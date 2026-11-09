@@ -153,7 +153,7 @@ class Item:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ItemResult:
+class Verdict:
     """Verdict for one quantity.
 
     Attributes:
@@ -199,7 +199,7 @@ def reconcile_item(
     gate: certificates.GateStatus = certificates.GateStatus.DESCRIPTIVE,
     set_id: qualification.SetId = qualification.SetId.ALL,
     seed_path: qualification.SeedPath = (0, DETECTOR_ID, 0),
-) -> ItemResult:
+) -> Verdict:
     """Reconciles one quantity.
 
     A gap equal to the tolerance matches. The check blocks when the gap is
@@ -256,7 +256,7 @@ def reconcile_item(
         seed_path=seed_path,
         tier=tier,
     )
-    return ItemResult(item, gap, residual, status, tier, check)
+    return Verdict(item, gap, residual, status, tier, check)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -268,7 +268,7 @@ class Reconciliation:
         tolerance: Relative gap that needs no explanation.
     """
 
-    results: tuple[ItemResult, ...]
+    results: tuple[Verdict, ...]
     tolerance: float
 
     @property

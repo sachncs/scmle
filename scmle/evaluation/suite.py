@@ -21,9 +21,9 @@ def full_suite() -> tuple[diagnostics.Diagnostic, ...]:
     """
     return (
         *diagnostics.default_suite(),
-        slices.SliceReport(),
-        fairness.FairnessReport(),
-        robustness.RobustnessReport(),
+        slices.Slices(),
+        fairness.Fairness(),
+        robustness.Robustness(),
         shift.AdversarialValidation(),
         *suite.default_suite(),
     )

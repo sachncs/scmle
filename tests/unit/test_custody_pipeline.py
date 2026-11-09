@@ -1,4 +1,4 @@
-"""`apply_custody`: the three-way split over a real `SplitManager` result."""
+"""`apply_custody`: the three-way split over a real `Splitter` result."""
 
 import typing
 
@@ -19,9 +19,9 @@ DATA_HASH = "9" * 64
 
 
 def make_spec(**data):
-    return tasks.ProjectSpec(
-        data=tasks.DataSpec(uri="m", target="y", **data),
-        validation=tasks.ValidationSpec(strategy="stratified", seed=5),
+    return tasks.Config(
+        data=tasks.Dataset(uri="m", target="y", **data),
+        validation=tasks.Validation(strategy="stratified", seed=5),
     )
 
 
@@ -37,22 +37,22 @@ def make_frame(rows=2000, seed=0):
 
 
 class Ran(typing.NamedTuple):
-    outcome: pipeline.CustodyOutcome
-    original: splitters.SplitResult
-    vault: sealed.CustodyVault
+    outcome: pipeline.Outcome
+    original: splitters.Split
+    vault: sealed.Vault
 
 
 def run(frame, charter=None, spec=None):
     spec = spec or make_spec()
-    split = splitters.SplitManager(spec, tasks.TaskType.BINARY).split(frame)
+    split = splitters.Splitter(spec, tasks.Task.BINARY).split(frame)
     log = sealed.OpenLog()
-    vault = sealed.CustodyVault(log)
+    vault = sealed.Vault(log)
     outcome = pipeline.apply_custody(
         charter=charter or make_charter(min_effect=0.3, k_max=5),
         split=split,
         frame=frame,
         spec=spec,
-        task=tasks.TaskType.BINARY,
+        task=tasks.Task.BINARY,
         data_hash=DATA_HASH,
         vault=vault,
     )
@@ -136,15 +136,15 @@ def test_the_group_column_keeps_groups_out_of_both_sets():
     frame = make_frame()
     frame["g"] = numpy.arange(len(frame)) // 5
     spec = make_spec(group_column="g")
-    split = splitters.SplitManager(spec, tasks.TaskType.BINARY).split(frame)
+    split = splitters.Splitter(spec, tasks.Task.BINARY).split(frame)
     log = sealed.OpenLog()
-    vault = sealed.CustodyVault(log)
+    vault = sealed.Vault(log)
     outcome = pipeline.apply_custody(
         charter=make_charter(min_effect=0.3, k_max=5),
         split=split,
         frame=frame,
         spec=spec,
-        task=tasks.TaskType.BINARY,
+        task=tasks.Task.BINARY,
         data_hash=DATA_HASH,
         vault=vault,
     )
@@ -210,13 +210,13 @@ def temporal_frame(phi, rows=1500):
 
 
 def run_temporal(frame, charter):
-    spec = tasks.ProjectSpec(
-        data=tasks.DataSpec(uri="m", target="y", time_column="t"),
-        validation=tasks.ValidationSpec(strategy="temporal", seed=5),
+    spec = tasks.Config(
+        data=tasks.Dataset(uri="m", target="y", time_column="t"),
+        validation=tasks.Validation(strategy="temporal", seed=5),
     )
-    task = tasks.TaskType.REGRESSION
-    split = splitters.SplitManager(spec, task).split(frame)
-    vault = sealed.CustodyVault(sealed.OpenLog(), process=False)
+    task = tasks.Task.REGRESSION
+    split = splitters.Splitter(spec, task).split(frame)
+    vault = sealed.Vault(sealed.OpenLog(), process=False)
     outcome = pipeline.apply_custody(
         charter=charter,
         split=split,

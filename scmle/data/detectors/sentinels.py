@@ -73,7 +73,7 @@ class SentinelFinding:
 
 
 @dataclasses.dataclass(frozen=True)
-class SentinelReport:
+class Sentinels:
     """Sentinel findings and the cells they cover.
 
     Attributes:
@@ -222,7 +222,7 @@ def find_sentinels(
     text_codes: Sequence[str] = TEXT_CODES,
     numeric_codes: Sequence[float] = (),
     alpha: float = ALPHA,
-) -> SentinelReport:
+) -> Sentinels:
     """Finds suspected sentinel codes.
 
     Args:
@@ -276,11 +276,11 @@ def find_sentinels(
         if significant and key not in seen:
             findings.append(finding)
     findings.sort(key=lambda f: (f.column, str(f.value)))
-    return SentinelReport(tuple(findings), len(frame))
+    return Sentinels(tuple(findings), len(frame))
 
 
 def sentinel_mask(
-    frame: pandas.DataFrame, report: SentinelReport
+    frame: pandas.DataFrame, report: Sentinels
 ) -> pandas.DataFrame:
     """Marks the cells that hold a reported code.
 
@@ -306,7 +306,7 @@ def sentinel_mask(
 
 
 def recode_missing(
-    frame: pandas.DataFrame, report: SentinelReport
+    frame: pandas.DataFrame, report: Sentinels
 ) -> tuple[pandas.DataFrame, list[dict[str, Any]]]:
     """Replaces reported codes by missing values and logs each recode.
 

@@ -485,7 +485,7 @@ def sample_skill(
 def skill_bound(
     problem: Problem,
     phi: numpy.ndarray,
-    cfg: leakage.LeakageConfig,
+    cfg: leakage.Config,
     groups: numpy.ndarray | None,
     rng: numpy.random.Generator,
 ) -> float:
@@ -610,7 +610,7 @@ def purity_statistic(recorded: numpy.ndarray) -> Statistic:
 def purity_bound(
     recorded: numpy.ndarray,
     classes: numpy.ndarray,
-    cfg: leakage.LeakageConfig,
+    cfg: leakage.Config,
     groups: numpy.ndarray | None,
 ) -> float:
     """One-sided Clopper-Pearson lower bound of the commonest class's share.
@@ -645,7 +645,7 @@ def bootstrap_v(
     missing: numpy.ndarray,
     classes: numpy.ndarray,
     n_classes: int,
-    cfg: leakage.LeakageConfig,
+    cfg: leakage.Config,
     groups: numpy.ndarray | None,
     rng: numpy.random.Generator,
 ) -> float:
@@ -857,7 +857,7 @@ class Finding:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ScreenReport:
+class Screen:
     """Result of the leakage screen over all candidate columns.
 
     Attributes:
@@ -1011,8 +1011,8 @@ def subsample(
 
 
 def gate_statuses(
-    store: certificates.CertificateStore | None,
-    cfg: leakage.LeakageConfig,
+    store: certificates.Store | None,
+    cfg: leakage.Config,
     task: str,
     n_classes: int,
 ) -> dict[str, certificates.GateStatus]:
@@ -1059,7 +1059,7 @@ def gate_statuses(
 
 def load_store(
     path: Path | None = None,
-) -> certificates.CertificateStore | None:
+) -> certificates.Store | None:
     """Loads the certificates of the screen.
 
     Args:
@@ -1073,13 +1073,13 @@ def load_store(
     if not target.is_file():
         return None
     try:
-        return certificates.CertificateStore.load(target)
+        return certificates.Store.load(target)
     except (ValueError, KeyError, OSError):
         return None
 
 
 @functools.cache
-def shipped_store() -> certificates.CertificateStore | None:
+def shipped_store() -> certificates.Store | None:
     """Loads the certificates shipped with the package, once.
 
     Returns:
@@ -1114,9 +1114,9 @@ def screen_table(
     seed: int,
     group_column: str | None = None,
     time_column: str | None = None,
-    store: certificates.CertificateStore | None = None,
+    store: certificates.Store | None = None,
     time_budget_seconds: float | None = None,
-) -> ScreenReport:
+) -> Screen:
     """Screens training data with the certified settings.
 
     Groups keep entities whole. A time column orders the rows (stable sort)
@@ -1181,7 +1181,7 @@ def code_digest() -> str:
     return certificates.code_hash(sys.modules[__name__], leakage, multiplicity)
 
 
-def ceilings_of(cfg: leakage.LeakageConfig) -> dict[str, float]:
+def ceilings_of(cfg: leakage.Config) -> dict[str, float]:
     """Looks up the pre-registered ceiling of each mechanism's effect size.
 
     Args:
@@ -1199,11 +1199,11 @@ def ceilings_of(cfg: leakage.LeakageConfig) -> dict[str, float]:
 
 
 def empty_report(
-    cfg: leakage.LeakageConfig,
+    cfg: leakage.Config,
     gates: Mapping[str, certificates.GateStatus],
     rows: int,
     note: str,
-) -> ScreenReport:
+) -> Screen:
     """Builds a report that tested nothing, and says why.
 
     Args:
@@ -1216,7 +1216,7 @@ def empty_report(
         A report with no findings, a family of 0, and `note` as its only
         note.
     """
-    return ScreenReport(
+    return Screen(
         (),
         rows,
         0,
@@ -1231,7 +1231,7 @@ def empty_report(
 def build_problem(
     target: pandas.Series,
     task: str,
-    cfg: leakage.LeakageConfig,
+    cfg: leakage.Config,
     groups: numpy.ndarray | None,
     block_size: int | None,
 ) -> Problem:
@@ -1265,13 +1265,13 @@ def scan_frame(
     frame: pandas.DataFrame,
     target: str,
     task: str,
-    cfg: leakage.LeakageConfig,
+    cfg: leakage.Config,
     names: Sequence[Hashable],
     groups: numpy.ndarray | None,
     block_size: int | None,
     gates: Mapping[str, certificates.GateStatus],
     time_budget_seconds: float | None = None,
-) -> ScreenReport:
+) -> Screen:
     """Runs the screen on rows that are already chosen.
 
     Args:
@@ -1358,7 +1358,7 @@ def scan_frame(
     total = max(cfg.permutations, required_permutations(family, alpha))
     declined = tuple(dict.fromkeys(h.feature for h in pending))
     if total > MAX_PERMUTATIONS:
-        return ScreenReport(
+        return Screen(
             (),
             n,
             family,
@@ -1383,7 +1383,7 @@ def scan_frame(
     )
     cap = work_cap(time_budget_seconds)
     if cap is not None and work > cap:
-        return ScreenReport(
+        return Screen(
             (),
             n,
             family,
@@ -1411,7 +1411,7 @@ def scan_frame(
     complete = [h.statistic is None or h.drawn == total for h in pending]
     used = [p if done else 1.0 for p, done in zip(ps, complete, strict=True)]
     adjustment = multiplicity.adjust(
-        used, scmle.data.ledger.budget.MultiplicityRule.BY, alpha
+        used, scmle.data.ledger.budget.Correction.BY, alpha
     )
     findings = []
     for k, h in enumerate(pending):
@@ -1447,22 +1447,20 @@ def scan_frame(
                 gates[h.mechanism],
             )
         )
-    return ScreenReport(
-        tuple(findings), n, family, total, cfg.alpha, gates, ceilings
-    )
+    return Screen(tuple(findings), n, family, total, cfg.alpha, gates, ceilings)
 
 
 def screen(
     frame: pandas.DataFrame,
     target: str,
     task: str,
-    cfg: leakage.LeakageConfig,
+    cfg: leakage.Config,
     features: Sequence[Hashable] | None = None,
     groups: pandas.Series | None = None,
     block_size: int | None = None,
-    store: certificates.CertificateStore | None = None,
+    store: certificates.Store | None = None,
     time_budget_seconds: float | None = None,
-) -> ScreenReport:
+) -> Screen:
     """Screens the candidate columns of training data for leakage suspicion.
 
     Args:

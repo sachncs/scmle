@@ -36,7 +36,7 @@ class Unsupported(errors.ScmleError):
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ConfirmPolicy:
+class Polling:
     """How long to wait for the platform to settle.
 
     Attributes:
@@ -108,7 +108,7 @@ class ControlPlane(abc.ABC):
 def confirm(
     plane: ControlPlane,
     check: Callable[[observation.Observation], list[str]],
-    policy: ConfirmPolicy | None = None,
+    policy: Polling | None = None,
 ) -> observation.Observation:
     """Reads the platform until ``check`` finds nothing wrong.
 
@@ -118,7 +118,7 @@ def confirm(
         plane: The platform.
         check: Returns the reasons an observation is not yet what was asked; an
             empty list means it is.
-        policy: Attempts and delay; the defaults of `ConfirmPolicy` if None.
+        policy: Attempts and delay; the defaults of `Polling` if None.
 
     Returns:
         The confirming observation.
@@ -126,7 +126,7 @@ def confirm(
     Raises:
         RuntimeUnconfirmed: If the last read still differs, with its reasons.
     """
-    policy = policy or ConfirmPolicy()
+    policy = policy or Polling()
     reasons: list[str] = []
     for attempt in range(policy.attempts):
         if attempt:

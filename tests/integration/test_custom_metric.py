@@ -4,19 +4,19 @@ import metric_functions
 import pytest
 import support
 
-import scmle
 from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.evaluation import metrics
+import scmle.evaluation.metrics
 
 
 @pytest.fixture
 def registered():
-    metric = scmle.register_metric(
+    metric = scmle.evaluation.metrics.register_metric(
         "business_cost",
         metric_functions.business_cost,
         greater_is_better=False,
-        task_types=(tasks.TaskType.BINARY,),
+        task_types=(tasks.Task.BINARY,),
     )
     yield metric
     metrics.CATALOG.unregister("business_cost")
@@ -45,18 +45,18 @@ def test_registering_twice_needs_replace_and_unknown_tasks_are_rejected(
     registered,
 ):
     with pytest.raises(errors.ConfigError, match="already exists"):
-        scmle.register_metric(
+        scmle.evaluation.metrics.register_metric(
             "business_cost", metric_functions.business_cost, False
         )
-    scmle.register_metric(
+    scmle.evaluation.metrics.register_metric(
         "business_cost",
         metric_functions.business_cost,
         False,
-        task_types=(tasks.TaskType.BINARY,),
+        task_types=(tasks.Task.BINARY,),
         replace=True,
     )
     with pytest.raises(errors.ConfigError, match="not defined"):
-        metrics.CATALOG.resolve("business_cost", tasks.TaskType.REGRESSION)
+        metrics.CATALOG.resolve("business_cost", tasks.Task.REGRESSION)
 
 
 def test_a_regression_metric_can_be_user_defined(tmp_path):
@@ -66,11 +66,11 @@ def test_a_regression_metric_can_be_user_defined(tmp_path):
     rng = numpy.random.default_rng(2)
     frame = pandas.DataFrame({"x": rng.uniform(1, 5, 400)})
     frame["y"] = 3 * frame.x + rng.normal(0, 0.3, 400)
-    scmle.register_metric(
+    scmle.evaluation.metrics.register_metric(
         "mape",
         metric_functions.mean_absolute_percentage,
         greater_is_better=False,
-        task_types=(tasks.TaskType.REGRESSION,),
+        task_types=(tasks.Task.REGRESSION,),
     )
     try:
         result = support.make_project(

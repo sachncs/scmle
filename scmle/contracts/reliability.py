@@ -73,7 +73,7 @@ class EvidenceOutcome(enum.StrEnum):
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class FaultEvidence:
+class Evidence:
     """Evidence produced by an actual fault-injection execution.
 
     The contract requires non-blank text for an execution identity, an
@@ -161,7 +161,7 @@ class FaultEvidence:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class FaultScenarioPlan:
+class Plan:
     """Declaration and verification state for one fault scenario.
 
     ``PLANNED`` is the only status permitted without execution evidence.
@@ -184,7 +184,7 @@ class FaultScenarioPlan:
     evidence_requirements: tuple[str, ...]
     release_blocking: bool
     verification_status: VerificationStatus = VerificationStatus.PLANNED
-    evidence: tuple[FaultEvidence, ...] = ()
+    evidence: tuple[Evidence, ...] = ()
 
     def __post_init__(self) -> None:
         """Validates declaration completeness and evidence/status consistency.
@@ -281,13 +281,13 @@ class FaultScenarioPlan:
                 record["verification_status"]
             ),
             evidence=tuple(
-                FaultEvidence.from_dict(item) for item in record["evidence"]
+                Evidence.from_dict(item) for item in record["evidence"]
             ),
         )
 
 
 @dataclasses.dataclass
-class FaultInjectionPlanRegistry:
+class Registry:
     """Deterministic registry of the complete production fault-injection plan.
 
     The registry accepts planned declarations without pretending they have
@@ -298,9 +298,7 @@ class FaultInjectionPlanRegistry:
         plans: Scenario plans keyed by their stable scenario enum.
     """
 
-    plans: dict[FaultScenario, FaultScenarioPlan] = dataclasses.field(
-        default_factory=dict
-    )
+    plans: dict[FaultScenario, Plan] = dataclasses.field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Re-registers the plans supplied at construction time.
@@ -326,7 +324,7 @@ class FaultInjectionPlanRegistry:
         registry.validate_complete()
         return registry
 
-    def register(self, plan: FaultScenarioPlan) -> None:
+    def register(self, plan: Plan) -> None:
         """Registers one complete scenario declaration.
 
         Args:
@@ -336,8 +334,8 @@ class FaultInjectionPlanRegistry:
             TypeError: If ``plan`` is not a scenario plan.
             ValueError: If the scenario is already registered.
         """
-        if not isinstance(plan, FaultScenarioPlan):
-            raise TypeError("plan must be FaultScenarioPlan")
+        if not isinstance(plan, Plan):
+            raise TypeError("plan must be Plan")
         if plan.scenario in self.plans:
             raise ValueError(f"scenario already registered: {plan.scenario}")
         self.plans[plan.scenario] = plan
@@ -345,8 +343,8 @@ class FaultInjectionPlanRegistry:
     def record_evidence(
         self,
         scenario: FaultScenario,
-        evidence: tuple[FaultEvidence, ...],
-    ) -> FaultScenarioPlan:
+        evidence: tuple[Evidence, ...],
+    ) -> Plan:
         """Records one execution and derives its verification status.
 
         Safe evidence for every declared requirement produces ``PASSED``.
@@ -369,7 +367,7 @@ class FaultInjectionPlanRegistry:
 
         Raises:
             TypeError: If `scenario` is not a `FaultScenario` or an item is
-                not a `FaultEvidence`.
+                not a `Evidence`.
             ValueError: If `evidence` is not a non-empty tuple, comes from
                 more than one execution, repeats an evidence type, has a type
                 outside the scenario's requirements, or would give a passed
@@ -379,8 +377,8 @@ class FaultInjectionPlanRegistry:
             raise TypeError("scenario must be FaultScenario")
         if not isinstance(evidence, tuple) or not evidence:
             raise ValueError("evidence must be a non-empty tuple")
-        if not all(isinstance(item, FaultEvidence) for item in evidence):
-            raise TypeError("evidence must contain FaultEvidence values")
+        if not all(isinstance(item, Evidence) for item in evidence):
+            raise TypeError("evidence must contain Evidence values")
         execution_ids = {item.execution_id for item in evidence}
         if len(execution_ids) != 1:
             raise ValueError(
@@ -484,7 +482,7 @@ class FaultInjectionPlanRegistry:
         for item in scenarios:
             if not isinstance(item, Mapping):
                 raise TypeError("each scenario must be a mapping")
-            registry.register(FaultScenarioPlan.from_dict(item))
+            registry.register(Plan.from_dict(item))
         registry.validate_complete()
         return registry
 
@@ -508,7 +506,7 @@ class FaultInjectionPlanRegistry:
         return cls.from_dict(record)
 
 
-def default_fault_injection_plans() -> tuple[FaultScenarioPlan, ...]:
+def default_fault_injection_plans() -> tuple[Plan, ...]:
     """Returns the complete, unexecuted production-beta fault plan.
 
     These declarations describe what must be injected and what evidence a
@@ -616,7 +614,7 @@ def default_fault_injection_plans() -> tuple[FaultScenarioPlan, ...]:
         ),
     )
     return tuple(
-        FaultScenarioPlan(
+        Plan(
             scenario=scenario,
             expected_safe_outcome=expected_safe_outcome,
             recoverability=recoverability,

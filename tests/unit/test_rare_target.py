@@ -14,7 +14,7 @@ from scmle.sampling import strategies
 
 @pytest.fixture
 def registry():
-    return scmle.models.registry.ModelRegistry.with_builtins()
+    return scmle.models.registry.Catalog.with_builtins()
 
 
 def long_tailed(rows=800, seed=0):
@@ -49,20 +49,18 @@ def test_strategy_applies_only_to_long_tailed_regression(registry):
     strategy = strategies.get_strategy("rare_target_weighting")
     forest = registry.get("random_forest")
     assert (
-        strategy.applicability(
-            profile_with(3.0), tasks.TaskType.REGRESSION, forest
-        )
+        strategy.applicability(profile_with(3.0), tasks.Task.REGRESSION, forest)
         is None
     )
     assert "not long-tailed" in strategy.applicability(
-        profile_with(0.2), tasks.TaskType.REGRESSION, forest
+        profile_with(0.2), tasks.Task.REGRESSION, forest
     )
     assert "regression only" in strategy.applicability(
-        profile_with(3.0), tasks.TaskType.BINARY, forest
+        profile_with(3.0), tasks.Task.BINARY, forest
     )
     knn = registry.get("knn")
     assert "sample weights" in strategy.applicability(
-        profile_with(3.0), tasks.TaskType.REGRESSION, knn
+        profile_with(3.0), tasks.Task.REGRESSION, knn
     )
 
 
@@ -70,7 +68,7 @@ def test_classification_resampling_strategies_never_touch_regression(registry):
     forest = registry.get("random_forest")
     for name in ("random_oversample", "smote", "class_weight"):
         reason = strategies.get_strategy(name).applicability(
-            profile_with(3.0), tasks.TaskType.REGRESSION, forest
+            profile_with(3.0), tasks.Task.REGRESSION, forest
         )
         assert reason is not None
 
@@ -79,7 +77,7 @@ def test_weighted_pipeline_fits_and_predicts(registry):
     features, target = long_tailed()
     plan = data.FeaturePlan(("x",), ())
     candidate = strategies.get_strategy("rare_target_weighting").build(
-        plan, registry.get("random_forest"), tasks.TaskType.REGRESSION, 0
+        plan, registry.get("random_forest"), tasks.Task.REGRESSION, 0
     )
     candidate.fit(features, target)
     predictions = candidate.predict(features)

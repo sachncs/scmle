@@ -7,7 +7,7 @@ import pandas
 import pytest
 import support
 
-import scmle
+import scmle.api.project
 from scmle.contracts import errors
 from scmle.contracts import tasks
 
@@ -110,15 +110,15 @@ def test_test_set_is_opened_exactly_once_per_run(binary_frame, tmp_path):
 
 
 def run_default(frame, directory):
-    return scmle.MLProject(
+    return scmle.api.project.Project(
         frame,
         "y",
         time_budget=600,
         output_dir=directory,
         validation="random",  # Stratified splits legitimately use labels.
-        search=tasks.SearchSpec(top_models=1, configs_per_model=4),
-        strategies=tasks.StrategySpec(top_models=1),
-        ensemble=tasks.EnsembleSpec(size=2),
+        search=tasks.Search(top_models=1, configs_per_model=4),
+        strategies=tasks.Strategies(top_models=1),
+        ensemble=tasks.Stacking(size=2),
     ).run()
 
 
@@ -179,9 +179,7 @@ def test_profile_and_feature_plan_never_see_the_locked_test_rows(
     base.plan()
     from scmle.data.splitting import splitters
 
-    split = splitters.SplitManager(base.spec, tasks.TaskType.BINARY).split(
-        binary_frame
-    )
+    split = splitters.Splitter(base.spec, tasks.Task.BINARY).split(binary_frame)
     test_positions = list(split.manifest.test_ids)
 
     altered = binary_frame.copy()
@@ -209,7 +207,7 @@ def test_a_leak_present_only_in_the_test_rows_is_not_a_profile_finding(
     from scmle.data.splitting import splitters
 
     project = support.make_project(binary_frame, "y", output_dir=tmp_path)
-    split = splitters.SplitManager(project.spec, tasks.TaskType.BINARY).split(
+    split = splitters.Splitter(project.spec, tasks.Task.BINARY).split(
         binary_frame
     )
     test_positions = list(split.manifest.test_ids)
@@ -238,13 +236,13 @@ def test_hard_enforcement_moves_the_test_rows_out_of_reach(
     )
     frame["y"] = (frame.x + rng.normal(0, 0.5, 400) > 0).astype(int)
     seen = []
-    original = limits.TrialSupervisor.run
+    original = limits.Supervisor.run
 
     def record(self, function, argument):
         seen.append(set(argument.features["sentinel"]))
         return original(self, function, argument)
 
-    monkeypatch.setattr(limits.TrialSupervisor, "run", record)
+    monkeypatch.setattr(limits.Supervisor, "run", record)
     result = support.make_project(
         frame,
         "y",

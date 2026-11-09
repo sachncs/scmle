@@ -30,9 +30,9 @@ def binary_frame() -> pandas.DataFrame:
 def capability(resources: capabilities.ResourceAssumptions):
     """Return the baseline binary capability used by the test gate."""
     return capabilities.Capability(
-        key=capabilities.CapabilityKey(
+        key=capabilities.Coordinate(
             modality=capabilities.Modality.TABULAR,
-            task=tasks.TaskType.BINARY,
+            task=tasks.Task.BINARY,
             model_family="baseline",
             evaluation=capabilities.Evaluation.STANDARD,
             uncertainty=capabilities.Uncertainty.NONE,
@@ -40,7 +40,7 @@ def capability(resources: capabilities.ResourceAssumptions):
             explainability=capabilities.Explainability.NONE,
             inference=capabilities.Inference.LIBRARY,
         ),
-        status=capabilities.CapabilityStatus.SUPPORTED,
+        status=capabilities.Status.SUPPORTED,
         required_extras=("core",),
         resources=resources,
         failure_modes=("resource observation unavailable",),
@@ -55,15 +55,15 @@ def observation(
     cpu_cores: int | None,
     memory_gb: float | None,
     disk_gb: float | None,
-) -> resource_observation.RuntimeResourceObservation:
+) -> resource_observation.Observation:
     """Build a fixed observation for tests without probing the host."""
-    environment = capabilities.CapabilityEnvironment(
+    environment = capabilities.Environment(
         available_extras=frozenset({"core"}),
         cpu_cores=cpu_cores,
         memory_gb=memory_gb,
         disk_gb=disk_gb,
     )
-    return resource_observation.RuntimeResourceObservation(
+    return resource_observation.Observation(
         environment,
         captured_at="2026-01-01T00:00:00+00:00",
         disk_path="/tmp",
@@ -77,13 +77,13 @@ def observation(
     )
 
 
-def make_spec() -> tasks.ProjectSpec:
+def make_spec() -> tasks.Config:
     """Return a planning-only project specification."""
-    return tasks.ProjectSpec(
-        data=tasks.DataSpec(uri="<in-memory>", target="y"),
-        search=tasks.SearchSpec(top_models=0),
-        strategies=tasks.StrategySpec(top_models=0),
-        ensemble=tasks.EnsembleSpec(size=0),
+    return tasks.Config(
+        data=tasks.Dataset(uri="<in-memory>", target="y"),
+        search=tasks.Search(top_models=0),
+        strategies=tasks.Strategies(top_models=0),
+        ensemble=tasks.Stacking(size=0),
     )
 
 
@@ -137,7 +137,7 @@ def test_bound_observation_is_used_by_the_capability_gate(monkeypatch):
             disk_gb=1.0,
         )
     )
-    registry = capabilities.CapabilityRegistry((record,))
+    registry = capabilities.Registry((record,))
     monkeypatch.setattr(
         orchestrator.resource_observation,
         "observe_runtime_resources",
@@ -150,9 +150,7 @@ def test_bound_observation_is_used_by_the_capability_gate(monkeypatch):
     project = orchestrator.Orchestrator(
         make_spec(),
         binary_frame(),
-        registry=scmle.models.registry.ModelRegistry(
-            (classical.DummyAdapter(),)
-        ),
+        registry=scmle.models.registry.Catalog((classical.Dummy(),)),
         capability_registry=registry,
     )
     context = project.new_context()
@@ -175,7 +173,7 @@ def test_unknown_declared_facts_fail_closed_and_are_persisted(
             disk_gb=1.0,
         )
     )
-    registry = capabilities.CapabilityRegistry((record,))
+    registry = capabilities.Registry((record,))
     monkeypatch.setattr(
         orchestrator.resource_observation,
         "observe_runtime_resources",
@@ -188,9 +186,7 @@ def test_unknown_declared_facts_fail_closed_and_are_persisted(
     project = orchestrator.Orchestrator(
         make_spec(),
         binary_frame(),
-        registry=scmle.models.registry.ModelRegistry(
-            (classical.DummyAdapter(),)
-        ),
+        registry=scmle.models.registry.Catalog((classical.Dummy(),)),
         capability_registry=registry,
     )
 

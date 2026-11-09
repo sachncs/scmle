@@ -40,7 +40,7 @@ QUALITY_PREFIX = "quality"
 MARKER = "DATASET.json"
 
 
-class Policy(enum.StrEnum):
+class Severity(enum.StrEnum):
     """What a violation of a rule means."""
 
     FAIL = "fail"
@@ -69,7 +69,7 @@ class QualityGateError(errors.DataError):
     category = "quality"
 
     def __init__(
-        self, message: str, report: "GateReport", *, quarantined: bool = False
+        self, message: str, report: "Assessment", *, quarantined: bool = False
     ) -> None:
         """Initializes the error.
 
@@ -98,7 +98,7 @@ class Finding:
     """
 
     rule: str
-    policy: Policy
+    policy: Severity
     passed: bool
     violations: int
     row_level: bool
@@ -119,7 +119,7 @@ class Finding:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class GateReport:
+class Assessment:
     """The outcome of one gate run.
 
     Attributes:
@@ -160,7 +160,7 @@ class GateReport:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class GateResult:
+class Screening:
     """The data that may continue, what was held back, and the report.
 
     Attributes:
@@ -173,10 +173,10 @@ class GateResult:
 
     frame: pandas.DataFrame
     quarantined: pandas.DataFrame
-    report: GateReport
+    report: Assessment
 
 
-class Rule(abc.ABC):
+class Check(abc.ABC):
     """A check with a declared failure policy.
 
     Attributes:
@@ -189,7 +189,7 @@ class Rule(abc.ABC):
 
     def __init__(
         self,
-        policy: Policy = Policy.FAIL,
+        policy: Severity = Severity.FAIL,
         stages: Collection[Stage] = BOTH,
     ) -> None:
         """Initializes the rule.
@@ -198,7 +198,7 @@ class Rule(abc.ABC):
             policy: What a violation means.
             stages: The stages the rule applies to.
         """
-        self.policy = Policy(policy)
+        self.policy = Severity(policy)
         self.stages = frozenset(stages)
 
     @abc.abstractmethod
@@ -251,7 +251,7 @@ class Rule(abc.ABC):
         )
 
 
-class SchemaRule(Rule):
+class SchemaCheck(Check):
     """The observed schema equals the contract's."""
 
     name = "schema"
@@ -277,7 +277,7 @@ class SchemaRule(Rule):
         return self.dataset_finding(not problems, "; ".join(problems[:5]))
 
 
-class FreshnessRule(Rule):
+class FreshnessCheck(Check):
     """The data is not older than the contract allows."""
 
     name = "freshness"
@@ -306,7 +306,7 @@ class FreshnessRule(Rule):
         )
 
 
-class MinRowsRule(Rule):
+class MinRowsCheck(Check):
     """The dataset has at least `minimum` rows."""
 
     name = "min_rows"
@@ -344,7 +344,7 @@ class MinRowsRule(Rule):
         )
 
 
-class NullFractionRule(Rule):
+class NullFractionCheck(Check):
     """At most `maximum` of a column is null."""
 
     name = "null_fraction"
@@ -390,7 +390,7 @@ class NullFractionRule(Rule):
         )
 
 
-class NoNullsRule(Rule):
+class NoNullsCheck(Check):
     """No row has a null in the column."""
 
     name = "no_nulls"
@@ -430,7 +430,7 @@ class NoNullsRule(Rule):
         )
 
 
-class UniqueKeyRule(Rule):
+class UniqueKeyCheck(Check):
     """The contract's key columns identify rows (repeats are violations)."""
 
     name = "unique_key"
@@ -463,7 +463,7 @@ class UniqueKeyRule(Rule):
         )
 
 
-class RangeRule(Rule):
+class RangeCheck(Check):
     """Values of a numeric column lie in `[minimum, maximum]`."""
 
     name = "range"
@@ -523,7 +523,7 @@ class RangeRule(Rule):
         )
 
 
-class AllowedValuesRule(Rule):
+class AllowedValuesCheck(Check):
     """Values of a column belong to a declared set."""
 
     name = "allowed_values"
@@ -583,7 +583,7 @@ class QualityGate:
 
     def __init__(
         self,
-        rules: Sequence[Rule],
+        rules: Sequence[Check],
         store: objectstore.ObjectStore | None = None,
     ) -> None:
         """Initializes the gate.
@@ -630,7 +630,7 @@ class QualityGate:
         record: snapshot.SnapshotRecord,
         contract: snapshot.DataContract,
         stage: Stage,
-    ) -> GateResult:
+    ) -> Screening:
         """Checks the data for a stage.
 
         Args:
@@ -654,7 +654,7 @@ class QualityGate:
         if self.store is not None and self.store.exists(
             self.marker_key(record.snapshot_id)
         ):
-            report = GateReport(
+            report = Assessment(
                 stage.value,
                 record.snapshot_id,
                 record.dataset,
@@ -673,24 +673,24 @@ class QualityGate:
             for rule in applicable
         )
         failed = [f for f in findings if not f.passed]
-        stops = [f for f in failed if f.policy is Policy.FAIL]
+        stops = [f for f in failed if f.policy is Severity.FAIL]
         holds = [
             f
             for f in failed
-            if f.policy is Policy.QUARANTINE and not f.row_level
+            if f.policy is Severity.QUARANTINE and not f.row_level
         ]
         removed = sorted(
             {
                 row
                 for f in failed
-                if f.policy is Policy.QUARANTINE and f.row_level
+                if f.policy is Severity.QUARANTINE and f.row_level
                 for row in f.rows
             }
         )
         decision = self.decide(failed, stops, holds, removed)
         kept = frame.reset_index(drop=True).drop(index=removed)
         held = frame.reset_index(drop=True).iloc[removed]
-        report = GateReport(
+        report = Assessment(
             stage.value,
             record.snapshot_id,
             record.dataset,
@@ -711,7 +711,7 @@ class QualityGate:
                 report,
                 quarantined=True,
             )
-        return GateResult(kept, held, report)
+        return Screening(kept, held, report)
 
     def decide(
         self,
@@ -746,7 +746,7 @@ class QualityGate:
 
     def persist(
         self,
-        report: GateReport,
+        report: Assessment,
         held: pandas.DataFrame,
         record: snapshot.SnapshotRecord,
         whole_snapshot: bool,

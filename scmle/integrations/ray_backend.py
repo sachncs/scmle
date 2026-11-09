@@ -11,7 +11,7 @@ from scmle.core import scheduler
 DEFAULT_RETRIES = 1
 
 
-class RayBackend(scheduler.ExecutionBackend):
+class RayBackend(scheduler.Executor):
     """Runs items as Ray tasks (`distributed` extra), local or cluster.
 
     A task whose worker process or node disappears is retried once; if it

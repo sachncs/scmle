@@ -1,6 +1,6 @@
 # What a run writes
 
-Every `MLProject.run()` (or `scmle run`) creates `runs/run_<date>_<n>/` under
+Every `Project.run()` (or `scmle run`) creates `runs/run_<date>_<n>/` under
 the output directory. Nothing is hidden in memory: this directory is the
 evidence for the result and is what `resume` and `verify_replay` read.
 Sibling file `runs/experiments.sqlite` tracks run and trial rows.
@@ -42,7 +42,7 @@ Start with `report.html`, then `diagnostics/decision_log.json`.
 
 ### Raw-data ingestion (`scmle ingest`)
 
-`scmle ingest --sqlite FILE --tables a,b` (read-only connection) or `IngestPlan` writes into `--output`:
+`scmle ingest --sqlite FILE --tables a,b` (read-only connection) or `Plan` writes into `--output`:
 
 | Path | Contents |
 | --- | --- |

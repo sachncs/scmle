@@ -44,7 +44,7 @@ def charter_file(
     estimand = dataclasses.replace(
         base.estimand,
         kind="causal",
-        causal=causal.CausalSpec(
+        causal=causal.Question(
             treatment="t",
             outcome="y",
             estimand="ATE",

@@ -338,30 +338,30 @@ def test_confirmation_alpha_by_and_bonferroni_are_exact_at_rank_one():
     budget = make_budget()
     assert (
         scmle.data.ledger.budget.confirmation_alpha(
-            budget, 1, scmle.data.ledger.budget.MultiplicityRule.BY
+            budget, 1, scmle.data.ledger.budget.Correction.BY
         )
         == 0.05
     )
     assert (
         scmle.data.ledger.budget.confirmation_alpha(
-            budget, 1, scmle.data.ledger.budget.MultiplicityRule.BH
+            budget, 1, scmle.data.ledger.budget.Correction.BH
         )
         == 0.05
     )
     assert (
         scmle.data.ledger.budget.confirmation_alpha(
-            budget, 2, scmle.data.ledger.budget.MultiplicityRule.HOLM
+            budget, 2, scmle.data.ledger.budget.Correction.HOLM
         )
         == 0.025
     )
     assert scmle.data.ledger.budget.confirmation_alpha(
-        budget, 2, scmle.data.ledger.budget.MultiplicityRule.BY
+        budget, 2, scmle.data.ledger.budget.Correction.BY
     ) == pytest.approx(0.05 / 3)
 
 
 def test_confirmation_alpha_never_exceeds_alpha_and_shrinks_with_survivors():
     budget = make_budget()
-    for rule in scmle.data.ledger.budget.MultiplicityRule:
+    for rule in scmle.data.ledger.budget.Correction:
         levels = [
             scmle.data.ledger.budget.confirmation_alpha(budget, n, rule)
             for n in range(0, 12)
@@ -375,11 +375,11 @@ def test_confirmation_alpha_input_validation():
     budget = make_budget()
     with pytest.raises(ValueError, match=r"^n_survivors must be non-negative$"):
         scmle.data.ledger.budget.confirmation_alpha(
-            budget, -1, scmle.data.ledger.budget.MultiplicityRule.BH
+            budget, -1, scmle.data.ledger.budget.Correction.BH
         )
     with pytest.raises(ValueError, match=r"^n_survivors must be an integer$"):
         scmle.data.ledger.budget.confirmation_alpha(
-            budget, 1.5, scmle.data.ledger.budget.MultiplicityRule.BH
+            budget, 1.5, scmle.data.ledger.budget.Correction.BH
         )  # type: ignore[arg-type]
-    with pytest.raises(ValueError, match=r"^rule must be a MultiplicityRule$"):
+    with pytest.raises(ValueError, match=r"^rule must be a Correction$"):
         scmle.data.ledger.budget.confirmation_alpha(budget, 1, "bh")  # type: ignore[arg-type]

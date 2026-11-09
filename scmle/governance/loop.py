@@ -99,7 +99,7 @@ class ReplyRefused(errors.ArtifactError):
 
 
 @dataclasses.dataclass(frozen=True)
-class LoopPolicy:
+class Preregistration:
     """Pre-registered inputs of the loop (changed only by `Loop.amend_policy`).
 
     Risks, tolerances and margins are in loss units, ``alpha_*`` and ``delta``
@@ -214,7 +214,7 @@ class LoopPolicy:
         return record
 
     @classmethod
-    def from_dict(cls, record: Mapping[str, Any]) -> "LoopPolicy":
+    def from_dict(cls, record: Mapping[str, Any]) -> "Preregistration":
         """Rebuilds a policy from `to_dict`.
 
         Args:
@@ -266,7 +266,7 @@ class Observation:
 
 
 @dataclasses.dataclass(frozen=True)
-class StepResult:
+class Outcome:
     """What a `step` found and did.
 
     Attributes:
@@ -351,7 +351,7 @@ class Loop:
         self,
         directory: Path,
         ledger: deployment_ledger.DeploymentLedger,
-        policy: LoopPolicy,
+        policy: Preregistration,
         guard: never_list.Guard,
         hooks: Hooks,
         verification_keys: Mapping[str, str | bytes],
@@ -406,7 +406,7 @@ class Loop:
         cls,
         deploy_dir: str | Path,
         charter: Any,
-        policy: LoopPolicy,
+        policy: Preregistration,
         *,
         hooks: Hooks | None = None,
         verification_keys: Mapping[str, str | bytes] | None = None,
@@ -528,7 +528,7 @@ class Loop:
         for row in ledger.rows:
             if row["kind"] == deployment_ledger.OBSERVE_SUMMARY:
                 effective.update(row["body"].get("policy_amendment", {}))
-        policy = LoopPolicy.from_dict(effective)
+        policy = Preregistration.from_dict(effective)
         charter = types.SimpleNamespace(
             charter_hash=ledger.header["charter_hash"]
         )
@@ -1106,7 +1106,7 @@ class Loop:
             signed=True,
         )
 
-    def step(self) -> StepResult:
+    def step(self) -> Outcome:
         """Processes matured batches and applies the decision map.
 
         A batch is processed once ``outcome_window`` batches have passed since
@@ -1118,11 +1118,11 @@ class Loop:
             when the ledger fails verification, with the single event
             ``("halt", reason)``), else `ok` if at least one matured batch
             had enough labels, else `insufficient_labels`. Its events, newest
-            escalation and mechanism are described by `StepResult`.
+            escalation and mechanism are described by `Outcome`.
         """
         if not self.verify_ledger():
             self.save_state()
-            return StepResult(
+            return Outcome(
                 HALTED, (("halt", HALT_LEDGER),), None, self.mechanism
             )
         first_row = len(self.ledger.rows)
@@ -1151,7 +1151,7 @@ class Loop:
         status = (
             HALTED if self.halted else (OK if used else INSUFFICIENT_LABELS)
         )
-        return StepResult(status, events, newest, self.mechanism)
+        return Outcome(status, events, newest, self.mechanism)
 
     def process_batch(self, record: dict[str, Any]) -> bool:
         """Feeds one matured batch to the monitors; False if unusable.
@@ -1520,7 +1520,7 @@ class Loop:
         loss: Any,
         weights: Any = None,
         confidence: numpy.ndarray | None = None,
-    ) -> escalation.ThresholdResult:
+    ) -> escalation.Threshold:
         """Selects `tau` on matured calibration cases and applies it.
 
         The first calibration, and any raise of `tau`, is free. Lowering `tau`
@@ -1786,7 +1786,7 @@ class Loop:
         """Routes every champion move of `registry` through this guard.
 
         `promote_challenger`, `check_rollback` and `register_run(promote=True)`
-        of a `LifecycleManager` over this registry then need an attestation,
+        of a `Maintainer` over this registry then need an attestation,
         as `move_champion` does. Moving the alias by editing the registry's
         files is not stopped.
 
@@ -1952,7 +1952,7 @@ class Loop:
             never_list.NeverAction.DELETE_OR_EXTERNAL, {"what": what}, do
         )
 
-    def amend_policy(self, **changes: Any) -> LoopPolicy:
+    def amend_policy(self, **changes: Any) -> Preregistration:
         """Changes the policy: tightening is free, anything else is gated.
 
         A field in ``NUMERIC_ORIENTATION`` (for example ``r_star`` or
@@ -1974,7 +1974,7 @@ class Loop:
             ValueError: For an unknown field, or a new value the policy's
                 range checks reject.
         """
-        names = {f.name for f in dataclasses.fields(LoopPolicy)}
+        names = {f.name for f in dataclasses.fields(Preregistration)}
         unknown = set(changes) - names
         if unknown:
             raise ValueError(f"unknown policy fields: {sorted(unknown)}")

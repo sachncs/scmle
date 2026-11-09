@@ -38,7 +38,7 @@ F_THRESHOLD = 10.0
 
 
 @dataclasses.dataclass(frozen=True)
-class IvResult:
+class Estimate:
     """A just-identified IV fit.
 
     Attributes:
@@ -185,7 +185,7 @@ def estimate(
     instrument: str,
     controls: tuple[str, ...] = (),
     level: float = 0.95,
-) -> IvResult:
+) -> Estimate:
     """Fits the just-identified model.
 
     Args:
@@ -236,7 +236,7 @@ def estimate(
         high = ar_high if kind == "bounded" else math.inf
     else:
         headline, low, high = "wald", wald[0], wald[1]
-    return IvResult(
+    return Estimate(
         estimate=beta,
         se=se,
         wald_low=wald[0],
@@ -255,7 +255,7 @@ def estimate(
     )
 
 
-def exclusion_bound(result: IvResult, direct_effect: float) -> float:
+def exclusion_bound(result: Estimate, direct_effect: float) -> float:
     """Returns the 2SLS bias if the instrument had a direct effect.
 
     A direct effect `gamma` of the instrument on the outcome moves the Wald

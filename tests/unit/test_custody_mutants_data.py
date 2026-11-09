@@ -117,14 +117,14 @@ def test_hash_and_version_errors_are_exact_and_a_missing_hash_is_an_error():
     record = make().to_dict()
     record["strategy"] = "other"
     assert message(
-        lambda: scmle.data.custody.manifest.CustodyManifest.from_dict(record)
+        lambda: scmle.data.custody.manifest.Manifest.from_dict(record)
     ) == ("split manifest hash mismatch: the manifest was edited")
     del record["sha256"]
     assert message(
-        lambda: scmle.data.custody.manifest.CustodyManifest.from_dict(record)
+        lambda: scmle.data.custody.manifest.Manifest.from_dict(record)
     ) == ("split manifest hash mismatch: the manifest was edited")
     assert message(
-        lambda: scmle.data.custody.manifest.CustodyManifest.from_dict({})
+        lambda: scmle.data.custody.manifest.Manifest.from_dict({})
     ) == ("unsupported split manifest version")
 
 
@@ -140,7 +140,7 @@ def test_a_record_without_a_version_or_ids_is_unsupported_not_a_key_error():
 
 
 def test_a_v1_record_without_notes_loads_and_a_bad_fingerprint_is_exact():
-    v1 = splitters.SplitManifest("random", 3, (0, 1), (2,), (((0,), (1,)),))
+    v1 = splitters.Manifest("random", 3, (0, 1), (2,), (((0,), (1,)),))
     record = v1.to_dict()
     record.pop("notes", None)
     assert scmle.data.custody.manifest.load_manifest(record).notes == ()
@@ -154,16 +154,13 @@ def test_a_manifest_without_roots_loads_with_empty_roots():
     record = make().to_dict()
     assert "row_roots" not in record
     assert (
-        scmle.data.custody.manifest.CustodyManifest.from_dict(record).row_roots
-        == ()
+        scmle.data.custody.manifest.Manifest.from_dict(record).row_roots == ()
     )
 
 
 def test_pairs_of_a_root_are_stored_as_tuples_after_a_round_trip():
     manifest = make(row_roots=(("exploration", "a" * 64),))
-    loaded = scmle.data.custody.manifest.CustodyManifest.from_dict(
-        manifest.to_dict()
-    )
+    loaded = scmle.data.custody.manifest.Manifest.from_dict(manifest.to_dict())
     assert loaded.row_roots == (("exploration", "a" * 64),)
     assert loaded == manifest
 
@@ -420,16 +417,16 @@ def test_a_missing_class_in_c_means_no_confirmation_set():
     frame["y"] = 0
     frame.loc[frame["g"] == 3, "y"] = 1
     spec = make_spec(group_column="g")
-    split = splitters.SplitManager(
-        spec, scmle.contracts.tasks.TaskType.BINARY
-    ).split(frame)
-    vault = sealed.CustodyVault(sealed.OpenLog(), process=False)
+    split = splitters.Splitter(spec, scmle.contracts.tasks.Task.BINARY).split(
+        frame
+    )
+    vault = sealed.Vault(sealed.OpenLog(), process=False)
     outcome = pipeline.apply_custody(
         charter=make_charter(min_effect=0.3, k_max=5),
         split=split,
         frame=frame,
         spec=spec,
-        task=scmle.contracts.tasks.TaskType.BINARY,
+        task=scmle.contracts.tasks.Task.BINARY,
         data_hash=DATA_HASH,
         vault=vault,
     )
@@ -450,20 +447,20 @@ def test_a_classification_target_is_measured_through_its_codes():
     )
     frame["y"] = numpy.where(runs == 1, "yes", "no")
     dev = numpy.arange(len(frame))
-    data = tasks.DataSpec(uri="m", target="y", time_column="t")
+    data = tasks.Dataset(uri="m", target="y", time_column="t")
     assert (
         pipeline.measured_embargo(
             frame,
             dev,
             data,
             frame["t"].to_numpy(),
-            scmle.contracts.tasks.TaskType.BINARY,
+            scmle.contracts.tasks.Task.BINARY,
         )
         > 5
     )
     assert (
         pipeline.measured_embargo(
-            frame, dev, data, None, scmle.contracts.tasks.TaskType.BINARY
+            frame, dev, data, None, scmle.contracts.tasks.Task.BINARY
         )
         == 0
     )
@@ -473,12 +470,12 @@ def test_a_text_target_in_a_regression_gives_no_measured_embargo():
     frame = pandas.DataFrame(
         {"t": numpy.arange(40), "y": ["a", "b"] * 20, "x": numpy.arange(40.0)}
     )
-    data = tasks.DataSpec(uri="m", target="y", time_column="t")
+    data = tasks.Dataset(uri="m", target="y", time_column="t")
     got = pipeline.measured_embargo(
         frame,
         numpy.arange(40),
         data,
         frame["t"].to_numpy(),
-        tasks.TaskType.REGRESSION,
+        tasks.Task.REGRESSION,
     )
     assert got == 0

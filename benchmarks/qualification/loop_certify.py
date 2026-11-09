@@ -18,7 +18,7 @@ Each gate is the function named in brackets and is filed under the key in
 * False alarm (`gate_h1`): `R` stable streams of `T` batches. Pass: P(any
   alarm) `<= alpha + 2 sqrt(alpha (1 - alpha) / R)` both at the stable risk
   `R_REF` and on the boundary of the null (risk `R_REF + DELTA`). The
-  existing fixed rule (`MonitoringThresholds`: 10 percent relative
+  existing fixed rule (`Thresholds`: 10 percent relative
   degradation on batches of 30 or more labelled rows) is measured on the same
   streams.
 * Detection delay (`gate_h2`): abrupt rises to `R_REF + k DELTA`, `k` in
@@ -164,9 +164,7 @@ def fixed_rule(batch_mean: numpy.ndarray) -> numpy.ndarray:
         A boolean array, True where the mean exceeds
         `R_REF * (1 + performance_tolerance)`.
     """
-    tolerance = (
-        scmle.monitoring.monitor.MonitoringThresholds().performance_tolerance
-    )
+    tolerance = scmle.monitoring.monitor.Thresholds().performance_tolerance
     return batch_mean > R_REF * (1.0 + tolerance)
 
 
@@ -322,9 +320,7 @@ def gate_h3(replicates: int, base: int = 0) -> dict[str, Any]:
         psi = reference.population_stability_index(
             expected / expected.sum(), actual / actual.sum()
         )
-        psi_flag += int(
-            psi >= scmle.monitoring.monitor.MonitoringThresholds().psi_high
-        )
+        psi_flag += int(psi >= scmle.monitoring.monitor.Thresholds().psi_high)
     rate = trigger / replicates
     bound = rate_floor(rate, ALPHA_ALARM, replicates)
     return {
@@ -604,7 +600,7 @@ def run_mnar_loop(seed: int) -> dict[str, Any]:
         )
     )
     charter = types.SimpleNamespace(charter_hash="c" * 64)
-    policy = scmle.governance.loop.LoopPolicy(
+    policy = scmle.governance.loop.Preregistration(
         reference_risk=R_REF,
         tolerance=DELTA,
         r_star=0.6,

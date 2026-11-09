@@ -24,7 +24,7 @@ Send = Callable[[list[observability.MetricSample]], int]
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class FlushResult:
+class Flush:
     """What a flush did.
 
     Attributes:
@@ -104,7 +104,7 @@ class MetricsSpool:
             durability.append_text(self.path, text)
         return len(samples)
 
-    def flush(self) -> FlushResult:
+    def flush(self) -> Flush:
         """Sends batches in order until the spool is empty or a send fails.
 
         Each batch holds up to ``batch_size`` of the oldest lines. A send
@@ -143,4 +143,4 @@ class MetricsSpool:
             sent += len(batch)
             text = "".join(line + "\n" for line in lines)
             durability.write_atomically(self.path, text.encode("utf-8"))
-        return FlushResult(sent, len(lines), error)
+        return Flush(sent, len(lines), error)

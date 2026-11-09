@@ -1,62 +1,25 @@
 """The supported top-level API does not disappear accidentally."""
 
 from importlib import metadata
+import types
 
 import pandas
 
 import scmle
+import scmle.api.project
 from scmle.governance import vault
 
-PUBLIC_API = {
-    "BayesianPrior",
-    "DatasetCatalog",
-    "EstimandSpec",
-    "EstimationPolicy",
-    "EstimationResult",
-    "ExtensionCurationAdapter",
-    "LifecycleCancellation",
-    "LifecycleCancelledError",
-    "LifecycleCheckpoint",
-    "LongitudinalEstimand",
-    "LongitudinalEstimationPolicy",
-    "LongitudinalEstimationResult",
-    "LongitudinalIPWEstimator",
-    "MLProject",
-    "ModalityCurationAdapter",
-    "ModalityCurationProject",
-    "ModalityCurationResult",
-    "ModalityHttpServing",
-    "ModalityProject",
-    "ModalityPredictor",
-    "ModalitySampleDecoder",
-    "ModelBundle",
-    "NonTabularModelCapability",
-    "NonTabularModelProject",
-    "NonTabularModelResult",
-    "ParameterEstimate",
-    "PeriodATE",
-    "RunResult",
-    "SequentialEstimand",
-    "SequentialEstimationPolicy",
-    "SequentialEstimationProject",
-    "SequentialEstimationResult",
-    "SequentialIPWEstimator",
-    "SequentialPeriodDiagnostics",
-    "SequentialRegimeEstimate",
-    "UnsupportedNonTabularModelError",
-    "__version__",
-    "estimate_parameters",
-    "load_model",
-    "predict",
-    "register_estimator",
-    "register_metric",
-    "unregister_estimator",
-}
 
+def test_the_package_root_re_exports_nothing():
+    """Every public name lives in the module that defines it, and only there."""
+    leaked = [
+        name
+        for name, value in vars(scmle).items()
+        if isinstance(value, type | types.FunctionType)
+    ]
 
-def test_top_level_exports_are_the_documented_public_api():
-    assert set(scmle.__all__) == PUBLIC_API
-    assert all(hasattr(scmle, name) for name in PUBLIC_API)
+    assert leaked == []
+    assert not hasattr(scmle, "__all__")
 
 
 def test_version_is_a_nonempty_release_string():
@@ -75,7 +38,7 @@ def test_package_documentation_points_to_standalone_site():
 
 def test_public_project_exposes_an_explicit_dataset_modality():
     """The user-facing API carries modality declarations to the contract."""
-    project = scmle.MLProject(
+    project = scmle.api.project.Project(
         data={"feature": [1, 2], "y": [0, 1]},
         target="y",
         modality="image",
@@ -94,7 +57,7 @@ def test_plan_closes_the_preview_test_set(monkeypatch):
         close(instance)
 
     monkeypatch.setattr(vault.SealedTestSet, "close", record_close)
-    project = scmle.MLProject(
+    project = scmle.api.project.Project(
         data=pandas.DataFrame({"feature": list(range(80)), "y": [0, 1] * 40}),
         target="y",
         time_budget=30,

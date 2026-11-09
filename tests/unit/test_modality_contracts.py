@@ -25,11 +25,11 @@ def make_evidence(
 
 
 def make_declaration(
-    status: modalities.ModalityStatus = modalities.ModalityStatus.SUPPORTED,
+    status: modalities.Status = modalities.Status.SUPPORTED,
     stage_evidence: tuple[modalities.StageEvidence, ...] | None = None,
     modality: modalities.ModalityIdentity = modalities.Modality.TABULAR,
-) -> modalities.ModalityDeclaration:
-    return modalities.ModalityDeclaration(
+) -> modalities.Declaration:
+    return modalities.Declaration(
         modality=modality,
         status=status,
         stage_evidence=(
@@ -87,19 +87,19 @@ def test_extension_declarations_are_never_promoted_to_supported():
     identity = modalities.ExtensionModality("acme/point-cloud")
     declaration = make_declaration(
         modality=identity,
-        status=modalities.ModalityStatus.EXTENSION_ONLY,
+        status=modalities.Status.EXTENSION_ONLY,
     )
-    registry = modalities.ModalityRegistry((declaration,))
+    registry = modalities.Registry((declaration,))
 
     assert (
-        registry.require(identity, {modalities.ModalityStatus.EXTENSION_ONLY})
+        registry.require(identity, {modalities.Status.EXTENSION_ONLY})
         is declaration
     )
     assert declaration.to_dict()["modality"] == "extension:acme/point-cloud"
     with pytest.raises(ValueError, match="extension-only status"):
         make_declaration(
             modality=identity,
-            status=modalities.ModalityStatus.SUPPORTED,
+            status=modalities.Status.SUPPORTED,
         )
 
 
@@ -149,7 +149,7 @@ def test_modality_dataset_card_keeps_curation_and_governance_gaps_explicit():
         "risk_findings": [],
     }
 
-    card = curation.ModalityDatasetCard.from_report(
+    card = curation.DatasetCard.from_report(
         "image", report, ("bounded representation",)
     )
 
@@ -161,7 +161,7 @@ def test_modality_dataset_card_keeps_curation_and_governance_gaps_explicit():
     )
 
     with pytest.raises(ValueError, match="does not match dataset_hash"):
-        curation.ModalityDatasetCard(
+        curation.DatasetCard(
             modality="image",
             dataset_hash="different",
             sample_count=3,
@@ -183,7 +183,7 @@ def test_modality_curation_card_can_describe_an_empty_snapshot():
         "risk_findings": [],
     }
 
-    card = curation.ModalityDatasetCard.from_report(
+    card = curation.DatasetCard.from_report(
         "extension:acme/empty-source", report, ("empty snapshot",)
     )
 
@@ -244,7 +244,7 @@ def test_declaration_is_immutable():
 
     with pytest.raises(dataclasses.FrozenInstanceError):
         declaration.status = (  # type: ignore[misc]
-            modalities.ModalityStatus.EXPERIMENTAL
+            modalities.Status.EXPERIMENTAL
         )
 
 
@@ -270,10 +270,10 @@ def test_empty_stage_evidence_is_incomplete_and_fails_closed():
         for stage in modalities.REQUIRED_LIFECYCLE_STAGES
     )
     declaration = make_declaration(
-        status=modalities.ModalityStatus.EXPERIMENTAL,
+        status=modalities.Status.EXPERIMENTAL,
         stage_evidence=evidence,
     )
-    registry = modalities.ModalityRegistry((declaration,))
+    registry = modalities.Registry((declaration,))
 
     assert declaration.missing_stages == (modalities.LifecycleStage.INFERENCE,)
     with pytest.raises(
@@ -282,13 +282,13 @@ def test_empty_stage_evidence_is_incomplete_and_fails_closed():
     ) as failure:
         registry.require(
             modalities.Modality.TABULAR,
-            {modalities.ModalityStatus.EXPERIMENTAL},
+            {modalities.Status.EXPERIMENTAL},
         )
     assert failure.value.details["missing_stages"] == ["inference"]
 
 
 def test_registry_fails_closed_for_undeclared_modality():
-    registry = modalities.ModalityRegistry((make_declaration(),))
+    registry = modalities.Registry((make_declaration(),))
 
     with pytest.raises(
         modalities.UnsupportedModalityError,
@@ -304,9 +304,9 @@ def test_registry_fails_closed_for_undeclared_modality():
 
 def test_status_requires_explicit_opt_in_after_completeness_is_proven():
     declaration = make_declaration(
-        status=modalities.ModalityStatus.EXPERIMENTAL,
+        status=modalities.Status.EXPERIMENTAL,
     )
-    registry = modalities.ModalityRegistry((declaration,))
+    registry = modalities.Registry((declaration,))
 
     with pytest.raises(
         modalities.UnsupportedModalityError,
@@ -316,7 +316,7 @@ def test_status_requires_explicit_opt_in_after_completeness_is_proven():
     assert (
         registry.require(
             modalities.Modality.TABULAR,
-            {modalities.ModalityStatus.EXPERIMENTAL},
+            {modalities.Status.EXPERIMENTAL},
         )
         is declaration
     )
@@ -326,10 +326,10 @@ def test_registry_serialization_is_deterministic_and_duplicate_safe():
     tabular = make_declaration()
     image = make_declaration(
         modality=modalities.Modality.IMAGE,
-        status=modalities.ModalityStatus.EXTENSION_ONLY,
+        status=modalities.Status.EXTENSION_ONLY,
     )
-    first = modalities.ModalityRegistry((image, tabular))
-    second = modalities.ModalityRegistry((tabular, image))
+    first = modalities.Registry((image, tabular))
+    second = modalities.Registry((tabular, image))
 
     assert first.to_json() == second.to_json()
     assert json.loads(first.to_json()) == first.to_dict()
@@ -348,8 +348,8 @@ def test_declaration_rejects_duplicate_stages_and_missing_failure_modes():
         make_declaration(stage_evidence=(duplicate, duplicate))
 
     with pytest.raises(ValueError, match="failure_modes"):
-        modalities.ModalityDeclaration(
+        modalities.Declaration(
             modality=modalities.Modality.TEXT,
-            status=modalities.ModalityStatus.EXPERIMENTAL,
+            status=modalities.Status.EXPERIMENTAL,
             stage_evidence=(),
         )

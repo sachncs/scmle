@@ -36,7 +36,7 @@ def resolve_tabular_input(
     )
 
 
-class SequentialEstimationProject:
+class Estimation:
     """Runs and durably verifies a sequential causal estimation project.
 
     The project owns the input declaration, sequential estimand, numerical
@@ -56,8 +56,8 @@ class SequentialEstimationProject:
     def __init__(
         self,
         data: pandas.DataFrame | str | pathlib.Path,
-        estimand: sequential.SequentialEstimand,
-        policy: sequential.SequentialEstimationPolicy,
+        estimand: sequential.Estimand,
+        policy: sequential.Config,
         *,
         output_dir: str | pathlib.Path = "runs",
     ) -> None:
@@ -77,18 +77,18 @@ class SequentialEstimationProject:
                 "data must be a pandas DataFrame or a path to a supported "
                 "tabular file"
             )
-        if not isinstance(estimand, sequential.SequentialEstimand):
-            raise TypeError("estimand must be SequentialEstimand")
-        if not isinstance(policy, sequential.SequentialEstimationPolicy):
-            raise TypeError("policy must be SequentialEstimationPolicy")
+        if not isinstance(estimand, sequential.Estimand):
+            raise TypeError("estimand must be Estimand")
+        if not isinstance(policy, sequential.Config):
+            raise TypeError("policy must be Config")
         self.data = data
         self.estimand = estimand
         self.policy = policy
         self.output_dir = pathlib.Path(output_dir)
         self.artifact_path = self.output_dir / SEQUENTIAL_ESTIMATION_ARTIFACT
-        self.result: sequential.SequentialEstimationResult | None = None
+        self.result: sequential.Estimation | None = None
 
-    def run(self) -> sequential.SequentialEstimationResult:
+    def run(self) -> sequential.Estimation:
         """Estimates, atomically persists, and reads back the verified result.
 
         The report is written to `artifact_path`, replacing any earlier one.
@@ -101,19 +101,15 @@ class SequentialEstimationProject:
                 of the report that was written.
         """
         frame = resolve_tabular_input(self.data)
-        estimate = sequential.SequentialIPWEstimator(
-            self.estimand, self.policy
-        ).fit(frame)
+        estimate = sequential.Estimator(self.estimand, self.policy).fit(frame)
         expected_digest = estimate.write(self.artifact_path)
-        verified = sequential.SequentialEstimationResult.read(
-            self.artifact_path
-        )
+        verified = sequential.Estimation.read(self.artifact_path)
         if verified.digest() != expected_digest:
             raise ValueError("persisted sequential report failed verification")
         self.result = verified
         return verified
 
-    def load_result(self) -> sequential.SequentialEstimationResult:
+    def load_result(self) -> sequential.Estimation:
         """Loads and verifies the durable report associated with this project.
 
         A missing report, or one whose envelope or digest fails verification,
@@ -122,9 +118,7 @@ class SequentialEstimationProject:
         Returns:
             The persisted result, which is also kept as `result`.
         """
-        self.result = sequential.SequentialEstimationResult.read(
-            self.artifact_path
-        )
+        self.result = sequential.Estimation.read(self.artifact_path)
         return self.result
 
     def verify_replay(
@@ -155,9 +149,7 @@ class SequentialEstimationProject:
             )
         if persisted.policy.to_dict() != self.policy.to_dict():
             reasons.append("estimation policy differs from persisted evidence")
-        replayed = sequential.SequentialIPWEstimator(
-            self.estimand, self.policy
-        ).fit(frame)
+        replayed = sequential.Estimator(self.estimand, self.policy).fit(frame)
         if replayed.digest() != persisted.digest():
             reasons.append(
                 "replayed result digest differs from persisted evidence"

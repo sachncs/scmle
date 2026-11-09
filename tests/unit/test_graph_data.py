@@ -9,15 +9,15 @@ from pathlib import Path
 import numpy
 import pytest
 
+from scmle.data.modalities.graph import Dataset
+from scmle.data.modalities.graph import Edge
 from scmle.data.modalities.graph import edges_from_records
 from scmle.data.modalities.graph import graph_identity
-from scmle.data.modalities.graph import GraphData
-from scmle.data.modalities.graph import GraphEdge
 from scmle.data.modalities.graph import GraphInputError
-from scmle.data.modalities.graph import GraphNode
 from scmle.data.modalities.graph import GraphTemporalError
 from scmle.data.modalities.graph import GraphValidationError
 from scmle.data.modalities.graph import inductive_node_split
+from scmle.data.modalities.graph import Node
 from scmle.data.modalities.graph import prepare_features
 from scmle.data.modalities.graph import read_edges
 
@@ -65,14 +65,14 @@ def malformed_jsonl(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def shifted_graph() -> GraphData:
+def shifted_graph() -> Dataset:
     """Returns a feature-shifted graph fixture."""
-    return GraphData.from_edges(
-        [GraphEdge("a", "b"), GraphEdge("b", "c")],
+    return Dataset.from_edges(
+        [Edge("a", "b"), Edge("b", "c")],
         nodes=[
-            GraphNode("a", (10.0, 20.0)),
-            GraphNode("b", (11.0, 21.0)),
-            GraphNode("c", (12.0, 22.0)),
+            Node("a", (10.0, 20.0)),
+            Node("b", (11.0, 21.0)),
+            Node("c", (12.0, 22.0)),
         ],
         feature_names=("x", "y"),
     )
@@ -83,14 +83,14 @@ def test_reads_csv_and_jsonl_edges(valid_csv: Path, valid_jsonl: Path) -> None:
     csv_edges = read_edges(valid_csv)
     jsonl_edges = read_edges(valid_jsonl)
 
-    assert csv_edges[0] == GraphEdge("a", "b", 1.5)
-    assert jsonl_edges[1] == GraphEdge("b", "c")
+    assert csv_edges[0] == Edge("a", "b", 1.5)
+    assert jsonl_edges[1] == Edge("b", "c")
     assert isinstance(csv_edges, tuple)
 
 
 def test_empty_fixture_is_a_valid_empty_graph(empty_csv: Path) -> None:
     """An empty edge file remains valid and preserves explicit nodes."""
-    graph = GraphData.from_edge_file(empty_csv, nodes=["orphan"])
+    graph = Dataset.from_edge_file(empty_csv, nodes=["orphan"])
 
     assert graph.edges == ()
     assert graph.node_ids == ("orphan",)
@@ -112,18 +112,16 @@ def test_invalid_weight_fails_closed() -> None:
             [{"source": "a", "target": "b", "weight": numpy.nan}]
         )
     with pytest.raises(ValueError, match="finite"):
-        GraphEdge("a", "b", float("inf"))
+        Edge("a", "b", float("inf"))
 
 
 def test_duplicate_self_loop_and_missing_node_validation() -> None:
     """Validation reports every requested structural error class."""
-    duplicate = GraphData.from_edges(
-        [GraphEdge("a", "b"), GraphEdge("a", "b")], nodes=["a", "b"]
+    duplicate = Dataset.from_edges(
+        [Edge("a", "b"), Edge("a", "b")], nodes=["a", "b"]
     )
-    self_loop = GraphData.from_edges([GraphEdge("a", "a")])
-    missing_node = GraphData.from_edges(
-        [GraphEdge("a", "missing")], nodes=["a"]
-    )
+    self_loop = Dataset.from_edges([Edge("a", "a")])
+    missing_node = Dataset.from_edges([Edge("a", "missing")], nodes=["a"])
 
     assert "duplicate_edge" in duplicate.validate().error_codes
     assert "self_loop" in self_loop.validate().error_codes
@@ -134,13 +132,13 @@ def test_duplicate_self_loop_and_missing_node_validation() -> None:
 
 def test_undirected_duplicate_detection_and_identity_are_canonical() -> None:
     """Undirected reversals are duplicates and ordering does not affect identity."""
-    first = GraphData.from_edges(
-        [GraphEdge("a", "b"), GraphEdge("b", "a")],
+    first = Dataset.from_edges(
+        [Edge("a", "b"), Edge("b", "a")],
         nodes=["b", "a"],
         directed=False,
     )
-    second = GraphData.from_edges(
-        [GraphEdge("b", "a"), GraphEdge("a", "b")],
+    second = Dataset.from_edges(
+        [Edge("b", "a"), Edge("a", "b")],
         nodes=["a", "b"],
         directed=False,
     )
@@ -154,7 +152,7 @@ def test_undirected_duplicate_detection_and_identity_are_canonical() -> None:
 
 
 def test_components_and_profiles_are_deterministic(
-    shifted_graph: GraphData,
+    shifted_graph: Dataset,
 ) -> None:
     """Components and node/edge profiles summarize valid graph evidence."""
     profile = shifted_graph.profile()
@@ -168,7 +166,7 @@ def test_components_and_profiles_are_deterministic(
 
 
 def test_graph_curation_records_structure_and_feature_policy(
-    shifted_graph: GraphData,
+    shifted_graph: Dataset,
 ) -> None:
     """Graph curation explains structure before model selection."""
     report = shifted_graph.curate()
@@ -183,9 +181,9 @@ def test_graph_curation_records_structure_and_feature_policy(
 
 def test_graph_curation_reports_mixed_label_state():
     """Graph curation exposes mixed node labels before graph modelling."""
-    graph = GraphData.from_edges(
-        [GraphEdge("a", "b")],
-        nodes=[GraphNode("a", label="source"), GraphNode("b")],
+    graph = Dataset.from_edges(
+        [Edge("a", "b")],
+        nodes=[Node("a", label="source"), Node("b")],
     )
 
     report = graph.curate()
@@ -221,7 +219,7 @@ def test_temporal_edges_are_normalized_split_and_curated() -> None:
         ],
         time_column="event_time",
     )
-    graph = GraphData.from_edges(edges, nodes=["a", "b", "c"])
+    graph = Dataset.from_edges(edges, nodes=["a", "b", "c"])
 
     assert edges[0].event_time == datetime(2026, 1, 1, tzinfo=UTC)
     split = graph.temporal_split("2026-01-02T00:00:00+00:00")
@@ -234,14 +232,14 @@ def test_temporal_edges_are_normalized_split_and_curated() -> None:
 
 def test_temporal_graphs_fail_closed_on_mixed_or_invalid_time_state() -> None:
     """Missing and malformed event times remain visible before splitting."""
-    mixed_graph = GraphData.from_edges(
+    mixed_graph = Dataset.from_edges(
         [
-            GraphEdge(
+            Edge(
                 "a",
                 "b",
                 event_time=datetime(2026, 1, 1, tzinfo=UTC),
             ),
-            GraphEdge("b", "c"),
+            Edge("b", "c"),
         ],
         nodes=["a", "b", "c"],
     )
@@ -266,14 +264,14 @@ def test_temporal_graphs_fail_closed_on_mixed_or_invalid_time_state() -> None:
 
 def test_temporal_edge_identity_preserves_parallel_events() -> None:
     """Events with distinct timestamps are not collapsed as duplicates."""
-    graph = GraphData.from_edges(
+    graph = Dataset.from_edges(
         [
-            GraphEdge(
+            Edge(
                 "a",
                 "b",
                 event_time=datetime(2026, 1, 1, tzinfo=UTC),
             ),
-            GraphEdge(
+            Edge(
                 "a",
                 "b",
                 event_time=datetime(2026, 1, 2, tzinfo=UTC),
@@ -287,7 +285,7 @@ def test_temporal_edge_identity_preserves_parallel_events() -> None:
 
 
 def test_inductive_split_is_deterministic_and_withholds_cross_partition_edges(
-    shifted_graph: GraphData,
+    shifted_graph: Dataset,
 ) -> None:
     """Repeated seeded splits match and retain no crossing edges."""
     first = inductive_node_split(shifted_graph, seed=41)
@@ -302,7 +300,7 @@ def test_inductive_split_is_deterministic_and_withholds_cross_partition_edges(
 
 
 def test_feature_preparation_is_bounded_and_shift_fixture_is_observable(
-    shifted_graph: GraphData,
+    shifted_graph: Dataset,
 ) -> None:
     """Baseline preparation is finite, bounded, and exposes feature shift."""
     prepared = prepare_features(
@@ -311,12 +309,12 @@ def test_feature_preparation_is_bounded_and_shift_fixture_is_observable(
         max_features=3,
         standardize=True,
     )
-    unshifted = GraphData.from_edges(
+    unshifted = Dataset.from_edges(
         shifted_graph.edges,
         nodes=[
-            GraphNode("a", (0.0, 0.0)),
-            GraphNode("b", (1.0, 1.0)),
-            GraphNode("c", (2.0, 2.0)),
+            Node("a", (0.0, 0.0)),
+            Node("b", (1.0, 1.0)),
+            Node("c", (2.0, 2.0)),
         ],
         feature_names=("x", "y"),
     )
@@ -331,8 +329,8 @@ def test_feature_preparation_is_bounded_and_shift_fixture_is_observable(
 
 def test_immutable_contracts_reject_mutation() -> None:
     """Node and edge contracts are frozen value objects."""
-    node = GraphNode("a")
-    edge = GraphEdge("a", "b")
+    node = Node("a")
+    edge = Edge("a", "b")
 
     with pytest.raises(dataclasses.FrozenInstanceError):
         node.node_id = "b"  # type: ignore[misc]

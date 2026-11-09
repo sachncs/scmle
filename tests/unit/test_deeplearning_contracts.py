@@ -34,14 +34,14 @@ def test_transformer_contract_is_tabular_and_fails_closed_for_images():
     """The experimental Transformer cannot be mistaken for multimodal support."""
     family = contracts.TABULAR_TRANSFORMER_CONTRACT
 
-    assert family.status is capabilities.CapabilityStatus.EXPERIMENTAL
+    assert family.status is capabilities.Status.EXPERIMENTAL
     assert family.supports_modality(capabilities.Modality.TABULAR)
     assert not family.supports_modality(capabilities.Modality.IMAGE)
     with pytest.raises(ValueError, match="supports only tabular modality"):
         family.require_modality(capabilities.Modality.IMAGE)
 
     boundary = contracts.ModelFamilyContract.unsupported_multimodal()
-    assert boundary.status is capabilities.CapabilityStatus.EXTENSION_ONLY
+    assert boundary.status is capabilities.Status.EXTENSION_ONLY
     with pytest.raises(ValueError, match="supports only tabular modality"):
         boundary.require_modality(capabilities.Modality.TEXT)
 
@@ -144,8 +144,8 @@ def test_transformer_checkpoint_metadata_tampering_is_rejected(tmp_path):
 
 def test_torch_adapters_expose_the_same_fail_closed_modality_contract():
     """Adapter-level declarations match the estimator-level boundary."""
-    transformer = networks.TorchTransformerAdapter()
-    jepa_adapter = networks.TorchJepaAdapter()
+    transformer = networks.FtTransformer()
+    jepa_adapter = networks.Jepa()
 
     assert transformer.supports_modality("tabular")
     assert not transformer.supports_modality("image")
@@ -156,9 +156,7 @@ def test_torch_adapters_expose_the_same_fail_closed_modality_contract():
 
 def test_jepa_rejection_reason_includes_both_training_boundaries():
     """Small JEPA datasets report the complete actionable boundary."""
-    reason = networks.TorchJepaAdapter().rejection_reason(
-        tasks.TaskType.BINARY, row_count=15
-    )
+    reason = networks.Jepa().rejection_reason(tasks.Task.BINARY, row_count=15)
 
     assert reason == (
         "tabular JEPA requires at least 16 rows for its training and "

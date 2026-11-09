@@ -512,7 +512,7 @@ def check_replay(document: dict[str, Any]) -> Finding:
         values = [by_check[f"{c['claim_id']}:C"]["p_value"] for c in tested]
         adjustment = multiplicity.adjust(
             values,
-            budget.MultiplicityRule(document["rule"]),
+            budget.Correction(document["rule"]),
             Fraction(document["alpha_confirm"]),
         )
         for index, claim in enumerate(tested):

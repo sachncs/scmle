@@ -1,7 +1,7 @@
 """Leakage-aware splitting: strategies, immutable manifest, sealed test set.
 
 Row identifiers are positional indices into the ingested frame. Each
-`SplitStrategy` subclass owns one validation protocol; `SplitManager` selects
+`Partitioner` subclass owns one validation protocol; `Splitter` selects
 and applies it. The test partition lives behind `LockedTestSet`, which opens
 exactly once, with the token the orchestrator issues after selection.
 """
@@ -30,7 +30,7 @@ MIN_ROLLING_FOLDS = 2
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class SplitManifest:
+class Manifest:
     """Immutable record of how rows were partitioned.
 
     Attributes:
@@ -255,7 +255,7 @@ class ResidentTestSet(LockedTestSet):
 
 
 @dataclasses.dataclass(slots=True)
-class SplitResult:
+class Split:
     """Everything produced by splitting a dataset.
 
     Attributes:
@@ -265,7 +265,7 @@ class SplitResult:
         locked_test: The sealed test partition.
     """
 
-    manifest: SplitManifest
+    manifest: Manifest
     dev_features: pandas.DataFrame
     dev_target: pandas.Series
     locked_test: LockedTestSet
@@ -283,7 +283,7 @@ def to_ids(values: numpy.ndarray) -> tuple[int, ...]:
     return tuple(int(v) for v in values)
 
 
-class SplitStrategy(abc.ABC):
+class Partitioner(abc.ABC):
     """One validation protocol (holdout + cross-validation folds).
 
     Attributes:
@@ -295,11 +295,9 @@ class SplitStrategy(abc.ABC):
     """
 
     name: ClassVar[str]
-    supported_tasks: ClassVar[frozenset[tasks.TaskType]] = frozenset(
-        tasks.TaskType
-    )
+    supported_tasks: ClassVar[frozenset[tasks.Task]] = frozenset(tasks.Task)
 
-    def __init__(self, spec: tasks.ProjectSpec, task: tasks.TaskType) -> None:
+    def __init__(self, spec: tasks.Config, task: tasks.Task) -> None:
         """Initializes the strategy.
 
         The task is checked by `check_task`, so a `BlockedError` from it
@@ -340,7 +338,7 @@ class SplitStrategy(abc.ABC):
         """
 
 
-class RandomSplit(SplitStrategy):
+class RandomSplit(Partitioner):
     """Shuffled holdout and K-fold; the default for regression."""
 
     name = "random"
@@ -440,9 +438,7 @@ class StratifiedSplit(RandomSplit):
     """Class-proportion preserving split for classification."""
 
     name = "stratified"
-    supported_tasks = frozenset(
-        {tasks.TaskType.BINARY, tasks.TaskType.MULTICLASS}
-    )
+    supported_tasks = frozenset({tasks.Task.BINARY, tasks.Task.MULTICLASS})
 
     def stratify_labels(self, frame: pandas.DataFrame) -> pandas.Series:
         """Stratifies on the target; every class needs two examples.
@@ -503,7 +499,7 @@ class EventStratifiedSplit(RandomSplit):
     """Keeps the share of observed events equal across splits (survival)."""
 
     name = "stratified_events"
-    supported_tasks = frozenset({tasks.TaskType.SURVIVAL})
+    supported_tasks = frozenset({tasks.Task.SURVIVAL})
 
     def events(self, frame: pandas.DataFrame) -> pandas.Series:
         """Selects the 0/1 event column.
@@ -574,7 +570,7 @@ class MultilabelStratifiedSplit(RandomSplit):
     """Keeps every label's share steady across splits (multi-label)."""
 
     name = "multilabel_stratified"
-    supported_tasks = frozenset({tasks.TaskType.MULTILABEL})
+    supported_tasks = frozenset({tasks.Task.MULTILABEL})
 
     def label_matrix(self, frame: pandas.DataFrame) -> numpy.ndarray:
         """Collects all label columns into one matrix.
@@ -654,7 +650,7 @@ class TreatmentStratifiedSplit(RandomSplit):
     """Keeps treatment and outcome shares equal across splits (uplift)."""
 
     name = "treatment_stratified"
-    supported_tasks = frozenset({tasks.TaskType.UPLIFT})
+    supported_tasks = frozenset({tasks.Task.UPLIFT})
 
     def cells(self, frame: pandas.DataFrame) -> pandas.Series:
         """Combines the treatment arm with a binary outcome.
@@ -764,7 +760,7 @@ class PresetSplit(RandomSplit):
         return Partition(dev_ids, test_ids, parts, notes)
 
 
-class GroupSplit(SplitStrategy):
+class GroupSplit(Partitioner):
     """Keeps every group wholly inside one partition."""
 
     name = "group"
@@ -877,7 +873,7 @@ class GroupSplit(SplitStrategy):
         )
 
 
-class TemporalSplit(SplitStrategy):
+class TemporalSplit(Partitioner):
     """Trains on the past and evaluates on the future."""
 
     name = "temporal"
@@ -1040,7 +1036,7 @@ class RollingSplit(TemporalSplit):
         return Partition(dev_ids, test_ids, windows, notes)
 
 
-STRATEGIES: dict[str, type[SplitStrategy]] = {
+STRATEGIES: dict[str, type[Partitioner]] = {
     strategy.name: strategy
     for strategy in (
         RandomSplit,
@@ -1056,7 +1052,7 @@ STRATEGIES: dict[str, type[SplitStrategy]] = {
 }
 
 
-def resolve_strategy_name(spec: tasks.ProjectSpec, task: tasks.TaskType) -> str:
+def resolve_strategy_name(spec: tasks.Config, task: tasks.Task) -> str:
     """Chooses the split strategy for a project.
 
     Args:
@@ -1074,18 +1070,18 @@ def resolve_strategy_name(spec: tasks.ProjectSpec, task: tasks.TaskType) -> str:
         return "temporal"
     if spec.data.group_column:
         return "group"
-    if task is tasks.TaskType.SURVIVAL:
+    if task is tasks.Task.SURVIVAL:
         return "stratified_events"
-    if task is tasks.TaskType.RANKING:
+    if task is tasks.Task.RANKING:
         return "group"
-    if task is tasks.TaskType.MULTILABEL:
+    if task is tasks.Task.MULTILABEL:
         return "multilabel_stratified"
-    if task is tasks.TaskType.UPLIFT:
+    if task is tasks.Task.UPLIFT:
         return "treatment_stratified"
     return "stratified" if task.is_classification else "random"
 
 
-class SplitManager:
+class Splitter:
     """Selects and applies the validation protocol for a project.
 
     Attributes:
@@ -1094,7 +1090,7 @@ class SplitManager:
         strategy_name: Name of the strategy chosen for the project.
     """
 
-    def __init__(self, spec: tasks.ProjectSpec, task: tasks.TaskType) -> None:
+    def __init__(self, spec: tasks.Config, task: tasks.Task) -> None:
         """Initializes the manager.
 
         Args:
@@ -1163,7 +1159,7 @@ class SplitManager:
         ]
         return Partition(dev, test, folds, notes)
 
-    def split(self, frame: pandas.DataFrame) -> SplitResult:
+    def split(self, frame: pandas.DataFrame) -> Split:
         """Splits the dataset.
 
         Errors from the chosen strategy propagate: a `BlockedError` when it
@@ -1185,7 +1181,7 @@ class SplitManager:
         part = strategy.partition(frame)
         if name in DUPLICATE_AWARE:
             part = self.keep_duplicates_together(frame, part)
-        manifest = SplitManifest(
+        manifest = Manifest(
             strategy=name,
             seed=self.spec.validation.seed,
             train_ids=to_ids(part.dev_ids),
@@ -1201,7 +1197,7 @@ class SplitManager:
             target.iloc[part.test_ids].reset_index(drop=True),
             manifest.test_ids,
         )
-        return SplitResult(
+        return Split(
             manifest,
             features.iloc[part.dev_ids].reset_index(drop=True),
             target.iloc[part.dev_ids].reset_index(drop=True),

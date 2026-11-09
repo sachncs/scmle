@@ -64,7 +64,7 @@ METHOD_SOURCES: dict[str, list[Any]] = {
         sensitivity.adjusted_interval,
         sensitivity.bias_bound,
     ],
-    "sensitivity_did": [did.estimate, did.DidResult.sensitivity],
+    "sensitivity_did": [did.estimate, did.Estimate.sensitivity],
     "false_confirm": [tier.decide, battery.run_battery],
 }
 NOT_MEASURED = ("battery_iv", "battery_synth")

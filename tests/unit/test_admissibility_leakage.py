@@ -18,7 +18,7 @@ from scmle.data.admissibility import leakage
 from scmle.data.detectors import certificates
 
 CLS = "classification"
-FAST = leakage.LeakageConfig(
+FAST = leakage.Config(
     skill_ceiling=0.95,
     association_ceiling=0.9,
     permutations=39,
@@ -139,25 +139,25 @@ def test_target_encoding_rules():
 
 
 def test_config_boundaries():
-    ok = leakage.LeakageConfig(0.9, 0.5, alpha=0.05, permutations=20)
+    ok = leakage.Config(0.9, 0.5, alpha=0.05, permutations=20)
     assert ok.permutations == 20
     with pytest.raises(ValueError, match="too few"):
-        leakage.LeakageConfig(0.9, 0.5, alpha=0.04, permutations=20)
-    leakage.LeakageConfig(0.9, 0.5, alpha=0.04, permutations=24)  # B + 1 == 25
+        leakage.Config(0.9, 0.5, alpha=0.04, permutations=20)
+    leakage.Config(0.9, 0.5, alpha=0.04, permutations=24)  # B + 1 == 25
     with pytest.raises(ValueError):
-        leakage.LeakageConfig(0.9, 0.5, permutations=19)
+        leakage.Config(0.9, 0.5, permutations=19)
     for bad in (0.0, 1.5, float("nan")):
         with pytest.raises(ValueError):
-            leakage.LeakageConfig(bad, 0.5)
+            leakage.Config(bad, 0.5)
         with pytest.raises(ValueError):
-            leakage.LeakageConfig(0.9, bad)
-    leakage.LeakageConfig(1.0, 1.0)
+            leakage.Config(0.9, bad)
+    leakage.Config(1.0, 1.0)
     for field in ("alpha", "confidence"):
         for bad in (0.0, 1.0):
             with pytest.raises(ValueError):
-                leakage.LeakageConfig(0.9, 0.5, **{field: bad})
+                leakage.Config(0.9, 0.5, **{field: bad})
     with pytest.raises(ValueError):
-        leakage.LeakageConfig(0.9, 0.5, folds=1)
+        leakage.Config(0.9, 0.5, folds=1)
 
 
 # ---- the skill test -------------------------------------------------------
@@ -496,9 +496,9 @@ def store_for(digest, defects=leakage.LEAK_DEFECTS, passed=True):
         "b" * 64,
         [0],
         results,
-        certificates.CertificationPolicy(0.9, 0.05, 0.95),
+        certificates.Standard(0.9, 0.05, 0.95),
     )
-    return certificates.CertificateStore([cert])
+    return certificates.Store([cert])
 
 
 def test_gate_requires_current_passing_certificates_for_every_leak_type():
@@ -510,7 +510,7 @@ def test_gate_requires_current_passing_certificates_for_every_leak_type():
     )
     descriptive = certificates.GateStatus.DESCRIPTIVE
     assert (
-        leakage.gate_status(certificates.CertificateStore(), leakage.CERTIFIED)
+        leakage.gate_status(certificates.Store(), leakage.CERTIFIED)
         is descriptive
     )
     assert (

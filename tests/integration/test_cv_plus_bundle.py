@@ -5,8 +5,8 @@ import pandas
 import pytest
 import support
 
-import scmle
 from scmle.artifacts import bundle
+import scmle.artifacts.bundle
 from scmle.contracts import errors
 
 
@@ -46,7 +46,7 @@ def test_cv_plus_survives_saving_and_loading(result, tmp_path):
     grid = pandas.DataFrame({"x": [1.0, 5.0, 9.0]})
     expected = result.bundle.predict_interval(grid, method="cv_plus")
     result.bundle.save(tmp_path / "copy")
-    loaded = scmle.ModelBundle.load(tmp_path / "copy", trusted=True)
+    loaded = scmle.artifacts.bundle.Bundle.load(tmp_path / "copy", trusted=True)
     pandas.testing.assert_frame_equal(
         loaded.predict_interval(grid, method="cv_plus"), expected
     )
@@ -59,11 +59,11 @@ def test_a_changed_fold_model_file_is_refused(result, tmp_path):
     data[len(data) // 2] ^= 0xFF
     path.write_bytes(bytes(data))
     with pytest.raises(errors.ArtifactError, match="CV\\+ fold models"):
-        scmle.ModelBundle.load(tmp_path / "copy", trusted=True)
+        scmle.artifacts.bundle.Bundle.load(tmp_path / "copy", trusted=True)
 
 
 def test_a_bundle_without_the_models_says_so(result):
-    plain = scmle.ModelBundle(
+    plain = scmle.artifacts.bundle.Bundle(
         result.bundle.pipeline, result.bundle.schema, result.bundle.info
     )
     with pytest.raises(errors.ArtifactError, match="no CV\\+ fold models"):

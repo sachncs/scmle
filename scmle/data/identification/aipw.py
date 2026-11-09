@@ -347,7 +347,7 @@ def overlap_report(
 
 
 @dataclasses.dataclass(frozen=True)
-class AipwResult:
+class Estimate:
     """An AIPW estimate on the confirmation rows.
 
     Attributes:
@@ -431,7 +431,7 @@ def estimate(
     level: float = 0.95,
     trim: float = 0.0,
     min_share: float = 0.5,
-) -> AipwResult:
+) -> Estimate:
     """Scores the frozen nuisances on `frame` (the confirmation rows).
 
     Args:
@@ -481,7 +481,7 @@ def estimate(
             f"the overlap population (propensity within [{trim}, {1 - trim}]);"
             " the estimand changed by trimming"
         )
-    return AipwResult(
+    return Estimate(
         estimand=estimand,
         estimate=theta,
         se=se,
@@ -497,7 +497,7 @@ def estimate(
 
 
 @dataclasses.dataclass(frozen=True)
-class DiffResult:
+class Difference:
     """A difference in means (randomized assignment).
 
     Attributes:
@@ -527,7 +527,7 @@ class DiffResult:
 
 def difference_in_means(
     frame: pandas.DataFrame, treatment: str, outcome: str, level: float = 0.95
-) -> DiffResult:
+) -> Difference:
     """Computes the treated minus control mean with the Neyman variance.
 
     Args:
@@ -553,6 +553,6 @@ def difference_in_means(
     df = (v1 + v0) ** 2 / (v1**2 / (len(y1) - 1) + v0**2 / (len(y0) - 1))
     quantile = float(stats.t.ppf(0.5 + level / 2, df))
     diff = float(y1.mean() - y0.mean())
-    return DiffResult(
+    return Difference(
         diff, se, diff - quantile * se, diff + quantile * se, level, len(y)
     )

@@ -73,7 +73,7 @@ def test_declared_slices_are_in_the_claim_and_flagged_by_the_margin(tmp_path):
     result = run(
         tmp_path,
         plan=False,
-        uncertainty=uncertainty.UncertaintySpec(None, ("grp", "z", "ghost")),
+        uncertainty=uncertainty.Uncertainty(None, ("grp", "z", "ghost")),
     )
     folder = pathlib.Path(result.run_dir)
 
@@ -101,7 +101,7 @@ def confirmation_run(tmp_path):
     return run(
         tmp_path,
         plan=False,
-        uncertainty=uncertainty.UncertaintySpec(None, (), True),
+        uncertainty=uncertainty.Uncertainty(None, (), True),
     )
 
 

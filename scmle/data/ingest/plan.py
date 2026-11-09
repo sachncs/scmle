@@ -1,4 +1,4 @@
-"""`IngestPlan`: runs the ingestion stages in order and writes their artifacts.
+"""`Plan`: runs the ingestion stages in order and writes their artifacts.
 
 Stages: `profile` (catalog), `infer_grain` (keys and the unit verdict),
 `discover_joins` (link graph), each under one budget. Artifacts, written
@@ -31,7 +31,7 @@ BUDGET = "ingest_budget.json"
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class IngestSettings:
+class Config:
     """Declared tolerances and scope of one ingestion.
 
     Attributes:
@@ -89,15 +89,15 @@ def write_artifact(
     return path
 
 
-class IngestPlan:
+class Plan:
     """One ingestion over a read-only source, under a budget."""
 
     def __init__(
         self,
         run_dir: pathlib.Path,
         connection_factory: Callable[[], Any],
-        settings: IngestSettings,
-        budget: scmle.data.ingest.budget.IngestBudget | None = None,
+        settings: Config,
+        budget: scmle.data.ingest.budget.Budget | None = None,
         clock: Callable[[], float] | None = None,
     ) -> None:
         """Opens the ingestion; nothing is read yet.
@@ -113,7 +113,7 @@ class IngestPlan:
         """
         self.run_dir = pathlib.Path(run_dir)
         self.settings = settings
-        limits = budget or scmle.data.ingest.budget.IngestBudget()
+        limits = budget or scmle.data.ingest.budget.Budget()
         self.meter = (
             scmle.data.ingest.budget.BudgetMeter(limits)
             if clock is None

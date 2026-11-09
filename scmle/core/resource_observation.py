@@ -21,7 +21,7 @@ EXTRA_MARKER = re.compile(r";\s*extra\s*==\s*['\"]([^'\"]+)['\"]")
 REQUIREMENT_NAME = re.compile(r"^\s*([A-Za-z0-9][A-Za-z0-9._-]*)")
 
 
-class RuntimeResourceObservation:
+class Observation:
     """A bounded, serializable snapshot of facts used at a capability gate."""
 
     __slots__ = (
@@ -34,7 +34,7 @@ class RuntimeResourceObservation:
 
     def __init__(
         self,
-        environment: capabilities.CapabilityEnvironment,
+        environment: capabilities.Environment,
         *,
         captured_at: str,
         disk_path: str,
@@ -52,10 +52,10 @@ class RuntimeResourceObservation:
             sources: For each observed fact, how it was obtained.
 
         Raises:
-            TypeError: If `environment` is not a `CapabilityEnvironment`.
+            TypeError: If `environment` is not a `Environment`.
         """
-        if not isinstance(environment, capabilities.CapabilityEnvironment):
-            raise TypeError("environment must be CapabilityEnvironment")
+        if not isinstance(environment, capabilities.Environment):
+            raise TypeError("environment must be Environment")
         self.environment = environment
         self.captured_at = captured_at
         self.disk_path = disk_path
@@ -99,7 +99,7 @@ class RuntimeResourceObservation:
 
 def observe_runtime_resources(
     disk_path: str | pathlib.Path | None = None,
-) -> RuntimeResourceObservation:
+) -> Observation:
     """Captures only the bounded host facts that capability declarations need.
 
     A failed probe yields ``None``. The capability registry then rejects a
@@ -120,7 +120,7 @@ def observe_runtime_resources(
     selected_path = pathlib.Path(disk_path or pathlib.Path.cwd())
     disk_gb, disk_source = observe_disk_gb(selected_path)
     extras, extra_observations, extra_sources = observe_extras()
-    environment = capabilities.CapabilityEnvironment(
+    environment = capabilities.Environment(
         available_extras=extras,
         cpu_cores=cpu_cores,
         memory_gb=memory_gb,
@@ -130,7 +130,7 @@ def observe_runtime_resources(
         gpu_available=None,
         network_available=None,
     )
-    return RuntimeResourceObservation(
+    return Observation(
         environment,
         captured_at=datetime.datetime.now(datetime.UTC).isoformat(),
         disk_path=str(selected_path),

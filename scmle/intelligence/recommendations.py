@@ -41,12 +41,12 @@ class Recommendation:
         return dataclasses.asdict(self)
 
 
-class RecommendationRule(abc.ABC):
+class Advisor(abc.ABC):
     """Produces recommendations from one aspect of the profile."""
 
     @abc.abstractmethod
     def advise(
-        self, profile: data.DatasetProfile, spec: tasks.ProjectSpec
+        self, profile: data.DatasetProfile, spec: tasks.Config
     ) -> list[Recommendation]:
         """Returns the recommendations that apply, possibly none.
 
@@ -59,11 +59,11 @@ class RecommendationRule(abc.ABC):
         """
 
 
-class ImbalanceAdvice(RecommendationRule):
+class ImbalanceAdvice(Advisor):
     """Suggests decision and metric choices for rare positive classes."""
 
     def advise(
-        self, profile: data.DatasetProfile, spec: tasks.ProjectSpec
+        self, profile: data.DatasetProfile, spec: tasks.Config
     ) -> list[Recommendation]:
         """Advises on a severely imbalanced binary target.
 
@@ -77,9 +77,7 @@ class ImbalanceAdvice(RecommendationRule):
             `SEVERE_IMBALANCE`; otherwise empty.
         """
         ratio = float(profile.target_summary.get("imbalance_ratio", 0.0))
-        binary = profile.target_summary.get("task") == str(
-            tasks.TaskType.BINARY
-        )
+        binary = profile.target_summary.get("task") == str(tasks.Task.BINARY)
         if not binary or ratio < SEVERE_IMBALANCE:
             return []
         advice = [
@@ -103,11 +101,11 @@ class ImbalanceAdvice(RecommendationRule):
         return advice
 
 
-class MissingnessAdvice(RecommendationRule):
+class MissingnessAdvice(Advisor):
     """Flags columns that are mostly missing."""
 
     def advise(
-        self, profile: data.DatasetProfile, spec: tasks.ProjectSpec
+        self, profile: data.DatasetProfile, spec: tasks.Config
     ) -> list[Recommendation]:
         """Advises on heavy missingness.
 
@@ -139,11 +137,11 @@ class MissingnessAdvice(RecommendationRule):
         ]
 
 
-class LeakageAdvice(RecommendationRule):
+class LeakageAdvice(Advisor):
     """Points at leakage hypotheses raised by the profile."""
 
     def advise(
-        self, profile: data.DatasetProfile, spec: tasks.ProjectSpec
+        self, profile: data.DatasetProfile, spec: tasks.Config
     ) -> list[Recommendation]:
         """Advises when leakage hypotheses exist and are not blocking.
 
@@ -180,11 +178,11 @@ class LeakageAdvice(RecommendationRule):
         return advice
 
 
-class DuplicateAdvice(RecommendationRule):
+class DuplicateAdvice(Advisor):
     """Flags heavily duplicated rows."""
 
     def advise(
-        self, profile: data.DatasetProfile, spec: tasks.ProjectSpec
+        self, profile: data.DatasetProfile, spec: tasks.Config
     ) -> list[Recommendation]:
         """Advises when many rows are exact duplicates.
 
@@ -215,11 +213,11 @@ class DuplicateAdvice(RecommendationRule):
         ]
 
 
-class SmallDataAdvice(RecommendationRule):
+class SmallDataAdvice(Advisor):
     """Warns that estimates from few rows are noisy."""
 
     def advise(
-        self, profile: data.DatasetProfile, spec: tasks.ProjectSpec
+        self, profile: data.DatasetProfile, spec: tasks.Config
     ) -> list[Recommendation]:
         """Advises on small development sets.
 
@@ -245,7 +243,7 @@ class SmallDataAdvice(RecommendationRule):
         ]
 
 
-def default_rules() -> tuple[RecommendationRule, ...]:
+def default_rules() -> tuple[Advisor, ...]:
     """Returns the standard recommendation rules.
 
     Returns:
@@ -262,8 +260,8 @@ def default_rules() -> tuple[RecommendationRule, ...]:
 
 def recommend(
     profile: data.DatasetProfile,
-    spec: tasks.ProjectSpec,
-    rules: tuple[RecommendationRule, ...] | None = None,
+    spec: tasks.Config,
+    rules: tuple[Advisor, ...] | None = None,
 ) -> tuple[Recommendation, ...]:
     """Collects the recommendations of every rule.
 

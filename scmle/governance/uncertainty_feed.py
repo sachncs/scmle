@@ -13,7 +13,7 @@ loop's coverage monitor escalate (`coverage_below_nominal`), exactly as it
 already did for any caller of `mature`; it never retrains, and the policy's
 `alarm_gates_retrain` is not read or changed. Classification only: sets of a
 regression bundle have no size to route on. The monitor in the loop tests the
-share of covered cases against `LoopPolicy.coverage_target`, so that target
+share of covered cases against `Preregistration.coverage_target`, so that target
 should be the nominal level used here.
 """
 

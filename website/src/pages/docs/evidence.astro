@@ -114,7 +114,7 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
                                       └→ bundle → inference event
 
 The graph digest changes when an identity or relationship changes.`}</code></pre>
-  <p><code>InferenceEvidenceLinker</code> checks the graph digest, checks the bundle digest, and writes the updated graph atomically. Replaying the same event is safe; reusing an event ID for different input or output evidence fails closed. Use the graph to answer “which snapshot and curation decision produced this bundle and served this event?” Use the event log to answer “what happened, and in what order?” Both are necessary; neither is a release approval on its own.</p>
+  <p><code>Linker</code> checks the graph digest, checks the bundle digest, and writes the updated graph atomically. Replaying the same event is safe; reusing an event ID for different input or output evidence fails closed. Use the graph to answer “which snapshot and curation decision produced this bundle and served this event?” Use the event log to answer “what happened, and in what order?” Both are necessary; neither is a release approval on its own.</p>
 
   <p class="meta">Evidence is a product surface, not an appendix · 0.1 beta</p>
 </DocsLayout>

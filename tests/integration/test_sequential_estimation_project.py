@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from scmle.api.sequential import SequentialEstimationProject
+from scmle.api.sequential import Estimation
 from tests.unit.test_sequential_project import make_estimand
 from tests.unit.test_sequential_project import make_frame
 from tests.unit.test_sequential_project import make_policy
@@ -14,7 +14,7 @@ def test_project_persists_atomic_report_and_verifies_exact_replay(
     tmp_path,
 ) -> None:
     """Run, persistence, load, and replay form one durable contract."""
-    project = SequentialEstimationProject(
+    project = Estimation(
         make_frame(), make_estimand(), make_policy(), output_dir=tmp_path
     )
 
@@ -32,7 +32,7 @@ def test_project_persists_atomic_report_and_verifies_exact_replay(
 def test_project_replay_rejects_a_different_input_identity(tmp_path) -> None:
     """Changing even one input value invalidates the persisted identity."""
     frame = make_frame()
-    project = SequentialEstimationProject(
+    project = Estimation(
         frame, make_estimand(), make_policy(), output_dir=tmp_path
     )
     project.run()
@@ -47,7 +47,7 @@ def test_project_replay_rejects_a_different_input_identity(tmp_path) -> None:
 
 def test_project_rejects_tampered_report_before_replay(tmp_path) -> None:
     """Digest verification prevents replay from consuming altered evidence."""
-    project = SequentialEstimationProject(
+    project = Estimation(
         make_frame(), make_estimand(), make_policy(), output_dir=tmp_path
     )
     project.run()

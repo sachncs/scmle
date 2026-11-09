@@ -8,8 +8,9 @@ import numpy
 import pandas
 import pytest
 
-import scmle
 from scmle.data import catalog
+import scmle.data.catalog
+from scripts import check_api_compatibility
 
 
 def test_dataframe_observation_is_deterministic_and_reviewable():
@@ -21,7 +22,7 @@ def test_dataframe_observation_is_deterministic_and_reviewable():
             "label": ["keep", "keep", None],
         }
     )
-    source = catalog.DatasetSource(
+    source = catalog.Source(
         uri="s3://bucket/events?version=7",
         version="7",
         owner="analytics",
@@ -29,10 +30,10 @@ def test_dataframe_observation_is_deterministic_and_reviewable():
         privacy_classification="internal",
     )
 
-    first = catalog.DatasetCatalog.from_data(
+    first = catalog.Catalog.from_data(
         frame, source=source, label_column="label"
     )
-    second = catalog.DatasetCatalog.from_data(
+    second = catalog.Catalog.from_data(
         frame.copy(), source=source, label_column="label"
     )
 
@@ -72,7 +73,7 @@ def test_common_caller_owned_shapes_are_cataloged(
     data, expected_kind, expected_shape
 ):
     """The entry point accepts several data shapes without a model claim."""
-    result = catalog.DatasetCatalog.from_data(data)
+    result = catalog.Catalog.from_data(data)
 
     assert result.data_kind == expected_kind
     assert result.shape == expected_shape
@@ -83,7 +84,7 @@ def test_common_caller_owned_shapes_are_cataloged(
 def test_raw_bytes_report_decoder_boundary_and_direct_identity():
     """Raw bytes receive identity but no invented modality understanding."""
     payload = b"opaque dataset payload"
-    result = catalog.DatasetCatalog.from_data(payload)
+    result = catalog.Catalog.from_data(payload)
 
     expected = f"sha256:{hashlib.sha256(payload).hexdigest()}"
     assert result.content_identity == expected
@@ -101,9 +102,9 @@ def test_opaque_data_requires_explicit_content_identity():
     identity = "sha256:" + "a" * 64
 
     with pytest.raises(TypeError, match="caller-supplied"):
-        catalog.DatasetCatalog.from_data(opaque)
+        catalog.Catalog.from_data(opaque)
 
-    result = catalog.DatasetCatalog.from_data(opaque, content_identity=identity)
+    result = catalog.Catalog.from_data(opaque, content_identity=identity)
 
     assert result.content_identity == identity
     assert result.data_kind == "object"
@@ -113,14 +114,14 @@ def test_opaque_data_requires_explicit_content_identity():
 
 def test_source_metadata_removes_governance_blockers_for_clean_data():
     """Declared source context is retained instead of inferred from bytes."""
-    source = catalog.DatasetSource(
+    source = catalog.Source(
         uri="memory://customer-sample",
         version="2026-10-23",
         owner="data-platform",
         acquisition_method="approved-export",
         privacy_classification="internal",
     )
-    result = catalog.DatasetCatalog.from_data(
+    result = catalog.Catalog.from_data(
         {"x": [1, 2], "label": [0, 1]},
         source=source,
         label_column="label",
@@ -140,7 +141,7 @@ def test_source_metadata_removes_governance_blockers_for_clean_data():
 )
 def test_label_state_is_explicit_and_does_not_infer_task(data, label_status):
     """Label presence is described without deciding classification or regression."""
-    result = catalog.DatasetCatalog.from_data(data, label_column="label")
+    result = catalog.Catalog.from_data(data, label_column="label")
 
     assert result.label.status == label_status
     assert result.label.field == "label"
@@ -151,14 +152,14 @@ def test_label_state_is_explicit_and_does_not_infer_task(data, label_status):
 
 def test_catalog_persists_atomically_and_verifies_read_back(tmp_path):
     """Persistence verifies both nested source identity and catalog digest."""
-    result = catalog.DatasetCatalog.from_data(
+    result = catalog.Catalog.from_data(
         [{"text": "a"}, {"text": "b"}],
         source="file:///tmp/records.jsonl",
     )
     path = tmp_path / "catalog.json"
 
     result.write(path)
-    restored = catalog.DatasetCatalog.read_verified(path)
+    restored = catalog.Catalog.read_verified(path)
 
     assert restored == result
     assert json.loads(path.read_text(encoding="utf-8"))["catalog_digest"] == (
@@ -169,16 +170,16 @@ def test_catalog_persists_atomically_and_verifies_read_back(tmp_path):
     tampered["sample_count"] = 99
     path.write_text(json.dumps(tampered), encoding="utf-8")
     with pytest.raises(ValueError, match="catalog digest"):
-        catalog.DatasetCatalog.read_verified(path)
+        catalog.Catalog.read_verified(path)
 
 
 def test_adapter_owned_observation_supports_unknown_shapes():
     """Adapters can publish evidence without routing through a model API."""
-    result = catalog.DatasetCatalog.from_observation(
+    result = catalog.Catalog.from_observation(
         source="warehouse://events",
         data_kind="custom_event_stream",
         shape=(12, 4),
-        schema=(catalog.DatasetField("event", "custom"),),
+        schema=(catalog.Field("event", "custom"),),
         sample_count=12,
         missingness=catalog.MissingnessSummary("not_observed", 0, 0, 0, {}),
         duplicates=catalog.DuplicateSummary(
@@ -195,34 +196,36 @@ def test_adapter_owned_observation_supports_unknown_shapes():
     assert result.release_blockers == ("adapter_schema_review_required",)
 
 
-def test_catalog_is_a_top_level_public_entry_point():
-    """The general catalog is discoverable without importing implementation files."""
-    assert scmle.DatasetCatalog is catalog.DatasetCatalog
-    assert "DatasetCatalog" in scmle.__all__
+def test_catalog_is_a_pinned_public_name_of_its_module():
+    """The general catalog is defined and pinned in `scmle.data.catalog`."""
+    assert scmle.data.catalog.Catalog is catalog.Catalog
+    assert (
+        "Catalog" in check_api_compatibility.ROOT_SURFACES["scmle.data.catalog"]
+    )
 
 
 def test_invalid_mapping_lengths_and_tampered_source_fail_closed():
     """Invalid structural input and source identity tampering are rejected."""
     with pytest.raises(ValueError, match="equal lengths"):
-        catalog.DatasetCatalog.from_data({"a": [1], "b": [1, 2]})
+        catalog.Catalog.from_data({"a": [1], "b": [1, 2]})
 
-    source = catalog.DatasetSource(uri="memory://source")
+    source = catalog.Source(uri="memory://source")
     record = source.to_dict()
     record["uri"] = "memory://other"
     with pytest.raises(ValueError, match="source_identity"):
-        catalog.DatasetSource.from_dict(record)
+        catalog.Source.from_dict(record)
 
 
 def test_contract_components_reject_invalid_accounting():
     """Nested summaries fail closed instead of publishing contradictory counts."""
     with pytest.raises(ValueError, match="uri"):
-        catalog.DatasetSource(uri=" ")
+        catalog.Source(uri=" ")
     with pytest.raises(TypeError, match="version"):
-        catalog.DatasetSource(version=3)
+        catalog.Source(version=3)
     with pytest.raises(ValueError, match="field name"):
-        catalog.DatasetField(" ", "int64")
+        catalog.Field(" ", "int64")
     with pytest.raises(ValueError, match="data_type"):
-        catalog.DatasetField("x", " ")
+        catalog.Field("x", " ")
     with pytest.raises(ValueError, match="status"):
         catalog.MissingnessSummary(" ", 0, 0, 0, {})
     with pytest.raises(TypeError, match="total_values"):
@@ -263,9 +266,9 @@ def test_contract_components_reject_invalid_accounting():
 def test_scalar_series_and_nested_value_observers_cover_type_boundaries():
     """Common scalar and nested values remain deterministic and JSON-native."""
     series = pandas.Series([1, 2], name="score")
-    scalar = catalog.DatasetCatalog.from_data(numpy.asarray(4))
-    dated = catalog.DatasetCatalog.from_data(datetime.date(2026, 10, 23))
-    series_result = catalog.DatasetCatalog.from_data(series)
+    scalar = catalog.Catalog.from_data(numpy.asarray(4))
+    dated = catalog.Catalog.from_data(datetime.date(2026, 10, 23))
+    series_result = catalog.Catalog.from_data(series)
 
     assert series_result.data_kind == "pandas_series"
     assert scalar.shape == () and scalar.sample_count == 1
@@ -288,12 +291,12 @@ def test_scalar_series_and_nested_value_observers_cover_type_boundaries():
 
 def test_label_and_source_boundaries_are_explicit():
     """Unavailable and ambiguous labels become reviewable evidence."""
-    unavailable = catalog.DatasetCatalog.from_data([1, 2], label_column="label")
+    unavailable = catalog.Catalog.from_data([1, 2], label_column="label")
     duplicate_columns = pandas.DataFrame([[1, 2]], columns=["label", "label"])
-    ambiguous = catalog.DatasetCatalog.from_data(
+    ambiguous = catalog.Catalog.from_data(
         duplicate_columns, label_column="label"
     )
-    path_source = catalog.DatasetSource(uri="relative/catalog.json")
+    path_source = catalog.Source(uri="relative/catalog.json")
 
     assert unavailable.label.status == "not_observed"
     assert "declared_label_field_is_not_available" in (
@@ -307,10 +310,10 @@ def test_label_and_source_boundaries_are_explicit():
 def test_raw_and_opaque_identity_overrides_are_validated():
     """Caller identity overrides are accepted only as SHA-256 values."""
     identity = "a" * 64
-    raw = catalog.DatasetCatalog.from_data(
+    raw = catalog.Catalog.from_data(
         b"payload", content_identity=identity, label_column="label"
     )
-    high_dimensional = catalog.DatasetCatalog.from_data(
+    high_dimensional = catalog.Catalog.from_data(
         numpy.zeros((2, 2, 2)), content_identity=identity
     )
 
@@ -318,9 +321,9 @@ def test_raw_and_opaque_identity_overrides_are_validated():
     assert raw.label.status == "not_observed"
     assert high_dimensional.shape == (2, 2, 2)
     with pytest.raises(ValueError, match="SHA-256"):
-        catalog.DatasetCatalog.from_data(object(), content_identity="bad")
+        catalog.Catalog.from_data(object(), content_identity="bad")
     with pytest.raises(ValueError, match="SHA-256"):
-        catalog.DatasetCatalog.from_observation(
+        catalog.Catalog.from_observation(
             source="memory://bad",
             data_kind="custom",
             shape=(),
@@ -339,13 +342,13 @@ def test_verified_reader_rejects_malformed_envelopes(tmp_path):
     path = tmp_path / "catalog.json"
     path.write_text("not json", encoding="utf-8")
     with pytest.raises(ValueError, match="invalid JSON"):
-        catalog.DatasetCatalog.read_verified(path)
+        catalog.Catalog.read_verified(path)
     path.write_text("[]", encoding="utf-8")
     with pytest.raises(ValueError, match="JSON object"):
-        catalog.DatasetCatalog.read_verified(path)
+        catalog.Catalog.read_verified(path)
     path.write_text("{}", encoding="utf-8")
     with pytest.raises(ValueError, match="catalog_digest"):
-        catalog.DatasetCatalog.read_verified(path)
+        catalog.Catalog.read_verified(path)
     path.write_text(json.dumps({"catalog_digest": "bad"}), encoding="utf-8")
     with pytest.raises(ValueError, match="schema is invalid"):
-        catalog.DatasetCatalog.read_verified(path)
+        catalog.Catalog.read_verified(path)

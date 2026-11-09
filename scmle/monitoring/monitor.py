@@ -20,7 +20,7 @@ SEVERITY = {STABLE: 0, MODERATE: 1, HIGH: 2}
 
 
 @dataclasses.dataclass(frozen=True)
-class MonitoringThresholds:
+class Thresholds:
     """Decision thresholds for monitoring.
 
     Attributes:
@@ -79,7 +79,7 @@ class FeatureDrift:
 
 
 @dataclasses.dataclass(frozen=True)
-class DriftReport:
+class Drift:
     """Input and output drift of a batch.
 
     Attributes:
@@ -104,7 +104,7 @@ class DriftReport:
 
 
 @dataclasses.dataclass(frozen=True)
-class PerformanceReport:
+class Performance:
     """Delayed-label performance.
 
     Attributes:
@@ -141,7 +141,7 @@ class Recommendation:
 
 
 @dataclasses.dataclass(frozen=True)
-class MonitoringReport:
+class Assessment:
     """Everything monitoring concluded about a batch.
 
     Attributes:
@@ -150,8 +150,8 @@ class MonitoringReport:
         recommendation: Advice derived from the evidence.
     """
 
-    drift: DriftReport
-    performance: PerformanceReport | None
+    drift: Drift
+    performance: Performance | None
     recommendation: Recommendation
 
     def to_dict(self) -> dict[str, Any]:
@@ -164,15 +164,15 @@ class MonitoringReport:
         return dataclasses.asdict(self)
 
 
-class AdvisoryRule(abc.ABC):
+class Advisor(abc.ABC):
     """One piece of evidence that can recommend action."""
 
     @abc.abstractmethod
     def evaluate(
         self,
-        drift: DriftReport,
-        performance: PerformanceReport | None,
-        thresholds: MonitoringThresholds,
+        drift: Drift,
+        performance: Performance | None,
+        thresholds: Thresholds,
     ) -> tuple[str, str] | None:
         """Judges the evidence.
 
@@ -186,14 +186,14 @@ class AdvisoryRule(abc.ABC):
         """
 
 
-class PerformanceRule(AdvisoryRule):
+class PerformanceAdvisor(Advisor):
     """Retrain when labeled performance degraded beyond tolerance."""
 
     def evaluate(
         self,
-        drift: DriftReport,
-        performance: PerformanceReport | None,
-        thresholds: MonitoringThresholds,
+        drift: Drift,
+        performance: Performance | None,
+        thresholds: Thresholds,
     ) -> tuple[str, str] | None:
         """Fires on degraded performance.
 
@@ -218,14 +218,14 @@ class PerformanceRule(AdvisoryRule):
         return None
 
 
-class FeatureDriftRule(AdvisoryRule):
+class FeatureDriftAdvisor(Advisor):
     """Retrain on widespread large drift; investigate localized drift."""
 
     def evaluate(
         self,
-        drift: DriftReport,
-        performance: PerformanceReport | None,
-        thresholds: MonitoringThresholds,
+        drift: Drift,
+        performance: Performance | None,
+        thresholds: Thresholds,
     ) -> tuple[str, str] | None:
         """Fires on feature drift.
 
@@ -259,14 +259,14 @@ class FeatureDriftRule(AdvisoryRule):
         return None
 
 
-class OutputDriftRule(AdvisoryRule):
+class OutputDriftAdvisor(Advisor):
     """Investigate shifts in the model's own output distribution."""
 
     def evaluate(
         self,
-        drift: DriftReport,
-        performance: PerformanceReport | None,
-        thresholds: MonitoringThresholds,
+        drift: Drift,
+        performance: Performance | None,
+        thresholds: Thresholds,
     ) -> tuple[str, str] | None:
         """Fires on output drift.
 
@@ -293,14 +293,14 @@ class OutputDriftRule(AdvisoryRule):
         return None
 
 
-class UnseenCategoryRule(AdvisoryRule):
+class UnseenCategoryAdvisor(Advisor):
     """Investigate when many categories were never seen in training."""
 
     def evaluate(
         self,
-        drift: DriftReport,
-        performance: PerformanceReport | None,
-        thresholds: MonitoringThresholds,
+        drift: Drift,
+        performance: Performance | None,
+        thresholds: Thresholds,
     ) -> tuple[str, str] | None:
         """Fires on unseen categories.
 
@@ -323,19 +323,19 @@ class UnseenCategoryRule(AdvisoryRule):
         return None
 
 
-DEFAULT_RULES: tuple[AdvisoryRule, ...] = (
-    PerformanceRule(),
-    FeatureDriftRule(),
-    OutputDriftRule(),
-    UnseenCategoryRule(),
+DEFAULT_RULES: tuple[Advisor, ...] = (
+    PerformanceAdvisor(),
+    FeatureDriftAdvisor(),
+    OutputDriftAdvisor(),
+    UnseenCategoryAdvisor(),
 )
 
 
 def advise(
-    drift: DriftReport,
-    performance: PerformanceReport | None,
-    thresholds: MonitoringThresholds,
-    rules: tuple[AdvisoryRule, ...] = DEFAULT_RULES,
+    drift: Drift,
+    performance: Performance | None,
+    thresholds: Thresholds,
+    rules: tuple[Advisor, ...] = DEFAULT_RULES,
 ) -> Recommendation:
     """Combines the rules; the strongest action wins, all reasons are kept.
 
@@ -372,8 +372,8 @@ class ModelMonitor:
 
     def __init__(
         self,
-        bundle: scmle.artifacts.bundle.ModelBundle,
-        thresholds: MonitoringThresholds | None = None,
+        bundle: scmle.artifacts.bundle.Bundle,
+        thresholds: Thresholds | None = None,
     ) -> None:
         """Initializes the monitor.
 
@@ -390,7 +390,7 @@ class ModelMonitor:
             )
         self.bundle = bundle
         self.reference: reference.ReferenceProfile = bundle.reference
-        self.thresholds = thresholds or MonitoringThresholds()
+        self.thresholds = thresholds or Thresholds()
 
     def model_output(self, frame: pandas.DataFrame) -> pandas.Series:
         """Computes the output the reference describes.
@@ -402,11 +402,11 @@ class ModelMonitor:
             The positive-class probability for a binary task, otherwise the
             predictions.
         """
-        if self.bundle.schema.task == tasks.TaskType.BINARY.value:
+        if self.bundle.schema.task == tasks.Task.BINARY.value:
             return pandas.Series(self.bundle.predict_proba(frame)[:, 1])
         return pandas.Series(self.bundle.predict(frame))
 
-    def drift(self, data: pandas.DataFrame) -> DriftReport:
+    def drift(self, data: pandas.DataFrame) -> Drift:
         """Measures feature and output drift of a batch.
 
         Args:
@@ -434,7 +434,7 @@ class ModelMonitor:
         features.sort(key=lambda f: -f.psi)
         output = self.model_output(frame)
         output_psi = self.reference.output.adjusted_psi(output)
-        return DriftReport(
+        return Drift(
             len(frame),
             features,
             output_psi,
@@ -448,7 +448,7 @@ class ModelMonitor:
         outcomes: pandas.Series,
         propensity: pandas.Series | None = None,
         maturity: pandas.Series | None = None,
-    ) -> PerformanceReport:
+    ) -> Performance:
         """Scores the model on rows whose outcome is already known.
 
         Args:
@@ -486,7 +486,7 @@ class ModelMonitor:
         coverage = labeled / max(rows, 1)
         reference_metrics = dict(self.reference.reference_metrics)
         if labeled < self.thresholds.min_labeled_rows:
-            return PerformanceReport(
+            return Performance(
                 rows,
                 labeled,
                 coverage,
@@ -495,7 +495,7 @@ class ModelMonitor:
                 {},
                 "insufficient_labels",
             )
-        task = tasks.TaskType(self.bundle.schema.task)
+        task = tasks.Task(self.bundle.schema.task)
         target = outcomes.reset_index(drop=True)[known].reset_index(drop=True)
         features = frame.reset_index(drop=True)[known].reset_index(drop=True)
         if propensity is not None:
@@ -523,7 +523,7 @@ class ModelMonitor:
             primary in change
             and change[primary] < -self.thresholds.performance_tolerance
         )
-        return PerformanceReport(
+        return Performance(
             rows,
             labeled,
             coverage,
@@ -535,7 +535,7 @@ class ModelMonitor:
 
     def assess(
         self, data: pandas.DataFrame, outcomes: pandas.Series | None = None
-    ) -> MonitoringReport:
+    ) -> Assessment:
         """Produces the full monitoring report for a batch.
 
         Args:
@@ -549,7 +549,7 @@ class ModelMonitor:
         performance = (
             self.performance(data, outcomes) if outcomes is not None else None
         )
-        return MonitoringReport(
+        return Assessment(
             drift,
             performance,
             advise(drift, performance, self.thresholds),

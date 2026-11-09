@@ -37,7 +37,7 @@ def test_occlusion_attributes_the_prediction_to_the_feature_that_drives_it():
 
 
 def test_partial_dependence_follows_the_driving_feature():
-    inputs = test_diagnostics.make_inputs(tasks.TaskType.REGRESSION)
+    inputs = test_diagnostics.make_inputs(tasks.Task.REGRESSION)
 
     report = dependence.PartialDependence().compute(inputs)["features"]
 
@@ -48,7 +48,7 @@ def test_partial_dependence_follows_the_driving_feature():
 
 
 def test_partial_dependence_for_binary_is_a_probability_curve():
-    inputs = test_diagnostics.make_inputs(tasks.TaskType.BINARY)
+    inputs = test_diagnostics.make_inputs(tasks.Task.BINARY)
 
     report = dependence.PartialDependence().compute(inputs)["features"]
 
@@ -59,7 +59,7 @@ def test_partial_dependence_for_binary_is_a_probability_curve():
 
 def test_pairwise_interaction_is_bounded_and_deterministic():
     """Interaction evidence reports a stable second-order model effect."""
-    inputs = test_diagnostics.make_inputs(tasks.TaskType.REGRESSION)
+    inputs = test_diagnostics.make_inputs(tasks.Task.REGRESSION)
 
     first = interaction.PairwiseInteraction().compute(inputs)
     second = interaction.PairwiseInteraction().compute(inputs)
@@ -74,7 +74,7 @@ def test_pairwise_interaction_is_bounded_and_deterministic():
 
 def test_pairwise_interaction_respects_the_shared_deadline():
     """A spent diagnostic budget produces explicit partial evidence."""
-    inputs = test_diagnostics.make_inputs(tasks.TaskType.BINARY)
+    inputs = test_diagnostics.make_inputs(tasks.Task.BINARY)
     expired = dataclasses.replace(inputs, deadline=time.monotonic() - 1.0)
 
     report = interaction.PairwiseInteraction().compute(expired)
@@ -84,7 +84,7 @@ def test_pairwise_interaction_respects_the_shared_deadline():
 
 
 def test_importance_stops_at_its_deadline_and_says_it_was_partial():
-    inputs = test_diagnostics.make_inputs(tasks.TaskType.BINARY)
+    inputs = test_diagnostics.make_inputs(tasks.Task.BINARY)
     expired = dataclasses.replace(inputs, deadline=time.monotonic() - 1.0)
 
     report = importance.PermutationImportance().compute(expired)
@@ -96,7 +96,7 @@ def test_importance_stops_at_its_deadline_and_says_it_was_partial():
 
 
 def test_importance_is_deterministic_and_ranks_the_signal_first():
-    inputs = test_diagnostics.make_inputs(tasks.TaskType.REGRESSION)
+    inputs = test_diagnostics.make_inputs(tasks.Task.REGRESSION)
 
     first = importance.PermutationImportance().compute(inputs)
     second = importance.PermutationImportance().compute(inputs)
@@ -105,7 +105,7 @@ def test_importance_is_deterministic_and_ranks_the_signal_first():
 
 
 def test_a_suite_shares_its_time_allowance_among_diagnostics():
-    inputs = test_diagnostics.make_inputs(tasks.TaskType.BINARY)
+    inputs = test_diagnostics.make_inputs(tasks.Task.BINARY)
 
     reports = diagnostics.run_suite(
         inputs, suite.full_suite(), total_seconds=0.0

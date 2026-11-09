@@ -39,7 +39,7 @@ NOT_IDENTIFIED = "not_identified"
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class TierInputs:
+class Inputs:
     """Facts about a causal run, copied from its report files.
 
     Attributes:
@@ -88,7 +88,7 @@ class TierInputs:
 
 
 @dataclasses.dataclass(frozen=True)
-class TierDecision:
+class Assignment:
     """The tier, the five conditions and the reasons for any shortfall.
 
     Attributes:
@@ -122,7 +122,7 @@ class TierDecision:
         }
 
 
-def decide(facts: TierInputs) -> TierDecision:
+def decide(facts: Inputs) -> Assignment:
     """Applies the tier rule.
 
     Args:
@@ -138,7 +138,7 @@ def decide(facts: TierInputs) -> TierDecision:
         empty for `confirmed`.
     """
     if not facts.identified:
-        return TierDecision(
+        return Assignment(
             None,
             NOT_IDENTIFIED,
             dict.fromkeys(CONDITIONS, False),
@@ -180,7 +180,7 @@ def decide(facts: TierInputs) -> TierDecision:
         or not facts.design_passed
         or (facts.battery_ran and not facts.battery_passed)
     ):
-        return TierDecision(
+        return Assignment(
             qualification.Tier.UNVERIFIED,
             "identified",
             conditions,
@@ -217,10 +217,10 @@ def decide(facts: TierInputs) -> TierDecision:
     elif conditions["sensitivity"] is False:
         reasons.append("the sensitivity analysis has no passing certificate")
     if all(conditions.values()):
-        return TierDecision(
+        return Assignment(
             qualification.Tier.CONFIRMED, "identified", conditions, (), ""
         )
-    return TierDecision(
+    return Assignment(
         qualification.Tier.ATTESTED,
         "identified",
         conditions,

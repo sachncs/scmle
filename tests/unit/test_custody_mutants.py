@@ -152,14 +152,14 @@ def test_the_mac_error_names_the_entry(tmp_path):
 def test_the_vault_seals_in_process_only_when_asked_not_to_use_one():
     frame = pandas.DataFrame({"a": [1.0, 2.0, 3.0]})
     target = pandas.Series([0, 1, 0], name="y")
-    protocol = sealed.CustodyVault(sealed.OpenLog(), process=False)
+    protocol = sealed.Vault(sealed.OpenLog(), process=False)
     held = protocol.seal("C", frame, target, (4, 5, 6))
     assert isinstance(held.locked, splitters.ResidentTestSet)
     assert protocol.level == sealed.PROTOCOL_LEVEL
     features, labels = held.open(held.issue_token())
     assert features.equals(frame) and labels.equals(target)
     assert held.ids == (4, 5, 6)
-    process = sealed.CustodyVault(sealed.OpenLog(), process=True)
+    process = sealed.Vault(sealed.OpenLog(), process=True)
     try:
         real = process.seal("C", frame, target, (4, 5, 6))
         assert isinstance(real.locked, vault.SealedTestSet)
@@ -172,7 +172,7 @@ def test_the_vault_seals_in_process_only_when_asked_not_to_use_one():
 
 def test_adopting_a_set_names_it_in_the_log_and_refuses_a_repeat():
     log = sealed.OpenLog()
-    custody = sealed.CustodyVault(log, process=False)
+    custody = sealed.Vault(log, process=False)
     custody.adopt("C", resident())
     assert log.entries[0]["set"] == "C"
     with pytest.raises(ValueError) as caught:

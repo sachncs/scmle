@@ -11,7 +11,7 @@
   libraries are limited to its share of the CPUs.
 * GPU: no built-in model uses a GPU; `gpu="required"` blocks the run.
 
-Supervision applies when `ResourceSpec.enforcement` is `hard` (the default);
+Supervision applies when `Resources.enforcement` is `hard` (the default);
 `cooperative` only stops new trials from starting.
 """
 
@@ -250,7 +250,7 @@ def child_main(
 
 
 @dataclasses.dataclass(frozen=True)
-class TrialSupervisor:
+class Supervisor:
     """Runs one call in a separate process under hard limits.
 
     Attributes:
@@ -365,7 +365,7 @@ class TrialSupervisor:
 
 
 @dataclasses.dataclass(frozen=True)
-class ResourceGovernor:
+class Governor:
     """Applies and reports the configured resource limits.
 
     Attributes:
@@ -373,7 +373,7 @@ class ResourceGovernor:
         started_at: Monotonic start time of the run.
     """
 
-    spec: tasks.ResourceSpec
+    spec: tasks.Resources
     started_at: float = dataclasses.field(default_factory=time.monotonic)
 
     @property

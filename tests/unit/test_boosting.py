@@ -13,32 +13,28 @@ import scmle.models.registry
 @pytest.mark.parametrize("library", ["lightgbm", "xgboost"])
 def test_adapters_pass_conformance_when_installed(library):
     pytest.importorskip(library)
-    adapter = scmle.models.registry.ModelRegistry.with_builtins().get(library)
+    adapter = scmle.models.registry.Catalog.with_builtins().get(library)
     conformance.check_conformance(adapter)
 
 
 def test_adapters_are_rejected_not_failing_when_library_missing(monkeypatch):
-    registry = scmle.models.registry.ModelRegistry.with_builtins()
-    monkeypatch.setattr(
-        boosters.XgboostAdapter, "requires", ("not_installed_pkg",)
-    )
-    compatible, rejected = registry.candidates(tasks.TaskType.BINARY)
+    registry = scmle.models.registry.Catalog.with_builtins()
+    monkeypatch.setattr(boosters.Xgboost, "requires", ("not_installed_pkg",))
+    compatible, rejected = registry.candidates(tasks.Task.BINARY)
     assert "missing dependency" in rejected["xgboost"]
     assert "xgboost" not in {a.name for a in compatible}
 
 
 def test_build_without_library_raises_config_error(monkeypatch):
-    monkeypatch.setattr(
-        boosters.XgboostAdapter, "requires", ("not_installed_pkg",)
-    )
+    monkeypatch.setattr(boosters.Xgboost, "requires", ("not_installed_pkg",))
     with pytest.raises(errors.ConfigError, match="boosting"):
-        boosters.XgboostAdapter().build(tasks.TaskType.BINARY, 0)
+        boosters.Xgboost().build(tasks.Task.BINARY, 0)
 
 
 def test_params_override_fixed_params_and_seed_is_applied():
     pytest.importorskip("lightgbm")
-    estimator = boosters.LightGbmAdapter().build(
-        tasks.TaskType.REGRESSION, 5, {"num_leaves": 9}
+    estimator = boosters.LightGbm().build(
+        tasks.Task.REGRESSION, 5, {"num_leaves": 9}
     )
     params = estimator.get_params()
     assert params["estimator__num_leaves"] == 9
@@ -103,9 +99,7 @@ def test_wrapper_survives_pickling_and_cloning():
 
 def test_catboost_passes_conformance_when_installed():
     pytest.importorskip("catboost")
-    adapter = scmle.models.registry.ModelRegistry.with_builtins().get(
-        "catboost"
-    )
+    adapter = scmle.models.registry.Catalog.with_builtins().get("catboost")
     conformance.check_conformance(adapter)
 
 
@@ -115,7 +109,7 @@ def test_catboost_handles_string_labels_natively(multiclass_frame, tmp_path):
 
     from scmle.contracts import tasks
 
-    only = tasks.StrategySpec(top_models=0)
+    only = tasks.Strategies(top_models=0)
     project = support.make_project(
         multiclass_frame,
         "y",
@@ -165,10 +159,8 @@ def test_catboost_multiclass_predictions_are_one_dimensional(multiclass_frame):
     pytest.importorskip("catboost")
     from scmle.contracts import tasks
 
-    adapter = scmle.models.registry.ModelRegistry.with_builtins().get(
-        "catboost"
-    )
-    estimator = adapter.build(tasks.TaskType.MULTICLASS, 0, {"iterations": 20})
+    adapter = scmle.models.registry.Catalog.with_builtins().get("catboost")
+    estimator = adapter.build(tasks.Task.MULTICLASS, 0, {"iterations": 20})
     features = multiclass_frame.drop(columns="y")
     estimator.fit(features, multiclass_frame["y"])
     assert estimator.predict(features).shape == (len(features),)

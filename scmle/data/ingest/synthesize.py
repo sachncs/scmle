@@ -108,7 +108,7 @@ class Nest:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class FeatureSpec:
+class Feature:
     """One feature of the grammar.
 
     Attributes:
@@ -196,7 +196,7 @@ def propose(
     sources: Sequence[Source],
     nests: Sequence[Nest] = (),
     windows: Sequence[float | None] = WINDOWS_DAYS,
-) -> list[FeatureSpec]:
+) -> list[Feature]:
     """Lists every feature of the grammar for these sources.
 
     Args:
@@ -208,14 +208,14 @@ def propose(
     Returns:
         The feature specifications in a fixed order.
     """
-    specs: list[FeatureSpec] = []
+    specs: list[Feature] = []
     for index, source in enumerate(sources):
         table = source.view.name
         numeric, other = candidate_columns(source)
         if source.role == PARENT:
             for column in (*numeric, *other):
                 specs.append(
-                    FeatureSpec(
+                    Feature(
                         f"{table}__lookup__{column}",
                         "lookup",
                         index,
@@ -229,7 +229,7 @@ def propose(
             label = window_label(window)
             for primitive in VALUE_FREE:
                 specs.append(
-                    FeatureSpec(
+                    Feature(
                         f"{table}__{primitive}__{label}",
                         "aggregate",
                         index,
@@ -241,7 +241,7 @@ def propose(
             for column in numeric:
                 for primitive in (*NUMERIC_ONLY, LAST):
                     specs.append(
-                        FeatureSpec(
+                        Feature(
                             f"{table}__{primitive}__{column}__{label}",
                             "aggregate",
                             index,
@@ -252,7 +252,7 @@ def propose(
                     )
             for column in (*numeric, *other):
                 specs.append(
-                    FeatureSpec(
+                    Feature(
                         f"{table}__{NUNIQUE}__{column}__{label}",
                         "aggregate",
                         index,
@@ -275,7 +275,7 @@ def propose(
                     )
                     for pick in picks:
                         specs.append(
-                            FeatureSpec(
+                            Feature(
                                 f"{nest.mid.view.name}__{outer}__of__"
                                 f"{nest.leaf.name}__{inner}__"
                                 f"{pick or '*'}__{label}",
@@ -419,7 +419,7 @@ def slope(rows: pandas.DataFrame, value: str) -> pandas.Series:
 
 
 def evaluate(
-    spec: FeatureSpec,
+    spec: Feature,
     targets: pandas.DataFrame,
     moment: str,
     sources: Sequence[Source],
@@ -476,7 +476,7 @@ def evaluate(
 
 
 def tables_read(
-    spec: FeatureSpec, sources: Sequence[Source], nests: Sequence[Nest]
+    spec: Feature, sources: Sequence[Source], nests: Sequence[Nest]
 ) -> list[asof_view.AsOfView]:
     """Lists the views a feature reads.
 
@@ -642,7 +642,7 @@ def feature_provenance(
     lag_days: float,
     views: Sequence[asof_view.AsOfView],
     today: datetime.date | None = None,
-) -> provenance.ProvenanceTable:
+) -> provenance.Dictionary:
     """Builds the provenance table of the kept features.
 
     Each feature inherits the weakest source among the tables it reads. A
@@ -700,7 +700,7 @@ def feature_provenance(
                 else None,
             )
         )
-    return provenance.ProvenanceTable(tuple(records))
+    return provenance.Dictionary(tuple(records))
 
 
 def register_family(
@@ -722,7 +722,7 @@ def register_family(
     for entry in features.kept():
         registered.append(
             ledger.register(
-                scmle.data.ledger.ledger.HypothesisSpec.create(
+                scmle.data.ledger.ledger.Test.create(
                     name=f"{entry['name']}~target",
                     family=FAMILY,
                     statistic=STATISTIC,

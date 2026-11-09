@@ -116,7 +116,7 @@ def validate_digest(value: str, field_name: str) -> str:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class DatasetSource:
+class Source:
     """Identity and governance context for a caller-owned data source."""
 
     uri: str | pathlib.Path = "memory://"
@@ -212,7 +212,7 @@ class DatasetSource:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class DatasetField:
+class Field:
     """One ordered field in an observed dataset schema."""
 
     name: str
@@ -518,7 +518,7 @@ class LabelSummary:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class DatasetCatalog:
+class Catalog:
     """Versioned, model-agnostic curation evidence for one data snapshot.
 
     The contract accepts arbitrary caller-owned observations, but it never
@@ -527,10 +527,10 @@ class DatasetCatalog:
     caller-owned adapter can provide trustworthy evidence for another format.
     """
 
-    source: DatasetSource
+    source: Source
     data_kind: str
     shape: tuple[int, ...]
-    schema: tuple[DatasetField, ...]
+    schema: tuple[Field, ...]
     sample_count: int
     missingness: MissingnessSummary
     duplicates: DuplicateSummary
@@ -554,8 +554,8 @@ class DatasetCatalog:
                 a blank entry, ``release_blockers`` has a blank entry, or
                 ``content_identity`` is not a SHA-256 digest.
         """
-        if not isinstance(self.source, DatasetSource):
-            raise TypeError("source must be DatasetSource")
+        if not isinstance(self.source, Source):
+            raise TypeError("source must be Source")
         if not isinstance(self.data_kind, str) or not self.data_kind.strip():
             raise ValueError("data_kind must not be empty")
         if isinstance(self.sample_count, bool) or not isinstance(
@@ -578,8 +578,8 @@ class DatasetCatalog:
         ):
             raise ValueError("shape must contain non-negative integers")
         fields = tuple(self.schema)
-        if any(not isinstance(field, DatasetField) for field in fields):
-            raise TypeError("schema must contain DatasetField records")
+        if any(not isinstance(field, Field) for field in fields):
+            raise TypeError("schema must contain Field records")
         if not isinstance(self.missingness, MissingnessSummary):
             raise TypeError("missingness must be MissingnessSummary")
         if not isinstance(self.duplicates, DuplicateSummary):
@@ -613,10 +613,10 @@ class DatasetCatalog:
     @classmethod
     def from_observation(
         cls,
-        source: DatasetSource | str | pathlib.Path,
+        source: Source | str | pathlib.Path,
         data_kind: str,
         shape: Sequence[int],
-        schema: Sequence[DatasetField],
+        schema: Sequence[Field],
         sample_count: int,
         missingness: MissingnessSummary,
         duplicates: DuplicateSummary,
@@ -629,7 +629,7 @@ class DatasetCatalog:
 
         Args:
             source: The data source, or a URI or path that is wrapped in a
-                ``DatasetSource`` with default governance fields.
+                ``Source`` with default governance fields.
             data_kind: Name of the kind of data observed.
             shape: Dimensions of the data.
             schema: Ordered fields of the observed schema.
@@ -646,11 +646,7 @@ class DatasetCatalog:
         Returns:
             The validated catalog.
         """
-        source_value = (
-            source
-            if isinstance(source, DatasetSource)
-            else DatasetSource(source)
-        )
+        source_value = source if isinstance(source, Source) else Source(source)
         return cls(
             source=source_value,
             data_kind=data_kind,
@@ -669,7 +665,7 @@ class DatasetCatalog:
     def from_data(
         cls,
         data: Any,
-        source: DatasetSource | str | pathlib.Path = "memory://",
+        source: Source | str | pathlib.Path = "memory://",
         label_column: str | None = None,
         content_identity: str | None = None,
         limitations: Sequence[str] = (),
@@ -685,7 +681,7 @@ class DatasetCatalog:
         Args:
             data: The object to observe.
             source: The data source, or a URI or path that is wrapped in a
-                ``DatasetSource`` with default governance fields.
+                ``Source`` with default governance fields.
             label_column: Name of the label column, or None when no label
                 is declared.
             content_identity: Caller-supplied SHA-256 digest of the
@@ -701,11 +697,7 @@ class DatasetCatalog:
             observing, and the caller's, with duplicates removed in
             first-seen order.
         """
-        source_value = (
-            source
-            if isinstance(source, DatasetSource)
-            else DatasetSource(source)
-        )
+        source_value = source if isinstance(source, Source) else Source(source)
         observation = observe_data(data, label_column, content_identity)
         limitation_values = [
             "curation_only_no_model_fit_or_performance_claim",
@@ -855,12 +847,10 @@ class DatasetCatalog:
         if int(record.get("schema_version", 0)) != CATALOG_SCHEMA_VERSION:
             raise ValueError("unsupported catalog schema version")
         return cls(
-            source=DatasetSource.from_dict(record["source"]),
+            source=Source.from_dict(record["source"]),
             data_kind=str(record["data_kind"]),
             shape=tuple(int(value) for value in record["shape"]),
-            schema=tuple(
-                DatasetField.from_dict(field) for field in record["schema"]
-            ),
+            schema=tuple(Field.from_dict(field) for field in record["schema"]),
             sample_count=int(record["sample_count"]),
             missingness=MissingnessSummary.from_dict(record["missingness"]),
             duplicates=DuplicateSummary.from_dict(record["duplicates"]),
@@ -874,12 +864,12 @@ class DatasetCatalog:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class DataObservation:
+class Observation:
     """Intermediate evidence produced by the supported data observers."""
 
     data_kind: str
     shape: tuple[int, ...]
-    schema: tuple[DatasetField, ...]
+    schema: tuple[Field, ...]
     sample_count: int
     missingness: MissingnessSummary
     duplicates: DuplicateSummary
@@ -889,7 +879,7 @@ class DataObservation:
     release_blockers: tuple[str, ...]
 
 
-def source_blockers(source: DatasetSource) -> tuple[str, ...]:
+def source_blockers(source: Source) -> tuple[str, ...]:
     """Returns governance blockers that can be proven from source metadata.
 
     Args:
@@ -1065,7 +1055,7 @@ def canonical_value(value: Any) -> Any:
     )
 
 
-def schema_for_frame(frame: pandas.DataFrame) -> tuple[DatasetField, ...]:
+def schema_for_frame(frame: pandas.DataFrame) -> tuple[Field, ...]:
     """Returns ordered field metadata, preserving duplicate column positions.
 
     Args:
@@ -1075,7 +1065,7 @@ def schema_for_frame(frame: pandas.DataFrame) -> tuple[DatasetField, ...]:
         One field per column, in column order, with the dtype as a string.
     """
     return tuple(
-        DatasetField(str(name), str(data_type))
+        Field(str(name), str(data_type))
         for name, data_type in zip(
             frame.columns, frame.dtypes.astype(str), strict=True
         )
@@ -1246,7 +1236,7 @@ def observe_data(
     data: Any,
     label_column: str | None,
     supplied_identity: str | None,
-) -> DataObservation:
+) -> Observation:
     """Observes a supported object and produces structured quality evidence.
 
     Args:
@@ -1293,7 +1283,7 @@ def observe_data(
                 supplied_identity, "content_identity"
             )
             limitations.append("content_identity_was_supplied_by_caller")
-        return DataObservation(
+        return Observation(
             data_kind=data_kind,
             shape=shape,
             schema=schema,
@@ -1306,7 +1296,7 @@ def observe_data(
             release_blockers=tuple(dict.fromkeys(blockers)),
         )
     if isinstance(data, (bytes, bytearray, memoryview)):
-        schema = (DatasetField("payload", "bytes"),)
+        schema = (Field("payload", "bytes"),)
         content_identity = (
             bytes_content(data)
             if supplied_identity is None
@@ -1321,7 +1311,7 @@ def observe_data(
         limitations.extend(label_limitations)
         blockers.extend(label_blockers)
         blockers.append("modality_specific_decoder_not_declared")
-        return DataObservation(
+        return Observation(
             data_kind=data_kind,
             shape=shape,
             schema=schema,
@@ -1351,10 +1341,10 @@ def observe_data(
         )
     )
     blockers.extend(("schema_adapter_not_declared", *label_blockers))
-    return DataObservation(
+    return Observation(
         data_kind=data_kind,
         shape=shape,
-        schema=(DatasetField("value", type(data).__name__),),
+        schema=(Field("value", type(data).__name__),),
         sample_count=1,
         missingness=MissingnessSummary("not_observed", 0, 0, 0, {}),
         duplicates=DuplicateSummary(
@@ -1368,10 +1358,10 @@ def observe_data(
 
 
 __all__ = [
-    "DatasetCatalog",
-    "DatasetField",
-    "DatasetSource",
+    "Catalog",
     "DuplicateSummary",
+    "Field",
     "LabelSummary",
     "MissingnessSummary",
+    "Source",
 ]

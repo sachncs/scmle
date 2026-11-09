@@ -57,7 +57,7 @@ def make_policy(**changes):
         "outcome_window": 0,
     }
     values.update(changes)
-    return loop.LoopPolicy(**values)
+    return loop.Preregistration(**values)
 
 
 def make_stream(**changes):

@@ -101,7 +101,7 @@ def check_treatment(frame: pandas.DataFrame, column: str | None) -> None:
 
 
 def check_targets(
-    frame: pandas.DataFrame, columns: list[str], task: tasks.TaskType
+    frame: pandas.DataFrame, columns: list[str], task: tasks.Task
 ) -> None:
     """Requires every target column to exist, be complete and fit the task.
 
@@ -123,7 +123,7 @@ def check_targets(
             raise errors.BlockedError(
                 f"target column '{column}' has missing values"
             )
-        if task is tasks.TaskType.MULTILABEL:
+        if task is tasks.Task.MULTILABEL:
             if not values.isin([0, 1]).all():
                 raise errors.BlockedError(
                     f"label column '{column}' must hold 0 or 1"
@@ -142,7 +142,7 @@ class TaskResolver:
         order: Listed ordinal label order (empty when none is given).
     """
 
-    def __init__(self, spec: tasks.ProjectSpec) -> None:
+    def __init__(self, spec: tasks.Config) -> None:
         """Initializes the resolver.
 
         Args:
@@ -151,7 +151,7 @@ class TaskResolver:
         self.request = spec.task
         self.order = list(spec.data.ordinal_order)
 
-    def resolve(self, target: pandas.Series) -> tasks.TaskType:
+    def resolve(self, target: pandas.Series) -> tasks.Task:
         """Returns the concrete task type.
 
         Args:
@@ -179,21 +179,21 @@ class TaskResolver:
         if self.request == "uplift":
             return self.resolve_uplift(target)
         if self.request in ("multilabel", "multioutput", "forecast"):
-            return tasks.TaskType(self.request)
+            return tasks.Task(self.request)
         if self.request == "regression":
             return self.resolve_regression(target)
         if self.request == "auto":
             return self.resolve_auto(target)
         return self.resolve_classification(target)
 
-    def resolve_survival(self, target: pandas.Series) -> tasks.TaskType:
+    def resolve_survival(self, target: pandas.Series) -> tasks.Task:
         """Validates a survival request: durations must be positive numbers.
 
         Args:
             target: The duration column.
 
         Returns:
-            `TaskType.SURVIVAL`.
+            `Task.SURVIVAL`.
 
         Raises:
             BlockedError: If the target is not numeric or has a value that
@@ -203,32 +203,32 @@ class TaskResolver:
             raise errors.BlockedError(
                 "survival needs a numeric duration target greater than zero"
             )
-        return tasks.TaskType.SURVIVAL
+        return tasks.Task.SURVIVAL
 
-    def resolve_uplift(self, target: pandas.Series) -> tasks.TaskType:
+    def resolve_uplift(self, target: pandas.Series) -> tasks.Task:
         """The outcome must be numeric (0/1 labels or a quantity).
 
         Args:
             target: The outcome column.
 
         Returns:
-            `TaskType.UPLIFT`.
+            `Task.UPLIFT`.
 
         Raises:
             BlockedError: If the outcome is not numeric.
         """
         if not is_numeric_target(target):
             raise errors.BlockedError("uplift needs a numeric outcome")
-        return tasks.TaskType.UPLIFT
+        return tasks.Task.UPLIFT
 
-    def resolve_ranking(self, target: pandas.Series) -> tasks.TaskType:
+    def resolve_ranking(self, target: pandas.Series) -> tasks.Task:
         """Resolves a ranking target, requiring non-negative whole grades.
 
         Args:
             target: The relevance column.
 
         Returns:
-            `TaskType.RANKING`.
+            `Task.RANKING`.
 
         Raises:
             BlockedError: If any grade is missing, unparseable, negative or
@@ -240,16 +240,16 @@ class TaskResolver:
                 "ranking needs a relevance target of non-negative whole "
                 "numbers (0 = not relevant)"
             )
-        return tasks.TaskType.RANKING
+        return tasks.Task.RANKING
 
-    def resolve_ordinal(self, target: pandas.Series) -> tasks.TaskType:
+    def resolve_ordinal(self, target: pandas.Series) -> tasks.Task:
         """Requires the listed order to match the labels in the data.
 
         Args:
             target: The ordinal label column.
 
         Returns:
-            `TaskType.ORDINAL`.
+            `Task.ORDINAL`.
 
         Raises:
             BlockedError: If a label in the data is missing from the listed
@@ -267,16 +267,16 @@ class TaskResolver:
                 "ordinal_order lists label(s) with no rows: "
                 f"{sorted(map(str, listed - present))}"
             )
-        return tasks.TaskType.ORDINAL
+        return tasks.Task.ORDINAL
 
-    def resolve_regression(self, target: pandas.Series) -> tasks.TaskType:
+    def resolve_regression(self, target: pandas.Series) -> tasks.Task:
         """Validates an explicit regression request.
 
         Args:
             target: The target column.
 
         Returns:
-            `TaskType.REGRESSION`.
+            `Task.REGRESSION`.
 
         Raises:
             BlockedError: If the target is not numeric.
@@ -285,17 +285,17 @@ class TaskResolver:
             raise errors.BlockedError(
                 "regression requested but the target is not numeric"
             )
-        return tasks.TaskType.REGRESSION
+        return tasks.Task.REGRESSION
 
-    def resolve_classification(self, target: pandas.Series) -> tasks.TaskType:
+    def resolve_classification(self, target: pandas.Series) -> tasks.Task:
         """Validates an explicit (possibly generic) classification request.
 
         Args:
             target: The target column.
 
         Returns:
-            `TaskType.BINARY` for two classes, otherwise
-            `TaskType.MULTICLASS`.
+            `Task.BINARY` for two classes, otherwise
+            `Task.MULTICLASS`.
 
         Raises:
             BlockedError: If the target has fewer than two classes, a
@@ -317,18 +317,18 @@ class TaskResolver:
             raise errors.BlockedError(
                 "multiclass_classification requested but target has 2 classes"
             )
-        return tasks.TaskType.BINARY if binary else tasks.TaskType.MULTICLASS
+        return tasks.Task.BINARY if binary else tasks.Task.MULTICLASS
 
-    def resolve_auto(self, target: pandas.Series) -> tasks.TaskType:
+    def resolve_auto(self, target: pandas.Series) -> tasks.Task:
         """Infers the task; blocks when the choice is genuinely ambiguous.
 
         Args:
             target: The target column.
 
         Returns:
-            `TaskType.BINARY` for two distinct values, `TaskType.MULTICLASS`
+            `Task.BINARY` for two distinct values, `Task.MULTICLASS`
             for a non-numeric target with more, otherwise
-            `TaskType.REGRESSION`.
+            `Task.REGRESSION`.
 
         Raises:
             BlockedError: If the target has fewer than two distinct values,
@@ -353,13 +353,9 @@ class TaskResolver:
                 "not a class label; choose another target"
             )
         if not is_numeric_target(target):
-            return (
-                tasks.TaskType.BINARY
-                if classes == 2
-                else tasks.TaskType.MULTICLASS
-            )
+            return tasks.Task.BINARY if classes == 2 else tasks.Task.MULTICLASS
         if classes == 2:
-            return tasks.TaskType.BINARY
+            return tasks.Task.BINARY
         values = target.dropna()
         integral = bool((values % 1 == 0).all())
         if (
@@ -372,4 +368,4 @@ class TaskResolver:
                 f"integer ({classes} values): classification vs regression "
                 "is ambiguous; set task= explicitly"
             )
-        return tasks.TaskType.REGRESSION
+        return tasks.Task.REGRESSION

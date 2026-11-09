@@ -32,7 +32,7 @@ class BudgetExhaustedError(ValueError):
     """Raised when a spend exceeds the remaining exploration wealth."""
 
 
-class MultiplicityRule(enum.StrEnum):
+class Correction(enum.StrEnum):
     """Rule that adjusts the confirmation level for the survivor count."""
 
     BONFERRONI = "bonferroni"
@@ -416,7 +416,7 @@ def harmonic(n: int) -> float:
 
 
 def confirmation_alpha(
-    budget: ErrorBudget, n_survivors: int, rule: MultiplicityRule
+    budget: ErrorBudget, n_survivors: int, rule: Correction
 ) -> float:
     """Returns the smallest per-hypothesis level for `n_survivors`.
 
@@ -437,15 +437,15 @@ def confirmation_alpha(
 
     Raises:
         ValueError: If `n_survivors` is not a non-negative integer or `rule`
-            is not a `MultiplicityRule`.
+            is not a `Correction`.
     """
     qualification.count(n_survivors, "n_survivors")
-    if not isinstance(rule, MultiplicityRule):
-        raise ValueError("rule must be a MultiplicityRule")
+    if not isinstance(rule, Correction):
+        raise ValueError("rule must be a Correction")
     alpha = budget.confirmation.alpha_confirm
     if n_survivors == 0:
         return float(alpha)
-    if rule is MultiplicityRule.BY:
+    if rule is Correction.BY:
         return float(alpha) / (n_survivors * harmonic(n_survivors))
     return float(alpha / n_survivors)
 

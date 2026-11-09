@@ -137,8 +137,8 @@ def test_the_harmonic_number_agrees_with_the_digamma_identity():
 def test_the_rank_one_thresholds_reproduce_alpha_under_scipys_adjustment(n):
     plan = budget.ErrorBudget.create(0.05, 0.1)
     for rule, method in (
-        (budget.MultiplicityRule.BY, "by"),
-        (budget.MultiplicityRule.BH, "bh"),
+        (budget.Correction.BY, "by"),
+        (budget.Correction.BH, "bh"),
     ):
         level = budget.confirmation_alpha(plan, n, rule)
         others = [1.0] * (n - 1)

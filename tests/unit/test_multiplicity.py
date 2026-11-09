@@ -13,7 +13,7 @@ from scmle.data.ledger import multiplicity
 
 def test_bh_and_by_adjusted_values_match_the_frozen_scipy_oracle():
     for case in oracles.load_oracle("fdr_control").cases:
-        rule = budget.MultiplicityRule(case["inputs"]["method"])
+        rule = budget.Correction(case["inputs"]["method"])
         out = multiplicity.adjust(
             case["inputs"]["pvalues"], rule, Fraction(1, 20)
         )
@@ -33,8 +33,8 @@ def test_bh_by_agree_with_scipy_and_decisions_match_adjusted(seed):
         [rng.uniform(size=n), rng.uniform(0, 0.01, size=n // 2)]
     )
     for rule, method in (
-        (budget.MultiplicityRule.BH, "bh"),
-        (budget.MultiplicityRule.BY, "by"),
+        (budget.Correction.BH, "bh"),
+        (budget.Correction.BY, "by"),
     ):
         out = multiplicity.adjust(p.tolist(), rule, Fraction(1, 20))
         reference = stats.false_discovery_control(p, method=method)
@@ -66,7 +66,7 @@ def test_holm_matches_a_brute_force_definition(seed):
     rng = numpy.random.default_rng(100 + seed)
     p = numpy.concatenate([rng.uniform(size=12), rng.uniform(0, 0.004, size=4)])
     out = multiplicity.adjust(
-        p.tolist(), budget.MultiplicityRule.HOLM, Fraction(1, 20)
+        p.tolist(), budget.Correction.HOLM, Fraction(1, 20)
     )
     reject, adjusted = brute_holm(p, 0.05)
     assert list(out.rejected) == list(reject)
@@ -76,14 +76,14 @@ def test_holm_matches_a_brute_force_definition(seed):
 def test_bonferroni_threshold_and_adjustment():
     out = multiplicity.adjust(
         [0.01, 0.0124, 0.0126, 0.5],
-        budget.MultiplicityRule.BONFERRONI,
+        budget.Correction.BONFERRONI,
         Fraction(1, 20),
     )
     assert list(out.rejected) == [True, True, False, False]  # 0.05 / 4
     assert out.adjusted == pytest.approx((0.04, 0.0496, 0.0504, 1.0))
     # Inclusive at an exactly representable threshold: 1/2 / 2 = 0.25.
     edge = multiplicity.adjust(
-        [0.25, 0.75], budget.MultiplicityRule.BONFERRONI, Fraction(1, 2)
+        [0.25, 0.75], budget.Correction.BONFERRONI, Fraction(1, 2)
     )
     assert edge.rejected == (True, False)
 
@@ -92,41 +92,41 @@ def test_exact_boundaries_are_inclusive_and_step_wise():
     half = Fraction(1, 2)
     # m = 2: BH thresholds are 1/4 and 1/2.
     assert multiplicity.adjust(
-        [0.25, 0.5], budget.MultiplicityRule.BH, half
+        [0.25, 0.5], budget.Correction.BH, half
     ).rejected == (True, True)
     assert multiplicity.adjust(
-        [0.25, 0.5000001], budget.MultiplicityRule.BH, half
+        [0.25, 0.5000001], budget.Correction.BH, half
     ).rejected == (
         True,
         False,
     )
     assert multiplicity.adjust(
-        [0.2500001, 0.5], budget.MultiplicityRule.BH, half
+        [0.2500001, 0.5], budget.Correction.BH, half
     ).rejected == (
         True,
         True,
     )
     assert multiplicity.adjust(
-        [0.2500001, 0.5000001], budget.MultiplicityRule.BH, half
+        [0.2500001, 0.5000001], budget.Correction.BH, half
     ).rejected == (
         False,
         False,
     )
     # Holm thresholds are 1/4 then 1/2.
     assert multiplicity.adjust(
-        [0.25, 0.5], budget.MultiplicityRule.HOLM, half
+        [0.25, 0.5], budget.Correction.HOLM, half
     ).rejected == (
         True,
         True,
     )
     assert multiplicity.adjust(
-        [0.2500001, 0.4], budget.MultiplicityRule.HOLM, half
+        [0.2500001, 0.4], budget.Correction.HOLM, half
     ).rejected == (
         False,
         False,
     )
     assert multiplicity.adjust(
-        [0.25, 0.5000001], budget.MultiplicityRule.HOLM, half
+        [0.25, 0.5000001], budget.Correction.HOLM, half
     ).rejected == (
         True,
         False,
@@ -137,17 +137,17 @@ def test_bh_is_step_up_and_holm_is_step_down():
     # p_(2) passes its BH threshold although p_(1) fails its own.
     p = [0.03, 0.04]
     assert multiplicity.adjust(
-        p, budget.MultiplicityRule.BH, Fraction(1, 20)
+        p, budget.Correction.BH, Fraction(1, 20)
     ).rejected == (True, True)
     assert multiplicity.adjust(
-        p, budget.MultiplicityRule.HOLM, Fraction(1, 20)
+        p, budget.Correction.HOLM, Fraction(1, 20)
     ).rejected == (False, False)
 
 
 def test_by_is_more_conservative_than_bh():
     p = [0.001, 0.01, 0.02, 0.04, 0.2]
-    bh = multiplicity.adjust(p, budget.MultiplicityRule.BH, Fraction(1, 20))
-    by = multiplicity.adjust(p, budget.MultiplicityRule.BY, Fraction(1, 20))
+    bh = multiplicity.adjust(p, budget.Correction.BH, Fraction(1, 20))
+    by = multiplicity.adjust(p, budget.Correction.BY, Fraction(1, 20))
     assert sum(by.rejected) <= sum(bh.rejected)
     assert all(a >= x for a, x in zip(by.adjusted, bh.adjusted, strict=True))
     assert multiplicity.harmonic_exact(3) == Fraction(11, 6)
@@ -155,7 +155,7 @@ def test_by_is_more_conservative_than_bh():
 
 def test_order_of_the_input_is_preserved_and_ties_agree():
     p = [0.9, 0.001, 0.04, 0.001, 0.04]
-    out = multiplicity.adjust(p, budget.MultiplicityRule.BH, Fraction(1, 20))
+    out = multiplicity.adjust(p, budget.Correction.BH, Fraction(1, 20))
     assert out.rejected[1] == out.rejected[3]
     assert out.rejected[2] == out.rejected[4]
     assert out.rejected[0] is False
@@ -163,24 +163,22 @@ def test_order_of_the_input_is_preserved_and_ties_agree():
 
 def test_empty_family_and_validation():
     assert (
-        multiplicity.adjust(
-            [], budget.MultiplicityRule.BY, Fraction(1, 20)
-        ).rejected
+        multiplicity.adjust([], budget.Correction.BY, Fraction(1, 20)).rejected
         == ()
     )
     with pytest.raises(ValueError, match="alpha"):
-        multiplicity.adjust([0.1], budget.MultiplicityRule.BH, Fraction(0))
+        multiplicity.adjust([0.1], budget.Correction.BH, Fraction(0))
     with pytest.raises(ValueError, match="alpha"):
-        multiplicity.adjust([0.1], budget.MultiplicityRule.BH, Fraction(1))
+        multiplicity.adjust([0.1], budget.Correction.BH, Fraction(1))
     with pytest.raises(ValueError, match="p-value"):
-        multiplicity.adjust([1.1], budget.MultiplicityRule.BH, Fraction(1, 20))
+        multiplicity.adjust([1.1], budget.Correction.BH, Fraction(1, 20))
     with pytest.raises(ValueError, match="rule"):
         multiplicity.adjust([0.1], "bh", Fraction(1, 20))  # type: ignore[arg-type]
-    assert set(multiplicity.STATEMENTS) == set(budget.MultiplicityRule)
+    assert set(multiplicity.STATEMENTS) == set(budget.Correction)
 
 
 def test_a_p_value_of_one_is_never_rejected_and_zero_always_is():
-    for rule in budget.MultiplicityRule:
+    for rule in budget.Correction:
         out = multiplicity.adjust([0.0, 1.0], rule, Fraction(1, 20))
         assert out.rejected == (True, False)
         assert out.adjusted[1] == 1.0
@@ -190,12 +188,12 @@ def test_empirical_error_rates_under_the_global_null_and_with_signal():
     rng = numpy.random.default_rng(0)
     runs, family = 3000, 20
     any_reject = {
-        budget.MultiplicityRule.HOLM: 0,
-        budget.MultiplicityRule.BONFERRONI: 0,
+        budget.Correction.HOLM: 0,
+        budget.Correction.BONFERRONI: 0,
     }
     false_proportions = {
-        budget.MultiplicityRule.BH: [],
-        budget.MultiplicityRule.BY: [],
+        budget.Correction.BH: [],
+        budget.Correction.BY: [],
     }
     for null in rng.uniform(size=(runs, family)):
         for rule in any_reject:

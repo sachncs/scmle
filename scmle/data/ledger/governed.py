@@ -56,7 +56,7 @@ class GovernedRun:
 
     ledger: scmle.data.ledger.ledger.Ledger
     plan: explore.Plan
-    control: controls.ControlResult
+    control: controls.Control
     confirmation: confirm.Confirmation
     scope: str
 
@@ -154,7 +154,7 @@ class Explored:
 
     ledger: scmle.data.ledger.ledger.Ledger
     plan: explore.Plan
-    control: controls.ControlResult
+    control: controls.Control
     withdrawal: confirm.Withdrawal | None
     scope: str
     charter: Any
@@ -174,8 +174,8 @@ def run_governed(
     exclude: tuple[str, ...] = (),
     strata: numpy.ndarray | None = None,
     rule: str = scmle.data.ledger.online_fdr.ELOND,
-    confirmation_rule: budget.MultiplicityRule = (
-        scmle.data.ledger.budget.MultiplicityRule.BY
+    confirmation_rule: budget.Correction = (
+        scmle.data.ledger.budget.Correction.BY
     ),
     policy: str = confirm.UNCONFIRMED,
     diagnostics: Sequence[tuple[str, qualification.Check]] = (),
@@ -358,8 +358,8 @@ def confirm_explored(
     explored: Explored,
     *,
     source: confirm.ConfirmationSource | None,
-    confirmation_rule: budget.MultiplicityRule = (
-        scmle.data.ledger.budget.MultiplicityRule.BY
+    confirmation_rule: budget.Correction = (
+        scmle.data.ledger.budget.Correction.BY
     ),
     policy: str = confirm.UNCONFIRMED,
     claim_runner: confirm.ClaimRunner | None = None,

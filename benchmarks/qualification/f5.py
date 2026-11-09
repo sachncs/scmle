@@ -51,7 +51,7 @@ from scmle.data.detectors import registry
 from scmle.data.detectors import sentinels
 
 CERT_PATH = Path(__file__).with_name("detector_certificates.json")
-POLICY = certificates.CertificationPolicy(
+POLICY = certificates.Standard(
     recall_floor=0.80, false_alarm_ceiling=0.05, confidence=0.95
 )
 ROW_SEEDS = (0, 1, 2, 3, 4)
@@ -222,8 +222,8 @@ def row_detectors(
 def certify_missingness(
     frame: pandas.DataFrame,
     seeds: Sequence[int] = MISSING_SEEDS,
-    policy: certificates.CertificationPolicy = POLICY,
-) -> certificates.DetectorCertificate:
+    policy: certificates.Standard = POLICY,
+) -> certificates.Certification:
     """Replicate-level certificate for the MCAR rejection decision.
 
     Plants missing values by each mechanism in the first `MISSING_COLUMNS`
@@ -283,7 +283,7 @@ def certify_missingness(
 
 def select_cut(
     frame: pandas.DataFrame,
-    policy: certificates.CertificationPolicy = POLICY,
+    policy: certificates.Standard = POLICY,
 ) -> float:
     """Largest grid cut whose clean-copy false-alarm bound meets the policy.
 
@@ -316,7 +316,7 @@ def certify_all(
     missing_seeds: Sequence[int] = MISSING_SEEDS,
     frame: pandas.DataFrame | None = None,
     only: Sequence[str] | None = None,
-) -> certificates.CertificateStore:
+) -> certificates.Store:
     """Certifies the data detectors on the demo table.
 
     Args:
@@ -329,7 +329,7 @@ def certify_all(
         A store with one certificate per detector.
     """
     data = standins.demo_frame() if frame is None else frame
-    store = certificates.CertificateStore()
+    store = certificates.Store()
     plans = row_plans()
     detectors = row_detectors(data)
     for detector_id, detector in detectors.items():
@@ -352,7 +352,7 @@ def certify_all(
     return store
 
 
-def problems(store: certificates.CertificateStore) -> list[str]:
+def problems(store: certificates.Store) -> list[str]:
     """Why a store does not hold current certificates for every detector.
 
     Args:
@@ -365,13 +365,13 @@ def problems(store: certificates.CertificateStore) -> list[str]:
     found = []
     for detector_id, spec in registry.SPECS.items():
         state = store.state(detector_id, spec.code_hash())
-        if state is not certificates.CertificateState.CURRENT:
+        if state is not certificates.Freshness.CURRENT:
             found.append(f"{detector_id}: certificate is {state.value}")
     return found
 
 
 def gating(
-    store: certificates.CertificateStore,
+    store: certificates.Store,
 ) -> list[tuple[str, str, str]]:
     """(detector id, code hash, defect type) for every passing outcome.
 
@@ -390,7 +390,7 @@ def gating(
     return registered
 
 
-def audit_problems(store: certificates.CertificateStore) -> list[str]:
+def audit_problems(store: certificates.Store) -> list[str]:
     """Registered gating pairs that `mark_gating` would refuse.
 
     Args:
@@ -409,7 +409,7 @@ def audit_problems(store: certificates.CertificateStore) -> list[str]:
     return found
 
 
-def summary(store: certificates.CertificateStore) -> list[dict[str, object]]:
+def summary(store: certificates.Store) -> list[dict[str, object]]:
     """One line per detector and defect type with the bounds and verdict.
 
     Args:

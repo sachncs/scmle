@@ -24,7 +24,7 @@ import pytest
 from sklearn import naive_bayes
 import support
 
-import scmle
+import scmle.api.predict
 import scmle.artifacts.bundle
 from scmle.contracts import errors
 from scmle.contracts import experiments
@@ -32,10 +32,12 @@ from scmle.contracts import observability
 from scmle.contracts import tasks
 from scmle.core import limits
 from scmle.evaluation import metrics
+import scmle.evaluation.metrics
 from scmle.experimentation import stores
 from scmle.governance import keyring
 from scmle.governance import lifecycle
 import scmle.governance.registry
+import scmle.models.custom
 from scmle.models.deeplearning import worker
 import scmle.models.registry
 from scmle.monitoring import alerts
@@ -101,7 +103,7 @@ def clean_registries():
     yield
     for name in list(scmle.models.registry.USER_ADAPTERS):
         if name.startswith("ts_"):
-            scmle.unregister_estimator(name)
+            scmle.models.custom.unregister_estimator(name)
     for name in list(metrics.CATALOG.metrics):
         if name.startswith("ts_"):
             metrics.CATALOG.unregister(name)
@@ -113,22 +115,26 @@ def clean_registries():
 def test_concurrent_register_estimator_keeps_every_registration():
     def work(index):
         name = f"ts_nb_{index}"
-        scmle.register_estimator(name, classifier=naive_bayes.GaussianNB)
+        scmle.models.custom.register_estimator(
+            name, classifier=naive_bayes.GaussianNB
+        )
         return name
 
     names, failures = run_together(THREADS, work)
 
     assert not failures
-    built = scmle.models.registry.ModelRegistry.with_builtins()
+    built = scmle.models.registry.Catalog.with_builtins()
     assert set(names) <= set(built.adapters)
 
 
 def test_register_same_estimator_name_has_exactly_one_winner():
     def work(index):
-        scmle.register_estimator("ts_same", classifier=naive_bayes.GaussianNB)
+        scmle.models.custom.register_estimator(
+            "ts_same", classifier=naive_bayes.GaussianNB
+        )
 
     for round_number in range(5):
-        scmle.unregister_estimator("ts_same")
+        scmle.models.custom.unregister_estimator("ts_same")
         failures = failures_of(THREADS, work)
         winners = THREADS - len(failures)
         assert winners == 1, (round_number, winners)
@@ -136,7 +142,9 @@ def test_register_same_estimator_name_has_exactly_one_winner():
 
 
 def test_builtin_name_check_does_not_hide_registered_estimators():
-    scmle.register_estimator("ts_persist", classifier=naive_bayes.GaussianNB)
+    scmle.models.custom.register_estimator(
+        "ts_persist", classifier=naive_bayes.GaussianNB
+    )
     stop = threading.Event()
 
     def churn(index):
@@ -147,9 +155,7 @@ def test_builtin_name_check_does_not_hide_registered_estimators():
             return True
         missing = 0
         while not stop.is_set():
-            adapters = (
-                scmle.models.registry.ModelRegistry.with_builtins().adapters
-            )
+            adapters = scmle.models.registry.Catalog.with_builtins().adapters
             missing += "ts_persist" not in adapters
         return missing
 
@@ -163,11 +169,11 @@ def test_register_unregister_and_lookup_never_raise():
     def work(index):
         name = f"ts_churn_{index}"
         for round_number in range(15):  # noqa: B007
-            scmle.register_estimator(
+            scmle.models.custom.register_estimator(
                 name, classifier=naive_bayes.GaussianNB, replace=True
             )
-            scmle.models.registry.ModelRegistry.with_builtins().get(name)
-            scmle.unregister_estimator(name)
+            scmle.models.registry.Catalog.with_builtins().get(name)
+            scmle.models.custom.unregister_estimator(name)
 
     failures = failures_of(4, work)
 
@@ -182,22 +188,26 @@ def score(truth, predicted):
 def test_concurrent_register_metric_and_lookup():
     def work(index):
         name = f"ts_metric_{index}"
-        scmle.register_metric(name, score, greater_is_better=True)
+        scmle.evaluation.metrics.register_metric(
+            name, score, greater_is_better=True
+        )
         for round_number in range(50):  # noqa: B007
             sorted(metrics.CATALOG.metrics)
-            metrics.CATALOG.resolve(name, tasks.TaskType.BINARY)
+            metrics.CATALOG.resolve(name, tasks.Task.BINARY)
         return name
 
     names, failures = run_together(THREADS, work)
 
     assert not failures
     for name in names:
-        assert name in metrics.CATALOG.report_names[tasks.TaskType.BINARY]
+        assert name in metrics.CATALOG.report_names[tasks.Task.BINARY]
 
 
 def test_register_same_metric_name_has_exactly_one_winner():
     def work(index):
-        scmle.register_metric("ts_metric_same", score, greater_is_better=True)
+        scmle.evaluation.metrics.register_metric(
+            "ts_metric_same", score, greater_is_better=True
+        )
 
     for round_number in range(5):  # noqa: B007
         metrics.CATALOG.unregister("ts_metric_same")
@@ -209,7 +219,9 @@ def test_metric_unregister_during_report_names_update_is_consistent():
     def work(index):
         name = f"ts_metric_c{index}"
         for round_number in range(40):  # noqa: B007
-            scmle.register_metric(name, score, True, replace=True)
+            scmle.evaluation.metrics.register_metric(
+                name, score, True, replace=True
+            )
             metrics.CATALOG.unregister(name)
 
     failures = failures_of(THREADS, work)
@@ -229,7 +241,7 @@ def small_project(data, output_dir):
         "y",
         output_dir=output_dir,
         seed=7,
-        search=tasks.SearchSpec(top_models=1, configs_per_model=2),
+        search=tasks.Search(top_models=1, configs_per_model=2),
         time_budget=300,
     )
 
@@ -330,8 +342,10 @@ def test_concurrent_load_model_and_predict(trained, tmp_path):
     want = trained.predict(data)
 
     def work(index):
-        model = scmle.load_model(directory, trusted=True)
-        return model.predict(data), scmle.predict(directory, data, trusted=True)
+        model = scmle.api.predict.load_model(directory, trusted=True)
+        return model.predict(data), scmle.api.predict.predict(
+            directory, data, trusted=True
+        )
 
     outcomes, failures = run_together(4, work)
 
@@ -386,7 +400,7 @@ def test_concurrent_store_writes_are_all_recorded(tmp_path):
         for number in range(per_thread):
             store.record_trial(
                 run_id,
-                experiments.TrialResult(
+                experiments.Trial(
                     trial_id=f"t{number}",
                     model_name="m",
                     status=experiments.TrialStatus.OK,
@@ -474,7 +488,7 @@ def test_concurrent_alias_moves_do_not_corrupt_the_index(two_bundles, tmp_path):
 
 def test_concurrent_lifecycle_state_writes(tmp_path):
     store = scmle.governance.registry.ModelRegistryStore(tmp_path / "registry")
-    manager = lifecycle.LifecycleManager(store, "churn", str(tmp_path / "w"))
+    manager = lifecycle.Maintainer(store, "churn", str(tmp_path / "w"))
 
     def work(index):
         for round_number in range(25):  # noqa: B007
@@ -672,7 +686,7 @@ def test_worker_client_is_a_singleton_per_process(monkeypatch):
         def shutdown(self):
             """Nothing to stop."""
 
-    monkeypatch.setattr(worker, "WorkerClient", Slow)
+    monkeypatch.setattr(worker, "Client", Slow)
     monkeypatch.setattr(worker, "CLIENTS", {})
 
     clients, failures = run_together(THREADS, lambda index: worker.client())
@@ -683,7 +697,7 @@ def test_worker_client_is_a_singleton_per_process(monkeypatch):
 
 
 def test_bundle_remember_does_not_lose_rows():
-    bundle = object.__new__(scmle.artifacts.bundle.ModelBundle)
+    bundle = object.__new__(scmle.artifacts.bundle.Bundle)
     bundle.schema = type(
         "Schema", (), {"series": [1], "group_column": "g", "time_column": "t"}
     )()

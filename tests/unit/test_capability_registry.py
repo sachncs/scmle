@@ -13,7 +13,7 @@ from scmle.contracts import tasks
 def make_key(**overrides):
     values = {
         "modality": capabilities.Modality.TABULAR,
-        "task": tasks.TaskType.BINARY,
+        "task": tasks.Task.BINARY,
         "model_family": "tree",
         "evaluation": capabilities.Evaluation.CALIBRATED,
         "uncertainty": capabilities.Uncertainty.CALIBRATED_PROBABILITY,
@@ -22,11 +22,11 @@ def make_key(**overrides):
         "inference": capabilities.Inference.LIBRARY,
     }
     values.update(overrides)
-    return capabilities.CapabilityKey(**values)
+    return capabilities.Coordinate(**values)
 
 
 def make_capability(
-    status=capabilities.CapabilityStatus.SUPPORTED,
+    status=capabilities.Status.SUPPORTED,
     key=None,
 ):
     return capabilities.Capability(
@@ -84,7 +84,7 @@ def test_capability_declaration_serializes_resources_failures_and_evidence():
 
 def test_supported_capability_is_required_by_default():
     record = make_capability()
-    registry = capabilities.CapabilityRegistry((record,))
+    registry = capabilities.Registry((record,))
 
     assert registry.find(record.key) is record
     assert registry.require(record.key) is record
@@ -92,8 +92,8 @@ def test_supported_capability_is_required_by_default():
 
 
 def test_non_supported_status_requires_explicit_opt_in():
-    record = make_capability(capabilities.CapabilityStatus.EXPERIMENTAL)
-    registry = capabilities.CapabilityRegistry((record,))
+    record = make_capability(capabilities.Status.EXPERIMENTAL)
+    registry = capabilities.Registry((record,))
 
     with pytest.raises(
         capabilities.UnsupportedCapabilityError,
@@ -103,7 +103,7 @@ def test_non_supported_status_requires_explicit_opt_in():
     assert (
         registry.require(
             record.key,
-            {capabilities.CapabilityStatus.EXPERIMENTAL},
+            {capabilities.Status.EXPERIMENTAL},
         )
         is record
     )
@@ -116,7 +116,7 @@ def test_unknown_combination_fails_before_training_with_structured_diagnostic():
         model_family="vision",
         inference=capabilities.Inference.BATCH,
     )
-    registry = capabilities.CapabilityRegistry((registered,))
+    registry = capabilities.Registry((registered,))
 
     with pytest.raises(capabilities.UnsupportedCapabilityError) as failure:
         registry.require(requested)
@@ -132,14 +132,14 @@ def test_unknown_combination_fails_before_training_with_structured_diagnostic():
 
 def test_duplicate_keys_and_incomplete_declarations_are_rejected():
     record = make_capability()
-    registry = capabilities.CapabilityRegistry((record,))
+    registry = capabilities.Registry((record,))
 
     with pytest.raises(errors.ConfigError, match="already registered"):
         registry.register(record)
     with pytest.raises(ValueError, match="evidence_links"):
         capabilities.Capability(
             key=record.key,
-            status=capabilities.CapabilityStatus.SUPPORTED,
+            status=capabilities.Status.SUPPORTED,
             required_extras=("core",),
             resources=record.resources,
             failure_modes=record.failure_modes,
@@ -157,10 +157,10 @@ def test_contract_rejects_noncanonical_dimensions_and_resources():
 
 def test_registry_serialization_is_canonical_across_registration_order():
     """Registry evidence does not depend on insertion order."""
-    first = capabilities.CapabilityRegistry.with_declared_model_families(
+    first = capabilities.Registry.with_declared_model_families(
         (make_capability(),)
     )
-    second = capabilities.CapabilityRegistry(
+    second = capabilities.Registry(
         (make_capability(),),
         tuple(reversed(capabilities.DEFAULT_MODEL_FAMILY_DECLARATIONS)),
     )
@@ -172,7 +172,7 @@ def test_registry_serialization_is_canonical_across_registration_order():
 
 def test_transformer_and_jepa_family_statuses_are_explicit():
     """Family metadata records implemented boundaries without promotion."""
-    registry = capabilities.CapabilityRegistry.with_declared_model_families()
+    registry = capabilities.Registry.with_declared_model_families()
 
     families = {
         item.model_family: item for item in registry.list_model_families()
@@ -187,7 +187,7 @@ def test_transformer_and_jepa_family_statuses_are_explicit():
         capabilities.ModelFamily.JEPA.value,
     } <= families.keys()
     assert families[capabilities.ModelFamily.JEPA.value].status is (
-        capabilities.CapabilityStatus.EXPERIMENTAL
+        capabilities.Status.EXPERIMENTAL
     )
     assert families[capabilities.ModelFamily.JEPA.value].modalities == (
         capabilities.Modality.TABULAR,
@@ -196,7 +196,7 @@ def test_transformer_and_jepa_family_statuses_are_explicit():
         "deeplearning",
     )
     assert families[capabilities.ModelFamily.TRANSFORMER.value].status is (
-        capabilities.CapabilityStatus.EXPERIMENTAL
+        capabilities.Status.EXPERIMENTAL
     )
     assert families[capabilities.ModelFamily.TRANSFORMER.value].modalities == (
         capabilities.Modality.TABULAR,
@@ -215,7 +215,7 @@ def test_transformer_and_jepa_family_statuses_are_explicit():
         capabilities.ModelFamily.MULTIMODAL_TRANSFORMER.value,
     ):
         assert families[family_name].status is (
-            capabilities.CapabilityStatus.EXTENSION_ONLY
+            capabilities.Status.EXTENSION_ONLY
         )
 
     diagnostic = registry.diagnose(make_key(model_family="jepa"))
@@ -241,7 +241,7 @@ def test_unsupported_family_modality_reports_structured_diagnostic(
     model_family, modality
 ):
     """Known families reject undeclared modalities before training."""
-    registry = capabilities.CapabilityRegistry.with_declared_model_families()
+    registry = capabilities.Registry.with_declared_model_families()
     key = make_key(model_family=model_family, modality=modality)
 
     diagnostics = registry.diagnose(key)
@@ -263,7 +263,7 @@ def test_unsupported_family_modality_reports_structured_diagnostic(
 
 def test_experimental_family_requires_explicit_status_opt_in():
     """A catalog entry never becomes training support by being known."""
-    registry = capabilities.CapabilityRegistry.with_declared_model_families()
+    registry = capabilities.Registry.with_declared_model_families()
     key = make_key(
         model_family=capabilities.ModelFamily.TRANSFORMER.value,
         modality=capabilities.Modality.TABULAR,
@@ -282,8 +282,8 @@ def test_experimental_family_requires_explicit_status_opt_in():
 def test_environment_checks_collect_missing_extras_and_resources():
     """A declared capability fails closed with all observed environment gaps."""
     record = make_capability()
-    registry = capabilities.CapabilityRegistry((record,))
-    environment = capabilities.CapabilityEnvironment(
+    registry = capabilities.Registry((record,))
+    environment = capabilities.Environment(
         available_extras=frozenset(),
         cpu_cores=1,
         memory_gb=1.0,
@@ -318,8 +318,8 @@ def test_required_resources_reject_unknown_runtime_facts():
             network_required=True,
         ),
     )
-    registry = capabilities.CapabilityRegistry((gpu_record,))
-    environment = capabilities.CapabilityEnvironment(
+    registry = capabilities.Registry((gpu_record,))
+    environment = capabilities.Environment(
         available_extras=frozenset({"core"}),
         cpu_cores=2,
         memory_gb=4.0,
@@ -346,10 +346,10 @@ def test_row_limits_are_checked_before_training():
             max_rows=10,
         ),
     )
-    registry = capabilities.CapabilityRegistry((record,))
+    registry = capabilities.Registry((record,))
 
     assert registry.diagnose(record.key) == (
-        capabilities.CapabilityDiagnostic(
+        capabilities.Reason(
             code="unknown_row_count",
             message="row count is required for this capability limit",
             expected=10,

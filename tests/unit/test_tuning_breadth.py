@@ -56,7 +56,7 @@ def test_after_the_grid_is_exhausted_random_draws_continue():
 def tuner_with(folds, eta):
     tuner = tuning.Tuner.__new__(tuning.Tuner)
     tuner.runner = types.SimpleNamespace(folds=list(range(folds)))
-    tuner.search = tasks.SearchSpec(pruning="hyperband", eta=eta)
+    tuner.search = tasks.Search(pruning="hyperband", eta=eta)
     return tuner
 
 

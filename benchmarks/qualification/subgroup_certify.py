@@ -133,14 +133,14 @@ def world(
     return pandas.DataFrame({"g": group, "t": t, "y": y})
 
 
-def adapter_for() -> run.Adapter:
+def adapter_for() -> run.Estimator:
     """The randomized-difference adapter the report is run with.
 
     Returns:
         An adapter for the `randomized_diff` strategy on a randomized
         treatment `t` and outcome `y`.
     """
-    spec = causal.CausalSpec(
+    spec = causal.Question(
         treatment="t",
         outcome="y",
         estimand="ATE",
@@ -152,7 +152,9 @@ def adapter_for() -> run.Adapter:
     )
 
 
-def rejected_levels(frame: pandas.DataFrame, adapter: run.Adapter) -> set[str]:
+def rejected_levels(
+    frame: pandas.DataFrame, adapter: run.Estimator
+) -> set[str]:
     """Levels the Holm family rejects on one replicate.
 
     Args:

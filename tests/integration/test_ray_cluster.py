@@ -143,7 +143,7 @@ def test_a_trial_past_the_memory_limit_is_killed_on_a_ray_worker(
         memory_limit_gb=1.0,
         enforcement="hard",
     )
-    registry = scmle.models.registry.ModelRegistry.with_builtins()
+    registry = scmle.models.registry.Catalog.with_builtins()
     registry.register(support.HungryAdapter())
     project.orchestrator.registry = registry
     plan = dataclasses.replace(

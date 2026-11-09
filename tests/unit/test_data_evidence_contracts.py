@@ -245,7 +245,7 @@ def test_curation_report_serializes_structured_quality_and_risk_findings():
         finding_id="risk.target-leakage",
         severity=data.FindingSeverity.ERROR,
     )
-    report = data.CurationReport(
+    report = data.Curation(
         manifest=data.DatasetManifest("ds_1", "schema", "data", 10, 2, "label"),
         source_rows=10,
         profiled_rows=10,
@@ -271,7 +271,7 @@ def test_curation_report_is_not_release_ready_with_open_blocking_findings():
         finding_id="risk.target-leakage",
         severity=data.FindingSeverity.ERROR,
     )
-    report = data.CurationReport(
+    report = data.Curation(
         manifest=data.DatasetManifest("ds_1", "schema", "data", 10, 2, "label"),
         source_rows=10,
         profiled_rows=10,
@@ -297,7 +297,7 @@ def test_curation_report_accepts_explicit_safe_dispositions():
         finding_id="risk.target-leakage",
         severity=data.FindingSeverity.ERROR,
     )
-    report = data.CurationReport(
+    report = data.Curation(
         manifest=data.DatasetManifest("ds_1", "schema", "data", 10, 2, "label"),
         source_rows=10,
         profiled_rows=10,
@@ -319,7 +319,7 @@ def test_curation_report_accepts_explicit_safe_dispositions():
 
 
 def test_dataset_card_makes_intended_use_and_limits_explicit():
-    report = data.CurationReport(
+    report = data.Curation(
         manifest=data.DatasetManifest(
             "ds_1",
             "schema",

@@ -1,6 +1,6 @@
 """Execution backends: where independent trials run.
 
-The control plane only ever calls `ExecutionBackend.map`, so moving from a
+The control plane only ever calls `Executor.map`, so moving from a
 single process to a pool (or a Ray cluster) never touches orchestration.
 """
 
@@ -15,7 +15,7 @@ import joblib
 from scmle.contracts import errors
 
 
-class ExecutionBackend(abc.ABC):
+class Executor(abc.ABC):
     """Runs a function over independent work items.
 
     Attributes:
@@ -47,7 +47,7 @@ class ExecutionBackend(abc.ABC):
         """
 
 
-class SequentialBackend(ExecutionBackend):
+class Serial(Executor):
     """Runs everything in the calling process, one item at a time."""
 
     name = "sequential"
@@ -76,7 +76,7 @@ class SequentialBackend(ExecutionBackend):
         return [function(item) for item in items]
 
 
-class ProcessBackend(ExecutionBackend):
+class Pool(Executor):
     """Runs items in a pool of worker processes (loky)."""
 
     name = "process"
@@ -91,7 +91,7 @@ class ProcessBackend(ExecutionBackend):
             ConfigError: If fewer than two workers are requested.
         """
         if workers < 2:
-            raise errors.ConfigError("ProcessBackend needs at least 2 workers")
+            raise errors.ConfigError("Pool needs at least 2 workers")
         self.workers = workers
 
     def map(
@@ -125,7 +125,7 @@ class ProcessBackend(ExecutionBackend):
 
 def create_backend(
     workers: int, executor: str = "process", address: str | None = None
-) -> ExecutionBackend:
+) -> Executor:
     """Chooses the backend for a worker count and executor.
 
     Args:
@@ -146,4 +146,4 @@ def create_backend(
         return ray_backend.RayBackend(workers, address)
     if executor != "process":
         raise errors.ConfigError(f"unknown executor '{executor}'")
-    return SequentialBackend() if workers <= 1 else ProcessBackend(workers)
+    return Serial() if workers <= 1 else Pool(workers)

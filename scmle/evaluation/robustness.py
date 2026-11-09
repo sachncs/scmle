@@ -178,7 +178,7 @@ def default_stressors() -> tuple[Stressor, ...]:
     )
 
 
-class RobustnessReport(diagnostics.Diagnostic):
+class Robustness(diagnostics.Diagnostic):
     """Score under degraded input, relative to the clean score."""
 
     name = "robustness"

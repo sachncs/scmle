@@ -174,7 +174,7 @@ def test_diagnostics_spend_no_wealth():
 
 
 def test_thresholds_other_than_the_certified_rule_never_withdraw():
-    loose = stability.Rule(s_min=0.5, band=0.9, q_min=0.5)
+    loose = stability.Thresholds(s_min=0.5, band=0.9, q_min=0.5)
     result, stage = run(True, rule=loose)
 
     assert stage.found.stability_gate is certificates.GateStatus.DESCRIPTIVE

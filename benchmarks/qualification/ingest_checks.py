@@ -142,7 +142,7 @@ def views(schema: Schema) -> tuple[synthesize.Source, asof_view.AsOfView]:
         items.
     """
 
-    def rule(known: bool) -> asof_view.TimeRule:
+    def rule(known: bool) -> asof_view.KnownTime:
         """The time rule of a table.
 
         Args:
@@ -153,10 +153,10 @@ def views(schema: Schema) -> tuple[synthesize.Source, asof_view.AsOfView]:
             event-delay rule; both with the schema's delta.
         """
         if known:
-            return asof_view.TimeRule(
+            return asof_view.KnownTime(
                 asof_view.TRANSACTION, "rec", schema.delta
             )
-        return asof_view.TimeRule(asof_view.EVENT_DELAY, None, schema.delta)
+        return asof_view.KnownTime(asof_view.EVENT_DELAY, None, schema.delta)
 
     orders = asof_view.AsOfView(
         schema.orders, "cid", rule(schema.known), "ev", "orders"
@@ -178,7 +178,7 @@ def fast_feature(schema: Schema) -> pandas.Series:
     """
     source, items = views(schema)
     if schema.nested:
-        spec = synthesize.FeatureSpec(
+        spec = synthesize.Feature(
             "f",
             "nested",
             0,
@@ -193,7 +193,7 @@ def fast_feature(schema: Schema) -> pandas.Series:
             spec, schema.targets, "moment", [source], [nest], schema.lag
         )
     value = None if schema.primitive in synthesize.VALUE_FREE else "val"
-    spec = synthesize.FeatureSpec(
+    spec = synthesize.Feature(
         "f", "aggregate", 0, schema.primitive, value, schema.window
     )
     return synthesize.evaluate(
@@ -358,7 +358,7 @@ def late_leaks(seed: int) -> Leaks:
     view = asof_view.AsOfView(
         world.child,
         "cid",
-        asof_view.TimeRule(asof_view.TRANSACTION, "recorded", 0.0),
+        asof_view.KnownTime(asof_view.TRANSACTION, "recorded", 0.0),
         "event_time",
         "events",
     )

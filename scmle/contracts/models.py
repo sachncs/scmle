@@ -1,7 +1,7 @@
 """Model adapter contract.
 
 Adapters are polymorphic: the planner, trial runner and conformance suite
-treat every `ModelAdapter` identically and read declared `Capabilities`
+treat every `Model` identically and read declared `Capabilities`
 instead of hard-coding library-specific conditions.
 """
 
@@ -92,7 +92,7 @@ class Capabilities:
             rejects models whose estimate exceeds the memory limit.
     """
 
-    tasks: frozenset[tasks.TaskType]
+    tasks: frozenset[tasks.Task]
     sparse_input: bool = False
     probabilities: bool = True
     native_categorical: bool = False
@@ -109,7 +109,7 @@ class Capabilities:
     memory_factor: float = 1.0
 
 
-class ModelAdapter(abc.ABC):
+class Model(abc.ABC):
     """A model family the framework can plan, train and package.
 
     Subclasses declare class-level metadata and implement `build`.
@@ -145,7 +145,7 @@ class ModelAdapter(abc.ABC):
     @abc.abstractmethod
     def build(
         self,
-        task: tasks.TaskType,
+        task: tasks.Task,
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> Estimator:
@@ -163,7 +163,7 @@ class ModelAdapter(abc.ABC):
     def assemble(
         self,
         plan: data.FeaturePlan,
-        task: tasks.TaskType,
+        task: tasks.Task,
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> Estimator | None:
@@ -224,7 +224,7 @@ class ModelAdapter(abc.ABC):
         )
 
     def rejection_reason(
-        self, task: tasks.TaskType, row_count: int | None = None
+        self, task: tasks.Task, row_count: int | None = None
     ) -> str | None:
         """Returns why the adapter cannot be used, if it cannot.
 
@@ -252,10 +252,10 @@ class ModelAdapter(abc.ABC):
         return None
 
 
-class AdapterResolver(Protocol):
+class Resolver(Protocol):
     """Anything that resolves a model name to its adapter (a registry)."""
 
-    def get(self, name: str) -> ModelAdapter:
+    def get(self, name: str) -> Model:
         """Returns the adapter registered under `name`.
 
         Args:

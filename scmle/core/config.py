@@ -8,13 +8,13 @@ from scmle.contracts import errors
 from scmle.contracts import tasks
 
 SECTIONS = {
-    "search": tasks.SearchSpec,
-    "strategies": tasks.StrategySpec,
-    "models": tasks.ModelSpec,
-    "ensemble": tasks.EnsembleSpec,
-    "feature_graph": tasks.FeatureGraphSpec,
-    "selection": tasks.SelectionSpec,
-    "decision": tasks.DecisionSpec,
+    "search": tasks.Search,
+    "strategies": tasks.Strategies,
+    "models": tasks.Candidates,
+    "ensemble": tasks.Stacking,
+    "feature_graph": tasks.FeatureGraph,
+    "selection": tasks.Selection,
+    "decision": tasks.Threshold,
 }
 
 
@@ -42,7 +42,7 @@ def load_sections(path: str | pathlib.Path | None) -> dict[str, Any]:
     return {name: SECTIONS[name](**body) for name, body in record.items()}
 
 
-def load_spec(path: str | pathlib.Path) -> tasks.ProjectSpec:
+def load_spec(path: str | pathlib.Path) -> tasks.Config:
     """Reads a complete project specification (for example `config.json`).
 
     Args:
@@ -55,7 +55,7 @@ def load_spec(path: str | pathlib.Path) -> tasks.ProjectSpec:
         ConfigError: If the file is not a valid specification.
     """
     try:
-        return tasks.ProjectSpec.model_validate_json(
+        return tasks.Config.model_validate_json(
             pathlib.Path(path).read_text(encoding="utf-8")
         )
     except ValueError as error:
@@ -64,7 +64,7 @@ def load_spec(path: str | pathlib.Path) -> tasks.ProjectSpec:
         ) from error
 
 
-def save_spec(spec: tasks.ProjectSpec, path: str | pathlib.Path) -> None:
+def save_spec(spec: tasks.Config, path: str | pathlib.Path) -> None:
     """Writes a specification as canonical, key-sorted JSON.
 
     Args:

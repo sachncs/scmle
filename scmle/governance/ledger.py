@@ -28,7 +28,7 @@ def digest_of(row_ids: list[Any]) -> dict[str, Any]:
 
 
 def observed_access(
-    split: splitters.SplitResult, trials: list[experiments.TrialResult]
+    split: splitters.Split, trials: list[experiments.Trial]
 ) -> dict[str, Any]:
     """Checks what trials actually received against the split manifest.
 
@@ -75,8 +75,8 @@ def observed_access(
 
 
 def build_ledger(
-    split: splitters.SplitResult,
-    trials: list[experiments.TrialResult],
+    split: splitters.Split,
+    trials: list[experiments.Trial],
     test_opens: int,
     threshold_used: bool,
 ) -> dict[str, Any]:

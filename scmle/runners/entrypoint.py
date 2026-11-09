@@ -74,9 +74,7 @@ def load_workload(name: str) -> Callable[[local.JobContext], None]:
     return workload
 
 
-def spec_from_store(
-    store: objectstore.ObjectStore, run_id: str
-) -> base.JobSpec:
+def spec_from_store(store: objectstore.ObjectStore, run_id: str) -> base.Job:
     """Rebuilds the stored spec.
 
     Args:
@@ -89,14 +87,14 @@ def spec_from_store(
     data, ignored = store.get(f"runs/{run_id}/spec.json")
     record = json.loads(data)
     budget = record["budget"]
-    return base.JobSpec(
+    return base.Job(
         run_id=record["run_id"],
         name=record["name"],
         project=record["project"],
         identity=record["identity"],
         resources=base.Resources(**record["resources"]),
         timeout_seconds=record["timeout_seconds"],
-        retries=retry.RetryPolicy(**record["retries"]),
+        retries=retry.Retries(**record["retries"]),
         budget=None
         if budget is None
         else base.CostBudget(

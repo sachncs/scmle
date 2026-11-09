@@ -9,7 +9,7 @@ this:
    fitted with the run seed, acting where its probability reaches the cost
    model's implied threshold. Its fitted parameters are hashed.
 2. The registration (cost-model hash, rule hash, level, range) is written to
-   the ledger as a `claim` row by hash, and `BaselineGuard` evaluates it once.
+   the ledger as a `claim` row by hash, and `Evaluator` evaluates it once.
 3. The runner receives the frame `C` releases for the confirmation, in the
    same opening, and tests both ends of the cost range.
 
@@ -67,7 +67,7 @@ RIDGE = 1.0
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class FrozenRule:
+class Regression:
     """A linear rule fixed on `X`.
 
     Attributes:
@@ -164,7 +164,7 @@ class Rule(Protocol):
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class SelectedModelRule:
+class Selection:
     """The model a run selected, as the rule of the claim.
 
     The model was chosen and fitted on the development rows (never on `C`)
@@ -223,7 +223,7 @@ def freeze_rule(
     columns: Sequence[str],
     cut: float,
     seed: int,
-) -> FrozenRule:
+) -> Regression:
     """Fits the rule on exploration rows with an observed outcome.
 
     Args:
@@ -270,7 +270,7 @@ def freeze_rule(
         C=RIDGE, max_iter=1000, random_state=seed
     )
     model.fit(((filled - means) / scales)[seen], y[seen])
-    return FrozenRule(
+    return Regression(
         names,
         tuple(float(v) for v in medians),
         tuple(float(v) for v in means),
@@ -366,7 +366,7 @@ def jsonable(document: Mapping[str, Any]) -> dict[str, Any]:
 def build_runner(
     *,
     rule: Rule,
-    reference: FrozenRule | None = None,
+    reference: Regression | None = None,
     model: costs.DecisionCostModel,
     alpha: float,
     baseline_column: str,
@@ -402,7 +402,7 @@ def build_runner(
     """
     description = rule.describe()
     registration = baseline.register(model, description, alpha)
-    guard = baseline.BaselineGuard(registration)
+    guard = baseline.Evaluator(registration)
     claim = confirm.RegisteredClaim(
         baseline.CLAIM_ID,
         KIND,
@@ -463,7 +463,7 @@ def build_runner(
 
 
 def refused(
-    registration: baseline.BaselineRegistration,
+    registration: baseline.Registration,
     selection: Mapping[str, Any],
     ceiling: qualification.Tier,
 ) -> dict[str, Any]:

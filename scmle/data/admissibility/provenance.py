@@ -504,7 +504,7 @@ def undeclared(name: str) -> FieldProvenance:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ProvenanceTable:
+class Dictionary:
     """The data dictionary of every field, which ingest writes as JSON.
 
     Attributes:

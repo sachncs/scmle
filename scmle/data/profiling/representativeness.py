@@ -41,7 +41,7 @@ class ColumnGap:
 
 
 @dataclasses.dataclass(frozen=True)
-class RepresentativenessReport:
+class Representativeness:
     """Comparison of a sample against a reference.
 
     Attributes:
@@ -152,7 +152,7 @@ def column_gap(sample: pandas.Series, reference: pandas.Series) -> ColumnGap:
 
 def compare_to_reference(
     sample: pandas.DataFrame, reference: pandas.DataFrame, seed: int = 0
-) -> RepresentativenessReport:
+) -> Representativeness:
     """Measures how distinguishable the sample is from the reference.
 
     Args:
@@ -192,13 +192,13 @@ def compare_to_reference(
         (column_gap(sample[name], reference[name]) for name in columns),
         key=lambda gap: -gap.statistic,
     )
-    return RepresentativenessReport(
+    return Representativeness(
         auc=auc, representative=auc < UNREPRESENTATIVE_AUC, gaps=tuple(gaps)
     )
 
 
 def representativeness_report_note(
-    report: RepresentativenessReport,
+    report: Representativeness,
 ) -> str | None:
     """Writes the finding text for a comparison report.
 

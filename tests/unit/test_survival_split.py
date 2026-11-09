@@ -10,8 +10,8 @@ from scmle.data.splitting import splitters
 
 
 def spec():
-    return tasks.ProjectSpec(
-        data=tasks.DataSpec(uri="x", target="time", event_column="event"),
+    return tasks.Config(
+        data=tasks.Dataset(uri="x", target="time", event_column="event"),
         task="survival",
     )
 
@@ -29,7 +29,7 @@ def cohort(rows=1000, event_rate=0.12, seed=0):
 
 def test_auto_picks_event_stratification_for_survival():
     assert (
-        splitters.resolve_strategy_name(spec(), tasks.TaskType.SURVIVAL)
+        splitters.resolve_strategy_name(spec(), tasks.Task.SURVIVAL)
         == "stratified_events"
     )
 
@@ -37,7 +37,7 @@ def test_auto_picks_event_stratification_for_survival():
 def test_the_event_rate_is_steady_across_test_and_folds():
     frame = cohort()
 
-    split = splitters.SplitManager(spec(), tasks.TaskType.SURVIVAL).split(frame)
+    split = splitters.Splitter(spec(), tasks.Task.SURVIVAL).split(frame)
 
     overall = frame.event.mean()
     test = frame.event.iloc[list(split.manifest.test_ids)].mean()
@@ -52,7 +52,7 @@ def test_folds_shrink_when_events_are_scarce():
     frame = cohort(rows=400, event_rate=0.0)
     frame.loc[:4, "event"] = 1  # five events in 400 rows
 
-    split = splitters.SplitManager(spec(), tasks.TaskType.SURVIVAL).split(frame)
+    split = splitters.Splitter(spec(), tasks.Task.SURVIVAL).split(frame)
 
     assert len(split.manifest.folds) < 5
     assert any("reduced" in note for note in split.manifest.notes)
@@ -65,4 +65,4 @@ def test_a_single_event_cannot_be_split():
     frame.loc[0, "event"] = 1
 
     with pytest.raises(errors.BlockedError, match="fewer than 2"):
-        splitters.SplitManager(spec(), tasks.TaskType.SURVIVAL).split(frame)
+        splitters.Splitter(spec(), tasks.Task.SURVIVAL).split(frame)

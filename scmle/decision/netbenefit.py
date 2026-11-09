@@ -170,7 +170,7 @@ def factorize(clusters: ArrayLike | None) -> NDArray[numpy.intp] | None:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class NetBenefitReport:
+class NetBenefit:
     """Net benefit of a frozen rule over a range of threshold probabilities.
 
     Attributes:
@@ -256,7 +256,7 @@ def net_benefit_band(
     replicates: int = 500,
     seed: int = 0,
     points: int = GRID_POINTS,
-) -> NetBenefitReport:
+) -> NetBenefit:
     """Net benefit of a frozen rule with a simultaneous lower band.
 
     Args:
@@ -318,7 +318,7 @@ def net_benefit_band(
         int(numpy.max(groups)) + 1 if groups is not None else len(outcomes)
     )
     claim = USEFUL if bool(positive.all()) else NOT_USEFUL
-    return NetBenefitReport(
+    return NetBenefit(
         thresholds=tuple(float(t) for t in grid),
         rule=tuple(float(v) for v in mean_row[0] - mean_row[1] * weights),
         treat_all=tuple(float(v) for v in mean_row[2] - mean_row[3] * weights),
@@ -370,7 +370,7 @@ class FinalNetBenefit:
         acts: ArrayLike,
         t_range: tuple[float, float],
         **options: Any,
-    ) -> NetBenefitReport:
+    ) -> NetBenefit:
         """Runs the band once; a changed rule or a second call is refused.
 
         Args:

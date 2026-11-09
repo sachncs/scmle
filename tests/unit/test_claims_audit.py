@@ -48,7 +48,7 @@ def make_run(tmp_path, withdraw=True, rules=None):
     if rules is not None:
         options = {
             "rule": rules.ledger_rule,
-            "confirmation_rule": confirm.budget.MultiplicityRule(
+            "confirmation_rule": confirm.budget.Correction(
                 rules.confirmation_rule
             ),
         }
@@ -92,7 +92,7 @@ def test_without_a_key_the_charter_is_hash_checked_only(tmp_path):
 
 
 def test_chartered_rules_are_checked_against_the_ledger(tmp_path):
-    rules = scmle.data.charter.rules.RunRules(
+    rules = scmle.data.charter.rules.Procedure(
         ledger_rule="lord++", confirmation_rule="bh"
     )
     make_run(tmp_path, rules=rules)
@@ -104,7 +104,7 @@ def test_chartered_rules_are_checked_against_the_ledger(tmp_path):
     other.mkdir()
     make_run(other)
     changed = json.loads((other / "analysis_charter.json").read_text())
-    changed["charter"]["rules"] = scmle.data.charter.rules.RunRules(
+    changed["charter"]["rules"] = scmle.data.charter.rules.Procedure(
         confirmation_rule="holm"
     ).to_dict()
     changed["format"] = 3

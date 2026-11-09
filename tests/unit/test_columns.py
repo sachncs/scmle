@@ -8,8 +8,8 @@ from scmle.contracts import data
 from scmle.contracts import tasks
 from scmle.data.validation import columns
 
-OPTIONS_SCALED = data.PreprocessingOptions(scale=True)
-OPTIONS_PLAIN = data.PreprocessingOptions()
+OPTIONS_SCALED = data.Preprocessing(scale=True)
+OPTIONS_PLAIN = data.Preprocessing()
 
 
 def test_kind_detection():
@@ -78,19 +78,19 @@ def test_association_detects_perfect_predictors():
     leak = target * 5.0
     noise = pandas.Series(rng.normal(size=200))
     kind = columns.NumericKind()
-    clf = tasks.TaskType.BINARY
+    clf = tasks.Task.BINARY
     assert kind.association(leak, target, clf) == pytest.approx(1.0)
     assert kind.association(noise, target, clf) < 0.5
     cat = columns.CategoricalKind()
     labels = target.map({0: "no", 1: "yes"})
     assert cat.association(labels, target, clf) == pytest.approx(1.0)
-    assert cat.association(labels, target, tasks.TaskType.REGRESSION) == 0.0
+    assert cat.association(labels, target, tasks.Task.REGRESSION) == 0.0
 
 
 def test_regression_association_uses_rank_correlation():
     x = pandas.Series(numpy.arange(100.0))
     assert columns.NumericKind().association(
-        x, x**3, tasks.TaskType.REGRESSION
+        x, x**3, tasks.Task.REGRESSION
     ) == pytest.approx(1.0)
 
 
@@ -98,7 +98,7 @@ def test_association_with_too_few_rows_is_zero():
     kind = columns.NumericKind()
     short = pandas.Series([1.0, 2.0, 3.0])
     assert (
-        kind.association(short, pandas.Series([0, 1, 0]), tasks.TaskType.BINARY)
+        kind.association(short, pandas.Series([0, 1, 0]), tasks.Task.BINARY)
         == 0.0
     )
 
@@ -113,9 +113,7 @@ def test_numeric_statistics_include_skew():
 
 def test_numeric_transformer_composes_optional_steps():
     full = columns.NumericKind().transformer(
-        data.PreprocessingOptions(
-            scale=True, log_skewed=True, interactions=True
-        )
+        data.Preprocessing(scale=True, log_skewed=True, interactions=True)
     )
     assert list(full.named_steps) == [
         "cast",
@@ -138,9 +136,7 @@ def make_outcome_recorded_only_frame(rows=400):
 def test_missingness_leak_detected_when_recorded_for_one_outcome_only():
     target, informative = make_outcome_recorded_only_frame()
     kind = columns.NumericKind()
-    score = kind.missingness_association(
-        informative, target, tasks.TaskType.BINARY
-    )
+    score = kind.missingness_association(informative, target, tasks.Task.BINARY)
     assert score >= 0.9
 
 
@@ -151,7 +147,7 @@ def test_one_sided_presence_is_flagged_even_when_mostly_missing():
     died = target.index[(target == 0)][:60]  # recorded only for outcome 0
     recorded[died] = 1.0
     score = columns.NumericKind().missingness_association(
-        recorded, target, tasks.TaskType.BINARY
+        recorded, target, tasks.Task.BINARY
     )
     assert score == 1.0
 
@@ -162,10 +158,7 @@ def test_random_missingness_is_not_flagged():
     values = pandas.Series(rng.normal(size=500))
     values[rng.random(500) < 0.4] = numpy.nan
     kind = columns.NumericKind()
-    assert (
-        kind.missingness_association(values, target, tasks.TaskType.BINARY)
-        < 0.2
-    )
+    assert kind.missingness_association(values, target, tasks.Task.BINARY) < 0.2
 
 
 def test_rare_or_nearly_complete_features_are_not_judged():
@@ -173,14 +166,14 @@ def test_rare_or_nearly_complete_features_are_not_judged():
     complete = pandas.Series(numpy.arange(200.0))
     assert (
         columns.NumericKind().missingness_association(
-            complete, target, tasks.TaskType.BINARY
+            complete, target, tasks.Task.BINARY
         )
         == 0.0
     )
     sparse = pandas.Series([numpy.nan] * 190 + [1.0] * 10)
     assert (
         columns.NumericKind().missingness_association(
-            sparse, target, tasks.TaskType.BINARY
+            sparse, target, tasks.Task.BINARY
         )
         == 0.0
     )
@@ -191,7 +184,7 @@ def test_regression_missingness_uses_rank_correlation():
     target = pandas.Series(rng.normal(size=400))
     values = pandas.Series(numpy.where(target > 0.5, 1.0, numpy.nan))
     score = columns.NumericKind().missingness_association(
-        values, target, tasks.TaskType.REGRESSION
+        values, target, tasks.Task.REGRESSION
     )
     assert score > 0.5
 
@@ -224,9 +217,7 @@ def test_threshold_association_finds_sharp_boundaries_that_bins_blur():
         1.0
     )
     assert (
-        columns.NumericKind().association(
-            values, separable, tasks.TaskType.BINARY
-        )
+        columns.NumericKind().association(values, separable, tasks.Task.BINARY)
         >= 0.98
     )
     noise = pandas.Series(rng.integers(0, 2, 300))

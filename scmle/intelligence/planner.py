@@ -2,7 +2,7 @@
 
 The planner decides which experiments are worth trying and records why; the
 evaluation layer decides whether they help. Nothing here asserts that a
-technique will improve performance. Each `PlanningRule` is an independent,
+technique will improve performance. Each `Refiner` is an independent,
 polymorphic policy applied in order to the candidate list.
 """
 
@@ -45,23 +45,23 @@ class PlanningContext:
         history: Past runs available for meta-learning.
     """
 
-    spec: tasks.ProjectSpec
+    spec: tasks.Config
     profile: data.DatasetProfile
-    task: tasks.TaskType
+    task: tasks.Task
     approved_models: tuple[str, ...] | None = None
     history: tuple[experiments.HistoricalRun, ...] = ()
 
 
-class PlanningRule(abc.ABC):
+class Refiner(abc.ABC):
     """A policy that filters candidates and records its decisions."""
 
     @abc.abstractmethod
     def apply(
         self,
         context: PlanningContext,
-        candidates: list[models.ModelAdapter],
+        candidates: list[models.Model],
         decisions: list[experiments.Decision],
-    ) -> list[models.ModelAdapter]:
+    ) -> list[models.Model]:
         """Applies the rule.
 
         Args:
@@ -78,7 +78,7 @@ class PlanningRule(abc.ABC):
         """
 
 
-class MemoryRule(PlanningRule):
+class MemoryFilter(Refiner):
     """Rejects models whose estimated training memory exceeds the limit.
 
     The estimate is `rows x features x 8 bytes x memory_factor`, where the
@@ -88,9 +88,9 @@ class MemoryRule(PlanningRule):
     def apply(
         self,
         context: PlanningContext,
-        candidates: list[models.ModelAdapter],
+        candidates: list[models.Model],
         decisions: list[experiments.Decision],
-    ) -> list[models.ModelAdapter]:
+    ) -> list[models.Model]:
         """Drops candidates that would not fit in `memory_limit_gb`.
 
         Args:
@@ -123,15 +123,15 @@ class MemoryRule(PlanningRule):
         return kept
 
 
-class GpuRule(PlanningRule):
+class GpuFilter(Refiner):
     """Honours the GPU policy: `required` keeps only GPU-capable models."""
 
     def apply(
         self,
         context: PlanningContext,
-        candidates: list[models.ModelAdapter],
+        candidates: list[models.Model],
         decisions: list[experiments.Decision],
-    ) -> list[models.ModelAdapter]:
+    ) -> list[models.Model]:
         """Filters for GPU capability when a GPU is required.
 
         Args:
@@ -167,15 +167,15 @@ class GpuRule(PlanningRule):
         return capable
 
 
-class FastBudgetRule(PlanningRule):
+class BudgetFilter(Refiner):
     """Prefers fast models when the time budget is small."""
 
     def apply(
         self,
         context: PlanningContext,
-        candidates: list[models.ModelAdapter],
+        candidates: list[models.Model],
         decisions: list[experiments.Decision],
-    ) -> list[models.ModelAdapter]:
+    ) -> list[models.Model]:
         """Drops expensive models and shrinks the search on a tight budget.
 
         Args:
@@ -219,15 +219,15 @@ class FastBudgetRule(PlanningRule):
         return kept
 
 
-class IncrementalRule(PlanningRule):
+class IncrementalFilter(Refiner):
     """Keeps only models that can learn from batches when streaming."""
 
     def apply(
         self,
         context: PlanningContext,
-        candidates: list[models.ModelAdapter],
+        candidates: list[models.Model],
         decisions: list[experiments.Decision],
-    ) -> list[models.ModelAdapter]:
+    ) -> list[models.Model]:
         """Drops non-incremental models when training on a stream.
 
         When not streaming, models built only for streaming are dropped instead.
@@ -273,15 +273,15 @@ class IncrementalRule(PlanningRule):
         return kept
 
 
-class SerializableRule(PlanningRule):
+class SerializableFilter(Refiner):
     """Rejects models that cannot be persisted in a bundle."""
 
     def apply(
         self,
         context: PlanningContext,
-        candidates: list[models.ModelAdapter],
+        candidates: list[models.Model],
         decisions: list[experiments.Decision],
-    ) -> list[models.ModelAdapter]:
+    ) -> list[models.Model]:
         """Drops adapters whose models are not serializable.
 
         Args:
@@ -308,7 +308,7 @@ class SerializableRule(PlanningRule):
         return kept
 
 
-class HighCardinalityRule(PlanningRule):
+class CategoricalPrioritizer(Refiner):
     """Plans for categorical features with many levels.
 
     Native-categorical models are searched first, and regularized target
@@ -318,9 +318,9 @@ class HighCardinalityRule(PlanningRule):
     def apply(
         self,
         context: PlanningContext,
-        candidates: list[models.ModelAdapter],
+        candidates: list[models.Model],
         decisions: list[experiments.Decision],
-    ) -> list[models.ModelAdapter]:
+    ) -> list[models.Model]:
         """Prefers native-categorical models when such features exist.
 
         Args:
@@ -384,15 +384,15 @@ class HighCardinalityRule(PlanningRule):
         return baselines + native + rest
 
 
-class ExcludedModelsRule(PlanningRule):
+class ExclusionFilter(Refiner):
     """Removes the models and families the specification excludes."""
 
     def apply(
         self,
         context: PlanningContext,
-        candidates: list[models.ModelAdapter],
+        candidates: list[models.Model],
         decisions: list[experiments.Decision],
-    ) -> list[models.ModelAdapter]:
+    ) -> list[models.Model]:
         """Drops excluded models, recording why.
 
         Args:
@@ -422,15 +422,15 @@ class ExcludedModelsRule(PlanningRule):
         return kept
 
 
-class MonotonicRule(PlanningRule):
+class MonotonicFilter(Refiner):
     """Keeps only models that can enforce the requested monotonic signs."""
 
     def apply(
         self,
         context: PlanningContext,
-        candidates: list[models.ModelAdapter],
+        candidates: list[models.Model],
         decisions: list[experiments.Decision],
-    ) -> list[models.ModelAdapter]:
+    ) -> list[models.Model]:
         """Drops models that cannot enforce monotonic constraints.
 
         Args:
@@ -449,7 +449,7 @@ class MonotonicRule(PlanningRule):
         """
         if not context.spec.data.monotonic_constraints:
             return candidates
-        if context.task is tasks.TaskType.MULTICLASS:
+        if context.task is tasks.Task.MULTICLASS:
             raise errors.BlockedError(
                 "monotonic constraints are supported for binary "
                 "classification and regression, not multiclass"
@@ -474,15 +474,15 @@ class MonotonicRule(PlanningRule):
         return kept
 
 
-class ApprovedModelsRule(PlanningRule):
+class ApprovalFilter(Refiner):
     """Restricts candidates to a human-approved subset."""
 
     def apply(
         self,
         context: PlanningContext,
-        candidates: list[models.ModelAdapter],
+        candidates: list[models.Model],
         decisions: list[experiments.Decision],
-    ) -> list[models.ModelAdapter]:
+    ) -> list[models.Model]:
         """Keeps only approved models; refuses unknown approvals.
 
         Args:
@@ -519,7 +519,7 @@ class ApprovedModelsRule(PlanningRule):
         return [a for a in candidates if a.name in approved]
 
 
-class HistoryRule(PlanningRule):
+class HistoryPrioritizer(Refiner):
     """Searches models that won on similar past datasets first.
 
     Only the order changes; every candidate is still evaluated, and runs on
@@ -529,9 +529,9 @@ class HistoryRule(PlanningRule):
     def apply(
         self,
         context: PlanningContext,
-        candidates: list[models.ModelAdapter],
+        candidates: list[models.Model],
         decisions: list[experiments.Decision],
-    ) -> list[models.ModelAdapter]:
+    ) -> list[models.Model]:
         """Moves historically successful models ahead of the others.
 
         Args:
@@ -581,15 +581,15 @@ class HistoryRule(PlanningRule):
         return baselines + preferred + rest
 
 
-class StrategyRule(PlanningRule):
+class StrategyRecorder(Refiner):
     """Records which data strategies will be evaluated and which cannot."""
 
     def apply(
         self,
         context: PlanningContext,
-        candidates: list[models.ModelAdapter],
+        candidates: list[models.Model],
         decisions: list[experiments.Decision],
-    ) -> list[models.ModelAdapter]:
+    ) -> list[models.Model]:
         """Documents strategy applicability; leaves candidates unchanged.
 
         Args:
@@ -643,15 +643,15 @@ class StrategyRule(PlanningRule):
         return candidates
 
 
-class TuningRule(PlanningRule):
+class TuningRecorder(Refiner):
     """Records whether hyperparameter search will run after screening."""
 
     def apply(
         self,
         context: PlanningContext,
-        candidates: list[models.ModelAdapter],
+        candidates: list[models.Model],
         decisions: list[experiments.Decision],
-    ) -> list[models.ModelAdapter]:
+    ) -> list[models.Model]:
         """Documents the search decision; leaves candidates unchanged.
 
         Args:
@@ -686,15 +686,15 @@ class TuningRule(PlanningRule):
         return candidates
 
 
-class EnsembleRule(PlanningRule):
+class EnsembleRecorder(Refiner):
     """Records whether a stacking ensemble will be assembled."""
 
     def apply(
         self,
         context: PlanningContext,
-        candidates: list[models.ModelAdapter],
+        candidates: list[models.Model],
         decisions: list[experiments.Decision],
-    ) -> list[models.ModelAdapter]:
+    ) -> list[models.Model]:
         """Documents the ensemble decision; leaves candidates unchanged.
 
         Args:
@@ -728,31 +728,31 @@ class EnsembleRule(PlanningRule):
         return candidates
 
 
-def default_rules() -> tuple[PlanningRule, ...]:
+def default_rules() -> tuple[Refiner, ...]:
     """Returns the standard rule chain.
 
     Returns:
         One instance of each rule, in the order they are applied.
     """
     return (
-        ExcludedModelsRule(),
-        MonotonicRule(),
-        GpuRule(),
-        MemoryRule(),
-        SerializableRule(),
-        IncrementalRule(),
-        FastBudgetRule(),
-        ApprovedModelsRule(),
-        HighCardinalityRule(),
-        HistoryRule(),
-        StrategyRule(),
-        TuningRule(),
-        EnsembleRule(),
+        ExclusionFilter(),
+        MonotonicFilter(),
+        GpuFilter(),
+        MemoryFilter(),
+        SerializableFilter(),
+        IncrementalFilter(),
+        BudgetFilter(),
+        ApprovalFilter(),
+        CategoricalPrioritizer(),
+        HistoryPrioritizer(),
+        StrategyRecorder(),
+        TuningRecorder(),
+        EnsembleRecorder(),
     )
 
 
 class Planner:
-    """Builds an `ExperimentPlan` from a profile.
+    """Builds an `Plan` from a profile.
 
     Attributes:
         registry: Source of candidate adapters.
@@ -762,9 +762,9 @@ class Planner:
 
     def __init__(
         self,
-        registry: scmle.models.registry.ModelRegistry,
+        registry: scmle.models.registry.Catalog,
         catalog: metrics.MetricCatalog = metrics.CATALOG,
-        rules: tuple[PlanningRule, ...] | None = None,
+        rules: tuple[Refiner, ...] | None = None,
     ) -> None:
         """Initializes the planner.
 
@@ -777,7 +777,7 @@ class Planner:
         self.catalog = catalog
         self.rules = rules if rules is not None else default_rules()
 
-    def plan(self, context: PlanningContext) -> experiments.ExperimentPlan:
+    def plan(self, context: PlanningContext) -> experiments.Plan:
         """Builds the experiment plan.
 
         Models the registry rejects are logged first, then each rule is applied
@@ -832,7 +832,7 @@ class Planner:
             )
         names = tuple(a.name for a in candidates)
         strategy = splitters.resolve_strategy_name(spec, task)
-        resolved = tasks.ProjectSpec.model_validate(
+        resolved = tasks.Config.model_validate(
             spec.model_dump()
             | {
                 "metric": metric.name,
@@ -844,7 +844,7 @@ class Planner:
             f"{resolved.config_hash()}|{profile.manifest.data_hash}|{names}"
         )
         plan_id = hashlib.sha256(identity.encode()).hexdigest()[:10]
-        return experiments.ExperimentPlan(
+        return experiments.Plan(
             plan_id=f"plan_{plan_id}",
             task=task.value,
             metric=metric.name,

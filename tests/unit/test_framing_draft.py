@@ -42,7 +42,7 @@ def request(frame, text="Predict churn for each customer.", **kw):
         primary_key=("customer_id",),
         **kw,
     )
-    return draft.FramingRequest(text, source)
+    return draft.Request(text, source)
 
 
 def test_deterministic_draft_assembles_an_unsigned_charter():

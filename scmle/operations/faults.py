@@ -386,7 +386,7 @@ while True:
 LEDGER_WRITER = """
 import sys
 from scmle.security import audit
-log = audit.AuditLog.open(sys.argv[1])
+log = audit.Log.open(sys.argv[1])
 n = 0
 while True:
     log.admin("writer", "tick", n=n)
@@ -471,7 +471,7 @@ def state_writer_trials(fleet: Fleet, base: pathlib.Path) -> dict[str, Any]:
     }
 
 
-def process_kill() -> recovery.Result:
+def process_kill() -> recovery.Outcome:
     """Kills the service process three times, restarting it each time.
 
     After the three kills it also runs `state_writer_trials` on atomic state
@@ -486,7 +486,7 @@ def process_kill() -> recovery.Result:
     """
     fleet = Fleet()
     base = work_folder("kill")
-    result = recovery.Result("process_kill", environment="local subprocess")
+    result = recovery.Outcome("process_kill", environment="local subprocess")
     try:
         service = export_service(base / "service", golden_spec())
         times = []
@@ -586,7 +586,7 @@ class Client(threading.Thread):
             time.sleep(0.05)
 
 
-def rolling_restart() -> recovery.Result:
+def rolling_restart() -> recovery.Outcome:
     """Replaces an instance under client load: a tampered copy, then a good one.
 
     The tampered replacement must stay alive but unready and never receive
@@ -602,7 +602,7 @@ def rolling_restart() -> recovery.Result:
     """
     fleet = Fleet()
     base = work_folder("rolling")
-    result = recovery.Result(
+    result = recovery.Outcome(
         "unhealthy_container_rolling_restart", environment="local subprocess"
     )
     client = None
@@ -679,7 +679,7 @@ def rolling_restart() -> recovery.Result:
 # ---- credentials and secrets -------------------------------------------
 
 
-def invalid_credentials() -> recovery.Result:
+def invalid_credentials() -> recovery.Outcome:
     """A wrong signing key leaves the service unready until corrected.
 
     Returns:
@@ -688,7 +688,7 @@ def invalid_credentials() -> recovery.Result:
     """
     fleet = Fleet()
     base = work_folder("credentials")
-    result = recovery.Result(
+    result = recovery.Outcome(
         "invalid_credentials", environment="local subprocess"
     )
     try:
@@ -729,7 +729,7 @@ def invalid_credentials() -> recovery.Result:
     return result
 
 
-def secret_rotation() -> recovery.Result:
+def secret_rotation() -> recovery.Outcome:
     """A bundle re-signed under a rotated key is refused under the old key.
 
     The service is shown to run under the old key, the re-signed bundle to be
@@ -742,7 +742,7 @@ def secret_rotation() -> recovery.Result:
     """
     fleet = Fleet()
     base = work_folder("rotation")
-    result = recovery.Result(
+    result = recovery.Outcome(
         "secret_rotation_recovery", environment="local subprocess"
     )
     try:
@@ -762,7 +762,7 @@ def secret_rotation() -> recovery.Result:
         fresh = fleet.start(new_service, key=ROTATED_KEY)
         seconds = ready_after(fresh)
         elapsed = time.monotonic() - detected
-        log = audit.AuditLog.open(base / "audit.jsonl")
+        log = audit.Log.open(base / "audit.jsonl")
         log.admin("operator-1", "key_rotation", from_key="old", to_key="new")
         log.ledger.verify()
         result.checks = {
@@ -808,7 +808,7 @@ def upload(base: str, folder: pathlib.Path, prefix: str) -> dict[str, str]:
     return demo.upload_folder(base, folder, prefix)
 
 
-def object_store_loss() -> recovery.Result:
+def object_store_loss() -> recovery.Outcome:
     """The store goes away; the service keeps serving; access returns.
 
     Returns:
@@ -820,7 +820,7 @@ def object_store_loss() -> recovery.Result:
     """
     fleet = Fleet()
     base = work_folder("store")
-    result = recovery.Result(
+    result = recovery.Outcome(
         "lost_object_store_access", environment="local emulator + subprocess"
     )
     try:
@@ -891,7 +891,7 @@ def object_store_loss() -> recovery.Result:
     return result
 
 
-def metrics_destination_outage() -> recovery.Result:
+def metrics_destination_outage() -> recovery.Outcome:
     """The metrics sink is down; samples are spooled and drained later.
 
     Returns:
@@ -903,7 +903,7 @@ def metrics_destination_outage() -> recovery.Result:
     """
     fleet = Fleet()
     base = work_folder("spool")
-    result = recovery.Result("dependency_outage", environment="local emulator")
+    result = recovery.Outcome("dependency_outage", environment="local emulator")
     try:
         service = export_service(base / "service", golden_spec())
         running = fleet.start(service)
@@ -969,7 +969,7 @@ def metrics_destination_outage() -> recovery.Result:
     return result
 
 
-def corrupted_bundle() -> recovery.Result:
+def corrupted_bundle() -> recovery.Outcome:
     """A tampered bundle never serves; a digest-checked copy restores it.
 
     Returns:
@@ -978,7 +978,9 @@ def corrupted_bundle() -> recovery.Result:
     """
     fleet = Fleet()
     base = work_folder("corrupt")
-    result = recovery.Result("corrupted_bundle", environment="local subprocess")
+    result = recovery.Outcome(
+        "corrupted_bundle", environment="local subprocess"
+    )
     try:
         service = export_service(base / "service", golden_spec())
         expected = model_file_digest(service)
@@ -1025,7 +1027,7 @@ def corrupted_bundle() -> recovery.Result:
     return result
 
 
-def incompatible_schema() -> recovery.Result:
+def incompatible_schema() -> recovery.Outcome:
     """Requests with a wrong schema digest, version or column are refused.
 
     A different expected digest and an unserved schema version are checked to
@@ -1042,7 +1044,7 @@ def incompatible_schema() -> recovery.Result:
     """
     fleet = Fleet()
     base = work_folder("schema")
-    result = recovery.Result(
+    result = recovery.Outcome(
         "incompatible_schema", environment="local subprocess"
     )
     try:
@@ -1065,7 +1067,7 @@ def incompatible_schema() -> recovery.Result:
             {k: v for k, v in r.items() if k != "age"} for r in records(3)
         ]
         started = time.monotonic()
-        watch = signals.SignalMonitor(signals.WindowPolicy(min_samples=30))
+        watch = signals.SignalMonitor(signals.Window(min_samples=30))
         statuses = []
         for step in range(40):
             code = demo.post_json(url, {"records": missing})[0]
@@ -1299,7 +1301,7 @@ def register(
     return record
 
 
-def bad_release() -> recovery.Result:
+def bad_release() -> recovery.Outcome:
     """Promotes a wrong release, detects it from labels and rolls it back.
 
     A good and an inverted-coefficient version are promoted in turn. Noisy
@@ -1315,7 +1317,7 @@ def bad_release() -> recovery.Result:
     """
     fleet = Fleet()
     base = work_folder("release")
-    result = recovery.Result("bad_release", environment="local processes")
+    result = recovery.Outcome("bad_release", environment="local processes")
     try:
         store = registry.ModelRegistryStore(base / "registry")
         ledger = deployment_ledger.DeploymentLedger.create(
@@ -1324,7 +1326,7 @@ def bad_release() -> recovery.Result:
         release = release_state.ReleaseRegistry(
             store,
             ledger,
-            control.ConfirmPolicy(attempts=40, delay=recovery.scaled(0.5)),
+            control.Polling(attempts=40, delay=recovery.scaled(0.5)),
         )
         good_spec = golden_spec()
         third_spec = {**good_spec, "model_version": "golden-3"}
@@ -1358,7 +1360,7 @@ def bad_release() -> recovery.Result:
         # delayed labels: the truth is what the good model says, with 5% noise
         rng = numpy.random.default_rng(3)
         watch = signals.SignalMonitor(
-            signals.WindowPolicy(window_seconds=1000.0, min_samples=30),
+            signals.Window(window_seconds=1000.0, min_samples=30),
             signals.SignalThresholds(reference_loss=0.05, loss_tolerance=0.05),
         )
         detected_after = None
@@ -1480,7 +1482,7 @@ def handler(name):
     return run
 
 store = objectstore.LocalObjectStore(root)
-runner = ex.LocalExecutor(
+runner = ex.Executor(
     flow,
     store,
     {n: handler(n) for n in ("ingest", "train", "evaluate")},
@@ -1491,7 +1493,7 @@ print(json.dumps({"state": record["state"]}), flush=True)
 """
 
 
-def job_interruption() -> recovery.Result:
+def job_interruption() -> recovery.Outcome:
     """A three-step workflow run kills itself in step two; a rerun resumes it.
 
     A second process started after the one-second lease runs the same trigger
@@ -1503,7 +1505,9 @@ def job_interruption() -> recovery.Result:
     """
     fleet = Fleet()
     base = work_folder("job")
-    result = recovery.Result("job_interruption", environment="local subprocess")
+    result = recovery.Outcome(
+        "job_interruption", environment="local subprocess"
+    )
     try:
         marker = base / "marker.txt"
         state = base / "state"
@@ -1552,7 +1556,7 @@ def job_interruption() -> recovery.Result:
     return result
 
 
-def audit_continuity() -> recovery.Result:
+def audit_continuity() -> recovery.Outcome:
     """Kills an audit-log writer five times and reopens each log.
 
     Each reopened log must verify, hold every acknowledged row, continue after
@@ -1564,7 +1568,7 @@ def audit_continuity() -> recovery.Result:
     """
     fleet = Fleet()
     base = work_folder("ledger")
-    result = recovery.Result(
+    result = recovery.Outcome(
         "audit_log_continuity", environment="local subprocess"
     )
     try:
@@ -1580,7 +1584,7 @@ def audit_continuity() -> recovery.Result:
             )
             started = time.monotonic()
             try:
-                reopened = audit.AuditLog.open(path)
+                reopened = audit.Log.open(path)
             except deployment_ledger.DeploymentLedgerError:
                 broken += 1
                 continue
@@ -1589,7 +1593,7 @@ def audit_continuity() -> recovery.Result:
             lost += max(0, acknowledged + 1 - len(ticks))
             for extra in range(3):
                 reopened.admin("operator", "after_restart", n=extra)
-            again = audit.AuditLog.open(path)
+            again = audit.Log.open(path)
             again.ledger.verify()
             contiguous &= ticks == list(range(len(ticks)))
             contiguous &= [r["seq"] for r in again.ledger.rows] == list(
@@ -1618,7 +1622,7 @@ def audit_continuity() -> recovery.Result:
     return result
 
 
-SCENARIOS: dict[str, Callable[[], recovery.Result]] = {
+SCENARIOS: dict[str, Callable[[], recovery.Outcome]] = {
     "process_kill": process_kill,
     "unhealthy_container_rolling_restart": rolling_restart,
     "invalid_credentials": invalid_credentials,

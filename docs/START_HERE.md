@@ -451,7 +451,7 @@ import scmle
 
 def main():
     run = sorted(pathlib.Path("runs").glob("run_*"))[-1]
-    bundle = scmle.ModelBundle.load(run / "model", trusted=True)
+    bundle = scmle.artifacts.bundle.Bundle.load(run / "model", trusted=True)
     bundle.save("artifacts/titanic", signing_key="demo-key-change-me")
     print("saved artifacts/titanic")
 
@@ -674,7 +674,7 @@ from scmle.monitoring import monitor
 
 def main():
     data = pd.read_csv("titanic.csv").drop(columns=["boat", "body"])
-    bundle = scmle.ModelBundle.load(
+    bundle = scmle.artifacts.bundle.Bundle.load(
         "artifacts/titanic", signing_key="demo-key-change-me"
     )
     watcher = monitor.ModelMonitor(bundle)
@@ -758,7 +758,7 @@ def main():
     data["survived"] = (
         data["survived"].sample(frac=1, random_state=1).to_numpy()
     )
-    project = scmle.MLProject(
+    project = scmle.api.project.Project(
         data,
         target="survived",
         unavailable_at_prediction=["boat", "body"],
@@ -862,7 +862,7 @@ version 1 is champion again.
 What you should know that this demo skips: a real approval is written by a
 second person, with real evidence files, using a key you keep secret. The demo
 signs its own approval, which proves the mechanism, not the independence.
-The registry also has `LifecycleManager.check_rollback`, which compares the two
+The registry also has `Maintainer.check_rollback`, which compares the two
 versions on fresh labeled rows and rolls back only if the new one is clearly
 worse. See [`TUTORIAL.md`](TUTORIAL.md) section 7.
 

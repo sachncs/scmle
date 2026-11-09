@@ -5,7 +5,7 @@ import logging
 import numpy
 import pandas
 
-import scmle
+import scmle.api.project
 from scmle.contracts import tasks
 
 LOGGER = logging.getLogger(__name__)
@@ -27,13 +27,13 @@ def main() -> None:
     # Intervals need spare time budget after the search; skip tuning so a
     # short budget still leaves room (a skipped calibration is logged as a
     # `conformal.skipped` event in the run's events.jsonl).
-    result = scmle.MLProject(
+    result = scmle.api.project.Project(
         make_dataset(800, 0),
         "price",
         metric="rmse",
         time_budget=120,
-        search=tasks.SearchSpec(top_models=0),
-        strategies=tasks.StrategySpec(top_models=0),
+        search=tasks.Search(top_models=0),
+        strategies=tasks.Strategies(top_models=0),
     ).run()
     LOGGER.info(result.summary())
 

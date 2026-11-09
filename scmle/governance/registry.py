@@ -346,7 +346,7 @@ class ModelRegistryStore:
             identical content is already registered (registration is
             idempotent for the same content).
         """
-        bundle.ModelBundle.load(
+        bundle.Bundle.load(
             bundle_directory, trusted=trusted, signing_key=signing_key
         )
         signed = bundle.verify_signature(
@@ -616,7 +616,7 @@ class ModelRegistryStore:
         model: str,
         ref: str | int = CHAMPION,
         signing_key: str | bytes | None = None,
-    ) -> bundle.ModelBundle:
+    ) -> bundle.Bundle:
         """Loads a registered bundle by alias or version.
 
         A bundle registered as signed is authenticated again with the key; one
@@ -633,7 +633,7 @@ class ModelRegistryStore:
             The loaded bundle.
         """
         record = self.resolve(model, ref)
-        return bundle.ModelBundle.load(
+        return bundle.Bundle.load(
             self.root / record.path,
             trusted=not record.signed,
             signing_key=signing_key,

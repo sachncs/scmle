@@ -6,7 +6,7 @@ table alone. The stage runs before the data are split, so nothing it reads
 depends on the confirmation set:
 
 1. profile the tables, infer the grain and discover the links under the
-   charter's budget (`IngestPlan`); a unit verdict of `coarser` or `unknown`
+   charter's budget (`Plan`); a unit verdict of `coarser` or `unknown`
    stops the run with the questions a person must settle;
 2. read each table once through a consistent (snapshot-checked) read and wrap
    it in an `AsOfView` with its declared time rule;
@@ -74,7 +74,7 @@ BATCH_ROWS = 1000
 
 
 @dataclasses.dataclass(frozen=True)
-class IngestResult:
+class Output:
     """What the stage produced.
 
     Attributes:
@@ -83,7 +83,7 @@ class IngestResult:
         records: Field provenance of the kept features, for the
             admissibility tests.
         documents: File name to JSON-ready content (the ingest plan's own
-            files are written by `IngestPlan`).
+            files are written by `Plan`).
         summary: The ingest plan's summary (whether the budget cut the run
             short, source queries, unit verdict, accepted links, open
             questions) plus `declared_family_size` and the number of
@@ -143,8 +143,8 @@ def identifier(value: Any, what: str) -> str:
 
 
 def rule_of(
-    record: dict[str, Any], spec: ingest.IngestSpec
-) -> asof_view.TimeRule:
+    record: dict[str, Any], spec: ingest.Ingestion
+) -> asof_view.KnownTime:
     """The time rule a view declares.
 
     Args:
@@ -158,7 +158,7 @@ def rule_of(
     """
     note = record.get("attestation")
     delay = record.get("delta_rec_days", spec.delta_rec)
-    return asof_view.TimeRule(
+    return asof_view.KnownTime(
         record["mode"],
         record.get("known_column"),
         None if record["mode"] == asof_view.NON_VERSIONED else float(delay),
@@ -195,7 +195,7 @@ def read_frame(entry: dict[str, Any], factory: Any) -> pandas.DataFrame:
 def read_view(
     entry: dict[str, Any],
     factory: Any,
-    spec: ingest.IngestSpec,
+    spec: ingest.Ingestion,
     frame: pandas.DataFrame | None = None,
 ) -> asof_view.AsOfView:
     """One table as an as-of view; `frame` is the extract if already read.
@@ -225,10 +225,10 @@ def read_view(
 
 def run(
     plan_document: dict[str, Any],
-    spec: ingest.IngestSpec,
+    spec: ingest.Ingestion,
     frame: pandas.DataFrame,
     run_dir: Path | None,
-) -> IngestResult:
+) -> Output:
     """Runs the ingest plan, then synthesizes features for the rows of `frame`.
 
     Args:
@@ -255,7 +255,7 @@ def run(
     if missing:
         raise errors.ConfigError(f"ingest plan names columns {missing} absent")
     factory = scmle.data.ingest.plan.sqlite_factory(plan_document["database"])
-    settings = scmle.data.ingest.plan.IngestSettings(
+    settings = scmle.data.ingest.plan.Config(
         tables=tuple(plan_document["tables"]),
         unit=plan_document.get("unit"),
         target_table=plan_document.get("target_table"),
@@ -266,7 +266,7 @@ def run(
             plan_document.get("declared", [])
         ),
     )
-    limits = budget.IngestBudget(
+    limits = budget.Budget(
         spec.max_queries,
         spec.max_rows_scanned,
         spec.max_seconds,
@@ -274,9 +274,7 @@ def run(
     )
     with tempfile.TemporaryDirectory() as scratch:
         folder = run_dir if run_dir is not None else Path(scratch)
-        plan = scmle.data.ingest.plan.IngestPlan(
-            folder, factory, settings, limits
-        )
+        plan = scmle.data.ingest.plan.Plan(folder, factory, settings, limits)
         summary = plan.run_all()
     verdict = plan.verdict
     if verdict is not None and verdict.blocks:
@@ -358,7 +356,7 @@ def run(
     }
     if report is not None:
         documents[declared.FILE] = report
-    return IngestResult(
+    return Output(
         found.frame,
         found.declared_family_size,
         table.fields,
@@ -372,7 +370,7 @@ def run(
 
 
 def resolve_entities(
-    frame: pandas.DataFrame, spec: ingest.EntitySpec
+    frame: pandas.DataFrame, spec: ingest.Entity
 ) -> tuple[pandas.Series, dict[str, Any]]:
     """Group id per row of the run table, from the charter's entity block.
 

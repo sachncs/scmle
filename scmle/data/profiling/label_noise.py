@@ -27,7 +27,7 @@ NOTE_RATE = 0.05
 
 
 @dataclasses.dataclass(frozen=True)
-class LabelNoiseReport:
+class LabelNoise:
     """Rows whose label disagrees with a confident out-of-fold prediction.
 
     Attributes:
@@ -113,7 +113,7 @@ class LabelNoiseReport:
 
 def find_label_noise(
     features: pandas.DataFrame, labels: pandas.Series, seed: int = 0
-) -> LabelNoiseReport:
+) -> LabelNoise:
     """Flags rows whose label a model that never saw them contradicts.
 
     Args:
@@ -164,7 +164,7 @@ def find_label_noise(
     )
     order = numpy.flatnonzero(flagged)
     order = order[numpy.argsort(-probabilities[order, best[order]])]
-    return LabelNoiseReport(
+    return LabelNoise(
         suspects=tuple(int(index) for index in order),
         suggested=tuple(classes[best[order]].tolist()),
         confidence=tuple(float(probabilities[i, best[i]]) for i in order),
@@ -174,7 +174,7 @@ def find_label_noise(
     )
 
 
-def label_noise_note(report: LabelNoiseReport, rows_checked: int) -> str | None:
+def label_noise_note(report: LabelNoise, rows_checked: int) -> str | None:
     """Writes the finding text for a label-noise report.
 
     Args:

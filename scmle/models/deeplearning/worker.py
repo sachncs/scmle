@@ -126,7 +126,7 @@ def main() -> None:
     serve(ipc.connect_to_parent())
 
 
-class WorkerClient:
+class Client:
     """Owns the worker process and serializes requests to it."""
 
     def __init__(self) -> None:
@@ -189,11 +189,11 @@ class WorkerClient:
             self.process = None
 
 
-CLIENTS: dict[int, WorkerClient] = {}
+CLIENTS: dict[int, Client] = {}
 CLIENTS_LOCK = threading.Lock()
 
 
-def client() -> WorkerClient:
+def client() -> Client:
     """Returns this process's worker client (one worker per process).
 
     Safe to call from several threads: the first creates the client, and
@@ -209,6 +209,6 @@ def client() -> WorkerClient:
     with CLIENTS_LOCK:
         found = CLIENTS.get(pid)
         if found is None:
-            found = CLIENTS[pid] = WorkerClient()
+            found = CLIENTS[pid] = Client()
             atexit.register(found.shutdown)
         return found

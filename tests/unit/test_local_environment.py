@@ -265,7 +265,7 @@ def test_the_container_healthcheck_follows_readiness(tmp_path):
 
     golden = parity.load_golden(ROOT / "deploy" / "local" / "golden")
     folder = parity.reference_bundle(golden.spec).save(tmp_path / "bundle")
-    model = bundle.ModelBundle.load(folder, trusted=True)
+    model = bundle.Bundle.load(folder, trusted=True)
     adapter = serving.HttpServing(model, port=0)
     adapter.start()
     try:

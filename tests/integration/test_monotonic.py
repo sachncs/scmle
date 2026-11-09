@@ -41,7 +41,7 @@ def test_constrained_predictions_never_fall_as_the_feature_rises(tmp_path):
         noisy_frame(),
         tmp_path,
         monotonic_constraints={"missed": 1},
-        models=tasks.ModelSpec(exclude_families=["deep_learning"]),
+        models=tasks.Candidates(exclude_families=["deep_learning"]),
     )
 
     curve = sweep(result)
@@ -90,8 +90,8 @@ def test_constraints_on_unusable_columns_or_multiclass_tasks_are_refused(
             noisy_frame(), "y", monotonic_constraints={"nope": 1}
         ).plan()
     with pytest.raises(ValueError, match=r"\+1 or -1"):
-        tasks.ProjectSpec(
-            data=tasks.DataSpec(
+        tasks.Config(
+            data=tasks.Dataset(
                 uri="m", target="y", monotonic_constraints={"a": 2}
             )
         )

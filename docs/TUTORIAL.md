@@ -5,10 +5,10 @@
 ```python
 import logging
 
-import scmle
+import scmle.api.project
 
 logging.basicConfig(level=logging.INFO)
-project = scmle.MLProject("customers.parquet", target="churn", metric="roc_auc")
+project = scmle.api.project.Project("customers.parquet", target="churn", metric="roc_auc")
 logging.info(project.plan().summary())  # nothing is trained or written
 result = project.run()
 logging.info(
@@ -27,13 +27,13 @@ choice.
 ```python
 from scmle.contracts import tasks
 
-project = scmle.MLProject(
+project = scmle.api.project.Project(
     data,
     "churn",
-    decision=tasks.DecisionSpec(  # tune the cutoff to your costs
+    decision=tasks.Threshold(  # tune the cutoff to your costs
         threshold_objective="cost", false_positive_cost=1, false_negative_cost=8
     ),
-    selection=tasks.SelectionSpec(max_model_mb=50, max_p95_latency_ms=20),
+    selection=tasks.Selection(max_model_mb=50, max_p95_latency_ms=20),
     leakage_policy="block",  # opt-in stop; the default "warn" labels the score
 )
 ```
@@ -41,10 +41,10 @@ project = scmle.MLProject(
 ## 3. Group and time structure
 
 ```python
-scmle.MLProject(
+scmle.api.project.Project(
     data, "default", group_column="customer_id"
 )  # no customer in both
-scmle.MLProject(data, "default", time_column="event_time")  # train on the past
+scmle.api.project.Project(data, "default", time_column="event_time")  # train on the past
 ```
 
 ## 4. Feature graph
@@ -52,7 +52,7 @@ scmle.MLProject(data, "default", time_column="event_time")  # train on the past
 ```python
 from scmle.contracts import tasks
 
-graph = tasks.FeatureGraphSpec(
+graph = tasks.FeatureGraph(
     nodes=[
         tasks.FeatureNode(
             name="unit_price", op="ratio", inputs=["price", "area"]
@@ -80,7 +80,7 @@ graph = tasks.FeatureGraphSpec(
         ),
     ]
 )
-project = scmle.MLProject(
+project = scmle.api.project.Project(
     data, "y", time_column="day", group_column="unit", feature_graph=graph
 )
 ```
@@ -106,8 +106,8 @@ def reviewer(review):  # review.gate is PLANNING or SELECTING
     return input("approve? [y/N] ").lower() == "y"
 
 
-project = scmle.MLProject(
-    data, "churn", checkpoints=(policies.CallbackCheckpoint(reviewer),)
+project = scmle.api.project.Project(
+    data, "churn", checkpoints=(policies.Callback(reviewer),)
 )
 ```
 
@@ -116,14 +116,14 @@ locked. `diagnostics/data_access.json` and the `policy.*`, `split.created`,
 `selection.frozen`, `test.opened` events in `events.jsonl` are the audit trail.
 
 ```python
-verdict = scmle.MLProject.verify_replay("runs/run_20261015_001", data=data)
+verdict = scmle.api.project.Project.verify_replay("runs/run_20261015_001", data=data)
 logging.info(verdict.level)  # exact | comparable | different
 ```
 
 ## 6. Interrupted runs
 
 ```python
-scmle.MLProject.resume("runs/run_20261015_001")  # finished trials are reused
+scmle.api.project.Project.resume("runs/run_20261015_001")  # finished trials are reused
 ```
 
 ## 7. Serve and monitor
@@ -133,7 +133,7 @@ from scmle.governance import lifecycle, registry
 from scmle.inference import serving
 from scmle.monitoring import monitor
 
-bundle = scmle.ModelBundle.load("artifacts/churn", signing_key="...")
+bundle = scmle.artifacts.bundle.Bundle.load("artifacts/churn", signing_key="...")
 api = serving.HttpServing(bundle)
 api.start()  # POST /predict {"records": [...]}
 
@@ -141,7 +141,7 @@ report = monitor.ModelMonitor(bundle).assess(recent_rows, outcomes=known_labels)
 logging.info(report.recommendation)  # none / investigate / retrain
 
 store = registry.ModelRegistryStore("registry")
-manager = lifecycle.LifecycleManager(store, "churn", "work")
+manager = lifecycle.Maintainer(store, "churn", "work")
 record = manager.register_run(result)  # registers a staged version
 approval_key = "loaded-from-your-release-secret"
 approval = registry.PromotionApproval(
@@ -203,15 +203,15 @@ scmle predict artifacts/churn new.csv --output scored.csv   # needs a signed bun
 from scmle.contracts import tasks
 
 # Skip whole families, or single models.
-project = scmle.MLProject(
-    data, "churn", models=tasks.ModelSpec(exclude_families=["deep_learning"])
+project = scmle.api.project.Project(
+    data, "churn", models=tasks.Candidates(exclude_families=["deep_learning"])
 )
 
 # Prefer the simpler model unless the best is credibly better.
-selection = tasks.SelectionSpec(uncertainty="bayesian", rope=0.005)
+selection = tasks.Selection(uncertainty="bayesian", rope=0.005)
 
 # Series data: rolling-origin validation and delayed columns.
-project = scmle.MLProject(
+project = scmle.api.project.Project(
     data,
     "demand",
     time_column="week",
@@ -222,11 +222,11 @@ project = scmle.MLProject(
 )
 
 # Your own metric (a module-level function, so trial processes can import it).
-scmle.register_metric("business_cost", my_module.cost, greater_is_better=False)
-project = scmle.MLProject(data, "churn", metric="business_cost")
+scmle.evaluation.metrics.register_metric("business_cost", my_module.cost, greater_is_better=False)
+project = scmle.api.project.Project(data, "churn", metric="business_cost")
 
 # Domain rules and responsibility.
-project = scmle.MLProject(
+project = scmle.api.project.Project(
     data,
     "default",
     sensitive_columns=["sex"],
@@ -235,11 +235,11 @@ project = scmle.MLProject(
 )
 
 # Rows without a label: set aside, or self-train when it measurably helps.
-project = scmle.MLProject(data, "churn", unlabeled="pseudo_label")
+project = scmle.api.project.Project(data, "churn", unlabeled="pseudo_label")
 # result.bundle.rank_for_labeling(pool, count=20) -> rows to label next
 
 # Time to an event with censored rows (target = time, event_column = 0/1).
-project = scmle.MLProject(
+project = scmle.api.project.Project(
     data, "months_to_churn", task="survival", event_column="churned"
 )
 # result.bundle.predict_survival(rows, times=[3, 6, 12]) -> P(no event yet)
@@ -254,7 +254,7 @@ result.bundle.export_onnx("model.onnx", check=sample_rows)
 # scmle serve runs/<id>/model --trusted --port 8000
 
 # Ordered labels: predictions come back as your labels, in order.
-project = scmle.MLProject(
+project = scmle.api.project.Project(
     data, "rating", task="ordinal", ordinal_order=["low", "medium", "high"]
 )
 
@@ -281,7 +281,7 @@ default to `cost=3`, and budgets under 300 s only search cheap models, so pass
 [`examples/custom_estimator.py`](../examples/custom_estimator.py)):
 
 ```python
-scmle.register_estimator("gaussian_nb", classifier=GaussianNB, cost=1)
+scmle.models.custom.register_estimator("gaussian_nb", classifier=GaussianNB, cost=1)
 ```
 
 ## 10. More runnable examples
@@ -293,6 +293,6 @@ file a run writes, and [`CLI.md`](CLI.md) the shell interface.
 
 ## 11. Extending
 
-Subclass `ModelAdapter` and pass `check_conformance`, or register it through
+Subclass `Model` and pass `check_conformance`, or register it through
 the `scmle.models` entry point. See `docs/ARCHITECTURE.md` for every extension
 point.

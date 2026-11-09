@@ -38,7 +38,7 @@ class ExtensionModality:
 
     Extension identities let a dataset family enter the same lifecycle
     contract without pretending that the core package understands its raw
-    representation. A `ModalityDeclaration` for one must use the
+    representation. A `Declaration` for one must use the
     extension-only status, so it can never be declared as supported.
     """
 
@@ -141,7 +141,7 @@ class LifecycleStage(enum.StrEnum):
 REQUIRED_LIFECYCLE_STAGES = tuple(LifecycleStage)
 
 
-class ModalityStatus(enum.StrEnum):
+class Status(enum.StrEnum):
     """Evidence level assigned to a modality declaration."""
 
     SUPPORTED = "supported"
@@ -221,7 +221,7 @@ class StageEvidence:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ModalityDeclaration:
+class Declaration:
     """Declared lifecycle support and evidence boundary for one modality.
 
     Attributes:
@@ -235,7 +235,7 @@ class ModalityDeclaration:
     """
 
     modality: ModalityIdentity
-    status: ModalityStatus
+    status: Status
     stage_evidence: tuple[StageEvidence, ...]
     required_extras: tuple[str, ...] = ()
     resources: capabilities.ResourceAssumptions = dataclasses.field(
@@ -258,8 +258,8 @@ class ModalityDeclaration:
         """
         if not isinstance(self.modality, (Modality, ExtensionModality)):
             raise TypeError("modality must be Modality or ExtensionModality")
-        if not isinstance(self.status, ModalityStatus):
-            raise TypeError("status must be ModalityStatus")
+        if not isinstance(self.status, Status):
+            raise TypeError("status must be Status")
         if not isinstance(self.resources, capabilities.ResourceAssumptions):
             raise TypeError(
                 "resources must be capabilities.ResourceAssumptions"
@@ -287,12 +287,12 @@ class ModalityDeclaration:
             raise ValueError("failure_modes must declare at least one value")
         if (
             isinstance(self.modality, ExtensionModality)
-            and self.status is not ModalityStatus.EXTENSION_ONLY
+            and self.status is not Status.EXTENSION_ONLY
         ):
             raise ValueError(
                 "extension modalities must use extension-only status"
             )
-        if self.status is ModalityStatus.SUPPORTED and self.missing_stages:
+        if self.status is Status.SUPPORTED and self.missing_stages:
             missing = ", ".join(stage.value for stage in self.missing_stages)
             raise ValueError(
                 "supported modalities require evidenced lifecycle stages: "
@@ -340,7 +340,7 @@ class UnsupportedModalityError(errors.ConfigError):
     category = "modality"
 
 
-class ModalityRegistry:
+class Registry:
     """Registry that resolves complete modality support before execution.
 
     The registry has no implicit modality defaults. A declaration must be
@@ -351,31 +351,29 @@ class ModalityRegistry:
         records: Registered declarations keyed by modality.
     """
 
-    def __init__(
-        self, declarations: Iterable[ModalityDeclaration] = ()
-    ) -> None:
+    def __init__(self, declarations: Iterable[Declaration] = ()) -> None:
         """Creates a registry and registers the supplied declarations.
 
         Args:
             declarations: Declarations registered in order with `register`,
                 which rejects non-declarations and repeated modalities.
         """
-        self.records: dict[ModalityIdentity, ModalityDeclaration] = {}
+        self.records: dict[ModalityIdentity, Declaration] = {}
         for declaration in declarations:
             self.register(declaration)
 
-    def register(self, declaration: ModalityDeclaration) -> None:
+    def register(self, declaration: Declaration) -> None:
         """Registers a declaration without replacing an existing modality.
 
         Args:
             declaration: Modality lifecycle declaration.
 
         Raises:
-            TypeError: If `declaration` is not a `ModalityDeclaration`.
+            TypeError: If `declaration` is not a `Declaration`.
             errors.ConfigError: If the modality is already registered.
         """
-        if not isinstance(declaration, ModalityDeclaration):
-            raise TypeError("declaration must be ModalityDeclaration")
+        if not isinstance(declaration, Declaration):
+            raise TypeError("declaration must be Declaration")
         if declaration.modality in self.records:
             raise errors.ConfigError(
                 "modality already registered: "
@@ -383,7 +381,7 @@ class ModalityRegistry:
             )
         self.records[declaration.modality] = declaration
 
-    def find(self, modality: ModalityIdentity) -> ModalityDeclaration | None:
+    def find(self, modality: ModalityIdentity) -> Declaration | None:
         """Returns a declaration or ``None`` when it is unregistered.
 
         Args:
@@ -402,8 +400,8 @@ class ModalityRegistry:
     def require(
         self,
         modality: ModalityIdentity,
-        allowed_statuses: Collection[ModalityStatus] | None = None,
-    ) -> ModalityDeclaration:
+        allowed_statuses: Collection[Status] | None = None,
+    ) -> Declaration:
         """Requires complete, status-eligible modality support.
 
         Incomplete declarations fail regardless of requested status. This
@@ -422,7 +420,7 @@ class ModalityRegistry:
         """
         declaration = self.find(modality)
         statuses = (
-            frozenset({ModalityStatus.SUPPORTED})
+            frozenset({Status.SUPPORTED})
             if allowed_statuses is None
             else frozenset(allowed_statuses)
         )
@@ -443,7 +441,7 @@ class ModalityRegistry:
             )
         return declaration
 
-    def list_declarations(self) -> tuple[ModalityDeclaration, ...]:
+    def list_declarations(self) -> tuple[Declaration, ...]:
         """Returns declarations in deterministic modality order."""
         return tuple(
             self.records[modality]

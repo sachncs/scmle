@@ -26,7 +26,7 @@ class Metric:
     name: str
     scorer_name: str
     greater_is_better: bool
-    tasks: frozenset[tasks.TaskType]
+    tasks: frozenset[tasks.Task]
 
     def to_natural(self, scorer_value: float) -> float:
         """Converts a sign-adjusted scorer value to natural units.

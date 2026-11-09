@@ -7,9 +7,9 @@ import math
 import pytest
 
 from scmle.data.modalities import image
-from scmle.models.images import ImageClassifier
-from scmle.models.images import ImageModelConfig
-from scmle.models.images import ImageMonitor
+from scmle.models.images import Classifier
+from scmle.models.images import Config
+from scmle.models.images import Monitor
 
 try:
     from PIL import Image
@@ -31,15 +31,15 @@ def png_bytes(color, size=(4, 4)):
     return output.getvalue()
 
 
-def sample(source: str, color, label: str) -> image.ImageSample:
+def sample(source: str, color, label: str) -> image.Sample:
     """Create a labelled image fixture."""
-    return image.ImageSample.from_bytes(png_bytes(color), source, label=label)
+    return image.Sample.from_bytes(png_bytes(color), source, label=label)
 
 
 @pytest.fixture
-def training_data() -> image.ImageDataset:
+def training_data() -> image.Dataset:
     """Return a deterministic binary image-training fixture."""
-    return image.ImageDataset(
+    return image.Dataset(
         (
             sample("red-1.png", (255, 0, 0), "red"),
             sample("red-2.png", (220, 10, 10), "red"),
@@ -50,9 +50,9 @@ def training_data() -> image.ImageDataset:
 
 
 @pytest.fixture
-def evaluation_data() -> image.ImageDataset:
+def evaluation_data() -> image.Dataset:
     """Return held-out images with both labels represented."""
-    return image.ImageDataset(
+    return image.Dataset(
         (
             sample("red-test.png", (250, 20, 20), "red"),
             sample("blue-test.png", (20, 20, 250), "blue"),
@@ -60,9 +60,9 @@ def evaluation_data() -> image.ImageDataset:
     )
 
 
-def make_classifier() -> ImageClassifier:
+def make_classifier() -> Classifier:
     """Return a small deterministic image baseline."""
-    return ImageClassifier(ImageModelConfig(target_size=(2, 2), max_iter=200))
+    return Classifier(Config(target_size=(2, 2), max_iter=200))
 
 
 @PILLOW_SKIP
@@ -117,14 +117,14 @@ def test_image_classifier_rejects_unsafe_training_data(training_data):
     """Training refuses missing labels, duplicates, and one-class data."""
     with pytest.raises(ValueError, match="every training image"):
         make_classifier().fit(
-            image.ImageDataset(
-                (image.ImageSample.from_bytes(png_bytes((1, 2, 3)), "raw"),)
+            image.Dataset(
+                (image.Sample.from_bytes(png_bytes((1, 2, 3)), "raw"),)
             )
         )
 
     with pytest.raises(ValueError, match="duplicate content"):
         make_classifier().fit(
-            image.ImageDataset(
+            image.Dataset(
                 (
                     sample("one.png", (100, 0, 0), "red"),
                     sample("two.png", (100, 0, 0), "blue"),
@@ -134,7 +134,7 @@ def test_image_classifier_rejects_unsafe_training_data(training_data):
 
     with pytest.raises(ValueError, match="two classes"):
         make_classifier().fit(
-            image.ImageDataset(
+            image.Dataset(
                 (
                     sample("one.png", (100, 0, 0), "red"),
                     sample("two.png", (120, 0, 0), "red"),
@@ -155,9 +155,9 @@ def test_image_classifier_package_round_trip_and_tamper_rejection(
     artifact = classifier.save(path)
 
     with pytest.raises(PermissionError, match="trusted=True"):
-        ImageClassifier.load(path)
+        Classifier.load(path)
 
-    loaded = ImageClassifier.load(path, trusted=True)
+    loaded = Classifier.load(path, trusted=True)
     assert loaded.model_digest == classifier.model_digest
     assert loaded.predict(evaluation_data) == classifier.predict(
         evaluation_data
@@ -168,18 +168,16 @@ def test_image_classifier_package_round_trip_and_tamper_rejection(
     manifest["model_digest"] = "0" * 64
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
     with pytest.raises(ValueError, match="model digest"):
-        ImageClassifier.load(artifact.path, trusted=True)
+        Classifier.load(artifact.path, trusted=True)
 
 
 @PILLOW_SKIP
 def test_image_monitor_detects_mean_pixel_shift(training_data):
     """Monitoring compares image profile evidence against a fixed snapshot."""
     reference = training_data.curate(profile_size=(2, 2))
-    observed = image.ImageDataset(
-        (sample("observed.png", (0, 255, 0), "green"),)
-    )
+    observed = image.Dataset((sample("observed.png", (0, 255, 0), "green"),))
 
-    report = ImageMonitor(reference, threshold=0.1).observe(observed)
+    report = Monitor(reference, threshold=0.1).observe(observed)
 
     assert report.reference_hash == reference.dataset_hash
     assert report.observed_hash == observed.curate().dataset_hash

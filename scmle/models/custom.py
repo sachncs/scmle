@@ -20,7 +20,7 @@ from scmle.models.sklearn import classical
 
 
 @dataclasses.dataclass(frozen=True)
-class EstimatorSpec:
+class Registration:
     """Everything needed to rebuild a registered estimator's adapter.
 
     Attributes:
@@ -46,7 +46,7 @@ class EstimatorSpec:
     cost: int = 3
 
 
-def rebuild(spec: EstimatorSpec) -> models.ModelAdapter:
+def rebuild(spec: Registration) -> models.Model:
     """Creates the adapter for `spec` (also how it is unpickled).
 
     Args:
@@ -57,7 +57,7 @@ def rebuild(spec: EstimatorSpec) -> models.ModelAdapter:
         if a classifier class is given, regression if a regressor class is
         given, and probabilities if the classifier has `predict_proba`.
     """
-    supported: frozenset[tasks.TaskType] = frozenset()
+    supported: frozenset[tasks.Task] = frozenset()
     if spec.classifier is not None:
         supported |= classical.CLASSIFICATION
     if spec.regressor is not None:
@@ -82,7 +82,7 @@ def rebuild(spec: EstimatorSpec) -> models.ModelAdapter:
         "spec": spec,
         "__reduce__": lambda self: (rebuild, (self.spec,)),
     }
-    kind = type("CustomEstimatorAdapter", (classical.SklearnAdapter,), members)
+    kind = type("Custom", (classical.Learner,), members)
     return kind()
 
 
@@ -98,7 +98,7 @@ def register_estimator(
     sparse_input: bool = False,
     cost: int = 3,
     replace: bool = False,
-) -> models.ModelAdapter:
+) -> models.Model:
     """Makes an estimator class a candidate in every later project.
 
     Args:
@@ -132,7 +132,7 @@ def register_estimator(
     if name in registry.user_adapters() and not replace:
         raise errors.ConfigError(f"model '{name}' is already registered")
     adapter = rebuild(
-        EstimatorSpec(
+        Registration(
             name,
             classifier,
             regressor,

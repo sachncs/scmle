@@ -113,7 +113,7 @@ class Finding:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ReconcileReport:
+class Reconciliation:
     """The result of comparing records with a platform observation."""
 
     model: str
@@ -177,7 +177,7 @@ class ReleaseRegistry:
         self,
         store: registry.ModelRegistryStore,
         ledger: deployment_ledger.DeploymentLedger | None = None,
-        policy: control.ConfirmPolicy | None = None,
+        policy: control.Polling | None = None,
     ) -> None:
         """Binds the release state to a registry.
 
@@ -188,7 +188,7 @@ class ReleaseRegistry:
         """
         self.store = store
         self.ledger = ledger
-        self.policy = policy or control.ConfirmPolicy()
+        self.policy = policy or control.Polling()
 
     # -- the state file --------------------------------------------------
 
@@ -1042,7 +1042,7 @@ class ReleaseRegistry:
         model: str,
         environment: str,
         seen: observation.Observation,
-    ) -> ReconcileReport:
+    ) -> Reconciliation:
         """Compares the registry and the ledger with a platform observation.
 
         Every disagreement is a finding; none is repaired. The finding kinds
@@ -1160,4 +1160,4 @@ class ReleaseRegistry:
                         f"{event['revision']}",
                     )
                 )
-        return ReconcileReport(model, environment, tuple(findings))
+        return Reconciliation(model, environment, tuple(findings))

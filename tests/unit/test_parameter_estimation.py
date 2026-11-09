@@ -10,16 +10,16 @@ import pytest
 
 from scmle.evaluation import parameter_estimation
 from scmle.evaluation.parameter_estimation import BayesianPrior
-from scmle.evaluation.parameter_estimation import EstimandSpec
+from scmle.evaluation.parameter_estimation import Config
+from scmle.evaluation.parameter_estimation import Estimand
 from scmle.evaluation.parameter_estimation import estimate_parameters
-from scmle.evaluation.parameter_estimation import EstimationPolicy
-from scmle.evaluation.parameter_estimation import EstimationResult
+from scmle.evaluation.parameter_estimation import Estimation
 from scmle.evaluation.parameter_estimation import ParameterEstimate
 
 
-def linear_estimand() -> EstimandSpec:
+def linear_estimand() -> Estimand:
     """Return a declared Gaussian estimand for test fixtures."""
-    return EstimandSpec(
+    return Estimand(
         name="mean_outcome_difference",
         outcome="outcome",
         population="eligible observations in the 2026 study window",
@@ -32,9 +32,9 @@ def linear_estimand() -> EstimandSpec:
     )
 
 
-def causal_estimand() -> EstimandSpec:
+def causal_estimand() -> Estimand:
     """Return a continuous-outcome estimand with a declared treatment column."""
-    return EstimandSpec(
+    return Estimand(
         name="average_treatment_effect",
         outcome="outcome",
         population="eligible observations in the 2026 study window",
@@ -73,9 +73,9 @@ def clustered_causal_fixture() -> tuple[
 
 def clustered_causal_policy(
     estimator: Literal["ipw_ate", "aipw_ate"],
-) -> EstimationPolicy:
+) -> Config:
     """Return a project-serializable clustered causal policy."""
-    return EstimationPolicy(
+    return Config(
         estimator=estimator,
         covariance="clustered",
         cluster_name="site_id",
@@ -89,9 +89,9 @@ def clustered_causal_policy(
     )
 
 
-def continuous_treatment_estimand() -> EstimandSpec:
+def continuous_treatment_estimand() -> Estimand:
     """Return a declared continuous-treatment dose-response estimand."""
-    return EstimandSpec(
+    return Estimand(
         name="continuous_treatment_dose_response",
         outcome="outcome",
         population="eligible observations in the 2026 study window",
@@ -106,9 +106,9 @@ def continuous_treatment_estimand() -> EstimandSpec:
 
 def continuous_treatment_policy(
     covariance: Literal["iid", "clustered"] = "iid",
-) -> EstimationPolicy:
+) -> Config:
     """Return the fully identified bounded continuous-treatment policy."""
-    return EstimationPolicy(
+    return Config(
         estimator="continuous_ipw_ate",
         covariance=covariance,
         cluster_name="site_id" if covariance == "clustered" else None,
@@ -148,9 +148,9 @@ def continuous_treatment_fixture(
     return numpy.column_stack((dose, age, risk_score)), outcome, clusters
 
 
-def hierarchical_estimand() -> EstimandSpec:
+def hierarchical_estimand() -> Estimand:
     """Return a Gaussian estimand for grouped observations."""
-    return EstimandSpec(
+    return Estimand(
         name="grouped_outcome_slope",
         outcome="outcome",
         population="observations nested in declared sites",
@@ -174,7 +174,7 @@ def test_linear_estimation_records_robust_uncertainty_and_reference():
         features,
         outcome,
         linear_estimand(),
-        EstimationPolicy(estimator="linear", covariance="hc3"),
+        Config(estimator="linear", covariance="hc3"),
     )
 
     assert result.parameters[0].name == "intercept"
@@ -195,7 +195,7 @@ def test_estimation_fingerprint_binds_raw_feature_outcome_and_clusters():
     features = numpy.column_stack((values, values**2))
     outcome = 1.0 + features[:, 0] - 0.5 * features[:, 1]
     clusters = numpy.repeat(("a", "b", "c"), 5)
-    policy = EstimationPolicy(
+    policy = Config(
         estimator="linear", covariance="clustered", cluster_name="site"
     )
 
@@ -236,7 +236,7 @@ def test_clustered_covariance_and_shift_diagnostics_are_explicit():
         features,
         outcome,
         linear_estimand(),
-        EstimationPolicy(
+        Config(
             estimator="linear",
             covariance="clustered",
             cluster_name="site_id",
@@ -264,7 +264,7 @@ def test_logistic_estimation_has_independent_optimization_check():
     features = rng.normal(size=(500, 2))
     logits = -0.3 + 1.1 * features[:, 0] - 0.8 * features[:, 1]
     outcome = rng.binomial(1, 1.0 / (1.0 + numpy.exp(-logits)))
-    estimand = EstimandSpec(
+    estimand = Estimand(
         name="conversion_log_odds",
         outcome="converted",
         population="eligible visitors in the observation window",
@@ -277,7 +277,7 @@ def test_logistic_estimation_has_independent_optimization_check():
         features,
         outcome,
         estimand,
-        EstimationPolicy(estimator="logistic", covariance="iid"),
+        Config(estimator="logistic", covariance="iid"),
     )
 
     assert result.diagnostics["converged"] is True
@@ -300,9 +300,7 @@ def test_bayesian_linear_estimation_reports_posterior_evidence():
         features,
         outcome,
         linear_estimand(),
-        EstimationPolicy(
-            estimator="bayesian_linear", covariance="iid", prior=prior
-        ),
+        Config(estimator="bayesian_linear", covariance="iid", prior=prior),
     )
 
     assert result.parameters[1].estimate == pytest.approx(1.8, abs=0.12)
@@ -330,14 +328,12 @@ def test_bayesian_prior_round_trip_preserves_digest_contract(tmp_path):
         features,
         outcome,
         linear_estimand(),
-        EstimationPolicy(
-            estimator="bayesian_linear", covariance="iid", prior=prior
-        ),
+        Config(estimator="bayesian_linear", covariance="iid", prior=prior),
     )
     path = tmp_path / "bayesian-estimation.json"
 
     digest = result.write(path)
-    restored = EstimationResult.read(path)
+    restored = Estimation.read(path)
 
     assert restored.policy.prior == prior
     assert restored.digest() == digest
@@ -346,21 +342,19 @@ def test_bayesian_prior_round_trip_preserves_digest_contract(tmp_path):
 def test_bayesian_estimation_fails_closed_for_unsupported_policies():
     """Bayesian evidence does not silently claim robust or clustered errors."""
     with pytest.raises(ValueError, match="requires an explicit prior"):
-        EstimationPolicy(estimator="bayesian_linear")
+        Config(estimator="bayesian_linear")
 
     prior = BayesianPrior(
         mean=(0.0, 0.0, 0.0),
         precision=((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0)),
     )
     with pytest.raises(ValueError, match="only iid covariance"):
-        EstimationPolicy(
-            estimator="bayesian_linear", covariance="hc3", prior=prior
-        )
+        Config(estimator="bayesian_linear", covariance="hc3", prior=prior)
 
     with pytest.raises(
         ValueError, match="bootstrap sensitivity is unsupported"
     ):
-        EstimationPolicy(
+        Config(
             estimator="bayesian_linear",
             covariance="iid",
             prior=prior,
@@ -368,7 +362,7 @@ def test_bayesian_estimation_fails_closed_for_unsupported_policies():
         )
 
     with pytest.raises(ValueError, match="only by bayesian_linear"):
-        EstimationPolicy(estimator="linear", prior=prior)
+        Config(estimator="linear", prior=prior)
 
 
 def test_bayesian_ate_reports_causal_posterior_evidence():
@@ -396,7 +390,7 @@ def test_bayesian_ate_reports_causal_posterior_evidence():
             for row in range(4)
         ),
     )
-    policy = EstimationPolicy(
+    policy = Config(
         estimator="bayesian_ate",
         covariance="iid",
         prior=prior,
@@ -446,7 +440,7 @@ def test_bayesian_ate_reports_causal_posterior_evidence():
 def test_bayesian_ate_validates_causal_policy_and_prior_shape():
     """Causal Bayesian estimation fails closed at its scientific boundary."""
     with pytest.raises(ValueError, match="requires an explicit prior"):
-        EstimationPolicy(
+        Config(
             estimator="bayesian_ate",
             treatment_position=0,
             causal_assumptions=(
@@ -484,11 +478,11 @@ def test_bayesian_ate_validates_causal_policy_and_prior_shape():
             ),
             numpy.arange(12, dtype=float),
             causal_estimand(),
-            EstimationPolicy(**policy_values),
+            Config(**policy_values),
         )
 
     with pytest.raises(ValueError, match="requires consistency"):
-        EstimationPolicy(
+        Config(
             estimator="bayesian_ate",
             covariance="iid",
             prior=BayesianPrior(
@@ -503,7 +497,7 @@ def test_bayesian_ate_validates_causal_policy_and_prior_shape():
         )
 
     with pytest.raises(ValueError, match="only iid covariance"):
-        EstimationPolicy(
+        Config(
             estimator="bayesian_ate",
             covariance="hc3",
             prior=policy_values["prior"],
@@ -517,7 +511,7 @@ def test_bayesian_ate_validates_causal_policy_and_prior_shape():
         )
 
     with pytest.raises(ValueError, match="does not support clustered"):
-        EstimationPolicy(
+        Config(
             estimator="bayesian_ate",
             covariance="iid",
             cluster_name="site_id",
@@ -551,7 +545,7 @@ def test_ipw_ate_requires_declared_assumptions_and_reports_overlap():
     outcome = 1.0 + 2.0 * treatment + 0.5 * age - 0.25 * risk_score
     outcome += rng.normal(scale=0.8, size=rows)
     features = numpy.column_stack((treatment, age, risk_score))
-    policy = EstimationPolicy(
+    policy = Config(
         estimator="ipw_ate",
         covariance="iid",
         treatment_position=0,
@@ -582,7 +576,7 @@ def test_ipw_ate_requires_declared_assumptions_and_reports_overlap():
 def test_ipw_ate_fails_closed_without_all_causal_assumptions():
     """The causal estimator cannot be selected with underspecified claims."""
     with pytest.raises(ValueError, match="requires consistency"):
-        EstimationPolicy(
+        Config(
             estimator="ipw_ate",
             covariance="iid",
             treatment_position=0,
@@ -645,7 +639,7 @@ def test_continuous_ipw_ate_supports_clustered_uncertainty():
 def test_continuous_ipw_ate_requires_declared_density_assumptions():
     """A continuous-treatment claim cannot reuse the binary policy default."""
     with pytest.raises(ValueError, match="continuous_treatment_positivity"):
-        EstimationPolicy(
+        Config(
             estimator="continuous_ipw_ate",
             covariance="iid",
             treatment_position=0,
@@ -671,7 +665,7 @@ def test_continuous_ipw_ate_requires_declared_density_assumptions():
 def test_continuous_policy_round_trip_preserves_explicit_capability():
     """Serialized continuous policy evidence reconstructs without defaults."""
     policy = continuous_treatment_policy()
-    restored = EstimationPolicy(**policy.to_dict())
+    restored = Config(**policy.to_dict())
 
     assert restored == policy
     assert restored.to_dict()["continuous_weight_cap"] == 8.0
@@ -697,7 +691,7 @@ def test_aipw_ate_reports_augmented_score_and_reference_evidence():
     outcome = 1.0 + 2.0 * treatment + 0.5 * age - 0.25 * risk_score
     outcome += rng.normal(scale=0.8, size=rows)
     features = numpy.column_stack((treatment, age, risk_score))
-    policy = EstimationPolicy(
+    policy = Config(
         estimator="aipw_ate",
         covariance="iid",
         treatment_position=0,
@@ -743,7 +737,7 @@ def test_ipw_ate_clustered_influence_uncertainty_is_deterministic():
         features,
         outcome,
         causal_estimand(),
-        EstimationPolicy(**iid_policy_values),
+        Config(**iid_policy_values),
     )
 
     assert first.to_dict() == second.to_dict()
@@ -769,7 +763,7 @@ def test_aipw_ate_clustered_influence_uncertainty_is_serializable(tmp_path):
         features, outcome, causal_estimand(), policy, clusters=clusters
     )
 
-    restored_policy = EstimationPolicy(**policy.to_dict())
+    restored_policy = Config(**policy.to_dict())
     assert restored_policy == policy
     assert result.diagnostics["uncertainty_method"] == (
         "clustered_centered_influence_function"
@@ -783,14 +777,14 @@ def test_aipw_ate_clustered_influence_uncertainty_is_serializable(tmp_path):
     json.dumps(result.to_dict())
     path = tmp_path / "clustered-aipw.json"
     result.write(path)
-    restored = EstimationResult.read(path)
+    restored = Estimation.read(path)
     assert restored.to_dict() == result.to_dict()
 
 
 def test_causal_clustered_uncertainty_rejects_hc3_and_one_cluster():
     """Causal uncertainty fails clearly for unsupported covariance claims."""
     with pytest.raises(ValueError, match="hc3 is unsupported"):
-        EstimationPolicy(
+        Config(
             estimator="ipw_ate",
             covariance="hc3",
             treatment_position=0,
@@ -825,7 +819,7 @@ def test_aipw_ate_cross_fitting_is_deterministic_and_auditable():
     outcome = 1.0 + 2.0 * treatment + 0.5 * age - 0.25 * risk_score
     outcome += rng.normal(scale=0.8, size=rows)
     features = numpy.column_stack((treatment, age, risk_score))
-    policy = EstimationPolicy(
+    policy = Config(
         estimator="aipw_ate",
         covariance="iid",
         treatment_position=0,
@@ -879,7 +873,7 @@ def test_causal_row_bootstrap_is_reproducible_and_reports_intervals(
     """Causal row bootstrap retains assumptions and reference evidence."""
     fixture = clustered_causal_fixture()
     features, outcome = fixture[0], fixture[1]
-    policy = EstimationPolicy(
+    policy = Config(
         estimator=estimator,
         covariance="iid",
         treatment_position=0,
@@ -928,7 +922,7 @@ def test_causal_cluster_bootstrap_resamples_whole_clusters(
     """Clustered causal bootstrap records cluster-unit and covariance evidence."""
     features, outcome, clusters = clustered_causal_fixture()
     policy = clustered_causal_policy(estimator)
-    policy = EstimationPolicy(
+    policy = Config(
         **{
             **policy.to_dict(),
             "bootstrap_replicates": 4,
@@ -964,7 +958,7 @@ def test_causal_bootstrap_records_failed_replicates(
     """An invalid replicate is recorded and excluded from intervals."""
     fixture = clustered_causal_fixture()
     features, outcome = fixture[0], fixture[1]
-    policy = EstimationPolicy(
+    policy = Config(
         estimator="ipw_ate",
         covariance="iid",
         treatment_position=0,
@@ -1016,7 +1010,7 @@ def test_causal_bootstrap_fails_closed_when_too_few_replicates_succeed(
     """Bootstrap intervals are not emitted when evidence is insufficient."""
     fixture = clustered_causal_fixture()
     features, outcome = fixture[0], fixture[1]
-    policy = EstimationPolicy(
+    policy = Config(
         estimator="aipw_ate",
         covariance="iid",
         treatment_position=0,
@@ -1050,7 +1044,7 @@ def test_causal_bootstrap_fails_closed_when_too_few_replicates_succeed(
 def test_aipw_cross_fitting_validates_policy_and_fold_support():
     """Cross-fitting fails closed for unsupported folds and treatment support."""
     with pytest.raises(ValueError, match="positive integer"):
-        EstimationPolicy(
+        Config(
             estimator="aipw_ate",
             treatment_position=0,
             cross_fitting_folds=0,
@@ -1061,13 +1055,13 @@ def test_aipw_cross_fitting_validates_policy_and_fold_support():
             ),
         )
     with pytest.raises(ValueError, match="only by aipw_ate"):
-        EstimationPolicy(estimator="linear", cross_fitting_folds=2)
+        Config(estimator="linear", cross_fitting_folds=2)
 
     treatment = numpy.tile((0.0, 1.0), 4)
     signal = numpy.arange(8, dtype=float)
     features = numpy.column_stack((treatment, signal, signal**2))
     outcome = signal
-    policy = EstimationPolicy(
+    policy = Config(
         estimator="aipw_ate",
         covariance="iid",
         treatment_position=0,
@@ -1103,7 +1097,7 @@ def test_hierarchical_linear_reports_random_intercept_variance():
         "random_effect_exogeneity",
         "constant_residual_variance",
     )
-    policy = EstimationPolicy(
+    policy = Config(
         estimator="hierarchical_linear",
         covariance="iid",
         cluster_name="site_id",
@@ -1150,9 +1144,9 @@ def make_hierarchical_reml_fixture() -> tuple[
     return signal.reshape(-1, 1), outcome, clusters
 
 
-def make_hierarchical_reml_policy() -> EstimationPolicy:
+def make_hierarchical_reml_policy() -> Config:
     """Return the bounded REML policy used by grouped estimator tests."""
-    return EstimationPolicy(
+    return Config(
         estimator="hierarchical_linear",
         covariance="iid",
         cluster_name="site_id",
@@ -1212,9 +1206,9 @@ def make_hierarchical_random_slope_fixture() -> tuple[
 
 def make_hierarchical_random_slope_policy(
     method: Literal["moment_gls", "reml"] = "moment_gls",
-) -> EstimationPolicy:
+) -> Config:
     """Return a policy declaring one random slope for the signal feature."""
-    return EstimationPolicy(
+    return Config(
         estimator="hierarchical_linear",
         covariance="iid",
         cluster_name="site_id",
@@ -1265,7 +1259,7 @@ def test_hierarchical_linear_supports_one_declared_random_slope():
     )
     assert result.reference["passed"] is True
     serialized = json.loads(json.dumps(result.to_dict()))
-    restored = EstimationResult.from_dict(serialized)
+    restored = Estimation.from_dict(serialized)
     assert restored.to_dict() == result.to_dict()
 
 
@@ -1293,20 +1287,20 @@ def test_hierarchical_linear_random_slope_supports_bounded_reml():
 def test_hierarchical_random_slope_policy_is_strictly_declared():
     """Slope position cannot be silently broadened or left out of bounds."""
     with pytest.raises(ValueError, match="non-negative integer"):
-        EstimationPolicy(
+        Config(
             estimator="hierarchical_linear",
             cluster_name="site_id",
             random_slope_position=True,
         )
     with pytest.raises(ValueError, match="only by hierarchical_linear"):
-        EstimationPolicy(estimator="linear", random_slope_position=0)
+        Config(estimator="linear", random_slope_position=0)
     features, outcome, clusters = make_hierarchical_random_slope_fixture()
     with pytest.raises(ValueError, match="outside the feature matrix"):
         estimate_parameters(
             features,
             outcome,
             hierarchical_estimand(),
-            EstimationPolicy(
+            Config(
                 **{
                     **make_hierarchical_random_slope_policy().to_dict(),
                     "random_slope_position": 1,
@@ -1344,7 +1338,7 @@ def test_hierarchical_bootstrap_is_deterministic_and_reference_checked(
     """Grouped bootstrap preserves the declared method and evidence contract."""
     features, outcome, clusters = make_hierarchical_reml_fixture()
     base_policy = make_hierarchical_reml_policy()
-    policy = EstimationPolicy(
+    policy = Config(
         **{
             **base_policy.to_dict(),
             "hierarchical_method": method,
@@ -1415,7 +1409,7 @@ def test_hierarchical_bootstrap_records_failed_replicates(
 ):
     """Invalid grouped draws are recorded and excluded from intervals."""
     features, outcome, clusters = make_hierarchical_reml_fixture()
-    policy = EstimationPolicy(
+    policy = Config(
         **{
             **make_hierarchical_reml_policy().to_dict(),
             "bootstrap_replicates": 4,
@@ -1503,7 +1497,7 @@ def test_hierarchical_linear_reml_serializes_without_losing_policy(
     )
     path = tmp_path / "scmle-reml-estimation-report.json"
     result.write(path)
-    restored = EstimationResult.read(path)
+    restored = Estimation.read(path)
 
     assert restored.to_dict() == result.to_dict()
     assert restored.policy.hierarchical_method == "reml"
@@ -1522,14 +1516,14 @@ def test_hierarchical_linear_requires_groups_and_rejects_robust_policy():
         "constant_residual_variance",
     )
     with pytest.raises(ValueError, match="supplies its own covariance"):
-        EstimationPolicy(
+        Config(
             estimator="hierarchical_linear",
             covariance="hc3",
             cluster_name="site_id",
             hierarchical_assumptions=assumptions,
         )
 
-    policy = EstimationPolicy(
+    policy = Config(
         estimator="hierarchical_linear",
         covariance="iid",
         cluster_name="site_id",
@@ -1550,7 +1544,7 @@ def test_complete_case_is_explicit_and_reject_is_fail_closed():
     """Missingness must be a declared policy, never an accidental drop."""
     features = numpy.array([[0.0], [1.0], [numpy.nan], [3.0], [4.0], [5.0]])
     outcome = numpy.array([0.0, 1.0, 2.0, 3.0, 4.0, 5.0])
-    estimand = EstimandSpec(
+    estimand = Estimand(
         name="slope",
         outcome="outcome",
         population="all rows in the source snapshot",
@@ -1564,14 +1558,14 @@ def test_complete_case_is_explicit_and_reject_is_fail_closed():
             features,
             outcome,
             estimand,
-            EstimationPolicy(estimator="linear"),
+            Config(estimator="linear"),
         )
 
     result = estimate_parameters(
         features,
         outcome,
         estimand,
-        EstimationPolicy(estimator="linear", missing="complete_case"),
+        Config(estimator="linear", missing="complete_case"),
     )
     assert result.rows_input == 6
     assert result.rows_used == 5
@@ -1583,7 +1577,7 @@ def test_estimation_validates_vector_and_cluster_shapes_before_fitting():
     signal = numpy.arange(6, dtype=float)
     features = numpy.column_stack((signal, signal**2))
     outcome = numpy.arange(6, dtype=float)
-    policy = EstimationPolicy(estimator="linear")
+    policy = Config(estimator="linear")
 
     with pytest.raises(ValueError, match=r"outcome must have shape \(rows,\)"):
         estimate_parameters(
@@ -1625,7 +1619,7 @@ def test_covariance_conditioning_is_reported_and_nonfinite_shift_fails_closed(
         features,
         outcome,
         linear_estimand(),
-        EstimationPolicy(estimator="linear"),
+        Config(estimator="linear"),
     )
 
     covariance_conditioning = result.diagnostics["covariance_conditioning"]
@@ -1638,7 +1632,7 @@ def test_covariance_conditioning_is_reported_and_nonfinite_shift_fails_closed(
             features,
             outcome,
             linear_estimand(),
-            EstimationPolicy(estimator="linear"),
+            Config(estimator="linear"),
             shift_reference=numpy.array(
                 [[0.0, 1.0], [numpy.nan, 2.0], [2.0, 3.0]]
             ),
@@ -1647,7 +1641,7 @@ def test_covariance_conditioning_is_reported_and_nonfinite_shift_fails_closed(
 
 def test_declared_likelihood_must_match_estimation_method():
     """A report cannot silently relabel the scientific likelihood."""
-    estimand = EstimandSpec(
+    estimand = Estimand(
         name="conversion",
         outcome="converted",
         population="eligible visitors",
@@ -1661,7 +1655,7 @@ def test_declared_likelihood_must_match_estimation_method():
             numpy.ones((12, 1)),
             numpy.zeros(12),
             estimand,
-            EstimationPolicy(estimator="logistic"),
+            Config(estimator="logistic"),
         )
 
 
@@ -1670,7 +1664,7 @@ def test_report_persistence_is_atomic_and_digest_bound(tmp_path):
     rng = numpy.random.default_rng(12)
     features = rng.normal(size=(40, 1))
     outcome = 2.0 + features[:, 0]
-    estimand = EstimandSpec(
+    estimand = Estimand(
         name="slope",
         outcome="outcome",
         population="test rows",
@@ -1682,19 +1676,19 @@ def test_report_persistence_is_atomic_and_digest_bound(tmp_path):
         features,
         outcome,
         estimand,
-        EstimationPolicy(estimator="linear"),
+        Config(estimator="linear"),
     )
     path = tmp_path / "estimation.json"
 
     digest = result.write(path)
 
-    restored = EstimationResult.read(path)
+    restored = Estimation.read(path)
     assert digest == result.digest() == restored.digest()
     path.write_text(
         path.read_text().replace('"rows_used": 40', '"rows_used": 39')
     )
     with pytest.raises(ValueError, match="digest mismatch"):
-        EstimationResult.read(path)
+        Estimation.read(path)
 
 
 def test_parameter_report_rejects_invalid_scientific_evidence():
@@ -1708,7 +1702,7 @@ def test_parameter_report_rejects_invalid_scientific_evidence():
 
 def test_parameter_report_rejects_inconsistent_shape_and_row_accounting():
     """Covariance shape and complete-case accounting are release invariants."""
-    estimand = EstimandSpec(
+    estimand = Estimand(
         name="slope",
         outcome="outcome",
         population="test rows",
@@ -1716,11 +1710,11 @@ def test_parameter_report_rejects_inconsistent_shape_and_row_accounting():
         feature_names=("feature",),
         assumptions=("linear conditional mean",),
     )
-    policy = EstimationPolicy(estimator="linear")
+    policy = Config(estimator="linear")
     parameter = ParameterEstimate("intercept", 1.0, 0.1, (0.8, 1.2), 0.01)
 
     with pytest.raises(ValueError, match="covariance must be square"):
-        EstimationResult(
+        Estimation(
             estimand,
             policy,
             (parameter,),
@@ -1735,7 +1729,7 @@ def test_parameter_report_rejects_inconsistent_shape_and_row_accounting():
         )
 
     with pytest.raises(ValueError, match="row accounting"):
-        EstimationResult(
+        Estimation(
             estimand,
             policy,
             (parameter,),

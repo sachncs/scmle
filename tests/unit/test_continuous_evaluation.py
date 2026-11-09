@@ -45,10 +45,10 @@ def named(name, category, breached, value=0.5, samples=500):
 
 
 SPECS = [
-    continuous.MetricSpec(
+    continuous.Indicator(
         "conversion", "business", "higher", margin=0.0, primary=True
     ),
-    continuous.MetricSpec("latency_ms", "operational", "lower", margin=5.0),
+    continuous.Indicator("latency_ms", "operational", "lower", margin=5.0),
 ]
 
 
@@ -196,9 +196,9 @@ def test_policy_and_spec_validation():
     with pytest.raises(ValueError):
         continuous.RetrainPolicy(max_age_days=0)
     with pytest.raises(ValueError):
-        continuous.MetricSpec("x", "finance", "higher")
+        continuous.Indicator("x", "finance", "higher")
     with pytest.raises(ValueError):
-        continuous.MetricSpec("x", "business", "bigger")
+        continuous.Indicator("x", "business", "bigger")
 
 
 # ---- feeding -----------------------------------------------------------

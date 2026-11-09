@@ -21,7 +21,7 @@ STAMP = "2026-11-05T10:00:00+00:00"
 
 def passing(fault_id, rto=1.0, lost=0, component="service"):
     def scenario():
-        result = recovery.Result(fault_id, environment="test")
+        result = recovery.Outcome(fault_id, environment="test")
         result.checks = {"it held": True}
         result.measurements = [
             recovery.Measurement(component, rto, lost, "test")
@@ -120,7 +120,7 @@ def test_measurements_outside_the_declared_objective_fail_the_fault():
 
 def test_a_failed_check_or_a_crash_is_a_failure_not_a_pass():
     def false_check():
-        result = recovery.Result("process_kill", environment="test")
+        result = recovery.Outcome("process_kill", environment="test")
         result.checks = {"the thing held": False}
         result.measurements = [recovery.Measurement("service", 1.0, 0, "t")]
         return result

@@ -101,7 +101,7 @@ def column_of(frame: pandas.DataFrame, view: str, column: str) -> pandas.Series:
 
 def reconcile(
     frames: Mapping[str, pandas.DataFrame],
-    spec: ingest.ReconcileSpec,
+    spec: ingest.Expectation,
     tolerance: float,
 ) -> dict[str, Any]:
     """Compares every declared total with the extracted view.
@@ -284,7 +284,7 @@ def source_totals(
 def reconcile_source(
     frames: Mapping[str, pandas.DataFrame],
     tables: Mapping[str, str],
-    spec: ingest.ReconcileSpec,
+    spec: ingest.Expectation,
     factory: Callable[[], Any],
     tolerance: float,
 ) -> list[dict]:

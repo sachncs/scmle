@@ -806,7 +806,7 @@ class DatasetProfile:
             structure, quality, operational, risk).
         missingness: Per-column tests of whether gaps relate to the target.
         quality_evidence: JSON-native records for reproducible quality checks.
-        leakage: The leakage screen (`screen.ScreenReport.to_dict`): its level,
+        leakage: The leakage screen (`screen.Screen.to_dict`): its level,
             family size, suspects and the suspects that may block a run. Empty
             when the screen did not apply.
     """
@@ -864,7 +864,7 @@ class DatasetProfile:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class CurationReport:
+class Curation:
     """Auditable record of what happened before modelling.
 
     This report deliberately contains no model scores. It describes the
@@ -992,7 +992,7 @@ class DatasetCard:
             raise ValueError("limitations must not be empty")
 
     @classmethod
-    def from_curation(cls, report: CurationReport) -> Self:
+    def from_curation(cls, report: Curation) -> Self:
         """Builds a card from the immutable curation evidence.
 
         Args:
@@ -1077,7 +1077,7 @@ class DatasetCard:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class PreprocessingOptions:
+class Preprocessing:
     """Switches that shape the preprocessing transformers.
 
     Attributes:

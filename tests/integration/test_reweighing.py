@@ -6,7 +6,7 @@ import numpy
 import pandas
 import pytest
 
-import scmle
+import scmle.api.project
 from scmle.contracts import tasks
 from scmle.evaluation import reweighing
 
@@ -49,7 +49,7 @@ def test_a_project_trained_on_the_weights_selects_more_evenly():
     frame["w"] = reweighing.reweighing_weights(frame.group, frame.y)
 
     def gap(weight_column):
-        result = scmle.MLProject(
+        result = scmle.api.project.Project(
             frame,
             "y",
             metric="roc_auc",
@@ -68,13 +68,13 @@ def test_the_fairness_option_reweights_development_rows_automatically():
     frame = biased()
 
     def run(mitigation):
-        result = scmle.MLProject(
+        result = scmle.api.project.Project(
             frame,
             "y",
             metric="roc_auc",
             time_budget=60,
             sensitive_columns=["group"],
-            fairness=tasks.FairnessSpec(mitigation=mitigation),
+            fairness=tasks.Parity(mitigation=mitigation),
         ).run()
         scored = result.predict(frame.drop(columns="y"))
         rates = pandas.Series(scored).groupby(frame.group.to_numpy()).mean()
@@ -98,10 +98,10 @@ def test_the_fairness_option_reweights_development_rows_automatically():
 
 def test_reweighing_cannot_be_combined_with_a_weight_column():
     with pytest.raises(ValueError, match="weight_column"):
-        scmle.MLProject(
+        scmle.api.project.Project(
             biased().assign(w=1.0),
             "y",
             weight_column="w",
             sensitive_columns=["group"],
-            fairness=tasks.FairnessSpec(mitigation="reweighing"),
+            fairness=tasks.Parity(mitigation="reweighing"),
         )

@@ -27,7 +27,7 @@ FOLLOW_UP = (
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class Report:
+class Verification:
     """The result of verifying a trail.
 
     Attributes:
@@ -132,7 +132,7 @@ def signature_for(head: str, held: Mapping[str, str], key: str | bytes) -> str:
 
 def seal(
     directory: str | Path, keys: Mapping[str, str | bytes | None]
-) -> Report:
+) -> Verification:
     """Derives the steps from the retained records and writes the trail.
 
     The derived reports are written first and the steps are derived again, so
@@ -311,7 +311,7 @@ def check_steps(
 
 def verify(
     directory: str | Path, keys: Mapping[str, str | bytes | None]
-) -> Report:
+) -> Verification:
     """Verifies a trail folder against its own retained records.
 
     Args:
@@ -331,14 +331,14 @@ def verify(
         found = (
             trace.Finding(trace.MISSING_LINK, "trail", "trail.json is absent"),
         )
-        return Report(str(folder), "", 0, found)
+        return Verification(str(folder), "", 0, found)
     try:
         document = records.read_json(path)
     except ValueError:
         found = (
             trace.Finding(trace.BROKEN_CHAIN, "trail", "trail.json is bad"),
         )
-        return Report(str(folder), "", 0, found)
+        return Verification(str(folder), "", 0, found)
     problems = check_chain(document, keys) + check_manifest(folder, document)
     derived = trace.derive(folder, keys)
     problems += list(derived.findings) + check_steps(document, derived)
@@ -346,7 +346,7 @@ def verify(
     for item in problems:
         if item not in unique:
             unique.append(item)
-    return Report(
+    return Verification(
         str(folder),
         str(document.get("head", "")),
         len(document.get("steps", [])),

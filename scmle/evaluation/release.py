@@ -3,7 +3,7 @@
 This module evaluates release evidence; it does not calculate metrics or
 diagnostics. A caller supplies the outputs produced by those algorithms and
 the evaluator applies the thresholds and evidence references declared by an
-``EvaluationPolicy``. Unknown inputs and incomplete evidence fail closed.
+``Criteria``. Unknown inputs and incomplete evidence fail closed.
 """
 
 from collections.abc import Mapping
@@ -491,7 +491,7 @@ class ReleaseEvaluation:
 
 
 def required_evidence_references(
-    policy: evaluation.EvaluationPolicy,
+    policy: evaluation.Criteria,
 ) -> tuple[str, ...]:
     """Returns every evidence reference declared by a policy in sorted order.
 
@@ -728,7 +728,7 @@ def apply_attestation_gate(
 
 def apply_evidence_index_gate(
     outcome: ReleaseEvaluation,
-    index: evidence.EvidenceIndex | None,
+    index: evidence.Index | None,
     verified: bool,
 ) -> ReleaseEvaluation:
     """Blocks release until the persisted evidence index is signed.
@@ -749,7 +749,7 @@ def apply_evidence_index_gate(
     if not isinstance(outcome, ReleaseEvaluation):
         raise TypeError("outcome must be ReleaseEvaluation")
     passed = (
-        isinstance(index, evidence.EvidenceIndex)
+        isinstance(index, evidence.Index)
         and index.signature is not None
         and verified
     )
@@ -766,7 +766,7 @@ def apply_evidence_index_gate(
         ),
         observed=(
             "invalid"
-            if isinstance(index, evidence.EvidenceIndex)
+            if isinstance(index, evidence.Index)
             and index.signature is not None
             and not verified
             else "unsigned"
@@ -793,11 +793,11 @@ def apply_evidence_index_gate(
 
 
 def evaluate_release(
-    policy: evaluation.EvaluationPolicy,
+    policy: evaluation.Criteria,
     metric_values: Mapping[str, Any],
     diagnostic_reports: Mapping[str, Any],
     fairness_reports: Mapping[str, Any],
-    evidence_index: evidence.EvidenceIndex | None,
+    evidence_index: evidence.Index | None,
 ) -> ReleaseEvaluation:
     """Evaluates supplied release outputs against a declared policy.
 
@@ -814,7 +814,7 @@ def evaluate_release(
 
     Returns:
         An immutable evaluation. A `policy` that is not an
-        ``EvaluationPolicy`` yields a blocked evaluation with task
+        ``Criteria`` yields a blocked evaluation with task
         ``"unknown"`` and one input finding. Otherwise a warning diagnostic
         may produce a failed finding without blocking. Unsupported inputs,
         failed blocking gates, and missing or unaccepted evidence always
@@ -824,7 +824,7 @@ def evaluate_release(
         ValueError: If a required explanation quality measure has no
             threshold in the policy.
     """
-    if not isinstance(policy, evaluation.EvaluationPolicy):
+    if not isinstance(policy, evaluation.Criteria):
         finding = ReleaseFinding(
             kind=FindingKind.INPUT,
             name="policy",
@@ -1174,7 +1174,7 @@ def evaluate_release(
     for reference in references:
         record = (
             evidence_index.find(reference)
-            if isinstance(evidence_index, evidence.EvidenceIndex)
+            if isinstance(evidence_index, evidence.Index)
             else None
         )
         observed_value: float | str | None
@@ -1182,8 +1182,8 @@ def evaluate_release(
             reason = f"required evidence '{reference}' is missing"
             observed_value = None
         elif (
-            record.result is evidence.EvidenceResult.PASS
-            and record.decision is evidence.EvidenceDecision.ACCEPTED
+            record.result is evidence.Outcome.PASS
+            and record.decision is evidence.Disposition.ACCEPTED
         ):
             reason = f"required evidence '{reference}' is accepted"
             observed_value = "pass:accepted"
@@ -1198,8 +1198,8 @@ def evaluate_release(
                 FindingKind.EVIDENCE,
                 reference,
                 record is not None
-                and record.result is evidence.EvidenceResult.PASS
-                and record.decision is evidence.EvidenceDecision.ACCEPTED,
+                and record.result is evidence.Outcome.PASS
+                and record.decision is evidence.Disposition.ACCEPTED,
                 True,
                 reason,
                 observed=observed_value,
@@ -1207,7 +1207,7 @@ def evaluate_release(
                 evidence=(reference,),
             )
         )
-    if references and not isinstance(evidence_index, evidence.EvidenceIndex):
+    if references and not isinstance(evidence_index, evidence.Index):
         findings.append(
             ReleaseFinding(
                 FindingKind.INPUT,
@@ -1215,7 +1215,7 @@ def evaluate_release(
                 False,
                 True,
                 "evidence index is unsupported or missing",
-                expected="EvidenceIndex",
+                expected="Index",
             )
         )
 

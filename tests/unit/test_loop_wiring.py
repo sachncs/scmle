@@ -21,7 +21,7 @@ from tests.unit import test_loop
 
 APPROVAL_KEY = "promotion-review-key"
 PLAN = data.FeaturePlan(("a", "b"), ())
-MODELS = scmle.models.registry.ModelRegistry.with_builtins()
+MODELS = scmle.models.registry.Catalog.with_builtins()
 
 
 def halted_loop(tmp_path, hooks=None):
@@ -130,9 +130,9 @@ def traffic(rows=400, seed=0, flip=False):
 def bundle_of(frame):
     features = frame.drop(columns="y")
     fitted = preprocessing.build_pipeline(
-        PLAN, MODELS.get("logistic_regression"), tasks.TaskType.BINARY, 0
+        PLAN, MODELS.get("logistic_regression"), tasks.Task.BINARY, 0
     ).fit(features, frame.y)
-    return bundle.ModelBundle.create(
+    return bundle.Bundle.create(
         fitted,
         PLAN,
         features,
@@ -210,7 +210,7 @@ def test_promote_challenger_needs_the_attestation_and_the_approval(
     loop, store, *records = guarded(tmp_path, exported)
     second = records[1]
     store.promote("m", 2, alias=scmle.governance.registry.CHALLENGER)
-    manager = lifecycle.LifecycleManager(store, "m", str(tmp_path / "work"))
+    manager = lifecycle.Maintainer(store, "m", str(tmp_path / "work"))
     approval = approval_for(second)
     with pytest.raises(never_list.AttestationRequired):
         manager.promote_challenger(approval, signing_key=APPROVAL_KEY)
@@ -233,7 +233,7 @@ def test_a_rollback_needs_an_attestation_naming_the_rollback(
             signing_key=APPROVAL_KEY,
         )
     loop.guard_registry(store)
-    manager = lifecycle.LifecycleManager(store, "m", str(tmp_path / "work"))
+    manager = lifecycle.Maintainer(store, "m", str(tmp_path / "work"))
     with pytest.raises(never_list.AttestationRequired):
         manager.check_rollback(
             traffic(1200, seed=20),

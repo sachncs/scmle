@@ -8,8 +8,8 @@ import pandas
 import pytest
 import support
 
-import scmle
 from scmle.artifacts import bundle
+import scmle.artifacts.bundle
 from scmle.contracts import errors
 
 
@@ -44,12 +44,12 @@ def test_the_report_is_saved_with_the_bundle_and_checksummed(
     regression, tmp_path
 ):
     regression.bundle.save(tmp_path / "copy")
-    loaded = scmle.ModelBundle.load(tmp_path / "copy", trusted=True)
+    loaded = scmle.artifacts.bundle.Bundle.load(tmp_path / "copy", trusted=True)
     assert loaded.coverage_report == regression.bundle.coverage_report
     path = tmp_path / "copy" / bundle.COVERAGE_FILE
     path.write_text(path.read_text().replace("0.9", "0.8", 1))
     with pytest.raises(errors.ArtifactError, match="coverage report"):
-        scmle.ModelBundle.load(tmp_path / "copy", trusted=True)
+        scmle.artifacts.bundle.Bundle.load(tmp_path / "copy", trusted=True)
 
 
 def test_a_classification_run_reports_sets_by_class(tmp_path, binary_frame):

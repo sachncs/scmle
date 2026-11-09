@@ -1,6 +1,6 @@
 """Carving the confirmation set `C` out of the development rows.
 
-The final-evaluation rows are already held out by `SplitManager`. This module
+The final-evaluation rows are already held out by `Splitter`. This module
 takes what is left (the development rows) and divides it into the
 exploration set `X`, the confirmation set `C` and, for temporal data, an
 embargo of rows dropped between them. The result is a pure function of the

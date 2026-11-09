@@ -461,7 +461,7 @@ def test_chartered_rules_drive_the_ledger_and_the_second_stage(
     import scmle.data.charter.rules
     import scmle.data.ledger.ledger
 
-    rules = scmle.data.charter.rules.RunRules(
+    rules = scmle.data.charter.rules.Procedure(
         ledger_rule="lord++", confirmation_rule="bh", stability_filter=True
     )
     path = write_charter(tmp_path, multiverse=RICH_MULTIVERSE, rules=rules)

@@ -48,8 +48,8 @@ def make_inputs(biased=True, rows=1200):
         estimator,
         frame,
         target,
-        tasks.TaskType.BINARY,
-        metrics.CATALOG.resolve("roc_auc", tasks.TaskType.BINARY),
+        tasks.Task.BINARY,
+        metrics.CATALOG.resolve("roc_auc", tasks.Task.BINARY),
         PLAN,
         0,
         sensitive_columns=("group",),
@@ -57,7 +57,7 @@ def make_inputs(biased=True, rows=1200):
 
 
 def test_a_rule_that_favours_one_group_is_flagged_with_its_disparities():
-    report = fairness.FairnessReport().compute(make_inputs())
+    report = fairness.Fairness().compute(make_inputs())
 
     body = report["columns"]["group"]
     assert report["flagged"] == ["group"]
@@ -68,7 +68,7 @@ def test_a_rule_that_favours_one_group_is_flagged_with_its_disparities():
 
 
 def test_group_blind_decisions_are_not_flagged():
-    report = fairness.FairnessReport().compute(make_inputs(biased=False))
+    report = fairness.Fairness().compute(make_inputs(biased=False))
 
     assert report["flagged"] == []
     assert report["columns"]["group"]["demographic_parity_difference"] < 0.1
@@ -77,7 +77,7 @@ def test_group_blind_decisions_are_not_flagged():
 def test_without_sensitive_columns_the_report_says_so():
     inputs = dataclasses.replace(make_inputs(), sensitive_columns=())
 
-    assert fairness.FairnessReport().compute(inputs) == {
+    assert fairness.Fairness().compute(inputs) == {
         "available": False,
         "reason": "no sensitive columns",
     }
@@ -87,13 +87,13 @@ def test_numeric_sensitive_columns_are_banded_and_small_groups_skipped():
     inputs = make_inputs()
     inputs = dataclasses.replace(inputs, sensitive_columns=("score",))
 
-    report = fairness.FairnessReport().compute(inputs)
+    report = fairness.Fairness().compute(inputs)
 
     assert len(report["columns"]["score"]["groups"]) == 4
     tiny = dataclasses.replace(
         make_inputs(rows=40), sensitive_columns=("group",)
     )
-    body = fairness.FairnessReport().compute(tiny)["columns"]["group"]
+    body = fairness.Fairness().compute(tiny)["columns"]["group"]
     assert all(
         g["rows"] >= fairness.MIN_GROUP_ROWS for g in body["groups"].values()
     )
@@ -105,7 +105,7 @@ def test_intersectional_groups_are_reported_and_bounded():
         make_inputs(), sensitive_columns=("group", "score")
     )
 
-    report = fairness.FairnessReport().compute(inputs)
+    report = fairness.Fairness().compute(inputs)
 
     body = report["columns"]["intersectional"]
     assert len(body["groups"]) >= 2
@@ -135,14 +135,14 @@ def test_regression_reports_bias_per_group():
         Ignorant(),
         frame,
         truth,
-        tasks.TaskType.REGRESSION,
-        metrics.CATALOG.resolve("rmse", tasks.TaskType.REGRESSION),
+        tasks.Task.REGRESSION,
+        metrics.CATALOG.resolve("rmse", tasks.Task.REGRESSION),
         data.FeaturePlan(("x",), ("group",)),
         0,
         sensitive_columns=("group",),
     )
 
-    body = fairness.FairnessReport().compute(inputs)["columns"]["group"]
+    body = fairness.Fairness().compute(inputs)["columns"]["group"]
 
     assert (
         body["groups"]["b"]["bias"] < -2.5
@@ -170,16 +170,14 @@ def test_regression_intersectional_groups_use_the_same_small_cell_guard():
         Ignorant(),
         frame,
         truth,
-        tasks.TaskType.REGRESSION,
-        metrics.CATALOG.resolve("rmse", tasks.TaskType.REGRESSION),
+        tasks.Task.REGRESSION,
+        metrics.CATALOG.resolve("rmse", tasks.Task.REGRESSION),
         data.FeaturePlan(("x",), ("group",)),
         0,
         sensitive_columns=("group", "x"),
     )
 
-    body = fairness.FairnessReport().compute(inputs)["columns"][
-        "intersectional"
-    ]
+    body = fairness.Fairness().compute(inputs)["columns"]["intersectional"]
 
     assert body["groups"]
     assert all(

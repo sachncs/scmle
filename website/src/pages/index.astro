@@ -20,10 +20,10 @@ const families = [
 
 const quickstart = `<span class="tok-k">import</span> logging
 
-<span class="tok-k">import</span> scmle
+<span class="tok-k">import</span> scmle.api.project
 
 logging.basicConfig(level=logging.INFO)
-project = scmle.MLProject(<span class="tok-s">"customers.parquet"</span>, target=<span class="tok-s">"churn"</span>, metric=<span class="tok-s">"roc_auc"</span>)
+project = scmle.api.project.Project(<span class="tok-s">"customers.parquet"</span>, target=<span class="tok-s">"churn"</span>, metric=<span class="tok-s">"roc_auc"</span>)
 logging.info(project.plan().summary())  <span class="tok-c"># inspect before any training</span>
 result = project.run()  <span class="tok-c"># profile, split, search, test, package</span>
 logging.info(<span class="tok-s">"\\n%s"</span>, result.leaderboard())
@@ -290,7 +290,7 @@ const bw = 360;
           <article class="tile wide feature reveal">
             <Glyph name="graph" />
             <h3>Declarative features, learned in-fold</h3>
-            <p><code>FeatureGraphSpec</code>: ratios, bins, clipping, datetime parts, lags and rolling statistics per entity. Every statistic is learned on the training fold only.</p>
+            <p><code>FeatureGraph</code>: ratios, bins, clipping, datetime parts, lags and rolling statistics per entity. Every statistic is learned on the training fold only.</p>
           </article>
           <article class="tile reveal" data-delay="1">
             <Glyph name="search" />

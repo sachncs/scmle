@@ -3,17 +3,17 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 import DocTable from "../../components/DocTable.astro";
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 const adapters = [
-  ["<code>LocalRunner</code>", "the workload, in this process", "the training role of <code>RoleStore</code>", "injected, or <code>JobInterruptedError</code>"],
+  ["<code>Runner</code>", "the workload, in this process", "the training role of <code>RoleStore</code>", "injected, or <code>JobInterruptedError</code>"],
 ];
 ---
 
 <DocsLayout title="Portable training" description="One scmle job spec, a runner interface: durable run ids, checkpoints, retries, cost budgets, separated training and serving roles, and what has not been run." current="portable-training">
   <p class="eyebrow"><span></span> Serve and operate</p>
   <h1>One job spec,<br /><em>any place to run it.</em></h1>
-  <p class="lead">A <code>JobSpec</code> and a <code>Runner</code> interface. The package ships the local runner, which runs and is tested; a runner for any other place is written by the user against the same interface.</p>
+  <p class="lead">A <code>Job</code> and a <code>Runner</code> interface. The package ships the local runner, which runs and is tested; a runner for any other place is written by the user against the same interface.</p>
 
   <h2>The spec and the run</h2>
-  <p>A <code>JobSpec</code> names a durable <code>run_id</code> (the idempotency key), the project specification (opaque JSON), the training identity, resources, a timeout, a <code>RetryPolicy</code>, an optional <code>CostBudget</code> and a non-secret environment. A GPU needs a stated <code>gpu_reason</code>: specialised compute only behind a declared need. <code>Runner.run(spec)</code> behaves the same on every runner:</p>
+  <p>A <code>Job</code> names a durable <code>run_id</code> (the idempotency key), the project specification (opaque JSON), the training identity, resources, a timeout, a <code>Retries</code>, an optional <code>CostBudget</code> and a non-secret environment. A GPU needs a stated <code>gpu_reason</code>: specialised compute only behind a declared need. <code>Runner.run(spec)</code> behaves the same on every runner:</p>
   <ul>
     <li>The spec is stored at <code>runs/&lt;id&gt;/spec.json</code>. The same id with a different spec is a <code>RunConflictError</code>; a finished id returns its recorded manifest and starts nothing.</li>
     <li><code>runs/&lt;id&gt;/manifest.json</code> is rewritten atomically at every transition: attempts with state, seconds, cost and reason; checkpoint digests; result digest; evidence list; final state.</li>
@@ -28,7 +28,7 @@ const adapters = [
 
   <h2>Runners</h2>
   <DocTable label="Runners" head={["Runner", "Runs the attempt as", "Identity", "Interruption"]} rows={adapters} />
-  <p>A runner for a container platform starts the runner entrypoint in the image. It opens the <code>file://</code> store named by <code>SCMLE_STORE_URI</code>, loads the stored spec, refuses it if its digest is not the one the runner started, and runs the workload named by <code>SCMLE_WORKLOAD</code>. The default workload runs an unchanged <code>MLProject</code>: it copies the data from the store, mirrors the run directory to <code>runs/&lt;id&gt;/workdir/</code> every 30 seconds and at the end, and after a restart on an empty disk restores it and calls <code>MLProject.resume</code>. A hard kill loses at most the trials since the last mirror.</p>
+  <p>A runner for a container platform starts the runner entrypoint in the image. It opens the <code>file://</code> store named by <code>SCMLE_STORE_URI</code>, loads the stored spec, refuses it if its digest is not the one the runner started, and runs the workload named by <code>SCMLE_WORKLOAD</code>. The default workload runs an unchanged <code>Project</code>: it copies the data from the store, mirrors the run directory to <code>runs/&lt;id&gt;/workdir/</code> every 30 seconds and at the end, and after a restart on an empty disk restores it and calls <code>Project.resume</code>. A hard kill loses at most the trials since the last mirror.</p>
   <p>A reproducibility report compares each metric of a result against tolerances declared before the runs; a miss is published, not hidden.</p>
 
   <h2>What was not done</h2>

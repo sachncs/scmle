@@ -141,7 +141,7 @@ def old_rule(frame: pandas.DataFrame, names: Sequence[str]) -> dict[str, bool]:
     flagged = {}
     for name in names:
         kind = columns.kind_of(frame[name])
-        task = tasks.TaskType.BINARY
+        task = tasks.Task.BINARY
         flagged[name] = (
             kind.association(frame[name], target, task) >= OLD_ASSOCIATION
             or kind.missingness_association(frame[name], target, task)
@@ -391,7 +391,7 @@ def certify_screen(workers: int = 1) -> tuple[Any, dict[str, Any]]:
     return cert, measurements
 
 
-def problems(store: certificates.CertificateStore) -> list[str]:
+def problems(store: certificates.Store) -> list[str]:
     """Why the certificate file is unusable: missing or stale entries.
 
     Args:
@@ -414,7 +414,7 @@ def problems(store: certificates.CertificateStore) -> list[str]:
     return found
 
 
-def uncertified(store: certificates.CertificateStore) -> list[str]:
+def uncertified(store: certificates.Store) -> list[str]:
     """Defect types that were measured and did not meet the policy.
 
     Args:
@@ -449,7 +449,7 @@ def main(arguments: list[str] | None = None) -> int:
     parser.add_argument("--workers", type=int, default=1)
     options = parser.parse_args(arguments)
     if options.check:
-        store = certificates.CertificateStore.load(screen.STORE_PATH)
+        store = certificates.Store.load(screen.STORE_PATH)
         found = problems(store)
         print(
             json.dumps(
@@ -463,7 +463,7 @@ def main(arguments: list[str] | None = None) -> int:
         )
         return 1 if found else 0
     cert, measurements = certify_screen(options.workers)
-    certificates.CertificateStore([cert]).save(screen.STORE_PATH)
+    certificates.Store([cert]).save(screen.STORE_PATH)
     MEASUREMENTS_PATH.write_text(
         json.dumps(measurements, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",

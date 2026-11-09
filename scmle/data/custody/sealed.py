@@ -313,7 +313,7 @@ class SealedSet:
         return rows
 
 
-class CustodyVault:
+class Vault:
     """Holds every sealed set of a run and the shared custody log."""
 
     def __init__(self, log: OpenLog, process: bool = True) -> None:

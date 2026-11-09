@@ -40,14 +40,14 @@ def custody(rows=2000, process=True):
             "y": (rng.random(rows) < 0.3).astype(int),
         }
     )
-    spec = tasks.ProjectSpec(
-        data=tasks.DataSpec(uri="m", target="y"),
-        validation=tasks.ValidationSpec(strategy="stratified", seed=3),
+    spec = tasks.Config(
+        data=tasks.Dataset(uri="m", target="y"),
+        validation=tasks.Validation(strategy="stratified", seed=3),
     )
-    task = tasks.TaskType.BINARY
-    split = splitters.SplitManager(spec, task).split(frame)
+    task = tasks.Task.BINARY
+    split = splitters.Splitter(spec, task).split(frame)
     log = sealed.OpenLog()
-    vault = sealed.CustodyVault(log, process=process)
+    vault = sealed.Vault(log, process=process)
     outcome = pipeline.apply_custody(
         charter=make_charter(min_effect=0.3, k_max=5),
         split=split,

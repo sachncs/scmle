@@ -100,12 +100,12 @@ def test_budget_stops_the_lattice_at_a_level_boundary():
         {c: numpy.tile(numpy.arange(5), 40) for c in "abc"}
         | {"d": numpy.repeat(numpy.arange(40), 5)}
     )
-    meter = budget.BudgetMeter(budget.IngestBudget(max_queries=100))
+    meter = budget.BudgetMeter(budget.Budget(max_queries=100))
     db = ingest_worlds.new_database("gb")
     ingest_worlds.load(db, "t", frame)
     source = profile.SqlSource(db.factory, meter)
     table = profile.profile_table(source, "t")
-    tight = budget.BudgetMeter(budget.IngestBudget(max_queries=0))
+    tight = budget.BudgetMeter(budget.Budget(max_queries=0))
     source.meter = tight
     scan = grain.infer_keys(source, table)
     assert scan.partial

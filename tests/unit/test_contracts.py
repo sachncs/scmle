@@ -13,7 +13,7 @@ from scmle.contracts import tasks
 
 
 def test_event_log_writes_jsonl(tmp_path):
-    log = events.EventLog(tmp_path / "events.jsonl")
+    log = events.Log(tmp_path / "events.jsonl")
     log.emit(events.Event("r1", "state.CREATED", "start"))
     log.emit(events.Event("r1", "state.VALIDATING"))
     lines = (tmp_path / "events.jsonl").read_text().splitlines()
@@ -41,7 +41,7 @@ def test_plan_summary_and_dict():
     decision = experiments.Decision(
         "dummy", experiments.DecisionAction.INCLUDE, "baseline"
     )
-    plan = experiments.ExperimentPlan(
+    plan = experiments.Plan(
         "p1", "regression", "rmse", "random", ("dummy",), 60, (decision,)
     )
     assert "[include] dummy: baseline" in plan.summary()
@@ -49,18 +49,18 @@ def test_plan_summary_and_dict():
 
 
 def test_trial_result_serializes_status():
-    trial = experiments.TrialResult(
+    trial = experiments.Trial(
         "t1", "dummy", experiments.TrialStatus.FAILED, error="boom"
     )
     assert trial.to_dict()["status"] == "failed"
 
 
 def test_adapter_rejection_reasons():
-    class Probe(models.ModelAdapter):
+    class Probe(models.Model):
         name = "probe"
         family = "x"
         capabilities = models.Capabilities(
-            frozenset({tasks.TaskType.BINARY}), max_rows=10
+            frozenset({tasks.Task.BINARY}), max_rows=10
         )
         requires = ("definitely_not_installed_pkg",)
 
@@ -68,15 +68,11 @@ def test_adapter_rejection_reasons():
             raise NotImplementedError
 
     adapter = Probe()
-    assert "does not support" in adapter.rejection_reason(
-        tasks.TaskType.REGRESSION
-    )
-    assert "missing dependency" in adapter.rejection_reason(
-        tasks.TaskType.BINARY
-    )
+    assert "does not support" in adapter.rejection_reason(tasks.Task.REGRESSION)
+    assert "missing dependency" in adapter.rejection_reason(tasks.Task.BINARY)
     assert not adapter.is_available()
 
 
 def test_abstract_adapter_cannot_be_instantiated():
     with pytest.raises(TypeError):
-        models.ModelAdapter()
+        models.Model()

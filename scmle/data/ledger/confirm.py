@@ -375,9 +375,7 @@ class Confirmation:
             "outcome": self.outcome,
             "reason": self.reason,
             "rule": self.rule,
-            "guarantee": multiplicity.STATEMENTS[
-                budget.MultiplicityRule(self.rule)
-            ],
+            "guarantee": multiplicity.STATEMENTS[budget.Correction(self.rule)],
             "alpha_confirm": str(self.alpha_confirm),
             "survivors_sha256": self.survivors_sha256,
             "ledger_head": self.ledger_head,
@@ -421,7 +419,7 @@ class Confirmation:
 
 
 def assumptions(
-    rule: budget.MultiplicityRule, size: int, withdrawn: int = 0
+    rule: budget.Correction, size: int, withdrawn: int = 0
 ) -> tuple[str, ...]:
     """Lists the assumptions a confirmed claim depends on.
 
@@ -454,7 +452,7 @@ def assumptions(
     return tuple(lines)
 
 
-def statement(spec: scmle.data.ledger.ledger.HypothesisSpec) -> str:
+def statement(spec: scmle.data.ledger.ledger.Test) -> str:
     """Writes the sentence of a claim.
 
     Args:
@@ -513,7 +511,7 @@ def finish(
     reason: str,
     claims: tuple[qualification.Claim, ...],
     checks: tuple[qualification.Check, ...],
-    rule: budget.MultiplicityRule,
+    rule: budget.Correction,
     alpha: Fraction,
     custody_head: str | None,
     stage_two: Mapping[str, Any] | None = None,
@@ -688,7 +686,7 @@ def stage_two_record(
 def run_confirmation(
     ledger: scmle.data.ledger.ledger.Ledger,
     rows: tuple[pandas.DataFrame, pandas.Series],
-    rule: budget.MultiplicityRule,
+    rule: budget.Correction,
     alpha: Fraction,
     encode: Callable[[pandas.Series], Any],
     stage_two: Mapping[str, Any] | None = None,
@@ -805,7 +803,7 @@ def confirm(
     source: ConfirmationSource | None,
     *,
     alpha_confirm: Fraction,
-    rule: budget.MultiplicityRule = budget.MultiplicityRule.BY,
+    rule: budget.Correction = budget.Correction.BY,
     policy: str = UNCONFIRMED,
     require_control: bool = True,
     custody_log: EventLog | None = None,

@@ -6,15 +6,15 @@ import numpy
 import pandas
 import pytest
 
-from scmle.evaluation.longitudinal import LongitudinalEstimand
-from scmle.evaluation.longitudinal import LongitudinalEstimationPolicy
-from scmle.evaluation.longitudinal import LongitudinalEstimationResult
-from scmle.evaluation.longitudinal import LongitudinalIPWEstimator
+from scmle.evaluation.longitudinal import Config
+from scmle.evaluation.longitudinal import Estimand
+from scmle.evaluation.longitudinal import Estimation
+from scmle.evaluation.longitudinal import Estimator
 
 
-def make_estimand() -> LongitudinalEstimand:
+def make_estimand() -> Estimand:
     """Return the fully identified longitudinal declaration."""
-    return LongitudinalEstimand(
+    return Estimand(
         name="period_specific_treatment_effect",
         subject_identity="subject_id",
         time_column="time",
@@ -64,9 +64,7 @@ def make_frame() -> pandas.DataFrame:
 
 def test_period_specific_ipw_is_deterministic_and_auditable() -> None:
     """The result contains period diagnostics, covariance, and reference evidence."""
-    estimator = LongitudinalIPWEstimator(
-        make_estimand(), LongitudinalEstimationPolicy(seed=23)
-    )
+    estimator = Estimator(make_estimand(), Config(seed=23))
     first = estimator.fit(make_frame())
     second = estimator.fit(make_frame())
 
@@ -84,11 +82,11 @@ def test_period_specific_ipw_is_deterministic_and_auditable() -> None:
 
 def test_report_round_trip_is_digest_bound_and_atomic(tmp_path) -> None:
     """Longitudinal reports round-trip and reject content tampering."""
-    result = LongitudinalIPWEstimator(make_estimand()).fit(make_frame())
+    result = Estimator(make_estimand()).fit(make_frame())
     destination = tmp_path / "longitudinal.json"
 
     digest = result.write(destination)
-    restored = LongitudinalEstimationResult.read(destination)
+    restored = Estimation.read(destination)
 
     assert digest == result.digest() == restored.digest()
     assert restored.to_dict() == result.to_dict()
@@ -96,7 +94,7 @@ def test_report_round_trip_is_digest_bound_and_atomic(tmp_path) -> None:
     envelope["report"]["rows_used"] += 1
     destination.write_text(json.dumps(envelope), encoding="utf-8")
     with pytest.raises(ValueError, match="digest mismatch"):
-        LongitudinalEstimationResult.read(destination)
+        Estimation.read(destination)
 
 
 @pytest.mark.parametrize(
@@ -131,16 +129,16 @@ def test_invalid_longitudinal_inputs_are_rejected(
         raise AssertionError(f"unhandled change {change}")
 
     with pytest.raises(ValueError, match=message):
-        LongitudinalIPWEstimator(make_estimand()).fit(frame)
+        Estimator(make_estimand()).fit(frame)
 
 
 def test_complete_case_policy_records_dropped_rows() -> None:
     """Complete-case deletion is explicit in row accounting and limitations."""
     frame = make_frame()
     frame.loc[0, "outcome"] = numpy.nan
-    policy = LongitudinalEstimationPolicy(missingness="complete_case")
+    policy = Config(missingness="complete_case")
 
-    result = LongitudinalIPWEstimator(make_estimand(), policy).fit(frame)
+    result = Estimator(make_estimand(), policy).fit(frame)
 
     assert result.rows_dropped == 1
     assert result.rows_used == result.rows_input - 1
@@ -150,7 +148,7 @@ def test_complete_case_policy_records_dropped_rows() -> None:
 def test_required_assumptions_are_not_implicit() -> None:
     """Omitting any identification assumption blocks estimation declaration."""
     with pytest.raises(ValueError, match="required assumptions"):
-        LongitudinalEstimand(
+        Estimand(
             name="period_specific_treatment_effect",
             subject_identity="subject_id",
             time_column="time",

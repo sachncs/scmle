@@ -264,7 +264,7 @@ def verify_signature(
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class BundleInfo:
+class Manifest:
     """Provenance and compatibility metadata of a bundle.
 
     Attributes:
@@ -285,7 +285,7 @@ class BundleInfo:
         calibration: Description of the probability calibration applied at
             inference, empty if none.
         environment: Every distribution installed when the bundle was built
-            (filled by `ModelBundle.create`, empty otherwise), by name, so the
+            (filled by `Bundle.create`, empty otherwise), by name, so the
             environment can be rebuilt.
         platform: Operating system and architecture that built it.
     """
@@ -363,7 +363,7 @@ class BundleInfo:
         return problems
 
 
-class ModelBundle:
+class Bundle:
     """A fitted pipeline plus the schema and metadata needed to serve it.
 
     Attributes:
@@ -387,7 +387,7 @@ class ModelBundle:
         self,
         pipeline: Any,
         schema: artifacts.BundleSchema,
-        info: BundleInfo,
+        info: Manifest,
         reference: scmle.monitoring.reference.ReferenceProfile | None = None,
         history: pandas.DataFrame | None = None,
         calibrator: Any = None,
@@ -523,11 +523,11 @@ class ModelBundle:
             targets=tuple(getattr(pipeline, "target_columns", ())),
             optional_inputs=(
                 (pipeline.column,)
-                if isinstance(pipeline, thresholds.GroupThresholdClassifier)
+                if isinstance(pipeline, thresholds.GroupClassifier)
                 else ()
             ),
         )
-        info = BundleInfo(
+        info = Manifest(
             model_name,
             model_version,
             metric,
@@ -568,7 +568,7 @@ class ModelBundle:
                 reload uses `trusted=True`, so it is refused when
                 `$SCMLE_ENV` is `production`.
         """
-        reloaded = ModelBundle.load(directory, trusted=True)
+        reloaded = Bundle.load(directory, trusted=True)
         before = numpy.asarray(self.predict(sample))
         after = numpy.asarray(reloaded.predict(sample))
         if before.dtype.kind in "fiu":
@@ -697,7 +697,7 @@ class ModelBundle:
         """
         if (
             self.schema.classes is None
-            or self.schema.task == tasks.TaskType.ORDINAL.value
+            or self.schema.task == tasks.Task.ORDINAL.value
         ):
             raise errors.ArtifactError("only classifiers can be calibrated")
         if method not in ("sigmoid", "isotonic", "dirichlet"):
@@ -1027,7 +1027,7 @@ class ModelBundle:
             raise errors.ArtifactError(
                 f"unsupported bundle format {manifest.get('format')}"
             )
-        info = BundleInfo(**manifest)
+        info = Manifest(**manifest)
         if SCHEMA_FILE not in info.files and not legacy:
             raise errors.ArtifactError(
                 "bundle is missing a schema checksum; re-export it with "
@@ -1218,7 +1218,7 @@ class ModelBundle:
         self,
         data: str | pathlib.Path | pandas.DataFrame,
         mapping: scmle.inference.mapping.ColumnMapping | None = None,
-    ) -> artifacts.SchemaReport:
+    ) -> artifacts.Conformance:
         """Checks input against the schema without predicting.
 
         Args:
@@ -1287,7 +1287,7 @@ class ModelBundle:
         predictions = self.pipeline.predict(self.prepare_frame(data, mapping))
         if self.schema.targets:
             return numpy.asarray(predictions)
-        if self.schema.task == tasks.TaskType.ORDINAL.value:
+        if self.schema.task == tasks.Task.ORDINAL.value:
             labels = numpy.asarray(self.schema.classes, dtype=object)
             return labels[numpy.asarray(predictions).astype(int)]
         return predictions
@@ -1336,7 +1336,7 @@ class ModelBundle:
         """
         if self.schema.task in (
             "regression",
-            tasks.TaskType.MULTIOUTPUT.value,
+            tasks.Task.MULTIOUTPUT.value,
         ) or not hasattr(self.pipeline, "predict_proba"):
             raise errors.ArtifactError(
                 "this model does not provide probabilities"
@@ -1791,7 +1791,7 @@ class ModelBundle:
         Raises:
             ArtifactError: For models that are not survival models.
         """
-        if self.schema.task != tasks.TaskType.SURVIVAL.value:
+        if self.schema.task != tasks.Task.SURVIVAL.value:
             raise errors.ArtifactError("this bundle is not a survival model")
         frame = self.prepare_frame(data, mapping)
         return numpy.asarray(
@@ -1830,7 +1830,7 @@ class ModelBundle:
             ArtifactError: For models that are not forecasters or a `steps`
                 outside 1 to the trained horizon.
         """
-        if self.schema.task != tasks.TaskType.FORECAST.value:
+        if self.schema.task != tasks.Task.FORECAST.value:
             raise errors.ArtifactError("this bundle is not a forecaster")
         horizon = len(self.schema.targets)
         wanted = horizon if steps is None else steps
@@ -1906,7 +1906,7 @@ class ModelBundle:
             ArtifactError: For models that are not ranking models, or when
                 `query_column` is missing from the data.
         """
-        if self.schema.task != tasks.TaskType.RANKING.value:
+        if self.schema.task != tasks.Task.RANKING.value:
             raise errors.ArtifactError("this bundle is not a ranking model")
         frame = self.read_frame(data)
         if query_column not in frame.columns:

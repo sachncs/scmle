@@ -96,7 +96,7 @@ def plan_file(tmp_path, unit="customer"):
 
 
 def charter_file(tmp_path, block=True, entity=None, reconcile=None):
-    spec = ingest.IngestSpec(
+    spec = ingest.Ingestion(
         feature_budget=40,
         windows=(30.0, 90.0),
         lag=1.0,
@@ -211,7 +211,7 @@ def with_emails(frame):
 
 
 def entity_block():
-    return ingest.EntitySpec(
+    return ingest.Entity(
         fields=(ingest.EntityField("email", False),),
         passes=(ingest.EntityPass("email"),),
     )
@@ -268,7 +268,7 @@ def declared_totals(path, rows_off=0):
         keys = pandas.read_sql(
             "SELECT order_id, amount FROM orders", connection
         )
-    return ingest.ReconcileSpec(
+    return ingest.Expectation(
         (
             ingest.TableTotals(
                 "orders",

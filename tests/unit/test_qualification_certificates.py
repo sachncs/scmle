@@ -12,7 +12,7 @@ from scmle.data.detectors import certificates
 HASH_A = "a" * 64
 HASH_B = "b" * 64
 CORPUS = "c" * 64
-POLICY = certificates.CertificationPolicy(
+POLICY = certificates.Standard(
     recall_floor=0.8, false_alarm_ceiling=0.05, confidence=0.95
 )
 
@@ -163,17 +163,17 @@ def test_certify_rejects_empty_duplicate_and_bad_inputs():
     with pytest.raises(ValueError):
         certificates.certify("d1", HASH_A, CORPUS, (), [measured()], POLICY)
     with pytest.raises(ValueError):
-        certificates.CertificationPolicy(1.5, 0.05)
+        certificates.Standard(1.5, 0.05)
     with pytest.raises(ValueError):
-        certificates.CertificationPolicy(0.8, 0.05, confidence=1.0)
+        certificates.Standard(0.8, 0.05, confidence=1.0)
 
 
 def test_store_round_trips_with_stable_bytes(tmp_path):
-    store = certificates.CertificateStore([certified()])
+    store = certificates.Store([certified()])
     path = tmp_path / "detector_certificates.json"
     store.save(path)
     first = path.read_bytes()
-    loaded = certificates.CertificateStore.load(path)
+    loaded = certificates.Store.load(path)
     loaded.save(path)
     assert path.read_bytes() == first
     assert loaded.certificates == store.certificates
@@ -181,33 +181,33 @@ def test_store_round_trips_with_stable_bytes(tmp_path):
 
 
 def test_store_rejects_tampered_pass_flags_and_unknown_fields(tmp_path):
-    store = certificates.CertificateStore(
+    store = certificates.Store(
         [certified(results=[measured(planted=10, detected=8, fa=0)])]
     )
     document = store.to_dict()
     document["certificates"][0]["outcomes"][0]["passed"] = True
     with pytest.raises(certificates.CertificateError, match="passed"):
-        certificates.CertificateStore.from_dict(document)
+        certificates.Store.from_dict(document)
 
     document = store.to_dict()
     document["certificates"][0]["outcomes"][0]["recall_interval"] = [0.9, 1.0]
     with pytest.raises(certificates.CertificateError, match="interval"):
-        certificates.CertificateStore.from_dict(document)
+        certificates.Store.from_dict(document)
 
     document = store.to_dict()
     document["certificates"][0]["extra"] = 1
     with pytest.raises(ValueError, match="unexpected"):
-        certificates.CertificateStore.from_dict(document)
+        certificates.Store.from_dict(document)
 
     document = store.to_dict()
     document["schema_version"] = 99
     with pytest.raises(certificates.CertificateError, match="schema"):
-        certificates.CertificateStore.from_dict(document)
+        certificates.Store.from_dict(document)
 
 
 def test_a_current_certified_detector_may_gate_for_that_defect_only():
-    store = certificates.CertificateStore([certified()])
-    assert store.state("d1", HASH_A) is certificates.CertificateState.CURRENT
+    store = certificates.Store([certified()])
+    assert store.state("d1", HASH_A) is certificates.Freshness.CURRENT
     assert (
         store.status("d1", HASH_A, "label_flip")
         is certificates.GateStatus.GATING
@@ -225,8 +225,8 @@ def test_a_current_certified_detector_may_gate_for_that_defect_only():
 
 
 def test_a_code_change_makes_the_certificate_stale_and_blocks_gating():
-    store = certificates.CertificateStore([certified(HASH_A)])
-    assert store.state("d1", HASH_B) is certificates.CertificateState.STALE
+    store = certificates.Store([certified(HASH_A)])
+    assert store.state("d1", HASH_B) is certificates.Freshness.STALE
     assert (
         store.status("d1", HASH_B, "label_flip")
         is certificates.GateStatus.DESCRIPTIVE
@@ -236,15 +236,15 @@ def test_a_code_change_makes_the_certificate_stale_and_blocks_gating():
 
 
 def test_a_detector_without_a_certificate_cannot_be_marked_gating():
-    store = certificates.CertificateStore()
-    assert store.state("d1", HASH_A) is certificates.CertificateState.MISSING
+    store = certificates.Store()
+    assert store.state("d1", HASH_A) is certificates.Freshness.MISSING
     with pytest.raises(certificates.CertificateError, match="no certificate"):
         store.mark_gating("d1", HASH_A, "label_flip")
 
 
 def test_a_failed_outcome_does_not_certify_gating():
     weak = certified(results=[measured(planted=10, detected=8, fa=0)])
-    store = certificates.CertificateStore([weak])
+    store = certificates.Store([weak])
     assert (
         store.status("d1", HASH_A, "label_flip")
         is certificates.GateStatus.DESCRIPTIVE
@@ -256,7 +256,7 @@ def test_a_failed_outcome_does_not_certify_gating():
 def test_add_replaces_the_entry_with_the_same_key():
     first = certified()
     second = certified(results=[measured(detected=180)])
-    store = certificates.CertificateStore([first])
+    store = certificates.Store([first])
     store.add(second)
     assert len(store.certificates) == 1
     assert store.certificates[0] == second
@@ -279,7 +279,7 @@ def test_descriptive_status_demotes_blocking_decisions():
 
 
 def test_audit_reports_missing_and_stale_gating_detectors():
-    store = certificates.CertificateStore([certified(HASH_A)])
+    store = certificates.Store([certified(HASH_A)])
     report = certificates.audit(
         store,
         {

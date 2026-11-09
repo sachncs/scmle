@@ -99,7 +99,7 @@ class GoldenSet:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ParityReport:
+class Parity:
     """The outcome of one comparison.
 
     Attributes:
@@ -179,7 +179,7 @@ def to_object(frame: Any) -> Any:
     return pandas.DataFrame(frame).astype(object)
 
 
-def reference_bundle(spec: dict[str, Any]) -> bundle.ModelBundle:
+def reference_bundle(spec: dict[str, Any]) -> bundle.Bundle:
     """Builds the hand-written model as a bundle.
 
     The pipeline has the structure of a trained one (median imputation,
@@ -270,7 +270,7 @@ def reference_bundle(spec: dict[str, Any]) -> bundle.ModelBundle:
     model.intercept_ = numpy.array([spec["intercept"]])
     model.classes_ = numpy.array(spec["classes"])
     plan = data.FeaturePlan(tuple(numeric), tuple(categorical))
-    return bundle.ModelBundle.create(
+    return bundle.Bundle.create(
         pipeline,
         plan,
         frame,
@@ -323,7 +323,7 @@ def compare(
     predictions: list[Any],
     probabilities: list[list[float]],
     tolerance: Tolerance,
-) -> ParityReport:
+) -> Parity:
     """Compares a serving path's outputs with the expected ones.
 
     Args:
@@ -340,7 +340,7 @@ def compare(
     mismatches = []
     count = len(expected["labels"])
     if len(predictions) != count or len(probabilities) != count:
-        return ParityReport(
+        return Parity(
             False,
             count,
             float("inf"),
@@ -358,7 +358,7 @@ def compare(
         worst = max(worst, error)
         if error > tolerance.probability_abs:
             mismatches.append(f"record {index}: probability off by {error:.3g}")
-    return ParityReport(
+    return Parity(
         not mismatches,
         count,
         worst,

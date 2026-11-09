@@ -1,6 +1,6 @@
 """The job spec, the run manifest and the `Runner` template.
 
-One `JobSpec` describes a training run independent of where it runs. A
+One `Job` describes a training run independent of where it runs. A
 `Runner` adapter knows how to start, poll and cancel a job in one place
 (this process, a container job, a managed service). The shared `Runner.run`
 does everything that must not differ between places:
@@ -13,7 +13,7 @@ does everything that must not differ between places:
   the checkpoints and the result.
 * **Controlled retries.** An attempt that ends interrupted (preemption,
   spot reclaim) or failed with a retryable cause is retried under the spec's
-  `RetryPolicy`, up to its attempt limit; the retry resumes from the run's
+  `Retries`, up to its attempt limit; the retry resumes from the run's
   checkpoints. Other failures, timeouts and budget stops are final.
 * **Cost budget.** Cost is the declared rate times resources times elapsed
   time, accumulated across attempts. When it passes the budget the job is
@@ -193,7 +193,7 @@ class CostBudget:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class JobSpec:
+class Job:
     """One training run, independent of where it runs.
 
     Attributes:
@@ -214,9 +214,7 @@ class JobSpec:
     identity: str
     resources: Resources = dataclasses.field(default_factory=Resources)
     timeout_seconds: float = 3600.0
-    retries: retry.RetryPolicy = dataclasses.field(
-        default_factory=retry.RetryPolicy
-    )
+    retries: retry.Retries = dataclasses.field(default_factory=retry.Retries)
     budget: CostBudget | None = None
     environment: Mapping[str, str] = dataclasses.field(default_factory=dict)
 
@@ -444,7 +442,7 @@ class BudgetMeter:
         spent: Cost accumulated by finished attempts.
     """
 
-    def __init__(self, spec: JobSpec, spent: float = 0.0) -> None:
+    def __init__(self, spec: Job, spent: float = 0.0) -> None:
         """Initializes the meter.
 
         Args:
@@ -496,7 +494,7 @@ class BudgetMeter:
 
 
 class Runner(abc.ABC):
-    """Runs a `JobSpec` in one place, with the shared supervision.
+    """Runs a `Job` in one place, with the shared supervision.
 
     Attributes:
         kind: Name of the kind of runner, recorded in the manifest.
@@ -536,7 +534,7 @@ class Runner(abc.ABC):
         self.watcher: Callable[[], RunState | None] = lambda: None
 
     @abc.abstractmethod
-    def submit(self, spec: JobSpec, attempt: int) -> JobHandle:
+    def submit(self, spec: Job, attempt: int) -> JobHandle:
         """Starts one attempt.
 
         Args:
@@ -624,7 +622,7 @@ class Runner(abc.ABC):
             return None
         return RunManifest.from_dict(json.loads(data))
 
-    def register(self, spec: JobSpec) -> RunManifest:
+    def register(self, spec: Job) -> RunManifest:
         """Stores the spec, or recognises the same run, or refuses a clash.
 
         The job's identity is first checked against the serving identity, which
@@ -664,7 +662,7 @@ class Runner(abc.ABC):
         self.save(manifest)
         return manifest
 
-    def run(self, spec: JobSpec) -> RunManifest:
+    def run(self, spec: Job) -> RunManifest:
         """Runs the spec to a final state, resuming and retrying as declared.
 
         Calling it again with the same spec after the run finished returns the
@@ -696,7 +694,7 @@ class Runner(abc.ABC):
 
     def attempt(
         self,
-        spec: JobSpec,
+        spec: Job,
         manifest: RunManifest,
         meter: BudgetMeter,
         number: int,
@@ -788,7 +786,7 @@ class Runner(abc.ABC):
         return JobStatus(JobState.CANCELLED, "cancel requested")
 
     def finish(
-        self, spec: JobSpec, manifest: RunManifest, state: RunState
+        self, spec: Job, manifest: RunManifest, state: RunState
     ) -> RunManifest:
         """Seals the manifest with checkpoints, the result and the state.
 

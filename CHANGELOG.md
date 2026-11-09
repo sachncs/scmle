@@ -10,6 +10,29 @@ marked `Breaking:` and listed first in their group.
 
 ## [Unreleased]
 
+### Breaking changes
+
+* **No package-root exports.** `scmle` exports only `__version__`. Every public
+  name is imported from the module that defines it: `scmle.api.project.Project`,
+  not `scmle.Project`. The 42 former root names, and where each now lives, are
+  listed in `scripts/check_api_compatibility.py` (`ROOT_SURFACES`).
+* **No aliasing.** `import x as y`, `from m import n as a`, module-level
+  `NAME = other.name` assignments and type aliases are removed everywhere in the
+  package, tests, benchmarks, scripts and examples, and a test fails on any new
+  one. `numpy`, `pandas` and `pyarrow` are written in full.
+* **Class names.** About 470 classes were renamed to remove banned words
+  (`Adapter`, `Engine`, `Manager`, `Handler`, `Options`), most of the `Spec`,
+  `Policy`, `Rule`, `Strategy`, `Report` and `Result` suffixes and redundant
+  package prefixes. `MLProject` is now `Project`. The old-to-new map is the
+  reviewed registry kept with the project plan.
+* **Public-API snapshot.** `tests/fixtures/public_api.json` is schema version 2:
+  pinned names are listed under their defining module.
+
+Not yet done for these changes: the bundle and run format versions are not
+bumped, so a model bundle written by an earlier build, which embeds the module
+path and class name of the objects inside it, may fail to load, and there is no
+clear refusal message for it yet.
+
 ### Added
 
 - Unattended operation, tested on simulated streams only

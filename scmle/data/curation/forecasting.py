@@ -27,7 +27,7 @@ def target_names(value: str, horizon: int) -> list[str]:
 
 
 def add_targets(
-    frame: pandas.DataFrame, data: tasks.DataSpec
+    frame: pandas.DataFrame, data: tasks.Dataset
 ) -> pandas.DataFrame:
     """Sorts the series and adds the future-value target columns.
 

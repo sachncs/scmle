@@ -547,7 +547,7 @@ def test_reconcile_command(tmp_path, capsys):
 
 def test_confirm_waits_and_then_gives_up():
     waits = []
-    policy = control.ConfirmPolicy(attempts=3, delay=2, sleep=waits.append)
+    policy = control.Polling(attempts=3, delay=2, sleep=waits.append)
     plane = support_runtime.MemoryPlane(never_settles=True)
     revision = plane.deploy(support_runtime.NEW)
     with pytest.raises(control.RuntimeUnconfirmed):
@@ -556,7 +556,7 @@ def test_confirm_waits_and_then_gives_up():
         )
     assert waits == [2, 2]
     with pytest.raises(errors.ConfigError):
-        control.ConfirmPolicy(attempts=0)
+        control.Polling(attempts=0)
 
 
 def test_a_plane_that_cannot_split_traffic_refuses_a_split():

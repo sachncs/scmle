@@ -58,7 +58,7 @@ def column_exclusion_reason(
 
 
 def summarize_target(
-    target: pandas.Series, task: tasks.TaskType
+    target: pandas.Series, task: tasks.Task
 ) -> tuple[dict, list[str]]:
     """Summarizes the target distribution and imbalance risk.
 
@@ -95,10 +95,10 @@ MIN_BALANCE_ROWS = 100
 MIN_BALANCE_CLASSES = 2
 
 
-class DatasetProfiler:
+class Profiler:
     """Builds a `DatasetProfile` for a dataset under a project spec."""
 
-    def __init__(self, spec: tasks.ProjectSpec) -> None:
+    def __init__(self, spec: tasks.Config) -> None:
         """Initializes the profiler.
 
         Args:
@@ -304,9 +304,7 @@ class DatasetProfiler:
         return int(deduplicated.duplicated().sum())
 
     @staticmethod
-    def balance_findings(
-        target: pandas.Series, task: tasks.TaskType
-    ) -> list[str]:
+    def balance_findings(target: pandas.Series, task: tasks.Task) -> list[str]:
         """Warns when classes are exactly equal in size.
 
         Real data are rarely perfectly balanced, so equal counts usually mean
@@ -337,7 +335,7 @@ class DatasetProfiler:
         self,
         frame: pandas.DataFrame,
         feature_columns: list[str],
-        task: tasks.TaskType,
+        task: tasks.Task,
     ) -> list[str]:
         """Reports duplicate rows and, for classification, label conflicts.
 
@@ -372,7 +370,7 @@ class DatasetProfiler:
         frame: pandas.DataFrame,
         statistics: dict[str, dict],
         feature_columns: list[str],
-        task: tasks.TaskType,
+        task: tasks.Task,
     ) -> None:
         """Records each feature's descriptive association with the target.
 
@@ -402,8 +400,8 @@ class DatasetProfiler:
         self,
         frame: pandas.DataFrame,
         feature_columns: list[str],
-        task: tasks.TaskType,
-    ) -> screen.ScreenReport | None:
+        task: tasks.Task,
+    ) -> screen.Screen | None:
         """Screens the training rows for leakage suspects, or None.
 
         There is no custody in a run without a charter, so the rows are the
@@ -443,7 +441,7 @@ class DatasetProfiler:
         self,
         frame: pandas.DataFrame,
         manifest: scmle.contracts.data.DatasetManifest,
-        task: tasks.TaskType,
+        task: tasks.Task,
         read_seconds: float = 0.0,
         total_rows: int | None = None,
     ) -> scmle.contracts.data.DatasetProfile:

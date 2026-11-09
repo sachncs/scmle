@@ -19,9 +19,9 @@ import scmle.models.registry
 
 
 def run_with(frame, tmp_path, **resources):
-    spec = tasks.ProjectSpec(
-        data=tasks.DataSpec(uri="<in-memory>", target="y"),
-        resources=tasks.ResourceSpec(**resources),
+    spec = tasks.Config(
+        data=tasks.Dataset(uri="<in-memory>", target="y"),
+        resources=tasks.Resources(**resources),
         search=support.NO_TUNING,
         strategies=support.NO_STRATEGIES,
         ensemble=support.NO_ENSEMBLE,
@@ -91,12 +91,10 @@ class SleepyEstimator(dummy.DummyClassifier):
         return super().fit(features, target)
 
 
-class SleepyAdapter(models.ModelAdapter):
+class SleepyAdapter(models.Model):
     name = "sleepy"
     family = "test"
-    capabilities = models.Capabilities(
-        frozenset({tasks.TaskType.BINARY}), cost=2
-    )
+    capabilities = models.Capabilities(frozenset({tasks.Task.BINARY}), cost=2)
 
     def build(self, task, seed, params=None):
         return SleepyEstimator()
@@ -105,7 +103,7 @@ class SleepyAdapter(models.ModelAdapter):
 def test_a_trial_past_the_hard_ceiling_is_killed_and_the_run_continues(
     binary_frame, tmp_path
 ):
-    registry = scmle.models.registry.ModelRegistry.with_builtins()
+    registry = scmle.models.registry.Catalog.with_builtins()
     registry.register(SleepyAdapter())
     project = support.make_project(
         binary_frame,
@@ -145,7 +143,7 @@ def test_memory_of_subprocesses_a_trial_starts_counts_and_is_cleaned_up(
     tmp_path,
 ):
     marker = tmp_path / "child.pid"
-    supervisor = limits.TrialSupervisor(ceiling_seconds=60, memory_gb=0.4)
+    supervisor = limits.Supervisor(ceiling_seconds=60, memory_gb=0.4)
 
     with pytest.raises(limits.TrialLimitError, match="memory limit"):
         supervisor.run(spawn_memory_hungry_subprocess, marker)

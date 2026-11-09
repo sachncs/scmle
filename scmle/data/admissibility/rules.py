@@ -329,7 +329,7 @@ def decide_causal(
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class AdmissibilityTable:
+class Admissibility:
     """The table written as `admissibility_table.json`.
 
     Attributes:
@@ -390,7 +390,7 @@ class AdmissibilityTable:
 
 
 def build_table(
-    table: provenance.ProvenanceTable,
+    table: provenance.Dictionary,
     kind: str,
     mode: Mode = Mode.STRICT,
     declared_lag_seconds: float = 0.0,
@@ -402,7 +402,7 @@ def build_table(
     graph: dag.Dag | None = None,
     treatment: str | None = None,
     outcome: str | None = None,
-) -> AdmissibilityTable:
+) -> Admissibility:
     """Decides every field of a provenance table.
 
     Args:
@@ -447,7 +447,7 @@ def build_table(
             )
             for f in table.fields
         )
-        return AdmissibilityTable(kind, mode, decisions, None, None)
+        return Admissibility(kind, mode, decisions, None, None)
     if graph is None or treatment is None or outcome is None:
         raise ValueError("a causal estimand needs a graph, treatment, outcome")
     decisions = tuple(
@@ -464,7 +464,7 @@ def build_table(
         )
         for f in table.fields
     )
-    return AdmissibilityTable(
+    return Admissibility(
         kind,
         mode,
         decisions,

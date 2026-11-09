@@ -77,7 +77,7 @@ def validate_json_value(value: Any, field_name: str = "value") -> object:
     )
 
 
-class ContractModel(pydantic.BaseModel):
+class Contract(pydantic.BaseModel):
     """Immutable base model shared by explanation evidence records."""
 
     model_config = pydantic.ConfigDict(
@@ -88,7 +88,7 @@ class ContractModel(pydantic.BaseModel):
     )
 
 
-class DatasetSnapshot(ContractModel):
+class DatasetSnapshot(Contract):
     """Identity of the dataset state used to produce an explanation."""
 
     identifier: str
@@ -111,7 +111,7 @@ class DatasetSnapshot(ContractModel):
         return require_text(value, f"dataset_snapshot.{info.field_name}")
 
 
-class FeatureGraphReference(ContractModel):
+class FeatureGraphReference(Contract):
     """Version and fingerprint of the feature transformation graph."""
 
     version: int = pydantic.Field(ge=1)
@@ -131,7 +131,7 @@ class FeatureGraphReference(ContractModel):
         return require_text(value, "feature_graph.fingerprint")
 
 
-class ExplanationMethod(ContractModel):
+class Method(Contract):
     """Algorithm identity and resolved parameters for an explanation."""
 
     name: str
@@ -173,7 +173,7 @@ class ExplanationMethod(ContractModel):
         return normalized
 
 
-class PrivacyDecision(ContractModel):
+class PrivacyDecision(Contract):
     """Decision describing whether explanation content may be disclosed."""
 
     decision: PrivacyStatus
@@ -212,7 +212,7 @@ class PrivacyDecision(ContractModel):
         )
 
 
-class EvidenceLink(ContractModel):
+class EvidenceLink(Contract):
     """Reference to supporting evidence for an explanation record."""
 
     relation: str
@@ -268,7 +268,7 @@ class EvidenceLink(ContractModel):
         return None if value is None else require_text(value, "link.digest")
 
 
-class ExplanationEvidence(ContractModel):
+class Evidence(Contract):
     """Portable evidence record for one global or local explanation.
 
     The record deliberately stores references and JSON-native outputs rather
@@ -304,7 +304,7 @@ class ExplanationEvidence(ContractModel):
     input_fingerprint: str
     dataset_snapshot: DatasetSnapshot
     feature_graph: FeatureGraphReference
-    method: ExplanationMethod
+    method: Method
     output: Any
     timestamp: datetime.datetime
     software_version: str

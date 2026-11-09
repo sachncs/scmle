@@ -29,10 +29,10 @@ MAX_SEGMENT_FEATURES = 3
 SEGMENT_BANDS = 4
 MAX_ERROR_ROWS = 20
 THRESHOLDS = tuple(round(0.1 * step, 1) for step in range(1, 10))
-CLASSIFICATION = frozenset({tasks.TaskType.BINARY, tasks.TaskType.MULTICLASS})
-BINARY_ONLY = frozenset({tasks.TaskType.BINARY})
-REGRESSION_ONLY = frozenset({tasks.TaskType.REGRESSION})
-EVERYTHING = frozenset(tasks.TaskType)
+CLASSIFICATION = frozenset({tasks.Task.BINARY, tasks.Task.MULTICLASS})
+BINARY_ONLY = frozenset({tasks.Task.BINARY})
+REGRESSION_ONLY = frozenset({tasks.Task.REGRESSION})
+EVERYTHING = frozenset(tasks.Task)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -61,7 +61,7 @@ class DiagnosticInput:
     estimator: Any
     features: pandas.DataFrame
     target: pandas.Series
-    task: tasks.TaskType
+    task: tasks.Task
     metric: scmle.contracts.metrics.Metric
     feature_plan: data.FeaturePlan
     seed: int
@@ -86,7 +86,7 @@ class DiagnosticInput:
         It is the second class of the fitted estimator.
         """
         classes = getattr(self.estimator, "classes_", None)
-        if self.task is tasks.TaskType.BINARY and classes is not None:
+        if self.task is tasks.Task.BINARY and classes is not None:
             return classes[1]
         return None
 
@@ -100,7 +100,7 @@ class Diagnostic(abc.ABC):
     """
 
     name: ClassVar[str]
-    applies_to: ClassVar[frozenset[tasks.TaskType]] = EVERYTHING
+    applies_to: ClassVar[frozenset[tasks.Task]] = EVERYTHING
 
     @abc.abstractmethod
     def compute(self, inputs: DiagnosticInput) -> dict[str, Any]:
@@ -114,7 +114,7 @@ class Diagnostic(abc.ABC):
         """
 
 
-class ClassificationReport(Diagnostic):
+class ConfusionMatrix(Diagnostic):
     """Confusion matrix and per-class precision / recall / F-measure."""
 
     name = "classification_report"
@@ -156,7 +156,7 @@ class ClassificationReport(Diagnostic):
         }
 
 
-class CalibrationReport(Diagnostic):
+class Calibration(Diagnostic):
     """Reliability curve, Brier score and expected calibration error."""
 
     name = "calibration"
@@ -202,11 +202,11 @@ class CalibrationReport(Diagnostic):
         }
 
 
-class MulticlassCalibrationReport(Diagnostic):
+class MulticlassCalibration(Diagnostic):
     """Top-label reliability curve, Brier score and calibration error."""
 
     name = "calibration"
-    applies_to = frozenset({tasks.TaskType.MULTICLASS})
+    applies_to = frozenset({tasks.Task.MULTICLASS})
 
     def compute(self, inputs: DiagnosticInput) -> dict[str, Any]:
         """Compares confidence in the predicted class with its accuracy.
@@ -238,7 +238,7 @@ class MulticlassCalibrationReport(Diagnostic):
         }
 
 
-class ThresholdReport(Diagnostic):
+class ThresholdSweep(Diagnostic):
     """Precision / recall / F-measure across decision thresholds."""
 
     name = "threshold_analysis"
@@ -275,7 +275,7 @@ class ThresholdReport(Diagnostic):
         return {"thresholds": rows}
 
 
-class ResidualReport(Diagnostic):
+class Residuals(Diagnostic):
     """Bias, spread and error by segment for regression."""
 
     name = "residuals"
@@ -573,7 +573,7 @@ class MetricUncertainty(Diagnostic):
         target = inputs.target.reset_index(drop=True)
         replay_class = (
             RegressorReplay
-            if inputs.task is tasks.TaskType.REGRESSION
+            if inputs.task is tasks.Task.REGRESSION
             else ClassifierReplay
         )
         replay = replay_class(inputs.estimator, features)
@@ -639,11 +639,11 @@ def default_suite() -> tuple[Diagnostic, ...]:
         One instance of each diagnostic, in the order they are run.
     """
     return (
-        ClassificationReport(),
-        CalibrationReport(),
-        MulticlassCalibrationReport(),
-        ThresholdReport(),
-        ResidualReport(),
+        ConfusionMatrix(),
+        Calibration(),
+        MulticlassCalibration(),
+        ThresholdSweep(),
+        Residuals(),
         ErrorAnalysis(),
         MetricUncertainty(),
     )

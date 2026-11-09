@@ -36,7 +36,7 @@ Assumptions, stated in every record: randomized assignment with the recorded
 probability, no interference between units, and a stationary effect (under
 drift the confidence sequence covers the running average of `Delta_t`). A
 promotion is a recommendation: the independent signed approval of
-`LifecycleManager` is unchanged and still required.
+`Maintainer` is unchanged and still required.
 """
 
 from collections.abc import Mapping

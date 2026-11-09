@@ -7,10 +7,10 @@ import numpy
 import pytest
 import support
 
-import scmle
+import scmle.artifacts.bundle
 from scmle.contracts import tasks
 
-SEARCH = tasks.SearchSpec(top_models=1, configs_per_model=6, prune_fraction=0.5)
+SEARCH = tasks.Search(top_models=1, configs_per_model=6, prune_fraction=0.5)
 
 
 def run(frame, tmp_path, search=SEARCH, **kwargs):
@@ -59,7 +59,7 @@ def test_params_survive_in_leaderboard_and_bundle(binary_frame, tmp_path):
         .map(lambda value: isinstance(json.loads(value), dict))
         .all()
     )
-    loaded = scmle.ModelBundle.load(
+    loaded = scmle.artifacts.bundle.Bundle.load(
         result.save(tmp_path / "exported"), trusted=True
     )
     assert loaded.info.model_params == result.bundle.info.model_params
@@ -70,7 +70,7 @@ def test_params_survive_in_leaderboard_and_bundle(binary_frame, tmp_path):
 
 
 def test_tuning_can_be_disabled(binary_frame, tmp_path):
-    result = run(binary_frame, tmp_path, search=tasks.SearchSpec(top_models=0))
+    result = run(binary_frame, tmp_path, search=tasks.Search(top_models=0))
     assert not any(t.params for t in result.trials)
     assert any(
         d.technique == "hyperparameter_tuning" and d.action == "defer"
@@ -105,9 +105,7 @@ def test_tuning_is_reproducible(binary_frame, tmp_path):
 
 def test_optuna_backend(binary_frame, tmp_path):
     pytest.importorskip("optuna")
-    search = tasks.SearchSpec(
-        top_models=1, configs_per_model=6, optimizer="optuna"
-    )
+    search = tasks.Search(top_models=1, configs_per_model=6, optimizer="optuna")
     result = run(binary_frame, tmp_path, search=search)
     assert any(t.params for t in result.trials) and result.state == "COMPLETED"
 

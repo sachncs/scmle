@@ -10,7 +10,7 @@
   rows (sampled at ``sample_rate``);
 * model performance: the mean loss of cases whose outcome has arrived
   (delayed labels) against ``reference_loss`` plus a tolerance, using the same
-  names as `scmle.governance.loop.LoopPolicy`.
+  names as `scmle.governance.loop.Preregistration`.
 
 A window with too few samples is ``insufficient_data``: it is reported and
 never treated as healthy. Nothing here decides what to do; the classifier
@@ -99,7 +99,7 @@ class Signal:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class WindowPolicy:
+class Window:
     """The window every monitor looks at.
 
     Attributes:
@@ -153,8 +153,8 @@ class SignalThresholds:
     latency_p95_seconds: float = 1.0
     invalid_request_rate: float = 0.05
     missing_rate_increase: float = 0.05
-    drift: monitor.MonitoringThresholds = dataclasses.field(
-        default_factory=monitor.MonitoringThresholds
+    drift: monitor.Thresholds = dataclasses.field(
+        default_factory=monitor.Thresholds
     )
     reference_loss: float = 0.1
     loss_tolerance: float = 0.05
@@ -223,7 +223,7 @@ class SignalMonitor:
 
     def __init__(
         self,
-        policy: WindowPolicy = WindowPolicy(),  # noqa: B008
+        policy: Window = Window(),  # noqa: B008
         thresholds: SignalThresholds = SignalThresholds(),  # noqa: B008
         profile: scmle.monitoring.reference.ReferenceProfile | None = None,
     ) -> None:

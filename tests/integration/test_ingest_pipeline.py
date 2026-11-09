@@ -78,15 +78,15 @@ def frame_of(db, table, order):
 
 
 def run_pipeline(db, tmp_path):
-    plan = scmle.data.ingest.plan.IngestPlan(
+    plan = scmle.data.ingest.plan.Plan(
         tmp_path / "ingest",
         db.factory,
-        scmle.data.ingest.plan.IngestSettings(
+        scmle.data.ingest.plan.Config(
             tables=("customers", "orders", "events"),
             unit="customer",
             target_table="customers",
         ),
-        scmle.data.ingest.budget.IngestBudget(),
+        scmle.data.ingest.budget.Budget(),
     )
     summary = plan.run_all()
     note = provenance.Attestation(
@@ -98,7 +98,7 @@ def run_pipeline(db, tmp_path):
         "scope",
         "2099-01-01",
     )
-    rule = asof_view.TimeRule(asof_view.TRANSACTION, "recorded", 0.0, note)
+    rule = asof_view.KnownTime(asof_view.TRANSACTION, "recorded", 0.0, note)
     orders = asof_view.AsOfView(
         frame_of(db, "orders", "order_id"),
         "customer_id",
@@ -116,7 +116,7 @@ def run_pipeline(db, tmp_path):
     dim = asof_view.AsOfView(
         frame_of(db, "customers", "customer_id"),
         "customer_id",
-        asof_view.TimeRule(asof_view.NON_VERSIONED),
+        asof_view.KnownTime(asof_view.NON_VERSIONED),
         name="customers_now",
     )
     targets = pandas.DataFrame(

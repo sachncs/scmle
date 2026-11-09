@@ -11,17 +11,17 @@ registries. This hook is the one place that joins the two:
   probability that arm had (the propensity); each decision is written to the
   deployment ledger and to the hash-chained decision log;
 * a `promote` decision is a proposal row; the alias moves only through
-  `LifecycleManager.promote_challenger`, which still needs the registry's
+  `Maintainer.promote_challenger`, which still needs the registry's
   independent signed approval (and the attestation of a guarded registry);
 * binding the hook makes the manager's bootstrap rules descriptive
-  (`LifecycleManager.defer_to_rollout`): `review` and `check_rollback` no
+  (`Maintainer.defer_to_rollout`): `review` and `check_rollback` no
   longer decide promotion or rollback, and the hook's `review` and
   `check_rollback` write their results to the decision log as
   `bootstrap_diagnostic` rows with `descriptive: true` and `decides: false`;
 * a promoted champion gets its rollback monitor at the rollout plan's
   rollback level (once per champion); a rollback decision is a proposal
   row, and the alias moves back only through
-  `LifecycleManager.restore_previous`.
+  `Maintainer.restore_previous`.
 
 The statistical guarantees are those of `scmle.decision.rollout`: a false
 promotion has probability at most the experiment's level, and the levels sum
@@ -50,7 +50,7 @@ class RolloutHook:
 
     def __init__(
         self,
-        manager: lifecycle.LifecycleManager,
+        manager: lifecycle.Maintainer,
         plan: scmle.data.charter.decision.RolloutPlan,
         ledger: deployment_ledger.DeploymentLedger,
         *,
@@ -60,7 +60,7 @@ class RolloutHook:
         """Binds the hook to a manager, a plan and a deployment ledger.
 
         Also switches the manager to defer promotion and rollback decisions
-        to the rollout (`LifecycleManager.defer_to_rollout`).
+        to the rollout (`Maintainer.defer_to_rollout`).
 
         Args:
             manager: The model's lifecycle manager.
@@ -117,7 +117,7 @@ class RolloutHook:
         retrain: bool = True,
         project_options: dict[str, Any] | None = None,
     ) -> lifecycle.LifecycleOutcome:
-        """Runs `LifecycleManager.review` and logs its comparison.
+        """Runs `Maintainer.review` and logs its comparison.
 
         When a retrain runs, the challenger is staged for the rollout whatever
         its bootstrap comparison says; the comparison, if there is one, goes
@@ -141,11 +141,11 @@ class RolloutHook:
         self,
         fresh: pandas.DataFrame,
         target: str,
-        policy: lifecycle.RollbackPolicy | None = None,
+        policy: lifecycle.Trigger | None = None,
         approval: registry.PromotionApproval | None = None,
         signing_key: str | bytes | None = None,
     ) -> lifecycle.RollbackOutcome:
-        """Runs `LifecycleManager.check_rollback` as a logged diagnostic.
+        """Runs `Maintainer.check_rollback` as a logged diagnostic.
 
         Nothing moves, whatever the approval: only `watch` and `roll_back`
         take the previous champion back.

@@ -186,7 +186,7 @@ def write_service(
     directories are created.
 
     Args:
-        bundle: A `ModelBundle`.
+        bundle: A `Bundle`.
         destination: Folder to write; it must not already contain a `model`
             entry.
         scmle_pin: Requirement line for the framework itself; defaults to

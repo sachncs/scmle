@@ -7,10 +7,10 @@ from scmle.contracts import models
 from scmle.contracts import tasks
 from scmle.models.uplift import estimators
 
-UPLIFT = frozenset({tasks.TaskType.UPLIFT})
+UPLIFT = frozenset({tasks.Task.UPLIFT})
 
 
-class UpliftAdapter(models.ModelAdapter):
+class Uplift(models.Model):
     """Base: a meta-learner built from boosted outcome models.
 
     Attributes:
@@ -22,7 +22,7 @@ class UpliftAdapter(models.ModelAdapter):
 
     def build(
         self,
-        task: tasks.TaskType,
+        task: tasks.Task,
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
@@ -43,7 +43,7 @@ class UpliftAdapter(models.ModelAdapter):
         )
 
 
-class TwoModelAdapter(UpliftAdapter):
+class TLearner(Uplift):
     """T-learner."""
 
     name = "uplift_t_learner"
@@ -53,7 +53,7 @@ class TwoModelAdapter(UpliftAdapter):
     learner = estimators.TwoModelLearner
 
 
-class SingleModelAdapter(UpliftAdapter):
+class SLearner(Uplift):
     """S-learner."""
 
     name = "uplift_s_learner"
@@ -63,7 +63,7 @@ class SingleModelAdapter(UpliftAdapter):
     learner = estimators.SingleModelLearner
 
 
-class CrossAdapter(UpliftAdapter):
+class XLearner(Uplift):
     """X-learner."""
 
     name = "uplift_x_learner"
@@ -73,8 +73,8 @@ class CrossAdapter(UpliftAdapter):
     learner = estimators.CrossLearner
 
 
-UPLIFT_ADAPTERS: tuple[type[models.ModelAdapter], ...] = (
-    TwoModelAdapter,
-    SingleModelAdapter,
-    CrossAdapter,
+UPLIFT_ADAPTERS: tuple[type[models.Model], ...] = (
+    TLearner,
+    SLearner,
+    XLearner,
 )

@@ -14,7 +14,7 @@ from scmle.evaluation import metrics
 
 
 @dataclasses.dataclass(frozen=True)
-class CriterionResult:
+class Criterion:
     """One success criterion against the achieved score.
 
     Attributes:
@@ -44,7 +44,7 @@ def check(
     criteria: dict[str, float],
     test_metrics: dict[str, float],
     catalog: metrics.MetricCatalog = metrics.CATALOG,
-) -> list[CriterionResult]:
+) -> list[Criterion]:
     """Compares each criterion with the achieved score.
 
     Args:
@@ -72,6 +72,6 @@ def check(
         higher = catalog.metrics[name].greater_is_better
         met = achieved >= required if higher else achieved <= required
         results.append(
-            CriterionResult(name, float(required), achieved, higher, bool(met))
+            Criterion(name, float(required), achieved, higher, bool(met))
         )
     return results

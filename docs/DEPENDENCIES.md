@@ -10,12 +10,12 @@
 | Extra | Adds | Notes |
 | --- | --- | --- |
 | `boosting` | LightGBM, XGBoost | adapters are rejected with a reason when absent |
-| `optimization` | Optuna | `SearchSpec(optimizer="optuna")` |
+| `optimization` | Optuna | `Search(optimizer="optuna")` |
 | `sampling` | imbalanced-learn | SMOTE, Borderline-SMOTE, ADASYN strategies |
 | `polars` | Polars | Polars frames and lazyframes as input (Arrow tables need only pyarrow) |
 | `spreadsheets` | openpyxl | `.xlsx` and `.xlsm` input; first worksheet is read |
 | `tracking` | MLflow | `MlflowExperimentStore` |
-| `distributed` | Ray | `ResourceSpec(executor="ray")`; no free-threaded (3.14t) wheel yet |
+| `distributed` | Ray | `Resources(executor="ray")`; no free-threaded (3.14t) wheel yet |
 | `catboost` | CatBoost | no free-threaded (3.14t) wheel yet; kept out of `boosting` for that reason |
 | `deeplearning` | PyTorch, Keras 3 (PyTorch backend) | model families run in a separate worker process; CPU wheel on Linux via `uv` |
 | `tabpfn` | TabPFN | needs an accepted Prior Labs license and `TABPFN_TOKEN`; extension-only, not in `all` |

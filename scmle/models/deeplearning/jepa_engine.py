@@ -61,7 +61,7 @@ class JepaNetwork:
         self.module.load_state_dict(state)
 
 
-class JepaEngine:
+class Trainer:
     """Train a bounded tabular JEPA representation."""
 
     def __init__(
@@ -112,7 +112,7 @@ class JepaEngine:
         features: Any,
         target: Any = None,
         sample_weight: Any = None,
-    ) -> "JepaEngine":
+    ) -> "Trainer":
         """Fits context prediction without consuming labels.
 
         Args:

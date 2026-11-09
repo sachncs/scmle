@@ -25,7 +25,7 @@ MIN_INNER_ROWS = 30
 
 
 @dataclasses.dataclass(frozen=True)
-class NestedResult:
+class Scores:
     """Outcome of a nested validation.
 
     Attributes:
@@ -115,7 +115,7 @@ def nested_score(
     seed: int = 0,
     configurations: int = CONFIGURATIONS,
     should_stop: Callable[[], bool] = lambda: False,
-) -> NestedResult | None:
+) -> Scores | None:
     """Runs the tuning procedure inside every outer fold.
 
     Args:
@@ -171,7 +171,7 @@ def nested_score(
         inner.append(float(best_score))
     if not outer:
         return None
-    return NestedResult(
+    return Scores(
         tuple(outer),
         tuple(inner),
         float(numpy.mean(outer)),

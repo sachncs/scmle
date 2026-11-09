@@ -30,7 +30,7 @@ def test_resources_are_always_measured_and_recorded(binary_frame, tmp_path):
 
 def test_size_limit_forces_a_smaller_model(binary_frame, tmp_path):
     free = run(binary_frame, tmp_path / "free")
-    limit = tasks.SelectionSpec(max_model_mb=0.05)
+    limit = tasks.Selection(max_model_mb=0.05)
     constrained = run(binary_frame, tmp_path / "limited", limit)
     assert constrained.evaluation["resources"]["model_mb"] <= 0.05
     log = json.loads(
@@ -43,13 +43,13 @@ def test_size_limit_forces_a_smaller_model(binary_frame, tmp_path):
 
 
 def test_latency_limit_is_enforced_and_reported(binary_frame, tmp_path):
-    limit = tasks.SelectionSpec(max_p95_latency_ms=1000.0)
+    limit = tasks.Selection(max_p95_latency_ms=1000.0)
     result = run(binary_frame, tmp_path, limit)
     assert result.evaluation["resources"]["p95_latency_ms"] <= 1000.0
 
 
 def test_impossible_constraints_block_the_run(binary_frame, tmp_path):
-    limit = tasks.SelectionSpec(max_model_mb=1e-6, max_candidates_checked=3)
+    limit = tasks.Selection(max_model_mb=1e-6, max_candidates_checked=3)
     with pytest.raises(errors.BlockedError, match="satisfies") as caught:
         run(binary_frame, tmp_path, limit)
     events_path = pathlib.Path(caught.value.details["run_dir"]) / "events.jsonl"
@@ -59,5 +59,5 @@ def test_impossible_constraints_block_the_run(binary_frame, tmp_path):
 
 def test_selection_is_unchanged_without_constraints(binary_frame, tmp_path):
     first = run(binary_frame, tmp_path / "a")
-    second = run(binary_frame, tmp_path / "b", tasks.SelectionSpec())
+    second = run(binary_frame, tmp_path / "b", tasks.Selection())
     assert first.selected_model == second.selected_model

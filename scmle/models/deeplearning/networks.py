@@ -27,7 +27,7 @@ COMMON_SPACE = (
 )
 
 
-class TorchAdapter(models.ModelAdapter):
+class Network(models.Model):
     """A PyTorch tabular network family.
 
     Attributes:
@@ -86,7 +86,7 @@ class TorchAdapter(models.ModelAdapter):
 
     def build(
         self,
-        task: tasks.TaskType,
+        task: tasks.Task,
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
@@ -117,7 +117,7 @@ class TorchAdapter(models.ModelAdapter):
         return estimators.TorchRegressor(**settings)
 
 
-class TorchMlpAdapter(TorchAdapter):
+class Mlp(Network):
     """Fully connected network."""
 
     name = "torch_mlp"
@@ -132,7 +132,7 @@ class TorchMlpAdapter(TorchAdapter):
     )
 
 
-class TorchResidualAdapter(TorchAdapter):
+class ResidualMlp(Network):
     """Residual network with layer normalization."""
 
     name = "torch_residual"
@@ -147,7 +147,7 @@ class TorchResidualAdapter(TorchAdapter):
     )
 
 
-class TorchEnsembleAdapter(TorchAdapter):
+class Tabm(Network):
     """BatchEnsemble MLP (TabM-style): many cheap members, averaged."""
 
     name = "torch_tabm"
@@ -162,7 +162,7 @@ class TorchEnsembleAdapter(TorchAdapter):
     )
 
 
-class TorchTransformerAdapter(TorchAdapter):
+class FtTransformer(Network):
     """Experimental tabular FT-Transformer over numeric feature tokens.
 
     ``family`` stays ``deep_learning`` for existing reporting and strategy
@@ -177,7 +177,7 @@ class TorchTransformerAdapter(TorchAdapter):
     family_contract = contracts.TABULAR_TRANSFORMER_CONTRACT
     auto_candidate = False
     capabilities = dataclasses.replace(
-        TorchAdapter.capabilities, max_rows=100_000, cost=5, memory_factor=8.0
+        Network.capabilities, max_rows=100_000, cost=5, memory_factor=8.0
     )
 
     search_space = search.SearchSpace(
@@ -188,7 +188,7 @@ class TorchTransformerAdapter(TorchAdapter):
     )
 
 
-class TorchJepaAdapter(TorchAdapter):
+class Jepa(Network):
     """Experimental tabular JEPA representation plus supervised head.
 
     The adapter composes the existing worker-backed numeric JEPA estimator
@@ -205,7 +205,7 @@ class TorchJepaAdapter(TorchAdapter):
     auto_candidate = False
     requires: ClassVar[tuple[str, ...]] = ("torch",)
     capabilities = dataclasses.replace(
-        TorchAdapter.capabilities,
+        Network.capabilities,
         max_rows=100_000,
         cost=5,
         memory_factor=8.0,
@@ -225,7 +225,7 @@ class TorchJepaAdapter(TorchAdapter):
     )
 
     def rejection_reason(
-        self, task: tasks.TaskType, row_count: int | None = None
+        self, task: tasks.Task, row_count: int | None = None
     ) -> str | None:
         """Rejects datasets too small for representation cross-validation.
 
@@ -249,7 +249,7 @@ class TorchJepaAdapter(TorchAdapter):
 
     def build(
         self,
-        task: tasks.TaskType,
+        task: tasks.Task,
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> pipeline.Pipeline:
@@ -317,7 +317,7 @@ class TorchJepaAdapter(TorchAdapter):
     def assemble(
         self,
         plan: data.FeaturePlan,
-        task: tasks.TaskType,
+        task: tasks.Task,
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> pipeline.Pipeline:
@@ -349,7 +349,7 @@ class TorchJepaAdapter(TorchAdapter):
         )
 
 
-class TorchRobustMlpAdapter(TorchAdapter):
+class RobustMlp(Network):
     """MLP with learned scaling, smooth clipping and PReLU (RealMLP-style)."""
 
     name = "torch_realmlp"
@@ -364,7 +364,7 @@ class TorchRobustMlpAdapter(TorchAdapter):
     )
 
 
-class KerasMlpAdapter(TorchAdapter):
+class KerasMlp(Network):
     """Keras dense network, run on the PyTorch backend in the same worker."""
 
     name = "keras_mlp"
@@ -383,7 +383,7 @@ class KerasMlpAdapter(TorchAdapter):
 
     def build(
         self,
-        task: tasks.TaskType,
+        task: tasks.Task,
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
@@ -410,7 +410,7 @@ class KerasMlpAdapter(TorchAdapter):
         return estimators.KerasRegressor(**settings)
 
 
-class TabPfnAdapter(models.ModelAdapter):
+class TabPfn(models.Model):
     """Pretrained tabular foundation model (`tabpfn` extra, license required).
 
     Needs the `tabpfn` package and an accepted Prior Labs license for the
@@ -431,7 +431,7 @@ class TabPfnAdapter(models.ModelAdapter):
     )
 
     def rejection_reason(
-        self, task: tasks.TaskType, row_count: int | None = None
+        self, task: tasks.Task, row_count: int | None = None
     ) -> str | None:
         """Keeps TabPFN outside the automatic beta candidate set.
 
@@ -470,7 +470,7 @@ class TabPfnAdapter(models.ModelAdapter):
 
     def build(
         self,
-        task: tasks.TaskType,
+        task: tasks.Task,
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
@@ -497,13 +497,13 @@ class TabPfnAdapter(models.ModelAdapter):
         return estimators.TabPfnRegressor(**settings)
 
 
-DEEP_LEARNING_ADAPTERS: tuple[type[models.ModelAdapter], ...] = (
-    TabPfnAdapter,
-    TorchMlpAdapter,
-    TorchResidualAdapter,
-    TorchEnsembleAdapter,
-    TorchTransformerAdapter,
-    TorchJepaAdapter,
-    TorchRobustMlpAdapter,
-    KerasMlpAdapter,
+DEEP_LEARNING_ADAPTERS: tuple[type[models.Model], ...] = (
+    TabPfn,
+    Mlp,
+    ResidualMlp,
+    Tabm,
+    FtTransformer,
+    Jepa,
+    RobustMlp,
+    KerasMlp,
 )

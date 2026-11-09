@@ -149,7 +149,7 @@ def overlap_world(
 
 def rejected(
     frame: pandas.DataFrame,
-    adapter: run.Adapter,
+    adapter: run.Estimator,
     groups: tuple[causal.Subgroup, ...],
 ) -> set[tuple[str, str]]:
     """(column, level) pairs the Holm family rejects on one replicate.

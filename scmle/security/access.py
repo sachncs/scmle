@@ -1,8 +1,8 @@
 """Authorization for the prediction service: scopes, tenant, rate limits.
 
 `Gateway.check` is the one decision point. It runs before a request body is
-read and answers with a `Principal` or raises `AccessDenied`. Whatever the
-cause, the body a caller sees is the one `AccessDenied.body` returns: a fixed
+read and answers with a `Principal` or raises `DeniedError`. Whatever the
+cause, the body a caller sees is the one `DeniedError.body` returns: a fixed
 message per status (401, 403, 429), with no reason, key id, claim or token
 fragment in it. The precise reason goes to the audit log, which the caller
 cannot read.
@@ -87,7 +87,7 @@ def require_authentication_for(host: str, gateway: "Gateway | None") -> None:
         )
 
 
-class AccessDenied(errors.ScmleError):
+class DeniedError(errors.ScmleError):
     """A request was refused before it reached the model.
 
     Attributes:
@@ -267,13 +267,13 @@ class Gateway:
 
     def __init__(
         self,
-        verifier: tokens.TokenVerifier,
+        verifier: tokens.Verifier,
         *,
         tenant: str | None = None,
         routes: Mapping[tuple[str, str], str] = DEFAULT_ROUTES,
         limiter: RateLimiter | None = None,
         failure_limiter: RateLimiter | None = None,
-        audit: scmle.security.audit.AuditLog | None = None,
+        audit: scmle.security.audit.Log | None = None,
     ) -> None:
         """Initializes the gateway.
 
@@ -318,14 +318,14 @@ class Gateway:
             denied, is recorded in the audit log when there is one.
 
         Raises:
-            AccessDenied: With status 401, 403 or 429.
+            DeniedError: With status 401, 403 or 429.
         """
         route = path.split("?", 1)[0]
         if method == "GET" and route in PUBLIC_PATHS:
             return None
         try:
             principal = self.decide(method, route, authorization, remote)
-        except AccessDenied as denied:
+        except DeniedError as denied:
             if self.audit is not None:
                 self.audit.access(
                     denied.principal,
@@ -369,7 +369,7 @@ class Gateway:
             The verified caller.
 
         Raises:
-            AccessDenied: With status 401 for missing or invalid credentials,
+            DeniedError: With status 401 for missing or invalid credentials,
                 403 for a route not in the table, a missing scope or a tenant
                 mismatch, and 429 when the caller is rate-limited or the
                 client has made too many failed attempts.
@@ -383,16 +383,14 @@ class Gateway:
             self.refuse(401, error.reason, remote)
         required = self.routes.get((method, route))
         if required is None:
-            raise AccessDenied(403, "route_not_allowed", None, principal)
+            raise DeniedError(403, "route_not_allowed", None, principal)
         if required not in principal.scopes:
-            raise AccessDenied(
-                403, f"missing_scope:{required}", None, principal
-            )
+            raise DeniedError(403, f"missing_scope:{required}", None, principal)
         if self.tenant is not None and principal.tenant != self.tenant:
-            raise AccessDenied(403, "tenant_mismatch", None, principal)
+            raise DeniedError(403, "tenant_mismatch", None, principal)
         wait = self.limiter.take(principal.subject)
         if wait is not None:
-            raise AccessDenied(429, "rate_limited", wait, principal)
+            raise DeniedError(429, "rate_limited", wait, principal)
         return principal
 
     def refuse(self, status: int, reason: str, remote: str) -> NoReturn:
@@ -404,13 +402,13 @@ class Gateway:
             remote: The peer address, counted against the failure limit.
 
         Raises:
-            AccessDenied: With the given status, or with 429 if the client has
+            DeniedError: With the given status, or with 429 if the client has
                 made too many refused attempts.
         """
         wait = self.failure_limiter.take(client_key(remote))
         if wait is not None:
-            raise AccessDenied(429, "too_many_failures", wait)
-        raise AccessDenied(status, reason)
+            raise DeniedError(429, "too_many_failures", wait)
+        raise DeniedError(status, reason)
 
     def rotate(self, keys: tokens.KeySet, actor: str, reason: str) -> None:
         """Replaces the verifier's trusted keys and audits the change.
@@ -436,7 +434,7 @@ class Gateway:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class AuthSettings:
+class Config:
     """Authentication settings read from the environment.
 
     Attributes:
@@ -458,7 +456,7 @@ class AuthSettings:
     audit_file: str
 
     @classmethod
-    def from_environment(cls, environ: Mapping[str, str]) -> "AuthSettings":
+    def from_environment(cls, environ: Mapping[str, str]) -> "Config":
         """Reads the authentication variables of an environment.
 
         These are `SCMLE_AUTH_KEYS_FILE`, `SCMLE_AUTH_HS256_SECRET`,
@@ -507,7 +505,7 @@ def gateway_from_environment(environ: Mapping[str, str]) -> Gateway | None:
             or the key file or inline secret is unusable (for example an
             HS256 secret under 32 bytes).
     """
-    settings = AuthSettings.from_environment(environ)
+    settings = Config.from_environment(environ)
     if not settings.configured:
         return None
     if not settings.issuer or not settings.audience:
@@ -520,7 +518,7 @@ def gateway_from_environment(environ: Mapping[str, str]) -> Gateway | None:
     else:
         keys = tokens.KeySet(
             [
-                tokens.VerificationKey(
+                tokens.Key(
                     "env", tokens.HS256, secret=settings.hs256_secret.encode()
                 )
             ]
@@ -539,8 +537,8 @@ def gateway_from_environment(environ: Mapping[str, str]) -> Gateway | None:
 
         revocation_source = revocations
 
-    verifier = tokens.TokenVerifier(
+    verifier = tokens.Verifier(
         keys, settings.issuer, settings.audience, revocations=revocation_source
     )
-    log = scmle.security.audit.AuditLog.open(settings.audit_file or None)
+    log = scmle.security.audit.Log.open(settings.audit_file or None)
     return Gateway(verifier, tenant=settings.tenant or None, audit=log)

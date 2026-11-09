@@ -14,9 +14,7 @@ from benchmarks.qualification import standins
 from scmle.data.detectors import certificates
 from scmle.data.detectors import sentinels
 
-POLICY = certificates.CertificationPolicy(
-    recall_floor=0.5, false_alarm_ceiling=0.1
-)
+POLICY = certificates.Standard(recall_floor=0.5, false_alarm_ceiling=0.1)
 
 
 def under_mutation() -> bool:
@@ -158,9 +156,7 @@ def test_every_standin_is_certified_with_its_current_code_hash():
     store = standins.certify_all(seeds=(0, 1, 2))
     for name, standin in standins.STANDINS.items():
         digest = standin.code_hash()
-        assert (
-            store.state(name, digest) is certificates.CertificateState.CURRENT
-        )
+        assert store.state(name, digest) is certificates.Freshness.CURRENT
         assert (
             store.status(name, digest, standin.plan.defect_type)
             is certificates.GateStatus.GATING
@@ -172,23 +168,23 @@ def test_editing_a_standin_makes_its_certificate_stale():
     store = standins.certify_all(seeds=(0,))
     name = "standin-duplicate"
     changed = "f" * 64
-    assert store.state(name, changed) is certificates.CertificateState.STALE
+    assert store.state(name, changed) is certificates.Freshness.STALE
     with pytest.raises(certificates.StaleCertificateError):
         store.mark_gating(name, changed, "duplicate_exact")
 
 
 def test_the_committed_sample_is_current_for_the_standin_code():
-    store = certificates.CertificateStore.load(standins.SAMPLE_PATH)
+    store = certificates.Store.load(standins.SAMPLE_PATH)
     assert {c.detector_id for c in store.certificates} == set(standins.STANDINS)
     problems = standins.sample_problems(store)
     assert problems == []
 
 
 def test_a_sample_with_an_old_code_hash_is_reported():
-    store = certificates.CertificateStore.load(standins.SAMPLE_PATH)
+    store = certificates.Store.load(standins.SAMPLE_PATH)
     document = store.to_dict()
     document["certificates"][0]["code_hash"] = "0" * 64
-    stale = certificates.CertificateStore.from_dict(document)
+    stale = certificates.Store.from_dict(document)
     assert standins.sample_problems(stale)
 
 
@@ -229,7 +225,7 @@ def test_the_command_line_runs_smoke_check_and_writes_a_sample(
     target = tmp_path / "sample.json"
     assert __main__.main(["--write-sample", str(target)]) == 0
     capsys.readouterr()
-    written = certificates.CertificateStore.load(target)
+    written = certificates.Store.load(target)
     assert standins.sample_problems(written) == []
     with pytest.raises(SystemExit):
         __main__.main([])

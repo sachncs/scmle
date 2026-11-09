@@ -40,7 +40,7 @@ MAX_ITERATIVE_FEATURES = 50
 CALIBRATION_FOLDS = 3
 
 
-class DataStrategy(abc.ABC):
+class Strategy(abc.ABC):
     """One way of preparing and wrapping a candidate pipeline.
 
     Attributes:
@@ -54,8 +54,8 @@ class DataStrategy(abc.ABC):
     def applicability(
         self,
         profile: data.DatasetProfile,
-        task: tasks.TaskType,
-        adapter: models.ModelAdapter,
+        task: tasks.Task,
+        adapter: models.Model,
     ) -> str | None:
         """Explains why the strategy does not apply, if it does not.
 
@@ -75,8 +75,8 @@ class DataStrategy(abc.ABC):
     def build(
         self,
         plan: data.FeaturePlan,
-        adapter: models.ModelAdapter,
-        task: tasks.TaskType,
+        adapter: models.Model,
+        task: tasks.Task,
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
@@ -94,7 +94,7 @@ class DataStrategy(abc.ABC):
         """
 
 
-class DefaultStrategy(DataStrategy):
+class Default(Strategy):
     """Standard preprocessing; the reference every other strategy must beat."""
 
     name = experiments.DEFAULT_STRATEGY
@@ -103,8 +103,8 @@ class DefaultStrategy(DataStrategy):
     def applicability(
         self,
         profile: data.DatasetProfile,
-        task: tasks.TaskType,
-        adapter: models.ModelAdapter,
+        task: tasks.Task,
+        adapter: models.Model,
     ) -> str | None:
         """Always applicable.
 
@@ -121,8 +121,8 @@ class DefaultStrategy(DataStrategy):
     def build(
         self,
         plan: data.FeaturePlan,
-        adapter: models.ModelAdapter,
-        task: tasks.TaskType,
+        adapter: models.Model,
+        task: tasks.Task,
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
@@ -141,14 +141,14 @@ class DefaultStrategy(DataStrategy):
         return preprocessing.build_pipeline(plan, adapter, task, seed, params)
 
 
-class ImbalanceStrategy(DataStrategy):
+class Rebalancing(Strategy):
     """Base for strategies that address class imbalance."""
 
     def applicability(
         self,
         profile: data.DatasetProfile,
-        task: tasks.TaskType,
-        adapter: models.ModelAdapter,
+        task: tasks.Task,
+        adapter: models.Model,
     ) -> str | None:
         """Requires a classification task with noticeably skewed classes.
 
@@ -174,7 +174,7 @@ class ImbalanceStrategy(DataStrategy):
         return None
 
 
-class ClassWeightStrategy(ImbalanceStrategy):
+class ClassWeighting(Rebalancing):
     """Re-weights classes inversely to their frequency."""
 
     name = "class_weight"
@@ -183,8 +183,8 @@ class ClassWeightStrategy(ImbalanceStrategy):
     def applicability(
         self,
         profile: data.DatasetProfile,
-        task: tasks.TaskType,
-        adapter: models.ModelAdapter,
+        task: tasks.Task,
+        adapter: models.Model,
     ) -> str | None:
         """Also requires an estimator with a `class_weight` parameter.
 
@@ -206,8 +206,8 @@ class ClassWeightStrategy(ImbalanceStrategy):
     def build(
         self,
         plan: data.FeaturePlan,
-        adapter: models.ModelAdapter,
-        task: tasks.TaskType,
+        adapter: models.Model,
+        task: tasks.Task,
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
@@ -227,7 +227,7 @@ class ClassWeightStrategy(ImbalanceStrategy):
         return preprocessing.build_pipeline(plan, adapter, task, seed, weighted)
 
 
-class ResamplingStrategy(ImbalanceStrategy):
+class FoldResampling(Rebalancing):
     """Base for strategies that resample each training fold.
 
     Attributes:
@@ -239,8 +239,8 @@ class ResamplingStrategy(ImbalanceStrategy):
     def build(
         self,
         plan: data.FeaturePlan,
-        adapter: models.ModelAdapter,
-        task: tasks.TaskType,
+        adapter: models.Model,
+        task: tasks.Task,
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
@@ -262,7 +262,7 @@ class ResamplingStrategy(ImbalanceStrategy):
         )
 
 
-class OversampleStrategy(ResamplingStrategy):
+class Oversampling(FoldResampling):
     """Random oversampling of minority classes inside each training fold."""
 
     name = "random_oversample"
@@ -270,7 +270,7 @@ class OversampleStrategy(ResamplingStrategy):
     resampler_class = resampling.RandomOverSampler
 
 
-class UndersampleStrategy(ResamplingStrategy):
+class Undersampling(FoldResampling):
     """Random undersampling of majority classes inside each training fold."""
 
     name = "random_undersample"
@@ -278,7 +278,7 @@ class UndersampleStrategy(ResamplingStrategy):
     resampler_class = resampling.RandomUnderSampler
 
 
-class CalibrationStrategy(DataStrategy):
+class Recalibration(Strategy):
     """Recalibrates predicted probabilities (sigmoid, fitted inside folds)."""
 
     name = "calibrated"
@@ -287,8 +287,8 @@ class CalibrationStrategy(DataStrategy):
     def applicability(
         self,
         profile: data.DatasetProfile,
-        task: tasks.TaskType,
-        adapter: models.ModelAdapter,
+        task: tasks.Task,
+        adapter: models.Model,
     ) -> str | None:
         """Needs a probabilistic classifier worth calibrating.
 
@@ -314,8 +314,8 @@ class CalibrationStrategy(DataStrategy):
     def build(
         self,
         plan: data.FeaturePlan,
-        adapter: models.ModelAdapter,
-        task: tasks.TaskType,
+        adapter: models.Model,
+        task: tasks.Task,
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
@@ -339,11 +339,11 @@ class CalibrationStrategy(DataStrategy):
         )
 
 
-class JitterStrategy(ResamplingStrategy):
+class Jitter(FoldResampling):
     """Experimental augmentation: jittered minority copies in each fold.
 
     Not part of the default strategy list; request it explicitly with
-    `StrategySpec(names=["jitter_augment"])`.
+    `Strategies(names=["jitter_augment"])`.
     """
 
     name = "jitter_augment"
@@ -351,7 +351,7 @@ class JitterStrategy(ResamplingStrategy):
     resampler_class = resampling.JitterOverSampler
 
 
-class CopulaAugmentStrategy(ResamplingStrategy):
+class Copula(FoldResampling):
     """Experimental augmentation: Gaussian-copula synthetic minority rows.
 
     Opt-in only; adopted only when it beats the un-augmented baseline on the
@@ -363,7 +363,7 @@ class CopulaAugmentStrategy(ResamplingStrategy):
     resampler_class = synthesis.CopulaOverSampler
 
 
-class SmoteStrategy(ImbalanceStrategy):
+class Smote(Rebalancing):
     """SMOTE-family oversampling on the encoded training fold.
 
     Attributes:
@@ -376,8 +376,8 @@ class SmoteStrategy(ImbalanceStrategy):
     def applicability(
         self,
         profile: data.DatasetProfile,
-        task: tasks.TaskType,
-        adapter: models.ModelAdapter,
+        task: tasks.Task,
+        adapter: models.Model,
     ) -> str | None:
         """Needs imbalanced-learn and a purely numeric feature space.
 
@@ -403,8 +403,8 @@ class SmoteStrategy(ImbalanceStrategy):
     def build(
         self,
         plan: data.FeaturePlan,
-        adapter: models.ModelAdapter,
-        task: tasks.TaskType,
+        adapter: models.Model,
+        task: tasks.Task,
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
@@ -422,9 +422,7 @@ class SmoteStrategy(ImbalanceStrategy):
         """
         over_sampling = importlib.import_module("imblearn.over_sampling")
         sampler = getattr(over_sampling, self.sampler_name)(random_state=seed)
-        options = data.PreprocessingOptions(
-            scale=adapter.capabilities.needs_scaling
-        )
+        options = data.Preprocessing(scale=adapter.capabilities.needs_scaling)
         return resampling.PreprocessedResamplingClassifier(
             preprocessing.build_front_end(plan, options),
             sampler,
@@ -432,7 +430,7 @@ class SmoteStrategy(ImbalanceStrategy):
         )
 
 
-class BorderlineSmoteStrategy(SmoteStrategy):
+class BorderlineSmote(Smote):
     """Borderline-SMOTE: synthesizes only near the decision boundary."""
 
     name = "borderline_smote"
@@ -440,7 +438,7 @@ class BorderlineSmoteStrategy(SmoteStrategy):
     sampler_name = "BorderlineSMOTE"
 
 
-class PlainSmoteStrategy(SmoteStrategy):
+class PlainSmote(Smote):
     """Classic SMOTE."""
 
     name = "smote"
@@ -448,7 +446,7 @@ class PlainSmoteStrategy(SmoteStrategy):
     sampler_name = "SMOTE"
 
 
-class AdasynStrategy(SmoteStrategy):
+class Adasyn(Smote):
     """ADASYN: more synthetic rows where minority density is low."""
 
     name = "adasyn"
@@ -456,7 +454,7 @@ class AdasynStrategy(SmoteStrategy):
     sampler_name = "ADASYN"
 
 
-class FeatureStrategy(DataStrategy):
+class Features(Strategy):
     """Base for strategies that change the numeric preprocessing.
 
     Attributes:
@@ -476,8 +474,8 @@ class FeatureStrategy(DataStrategy):
     def build(
         self,
         plan: data.FeaturePlan,
-        adapter: models.ModelAdapter,
-        task: tasks.TaskType,
+        adapter: models.Model,
+        task: tasks.Task,
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
@@ -508,7 +506,7 @@ class FeatureStrategy(DataStrategy):
         )
 
 
-class LogSkewedStrategy(FeatureStrategy):
+class LogTransform(Features):
     """Log-transforms right-skewed, non-negative numeric features."""
 
     name = "log_skewed"
@@ -518,8 +516,8 @@ class LogSkewedStrategy(FeatureStrategy):
     def applicability(
         self,
         profile: data.DatasetProfile,
-        task: tasks.TaskType,
-        adapter: models.ModelAdapter,
+        task: tasks.Task,
+        adapter: models.Model,
     ) -> str | None:
         """Needs a skewed feature and a model sensitive to monotone shifts.
 
@@ -549,7 +547,7 @@ class LogSkewedStrategy(FeatureStrategy):
         return None
 
 
-class RareTargetStrategy(DataStrategy):
+class RareTarget(Strategy):
     """Regression policy for a long-tailed target: inverse-density weights.
 
     Classification resampling does not transfer to a continuous target, so
@@ -564,8 +562,8 @@ class RareTargetStrategy(DataStrategy):
     def applicability(
         self,
         profile: data.DatasetProfile,
-        task: tasks.TaskType,
-        adapter: models.ModelAdapter,
+        task: tasks.Task,
+        adapter: models.Model,
     ) -> str | None:
         """Needs a skewed regression target and a model taking weights.
 
@@ -600,8 +598,8 @@ class RareTargetStrategy(DataStrategy):
     def build(
         self,
         plan: data.FeaturePlan,
-        adapter: models.ModelAdapter,
-        task: tasks.TaskType,
+        adapter: models.Model,
+        task: tasks.Task,
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
@@ -621,7 +619,7 @@ class RareTargetStrategy(DataStrategy):
         return resampling.DensityWeightedRegressor(inner)
 
 
-class TargetEncodingStrategy(DataStrategy):
+class TargetEncoding(Strategy):
     """Regularized, cross-fitted target encoding of high-cardinality columns.
 
     Replaces one-hot encoding of categorical features with many levels by a
@@ -635,8 +633,8 @@ class TargetEncodingStrategy(DataStrategy):
     def applicability(
         self,
         profile: data.DatasetProfile,
-        task: tasks.TaskType,
-        adapter: models.ModelAdapter,
+        task: tasks.Task,
+        adapter: models.Model,
     ) -> str | None:
         """Needs at least one high-cardinality categorical feature.
 
@@ -658,8 +656,8 @@ class TargetEncodingStrategy(DataStrategy):
     def build(
         self,
         plan: data.FeaturePlan,
-        adapter: models.ModelAdapter,
-        task: tasks.TaskType,
+        adapter: models.Model,
+        task: tasks.Task,
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
@@ -685,7 +683,7 @@ class TargetEncodingStrategy(DataStrategy):
         )
 
 
-class InteractionStrategy(FeatureStrategy):
+class Interactions(Features):
     """Adds pairwise numeric interactions for linear models."""
 
     name = "interactions"
@@ -695,8 +693,8 @@ class InteractionStrategy(FeatureStrategy):
     def applicability(
         self,
         profile: data.DatasetProfile,
-        task: tasks.TaskType,
-        adapter: models.ModelAdapter,
+        task: tasks.Task,
+        adapter: models.Model,
     ) -> str | None:
         """Linear models with a moderate number of numeric features.
 
@@ -719,7 +717,7 @@ class InteractionStrategy(FeatureStrategy):
         return None
 
 
-class ConstructFeaturesStrategy(FeatureStrategy):
+class FeatureConstruction(Features):
     """Adds differences and ratios of the numeric features that matter most."""
 
     name = "construct_features"
@@ -729,8 +727,8 @@ class ConstructFeaturesStrategy(FeatureStrategy):
     def applicability(
         self,
         profile: data.DatasetProfile,
-        task: tasks.TaskType,
-        adapter: models.ModelAdapter,
+        task: tasks.Task,
+        adapter: models.Model,
     ) -> str | None:
         """Needs at least two numeric features to combine.
 
@@ -750,7 +748,7 @@ class ConstructFeaturesStrategy(FeatureStrategy):
         return None
 
 
-class SelectFeaturesStrategy(FeatureStrategy):
+class FeatureSelection(Features):
     """Drops columns an L1-penalised linear model gives no weight."""
 
     name = "select_features"
@@ -760,8 +758,8 @@ class SelectFeaturesStrategy(FeatureStrategy):
     def applicability(
         self,
         profile: data.DatasetProfile,
-        task: tasks.TaskType,
-        adapter: models.ModelAdapter,
+        task: tasks.Task,
+        adapter: models.Model,
     ) -> str | None:
         """Needs enough features for removal to be meaningful.
 
@@ -784,14 +782,14 @@ class SelectFeaturesStrategy(FeatureStrategy):
         return None
 
 
-class MissingValueStrategy(FeatureStrategy):
+class Imputation(Features):
     """Base for strategies that change how missing numbers are filled."""
 
     def applicability(
         self,
         profile: data.DatasetProfile,
-        task: tasks.TaskType,
-        adapter: models.ModelAdapter,
+        task: tasks.Task,
+        adapter: models.Model,
     ) -> str | None:
         """Needs numeric gaps and a model that does not handle them itself.
 
@@ -819,7 +817,7 @@ class MissingValueStrategy(FeatureStrategy):
         return None
 
 
-class MissingIndicatorStrategy(MissingValueStrategy):
+class MissingIndicators(Imputation):
     """Fills with the median and flags which values were missing."""
 
     name = "missing_indicators"
@@ -832,8 +830,8 @@ class MissingIndicatorStrategy(MissingValueStrategy):
     def applicability(
         self,
         profile: data.DatasetProfile,
-        task: tasks.TaskType,
-        adapter: models.ModelAdapter,
+        task: tasks.Task,
+        adapter: models.Model,
     ) -> str | None:
         """Needs numeric gaps that the missingness report calls informative.
 
@@ -862,7 +860,7 @@ class MissingIndicatorStrategy(MissingValueStrategy):
         return None
 
 
-class IterativeImputationStrategy(MissingValueStrategy):
+class IterativeImputation(Imputation):
     """Predicts each missing value from the other features."""
 
     name = "iterative_imputation"
@@ -872,8 +870,8 @@ class IterativeImputationStrategy(MissingValueStrategy):
     def applicability(
         self,
         profile: data.DatasetProfile,
-        task: tasks.TaskType,
-        adapter: models.ModelAdapter,
+        task: tasks.Task,
+        adapter: models.Model,
     ) -> str | None:
         """Also bounded in width, because it fits a model per feature.
 
@@ -894,7 +892,7 @@ class IterativeImputationStrategy(MissingValueStrategy):
         return None
 
 
-class TargetTransformStrategy(DataStrategy):
+class TargetTransform(Strategy):
     """Regression on a compressed target, predicted in original units.
 
     A long-tailed target makes squared error chase the extremes; modelling a
@@ -908,8 +906,8 @@ class TargetTransformStrategy(DataStrategy):
     def applicability(
         self,
         profile: data.DatasetProfile,
-        task: tasks.TaskType,
-        adapter: models.ModelAdapter,
+        task: tasks.Task,
+        adapter: models.Model,
     ) -> str | None:
         """Needs a skewed regression target.
 
@@ -929,7 +927,7 @@ class TargetTransformStrategy(DataStrategy):
         reason = super().applicability(profile, task, adapter)
         if reason is not None:
             return reason
-        if task is not tasks.TaskType.REGRESSION:
+        if task is not tasks.Task.REGRESSION:
             return "target transforms are a regression technique"
         skew = abs(profile.target_summary.get("skew", 0.0))
         if skew < TARGET_SKEW_THRESHOLD:
@@ -939,8 +937,8 @@ class TargetTransformStrategy(DataStrategy):
     def build(
         self,
         plan: data.FeaturePlan,
-        adapter: models.ModelAdapter,
-        task: tasks.TaskType,
+        adapter: models.Model,
+        task: tasks.Task,
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
@@ -964,28 +962,28 @@ class TargetTransformStrategy(DataStrategy):
         )
 
 
-STRATEGIES: dict[str, DataStrategy] = {
+STRATEGIES: dict[str, Strategy] = {
     strategy.name: strategy
     for strategy in (
-        DefaultStrategy(),
-        ClassWeightStrategy(),
-        OversampleStrategy(),
-        UndersampleStrategy(),
-        PlainSmoteStrategy(),
-        BorderlineSmoteStrategy(),
-        AdasynStrategy(),
-        JitterStrategy(),
-        CopulaAugmentStrategy(),
-        CalibrationStrategy(),
-        LogSkewedStrategy(),
-        InteractionStrategy(),
-        ConstructFeaturesStrategy(),
-        SelectFeaturesStrategy(),
-        MissingIndicatorStrategy(),
-        IterativeImputationStrategy(),
-        TargetTransformStrategy(),
-        TargetEncodingStrategy(),
-        RareTargetStrategy(),
+        Default(),
+        ClassWeighting(),
+        Oversampling(),
+        Undersampling(),
+        PlainSmote(),
+        BorderlineSmote(),
+        Adasyn(),
+        Jitter(),
+        Copula(),
+        Recalibration(),
+        LogTransform(),
+        Interactions(),
+        FeatureConstruction(),
+        FeatureSelection(),
+        MissingIndicators(),
+        IterativeImputation(),
+        TargetTransform(),
+        TargetEncoding(),
+        RareTarget(),
     )
 }
 EXPERIMENTAL = tuple(
@@ -995,7 +993,7 @@ OPT_IN = frozenset({"jitter_augment", "copula_augment"})
 DEFAULT_NAMES = tuple(n for n in EXPERIMENTAL if n not in OPT_IN)
 
 
-def get_strategy(name: str) -> DataStrategy:
+def get_strategy(name: str) -> Strategy:
     """Looks up a registered data strategy.
 
     Args:

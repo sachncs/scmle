@@ -248,9 +248,9 @@ def test_trusted_is_refused_in_production_everywhere(
     with pytest.raises(
         errors.ArtifactError, match="trusted loading is refused"
     ):
-        bundle.ModelBundle.load(folder, trusted=True)
+        bundle.Bundle.load(folder, trusted=True)
     monkeypatch.setenv("SCMLE_ENV", "staging")
-    assert bundle.ModelBundle.load(folder, trusted=True)
+    assert bundle.Bundle.load(folder, trusted=True)
 
 
 def test_verification_happens_before_anything_is_deserialized(

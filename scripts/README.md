@@ -6,7 +6,7 @@ test under `tests/unit/`. Run any script with `uv run python scripts/<name>.py`.
 
 | Script | What it enforces | Called by |
 | --- | --- | --- |
-| `check_api_compatibility.py` | The public API (`scmle.__all__`) matches the snapshot in `tests/fixtures/public_api.json`. | `ci.yml`, preflight |
+| `check_api_compatibility.py` | The pinned public names, by defining module, match the snapshot in `tests/fixtures/public_api.json`. The package root exports nothing. | `ci.yml`, preflight |
 | `check_pytest_skips.py` | Every skip is listed in `pytest_skip_manifest.json` with a reason; any xfail fails. | every test job |
 | `pytest_skip_manifest.json` | The approved skips and their reasons (data for the script above). | `check_pytest_skips.py` |
 | `check_test_stability.py` | Repeats tests and applies the quarantine policy in `tests/quarantine.json` (owner, reason, expiry). | `full-suite.yml` |

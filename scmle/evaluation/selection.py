@@ -14,7 +14,7 @@ SCORE_PRECISION = 12
 BASELINE = "dummy"
 
 
-class SelectionPolicy(abc.ABC):
+class Selector(abc.ABC):
     """Orders trials from best to worst and picks the winner.
 
     Attributes:
@@ -26,10 +26,10 @@ class SelectionPolicy(abc.ABC):
     @abc.abstractmethod
     def rank(
         self,
-        trials: list[experiments.TrialResult],
+        trials: list[experiments.Trial],
         metric: metrics.Metric,
-        registry: scmle.models.registry.ModelRegistry,
-    ) -> list[experiments.TrialResult]:
+        registry: scmle.models.registry.Catalog,
+    ) -> list[experiments.Trial]:
         """Orders the eligible trials best first.
 
         Args:
@@ -46,10 +46,10 @@ class SelectionPolicy(abc.ABC):
 
     def select(
         self,
-        trials: list[experiments.TrialResult],
+        trials: list[experiments.Trial],
         metric: metrics.Metric,
-        registry: scmle.models.registry.ModelRegistry,
-    ) -> experiments.TrialResult:
+        registry: scmle.models.registry.Catalog,
+    ) -> experiments.Trial:
         """Returns the best-ranked trial.
 
         Args:
@@ -64,7 +64,7 @@ class SelectionPolicy(abc.ABC):
         return self.rank(trials, metric, registry)[0]
 
 
-class BestMeanPolicy(SelectionPolicy):
+class MeanSelector(Selector):
     """Best mean cross-validation score, with an explicit tie policy.
 
     Candidates whose score is indistinguishable from the best (within
@@ -78,17 +78,17 @@ class BestMeanPolicy(SelectionPolicy):
         rule: The selection settings.
     """
 
-    def __init__(self, rule: tasks.SelectionSpec | None = None) -> None:
+    def __init__(self, rule: tasks.Selection | None = None) -> None:
         """Initializes the policy.
 
         Args:
             rule: Selection settings; defaults to the plain best-mean rule.
         """
-        self.rule = rule or tasks.SelectionSpec()
+        self.rule = rule or tasks.Selection()
         self.description = self.describe(self.rule)
 
     @staticmethod
-    def describe(rule: tasks.SelectionSpec) -> str:
+    def describe(rule: tasks.Selection) -> str:
         """Describes the selection rule for the evaluation report.
 
         Args:
@@ -115,8 +115,8 @@ class BestMeanPolicy(SelectionPolicy):
 
     def probably_equivalent(
         self,
-        best: experiments.TrialResult,
-        other: experiments.TrialResult,
+        best: experiments.Trial,
+        other: experiments.Trial,
         sign: int,
     ) -> bool:
         """Returns whether the best trial is not credibly better than `other`.
@@ -150,10 +150,10 @@ class BestMeanPolicy(SelectionPolicy):
 
     def rank(
         self,
-        trials: list[experiments.TrialResult],
+        trials: list[experiments.Trial],
         metric: metrics.Metric,
-        registry: scmle.models.registry.ModelRegistry,
-    ) -> list[experiments.TrialResult]:
+        registry: scmle.models.registry.Catalog,
+    ) -> list[experiments.Trial]:
         """Sorts by score, resolving ties with the configured tie-breaker.
 
         Args:
@@ -178,10 +178,10 @@ class BestMeanPolicy(SelectionPolicy):
         pool = [t for t in ok if t.model_name != BASELINE] or ok
         sign = 1 if metric.greater_is_better else -1
 
-        def by_score(trial: experiments.TrialResult) -> tuple:
+        def by_score(trial: experiments.Trial) -> tuple:
             return (-sign * round(trial.score_mean, SCORE_PRECISION),)
 
-        def tie_key(trial: experiments.TrialResult) -> tuple:
+        def tie_key(trial: experiments.Trial) -> tuple:
             cost = registry.get(trial.model_name).capabilities.cost
             plain = trial.strategy == experiments.DEFAULT_STRATEGY
             ordering = (

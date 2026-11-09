@@ -4,7 +4,7 @@ import numpy
 import pandas
 import support
 
-import scmle
+import scmle.api.project
 from scmle.experimentation import stores
 
 
@@ -99,4 +99,4 @@ def test_old_databases_are_migrated(tmp_path):
         "r", fingerprint={"a": 1.0}, task="regression", selected_strategy="x"
     )
     assert store.runs()[0]["selected_strategy"] == "x"
-    assert isinstance(scmle.MLProject, type)
+    assert isinstance(scmle.api.project.Project, type)

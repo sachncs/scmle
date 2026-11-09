@@ -11,7 +11,7 @@ import scmle.core.context
 from scmle.experimentation import trials
 from scmle.models import ensembles
 
-COMBINERS = (ensembles.StackingAdapter.name, ensembles.BlendingAdapter.name)
+COMBINERS = (ensembles.Stacking.name, ensembles.Blending.name)
 
 
 class EnsembleSearch:
@@ -24,7 +24,7 @@ class EnsembleSearch:
     """
 
     def __init__(
-        self, context: scmle.core.context.RunContext, runner: trials.TrialRunner
+        self, context: scmle.core.context.Context, runner: trials.TrialRunner
     ) -> None:
         """Initializes the search.
 
@@ -37,8 +37,8 @@ class EnsembleSearch:
         self.metric = scmle.core.context.require(context.metric, "metric")
 
     def members(
-        self, evaluated: list[experiments.TrialResult], size: int
-    ) -> list[experiments.TrialResult]:
+        self, evaluated: list[experiments.Trial], size: int
+    ) -> list[experiments.Trial]:
         """Picks the best default-strategy trial of each distinct model.
 
         Args:
@@ -58,12 +58,12 @@ class EnsembleSearch:
             and t.model_name not in COMBINERS
             and self.context.registry.get(t.model_name).family != "baseline"
         ]
-        best: dict[str, experiments.TrialResult] = {}
+        best: dict[str, experiments.Trial] = {}
         for trial in sorted(eligible, key=lambda t: -sign * t.score_mean):
             best.setdefault(trial.model_name, trial)
         return list(best.values())[:size]
 
-    def search(self, evaluated: list[experiments.TrialResult]) -> None:
+    def search(self, evaluated: list[experiments.Trial]) -> None:
         """Evaluates one stack and one blend and records the verdicts.
 
         Nothing is done if the configured ensemble size is below
@@ -112,8 +112,8 @@ class EnsembleSearch:
     def judge(
         self,
         combiner: str,
-        leader: experiments.TrialResult,
-        outcome: experiments.TrialResult,
+        leader: experiments.Trial,
+        outcome: experiments.Trial,
         names: list[str],
     ) -> None:
         """Compares an ensemble with its best member and records the verdict.

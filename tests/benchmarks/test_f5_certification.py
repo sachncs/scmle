@@ -12,7 +12,7 @@ from scmle.data.detectors import registry
 
 @pytest.fixture(scope="module")
 def committed():
-    return certificates.CertificateStore.load(f5.CERT_PATH)
+    return certificates.Store.load(f5.CERT_PATH)
 
 
 def test_policy_is_the_pre_declared_one():
@@ -46,9 +46,7 @@ def test_gating_lists_only_passing_outcomes(committed):
 
 
 def test_a_changed_detector_makes_its_certificate_stale(committed, monkeypatch):
-    monkeypatch.setattr(
-        registry.DetectorSpec, "code_hash", lambda self: "f" * 64
-    )
+    monkeypatch.setattr(registry.Identity, "code_hash", lambda self: "f" * 64)
     assert len(f5.problems(committed)) == len(registry.SPECS)
     assert f5.gating(committed) == []
 

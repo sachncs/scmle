@@ -16,7 +16,7 @@ objects, once each, in sorted key order:
   own digest. A checkpoint that fails its digest stops the run; it is never
   silently reset.
 * **Retried.** Transient errors from the store or the transform are retried
-  under a `RetryPolicy`; anything else stops the run at that object with the
+  under a `Retries`; anything else stops the run at that object with the
   checkpoint unchanged.
 * **Recoverable.** The output is written before the checkpoint. A crash
   between the two leaves the object unrecorded, so the next run processes it
@@ -131,7 +131,7 @@ class Checkpoint:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class RunResult:
+class Processing:
     """What one run did.
 
     Attributes:
@@ -216,7 +216,7 @@ class IncrementalProcessor:
         lock_key: str = "state/lock",
         gate: quality.QualityGate | None = None,
         stage: quality.Stage = quality.Stage.TRAIN,
-        policy: retry.RetryPolicy | None = None,
+        policy: retry.Retries | None = None,
         sleep: Callable[[float], None] = time.sleep,
         reader: snapshot.SnapshotReader | None = None,
         before_commit: Callable[[str], None] | None = None,
@@ -253,7 +253,7 @@ class IncrementalProcessor:
         self.lock_key = lock_key
         self.gate = gate
         self.stage = stage
-        self.policy = policy or retry.RetryPolicy()
+        self.policy = policy or retry.Retries()
         self.sleep = sleep
         self.reader = reader or snapshot.SnapshotReader(store)
         self.before_commit = before_commit
@@ -312,7 +312,7 @@ class IncrementalProcessor:
 
         return retry.call_with_retries(operation, self.policy, sleep=sleeper)
 
-    def run(self, max_objects: int | None = None) -> RunResult:
+    def run(self, max_objects: int | None = None) -> Processing:
         """Processes the new input objects.
 
         Args:
@@ -339,7 +339,7 @@ class IncrementalProcessor:
         finally:
             self.store.delete(self.lock_key)
 
-    def run_locked(self, max_objects: int | None) -> RunResult:
+    def run_locked(self, max_objects: int | None) -> Processing:
         """Runs with the lock held.
 
         Lists the inputs in key order. An input already in the checkpoint
@@ -397,7 +397,7 @@ class IncrementalProcessor:
             duplicate_rows += dropped
             rows_out += written
             outputs.append(output_key)
-        return RunResult(
+        return Processing(
             tuple(done),
             tuple(skipped),
             tuple(duplicate_objects),

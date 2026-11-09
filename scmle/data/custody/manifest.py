@@ -1,6 +1,6 @@
 """Split manifest v2: a full-length hash over the whole three-way split.
 
-The v1 `SplitManifest.fingerprint` is `sha256(repr(...))` cut to 16 hex
+The v1 `Manifest.fingerprint` is `sha256(repr(...))` cut to 16 hex
 characters. That is too short to be a commitment and depends on Python's
 `repr`. Version 2 hashes canonical JSON of every id, the strategy, seed,
 embargo, the charter hash and the data hash, and keeps the full 64 hex
@@ -51,7 +51,7 @@ def ids(value: Any, name: str) -> tuple[int, ...]:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class CustodyManifest:
+class Manifest:
     """Immutable record of the three-way split.
 
     Attributes:
@@ -256,7 +256,7 @@ class CustodyManifest:
         return manifest
 
 
-def read_v1(record: Mapping[str, Any]) -> splitters.SplitManifest:
+def read_v1(record: Mapping[str, Any]) -> splitters.Manifest:
     """Rebuilds a v1 manifest and checks its 16-hex fingerprint.
 
     Args:
@@ -269,7 +269,7 @@ def read_v1(record: Mapping[str, Any]) -> splitters.SplitManifest:
         ArtifactError: If the recorded fingerprint differs from the one
             computed from the content.
     """
-    manifest = splitters.SplitManifest(
+    manifest = splitters.Manifest(
         strategy=record["strategy"],
         seed=record["seed"],
         train_ids=tuple(record["train_ids"]),
@@ -288,21 +288,21 @@ def read_v1(record: Mapping[str, Any]) -> splitters.SplitManifest:
 
 def load_manifest(
     record: Mapping[str, Any],
-) -> CustodyManifest | splitters.SplitManifest:
+) -> Manifest | splitters.Manifest:
     """Reads a manifest of either version and verifies it.
 
     Args:
         record: A parsed manifest file.
 
     Returns:
-        A `CustodyManifest` (v2) or a `SplitManifest` (v1).
+        A `Manifest` (v2) or a `Manifest` (v1).
 
     Raises:
         ArtifactError: On an unknown version or a failed hash check.
     """
     version = record.get("manifest_version")
     if version == MANIFEST_VERSION:
-        return CustodyManifest.from_dict(record)
+        return Manifest.from_dict(record)
     if version is None and "train_ids" in record:
         return read_v1(record)
     raise errors.ArtifactError(

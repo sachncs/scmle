@@ -62,7 +62,7 @@ def observational(n: int, seed: int, tau: float = 2.0, hidden: float = 0.0):
     )
 
 
-def block(**changes) -> causal.CausalSpec:
+def block(**changes) -> causal.Question:
     values = {
         "treatment": "t",
         "outcome": "y",
@@ -71,10 +71,10 @@ def block(**changes) -> causal.CausalSpec:
         "strategies": ("backdoor_aipw",),
         "negative_controls": (causal.NegativeControl("outcome", "nco"),),
         "strata": ("region",),
-        "sensitivity": causal.SensitivitySpec("strongest_observed", 1.0),
+        "sensitivity": causal.Confounding("strongest_observed", 1.0),
     }
     values.update(changes)
-    return causal.CausalSpec(**values)
+    return causal.Question(**values)
 
 
 def go(spec, x, c, **kw):
@@ -123,7 +123,7 @@ def test_with_a_checked_dag_and_certificates_the_claim_is_confirmed():
             ("b", "nco"),
         ),
     )
-    spec = block(sensitivity=causal.SensitivitySpec("strongest_observed", 0.2))
+    spec = block(sensitivity=causal.Confounding("strongest_observed", 0.2))
     out = go(spec, observational(3000, 3), observational(5000, 4), dag=graph)
     claims = out.documents["causal_claims.json"]
     assert claims["tier"] == "confirmed", claims["reasons"]
@@ -243,7 +243,7 @@ def did_frame(seed, n=120, tau=1.5, periods=5):
 
 
 def test_difference_in_differences_runs_through_the_same_documents():
-    spec = causal.CausalSpec(
+    spec = causal.Question(
         treatment="g",
         outcome="y",
         estimand="ATT_DID",
@@ -254,7 +254,7 @@ def test_difference_in_differences_runs_through_the_same_documents():
         strategies=("did",),
         negative_controls=(causal.NegativeControl("outcome", "nco"),),
         strata=("region",),
-        sensitivity=causal.SensitivitySpec(m_max=1.0),
+        sensitivity=causal.Confounding(m_max=1.0),
     )
     out = go(spec, did_frame(1, 400), did_frame(2, 400))
     est = out.documents["identification_report.json"]["estimate"]
@@ -280,7 +280,7 @@ def test_instrument_and_discontinuity_and_synthetic_control_run():
         y = 2 * d + 1.5 * u + rng.standard_normal(n)
         return pandas.DataFrame({"z": z, "d": d, "y": y})
 
-    iv_spec = causal.CausalSpec(
+    iv_spec = causal.Question(
         treatment="d",
         outcome="y",
         estimand="LATE",
@@ -306,7 +306,7 @@ def test_instrument_and_discontinuity_and_synthetic_control_run():
         y = 2 * x + (x >= 0) + rng.normal(scale=0.5, size=n)
         return pandas.DataFrame({"x": x, "y": y})
 
-    rd_spec = causal.CausalSpec(
+    rd_spec = causal.Question(
         treatment="d",
         outcome="y",
         estimand="LATE_RD",
@@ -337,7 +337,7 @@ def test_instrument_and_discontinuity_and_synthetic_control_run():
             treated = float(u == 0 and t >= 12)
             rows.append((u, t, y + 3.0 * treated, treated))
     panel = pandas.DataFrame(rows, columns=["u", "t", "y", "d"])
-    sc_spec = causal.CausalSpec(
+    sc_spec = causal.Question(
         treatment="d",
         outcome="y",
         estimand="ATT_SC",
@@ -364,8 +364,8 @@ def test_c_is_only_used_after_the_design_step():
     # the adapter receives X alone in prepare(); C never reaches it
     import inspect
 
-    assert "c" not in inspect.signature(run.Adapter.prepare).parameters
-    assert "c" not in inspect.signature(run.Adapter.__init__).parameters
+    assert "c" not in inspect.signature(run.Estimator.prepare).parameters
+    assert "c" not in inspect.signature(run.Estimator.__init__).parameters
 
 
 def test_alphas_split_the_confirmation_level_four_to_one():
@@ -385,7 +385,7 @@ def test_design_only_never_estimates_and_is_unverified():
     assert refused.documents["causal_claims.json"]["status"] == "not_identified"
 
 
-class StubAdapter(run.Adapter):
+class StubAdapter(run.Estimator):
     name = "stub"
 
     def estimate(self, c, level):

@@ -23,7 +23,7 @@ def test_hyperband_with_a_grid_tunes_and_prunes_cheaply(tmp_path):
         time_budget=300,
         output_dir=tmp_path,
         folds=5,
-        search=tasks.SearchSpec(
+        search=tasks.Search(
             top_models=1,
             configs_per_model=8,
             optimizer="grid",
@@ -44,7 +44,7 @@ def test_the_pareto_front_is_reported_and_the_fast_model_wins_a_tie(tmp_path):
         "y",
         time_budget=300,
         output_dir=tmp_path,
-        selection=tasks.SelectionSpec(pareto=True, pareto_tolerance=0.05),
+        selection=tasks.Selection(pareto=True, pareto_tolerance=0.05),
     ).run()
 
     front = result.evaluation["pareto_front"]

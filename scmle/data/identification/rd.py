@@ -133,7 +133,7 @@ def cv_bandwidth(x: numpy.ndarray, y: numpy.ndarray) -> float:
 
 
 @dataclasses.dataclass(frozen=True)
-class RdResult:
+class Estimate:
     """A regression discontinuity fit.
 
     Attributes:
@@ -233,7 +233,7 @@ def estimate(
     level: float = 0.95,
     bandwidth: float | None = None,
     covariates: tuple[str, ...] = (),
-) -> RdResult:
+) -> Estimate:
     """Fits the discontinuity, its diagnostics and bandwidth sensitivity.
 
     Args:
@@ -294,7 +294,7 @@ def estimate(
         found = discontinuity(x, y, cutoff, h * multiple, level)
         if found is not None:
             sensitivity[str(multiple)] = found
-    return RdResult(
+    return Estimate(
         estimate=main["estimate"],
         bias_corrected=main["bias_corrected"],
         se=main["se"],

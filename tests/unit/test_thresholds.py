@@ -70,9 +70,9 @@ def test_threshold_classifier_applies_cutoff_and_keeps_probabilities():
     target = pandas.Series(
         numpy.where(features.a + rng.normal(size=300) > 0, "yes", "no")
     )
-    model = thresholds.ThresholdClassifier(
-        linear_model.LogisticRegression(), 0.8
-    ).fit(features, target)
+    model = thresholds.Classifier(linear_model.LogisticRegression(), 0.8).fit(
+        features, target
+    )
     proba = model.predict_proba(features)[:, 1]
     expected = numpy.where(proba >= 0.8, "yes", "no")
     numpy.testing.assert_array_equal(model.predict(features), expected)
@@ -84,7 +84,7 @@ def test_around_fitted_does_not_refit_and_clone_resets():
     features = pandas.DataFrame({"a": numpy.arange(100.0)})
     target = pandas.Series([0] * 50 + [1] * 50)
     fitted = linear_model.LogisticRegression().fit(features, target)
-    wrapper = thresholds.ThresholdClassifier.around_fitted(fitted, 0.3)
+    wrapper = thresholds.Classifier.around_fitted(fitted, 0.3)
     assert wrapper.estimator_ is fitted and wrapper.predict(features).shape == (
         100,
     )

@@ -15,10 +15,10 @@ def test_bagging_adapters_pass_the_shared_conformance_suite(adapter_class):
 
 
 def test_the_bagger_wraps_the_base_model_and_applies_both_parameter_sets():
-    adapter = bagging.BaggedKnnAdapter()
+    adapter = bagging.BaggedKnn()
 
     estimator = adapter.build(
-        tasks.TaskType.BINARY,
+        tasks.Task.BINARY,
         0,
         {"n_estimators": 12, "max_samples": 0.7, "n_neighbors": 9},
     )
@@ -32,13 +32,13 @@ def test_regression_uses_the_regression_bagger_and_trees_gain_from_bagging():
     rng = numpy.random.default_rng(0)
     features = rng.normal(size=(400, 3))
     target = features[:, 0] * 2 + rng.normal(0, 1.0, 400)
-    adapter = bagging.BaggedTreeAdapter()
+    adapter = bagging.BaggedTree()
     single = (
         adapter.base()
-        .build(tasks.TaskType.REGRESSION, 0)
+        .build(tasks.Task.REGRESSION, 0)
         .fit(features[:300], target[:300])
     )
-    bagged = adapter.build(tasks.TaskType.REGRESSION, 0).fit(
+    bagged = adapter.build(tasks.Task.REGRESSION, 0).fit(
         features[:300], target[:300]
     )
 
@@ -54,7 +54,7 @@ def test_regression_uses_the_regression_bagger_and_trees_gain_from_bagging():
 
 
 def test_capabilities_follow_the_base_model_with_higher_cost():
-    adapter = bagging.BaggedLogisticAdapter()
+    adapter = bagging.BaggedLogistic()
 
     assert adapter.capabilities.tasks == adapter.base.capabilities.tasks
     assert adapter.capabilities.cost == adapter.base.capabilities.cost + 1

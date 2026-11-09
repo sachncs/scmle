@@ -15,7 +15,7 @@ from scmle.contracts import lineage
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class InferenceEvidenceLink:
+class Link:
     """Identity of one inference event linked to an exact model bundle.
 
     Attributes:
@@ -67,7 +67,7 @@ class InferenceEvidenceLink:
         return dataclasses.asdict(self)
 
 
-class InferenceEvidenceLinker:
+class Linker:
     """Appends exact-bundle inference nodes to a durable evidence graph."""
 
     def link(
@@ -79,7 +79,7 @@ class InferenceEvidenceLinker:
         output_fingerprint: str,
         bundle_digest: str,
         timestamp: str,
-    ) -> InferenceEvidenceLink:
+    ) -> Link:
         """Links an inference event and atomically persists the graph.
 
         The caller supplies fingerprints from the serving boundary. The
@@ -108,7 +108,7 @@ class InferenceEvidenceLinker:
                 ID is already used with a different identity, or the graph
                 file fails the checks of `load`.
         """
-        candidate = InferenceEvidenceLink(
+        candidate = Link(
             event_id=event_id,
             input_fingerprint=input_fingerprint,
             output_fingerprint=output_fingerprint,
@@ -119,7 +119,7 @@ class InferenceEvidenceLinker:
         path = pathlib.Path(graph_path)
         graph = self.load(path)
         bundle = graph.nodes.get("bundle")
-        if bundle is None or bundle.kind is not lineage.EvidenceNodeKind.BUNDLE:
+        if bundle is None or bundle.kind is not lineage.Kind.BUNDLE:
             raise ValueError("evidence graph has no bundle node")
         if bundle.digest != bundle_digest:
             raise ValueError("inference bundle digest does not match graph")
@@ -139,9 +139,9 @@ class InferenceEvidenceLinker:
                 sort_keys=True,
             ).encode("utf-8")
         ).hexdigest()
-        node = lineage.EvidenceNode(
+        node = lineage.Node(
             node_id=node_id,
-            kind=lineage.EvidenceNodeKind.INFERENCE,
+            kind=lineage.Kind.INFERENCE,
             digest=node_digest,
             attributes={
                 "event_id": candidate.event_id,
@@ -152,11 +152,11 @@ class InferenceEvidenceLinker:
             },
         )
         graph.add_node(node)
-        graph.add_edge(lineage.EvidenceEdge("bundle", node_id, "serves"))
+        graph.add_edge(lineage.Edge("bundle", node_id, "serves"))
         graph_record = graph.to_dict()
         graph_record["graph_digest"] = graph.digest()
         self.write_atomically(path, graph_record)
-        return InferenceEvidenceLink(
+        return Link(
             event_id=candidate.event_id,
             input_fingerprint=candidate.input_fingerprint,
             output_fingerprint=candidate.output_fingerprint,
@@ -166,7 +166,7 @@ class InferenceEvidenceLinker:
         )
 
     @staticmethod
-    def load(path: str | pathlib.Path) -> lineage.EvidenceGraph:
+    def load(path: str | pathlib.Path) -> lineage.Graph:
         """Loads and validates a persisted evidence graph.
 
         Args:
@@ -183,7 +183,7 @@ class InferenceEvidenceLinker:
         record = json.loads(pathlib.Path(path).read_text(encoding="utf-8"))
         if not isinstance(record, Mapping):
             raise TypeError("evidence graph must be a JSON object")
-        graph = lineage.EvidenceGraph.from_dict(record)
+        graph = lineage.Graph.from_dict(record)
         expected_digest = record.get("graph_digest")
         if expected_digest is not None and expected_digest != graph.digest():
             raise ValueError("evidence graph digest does not match content")

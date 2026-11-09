@@ -78,7 +78,7 @@ listed in `tests/unit/MUTANTS_custody.md`.
 ## Guidance for operators
 
 1. Set `SCMLE_SIGNING_KEY` wherever bundles are produced and verified.
-2. Rotate keys with `ModelBundle.rotate_signing_key(directory, old, new)`;
+2. Rotate keys with `Bundle.rotate_signing_key(directory, old, new)`;
    verify the new key before retiring the old one. Maintain the corresponding
    `SigningKeyRegistry` record and transition it to `retired` only after
    parity is confirmed.

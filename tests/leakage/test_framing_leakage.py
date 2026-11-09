@@ -23,7 +23,7 @@ def test_framing_reads_only_the_rows_it_is_given():
         }
     )
     source = draft.SourceDescription("u://x", tuple(x.columns), ("id",))
-    request = draft.FramingRequest("predict target y", source)
+    request = draft.Request("predict target y", source)
     first = draft.frame(request, x, cost_model=MODEL)
     sealed = pandas.concat([x, x.assign(y=1 - x["y"])], ignore_index=True)
     assert sealed.shape[0] == 400  # the sealed rows exist but are not passed
@@ -33,7 +33,7 @@ def test_framing_reads_only_the_rows_it_is_given():
 
 def test_baseline_claim_cannot_be_evaluated_twice_or_unregistered():
     rule = {"r": 1}
-    guard = baseline.BaselineGuard(baseline.register(MODEL, rule, 0.05))
+    guard = baseline.Evaluator(baseline.register(MODEL, rule, 0.05))
     y = numpy.array([1.0, 0.0] * 40)
     a = numpy.array([1.0, 0.0] * 40)
     b = numpy.zeros(80)
@@ -41,7 +41,7 @@ def test_baseline_claim_cannot_be_evaluated_twice_or_unregistered():
     guard.evaluate(y, a, b, clusters, rule=rule, model=MODEL)
     with pytest.raises(baseline.BaselineError):
         guard.evaluate(y, a, b, clusters, rule=rule, model=MODEL)
-    fresh = baseline.BaselineGuard(baseline.register(MODEL, rule, 0.05))
+    fresh = baseline.Evaluator(baseline.register(MODEL, rule, 0.05))
     with pytest.raises(baseline.BaselineError):
         fresh.evaluate(y, a, b, clusters, rule={"r": 2}, model=MODEL)
     assert not fresh.used

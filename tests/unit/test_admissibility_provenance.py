@@ -193,8 +193,8 @@ def test_records_round_trip_through_json():
         ),
         provenance.undeclared("c"),
     ]
-    table = provenance.ProvenanceTable(tuple(records))
-    again = provenance.ProvenanceTable.from_dict(
+    table = provenance.Dictionary(tuple(records))
+    again = provenance.Dictionary.from_dict(
         json.loads(json.dumps(table.to_dict()))
     )
     assert again == table
@@ -202,17 +202,17 @@ def test_records_round_trip_through_json():
 
 
 def test_digest_changes_with_any_edit():
-    base = provenance.ProvenanceTable((make_field("a", lead=3600.0),))
-    other = provenance.ProvenanceTable((make_field("a", lead=3601.0),))
+    base = provenance.Dictionary((make_field("a", lead=3600.0),))
+    other = provenance.Dictionary((make_field("a", lead=3601.0),))
     assert base.digest() != other.digest()
 
 
 def test_from_dict_rejects_unknown_versions_and_fields():
-    table = provenance.ProvenanceTable((make_field("a"),)).to_dict()
+    table = provenance.Dictionary((make_field("a"),)).to_dict()
     with pytest.raises(ValueError, match="format_version"):
-        provenance.ProvenanceTable.from_dict({**table, "format_version": 9})
+        provenance.Dictionary.from_dict({**table, "format_version": 9})
     with pytest.raises(ValueError, match="unexpected"):
-        provenance.ProvenanceTable.from_dict({**table, "extra": 1})
+        provenance.Dictionary.from_dict({**table, "extra": 1})
     record = dict(table["fields"][0])
     record["surprise"] = 1
     with pytest.raises(ValueError, match="unexpected"):
@@ -221,7 +221,7 @@ def test_from_dict_rejects_unknown_versions_and_fields():
 
 def test_covering_adds_unverified_records_for_undeclared_columns():
     declared = [make_field("b")]
-    table = provenance.ProvenanceTable.covering(["a", "b", "c"], declared)
+    table = provenance.Dictionary.covering(["a", "b", "c"], declared)
     assert [f.name for f in table.fields] == ["a", "b", "c"]
     tiers = table.tiers(DAY)
     assert tiers == {
@@ -230,9 +230,9 @@ def test_covering_adds_unverified_records_for_undeclared_columns():
         "c": Tier.UNVERIFIED,
     }
     with pytest.raises(ValueError, match="not in the data"):
-        provenance.ProvenanceTable.covering(["a"], [make_field("zzz")])
+        provenance.Dictionary.covering(["a"], [make_field("zzz")])
     with pytest.raises(ValueError, match="unique"):
-        provenance.ProvenanceTable.covering(
+        provenance.Dictionary.covering(
             ["b"], [make_field("b"), make_field("b")]
         )
     with pytest.raises(KeyError):
@@ -242,7 +242,7 @@ def test_covering_adds_unverified_records_for_undeclared_columns():
 
 def test_table_rejects_duplicate_names():
     with pytest.raises(ValueError, match="unique"):
-        provenance.ProvenanceTable((make_field("a"), make_field("a")))
+        provenance.Dictionary((make_field("a"), make_field("a")))
 
 
 def test_no_field_is_confirmed_without_a_log():
@@ -252,7 +252,7 @@ def test_no_field_is_confirmed_without_a_log():
 
 def test_a_table_without_fields_is_a_value_error():
     with pytest.raises(ValueError, match="fields"):
-        provenance.ProvenanceTable.from_dict({"format_version": 1})
+        provenance.Dictionary.from_dict({"format_version": 1})
 
 
 @pytest.mark.parametrize("value", [None, 5, ["x"]])

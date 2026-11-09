@@ -33,7 +33,7 @@ class AuditFinding:
 
 
 @dataclasses.dataclass(frozen=True)
-class AuditReport:
+class Audit:
     """The result of auditing one run.
 
     Attributes:
@@ -65,7 +65,7 @@ class RunAuditor:
     artifacts exist; the run ends in a terminal state.
     """
 
-    def audit(self, run_dir: str | pathlib.Path) -> AuditReport:
+    def audit(self, run_dir: str | pathlib.Path) -> Audit:
         """Audits one run directory.
 
         A malformed log (invalid JSON, or a record without the expected keys)
@@ -83,7 +83,7 @@ class RunAuditor:
         path = root / EVENTS_FILE
         if not path.exists():
             finding = AuditFinding("log.missing", f"{EVENTS_FILE} is absent")
-            return AuditReport(root.name, 0, (), (finding,))
+            return Audit(root.name, 0, (), (finding,))
         records = [
             json.loads(line)
             for line in path.read_text(encoding="utf-8").splitlines()
@@ -95,7 +95,7 @@ class RunAuditor:
             *self.check_test_access(records),
             *self.check_artifacts(root, records),
         ]
-        return AuditReport(
+        return Audit(
             root.name,
             len(records),
             self.decisions(root, records),

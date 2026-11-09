@@ -53,7 +53,7 @@ def signal_data(rows=300, seed=0):
 
 
 def spec(column, name=None, direction=bivariate.TWO_SIDED):
-    return scmle.data.ledger.ledger.HypothesisSpec.create(
+    return scmle.data.ledger.ledger.Test.create(
         name=name or f"{column}~y",
         family="f",
         statistic="spearman",
@@ -190,7 +190,7 @@ def test_a_result_row_without_a_reason_loads_with_an_empty_one(tmp_path):
 def test_a_hypothesis_without_a_column_reads_the_first_one():
     features, target = signal_data()
     ledger = fresh()
-    plain = scmle.data.ledger.ledger.HypothesisSpec.create(
+    plain = scmle.data.ledger.ledger.Test.create(
         name="first", family="f", statistic="spearman", null="x"
     )
     result = ledger.test(ledger.register(plain), features, target)
@@ -262,7 +262,7 @@ def test_the_claims_file_is_indented_sorted_json_in_a_new_folder(tmp_path):
 
 
 def test_assumptions_are_stated_in_full():
-    texts = confirm.assumptions(budget.MultiplicityRule.BY, 3)
+    texts = confirm.assumptions(budget.Correction.BY, 3)
     assert texts == (
         "FDR <= alpha * m0 / m under arbitrary dependence (rule by, family "
         "of 3 survivors fixed before C was opened)",
@@ -411,7 +411,7 @@ def test_a_custody_log_without_entries_gives_no_head():
 def test_hypotheses_without_a_column_or_with_a_direction_run_on_c():
     features, target = signal_data(600, 1)
     ledger = fresh(None, Fraction(1, 10))
-    plain = scmle.data.ledger.ledger.HypothesisSpec.create(
+    plain = scmle.data.ledger.ledger.Test.create(
         name="first", family="f", statistic="spearman", null="x"
     )
     up = spec("s", "up", bivariate.GREATER)
@@ -511,7 +511,7 @@ def test_a_governed_run_reports_exact_counts_and_artifacts(tmp_path):
         run_dir=tmp_path,
         exclude=("f5",),
         rule=online_fdr.LORD_PLUS_PLUS,
-        confirmation_rule=budget.MultiplicityRule.BH,
+        confirmation_rule=budget.Correction.BH,
     )
     summary = run.summary()
     assert summary["rule"] == "lord++" and run.confirmation.rule == "bh"

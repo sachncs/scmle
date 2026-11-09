@@ -22,8 +22,8 @@ import numpy
 from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.data.modalities.curation import build_finding
+from scmle.data.modalities.curation import Curation
 from scmle.data.modalities.curation import label_counts
-from scmle.data.modalities.curation import ModalityCurationReport
 
 GEOMETRY_TYPES = frozenset(
     {
@@ -473,7 +473,7 @@ class SpatialJoinMatch:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class SpatialJoinReport:
+class SpatialJoin:
     """Bounded, same-CRS evidence from a caller-owned spatial predicate.
 
     Attributes:
@@ -584,7 +584,7 @@ class SpatialJoinReport:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class SpatialReprojectionReport:
+class Provenance:
     """Evidence binding a caller-owned coordinate transformation.
 
     Attributes:
@@ -723,7 +723,7 @@ class SpatialBoundaryLeakage:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class GeospatialProfile:
+class Profile:
     """Bounded data-understanding summary for a vector dataset.
 
     Attributes:
@@ -778,7 +778,7 @@ class SpatialSplit:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class GeospatialTemporalSplit:
+class TemporalSplit:
     """Time-ordered geospatial features separated at a UTC cutoff.
 
     Attributes:
@@ -871,7 +871,7 @@ class SpatialAutocorrelation:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class GeospatialFeatures:
+class Features:
     """Numeric geometry features tied to an explicit CRS.
 
     Attributes:
@@ -902,7 +902,7 @@ class GeospatialFeatures:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class GeospatialDataset:
+class Dataset:
     """Immutable GeoJSON-like vector collection with CRS provenance.
 
     Attributes:
@@ -1014,7 +1014,7 @@ class GeospatialDataset:
             features.append(GeoFeature(feature_id, geometry, properties))
         return cls(tuple(features), crs=crs, source=source)
 
-    def profile(self) -> GeospatialProfile:
+    def profile(self) -> Profile:
         """Returns geometry counts, bounds, CRS, and immutable identity.
 
         Returns:
@@ -1024,7 +1024,7 @@ class GeospatialDataset:
         bounds = tuple(
             value for feature in self.features for value in feature.bounds
         )
-        return GeospatialProfile(
+        return Profile(
             feature_count=len(self.features),
             geometry_types=tuple(
                 sorted({feature.geometry_type for feature in self.features})
@@ -1039,7 +1039,7 @@ class GeospatialDataset:
             content_hash=self.content_hash,
         )
 
-    def curate(self) -> ModalityCurationReport:
+    def curate(self) -> Curation:
         """Builds geometry, CRS, and spatial-interpretation evidence.
 
         The profile includes label counts, temporal completeness, and global
@@ -1147,7 +1147,7 @@ class GeospatialDataset:
                     False,
                 )
             )
-        return ModalityCurationReport(
+        return Curation(
             modality="geospatial",
             dataset_hash=self.content_hash,
             sample_count=len(self.features),
@@ -1211,12 +1211,12 @@ class GeospatialDataset:
 
     def spatial_join(
         self,
-        other: "GeospatialDataset",
+        other: "Dataset",
         predicate: SpatialJoinPredicate,
         predicate_name: str,
         comparison_limit: int = 100_000,
         match_limit: int = 100_000,
-    ) -> SpatialJoinReport:
+    ) -> SpatialJoin:
         """Joins two same-CRS datasets through a bounded caller predicate.
 
         The core package does not choose a geometry engine, infer CRS
@@ -1246,8 +1246,8 @@ class GeospatialDataset:
                 ``comparison_limit``, the predicate raises or returns a
                 non-boolean, or the matches exceed ``match_limit``.
         """
-        if not isinstance(other, GeospatialDataset):
-            raise TypeError("other must be a GeospatialDataset")
+        if not isinstance(other, Dataset):
+            raise TypeError("other must be a Dataset")
         if not callable(predicate):
             raise TypeError("predicate must be callable")
         if not predicate_name.strip():
@@ -1318,7 +1318,7 @@ class GeospatialDataset:
                         )
         matched_left = {match.left_feature_id for match in matches}
         matched_right = {match.right_feature_id for match in matches}
-        return SpatialJoinReport(
+        return SpatialJoin(
             left_dataset_hash=self.content_hash,
             right_dataset_hash=other.content_hash,
             crs=self.crs.strip(),
@@ -1344,7 +1344,7 @@ class GeospatialDataset:
         target_crs: str,
         transformer: CoordinateTransformer,
         transformer_name: str,
-    ) -> "GeospatialReprojection":
+    ) -> "Reprojection":
         """Transforms coordinates through an explicit caller-owned policy.
 
         The core package does not select a CRS database or geometry engine.
@@ -1420,12 +1420,12 @@ class GeospatialDataset:
                     },
                 )
             transformed_features.append(transformed)
-        dataset = GeospatialDataset(
+        dataset = Dataset(
             tuple(transformed_features),
             crs=canonical_target_crs,
             source=self.source,
         )
-        report = SpatialReprojectionReport(
+        report = Provenance(
             source_dataset_hash=self.content_hash,
             target_dataset_hash=dataset.content_hash,
             source_crs=self.crs,
@@ -1433,7 +1433,7 @@ class GeospatialDataset:
             transformer_name=transformer_name.strip(),
             feature_count=len(transformed_features),
         )
-        return GeospatialReprojection(dataset=dataset, report=report)
+        return Reprojection(dataset=dataset, report=report)
 
     def spatial_autocorrelation(
         self,
@@ -1532,7 +1532,7 @@ class GeospatialDataset:
             seed=seed,
         )
 
-    def prepare_features(self) -> GeospatialFeatures:
+    def prepare_features(self) -> Features:
         """Prepares bounded geometry features without changing CRS units.
 
         The output is a geometry envelope and centroid representation. It does
@@ -1586,7 +1586,7 @@ class GeospatialDataset:
                 "geospatial features must be finite",
                 {"code": "non_finite_features"},
             )
-        return GeospatialFeatures(
+        return Features(
             feature_ids=tuple(feature.feature_id for feature in self.features),
             feature_names=feature_names,
             values=tuple(
@@ -1792,7 +1792,7 @@ class GeospatialDataset:
             },
         )
 
-    def split_temporal(self, cutoff: datetime | str) -> GeospatialTemporalSplit:
+    def split_temporal(self, cutoff: datetime | str) -> TemporalSplit:
         """Splits fully timestamped features into past and future partitions.
 
         Features at the cutoff belong to training. Features after the cutoff
@@ -1829,7 +1829,7 @@ class GeospatialDataset:
             if isinstance(feature.observation_time, datetime)
             and feature.observation_time > cutoff_time
         )
-        return GeospatialTemporalSplit(
+        return TemporalSplit(
             cutoff=cutoff_time,
             train=train,
             future=future,
@@ -1837,7 +1837,7 @@ class GeospatialDataset:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class GeospatialReprojection:
+class Reprojection:
     """A transformed dataset paired with its source-bound evidence.
 
     Attributes:
@@ -1845,8 +1845,8 @@ class GeospatialReprojection:
         report: Evidence binding the source and transformed datasets.
     """
 
-    dataset: GeospatialDataset
-    report: SpatialReprojectionReport
+    dataset: Dataset
+    report: Provenance
 
     def __post_init__(self) -> None:
         """Ensures the report describes the returned transformed dataset.
@@ -2159,17 +2159,17 @@ class RasterSample:
 
 __all__ = [
     "GEOMETRY_TYPES",
+    "Dataset",
+    "Features",
     "GeoFeature",
-    "GeospatialDataset",
-    "GeospatialFeatures",
-    "GeospatialProfile",
     "GeospatialTemporalError",
-    "GeospatialTemporalSplit",
     "GeospatialValidationError",
+    "Profile",
     "RasterDecoder",
     "RasterSample",
     "SpatialAutocorrelation",
     "SpatialSplit",
+    "TemporalSplit",
     "canonical_observation_time",
     "canonical_source",
     "geometry_coordinates",

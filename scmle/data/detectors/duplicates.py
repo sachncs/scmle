@@ -34,7 +34,7 @@ CONFIDENCE = 0.95
 
 
 @dataclasses.dataclass(frozen=True)
-class DuplicateReport:
+class Duplicates:
     """Duplicate evidence for a table.
 
     Attributes:
@@ -205,7 +205,7 @@ def assess_duplicates(
     columns: Sequence[str] | None = None,
     target: str | None = None,
     cut: float = DEFAULT_CUT,
-) -> DuplicateReport:
+) -> Duplicates:
     """Counts exact and near duplicates and label conflicts.
 
     Args:
@@ -230,7 +230,7 @@ def assess_duplicates(
             if len(pandas.unique(pandas.Series(labels))) > 1:
                 conflicts += 1
     extra = int(exact.sum())
-    return DuplicateReport(
+    return Duplicates(
         rows=len(frame),
         exact_extra=extra,
         exact_rate=extra / len(frame),

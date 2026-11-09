@@ -36,7 +36,7 @@ class UnsupportedNonTabularModelError(errors.ConfigError):
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class NonTabularModelCapability:
+class Scope:
     """The bounded representation and claim for one accepted adapter.
 
     Attributes:
@@ -98,7 +98,7 @@ class NonTabularModelCapability:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class NonTabularModelResult:
+class Predictor:
     """Verified model, lifecycle evidence, and representation declaration.
 
     Attributes:
@@ -107,9 +107,9 @@ class NonTabularModelResult:
         capability: The bounded capability the model was built under.
     """
 
-    report: modality_lifecycle.LifecycleReport
-    predictor: modality_lifecycle.ModalityPredictor
-    capability: NonTabularModelCapability
+    report: modality_lifecycle.Record
+    predictor: modality_lifecycle.Predictor
+    capability: Scope
 
     def __post_init__(self) -> None:
         """Validates the result's package and capability identities.
@@ -173,8 +173,8 @@ class NonTabularModelResult:
 
 
 def capability_for_adapter(
-    adapter: modality_lifecycle.ModalityAdapter,
-) -> NonTabularModelCapability:
+    adapter: modality_lifecycle.Preparer,
+) -> Scope:
     """Returns the explicit capability for one built-in adapter.
 
     Exact built-in types are required. A caller-defined subclass can change
@@ -192,17 +192,17 @@ def capability_for_adapter(
         (container or raster metadata only).
 
     Raises:
-        TypeError: If ``adapter`` is not a ``ModalityAdapter``.
+        TypeError: If ``adapter`` is not a ``Preparer``.
         UnsupportedNonTabularModelError: If its exact type is not allowlisted.
     """
-    if not isinstance(adapter, modality_lifecycle.ModalityAdapter):
-        raise TypeError("adapter must be a ModalityAdapter")
+    if not isinstance(adapter, modality_lifecycle.Preparer):
+        raise TypeError("adapter must be a Preparer")
     adapter_type = type(adapter)
     if adapter_type in {
-        modality_lifecycle.DocumentAdapter,
-        modality_lifecycle.TextAdapter,
+        modality_lifecycle.DocumentPreparer,
+        modality_lifecycle.TextPreparer,
     }:
-        return NonTabularModelCapability(
+        return Scope(
             modality=modalities.modality_value(adapter.modality),
             representation="bounded_character_and_token_counts",
             decoder_policy="caller-decoded text or document samples",
@@ -212,8 +212,8 @@ def capability_for_adapter(
                 "The model is associational and not a causal explanation.",
             ),
         )
-    if adapter_type is modality_lifecycle.ImageAdapter:
-        return NonTabularModelCapability(
+    if adapter_type is modality_lifecycle.ImagePreparer:
+        return Scope(
             modality="image",
             representation="decoded_resized_rgb_pixels",
             decoder_policy="built-in bounded RGB decoder",
@@ -223,8 +223,8 @@ def capability_for_adapter(
                 "The model is associational and not a causal explanation.",
             ),
         )
-    if adapter_type is modality_lifecycle.AudioAdapter:
-        return NonTabularModelCapability(
+    if adapter_type is modality_lifecycle.AudioPreparer:
+        return Scope(
             modality="audio",
             representation="bounded_decoded_wav_signal_statistics",
             decoder_policy="built-in WAV decoder; other codecs are rejected",
@@ -234,8 +234,8 @@ def capability_for_adapter(
                 "The model is associational and not a causal explanation.",
             ),
         )
-    if adapter_type is modality_lifecycle.VideoAdapter:
-        video_adapter = cast(modality_lifecycle.VideoAdapter, adapter)
+    if adapter_type is modality_lifecycle.VideoPreparer:
+        video_adapter = cast(modality_lifecycle.VideoPreparer, adapter)
         decoder_policy = (
             "caller-owned bounded frame decoder"
             if video_adapter.frame_decoder is not None
@@ -246,7 +246,7 @@ def capability_for_adapter(
             if video_adapter.frame_decoder is not None
             else "bounded_container_metadata"
         )
-        return NonTabularModelCapability(
+        return Scope(
             modality="video",
             representation=representation,
             decoder_policy=decoder_policy,
@@ -257,8 +257,8 @@ def capability_for_adapter(
                 "or temporal event localization.",
             ),
         )
-    if adapter_type is modality_lifecycle.GraphAdapter:
-        return NonTabularModelCapability(
+    if adapter_type is modality_lifecycle.GraphPreparer:
+        return Scope(
             modality="graph",
             representation="declared_inductive_node_features",
             decoder_policy="caller-declared graph nodes and features",
@@ -268,8 +268,8 @@ def capability_for_adapter(
                 "The model is associational and not a causal explanation.",
             ),
         )
-    if adapter_type is modality_lifecycle.GeospatialAdapter:
-        return NonTabularModelCapability(
+    if adapter_type is modality_lifecycle.GeospatialPreparer:
+        return Scope(
             modality="geospatial",
             representation="declared_crs_geometry_features",
             decoder_policy="caller-declared geometries and CRS",
@@ -279,8 +279,8 @@ def capability_for_adapter(
                 "CRS and spatial split policy remain domain responsibilities.",
             ),
         )
-    if adapter_type is modality_lifecycle.RasterAdapter:
-        raster_adapter = cast(modality_lifecycle.RasterAdapter, adapter)
+    if adapter_type is modality_lifecycle.RasterPreparer:
+        raster_adapter = cast(modality_lifecycle.RasterPreparer, adapter)
         decoder_policy = (
             f"caller-owned raster decoder {raster_adapter.decoder_name}"
             if raster_adapter.decoder is not None
@@ -291,7 +291,7 @@ def capability_for_adapter(
             if raster_adapter.decoder is not None
             else "bounded_raster_metadata"
         )
-        return NonTabularModelCapability(
+        return Scope(
             modality="raster",
             representation=representation,
             decoder_policy=decoder_policy,
@@ -304,18 +304,18 @@ def capability_for_adapter(
         )
     raise UnsupportedNonTabularModelError(
         "adapter type is not allowlisted for bounded non-tabular modelling; "
-        "exact built-in ModalityAdapter types are required",
+        "exact built-in Preparer types are required",
         {
             "adapter_type": (
                 f"{adapter_type.__module__}.{adapter_type.__qualname__}"
             ),
             "modality": modalities.modality_value(adapter.modality),
-            "supported_boundary": "exact built-in ModalityAdapter types",
+            "supported_boundary": "exact built-in Preparer types",
         },
     )
 
 
-class NonTabularModelProject:
+class Modeler:
     """Runs a bounded, explicitly experimental non-tabular model lifecycle.
 
     This project is production-oriented in its artifact and failure boundary,
@@ -345,18 +345,18 @@ class NonTabularModelProject:
 
     def __init__(
         self,
-        adapter: modality_lifecycle.ModalityAdapter,
+        adapter: modality_lifecycle.Preparer,
         signing_key: str | bytes,
         *,
         experimental_opt_in: bool = False,
         output_dir: str | Path = "runs",
         seed: int = 42,
-        observed_adapter: modality_lifecycle.ModalityAdapter | None = None,
-        performance_budget: performance.PerformanceBudget | None = None,
-        performance_baseline: performance.PerformanceBaseline | None = None,
+        observed_adapter: modality_lifecycle.Preparer | None = None,
+        performance_budget: performance.Budget | None = None,
+        performance_baseline: performance.Baseline | None = None,
         manifest: data.ModalityManifest | None = None,
         require_independent_ground_truth: bool = False,
-        cancellation: modality_lifecycle.LifecycleCancellation | None = None,
+        cancellation: modality_lifecycle.Cancellation | None = None,
         checkpoint_path: str | Path | None = None,
         resume: bool = False,
     ) -> None:
@@ -386,7 +386,7 @@ class NonTabularModelProject:
             UnsupportedNonTabularModelError: If opt-in is absent, the adapter is
                 outside the exact built-in boundary, or the observed adapter
                 differs in capability or decoder.
-            TypeError: If an adapter is not a `ModalityAdapter`, or a flag, the
+            TypeError: If an adapter is not a `Preparer`, or a flag, the
                 seed or the cancellation has the wrong type.
             ValueError: If the signing key is empty.
         """
@@ -420,10 +420,10 @@ class NonTabularModelProject:
                         "observed": observed_capability.to_dict(),
                     },
                 )
-            if isinstance(adapter, modality_lifecycle.VideoAdapter) and (
+            if isinstance(adapter, modality_lifecycle.VideoPreparer) and (
                 adapter.frame_decoder
                 is not cast(
-                    modality_lifecycle.VideoAdapter, observed_adapter
+                    modality_lifecycle.VideoPreparer, observed_adapter
                 ).frame_decoder
             ):
                 raise UnsupportedNonTabularModelError(
@@ -431,10 +431,10 @@ class NonTabularModelProject:
                     "same frame decoder object",
                     {"modality": self.capability.modality},
                 )
-            if isinstance(adapter, modality_lifecycle.RasterAdapter) and (
+            if isinstance(adapter, modality_lifecycle.RasterPreparer) and (
                 adapter.decoder
                 is not cast(
-                    modality_lifecycle.RasterAdapter, observed_adapter
+                    modality_lifecycle.RasterPreparer, observed_adapter
                 ).decoder
             ):
                 raise UnsupportedNonTabularModelError(
@@ -443,9 +443,9 @@ class NonTabularModelProject:
                     {"modality": self.capability.modality},
                 )
         if cancellation is not None and not isinstance(
-            cancellation, modality_lifecycle.LifecycleCancellation
+            cancellation, modality_lifecycle.Cancellation
         ):
-            raise TypeError("cancellation must be a LifecycleCancellation")
+            raise TypeError("cancellation must be a Cancellation")
         self.adapter = adapter
         self.signing_key = signing_key
         self.output_dir = Path(output_dir)
@@ -455,15 +455,13 @@ class NonTabularModelProject:
         self.performance_baseline = performance_baseline
         self.manifest = manifest
         self.require_independent_ground_truth = require_independent_ground_truth
-        self.cancellation = (
-            cancellation or modality_lifecycle.LifecycleCancellation()
-        )
+        self.cancellation = cancellation or modality_lifecycle.Cancellation()
         self.checkpoint_path = (
             Path(checkpoint_path) if checkpoint_path is not None else None
         )
         self.resume = resume
-        self.lifecycle = modality_lifecycle.ModalityLifecycle()
-        self.result: NonTabularModelResult | None = None
+        self.lifecycle = modality_lifecycle.Lifecycle()
+        self.result: Predictor | None = None
 
     @property
     def report_path(self) -> Path:
@@ -475,7 +473,7 @@ class NonTabularModelProject:
         """The signed model package location."""
         return self.output_dir / NON_TABULAR_MODEL_DIRECTORY
 
-    def run(self) -> NonTabularModelResult:
+    def run(self) -> Predictor:
         """Runs, verifies, and returns the complete bounded lifecycle.
 
         The lifecycle writes the signed report and package under `output_dir`.
@@ -512,7 +510,7 @@ class NonTabularModelProject:
         )
         return self.load_result()
 
-    def load_result(self) -> NonTabularModelResult:
+    def load_result(self) -> Predictor:
         """Loads and verifies the signed report and package for this project.
 
         Returns:
@@ -522,20 +520,20 @@ class NonTabularModelProject:
             ValueError: If the report's modality or dataset does not match the
                 project.
         """
-        report = modality_lifecycle.LifecycleReport.read_verified(
+        report = modality_lifecycle.Record.read_verified(
             self.report_path, self.signing_key
         )
         if report.modality != self.capability.modality:
             raise ValueError("lifecycle report modality does not match project")
         if report.dataset_hash != self.adapter.dataset_hash:
             raise ValueError("lifecycle report dataset does not match project")
-        predictor = modality_lifecycle.ModalityPredictor.from_package(
+        predictor = modality_lifecycle.Predictor.from_package(
             self.adapter,
             report.package.path,
             self.signing_key,
             lifecycle_report_path=self.report_path,
         )
-        self.result = NonTabularModelResult(
+        self.result = Predictor(
             report=report,
             predictor=predictor,
             capability=self.capability,
@@ -548,8 +546,8 @@ class NonTabularModelProject:
 
     @classmethod
     def capability_for_adapter(
-        cls, adapter: modality_lifecycle.ModalityAdapter
-    ) -> NonTabularModelCapability:
+        cls, adapter: modality_lifecycle.Preparer
+    ) -> Scope:
         """Returns the capability without opting into a model run.
 
         Args:
@@ -565,9 +563,9 @@ __all__ = [
     "NON_TABULAR_MODEL_DIRECTORY",
     "NON_TABULAR_MODEL_FAMILY",
     "NON_TABULAR_MODEL_REPORT",
-    "NonTabularModelCapability",
-    "NonTabularModelProject",
-    "NonTabularModelResult",
+    "Modeler",
+    "Predictor",
+    "Scope",
     "UnsupportedNonTabularModelError",
     "capability_for_adapter",
 ]

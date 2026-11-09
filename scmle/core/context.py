@@ -37,7 +37,7 @@ T = TypeVar("T")
 
 TABULAR_BETA_TASK_FAMILIES = (
     (
-        tasks.TaskType.BINARY,
+        tasks.Task.BINARY,
         (
             "baseline",
             "linear",
@@ -51,7 +51,7 @@ TABULAR_BETA_TASK_FAMILIES = (
         ),
     ),
     (
-        tasks.TaskType.MULTICLASS,
+        tasks.Task.MULTICLASS,
         (
             "baseline",
             "linear",
@@ -65,7 +65,7 @@ TABULAR_BETA_TASK_FAMILIES = (
         ),
     ),
     (
-        tasks.TaskType.REGRESSION,
+        tasks.Task.REGRESSION,
         (
             "baseline",
             "linear",
@@ -78,39 +78,39 @@ TABULAR_BETA_TASK_FAMILIES = (
             "deep_learning",
         ),
     ),
-    (tasks.TaskType.SURVIVAL, ("baseline", "linear", "boosting")),
-    (tasks.TaskType.ORDINAL, ("baseline", "linear", "tree", "boosting")),
-    (tasks.TaskType.RANKING, ("baseline", "boosting")),
+    (tasks.Task.SURVIVAL, ("baseline", "linear", "boosting")),
+    (tasks.Task.ORDINAL, ("baseline", "linear", "tree", "boosting")),
+    (tasks.Task.RANKING, ("baseline", "boosting")),
     (
-        tasks.TaskType.MULTILABEL,
+        tasks.Task.MULTILABEL,
         ("baseline", "linear", "tree", "boosting"),
     ),
     (
-        tasks.TaskType.MULTIOUTPUT,
+        tasks.Task.MULTIOUTPUT,
         ("baseline", "linear", "tree", "boosting"),
     ),
-    (tasks.TaskType.FORECAST, ("baseline", "linear", "tree", "boosting")),
-    (tasks.TaskType.UPLIFT, ("baseline", "causal")),
+    (tasks.Task.FORECAST, ("baseline", "linear", "tree", "boosting")),
+    (tasks.Task.UPLIFT, ("baseline", "causal")),
 )
 """Explicit tabular model-family paths covered by the current beta."""
 
 
 TABULAR_BETA_EVALUATIONS = {
-    tasks.TaskType.BINARY: capabilities.Evaluation.STANDARD,
-    tasks.TaskType.MULTICLASS: capabilities.Evaluation.STANDARD,
-    tasks.TaskType.REGRESSION: capabilities.Evaluation.STANDARD,
-    tasks.TaskType.SURVIVAL: capabilities.Evaluation.SURVIVAL,
-    tasks.TaskType.ORDINAL: capabilities.Evaluation.STANDARD,
-    tasks.TaskType.RANKING: capabilities.Evaluation.RANKING,
-    tasks.TaskType.MULTILABEL: capabilities.Evaluation.MULTILABEL,
-    tasks.TaskType.MULTIOUTPUT: capabilities.Evaluation.MULTIOUTPUT,
-    tasks.TaskType.FORECAST: capabilities.Evaluation.FORECASTING,
-    tasks.TaskType.UPLIFT: capabilities.Evaluation.UPLIFT,
+    tasks.Task.BINARY: capabilities.Evaluation.STANDARD,
+    tasks.Task.MULTICLASS: capabilities.Evaluation.STANDARD,
+    tasks.Task.REGRESSION: capabilities.Evaluation.STANDARD,
+    tasks.Task.SURVIVAL: capabilities.Evaluation.SURVIVAL,
+    tasks.Task.ORDINAL: capabilities.Evaluation.STANDARD,
+    tasks.Task.RANKING: capabilities.Evaluation.RANKING,
+    tasks.Task.MULTILABEL: capabilities.Evaluation.MULTILABEL,
+    tasks.Task.MULTIOUTPUT: capabilities.Evaluation.MULTIOUTPUT,
+    tasks.Task.FORECAST: capabilities.Evaluation.FORECASTING,
+    tasks.Task.UPLIFT: capabilities.Evaluation.UPLIFT,
 }
 """Canonical evaluation contract for each tabular task path."""
 
 
-def tabular_beta_capability_registry() -> capabilities.CapabilityRegistry:
+def tabular_beta_capability_registry() -> capabilities.Registry:
     """Builds the explicit capability registry for the tabular beta.
 
     The registry intentionally declares only the library inference path with
@@ -127,8 +127,7 @@ def tabular_beta_capability_registry() -> capabilities.CapabilityRegistry:
         for model_family in families:
             for fairness in (
                 (capabilities.Fairness.NONE,)
-                if task
-                not in (tasks.TaskType.BINARY, tasks.TaskType.MULTICLASS)
+                if task not in (tasks.Task.BINARY, tasks.Task.MULTICLASS)
                 else (
                     capabilities.Fairness.NONE,
                     capabilities.Fairness.MITIGATION,
@@ -136,7 +135,7 @@ def tabular_beta_capability_registry() -> capabilities.CapabilityRegistry:
             ):
                 records.append(
                     capabilities.Capability(
-                        key=capabilities.CapabilityKey(
+                        key=capabilities.Coordinate(
                             modality=capabilities.Modality.TABULAR,
                             task=task,
                             model_family=model_family,
@@ -146,7 +145,7 @@ def tabular_beta_capability_registry() -> capabilities.CapabilityRegistry:
                             explainability=capabilities.Explainability.NONE,
                             inference=capabilities.Inference.LIBRARY,
                         ),
-                        status=capabilities.CapabilityStatus.SUPPORTED,
+                        status=capabilities.Status.SUPPORTED,
                         required_extras=(
                             ("deeplearning",)
                             if model_family == "deep_learning"
@@ -172,21 +171,21 @@ def tabular_beta_capability_registry() -> capabilities.CapabilityRegistry:
                     )
                 )
     for task in (
-        tasks.TaskType.BINARY,
-        tasks.TaskType.MULTICLASS,
-        tasks.TaskType.REGRESSION,
+        tasks.Task.BINARY,
+        tasks.Task.MULTICLASS,
+        tasks.Task.REGRESSION,
     ):
         for fairness in (
             (
                 capabilities.Fairness.NONE,
                 capabilities.Fairness.MITIGATION,
             )
-            if task in (tasks.TaskType.BINARY, tasks.TaskType.MULTICLASS)
+            if task in (tasks.Task.BINARY, tasks.Task.MULTICLASS)
             else (capabilities.Fairness.NONE,)
         ):
             records.append(
                 capabilities.Capability(
-                    key=capabilities.CapabilityKey(
+                    key=capabilities.Coordinate(
                         modality=capabilities.Modality.TABULAR,
                         task=task,
                         model_family=capabilities.ModelFamily.TRANSFORMER.value,
@@ -196,7 +195,7 @@ def tabular_beta_capability_registry() -> capabilities.CapabilityRegistry:
                         explainability=capabilities.Explainability.NONE,
                         inference=capabilities.Inference.LIBRARY,
                     ),
-                    status=capabilities.CapabilityStatus.EXPERIMENTAL,
+                    status=capabilities.Status.EXPERIMENTAL,
                     required_extras=("deeplearning",),
                     resources=capabilities.ResourceAssumptions(
                         memory_gb=4.0,
@@ -223,21 +222,21 @@ def tabular_beta_capability_registry() -> capabilities.CapabilityRegistry:
                 )
             )
     for task in (
-        tasks.TaskType.BINARY,
-        tasks.TaskType.MULTICLASS,
-        tasks.TaskType.REGRESSION,
+        tasks.Task.BINARY,
+        tasks.Task.MULTICLASS,
+        tasks.Task.REGRESSION,
     ):
         for fairness in (
             (
                 capabilities.Fairness.NONE,
                 capabilities.Fairness.MITIGATION,
             )
-            if task in (tasks.TaskType.BINARY, tasks.TaskType.MULTICLASS)
+            if task in (tasks.Task.BINARY, tasks.Task.MULTICLASS)
             else (capabilities.Fairness.NONE,)
         ):
             records.append(
                 capabilities.Capability(
-                    key=capabilities.CapabilityKey(
+                    key=capabilities.Coordinate(
                         modality=capabilities.Modality.TABULAR,
                         task=task,
                         model_family=capabilities.ModelFamily.JEPA.value,
@@ -247,7 +246,7 @@ def tabular_beta_capability_registry() -> capabilities.CapabilityRegistry:
                         explainability=capabilities.Explainability.NONE,
                         inference=capabilities.Inference.LIBRARY,
                     ),
-                    status=capabilities.CapabilityStatus.EXPERIMENTAL,
+                    status=capabilities.Status.EXPERIMENTAL,
                     required_extras=("deeplearning",),
                     resources=capabilities.ResourceAssumptions(
                         memory_gb=4.0,
@@ -275,11 +274,11 @@ def tabular_beta_capability_registry() -> capabilities.CapabilityRegistry:
                     ),
                 )
             )
-    return capabilities.CapabilityRegistry.with_declared_model_families(records)
+    return capabilities.Registry.with_declared_model_families(records)
 
 
 def extension_capability(
-    key: capabilities.CapabilityKey,
+    key: capabilities.Coordinate,
 ) -> capabilities.Capability:
     """Describes an explicitly supplied adapter outside the beta guarantee.
 
@@ -296,7 +295,7 @@ def extension_capability(
     """
     return capabilities.Capability(
         key=key,
-        status=capabilities.CapabilityStatus.EXTENSION_ONLY,
+        status=capabilities.Status.EXTENSION_ONLY,
         required_extras=(),
         resources=capabilities.ResourceAssumptions(memory_gb=1.0),
         failure_modes=(
@@ -333,7 +332,7 @@ def require(value: T | None, name: str) -> T:
 
 
 @dataclasses.dataclass
-class RunContext:
+class Context:
     """Inputs, services and progressively produced artifacts of a run.
 
     Services and inputs are set at construction; the remaining fields are
@@ -416,61 +415,57 @@ class RunContext:
             time budget (and the `deadline` property) counts from it.
     """
 
-    spec: tasks.ProjectSpec
-    registry: scmle.models.registry.ModelRegistry
+    spec: tasks.Config
+    registry: scmle.models.registry.Catalog
     catalog: metrics.MetricCatalog
-    policy: selection.SelectionPolicy
-    capability_registry: capabilities.CapabilityRegistry = dataclasses.field(
+    policy: selection.Selector
+    capability_registry: capabilities.Registry = dataclasses.field(
         default_factory=tabular_beta_capability_registry
     )
-    capability_observation: (
-        resource_observation.RuntimeResourceObservation | None
-    ) = None
+    capability_observation: resource_observation.Observation | None = None
     store: scmle.artifacts.store.RunStore | None = None
-    log: events.EventLog | None = None
+    log: events.Log | None = None
     tracker: stores.ExperimentStore = dataclasses.field(
         default_factory=stores.NullExperimentStore
     )
-    checkpoints: dict[str, experiments.TrialResult] = dataclasses.field(
+    checkpoints: dict[str, experiments.Trial] = dataclasses.field(
         default_factory=dict
     )
-    backend: scheduler.ExecutionBackend = dataclasses.field(
-        default_factory=scheduler.SequentialBackend
+    backend: scheduler.Executor = dataclasses.field(
+        default_factory=scheduler.Serial
     )
-    governor: limits.ResourceGovernor | None = None
+    governor: limits.Governor | None = None
     cancel_event: threading.Event = dataclasses.field(
         default_factory=threading.Event
     )
     input_frame: pandas.DataFrame | None = None
-    approved_plan: experiments.ExperimentPlan | None = None
+    approved_plan: experiments.Plan | None = None
     frame: pandas.DataFrame | None = None
     read_seconds: float = 0.0
     cleaning_notes: list[str] = dataclasses.field(default_factory=list)
     manifest: scmle.contracts.data.DatasetManifest | None = None
-    evidence_graph: lineage.EvidenceGraph = dataclasses.field(
-        default_factory=lineage.EvidenceGraph
+    evidence_graph: lineage.Graph = dataclasses.field(
+        default_factory=lineage.Graph
     )
-    task: tasks.TaskType | None = None
+    task: tasks.Task | None = None
     profile: scmle.contracts.data.DatasetProfile | None = None
-    curation: scmle.contracts.data.CurationReport | None = None
+    curation: scmle.contracts.data.Curation | None = None
     cluster_column: str | None = None
-    split: splitters.SplitResult | None = None
-    custody: pipeline.CustodyOutcome | None = None
-    custody_vault: sealed.CustodyVault | None = None
-    plan: experiments.ExperimentPlan | None = None
+    split: splitters.Split | None = None
+    custody: pipeline.Outcome | None = None
+    custody_vault: sealed.Vault | None = None
+    plan: experiments.Plan | None = None
     recommendations: tuple[
         scmle.intelligence.recommendations.Recommendation, ...
     ] = ()
     metric: scmle.contracts.metrics.Metric | None = None
-    trials: list[experiments.TrialResult] = dataclasses.field(
-        default_factory=list
-    )
+    trials: list[experiments.Trial] = dataclasses.field(default_factory=list)
     history: tuple[experiments.HistoricalRun, ...] = ()
     outcomes: list[experiments.Decision] = dataclasses.field(
         default_factory=list
     )
     trial_counter: int = 0
-    selected: experiments.TrialResult | None = None
+    selected: experiments.Trial | None = None
     diagnostics: dict[str, dict[str, Any]] = dataclasses.field(
         default_factory=dict
     )
@@ -490,8 +485,8 @@ class RunContext:
     ingest: Any = None
     semi_supervised: dict[str, Any] | None = None
     evaluation: dict[str, Any] | None = None
-    bundle: scmle.artifacts.bundle.ModelBundle | None = None
-    result: results.RunResult | None = None
+    bundle: scmle.artifacts.bundle.Bundle | None = None
+    result: results.Run | None = None
     started_at: float = dataclasses.field(default_factory=time.monotonic)
 
     def __post_init__(self) -> None:
@@ -502,10 +497,10 @@ class RunContext:
             )
 
     @property
-    def resource_governor(self) -> limits.ResourceGovernor:
+    def resource_governor(self) -> limits.Governor:
         """The governor, created on first use from the specification."""
         if self.governor is None:
-            self.governor = limits.ResourceGovernor(
+            self.governor = limits.Governor(
                 self.spec.resources, self.started_at
             )
         return self.governor
@@ -628,7 +623,7 @@ class RunContext:
         """
         self.outcomes.append(experiments.Decision(technique, action, reason))
 
-    def record_trial(self, outcome: experiments.TrialResult) -> None:
+    def record_trial(self, outcome: experiments.Trial) -> None:
         """Appends a trial and persists, announces and tracks it.
 
         Args:

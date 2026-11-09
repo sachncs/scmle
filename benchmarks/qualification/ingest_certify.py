@@ -81,9 +81,9 @@ MEASUREMENTS_PATH = Path(__file__).with_name("ingest_measurements.json")
 TORN_ID = "ingest-torn-read"
 TORN_DEFECT = "torn_read"
 TORN_RUNS = 500
-TORN_POLICY = certificates.CertificationPolicy(0.99, 0.02, 0.95)
+TORN_POLICY = certificates.Standard(0.99, 0.02, 0.95)
 RECONCILE_RUNS = 500
-RECONCILE_POLICY = certificates.CertificationPolicy(0.95, 0.05, 0.95)
+RECONCILE_POLICY = certificates.Standard(0.95, 0.05, 0.95)
 LATE_WORLDS = 500
 DIFFERENTIAL_CASES = 1000
 METAMORPHIC_CASES = 10_000
@@ -180,7 +180,7 @@ def torn_code() -> str:
 
 def torn_certificate(
     offset: int, workers: int
-) -> tuple[certificates.DetectorCertificate, dict[str, Any]]:
+) -> tuple[certificates.Certification, dict[str, Any]]:
     """Measures the torn-read check on mutated and static worlds.
 
     Args:
@@ -262,7 +262,7 @@ def reconcile_flagged(kind: str, seed: int) -> bool:
 
 def reconcile_certificate(
     offset: int, workers: int
-) -> tuple[certificates.DetectorCertificate, dict[str, Any]]:
+) -> tuple[certificates.Certification, dict[str, Any]]:
     """Measures the reconciliation on planted defects and clean worlds.
 
     Args:
@@ -657,15 +657,15 @@ def budget_run(seed: int, directory: Path) -> tuple[bool, list[dict[str, str]]]:
         stop boundaries recorded by the meter.
     """
     rng = randomness.component_rng(seed, "ingest.certify.budget", 0)
-    limit = budget.IngestBudget(
+    limit = budget.Budget(
         max_queries=int(rng.integers(0, 800)),
         max_rows_scanned=int(rng.integers(0, 150_000)),
     )
     world = ingest_worlds.surrogate_world(0)
-    plan = scmle.data.ingest.plan.IngestPlan(
+    plan = scmle.data.ingest.plan.Plan(
         directory / f"b{seed}",
         world.db.factory,
-        scmle.data.ingest.plan.IngestSettings(tables=tuple(world.tables)),
+        scmle.data.ingest.plan.Config(tables=tuple(world.tables)),
         limit,
     )
     plan.run_all()
@@ -779,7 +779,7 @@ def code_hashes() -> dict[str, str]:
 
 def certify_all(
     workers: int = 1, offset: int = 0, scratch: Path | None = None
-) -> tuple[certificates.CertificateStore, dict[str, Any]]:
+) -> tuple[certificates.Store, dict[str, Any]]:
     """Measures everything; `offset` shifts the seed range.
 
     Args:
@@ -791,7 +791,7 @@ def certify_all(
         The certificate store and the measurements document.
     """
     started = time.monotonic()
-    store = certificates.CertificateStore()
+    store = certificates.Store()
     document: dict[str, Any] = {}
     cert, measured = torn_certificate(offset, workers)
     store.add(cert)
@@ -838,7 +838,7 @@ def required_defects() -> dict[str, tuple[str, ...]]:
     }
 
 
-def audit_labels(store: certificates.CertificateStore) -> dict[str, list[str]]:
+def audit_labels(store: certificates.Store) -> dict[str, list[str]]:
     """Detector/defect pairs by why they may not gate.
 
     `missing` and `stale` are failures of the file; `uncertified` pairs were
@@ -868,7 +868,7 @@ def audit_labels(store: certificates.CertificateStore) -> dict[str, list[str]]:
     return found
 
 
-def problems(store: certificates.CertificateStore) -> list[str]:
+def problems(store: certificates.Store) -> list[str]:
     """Why the certificate file is unusable: missing or stale entries.
 
     Args:
@@ -951,7 +951,7 @@ def check() -> dict[str, Any]:
         pairs, the floors missed, the gates without an external referent and
         the live-check result.
     """
-    store = certificates.CertificateStore.load(STORE_PATH)
+    store = certificates.Store.load(STORE_PATH)
     found = problems(store)
     measured = json.loads(MEASUREMENTS_PATH.read_text(encoding="utf-8"))
     found += measurement_problems(measured)

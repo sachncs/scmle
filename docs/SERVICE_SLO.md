@@ -77,7 +77,7 @@ adding replicas, not threads.
 
 ## Batch
 
-`scmle batch BUNDLE DATA` scores a file through `ServingAdapter.respond_frame`,
+`scmle batch BUNDLE DATA` scores a file through `Server.respond_frame`,
 the same function the online path calls: the same validation, preprocessing,
 model call and policies. The output CSV is written atomically with
 `<output>.manifest.json` (model version, artifact digest, schema digest, row

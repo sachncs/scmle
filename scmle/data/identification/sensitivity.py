@@ -338,7 +338,7 @@ def benchmark_strength(
 
 
 @dataclasses.dataclass(frozen=True)
-class SensitivityReport:
+class Sensitivity:
     """Result of the sensitivity gate.
 
     Attributes:
@@ -384,7 +384,7 @@ def assess(
     benchmark: str = "strongest_observed",
     strength: float = 1.0,
     level: float = 0.95,
-) -> SensitivityReport:
+) -> Sensitivity:
     """Runs the charter's sensitivity gate for the linear effect summary.
 
     `strongest_observed` takes the covariate whose benchmarked bound is
@@ -443,7 +443,7 @@ def assess(
         )
     r2yz, r2dz = min(r2yz, INFEASIBLE), min(r2dz, INFEASIBLE)
     low, high = adjusted_interval(fit, r2yz, r2dz, level)
-    return SensitivityReport(
+    return Sensitivity(
         estimate=fit.estimate,
         rv=robustness_value(fit.t, fit.dof, 1.0),
         rv_alpha=robustness_value(fit.t, fit.dof, 1.0, 1 - level),

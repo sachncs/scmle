@@ -48,7 +48,7 @@ customers about to leave. SCMLE cannot see this; only you can.
 | Many categories | `f1_macro` or `log_loss` | Counts every category equally |
 
 SCMLE lists the others it knows in `scmle.evaluation.metrics.CATALOG`. You can
-also add your own with `scmle.register_metric`, for example the money lost.
+also add your own with `scmle.evaluation.metrics.register_metric`, for example the money lost.
 
 **If you choose wrong.** The search picks the model that is best at the wrong
 thing. Accuracy on a rare event picks a model that always says "no". The
@@ -217,7 +217,7 @@ later.
 * The names of the people to call.
 
 SCMLE can hold your thresholds as success criteria
-(`ProblemSpec.success_criteria`). If you declare none, the release evaluation
+(`Problem.success_criteria`). If you declare none, the release evaluation
 says `policy_not_declared` and blocks: the tool will not invent thresholds from
 the metrics it just saw.
 

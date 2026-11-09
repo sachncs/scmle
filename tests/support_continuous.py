@@ -40,7 +40,7 @@ def make_loop(tmp_path, **changes):
     return scmle.governance.loop.Loop.open(
         tmp_path / "deploy",
         CHARTER,
-        scmle.governance.loop.LoopPolicy(**values),
+        scmle.governance.loop.Preregistration(**values),
         verification_keys={
             deployment_ledger.key_fingerprint(HUMAN_KEY): HUMAN_KEY
         },

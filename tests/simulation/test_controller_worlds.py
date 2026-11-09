@@ -211,9 +211,7 @@ def test_a_label_outage_carries_on_and_asks(tmp_path):
     trainer = Trainer()
     controller = world.controller(
         retrain=trainer,
-        policy=scmle.operations.controller.ControllerPolicy(
-            max_unlabelled_ticks=3
-        ),
+        policy=scmle.operations.controller.Limits(max_unlabelled_ticks=3),
     )
     controller.envelopes.grant(tests.simulation.world.envelope(limit=1))
     for index in range(20):

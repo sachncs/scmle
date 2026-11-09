@@ -7,12 +7,10 @@ import pandas
 from scmle.api import results
 
 
-class HtmlReport:
+class Renderer:
     """Renders a self-contained HTML summary of a run."""
 
-    def render(
-        self, result: results.RunResult, leaderboard: pandas.DataFrame
-    ) -> str:
+    def render(self, result: results.Run, leaderboard: pandas.DataFrame) -> str:
         """Builds the HTML page summarizing a run.
 
         Args:
@@ -89,7 +87,7 @@ class HtmlReport:
         )
 
     @staticmethod
-    def reliability(result: results.RunResult) -> str:
+    def reliability(result: results.Run) -> str:
         """Summarizes the reliability checks that have results.
 
         The checks are fit health, learning curve, development-versus-test

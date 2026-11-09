@@ -434,7 +434,7 @@ def check_certificates() -> list[SmokeCheck]:
     name = "standin-duplicate"
     standin = standins.STANDINS[name]
     altered = "0" * 64
-    stale = first.state(name, altered) is certificates.CertificateState.STALE
+    stale = first.state(name, altered) is certificates.Freshness.STALE
     demoted = (
         first.status(name, altered, standin.plan.defect_type)
         is certificates.GateStatus.DESCRIPTIVE

@@ -15,7 +15,7 @@ from tests.unit.test_charter_rules import FROZEN_HASH
 KEY = "causal-key"
 
 
-def spec(**changes) -> causal.CausalSpec:
+def spec(**changes) -> causal.Question:
     values = {
         "treatment": "coupon",
         "outcome": "spend",
@@ -28,10 +28,10 @@ def spec(**changes) -> causal.CausalSpec:
         "strategies": ("backdoor_aipw",),
         "negative_controls": (causal.NegativeControl("outcome", "prior"),),
         "strata": ("region",),
-        "sensitivity": causal.SensitivitySpec("strongest_observed", 1.0),
+        "sensitivity": causal.Confounding("strongest_observed", 1.0),
     }
     values.update(changes)
-    return causal.CausalSpec(**values)
+    return causal.Question(**values)
 
 
 def causal_charter(**changes):
@@ -66,7 +66,7 @@ def test_the_block_round_trips_and_needs_format_four():
         {"assumptions": ("positivity",)},
         {"strategies": ("did", "backdoor_aipw")},
         {"strata": ("period",)},
-        {"sensitivity": causal.SensitivitySpec("fixed", 0.1)},
+        {"sensitivity": causal.Confounding("fixed", 0.1)},
         {"negative_controls": ()},
     ],
 )
@@ -106,18 +106,18 @@ def test_covariates_are_read_from_the_attestation():
 
 
 def test_m_max_is_part_of_the_hash_and_must_not_be_negative():
-    one = causal_charter(sensitivity=causal.SensitivitySpec(m_max=1.0))
-    two = causal_charter(sensitivity=causal.SensitivitySpec(m_max=2.0))
+    one = causal_charter(sensitivity=causal.Confounding(m_max=1.0))
+    two = causal_charter(sensitivity=causal.Confounding(m_max=2.0))
     assert one.charter_hash != two.charter_hash
     with pytest.raises(ValueError, match="m_max"):
-        causal.SensitivitySpec(m_max=-1.0)
+        causal.Confounding(m_max=-1.0)
 
 
 def test_a_fixed_benchmark_is_a_partial_r2():
     with pytest.raises(ValueError, match="below 1"):
-        causal.SensitivitySpec("fixed", 1.5)
+        causal.Confounding("fixed", 1.5)
     with pytest.raises(ValueError, match="benchmark"):
-        causal.SensitivitySpec("odd", 0.5)
+        causal.Confounding("odd", 0.5)
 
 
 def test_a_causal_block_in_an_older_format_is_refused(tmp_path):

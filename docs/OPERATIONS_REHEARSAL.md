@@ -40,7 +40,7 @@ Automated evidence: `tests/unit/test_lifecycle_extras.py` and
 
 ## 5. Fault evidence recording
 
-1. Build the complete `FaultInjectionPlanRegistry` for the disposable
+1. Build the complete `Registry` for the disposable
    release candidate.
 2. Use `FaultInjectionHarness` with a unique execution ID, reviewer, and
    evidence directory.
@@ -58,7 +58,7 @@ Automated evidence: `tests/unit/test_reliability_harness.py`.
 ## 3. Signing-key rotation
 
 1. Produce a signed bundle with the current key.
-2. Run `ModelBundle.rotate_signing_key(bundle_dir, old_key, new_key)`.
+2. Run `Bundle.rotate_signing_key(bundle_dir, old_key, new_key)`.
 3. Load the bundle with the new key and verify predictions against a saved
    parity sample.
 4. Confirm the old key is rejected and no temporary signature file remains.

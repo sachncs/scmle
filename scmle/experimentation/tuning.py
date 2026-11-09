@@ -27,7 +27,7 @@ class Tuner:
     """
 
     def __init__(
-        self, context: scmle.core.context.RunContext, runner: trials.TrialRunner
+        self, context: scmle.core.context.Context, runner: trials.TrialRunner
     ) -> None:
         """Initializes the tuner.
 
@@ -41,7 +41,7 @@ class Tuner:
         self.metric = scmle.core.context.require(context.metric, "metric")
 
     def promising_candidates(
-        self, screened: list[experiments.TrialResult]
+        self, screened: list[experiments.Trial]
     ) -> list[tuple[str, str]]:
         """Picks the best (model, strategy) per model, best models first.
 
@@ -69,7 +69,7 @@ class Tuner:
                 chosen[trial.model_name] = trial.strategy
         return list(chosen.items())[: self.search.top_models]
 
-    def tune(self, screened: list[experiments.TrialResult]) -> None:
+    def tune(self, screened: list[experiments.Trial]) -> None:
         """Searches the most promising candidates; results go to the context.
 
         Args:
@@ -289,9 +289,7 @@ class Tuner:
                 trial.error = "pruned after the first rung"
                 self.complete(trial, optimizer)
 
-    def survivor_ids(
-        self, first_rung: list[experiments.TrialResult]
-    ) -> set[str]:
+    def survivor_ids(self, first_rung: list[experiments.Trial]) -> set[str]:
         """Selects the first-rung trials that advance.
 
         Args:
@@ -308,7 +306,7 @@ class Tuner:
         return {t.trial_id for t in ranked[:keep]}
 
     def complete(
-        self, trial: experiments.TrialResult, optimizer: optimizers.Optimizer
+        self, trial: experiments.Trial, optimizer: optimizers.Optimizer
     ) -> None:
         """Tells the optimizer the trial's score (if any) and records it.
 

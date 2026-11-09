@@ -8,7 +8,7 @@ import wave
 import numpy
 import pytest
 
-import scmle
+import scmle.api.non_tabular
 from scmle.data.modalities import audio
 from scmle.data.modalities import document
 from scmle.data.modalities import geospatial
@@ -18,10 +18,10 @@ from scmle.data.modalities import video
 from scmle.models import modality_lifecycle
 
 
-def text_adapter() -> modality_lifecycle.TextAdapter:
+def text_adapter() -> modality_lifecycle.TextPreparer:
     """Build a small deterministic labelled text dataset."""
     samples = tuple(
-        document.DocumentSample(
+        document.Sample(
             document_id=f"document-{index}",
             content=("alpha signal " if index % 2 else "beta signal ")
             * (index + 2),
@@ -29,15 +29,15 @@ def text_adapter() -> modality_lifecycle.TextAdapter:
         )
         for index in range(12)
     )
-    return modality_lifecycle.TextAdapter(document.DocumentDataset(samples))
+    return modality_lifecycle.TextPreparer(document.Dataset(samples))
 
 
-def metadata_video_adapter() -> modality_lifecycle.VideoAdapter:
+def metadata_video_adapter() -> modality_lifecycle.VideoPreparer:
     """Build a video adapter that uses its declared metadata representation."""
     samples = tuple(
-        video.VideoSample.from_bytes(
+        video.Sample.from_bytes(
             bytes([index + 1]) * 16,
-            video.VideoMetadata(
+            video.Metadata(
                 "fixture",
                 16 + index,
                 16,
@@ -51,21 +51,21 @@ def metadata_video_adapter() -> modality_lifecycle.VideoAdapter:
         )
         for index in range(12)
     )
-    return modality_lifecycle.VideoAdapter(video.VideoDataset(samples))
+    return modality_lifecycle.VideoPreparer(video.Dataset(samples))
 
 
-def image_adapter() -> modality_lifecycle.ImageAdapter:
+def image_adapter() -> modality_lifecycle.ImagePreparer:
     """Build one decoded image representation."""
     image_library = pytest.importorskip("PIL.Image")
     output = io.BytesIO()
     image_library.new("RGB", (4, 4), (32, 64, 96)).save(output, format="PNG")
-    sample = image.ImageSample.from_bytes(
+    sample = image.Sample.from_bytes(
         output.getvalue(), source="image.png", label="alpha", group_id="one"
     )
-    return modality_lifecycle.ImageAdapter(image.ImageDataset((sample,)))
+    return modality_lifecycle.ImagePreparer(image.Dataset((sample,)))
 
 
-def audio_adapter() -> modality_lifecycle.AudioAdapter:
+def audio_adapter() -> modality_lifecycle.AudioPreparer:
     """Build one WAV signal representation."""
     output = io.BytesIO()
     with wave.open(output, "wb") as opened:
@@ -75,25 +75,25 @@ def audio_adapter() -> modality_lifecycle.AudioAdapter:
         opened.writeframes(
             numpy.asarray([200, -200] * 8, dtype="<i2").tobytes()
         )
-    sample = audio.AudioSample.from_bytes(
+    sample = audio.Sample.from_bytes(
         output.getvalue(), source="audio.wav", label="alpha", group_id="one"
     )
-    return modality_lifecycle.AudioAdapter(audio.AudioDataset((sample,)))
+    return modality_lifecycle.AudioPreparer(audio.Dataset((sample,)))
 
 
-def graph_adapter() -> modality_lifecycle.GraphAdapter:
+def graph_adapter() -> modality_lifecycle.GraphPreparer:
     """Build one declared node-feature representation."""
-    dataset = graph.GraphData(
-        nodes=(graph.GraphNode("node-1", (1.0, 2.0), "alpha"),),
+    dataset = graph.Dataset(
+        nodes=(graph.Node("node-1", (1.0, 2.0), "alpha"),),
         edges=(),
         feature_names=("x", "y"),
     )
-    return modality_lifecycle.GraphAdapter(dataset)
+    return modality_lifecycle.GraphPreparer(dataset)
 
 
-def geospatial_adapter() -> modality_lifecycle.GeospatialAdapter:
+def geospatial_adapter() -> modality_lifecycle.GeospatialPreparer:
     """Build one CRS-bound geometry representation."""
-    dataset = geospatial.GeospatialDataset(
+    dataset = geospatial.Dataset(
         features=(
             geospatial.GeoFeature(
                 feature_id="feature-1",
@@ -104,10 +104,10 @@ def geospatial_adapter() -> modality_lifecycle.GeospatialAdapter:
         crs="EPSG:4326",
         source="memory://fixture.geojson",
     )
-    return modality_lifecycle.GeospatialAdapter(dataset)
+    return modality_lifecycle.GeospatialPreparer(dataset)
 
 
-def raster_adapter() -> modality_lifecycle.RasterAdapter:
+def raster_adapter() -> modality_lifecycle.RasterPreparer:
     """Build one metadata-only raster representation."""
     payload = b"raster"
     sample = geospatial.RasterSample(
@@ -121,16 +121,18 @@ def raster_adapter() -> modality_lifecycle.RasterAdapter:
         crs="EPSG:3857",
         transform=(1.0, 0.0, 0.0, 0.0, -1.0, 0.0),
     )
-    return modality_lifecycle.RasterAdapter((sample,), {sample.source: "alpha"})
+    return modality_lifecycle.RasterPreparer(
+        (sample,), {sample.source: "alpha"}
+    )
 
 
 def test_project_requires_explicit_experimental_opt_in(tmp_path: Path):
     """Experimental non-tabular paths never become an implicit default."""
     with pytest.raises(
-        scmle.UnsupportedNonTabularModelError,
+        scmle.api.non_tabular.UnsupportedNonTabularModelError,
         match="experimental_opt_in=True",
     ):
-        scmle.NonTabularModelProject(
+        scmle.api.non_tabular.Modeler(
             text_adapter(), "test-key", output_dir=tmp_path
         )
 
@@ -138,7 +140,7 @@ def test_project_requires_explicit_experimental_opt_in(tmp_path: Path):
 def test_project_runs_and_reloads_verified_bounded_result(tmp_path: Path):
     """A run returns a verified package tied to its representation contract."""
     adapter = text_adapter()
-    project = scmle.NonTabularModelProject(
+    project = scmle.api.non_tabular.Modeler(
         adapter,
         "test-key",
         experimental_opt_in=True,
@@ -163,15 +165,15 @@ def test_project_runs_and_reloads_verified_bounded_result(tmp_path: Path):
 def test_project_rejects_custom_adapter_subclasses(tmp_path: Path):
     """Caller-defined model semantics remain on the broader extension path."""
 
-    class CustomTextAdapter(modality_lifecycle.TextAdapter):
+    class CustomTextAdapter(modality_lifecycle.TextPreparer):
         """Adapter subclass intentionally outside the exact allowlist."""
 
     adapter = CustomTextAdapter(text_adapter().dataset)
     with pytest.raises(
-        scmle.UnsupportedNonTabularModelError,
-        match="exact built-in ModalityAdapter types",
+        scmle.api.non_tabular.UnsupportedNonTabularModelError,
+        match="exact built-in Preparer types",
     ):
-        scmle.NonTabularModelProject(
+        scmle.api.non_tabular.Modeler(
             adapter,
             "test-key",
             experimental_opt_in=True,
@@ -181,7 +183,7 @@ def test_project_rejects_custom_adapter_subclasses(tmp_path: Path):
 
 def test_capability_reports_existing_metadata_representation():
     """Metadata-only video is explicit and does not imply visual modelling."""
-    capability = scmle.NonTabularModelProject.capability_for_adapter(
+    capability = scmle.api.non_tabular.Modeler.capability_for_adapter(
         metadata_video_adapter()
     )
 
@@ -204,7 +206,7 @@ def test_capability_allowlist_uses_existing_feature_representations(
     factory, representation: str
 ):
     """Every admitted built-in branch names the representation it consumes."""
-    capability = scmle.NonTabularModelProject.capability_for_adapter(factory())
+    capability = scmle.api.non_tabular.Modeler.capability_for_adapter(factory())
 
     assert capability.representation == representation
     assert capability.status == "experimental"
@@ -212,8 +214,8 @@ def test_capability_allowlist_uses_existing_feature_representations(
 
 def test_capability_rejects_non_modelling_curation_adapter():
     """Curation-only extension adapters cannot cross the modelling boundary."""
-    with pytest.raises(TypeError, match="ModalityAdapter"):
-        scmle.NonTabularModelProject.capability_for_adapter(  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="Preparer"):
+        scmle.api.non_tabular.Modeler.capability_for_adapter(  # type: ignore[arg-type]
             object()
         )
 
@@ -221,10 +223,10 @@ def test_capability_rejects_non_modelling_curation_adapter():
 def test_project_rejects_mismatched_observed_representation(tmp_path: Path):
     """Monitoring cannot silently compare incompatible feature contracts."""
     with pytest.raises(
-        scmle.UnsupportedNonTabularModelError,
+        scmle.api.non_tabular.UnsupportedNonTabularModelError,
         match="same bounded capability",
     ):
-        scmle.NonTabularModelProject(
+        scmle.api.non_tabular.Modeler(
             text_adapter(),
             "test-key",
             experimental_opt_in=True,
@@ -235,7 +237,7 @@ def test_project_rejects_mismatched_observed_representation(tmp_path: Path):
 
 def test_public_capability_record_is_json_native():
     """The representation claim can travel with release evidence."""
-    record = scmle.NonTabularModelProject.capability_for_adapter(
+    record = scmle.api.non_tabular.Modeler.capability_for_adapter(
         text_adapter()
     ).to_dict()
 

@@ -20,7 +20,7 @@ def spec(**changes):
         "checksum": declared.key_checksum(orders()["order_id"]),
     }
     values.update(changes)
-    return ingest.ReconcileSpec((ingest.TableTotals("orders", **values),))
+    return ingest.Expectation((ingest.TableTotals("orders", **values),))
 
 
 def test_matching_totals_pass_and_are_reported():
@@ -98,7 +98,7 @@ def source_factory(amounts):
 
 
 def test_the_source_is_queried_and_a_zero_total_is_compared_not_skipped():
-    block = ingest.ReconcileSpec(
+    block = ingest.Expectation(
         (
             ingest.TableTotals(
                 "orders",

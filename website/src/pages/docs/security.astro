@@ -24,9 +24,9 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 
   <h2>Bundle verification is mandatory</h2>
   <p>A bundle load verifies the manifest signature, model payload digest, model digest, and fitted type before deserialization. Treat <code>trusted=True</code> as an explicit executable-code boundary, not as a convenience switch.</p>
-  <pre><code>{`from scmle import ModelBundle
+  <pre><code>{`from scmle.artifacts.bundle import Bundle
 
-bundle = ModelBundle.load(
+bundle = Bundle.load(
     "runs/run-42/model",
     trusted=True,
     signing_key=release_key,

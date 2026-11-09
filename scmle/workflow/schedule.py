@@ -35,7 +35,7 @@ GRACE_FRACTION = 0.1
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class TickReport:
+class Tick:
     """What one tick did.
 
     Attributes:
@@ -139,9 +139,7 @@ class Scheduler:
             last + schedule.interval_seconds * n for n in range(1, count + 1)
         ]
 
-    def tick(
-        self, executor: scmle.workflow.executor.LocalExecutor
-    ) -> TickReport:
+    def tick(self, executor: scmle.workflow.executor.Executor) -> Tick:
         """Runs what is due under the catch-up policy.
 
         A slot that cannot start because a run is in flight or the workflow is
@@ -184,4 +182,4 @@ class Scheduler:
             settled = [s for s in slots if s < deferred[0]]
             if settled:
                 self.save(settled[-1], {"ran": progressed, "missed": missed})
-        return TickReport(tuple(ran), tuple(missed), tuple(deferred))
+        return Tick(tuple(ran), tuple(missed), tuple(deferred))

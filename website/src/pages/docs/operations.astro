@@ -24,7 +24,7 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 
   <h2>Bundle security</h2>
   <p>Sign bundles with <code>SCMLE_SIGNING_KEY</code> and verify them at load time. Rotate keys without reserializing the model:</p>
-  <pre><code>ModelBundle.rotate_signing_key(
+  <pre><code>Bundle.rotate_signing_key(
     "runs/&lt;run-id&gt;/model",
     current_key,
     new_key,
@@ -95,9 +95,9 @@ workflow.resolve(
 
   <h2>Join serving evidence to the run</h2>
   <p>Prediction telemetry tells you what happened; the evidence graph tells you what produced the bundle. Link an event only with the input and output fingerprints captured at the serving boundary and the exact bundle digest loaded for that request.</p>
-  <pre><code>{`from scmle.inference.evidence import InferenceEvidenceLinker
+  <pre><code>{`from scmle.inference.evidence import Linker
 
-InferenceEvidenceLinker().link(
+Linker().link(
     "runs/&lt;run-id&gt;/evidence_graph.json",
     event_id="request-123",
     input_fingerprint="sha256:...",
@@ -155,7 +155,7 @@ manager.promote_challenger(approval, signing_key="release-key")</code></pre>
 
   <h2>Deployment boundary</h2>
   <p>The built-in HTTP adapter is a reference server. Put it behind an authenticating gateway with TLS, request policy, logs, and operational ownership.</p>
-  <p>For experimental modalities, <code>ModalityHttpServing</code> has the same deliberate boundary: it serves only a verified <code>ModalityPredictor</code> and a caller-owned <code>ModalitySampleDecoder</code>. The decoder is where transport-specific limits, privacy checks, codec policy, and raw-payload provenance belong.</p>
+  <p>For experimental modalities, <code>ModalityHttpServing</code> has the same deliberate boundary: it serves only a verified <code>Predictor</code> and a caller-owned <code>ModalitySampleDecoder</code>. The decoder is where transport-specific limits, privacy checks, codec policy, and raw-payload provenance belong.</p>
   <pre><code>{`server = ModalityHttpServing(
     predictor,
     decoder,

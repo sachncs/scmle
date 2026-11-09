@@ -60,7 +60,7 @@ def sklearn_table(loader: Any) -> pandas.DataFrame:
     return loader(as_frame=True).frame.reset_index(drop=True)
 
 
-def screened(frame: pandas.DataFrame, target: str) -> screen.ScreenReport:
+def screened(frame: pandas.DataFrame, target: str) -> screen.Screen:
     """Runs the certified screen with the shipped certificates.
 
     Args:
@@ -77,7 +77,7 @@ def screened(frame: pandas.DataFrame, target: str) -> screen.ScreenReport:
     )
 
 
-def flagged_names(report: screen.ScreenReport) -> list[str]:
+def flagged_names(report: screen.Screen) -> list[str]:
     """Distinct suspect columns, in column order of first appearance.
 
     Args:
@@ -93,7 +93,7 @@ def flagged_names(report: screen.ScreenReport) -> list[str]:
     return names
 
 
-def blocking_names(report: screen.ScreenReport) -> list[str]:
+def blocking_names(report: screen.Screen) -> list[str]:
     """Distinct columns that would stop a run under the block policy.
 
     Args:

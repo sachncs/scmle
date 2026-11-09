@@ -11,7 +11,7 @@ import pandas
 import pytest
 import support
 
-import scmle
+import scmle.api.project
 from scmle.contracts import errors
 from scmle.governance import lifecycle
 from scmle.governance import registry
@@ -272,7 +272,7 @@ def test_batch_serving_scores_files(trained, tmp_path, monkeypatch):
 
 def test_lifecycle_keeps_a_healthy_champion(trained, tmp_path):
     store = registry.ModelRegistryStore(tmp_path / "registry")
-    manager = lifecycle.LifecycleManager(store, "churn", str(tmp_path / "work"))
+    manager = lifecycle.Maintainer(store, "churn", str(tmp_path / "work"))
     record = register_champion(manager, store, trained)
     assert store.resolve("churn").version == record.version == 1
     outcome = manager.review(make_frame(600, 4), "y")
@@ -282,7 +282,7 @@ def test_lifecycle_keeps_a_healthy_champion(trained, tmp_path):
 
 def test_lifecycle_retrains_and_promotes_after_concept_drift(trained, tmp_path):
     store = registry.ModelRegistryStore(tmp_path / "registry")
-    manager = lifecycle.LifecycleManager(store, "churn", str(tmp_path / "work"))
+    manager = lifecycle.Maintainer(store, "churn", str(tmp_path / "work"))
     register_champion(manager, store, trained)
     drifted = make_frame(2400, 5, relabel=True)
     outcome = manager.review(
@@ -313,7 +313,7 @@ def test_lifecycle_retrains_and_promotes_after_concept_drift(trained, tmp_path):
 
 def test_review_can_be_report_only(trained, tmp_path):
     store = registry.ModelRegistryStore(tmp_path / "registry")
-    manager = lifecycle.LifecycleManager(store, "churn", str(tmp_path / "work"))
+    manager = lifecycle.Maintainer(store, "churn", str(tmp_path / "work"))
     register_champion(manager, store, trained)
     outcome = manager.review(
         make_frame(1000, 7, relabel=True), "y", retrain=False
@@ -371,13 +371,13 @@ def test_registry_accepts_signed_bundles_and_reauthenticates_on_load(
 
 def count_trainings(monkeypatch):
     runs = []
-    original = scmle.MLProject.run
+    original = scmle.api.project.Project.run
 
     def counted(self, *args, **kwargs):
         runs.append(1)
         return original(self, *args, **kwargs)
 
-    monkeypatch.setattr(scmle.MLProject, "run", counted)
+    monkeypatch.setattr(scmle.api.project.Project, "run", counted)
     return runs
 
 
@@ -399,7 +399,7 @@ def test_repeated_checks_of_the_same_drift_retrain_exactly_once(
 ):
     runs = count_trainings(monkeypatch)
     store = registry.ModelRegistryStore(tmp_path / "registry")
-    manager = lifecycle.LifecycleManager(store, "churn", str(tmp_path / "work"))
+    manager = lifecycle.Maintainer(store, "churn", str(tmp_path / "work"))
     register_champion(manager, store, trained)
     runs.clear()
     drifted = make_frame(2400, 5, relabel=True)
@@ -420,11 +420,11 @@ def test_a_rejected_challenger_is_recorded_and_not_retried_at_once(
 ):
     runs = count_trainings(monkeypatch)
     store = registry.ModelRegistryStore(tmp_path / "registry")
-    manager = lifecycle.LifecycleManager(
+    manager = lifecycle.Maintainer(
         store,
         "churn",
         str(tmp_path / "work"),
-        lifecycle.RetrainPolicy(min_rows=200, cooldown_rows=1500),
+        lifecycle.Cadence(min_rows=200, cooldown_rows=1500),
     )
     register_champion(manager, store, trained)
     runs.clear()
@@ -465,11 +465,11 @@ def test_too_few_labeled_rows_do_not_trigger_training(
 ):
     runs = count_trainings(monkeypatch)
     store = registry.ModelRegistryStore(tmp_path / "registry")
-    manager = lifecycle.LifecycleManager(
+    manager = lifecycle.Maintainer(
         store,
         "churn",
         str(tmp_path / "work"),
-        lifecycle.RetrainPolicy(min_rows=5000),
+        lifecycle.Cadence(min_rows=5000),
     )
     register_champion(manager, store, trained)
     runs.clear()
@@ -492,7 +492,7 @@ def test_a_bound_rollout_stages_the_challenger_whatever_the_bootstrap_says(
         ),
     )
     store = registry.ModelRegistryStore(tmp_path / "registry")
-    manager = lifecycle.LifecycleManager(store, "churn", str(tmp_path / "work"))
+    manager = lifecycle.Maintainer(store, "churn", str(tmp_path / "work"))
     register_champion(manager, store, trained)
     manager.defer_to_rollout()
 

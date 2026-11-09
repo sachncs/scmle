@@ -76,7 +76,7 @@ class ForwardFinding:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ForwardResult:
+class ForwardCheck:
     """Outcome of the forward check.
 
     Attributes:
@@ -105,7 +105,7 @@ class ForwardResult:
         }
 
 
-def skipped(reason: str) -> ForwardResult:
+def skipped(reason: str) -> ForwardCheck:
     """Builds a result that says the check did not run, and why.
 
     Args:
@@ -114,7 +114,7 @@ def skipped(reason: str) -> ForwardResult:
     Returns:
         A `skipped` result with `opened` False and no findings.
     """
-    return ForwardResult("skipped", reason, False, ())
+    return ForwardCheck("skipped", reason, False, ())
 
 
 def label_for(effect_x: float, low: float, high: float) -> str:
@@ -210,7 +210,7 @@ def forward_check(
     temporal: bool,
     seed: int,
     bootstrap: int = BOOTSTRAP,
-) -> ForwardResult:
+) -> ForwardCheck:
     """Opens `F` once and evaluates the surviving findings on it.
 
     Args:
@@ -254,7 +254,7 @@ def forward_check(
                 bootstrap,
             )
         )
-    return ForwardResult(
+    return ForwardCheck(
         "checked",
         "F was opened once and nothing was fitted on it",
         True,

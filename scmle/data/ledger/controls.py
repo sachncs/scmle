@@ -33,7 +33,7 @@ by chance with probability at most 1/21 for B = 20 (and at most 0.05 in
 general), which is what a "95th percentile" gate is meant to give.
 
 Monte Carlo error. With `B` repeats the 95th percentile is itself an
-estimate. `ControlResult` reports an approximate distribution-free interval
+estimate. `Control` reports an approximate distribution-free interval
 for it from order statistics and the exceedance p-value
 ``(1 + #{permuted >= observed}) / (B + 1)``, which is a valid p-value for
 "the real count is not larger than a typical null count".
@@ -188,7 +188,7 @@ def block_labels(order: numpy.ndarray, block_size: int) -> numpy.ndarray:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ControlResult:
+class Control:
     """The outcome of a negative control.
 
     Attributes:
@@ -258,7 +258,7 @@ class ControlResult:
         }
 
     @classmethod
-    def from_dict(cls, record: Mapping[str, Any]) -> "ControlResult":
+    def from_dict(cls, record: Mapping[str, Any]) -> "Control":
         """Rebuilds a result from its JSON record.
 
         Args:
@@ -285,7 +285,7 @@ class ControlResult:
 
 def summarize(
     kind: str, scope: str, observed: int, counts: tuple[int, ...]
-) -> ControlResult:
+) -> Control:
     """Builds the result for an observed count and the re-run counts.
 
     Args:
@@ -309,7 +309,7 @@ def summarize(
         )
     p95 = percentile(counts)
     as_large = sum(1 for c in counts if c >= observed)
-    return ControlResult(
+    return Control(
         kind=kind,
         scope=scope,
         observed=observed,
@@ -331,7 +331,7 @@ def permuted_target_control(
     seed: int,
     strata: numpy.ndarray | None,
     component: str = "ledger.control.permuted_target",
-) -> ControlResult:
+) -> Control:
     """Re-runs the exploration with the target permuted within strata.
 
     Args:
@@ -444,7 +444,7 @@ def resampling_control(
     strata: numpy.ndarray | None = None,
     blocks: numpy.ndarray | None = None,
     component: str = "ledger.control.resampling",
-) -> ControlResult:
+) -> Control:
     """Re-runs the exploration with the features shuffled, ignoring the target.
 
     Args:

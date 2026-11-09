@@ -20,22 +20,22 @@ NEW_NAMES = {
     "ErrorBudget",
     "ExplorationBudget",
     "ConfirmationBudget",
-    "MultiplicityRule",
+    "Correction",
     "component_rng",
 }
 
 
-def test_no_previously_pinned_export_changed():
-    pinned = json.loads(SNAPSHOT.read_text(encoding="utf-8"))["exports"]
-    current = check_api_compatibility.current_snapshot()["exports"]
+def test_no_previously_pinned_name_changed():
+    pinned = json.loads(SNAPSHOT.read_text(encoding="utf-8"))["surfaces"]
+    current = check_api_compatibility.current_snapshot()["surfaces"]
 
     assert pinned
-    for name, record in pinned.items():
-        assert current[name] == record, name
+    for module_name, names in pinned.items():
+        for name, record in names.items():
+            assert current[module_name][name] == record, (module_name, name)
 
 
-def test_new_types_are_not_top_level_exports_yet():
-    assert NEW_NAMES.isdisjoint(scmle.__all__)
+def test_new_types_are_not_package_root_names():
     assert all(not hasattr(scmle, name) for name in NEW_NAMES)
 
 

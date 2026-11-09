@@ -1,6 +1,6 @@
 """Which task types have passed a measured gate?
 
-`task_gate_status.json` lists every `TaskType` as `passed`, `failed` or
+`task_gate_status.json` lists every `Task` as `passed`, `failed` or
 `no_referent`. A type that has not passed may still run, but its outputs are
 capped at the `unverified` tier. The file is written by hand from the
 certificates in `benchmarks/qualification/uncertainty_certificates.json`; a
@@ -29,7 +29,7 @@ def load() -> dict[str, Any]:
     return json.loads(STATUS_PATH.read_text(encoding="utf-8"))["tasks"]
 
 
-def status(task: tasks.TaskType) -> str:
+def status(task: tasks.Task) -> str:
     """Returns the gate status of a task type (`no_referent` when unlisted).
 
     Args:
@@ -42,7 +42,7 @@ def status(task: tasks.TaskType) -> str:
     return row["status"] if row else "no_referent"
 
 
-def tier_ceiling(task: tasks.TaskType, tier: str) -> str:
+def tier_ceiling(task: tasks.Task, tier: str) -> str:
     """Caps a tier at `unverified` unless the task type passed its gate.
 
     Args:

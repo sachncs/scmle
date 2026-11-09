@@ -40,13 +40,13 @@ def healthy(monitor):
 
 
 def test_a_normal_run_is_ok():
-    report = healthy(training.TrainingMonitor()).report()
+    report = healthy(training.Monitor()).report()
 
     assert report["verdict"] == "ok" and report["clipped_steps"] == 0
 
 
 def test_non_finite_values_mean_divergence_and_stop_the_run():
-    monitor = training.TrainingMonitor()
+    monitor = training.Monitor()
 
     assert monitor.step(1.0, 0.5, None) is True
     assert monitor.step(float("nan"), 0.5, None) is False
@@ -54,7 +54,7 @@ def test_non_finite_values_mean_divergence_and_stop_the_run():
 
 
 def test_gradient_spikes_are_reported_as_exploding_and_counted_as_clipped():
-    monitor = training.TrainingMonitor()
+    monitor = training.Monitor()
     for norm in [0.5] * 20 + [900.0]:
         monitor.step(1.0, norm, 5.0)
     for epoch in range(3):
@@ -66,7 +66,7 @@ def test_gradient_spikes_are_reported_as_exploding_and_counted_as_clipped():
 
 
 def test_near_zero_gradients_are_vanishing():
-    monitor = training.TrainingMonitor()
+    monitor = training.Monitor()
     for step in range(30):
         monitor.step(0.7 + 0 * step, 1e-10, 5.0)
     for epoch in range(4):
@@ -76,7 +76,7 @@ def test_near_zero_gradients_are_vanishing():
 
 
 def test_a_flat_loss_with_live_gradients_is_stalled():
-    monitor = training.TrainingMonitor()
+    monitor = training.Monitor()
     for step in range(30):
         monitor.step(0.7 + 0 * step, 0.4, 5.0)
     for epoch in range(5):

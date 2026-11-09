@@ -38,7 +38,7 @@ class Plan:
         target_kind: `numeric`, `binary` or `multiclass`.
     """
 
-    specs: tuple[scmle.data.ledger.ledger.HypothesisSpec, ...]
+    specs: tuple[scmle.data.ledger.ledger.Test, ...]
     skipped: tuple[tuple[str, str], ...]
     target_kind: str
 
@@ -133,7 +133,7 @@ def plan_exploration(
             skipped.append((str(name), "constant or entirely missing"))
             continue
         specs.append(
-            scmle.data.ledger.ledger.HypothesisSpec.create(
+            scmle.data.ledger.ledger.Test.create(
                 name=f"{name}~target",
                 family=FAMILY,
                 statistic=statistic,
@@ -153,7 +153,7 @@ def run_exploration(
     features: pandas.DataFrame,
     codes: pandas.Series,
     plan: Plan,
-) -> tuple[scmle.data.ledger.ledger.Result, ...]:
+) -> tuple[scmle.data.ledger.ledger.Outcome, ...]:
     """Registers every planned hypothesis, then tests them in order.
 
     Args:

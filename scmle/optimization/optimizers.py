@@ -22,7 +22,7 @@ class Optimizer(abc.ABC):
     """Proposes configurations from a search space.
 
     Attributes:
-        name: Name used in `SearchSpec.optimizer`.
+        name: Name used in `Search.optimizer`.
         requires: Importable modules the optimizer needs.
     """
 

@@ -22,8 +22,8 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
   </div>
 
   <h2>Declare before you ingest</h2>
-  <p>The modality is a semantic contract, not a file-extension guess. Set it explicitly when constructing <code>MLProject</code> or <code>DataSpec</code>. The manifest carries that declaration into planning; a non-tabular declaration cannot silently inherit the tabular beta path.</p>
-  <pre><code>project = MLProject(
+  <p>The modality is a semantic contract, not a file-extension guess. Set it explicitly when constructing <code>Project</code> or <code>Dataset</code>. The manifest carries that declaration into planning; a non-tabular declaration cannot silently inherit the tabular beta path.</p>
+  <pre><code>project = Project(
     data="events.parquet",
     target="label",
     modality="tabular",
@@ -38,17 +38,17 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
   </ol>
 
   <h2 id="catalog-any-data">Catalog any dataset before modelling</h2>
-  <p><code>DatasetCatalog</code> is the model-agnostic entry point for data that is not yet ready for a task or a model. It observes common Python forms—tables, arrays, column mappings, record sequences, scalars, and raw bytes—and records what was actually observed. For an opaque domain object, provide an adapter-owned observation and a caller-supplied SHA-256 identity; the catalog will not invent a process-dependent hash.</p>
-  <pre><code>{`from scmle import DatasetCatalog
+  <p><code>Catalog</code> is the model-agnostic entry point for data that is not yet ready for a task or a model. It observes common Python forms—tables, arrays, column mappings, record sequences, scalars, and raw bytes—and records what was actually observed. For an opaque domain object, provide an adapter-owned observation and a caller-supplied SHA-256 identity; the catalog will not invent a process-dependent hash.</p>
+  <pre><code>{`from scmle.data.catalog import Catalog
 
-catalog = DatasetCatalog.from_data(
+catalog = Catalog.from_data(
     records,
     source="warehouse://orders?versionId=17",
     label_column="outcome",
 )
 catalog.write("artifacts/orders-catalog.json")
 
-verified = DatasetCatalog.read_verified(
+verified = Catalog.read_verified(
     "artifacts/orders-catalog.json"
 )
 print(verified.content_identity)
@@ -59,7 +59,7 @@ print(verified.release_blockers)
   <h2>Consume an event stream safely</h2>
   <p>The consumer contract separates three responsibilities. The source polls a bounded batch. Your writer commits unseen events to the downstream sink with event IDs as idempotency keys. Your broker adapter acknowledges only after that commit is durable. If acknowledgement delivery fails, the ledger keeps a JSON sidecar and retries it before polling the next batch; the sink is not run again.</p>
   <pre><code>{`source = EventStreamSource("kafka://cluster/orders", poll)
-ledger = IncrementalIngestionLedger("state/orders.json", source.source_identity)
+ledger = IngestionLedger("state/orders.json", source.source_identity)
 consumer = EventConsumer(
     source,
     ledger,
@@ -72,14 +72,14 @@ print(evidence.to_dict())`}</code></pre>
   <div class="callout"><p><strong>Important boundary:</strong> the core package proves durable local ordering and retry semantics. A real Kafka/Pulsar/Kinesis adapter still owns leases, partition assignment, broker transactions, credentials, and the independent evidence needed for distributed exactly-once claims.</p></div>
 
   <h2>Read a large local snapshot with a durable ledger</h2>
-  <p>For CSV, JSONL, and Parquet files, <code>StreamingLedger</code> binds each bounded batch to the raw snapshot digest, row offset, watermark column, and deterministic batch id. The sink receives that id as its idempotency key. A changed file, malformed state file, checkpoint from another source, or acknowledgement from another consumer group fails closed before the next commit.</p>
+  <p>For CSV, JSONL, and Parquet files, <code>CommitLedger</code> binds each bounded batch to the raw snapshot digest, row offset, watermark column, and deterministic batch id. The sink receives that id as its idempotency key. A changed file, malformed state file, checkpoint from another source, or acknowledgement from another consumer group fails closed before the next commit.</p>
   <p>When the sink can return a transport-owned receipt, use <code>TransactionalSink</code> and <code>commit_transaction()</code>. The ledger atomically stores the receipt with the matching acknowledgement and checkpoint evidence, and a matching retry after restart does not call the sink again. This is a local idempotency boundary; it is not a broker transaction or distributed exactly-once guarantee.</p>
   <pre><code>{`from pathlib import Path
-from scmle.data.readers import StreamingConsumer, StreamingLedger, source_for
+from scmle.data.readers import Consumer, CommitLedger, source_for
 
 source = source_for(Path("events.csv"))
-ledger = StreamingLedger(Path("state/events.json"), source)
-consumer = StreamingConsumer(
+ledger = CommitLedger(Path("state/events.json"), source)
+consumer = Consumer(
     ledger,
     consumer_group="events-worker",
     writer=write_batch_idempotently,
@@ -126,7 +126,7 @@ next_batch = connector.read_rows(batch.checkpoint, limit=10_000)`}</code></pre>
 }`}</code></pre>
 
   <h2>Bind non-tabular governance before modelling</h2>
-  <p>Non-tabular lifecycles accept a typed <code>ModalityManifest</code>. It binds the exact content hash and sample count to the modality, task, source ownership, transformation and label lineage, privacy policy, and curation findings. The lifecycle rejects a manifest that does not match the adapter before it starts training. For unlabeled or unsupervised snapshots, <code>ModalityCurationProject</code> persists the data-understanding evidence without entering modelling.</p>
+  <p>Non-tabular lifecycles accept a typed <code>ModalityManifest</code>. It binds the exact content hash and sample count to the modality, task, source ownership, transformation and label lineage, privacy policy, and curation findings. The lifecycle rejects a manifest that does not match the adapter before it starts training. For unlabeled or unsupervised snapshots, <code>Curator</code> persists the data-understanding evidence without entering modelling.</p>
   <pre><code>{`from scmle.contracts.data import ModalityManifest, PrivacyMetadata, SourceMetadata
 
 manifest = ModalityManifest(
@@ -155,9 +155,9 @@ report = lifecycle.run(adapter, package_path, signing_key, manifest=manifest)`}<
 
   <h2>Verify a modality package before prediction</h2>
   <p>The experimental lifecycle exposes a library predictor for callers that already own a typed adapter. It verifies the signed package, modality, feature names, and estimator dimension before converting new samples into features. Codec choice and raw transport remain caller-owned.</p>
-  <pre><code>{`from scmle.models.modality_lifecycle import ModalityPredictor
+  <pre><code>{`from scmle.models.modality_lifecycle import Predictor
 
-predictor = ModalityPredictor.from_package(
+predictor = Predictor.from_package(
     adapter, "artifacts/modality-package", signing_key
 )
 predictions = predictor.predict(new_samples)
@@ -172,40 +172,40 @@ print(predictor.health())`}</code></pre>
     <div class="doc-card"><small>VIDEO</small><h3>Decoder and time policy are yours</h3><p>Video samples require dimensions, frame timing, codec, and audio-track metadata. Use the metadata matrix by default, or provide an audited decoder for bounded, evenly sampled frame statistics. When observation times exist, <code>split_temporal</code> creates a UTC-normalized past/future boundary and refuses mixed timestamp coverage. The core package never guesses from a filename or imports a codec stack implicitly.</p></div>
     <div class="doc-card"><small>GEOSPATIAL</small><h3>Coordinates need context</h3><p>GeoJSON geometry is validated before profiling; CRS is recorded explicitly. Spatial-block splitting keeps nearby features together in CRS units, and envelope crossings are surfaced as a review warning before modelling. Raster samples require dimensions, bands, dtype, CRS, and transform metadata; a caller-owned, named decoder may add bounded pixel summaries, measured nodata evidence, and decoded-pixel region occlusion with source-CRS window envelopes. That is pixel-window evidence, not reprojection, semantic localization, or encoded-byte attribution.</p></div>
   </div>
-  <pre><code>{`from scmle.data.modalities import AudioDataset, AudioSample, GeospatialDataset, VideoDataset
-from scmle.data.modalities import VideoSample
-from scmle.data.modalities import DocumentDataset, DocumentSample
+  <pre><code>{`from scmle.data.modalities import Dataset, Sample, Dataset, Dataset
+from scmle.data.modalities import Sample
+from scmle.data.modalities import Dataset, Sample
 
-audio = AudioSample.from_bytes(
+audio = Sample.from_bytes(
     wav_bytes, source="clip.wav", group_id="speaker-17"
 )
-video = VideoSample.from_bytes(
+video = Sample.from_bytes(
     encoded,
     video_metadata,
     source="clip.mp4",
     observation_time="2026-01-01T00:00:00Z",
 )
-places = GeospatialDataset.from_geojson(
+places = Dataset.from_geojson(
     feature_collection, source="places.geojson", crs="EPSG:4326"
 )
-documents = DocumentDataset((
-    DocumentSample("policy-1", "...", label="approved"),
-    DocumentSample("policy-2", "...", label="review"),
+documents = Dataset((
+    Sample("policy-1", "...", label="approved"),
+    Sample("policy-2", "...", label="review"),
 ))
 curation = documents.curate()
 assert curation.dataset_hash == documents.content_hash
 
-audio_features = AudioDataset((audio,)).prepare_features(max_frames=100_000)
+audio_features = Dataset((audio,)).prepare_features(max_frames=100_000)
 assert audio_features.frames_truncated == (False,)
-audio_split = AudioDataset((audio,)).split(test_fraction=0)
-video_split = VideoDataset((video,)).split_temporal(
+audio_split = Dataset((audio,)).split(test_fraction=0)
+video_split = Dataset((video,)).split_temporal(
     "2026-01-01T00:00:00Z"
 )
 assert not video_split.has_future_leakage
 
 # These objects can be profiled and curated. They do not silently opt into
 # tabular modelling or a production support claim.`}</code></pre>
-  <p>Image, document, graph, audio, video, and geospatial foundations now have a complete experimental baseline lifecycle through <code>ModalityLifecycle</code>. Raster adapters can remain metadata-only or accept a caller-owned named decoder for bounded pixel summaries, measured nodata, and decoded-pixel region occlusion, while codec selection and spatial transforms remain outside the core package. That path attaches modelling, evaluation, packaging, inference, monitoring, documentation, and recovery evidence to an explicit experimental declaration. It does not promote those modalities to supported status: the supported release boundary remains the explicitly gated tabular library path. Warehouse, lakehouse, and event-stream boundaries have tested callback contracts; broker leases, transactions, and distributed exactly-once evidence remain transport-owner responsibilities.</p>
+  <p>Image, document, graph, audio, video, and geospatial foundations now have a complete experimental baseline lifecycle through <code>Lifecycle</code>. Raster adapters can remain metadata-only or accept a caller-owned named decoder for bounded pixel summaries, measured nodata, and decoded-pixel region occlusion, while codec selection and spatial transforms remain outside the core package. That path attaches modelling, evaluation, packaging, inference, monitoring, documentation, and recovery evidence to an explicit experimental declaration. It does not promote those modalities to supported status: the supported release boundary remains the explicitly gated tabular library path. Warehouse, lakehouse, and event-stream boundaries have tested callback contracts; broker leases, transactions, and distributed exactly-once evidence remain transport-owner responsibilities.</p>
   <h2>Modality hand-off checklist</h2>
   <p>Use the raw material and its evidence boundary to decide what the next stage is allowed to consume. A successful parser is only the first observation; the hand-off is complete when the dataset identity, curation findings, split policy, and representation limits are all persisted.</p>
   <div class="doc-cards">
@@ -217,14 +217,14 @@ assert not video_split.has_future_leakage
   </div>
   <p class="meta">Hand-off rule · identity → curation → split → representation → model</p>
   <h2>Spatial split boundary</h2>
-  <p><code>GeospatialDataset.prepare_features()</code> emits CRS-preserving bounds, widths, heights, centroids, and coordinate counts for a deterministic numeric hand-off. <code>GeospatialDataset.split_spatial(block_size=...)</code> requires a block size in the dataset CRS units and assigns each feature to one spatial block using its geometry centroid. Blocks, not individual features, are assigned to train, validation, and test. This prevents the common mistake of evaluating on points immediately adjacent to training points.</p>
-  <p>Large polygons or lines that cross block boundaries need a domain-specific spatial join policy. <code>GeospatialDataset.spatial_join()</code> provides a bounded same-CRS evidence boundary for that policy: the caller supplies a versioned predicate, while the contract records both dataset hashes, CRS, comparison and match limits, matched feature IDs, and unmatched counts. When coordinates must change CRS, <code>GeospatialDataset.reproject()</code> accepts a caller-owned versioned transformer and verifies that feature ownership and metadata survive the transformation. Both operations fail closed on incompatible CRS or resource/identity violations. The core contract does not choose a geometry engine or pretend that centroid assignment solves every spatial leakage problem.</p>
+  <p><code>Dataset.prepare_features()</code> emits CRS-preserving bounds, widths, heights, centroids, and coordinate counts for a deterministic numeric hand-off. <code>Dataset.split_spatial(block_size=...)</code> requires a block size in the dataset CRS units and assigns each feature to one spatial block using its geometry centroid. Blocks, not individual features, are assigned to train, validation, and test. This prevents the common mistake of evaluating on points immediately adjacent to training points.</p>
+  <p>Large polygons or lines that cross block boundaries need a domain-specific spatial join policy. <code>Dataset.spatial_join()</code> provides a bounded same-CRS evidence boundary for that policy: the caller supplies a versioned predicate, while the contract records both dataset hashes, CRS, comparison and match limits, matched feature IDs, and unmatched counts. When coordinates must change CRS, <code>Dataset.reproject()</code> accepts a caller-owned versioned transformer and verifies that feature ownership and metadata survive the transformation. Both operations fail closed on incompatible CRS or resource/identity violations. The core contract does not choose a geometry engine or pretend that centroid assignment solves every spatial leakage problem.</p>
   <h2>Audio feature boundary</h2>
-  <p><code>AudioDataset.prepare_features()</code> produces a small, inspectable baseline matrix: amplitude mean and spread, RMS, peak level, clipping fraction, silence fraction, observed duration, PCM scale, and recorded metadata. It reads a bounded prefix and exposes <code>frames_observed</code> and <code>frames_truncated</code> beside the values. This makes resource limits and measurement scope visible in data evidence.</p>
+  <p><code>Dataset.prepare_features()</code> produces a small, inspectable baseline matrix: amplitude mean and spread, RMS, peak level, clipping fraction, silence fraction, observed duration, PCM scale, and recorded metadata. It reads a bounded prefix and exposes <code>frames_observed</code> and <code>frames_truncated</code> beside the values. This makes resource limits and measurement scope visible in data evidence.</p>
   <p>The core implementation intentionally decodes WAV only. A sample accepted through an explicit FLAC, MP3, or other codec probe can be curated, but signal preparation stops until the caller supplies a versioned decoder adapter. There is no hidden resampling, speaker identification, transcript generation, spectrogram claim, or production audio model behind this API.</p>
   <h2>Video feature boundary</h2>
-  <p><code>VideoDataset.prepare_metadata_features()</code> produces numeric evidence from the probe output: duration, dimensions, pixel count, aspect ratio, frame count and rate, audio-track count, byte size, and bytes per frame. It never decodes or samples frames, so it cannot silently choose a temporal windowing policy or claim that container metadata represents visual content.</p>
-  <p>A caller-owned decoder can now provide bounded frame sampling with a pixel budget, sampled-frame provenance, and temporal frame-statistics occlusion evidence in the experimental lifecycle. If each clip has a timezone-aware <code>observation_time</code>, <code>VideoDataset.split_temporal(cutoff)</code> assigns clips at or before the UTC-normalized cutoff to training and later clips to future evaluation. Missing or mixed timestamps are surfaced by curation and rejected by the temporal split; the framework will not invent ordering from filenames or file modification times. Audio/video synchronization, raw saliency or motion attribution, reference serving, and production video modelling remain explicit extension work. The metadata, temporal boundary, and frame-statistics matrices are curation and baseline evidence, not a production video capability.</p>
+  <p><code>Dataset.prepare_metadata_features()</code> produces numeric evidence from the probe output: duration, dimensions, pixel count, aspect ratio, frame count and rate, audio-track count, byte size, and bytes per frame. It never decodes or samples frames, so it cannot silently choose a temporal windowing policy or claim that container metadata represents visual content.</p>
+  <p>A caller-owned decoder can now provide bounded frame sampling with a pixel budget, sampled-frame provenance, and temporal frame-statistics occlusion evidence in the experimental lifecycle. If each clip has a timezone-aware <code>observation_time</code>, <code>Dataset.split_temporal(cutoff)</code> assigns clips at or before the UTC-normalized cutoff to training and later clips to future evaluation. Missing or mixed timestamps are surfaced by curation and rejected by the temporal split; the framework will not invent ordering from filenames or file modification times. Audio/video synchronization, raw saliency or motion attribution, reference serving, and production video modelling remain explicit extension work. The metadata, temporal boundary, and frame-statistics matrices are curation and baseline evidence, not a production video capability.</p>
   <h2>Image privacy boundary</h2>
   <p>Image samples preserve encoded bytes for lineage, so decoding pixels does not erase metadata risk. Ingestion records the EXIF tags observed in the source and normalizes sensitive tags such as GPS, artist, camera make/model, copyright, software, and original capture time. Curation emits <code>risk.image-sensitive-metadata</code> as a blocking finding; a reviewer must redact, approve, or otherwise document the disposition before training or distribution.</p>
   <h2>Leakage-aware splitting</h2>

@@ -13,7 +13,7 @@ from scmle.data.detectors import certificates
 
 
 def stored():
-    return certificates.CertificateStore.load(f4_certify.STORE_PATH)
+    return certificates.Store.load(f4_certify.STORE_PATH)
 
 
 def test_the_stored_certificates_are_for_the_current_code():
@@ -21,7 +21,7 @@ def test_the_stored_certificates_are_for_the_current_code():
     digests = f4_certify.current_digests()
     for detector, digest in digests.items():
         state = store.state(detector, digest)
-        assert state is certificates.CertificateState.CURRENT, detector
+        assert state is certificates.Freshness.CURRENT, detector
 
 
 def test_every_required_defect_type_has_an_outcome_on_file():
@@ -35,7 +35,7 @@ def test_every_required_defect_type_has_an_outcome_on_file():
 
 
 def test_stale_and_missing_certificates_are_reported():
-    empty = certificates.CertificateStore()
+    empty = certificates.Store()
     found = f4_certify.problems(empty)
     assert found and all(item.endswith(": missing") for item in found)
     store = stored()

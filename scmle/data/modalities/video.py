@@ -17,8 +17,8 @@ from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.data.modalities.curation import build_finding
 from scmle.data.modalities.curation import conflicting_label_groups
+from scmle.data.modalities.curation import Curation
 from scmle.data.modalities.curation import label_counts
-from scmle.data.modalities.curation import ModalityCurationReport
 
 
 class VideoValidationError(errors.DataError):
@@ -32,7 +32,7 @@ class VideoTemporalError(VideoValidationError):
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class VideoMetadata:
+class Metadata:
     """Decoded container metadata required for bounded video profiling.
 
     Attributes:
@@ -134,7 +134,7 @@ class VideoMetadata:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class VideoProfile:
+class Profile:
     """Bounded data-understanding summary for one video sample.
 
     Attributes:
@@ -173,7 +173,7 @@ class VideoProfile:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class VideoFeatures:
+class Features:
     """Numeric video features with explicit sampled-frame provenance.
 
     Attributes:
@@ -238,7 +238,7 @@ class VideoFeatures:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class VideoSplit:
+class Split:
     """Group-aware video split that keeps related clips together.
 
     Attributes:
@@ -247,9 +247,9 @@ class VideoSplit:
         test: Samples assigned to testing.
     """
 
-    train: tuple["VideoSample", ...]
-    validation: tuple["VideoSample", ...]
-    test: tuple["VideoSample", ...]
+    train: tuple["Sample", ...]
+    validation: tuple["Sample", ...]
+    test: tuple["Sample", ...]
 
     def group_ids(self) -> dict[str, tuple[str, ...]]:
         """Returns the stable groups assigned to each partition.
@@ -272,7 +272,7 @@ class VideoSplit:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class VideoTemporalSplit:
+class TemporalSplit:
     """Time-ordered video clips separated at a UTC cutoff.
 
     Attributes:
@@ -282,8 +282,8 @@ class VideoTemporalSplit:
     """
 
     cutoff: datetime
-    train: tuple["VideoSample", ...]
-    future: tuple["VideoSample", ...]
+    train: tuple["Sample", ...]
+    future: tuple["Sample", ...]
 
     def __post_init__(self) -> None:
         """Validates the cutoff and timestamp completeness of each partition.
@@ -310,7 +310,7 @@ class VideoTemporalSplit:
         )
 
 
-VideoProbe = Callable[[bytes], VideoMetadata]
+VideoProbe = Callable[[bytes], Metadata]
 VideoFrameDecoder = Callable[[bytes, int], numpy.ndarray]
 
 
@@ -372,7 +372,7 @@ def canonical_observation_time(value: datetime | str) -> datetime:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class VideoSample:
+class Sample:
     """Immutable encoded video tied to metadata observed by a probe.
 
     Attributes:
@@ -389,7 +389,7 @@ class VideoSample:
     source: str
     encoded_bytes: bytes = dataclasses.field(repr=False)
     file_hash: str
-    metadata: VideoMetadata
+    metadata: Metadata
     label: str | int | float | bool | None = None
     group_id: str | None = None
     observation_time: datetime | None = None
@@ -431,7 +431,7 @@ class VideoSample:
     def from_bytes(
         cls,
         encoded_bytes: bytes,
-        metadata: VideoMetadata,
+        metadata: Metadata,
         source: str = "memory://",
         max_bytes: int | None = 2 * 1024 * 1024 * 1024,
         label: str | int | float | bool | None = None,
@@ -488,13 +488,13 @@ class VideoSample:
             ),
         )
 
-    def profile(self) -> VideoProfile:
+    def profile(self) -> Profile:
         """Returns bounded metadata suitable for curation and data cards.
 
         Returns:
             The profile of this sample.
         """
-        return VideoProfile(
+        return Profile(
             source=self.source,
             format=self.metadata.format,
             codec=self.metadata.codec,
@@ -514,7 +514,7 @@ class VideoSample:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class VideoDataset:
+class Dataset:
     """Immutable video collection with deterministic source identity.
 
     Attributes:
@@ -523,7 +523,7 @@ class VideoDataset:
             observation times, in sample order; set on construction.
     """
 
-    samples: tuple[VideoSample, ...]
+    samples: tuple[Sample, ...]
     content_hash: str = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
@@ -559,7 +559,7 @@ class VideoDataset:
         object.__setattr__(self, "samples", normalized)
         object.__setattr__(self, "content_hash", digest)
 
-    def profiles(self) -> tuple[VideoProfile, ...]:
+    def profiles(self) -> tuple[Profile, ...]:
         """Returns profiles in sample order for deterministic curation.
 
         Returns:
@@ -567,7 +567,7 @@ class VideoDataset:
         """
         return tuple(sample.profile() for sample in self.samples)
 
-    def prepare_metadata_features(self) -> VideoFeatures:
+    def prepare_metadata_features(self) -> Features:
         """Prepares deterministic numeric features from probed metadata.
 
         This method never decodes or samples frames. Frame-based features
@@ -617,7 +617,7 @@ class VideoDataset:
                 "video metadata features must be finite",
                 {"code": "non_finite_features"},
             )
-        return VideoFeatures(
+        return Features(
             sources=tuple(sample.source for sample in self.samples),
             feature_names=feature_names,
             values=tuple(
@@ -630,7 +630,7 @@ class VideoDataset:
         decoder: VideoFrameDecoder,
         max_frames: int = 8,
         max_frame_pixels: int = 1_000_000,
-    ) -> VideoFeatures:
+    ) -> Features:
         """Prepares bounded temporal statistics through an explicit decoder.
 
         The core package does not select or import a video codec. The caller
@@ -747,7 +747,7 @@ class VideoDataset:
                 )
             rows.append(tuple(float(value) for value in values))
             sampled_indices.append(indices)
-        return VideoFeatures(
+        return Features(
             sources=tuple(sample.source for sample in self.samples),
             feature_names=feature_names,
             values=tuple(rows),
@@ -755,9 +755,7 @@ class VideoDataset:
         )
 
     @staticmethod
-    def frame_indices_for(
-        sample: VideoSample, max_frames: int
-    ) -> tuple[int, ...]:
+    def frame_indices_for(sample: Sample, max_frames: int) -> tuple[int, ...]:
         """Returns deterministic, evenly spaced frame indices for a sample.
 
         Args:
@@ -789,7 +787,7 @@ class VideoDataset:
         validation_fraction: float = 0.2,
         test_fraction: float = 0.2,
         seed: int = 0,
-    ) -> VideoSplit:
+    ) -> Split:
         """Splits clips by explicit group identity to prevent leakage.
 
         A caller should use a subject, session, camera, or other identity as
@@ -816,7 +814,7 @@ class VideoDataset:
             raise ValueError("test_fraction must be in [0, 1)")
         if validation_fraction + test_fraction >= 1:
             raise ValueError("validation_fraction + test_fraction must be < 1")
-        grouped: dict[str, list[VideoSample]] = {}
+        grouped: dict[str, list[Sample]] = {}
         for sample in self.samples:
             grouped.setdefault(sample.group_id or sample.source, []).append(
                 sample
@@ -842,7 +840,7 @@ class VideoDataset:
             groups[test_count : test_count + validation_count]
         )
 
-        def samples_for(excluded: set[str]) -> tuple[VideoSample, ...]:
+        def samples_for(excluded: set[str]) -> tuple[Sample, ...]:
             return tuple(
                 sample
                 for sample in self.samples
@@ -859,13 +857,13 @@ class VideoDataset:
             for sample in self.samples
             if (sample.group_id or sample.source) in test_groups
         )
-        return VideoSplit(
+        return Split(
             train=samples_for(test_groups | validation_groups),
             validation=validation,
             test=test,
         )
 
-    def split_temporal(self, cutoff: datetime | str) -> VideoTemporalSplit:
+    def split_temporal(self, cutoff: datetime | str) -> TemporalSplit:
         """Splits fully timestamped videos into past and future partitions.
 
         Videos at the cutoff belong to training. Videos after the cutoff
@@ -901,13 +899,13 @@ class VideoDataset:
             if isinstance(sample.observation_time, datetime)
             and sample.observation_time > cutoff_time
         )
-        return VideoTemporalSplit(
+        return TemporalSplit(
             cutoff=cutoff_time,
             train=train,
             future=future,
         )
 
-    def curate(self) -> ModalityCurationReport:
+    def curate(self) -> Curation:
         """Builds reviewable metadata and compatibility findings.
 
         Returns:
@@ -1062,7 +1060,7 @@ class VideoDataset:
                     True,
                 )
             )
-        return ModalityCurationReport(
+        return Curation(
             modality="video",
             dataset_hash=self.content_hash,
             sample_count=len(self.samples),
@@ -1073,16 +1071,16 @@ class VideoDataset:
 
 
 __all__ = [
-    "VideoDataset",
-    "VideoFeatures",
+    "Dataset",
+    "Features",
+    "Metadata",
+    "Profile",
+    "Sample",
+    "Split",
+    "TemporalSplit",
     "VideoFrameDecoder",
-    "VideoMetadata",
     "VideoProbe",
-    "VideoProfile",
-    "VideoSample",
-    "VideoSplit",
     "VideoTemporalError",
-    "VideoTemporalSplit",
     "VideoValidationError",
     "canonical_observation_time",
     "canonical_source",

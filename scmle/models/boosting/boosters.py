@@ -21,7 +21,7 @@ from scmle.models.boosting import early_stopping
 NO_PARAMS: types.MappingProxyType = types.MappingProxyType({})
 
 
-class LazyLibraryAdapter(models.ModelAdapter):
+class Booster(models.Model):
     """Adapter whose estimator classes live in an optional library.
 
     Attributes:
@@ -46,7 +46,7 @@ class LazyLibraryAdapter(models.ModelAdapter):
 
     def build(
         self,
-        task: tasks.TaskType,
+        task: tasks.Task,
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
@@ -103,7 +103,7 @@ class LazyLibraryAdapter(models.ModelAdapter):
         return estimator
 
 
-class LightGbmAdapter(LazyLibraryAdapter):
+class LightGbm(Booster):
     """LightGBM gradient boosting."""
 
     name = "lightgbm"
@@ -151,7 +151,7 @@ class LightGbmAdapter(LazyLibraryAdapter):
         return {"categorical_feature": list(indices)}
 
 
-class XgboostAdapter(LazyLibraryAdapter):
+class Xgboost(Booster):
     """XGBoost gradient boosting."""
 
     name = "xgboost"
@@ -185,7 +185,7 @@ class XgboostAdapter(LazyLibraryAdapter):
     )
 
 
-class CatBoostAdapter(LazyLibraryAdapter):
+class CatBoost(Booster):
     """CatBoost gradient boosting (`catboost` extra)."""
 
     name = "catboost"
@@ -218,8 +218,8 @@ class CatBoostAdapter(LazyLibraryAdapter):
     )
 
 
-BOOSTING_ADAPTERS: tuple[type[models.ModelAdapter], ...] = (
-    LightGbmAdapter,
-    XgboostAdapter,
-    CatBoostAdapter,
+BOOSTING_ADAPTERS: tuple[type[models.Model], ...] = (
+    LightGbm,
+    Xgboost,
+    CatBoost,
 )

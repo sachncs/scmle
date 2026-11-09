@@ -4,13 +4,14 @@ import numpy
 import pytest
 import support
 
-import scmle
+import scmle.api.project
+import scmle.artifacts.bundle
 from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.models import ensembles
 import scmle.models.registry
 
-ENSEMBLE = tasks.EnsembleSpec(size=3)
+ENSEMBLE = tasks.Stacking(size=3)
 
 
 def run(frame, tmp_path, **kwargs):
@@ -41,7 +42,7 @@ def test_stack_is_evaluated_against_its_members(binary_frame, tmp_path):
 
 
 def test_stack_is_cross_fitted_inside_each_training_fold(binary_frame):
-    registry = scmle.models.registry.ModelRegistry.with_builtins()
+    registry = scmle.models.registry.Catalog.with_builtins()
     adapter = registry.get("stacking")
     params = {
         "members": [
@@ -49,7 +50,7 @@ def test_stack_is_cross_fitted_inside_each_training_fold(binary_frame):
             {"model": "random_forest"},
         ]
     }
-    stack = adapter.build(tasks.TaskType.BINARY, 0, params)
+    stack = adapter.build(tasks.Task.BINARY, 0, params)
     assert stack.cv == ensembles.STACK_FOLDS
     assert [pair[0].split("_", 1)[1] for pair in stack.estimators] == [
         "logistic_regression",
@@ -77,7 +78,7 @@ def test_a_winning_stack_is_selected_refit_and_packaged(
         assert result.selected_model == "stacking"
         assert result.bundle.info.model_params["members"]
         features = regression_frame.drop(columns="y")
-        loaded = scmle.ModelBundle.load(
+        loaded = scmle.artifacts.bundle.Bundle.load(
             result.save(tmp_path / "bundle"), trusted=True
         )
         numpy.testing.assert_allclose(
@@ -86,25 +87,25 @@ def test_a_winning_stack_is_selected_refit_and_packaged(
 
 
 def test_stacking_is_never_a_screening_candidate(binary_frame):
-    registry = scmle.models.registry.ModelRegistry.with_builtins()
-    names = {a.name for a in registry.candidates(tasks.TaskType.BINARY)[0]}
+    registry = scmle.models.registry.Catalog.with_builtins()
+    names = {a.name for a in registry.candidates(tasks.Task.BINARY)[0]}
     assert "stacking" not in names
-    rejected = registry.candidates(tasks.TaskType.BINARY)[1]
+    rejected = registry.candidates(tasks.Task.BINARY)[1]
     assert "stacking" not in rejected
 
 
 def test_stacking_needs_two_members():
-    registry = scmle.models.registry.ModelRegistry.with_builtins()
+    registry = scmle.models.registry.Catalog.with_builtins()
     with pytest.raises(errors.ConfigError, match="at least two"):
         registry.get("stacking").build(
-            tasks.TaskType.BINARY, 0, {"members": [{"model": "ridge"}]}
+            tasks.Task.BINARY, 0, {"members": [{"model": "ridge"}]}
         )
 
 
 def test_ensemble_can_be_disabled_and_is_planned(binary_frame, tmp_path):
     off = support.make_project(binary_frame, "y", output_dir=tmp_path).run()
     assert not any(t.model_name == "stacking" for t in off.trials)
-    plan = scmle.MLProject(binary_frame, "y").plan()
+    plan = scmle.api.project.Project(binary_frame, "y").plan()
     decision = next(d for d in plan.decisions if d.technique == "stacking")
     assert decision.action == "include"
 
@@ -126,5 +127,7 @@ def test_stack_resumes_without_recomputation(
         "evaluate_payload",
         lambda p: calls.append(p.job.trial_id) or real(p),
     )
-    resumed = scmle.MLProject.resume(original.run_dir, data=binary_frame)
+    resumed = scmle.api.project.Project.resume(
+        original.run_dir, data=binary_frame
+    )
     assert calls == [] and resumed.state == "COMPLETED"

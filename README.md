@@ -36,10 +36,10 @@ The supported entry points are documented in
 ```python
 import logging
 
-import scmle
+import scmle.api.project
 
 logging.basicConfig(level=logging.INFO)
-project = scmle.MLProject("customers.parquet", target="churn", metric="roc_auc")
+project = scmle.api.project.Project("customers.parquet", target="churn", metric="roc_auc")
 logging.info(project.plan().summary())  # inspect before any training
 result = project.run()  # profile, split, search, test, package
 logging.info("\n%s", result.leaderboard())
@@ -88,7 +88,7 @@ The hosted documentation is available at
    mechanisms with a passing certificate may block a run.
 2. **Splits** without leakage (stratified / random / group / temporal) behind
    a locked test set that opens once.
-3. **Engineers features** declaratively (`FeatureGraphSpec`: ratios, bins,
+3. **Engineers features** declaratively (`FeatureGraph`: ratios, bins,
    clipping, datetime parts, lags and rolling statistics per entity), with
    every statistic learned on the training fold only.
 4. **Searches** the planned compatible model families (scikit-learn,
@@ -186,10 +186,10 @@ wide data). The full tables, and where it is behind, are in
 | `scmle.data` | `readers` (CSV, Parquet, Arrow / Polars interchange), `profiling`, `validation` (column kinds, target and task), `curation` (fold-local preprocessing), `splitting` (leakage-safe and structure-aware strategies) |
 | `scmle.features` | Versioned, fitted feature graph (row-wise and series nodes) |
 | `scmle.sampling` | Resamplers, synthesis, and the data strategies evaluated inside folds |
-| `scmle.models` | `ModelAdapter` hierarchy and registry, `sklearn` and `boosting` adapters, conformance, thresholds, stacking |
+| `scmle.models` | `Model` hierarchy and registry, `sklearn` and `boosting` adapters, conformance, thresholds, stacking |
 | `scmle.optimization` | Ask/tell optimizers (random, Optuna) |
 | `scmle.experimentation` | Trials, tuning, strategy and ensemble search, experiment stores (SQLite) |
-| `scmle.intelligence` | Dataset fingerprint, `Planner` and `PlanningRule`s, recommendations, meta-learning from run history |
+| `scmle.intelligence` | Dataset fingerprint, `Planner` and `Refiner`s, recommendations, meta-learning from run history |
 | `scmle.evaluation` | Metric catalog, selection policies, diagnostics, resource measurement |
 | `scmle.explainability` | Permutation importance, partial dependence, per-prediction occlusion |
 | `scmle.core` | State machine, workflow compiler, `Stage` hierarchy, policy checkpoints, limits, execution backends, configuration files, orchestrator |
@@ -200,12 +200,12 @@ wide data). The full tables, and where it is behind, are in
 | `scmle.integrations` | Optional MLflow and Ray adapters |
 | `scmle.unsupervised` | Clustering model search and scoring |
 | `scmle.durability` | Atomic, crash-safe file writes used by the stores |
-| `scmle.api` | `MLProject`, `RunResult`, `load_model` / `predict` |
+| `scmle.api` | `Project`, `RunResult`, `load_model` / `predict` |
 
 Extension points are polymorphic: add a `TableReader`, `ColumnKind`,
-`SplitStrategy`, `DataStrategy`, `ModelAdapter`, `Optimizer`, `PlanningRule`,
-`SelectionPolicy`, `Diagnostic`, `PolicyCheckpoint`, `ExecutionBackend`,
-`ExperimentStore`, `ServingAdapter` or `Stage` subclass; no core edits are
+`Partitioner`, `Strategy`, `Model`, `Optimizer`, `Refiner`,
+`Selector`, `Diagnostic`, `Reviewer`, `Executor`,
+`ExperimentStore`, `Server` or `Stage` subclass; no core edits are
 needed ([`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)). Third-party adapters
 can also register via the `scmle.models` entry-point group and must pass
 `scmle.models.conformance.check_conformance`.
@@ -251,7 +251,7 @@ installed into a clean environment.
 * PyTorch and Keras model families ship with the `deeplearning` extra and run
   in a separate worker process (two OpenMP runtimes in one process crash).
   TabPFN (the `tabpfn` extra) stays extension-only and needs its own license
-  and token; other pretrained models plug in through the `ModelAdapter`
+  and token; other pretrained models plug in through the `Model`
   contract.
 * `gpu="required"` blocks a run unless PyTorch can see a CUDA device.
 * The test-set vault keeps the locked rows out of trial processes. It cannot
@@ -262,7 +262,7 @@ installed into a clean environment.
   (registries, runs, prediction, stores and journals; see "Concurrency" in
   `docs/ARCHITECTURE.md`). Locks are per process, so separate processes that
   share one registry, journal or run directory are not coordinated, and
-  mutating a shared `ModelBundle` (`calibrate`) while others predict is not
+  mutating a shared `Bundle` (`calibrate`) while others predict is not
   supported.
 * Windows: peak-memory reporting counts this process only (finished child
   processes are not reported), and the free-threaded build is not tested.

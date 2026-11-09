@@ -3,7 +3,7 @@
 import pytest
 
 from scmle.models.deeplearning.jepa import JepaEstimator
-from scmle.models.deeplearning.jepa_engine import JepaEngine
+from scmle.models.deeplearning.jepa_engine import Trainer
 
 
 def test_jepa_is_a_self_supervised_representation_contract():
@@ -73,7 +73,7 @@ def test_invalid_training_configuration_has_actionable_diagnostic(
     settings = {parameter: value}
 
     with pytest.raises(ValueError, match=message):
-        JepaEngine(**settings).fit(features)
+        Trainer(**settings).fit(features)
 
 
 @pytest.mark.skipif(
@@ -83,4 +83,4 @@ def test_invalid_training_configuration_has_actionable_diagnostic(
 def test_non_numeric_features_have_actionable_diagnostic():
     """String data is rejected as outside the numeric-tabular JEPA contract."""
     with pytest.raises(ValueError, match="numeric 2-D feature matrix"):
-        JepaEngine(epochs=1).fit([["a"], ["b"], ["c"], ["d"]] * 2)
+        Trainer(epochs=1).fit([["a"], ["b"], ["c"], ["d"]] * 2)

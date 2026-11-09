@@ -78,7 +78,7 @@ def learning_rate_at(
 
 
 @dataclasses.dataclass
-class TrainingMonitor:
+class Monitor:
     """Watches losses and gradient norms for signs of a broken run.
 
     Attributes:

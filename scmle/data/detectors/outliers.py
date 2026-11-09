@@ -59,7 +59,7 @@ Contract = Callable[[pandas.DataFrame], pandas.Series]
 
 
 @dataclasses.dataclass(frozen=True)
-class TriageResult:
+class Triage:
     """Class of every row.
 
     Attributes:
@@ -164,7 +164,7 @@ def triage(
     provenance: Mapping[str, FieldProvenance] | None = None,
     contracts: Mapping[str, Contract] | None = None,
     cutoff: float = CANDIDATE_Z,
-) -> TriageResult:
+) -> Triage:
     """Classes every row by provenance.
 
     Args:
@@ -216,7 +216,7 @@ def triage(
     classes[population] = "population"
     classes[error] = "error"
     tier = "attested" if known or contracts else "unverified"
-    return TriageResult(classes, scores, candidate, tier)
+    return Triage(classes, scores, candidate, tier)
 
 
 def error_flags(
@@ -241,7 +241,7 @@ def error_flags(
     )
 
 
-def summary(result: TriageResult) -> dict[str, Any]:
+def summary(result: Triage) -> dict[str, Any]:
     """Summarises a triage result.
 
     Args:

@@ -49,7 +49,7 @@ class Decision:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ExperimentPlan:
+class Plan:
     """Declarative, auditable description of the proposed workflow.
 
     Attributes:
@@ -130,7 +130,7 @@ class ExperimentPlan:
 
 
 @dataclasses.dataclass(slots=True)
-class TrialResult:
+class Trial:
     """Outcome of evaluating one complete candidate pipeline.
 
     Attributes:

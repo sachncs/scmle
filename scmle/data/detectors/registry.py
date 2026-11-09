@@ -18,7 +18,7 @@ import scmle.data.splitting.duplicates
 
 
 @dataclasses.dataclass(frozen=True)
-class DetectorSpec:
+class Identity:
     """A detector's identity for certification and gating.
 
     Attributes:
@@ -41,26 +41,26 @@ class DetectorSpec:
         return certificates.code_hash(*self.modules)
 
 
-SPECS: dict[str, DetectorSpec] = {
+SPECS: dict[str, Identity] = {
     spec.detector_id: spec
     for spec in (
-        DetectorSpec("f5-sentinel", (sentinels,), ("sentinel",)),
-        DetectorSpec(
+        Identity("f5-sentinel", (sentinels,), ("sentinel",)),
+        Identity(
             "f5-duplicates",
             (duplicates, scmle.data.splitting.duplicates),
             ("duplicate_exact", "duplicate_near"),
         ),
-        DetectorSpec(
+        Identity(
             "f5-label-noise",
             (labels,),
             ("label_flip_symmetric", "label_flip_class_conditional"),
         ),
-        DetectorSpec(
+        Identity(
             "f5-missingness",
             (missingness,),
             ("missing_mar", "missing_mnar"),
         ),
-        DetectorSpec("f5-outlier-triage", (outliers,), ("outlier_error",)),
+        Identity("f5-outlier-triage", (outliers,), ("outlier_error",)),
     )
 }
 

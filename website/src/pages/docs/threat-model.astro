@@ -63,7 +63,7 @@ const tested = [
   <h2>Guidance for operators</h2>
   <ol>
     <li>Set <code>SCMLE_SIGNING_KEY</code> wherever bundles are produced and verified.</li>
-    <li>Rotate keys with <code>ModelBundle.rotate_signing_key(directory, old, new)</code>. Verify the new key before retiring the old one, maintain the matching <code>SigningKeyRegistry</code> record, and transition it to <code>retired</code> only after parity is confirmed.</li>
+    <li>Rotate keys with <code>Bundle.rotate_signing_key(directory, old, new)</code>. Verify the new key before retiring the old one, maintain the matching <code>SigningKeyRegistry</code> record, and transition it to <code>retired</code> only after parity is confirmed.</li>
     <li>Never pass <code>trusted=True</code> (or <code>scmle predict --trusted</code>) for a bundle you did not produce.</li>
     <li>Serve behind an authenticating gateway; bind to loopback by default.</li>
     <li>Treat the model registry directory as a trust boundary: it is read with <code>trusted=True</code> after checksum verification at registration time.</li>

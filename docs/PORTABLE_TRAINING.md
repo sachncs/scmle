@@ -6,9 +6,9 @@ same interface.
 
 ## The spec and the run
 
-`JobSpec` names a durable `run_id` (the idempotency key), the project
+`Job` names a durable `run_id` (the idempotency key), the project
 specification (opaque JSON), the training identity, resources, a timeout, a
-`RetryPolicy`, an optional `CostBudget` and a non-secret environment. A GPU
+`Retries`, an optional `CostBudget` and a non-secret environment. A GPU
 needs a stated `gpu_reason`: specialised compute only behind a declared need.
 `Runner.run(spec)` is the same on every runner:
 
@@ -48,16 +48,16 @@ runner. Releasing a bundle is a third act, with an approval, outside both.
 
 | Runner | Runs the attempt as | Identity | Interruption |
 | --- | --- | --- | --- |
-| `LocalRunner` | the workload, in this process | the training role of `RoleStore` | injected, or `JobInterruptedError` |
+| `Runner` | the workload, in this process | the training role of `RoleStore` | injected, or `JobInterruptedError` |
 
 A runner for a container platform starts `python -m scmle.runners.entrypoint`
 in the image, which opens the `file://` store named by `SCMLE_STORE_URI`, loads
 the stored spec, refuses it if its digest is not the one the runner started,
 and runs the workload (`SCMLE_WORKLOAD`, default
 `scmle.runners.project:run_project`). `run_project` runs an unchanged
-`MLProject`: it copies the data from the store, mirrors the run directory to
+`Project`: it copies the data from the store, mirrors the run directory to
 `runs/<id>/workdir/` every 30 seconds and at the end, and after a restart on an
-empty disk restores it and calls `MLProject.resume`. A hard kill loses at most
+empty disk restores it and calls `Project.resume`. A hard kill loses at most
 the trials since the last mirror. `reproducibility.compare` reports each
 metric of a result against tolerances declared before the runs; a miss is
 published, not hidden.

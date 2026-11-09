@@ -7,8 +7,8 @@ from scmle.core import state
 
 
 def test_happy_path_emits_event_per_transition():
-    log = events.EventLog()
-    machine = state.StateMachine("r1", log, "abc")
+    log = events.Log()
+    machine = state.Tracker("r1", log, "abc")
     for step in state.FORWARD_ORDER[1:]:
         machine.transition(step, "ok")
     assert machine.state is state.RunState.COMPLETED
@@ -17,13 +17,13 @@ def test_happy_path_emits_event_per_transition():
 
 
 def test_cannot_skip_states():
-    machine = state.StateMachine("r1", events.EventLog())
+    machine = state.Tracker("r1", events.Log())
     with pytest.raises(state.InvalidTransitionError):
         machine.transition(state.RunState.TRAINING)
 
 
 def test_abort_then_terminal():
-    machine = state.StateMachine("r1", events.EventLog())
+    machine = state.Tracker("r1", events.Log())
     machine.transition(state.RunState.VALIDATING)
     machine.transition(state.RunState.BLOCKED, "ambiguous target")
     with pytest.raises(state.InvalidTransitionError):

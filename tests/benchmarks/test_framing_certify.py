@@ -37,11 +37,11 @@ def test_certification_and_development_seeds_do_not_overlap():
 
 
 def test_selective_label_certificate_is_stale_when_code_changes():
-    store = certificates.CertificateStore.load(framing_certify.STORE_PATH)
+    store = certificates.Store.load(framing_certify.STORE_PATH)
     state = store.state(baseline.DETECTOR_ID, framing_certify.code_digest())
-    assert state is certificates.CertificateState.CURRENT
+    assert state is certificates.Freshness.CURRENT
     assert store.state(baseline.DETECTOR_ID, "0" * 64) is (
-        certificates.CertificateState.STALE
+        certificates.Freshness.STALE
     )
 
 
@@ -51,7 +51,7 @@ def test_check_framing_is_wired_into_the_harness(capsys):
 
 
 def test_problems_flag_an_inconsistent_min_clusters():
-    store = certificates.CertificateStore.load(framing_certify.STORE_PATH)
+    store = certificates.Store.load(framing_certify.STORE_PATH)
     document = framing_certify.load_document()
     document = {**document, "min_clusters_measured": 50}
     assert any(

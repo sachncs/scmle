@@ -212,7 +212,7 @@ class StepContext:
 
 
 Handler = Callable[[StepContext], Mapping[str, Any] | None]
-StepResult = tuple[str, Mapping[str, Any], float]
+Outcome = tuple[str, Mapping[str, Any], float]
 
 
 def digest_of(value: Any) -> str:
@@ -243,7 +243,7 @@ def run_id_for(workflow: definition.Workflow, trigger_key: str) -> str:
     return f"{workflow.name}-{short}"[:64]
 
 
-class LocalExecutor:
+class Executor:
     """Runs a `Workflow` against handlers, keeping durable state.
 
     Attributes:
@@ -572,7 +572,7 @@ class LocalExecutor:
         budget_hit = False
         group_use: dict[str, int] = {}
         in_flight: dict[
-            concurrent.futures.Future[StepResult], definition.Step
+            concurrent.futures.Future[Outcome], definition.Step
         ] = {}
         with concurrent.futures.ThreadPoolExecutor(
             max_workers=self.workflow.max_parallel
@@ -760,7 +760,7 @@ class LocalExecutor:
         step: definition.Step,
         upstream: Mapping[str, Mapping[str, Any]],
         run_spent: float,
-    ) -> StepResult:
+    ) -> Outcome:
         """Runs one step with its retries.
 
         A step that already succeeded with the same idempotency key is not run

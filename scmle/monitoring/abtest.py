@@ -40,7 +40,7 @@ class Arm:
 
 
 @dataclasses.dataclass(frozen=True)
-class ABResult:
+class Comparison:
     """Outcome of an A/B comparison.
 
     Attributes:
@@ -76,7 +76,7 @@ def score_arm(
     arm: Arm,
     rows: numpy.ndarray,
     metric: Any,
-    task: tasks.TaskType,
+    task: tasks.Task,
 ) -> float:
     """Scores a subset of an arm's requests.
 
@@ -101,7 +101,7 @@ def score_arm(
         else replay.RegressorPredictions(arm.predictions[rows])
     )
     positive = None
-    if task is tasks.TaskType.BINARY and arm.classes is not None:
+    if task is tasks.Task.BINARY and arm.classes is not None:
         positive = arm.classes[1]
     return float(
         metric.score(
@@ -111,14 +111,14 @@ def score_arm(
 
 
 def compare_arms(
-    task: tasks.TaskType,
+    task: tasks.Task,
     metric_name: str,
     control: Arm,
     treatment: Arm,
     bootstraps: int = BOOTSTRAPS,
     seed: int = 0,
     min_rows: int = MIN_ROWS,
-) -> ABResult:
+) -> Comparison:
     """Compares two arms with independent bootstrap resampling.
 
     Resamples that miss a class are skipped.
@@ -172,7 +172,7 @@ def compare_arms(
         decision = "keep"
     else:
         decision = "inconclusive"
-    return ABResult(
+    return Comparison(
         metric.name,
         control_score,
         treatment_score,

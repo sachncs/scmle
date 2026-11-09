@@ -1,4 +1,4 @@
-"""A real MLProject run as a job: durable workdir, restore and resume."""
+"""A real Project run as a job: durable workdir, restore and resume."""
 
 import functools
 import json
@@ -52,17 +52,17 @@ def test_workdir_sync_pushes_changes_and_restores(tmp_path):
 
 
 def spec_of(run_id="churn-1"):
-    return base.JobSpec(
+    return base.Job(
         run_id=run_id,
         name="churn",
         project={"data": "data/train.csv", "target": "y", "options": OPTIONS},
         identity="arn:train",
-        retries=retry.RetryPolicy(3, 0.1, 1.0, 1.0),
+        retries=retry.Retries(3, 0.1, 1.0, 1.0),
     )
 
 
 def runner_for(store, workload):
-    return local.LocalRunner(
+    return local.Runner(
         store, workload, serving_identity="arn:serve", poll_seconds=0
     )
 

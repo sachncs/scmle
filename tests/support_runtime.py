@@ -21,7 +21,7 @@ OLD = "sha256:" + "a" * 64
 NEW = "sha256:" + "b" * 64
 OTHER = "sha256:" + "9" * 64
 
-NO_WAIT = control.ConfirmPolicy(attempts=4, delay=0, sleep=lambda seconds: None)
+NO_WAIT = control.Polling(attempts=4, delay=0, sleep=lambda seconds: None)
 
 
 class MemoryPlane(control.ControlPlane):

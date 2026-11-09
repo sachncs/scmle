@@ -22,7 +22,7 @@ issued.
 The comparison is valid only if outcomes are observed independently of the
 baseline's decision. `selective_labels` tests that. The hypothesis ledger is not
 used here: its hypotheses are single-feature bivariate statistics. Instead a
-`BaselineGuard` registers the cost model and the frozen rule by hash before
+`Evaluator` registers the cost model and the frozen rule by hash before
 `C` is read and refuses a second evaluation.
 """
 
@@ -311,7 +311,7 @@ def profile_on_exploration(
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class BaselineRegistration:
+class Registration:
     """What is fixed before the confirmation set is read.
 
     Attributes:
@@ -340,7 +340,7 @@ def register(
     model: costs.DecisionCostModel,
     rule: Mapping[str, Any],
     alpha: float,
-) -> BaselineRegistration:
+) -> Registration:
     """Freezes the claim: the cost model, the rule and the level.
 
     Args:
@@ -359,7 +359,7 @@ def register(
     if not 0.0 < level < 1.0:
         raise ValueError("alpha must be strictly between 0 and 1")
     rule_hash = hashlib.sha256(signing.canonical_payload(rule)).hexdigest()
-    return BaselineRegistration(
+    return Registration(
         model.model_hash, rule_hash, level, model.t_lo, model.t_hi
     )
 
@@ -377,7 +377,7 @@ def rule_digest(rule: Mapping[str, Any]) -> str:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class BaselineReport:
+class Outcome:
     """Outcome of the one evaluation on `C`.
 
     Attributes:
@@ -431,7 +431,7 @@ class BaselineReport:
         }
 
 
-class BaselineGuard:
+class Evaluator:
     """Evaluates the registered claim on `C` exactly once.
 
     Attributes:
@@ -439,7 +439,7 @@ class BaselineGuard:
         used: Whether the claim has already been evaluated.
     """
 
-    def __init__(self, registration: BaselineRegistration) -> None:
+    def __init__(self, registration: Registration) -> None:
         """Binds the guard to a registration.
 
         Args:
@@ -461,7 +461,7 @@ class BaselineGuard:
         observed: ArrayLike | None = None,
         input_tier: qualification.Tier = qualification.Tier.CONFIRMED,
         seed: int = 0,
-    ) -> BaselineReport:
+    ) -> Outcome:
         """Tests `Delta(t) > 0` at both endpoints on the confirmation rows.
 
         Args:
@@ -510,7 +510,7 @@ class BaselineGuard:
         input_tier: qualification.Tier,
         seed: int,
         model: costs.DecisionCostModel,
-    ) -> BaselineReport:
+    ) -> Outcome:
         """Computes the report once the call has been authorised.
 
         Args:
@@ -574,7 +574,7 @@ class BaselineGuard:
         input_tier: qualification.Tier,
         seed: int,
         model: costs.DecisionCostModel,
-    ) -> BaselineReport:
+    ) -> Outcome:
         """Builds the checks, the claim and the report.
 
         Args:
@@ -645,7 +645,7 @@ class BaselineGuard:
                 f"cost model {model.model_hash[:12]} fixed before C",
             ),
         )
-        return BaselineReport(
+        return Outcome(
             issued=issued,
             status=status,
             reasons=tuple(reasons),

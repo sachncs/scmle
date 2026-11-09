@@ -141,9 +141,7 @@ def test_a_malformed_definition_is_reported():
 
 def test_every_supported_capability_is_tabular_library_inference():
     found = context.tabular_beta_capability_registry().list_capabilities()
-    supported = [
-        c for c in found if c.status is capabilities.CapabilityStatus.SUPPORTED
-    ]
+    supported = [c for c in found if c.status is capabilities.Status.SUPPORTED]
     assert supported
     for capability in supported:
         assert capability.key.modality is capabilities.Modality.TABULAR
@@ -154,9 +152,7 @@ def test_no_pretrained_or_multimodal_family_is_supported():
     found = context.tabular_beta_capability_registry().list_capabilities()
     for capability in found:
         if capability.key.model_family in FAMILIES:
-            assert (
-                capability.status is capabilities.CapabilityStatus.EXPERIMENTAL
-            )
+            assert capability.status is capabilities.Status.EXPERIMENTAL
 
 
 def test_streaming_inference_is_not_declared_supported():
@@ -165,7 +161,7 @@ def test_streaming_inference_is_not_declared_supported():
         c
         for c in found
         if c.key.inference is capabilities.Inference.STREAMING
-        and c.status is capabilities.CapabilityStatus.SUPPORTED
+        and c.status is capabilities.Status.SUPPORTED
     ]
 
 
@@ -174,15 +170,15 @@ def test_unsupported_algorithms_are_not_in_the_model_registry():
 
 
 def test_unsupervised_families_are_not_task_types():
-    values = {task.value for task in tasks.TaskType}
+    values = {task.value for task in tasks.Task}
     for word in ("clustering", "association", "dimensionality"):
         assert not [v for v in values if word in v]
 
 
 def test_an_extension_adapter_never_inherits_supported():
-    key = capabilities.CapabilityKey(
+    key = capabilities.Coordinate(
         modality=capabilities.Modality.IMAGE,
-        task=tasks.TaskType.BINARY,
+        task=tasks.Task.BINARY,
         model_family="acme_cnn",
         evaluation=capabilities.Evaluation.STANDARD,
         uncertainty=capabilities.Uncertainty.NONE,
@@ -191,17 +187,21 @@ def test_an_extension_adapter_never_inherits_supported():
         inference=capabilities.Inference.LIBRARY,
     )
     declared = context.extension_capability(key)
-    assert declared.status is capabilities.CapabilityStatus.EXTENSION_ONLY
+    assert declared.status is capabilities.Status.EXTENSION_ONLY
 
 
 def test_only_the_contract_module_can_name_a_supported_modality():
     named = []
     for path in (ROOT / "scmle").rglob("*.py"):
         text = path.read_text(encoding="utf-8")
-        if "ModalityStatus.SUPPORTED" in text:
+        own = (
+            path.relative_to(ROOT).as_posix() == "scmle/contracts/modalities.py"
+        )
+        pattern = "Status.SUPPORTED" if own else "modalities.Status.SUPPORTED"
+        if pattern in text:
             named.append(path.relative_to(ROOT).as_posix())
     assert named == ["scmle/contracts/modalities.py"]
-    assert modalities.ModalityStatus.SUPPORTED.value == "supported"
+    assert modalities.Status.SUPPORTED.value == "supported"
 
 
 def table_rows():

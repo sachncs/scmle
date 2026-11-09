@@ -18,7 +18,7 @@ from scmle.data.ledger import multiplicity
 import scmle.data.ledger.budget
 
 CLS = "classification"
-FAST = leakage.LeakageConfig(
+FAST = leakage.Config(
     skill_ceiling=0.95,
     association_ceiling=0.9,
     permutations=199,
@@ -239,7 +239,7 @@ def test_by_decisions_equal_the_exact_adjustment_of_the_reported_p_values():
     report = run(frame)
     ps = [f.p_value if f.complete else 1.0 for f in report.findings]
     adjustment = multiplicity.adjust(
-        ps, scmle.data.ledger.budget.MultiplicityRule.BY, Fraction(1, 20)
+        ps, scmle.data.ledger.budget.Correction.BY, Fraction(1, 20)
     )
     assert [f.significant for f in report.findings] == list(adjustment.rejected)
 
@@ -445,13 +445,13 @@ def test_the_global_null_is_flagged_no_more_often_than_alpha():
 
 
 def passing_store():
-    return certificates.CertificateStore.load(screen.STORE_PATH)
+    return certificates.Store.load(screen.STORE_PATH)
 
 
 def test_the_shipped_certificate_is_current_for_the_screen_code():
     store = passing_store()
     state = store.state(screen.DETECTOR_ID, screen.code_digest())
-    assert state is certificates.CertificateState.CURRENT
+    assert state is certificates.Freshness.CURRENT
     gates = screen.gate_statuses(store, leakage.CERTIFIED, CLS, 2)
     assert set(gates) == set(screen.MECHANISM_DEFECTS)
     assert set(gates.values()) == {certificates.GateStatus.GATING}

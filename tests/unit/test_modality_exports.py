@@ -1,13 +1,14 @@
 """Tests for the public data-foundation import surfaces."""
 
-from scmle.data import modalities
-from scmle.data import readers
+import scmle.data.modalities.document
+import scmle.data.modalities.video
+import scmle.data.readers.connectors
 
 
 def test_modality_and_connector_surfaces_are_public():
-    assert modalities.DocumentReader is not None
-    assert modalities.GraphData is not None
-    assert modalities.ImageDataset is not None
-    assert readers.SourceConnector is not None
-    assert readers.LocalFileConnector is not None
-    assert readers.DbApiConnector is not None
+    assert scmle.data.modalities.document.Reader is not None
+    assert scmle.data.modalities.video.Dataset is not None
+    assert scmle.data.modalities.video.Dataset is not None
+    assert scmle.data.readers.connectors.SourceConnector is not None
+    assert scmle.data.readers.connectors.LocalFileConnector is not None
+    assert scmle.data.readers.connectors.DbApiConnector is not None

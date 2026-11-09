@@ -20,39 +20,41 @@ def message(call):
 
 
 def test_rule_choices_are_named_in_full():
-    assert message(partial(rules.RunRules, ledger_rule="x")) == (
+    assert message(partial(rules.Procedure, ledger_rule="x")) == (
         f"ledger_rule must be one of {online_fdr.RULE_NAMES}"
     )
     allowed = ("bonferroni", "holm", "bh", "by")
-    assert message(partial(rules.RunRules, confirmation_rule="x")) == (
+    assert message(partial(rules.Procedure, confirmation_rule="x")) == (
         f"confirmation_rule must be one of {allowed}"
     )
-    assert message(partial(rules.RunRules, failure_policy="retry")) == (
+    assert message(partial(rules.Procedure, failure_policy="retry")) == (
         "failure_policy must be 'unconfirmed': no other policy is implemented"
     )
-    assert message(partial(rules.RunRules, stability_filter=1)) == (
+    assert message(partial(rules.Procedure, stability_filter=1)) == (
         "stability_filter must be a boolean"
     )
 
 
 def test_stability_shares_are_in_the_half_open_unit_interval():
-    assert rules.RunRules(s_min=1.0, q_min=1.0).s_min == 1.0
+    assert rules.Procedure(s_min=1.0, q_min=1.0).s_min == 1.0
     for name in ("s_min", "q_min"):
         for bad in (0.0, -0.1, 1.01):
-            assert message(partial(rules.RunRules, **{name: bad})) == (
+            assert message(partial(rules.Procedure, **{name: bad})) == (
                 f"{name} must be within (0, 1]"
             )
-        assert message(partial(rules.RunRules, **{name: float("nan")})) == (
+        assert message(partial(rules.Procedure, **{name: float("nan")})) == (
             f"{name} must be a finite number"
         )
 
 
 def test_the_band_must_be_positive_and_finite():
-    assert message(partial(rules.RunRules, band=0.0)) == "band must be positive"
-    assert message(partial(rules.RunRules, band=float("inf"))) == (
+    assert (
+        message(partial(rules.Procedure, band=0.0)) == "band must be positive"
+    )
+    assert message(partial(rules.Procedure, band=float("inf"))) == (
         "band must be a finite number"
     )
-    assert rules.RunRules(band=1e-9).band == 1e-9
+    assert rules.Procedure(band=1e-9).band == 1e-9
 
 
 def test_a_written_charter_is_sorted_indented_and_in_a_new_folder(tmp_path):

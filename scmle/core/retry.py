@@ -44,7 +44,7 @@ class RetryExhaustedError(errors.ScmleError):
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class RetryPolicy:
+class Retries:
     """How often and how patiently an operation is retried.
 
     Attributes:
@@ -107,7 +107,7 @@ class RetryPolicy:
 
 def call_with_retries(
     operation: Callable[[], T],
-    policy: RetryPolicy,
+    policy: Retries,
     *,
     is_transient: Callable[[Exception], bool] | None = None,
     sleep: Callable[[float], None] = time.sleep,

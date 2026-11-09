@@ -15,7 +15,7 @@ def run(*arguments):
 
 
 def policy_file(tmp_path):
-    policy = loop.LoopPolicy(
+    policy = loop.Preregistration(
         reference_risk=0.1,
         tolerance=0.05,
         r_star=0.6,
@@ -152,6 +152,6 @@ def test_a_refused_reply_and_a_broken_ledger_fail(tmp_path, capsys):
 
 
 def test_a_policy_file_needs_only_the_reference_risk():
-    policy = loop.LoopPolicy.from_dict({"reference_risk": 0.1})
+    policy = loop.Preregistration.from_dict({"reference_risk": 0.1})
     assert policy.high_impact_actions == ()
     assert policy.reference_risk == 0.1

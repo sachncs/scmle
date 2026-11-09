@@ -26,7 +26,7 @@ def load_keras() -> Any:
     return importlib.import_module("keras")
 
 
-class KerasEngine(base.BaseEstimator):
+class Trainer(base.BaseEstimator):
     """A dense network trained with Keras, Adam and early stopping.
 
     Attributes:
@@ -128,7 +128,7 @@ class KerasEngine(base.BaseEstimator):
 
     def fit(
         self, features: Any, target: Any, sample_weight: Any = None
-    ) -> "KerasEngine":
+    ) -> "Trainer":
         """Trains the network and keeps its weights as numpy arrays.
 
         Early stopping on a validation split is used only when there are at
@@ -249,7 +249,7 @@ class KerasEngine(base.BaseEstimator):
         )
 
 
-class ClassifierEngine(base.ClassifierMixin, KerasEngine):
+class Classifier(base.ClassifierMixin, Trainer):
     """Classifier: softmax over class scores."""
 
     def output_units(self) -> int:
@@ -309,7 +309,7 @@ class ClassifierEngine(base.ClassifierMixin, KerasEngine):
         return self.classes_[self.predict_proba(features).argmax(axis=1)]
 
 
-class RegressorEngine(base.RegressorMixin, KerasEngine):
+class Regressor(base.RegressorMixin, Trainer):
     """Regressor trained on the standardized target."""
 
     def encode_target(self, target: Any) -> numpy.ndarray:

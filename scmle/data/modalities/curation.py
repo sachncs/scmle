@@ -12,7 +12,7 @@ from scmle.contracts import data
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ModalityCurationReport:
+class Curation:
     """JSON-native data-understanding evidence before modelling.
 
     Attributes:
@@ -87,7 +87,7 @@ class ModalityCurationReport:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ModalityDatasetCard:
+class DatasetCard:
     """Human-reviewable card generated from modality curation evidence.
 
     The card keeps data understanding separate from model quality. Privacy
@@ -199,7 +199,7 @@ class ModalityDatasetCard:
         Args:
             modality: Name of the modality.
             report: A curation report as produced by
-                `ModalityCurationReport.to_dict`; must hold `dataset_hash`
+                `Curation.to_dict`; must hold `dataset_hash`
                 (str) and `sample_count` (int).
             limitations: Known limitations to record on the card.
             manifest: Manifest to attach. When None, one is built from the
@@ -421,8 +421,8 @@ def build_finding(
 
 
 __all__ = [
-    "ModalityCurationReport",
-    "ModalityDatasetCard",
+    "Curation",
+    "DatasetCard",
     "build_finding",
     "conflicting_label_groups",
     "dataset_hash",

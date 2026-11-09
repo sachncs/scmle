@@ -7,11 +7,11 @@ from scmle.contracts import evidence
 
 def make_record(
     criterion_id: str = "quality.contracts",
-    result: evidence.EvidenceResult = evidence.EvidenceResult.PASS,
-    decision: evidence.EvidenceDecision = evidence.EvidenceDecision.ACCEPTED,
-) -> evidence.EvidenceRecord:
+    result: evidence.Outcome = evidence.Outcome.PASS,
+    decision: evidence.Disposition = evidence.Disposition.ACCEPTED,
+) -> evidence.Record:
     """Builds a representative release evidence record."""
-    return evidence.EvidenceRecord(
+    return evidence.Record(
         criterion_id=criterion_id,
         claim="structured curation findings are persisted",
         scope={"release": "beta", "area": "data"},
@@ -29,44 +29,39 @@ def make_record(
 
 
 def test_record_round_trips_and_index_is_deterministic():
-    index = evidence.EvidenceIndex(
-        [make_record("z.last"), make_record("a.first")]
-    )
+    index = evidence.Index([make_record("z.last"), make_record("a.first")])
 
     assert [record.criterion_id for record in index.ordered()] == [
         "a.first",
         "z.last",
     ]
-    assert (
-        evidence.EvidenceRecord.from_dict(make_record().to_dict())
-        == make_record()
-    )
+    assert evidence.Record.from_dict(make_record().to_dict()) == make_record()
     assert index.ready()
     assert (
         index.canonical_json()
-        == evidence.EvidenceIndex(
+        == evidence.Index(
             [make_record("a.first"), make_record("z.last")]
         ).canonical_json()
     )
 
 
 def test_signed_index_round_trips_and_rejects_tampering():
-    index = evidence.EvidenceIndex([make_record()])
+    index = evidence.Index([make_record()])
     signature = index.sign("evidence-key")
 
     assert signature
     assert index.verify("evidence-key")
-    restored = evidence.EvidenceIndex.from_dict(index.to_dict())
+    restored = evidence.Index.from_dict(index.to_dict())
     assert restored.verify("evidence-key")
     assert restored.to_dict() == index.to_dict()
-    restored.records["quality.contracts"] = evidence.EvidenceRecord.from_dict(
+    restored.records["quality.contracts"] = evidence.Record.from_dict(
         {**make_record().to_dict(), "claim": "tampered claim"}
     )
     assert not restored.verify("evidence-key")
 
 
 def test_signed_index_cannot_be_changed():
-    index = evidence.EvidenceIndex([make_record()])
+    index = evidence.Index([make_record()])
     index.sign("evidence-key")
 
     with pytest.raises(ValueError, match="signed evidence index"):
@@ -74,16 +69,16 @@ def test_signed_index_cannot_be_changed():
 
 
 def test_index_rejects_duplicate_and_pending_records():
-    index = evidence.EvidenceIndex([make_record()])
+    index = evidence.Index([make_record()])
 
     with pytest.raises(ValueError, match="duplicate"):
         index.register(make_record())
 
-    blocked = evidence.EvidenceIndex(
+    blocked = evidence.Index(
         [
             make_record(
-                result=evidence.EvidenceResult.FAIL,
-                decision=evidence.EvidenceDecision.BLOCKED,
+                result=evidence.Outcome.FAIL,
+                decision=evidence.Disposition.BLOCKED,
             )
         ]
     )
@@ -96,11 +91,11 @@ def test_index_rejects_duplicate_and_pending_records():
 @pytest.mark.parametrize("observed_at", ["2026-10-20T12:00:00", "not-a-time"])
 def test_record_requires_aware_timestamp(observed_at):
     with pytest.raises(ValueError):
-        evidence.EvidenceRecord(
+        evidence.Record(
             **{
                 **make_record().to_dict(),
-                "result": evidence.EvidenceResult.PASS,
-                "decision": evidence.EvidenceDecision.ACCEPTED,
+                "result": evidence.Outcome.PASS,
+                "decision": evidence.Disposition.ACCEPTED,
                 "observed_at": observed_at,
             }
         )

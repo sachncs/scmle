@@ -2,7 +2,7 @@
 
 A causal claim rests on assumptions no data can verify. The charter names who
 may vouch for which assumption (`causal.Attestor`) and where the signed
-statements are (`CausalSpec.attestations`). An attestation counts for an
+statements are (`Question.attestations`). An attestation counts for an
 assumption only when all of these hold; otherwise it is rejected with a
 reason and the assumption has no named attestor, which keeps the claim at
 `unverified` (`tier.decide` is unchanged):

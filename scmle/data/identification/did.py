@@ -39,7 +39,7 @@ MIN_PERIODS = 3
 
 
 @dataclasses.dataclass(frozen=True)
-class DidResult:
+class Estimate:
     """Group-time difference in differences.
 
     Attributes:
@@ -177,7 +177,7 @@ def estimate(
     adoption: str,
     outcome: str,
     level: float = 0.95,
-) -> DidResult:
+) -> Estimate:
     """Estimates group-time ATT against never-treated units, aggregated.
 
     Args:
@@ -301,7 +301,7 @@ def estimate(
             [j - index[g] + 1 for g, j in post_cells], weights=weights
         )
     )
-    return DidResult(
+    return Estimate(
         estimate=theta,
         se=se,
         low=theta - z * se,

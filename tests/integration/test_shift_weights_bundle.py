@@ -5,8 +5,8 @@ import pandas
 import pytest
 import support
 
-import scmle
 from scmle.artifacts import bundle
+import scmle.artifacts.bundle
 from scmle.contracts import errors
 from scmle.evaluation import shift_weights
 
@@ -38,7 +38,7 @@ def test_rows_must_match_the_stored_scores(result):
 
 
 def test_weighted_intervals_need_attached_weights(result):
-    plain = scmle.ModelBundle(
+    plain = scmle.artifacts.bundle.Bundle(
         result.bundle.pipeline, result.bundle.schema, result.bundle.info
     )
     with pytest.raises(errors.ArtifactError, match="conformal"):
@@ -63,7 +63,7 @@ def test_a_mild_shift_gives_weighted_intervals_that_round_trip(
     covered = ((fresh.y >= band.lower) & (fresh.y <= band.upper)).mean()
     assert covered >= 0.85
     result.bundle.save(tmp_path / "copy")
-    loaded = scmle.ModelBundle.load(tmp_path / "copy", trusted=True)
+    loaded = scmle.artifacts.bundle.Bundle.load(tmp_path / "copy", trusted=True)
     pandas.testing.assert_frame_equal(
         loaded.predict_interval(fresh[["x"]], coverage=0.9, shift=True), band
     )
@@ -80,7 +80,7 @@ def test_a_changed_weights_file_is_refused(result, tmp_path):
     data[len(data) // 2] ^= 0xFF
     path.write_bytes(bytes(data))
     with pytest.raises(errors.ArtifactError, match="shift weights"):
-        scmle.ModelBundle.load(tmp_path / "copy", trusted=True)
+        scmle.artifacts.bundle.Bundle.load(tmp_path / "copy", trusted=True)
 
 
 def test_an_extreme_shift_is_refused_and_nothing_is_stored(result):

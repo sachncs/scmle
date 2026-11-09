@@ -25,8 +25,8 @@ SENTINEL = "sentinel"
 
 class Built(typing.NamedTuple):
     frame: pandas.DataFrame
-    outcome: pipeline.CustodyOutcome
-    vault: sealed.CustodyVault
+    outcome: pipeline.Outcome
+    vault: sealed.Vault
     log: sealed.OpenLog
 
 
@@ -40,19 +40,19 @@ def build():
             "y": (rng.random(rows) < 0.3).astype(int),
         }
     )
-    spec = tasks.ProjectSpec(
-        data=tasks.DataSpec(uri="m", target="y"),
-        validation=tasks.ValidationSpec(strategy="stratified", seed=3),
+    spec = tasks.Config(
+        data=tasks.Dataset(uri="m", target="y"),
+        validation=tasks.Validation(strategy="stratified", seed=3),
     )
-    split = splitters.SplitManager(spec, tasks.TaskType.BINARY).split(frame)
+    split = splitters.Splitter(spec, tasks.Task.BINARY).split(frame)
     log = sealed.OpenLog()
-    vault = sealed.CustodyVault(log, process=True)
+    vault = sealed.Vault(log, process=True)
     outcome = pipeline.apply_custody(
         charter=make_charter(min_effect=0.3, k_max=5),
         split=split,
         frame=frame,
         spec=spec,
-        task=tasks.TaskType.BINARY,
+        task=tasks.Task.BINARY,
         data_hash="8" * 64,
         vault=vault,
     )
@@ -93,7 +93,7 @@ def test_the_view_reaches_no_sealed_object_or_token():
         isinstance(
             o,
             sealed.SealedSet
-            | sealed.CustodyVault
+            | sealed.Vault
             | sealed.OpenLog
             | scmle.governance.vault.SealedTestSet
             | splitters.LockedTestSet,

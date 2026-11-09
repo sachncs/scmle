@@ -43,7 +43,7 @@ REQUIRED_ASSUMPTIONS = frozenset(
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class SequentialEstimand:
+class Estimand:
     """Declaration of a sustained binary-treatment causal contrast.
 
     Attributes:
@@ -127,7 +127,7 @@ class SequentialEstimand:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class SequentialEstimationPolicy:
+class Config:
     """Bounded numerical, support, and truncation policy.
 
     Attributes:
@@ -225,7 +225,7 @@ class SequentialEstimationPolicy:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class SequentialPeriodDiagnostics:
+class PeriodDiagnostics:
     """Auditable propensity and cumulative-weight evidence for one period.
 
     Attributes:
@@ -313,7 +313,7 @@ class SequentialPeriodDiagnostics:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class SequentialRegimeEstimate:
+class RegimeEstimate:
     """A weighted mean outcome for one sustained treatment regime.
 
     Attributes:
@@ -376,7 +376,7 @@ class SequentialRegimeEstimate:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class SequentialEstimationResult:
+class Estimation:
     """Complete auditable evidence for one sequential estimation run.
 
     Attributes:
@@ -406,10 +406,10 @@ class SequentialEstimationResult:
             frame.
     """
 
-    estimand: SequentialEstimand
-    policy: SequentialEstimationPolicy
-    periods: tuple[SequentialPeriodDiagnostics, ...]
-    regimes: tuple[SequentialRegimeEstimate, ...]
+    estimand: Estimand
+    policy: Config
+    periods: tuple[PeriodDiagnostics, ...]
+    regimes: tuple[RegimeEstimate, ...]
     contrast_estimate: float
     contrast_standard_error: float
     contrast_interval: tuple[float, float]
@@ -601,7 +601,7 @@ class SequentialEstimationResult:
         return self.digest()
 
     @classmethod
-    def read(cls, path: str | Path) -> "SequentialEstimationResult":
+    def read(cls, path: str | Path) -> "Estimation":
         """Reads and verifies an atomic report envelope.
 
         An unreadable or malformed file raises the underlying OS or JSON
@@ -636,9 +636,7 @@ class SequentialEstimationResult:
         return result
 
     @classmethod
-    def from_dict(
-        cls, record: Mapping[str, Any]
-    ) -> "SequentialEstimationResult":
+    def from_dict(cls, record: Mapping[str, Any]) -> "Estimation":
         """Rebuilds a result from its JSON-compatible representation.
 
         A missing key raises `KeyError`.
@@ -658,13 +656,12 @@ class SequentialEstimationResult:
             estimand_values["time_varying_covariates"]
         )
         estimand_values["assumptions"] = tuple(estimand_values["assumptions"])
-        policy = SequentialEstimationPolicy(**dict(record["policy"]))
+        policy = Config(**dict(record["policy"]))
         periods = tuple(
-            SequentialPeriodDiagnostics(**dict(item))
-            for item in record["periods"]
+            PeriodDiagnostics(**dict(item)) for item in record["periods"]
         )
         regimes = tuple(
-            SequentialRegimeEstimate(
+            RegimeEstimate(
                 regime=str(item["regime"]),
                 treatment=int(item["treatment"]),
                 estimate=float(item["estimate"]),
@@ -680,7 +677,7 @@ class SequentialEstimationResult:
             for item in record["regimes"]
         )
         return cls(
-            estimand=SequentialEstimand(**estimand_values),
+            estimand=Estimand(**estimand_values),
             policy=policy,
             periods=periods,
             regimes=regimes,
@@ -707,7 +704,7 @@ class SequentialEstimationResult:
         )
 
 
-class SequentialIPWEstimator:
+class Estimator:
     """Estimates a sustained-treatment contrast with stabilized sequential IPW.
 
     Attributes:
@@ -718,30 +715,28 @@ class SequentialIPWEstimator:
 
     def __init__(
         self,
-        estimand: SequentialEstimand,
-        policy: SequentialEstimationPolicy | None = None,
+        estimand: Estimand,
+        policy: Config | None = None,
     ) -> None:
         """Stores a validated estimand and bounded policy.
 
         Args:
             estimand: The contrast to estimate.
-            policy: Estimation policy; `SequentialEstimationPolicy()` is
+            policy: Estimation policy; `Config()` is
                 used when None.
 
         Raises:
-            TypeError: If `estimand` is not a `SequentialEstimand` or
-                `policy` is neither None nor a `SequentialEstimationPolicy`.
+            TypeError: If `estimand` is not a `Estimand` or
+                `policy` is neither None nor a `Config`.
         """
-        if not isinstance(estimand, SequentialEstimand):
-            raise TypeError("estimand must be SequentialEstimand")
-        if policy is not None and not isinstance(
-            policy, SequentialEstimationPolicy
-        ):
-            raise TypeError("policy must be SequentialEstimationPolicy")
+        if not isinstance(estimand, Estimand):
+            raise TypeError("estimand must be Estimand")
+        if policy is not None and not isinstance(policy, Config):
+            raise TypeError("policy must be Config")
         self.estimand = estimand
-        self.policy = policy or SequentialEstimationPolicy()
+        self.policy = policy or Config()
 
-    def fit(self, frame: pandas.DataFrame) -> SequentialEstimationResult:
+    def fit(self, frame: pandas.DataFrame) -> Estimation:
         """Fits sequential stabilized weights and a sustained regime contrast.
 
         Args:
@@ -773,7 +768,7 @@ class SequentialIPWEstimator:
         treatment = matrices["treatment"]
         outcome = matrices["outcome"][:, -1]
         cumulative = numpy.ones(len(subject_values), dtype=float)
-        period_diagnostics: list[SequentialPeriodDiagnostics] = []
+        period_diagnostics: list[PeriodDiagnostics] = []
         critical_value = float(
             stats.norm.ppf(0.5 + self.policy.confidence_level / 2.0)
         )
@@ -813,7 +808,7 @@ class SequentialIPWEstimator:
             )
             cumulative *= increment
             truncated = numpy.minimum(cumulative, self.policy.maximum_weight)
-            period_diagnostic = SequentialPeriodDiagnostics(
+            period_diagnostic = PeriodDiagnostics(
                 period=period_label(value),
                 rows=len(subject_values),
                 treated_rows=treated_rows,
@@ -891,7 +886,7 @@ class SequentialIPWEstimator:
             comparator,
             self.policy.reference_tolerance,
         )
-        return SequentialEstimationResult(
+        return Estimation(
             estimand=self.estimand,
             policy=self.policy,
             periods=tuple(period_diagnostics),
@@ -969,8 +964,8 @@ class SequentialIPWEstimator:
 
 def prepare_sequential_frame(
     frame: pandas.DataFrame,
-    estimand: SequentialEstimand,
-    policy: SequentialEstimationPolicy,
+    estimand: Estimand,
+    policy: Config,
 ) -> tuple[pandas.DataFrame, int, int, int]:
     """Validates and prepares a balanced long-format panel.
 
@@ -1073,9 +1068,7 @@ def prepare_sequential_frame(
     return prepared, rows_dropped, subjects_input, subjects_dropped
 
 
-def validate_time_order(
-    frame: pandas.DataFrame, estimand: SequentialEstimand
-) -> None:
+def validate_time_order(frame: pandas.DataFrame, estimand: Estimand) -> None:
     """Rejects repeated consecutive time values within a subject.
 
     Only equal neighbouring values (in row order) are rejected; descending
@@ -1143,7 +1136,7 @@ def ordered_subjects(frame: pandas.DataFrame, subject_column: str) -> list[Any]:
 
 
 def validate_baseline_covariates(
-    frame: pandas.DataFrame, estimand: SequentialEstimand
+    frame: pandas.DataFrame, estimand: Estimand
 ) -> None:
     """Ensures declared baseline covariates are stable within subjects.
 
@@ -1165,7 +1158,7 @@ def validate_baseline_covariates(
 
 def build_matrices(
     frame: pandas.DataFrame,
-    estimand: SequentialEstimand,
+    estimand: Estimand,
     period_values: Sequence[Any],
     subject_values: Sequence[Any],
 ) -> dict[str, numpy.ndarray]:
@@ -1231,7 +1224,7 @@ def build_matrices(
 def fit_propensity(
     covariates: numpy.ndarray,
     treatment: numpy.ndarray,
-    policy: SequentialEstimationPolicy,
+    policy: Config,
 ) -> tuple[numpy.ndarray, int]:
     """Fits a deterministic ridge-logistic propensity by bounded Newton steps.
 
@@ -1325,9 +1318,9 @@ def build_regime_estimate(
     mask: numpy.ndarray,
     weights: numpy.ndarray,
     outcome: numpy.ndarray,
-    policy: SequentialEstimationPolicy,
+    policy: Config,
     critical_value: float,
-) -> SequentialRegimeEstimate:
+) -> RegimeEstimate:
     """Builds a normalized weighted regime mean and influence standard error.
 
     Args:
@@ -1368,7 +1361,7 @@ def build_regime_estimate(
     )
     influence = selected_weights * (selected_outcome - estimate) / weight_sum
     standard_error = math.sqrt(max(float(numpy.sum(influence**2)), 0.0))
-    return SequentialRegimeEstimate(
+    return RegimeEstimate(
         regime=regime,
         treatment=treatment,
         estimate=estimate,
@@ -1388,8 +1381,8 @@ def regime_covariance(
     comparator_mask: numpy.ndarray,
     weights: numpy.ndarray,
     outcome: numpy.ndarray,
-    target: SequentialRegimeEstimate,
-    comparator: SequentialRegimeEstimate,
+    target: RegimeEstimate,
+    comparator: RegimeEstimate,
 ) -> numpy.ndarray:
     """Estimates subject-level covariance of two normalized regime means.
 
@@ -1439,8 +1432,8 @@ def independent_reference(
     comparator_mask: numpy.ndarray,
     weights: numpy.ndarray,
     outcome: numpy.ndarray,
-    target: SequentialRegimeEstimate,
-    comparator: SequentialRegimeEstimate,
+    target: RegimeEstimate,
+    comparator: RegimeEstimate,
     tolerance: float,
 ) -> dict[str, Any]:
     """Recalculates normalized regime means through an independent path.

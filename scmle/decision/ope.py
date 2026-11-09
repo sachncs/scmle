@@ -486,7 +486,7 @@ def fit_outcome_model(
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ThresholdPolicy:
+class EffectThreshold:
     """Treat iff the estimated effect exceeds `cut` (a one-parameter class).
 
     Attributes:
@@ -520,7 +520,7 @@ def fit_threshold_policy(
     *,
     penalty: float = 0.0,
     clip: float | None = None,
-) -> ThresholdPolicy:
+) -> EffectThreshold:
     """Chooses the cut on development data by penalised DR value.
 
     The class has one parameter, so the complexity penalty is the declared
@@ -553,13 +553,13 @@ def fit_threshold_policy(
     gain = (
         log.outcome_model[:, 1] - log.outcome_model[:, 0]
     ) + ratio * resid * (2.0 * (log.actions == 1) - 1.0)
-    best: ThresholdPolicy | None = None
+    best: EffectThreshold | None = None
     for cut in numpy.unique(numpy.quantile(effect, numpy.linspace(0, 1, 101))):
         treat = effect > cut
         objective = float(numpy.mean(numpy.where(treat, gain - penalty, 0.0)))
         if best is None or objective > best.objective:
-            best = ThresholdPolicy(float(cut), objective, penalty)
+            best = EffectThreshold(float(cut), objective, penalty)
     if best is None:
         raise errors.ScmleError("no candidate threshold")
-    none = ThresholdPolicy(float(numpy.max(effect)), 0.0, penalty)
+    none = EffectThreshold(float(numpy.max(effect)), 0.0, penalty)
     return best if best.objective > none.objective else none

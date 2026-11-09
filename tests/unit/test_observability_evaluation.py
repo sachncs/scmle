@@ -7,9 +7,9 @@ from scmle.monitoring import events
 import scmle.monitoring.observability
 
 
-def make_policy() -> observability.ObservabilityPolicy:
+def make_policy() -> observability.Requirements:
     """Build a policy with one required signal and one upper bound."""
-    return observability.ObservabilityPolicy(
+    return observability.Requirements(
         retention_days=30,
         required_signals=(observability.SignalKind.LATENCY,),
         redacted_fields=("email",),
@@ -45,7 +45,7 @@ def test_evaluation_passes_fresh_metrics_under_threshold():
 
 
 def test_evaluation_fails_closed_for_missing_stale_future_and_breached_metrics():
-    policy = observability.ObservabilityPolicy(
+    policy = observability.Requirements(
         retention_days=1,
         required_signals=(
             observability.SignalKind.LATENCY,
@@ -80,7 +80,7 @@ def test_evaluation_fails_closed_for_missing_stale_future_and_breached_metrics()
 
 
 def test_prediction_log_enforces_sidecar_retention_atomically(tmp_path):
-    policy = observability.ObservabilityPolicy(
+    policy = observability.Requirements(
         retention_days=1,
         required_signals=(observability.SignalKind.LATENCY,),
         redacted_fields=(),

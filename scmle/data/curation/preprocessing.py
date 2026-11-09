@@ -32,7 +32,7 @@ SPARSE_THRESHOLD = 0.3
 
 def build_preprocessor(
     plan: data.FeaturePlan,
-    options: data.PreprocessingOptions,
+    options: data.Preprocessing,
 ) -> compose.ColumnTransformer:
     """Builds the column transformer for a feature plan.
 
@@ -159,7 +159,7 @@ def monotonic_layout_problem(
 
 def split_high_cardinality(
     plan: data.FeaturePlan,
-    options: data.PreprocessingOptions,
+    options: data.Preprocessing,
 ) -> tuple[str, ...]:
     """Columns that get a special encoder instead of one-hot encoding.
 
@@ -182,7 +182,7 @@ def split_high_cardinality(
 
 def build_front_end(
     plan: data.FeaturePlan,
-    options: data.PreprocessingOptions,
+    options: data.Preprocessing,
 ) -> Any:
     """Builds the preprocessing front end, with the feature graph if any.
 
@@ -206,8 +206,8 @@ def build_front_end(
 
 
 def default_options(
-    plan: data.FeaturePlan, adapter: models.ModelAdapter
-) -> data.PreprocessingOptions:
+    plan: data.FeaturePlan, adapter: models.Model
+) -> data.Preprocessing:
     """Preprocessing switches implied by an adapter's capabilities.
 
     Scaling for models that benefit from it, no imputation for models that
@@ -229,7 +229,7 @@ def default_options(
         and caps.native_categorical
         and adapter.categorical_params([0])
     )
-    return data.PreprocessingOptions(
+    return data.Preprocessing(
         scale=caps.needs_scaling,
         impute=not caps.handles_missing,
         high_cardinality="ordinal" if native else "onehot",
@@ -241,11 +241,11 @@ def default_options(
 
 def build_pipeline(
     plan: data.FeaturePlan,
-    adapter: models.ModelAdapter,
-    task: tasks.TaskType,
+    adapter: models.Model,
+    task: tasks.Task,
     seed: int,
     params: Mapping[str, Any] | None = None,
-    options: data.PreprocessingOptions | None = None,
+    options: data.Preprocessing | None = None,
 ) -> Any:
     """Builds a complete, independently evaluable candidate pipeline.
 
@@ -265,7 +265,7 @@ def build_pipeline(
     if plan.treatment_column:
         params = {**(params or {}), "classify": plan.binary_outcome}
     assembled: Any
-    if task is tasks.TaskType.FORECAST and adapter.name == "dummy":
+    if task is tasks.Task.FORECAST and adapter.name == "dummy":
         assembled = estimators.LastValueForecaster(
             None, plan.target_columns, plan.value_column or ""
         )
@@ -318,14 +318,14 @@ def build_pipeline(
         built = scmle.models.survival.wrapper.EventAwareEstimator(
             built, plan.event_column
         )
-    if task is tasks.TaskType.FORECAST:
+    if task is tasks.Task.FORECAST:
         built = estimators.ForecastEstimator(
             built, plan.target_columns, plan.value_column or ""
         )
     elif plan.target_columns:
         kind = (
             scmle.models.multitarget.wrapper.MultiLabelEstimator
-            if task is tasks.TaskType.MULTILABEL
+            if task is tasks.Task.MULTILABEL
             else scmle.models.multitarget.wrapper.MultiOutputEstimator
         )
         built = kind(built, plan.target_columns)

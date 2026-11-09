@@ -32,7 +32,7 @@ def test_the_full_block_round_trips_through_its_record():
         model=scmle.data.charter.decision.DecisionModel(
             unit="EUR per case",
             treatment_cost=2.0,
-            off_policy=scmle.data.charter.decision.OffPolicyRules(
+            off_policy=scmle.data.charter.decision.Gates(
                 clip=20.0, penalty=0.01
             ),
         ),
@@ -92,9 +92,9 @@ def test_group_thresholds_need_an_attestation():
         lambda: scmle.data.charter.decision.DecisionModel(
             "u", calibration_level=1.0
         ),
-        lambda: scmle.data.charter.decision.OffPolicyRules(clip=0.5),
-        lambda: scmle.data.charter.decision.OffPolicyRules(min_propensity=0.0),
-        lambda: scmle.data.charter.decision.OffPolicyRules(penalty=-1.0),
+        lambda: scmle.data.charter.decision.Gates(clip=0.5),
+        lambda: scmle.data.charter.decision.Gates(min_propensity=0.0),
+        lambda: scmle.data.charter.decision.Gates(penalty=-1.0),
         lambda: scmle.data.charter.decision.Guardrail("g", margin=0.0),
         lambda: scmle.data.charter.decision.Guardrail(
             "g", margin=1.0, low=1.0, high=1.0

@@ -70,14 +70,14 @@ class Robustness:
     findings: tuple[stability.Stability, ...]
     stability_note: str
     notes: tuple[str, ...]
-    shift: shift.ShiftResult
+    shift: shift.Shift
     coverage: tuple[coverage.LevelCoverage, ...]
-    forward: forward.ForwardResult
+    forward: forward.ForwardCheck
     stability_gate: certificates.GateStatus
     c2st_gate: certificates.GateStatus
     mmd_gate: certificates.GateStatus
     store_note: str
-    rule: stability.Rule = stability.DEFAULT_RULE
+    rule: stability.Thresholds = stability.DEFAULT_RULE
     rule_note: str = ""
 
     @property
@@ -104,7 +104,7 @@ def run(
     temporal: bool = False,
     directory: Path | None = None,
     budget_seconds: float = BUDGET_SECONDS,
-    rule: stability.Rule = stability.DEFAULT_RULE,
+    rule: stability.Thresholds = stability.DEFAULT_RULE,
 ) -> Robustness:
     """Assesses survivor stability and the shift to a deployment sample.
 

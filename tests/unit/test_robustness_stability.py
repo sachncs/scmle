@@ -156,7 +156,7 @@ def test_a_flipped_sign_in_more_than_the_allowed_share_is_fragile_by_rule():
     def row(effect, low, high):
         return stability.SpecEffect("h", {}, effect, low, high)
 
-    rule = stability.Rule(s_min=0.8, band=0.5, q_min=0.8)
+    rule = stability.Thresholds(s_min=0.8, band=0.5, q_min=0.8)
     good = [row(0.5, 0.3, 0.7)] * 10
     verdict = stability.verdict(good, 0.5, rule)
     assert verdict[0] == stability.STABLE
@@ -173,7 +173,7 @@ def test_size_band_and_interval_share_each_fail_on_their_own():
     def row(effect, low, high):
         return stability.SpecEffect("h", {}, effect, low, high)
 
-    rule = stability.Rule()
+    rule = stability.Thresholds()
     drifted = [row(0.2, 0.1, 0.3)] * 10
     status, reason = stability.verdict(drifted, 0.5, rule)[:2]
     assert status == stability.FRAGILE and "headline" in reason
@@ -184,10 +184,10 @@ def test_size_band_and_interval_share_each_fail_on_their_own():
 
 def test_too_few_specifications_cannot_be_evaluated():
     row = stability.SpecEffect("h", {}, 0.5, 0.3, 0.7)
-    assert stability.verdict([row] * 3, 0.5, stability.Rule())[0] == (
+    assert stability.verdict([row] * 3, 0.5, stability.Thresholds())[0] == (
         stability.NOT_EVALUABLE
     )
-    assert stability.verdict([row] * 9, None, stability.Rule())[0] == (
+    assert stability.verdict([row] * 9, None, stability.Thresholds())[0] == (
         stability.NOT_EVALUABLE
     )
     single = multiverse.enumerate_grid((), 0)
@@ -198,9 +198,9 @@ def test_too_few_specifications_cannot_be_evaluated():
 
 def test_the_rule_validates_its_thresholds():
     with pytest.raises(ValueError, match="s_min"):
-        stability.Rule(s_min=0.0)
+        stability.Thresholds(s_min=0.0)
     with pytest.raises(ValueError, match="band"):
-        stability.Rule(band=0.0)
+        stability.Thresholds(band=0.0)
 
 
 def test_the_same_seed_gives_the_same_verdict_and_a_cache_resumes_it():
@@ -300,6 +300,6 @@ def test_attribution_names_the_choice_that_moves_the_estimate():
 def test_gate_status_needs_every_defect_type_current_and_passing():
     assert stability.gate_status(None) is certificates.GateStatus.DESCRIPTIVE
     assert (
-        stability.gate_status(certificates.CertificateStore())
+        stability.gate_status(certificates.Store())
         is certificates.GateStatus.DESCRIPTIVE
     )

@@ -23,8 +23,8 @@ import pandas
 
 from scmle.contracts import data
 from scmle.data.modalities.curation import build_finding
+from scmle.data.modalities.curation import Curation
 from scmle.data.modalities.curation import label_counts
-from scmle.data.modalities.curation import ModalityCurationReport
 
 
 class GraphError(ValueError):
@@ -46,7 +46,7 @@ class GraphValidationError(GraphError):
         report: The complete validation report that caused the error.
     """
 
-    def __init__(self, report: "GraphValidationReport") -> None:
+    def __init__(self, report: "Validation") -> None:
         """Builds an error containing the complete validation report.
 
         Args:
@@ -58,7 +58,7 @@ class GraphValidationError(GraphError):
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class GraphNode:
+class Node:
     """Immutable node with an optional numeric feature vector and label.
 
     Attributes:
@@ -94,7 +94,7 @@ class GraphNode:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class GraphEdge:
+class Edge:
     """Immutable weighted edge between two node identifiers.
 
     Attributes:
@@ -148,7 +148,7 @@ class GraphEdge:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class TemporalGraphSplit:
+class TemporalSplit:
     """Time-ordered graph edges separated at an explicit UTC cutoff.
 
     Attributes:
@@ -158,8 +158,8 @@ class TemporalGraphSplit:
     """
 
     cutoff: datetime
-    train_edges: tuple[GraphEdge, ...]
-    future_edges: tuple[GraphEdge, ...]
+    train_edges: tuple[Edge, ...]
+    future_edges: tuple[Edge, ...]
 
     def __post_init__(self) -> None:
         """Validates the cutoff and timestamp completeness of both partitions.
@@ -223,7 +223,7 @@ def canonical_event_time(value: datetime | str) -> datetime:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class GraphValidationIssue:
+class Issue:
     """One deterministic graph validation finding.
 
     Attributes:
@@ -250,14 +250,14 @@ class GraphValidationIssue:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class GraphValidationReport:
+class Validation:
     """Complete graph validation result.
 
     Attributes:
         issues: Every issue found; empty when the graph is valid.
     """
 
-    issues: tuple[GraphValidationIssue, ...]
+    issues: tuple[Issue, ...]
 
     @property
     def is_valid(self) -> bool:
@@ -345,7 +345,7 @@ class EdgeProfile:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class GraphProfile:
+class Profile:
     """Combined graph, node, and edge profile.
 
     Attributes:
@@ -396,10 +396,10 @@ class InductiveNodeSplit:
     train_nodes: tuple[str, ...]
     validation_nodes: tuple[str, ...]
     test_nodes: tuple[str, ...]
-    train_edges: tuple[GraphEdge, ...]
-    validation_edges: tuple[GraphEdge, ...]
-    test_edges: tuple[GraphEdge, ...]
-    withheld_edges: tuple[GraphEdge, ...]
+    train_edges: tuple[Edge, ...]
+    validation_edges: tuple[Edge, ...]
+    test_edges: tuple[Edge, ...]
+    withheld_edges: tuple[Edge, ...]
     seed: int
 
     @property
@@ -459,7 +459,7 @@ class PreparedFeatures:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class GraphData:
+class Dataset:
     """Immutable graph dataset with canonical node and edge ordering.
 
     Attributes:
@@ -472,8 +472,8 @@ class GraphData:
         source_uri: URI the graph was loaded from.
     """
 
-    nodes: tuple[GraphNode, ...] = ()
-    edges: tuple[GraphEdge, ...] = ()
+    nodes: tuple[Node, ...] = ()
+    edges: tuple[Edge, ...] = ()
     directed: bool = True
     feature_names: tuple[str, ...] = ()
     source_uri: str = "memory://"
@@ -523,12 +523,12 @@ class GraphData:
     @classmethod
     def from_edges(
         cls,
-        edges: Iterable[GraphEdge],
-        nodes: Iterable[GraphNode | str] | None = None,
+        edges: Iterable[Edge],
+        nodes: Iterable[Node | str] | None = None,
         directed: bool = True,
         feature_names: Iterable[str] = (),
         source_uri: str = "memory://",
-    ) -> "GraphData":
+    ) -> "Dataset":
         """Builds a graph and derives nodes when no node collection is given.
 
         Args:
@@ -546,7 +546,7 @@ class GraphData:
         edge_values = tuple(edges)
         if nodes is None:
             node_values = tuple(
-                GraphNode(node_id)
+                Node(node_id)
                 for node_id in sorted(
                     {
                         endpoint
@@ -557,7 +557,7 @@ class GraphData:
             )
         else:
             node_values = tuple(
-                value if isinstance(value, GraphNode) else GraphNode(value)
+                value if isinstance(value, Node) else Node(value)
                 for value in nodes
             )
         return cls(
@@ -572,14 +572,14 @@ class GraphData:
     def from_edge_file(
         cls,
         path: str | Path,
-        nodes: Iterable[GraphNode | str] | None = None,
+        nodes: Iterable[Node | str] | None = None,
         directed: bool = True,
         source_column: str = "source",
         target_column: str = "target",
         weight_column: str = "weight",
         relation_column: str = "relation",
         time_column: str | None = None,
-    ) -> "GraphData":
+    ) -> "Dataset":
         """Loads CSV or JSONL edges into a validated graph dataset.
 
         Args:
@@ -631,7 +631,7 @@ class GraphData:
             feature_names=self.feature_names,
         )
 
-    def validate(self) -> GraphValidationReport:
+    def validate(self) -> Validation:
         """Finds missing endpoints, duplicates, self-loops, and bad weights.
 
         Returns:
@@ -640,14 +640,14 @@ class GraphData:
             `invalid_weight` and `duplicate_edge`.
         """
         node_ids = set(self.node_ids)
-        issues: list[GraphValidationIssue] = []
+        issues: list[Issue] = []
         duplicate_counts: defaultdict[tuple[str, str, str, str], int] = (
             defaultdict(int)
         )
         for edge in self.edges:
             if edge.source not in node_ids:
                 issues.append(
-                    GraphValidationIssue(
+                    Issue(
                         "missing_endpoint",
                         f"edge source '{edge.source}' is not a declared node",
                         (edge.source,),
@@ -655,7 +655,7 @@ class GraphData:
                 )
             if edge.target not in node_ids:
                 issues.append(
-                    GraphValidationIssue(
+                    Issue(
                         "missing_endpoint",
                         f"edge target '{edge.target}' is not a declared node",
                         (edge.target,),
@@ -663,7 +663,7 @@ class GraphData:
                 )
             if edge.source == edge.target:
                 issues.append(
-                    GraphValidationIssue(
+                    Issue(
                         "self_loop",
                         f"self-loop found on node '{edge.source}'",
                         (edge.source,),
@@ -671,7 +671,7 @@ class GraphData:
                 )
             if not math.isfinite(edge.weight):
                 issues.append(
-                    GraphValidationIssue(
+                    Issue(
                         "invalid_weight",
                         f"edge '{edge.source}->{edge.target}' has a non-finite "
                         "weight",
@@ -683,14 +683,14 @@ class GraphData:
         for key, count in sorted(duplicate_counts.items()):
             if count > 1:
                 issues.append(
-                    GraphValidationIssue(
+                    Issue(
                         "duplicate_edge",
                         f"edge {key[0]}->{key[1]} ({key[2]}) occurs "
                         f"{count} times",
                         key,
                     )
                 )
-        return GraphValidationReport(tuple(issues))
+        return Validation(tuple(issues))
 
     def require_valid(self) -> None:
         """Raises `GraphValidationError` unless the graph is valid.
@@ -702,7 +702,7 @@ class GraphData:
         if not report.is_valid:
             raise GraphValidationError(report)
 
-    def edge_key(self, edge: GraphEdge) -> tuple[str, str, str, str]:
+    def edge_key(self, edge: Edge) -> tuple[str, str, str, str]:
         """Returns the canonical duplicate-detection key for an edge.
 
         Args:
@@ -815,14 +815,14 @@ class GraphData:
             counts[self.edge_key(edge)] += 1
         return dict(counts)
 
-    def profile(self) -> GraphProfile:
+    def profile(self) -> Profile:
         """Returns the combined graph profile.
 
         Returns:
             The profile with identity, direction, component count, and node
             and edge profiles.
         """
-        return GraphProfile(
+        return Profile(
             graph_identity=self.identity,
             directed=self.directed,
             component_count=len(self.connected_components()),
@@ -830,7 +830,7 @@ class GraphData:
             edge=self.profile_edges(),
         )
 
-    def temporal_split(self, cutoff: datetime | str) -> TemporalGraphSplit:
+    def temporal_split(self, cutoff: datetime | str) -> TemporalSplit:
         """Splits fully timestamped edges into past and future partitions.
 
         Edges at the cutoff belong to training; edges after the cutoff belong
@@ -862,13 +862,13 @@ class GraphData:
             for edge in self.edges
             if edge.event_time is not None and edge.event_time > cutoff_time
         )
-        return TemporalGraphSplit(
+        return TemporalSplit(
             cutoff=cutoff_time,
             train_edges=train_edges,
             future_edges=future_edges,
         )
 
-    def curate(self) -> ModalityCurationReport:
+    def curate(self) -> Curation:
         """Builds graph-structure evidence before choosing a graph model.
 
         Returns:
@@ -970,7 +970,7 @@ class GraphData:
                     False,
                 )
             )
-        return ModalityCurationReport(
+        return Curation(
             modality="graph",
             dataset_hash=self.identity,
             sample_count=len(self.nodes),
@@ -981,8 +981,8 @@ class GraphData:
 
 
 def graph_identity(
-    nodes: Iterable[GraphNode],
-    edges: Iterable[GraphEdge],
+    nodes: Iterable[Node],
+    edges: Iterable[Edge],
     directed: bool = True,
     feature_names: Iterable[str] = (),
 ) -> str:
@@ -1059,7 +1059,7 @@ def read_edges(
     weight_column: str = "weight",
     relation_column: str = "relation",
     time_column: str | None = None,
-) -> tuple[GraphEdge, ...]:
+) -> tuple[Edge, ...]:
     """Reads CSV or JSONL edge records with bounded schema handling.
 
     The format is chosen from the file name: ``.csv``, ``.jsonl`` or
@@ -1155,7 +1155,7 @@ def edges_from_records(
     weight_column: str = "weight",
     relation_column: str = "relation",
     time_column: str | None = None,
-) -> tuple[GraphEdge, ...]:
+) -> tuple[Edge, ...]:
     """Converts mappings into immutable edges with deterministic errors.
 
     Args:
@@ -1174,10 +1174,10 @@ def edges_from_records(
     Raises:
         GraphInputError: If a record lacks the source or target key or has a
             null endpoint, a null or non-numeric weight, an invalid event
-            time, or values that `GraphEdge` rejects. The message gives the
+            time, or values that `Edge` rejects. The message gives the
             1-based record number.
     """
-    edges: list[GraphEdge] = []
+    edges: list[Edge] = []
     for index, record in enumerate(records, start=1):
         if source_column not in record or target_column not in record:
             raise GraphInputError(
@@ -1212,7 +1212,7 @@ def edges_from_records(
                     ) from error
         try:
             edges.append(
-                GraphEdge(
+                Edge(
                     source=str(source),
                     target=str(target),
                     weight=weight,
@@ -1228,7 +1228,7 @@ def edges_from_records(
 
 
 def inductive_node_split(
-    graph: GraphData,
+    graph: Dataset,
     train_fraction: float = 0.8,
     validation_fraction: float = 0.1,
     test_fraction: float = 0.1,
@@ -1254,7 +1254,7 @@ def inductive_node_split(
     Raises:
         ValueError: If a fraction is negative or not finite, or the
             fractions do not sum to one. An invalid graph raises
-            GraphValidationError from `GraphData.require_valid`.
+            GraphValidationError from `Dataset.require_valid`.
     """
     graph.require_valid()
     fractions = (train_fraction, validation_fraction, test_fraction)
@@ -1311,8 +1311,8 @@ def inductive_node_split(
         )
         for node_id in nodes
     }
-    retained: list[list[GraphEdge]] = [[], [], []]
-    withheld: list[GraphEdge] = []
+    retained: list[list[Edge]] = [[], [], []]
+    withheld: list[Edge] = []
     for edge in graph.edges:
         source_partition = partitions[edge.source]
         target_partition = partitions[edge.target]
@@ -1333,7 +1333,7 @@ def inductive_node_split(
 
 
 def prepare_features(
-    graph: GraphData,
+    graph: Dataset,
     max_nodes: int = 100_000,
     max_features: int = 512,
     standardize: bool = False,
@@ -1361,7 +1361,7 @@ def prepare_features(
     Raises:
         ValueError: If ``max_nodes`` or ``max_features`` is below one, or a
             feature value is not finite. An invalid graph raises
-            GraphValidationError from `GraphData.require_valid`.
+            GraphValidationError from `Dataset.require_valid`.
     """
     graph.require_valid()
     if max_nodes < 1 or max_features < 1:
@@ -1409,10 +1409,10 @@ def prepare_features(
 
 def load_graph(
     path: str | Path,
-    nodes: Iterable[GraphNode | str] | None = None,
+    nodes: Iterable[Node | str] | None = None,
     directed: bool = True,
     time_column: str | None = None,
-) -> GraphData:
+) -> Dataset:
     """Loads a CSV or JSONL graph using the default edge column names.
 
     Args:
@@ -1424,9 +1424,9 @@ def load_graph(
             untimed edges.
 
     Returns:
-        The validated graph; see `GraphData.from_edge_file`.
+        The validated graph; see `Dataset.from_edge_file`.
     """
-    return GraphData.from_edge_file(
+    return Dataset.from_edge_file(
         path,
         nodes=nodes,
         directed=directed,
@@ -1435,20 +1435,20 @@ def load_graph(
 
 
 __all__ = [
+    "Dataset",
+    "Edge",
     "EdgeProfile",
-    "GraphData",
-    "GraphEdge",
     "GraphError",
-    "GraphNode",
-    "GraphProfile",
     "GraphTemporalError",
     "GraphValidationError",
-    "GraphValidationIssue",
-    "GraphValidationReport",
     "InductiveNodeSplit",
+    "Issue",
+    "Node",
     "NodeProfile",
     "PreparedFeatures",
-    "TemporalGraphSplit",
+    "Profile",
+    "TemporalSplit",
+    "Validation",
     "canonical_event_time",
     "edges_from_records",
     "graph_identity",

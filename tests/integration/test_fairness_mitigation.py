@@ -33,12 +33,12 @@ def run(tmp_path, data, **kwargs):
         time_budget=300,
         output_dir=tmp_path,
         sensitive_columns=["group"],
-        models=tasks.ModelSpec(exclude_families=["deep_learning"]),
+        models=tasks.Candidates(exclude_families=["deep_learning"]),
         **kwargs,
     ).run()
 
 
-SPEC = tasks.FairnessSpec(
+SPEC = tasks.Parity(
     mitigation="group_thresholds",
     criterion="demographic_parity",
     trigger_gap=0.05,

@@ -42,7 +42,7 @@ print(modality.value)
 from scmle.models import modality_lifecycle
 
 
-class PointCloudAdapter(modality_lifecycle.ModalityAdapter):
+class PointCloudAdapter(modality_lifecycle.Preparer):
     modality = modalities.ExtensionModality("acme/point-cloud")
 
     @property
@@ -76,7 +76,7 @@ class PointCloudAdapter(modality_lifecycle.ModalityAdapter):
   <p>The ellipses above are a contract outline, not a compatibility shim. A real adapter must implement every abstract method and test its boundaries against raw fixtures. Keep domain code in the adapter; do not add a generic wrapper that hides missing semantics.</p>
 
   <h2>Run the lifecycle with explicit governance</h2>
-  <pre><code>{`from scmle import ModalityProject
+  <pre><code>{`from scmle.api.project import ModalityProject
 
 project = ModalityProject(
     PointCloudAdapter(...),
@@ -91,10 +91,10 @@ assert len(report.stage_evidence) == 15`}</code></pre>
   <p>When source, lineage, privacy, and task metadata are available, pass a <code>ModalityManifest</code>. The lifecycle rejects a manifest whose content hash or sample count does not match the adapter before modelling begins. Missing governance metadata remains visible as a gap in the dataset card.</p>
 
   <h2>Curate without modelling</h2>
-  <p>Not every useful dataset is labelled, supervised, or ready for a classifier. Use <code>ModalityCurationProject</code> when the immediate job is to understand the raw snapshot. It writes an atomic, signed curation record and dataset card, accepts empty and unlabeled snapshots, and never invents labels, features, metrics, or a model.</p>
-  <pre><code>{`from scmle import ModalityCurationProject
+  <p>Not every useful dataset is labelled, supervised, or ready for a classifier. Use <code>Curator</code> when the immediate job is to understand the raw snapshot. It writes an atomic, signed curation record and dataset card, accepts empty and unlabeled snapshots, and never invents labels, features, metrics, or a model.</p>
+  <pre><code>{`from scmle.api.project import Curator
 
-curation = ModalityCurationProject(
+curation = Curator(
     PointCloudAdapter(...),
     signing_key="load-this-from-your-secret-manager",
     output_dir="runs/point-cloud-curation",
@@ -103,20 +103,21 @@ curation = ModalityCurationProject(
 print(curation.dataset_card["curation"])
 print(curation.path)
 # No modelling stage was run.`}</code></pre>
-  <p>If the family is not ready for a full lifecycle adapter, use <code>ExtensionCurationAdapter</code>. It accepts arbitrary caller-owned records and a curation callback, but deliberately has no split, feature, label, or model hooks. The callback must return a report bound to the extension identity, dataset hash, and sample count.</p>
-  <pre><code>{`from scmle import ExtensionCurationAdapter, ModalityCurationProject
+  <p>If the family is not ready for a full lifecycle adapter, use <code>ExtensionCurator</code>. It accepts arbitrary caller-owned records and a curation callback, but deliberately has no split, feature, label, or model hooks. The callback must return a report bound to the extension identity, dataset hash, and sample count.</p>
+  <pre><code>{`from scmle.models.modality_lifecycle import ExtensionCurator
+from scmle.api.project import Curator
 from scmle.contracts import modalities
-from scmle.data.modalities.curation import ModalityCurationReport
+from scmle.data.modalities.curation import Curation
 
 records = ({"x": 1, "y": 2}, {"x": 3, "y": 4})
 extension = modalities.ExtensionModality("acme/point-cloud")
 snapshot = "sha256-of-the-immutable-snapshot"
 
-adapter = ExtensionCurationAdapter(
+adapter = ExtensionCurator(
     extension=extension,
     sample_values=records,
     dataset_hash_value=snapshot,
-    curation_callback=lambda: ModalityCurationReport(
+    curation_callback=lambda: Curation(
         modality=extension.value,
         dataset_hash=snapshot,
         sample_count=len(records),
@@ -124,7 +125,7 @@ adapter = ExtensionCurationAdapter(
     ),
     limitations=("The caller owns point-cloud validation.",),
 )
-ModalityCurationProject(adapter, signing_key="...", output_dir="runs/curation").run()`}</code></pre>
+Curator(adapter, signing_key="...", output_dir="runs/curation").run()`}</code></pre>
   <p>This is the honest starting point for data curation: make the raw snapshot understandable first. Do not implement modelling methods merely to satisfy a curation-only workflow.</p>
   <p>Move to <code>ModalityProject</code> only after labels, a task, a split policy, a bounded representation, and a modelling decision are justified by the curation evidence. A failed or incomplete curation decision should stop the hand-off.</p>
 

@@ -23,7 +23,7 @@ PARITY_TOLERANCE = 0.10
 IMPACT_RATIO_FLOOR = 0.80
 
 
-class FairnessReport(diagnostics.Diagnostic):
+class Fairness(diagnostics.Diagnostic):
     """Group-wise outcome and error rates for the sensitive columns."""
 
     name = "fairness"
@@ -51,7 +51,7 @@ class FairnessReport(diagnostics.Diagnostic):
         report = {}
         for column in inputs.sensitive_columns:
             groups = self.groups(inputs.features[column])
-            if inputs.task is tasks.TaskType.BINARY:
+            if inputs.task is tasks.Task.BINARY:
                 report[column] = self.binary(
                     groups, truth, predicted, inputs.positive_label
                 )
@@ -61,7 +61,7 @@ class FairnessReport(diagnostics.Diagnostic):
             inputs.features, inputs.sensitive_columns
         )
         if intersections is not None:
-            if inputs.task is tasks.TaskType.BINARY:
+            if inputs.task is tasks.Task.BINARY:
                 report["intersectional"] = self.binary(
                     intersections, truth, predicted, inputs.positive_label
                 )

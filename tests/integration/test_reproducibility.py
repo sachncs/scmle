@@ -4,7 +4,7 @@ import copy
 
 import support
 
-import scmle
+import scmle.api.project
 from scmle.artifacts import reproducibility
 
 
@@ -16,7 +16,9 @@ def run(frame, tmp_path, **kwargs):
 
 def test_a_deterministic_rerun_is_an_exact_replay(binary_frame, tmp_path):
     original = run(binary_frame, tmp_path)
-    verdict = scmle.MLProject.verify_replay(original.run_dir, data=binary_frame)
+    verdict = scmle.api.project.Project.verify_replay(
+        original.run_dir, data=binary_frame
+    )
     assert verdict.level == reproducibility.EXACT
     assert verdict.reasons == [] and verdict.max_abs_difference == 0.0
     assert verdict.trials_compared == len(original.trials)

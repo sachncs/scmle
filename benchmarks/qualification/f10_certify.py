@@ -291,7 +291,7 @@ def gate_selector(replicates: int, base: int = 0) -> dict[str, Any]:
     }
     names = list(select.STRATEGIES)
 
-    def build(rng: numpy.random.Generator, eligible: bool) -> causal.CausalSpec:
+    def build(rng: numpy.random.Generator, eligible: bool) -> causal.Question:
         """A charter for a random strategy, made ineligible when asked.
 
         Args:
@@ -318,7 +318,7 @@ def gate_selector(replicates: int, base: int = 0) -> dict[str, Any]:
                 words.pop(index)
             else:
                 kept.pop(field)
-        return causal.CausalSpec(
+        return causal.Question(
             treatment="t",
             outcome="y",
             estimand=strategy.estimands[0],
@@ -923,7 +923,7 @@ def confirm_world(kind: str, runs: int, base: int) -> dict[str, Any]:
         ),
     )
     columns = ",".join(f"x{j}" for j in range(f10_generators.COVARIATES))
-    spec = causal.CausalSpec(
+    spec = causal.Question(
         treatment="t",
         outcome="y",
         estimand="ATE",
@@ -935,7 +935,7 @@ def confirm_world(kind: str, runs: int, base: int) -> dict[str, Any]:
         strategies=("backdoor_aipw",),
         negative_controls=(causal.NegativeControl("outcome", "nco"),),
         strata=("region",),
-        sensitivity=causal.SensitivitySpec("strongest_observed", 0.2),
+        sensitivity=causal.Confounding("strongest_observed", 0.2),
     )
     named = dict.fromkeys(spec.assumptions, "certificate harness, 2026-11-04")
     error_budget = budget.ErrorBudget.create(0.05, 0.1)

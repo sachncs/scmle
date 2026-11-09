@@ -95,7 +95,7 @@ REQUIRED_HIERARCHICAL_RANDOM_SLOPE_ASSUMPTIONS = frozenset(
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class EstimandSpec:
+class Estimand:
     """The scientific quantity and assumptions a result claims to estimate.
 
     Attributes:
@@ -208,7 +208,7 @@ class BayesianPrior:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class EstimationPolicy:
+class Config:
     """Numerical and uncertainty policy for an estimation run.
 
     Attributes:
@@ -617,7 +617,7 @@ class ParameterEstimate:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class EstimationResult:
+class Estimation:
     """Complete, serializable evidence for one parameter-estimation run.
 
     Attributes:
@@ -635,8 +635,8 @@ class EstimationResult:
         raw_input_fingerprint: Lowercase SHA-256 hex digest of the raw input.
     """
 
-    estimand: EstimandSpec
-    policy: EstimationPolicy
+    estimand: Estimand
+    policy: Config
     parameters: tuple[ParameterEstimate, ...]
     covariance: tuple[tuple[float, ...], ...]
     rows_input: int
@@ -659,10 +659,10 @@ class EstimationResult:
                 used plus dropped rows differ from input rows, or if the
                 fingerprint is not a lowercase SHA-256 digest.
         """
-        if not isinstance(self.estimand, EstimandSpec):
-            raise TypeError("estimand must be EstimandSpec")
-        if not isinstance(self.policy, EstimationPolicy):
-            raise TypeError("policy must be EstimationPolicy")
+        if not isinstance(self.estimand, Estimand):
+            raise TypeError("estimand must be Estimand")
+        if not isinstance(self.policy, Config):
+            raise TypeError("policy must be Config")
         if not self.parameters:
             raise ValueError("estimation result needs parameters")
         names = tuple(item.name for item in self.parameters)
@@ -787,7 +787,7 @@ class EstimationResult:
         return self.digest()
 
     @classmethod
-    def read(cls, path: str | Path) -> "EstimationResult":
+    def read(cls, path: str | Path) -> "Estimation":
         """Reads a report and rejects a modified or malformed envelope.
 
         Args:
@@ -820,7 +820,7 @@ class EstimationResult:
         return report
 
     @classmethod
-    def from_dict(cls, record: Mapping[str, Any]) -> "EstimationResult":
+    def from_dict(cls, record: Mapping[str, Any]) -> "Estimation":
         """Rebuilds a result from its JSON-compatible report.
 
         Args:
@@ -868,8 +868,8 @@ class EstimationResult:
             )
             policy_values["prior"] = BayesianPrior(**prior_values)
         return cls(
-            EstimandSpec(**estimand_values),
-            EstimationPolicy(**policy_values),
+            Estimand(**estimand_values),
+            Config(**policy_values),
             parameters,
             tuple(
                 tuple(float(value) for value in row)
@@ -888,11 +888,11 @@ class EstimationResult:
 def estimate_parameters(
     features: Any,
     outcome: Any,
-    estimand: EstimandSpec,
-    policy: EstimationPolicy,
+    estimand: Estimand,
+    policy: Config,
     clusters: Sequence[Any] | None = None,
     shift_reference: Any | None = None,
-) -> EstimationResult:
+) -> Estimation:
     """Estimates declared parameters with auditable uncertainty evidence.
 
     Args:
@@ -1341,7 +1341,7 @@ def estimate_parameters(
             else None
         ),
     )
-    return EstimationResult(
+    return Estimation(
         estimand=dataclasses.replace(estimand, likelihood=likelihood),
         policy=policy,
         parameters=parameters,
@@ -1637,7 +1637,7 @@ def fit_continuous_ipw_effect(
     matrix: numpy.ndarray,
     values: numpy.ndarray,
     treatment_position: int,
-    policy: EstimationPolicy,
+    policy: Config,
     clusters: numpy.ndarray | None,
 ) -> tuple[numpy.ndarray, numpy.ndarray, dict[str, Any]]:
     """Estimates a linear continuous-treatment effect with GPS weights.
@@ -1839,7 +1839,7 @@ def reference_continuous_ipw_effect(
     matrix: numpy.ndarray,
     values: numpy.ndarray,
     treatment_position: int,
-    policy: EstimationPolicy,
+    policy: Config,
     coefficients: numpy.ndarray,
     clusters: numpy.ndarray | None,
 ) -> dict[str, Any]:
@@ -1952,7 +1952,7 @@ def fit_ipw_ate(
     matrix: numpy.ndarray,
     values: numpy.ndarray,
     treatment_position: int | None,
-    policy: EstimationPolicy,
+    policy: Config,
     clusters: numpy.ndarray | None,
 ) -> tuple[numpy.ndarray, numpy.ndarray, dict[str, Any], numpy.ndarray]:
     """Estimates a binary-treatment Hájek inverse-probability ATE.
@@ -2059,7 +2059,7 @@ def fit_aipw_ate(
     matrix: numpy.ndarray,
     values: numpy.ndarray,
     treatment_position: int | None,
-    policy: EstimationPolicy,
+    policy: Config,
     clusters: numpy.ndarray | None,
 ) -> tuple[
     numpy.ndarray, numpy.ndarray, dict[str, Any], dict[str, numpy.ndarray]
@@ -2282,7 +2282,7 @@ def fit_aipw_nuisance_models(
     training_treatment: numpy.ndarray,
     training_values: numpy.ndarray,
     evaluation_design: numpy.ndarray,
-    policy: EstimationPolicy,
+    policy: Config,
 ) -> tuple[
     numpy.ndarray,
     numpy.ndarray,
@@ -2724,7 +2724,7 @@ def fit_hierarchical_linear(
     design: numpy.ndarray,
     values: numpy.ndarray,
     clusters: numpy.ndarray,
-    policy: EstimationPolicy,
+    policy: Config,
 ) -> tuple[
     numpy.ndarray,
     numpy.ndarray,
@@ -2872,7 +2872,7 @@ def fit_hierarchical_random_slope(
     design: numpy.ndarray,
     values: numpy.ndarray,
     clusters: numpy.ndarray,
-    policy: EstimationPolicy,
+    policy: Config,
 ) -> tuple[
     numpy.ndarray,
     numpy.ndarray,
@@ -3195,7 +3195,7 @@ def fit_hierarchical_random_slope_reml(
     initial_residual_variance: float,
     initial_random_effect_covariance: numpy.ndarray,
     cluster_sizes: list[int],
-    policy: EstimationPolicy,
+    policy: Config,
 ) -> tuple[
     numpy.ndarray,
     numpy.ndarray,
@@ -3467,7 +3467,7 @@ def fit_hierarchical_reml(
     labels: tuple[Any, ...],
     initial_residual_variance: float,
     initial_random_intercept_variance: float,
-    policy: EstimationPolicy,
+    policy: Config,
 ) -> tuple[
     numpy.ndarray,
     numpy.ndarray,
@@ -3909,7 +3909,7 @@ def reference_linear(
     design: numpy.ndarray,
     values: numpy.ndarray,
     coefficients: numpy.ndarray,
-    policy: EstimationPolicy,
+    policy: Config,
 ) -> dict[str, Any]:
     """Independently verifies the linear solution with least squares.
 
@@ -3937,7 +3937,7 @@ def reference_ipw_ate(
     values: numpy.ndarray,
     treatment: numpy.ndarray,
     coefficients: numpy.ndarray,
-    policy: EstimationPolicy,
+    policy: Config,
     clusters: numpy.ndarray | None,
 ) -> dict[str, Any]:
     """Recomputes IPW propensities with an independent BFGS calculation.
@@ -4021,7 +4021,7 @@ def reference_aipw_ate(
     inputs: Mapping[str, numpy.ndarray],
     values: numpy.ndarray,
     coefficients: numpy.ndarray,
-    policy: EstimationPolicy,
+    policy: Config,
     clusters: numpy.ndarray | None,
 ) -> dict[str, Any]:
     """Recomputes the augmented IPW score with an independent reference.
@@ -4126,7 +4126,7 @@ def reference_cross_fitted_aipw_ate(
     inputs: Mapping[str, numpy.ndarray],
     values: numpy.ndarray,
     coefficients: numpy.ndarray,
-    policy: EstimationPolicy,
+    policy: Config,
     clusters: numpy.ndarray | None,
 ) -> dict[str, Any]:
     """Independently recomputes each cross-fitted AIPW validation score.
@@ -4268,7 +4268,7 @@ def reference_hierarchical_linear(
     residual_variance: float,
     random_intercept_variance: float,
     coefficients: numpy.ndarray,
-    policy: EstimationPolicy,
+    policy: Config,
 ) -> dict[str, Any]:
     """Verifies hierarchical GLS with explicit group covariance matrices.
 
@@ -4325,7 +4325,7 @@ def reference_hierarchical_reml(
     random_intercept_variance: float,
     coefficients: numpy.ndarray,
     objective: float,
-    policy: EstimationPolicy,
+    policy: Config,
 ) -> dict[str, Any]:
     """Verifies REML GLS with an independent dense covariance calculation.
 
@@ -4406,7 +4406,7 @@ def reference_hierarchical_random_slope(
     residual_variance: float,
     random_effect_covariance: numpy.ndarray,
     coefficients: numpy.ndarray,
-    policy: EstimationPolicy,
+    policy: Config,
 ) -> dict[str, Any]:
     """Verifies one-random-slope GLS with an independent dense calculation.
 
@@ -4477,7 +4477,7 @@ def reference_hierarchical_random_slope_reml(
     random_effect_covariance: numpy.ndarray,
     coefficients: numpy.ndarray,
     objective: float,
-    policy: EstimationPolicy,
+    policy: Config,
 ) -> dict[str, Any]:
     """Verifies random-slope REML with independent dense block algebra.
 
@@ -4566,7 +4566,7 @@ def reference_bayesian_linear(
     values: numpy.ndarray,
     prior: BayesianPrior,
     coefficients: numpy.ndarray,
-    policy: EstimationPolicy,
+    policy: Config,
 ) -> dict[str, Any]:
     """Verifies the conjugate posterior mean with an independent solver.
 
@@ -4603,7 +4603,7 @@ def reference_bayesian_ate(
     values: numpy.ndarray,
     prior: BayesianPrior,
     coefficients: numpy.ndarray,
-    policy: EstimationPolicy,
+    policy: Config,
 ) -> dict[str, Any]:
     """Independently verifies the causal posterior mean and ATE coefficient.
 
@@ -4651,7 +4651,7 @@ def reference_logistic(
     design: numpy.ndarray,
     values: numpy.ndarray,
     coefficients: numpy.ndarray,
-    policy: EstimationPolicy,
+    policy: Config,
 ) -> dict[str, Any]:
     """Independently verifies logistic coefficients with scipy optimization.
 
@@ -4724,11 +4724,11 @@ def bernoulli_log_likelihood(
 def sensitivity_report(
     matrix: numpy.ndarray,
     values: numpy.ndarray,
-    policy: EstimationPolicy,
+    policy: Config,
     design: numpy.ndarray,
     coefficients: numpy.ndarray,
     shift_reference: Any | None,
-    estimand: EstimandSpec,
+    estimand: Estimand,
     clusters: numpy.ndarray | None,
     prior: BayesianPrior | None = None,
 ) -> dict[str, Any]:
@@ -4891,8 +4891,8 @@ def sensitivity_report(
 def hierarchical_bootstrap_sensitivity(
     matrix: numpy.ndarray,
     values: numpy.ndarray,
-    estimand: EstimandSpec,
-    policy: EstimationPolicy,
+    estimand: Estimand,
+    policy: Config,
     coefficients: numpy.ndarray,
     clusters: numpy.ndarray,
 ) -> dict[str, Any]:
@@ -5095,8 +5095,8 @@ def draw_hierarchical_bootstrap_sample(
 def causal_bootstrap_sensitivity(
     matrix: numpy.ndarray,
     values: numpy.ndarray,
-    estimand: EstimandSpec,
-    policy: EstimationPolicy,
+    estimand: Estimand,
+    policy: Config,
     coefficients: numpy.ndarray,
     clusters: numpy.ndarray | None,
 ) -> dict[str, Any]:
@@ -5314,10 +5314,10 @@ def bootstrap_sample_digest(indices: numpy.ndarray) -> str:
 __all__ = [
     "BayesianPrior",
     "CausalAssumption",
+    "Config",
     "CovarianceKind",
-    "EstimandSpec",
-    "EstimationPolicy",
-    "EstimationResult",
+    "Estimand",
+    "Estimation",
     "EstimatorKind",
     "HierarchicalAssumption",
     "MissingPolicy",

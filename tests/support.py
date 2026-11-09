@@ -4,14 +4,14 @@ import time
 
 from sklearn import dummy
 
-import scmle
+import scmle.api.project
 from scmle.contracts import models
 from scmle.contracts import tasks
 
-NO_TUNING = tasks.SearchSpec(top_models=0)
-NO_STRATEGIES = tasks.StrategySpec(top_models=0)
-NO_ENSEMBLE = tasks.EnsembleSpec(size=0)
-FAST_MODELS = tasks.ModelSpec(
+NO_TUNING = tasks.Search(top_models=0)
+NO_STRATEGIES = tasks.Strategies(top_models=0)
+NO_ENSEMBLE = tasks.Stacking(size=0)
+FAST_MODELS = tasks.Candidates(
     exclude_families=["bagging", "deep_learning", "foundation"]
 )
 
@@ -23,7 +23,7 @@ def make_project(data, target, **kwargs):
     kwargs.setdefault("ensemble", NO_ENSEMBLE)
     kwargs.setdefault("models", FAST_MODELS)  # PyTorch trains slowly
     kwargs.setdefault("enforcement", "cooperative")  # fast, in-process
-    return scmle.MLProject(data, target, **kwargs)
+    return scmle.api.project.Project(data, target, **kwargs)
 
 
 class HungryClassifier(dummy.DummyClassifier):
@@ -36,14 +36,12 @@ class HungryClassifier(dummy.DummyClassifier):
         return super().fit(features, target)
 
 
-class HungryAdapter(models.ModelAdapter):
+class HungryAdapter(models.Model):
     """Adapter for `HungryClassifier`."""
 
     name = "hungry"
     family = "test"
-    capabilities = models.Capabilities(
-        frozenset({tasks.TaskType.BINARY}), cost=2
-    )
+    capabilities = models.Capabilities(frozenset({tasks.Task.BINARY}), cost=2)
 
     def build(self, task, seed, params=None):
         return HungryClassifier()

@@ -12,8 +12,8 @@ import scmle.data.validation.target
 
 
 def make_spec(task="auto", **data_overrides):
-    data = tasks.DataSpec(uri="m", target="y", **data_overrides)
-    return tasks.ProjectSpec(data=data, task=task)
+    data = tasks.Dataset(uri="m", target="y", **data_overrides)
+    return tasks.Config(data=data, task=task)
 
 
 def profile(frame, task="auto", **data_overrides):
@@ -22,7 +22,7 @@ def profile(frame, task="auto", **data_overrides):
         frame["y"]
     )
     manifest = tabular.build_manifest(frame, "y")
-    result = profiler.DatasetProfiler(spec).profile(frame, manifest, resolved)
+    result = profiler.Profiler(spec).profile(frame, manifest, resolved)
     return resolved, result
 
 
@@ -49,16 +49,16 @@ def resolve(frame, task="auto"):
 
 def test_task_resolution(classification_frame):
     frame = classification_frame
-    assert resolve(frame) is tasks.TaskType.BINARY
-    assert resolve(frame, "classification") is tasks.TaskType.BINARY
+    assert resolve(frame) is tasks.Task.BINARY
+    assert resolve(frame, "classification") is tasks.Task.BINARY
     multi = frame.assign(y=numpy.arange(len(frame)) % 4)
-    assert resolve(multi, "classification") is tasks.TaskType.MULTICLASS
+    assert resolve(multi, "classification") is tasks.Task.MULTICLASS
     continuous = frame.assign(
         y=numpy.random.default_rng(1).normal(size=len(frame))
     )
-    assert resolve(continuous) is tasks.TaskType.REGRESSION
+    assert resolve(continuous) is tasks.Task.REGRESSION
     strings = frame.assign(y=numpy.where(frame.y == 1, "yes", "no"))
-    assert resolve(strings) is tasks.TaskType.BINARY
+    assert resolve(strings) is tasks.Task.BINARY
 
 
 def test_ambiguous_integer_target_blocks(classification_frame):
@@ -160,8 +160,8 @@ def test_the_screen_uses_groups_and_the_time_order(classification_frame):
 def test_the_screen_is_skipped_for_a_non_numeric_non_class_target():
     frame = pandas.DataFrame({"a": range(120), "y": ["x"] * 120})
     spec = make_spec("auto")
-    report = profiler.DatasetProfiler(spec).leakage_screen(
-        frame, ["a"], tasks.TaskType.MULTILABEL
+    report = profiler.Profiler(spec).leakage_screen(
+        frame, ["a"], tasks.Task.MULTILABEL
     )
     assert report is None
 
@@ -194,7 +194,7 @@ def test_regression_target_summary():
     frame = pandas.DataFrame({"x": rng.normal(size=100)})
     frame["y"] = frame.x * 2
     task, result = profile(frame)
-    assert task is tasks.TaskType.REGRESSION
+    assert task is tasks.Task.REGRESSION
     assert {"mean", "std", "skew"} <= set(result.target_summary)
     assert any("'x'" in r for r in result.risk_findings)
 
@@ -252,11 +252,11 @@ def test_datetime_columns_become_calendar_and_trend_features():
             "y": rng.integers(0, 2, 400),
         }
     )
-    spec = tasks.ProjectSpec(data=tasks.DataSpec(uri="m", target="y"))
+    spec = tasks.Config(data=tasks.Dataset(uri="m", target="y"))
     manifest = tabular.build_manifest(frame, "y")
 
-    profile = profiler.DatasetProfiler(spec).profile(
-        frame, manifest, tasks.TaskType.BINARY
+    profile = profiler.Profiler(spec).profile(
+        frame, manifest, tasks.Task.BINARY
     )
 
     plan = profile.feature_plan

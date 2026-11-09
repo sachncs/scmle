@@ -13,7 +13,7 @@ from scmle.data.robustness import stability
 
 
 def stored():
-    return certificates.CertificateStore.load(f6_certify.STORE_PATH)
+    return certificates.Store.load(f6_certify.STORE_PATH)
 
 
 def measurements():
@@ -24,7 +24,7 @@ def test_the_stored_certificates_are_for_the_current_code():
     store = stored()
     for detector, digest in f6_certify.current_digests().items():
         state = store.state(detector, digest)
-        assert state is certificates.CertificateState.CURRENT, detector
+        assert state is certificates.Freshness.CURRENT, detector
     assert f6_certify.problems(store) == []
 
 
@@ -39,7 +39,7 @@ def test_every_required_defect_type_has_an_outcome_on_file():
 
 
 def test_missing_and_stale_certificates_are_reported():
-    found = f6_certify.problems(certificates.CertificateStore())
+    found = f6_certify.problems(certificates.Store())
     assert found and all(item.endswith(": missing") for item in found)
     forged = {
         detector: ("0" * 64, defects[0])
@@ -49,13 +49,9 @@ def test_missing_and_stale_certificates_are_reported():
 
 
 def test_the_floors_were_fixed_before_measuring():
+    assert certificates.Standard(0.80, 0.075, 0.95) == f6_certify.SHIFT_POLICY
     assert (
-        certificates.CertificationPolicy(0.80, 0.075, 0.95)
-        == f6_certify.SHIFT_POLICY
-    )
-    assert (
-        certificates.CertificationPolicy(0.80, 0.10, 0.95)
-        == f6_certify.STABILITY_POLICY
+        certificates.Standard(0.80, 0.10, 0.95) == f6_certify.STABILITY_POLICY
     )
     assert f6_certify.SHIFT_NULL >= 1000 and f6_certify.SHIFT_ROWS == 2000
     assert f6_certify.PLANTED_AUC == 0.60

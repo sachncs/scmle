@@ -26,13 +26,14 @@ def test_compatibility_gate_reports_removed_and_changed_exports():
     """A removed or changed signature must fail with a useful diagnosis."""
     expected = check_api_compatibility.current_snapshot()
     changed = json.loads(json.dumps(expected))
-    changed["exports"]["predict"]["signature_sha256"] = "changed"
-    changed["exports"].pop("load_model")
+    api = changed["surfaces"]["scmle.api.predict"]
+    api["predict"]["signature_sha256"] = "changed"
+    api.pop("load_model")
 
     differences = check_api_compatibility.differences(expected, changed)
 
-    assert "export removed: load_model" in differences
-    assert "export contract changed: predict" in differences
+    assert "surface removed: scmle.api.predict.load_model" in differences
+    assert "surface contract changed: scmle.api.predict.predict" in differences
 
 
 @pytest.mark.parametrize("value", [{"b", "a"}, frozenset({"b", "a"})])

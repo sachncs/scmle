@@ -83,7 +83,7 @@ def load_dag(path: str | None) -> scmle.data.admissibility.dag.Dag | None:
 
 
 def registration(
-    spec: causal.CausalSpec,
+    spec: causal.Question,
     plan: select.Plan,
     dag: scmle.data.admissibility.dag.Dag | None,
     error_budget: budget.ErrorBudget,
@@ -138,7 +138,7 @@ def jsonable(document: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def verified_attestors(
-    spec: causal.CausalSpec,
+    spec: causal.Question,
     plan: select.Plan,
     charter_hash: str,
     signing_key: str | bytes | None,
@@ -182,7 +182,7 @@ def verified_attestors(
 
 
 def build_runner(
-    spec: causal.CausalSpec,
+    spec: causal.Question,
     x: pandas.DataFrame,
     target_name: str,
     error_budget: budget.ErrorBudget,

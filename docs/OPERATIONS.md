@@ -28,7 +28,7 @@ buckets, as Prometheus does, so they are exact only at bucket edges.
 reported healthy. Feature rows are sampled at `sample_rate`; requests and
 outcomes are never sampled. Drift is the noise-adjusted PSI of
 `scmle.monitoring.reference`, so the thresholds are the ones the batch
-monitor already uses (`MonitoringThresholds`).
+monitor already uses (`Thresholds`).
 
 ## Classifying a fault
 

@@ -7,17 +7,17 @@ import numpy
 import pandas
 import pytest
 
-from scmle.evaluation.sequential import SequentialEstimand
-from scmle.evaluation.sequential import SequentialEstimationPolicy
-from scmle.evaluation.sequential import SequentialEstimationResult
-from scmle.evaluation.sequential import SequentialIPWEstimator
-from scmle.evaluation.sequential import SequentialPeriodDiagnostics
-from scmle.evaluation.sequential import SequentialRegimeEstimate
+from scmle.evaluation.sequential import Config
+from scmle.evaluation.sequential import Estimand
+from scmle.evaluation.sequential import Estimation
+from scmle.evaluation.sequential import Estimator
+from scmle.evaluation.sequential import PeriodDiagnostics
+from scmle.evaluation.sequential import RegimeEstimate
 
 
-def make_estimand() -> SequentialEstimand:
+def make_estimand() -> Estimand:
     """Return an identified sustained-treatment declaration."""
-    return SequentialEstimand(
+    return Estimand(
         name="sustained_treatment_effect",
         subject_identity="subject_id",
         time_column="time",
@@ -80,9 +80,9 @@ def make_frame() -> pandas.DataFrame:
     return pandas.DataFrame(rows)
 
 
-def make_policy() -> SequentialEstimationPolicy:
+def make_policy() -> Config:
     """Return a small but auditable policy for the fixture."""
-    return SequentialEstimationPolicy(
+    return Config(
         seed=17,
         minimum_subjects=100,
         minimum_arm_rows=2,
@@ -93,7 +93,7 @@ def make_policy() -> SequentialEstimationPolicy:
 
 def test_sequential_ipw_is_deterministic_and_auditable() -> None:
     """Sequential weights produce stable regime and period evidence."""
-    estimator = SequentialIPWEstimator(make_estimand(), make_policy())
+    estimator = Estimator(make_estimand(), make_policy())
     first = estimator.fit(make_frame())
     second = estimator.fit(make_frame())
 
@@ -113,13 +113,11 @@ def test_sequential_ipw_is_deterministic_and_auditable() -> None:
 
 def test_sequential_report_round_trip_is_digest_bound(tmp_path) -> None:
     """Sequential reports round-trip and reject content tampering."""
-    result = SequentialIPWEstimator(make_estimand(), make_policy()).fit(
-        make_frame()
-    )
+    result = Estimator(make_estimand(), make_policy()).fit(make_frame())
     destination = tmp_path / "sequential.json"
 
     digest = result.write(destination)
-    restored = SequentialEstimationResult.read(destination)
+    restored = Estimation.read(destination)
 
     assert digest == result.digest() == restored.digest()
     assert restored.to_dict() == result.to_dict()
@@ -127,17 +125,15 @@ def test_sequential_report_round_trip_is_digest_bound(tmp_path) -> None:
     envelope["report"]["rows_used"] += 1
     destination.write_text(json.dumps(envelope), encoding="utf-8")
     with pytest.raises(ValueError, match="digest mismatch"):
-        SequentialEstimationResult.read(destination)
+        Estimation.read(destination)
 
 
 def test_unsorted_rows_are_ordered_by_subject_and_period() -> None:
     """Long-format ingestion does not depend on source row ordering."""
     frame = make_frame()
-    baseline = SequentialIPWEstimator(make_estimand(), make_policy()).fit(frame)
+    baseline = Estimator(make_estimand(), make_policy()).fit(frame)
     shuffled = frame.sample(frac=1.0, random_state=9).reset_index(drop=True)
-    result = SequentialIPWEstimator(make_estimand(), make_policy()).fit(
-        shuffled
-    )
+    result = Estimator(make_estimand(), make_policy()).fit(shuffled)
 
     assert result.rows_used == len(frame)
     assert result.reference["passed"] is True
@@ -151,7 +147,7 @@ def test_complete_case_drops_subjects_as_whole_sequences() -> None:
     frame.loc[frame["subject_id"] == 0, "state"] = numpy.nan
     policy = dataclasses.replace(make_policy(), missingness="complete_case")
 
-    result = SequentialIPWEstimator(make_estimand(), policy).fit(frame)
+    result = Estimator(make_estimand(), policy).fit(frame)
 
     assert result.subjects_dropped == 1
     assert result.rows_dropped == 3
@@ -196,13 +192,13 @@ def test_invalid_sequential_panels_are_rejected(
         raise AssertionError(f"unhandled change {change}")
 
     with pytest.raises(ValueError, match=message):
-        SequentialIPWEstimator(make_estimand(), make_policy()).fit(frame)
+        Estimator(make_estimand(), make_policy()).fit(frame)
 
 
 def test_required_assumptions_are_not_implicit() -> None:
     """Omitting sequential identification assumptions blocks declaration."""
     with pytest.raises(ValueError, match="required assumptions"):
-        SequentialEstimand(
+        Estimand(
             name="sustained_treatment_effect",
             subject_identity="subject_id",
             time_column="time",
@@ -254,12 +250,12 @@ def test_estimand_rejects_ambiguous_declarations(change: str) -> None:
     values["assumptions"] = tuple(values["assumptions"])
 
     with pytest.raises(ValueError):
-        SequentialEstimand(**values)
+        Estimand(**values)
 
 
 def test_contract_dataclasses_reject_invalid_evidence() -> None:
     """Period, regime, and result contracts reject inconsistent evidence."""
-    period = SequentialPeriodDiagnostics(
+    period = PeriodDiagnostics(
         period="0",
         rows=4,
         treated_rows=2,
@@ -277,7 +273,7 @@ def test_contract_dataclasses_reject_invalid_evidence() -> None:
         dataclasses.replace(period, treated_rows=1)
     with pytest.raises(ValueError, match="strictly between"):
         dataclasses.replace(period, denominator_propensity_min=0.0)
-    regime = SequentialRegimeEstimate(
+    regime = RegimeEstimate(
         regime="always_treated",
         treatment=1,
         estimate=1.0,
@@ -289,9 +285,7 @@ def test_contract_dataclasses_reject_invalid_evidence() -> None:
     )
     with pytest.raises(ValueError, match="regime treatment"):
         dataclasses.replace(regime, treatment=2)
-    result = SequentialIPWEstimator(make_estimand(), make_policy()).fit(
-        make_frame()
-    )
+    result = Estimator(make_estimand(), make_policy()).fit(make_frame())
     with pytest.raises(ValueError, match="at least two periods"):
         dataclasses.replace(result, periods=(result.periods[0],))
     with pytest.raises(ValueError, match="symmetric"):
@@ -318,4 +312,4 @@ def test_policy_rejects_unbounded_or_ambiguous_values(
 ) -> None:
     """Policy validation prevents silent changes to the estimand."""
     with pytest.raises(ValueError):
-        SequentialEstimationPolicy(**{field: value})
+        Config(**{field: value})

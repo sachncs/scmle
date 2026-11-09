@@ -75,7 +75,7 @@ class PredictionLog:
         self,
         path: str | pathlib.Path,
         *,
-        observability_policy: observability.ObservabilityPolicy | None = None,
+        observability_policy: observability.Requirements | None = None,
         run_id: str | None = None,
     ) -> None:
         """Initializes the log.
@@ -108,7 +108,7 @@ class PredictionLog:
 
     def log_predictions(
         self,
-        bundle: scmle.artifacts.bundle.ModelBundle,
+        bundle: scmle.artifacts.bundle.Bundle,
         data: pandas.DataFrame,
         event_ids: list[str] | None = None,
     ) -> list[PredictionEvent]:
@@ -189,7 +189,7 @@ class PredictionLog:
 
     def log_observability(
         self,
-        bundle: scmle.artifacts.bundle.ModelBundle,
+        bundle: scmle.artifacts.bundle.Bundle,
         request_id: str,
         started: float,
         outcome: str,

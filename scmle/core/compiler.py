@@ -31,7 +31,7 @@ class WorkflowStage(Protocol):
     state: ClassVar["scmle.core.state.RunState"]
     requires: ClassVar[tuple[type["WorkflowStage"], ...]]
 
-    def describe(self, context: "scmle.core.context.RunContext") -> str:
+    def describe(self, context: "scmle.core.context.Context") -> str:
         """Returns the reason recorded on stage entry.
 
         Args:
@@ -41,7 +41,7 @@ class WorkflowStage(Protocol):
             The reason text attached to the stage's state transition.
         """
 
-    def execute(self, context: "scmle.core.context.RunContext") -> None:
+    def execute(self, context: "scmle.core.context.Context") -> None:
         """Executes the stage against the shared run context.
 
         Args:

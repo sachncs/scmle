@@ -44,7 +44,7 @@ class JobContext:
     store: roles.RoleStore
     run_id: str
     attempt: int
-    spec: base.JobSpec
+    spec: base.Job
     checkpoints: checkpoint.CheckpointStore
     hook: Callable[[int], None] = lambda step: None
 
@@ -85,7 +85,7 @@ Interruption = Callable[[int, int], bool]
 
 
 @dataclasses.dataclass(slots=True)
-class LocalJob:
+class Outcome:
     """A finished local attempt.
 
     Attributes:
@@ -95,7 +95,7 @@ class LocalJob:
     status: base.JobStatus
 
 
-class LocalRunner(base.Runner):
+class Runner(base.Runner):
     """Runs the workload inline, as the job.
 
     Attributes:
@@ -128,9 +128,9 @@ class LocalRunner(base.Runner):
         super().__init__(store, serving_identity=serving_identity, **options)
         self.workload = workload
         self.interruptions = interruptions
-        self.jobs: dict[str, LocalJob] = {}
+        self.jobs: dict[str, Outcome] = {}
 
-    def submit(self, spec: base.JobSpec, attempt: int) -> base.JobHandle:
+    def submit(self, spec: base.Job, attempt: int) -> base.JobHandle:
         """Runs the workload to completion and remembers how it ended.
 
         An interruption becomes `INTERRUPTED`, a supervisor stop `CANCELLED`, a
@@ -185,7 +185,7 @@ class LocalRunner(base.Runner):
         except Exception as error:
             reason = f"{type(error).__name__}: {error}"[:300]
             status = base.JobStatus(base.JobState.FAILED, reason)
-        self.jobs[handle.job_id] = LocalJob(status)
+        self.jobs[handle.job_id] = Outcome(status)
         return handle
 
     def poll(self, handle: base.JobHandle) -> base.JobStatus:

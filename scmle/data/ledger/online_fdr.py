@@ -311,7 +311,7 @@ def exact_alpha(value: Any, name: str) -> Fraction:
     return amount
 
 
-class OnlineRule(abc.ABC):
+class Tester(abc.ABC):
     """Base class: a level function plus a decision and wealth bookkeeping.
 
     Attributes:
@@ -451,7 +451,7 @@ class OnlineRule(abc.ABC):
         return Fraction(0)
 
 
-class ELond(OnlineRule):
+class ELond(Tester):
     """e-LOND: FDR control under arbitrary dependence from valid e-values."""
 
     name = ELOND
@@ -551,7 +551,7 @@ class ELond(OnlineRule):
         return Fraction(e_value) * level >= 1, False, e_value
 
 
-class PValueRule(OnlineRule):
+class PValueTester(Tester):
     """Shared parts of the p-value rules (initial wealth `w0`)."""
 
     def __init__(
@@ -606,7 +606,7 @@ class PValueRule(OnlineRule):
         return Fraction(evidence.p)
 
 
-class LordPlusPlus(PValueRule):
+class LordPlusPlus(PValueTester):
     """LORD++: FDR control for independent p-values."""
 
     name = LORD_PLUS_PLUS
@@ -672,7 +672,7 @@ class LordPlusPlus(PValueRule):
         return self.require_p(evidence) <= level, False, None
 
 
-class Saffron(PValueRule):
+class Saffron(PValueTester):
     """SAFFRON: adaptive FDR control for independent p-values."""
 
     name = SAFFRON
@@ -813,7 +813,7 @@ class RuleConfig:
         """
         self.build()
 
-    def build(self) -> OnlineRule:
+    def build(self) -> Tester:
         """Builds the rule this configuration describes.
 
         Returns:

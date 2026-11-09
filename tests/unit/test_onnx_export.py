@@ -22,7 +22,7 @@ pytestmark = pytest.mark.skipif(
 )
 
 PLAN = data.FeaturePlan(("num", "num2"), ("cat",))
-REGISTRY = registry.ModelRegistry.with_builtins()
+REGISTRY = registry.Catalog.with_builtins()
 
 
 def frame(rows=400, seed=0):
@@ -40,7 +40,7 @@ def frame(rows=400, seed=0):
 
 def make_bundle(name, task, features=None):
     features = frame() if features is None else features
-    if task is tasks.TaskType.REGRESSION:
+    if task is tasks.Task.REGRESSION:
         target = features.num2 * 3 + (features.cat == "a") * 2
     else:
         target = pandas.Series(
@@ -51,7 +51,7 @@ def make_bundle(name, task, features=None):
     fitted = preprocessing.build_pipeline(
         PLAN, REGISTRY.get(name), task, 0
     ).fit(features, target)
-    return scmle.artifacts.bundle.ModelBundle.create(
+    return scmle.artifacts.bundle.Bundle.create(
         fitted, PLAN, features, "y", task.value, "roc_auc", name
     ), features
 
@@ -60,7 +60,7 @@ def make_bundle(name, task, features=None):
     "name", ["logistic_regression", "random_forest", "decision_tree"]
 )
 def test_classifiers_match_the_pipeline_within_tolerance(name, tmp_path):
-    bundle, features = make_bundle(name, tasks.TaskType.BINARY)
+    bundle, features = make_bundle(name, tasks.Task.BINARY)
 
     path = bundle.export_onnx(tmp_path / "m.onnx")
     report = onnx_export.verify(bundle, path, features)
@@ -72,9 +72,7 @@ def test_classifiers_match_the_pipeline_within_tolerance(name, tmp_path):
 def test_hist_gradient_boosting_exports_when_the_converter_supports_it(
     tmp_path,
 ):
-    bundle, features = make_bundle(
-        "hist_gradient_boosting", tasks.TaskType.BINARY
-    )
+    bundle, features = make_bundle("hist_gradient_boosting", tasks.Task.BINARY)
 
     try:
         path = bundle.export_onnx(tmp_path / "m.onnx", check=features)
@@ -85,7 +83,7 @@ def test_hist_gradient_boosting_exports_when_the_converter_supports_it(
 
 
 def test_a_regressor_matches_on_scaled_values(tmp_path):
-    bundle, features = make_bundle("random_forest", tasks.TaskType.REGRESSION)
+    bundle, features = make_bundle("random_forest", tasks.Task.REGRESSION)
 
     path = bundle.export_onnx(tmp_path / "m.onnx", check=features)
 
@@ -99,7 +97,7 @@ def test_a_regressor_matches_on_scaled_values(tmp_path):
 
 
 def test_the_scorer_returns_probabilities_in_class_order(tmp_path):
-    bundle, features = make_bundle("logistic_regression", tasks.TaskType.BINARY)
+    bundle, features = make_bundle("logistic_regression", tasks.Task.BINARY)
     path = bundle.export_onnx(tmp_path / "m.onnx")
 
     scorer = onnx_export.OnnxScorer(bundle, path)
@@ -113,7 +111,7 @@ def test_the_scorer_returns_probabilities_in_class_order(tmp_path):
 
 
 def test_models_the_converter_cannot_express_are_refused_by_name(tmp_path):
-    bundle = make_bundle("random_forest", tasks.TaskType.BINARY)[0]
+    bundle = make_bundle("random_forest", tasks.Task.BINARY)[0]
     bundle.pipeline = tasks  # Not an estimator at all.
 
     with pytest.raises(errors.ArtifactError, match="not supported"):
@@ -121,7 +119,7 @@ def test_models_the_converter_cannot_express_are_refused_by_name(tmp_path):
 
 
 def test_an_attached_calibrator_blocks_the_export(tmp_path):
-    bundle, features = make_bundle("random_forest", tasks.TaskType.BINARY)
+    bundle, features = make_bundle("random_forest", tasks.Task.BINARY)
     bundle.calibrate(features, bundle.predict(features), method="sigmoid")
 
     with pytest.raises(errors.ArtifactError, match="calibrator"):
@@ -129,7 +127,7 @@ def test_an_attached_calibrator_blocks_the_export(tmp_path):
 
 
 def test_survival_models_are_refused(tmp_path):
-    bundle = make_bundle("random_forest", tasks.TaskType.BINARY)[0]
+    bundle = make_bundle("random_forest", tasks.Task.BINARY)[0]
     bundle.schema = dataclasses.replace(bundle.schema, task="survival")
 
     with pytest.raises(errors.ArtifactError, match="survival"):
@@ -137,7 +135,7 @@ def test_survival_models_are_refused(tmp_path):
 
 
 def test_a_failed_parity_check_names_the_difference(tmp_path):
-    bundle, features = make_bundle("logistic_regression", tasks.TaskType.BINARY)
+    bundle, features = make_bundle("logistic_regression", tasks.Task.BINARY)
     path = bundle.export_onnx(tmp_path / "m.onnx")
 
     with pytest.raises(errors.ArtifactError, match="differs"):
@@ -156,7 +154,7 @@ needs_boosters = pytest.mark.skipif(
 @needs_boosters
 @pytest.mark.parametrize("name", ["lightgbm", "xgboost"])
 def test_boosted_models_export_and_decode_their_string_labels(name, tmp_path):
-    bundle, features = make_bundle(name, tasks.TaskType.BINARY)
+    bundle, features = make_bundle(name, tasks.Task.BINARY)
 
     path = bundle.export_onnx(tmp_path / "m.onnx", check=features)
 
@@ -168,7 +166,7 @@ def test_boosted_models_export_and_decode_their_string_labels(name, tmp_path):
 @needs_boosters
 @pytest.mark.parametrize("name", ["lightgbm", "xgboost"])
 def test_boosted_regressors_export(name, tmp_path):
-    bundle, features = make_bundle(name, tasks.TaskType.REGRESSION)
+    bundle, features = make_bundle(name, tasks.Task.REGRESSION)
 
     path = bundle.export_onnx(tmp_path / "m.onnx", check=features)
 
@@ -176,7 +174,7 @@ def test_boosted_regressors_export(name, tmp_path):
 
 
 def test_a_refusal_points_to_the_service_package(tmp_path):
-    bundle = make_bundle("random_forest", tasks.TaskType.BINARY)[0]
+    bundle = make_bundle("random_forest", tasks.Task.BINARY)[0]
     bundle.pipeline = object()
 
     with pytest.raises(errors.ArtifactError, match="export_service"):

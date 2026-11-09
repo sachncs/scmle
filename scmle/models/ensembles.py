@@ -260,7 +260,7 @@ class RegressorBlender(base.RegressorMixin, GreedyBlender):
         return self.blend(meta)[:, 0]
 
 
-class StackingAdapter(models.ModelAdapter):
+class Stacking(models.Model):
     """Meta-model built from other registered models.
 
     Attributes:
@@ -280,7 +280,7 @@ class StackingAdapter(models.ModelAdapter):
         "members": [{"model": "decision_tree"}, {"model": "extra_trees"}]
     }
 
-    def __init__(self, registry: models.AdapterResolver) -> None:
+    def __init__(self, registry: models.Resolver) -> None:
         """Initializes the adapter.
 
         Args:
@@ -310,7 +310,7 @@ class StackingAdapter(models.ModelAdapter):
     def assemble(
         self,
         plan: data.FeaturePlan,
-        task: tasks.TaskType,
+        task: tasks.Task,
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator | None:
@@ -357,7 +357,7 @@ class StackingAdapter(models.ModelAdapter):
             estimators, final_estimator=meta, cv=inner
         )
 
-    def meta_learner(self, task: tasks.TaskType, members: int) -> Any:
+    def meta_learner(self, task: tasks.Task, members: int) -> Any:
         """Creates the model that combines the members' out-of-fold predictions.
 
         Args:
@@ -374,7 +374,7 @@ class StackingAdapter(models.ModelAdapter):
 
     def build(
         self,
-        task: tasks.TaskType,
+        task: tasks.Task,
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
@@ -413,12 +413,12 @@ class StackingAdapter(models.ModelAdapter):
         )
 
 
-class BlendingAdapter(StackingAdapter):
+class Blending(Stacking):
     """Weighted average of members, with weights chosen greedily."""
 
     name = "blending"
 
-    def meta_learner(self, task: tasks.TaskType, members: int) -> Any:
+    def meta_learner(self, task: tasks.Task, members: int) -> Any:
         """Creates a greedy blender instead of a fitted linear model.
 
         Args:

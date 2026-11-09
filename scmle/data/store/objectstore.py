@@ -536,7 +536,7 @@ class RetryingStore(ObjectStore):
     def __init__(
         self,
         inner: ObjectStore,
-        policy: retry.RetryPolicy,
+        policy: retry.Retries,
         sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         """Initializes the wrapper.

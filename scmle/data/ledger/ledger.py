@@ -101,7 +101,7 @@ def digest(body: Mapping[str, Any]) -> str:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class HypothesisSpec:
+class Test:
     """What is tested, fixed before the data is touched.
 
     Attributes:
@@ -156,7 +156,7 @@ class HypothesisSpec:
         column: str | None = None,
         direction: str = bivariate.TWO_SIDED,
         set_id: qualification.SetId = qualification.SetId.EXPLORATION,
-    ) -> "HypothesisSpec":
+    ) -> "Test":
         """Builds a specification, filling the code hash from the registry.
 
         Args:
@@ -202,7 +202,7 @@ class HypothesisSpec:
         }
 
     @classmethod
-    def from_dict(cls, record: Mapping[str, Any]) -> "HypothesisSpec":
+    def from_dict(cls, record: Mapping[str, Any]) -> "Test":
         """Rebuilds a specification, rejecting unknown or missing fields.
 
         Args:
@@ -250,11 +250,11 @@ class Hypothesis:
     """
 
     hypothesis_id: str
-    spec: HypothesisSpec
+    spec: Test
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class Result:
+class Outcome:
     """The recorded outcome of one hypothesis.
 
     Attributes:
@@ -296,9 +296,7 @@ class SurvivorSet:
     sha256: str
 
 
-def survivors_hash(
-    ids: tuple[str, ...], specs: Mapping[str, HypothesisSpec]
-) -> str:
+def survivors_hash(ids: tuple[str, ...], specs: Mapping[str, Test]) -> str:
     """Hashes the survivor ids together with their specifications.
 
     Args:
@@ -333,9 +331,9 @@ class Ledger:
         self.path = path
         self.rows: list[dict[str, Any]] = []
         self.hypotheses: dict[str, Hypothesis] = {}
-        self.results: dict[str, Result] = {}
+        self.results: dict[str, Outcome] = {}
         self.header: dict[str, Any] = {}
-        self.rule: online_fdr.OnlineRule | None = None
+        self.rule: online_fdr.Tester | None = None
         self.config: online_fdr.RuleConfig | None = None
         self.state = online_fdr.State()
         self.survivor_set: SurvivorSet | None = None
@@ -523,7 +521,7 @@ class Ledger:
         """Whether the survivors were frozen (no more hypotheses)."""
         return self.survivor_set is not None
 
-    def require_rule(self) -> online_fdr.OnlineRule:
+    def require_rule(self) -> online_fdr.Tester:
         """Returns the online rule, which exists once the `open` row is in.
 
         Returns:
@@ -659,7 +657,7 @@ class Ledger:
         """
         self.require_unfrozen()
         try:
-            spec = HypothesisSpec.from_dict(body["spec"])
+            spec = Test.from_dict(body["spec"])
             hypothesis_id = str(body["hypothesis_id"])
         except (KeyError, ValueError) as error:
             raise LedgerError(f"invalid registration: {error}") from error
@@ -729,7 +727,7 @@ class Ledger:
             decision == NOT_TESTED and (step.rejected or check is not None)
         ):
             raise LedgerError(f"invalid decision for {hypothesis_id}")
-        self.results[hypothesis_id] = Result(
+        self.results[hypothesis_id] = Outcome(
             hypothesis_id=hypothesis_id,
             check=check,
             e_value=body["e_value"],
@@ -742,7 +740,7 @@ class Ledger:
         self.state = step.state
 
     def check_calibration(
-        self, rule: online_fdr.OnlineRule, evidence: Mapping[str, Any]
+        self, rule: online_fdr.Tester, evidence: Mapping[str, Any]
     ) -> None:
         """Checks that a stored e-value is the calibrated p-value.
 
@@ -872,7 +870,7 @@ class Ledger:
                 )
         self.confirmation = dict(body)
 
-    def register(self, spec: HypothesisSpec) -> Hypothesis:
+    def register(self, spec: Test) -> Hypothesis:
         """Registers a hypothesis before any data is touched.
 
         Args:
@@ -954,7 +952,7 @@ class Ledger:
         hypothesis: Hypothesis,
         features: pandas.DataFrame,
         target: pandas.Series,
-    ) -> Result:
+    ) -> Outcome:
         """Runs a hypothesis' statistic on exploration data and records it.
 
         If the rule has no level left (wealth exhausted), the statistic is
@@ -989,7 +987,7 @@ class Ledger:
 
     def record(
         self, hypothesis: Hypothesis, outcome: bivariate.Outcome
-    ) -> Result:
+    ) -> Outcome:
         """Records an outcome computed elsewhere for a registered hypothesis.
 
         Args:
@@ -1027,7 +1025,7 @@ class Ledger:
             hypothesis, check, outcome.p, step, decision, outcome.note
         )
 
-    def record_not_tested(self, hypothesis: Hypothesis, reason: str) -> Result:
+    def record_not_tested(self, hypothesis: Hypothesis, reason: str) -> Outcome:
         """Logs a hypothesis that could not be tested (no level left).
 
         It still uses its place in the sequence, as an untestable hypothesis
@@ -1055,7 +1053,7 @@ class Ledger:
         step: online_fdr.Step,
         decision: str,
         reason: str,
-    ) -> Result:
+    ) -> Outcome:
         """Writes the result row for a computed step.
 
         Args:
@@ -1086,7 +1084,7 @@ class Ledger:
         )
         return self.results[hypothesis.hypothesis_id]
 
-    def decision(self, hypothesis: Hypothesis) -> Result:
+    def decision(self, hypothesis: Hypothesis) -> Outcome:
         """Looks up the recorded result of a hypothesis.
 
         Args:

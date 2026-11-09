@@ -9,7 +9,7 @@ import pytest
 from scmle.contracts import explanations
 
 
-def build_evidence(**overrides: object) -> explanations.ExplanationEvidence:
+def build_evidence(**overrides: object) -> explanations.Evidence:
     """Builds a valid evidence record for contract tests."""
     record: dict[str, object] = {
         "model_fingerprint": "model-123",
@@ -43,7 +43,7 @@ def build_evidence(**overrides: object) -> explanations.ExplanationEvidence:
         ),
     }
     record.update(overrides)
-    return explanations.ExplanationEvidence.model_validate(record)
+    return explanations.Evidence.model_validate(record)
 
 
 def test_evidence_contains_every_phase_four_binding():

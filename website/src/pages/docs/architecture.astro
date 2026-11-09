@@ -22,7 +22,7 @@ const layout = [
   ["<code>scmle.integrations</code>", "Optional MLflow and Ray adapters."],
   ["<code>scmle.unsupervised</code>", "Clustering model search and scoring."],
   ["<code>scmle.durability</code>", "Atomic, crash-safe file writes used by the stores."],
-  ["<code>scmle.api</code>", "<code>MLProject</code>, <code>RunResult</code>, <code>load_model</code> and <code>predict</code>."],
+  ["<code>scmle.api</code>", "<code>Project</code>, <code>RunResult</code>, <code>load_model</code> and <code>predict</code>."],
 ];
 ---
 
@@ -50,7 +50,7 @@ const layout = [
   <h2>Three planes, one run</h2>
   <figure class="diagram planes">
     <figcaption class="diagram-caption"><span>THREE PLANES</span><strong>One run, three responsibilities.</strong></figcaption>
-    <div class="plane plane-control"><span>CONTROL PLANE</span><strong>What should happen?</strong><p>MLProject · policies · task · validation · budget</p></div>
+    <div class="plane plane-control"><span>CONTROL PLANE</span><strong>What should happen?</strong><p>Project · policies · task · validation · budget</p></div>
     <div class="plane-connector">↓ declares work</div>
     <div class="plane plane-execution"><span>EXECUTION PLANE</span><strong>What happened?</strong><p>readers · curation · search · workers · checkpoints</p></div>
     <div class="plane-connector">↓ records proof</div>
@@ -92,7 +92,7 @@ const layout = [
 
   <h2 id="layout">Package layout</h2>
   <DocTable label="Package layout" head={["Package", "Responsibility"]} rows={layout} />
-  <p>Extension points are polymorphic: add a <code>TableReader</code>, <code>ColumnKind</code>, <code>SplitStrategy</code>, <code>DataStrategy</code>, <code>ModelAdapter</code>, <code>Optimizer</code>, <code>PlanningRule</code>, <code>SelectionPolicy</code>, <code>Diagnostic</code>, <code>PolicyCheckpoint</code>, <code>ExecutionBackend</code>, <code>ExperimentStore</code>, <code>ServingAdapter</code> or <code>Stage</code> subclass, and no core edit is needed. Third-party adapters can also register through the <code>scmle.models</code> entry-point group and must pass the conformance check. The contracts for these seams are on <a href={`${base}/docs/extensions/`}>Extension contracts</a>; which of them are pinned is on <a href={`${base}/docs/api-stability/`}>API stability</a>.</p>
+  <p>Extension points are polymorphic: add a <code>TableReader</code>, <code>ColumnKind</code>, <code>Partitioner</code>, <code>Strategy</code>, <code>Model</code>, <code>Optimizer</code>, <code>Refiner</code>, <code>Selector</code>, <code>Diagnostic</code>, <code>Reviewer</code>, <code>Executor</code>, <code>ExperimentStore</code>, <code>Server</code> or <code>Stage</code> subclass, and no core edit is needed. Third-party adapters can also register through the <code>scmle.models</code> entry-point group and must pass the conformance check. The contracts for these seams are on <a href={`${base}/docs/extensions/`}>Extension contracts</a>; which of them are pinned is on <a href={`${base}/docs/api-stability/`}>API stability</a>.</p>
 
   <h2 id="known-limits">Known limits</h2>
   <ul>
@@ -103,7 +103,7 @@ const layout = [
     <li>PyTorch and Keras model families ship with the <code>deeplearning</code> extra and run in a separate worker process, because two OpenMP runtimes in one process crash. TabPFN stays extension-only and needs its own licence and token. <code>gpu="required"</code> blocks a run unless PyTorch can see a CUDA device.</li>
     <li>The test-set vault keeps the locked rows out of trial processes. It cannot stop a process from reading the original data file when a path was given, and a caller's own in-memory DataFrame still holds every row.</li>
     <li>Ray and CatBoost have no free-threaded (3.14t) wheels yet.</li>
-    <li>The public API may be called from several threads of one process. Locks are per process, so separate processes that share one registry, journal or run directory are not coordinated, and mutating a shared <code>ModelBundle</code> (<code>calibrate</code>) while others predict is not supported.</li>
+    <li>The public API may be called from several threads of one process. Locks are per process, so separate processes that share one registry, journal or run directory are not coordinated, and mutating a shared <code>Bundle</code> (<code>calibrate</code>) while others predict is not supported.</li>
     <li>On Windows, peak-memory reporting counts this process only (finished child processes are not reported), and the free-threaded build is not tested.</li>
   </ul>
 

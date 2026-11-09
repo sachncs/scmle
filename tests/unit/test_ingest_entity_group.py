@@ -9,7 +9,7 @@ from scmle.data.charter import ingest
 
 
 def spec():
-    return ingest.EntitySpec(
+    return ingest.Entity(
         fields=(ingest.EntityField("name"), ingest.EntityField("email", False)),
         passes=(
             ingest.EntityPass("email"),

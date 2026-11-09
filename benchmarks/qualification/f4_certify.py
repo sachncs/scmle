@@ -56,7 +56,7 @@ SEEDS = (0, 1, 2)
 Z_99 = 2.5758293035489004
 # Fixed in advance: Wilson lower bound of recall at least 0.9, upper bound of
 # the false-alarm rate on clean copies at most 0.05, 95 percent intervals.
-LEAK_POLICY = certificates.CertificationPolicy(0.9, 0.05, 0.95)
+LEAK_POLICY = certificates.Standard(0.9, 0.05, 0.95)
 THRESHOLD_NOISE = 0.25
 NOISY_COPY_NOISE = 0.02
 LOG_ROWS = 1000
@@ -367,7 +367,7 @@ def overwrite_plan(rows: pandas.DataFrame) -> certify.DefectPlan:
     return certify.DefectPlan(asof.DEFECT_TYPE, plant)
 
 
-def certify_asof() -> certificates.DetectorCertificate:
+def certify_asof() -> certificates.Certification:
     """Certifies the as-of reconstruction on synthetic change logs.
 
     Returns:
@@ -482,7 +482,7 @@ def gap_plan() -> certify.DefectPlan:
     return certify.DefectPlan(reconciliation.DEFECT_TYPE, plant)
 
 
-def certify_reconciliation() -> certificates.DetectorCertificate:
+def certify_reconciliation() -> certificates.Certification:
     """Certifies reconciliation on planted unexplained gaps.
 
     Returns:
@@ -525,7 +525,7 @@ def required_defects() -> dict[str, tuple[str, ...]]:
     }
 
 
-def audit_labels(store: certificates.CertificateStore) -> dict[str, list[str]]:
+def audit_labels(store: certificates.Store) -> dict[str, list[str]]:
     """Detector/defect pairs by why they may not gate.
 
     Args:
@@ -553,7 +553,7 @@ def audit_labels(store: certificates.CertificateStore) -> dict[str, list[str]]:
     return found
 
 
-def problems(store: certificates.CertificateStore) -> list[str]:
+def problems(store: certificates.Store) -> list[str]:
     """Why the certificate file is unusable: missing or stale entries.
 
     Args:
@@ -587,7 +587,7 @@ def main(arguments: list[str] | None = None) -> int:
     parser.add_argument("--workers", type=int, default=1)
     options = parser.parse_args(arguments)
     if options.check:
-        store = certificates.CertificateStore.load(STORE_PATH)
+        store = certificates.Store.load(STORE_PATH)
         found = problems(store)
         report = {
             "ok": not found,
@@ -597,9 +597,7 @@ def main(arguments: list[str] | None = None) -> int:
         print(json.dumps(report, indent=2))
         return 1 if found else 0
     cert, measurements = certify_leakage(options.workers)
-    store = certificates.CertificateStore(
-        [cert, certify_asof(), certify_reconciliation()]
-    )
+    store = certificates.Store([cert, certify_asof(), certify_reconciliation()])
     store.save(STORE_PATH)
     MEASUREMENTS_PATH.write_text(
         json.dumps(measurements, indent=2, sort_keys=True) + "\n",

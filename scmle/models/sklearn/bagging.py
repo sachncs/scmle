@@ -24,7 +24,7 @@ MAX_COST = 5
 MEMORY_MULTIPLIER = 3
 
 
-class BaggedAdapter(models.ModelAdapter):
+class Bagging(models.Model):
     """Bags a base model family.
 
     Attributes:
@@ -32,7 +32,7 @@ class BaggedAdapter(models.ModelAdapter):
     """
 
     family = "bagging"
-    base: ClassVar[type[models.ModelAdapter]]
+    base: ClassVar[type[models.Model]]
     search_space = search.SearchSpace(
         (
             search.IntParameter("n_estimators", 10, 60),
@@ -61,7 +61,7 @@ class BaggedAdapter(models.ModelAdapter):
 
     def build(
         self,
-        task: tasks.TaskType,
+        task: tasks.Task,
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
@@ -87,29 +87,29 @@ class BaggedAdapter(models.ModelAdapter):
         return bagger(estimator=member, random_state=seed, n_jobs=1, **bag)
 
 
-class BaggedTreeAdapter(BaggedAdapter):
+class BaggedTree(Bagging):
     """Bagged deep decision trees."""
 
     name = "bagged_decision_tree"
-    base = classical.DecisionTreeAdapter
+    base = classical.DecisionTree
 
 
-class BaggedKnnAdapter(BaggedAdapter):
+class BaggedKnn(Bagging):
     """Bagged nearest neighbours."""
 
     name = "bagged_knn"
-    base = classical.KnnAdapter
+    base = classical.Knn
 
 
-class BaggedLogisticAdapter(BaggedAdapter):
+class BaggedLogistic(Bagging):
     """Bagged logistic regression."""
 
     name = "bagged_logistic_regression"
-    base = classical.LogisticRegressionAdapter
+    base = classical.LogisticRegression
 
 
-BAGGING_ADAPTERS: tuple[type[models.ModelAdapter], ...] = (
-    BaggedTreeAdapter,
-    BaggedKnnAdapter,
-    BaggedLogisticAdapter,
+BAGGING_ADAPTERS: tuple[type[models.Model], ...] = (
+    BaggedTree,
+    BaggedKnn,
+    BaggedLogistic,
 )

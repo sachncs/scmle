@@ -611,7 +611,7 @@ def feature_tests(
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ShiftResult:
+class Shift:
     """The overall verdict of a comparison with a deployment sample.
 
     Attributes:
@@ -649,7 +649,7 @@ class ShiftResult:
         }
 
 
-def unverifiable(reason: str) -> ShiftResult:
+def unverifiable(reason: str) -> Shift:
     """Builds a result that says nothing could be checked, and why.
 
     Args:
@@ -658,7 +658,7 @@ def unverifiable(reason: str) -> ShiftResult:
     Returns:
         An `unverifiable` result with no checks and no column tests.
     """
-    return ShiftResult(Status.UNVERIFIABLE, reason, None, None, (), None)
+    return Shift(Status.UNVERIFIABLE, reason, None, None, (), None)
 
 
 def assess(
@@ -671,7 +671,7 @@ def assess(
     delta: float = 0.0,
     c2st_gate: certificates.GateStatus = certificates.GateStatus.DESCRIPTIVE,
     mmd_gate: certificates.GateStatus = certificates.GateStatus.DESCRIPTIVE,
-) -> ShiftResult:
+) -> Shift:
     """Compares exploration rows with a deployment sample.
 
     Without a reference the result is `unverifiable`, never `pass`. The status
@@ -719,7 +719,7 @@ def assess(
     agree = (first.p_value is not None and first.p_value <= alpha) == (
         second.p_value is not None and second.p_value <= alpha
     )
-    return ShiftResult(
+    return Shift(
         Status.FAIL if fired else Status.PASS,
         "the classifier can tell the two samples apart"
         if fired

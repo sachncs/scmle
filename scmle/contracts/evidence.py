@@ -13,7 +13,7 @@ from typing import Self
 from scmle.contracts import signing
 
 
-class EvidenceResult(enum.StrEnum):
+class Outcome(enum.StrEnum):
     """Observed result of one release criterion."""
 
     PASS = "pass"  # nosec B105 - evidence status, not a credential
@@ -21,7 +21,7 @@ class EvidenceResult(enum.StrEnum):
     WAIVED = "waived"
 
 
-class EvidenceDecision(enum.StrEnum):
+class Disposition(enum.StrEnum):
     """Release disposition of an evidence record."""
 
     REQUIRED = "required"
@@ -49,7 +49,7 @@ def require_text(value: str, field_name: str) -> str:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class EvidenceRecord:
+class Record:
     """One independently reviewable release claim.
 
     Attributes:
@@ -72,11 +72,11 @@ class EvidenceRecord:
     raw_inputs: Mapping[str, str]
     command_or_test: str
     artifact: Mapping[str, str]
-    result: EvidenceResult
+    result: Outcome
     reviewer: str
     observed_at: str
     limitations: tuple[str, ...]
-    decision: EvidenceDecision
+    decision: Disposition
 
     def __post_init__(self) -> None:
         """Validates the release-proof boundary.
@@ -105,12 +105,10 @@ class EvidenceRecord:
             raise ValueError("limitations must state known uncertainty")
         if not all(item.strip() for item in self.limitations):
             raise ValueError("limitations must not contain empty values")
-        if not isinstance(self.result, EvidenceResult):
-            object.__setattr__(self, "result", EvidenceResult(self.result))
-        if not isinstance(self.decision, EvidenceDecision):
-            object.__setattr__(
-                self, "decision", EvidenceDecision(self.decision)
-            )
+        if not isinstance(self.result, Outcome):
+            object.__setattr__(self, "result", Outcome(self.result))
+        if not isinstance(self.decision, Disposition):
+            object.__setattr__(self, "decision", Disposition(self.decision))
         timestamp = datetime.datetime.fromisoformat(
             self.observed_at.replace("Z", "+00:00")
         )
@@ -150,20 +148,20 @@ class EvidenceRecord:
             raw_inputs=dict(record["raw_inputs"]),
             command_or_test=str(record["command_or_test"]),
             artifact=dict(record["artifact"]),
-            result=EvidenceResult(record["result"]),
+            result=Outcome(record["result"]),
             reviewer=str(record["reviewer"]),
             observed_at=str(record["observed_at"]),
             limitations=tuple(record["limitations"]),
-            decision=EvidenceDecision(record["decision"]),
+            decision=Disposition(record["decision"]),
         )
 
 
-class EvidenceIndex:
+class Index:
     """Deterministic collection of unique release evidence records."""
 
     def __init__(
         self,
-        records: Iterable[EvidenceRecord] = (),
+        records: Iterable[Record] = (),
         signature: str | None = None,
     ) -> None:
         """Creates an index and registers the supplied records.
@@ -176,14 +174,14 @@ class EvidenceIndex:
             records: The evidence records to register.
             signature: The index signature, if it is already signed.
         """
-        self.records: dict[str, EvidenceRecord] = {}
+        self.records: dict[str, Record] = {}
         self.signature = signature
         if signature is not None:
             require_text(signature, "signature")
         for record in records:
             self.register(record)
 
-    def register(self, record: EvidenceRecord) -> None:
+    def register(self, record: Record) -> None:
         """Registers one criterion without silently replacing evidence.
 
         Args:
@@ -201,7 +199,7 @@ class EvidenceIndex:
             )
         self.records[record.criterion_id] = record
 
-    def find(self, criterion_id: str) -> EvidenceRecord | None:
+    def find(self, criterion_id: str) -> Record | None:
         """Returns a criterion record, or ``None`` when it is absent.
 
         Args:
@@ -212,16 +210,16 @@ class EvidenceIndex:
         """
         return self.records.get(criterion_id)
 
-    def pending(self) -> tuple[EvidenceRecord, ...]:
+    def pending(self) -> tuple[Record, ...]:
         """Returns records that cannot yet support an accepted release."""
         return tuple(
             record
             for record in self.ordered()
-            if record.result is not EvidenceResult.PASS
-            or record.decision is not EvidenceDecision.ACCEPTED
+            if record.result is not Outcome.PASS
+            or record.decision is not Disposition.ACCEPTED
         )
 
-    def ordered(self) -> tuple[EvidenceRecord, ...]:
+    def ordered(self) -> tuple[Record, ...]:
         """Returns records in deterministic criterion order."""
         return tuple(self.records[key] for key in sorted(self.records))
 
@@ -310,7 +308,7 @@ class EvidenceIndex:
                 str(signature_record.get("value", "")),
                 "signature",
             )
-        index = cls(EvidenceRecord.from_dict(item) for item in raw_records)
+        index = cls(Record.from_dict(item) for item in raw_records)
         index.signature = signature
         return index
 

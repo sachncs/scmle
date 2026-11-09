@@ -5,12 +5,12 @@ module adds the pull side, with the standard library only:
 
 * `discover` reads an OpenID Connect discovery document and checks that its
   `issuer` is exactly the issuer asked for;
-* `RemoteKeySet` is a key set backed by a JWKS URL: cached for `ttl`
+* `KeySet` is a key set backed by a JWKS URL: cached for `ttl`
   seconds, refetched once for an unknown `kid` (at most every `min_refresh`
   seconds, so a stream of forged `kid` values cannot drive fetches), served
   stale for at most `max_stale` seconds when the source is down, and after
   that trusting nothing (`KEYS_UNAVAILABLE`);
-* `RemoteRevocations` is a callable for `TokenVerifier(revocations=...)`:
+* `Revocations` is a callable for `Verifier(revocations=...)`:
   every replica that pulls the same URL sees a new revocation within `ttl`
   seconds plus its fetch time. When the source stays down past `max_stale`
   seconds the verifier raises `REVOCATION_UNAVAILABLE` and accepts no token
@@ -121,7 +121,7 @@ def discover(
     return document
 
 
-class RemoteKeySet(tokens.KeySet):
+class KeySet(tokens.KeySet):
     """A key set that refreshes itself from a JWKS URL.
 
     Attributes:
@@ -205,7 +205,7 @@ class RemoteKeySet(tokens.KeySet):
         self.fetched_at = self.clock()
         return True
 
-    def get(self, kid: str) -> tokens.VerificationKey:
+    def get(self, kid: str) -> tokens.Key:
         """Looks up the key with this id, refreshing the set when it is due.
 
         The set is refetched when it is `ttl` seconds old or more, and for
@@ -234,8 +234,8 @@ class RemoteKeySet(tokens.KeySet):
         return super().get(kid)
 
 
-class RemoteRevocations:
-    """A pulled revocation list, usable as `TokenVerifier(revocations=...)`.
+class Revocations:
+    """A pulled revocation list, usable as `Verifier(revocations=...)`.
 
     Attributes:
         url: Where the revocation document is served.

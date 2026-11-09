@@ -14,8 +14,8 @@ import pyarrow.parquet
 import pytest
 
 from scmle.contracts import errors
-from scmle.data import readers
 from scmle.data.readers import streaming
+import scmle.data.readers.streaming
 
 
 def write_parquet(path, rows, columns=6, chunk=100_000, seed=0):
@@ -168,9 +168,17 @@ def write_stream_csv(path):
 
 
 def test_transactional_streaming_contracts_are_public_reader_exports():
-    assert readers.TransactionalSink is streaming.TransactionalSink
-    assert readers.SinkCommitReceipt is streaming.SinkCommitReceipt
-    assert readers.StreamCommitEvidence is streaming.StreamCommitEvidence
+    assert (
+        scmle.data.readers.streaming.TransactionalSink
+        is streaming.TransactionalSink
+    )
+    assert (
+        scmle.data.readers.streaming.SinkCommitReceipt
+        is streaming.SinkCommitReceipt
+    )
+    assert (
+        scmle.data.readers.streaming.CommitEvidence is streaming.CommitEvidence
+    )
 
 
 class RecordingSink(streaming.TransactionalSink):
@@ -225,9 +233,9 @@ def test_transactional_sink_binds_receipt_ack_and_checkpoint_durably(
     path = tmp_path / "events.csv"
     write_stream_csv(path)
     source = streaming.CsvChunks(path)
-    ledger = streaming.StreamingLedger(tmp_path / "state.json", source)
+    ledger = streaming.CommitLedger(tmp_path / "state.json", source)
     batch = ledger.read_batch(rows=2, watermark_column="event_time")
-    acknowledgement = streaming.StreamAcknowledgement(
+    acknowledgement = streaming.Acknowledgement(
         batch.source_identity,
         "events-consumer",
         batch.batch_id,
@@ -242,7 +250,7 @@ def test_transactional_sink_binds_receipt_ack_and_checkpoint_durably(
     sink = RecordingSink(sink_receipt)
 
     first = ledger.commit_transaction(batch, sink, acknowledgement)
-    reopened = streaming.StreamingLedger(ledger.path, source)
+    reopened = streaming.CommitLedger(ledger.path, source)
     retry_sink = RecordingSink(sink_receipt)
     second = reopened.commit_transaction(batch, retry_sink, acknowledgement)
     durable = json.loads(ledger.path.read_text(encoding="utf-8"))
@@ -275,9 +283,9 @@ def test_transactional_sink_rejects_receipts_not_bound_to_the_batch(
     path = tmp_path / "events.csv"
     write_stream_csv(path)
     source = streaming.CsvChunks(path)
-    ledger = streaming.StreamingLedger(tmp_path / "state.json", source)
+    ledger = streaming.CommitLedger(tmp_path / "state.json", source)
     batch = ledger.read_batch(rows=2)
-    acknowledgement = streaming.StreamAcknowledgement(
+    acknowledgement = streaming.Acknowledgement(
         batch.source_identity,
         "events-consumer",
         batch.batch_id,
@@ -324,9 +332,9 @@ def test_writer_commit_preserves_previous_transaction_evidence(tmp_path):
     path = tmp_path / "events.csv"
     write_stream_csv(path)
     source = streaming.CsvChunks(path)
-    ledger = streaming.StreamingLedger(tmp_path / "state.json", source)
+    ledger = streaming.CommitLedger(tmp_path / "state.json", source)
     first_batch = ledger.read_batch(rows=2)
-    acknowledgement = streaming.StreamAcknowledgement(
+    acknowledgement = streaming.Acknowledgement(
         first_batch.source_identity,
         "events-consumer",
         first_batch.batch_id,
@@ -347,7 +355,7 @@ def test_writer_commit_preserves_previous_transaction_evidence(tmp_path):
     second_batch = ledger.read_batch(rows=2)
     ledger.commit_with_writer(second_batch, lambda frame, batch_id: None)
 
-    reopened = streaming.StreamingLedger(ledger.path, source)
+    reopened = streaming.CommitLedger(ledger.path, source)
     retry_sink = RecordingSink(sink_receipt)
     duplicate = reopened.commit_transaction(
         first_batch,
@@ -363,7 +371,7 @@ def test_stream_ledger_commits_idempotently_and_persists_checkpoint(tmp_path):
     path = tmp_path / "events.csv"
     write_stream_csv(path)
     source = streaming.CsvChunks(path)
-    ledger = streaming.StreamingLedger(tmp_path / "state.json", source)
+    ledger = streaming.CommitLedger(tmp_path / "state.json", source)
     batch = ledger.read_batch(rows=2, watermark_column="event_time")
     written = []
 
@@ -373,7 +381,7 @@ def test_stream_ledger_commits_idempotently_and_persists_checkpoint(tmp_path):
     second = ledger.commit_with_writer(
         batch, lambda frame, key: written.append((frame.copy(), key))
     )
-    reopened = streaming.StreamingLedger(ledger.path, source)
+    reopened = streaming.CommitLedger(ledger.path, source)
 
     assert first.accepted and not first.duplicate
     assert second.duplicate and not second.accepted
@@ -402,8 +410,8 @@ def test_stream_consumer_retries_ack_after_restart_without_replaying_writer(
             raise OSError("transport unavailable")
         acknowledgements.append(acknowledgement)
 
-    first_consumer = streaming.StreamingConsumer(
-        streaming.StreamingLedger(ledger_path, source),
+    first_consumer = streaming.Consumer(
+        streaming.CommitLedger(ledger_path, source),
         "events-consumer",
         writer,
         flaky_ack,
@@ -414,8 +422,8 @@ def test_stream_consumer_retries_ack_after_restart_without_replaying_writer(
     assert len(written) == 1
     assert first_consumer.ledger.pending_acknowledgement_path.exists()
 
-    restarted = streaming.StreamingConsumer(
-        streaming.StreamingLedger(ledger_path, source),
+    restarted = streaming.Consumer(
+        streaming.CommitLedger(ledger_path, source),
         "events-consumer",
         writer,
         flaky_ack,
@@ -435,7 +443,7 @@ def test_stream_ledger_refuses_a_changed_source_snapshot(tmp_path):
     path = tmp_path / "events.csv"
     write_stream_csv(path)
     source = streaming.CsvChunks(path)
-    ledger = streaming.StreamingLedger(tmp_path / "state.json", source)
+    ledger = streaming.CommitLedger(tmp_path / "state.json", source)
     batch = ledger.read_batch(rows=2)
     ledger.commit_with_writer(batch, lambda frame, key: None)
 

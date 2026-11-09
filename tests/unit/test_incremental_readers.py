@@ -8,7 +8,7 @@ from scmle.data.readers import incremental
 
 
 def event(event_id, sequence, minute, value=None):
-    return incremental.IncrementalEvent(
+    return incremental.Event(
         event_id=event_id,
         sequence=sequence,
         event_time=f"2026-10-20T10:{minute:02d}:00+00:00",
@@ -44,7 +44,7 @@ def test_ingestion_ledger_commits_atomically_and_retries_idempotently(tmp_path):
     source = incremental.SequenceEventSource(
         "memory://events", [event("a", 1, 0), event("b", 2, 1)]
     )
-    ledger = incremental.IncrementalIngestionLedger(
+    ledger = incremental.IngestionLedger(
         tmp_path / "ingestion.json", source.source_identity
     )
 
@@ -52,7 +52,7 @@ def test_ingestion_ledger_commits_atomically_and_retries_idempotently(tmp_path):
     committed = ledger.commit(batch)
     retried = ledger.commit(batch)
     next_batch = ledger.read_batch(source)
-    reopened = incremental.IncrementalIngestionLedger(
+    reopened = incremental.IngestionLedger(
         ledger.path, source.source_identity
     ).load()
 
@@ -73,10 +73,10 @@ def test_late_data_policy_is_explicit():
     )
 
     dropped = incremental.SequenceEventSource(
-        "memory://events", records, incremental.LateDataPolicy.DROP
+        "memory://events", records, incremental.LateData.DROP
     ).read_events(checkpoint)
     accepted = incremental.SequenceEventSource(
-        "memory://events", records, incremental.LateDataPolicy.ACCEPT
+        "memory://events", records, incremental.LateData.ACCEPT
     ).read_events(checkpoint)
 
     assert dropped.event_ids == ("fresh",)
@@ -85,7 +85,7 @@ def test_late_data_policy_is_explicit():
     assert accepted.next_checkpoint.sequence == 3
     with pytest.raises(incremental.IncrementalError, match="older"):
         incremental.SequenceEventSource(
-            "memory://events", records, incremental.LateDataPolicy.REJECT
+            "memory://events", records, incremental.LateData.REJECT
         ).read_events(checkpoint)
 
 
@@ -93,7 +93,7 @@ def test_accepting_only_late_events_never_moves_the_checkpoint_back():
     source = incremental.SequenceEventSource(
         "memory://events",
         [event("late", 1, 0)],
-        incremental.LateDataPolicy.ACCEPT,
+        incremental.LateData.ACCEPT,
     )
     checkpoint = incremental.EventCheckpoint(
         source.source_identity,
@@ -182,7 +182,7 @@ def test_incremental_state_rejects_cross_source_reads_and_commits(tmp_path):
     second = incremental.SequenceEventSource(
         "memory://second", [event("b", 1, 0)]
     )
-    ledger = incremental.IncrementalIngestionLedger(
+    ledger = incremental.IngestionLedger(
         tmp_path / "ingestion.json", first.source_identity
     )
 
@@ -205,7 +205,7 @@ def test_idempotent_sink_commit_filters_duplicates_and_persists_receipt(
     source = incremental.SequenceEventSource(
         "memory://events", [event("a", 1, 0), event("b", 2, 1)]
     )
-    ledger = incremental.IncrementalIngestionLedger(
+    ledger = incremental.IngestionLedger(
         tmp_path / "sink.json", source.source_identity
     )
     written = []
@@ -230,11 +230,11 @@ def test_idempotent_sink_keeps_state_unchanged_when_writer_fails(tmp_path):
     source = incremental.SequenceEventSource(
         "memory://events", [event("a", 1, 0)]
     )
-    ledger = incremental.IncrementalIngestionLedger(
+    ledger = incremental.IngestionLedger(
         tmp_path / "sink.json", source.source_identity
     )
 
-    def fail(events: tuple[incremental.IncrementalEvent, ...]):
+    def fail(events: tuple[incremental.Event, ...]):
         del events
         raise OSError("sink unavailable")
 
@@ -250,7 +250,7 @@ def test_event_consumer_commits_before_acknowledging(tmp_path):
     source = incremental.SequenceEventSource(
         "memory://events", [event("a", 1, 0), event("b", 2, 1)]
     )
-    ledger = incremental.IncrementalIngestionLedger(
+    ledger = incremental.IngestionLedger(
         tmp_path / "consumer.json", source.source_identity
     )
     written = []
@@ -279,7 +279,7 @@ def test_event_consumer_retries_ack_without_replaying_the_sink(tmp_path):
     source = incremental.SequenceEventSource(
         "memory://events", lambda: tuple(available)
     )
-    ledger = incremental.IncrementalIngestionLedger(
+    ledger = incremental.IngestionLedger(
         tmp_path / "consumer.json", source.source_identity
     )
     written = []
@@ -315,11 +315,9 @@ def test_event_consumer_retries_ack_without_replaying_the_sink(tmp_path):
 
 def test_event_contract_rejects_naive_timestamps_and_invalid_sequences():
     with pytest.raises(ValueError, match="timezone"):
-        event_value = incremental.IncrementalEvent(
+        event_value = incremental.Event(
             "a", 1, "2026-10-20T10:00:00", {"value": 1}
         )
         del event_value
     with pytest.raises(ValueError, match="positive"):
-        incremental.IncrementalEvent(
-            "a", 0, "2026-10-20T10:00:00+00:00", {"value": 1}
-        )
+        incremental.Event("a", 0, "2026-10-20T10:00:00+00:00", {"value": 1})

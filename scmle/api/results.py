@@ -26,7 +26,7 @@ LEADERBOARD_DETAILS = (
 
 
 @dataclasses.dataclass(slots=True)
-class RunResult:
+class Run:
     """Everything a completed run produced.
 
     Attributes:
@@ -47,16 +47,16 @@ class RunResult:
     run_id: str
     run_dir: pathlib.Path
     state: str
-    plan: experiments.ExperimentPlan
+    plan: experiments.Plan
     profile: scmle.contracts.data.DatasetProfile
-    trials: list[experiments.TrialResult]
+    trials: list[experiments.Trial]
     selected_model: str
     evaluation: dict[str, Any]
-    bundle: scmle.artifacts.bundle.ModelBundle
+    bundle: scmle.artifacts.bundle.Bundle
     diagnostics: dict[str, dict[str, Any]] = dataclasses.field(
         default_factory=dict
     )
-    estimation: parameter_estimation.EstimationResult | None = None
+    estimation: parameter_estimation.Estimation | None = None
 
     def feature_importance(self) -> pandas.DataFrame:
         """Returns permutation importance, most important feature first.
@@ -70,7 +70,7 @@ class RunResult:
         report = self.diagnostics.get("permutation_importance", {})
         return pandas.DataFrame(report.get("features", []))
 
-    def health_label(self, trial: experiments.TrialResult) -> str:
+    def health_label(self, trial: experiments.Trial) -> str:
         """Gives the fit-health verdict of a trial.
 
         Args:
@@ -121,7 +121,7 @@ class RunResult:
         """
         return interchange.to_arrow(self.leaderboard())
 
-    def load_best_model(self) -> scmle.artifacts.bundle.ModelBundle:
+    def load_best_model(self) -> scmle.artifacts.bundle.Bundle:
         """Returns the packaged best model.
 
         Returns:

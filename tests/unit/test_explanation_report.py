@@ -8,9 +8,9 @@ from scmle.contracts import explanations
 
 def evidence(
     *, decision: explanations.PrivacyStatus = "allowed", output: object
-) -> explanations.ExplanationEvidence:
+) -> explanations.Evidence:
     """Builds a compact explanation record for renderer tests."""
-    return explanations.ExplanationEvidence(
+    return explanations.Evidence(
         model_fingerprint="model-123",
         bundle_digest="sha256:bundle-123",
         input_fingerprint="input-123",
@@ -22,7 +22,7 @@ def evidence(
         feature_graph=explanations.FeatureGraphReference(
             version=1, fingerprint="graph-123"
         ),
-        method=explanations.ExplanationMethod(
+        method=explanations.Method(
             name="permutation_importance", parameters={"repeats": 5}
         ),
         output=output,
@@ -46,7 +46,7 @@ def evidence(
 
 
 def test_renderer_escapes_output_and_keeps_links_non_navigable():
-    rendered = explanation_report.ExplanationHtmlReport().render(
+    rendered = explanation_report.Renderer().render(
         evidence(output={"text": "<script>alert('&')</script>"})
     )
 
@@ -58,7 +58,7 @@ def test_renderer_escapes_output_and_keeps_links_non_navigable():
 
 
 def test_renderer_withholds_denied_output():
-    rendered = explanation_report.ExplanationHtmlReport().render(
+    rendered = explanation_report.Renderer().render(
         evidence(decision="denied", output={"secret": "do-not-render"})
     )
 

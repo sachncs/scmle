@@ -2,7 +2,7 @@
 
 `Path.write_text` and a text-mode `open` translate "\\n" to "\\r\\n" on
 Windows unless `newline="\\n"` is given. The project's own wrappers
-(`RunStore.write_text(relative, text)`, `RunContext.write_text`) already write
+(`RunStore.write_text(relative, text)`, `Context.write_text`) already write
 LF; a call with two positional arguments, the second not a string literal, is
 one of those and is not checked. The bytes of a written file then
 differ between platforms while the in-memory hashes agree, which broke the

@@ -57,7 +57,7 @@ def lifecycle(final: str = "COMPLETED") -> list[dict[str, Any]]:
     return [event(i, f"state.{name}") for i, name in enumerate(names)]
 
 
-def codes(report: audit.AuditReport) -> list[str]:
+def codes(report: audit.Audit) -> list[str]:
     """Return the finding codes of a report."""
     return [finding.code for finding in report.findings]
 

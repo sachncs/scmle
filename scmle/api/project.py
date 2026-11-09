@@ -1,4 +1,4 @@
-"""Public API: `MLProject(...).plan()`, `.run()`, `result.predict()`."""
+"""Public API: `Project(...).plan()`, `.run()`, `result.predict()`."""
 
 import contextlib
 import dataclasses
@@ -87,8 +87,8 @@ PARAMETER_ESTIMATION_DECLARATION_SCHEMA = 1
 
 
 def build_parameter_estimation_declaration(
-    estimand: parameter_estimation.EstimandSpec | None,
-    policy: parameter_estimation.EstimationPolicy | None,
+    estimand: parameter_estimation.Estimand | None,
+    policy: parameter_estimation.Config | None,
 ) -> dict[str, Any]:
     """Builds the explicit scientific declaration stored with a run.
 
@@ -146,8 +146,8 @@ def restore_parameter_estimation_declaration(
     run_directory: str | pathlib.Path,
     expected_config_hash: str,
 ) -> tuple[
-    parameter_estimation.EstimandSpec | None,
-    parameter_estimation.EstimationPolicy | None,
+    parameter_estimation.Estimand | None,
+    parameter_estimation.Config | None,
 ]:
     """Validates and reconstructs the scientific declaration for resume.
 
@@ -237,7 +237,7 @@ def restore_parameter_estimation_declaration(
         )
     try:
         estimand_record = envelope["estimand"]
-        estimand = parameter_estimation.EstimandSpec(
+        estimand = parameter_estimation.Estimand(
             name=estimand_record["name"],
             outcome=estimand_record["outcome"],
             population=estimand_record["population"],
@@ -268,7 +268,7 @@ def restore_parameter_estimation_declaration(
             policy_values["reml_variance_bounds"] = tuple(
                 policy_values["reml_variance_bounds"]
             )
-        policy = parameter_estimation.EstimationPolicy(**policy_values)
+        policy = parameter_estimation.Config(**policy_values)
     except (KeyError, TypeError, ValueError) as error:
         raise errors.ArtifactError(
             "parameter estimation declaration is invalid",
@@ -280,7 +280,7 @@ def restore_parameter_estimation_declaration(
 def bind_parameter_estimation_evidence(
     run_directory: pathlib.Path,
     artifact: pathlib.Path,
-    estimation: parameter_estimation.EstimationResult,
+    estimation: parameter_estimation.Estimation,
 ) -> None:
     """Binds a verified parameter report into the run evidence graph.
 
@@ -300,7 +300,7 @@ def bind_parameter_estimation_evidence(
             node. A missing or corrupt graph file raises from the loader.
     """
     graph_path = run_directory / "evidence_graph.json"
-    graph = evidence.InferenceEvidenceLinker.load(graph_path)
+    graph = evidence.Linker.load(graph_path)
     evaluation_node = graph.nodes.get("evaluation")
     snapshot_node = graph.nodes.get("snapshot")
     if evaluation_node is None or snapshot_node is None:
@@ -311,19 +311,19 @@ def bind_parameter_estimation_evidence(
     nodes = [
         node for node_id, node in graph.nodes.items() if node_id != "evaluation"
     ]
-    updated = lineage.EvidenceGraph(nodes)
+    updated = lineage.Graph(nodes)
     updated.add_node(
-        lineage.EvidenceNode(
+        lineage.Node(
             "evaluation",
-            lineage.EvidenceNodeKind.EVALUATION,
+            lineage.Kind.EVALUATION,
             bundle.file_sha256(run_directory / "evaluation.json"),
             {"artifact": "evaluation.json"},
         )
     )
     updated.add_node(
-        lineage.EvidenceNode(
+        lineage.Node(
             "parameter-estimation",
-            lineage.EvidenceNodeKind.PARAMETER_ESTIMATION,
+            lineage.Kind.PARAMETER_ESTIMATION,
             estimation.digest(),
             {
                 "artifact": artifact.name,
@@ -335,19 +335,19 @@ def bind_parameter_estimation_evidence(
     for edge in graph.edges:
         updated.add_edge(edge)
     updated.add_edge(
-        lineage.EvidenceEdge("snapshot", "parameter-estimation", "estimates")
+        lineage.Edge("snapshot", "parameter-estimation", "estimates")
     )
     updated.add_edge(
-        lineage.EvidenceEdge("evaluation", "parameter-estimation", "records")
+        lineage.Edge("evaluation", "parameter-estimation", "records")
     )
     record = updated.to_dict()
     record["graph_digest"] = updated.digest()
-    evidence.InferenceEvidenceLinker.write_atomically(graph_path, record)
+    evidence.Linker.write_atomically(graph_path, record)
 
 
 def persist_parameter_estimation_evidence(
-    result: results.RunResult,
-    estimation: parameter_estimation.EstimationResult,
+    result: results.Run,
+    estimation: parameter_estimation.Estimation,
 ) -> None:
     """Persists and binds a verified parameter report to a run result.
 
@@ -367,7 +367,7 @@ def persist_parameter_estimation_evidence(
     artifact = result.run_dir / "parameter_estimation.json"
     expected_digest = estimation.write(artifact)
     try:
-        verified = parameter_estimation.EstimationResult.read(artifact)
+        verified = parameter_estimation.Estimation.read(artifact)
     except (OSError, TypeError, ValueError, KeyError) as error:
         raise errors.ArtifactError(
             "parameter estimation artifact cannot be read",
@@ -415,10 +415,10 @@ def persist_parameter_estimation_evidence(
 
 def estimate_parameters_for_project(
     orchestrator: scmle.core.orchestrator.Orchestrator,
-    estimand: parameter_estimation.EstimandSpec,
-    policy: parameter_estimation.EstimationPolicy,
+    estimand: parameter_estimation.Estimand,
+    policy: parameter_estimation.Config,
     artifact_directory: str | pathlib.Path | None = None,
-) -> parameter_estimation.EstimationResult:
+) -> parameter_estimation.Estimation:
     """Estimates the declared parameters against an orchestrator dataset.
 
     Args:
@@ -536,11 +536,11 @@ def estimate_parameters_for_project(
             pathlib.Path(artifact_directory) / "parameter_estimation.json"
         )
         estimation.write(artifact)
-        estimation = parameter_estimation.EstimationResult.read(artifact)
+        estimation = parameter_estimation.Estimation.read(artifact)
     return estimation
 
 
-class MLProject:
+class Project:
     """A declarative ML project over a tabular dataset.
 
     Attributes:
@@ -600,17 +600,17 @@ class MLProject:
         folds: int = 5,
         test_fraction: float = 0.2,
         seed: int = 42,
-        search: tasks.SearchSpec | None = None,
-        strategies: tasks.StrategySpec | None = None,
-        models: tasks.ModelSpec | None = None,
-        ensemble: tasks.EnsembleSpec | None = None,
-        feature_graph: tasks.FeatureGraphSpec | None = None,
-        selection: tasks.SelectionSpec | None = None,
-        decision: tasks.DecisionSpec | None = None,
-        fairness: tasks.FairnessSpec | None = None,
-        problem: tasks.ProblemSpec | None = None,
-        estimand: parameter_estimation.EstimandSpec | None = None,
-        estimation_policy: parameter_estimation.EstimationPolicy | None = None,
+        search: tasks.Search | None = None,
+        strategies: tasks.Strategies | None = None,
+        models: tasks.Candidates | None = None,
+        ensemble: tasks.Stacking | None = None,
+        feature_graph: tasks.FeatureGraph | None = None,
+        selection: tasks.Selection | None = None,
+        decision: tasks.Threshold | None = None,
+        fairness: tasks.Parity | None = None,
+        problem: tasks.Problem | None = None,
+        estimand: parameter_estimation.Estimand | None = None,
+        estimation_policy: parameter_estimation.Config | None = None,
         leakage_policy: LeakagePolicy = "warn",
         charter: str | pathlib.Path | None = None,
         leakage_attestations: str | pathlib.Path | None = None,
@@ -622,7 +622,7 @@ class MLProject:
         propensity_column: str | None = None,
         logged_action_column: str | None = None,
         ingest_plan: str | pathlib.Path | None = None,
-        checkpoints: tuple[policies.PolicyCheckpoint, ...] = (),
+        checkpoints: tuple[policies.Reviewer, ...] = (),
         output_dir: str | pathlib.Path = "runs",
     ) -> None:
         """Defines a project.
@@ -676,7 +676,7 @@ class MLProject:
             query_column: For `task="ranking"`, the column identifying each
                 row's query; the target is the relevance grade.
             memory_budget_gb: Largest in-memory size of the dataset; a bigger
-                Parquet / CSV file is streamed (see `DataSpec`).
+                Parquet / CSV file is streamed (see `Dataset`).
             training: `sample` or `stream` for a streamed file.
             treatment_column: For `task="uplift"`, the 0/1 column saying whether
                 a row was treated; the target is the outcome.
@@ -712,11 +712,11 @@ class MLProject:
             test_fraction: Share of rows locked away for the final test.
             seed: Random seed.
             search: Hyperparameter search settings; defaults to a small pruned
-                random search. Use `SearchSpec(top_models=0)` to disable tuning.
+                random search. Use `Search(top_models=0)` to disable tuning.
             strategies: Which data strategies to evaluate; defaults to all. Use
-                `StrategySpec(top_models=0)` to disable.
+                `Strategies(top_models=0)` to disable.
             models: Model names and families to exclude.
-            ensemble: Stacking settings; `EnsembleSpec(size=0)` disables.
+            ensemble: Stacking settings; `Stacking(size=0)` disables.
             feature_graph: Declarative derived features (row-wise, fitted and
                 time-series operations), versioned with the configuration.
             selection: Serving constraints (max model size, p95 latency).
@@ -773,8 +773,8 @@ class MLProject:
             if interchange.is_tabular(data)
             else None
         )
-        self.spec = tasks.ProjectSpec(
-            data=tasks.DataSpec(
+        self.spec = tasks.Config(
+            data=tasks.Dataset(
                 uri="<in-memory>" if frame is not None else str(data),
                 target=target if isinstance(target, str) else target[0],
                 modality=modality,
@@ -816,7 +816,7 @@ class MLProject:
             ),
             task=task,
             metric=metric,
-            validation=tasks.ValidationSpec(
+            validation=tasks.Validation(
                 strategy=validation,
                 embargo_rows=embargo_rows,
                 horizon_rows=horizon_rows,
@@ -825,7 +825,7 @@ class MLProject:
                 test_fraction=test_fraction,
                 seed=seed,
             ),
-            resources=tasks.ResourceSpec(
+            resources=tasks.Resources(
                 time_budget_seconds=time_budget,
                 workers=workers,
                 enforcement=enforcement,
@@ -833,15 +833,15 @@ class MLProject:
                 cluster_address=cluster_address,
                 memory_limit_gb=memory_limit_gb,
             ),
-            search=search or tasks.SearchSpec(),
-            strategies=strategies or tasks.StrategySpec(),
-            models=models or tasks.ModelSpec(),
-            ensemble=ensemble or tasks.EnsembleSpec(),
-            feature_graph=feature_graph or tasks.FeatureGraphSpec(),
-            selection=selection or tasks.SelectionSpec(),
-            decision=decision or tasks.DecisionSpec(),
-            fairness=fairness or tasks.FairnessSpec(),
-            problem=problem or tasks.ProblemSpec(),
+            search=search or tasks.Search(),
+            strategies=strategies or tasks.Strategies(),
+            models=models or tasks.Candidates(),
+            ensemble=ensemble or tasks.Stacking(),
+            feature_graph=feature_graph or tasks.FeatureGraph(),
+            selection=selection or tasks.Selection(),
+            decision=decision or tasks.Threshold(),
+            fairness=fairness or tasks.Parity(),
+            problem=problem or tasks.Problem(),
             leakage_policy=leakage_policy,
             charter_path=None if charter is None else str(charter),
             leakage_attestations=(
@@ -864,7 +864,7 @@ class MLProject:
         self.orchestrator.tracking_path = self.output_dir / "experiments.sqlite"
         self.profile: scmle.contracts.data.DatasetProfile | None = None
 
-    def plan(self) -> experiments.ExperimentPlan:
+    def plan(self) -> experiments.Plan:
         """Analyzes the data and proposes a workflow; trains nothing.
 
         Returns:
@@ -892,9 +892,7 @@ class MLProject:
         finally:
             context.close()
 
-    def run(
-        self, plan: experiments.ExperimentPlan | None = None
-    ) -> results.RunResult:
+    def run(self, plan: experiments.Plan | None = None) -> results.Run:
         """Executes the workflow.
 
         If an estimand and policy were declared, the parameter estimation runs
@@ -923,7 +921,7 @@ class MLProject:
 
     def estimate_parameters(
         self, artifact_directory: str | pathlib.Path | None = None
-    ) -> parameter_estimation.EstimationResult:
+    ) -> parameter_estimation.Estimation:
         """Estimates declared parameters without changing model selection.
 
         The estimation track is intentionally separate from the model selection
@@ -960,7 +958,7 @@ class MLProject:
         cls,
         run_directory: str | pathlib.Path,
         data: pandas.DataFrame | None = None,
-    ) -> results.RunResult:
+    ) -> results.Run:
         """Continues an interrupted run from its saved configuration.
 
         Completed trials are reused; the rest are computed. The saved
@@ -1045,8 +1043,8 @@ class MLProject:
 class ModalityProject:
     """Runs a typed non-tabular dataset through the shared lifecycle.
 
-    ``MLProject`` remains the supported tabular beta surface. This project
-    surface accepts a concrete ``ModalityAdapter`` for experimental text,
+    ``Project`` remains the supported tabular beta surface. This project
+    surface accepts a concrete ``Preparer`` for experimental text,
     document, image, audio, video, graph, geospatial-vector, or raster data. It
     gives those datasets the same curation, explainability, packaging,
     inference, monitoring, documentation, and recovery evidence without
@@ -1072,17 +1070,17 @@ class ModalityProject:
 
     def __init__(
         self,
-        adapter: modality_lifecycle.ModalityAdapter,
+        adapter: modality_lifecycle.Preparer,
         signing_key: str | bytes,
         *,
         output_dir: str | pathlib.Path = "runs",
         seed: int = 42,
-        observed_adapter: modality_lifecycle.ModalityAdapter | None = None,
-        performance_budget: performance.PerformanceBudget | None = None,
-        performance_baseline: performance.PerformanceBaseline | None = None,
+        observed_adapter: modality_lifecycle.Preparer | None = None,
+        performance_budget: performance.Budget | None = None,
+        performance_baseline: performance.Baseline | None = None,
         manifest: scmle.contracts.data.ModalityManifest | None = None,
         require_independent_ground_truth: bool = False,
-        cancellation: modality_lifecycle.LifecycleCancellation | None = None,
+        cancellation: modality_lifecycle.Cancellation | None = None,
         checkpoint_path: str | pathlib.Path | None = None,
         resume: bool = False,
     ) -> None:
@@ -1116,8 +1114,8 @@ class ModalityProject:
                 cancellation signal.
             ValueError: If the signing key is empty.
         """
-        if not isinstance(adapter, modality_lifecycle.ModalityAdapter):
-            raise TypeError("adapter must be a ModalityAdapter")
+        if not isinstance(adapter, modality_lifecycle.Preparer):
+            raise TypeError("adapter must be a Preparer")
         if not signing_key:
             raise ValueError("signing_key must not be empty")
         if isinstance(seed, bool) or not isinstance(seed, int):
@@ -1127,13 +1125,13 @@ class ModalityProject:
         if not isinstance(resume, bool):
             raise TypeError("resume must be bool")
         if cancellation is not None and not isinstance(
-            cancellation, modality_lifecycle.LifecycleCancellation
+            cancellation, modality_lifecycle.Cancellation
         ):
-            raise TypeError("cancellation must be a LifecycleCancellation")
+            raise TypeError("cancellation must be a Cancellation")
         if observed_adapter is not None and not isinstance(
-            observed_adapter, modality_lifecycle.ModalityAdapter
+            observed_adapter, modality_lifecycle.Preparer
         ):
-            raise TypeError("observed_adapter must be a ModalityAdapter")
+            raise TypeError("observed_adapter must be a Preparer")
         self.adapter = adapter
         self.signing_key = signing_key
         self.output_dir = pathlib.Path(output_dir)
@@ -1149,13 +1147,11 @@ class ModalityProject:
             else None
         )
         self.resume = resume
-        self.cancellation = (
-            cancellation or modality_lifecycle.LifecycleCancellation()
-        )
-        self.lifecycle = modality_lifecycle.ModalityLifecycle()
-        self.report: modality_lifecycle.LifecycleReport | None = None
+        self.cancellation = cancellation or modality_lifecycle.Cancellation()
+        self.lifecycle = modality_lifecycle.Lifecycle()
+        self.report: modality_lifecycle.Record | None = None
 
-    def run(self) -> modality_lifecycle.LifecycleReport:
+    def run(self) -> modality_lifecycle.Record:
         """Runs the full lifecycle and writes its package and signed report.
 
         A cancelled run raises `LifecycleCancelledError`; other lifecycle
@@ -1191,7 +1187,7 @@ class ModalityProject:
         """Requests cooperative cancellation of the active lifecycle run."""
         self.cancellation.cancel()
 
-    def declaration(self) -> modalities.ModalityDeclaration:
+    def declaration(self) -> modalities.Declaration:
         """Returns the experimental capability declaration after a run.
 
         Returns:
@@ -1205,7 +1201,7 @@ class ModalityProject:
         return self.lifecycle.declaration(self.report)
 
 
-class ModalityCurationProject:
+class Curator:
     """Curates and documents a modality without forcing a model fit.
 
     This is the data-understanding entry point for unlabeled, unsupervised, or
@@ -1221,7 +1217,7 @@ class ModalityCurationProject:
 
     def __init__(
         self,
-        adapter: modality_lifecycle.ModalityCurationAdapter,
+        adapter: modality_lifecycle.Curator,
         signing_key: str | bytes,
         *,
         output_dir: str | pathlib.Path = "runs",
@@ -1239,8 +1235,8 @@ class ModalityCurationProject:
             TypeError: If the adapter or manifest has the wrong type.
             ValueError: If the signing key is empty.
         """
-        if not isinstance(adapter, modality_lifecycle.ModalityCurationAdapter):
-            raise TypeError("adapter must be a ModalityCurationAdapter")
+        if not isinstance(adapter, modality_lifecycle.Curator):
+            raise TypeError("adapter must be a Curator")
         if not signing_key:
             raise ValueError("signing_key must not be empty")
         if manifest is not None and not isinstance(
@@ -1252,7 +1248,7 @@ class ModalityCurationProject:
         self.output_dir = pathlib.Path(output_dir)
         self.manifest = manifest
 
-    def run(self) -> modality_lifecycle.ModalityCurationResult:
+    def run(self) -> modality_lifecycle.Curation:
         """Persists signed curation evidence without entering modelling.
 
         If an artifact already exists it is verified and reused when it matches
@@ -1289,8 +1285,8 @@ class ModalityCurationProject:
         if not isinstance(
             report,
             (
-                modality_lifecycle.curation.ModalityCurationReport,
-                modality_lifecycle.document.DocumentCurationReport,
+                modality_lifecycle.curation.Curation,
+                modality_lifecycle.document.Curation,
             ),
         ):
             raise TypeError(
@@ -1303,7 +1299,7 @@ class ModalityCurationProject:
             raise ValueError("curation dataset_hash must match adapter")
         if reported_sample_count != sample_count:
             raise ValueError("curation sample_count must match adapter")
-        card = modality_lifecycle.curation.ModalityDatasetCard.from_report(
+        card = modality_lifecycle.curation.DatasetCard.from_report(
             modality,
             curation_payload,
             self.adapter.modality_notes(),
@@ -1322,7 +1318,7 @@ class ModalityCurationProject:
         signature = attestation.sign_payload(unsigned, self.signing_key)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         path = self.output_dir / "modality_curation.json"
-        candidate = modality_lifecycle.ModalityCurationResult(
+        candidate = modality_lifecycle.Curation(
             modality=modality,
             dataset_hash=dataset_hash,
             sample_count=sample_count,
@@ -1338,7 +1334,7 @@ class ModalityCurationProject:
         try:
             publish_curation_artifact(path, serialized_payload)
         except FileExistsError:
-            existing = modality_lifecycle.ModalityCurationResult.read_verified(
+            existing = modality_lifecycle.Curation.read_verified(
                 path, self.signing_key
             )
             if existing.modality != candidate.modality:

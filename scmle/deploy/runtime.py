@@ -178,7 +178,7 @@ def make_loader(
         loads the model bundle.
     """
 
-    def loader(readiness: guard.Readiness) -> bundle.ModelBundle:
+    def loader(readiness: guard.Readiness) -> bundle.Bundle:
         """Verifies the folder, then loads the model.
 
         Args:
@@ -196,7 +196,7 @@ def make_loader(
             f"provenance={verified.provenance_verified}",
         )
         readiness.begin(guard.Phase.LOADING)
-        model = bundle.ModelBundle.load(
+        model = bundle.Bundle.load(
             folder / "model",
             trusted=verified.trusted,
             signing_key=environ.get(verify.SIGNING_KEY) or None,

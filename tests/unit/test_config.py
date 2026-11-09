@@ -10,10 +10,10 @@ from scmle.core import config
 
 
 def make_spec():
-    return tasks.ProjectSpec(
-        data=tasks.DataSpec(uri="d.csv", target="y"),
+    return tasks.Config(
+        data=tasks.Dataset(uri="d.csv", target="y"),
         metric="roc_auc",
-        validation=tasks.ValidationSpec(folds=3),
+        validation=tasks.Validation(folds=3),
     )
 
 

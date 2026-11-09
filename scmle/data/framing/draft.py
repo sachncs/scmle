@@ -82,7 +82,7 @@ class SourceDescription:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class FramingRequest:
+class Request:
     """A plain-language request and the source it is about.
 
     Attributes:
@@ -120,7 +120,7 @@ class DataCheck:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class FramingDraft:
+class Draft:
     """The result of `frame`.
 
     Attributes:
@@ -220,7 +220,7 @@ def mentioned(text: str, columns: Sequence[str]) -> list[str]:
 
 
 def deterministic_slots(
-    request: FramingRequest, frame: pandas.DataFrame
+    request: Request, frame: pandas.DataFrame
 ) -> dict[str, Any]:
     """Fills slots by rules from the request and the schema.
 
@@ -360,7 +360,7 @@ def check_draft(
 
 def assemble(
     slots: Mapping[str, Any],
-    request: FramingRequest,
+    request: Request,
     cost_model: costs.DecisionCostModel | None,
 ) -> tuple[contracts.AnalysisCharter, list[str]]:
     """Builds the unsigned charter, filling blanks with placeholders.
@@ -420,7 +420,7 @@ def refused(
     checks: Sequence[DataCheck] = (),
     llm: dict[str, Any] | None = None,
     discarded: Sequence[str] = (),
-) -> FramingDraft:
+) -> Draft:
     """Builds a refused draft, with the reason on file.
 
     Args:
@@ -434,7 +434,7 @@ def refused(
         A draft with status `refused`, no charter, and the reason and detail
         as its refusal.
     """
-    return FramingDraft(
+    return Draft(
         REFUSED,
         None,
         {},
@@ -450,7 +450,7 @@ def refused(
 
 
 def frame(
-    request: FramingRequest,
+    request: Request,
     data_sample: pandas.DataFrame,
     *,
     cost_model: costs.DecisionCostModel | None = None,
@@ -460,7 +460,7 @@ def frame(
     sampler: refusal.SlotSampler | None = None,
     tau: float | None = None,
     k: int = refusal.DEFAULT_K,
-) -> FramingDraft:
+) -> Draft:
     """Drafts a charter from a request, reading only `X` rows.
 
     Args:
@@ -611,7 +611,7 @@ def frame(
         )
         if not asked:
             open_items.remove("cost_model")
-    return FramingDraft(
+    return Draft(
         ISSUED if not open_items else WITH_QUESTIONS,
         charter,
         {
@@ -633,7 +633,7 @@ def frame(
     )
 
 
-def write_artifacts(draft: FramingDraft, directory: str | Path) -> list[str]:
+def write_artifacts(draft: Draft, directory: str | Path) -> list[str]:
     """Writes the framing artifacts to a directory.
 
     The directory is created if needed. The files are the draft, the

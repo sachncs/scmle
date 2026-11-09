@@ -1,19 +1,26 @@
 # API stability
 
-The project is currently `0.1.0b1`. The supported top-level Python API is the
-surface exported by `scmle.__all__`:
+The project is currently `0.1.0b1`. The package root exports nothing but
+`__version__`: every public name is imported from the module that defines it,
+for example `scmle.api.project.Project`. There is one name and one import path
+for each thing.
 
-* `MLProject`, `RunResult`, and `ModelBundle` for lifecycle and artifacts;
-* `load_model` and `predict` for inference;
-* `register_estimator`, `unregister_estimator`, and `register_metric` for
-  extension.
+The pinned names, by module, are:
 
-The top-level exports are covered by `tests/unit/test_api_surface.py`.
-Removing or changing one requires a changelog entry, a migration note, and a
-deliberate versioning decision. Modules below `scmle.core`, `scmle.data`,
-`scmle.models`, and other package namespaces are extension surfaces for
-advanced users, but their concrete internals are not stable until promoted to
-the top-level API or documented as a contract.
+* `scmle.api.project.Project`, `scmle.api.results.Run` and
+  `scmle.artifacts.bundle.Bundle` for lifecycle and artifacts;
+* `scmle.api.predict.load_model` and `scmle.api.predict.predict` for inference;
+* `register_estimator`, `unregister_estimator` and `register_metric` in the
+  modules that define them, for extension.
+
+`tests/fixtures/public_api.json` (schema version 2) lists every pinned name
+under its module with the digest of its signature, and
+`scripts/check_api_compatibility.py` and `tests/unit/test_api_surface.py` check
+it. Removing or changing a pinned name requires a changelog entry, a migration
+note, and a deliberate versioning decision. Other names in `scmle.core`,
+`scmle.data`, `scmle.models` and the other packages are extension surfaces for
+advanced users, but their concrete internals are not stable until they are
+pinned or documented as a contract.
 
 ## Qualification types
 
@@ -23,11 +30,11 @@ and are extension surfaces until promoted: `scmle.contracts.qualification`
 `scmle.data.ledger.budget` (`ErrorBudget` and the budget functions) and
 `scmle.core.randomness` (keyed random streams). Rule: new qualification names
 are added without touching any entry in `tests/fixtures/public_api.json`, and
-a name is promoted to `scmle.__all__` only deliberately, with a changelog
+a name is pinned only deliberately, with a changelog
 entry and a regenerated snapshot (`scripts/check_api_compatibility.py
 --write`). `tests/unit/test_qualification_api_rule.py` enforces both halves.
 
-One deliberate change to the pinned surface: `MLProject` gained the optional
+One deliberate change to the pinned surface: `Project` gained the optional
 keyword `charter` (default `None`, so every existing call is unchanged) and the
 snapshot was regenerated for that single entry. The charter and custody
 modules (`scmle.data.charter`, `scmle.data.custody`) are extension surfaces
@@ -38,7 +45,7 @@ like the other qualification modules.
 The profiler's fixed leakage cutoffs (`LEAK_ASSOCIATION`, `MISSINGNESS_LEAK`,
 the `leakage_findings` method and the `"leakage"` string match that drove
 `leakage_policy="block"`) are gone. `leakage_policy` keeps its values and its
-meaning at the top level (`MLProject(...)` and the snapshot in
+meaning at the top level (`Project(...)` and the snapshot in
 `tests/fixtures/public_api.json` are unchanged); what blocks is now a typed
 result, `DatasetProfile.blocking_leaks`, from the permutation screen in
 `scmle.data.admissibility.screen`. Behaviour changes that users may notice:
@@ -52,30 +59,30 @@ no cutoff, and `risk.leakage_hypotheses` now counts screen suspects instead of
 cutoff hits, so stored fingerprints of data that crossed a retired cutoff can
 differ in that one count.
 
-`MLProject` gained the optional keyword `leakage_attestations` (default
-`None`, so every existing call is unchanged), `ProjectSpec` the field of the
+`Project` gained the optional keyword `leakage_attestations` (default
+`None`, so every existing call is unchanged), `Config` the field of the
 same name, and the CLI the flag `--leakage-attestations`; the snapshot in
-`tests/fixtures/public_api.json` was regenerated for the `MLProject` entry
+`tests/fixtures/public_api.json` was regenerated for the `Project` entry
 alone. In a charter run the leakage test is now the screen above instead of
 the earlier cross-fitted skill scan, so a charter run and a run without one
 flag the same columns, and a certified suspect is quarantined unless a valid
 attestation keeps it.
 
-`MLProject` gained the optional keywords `baseline_column` and `framing_draft`
-(both default `None`, so every existing call is unchanged), `DataSpec` the
+`Project` gained the optional keywords `baseline_column` and `framing_draft`
+(both default `None`, so every existing call is unchanged), `Dataset` the
 fields of the same names, and the CLI the flags `--baseline-column` and
 `--framing-draft` on `plan`, `run` and `resume`; `tests/fixtures/public_api.json`
-was regenerated for the `MLProject` entry alone. `scmle claims list` prints
+was regenerated for the `Project` entry alone. `scmle claims list` prints
 claims registered by hash after the bivariate ones, and `scmle claims verify`
 gained one step, present only when a claim was registered.
 
-`MLProject` gained the optional keyword `ingest_plan` (default `None`),
-`DataSpec` the field of the same name, and the CLI the flag `--ingest-plan`;
+`Project` gained the optional keyword `ingest_plan` (default `None`),
+`Dataset` the field of the same name, and the CLI the flag `--ingest-plan`;
 the charter gained the optional field `ingest` (format 7) and a charter
 without it keeps its hash. `tests/fixtures/public_api.json` was regenerated
-for the `MLProject` entry alone. Charter format 8 adds the optional
+for the `Project` entry alone. Charter format 8 adds the optional
 `entity` and `reconcile` sub-blocks of `ingest`
-(`scmle.data.charter.ingest.EntitySpec`, `ReconcileSpec`, extension
+(`scmle.data.charter.ingest.Entity`, `Expectation`, extension
 surfaces); a format 7 ingest charter keeps its hash and signature.
 Charter format 9 adds the optional `subgroups` field of the causal block
 (`scmle.data.charter.causal.Subgroup`, an extension surface) and the
@@ -88,12 +95,12 @@ hypothesis `certified_size`, and the summary in `causal_claims.json` a `gate`;
 additions (extension surfaces).
 
 Charter format 10 adds the optional `uncertainty` block
-(`scmle.data.charter.uncertainty.UncertaintySpec`, an extension surface; the
+(`scmle.data.charter.uncertainty.Uncertainty`, an extension surface; the
 snapshot is unchanged); a charter of format 9 or older keeps its hash and
 signature.
 
 Charter format 11 adds the optional `coverage_on_confirmation` field of the
-`uncertainty` block (`scmle.data.charter.uncertainty.UncertaintySpec`, an
+`uncertainty` block (`scmle.data.charter.uncertainty.Uncertainty`, an
 extension surface; a format 10 charter keeps its hash and signature, both
 pinned). `scmle.evaluation.coverage_confirm`, `coverage.slice_flag`,
 `coverage_slices.flag_gate` and `FlagGate` are additions (extension
@@ -106,28 +113,28 @@ on C: registered, recomputed, status matches". The snapshot is unchanged.
 extension surface; the snapshot is unchanged).
 
 `scmle.governance.rollout_hook.RolloutHook` and
-`LifecycleManager.restore_previous` are additions (extension surfaces), as
-are `LifecycleManager.defer_to_rollout` (called by `RolloutHook`; it makes
+`Maintainer.restore_previous` are additions (extension surfaces), as
+are `Maintainer.defer_to_rollout` (called by `RolloutHook`; it makes
 the bootstrap rules of `review` and `check_rollback` descriptive, and a
 manager without a bound hook behaves as before) and
 `RolloutHook.review` and `RolloutHook.check_rollback`; the
 deployment ledger gained the row kinds `rollout_experiment`,
 `rollout_assignment` and `rollout_decision`, and a ledger without them loads unchanged.
 
-`MLProject` gained the optional keyword `baseline_subject` (`frozen_rule`,
-the default, or `selected_model`), `DataSpec` the field of the same name, and
+`Project` gained the optional keyword `baseline_subject` (`frozen_rule`,
+the default, or `selected_model`), `Dataset` the field of the same name, and
 `plan`, `run` and `resume` the flag `--baseline-subject`; `tests/fixtures/public_api.json`
-was regenerated for the `MLProject` entry alone.
+was regenerated for the `Project` entry alone.
 
-`MLProject` gained the optional keywords `logged_action_column` and
-`propensity_column` (default `None`), `DataSpec` the fields of the same names,
+`Project` gained the optional keywords `logged_action_column` and
+`propensity_column` (default `None`), `Dataset` the fields of the same names,
 and the CLI the flags `--logged-action-column` and `--propensity-column`;
-`tests/fixtures/public_api.json` was regenerated for the `MLProject` entry
+`tests/fixtures/public_api.json` was regenerated for the `Project` entry
 alone. A charter run with a decision block now also writes `decision_report.json`,
 `policy_value.json` and, with a rollout plan, `rollout_design.json` and
 `rollout_decisions.jsonl`.
 
-Uncertainty (F12). `ModelBundle.predict_set` gained the optional argument
+Uncertainty (F12). `Bundle.predict_set` gained the optional argument
 `conditional` (default `None`, the previous behaviour). `conformal.json` gained
 `class_scores`; bundles saved earlier load and answer pooled queries, and
 `conditional="class"` raises for them. `ForecastMetric` gained the field
@@ -144,13 +151,13 @@ Closed loop (F13). No entry of the pinned surface changed.
 labelled rows are resampled with probability proportional to `1 / propensity`
 before the metrics are computed, a seeded approximation of a weighted metric;
 with a maturity mask only matured rows count. The retraining step of
-`LifecycleManager` now holds fresh rows out by time (the schema's time column)
+`Maintainer` now holds fresh rows out by time (the schema's time column)
 or by whole groups when the champion's schema has them, instead of a random
 shuffle; plain tables are shuffled as before. `scmle.monitoring.sequential_tests`,
 `scmle.monitoring.labels`, `scmle.governance.escalation`,
 `scmle.governance.deployment_ledger`, `scmle.governance.never_list`,
 `scmle.governance.loop` and the command `scmle loop` are extension surfaces
-like the other qualification modules. A `LoopPolicy` does not let an alarm
+like the other qualification modules. A `Preregistration` does not let an alarm
 retrain unless `alarm_gates_retrain` is set, and it should be set only when
 `python -m benchmarks.qualification --check loop` lists the detection-delay
 gate H2 as passed for the policy's settings (today it is descriptive).
@@ -160,8 +167,8 @@ guard behaviour is unchanged.
 
 Causal identification (F10). No entry of the pinned surface changed.
 `scmle.data.charter.contracts.AnalysisEstimand` gained the optional field
-`causal` (`scmle.data.charter.causal.CausalSpec`, with `NegativeControl` and
-`SensitivitySpec`); it is omitted from the record when unset, so charters of
+`causal` (`scmle.data.charter.causal.Question`, with `NegativeControl` and
+`Confounding`); it is omitted from the record when unset, so charters of
 format 1 to 3 keep their hash and signature, and a charter that carries it is
 format 4 (an older wrapper carrying it is refused). `DecisionAction` gained the
 member `refuse_claim`. `scmle.data.identification` (`select`, `aipw`, `did`,
@@ -169,8 +176,8 @@ member `refuse_claim`. `scmle.data.identification` (`select`, `aipw`, `did`,
 an extension surface like the other qualification modules.
 
 Decision layer (F11). `scmle.decision` and `scmle.data.charter.decision` are
-extension surfaces like the other qualification modules; nothing was added to
-`scmle.__all__` and `tests/fixtures/public_api.json` is unchanged. The charter
+extension surfaces like the other qualification modules; none of their
+names is pinned in `tests/fixtures/public_api.json`. The charter
 gained the optional field `decision` (format 5); a charter without it keeps
 its hash. `choose_decision_threshold` takes the threshold from the charter's
 cost model when the charter has a decision block and the task is binary, even
@@ -182,25 +189,22 @@ and, inside `decision`, `f11`. `scmle.data.ledger.budget` gained
 ## Deployment contract
 
 `scmle.deploy.contract` is an extension surface, not a top-level export. It
-holds the typed deployment spec (`DeploymentSpec` with `ImageRef`,
-`BundleRef`, `SecretRef`, `Resources`, `HealthSpec`), `RuntimeReport`,
-`conformance_problems` and the `ProviderAdapter` base class that a runtime
+holds the typed deployment spec (`Deployment` with `ImageRef`,
+`BundleRef`, `SecretRef`, `Resources`, `Probes`), `Runtime`,
+`conformance_problems` and the `Provider` base class that a runtime
 adapter written by a user implements.
-Because it sits below `scmle.__all__`, no entry of `exports` in
-`tests/fixtures/public_api.json` changed; the snapshot gained a separate
-`extension_surfaces` block that pins the signature of each name above, and
-`scripts/check_api_compatibility.py` reports `extension added`, `extension
-removed` and `extension contract changed` for it. The spec format is
+The snapshot's `surfaces` block pins the signature of each name above, and
+`scripts/check_api_compatibility.py` reports `surface added`, `surface
+removed` and `surface contract changed` for it. The spec format is
 versioned (`SPEC_FORMAT`); `from_dict` refuses any other format.
 
 ## Security surface
 
 `scmle.security.tokens`, `scmle.security.access` and `scmle.security.audit`
 are extension surfaces like `scmle.deploy.contract`: token verification
-(`TokenVerifier`, `KeySet`, `VerificationKey`, `RevocationList`, `Principal`),
-the request gateway (`Gateway`, `RateLimiter`, `AccessDenied`) and the audit
-log (`AuditLog`) are pinned in the snapshot's `extension_surfaces` block, and
-no `exports` entry changed. Behaviour changes to existing classes:
+(`Verifier`, `KeySet`, `Key`, `RevocationList`, `Principal`),
+the request gateway (`Gateway`, `RateLimiter`, `DeniedError`) and the audit
+log (`Log`) are pinned in the snapshot's `surfaces` block. Behaviour changes to existing classes:
 `HttpServing` gained the keyword-only `gateway` and refuses a non-loopback
 `host` without one; `ModalityHttpServing` kept its constructor, gained
 `set_gateway`, and `start` refuses a non-loopback `host` without a gateway.
@@ -210,7 +214,7 @@ The deployment ledger gained the row kind `audit`.
 
 `scmle.data.store` (`objectstore`, `snapshot`, `quality`,
 `processing`) and `scmle.core.retry` are extension surfaces pinned in the
-snapshot's `extension_surfaces` block; no `exports` entry changed. Pinned
+snapshot's `surfaces` block. Pinned
 signatures avoid function-valued defaults (a `None` default is resolved in the
 body), because a function's repr carries an address and would make the
 snapshot differ between runs.
@@ -224,17 +228,17 @@ entrypoint, project workload and fakes are not pinned.
 ## Workflow surface
 
 `scmle.workflow.definition` (`Workflow`, `Step`, `StepKind`, `Schedule`,
-`CatchUp`), `executor` (`LocalExecutor`) and `schedule` (`Scheduler`) are
+`CatchUp`), `executor` (`Executor`) and `schedule` (`Scheduler`) are
 extension surfaces pinned like the others.
 
 ## Release surfaces
 
 `scmle.deploy.gate` (`admit`, `certify`, `Candidate`, `GateDecision`, `ImageScan`,
-`model_digest_of`), `record` (`DeploymentRecord`), `livetests` (`run_checks`,
+`model_digest_of`), `record` (`Record`), `livetests` (`run_checks`,
 `Target`, `CheckResult`, `Response`, `http_fetch`), `observation`
 (`Observation`, `Traffic`), `control` (`ControlPlane`, `confirm`,
-`expecting`, `ConfirmPolicy`) and `scmle.governance.release_state` (`ReleaseRegistry`, `ReleaseState`,
-`Outcome`, `ReconcileReport`, `Finding`, `RuntimeDisagrees`) are extension
+`expecting`, `Polling`) and `scmle.governance.release_state` (`ReleaseRegistry`, `ReleaseState`,
+`Outcome`, `Reconciliation`, `Finding`, `RuntimeDisagrees`) are extension
 surfaces pinned like the others. The release manifest loader (`release`) is
 not pinned. The `deployment` row kind of the
 deployment ledger and the `release_state.json` file are additions; existing
@@ -243,12 +247,12 @@ ledgers and registries load unchanged.
 ## Operations surfaces
 
 `scmle.operations.signals` (`SignalMonitor`, `Signal`, `SignalThresholds`,
-`WindowPolicy`, `Category`, `Status`), `classify` (`classify`,
+`Window`, `Category`, `Status`), `classify` (`classify`,
 `Classification`, `Verdict`), `notify` (`WebhookSender`, `Notifier`,
 `Request`, `Delivery`, `sign`, `verify_signature`) and `continuous` (`ContinuousEvaluation`, `RetrainPolicy`,
-`RetrainDecision`, `MetricSpec`, `Replacement`, `TrainingHistory`,
+`RetrainDecision`, `Indicator`, `Replacement`, `TrainingHistory`,
 `post_promotion_check`), `recovery` (`Fault`, `Objective`, `Measurement`,
-`Result`, `Runner`) and `spool` (`MetricsSpool`, `FlushResult`) are extension
+`Result`, `Runner`) and `spool` (`MetricsSpool`, `Flush`) are extension
 surfaces pinned like the others. The metrics
 registry, the log writer, the cost report and the response desk are not
 pinned.

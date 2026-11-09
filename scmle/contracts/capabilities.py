@@ -88,7 +88,7 @@ class Inference(enum.StrEnum):
     STREAMING = "streaming"
 
 
-class CapabilityStatus(enum.StrEnum):
+class Status(enum.StrEnum):
     """Evidence level assigned to a registered capability."""
 
     SUPPORTED = "supported"
@@ -100,7 +100,7 @@ class ModelFamily(enum.StrEnum):
     """Named model families with an explicit support boundary.
 
     These values describe model-family identity only. A family is usable for a
-    run only after a complete :class:`CapabilityKey` declaration is registered.
+    run only after a complete :class:`Coordinate` declaration is registered.
     """
 
     TRANSFORMER = "transformer"
@@ -123,7 +123,7 @@ class ModelFamilyDeclaration:
     """
 
     model_family: str
-    status: CapabilityStatus
+    status: Status
     modalities: tuple[Modality, ...]
     required_extras: tuple[str, ...]
     resources: "ResourceAssumptions"
@@ -150,8 +150,8 @@ class ModelFamilyDeclaration:
                 "model_family must be lowercase and must not have surrounding "
                 "whitespace"
             )
-        if not isinstance(self.status, CapabilityStatus):
-            raise TypeError("status must be CapabilityStatus")
+        if not isinstance(self.status, Status):
+            raise TypeError("status must be Status")
         if not isinstance(self.resources, ResourceAssumptions):
             raise TypeError("resources must be ResourceAssumptions")
         if not self.modalities:
@@ -207,7 +207,7 @@ class ModelFamilyDeclaration:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class CapabilityEnvironment:
+class Environment:
     """Observed runtime facts used to cross a capability boundary.
 
     Values are deliberately supplied by the caller. The registry never
@@ -251,7 +251,7 @@ class CapabilityEnvironment:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class CapabilityDiagnostic:
+class Reason:
     """Machine-readable reason a capability cannot cross the boundary."""
 
     code: str
@@ -270,7 +270,7 @@ class CapabilityDiagnostic:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class CapabilityKey:
+class Coordinate:
     """Coordinates of one complete pre-training capability decision.
 
     Attributes:
@@ -285,7 +285,7 @@ class CapabilityKey:
     """
 
     modality: Modality
-    task: tasks.TaskType
+    task: tasks.Task
     model_family: str
     evaluation: Evaluation
     uncertainty: Uncertainty
@@ -304,7 +304,7 @@ class CapabilityKey:
         """
         dimensions = (
             ("modality", self.modality, Modality),
-            ("task", self.task, tasks.TaskType),
+            ("task", self.task, tasks.Task),
             ("evaluation", self.evaluation, Evaluation),
             ("uncertainty", self.uncertainty, Uncertainty),
             ("fairness", self.fairness, Fairness),
@@ -412,8 +412,8 @@ class Capability:
         limitations: User-visible limitations of the declaration.
     """
 
-    key: CapabilityKey
-    status: CapabilityStatus
+    key: Coordinate
+    status: Status
     required_extras: tuple[str, ...]
     resources: ResourceAssumptions
     failure_modes: tuple[str, ...]
@@ -428,10 +428,10 @@ class Capability:
             ValueError: If no failure mode is declared, a list entry is blank,
                 or a supported capability has no evidence links.
         """
-        if not isinstance(self.key, CapabilityKey):
-            raise TypeError("key must be CapabilityKey")
-        if not isinstance(self.status, CapabilityStatus):
-            raise TypeError("status must be CapabilityStatus")
+        if not isinstance(self.key, Coordinate):
+            raise TypeError("key must be Coordinate")
+        if not isinstance(self.status, Status):
+            raise TypeError("status must be Status")
         if not isinstance(self.resources, ResourceAssumptions):
             raise TypeError("resources must be ResourceAssumptions")
         object.__setattr__(self, "required_extras", tuple(self.required_extras))
@@ -451,10 +451,7 @@ class Capability:
                 for value in values
             ):
                 raise ValueError(f"{name} must contain non-empty strings")
-        if (
-            self.status is CapabilityStatus.SUPPORTED
-            and not self.evidence_links
-        ):
+        if self.status is Status.SUPPORTED and not self.evidence_links:
             raise ValueError(
                 "supported capabilities must declare evidence_links"
             )
@@ -475,7 +472,7 @@ class Capability:
 DEFAULT_MODEL_FAMILY_DECLARATIONS = (
     ModelFamilyDeclaration(
         model_family=ModelFamily.TRANSFORMER.value,
-        status=CapabilityStatus.EXPERIMENTAL,
+        status=Status.EXPERIMENTAL,
         modalities=(Modality.TABULAR,),
         required_extras=("deeplearning",),
         resources=ResourceAssumptions(memory_gb=4.0, gpu_required=True),
@@ -492,7 +489,7 @@ DEFAULT_MODEL_FAMILY_DECLARATIONS = (
     ),
     ModelFamilyDeclaration(
         model_family=ModelFamily.TEXT_TRANSFORMER.value,
-        status=CapabilityStatus.EXTENSION_ONLY,
+        status=Status.EXTENSION_ONLY,
         modalities=(Modality.TEXT, Modality.DOCUMENT),
         required_extras=("embeddings",),
         resources=ResourceAssumptions(memory_gb=4.0),
@@ -509,7 +506,7 @@ DEFAULT_MODEL_FAMILY_DECLARATIONS = (
     ),
     ModelFamilyDeclaration(
         model_family=ModelFamily.VISION_TRANSFORMER.value,
-        status=CapabilityStatus.EXTENSION_ONLY,
+        status=Status.EXTENSION_ONLY,
         modalities=(Modality.IMAGE, Modality.VIDEO),
         required_extras=("multimodal",),
         resources=ResourceAssumptions(memory_gb=8.0, gpu_required=True),
@@ -526,7 +523,7 @@ DEFAULT_MODEL_FAMILY_DECLARATIONS = (
     ),
     ModelFamilyDeclaration(
         model_family=ModelFamily.AUDIO_TRANSFORMER.value,
-        status=CapabilityStatus.EXTENSION_ONLY,
+        status=Status.EXTENSION_ONLY,
         modalities=(Modality.AUDIO,),
         required_extras=("multimodal",),
         resources=ResourceAssumptions(memory_gb=8.0, gpu_required=True),
@@ -543,7 +540,7 @@ DEFAULT_MODEL_FAMILY_DECLARATIONS = (
     ),
     ModelFamilyDeclaration(
         model_family=ModelFamily.VIDEO_TRANSFORMER.value,
-        status=CapabilityStatus.EXTENSION_ONLY,
+        status=Status.EXTENSION_ONLY,
         modalities=(Modality.VIDEO,),
         required_extras=("multimodal",),
         resources=ResourceAssumptions(memory_gb=12.0, gpu_required=True),
@@ -560,7 +557,7 @@ DEFAULT_MODEL_FAMILY_DECLARATIONS = (
     ),
     ModelFamilyDeclaration(
         model_family=ModelFamily.MULTIMODAL_TRANSFORMER.value,
-        status=CapabilityStatus.EXTENSION_ONLY,
+        status=Status.EXTENSION_ONLY,
         modalities=(
             Modality.TEXT,
             Modality.DOCUMENT,
@@ -582,7 +579,7 @@ DEFAULT_MODEL_FAMILY_DECLARATIONS = (
     ),
     ModelFamilyDeclaration(
         model_family=ModelFamily.JEPA.value,
-        status=CapabilityStatus.EXPERIMENTAL,
+        status=Status.EXPERIMENTAL,
         modalities=(Modality.TABULAR,),
         required_extras=("deeplearning",),
         resources=ResourceAssumptions(memory_gb=2.0),
@@ -606,7 +603,7 @@ class UnsupportedCapabilityError(errors.ConfigError):
     category = "capability"
 
 
-class CapabilityRegistry:
+class Registry:
     """Registry that resolves complete capabilities before training.
 
     The registry has no implicit defaults. Callers must register an explicit
@@ -631,9 +628,9 @@ class CapabilityRegistry:
             capabilities: The capabilities to register.
             model_families: The model-family declarations to register.
         """
-        self.records: dict[CapabilityKey, Capability] = {}
+        self.records: dict[Coordinate, Capability] = {}
         self.model_families: dict[str, ModelFamilyDeclaration] = {}
-        self.runtime_environment: CapabilityEnvironment | None = None
+        self.runtime_environment: Environment | None = None
         for capability in capabilities:
             self.register(capability)
         for declaration in model_families:
@@ -643,7 +640,7 @@ class CapabilityRegistry:
     def with_declared_model_families(
         cls,
         capabilities: Iterable[Capability] = (),
-    ) -> "CapabilityRegistry":
+    ) -> "Registry":
         """Creates a registry with the explicit transformer/JEPA catalog.
 
         The catalog is metadata, not support promotion. Callers still need a
@@ -697,7 +694,7 @@ class CapabilityRegistry:
             )
         self.model_families[declaration.model_family] = declaration
 
-    def find(self, key: CapabilityKey) -> Capability | None:
+    def find(self, key: Coordinate) -> Capability | None:
         """Returns a declaration or ``None`` when the key is unregistered.
 
         Args:
@@ -727,29 +724,27 @@ class CapabilityRegistry:
             raise TypeError("model_family must be a string")
         return self.model_families.get(model_family)
 
-    def bind_runtime_environment(
-        self, environment: CapabilityEnvironment
-    ) -> None:
+    def bind_runtime_environment(self, environment: Environment) -> None:
         """Binds observed facts used when a caller omits an environment.
 
         Args:
             environment: The observed runtime environment.
 
         Raises:
-            TypeError: If `environment` is not a `CapabilityEnvironment`.
+            TypeError: If `environment` is not a `Environment`.
         """
-        if not isinstance(environment, CapabilityEnvironment):
-            raise TypeError("environment must be CapabilityEnvironment")
+        if not isinstance(environment, Environment):
+            raise TypeError("environment must be Environment")
         self.runtime_environment = environment
 
     def diagnose(
         self,
-        key: CapabilityKey,
-        allowed_statuses: Collection[CapabilityStatus] | None = None,
+        key: Coordinate,
+        allowed_statuses: Collection[Status] | None = None,
         *,
-        environment: CapabilityEnvironment | None = None,
+        environment: Environment | None = None,
         row_count: int | None = None,
-    ) -> tuple[CapabilityDiagnostic, ...]:
+    ) -> tuple[Reason, ...]:
         """Returns every pre-training rejection for a capability request.
 
         Diagnostics are collected rather than short-circuited so a caller can
@@ -776,28 +771,26 @@ class CapabilityRegistry:
         Raises:
             TypeError: If `key`, `environment` or a status has the wrong type.
         """
-        if not isinstance(key, CapabilityKey):
-            raise TypeError("key must be CapabilityKey")
-        if environment is not None and not isinstance(
-            environment, CapabilityEnvironment
-        ):
-            raise TypeError("environment must be CapabilityEnvironment")
+        if not isinstance(key, Coordinate):
+            raise TypeError("key must be Coordinate")
+        if environment is not None and not isinstance(environment, Environment):
+            raise TypeError("environment must be Environment")
         if environment is None:
             environment = self.runtime_environment
         statuses = (
-            frozenset({CapabilityStatus.SUPPORTED})
+            frozenset({Status.SUPPORTED})
             if allowed_statuses is None
             else frozenset(allowed_statuses)
         )
-        if any(not isinstance(status, CapabilityStatus) for status in statuses):
-            raise TypeError("allowed_statuses must contain CapabilityStatus")
+        if any(not isinstance(status, Status) for status in statuses):
+            raise TypeError("allowed_statuses must contain Status")
 
         capability = self.find(key)
         if capability is None:
             family = self.find_model_family(key.model_family)
             family_status = None if family is None else family.status.value
             family_diagnostics = [
-                CapabilityDiagnostic(
+                Reason(
                     code="missing_declaration",
                     message=(
                         "no declaration exists for this complete capability"
@@ -810,7 +803,7 @@ class CapabilityRegistry:
                 key.modality
             ):
                 family_diagnostics.append(
-                    CapabilityDiagnostic(
+                    Reason(
                         code="model_family_modality_unsupported",
                         message=(
                             "model family is not declared for the requested "
@@ -822,7 +815,7 @@ class CapabilityRegistry:
                 )
             if family is not None and family.status not in statuses:
                 family_diagnostics.append(
-                    CapabilityDiagnostic(
+                    Reason(
                         code="model_family_status_not_allowed",
                         message=(
                             f"model family is registered as "
@@ -835,10 +828,10 @@ class CapabilityRegistry:
                 )
             return tuple(family_diagnostics)
 
-        diagnostics: list[CapabilityDiagnostic] = []
+        diagnostics: list[Reason] = []
         if capability.status not in statuses:
             diagnostics.append(
-                CapabilityDiagnostic(
+                Reason(
                     code="status_not_allowed",
                     message=(
                         f"registered as {capability.status.value}; accepted "
@@ -861,9 +854,9 @@ class CapabilityRegistry:
     def resource_diagnostics(
         self,
         capability: Capability,
-        environment: CapabilityEnvironment | None,
+        environment: Environment | None,
         row_count: int | None = None,
-    ) -> tuple[CapabilityDiagnostic, ...]:
+    ) -> tuple[Reason, ...]:
         """Checks extras and resource assumptions without starting work.
 
         Args:
@@ -883,13 +876,11 @@ class CapabilityRegistry:
         """
         if not isinstance(capability, Capability):
             raise TypeError("capability must be Capability")
-        if environment is not None and not isinstance(
-            environment, CapabilityEnvironment
-        ):
-            raise TypeError("environment must be CapabilityEnvironment")
+        if environment is not None and not isinstance(environment, Environment):
+            raise TypeError("environment must be Environment")
         if environment is None:
             environment = self.runtime_environment
-        diagnostics: list[CapabilityDiagnostic] = []
+        diagnostics: list[Reason] = []
         if environment is not None:
             missing_extras = sorted(
                 set(capability.required_extras)
@@ -897,7 +888,7 @@ class CapabilityRegistry:
             )
             if missing_extras:
                 diagnostics.append(
-                    CapabilityDiagnostic(
+                    Reason(
                         code="missing_extra",
                         message=(
                             "required optional dependency extra is unavailable"
@@ -912,7 +903,7 @@ class CapabilityRegistry:
         if capability.resources.max_rows is not None:
             if row_count is None:
                 diagnostics.append(
-                    CapabilityDiagnostic(
+                    Reason(
                         code="unknown_row_count",
                         message=(
                             "row count is required for this capability limit"
@@ -922,7 +913,7 @@ class CapabilityRegistry:
                 )
             elif row_count > capability.resources.max_rows:
                 diagnostics.append(
-                    CapabilityDiagnostic(
+                    Reason(
                         code="row_limit_exceeded",
                         message=(
                             "requested dataset exceeds capability row limit"
@@ -936,8 +927,8 @@ class CapabilityRegistry:
     def numeric_resource_diagnostics(
         self,
         capability: Capability,
-        environment: CapabilityEnvironment,
-    ) -> tuple[CapabilityDiagnostic, ...]:
+        environment: Environment,
+    ) -> tuple[Reason, ...]:
         """Checks CPU, memory, disk, GPU, and network assumptions.
 
         Args:
@@ -948,7 +939,7 @@ class CapabilityRegistry:
             A diagnostic for each assumption that is unobserved or not met.
         """
         requirements = capability.resources
-        diagnostics: list[CapabilityDiagnostic] = []
+        diagnostics: list[Reason] = []
         numeric_values = (
             ("cpu_cores", requirements.cpu_cores, environment.cpu_cores),
             ("memory_gb", requirements.memory_gb, environment.memory_gb),
@@ -957,7 +948,7 @@ class CapabilityRegistry:
         for name, expected, observed in numeric_values:
             if observed is None:
                 diagnostics.append(
-                    CapabilityDiagnostic(
+                    Reason(
                         code=f"unknown_{name}",
                         message=f"{name} is required to verify resources",
                         expected=expected,
@@ -965,7 +956,7 @@ class CapabilityRegistry:
                 )
             elif observed < expected:
                 diagnostics.append(
-                    CapabilityDiagnostic(
+                    Reason(
                         code=f"insufficient_{name}",
                         message=f"runtime {name} is below the declared minimum",
                         expected=expected,
@@ -991,7 +982,7 @@ class CapabilityRegistry:
                 continue
             if observed is None:
                 diagnostics.append(
-                    CapabilityDiagnostic(
+                    Reason(
                         code=f"unknown_{name}",
                         message=(
                             f"{label} availability is required to verify "
@@ -1002,7 +993,7 @@ class CapabilityRegistry:
                 )
             elif not observed:
                 diagnostics.append(
-                    CapabilityDiagnostic(
+                    Reason(
                         code=f"missing_{name}",
                         message=f"declared {label} resource is unavailable",
                         expected=True,
@@ -1013,10 +1004,10 @@ class CapabilityRegistry:
 
     def require(
         self,
-        key: CapabilityKey,
-        allowed_statuses: Collection[CapabilityStatus] | None = None,
+        key: Coordinate,
+        allowed_statuses: Collection[Status] | None = None,
         *,
-        environment: CapabilityEnvironment | None = None,
+        environment: Environment | None = None,
         row_count: int | None = None,
     ) -> Capability:
         """Requires a capability to be eligible before training begins.
@@ -1104,9 +1095,9 @@ class CapabilityRegistry:
 
     def raise_unsupported(
         self,
-        key: CapabilityKey,
+        key: Coordinate,
         reason: str,
-        diagnostics: Iterable[CapabilityDiagnostic] = (),
+        diagnostics: Iterable[Reason] = (),
     ) -> NoReturn:
         """Raises a structured pre-training rejection for ``key``.
 

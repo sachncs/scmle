@@ -27,7 +27,7 @@ SETTINGS = settings(
     deadline=None,
     suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large],
 )
-REGISTRY = registry.ModelRegistry.with_builtins()
+REGISTRY = registry.Catalog.with_builtins()
 
 
 @strategies.composite
@@ -58,7 +58,7 @@ def frames(draw, min_rows=40, max_rows=240):
 
 
 def spec_for(**kwargs):
-    return tasks.ProjectSpec(data=tasks.DataSpec(uri="m", target="y", **kwargs))
+    return tasks.Config(data=tasks.Dataset(uri="m", target="y", **kwargs))
 
 
 JSON_SCALARS = (
@@ -98,7 +98,7 @@ def test_attestation_parser_fails_closed_on_arbitrary_json(payload):
 @given(payload=strategies.binary(max_size=512))
 def test_document_reader_fails_closed_on_arbitrary_bytes(payload):
     """Arbitrary document bytes become structured outcomes or valid samples."""
-    reader = document.DocumentReader(max_bytes=1024)
+    reader = document.Reader(max_bytes=1024)
     try:
         sample = reader.load(payload, document_id="fuzzed")
     except document.DocumentValidationError as error:
@@ -117,7 +117,7 @@ def test_profiling_yields_a_consistent_plan_or_a_clear_refusal(frame):
         task = scmle.data.validation.target.TaskResolver(spec).resolve(
             frame["y"]
         )
-        profile = profiler.DatasetProfiler(spec).profile(frame, manifest, task)
+        profile = profiler.Profiler(spec).profile(frame, manifest, task)
     except errors.ScmleError:
         return
     plan = profile.feature_plan
@@ -141,9 +141,7 @@ def test_pipelines_fit_and_predict_on_arbitrary_clean_frames(frame, seed):
             frame["y"]
         )
         plan = (
-            profiler.DatasetProfiler(spec)
-            .profile(frame, manifest, task)
-            .feature_plan
+            profiler.Profiler(spec).profile(frame, manifest, task).feature_plan
         )
     except errors.ScmleError:
         return
@@ -180,16 +178,14 @@ def test_stratified_splits_partition_rows_without_overlap(
             "y": (rng.random(rows) < positive).astype(int),
         }
     )
-    spec = tasks.ProjectSpec(
-        data=tasks.DataSpec(uri="m", target="y"),
-        validation=tasks.ValidationSpec(
+    spec = tasks.Config(
+        data=tasks.Dataset(uri="m", target="y"),
+        validation=tasks.Validation(
             folds=folds, test_fraction=test_fraction, seed=seed
         ),
     )
     try:
-        result = splitters.SplitManager(spec, tasks.TaskType.BINARY).split(
-            frame
-        )
+        result = splitters.Splitter(spec, tasks.Task.BINARY).split(frame)
     except errors.BlockedError:
         return
     manifest = result.manifest
@@ -221,9 +217,7 @@ def test_group_splits_never_share_a_group(groups, rows, seed):
     )
     spec = spec_for(group_column="g")
     try:
-        result = splitters.SplitManager(spec, tasks.TaskType.BINARY).split(
-            frame
-        )
+        result = splitters.Splitter(spec, tasks.Task.BINARY).split(frame)
     except errors.BlockedError:
         return
     manifest = result.manifest
@@ -253,9 +247,7 @@ def test_temporal_splits_never_train_on_the_future(rows, seed):
     )
     spec = spec_for(time_column="t")
     try:
-        result = splitters.SplitManager(spec, tasks.TaskType.BINARY).split(
-            frame
-        )
+        result = splitters.Splitter(spec, tasks.Task.BINARY).split(frame)
     except errors.BlockedError:
         return
     manifest = result.manifest

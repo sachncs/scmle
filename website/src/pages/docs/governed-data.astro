@@ -7,7 +7,7 @@ const backends = [
 ];
 const policies = [
   ["<code>fail</code>", "<code>QualityGateError</code> with the report; nothing continues."],
-  ["<code>quarantine</code>", "Row-level rules remove the rows and write them with the report under <code>quarantine/&lt;snapshot id&gt;/</code>. Dataset-level rules (<code>SchemaRule</code>, <code>FreshnessRule</code>, <code>MinRowsRule</code>, <code>NullFractionRule</code>) hold the whole snapshot: a marker is written, the run stops, and the same snapshot is refused until a person calls <code>release</code>."],
+  ["<code>quarantine</code>", "Row-level rules remove the rows and write them with the report under <code>quarantine/&lt;snapshot id&gt;/</code>. Dataset-level rules (<code>SchemaCheck</code>, <code>FreshnessCheck</code>, <code>MinRowsCheck</code>, <code>NullFractionCheck</code>) hold the whole snapshot: a marker is written, the run stops, and the same snapshot is refused until a person calls <code>release</code>."],
   ["<code>warn</code>", "Recorded in the report, data unchanged."],
 ];
 ---
@@ -20,7 +20,7 @@ const policies = [
   <h2>Object stores</h2>
   <p>An <code>ObjectStore</code> is bytes under keys, with <code>put</code> (atomic replace; <code>if_absent=True</code> creates only), <code>get</code>, <code>head</code>, <code>list_objects</code>, <code>delete</code> and <code>exists</code>. Metadata always carries a SHA-256 computed by this code. A changed object raises <code>CorruptObjectError</code>.</p>
   <DocTable label="Object store backends" head={["Backend", "Class", "Client"]} rows={backends} />
-  <p>The package ships the interface and the directory backend; any other backend is written by the user against the same interface, and no object-store SDK is a dependency. Keys are validated before they reach a backend (no <code>..</code>, empty segment or leading slash). <code>RetryingStore</code> retries <code>TransientStoreError</code> (throttling, timeouts, 5xx) under a <code>RetryPolicy</code>.</p>
+  <p>The package ships the interface and the directory backend; any other backend is written by the user against the same interface, and no object-store SDK is a dependency. Keys are validated before they reach a backend (no <code>..</code>, empty segment or leading slash). <code>RetryingStore</code> retries <code>TransientStoreError</code> (throttling, timeouts, 5xx) under a <code>Retries</code>.</p>
   <p>One conformance suite is provided for any backend you write: round trip, binary, empty and large objects, overwrite, missing keys, <code>head</code> against <code>get</code>, conditional create, a race of eight conditional creates (exactly one wins), sorted prefix listing, pagination, idempotent delete, key rules and prefix isolation. The tests run it on the directory backend.</p>
 
   <h2>Snapshots</h2>
@@ -30,10 +30,10 @@ const policies = [
   <h2>Quality gates</h2>
   <p><code>QualityGate(rules, store).run(frame, record, contract, stage)</code> runs for stage <code>train</code> or <code>inference</code>. Each rule declares its policy in advance:</p>
   <DocTable label="Quality gate policies" head={["Policy", "Effect"]} rows={policies} />
-  <p>Rules: <code>SchemaRule</code>, <code>FreshnessRule</code>, <code>MinRowsRule</code>, <code>NullFractionRule</code>, <code>NoNullsRule</code>, <code>UniqueKeyRule</code>, <code>RangeRule</code> and <code>AllowedValuesRule</code>, each limited to the stages it names. Every rule is evaluated before any action, and the report is written to <code>quality/</code> whatever the outcome.</p>
+  <p>Rules: <code>SchemaCheck</code>, <code>FreshnessCheck</code>, <code>MinRowsCheck</code>, <code>NullFractionCheck</code>, <code>NoNullsCheck</code>, <code>UniqueKeyCheck</code>, <code>RangeCheck</code> and <code>AllowedValuesCheck</code>, each limited to the stages it names. Every rule is evaluated before any action, and the report is written to <code>quality/</code> whatever the outcome.</p>
 
   <h2>Incremental processing</h2>
-  <p><code>IncrementalProcessor</code> processes new objects under an input prefix in sorted key order, once each. It deduplicates repeated row keys and repeated uploads, writes a checkpoint with its own digest after each object, retries transient errors under a <code>RetryPolicy</code> (reproducible backoff, no jitter), writes the output before the checkpoint, and takes a lock object so two runs cannot share a checkpoint.</p>
+  <p><code>IncrementalProcessor</code> processes new objects under an input prefix in sorted key order, once each. It deduplicates repeated row keys and repeated uploads, writes a checkpoint with its own digest after each object, retries transient errors under a <code>Retries</code> (reproducible backoff, no jitter), writes the output before the checkpoint, and takes a lock object so two runs cannot share a checkpoint.</p>
   <div class="callout"><p><strong>Delivery semantics: at-least-once for the work, idempotent for the output.</strong> A crash between writing an output and committing the checkpoint makes the next run process that object again and rewrite the same bytes under the same key. The final outputs and checkpoint equal those of an uninterrupted run (tested). Exactly-once is not claimed: a transform with side effects beyond its output must be idempotent.</p></div>
   <p>A crashed run leaves its lock; <code>break_lock</code> is a person's decision. The set of seen row keys lives in one JSON object, which is fine for millions of keys and not beyond.</p>
 

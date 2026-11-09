@@ -53,8 +53,8 @@ class ChampionChallenger:
 
     def __init__(
         self,
-        champion: scmle.artifacts.bundle.ModelBundle,
-        challenger: scmle.artifacts.bundle.ModelBundle,
+        champion: scmle.artifacts.bundle.Bundle,
+        challenger: scmle.artifacts.bundle.Bundle,
         bootstraps: int = BOOTSTRAPS,
         seed: int = 0,
     ) -> None:
@@ -101,7 +101,7 @@ class ChampionChallenger:
         Raises:
             ConfigError: With too few labeled rows to compare.
         """
-        task = tasks.TaskType(self.champion.schema.task)
+        task = tasks.Task(self.champion.schema.task)
         metric = metrics.CATALOG.resolve(
             metric_name or self.champion.info.metric, task
         )
@@ -137,7 +137,7 @@ class ChampionChallenger:
         sign = 1.0 if metric.greater_is_better else -1.0
 
         def score(
-            bundle: scmle.artifacts.bundle.ModelBundle,
+            bundle: scmle.artifacts.bundle.Bundle,
             view: pandas.DataFrame,
             rows: numpy.ndarray,
         ) -> float:

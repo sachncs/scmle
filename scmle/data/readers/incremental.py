@@ -4,7 +4,7 @@ This module owns the semantics that every event source must provide: stable
 event identity, ordered checkpoints, watermarks, late-data policy, duplicate
 classification, and an atomic durable commit. It deliberately does not
 import a broker or warehouse SDK. A transport adapter supplies available
-events through ``IncrementalEventSource``.
+events through ``EventSource``.
 """
 
 import abc
@@ -65,7 +65,7 @@ class IncrementalError(errors.DataError):
         super().__init__(message, self.details)
 
 
-class LateDataPolicy(enum.StrEnum):
+class LateData(enum.StrEnum):
     """Action for an event older than the committed sequence checkpoint.
 
     Attributes:
@@ -105,7 +105,7 @@ def parse_timestamp(value: str, field_name: str) -> datetime.datetime:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class IncrementalEvent:
+class Event:
     """One immutable event from an incremental source.
 
     Attributes:
@@ -290,7 +290,7 @@ class EventBatch:
     """
 
     source_identity: str
-    events: tuple[IncrementalEvent, ...]
+    events: tuple[Event, ...]
     next_checkpoint: EventCheckpoint
     duplicate_event_ids: tuple[str, ...] = ()
     late_event_ids: tuple[str, ...] = ()
@@ -302,15 +302,13 @@ class EventBatch:
         Raises:
             ValueError: If the checkpoint belongs to another source, or the
                 duplicate or late identities are not sorted and unique.
-            TypeError: If `events` holds something other than IncrementalEvent
+            TypeError: If `events` holds something other than Event
                 values.
         """
         if self.next_checkpoint.source_identity != self.source_identity:
             raise ValueError("batch and checkpoint source identities differ")
-        if any(
-            not isinstance(event, IncrementalEvent) for event in self.events
-        ):
-            raise TypeError("events must contain IncrementalEvent values")
+        if any(not isinstance(event, Event) for event in self.events):
+            raise TypeError("events must contain Event values")
         if tuple(sorted(set(self.duplicate_event_ids))) != (
             self.duplicate_event_ids
         ):
@@ -457,7 +455,7 @@ class EventAcknowledgement:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class EventConsumerResult:
+class Consumption:
     """Evidence from one durable consume-and-acknowledge cycle.
 
     Attributes:
@@ -505,7 +503,7 @@ class EventConsumerResult:
         }
 
 
-class IncrementalEventSource(abc.ABC):
+class EventSource(abc.ABC):
     """Polymorphic contract for a source that yields ordered events.
 
     Attributes:
@@ -518,23 +516,23 @@ class IncrementalEventSource(abc.ABC):
     def __init__(
         self,
         source_uri: str,
-        late_data_policy: LateDataPolicy = LateDataPolicy.REJECT,
+        late_data_policy: LateData = LateData.REJECT,
     ) -> None:
         """Initializes source identity and late-data policy.
 
         Args:
             source_uri: URI of the source; canonicalized on binding.
             late_data_policy: Policy for late events; a plain string value of
-                LateDataPolicy is accepted.
+                LateData is accepted.
         """
-        if not isinstance(late_data_policy, LateDataPolicy):
-            late_data_policy = LateDataPolicy(late_data_policy)
+        if not isinstance(late_data_policy, LateData):
+            late_data_policy = LateData(late_data_policy)
         self.source_uri = connectors.canonical_source_uri(source_uri)
         self.source_identity = connectors.source_identity(self.source_uri)
         self.late_data_policy = late_data_policy
 
     @abc.abstractmethod
-    def available_events(self) -> Iterable[IncrementalEvent]:
+    def available_events(self) -> Iterable[Event]:
         """Returns available events without changing committed state.
 
         Returns:
@@ -571,7 +569,7 @@ class IncrementalEventSource(abc.ABC):
 
     def select_events(
         self,
-        records: Iterable[IncrementalEvent],
+        records: Iterable[Event],
         checkpoint: EventCheckpoint | None = None,
         seen_event_ids: Iterable[str] = (),
         limit: int = 1_000,
@@ -601,7 +599,7 @@ class IncrementalEventSource(abc.ABC):
         Raises:
             ValueError: If `limit` is not positive, or a selected event's
                 time is not a timezone-aware ISO-8601 string.
-            TypeError: If `records` holds something other than IncrementalEvent
+            TypeError: If `records` holds something other than Event
                 values.
             IncrementalError: With code "late_event" if a late event is found
                 and the policy is REJECT. An invalid checkpoint also raises
@@ -612,16 +610,14 @@ class IncrementalEventSource(abc.ABC):
         current = self.validate_checkpoint(checkpoint)
         committed = frozenset(seen_event_ids)
         values = tuple(records)
-        if any(not isinstance(event, IncrementalEvent) for event in values):
-            raise TypeError(
-                "transport records must yield IncrementalEvent values"
-            )
+        if any(not isinstance(event, Event) for event in values):
+            raise TypeError("transport records must yield Event values")
         ordered = tuple(
             sorted(values, key=lambda event: (event.sequence, event.event_id))
         )
         duplicates: set[str] = set()
         late: set[str] = set()
-        eligible: list[IncrementalEvent] = []
+        eligible: list[Event] = []
         selected_ids: set[str] = set()
         for event in ordered:
             if event.event_id in committed or event.event_id in selected_ids:
@@ -629,9 +625,9 @@ class IncrementalEventSource(abc.ABC):
                 continue
             if event.sequence <= current.sequence:
                 late.add(event.event_id)
-                if self.late_data_policy is LateDataPolicy.DROP:
+                if self.late_data_policy is LateData.DROP:
                     continue
-                if self.late_data_policy is LateDataPolicy.REJECT:
+                if self.late_data_policy is LateData.REJECT:
                     raise IncrementalError(
                         "late_event",
                         f"event '{event.event_id}' is older than checkpoint",
@@ -701,15 +697,14 @@ class IncrementalEventSource(abc.ABC):
         )
 
 
-class SequenceEventSource(IncrementalEventSource):
+class SequenceEventSource(EventSource):
     """Deterministic source adapter for tests and local replay fixtures."""
 
     def __init__(
         self,
         source_uri: str,
-        events: Iterable[IncrementalEvent]
-        | Callable[[], Iterable[IncrementalEvent]],
-        late_data_policy: LateDataPolicy = LateDataPolicy.REJECT,
+        events: Iterable[Event] | Callable[[], Iterable[Event]],
+        late_data_policy: LateData = LateData.REJECT,
     ) -> None:
         """Initializes a source from a fixed sequence or event factory.
 
@@ -727,7 +722,7 @@ class SequenceEventSource(IncrementalEventSource):
             values = tuple(events)
             self.event_factory = lambda: values
 
-    def available_events(self) -> Iterable[IncrementalEvent]:
+    def available_events(self) -> Iterable[Event]:
         """Returns the current event view supplied by the transport seam.
 
         Returns:
@@ -736,7 +731,7 @@ class SequenceEventSource(IncrementalEventSource):
         return self.event_factory()
 
 
-class EventStreamSource(IncrementalEventSource):
+class EventStreamSource(EventSource):
     """Bounded event-stream adapter around a caller-owned poll boundary.
 
     The callback is the only transport-specific surface. It receives the
@@ -763,10 +758,8 @@ class EventStreamSource(IncrementalEventSource):
     def __init__(
         self,
         source_uri: str,
-        event_reader: Callable[
-            [str, EventCheckpoint, int], Iterable[IncrementalEvent]
-        ],
-        late_data_policy: LateDataPolicy = LateDataPolicy.REJECT,
+        event_reader: Callable[[str, EventCheckpoint, int], Iterable[Event]],
+        late_data_policy: LateData = LateData.REJECT,
         retry_budget: connectors.RetryBudget | None = None,
     ) -> None:
         """Initializes a source around an injected broker poll callback.
@@ -795,7 +788,7 @@ class EventStreamSource(IncrementalEventSource):
         self.event_reader = event_reader
         self.retry_budget = retry_budget or connectors.RetryBudget()
 
-    def available_events(self) -> Iterable[IncrementalEvent]:
+    def available_events(self) -> Iterable[Event]:
         """Rejects unbounded polling without a checkpoint and limit.
 
         Raises:
@@ -811,7 +804,7 @@ class EventStreamSource(IncrementalEventSource):
 
     def poll_events(
         self, checkpoint: EventCheckpoint, limit: int
-    ) -> tuple[IncrementalEvent, ...]:
+    ) -> tuple[Event, ...]:
         """Polls a bounded transport batch with retry evidence.
 
         The reader is called under the retry budget; if every attempt fails
@@ -871,7 +864,7 @@ class EventStreamSource(IncrementalEventSource):
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class CommittedIncrementalState:
+class CommittedState:
     """Durable event IDs and checkpoint after an atomic ingestion commit.
 
     Attributes:
@@ -928,7 +921,7 @@ class CommittedIncrementalState:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class IncrementalIngestionLedger:
+class IngestionLedger:
     """Atomic durable commit boundary for incremental event processing.
 
     Attributes:
@@ -979,7 +972,7 @@ class IncrementalIngestionLedger:
                 else:
                     fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
-    def load(self) -> CommittedIncrementalState:
+    def load(self) -> CommittedState:
         """Loads committed state or initialize an empty source state.
 
         An unreadable or malformed state file raises the parsing error
@@ -994,11 +987,9 @@ class IncrementalIngestionLedger:
                 state belongs to another source.
         """
         if not self.path.exists():
-            return CommittedIncrementalState(
-                EventCheckpoint(self.source_identity)
-            )
+            return CommittedState(EventCheckpoint(self.source_identity))
         record = json.loads(self.path.read_text(encoding="utf-8"))
-        state = CommittedIncrementalState.from_dict(record)
+        state = CommittedState.from_dict(record)
         if state.checkpoint.source_identity != self.source_identity:
             raise IncrementalError(
                 "state_source_mismatch",
@@ -1008,9 +999,7 @@ class IncrementalIngestionLedger:
             )
         return state
 
-    def read_batch(
-        self, source: IncrementalEventSource, limit: int = 1_000
-    ) -> EventBatch:
+    def read_batch(self, source: EventSource, limit: int = 1_000) -> EventBatch:
         """Reads an uncommitted batch using the durable deduplication state.
 
         Args:
@@ -1035,7 +1024,7 @@ class IncrementalIngestionLedger:
         state = self.load()
         return source.read_events(state.checkpoint, state.seen_event_ids, limit)
 
-    def write_atomically(self, state: CommittedIncrementalState) -> None:
+    def write_atomically(self, state: CommittedState) -> None:
         """Publishes state with a durable temporary-file replacement.
 
         Callers that combine a read and write must hold ``lock``. This method
@@ -1160,7 +1149,7 @@ class IncrementalIngestionLedger:
         self.pending_acknowledgement_path.unlink(missing_ok=True)
         durability.sync_directory(self.pending_acknowledgement_path.parent)
 
-    def commit(self, batch: EventBatch) -> CommittedIncrementalState:
+    def commit(self, batch: EventBatch) -> CommittedState:
         """Atomically publishes a processed batch's IDs and checkpoint.
 
         Args:
@@ -1204,7 +1193,7 @@ class IncrementalIngestionLedger:
                         "candidate": batch.next_checkpoint.to_dict(),
                     },
                 )
-            state = CommittedIncrementalState(
+            state = CommittedState(
                 batch.next_checkpoint,
                 tuple(
                     sorted(set(current.seen_event_ids) | set(batch.event_ids))
@@ -1215,8 +1204,8 @@ class IncrementalIngestionLedger:
 
     def commit_with_writer(
         self,
-        events: Iterable[IncrementalEvent],
-        writer: Callable[[tuple[IncrementalEvent, ...]], None],
+        events: Iterable[Event],
+        writer: Callable[[tuple[Event, ...]], None],
         acknowledgement: EventAcknowledgement | None = None,
     ) -> EventCommitReceipt:
         """Writes unseen events and commit their IDs under one ledger lock.
@@ -1245,15 +1234,15 @@ class IncrementalIngestionLedger:
             otherwise the unchanged current checkpoint.
 
         Raises:
-            TypeError: If `events` holds something other than IncrementalEvent
+            TypeError: If `events` holds something other than Event
                 values or `writer` is not callable.
             IncrementalError: If the acknowledgement belongs to another source
                 (code "acknowledgement_source_mismatch") or the stored state
                 belongs to another source.
         """
         records = tuple(events)
-        if not all(isinstance(event, IncrementalEvent) for event in records):
-            raise TypeError("events must contain IncrementalEvent values")
+        if not all(isinstance(event, Event) for event in records):
+            raise TypeError("events must contain Event values")
         if not callable(writer):
             raise TypeError("writer must be callable")
         if (
@@ -1270,7 +1259,7 @@ class IncrementalIngestionLedger:
             current = self.load()
             seen = set(current.seen_event_ids)
             duplicates: set[str] = set()
-            accepted: list[IncrementalEvent] = []
+            accepted: list[Event] = []
             for event in sorted(
                 records, key=lambda value: (value.sequence, value.event_id)
             ):
@@ -1302,7 +1291,7 @@ class IncrementalIngestionLedger:
                     max(timestamps).isoformat(),
                 )
                 self.write_atomically(
-                    CommittedIncrementalState(checkpoint, tuple(sorted(seen)))
+                    CommittedState(checkpoint, tuple(sorted(seen)))
                 )
             else:
                 checkpoint = current.checkpoint
@@ -1340,10 +1329,10 @@ class EventConsumer:
 
     def __init__(
         self,
-        source: IncrementalEventSource,
-        ledger: IncrementalIngestionLedger,
+        source: EventSource,
+        ledger: IngestionLedger,
         consumer_group: str,
-        writer: Callable[[tuple[IncrementalEvent, ...]], None],
+        writer: Callable[[tuple[Event, ...]], None],
         acknowledge: Callable[[EventAcknowledgement], None],
     ) -> None:
         """Initializes a consumer around explicit transport and sink seams.
@@ -1420,7 +1409,7 @@ class EventConsumer:
         self.ledger.clear_pending_acknowledgement()
         return pending.event_ids
 
-    def consume(self, limit: int = 1_000) -> EventConsumerResult:
+    def consume(self, limit: int = 1_000) -> Consumption:
         """Consume, durably commit, acknowledge, and return evidence.
 
         A previously staged acknowledgement is delivered first. Failures from
@@ -1452,7 +1441,7 @@ class EventConsumer:
             batch.events, self.writer, acknowledgement
         )
         acknowledged = self.deliver_pending_acknowledgement()
-        return EventConsumerResult(
+        return Consumption(
             source_identity=self.source.source_identity,
             consumer_group=self.consumer_group,
             receipt=receipt,

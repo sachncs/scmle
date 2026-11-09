@@ -13,7 +13,7 @@ import scmle.evaluation.suite
 from scmle.explainability import importance
 from scmle.models import registry
 
-REGISTRY = registry.ModelRegistry.with_builtins()
+REGISTRY = registry.Catalog.with_builtins()
 PLAN = data.FeaturePlan(("signal", "noise"), ("group",))
 
 
@@ -26,14 +26,14 @@ def make_inputs(task, seed=0, rows=600):
             "group": rng.choice(["a", "b", "c"], rows),
         }
     )
-    if task is tasks.TaskType.REGRESSION:
+    if task is tasks.Task.REGRESSION:
         target = pandas.Series(
             3 * frame.signal + (frame.group == "a") + rng.normal(0, 0.2, rows)
         )
         adapter = REGISTRY.get("ridge")
     else:
         labels = (frame.signal + rng.normal(0, 0.5, rows) > 0).astype(int)
-        if task is tasks.TaskType.MULTICLASS:
+        if task is tasks.Task.MULTICLASS:
             labels = labels + (frame.signal > 1).astype(int)
         target = pandas.Series(labels)
         adapter = REGISTRY.get("logistic_regression")
@@ -49,7 +49,7 @@ def make_inputs(task, seed=0, rows=600):
 
 def test_importance_ranks_the_signal_feature_first():
     report = importance.PermutationImportance().compute(
-        make_inputs(tasks.TaskType.BINARY)
+        make_inputs(tasks.Task.BINARY)
     )
     ranked = [row["feature"] for row in report["features"]]
     assert ranked[0] == "signal" and ranked[-1] in {"noise", "group"}
@@ -57,8 +57,8 @@ def test_importance_ranks_the_signal_feature_first():
 
 
 def test_classification_report_matches_sklearn():
-    inputs = make_inputs(tasks.TaskType.MULTICLASS)
-    report = diagnostics.ClassificationReport().compute(inputs)
+    inputs = make_inputs(tasks.Task.MULTICLASS)
+    report = diagnostics.ConfusionMatrix().compute(inputs)
     matrix = numpy.array(report["confusion_matrix"])
     assert matrix.sum() == len(inputs.target)
     assert sum(c["support"] for c in report["per_class"].values()) == len(
@@ -68,26 +68,22 @@ def test_classification_report_matches_sklearn():
 
 
 def test_calibration_report_is_consistent():
-    report = diagnostics.CalibrationReport().compute(
-        make_inputs(tasks.TaskType.BINARY)
-    )
+    report = diagnostics.Calibration().compute(make_inputs(tasks.Task.BINARY))
     assert 0.0 <= report["brier_score"] <= 0.5
     assert 0.0 <= report["expected_calibration_error"] < 0.2
     assert sum(b["count"] for b in report["curve"]) == 300
 
 
 def test_threshold_report_trades_precision_for_recall():
-    rows = diagnostics.ThresholdReport().compute(
-        make_inputs(tasks.TaskType.BINARY)
-    )["thresholds"]
+    rows = diagnostics.ThresholdSweep().compute(make_inputs(tasks.Task.BINARY))[
+        "thresholds"
+    ]
     assert rows[0]["recall"] >= rows[-1]["recall"]
     assert rows[0]["precision"] <= rows[-1]["precision"]
 
 
 def test_residual_report_segments_and_bias():
-    report = diagnostics.ResidualReport().compute(
-        make_inputs(tasks.TaskType.REGRESSION)
-    )
+    report = diagnostics.Residuals().compute(make_inputs(tasks.Task.REGRESSION))
     assert abs(report["bias"]) < 0.3 and report["mae"] > 0
     assert set(report["segments"]["group"]) == {"a", "b", "c"}
     numeric = [c for c in report["segments"] if c != "group"]
@@ -103,9 +99,7 @@ def test_residual_report_segments_and_bias():
 
 def test_error_analysis_ranks_misclassified_rows_without_feature_values():
     """Classification errors are reviewable without copying raw features."""
-    report = diagnostics.ErrorAnalysis().compute(
-        make_inputs(tasks.TaskType.BINARY)
-    )
+    report = diagnostics.ErrorAnalysis().compute(make_inputs(tasks.Task.BINARY))
 
     assert report["row_count"] == 300
     assert report["misclassified_count"] > 0
@@ -117,7 +111,7 @@ def test_error_analysis_ranks_misclassified_rows_without_feature_values():
 def test_error_analysis_ranks_regression_residuals():
     """Regression errors carry bounded residual evidence."""
     report = diagnostics.ErrorAnalysis().compute(
-        make_inputs(tasks.TaskType.REGRESSION)
+        make_inputs(tasks.Task.REGRESSION)
     )
 
     assert report["task"] == "regression"
@@ -130,7 +124,7 @@ def test_error_analysis_ranks_regression_residuals():
 
 def test_suite_selects_by_task_and_isolates_failures():
     suite = scmle.evaluation.suite.full_suite()
-    binary = diagnostics.run_suite(make_inputs(tasks.TaskType.BINARY), suite)
+    binary = diagnostics.run_suite(make_inputs(tasks.Task.BINARY), suite)
     assert set(binary) == {
         "classification_report",
         "calibration",
@@ -146,7 +140,7 @@ def test_suite_selects_by_task_and_isolates_failures():
         "adversarial_validation",
     }
     regression = diagnostics.run_suite(
-        make_inputs(tasks.TaskType.REGRESSION), suite
+        make_inputs(tasks.Task.REGRESSION), suite
     )
     assert set(regression) == {
         "residuals",
@@ -168,17 +162,17 @@ def test_suite_selects_by_task_and_isolates_failures():
             raise RuntimeError("boom")
 
     reports = diagnostics.run_suite(
-        make_inputs(tasks.TaskType.BINARY),
-        (Broken(), diagnostics.CalibrationReport()),
+        make_inputs(tasks.Task.BINARY),
+        (Broken(), diagnostics.Calibration()),
     )
     assert reports["broken"] == {"error": "RuntimeError: boom"}
     assert "brier_score" in reports["calibration"]
 
 
 def test_positive_label_comes_from_the_fitted_classes():
-    inputs = make_inputs(tasks.TaskType.BINARY)
+    inputs = make_inputs(tasks.Task.BINARY)
     assert inputs.positive_label == 1
-    assert make_inputs(tasks.TaskType.REGRESSION).positive_label is None
+    assert make_inputs(tasks.Task.REGRESSION).positive_label is None
 
 
 def make_clustered_inputs(clusters=40, per_cluster=15, seed=0, grouped=True):
@@ -200,15 +194,15 @@ def make_clustered_inputs(clusters=40, per_cluster=15, seed=0, grouped=True):
     split = rows // 2
     adapter = REGISTRY.get("logistic_regression")
     model = preprocessing.build_pipeline(
-        PLAN, adapter, tasks.TaskType.BINARY, 0
+        PLAN, adapter, tasks.Task.BINARY, 0
     ).fit(frame.iloc[:split], target.iloc[:split])
-    metric = metrics.CATALOG.resolve("accuracy", tasks.TaskType.BINARY)
+    metric = metrics.CATALOG.resolve("accuracy", tasks.Task.BINARY)
     held = frame.iloc[split:]
     return diagnostics.DiagnosticInput(
         model,
         held,
         target.iloc[split:],
-        tasks.TaskType.BINARY,
+        tasks.Task.BINARY,
         metric,
         PLAN,
         0,
@@ -220,7 +214,7 @@ def make_clustered_inputs(clusters=40, per_cluster=15, seed=0, grouped=True):
 
 def test_uncertainty_reports_an_interval_around_the_estimate():
     report = diagnostics.MetricUncertainty().compute(
-        make_inputs(tasks.TaskType.BINARY)
+        make_inputs(tasks.Task.BINARY)
     )
     low, high = report["ci_95"]
     assert low <= report["estimate"] <= high and high - low < 0.2
@@ -243,7 +237,7 @@ def test_group_bootstrap_is_wider_than_a_naive_row_bootstrap():
 
 
 def test_temporal_inputs_use_contiguous_blocks():
-    inputs = make_inputs(tasks.TaskType.BINARY)
+    inputs = make_inputs(tasks.Task.BINARY)
     temporal = diagnostics.DiagnosticInput(
         inputs.estimator,
         inputs.features,
@@ -276,7 +270,7 @@ def test_group_resamples_keep_whole_groups_together():
 
 def test_regression_uncertainty_works():
     report = diagnostics.MetricUncertainty().compute(
-        make_inputs(tasks.TaskType.REGRESSION)
+        make_inputs(tasks.Task.REGRESSION)
     )
     assert (
         report["metric"] == "rmse" and report["ci_95"][0] <= report["ci_95"][1]
@@ -284,7 +278,7 @@ def test_regression_uncertainty_works():
 
 
 def test_cached_predictions_match_the_model():
-    inputs = make_inputs(tasks.TaskType.BINARY)
+    inputs = make_inputs(tasks.Task.BINARY)
     replay = diagnostics.ClassifierReplay(inputs.estimator, inputs.features)
     subset = inputs.features.iloc[[3, 1, 2]]
     numpy.testing.assert_array_equal(
@@ -294,8 +288,8 @@ def test_cached_predictions_match_the_model():
         replay.predict_proba(subset), inputs.estimator.predict_proba(subset)
     )
     bare = diagnostics.CachedPredictions(
-        make_inputs(tasks.TaskType.REGRESSION).estimator,
-        make_inputs(tasks.TaskType.REGRESSION).features,
+        make_inputs(tasks.Task.REGRESSION).estimator,
+        make_inputs(tasks.Task.REGRESSION).features,
     )
     with pytest.raises(Exception, match="no probabilities"):
         bare.predict_proba(inputs.features)
@@ -321,7 +315,7 @@ def test_uncertainty_is_unavailable_when_every_resample_fails():
             return 0.5
 
     Failing.first = True
-    inputs = make_inputs(tasks.TaskType.BINARY)
+    inputs = make_inputs(tasks.Task.BINARY)
     inputs = diagnostics.DiagnosticInput(
         inputs.estimator,
         inputs.features,

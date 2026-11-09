@@ -20,7 +20,7 @@ from typing import Any
 from benchmarks import datasets
 from benchmarks import intervals
 from benchmarks import reference
-import scmle
+import scmle.api.project
 from scmle.core import limits
 
 LOGGER = logging.getLogger(__name__)
@@ -115,7 +115,7 @@ def run_one(
         frame = dataset.load()
         cv_scores: list[float] = []
         for seed in range(seeds):
-            project = scmle.MLProject(
+            project = scmle.api.project.Project(
                 frame,
                 dataset.target,
                 task=dataset.task,

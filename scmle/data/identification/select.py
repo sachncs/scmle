@@ -23,7 +23,7 @@ ASSOCIATIONAL = (
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class Strategy:
+class Method:
     """What a strategy needs before it may run.
 
     Attributes:
@@ -42,31 +42,31 @@ class Strategy:
     family: str
 
 
-STRATEGIES: dict[str, Strategy] = {
+STRATEGIES: dict[str, Method] = {
     s.name: s
     for s in (
-        Strategy(
+        Method(
             "randomized_diff",
             ("ATE",),
             ("randomized_assignment", "no_interference"),
             (),
             "difference in means with a recorded assignment mechanism",
         ),
-        Strategy(
+        Method(
             "backdoor_aipw",
             ("ATE", "ATT"),
             ("unconfoundedness_given", "positivity", "no_interference"),
             (),
             "cross-fitted augmented IPW under back-door adjustment",
         ),
-        Strategy(
+        Method(
             "did",
             ("ATT_DID",),
             ("parallel_trends", "no_anticipation", "no_interference"),
             ("unit", "time", "adoption"),
             "group-time difference in differences",
         ),
-        Strategy(
+        Method(
             "iv",
             ("LATE",),
             (
@@ -78,14 +78,14 @@ STRATEGIES: dict[str, Strategy] = {
             ("instrument",),
             "just-identified two-stage least squares",
         ),
-        Strategy(
+        Method(
             "rd",
             ("LATE_RD",),
             ("continuity_at_cutoff", "no_manipulation"),
             ("running_variable", "cutoff"),
             "local linear regression discontinuity",
         ),
-        Strategy(
+        Method(
             "synth",
             ("ATT_SC",),
             ("synthetic_hull", "no_interference"),
@@ -196,8 +196,8 @@ class Plan:
 
 
 def judge(
-    strategy: Strategy,
-    spec: causal.CausalSpec,
+    strategy: Method,
+    spec: causal.Question,
     dag: scmle.data.admissibility.dag.Dag | None,
 ) -> Verdict:
     """Decides whether one strategy may run on this charter.
@@ -244,7 +244,7 @@ def judge(
 
 
 def check_adjustment(
-    spec: causal.CausalSpec, dag: scmle.data.admissibility.dag.Dag | None
+    spec: causal.Question, dag: scmle.data.admissibility.dag.Dag | None
 ) -> tuple[list[str], bool]:
     """Verifies the declared adjustment set against a declared DAG.
 
@@ -278,7 +278,7 @@ def check_adjustment(
 
 
 def select(
-    spec: causal.CausalSpec, dag: scmle.data.admissibility.dag.Dag | None = None
+    spec: causal.Question, dag: scmle.data.admissibility.dag.Dag | None = None
 ) -> Plan:
     """Chooses the primary strategy and the declared multiverse.
 
@@ -311,7 +311,7 @@ def select(
     )
 
 
-def refusal(plan: Plan, spec: causal.CausalSpec) -> Mapping[str, Any]:
+def refusal(plan: Plan, spec: causal.Question) -> Mapping[str, Any]:
     """Builds the `identification_report.json` of a run that cannot identify.
 
     Args:

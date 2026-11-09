@@ -9,7 +9,7 @@
    trace id and the model version;
 4. each step, and each later operator action (acknowledge, resolve), is an
    ``admin`` row in the hash-chained audit ledger
-   (`scmle.security.audit.AuditLog`), naming the actor and the incident.
+   (`scmle.security.audit.Log`), naming the actor and the incident.
 
 The ledger shows that rows were not edited or reordered; it does not prove who
 the actor was, which is the identity system's job.
@@ -77,7 +77,7 @@ class ResponseDesk:
     def __init__(
         self,
         directory: str | pathlib.Path,
-        audit: scmle.security.audit.AuditLog,
+        audit: scmle.security.audit.Log,
         notifier: notify.Notifier,
         model_version: str,
         artifact_digest: str,

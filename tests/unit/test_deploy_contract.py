@@ -24,10 +24,10 @@ def make_spec(**changes):
         ),
     }
     values.update(changes)
-    return contract.DeploymentSpec(**values)
+    return contract.Deployment(**values)
 
 
-class FakeAdapter(contract.ProviderAdapter):
+class FakeAdapter(contract.Provider):
     """Runs nothing; reports exactly what it was given, or a drift."""
 
     provider = "fake"
@@ -53,7 +53,7 @@ class FakeAdapter(contract.ProviderAdapter):
             "secret_names": tuple(s.name for s in spec.secrets),
         }
         values.update(self.drift)
-        self.last = contract.RuntimeReport(**values)
+        self.last = contract.Runtime(**values)
         return self.last
 
     def observe(self):
@@ -62,7 +62,7 @@ class FakeAdapter(contract.ProviderAdapter):
 
 def test_a_spec_round_trips_and_has_a_stable_digest():
     spec = make_spec()
-    rebuilt = contract.DeploymentSpec.from_dict(spec.to_dict())
+    rebuilt = contract.Deployment.from_dict(spec.to_dict())
     assert rebuilt == spec
     assert rebuilt.digest() == spec.digest()
     assert spec.digest().startswith("sha256:")
@@ -152,18 +152,18 @@ def test_resources_need_limits_above_requests_and_isolation():
 
 def test_health_needs_distinct_endpoints_and_sane_timing():
     with pytest.raises(errors.ConfigError, match="different"):
-        contract.HealthSpec("/z", "/z")
+        contract.Probes("/z", "/z")
     with pytest.raises(errors.ConfigError, match="start with"):
-        contract.HealthSpec("livez", "/readyz")
+        contract.Probes("livez", "/readyz")
     with pytest.raises(errors.ConfigError, match="period"):
-        contract.HealthSpec(period_seconds=1.0, timeout_seconds=2.0)
+        contract.Probes(period_seconds=1.0, timeout_seconds=2.0)
 
 
 def test_other_spec_formats_are_refused():
     record = make_spec().to_dict()
     record["format"] = 99
     with pytest.raises(errors.ConfigError, match="format"):
-        contract.DeploymentSpec.from_dict(record)
+        contract.Deployment.from_dict(record)
 
 
 def test_a_conforming_adapter_deploys():

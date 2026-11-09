@@ -20,7 +20,7 @@ DEFAULT_LAGS = (1, 2, 3, 7)
 DEFAULT_WINDOWS = (3, 7)
 
 
-class TaskType(enum.StrEnum):
+class Task(enum.StrEnum):
     """Supervised learning task kinds."""
 
     BINARY = "binary_classification"
@@ -37,15 +37,13 @@ class TaskType(enum.StrEnum):
     @property
     def is_classification(self) -> bool:
         """Whether the task predicts discrete classes."""
-        return self in (TaskType.BINARY, TaskType.MULTICLASS)
+        return self in (Task.BINARY, Task.MULTICLASS)
 
 
 FAIRNESS_WEIGHT = "fairness_weight"
 """Weight column the reweighing mitigation adds to development rows."""
 
-STANDARD_TASKS = frozenset(
-    {TaskType.BINARY, TaskType.MULTICLASS, TaskType.REGRESSION}
-)
+STANDARD_TASKS = frozenset({Task.BINARY, Task.MULTICLASS, Task.REGRESSION})
 """Tasks scikit-learn style estimators handle; survival needs its own models."""
 
 TaskRequest = Literal[
@@ -117,7 +115,7 @@ def forecast_nodes(record: dict[str, Any], value: str) -> list[dict[str, Any]]:
     """Returns lag, rolling and calendar nodes for a forecasting data record.
 
     Args:
-        record: The data record (a dict of `DataSpec` fields), giving the
+        record: The data record (a dict of `Dataset` fields), giving the
             lags, windows, seasonal period, time column and calendar parts;
             an empty lags or windows list means the defaults.
         value: The series value column.
@@ -173,7 +171,7 @@ class FeatureNode(FrozenModel):
     params: dict[str, Any] = pydantic.Field(default_factory=dict)
 
 
-class FeatureGraphSpec(FrozenModel):
+class FeatureGraph(FrozenModel):
     """An ordered set of derived features.
 
     Nodes are listed in dependency order: a node may only use raw columns and
@@ -234,7 +232,7 @@ class FeatureGraphSpec(FrozenModel):
         ).hexdigest()[:16]
 
 
-class DataSpec(FrozenModel):
+class Dataset(FrozenModel):
     """Where the data lives and what its columns mean.
 
     Attributes:
@@ -387,7 +385,7 @@ class DataSpec(FrozenModel):
     ingest_plan: str | None = None
 
 
-class ValidationSpec(FrozenModel):
+class Validation(FrozenModel):
     """How data is partitioned for model selection and final testing.
 
     Attributes:
@@ -423,7 +421,7 @@ class ValidationSpec(FrozenModel):
     window_rows: int | None = pydantic.Field(default=None, ge=1)
 
 
-class ResourceSpec(FrozenModel):
+class Resources(FrozenModel):
     """Compute limits for a run."""
 
     time_budget_seconds: int = pydantic.Field(default=1800, gt=0)
@@ -436,7 +434,7 @@ class ResourceSpec(FrozenModel):
     enforcement: Literal["hard", "cooperative"] = "hard"
 
 
-class SearchSpec(FrozenModel):
+class Search(FrozenModel):
     """Hyperparameter search settings (disabled when `top_models` is 0)."""
 
     top_models: int = pydantic.Field(default=2, ge=0)
@@ -447,7 +445,7 @@ class SearchSpec(FrozenModel):
     eta: int = pydantic.Field(default=3, ge=2)
 
 
-class StrategySpec(FrozenModel):
+class Strategies(FrozenModel):
     """Which data strategies to evaluate (imbalance and feature variants)."""
 
     names: list[str] = pydantic.Field(
@@ -473,13 +471,13 @@ class StrategySpec(FrozenModel):
     top_models: int = pydantic.Field(default=2, ge=0)
 
 
-class EnsembleSpec(FrozenModel):
+class Stacking(FrozenModel):
     """Stacking ensemble settings (disabled when `size` < 2)."""
 
     size: int = pydantic.Field(default=3, ge=0)
 
 
-class SelectionSpec(FrozenModel):
+class Selection(FrozenModel):
     """How the winning model is chosen and which constraints it must meet.
 
     Attributes:
@@ -543,7 +541,7 @@ class SelectionSpec(FrozenModel):
     pareto_tolerance: float = pydantic.Field(default=0.0, ge=0.0)
 
 
-class ModelSpec(FrozenModel):
+class Candidates(FrozenModel):
     """Which model families may be considered.
 
     Attributes:
@@ -563,7 +561,7 @@ class ModelSpec(FrozenModel):
     experimental_models: list[str] = pydantic.Field(default_factory=list)
 
 
-class DecisionSpec(FrozenModel):
+class Threshold(FrozenModel):
     """How binary probabilities become decisions (threshold optimization)."""
 
     threshold_objective: Literal[
@@ -573,7 +571,7 @@ class DecisionSpec(FrozenModel):
     false_negative_cost: float = pydantic.Field(default=1.0, gt=0)
 
 
-class FairnessSpec(FrozenModel):
+class Parity(FrozenModel):
     """Optional reduction of outcome gaps between groups (binary tasks).
 
     Attributes:
@@ -604,7 +602,7 @@ class FairnessSpec(FrozenModel):
     max_accuracy_cost: float = pydantic.Field(default=0.03, ge=0.0, lt=1.0)
 
 
-class ProblemSpec(FrozenModel):
+class Problem(FrozenModel):
     """What the model is for, so the result can be judged against it.
 
     Attributes:
@@ -620,26 +618,24 @@ class ProblemSpec(FrozenModel):
     success_criteria: dict[str, float] = pydantic.Field(default_factory=dict)
 
 
-class ProjectSpec(FrozenModel):
+class Config(FrozenModel):
     """The explicit, versioned specification of an ML project."""
 
     version: int = CONFIG_VERSION
-    data: DataSpec
+    data: Dataset
     task: TaskRequest = "auto"
     metric: str | None = None
-    validation: ValidationSpec = pydantic.Field(default_factory=ValidationSpec)
-    resources: ResourceSpec = pydantic.Field(default_factory=ResourceSpec)
-    search: SearchSpec = pydantic.Field(default_factory=SearchSpec)
-    strategies: StrategySpec = pydantic.Field(default_factory=StrategySpec)
-    models: ModelSpec = pydantic.Field(default_factory=ModelSpec)
-    feature_graph: FeatureGraphSpec = pydantic.Field(
-        default_factory=FeatureGraphSpec
-    )
-    ensemble: EnsembleSpec = pydantic.Field(default_factory=EnsembleSpec)
-    selection: SelectionSpec = pydantic.Field(default_factory=SelectionSpec)
-    decision: DecisionSpec = pydantic.Field(default_factory=DecisionSpec)
-    fairness: FairnessSpec = pydantic.Field(default_factory=FairnessSpec)
-    problem: ProblemSpec = pydantic.Field(default_factory=ProblemSpec)
+    validation: Validation = pydantic.Field(default_factory=Validation)
+    resources: Resources = pydantic.Field(default_factory=Resources)
+    search: Search = pydantic.Field(default_factory=Search)
+    strategies: Strategies = pydantic.Field(default_factory=Strategies)
+    models: Candidates = pydantic.Field(default_factory=Candidates)
+    feature_graph: FeatureGraph = pydantic.Field(default_factory=FeatureGraph)
+    ensemble: Stacking = pydantic.Field(default_factory=Stacking)
+    selection: Selection = pydantic.Field(default_factory=Selection)
+    decision: Threshold = pydantic.Field(default_factory=Threshold)
+    fairness: Parity = pydantic.Field(default_factory=Parity)
+    problem: Problem = pydantic.Field(default_factory=Problem)
     leakage_policy: Literal["warn", "block"] = "warn"
     # Path of an analysis charter. When set, the run splits the development
     # rows into exploration and sealed confirmation sets.
@@ -676,9 +672,7 @@ class ProjectSpec(FrozenModel):
             return values
         data = values.get("data")
         data_record = (
-            data.model_dump()
-            if isinstance(data, DataSpec)
-            else dict(data or {})
+            data.model_dump() if isinstance(data, Dataset) else dict(data or {})
         )
         delays = data_record.get("feature_delays") or {}
         if not delays:
@@ -686,7 +680,7 @@ class ProjectSpec(FrozenModel):
         graph = values.get("feature_graph")
         graph_record = (
             graph.model_dump()
-            if isinstance(graph, FeatureGraphSpec)
+            if isinstance(graph, FeatureGraph)
             else dict(graph or {})
         )
         nodes = list(graph_record.get("nodes", []))
@@ -732,9 +726,7 @@ class ProjectSpec(FrozenModel):
             return values
         data = values.get("data")
         record = (
-            data.model_dump()
-            if isinstance(data, DataSpec)
-            else dict(data or {})
+            data.model_dump() if isinstance(data, Dataset) else dict(data or {})
         )
         if record.get("value_column") or not record.get("horizon"):
             return values
@@ -743,7 +735,7 @@ class ProjectSpec(FrozenModel):
         graph = values.get("feature_graph")
         graph_record = (
             graph.model_dump()
-            if isinstance(graph, FeatureGraphSpec)
+            if isinstance(graph, FeatureGraph)
             else dict(graph or {})
         )
         known = list(graph_record.get("nodes", []))
@@ -944,7 +936,7 @@ class ProjectSpec(FrozenModel):
         """Whether the time budget is short enough to shrink the search."""
         return self.resources.time_budget_seconds < FAST_BUDGET_SECONDS
 
-    def effective_search(self) -> SearchSpec:
+    def effective_search(self) -> Search:
         """Returns the search settings in force, reduced under a short budget.
 
         Returns:
@@ -962,7 +954,7 @@ class ProjectSpec(FrozenModel):
             }
         )
 
-    def effective_strategies(self) -> StrategySpec:
+    def effective_strategies(self) -> Strategies:
         """Returns the strategy settings in force, reduced under a short budget.
 
         Returns:

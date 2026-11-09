@@ -18,7 +18,7 @@ Any other backend is written by the user against the same `ObjectStore`
 interface; no object-store SDK is a dependency. Keys are validated before
 they reach a backend (no `..`, empty segment or leading slash).
 `RetryingStore` retries `TransientStoreError` (throttling, timeouts, 5xx)
-under a `RetryPolicy`.
+under a `Retries`.
 
 `scmle.data.store.conformance.run_conformance(store)` is the one conformance
 suite, to be run against any backend you write: round trip, binary and empty and large objects, overwrite, missing
@@ -47,11 +47,11 @@ walks the lineage. `connector_reader(store)` plugs a store into the ingestion
 | Policy | Effect |
 | --- | --- |
 | `fail` | `QualityGateError` with the report; nothing continues |
-| `quarantine` | row-level rules remove the rows and write them with the report under `quarantine/<snapshot id>/`; dataset-level rules (`SchemaRule`, `FreshnessRule`, `MinRowsRule`, `NullFractionRule`) hold the whole snapshot: a marker is written, the run stops, and the same snapshot is refused until `release` |
+| `quarantine` | row-level rules remove the rows and write them with the report under `quarantine/<snapshot id>/`; dataset-level rules (`SchemaCheck`, `FreshnessCheck`, `MinRowsCheck`, `NullFractionCheck`) hold the whole snapshot: a marker is written, the run stops, and the same snapshot is refused until `release` |
 | `warn` | recorded in the report, data unchanged |
 
-Rules: `SchemaRule`, `FreshnessRule`, `MinRowsRule`, `NullFractionRule`,
-`NoNullsRule`, `UniqueKeyRule`, `RangeRule`, `AllowedValuesRule`, each
+Rules: `SchemaCheck`, `FreshnessCheck`, `MinRowsCheck`, `NullFractionCheck`,
+`NoNullsCheck`, `UniqueKeyCheck`, `RangeCheck`, `AllowedValuesCheck`, each
 limited to the stages it names. Every rule is evaluated before any action, and
 the report is written to `quality/` whatever the outcome.
 
@@ -60,7 +60,7 @@ the report is written to `quality/` whatever the outcome.
 `IncrementalProcessor` processes new objects under an input prefix in sorted
 key order, once each: dedup of repeated row keys and repeated uploads, a
 checkpoint with its own digest written after each object, transient errors
-retried under a `RetryPolicy` (reproducible backoff, no jitter), the output
+retried under a `Retries` (reproducible backoff, no jitter), the output
 written before the checkpoint, a lock object so two runs cannot share a
 checkpoint.
 

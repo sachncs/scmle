@@ -27,11 +27,11 @@ def trained():
         {"num": rng.normal(size=200), "cat": rng.choice(["a", "b"], 200)}
     )
     target = pandas.Series((features.num > 0).astype(int))
-    registry = scmle.models.registry.ModelRegistry.with_builtins()
+    registry = scmle.models.registry.Catalog.with_builtins()
     pipe = preprocessing.build_pipeline(
-        PLAN, registry.get("random_forest"), tasks.TaskType.BINARY, 0
+        PLAN, registry.get("random_forest"), tasks.Task.BINARY, 0
     ).fit(features, target)
-    bundle = scmle.artifacts.bundle.ModelBundle.create(
+    bundle = scmle.artifacts.bundle.Bundle.create(
         pipe, PLAN, features, "y", "binary_classification", "roc_auc", "rf"
     )
     return bundle, features
@@ -40,9 +40,7 @@ def trained():
 def test_roundtrip_prediction_equivalence(trained, tmp_path):
     bundle, features = trained
     bundle.save(tmp_path / "m")
-    loaded = scmle.artifacts.bundle.ModelBundle.load(
-        tmp_path / "m", trusted=True
-    )
+    loaded = scmle.artifacts.bundle.Bundle.load(tmp_path / "m", trusted=True)
     numpy.testing.assert_array_equal(
         bundle.predict(features), loaded.predict(features)
     )
@@ -85,7 +83,7 @@ def test_tampering_is_detected(trained, tmp_path):
     with (directory / scmle.artifacts.bundle.MODEL_FILE).open("ab") as handle:
         handle.write(b"x")
     with pytest.raises(errors.ArtifactError, match="checksum"):
-        scmle.artifacts.bundle.ModelBundle.load(directory, trusted=True)
+        scmle.artifacts.bundle.Bundle.load(directory, trusted=True)
 
 
 def test_schema_tampering_is_detected(trained, tmp_path):
@@ -94,7 +92,7 @@ def test_schema_tampering_is_detected(trained, tmp_path):
     schema = directory / scmle.artifacts.bundle.SCHEMA_FILE
     schema.write_text(schema.read_text() + "\n")
     with pytest.raises(errors.ArtifactError, match="schema file"):
-        scmle.artifacts.bundle.ModelBundle.load(directory, trusted=True)
+        scmle.artifacts.bundle.Bundle.load(directory, trusted=True)
 
 
 def test_version_mismatch_blocks_unless_allowed(trained, tmp_path):
@@ -105,8 +103,8 @@ def test_version_mismatch_blocks_unless_allowed(trained, tmp_path):
     manifest["sklearn"] = "0.1.0"
     path.write_text(json.dumps(manifest))
     with pytest.raises(errors.ArtifactError, match="different dependencies"):
-        scmle.artifacts.bundle.ModelBundle.load(directory, trusted=True)
-    relaxed = scmle.artifacts.bundle.ModelBundle.load(
+        scmle.artifacts.bundle.Bundle.load(directory, trusted=True)
+    relaxed = scmle.artifacts.bundle.Bundle.load(
         directory, trusted=True, allow_version_mismatch=True
     )
     assert len(relaxed.predict(features)) == len(features)
@@ -114,7 +112,7 @@ def test_version_mismatch_blocks_unless_allowed(trained, tmp_path):
 
 def test_invalid_bundles(tmp_path, trained):
     with pytest.raises(errors.ArtifactError, match="not a model bundle"):
-        scmle.artifacts.bundle.ModelBundle.load(tmp_path, trusted=True)
+        scmle.artifacts.bundle.Bundle.load(tmp_path, trusted=True)
     bundle = trained[0]
     directory = bundle.save(tmp_path / "m")
     path = directory / scmle.artifacts.bundle.MANIFEST_FILE
@@ -122,7 +120,7 @@ def test_invalid_bundles(tmp_path, trained):
     manifest["format"] = 99
     path.write_text(json.dumps(manifest))
     with pytest.raises(errors.ArtifactError, match="unsupported"):
-        scmle.artifacts.bundle.ModelBundle.load(directory, trusted=True)
+        scmle.artifacts.bundle.Bundle.load(directory, trusted=True)
 
 
 def test_legacy_bundle_requires_opt_in_and_can_be_migrated(tmp_path, trained):
@@ -133,8 +131,8 @@ def test_legacy_bundle_requires_opt_in_and_can_be_migrated(tmp_path, trained):
     manifest["files"].pop(scmle.artifacts.bundle.SCHEMA_FILE)
     manifest_path.write_text(json.dumps(manifest))
     with pytest.raises(errors.ArtifactError, match="unsupported"):
-        scmle.artifacts.bundle.ModelBundle.load(directory, trusted=True)
-    legacy = scmle.artifacts.bundle.ModelBundle.load(
+        scmle.artifacts.bundle.Bundle.load(directory, trusted=True)
+    legacy = scmle.artifacts.bundle.Bundle.load(
         directory, trusted=True, allow_legacy_format=True
     )
     migrated = legacy.save(tmp_path / "migrated")
@@ -145,9 +143,7 @@ def test_legacy_bundle_requires_opt_in_and_can_be_migrated(tmp_path, trained):
         == scmle.artifacts.bundle.BUNDLE_FORMAT
     )
     assert (
-        scmle.artifacts.bundle.ModelBundle.load(
-            migrated, trusted=True
-        ).info.format
+        scmle.artifacts.bundle.Bundle.load(migrated, trusted=True).info.format
         == 2
     )
 
@@ -156,7 +152,7 @@ def test_malformed_bundle_metadata_is_structured_error(tmp_path, trained):
     directory = trained[0].save(tmp_path / "m")
     (directory / scmle.artifacts.bundle.MANIFEST_FILE).write_text("not-json")
     with pytest.raises(errors.ArtifactError, match="invalid model bundle"):
-        scmle.artifacts.bundle.ModelBundle.load(directory, trusted=True)
+        scmle.artifacts.bundle.Bundle.load(directory, trusted=True)
 
 
 def test_unknown_signature_algorithm_is_rejected(trained, tmp_path):
@@ -166,18 +162,18 @@ def test_unknown_signature_algorithm_is_rejected(trained, tmp_path):
     record["algorithm"] = "sha256"
     signature_path.write_text(json.dumps(record))
     with pytest.raises(errors.ArtifactError, match="signature algorithm"):
-        scmle.artifacts.bundle.ModelBundle.load(directory, signing_key="secret")
+        scmle.artifacts.bundle.Bundle.load(directory, signing_key="secret")
 
 
 def test_regression_bundle_has_no_probabilities(tmp_path):
     rng = numpy.random.default_rng(1)
     features = pandas.DataFrame({"num": rng.normal(size=80)})
-    registry = scmle.models.registry.ModelRegistry.with_builtins()
+    registry = scmle.models.registry.Catalog.with_builtins()
     plan = data.FeaturePlan(("num",), ())
     pipe = preprocessing.build_pipeline(
-        plan, registry.get("ridge"), tasks.TaskType.REGRESSION, 0
+        plan, registry.get("ridge"), tasks.Task.REGRESSION, 0
     ).fit(features, features.num * 2)
-    bundle = scmle.artifacts.bundle.ModelBundle.create(
+    bundle = scmle.artifacts.bundle.Bundle.create(
         pipe, plan, features, "y", "regression", "rmse", "ridge"
     )
     assert bundle.classes is None
@@ -224,17 +220,17 @@ def test_reference_profile_roundtrips_and_is_checksummed(trained, tmp_path):
         features, PLAN, scores, "score", {"roc_auc": 0.9}
     )
     directory = bundle.save(tmp_path / "m")
-    loaded = scmle.artifacts.bundle.ModelBundle.load(directory, trusted=True)
+    loaded = scmle.artifacts.bundle.Bundle.load(directory, trusted=True)
     assert loaded.reference == bundle.reference
     assert scmle.artifacts.bundle.REFERENCE_FILE in loaded.info.files
     (directory / scmle.artifacts.bundle.REFERENCE_FILE).write_text("{}")
     with pytest.raises(errors.ArtifactError, match="reference profile"):
-        scmle.artifacts.bundle.ModelBundle.load(directory, trusted=True)
+        scmle.artifacts.bundle.Bundle.load(directory, trusted=True)
 
 
 def test_bundle_without_reference_still_loads(trained, tmp_path):
     bundle = trained[0]
-    loaded = scmle.artifacts.bundle.ModelBundle.load(
+    loaded = scmle.artifacts.bundle.Bundle.load(
         bundle.save(tmp_path / "m"), trusted=True
     )
     assert loaded.reference is None
@@ -247,11 +243,11 @@ def test_unsigned_bundles_are_refused_unless_trusted(
     bundle, features = trained
     directory = bundle.save(tmp_path / "m")
     with pytest.raises(errors.ArtifactError, match="unauthenticated"):
-        scmle.artifacts.bundle.ModelBundle.load(directory)
+        scmle.artifacts.bundle.Bundle.load(directory)
     assert len(
-        scmle.artifacts.bundle.ModelBundle.load(
-            directory, trusted=True
-        ).predict(features)
+        scmle.artifacts.bundle.Bundle.load(directory, trusted=True).predict(
+            features
+        )
     ) == len(features)
 
 
@@ -262,16 +258,12 @@ def test_signed_bundles_load_without_trust_and_detect_tampering(
     bundle, features = trained
     directory = bundle.save(tmp_path / "m", signing_key="s3cret")
     assert (directory / scmle.artifacts.bundle.SIGNATURE_FILE).exists()
-    loaded = scmle.artifacts.bundle.ModelBundle.load(
-        directory, signing_key="s3cret"
-    )
+    loaded = scmle.artifacts.bundle.Bundle.load(directory, signing_key="s3cret")
     assert len(loaded.predict(features)) == len(features)
     with pytest.raises(errors.ArtifactError, match="signature is invalid"):
-        scmle.artifacts.bundle.ModelBundle.load(
-            directory, signing_key="wrong-key"
-        )
+        scmle.artifacts.bundle.Bundle.load(directory, signing_key="wrong-key")
     with pytest.raises(errors.ArtifactError, match="signature is invalid"):
-        scmle.artifacts.bundle.ModelBundle.load(
+        scmle.artifacts.bundle.Bundle.load(
             directory, trusted=True, signing_key="wrong-key"
         )
 
@@ -291,7 +283,7 @@ def test_a_swapped_model_file_cannot_ride_a_valid_signature(
         (good / scmle.artifacts.bundle.SIGNATURE_FILE).read_bytes()
     )
     with pytest.raises(errors.ArtifactError, match="checksum"):
-        scmle.artifacts.bundle.ModelBundle.load(evil, signing_key="k")
+        scmle.artifacts.bundle.Bundle.load(evil, signing_key="k")
 
 
 def test_key_from_environment_signs_and_verifies(
@@ -301,11 +293,11 @@ def test_key_from_environment_signs_and_verifies(
     monkeypatch.setenv(scmle.artifacts.bundle.SIGNING_KEY_ENV, "env-key")
     directory = bundle.save(tmp_path / "m")
     assert len(
-        scmle.artifacts.bundle.ModelBundle.load(directory).predict(features)
+        scmle.artifacts.bundle.Bundle.load(directory).predict(features)
     ) == len(features)
     monkeypatch.delenv(scmle.artifacts.bundle.SIGNING_KEY_ENV)
     with pytest.raises(errors.ArtifactError, match="unauthenticated"):
-        scmle.artifacts.bundle.ModelBundle.load(directory)
+        scmle.artifacts.bundle.Bundle.load(directory)
 
 
 def test_signing_key_rotation_preserves_bundle_and_rejects_old_key(
@@ -313,14 +305,12 @@ def test_signing_key_rotation_preserves_bundle_and_rejects_old_key(
 ):
     bundle, features = trained
     directory = bundle.save(tmp_path / "m", signing_key="old-key")
-    scmle.artifacts.bundle.ModelBundle.rotate_signing_key(
+    scmle.artifacts.bundle.Bundle.rotate_signing_key(
         directory, "old-key", "new-key"
     )
     with pytest.raises(errors.ArtifactError, match="signature is invalid"):
-        scmle.artifacts.bundle.ModelBundle.load(
-            directory, signing_key="old-key"
-        )
-    loaded = scmle.artifacts.bundle.ModelBundle.load(
+        scmle.artifacts.bundle.Bundle.load(directory, signing_key="old-key")
+    loaded = scmle.artifacts.bundle.Bundle.load(
         directory, signing_key="new-key"
     )
     assert len(loaded.predict(features)) == len(features)
@@ -417,9 +407,7 @@ def test_round_trip_verification_catches_a_bundle_that_drifted(
 ):
     bundle, features = trained
     bundle.save(tmp_path / "m")
-    other = scmle.artifacts.bundle.ModelBundle.load(
-        tmp_path / "m", trusted=True
-    )
+    other = scmle.artifacts.bundle.Bundle.load(tmp_path / "m", trusted=True)
     flipped = features.assign(num=-features.num)
     other.pipeline = other.pipeline.fit(flipped, (flipped.num > 0).astype(int))
     with pytest.raises(errors.ArtifactError, match="does not reproduce"):
@@ -439,16 +427,14 @@ def test_inference_time_calibration_is_optional_persisted_and_verified(
     assert report["brier_after"] <= report["brier_before"] + 1e-9
     assert bundle.info.calibration.startswith("sigmoid on 200 rows")
     bundle.save(tmp_path / "m")
-    loaded = scmle.artifacts.bundle.ModelBundle.load(
-        tmp_path / "m", trusted=True
-    )
+    loaded = scmle.artifacts.bundle.Bundle.load(tmp_path / "m", trusted=True)
     numpy.testing.assert_allclose(loaded.predict_proba(features), calibrated)
     assert bundle.verify_round_trip(tmp_path / "m", features)["rows"] == 200
     (tmp_path / "m" / scmle.artifacts.bundle.CALIBRATOR_FILE).write_bytes(
         b"broken"
     )
     with pytest.raises(errors.ArtifactError, match="calibrator"):
-        scmle.artifacts.bundle.ModelBundle.load(tmp_path / "m", trusted=True)
+        scmle.artifacts.bundle.Bundle.load(tmp_path / "m", trusted=True)
 
 
 def test_calibration_rejects_unknown_methods_and_regression(trained):
@@ -461,7 +447,7 @@ def test_calibration_rejects_unknown_methods_and_regression(trained):
 
 
 def test_compatibility_checks_every_recorded_library():
-    info = scmle.artifacts.bundle.BundleInfo("m", "v1", "roc_auc")
+    info = scmle.artifacts.bundle.Manifest("m", "v1", "roc_auc")
     assert info.compatibility_problems() == []
     older = dataclasses.replace(
         info, libraries={**info.libraries, "numpy": "1.0.0"}
@@ -503,9 +489,7 @@ def test_the_lock_survives_saving_and_loading(trained, tmp_path):
     bundle = trained[0]
     bundle.save(tmp_path / "m")
 
-    loaded = scmle.artifacts.bundle.ModelBundle.load(
-        tmp_path / "m", trusted=True
-    )
+    loaded = scmle.artifacts.bundle.Bundle.load(tmp_path / "m", trusted=True)
 
     assert loaded.environment_lock() == bundle.environment_lock()
 
@@ -519,7 +503,7 @@ def test_a_version_mismatch_arrives_with_the_lock_attached(trained, tmp_path):
     manifest.write_text(json.dumps(recorded))
 
     with pytest.raises(errors.ArtifactError, match="scikit-learn") as caught:
-        scmle.artifacts.bundle.ModelBundle.load(tmp_path / "m", trusted=True)
+        scmle.artifacts.bundle.Bundle.load(tmp_path / "m", trusted=True)
 
     lock = caught.value.details["environment_lock"]
     assert lock == bundle.environment_lock()

@@ -10,7 +10,7 @@ from typing import Any
 from typing import Self
 
 
-class PerformanceOperation(enum.StrEnum):
+class Operation(enum.StrEnum):
     """Lifecycle operation whose resource cost can be released."""
 
     INGEST = "ingest"
@@ -40,10 +40,10 @@ def parse_timestamp(value: str, field_name: str) -> datetime.datetime:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class PerformanceObservation:
+class Observation:
     """One measured operation with the machine context for its result."""
 
-    operation: PerformanceOperation
+    operation: Operation
     elapsed_seconds: float
     peak_memory_gb: float | None
     sample_count: int
@@ -60,10 +60,8 @@ class PerformanceObservation:
                 count is negative (or a bool), the machine or software is
                 blank, or the timestamp is malformed or not offset-aware.
         """
-        if not isinstance(self.operation, PerformanceOperation):
-            object.__setattr__(
-                self, "operation", PerformanceOperation(self.operation)
-            )
+        if not isinstance(self.operation, Operation):
+            object.__setattr__(self, "operation", Operation(self.operation))
         if not math.isfinite(self.elapsed_seconds) or self.elapsed_seconds < 0:
             raise ValueError("elapsed_seconds must be finite and non-negative")
         if self.peak_memory_gb is not None and (
@@ -103,7 +101,7 @@ class PerformanceObservation:
             The observation.
         """
         return cls(
-            operation=PerformanceOperation(record["operation"]),
+            operation=Operation(record["operation"]),
             elapsed_seconds=float(record["elapsed_seconds"]),
             peak_memory_gb=(
                 float(record["peak_memory_gb"])
@@ -118,11 +116,11 @@ class PerformanceObservation:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class PerformanceRun:
+class Run:
     """One complete performance measurement run."""
 
     run_id: str
-    observations: tuple[PerformanceObservation, ...]
+    observations: tuple[Observation, ...]
 
     def __post_init__(self) -> None:
         """Rejects empty or ambiguous run evidence.
@@ -152,9 +150,7 @@ class PerformanceRun:
             )
         object.__setattr__(self, "observations", normalized)
 
-    def observation(
-        self, operation: PerformanceOperation
-    ) -> PerformanceObservation | None:
+    def observation(self, operation: Operation) -> Observation | None:
         """Returns the observation for an operation, when present.
 
         Args:
@@ -194,14 +190,14 @@ class PerformanceRun:
         return cls(
             run_id=str(record["run_id"]),
             observations=tuple(
-                PerformanceObservation.from_dict(observation)
+                Observation.from_dict(observation)
                 for observation in record["observations"]
             ),
         )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class PerformanceComparison:
+class Comparison:
     """Decision and measurements from a baseline comparison."""
 
     passed: bool
@@ -222,10 +218,10 @@ class PerformanceComparison:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class PerformanceBaseline:
+class Baseline:
     """Repeated-run performance baseline with a relative regression gate."""
 
-    reference_runs: tuple[PerformanceRun, ...]
+    reference_runs: tuple[Run, ...]
     max_relative_regression: float = 0.10
 
     def __post_init__(self) -> None:
@@ -294,7 +290,7 @@ class PerformanceBaseline:
             )
         object.__setattr__(self, "reference_runs", runs)
 
-    def evaluate(self, current: PerformanceRun) -> PerformanceComparison:
+    def evaluate(self, current: Run) -> Comparison:
         """Compares one run with the median of the repeated baseline.
 
         A run from a different environment, or with different sample counts,
@@ -350,7 +346,7 @@ class PerformanceBaseline:
             current.observations[0].software,
         )
         if current_environment != reference_environment:
-            return PerformanceComparison(
+            return Comparison(
                 passed=False,
                 baseline_run_count=len(self.reference_runs),
                 current_run_id=current.run_id,
@@ -380,7 +376,7 @@ class PerformanceBaseline:
                 )
         sample_count_violations = tuple(sample_count_violations_list)
         if sample_count_violations:
-            return PerformanceComparison(
+            return Comparison(
                 passed=False,
                 baseline_run_count=len(self.reference_runs),
                 current_run_id=current.run_id,
@@ -457,7 +453,7 @@ class PerformanceBaseline:
                     f"{memory_regression:.2%} exceeds "
                     f"{self.max_relative_regression:.2%}"
                 )
-        return PerformanceComparison(
+        return Comparison(
             passed=not violations,
             baseline_run_count=len(self.reference_runs),
             current_run_id=current.run_id,
@@ -491,10 +487,10 @@ def relative_change(reference: float, current: float) -> float:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class PerformanceBudget:
+class Budget:
     """Explicit time and optional memory ceilings for lifecycle operations."""
 
-    max_seconds: Mapping[PerformanceOperation, float]
+    max_seconds: Mapping[Operation, float]
     max_peak_memory_gb: float | None = None
 
     def __post_init__(self) -> None:
@@ -505,12 +501,12 @@ class PerformanceBudget:
                 memory limit is not positive and finite, or there are no time
                 limits.
         """
-        normalized: dict[PerformanceOperation, float] = {}
+        normalized: dict[Operation, float] = {}
         for operation, limit in self.max_seconds.items():
             resolved = (
                 operation
-                if isinstance(operation, PerformanceOperation)
-                else PerformanceOperation(operation)
+                if isinstance(operation, Operation)
+                else Operation(operation)
             )
             if not math.isfinite(limit) or limit <= 0:
                 raise ValueError(
@@ -526,9 +522,7 @@ class PerformanceBudget:
             raise ValueError("max_peak_memory_gb must be positive when present")
         object.__setattr__(self, "max_seconds", normalized)
 
-    def evaluate(
-        self, observations: tuple[PerformanceObservation, ...]
-    ) -> "PerformanceResult":
+    def evaluate(self, observations: tuple[Observation, ...]) -> "Verdict":
         """Evaluates observations without treating missing data as pass.
 
         Args:
@@ -544,7 +538,7 @@ class PerformanceBudget:
         Raises:
             ValueError: If an operation is observed more than once.
         """
-        by_operation: dict[PerformanceOperation, PerformanceObservation] = {}
+        by_operation: dict[Operation, Observation] = {}
         violations: list[str] = []
         for observation in observations:
             if observation.operation in by_operation:
@@ -582,7 +576,7 @@ class PerformanceBudget:
                     f"{memory:.6g} GB "
                     f"> {self.max_peak_memory_gb:.6g} GB budget"
                 )
-        return PerformanceResult(
+        return Verdict(
             passed=not violations,
             observations=observations,
             violations=tuple(violations),
@@ -602,11 +596,11 @@ class PerformanceBudget:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class PerformanceResult:
+class Verdict:
     """Budget decision with the observations that justify it."""
 
     passed: bool
-    observations: tuple[PerformanceObservation, ...]
+    observations: tuple[Observation, ...]
     violations: tuple[str, ...]
 
     def to_dict(self) -> dict[str, Any]:
@@ -621,13 +615,13 @@ class PerformanceResult:
 
 
 __all__ = [
-    "PerformanceBaseline",
-    "PerformanceBudget",
-    "PerformanceComparison",
-    "PerformanceObservation",
-    "PerformanceOperation",
-    "PerformanceResult",
-    "PerformanceRun",
+    "Baseline",
+    "Budget",
+    "Comparison",
+    "Observation",
+    "Operation",
+    "Run",
+    "Verdict",
     "parse_timestamp",
     "relative_change",
 ]

@@ -126,7 +126,7 @@ def int_from_segment(text: str) -> int:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class VerificationKey:
+class Key:
     """One key that may verify tokens.
 
     Attributes:
@@ -282,7 +282,7 @@ class KeySet:
         keys: The trusted keys by `kid`.
     """
 
-    def __init__(self, keys: Sequence[VerificationKey]) -> None:
+    def __init__(self, keys: Sequence[Key]) -> None:
         """Initializes the set.
 
         Args:
@@ -317,7 +317,7 @@ class KeySet:
         )
         if not isinstance(entries, list):
             raise errors.ConfigError("a JWKS document needs a keys list")
-        return cls([VerificationKey.from_jwk(entry) for entry in entries])
+        return cls([Key.from_jwk(entry) for entry in entries])
 
     @classmethod
     def from_file(cls, path: str | pathlib.Path) -> Self:
@@ -340,7 +340,7 @@ class KeySet:
         except (OSError, ValueError) as error:
             raise errors.ConfigError(f"cannot read key set {path}") from error
 
-    def get(self, kid: str) -> VerificationKey:
+    def get(self, kid: str) -> Key:
         """Looks up the key with this id.
 
         Args:
@@ -450,7 +450,7 @@ class Principal:
     expires: float
 
 
-class TokenVerifier:
+class Verifier:
     """Verifies bearer tokens against a key set and a revocation list.
 
     Attributes:
@@ -579,7 +579,7 @@ class TokenVerifier:
         self,
         header: Mapping[str, Any],
         claims: Mapping[str, Any],
-        key: VerificationKey,
+        key: Key,
         now: float,
     ) -> Principal:
         """Checks the claims of a token whose signature is valid.

@@ -1,7 +1,7 @@
 """The ingest block of the charter (formats 7 and 8).
 
-Everything here is optional: a charter without an `IngestSpec` serialises,
-hashes and loads exactly as a format 1 to 6 charter did, and an `IngestSpec`
+Everything here is optional: a charter without an `Ingestion` serialises,
+hashes and loads exactly as a format 1 to 6 charter did, and an `Ingestion`
 without the format 8 sub-blocks (`entity` and `reconcile`) serialises
 exactly as under format 7. The block fixes, before any data is read, how
 much the source may be asked (queries, rows scanned, seconds), how many
@@ -142,7 +142,7 @@ class EntityPass:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class EntitySpec:
+class Entity:
     """Entity resolution whose result is the split's group column (format 8).
 
     Attributes:
@@ -332,7 +332,7 @@ class TableTotals:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ReconcileSpec:
+class Expectation:
     """Totals the extract must reproduce, or the run stops (format 8).
 
     Attributes:
@@ -382,7 +382,7 @@ class ReconcileSpec:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class IngestSpec:
+class Ingestion:
     """Budget, windows and tolerances of an ingestion.
 
     Attributes:
@@ -417,8 +417,8 @@ class IngestSpec:
     eps_null: float = 0.0
     eps_fk: float = 0.0
     strict: bool = False
-    entity: EntitySpec | None = None
-    reconcile: ReconcileSpec | None = None
+    entity: Entity | None = None
+    reconcile: Expectation | None = None
 
     def __post_init__(self) -> None:
         """Validates the block.
@@ -483,11 +483,9 @@ class IngestSpec:
         qualification.require_fields(cls, values)
         values["windows"] = tuple(values["windows"])
         block = values["entity"]
-        values["entity"] = (
-            None if block is None else EntitySpec.from_dict(block)
-        )
+        values["entity"] = None if block is None else Entity.from_dict(block)
         totals = values["reconcile"]
         values["reconcile"] = (
-            None if totals is None else ReconcileSpec.from_dict(totals)
+            None if totals is None else Expectation.from_dict(totals)
         )
         return cls(**values)

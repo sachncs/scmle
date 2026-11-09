@@ -198,7 +198,7 @@ def load_candidate(manifest_path: str | pathlib.Path) -> gate.Candidate:
             ()
             if checks_path is None
             else tuple(
-                livetests.CheckResult.from_dict(item)
+                livetests.Check.from_dict(item)
                 for item in read_json(checks_path)
             )
         ),

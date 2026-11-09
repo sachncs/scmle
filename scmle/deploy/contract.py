@@ -48,7 +48,7 @@ class SecretSource(enum.StrEnum):
     STORE = "store"
 
 
-class DeploymentEnvironment(enum.StrEnum):
+class Environment(enum.StrEnum):
     """Named environments a spec may target."""
 
     LOCAL = "local"
@@ -429,7 +429,7 @@ class Resources:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class HealthSpec:
+class Probes:
     """Liveness and readiness probes and their timing.
 
     Attributes:
@@ -511,7 +511,7 @@ def canonical_json(payload: Mapping[str, Any]) -> bytes:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class DeploymentSpec:
+class Deployment:
     """Everything a provider needs to run one version of one service.
 
     Attributes:
@@ -527,11 +527,11 @@ class DeploymentSpec:
     """
 
     version: str
-    environment: DeploymentEnvironment
+    environment: Environment
     image: ImageRef
     bundle: BundleRef
     resources: Resources
-    health: HealthSpec = dataclasses.field(default_factory=HealthSpec)
+    health: Probes = dataclasses.field(default_factory=Probes)
     config: Mapping[str, str] = dataclasses.field(default_factory=dict)
     secrets: tuple[SecretRef, ...] = ()
     port: int = 8000
@@ -550,9 +550,7 @@ class DeploymentSpec:
         """
         if VERSION_PATTERN.fullmatch(str(self.version)) is None:
             raise errors.ConfigError("version is not valid")
-        object.__setattr__(
-            self, "environment", DeploymentEnvironment(self.environment)
-        )
+        object.__setattr__(self, "environment", Environment(self.environment))
         object.__setattr__(self, "config", dict(sorted(self.config.items())))
         object.__setattr__(self, "secrets", tuple(self.secrets))
         if not (0 < self.port < 65536):
@@ -578,7 +576,7 @@ class DeploymentSpec:
                 f"names are both config and secret: {', '.join(clash)}"
             )
         production = (
-            self.environment is DeploymentEnvironment.PRODUCTION
+            self.environment is Environment.PRODUCTION
             or self.config.get(ENVIRONMENT_VARIABLE) == PRODUCTION
         )
         if production and self.config.get(TRUSTED_VARIABLE) == "1":
@@ -630,11 +628,11 @@ class DeploymentSpec:
             )
         return cls(
             version=record["version"],
-            environment=DeploymentEnvironment(record["environment"]),
+            environment=Environment(record["environment"]),
             image=ImageRef.from_dict(record["image"]),
             bundle=BundleRef.from_dict(record["bundle"]),
             resources=Resources.from_dict(record["resources"]),
-            health=HealthSpec.from_dict(record["health"]),
+            health=Probes.from_dict(record["health"]),
             config=dict(record["config"]),
             secrets=tuple(SecretRef.from_dict(s) for s in record["secrets"]),
             port=record["port"],
@@ -654,7 +652,7 @@ class DeploymentSpec:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class RuntimeReport:
+class Runtime:
     """What a platform says is running, in the spec's own terms.
 
     Attributes:
@@ -688,9 +686,7 @@ class RuntimeReport:
         require_digest(self.bundle_digest, "report.bundle_digest")
 
 
-def conformance_problems(
-    spec: DeploymentSpec, report: RuntimeReport
-) -> list[str]:
+def conformance_problems(spec: Deployment, report: Runtime) -> list[str]:
     """Lists every way the running service differs from the spec.
 
     An empty list means the platform runs exactly what the spec says. The
@@ -742,7 +738,7 @@ def conformance_problems(
     return problems
 
 
-class ProviderAdapter(abc.ABC):
+class Provider(abc.ABC):
     """What a platform adapter implements; nothing else is provider-specific.
 
     Attributes:
@@ -760,7 +756,7 @@ class ProviderAdapter(abc.ABC):
         """
 
     @abc.abstractmethod
-    def apply(self, spec: DeploymentSpec) -> RuntimeReport:
+    def apply(self, spec: Deployment) -> Runtime:
         """Makes the platform run `spec` and reports what runs.
 
         Args:
@@ -771,14 +767,14 @@ class ProviderAdapter(abc.ABC):
         """
 
     @abc.abstractmethod
-    def observe(self) -> RuntimeReport:
+    def observe(self) -> Runtime:
         """Reads the running state back from the platform.
 
         Returns:
             The state the platform currently reports.
         """
 
-    def deploy(self, spec: DeploymentSpec) -> RuntimeReport:
+    def deploy(self, spec: Deployment) -> Runtime:
         """Applies `spec` and refuses a platform that does not conform.
 
         Args:

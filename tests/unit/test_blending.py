@@ -54,14 +54,14 @@ def test_multiclass_members_contribute_one_column_per_class():
 
 
 def test_the_blending_adapter_builds_working_ensembles_and_passes_conformance():
-    registry = scmle.models.registry.ModelRegistry.with_builtins()
+    registry = scmle.models.registry.Catalog.with_builtins()
     adapter = registry.get("blending")
 
     conformance.check_conformance(adapter)
 
     assert adapter.name == "blending" and adapter.family == "ensemble"
     estimator = adapter.build(
-        tasks.TaskType.BINARY,
+        tasks.Task.BINARY,
         0,
         {"members": [{"model": "decision_tree"}, {"model": "extra_trees"}]},
     )

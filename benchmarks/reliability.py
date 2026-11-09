@@ -6,7 +6,7 @@ it on synthetic data with known ground truth, and records the measured value
 next to the threshold it must meet:
 
 * `determinism`: the same seed gives the same selection and test score.
-* `replay`: `MLProject.verify_replay` classifies a rerun as `exact`.
+* `replay`: `Project.verify_replay` classifies a rerun as `exact`.
 * `no_false_skill`: pure-noise labels never produce a convincing score.
 * `leak_detection`: a planted leaked column is flagged and can block the run.
 * `bundle_roundtrip`: a saved, signed bundle predicts identically when loaded.
@@ -40,9 +40,12 @@ import pandas
 from sklearn import base
 
 import scmle
+import scmle.api.predict
+import scmle.api.project
 from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.evaluation import coverage
+import scmle.models.custom
 from scmle.monitoring import monitor
 
 LOGGER = logging.getLogger(__name__)
@@ -132,14 +135,14 @@ class CheckRecord:
 
 def fast_project(
     data: pandas.DataFrame, target: str, directory: pathlib.Path, **kwargs: Any
-) -> scmle.MLProject:
+) -> scmle.api.project.Project:
     """Builds a small in-process project so checks stay quick.
 
     Args:
         data: The dataset.
         target: Target column name.
         directory: Output directory of the run.
-        **kwargs: `MLProject` arguments overriding the quick defaults
+        **kwargs: `Project` arguments overriding the quick defaults
             (no top-model, strategy or ensemble search, bagging, deep
             learning and foundation families excluded, cooperative
             enforcement, a 120 second budget and a `warn` leakage policy).
@@ -147,19 +150,21 @@ def fast_project(
     Returns:
         The configured, not yet run, project.
     """
-    kwargs.setdefault("search", tasks.SearchSpec(top_models=0))
-    kwargs.setdefault("strategies", tasks.StrategySpec(top_models=0))
-    kwargs.setdefault("ensemble", tasks.EnsembleSpec(size=0))
+    kwargs.setdefault("search", tasks.Search(top_models=0))
+    kwargs.setdefault("strategies", tasks.Strategies(top_models=0))
+    kwargs.setdefault("ensemble", tasks.Stacking(size=0))
     kwargs.setdefault(
         "models",
-        tasks.ModelSpec(
+        tasks.Candidates(
             exclude_families=["bagging", "deep_learning", "foundation"]
         ),
     )
     kwargs.setdefault("enforcement", "cooperative")
     kwargs.setdefault("time_budget", 120)
     kwargs.setdefault("leakage_policy", "warn")  # the checks set it themselves
-    return scmle.MLProject(data, target, output_dir=directory, **kwargs)
+    return scmle.api.project.Project(
+        data, target, output_dir=directory, **kwargs
+    )
 
 
 def binary_data(rows: int = 600, seed: int = 0) -> pandas.DataFrame:
@@ -253,7 +258,7 @@ def check_replay(directory: pathlib.Path) -> CheckRecord:
     )
     data = binary_data()
     result = fast_project(data, "y", directory / "original", seed=3).run()
-    verdict = scmle.MLProject.verify_replay(
+    verdict = scmle.api.project.Project.verify_replay(
         result.run_dir, data=data, output_dir=directory / "rerun"
     )
     record.measured = {
@@ -363,7 +368,9 @@ def check_bundle_roundtrip(directory: pathlib.Path) -> CheckRecord:
     features = data.drop(columns="y")
     bundle_directory = directory / "bundle"
     result.save(bundle_directory, signing_key=SIGNING_KEY)
-    loaded = scmle.predict(bundle_directory, features, signing_key=SIGNING_KEY)
+    loaded = scmle.api.predict.predict(
+        bundle_directory, features, signing_key=SIGNING_KEY
+    )
     difference = float(
         numpy.abs(
             numpy.asarray(result.predict(features), dtype=float)
@@ -405,7 +412,7 @@ def check_tamper_detection(directory: pathlib.Path) -> CheckRecord:
             True if loading raises `ArtifactError`, otherwise False.
         """
         try:
-            scmle.load_model(bundle_directory, signing_key=key)
+            scmle.api.predict.load_model(bundle_directory, signing_key=key)
         except errors.ArtifactError:
             return True
         return False
@@ -501,13 +508,13 @@ def check_failure_isolation(directory: pathlib.Path) -> CheckRecord:
         "A crashing candidate is recorded as failed; the run still completes.",
         threshold="run COMPLETED, crashing trial not ok, another trial ok",
     )
-    scmle.register_estimator(
+    scmle.models.custom.register_estimator(
         "crashing_probe", classifier=CrashingClassifier, cost=1, replace=True
     )
     try:
         result = fast_project(binary_data(), "y", directory / "run").run()
     finally:
-        scmle.unregister_estimator("crashing_probe")
+        scmle.models.custom.unregister_estimator("crashing_probe")
     board = result.leaderboard()
     crashed = board[board.model_name == "crashing_probe"]
     others_ok = bool((board.status == "ok").any())

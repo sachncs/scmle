@@ -16,7 +16,7 @@ ROWS = 120
 
 
 def toy_problem(
-    task: tasks.TaskType, seed: int = 0
+    task: tasks.Task, seed: int = 0
 ) -> tuple[pandas.DataFrame, pandas.Series | pandas.DataFrame]:
     """Builds a small learnable problem for `task`.
 
@@ -34,12 +34,12 @@ def toy_problem(
         {"a": rng.normal(size=ROWS), "b": rng.normal(size=ROWS)}
     )
     target: pandas.Series | pandas.DataFrame
-    if task is tasks.TaskType.SURVIVAL:
+    if task is tasks.Task.SURVIVAL:
         target = pandas.Series(rng.exponential(1.0, ROWS) + 0.01)
     elif task in (
-        tasks.TaskType.MULTILABEL,
-        tasks.TaskType.MULTIOUTPUT,
-        tasks.TaskType.FORECAST,
+        tasks.Task.MULTILABEL,
+        tasks.Task.MULTIOUTPUT,
+        tasks.Task.FORECAST,
     ):
         target = pandas.DataFrame(
             {
@@ -47,30 +47,30 @@ def toy_problem(
                 "second": rng.integers(0, 2, ROWS),
             }
         ).astype(float)
-    elif task is tasks.TaskType.UPLIFT:
+    elif task is tasks.Task.UPLIFT:
         target = pandas.Series(rng.integers(0, 2, ROWS))
-    elif task is tasks.TaskType.RANKING:
+    elif task is tasks.Task.RANKING:
         target = pandas.Series(
             numpy.clip(numpy.round(features["a"] + rng.normal(size=ROWS)), 0, 2)
         ).astype(float)
-    elif task is tasks.TaskType.ORDINAL:
+    elif task is tasks.Task.ORDINAL:
         target = pandas.Series(
             numpy.clip(
                 numpy.round(features["a"] + rng.normal(size=ROWS)), -1, 1
             )
             + 1
         ).astype(float)
-    elif task is tasks.TaskType.REGRESSION:
+    elif task is tasks.Task.REGRESSION:
         target = features["a"] * 2 + rng.normal(scale=0.1, size=ROWS)
     else:
-        classes = 2 if task is tasks.TaskType.BINARY else 3
+        classes = 2 if task is tasks.Task.BINARY else 3
         target = pandas.Series(rng.integers(0, classes, ROWS))
     return features, target
 
 
 def check_declared_capabilities(
-    adapter: models.ModelAdapter,
-    task: tasks.TaskType,
+    adapter: models.Model,
+    task: tasks.Task,
     features: pandas.DataFrame,
     target: pandas.Series | pandas.DataFrame,
 ) -> None:
@@ -137,7 +137,7 @@ def check_declared_capabilities(
             )
 
 
-def check_conformance(adapter: models.ModelAdapter) -> None:
+def check_conformance(adapter: models.Model) -> None:
     """Verifies an adapter honours its declared capabilities.
 
     Args:

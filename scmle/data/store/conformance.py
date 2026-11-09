@@ -24,14 +24,14 @@ PAGE_OBJECTS = 25
 RACERS = 8
 
 
-class ConformanceFailure(errors.ScmleError):
+class ConformanceError(errors.ScmleError):
     """A backend broke a promise of the interface."""
 
     category = "conformance"
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class CheckResult:
+class Outcome:
     """The outcome of one check.
 
     Attributes:
@@ -48,7 +48,7 @@ class CheckResult:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ConformanceReport:
+class Conformance:
     """All checks against one backend.
 
     Attributes:
@@ -57,7 +57,7 @@ class ConformanceReport:
     """
 
     backend: str
-    results: tuple[CheckResult, ...]
+    results: tuple[Outcome, ...]
 
     @property
     def passed(self) -> bool:
@@ -86,10 +86,10 @@ def require(condition: bool, message: str) -> None:
         message: Describes the failure.
 
     Raises:
-        ConformanceFailure: If `condition` is false.
+        ConformanceError: If `condition` is false.
     """
     if not condition:
-        raise ConformanceFailure(message)
+        raise ConformanceError(message)
 
 
 def raises(
@@ -103,7 +103,7 @@ def raises(
         message: Describes the operation, for the failure text.
 
     Raises:
-        ConformanceFailure: If the operation raises a different exception,
+        ConformanceError: If the operation raises a different exception,
             or returns without raising.
     """
     try:
@@ -111,16 +111,16 @@ def raises(
     except expected:
         return
     except Exception as error:
-        raise ConformanceFailure(
+        raise ConformanceError(
             f"{message}: raised {type(error).__name__}"
         ) from error
-    raise ConformanceFailure(f"{message}: nothing was raised")
+    raise ConformanceError(f"{message}: nothing was raised")
 
 
 def check_round_trip(store: objectstore.ObjectStore, base: str) -> None:
     """Bytes come back unchanged with a correct hash and size.
 
-    The check fails with `ConformanceFailure` (through `require`) if the
+    The check fails with `ConformanceError` (through `require`) if the
     content, hash, size or key differs from what was written, or the
     modification time is missing.
 
@@ -142,7 +142,7 @@ def check_round_trip(store: objectstore.ObjectStore, base: str) -> None:
 def check_binary_and_empty(store: objectstore.ObjectStore, base: str) -> None:
     """Every byte value and the empty object survive.
 
-    The check fails with `ConformanceFailure` (through `require`) if the
+    The check fails with `ConformanceError` (through `require`) if the
     binary or empty content changes, or the empty object's size is not 0.
 
     Args:
@@ -159,7 +159,7 @@ def check_binary_and_empty(store: objectstore.ObjectStore, base: str) -> None:
 def check_large(store: objectstore.ObjectStore, base: str) -> None:
     """A one-mebibyte object round-trips.
 
-    The check fails with `ConformanceFailure` (through `require`) if the
+    The check fails with `ConformanceError` (through `require`) if the
     content read back differs from what was written.
 
     Args:
@@ -174,7 +174,7 @@ def check_large(store: objectstore.ObjectStore, base: str) -> None:
 def check_overwrite(store: objectstore.ObjectStore, base: str) -> None:
     """An unconditional put replaces the object.
 
-    The check fails with `ConformanceFailure` (through `require`) if the
+    The check fails with `ConformanceError` (through `require`) if the
     replacement is not what a read returns.
 
     Args:
@@ -190,7 +190,7 @@ def check_overwrite(store: objectstore.ObjectStore, base: str) -> None:
 def check_missing(store: objectstore.ObjectStore, base: str) -> None:
     """Reading a missing object is `NotFoundError`; `exists` says no.
 
-    The check fails with `ConformanceFailure` (through `require`) if if
+    The check fails with `ConformanceError` (through `require`) if if
     `get` or `head` of a missing key does not raise `NotFoundError`, or
     `exists` is wrong for a missing or written key.
 
@@ -216,7 +216,7 @@ def check_missing(store: objectstore.ObjectStore, base: str) -> None:
 def check_head_matches_get(store: objectstore.ObjectStore, base: str) -> None:
     """`head` reports what `get` reports.
 
-    The check fails with `ConformanceFailure` (through `require`) if the
+    The check fails with `ConformanceError` (through `require`) if the
     two disagree on the hash.
 
     Args:
@@ -233,7 +233,7 @@ def check_head_matches_get(store: objectstore.ObjectStore, base: str) -> None:
 def check_if_absent(store: objectstore.ObjectStore, base: str) -> None:
     """A conditional put creates once and then refuses without changes.
 
-    The check fails with `ConformanceFailure` (through `require`) if the
+    The check fails with `ConformanceError` (through `require`) if the
     second conditional put does not raise `AlreadyExistsError`, or it
     changes the object.
 
@@ -254,7 +254,7 @@ def check_if_absent(store: objectstore.ObjectStore, base: str) -> None:
 def check_if_absent_race(store: objectstore.ObjectStore, base: str) -> None:
     """Of several simultaneous conditional puts exactly one wins.
 
-    The check fails with `ConformanceFailure` (through `require`) if a
+    The check fails with `ConformanceError` (through `require`) if a
     racer fails with any error other than `AlreadyExistsError`, a racer does
     not finish, or the outcomes are not one winner and the rest refused.
 
@@ -302,7 +302,7 @@ def check_if_absent_race(store: objectstore.ObjectStore, base: str) -> None:
 def check_listing(store: objectstore.ObjectStore, base: str) -> None:
     """Listing is by prefix, sorted by key, and sees nested keys.
 
-    The check fails with `ConformanceFailure` (through `require`) if a
+    The check fails with `ConformanceError` (through `require`) if a
     listing is not exactly the keys under the prefix in sorted order, or an
     unused prefix is not empty.
 
@@ -325,7 +325,7 @@ def check_listing(store: objectstore.ObjectStore, base: str) -> None:
 def check_pagination(store: objectstore.ObjectStore, base: str) -> None:
     """More objects than one page are all listed once.
 
-    The check fails with `ConformanceFailure` (through `require`) if the
+    The check fails with `ConformanceError` (through `require`) if the
     listing loses or repeats a key.
 
     Args:
@@ -344,7 +344,7 @@ def check_pagination(store: objectstore.ObjectStore, base: str) -> None:
 def check_delete(store: objectstore.ObjectStore, base: str) -> None:
     """Delete removes the object and is idempotent.
 
-    The check fails with `ConformanceFailure` (through `require`) if the
+    The check fails with `ConformanceError` (through `require`) if the
     object still exists after it is deleted. Deleting the same key again,
     or a key that never existed, must not raise; any error the backend
     raises there propagates.
@@ -363,7 +363,7 @@ def check_delete(store: objectstore.ObjectStore, base: str) -> None:
 def check_key_rules(store: objectstore.ObjectStore, base: str) -> None:
     """Unsafe keys are refused before reaching the backend.
 
-    The check fails with `ConformanceFailure` (through `require`) if if
+    The check fails with `ConformanceError` (through `require`) if if
     `put` or `get` of an unsafe key does not raise `StoreError`.
 
     Args:
@@ -386,7 +386,7 @@ def check_key_rules(store: objectstore.ObjectStore, base: str) -> None:
 def check_isolation(store: objectstore.ObjectStore, base: str) -> None:
     """Objects written under one prefix are not listed under a sibling.
 
-    The check fails with `ConformanceFailure` (through `require`) if a
+    The check fails with `ConformanceError` (through `require`) if a
     sibling prefix's objects appear in the listing.
 
     Args:
@@ -421,7 +421,7 @@ CHECKS: tuple[Callable[[objectstore.ObjectStore, str], None], ...] = (
 
 def run_conformance(
     store: objectstore.ObjectStore, run_id: str | None = None
-) -> ConformanceReport:
+) -> Conformance:
     """Runs every check against `store`.
 
     Args:
@@ -444,14 +444,14 @@ def run_conformance(
         finally:
             cleanup(store, base)
         results.append(
-            CheckResult(
+            Outcome(
                 check.__name__.removeprefix("check_"),
                 outcome,
                 detail,
                 round(time.monotonic() - started, 4),
             )
         )
-    return ConformanceReport(f"{store.scheme}:{store.location}", tuple(results))
+    return Conformance(f"{store.scheme}:{store.location}", tuple(results))
 
 
 def cleanup(store: objectstore.ObjectStore, base: str) -> None:

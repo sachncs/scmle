@@ -88,7 +88,7 @@ class ExperimentStore(abc.ABC):
         """
 
     @abc.abstractmethod
-    def record_trial(self, run_id: str, trial: experiments.TrialResult) -> None:
+    def record_trial(self, run_id: str, trial: experiments.Trial) -> None:
         """Inserts or replaces a trial.
 
         Args:
@@ -157,7 +157,7 @@ class NullExperimentStore(ExperimentStore):
             **fields: Columns to update. Unused.
         """
 
-    def record_trial(self, run_id: str, trial: experiments.TrialResult) -> None:
+    def record_trial(self, run_id: str, trial: experiments.Trial) -> None:
         """Ignores the trial.
 
         Args:
@@ -360,7 +360,7 @@ class SqliteExperimentStore(ExperimentStore):
                 (*values.values(), run_id),
             )
 
-    def record_trial(self, run_id: str, trial: experiments.TrialResult) -> None:
+    def record_trial(self, run_id: str, trial: experiments.Trial) -> None:
         """Upserts a trial.
 
         Args:

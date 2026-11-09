@@ -15,7 +15,7 @@ def test_local_executor_passes_every_declared_scenario(tmp_path):
     """Every local scenario must satisfy its complete evidence contract."""
     root = tmp_path / "local-faults"
     executor = local_faults.LocalFaultExecutor(root)
-    registry = reliability.FaultInjectionPlanRegistry.production_beta()
+    registry = reliability.Registry.production_beta()
     harness = scmle.governance.reliability.FaultInjectionHarness(
         registry,
         root / "evidence",

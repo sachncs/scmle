@@ -31,7 +31,7 @@ from scmle.data.modalities import document
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class DocumentModelConfig:
+class Config:
     """Bounded configuration for the reproducible document baseline.
 
     Attributes:
@@ -89,7 +89,7 @@ class DocumentModelConfig:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class DocumentEvaluation:
+class Evaluation:
     """Evaluation evidence for a held-out document split.
 
     Attributes:
@@ -117,7 +117,7 @@ class DocumentEvaluation:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class DocumentExplanation:
+class Explanation:
     """Global or local term-weight explanation evidence.
 
     Attributes:
@@ -135,7 +135,7 @@ class DocumentExplanation:
     method: str
     terms: tuple[tuple[str, float], ...]
     limitations: tuple[str, ...]
-    citations: tuple[document.DocumentCitation, ...] = ()
+    citations: tuple[document.Citation, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         """Converts the explanation to JSON-compatible values.
@@ -155,7 +155,7 @@ class DocumentExplanation:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class DocumentModelArtifact:
+class Package:
     """Identity of an atomically written trusted-model package.
 
     Attributes:
@@ -178,7 +178,7 @@ class DocumentModelArtifact:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class DocumentDriftReport:
+class Drift:
     """Profile drift evidence comparing a reference and observed corpus.
 
     Attributes:
@@ -220,7 +220,7 @@ class DocumentDriftReport:
         }
 
 
-class DocumentClassifier:
+class Classifier:
     """TF-IDF document classifier with evidence and safe package boundaries.
 
     Attributes:
@@ -231,17 +231,17 @@ class DocumentClassifier:
             before fitting.
     """
 
-    def __init__(self, config: DocumentModelConfig | None = None) -> None:
+    def __init__(self, config: Config | None = None) -> None:
         """Initializes an unfitted classifier.
 
         Args:
             config: Configuration to use; defaults to
-                `DocumentModelConfig()`.
+                `Config()`.
         """
-        self.config = config or DocumentModelConfig()
+        self.config = config or Config()
         self.vectorizer: TfidfVectorizer | None = None
         self.estimator: LogisticRegression | None = None
-        self.curation_report: document.DocumentCurationReport | None = None
+        self.curation_report: document.Curation | None = None
 
     @property
     def fitted(self) -> bool:
@@ -277,7 +277,7 @@ class DocumentClassifier:
 
     def fit(
         self,
-        training_samples: Sequence[document.DocumentSample],
+        training_samples: Sequence[document.Sample],
     ) -> Self:
         """Fits the baseline on labelled, curated training documents.
 
@@ -295,7 +295,7 @@ class DocumentClassifier:
         values = tuple(training_samples)
         if not values:
             raise ValueError("training_samples must not be empty")
-        dataset = document.DocumentDataset(values)
+        dataset = document.Dataset(values)
         report = dataset.curate()
         if report.unresolved_blocking_findings:
             raise ValueError(
@@ -335,7 +335,7 @@ class DocumentClassifier:
 
     def predict(
         self,
-        samples: Sequence[document.DocumentSample],
+        samples: Sequence[document.Sample],
     ) -> tuple[Any, ...]:
         """Predicts labels for validated documents.
 
@@ -360,7 +360,7 @@ class DocumentClassifier:
 
     def predict_proba(
         self,
-        samples: Sequence[document.DocumentSample],
+        samples: Sequence[document.Sample],
     ) -> tuple[tuple[float, ...], ...]:
         """Predicts class probabilities for validated documents.
 
@@ -385,8 +385,8 @@ class DocumentClassifier:
 
     def evaluate(
         self,
-        samples: Sequence[document.DocumentSample],
-    ) -> DocumentEvaluation:
+        samples: Sequence[document.Sample],
+    ) -> Evaluation:
         """Evaluates labelled documents without refitting or touching training.
 
         The evaluator never changes the fitted vocabulary or estimator.
@@ -410,7 +410,7 @@ class DocumentClassifier:
         actual = [sample.label for sample in values]
         predicted = self.predict(values)
         probabilities = self.predict_proba(values)
-        return DocumentEvaluation(
+        return Evaluation(
             sample_count=len(values),
             accuracy=float(accuracy_score(actual, predicted)),
             macro_f1=float(f1_score(actual, predicted, average="macro")),
@@ -420,7 +420,7 @@ class DocumentClassifier:
             labels=labels,
         )
 
-    def global_explanation(self, top_k: int = 10) -> DocumentExplanation:
+    def global_explanation(self, top_k: int = 10) -> Explanation:
         """Ranks terms by their mean absolute linear coefficient.
 
         Args:
@@ -450,7 +450,7 @@ class DocumentClassifier:
             ),
             key=lambda item: (-item[1], item[0]),
         )[:top_k]
-        return DocumentExplanation(
+        return Explanation(
             model_digest=self.model_digest,
             input_hash=None,
             method="linear_global_term_weight",
@@ -463,9 +463,9 @@ class DocumentClassifier:
 
     def local_explanation(
         self,
-        sample: document.DocumentSample,
+        sample: document.Sample,
         top_k: int = 10,
-    ) -> DocumentExplanation:
+    ) -> Explanation:
         """Computes signed term contributions for one document.
 
         Args:
@@ -509,7 +509,7 @@ class DocumentClassifier:
             ),
             key=lambda item: (-abs(item[1]), item[0]),
         )[:top_k]
-        return DocumentExplanation(
+        return Explanation(
             model_digest=self.model_digest,
             input_hash=sample.content_hash,
             method="linear_local_term_contribution",
@@ -523,10 +523,10 @@ class DocumentClassifier:
 
     def term_ablation_explanation(
         self,
-        sample: document.DocumentSample,
+        sample: document.Sample,
         top_k: int = 10,
         max_terms: int = 100,
-    ) -> DocumentExplanation:
+    ) -> Explanation:
         """Measures predicted-class score changes when terms are removed.
 
         Candidate terms are the terms present in the document, ranked by
@@ -591,7 +591,7 @@ class DocumentClassifier:
             ablations,
             key=lambda item: (-abs(item[1]), item[0]),
         )[:top_k]
-        return DocumentExplanation(
+        return Explanation(
             model_digest=self.model_digest,
             input_hash=sample.content_hash,
             method="term_ablation",
@@ -642,7 +642,7 @@ class DocumentClassifier:
             raise RuntimeError("classifier is not fitted")
         return tuple(estimator.classes_.tolist())
 
-    def save(self, path: str | pathlib.Path) -> DocumentModelArtifact:
+    def save(self, path: str | pathlib.Path) -> Package:
         """Atomically saves this fitted classifier as a verified package.
 
         Args:
@@ -698,9 +698,7 @@ class DocumentClassifier:
             if temporary_directory is not None:
                 shutil.rmtree(temporary_directory, ignore_errors=True)
             raise
-        return DocumentModelArtifact(
-            str(target), str(manifest["artifact_digest"])
-        )
+        return Package(str(target), str(manifest["artifact_digest"]))
 
     @classmethod
     def load(
@@ -723,7 +721,7 @@ class DocumentClassifier:
             FileNotFoundError: If `path` is not a directory.
             ValueError: If the manifest or payload is missing, the version
                 is unsupported, or a digest does not match.
-            TypeError: If the payload is not a `DocumentClassifier`.
+            TypeError: If the payload is not a `Classifier`.
         """
         if not trusted:
             raise PermissionError(
@@ -746,13 +744,13 @@ class DocumentClassifier:
             raise ValueError("document model payload digest does not match")
         loaded = joblib.load(model_path)
         if not isinstance(loaded, cls):
-            raise TypeError("package does not contain a DocumentClassifier")
+            raise TypeError("package does not contain a Classifier")
         loaded.require_fitted()
         if loaded.model_digest != manifest.get("model_digest"):
             raise ValueError("document model digest does not match manifest")
         return loaded
 
-    def transform(self, samples: Sequence[document.DocumentSample]) -> Any:
+    def transform(self, samples: Sequence[document.Sample]) -> Any:
         """Transforms documents with the fitted training vocabulary.
 
         Args:
@@ -780,7 +778,7 @@ class DocumentClassifier:
             raise RuntimeError("document classifier has not been fitted")
 
 
-class DocumentMonitor:
+class Monitor:
     """Monitors bounded corpus-profile signals against a reference snapshot.
 
     Attributes:
@@ -790,7 +788,7 @@ class DocumentMonitor:
 
     def __init__(
         self,
-        reference: document.DocumentCurationReport,
+        reference: document.Curation,
         threshold: float = 0.25,
     ) -> None:
         """Initializes a monitor with an explicit normalized drift threshold.
@@ -810,8 +808,8 @@ class DocumentMonitor:
 
     def observe(
         self,
-        observed: document.DocumentDataset,
-    ) -> DocumentDriftReport:
+        observed: document.Dataset,
+    ) -> Drift:
         """Compares observed document profiles with the reference corpus.
 
         Args:
@@ -847,7 +845,7 @@ class DocumentMonitor:
             sum(len(group) for group in current.duplicate_groups)
             / current.sample_count
         )
-        return DocumentDriftReport(
+        return Drift(
             reference_hash=self.reference.dataset_hash,
             observed_hash=current.dataset_hash,
             language_distance=language_distance,
@@ -859,7 +857,7 @@ class DocumentMonitor:
 
     def mean_characters(
         self,
-        report: document.DocumentCurationReport,
+        report: document.Curation,
     ) -> float:
         """Computes the mean bounded character count from a curation report.
 
@@ -902,13 +900,13 @@ def sync_directory(path: pathlib.Path) -> None:
 
 
 __all__ = [
-    "DocumentClassifier",
-    "DocumentDriftReport",
-    "DocumentEvaluation",
-    "DocumentExplanation",
-    "DocumentModelArtifact",
-    "DocumentModelConfig",
-    "DocumentMonitor",
+    "Classifier",
+    "Config",
+    "Drift",
+    "Evaluation",
+    "Explanation",
+    "Monitor",
+    "Package",
     "file_digest",
     "sync_directory",
 ]

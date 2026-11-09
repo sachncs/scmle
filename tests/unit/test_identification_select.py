@@ -21,7 +21,7 @@ FIELDS = {
 }
 
 
-def block(**changes) -> causal.CausalSpec:
+def block(**changes) -> causal.Question:
     values = {
         "treatment": "t",
         "outcome": "y",
@@ -29,7 +29,7 @@ def block(**changes) -> causal.CausalSpec:
         "assumptions": (COVARIATES, "positivity", "no_interference"),
     }
     values.update(changes)
-    return causal.CausalSpec(**values)
+    return causal.Question(**values)
 
 
 def test_the_first_eligible_strategy_is_primary_and_the_rest_the_multiverse():
@@ -116,9 +116,7 @@ def test_a_declared_dag_checks_the_adjustment_set():
     assert not select.select(declared).verdict("backdoor_aipw").eligible
 
 
-def random_spec(
-    rng: numpy.random.Generator, eligible: bool
-) -> causal.CausalSpec:
+def random_spec(rng: numpy.random.Generator, eligible: bool) -> causal.Question:
     """A charter that matches one strategy, or one that matches none."""
     names = list(select.STRATEGIES)
     name = names[int(rng.integers(len(names)))]
@@ -137,7 +135,7 @@ def random_spec(
             words.pop(index)
         else:
             fields.pop(index)
-    return causal.CausalSpec(
+    return causal.Question(
         treatment="t",
         outcome="y",
         estimand=strategy.estimands[0],

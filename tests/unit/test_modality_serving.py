@@ -9,17 +9,17 @@ import urllib.request
 
 import pytest
 
-import scmle
 from scmle.contracts import errors
 from scmle.data.modalities import document
 from scmle.inference import modality_serving
+import scmle.inference.modality_serving
 from scmle.models import modality_lifecycle
 
 
 class DocumentDecoder(modality_serving.ModalitySampleDecoder):
     """Decode the deliberately small JSON document test contract."""
 
-    def decode(self, payload: object) -> tuple[document.DocumentSample, ...]:
+    def decode(self, payload: object) -> tuple[document.Sample, ...]:
         """Decode labelled document records from a request object."""
         if not isinstance(payload, dict) or not isinstance(
             payload.get("samples"), list
@@ -30,7 +30,7 @@ class DocumentDecoder(modality_serving.ModalitySampleDecoder):
             if not isinstance(record, dict):
                 raise TypeError("every sample must be an object")
             samples.append(
-                document.DocumentSample(
+                document.Sample(
                     document_id=str(record["document_id"]),
                     content=str(record["content"]),
                     label=str(record.get("label", "unknown")),
@@ -50,22 +50,22 @@ class DocumentDecoder(modality_serving.ModalitySampleDecoder):
 class ExplodingDecoder(DocumentDecoder):
     """Raise an unexpected decoder error for server-boundary testing."""
 
-    def decode(self, payload: object) -> tuple[document.DocumentSample, ...]:
+    def decode(self, payload: object) -> tuple[document.Sample, ...]:
         """Raise a representative unexpected decoder failure."""
         raise RuntimeError("decoder failed")
 
 
-def adapter() -> modality_lifecycle.DocumentAdapter:
+def adapter() -> modality_lifecycle.DocumentPreparer:
     """Build a small, labelled document fixture."""
     samples = tuple(
-        document.DocumentSample(
+        document.Sample(
             document_id=f"document-{index}",
             content=("alpha " if index % 2 else "beta ") * (index + 2),
             label="alpha" if index % 2 else "beta",
         )
         for index in range(12)
     )
-    return modality_lifecycle.DocumentAdapter(document.DocumentDataset(samples))
+    return modality_lifecycle.DocumentPreparer(document.Dataset(samples))
 
 
 def request(
@@ -103,15 +103,21 @@ def test_modality_http_serving_verifies_health_schema_and_predictions(
     tmp_path,
 ):
     """A caller decoder can expose a signed modality package safely."""
-    assert scmle.ModalityHttpServing is modality_serving.ModalityHttpServing
-    assert scmle.ModalitySampleDecoder is modality_serving.ModalitySampleDecoder
+    assert (
+        scmle.inference.modality_serving.ModalityHttpServing
+        is modality_serving.ModalityHttpServing
+    )
+    assert (
+        scmle.inference.modality_serving.ModalitySampleDecoder
+        is modality_serving.ModalitySampleDecoder
+    )
     reference = adapter()
-    report = modality_lifecycle.ModalityLifecycle().run(
+    report = modality_lifecycle.Lifecycle().run(
         reference,
         tmp_path / "package",
         signing_key="serving-key",
     )
-    predictor = modality_lifecycle.ModalityPredictor.from_package(
+    predictor = modality_lifecycle.Predictor.from_package(
         reference,
         report.package.path,
         "serving-key",
@@ -197,13 +203,13 @@ def test_release_bound_serving_publishes_verified_lifecycle_identity(tmp_path):
     """Serving can require the exact signed lifecycle report for its package."""
     reference = adapter()
     report_path = tmp_path / "modality_lifecycle.json"
-    report = modality_lifecycle.ModalityLifecycle().run(
+    report = modality_lifecycle.Lifecycle().run(
         reference,
         tmp_path / "package",
         signing_key="serving-key",
         report_path=report_path,
     )
-    predictor = modality_lifecycle.ModalityPredictor.from_package(
+    predictor = modality_lifecycle.Predictor.from_package(
         reference,
         report.package.path,
         "serving-key",
@@ -225,12 +231,12 @@ def test_release_bound_serving_publishes_verified_lifecycle_identity(tmp_path):
 def test_release_bound_serving_rejects_unbound_predictor(tmp_path):
     """The production-boundary mode must not accept package-only loading."""
     reference = adapter()
-    report = modality_lifecycle.ModalityLifecycle().run(
+    report = modality_lifecycle.Lifecycle().run(
         reference,
         tmp_path / "package",
         signing_key="serving-key",
     )
-    predictor = modality_lifecycle.ModalityPredictor.from_package(
+    predictor = modality_lifecycle.Predictor.from_package(
         reference, report.package.path, "serving-key"
     )
 
@@ -246,7 +252,7 @@ def test_report_binding_rejects_tampered_lifecycle_evidence(tmp_path):
     """A changed lifecycle report cannot be used to authorize serving."""
     reference = adapter()
     report_path = tmp_path / "modality_lifecycle.json"
-    report = modality_lifecycle.ModalityLifecycle().run(
+    report = modality_lifecycle.Lifecycle().run(
         reference,
         tmp_path / "package",
         signing_key="serving-key",
@@ -257,7 +263,7 @@ def test_report_binding_rejects_tampered_lifecycle_evidence(tmp_path):
     report_path.write_text(json.dumps(record), encoding="utf-8")
 
     with pytest.raises(ValueError, match="signature does not verify"):
-        modality_lifecycle.ModalityPredictor.from_package(
+        modality_lifecycle.Predictor.from_package(
             reference,
             report.package.path,
             "serving-key",
@@ -269,7 +275,7 @@ def test_modality_http_serving_rejects_invalid_request_bounds():
     """The reference server refuses unsafe zero-sized request limits."""
     with pytest.raises(ValueError, match="request bounds"):
         modality_serving.ModalityHttpServing(
-            predictor=cast(modality_lifecycle.ModalityPredictor, None),
+            predictor=cast(modality_lifecycle.Predictor, None),
             decoder=DocumentDecoder(),
             max_request_bytes=0,
         )
@@ -278,12 +284,12 @@ def test_modality_http_serving_rejects_invalid_request_bounds():
 def test_modality_http_serving_classifies_unexpected_decoder_errors(tmp_path):
     """Unexpected decoder errors become a bounded structured response."""
     reference = adapter()
-    report = modality_lifecycle.ModalityLifecycle().run(
+    report = modality_lifecycle.Lifecycle().run(
         reference,
         tmp_path / "package",
         signing_key="serving-key",
     )
-    predictor = modality_lifecycle.ModalityPredictor.from_package(
+    predictor = modality_lifecycle.Predictor.from_package(
         reference,
         report.package.path,
         "serving-key",
@@ -309,12 +315,12 @@ def test_modality_http_serving_classifies_unexpected_decoder_errors(tmp_path):
 def test_modality_http_serving_echoes_valid_request_identity(tmp_path):
     """A valid caller identity is echoed in the body and response header."""
     reference = adapter()
-    report = modality_lifecycle.ModalityLifecycle().run(
+    report = modality_lifecycle.Lifecycle().run(
         reference,
         tmp_path / "package",
         signing_key="serving-key",
     )
-    predictor = modality_lifecycle.ModalityPredictor.from_package(
+    predictor = modality_lifecycle.Predictor.from_package(
         reference,
         report.package.path,
         "serving-key",
@@ -340,12 +346,12 @@ def test_modality_http_serving_rejects_unsafe_request_identity(
 ):
     """Unsafe caller identities are rejected without echoing their contents."""
     reference = adapter()
-    report = modality_lifecycle.ModalityLifecycle().run(
+    report = modality_lifecycle.Lifecycle().run(
         reference,
         tmp_path / "package",
         signing_key="serving-key",
     )
-    predictor = modality_lifecycle.ModalityPredictor.from_package(
+    predictor = modality_lifecycle.Predictor.from_package(
         reference,
         report.package.path,
         "serving-key",
@@ -370,10 +376,10 @@ def test_modality_http_serving_rejects_unsafe_request_identity(
 
 def started_modality_service(tmp_path, limits=None):
     reference = adapter()
-    report = modality_lifecycle.ModalityLifecycle().run(
+    report = modality_lifecycle.Lifecycle().run(
         reference, tmp_path / "package", signing_key="serving-key"
     )
-    predictor = modality_lifecycle.ModalityPredictor.from_package(
+    predictor = modality_lifecycle.Predictor.from_package(
         reference, report.package.path, "serving-key"
     )
     service = modality_serving.ModalityHttpServing(predictor, DocumentDecoder())

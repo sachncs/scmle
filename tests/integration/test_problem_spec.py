@@ -28,7 +28,7 @@ def run(tmp_path, criteria):
         "y",
         time_budget=300,
         output_dir=tmp_path,
-        problem=tasks.ProblemSpec(
+        problem=tasks.Problem(
             decision="approve or decline",
             population="applicants",
             success_criteria=criteria,
@@ -132,7 +132,7 @@ def test_packaged_release_attestation_is_signed_when_key_is_configured(
         result.evaluation["sbom"],
         signing_key="release-key",
     )
-    evidence_index = evidence.EvidenceIndex.from_dict(
+    evidence_index = evidence.Index.from_dict(
         result.evaluation["release_evidence"]
     )
     assert evidence_index.verify("release-key")

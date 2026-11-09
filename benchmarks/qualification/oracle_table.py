@@ -126,7 +126,7 @@ def fdr(given: Mapping[str, Any]) -> Any:
         The adjusted p-values, as a list under `adjusted`, from
         `multiplicity.adjust` at level 1/20.
     """
-    rule = budget.MultiplicityRule(given["method"])
+    rule = budget.Correction(given["method"])
     out = multiplicity.adjust(given["pvalues"], rule, Fraction(1, 20))
     return {"adjusted": list(out.adjusted)}
 

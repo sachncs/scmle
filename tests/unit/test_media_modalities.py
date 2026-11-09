@@ -25,19 +25,19 @@ def wav_bytes(frame_count: int = 8) -> bytes:
     return output.getvalue()
 
 
-def failing_probe(payload: bytes) -> audio.AudioMetadata:
+def failing_probe(payload: bytes) -> audio.Metadata:
     """Represent a caller-owned codec probe that fails deterministically."""
     raise RuntimeError(payload)
 
 
-def flac_probe(payload: bytes) -> audio.AudioMetadata:
+def flac_probe(payload: bytes) -> audio.Metadata:
     """Represent metadata returned by an explicit non-WAV codec adapter."""
-    return audio.AudioMetadata("flac", 16_000, 1, len(payload))
+    return audio.Metadata("flac", 16_000, 1, len(payload))
 
 
 def test_audio_wav_ingestion_preserves_identity_and_profile():
     """WAV metadata and bytes are bound to the same immutable sample."""
-    sample = audio.AudioSample.from_bytes(wav_bytes(), source="clip.wav")
+    sample = audio.Sample.from_bytes(wav_bytes(), source="clip.wav")
 
     assert sample.source.endswith("/clip.wav")
     assert sample.metadata.sample_rate == 8
@@ -49,10 +49,10 @@ def test_audio_wav_ingestion_preserves_identity_and_profile():
 def test_audio_non_wav_requires_explicit_probe():
     """Unknown containers do not silently acquire a codec dependency."""
     with pytest.raises(audio.AudioDependencyError):
-        audio.AudioSample.from_bytes(b"opaque-audio", source="clip.flac")
+        audio.Sample.from_bytes(b"opaque-audio", source="clip.flac")
 
     with pytest.raises(audio.AudioDependencyError):
-        audio.AudioSample.from_bytes(
+        audio.Sample.from_bytes(
             b"opaque-audio",
             source="clip.flac",
             probe=failing_probe,
@@ -61,18 +61,18 @@ def test_audio_non_wav_requires_explicit_probe():
 
 def test_audio_dataset_rejects_duplicate_sources():
     """Duplicate source identities are a curation error, not two samples."""
-    first = audio.AudioSample.from_bytes(wav_bytes(), source="one.wav")
-    duplicate = audio.AudioSample.from_bytes(wav_bytes(), source="one.wav")
+    first = audio.Sample.from_bytes(wav_bytes(), source="one.wav")
+    duplicate = audio.Sample.from_bytes(wav_bytes(), source="one.wav")
 
     with pytest.raises(audio.AudioValidationError, match="duplicate sources"):
-        audio.AudioDataset((first, duplicate))
+        audio.Dataset((first, duplicate))
 
 
 def test_audio_curation_reports_metadata_and_label_composition():
     """Audio data understanding is explicit before a model is selected."""
-    sample = audio.AudioSample.from_bytes(wav_bytes(), source="one.wav")
+    sample = audio.Sample.from_bytes(wav_bytes(), source="one.wav")
 
-    report = audio.AudioDataset((sample,)).curate()
+    report = audio.Dataset((sample,)).curate()
 
     assert report.modality == "audio"
     assert report.sample_count == 1
@@ -84,33 +84,33 @@ def test_audio_curation_reports_metadata_and_label_composition():
 def test_audio_curation_hash_matches_source_order_identity():
     """Audio curation remains attached when source order is non-sorted."""
     samples = (
-        audio.AudioSample.from_bytes(wav_bytes(), source="z-last.wav"),
-        audio.AudioSample.from_bytes(wav_bytes(), source="a-first.wav"),
+        audio.Sample.from_bytes(wav_bytes(), source="z-last.wav"),
+        audio.Sample.from_bytes(wav_bytes(), source="a-first.wav"),
     )
-    dataset = audio.AudioDataset(samples)
+    dataset = audio.Dataset(samples)
 
     assert dataset.curate().dataset_hash == dataset.content_hash
 
 
 def test_audio_transcript_provenance_is_bounded_and_curated():
     """Transcript metadata remains tied to the source audio and provider."""
-    transcript = audio.AudioTranscript(
+    transcript = audio.Transcript(
         text="hello world",
         source="transcriber://run-7",
         provider="acme-asr",
         provider_version="2026.10",
         language="en",
         segments=(
-            audio.AudioTranscriptSegment(0.0, 0.5, "hello", 0.9),
-            audio.AudioTranscriptSegment(0.5, 1.0, "world", 0.8),
+            audio.TranscriptSegment(0.0, 0.5, "hello", 0.9),
+            audio.TranscriptSegment(0.5, 1.0, "world", 0.8),
         ),
         confidence=0.85,
     )
-    sample = audio.AudioSample.from_bytes(
+    sample = audio.Sample.from_bytes(
         wav_bytes(), source="spoken.wav", transcript=transcript
     )
 
-    report = audio.AudioDataset((sample,)).curate()
+    report = audio.Dataset((sample,)).curate()
 
     assert sample.profile().transcript_present
     assert sample.profile().transcript_segment_count == 2
@@ -124,17 +124,17 @@ def test_audio_transcript_provenance_is_bounded_and_curated():
 
 def test_audio_transcript_confidence_and_timing_fail_closed():
     """Missing confidence is visible and segments cannot exceed duration."""
-    uncertain = audio.AudioTranscript(
+    uncertain = audio.Transcript(
         text="hello",
         source="transcriber://run-8",
         provider="acme-asr",
         provider_version="2026.10",
         language="en",
-        segments=(audio.AudioTranscriptSegment(0.0, 0.5, "hello"),),
+        segments=(audio.TranscriptSegment(0.0, 0.5, "hello"),),
     )
-    report = audio.AudioDataset(
+    report = audio.Dataset(
         (
-            audio.AudioSample.from_bytes(
+            audio.Sample.from_bytes(
                 wav_bytes(), source="uncertain.wav", transcript=uncertain
             ),
         )
@@ -143,28 +143,28 @@ def test_audio_transcript_confidence_and_timing_fail_closed():
     assert [finding.finding_id for finding in report.quality_findings] == [
         "quality.audio-transcript-confidence-missing",
     ]
-    out_of_range = audio.AudioTranscript(
+    out_of_range = audio.Transcript(
         text="too long",
         source="transcriber://run-9",
         provider="acme-asr",
         provider_version="2026.10",
         language="en",
-        segments=(audio.AudioTranscriptSegment(0.0, 2.0, "too long"),),
+        segments=(audio.TranscriptSegment(0.0, 2.0, "too long"),),
     )
     with pytest.raises(audio.AudioValidationError, match="exceeds audio"):
-        audio.AudioSample.from_bytes(
+        audio.Sample.from_bytes(
             wav_bytes(), source="bad.wav", transcript=out_of_range
         )
 
 
 def test_audio_curation_blocks_conflicting_duplicate_labels():
     """Duplicate audio bytes cannot silently carry incompatible labels."""
-    dataset = audio.AudioDataset(
+    dataset = audio.Dataset(
         (
-            audio.AudioSample.from_bytes(
+            audio.Sample.from_bytes(
                 wav_bytes(), source="first.wav", label="speech"
             ),
-            audio.AudioSample.from_bytes(
+            audio.Sample.from_bytes(
                 wav_bytes(), source="second.wav", label="music"
             ),
         )
@@ -181,11 +181,9 @@ def test_audio_curation_blocks_conflicting_duplicate_labels():
 
 def test_audio_feature_preparation_is_bounded_and_explainable():
     """Signal features expose the observed prefix and deterministic names."""
-    sample = audio.AudioSample.from_bytes(
-        wav_bytes(frame_count=8), source="one.wav"
-    )
+    sample = audio.Sample.from_bytes(wav_bytes(frame_count=8), source="one.wav")
 
-    prepared = audio.AudioDataset((sample,)).prepare_features(max_frames=3)
+    prepared = audio.Dataset((sample,)).prepare_features(max_frames=3)
 
     assert prepared.shape == (1, 13)
     assert prepared.frames_observed == (3,)
@@ -201,11 +199,9 @@ def test_audio_feature_preparation_is_bounded_and_explainable():
 
 def test_audio_feature_preparation_supports_a_bounded_window():
     """A decoded WAV window remains tied to its source frame boundary."""
-    sample = audio.AudioSample.from_bytes(
-        wav_bytes(frame_count=8), source="one.wav"
-    )
+    sample = audio.Sample.from_bytes(wav_bytes(frame_count=8), source="one.wav")
 
-    prepared = audio.AudioDataset((sample,)).prepare_features(
+    prepared = audio.Dataset((sample,)).prepare_features(
         max_frames=3, start_frame=4
     )
 
@@ -215,18 +211,18 @@ def test_audio_feature_preparation_supports_a_bounded_window():
 
 def test_audio_feature_preparation_requires_a_wav_decoder():
     """Explicit probe metadata does not silently imply signal decoding."""
-    sample = audio.AudioSample.from_bytes(
+    sample = audio.Sample.from_bytes(
         b"opaque-audio", source="clip.flac", probe=flac_probe
     )
 
     with pytest.raises(audio.AudioDependencyError, match="WAV decoder"):
-        audio.AudioDataset((sample,)).prepare_features()
+        audio.Dataset((sample,)).prepare_features()
 
 
 def test_audio_split_keeps_explicit_speaker_groups_together():
     """Grouped splitting prevents speaker leakage across partitions."""
     samples = tuple(
-        audio.AudioSample.from_bytes(
+        audio.Sample.from_bytes(
             wav_bytes(),
             source=f"clip-{index}.wav",
             label="speech",
@@ -234,7 +230,7 @@ def test_audio_split_keeps_explicit_speaker_groups_together():
         )
         for index in range(6)
     )
-    dataset = audio.AudioDataset(samples)
+    dataset = audio.Dataset(samples)
 
     first = dataset.split(validation_fraction=0.25, test_fraction=0.25, seed=3)
     second = dataset.split(validation_fraction=0.25, test_fraction=0.25, seed=3)
@@ -248,7 +244,7 @@ def test_audio_split_keeps_explicit_speaker_groups_together():
 
 def test_video_metadata_is_explicit_and_profiled():
     """Video data records probe output instead of guessing from a suffix."""
-    metadata = video.VideoMetadata(
+    metadata = video.Metadata(
         format="mp4",
         width=1920,
         height=1080,
@@ -257,7 +253,7 @@ def test_video_metadata_is_explicit_and_profiled():
         codec="h264",
         audio_tracks=1,
     )
-    sample = video.VideoSample.from_bytes(
+    sample = video.Sample.from_bytes(
         b"video-bytes", metadata, source="sample.mp4"
     )
 
@@ -268,7 +264,7 @@ def test_video_metadata_is_explicit_and_profiled():
 
 def test_video_curation_records_explicit_audio_video_synchronization():
     """Synchronization claims require measured timing and tolerance."""
-    metadata = video.VideoMetadata(
+    metadata = video.Metadata(
         "mp4",
         2,
         2,
@@ -280,11 +276,11 @@ def test_video_curation_records_explicit_audio_video_synchronization():
         sync_offset_seconds=0.05,
         sync_tolerance_seconds=0.1,
     )
-    sample = video.VideoSample.from_bytes(
+    sample = video.Sample.from_bytes(
         b"synchronized-video", metadata, source="synced.mp4"
     )
 
-    report = video.VideoDataset((sample,)).curate()
+    report = video.Dataset((sample,)).curate()
 
     assert metadata.synchronization_status == "within_tolerance"
     assert sample.profile().synchronization_status == "within_tolerance"
@@ -296,11 +292,11 @@ def test_video_curation_records_explicit_audio_video_synchronization():
 
 def test_video_curation_hash_matches_source_order_identity():
     """Video curation remains attached when source order is non-sorted."""
-    metadata = video.VideoMetadata("mp4", 2, 2, 1, 1.0, "h264")
-    dataset = video.VideoDataset(
+    metadata = video.Metadata("mp4", 2, 2, 1, 1.0, "h264")
+    dataset = video.Dataset(
         (
-            video.VideoSample.from_bytes(b"z-video", metadata, "z-last.mp4"),
-            video.VideoSample.from_bytes(b"a-video", metadata, "a-first.mp4"),
+            video.Sample.from_bytes(b"z-video", metadata, "z-last.mp4"),
+            video.Sample.from_bytes(b"a-video", metadata, "a-first.mp4"),
         )
     )
 
@@ -309,9 +305,9 @@ def test_video_curation_hash_matches_source_order_identity():
 
 def test_video_temporal_split_normalizes_time_and_records_coverage():
     """Observation times support UTC-safe future evaluation evidence."""
-    metadata = video.VideoMetadata("mp4", 2, 2, 1, 1.0, "h264")
+    metadata = video.Metadata("mp4", 2, 2, 1, 1.0, "h264")
     samples = tuple(
-        video.VideoSample.from_bytes(
+        video.Sample.from_bytes(
             f"video-{index}".encode(),
             metadata,
             source=f"video-{index}.mp4",
@@ -325,7 +321,7 @@ def test_video_temporal_split_normalizes_time_and_records_coverage():
             )
         )
     )
-    dataset = video.VideoDataset(samples)
+    dataset = video.Dataset(samples)
 
     split = dataset.split_temporal("2026-01-02T00:00:00+00:00")
     report = dataset.curate()
@@ -342,16 +338,16 @@ def test_video_temporal_split_normalizes_time_and_records_coverage():
 
 def test_video_temporal_state_fails_closed_when_incomplete():
     """Missing observation times remain explicit before temporal splitting."""
-    metadata = video.VideoMetadata("mp4", 2, 2, 1, 1.0, "h264")
-    dataset = video.VideoDataset(
+    metadata = video.Metadata("mp4", 2, 2, 1, 1.0, "h264")
+    dataset = video.Dataset(
         (
-            video.VideoSample.from_bytes(
+            video.Sample.from_bytes(
                 b"timed-video",
                 metadata,
                 source="timed.mp4",
                 observation_time="2026-01-01T00:00:00Z",
             ),
-            video.VideoSample.from_bytes(
+            video.Sample.from_bytes(
                 b"untimed-video", metadata, source="untimed.mp4"
             ),
         )
@@ -375,7 +371,7 @@ def test_video_temporal_state_fails_closed_when_incomplete():
 
 def test_video_curation_blocks_measured_sync_drift_and_surfaces_unknown_sync():
     """Sync drift blocks timing-dependent data while missing evidence is visible."""
-    drifted = video.VideoMetadata(
+    drifted = video.Metadata(
         "mp4",
         2,
         2,
@@ -387,13 +383,13 @@ def test_video_curation_blocks_measured_sync_drift_and_surfaces_unknown_sync():
         sync_offset_seconds=0.4,
         sync_tolerance_seconds=0.1,
     )
-    unknown = video.VideoMetadata("mp4", 2, 2, 60, 30.0, "h264", 1)
+    unknown = video.Metadata("mp4", 2, 2, 60, 30.0, "h264", 1)
 
-    drift_report = video.VideoDataset(
-        (video.VideoSample.from_bytes(b"drift", drifted, "drift.mp4"),)
+    drift_report = video.Dataset(
+        (video.Sample.from_bytes(b"drift", drifted, "drift.mp4"),)
     ).curate()
-    unknown_report = video.VideoDataset(
-        (video.VideoSample.from_bytes(b"unknown", unknown, "unknown.mp4"),)
+    unknown_report = video.Dataset(
+        (video.Sample.from_bytes(b"unknown", unknown, "unknown.mp4"),)
     ).curate()
 
     assert drift_report.release_ready is False
@@ -408,10 +404,10 @@ def test_video_curation_blocks_measured_sync_drift_and_surfaces_unknown_sync():
 
 def test_video_rejects_hash_mismatch():
     """A persisted video cannot claim an identity different from its bytes."""
-    metadata = video.VideoMetadata("mp4", 2, 2, 1, 1.0, "raw")
+    metadata = video.Metadata("mp4", 2, 2, 1, 1.0, "raw")
 
     with pytest.raises(ValueError, match="file_hash"):
-        video.VideoSample(
+        video.Sample(
             source="memory://video",
             encoded_bytes=b"video",
             file_hash="0" * 64,
@@ -421,12 +417,12 @@ def test_video_rejects_hash_mismatch():
 
 def test_video_curation_surfaces_encoding_and_dimension_drift():
     """Video curation records normalization risks instead of guessing."""
-    first_metadata = video.VideoMetadata("mp4", 2, 2, 1, 1.0, "h264")
-    second_metadata = video.VideoMetadata("webm", 4, 4, 2, 1.0, "vp9")
-    dataset = video.VideoDataset(
+    first_metadata = video.Metadata("mp4", 2, 2, 1, 1.0, "h264")
+    second_metadata = video.Metadata("webm", 4, 4, 2, 1.0, "vp9")
+    dataset = video.Dataset(
         (
-            video.VideoSample.from_bytes(b"one", first_metadata, "one.mp4"),
-            video.VideoSample.from_bytes(b"two", second_metadata, "two.webm"),
+            video.Sample.from_bytes(b"one", first_metadata, "one.mp4"),
+            video.Sample.from_bytes(b"two", second_metadata, "two.webm"),
         )
     )
 
@@ -442,13 +438,13 @@ def test_video_curation_surfaces_encoding_and_dimension_drift():
 
 def test_video_curation_blocks_conflicting_duplicate_labels():
     """Duplicate video bytes cannot silently carry incompatible labels."""
-    metadata = video.VideoMetadata("mp4", 2, 2, 1, 1.0, "h264")
-    dataset = video.VideoDataset(
+    metadata = video.Metadata("mp4", 2, 2, 1, 1.0, "h264")
+    dataset = video.Dataset(
         (
-            video.VideoSample.from_bytes(
+            video.Sample.from_bytes(
                 b"same-video", metadata, "first.mp4", label="event"
             ),
-            video.VideoSample.from_bytes(
+            video.Sample.from_bytes(
                 b"same-video", metadata, "second.mp4", label="background"
             ),
         )
@@ -465,12 +461,12 @@ def test_video_curation_blocks_conflicting_duplicate_labels():
 
 def test_video_metadata_features_are_numeric_and_decoder_free():
     """Video preparation is explicit metadata evidence, not frame sampling."""
-    metadata = video.VideoMetadata("mp4", 1920, 1080, 60, 30.0, "h264", 1)
-    sample = video.VideoSample.from_bytes(
+    metadata = video.Metadata("mp4", 1920, 1080, 60, 30.0, "h264", 1)
+    sample = video.Sample.from_bytes(
         b"video-bytes", metadata, source="sample.mp4"
     )
 
-    prepared = video.VideoDataset((sample,)).prepare_metadata_features()
+    prepared = video.Dataset((sample,)).prepare_metadata_features()
 
     assert prepared.shape == (1, 10)
     assert prepared.feature_names[:5] == (
@@ -486,14 +482,14 @@ def test_video_metadata_features_are_numeric_and_decoder_free():
 
 def test_video_metadata_features_preserve_sample_order():
     """Feature rows remain bound to canonical source order."""
-    first = video.VideoSample.from_bytes(
-        b"one", video.VideoMetadata("mp4", 2, 2, 2, 2.0, "h264"), "one.mp4"
+    first = video.Sample.from_bytes(
+        b"one", video.Metadata("mp4", 2, 2, 2, 2.0, "h264"), "one.mp4"
     )
-    second = video.VideoSample.from_bytes(
-        b"two", video.VideoMetadata("mp4", 4, 2, 4, 2.0, "h264"), "two.mp4"
+    second = video.Sample.from_bytes(
+        b"two", video.Metadata("mp4", 4, 2, 4, 2.0, "h264"), "two.mp4"
     )
 
-    prepared = video.VideoDataset((first, second)).prepare_metadata_features()
+    prepared = video.Dataset((first, second)).prepare_metadata_features()
 
     assert prepared.sources[0].endswith("/one.mp4")
     assert prepared.sources[1].endswith("/two.mp4")
@@ -502,8 +498,8 @@ def test_video_metadata_features_preserve_sample_order():
 
 def test_video_frame_features_use_a_bounded_explicit_decoder():
     """Temporal features record evenly sampled frame identities."""
-    metadata = video.VideoMetadata("mp4", 4, 4, 5, 2.0, "h264")
-    sample = video.VideoSample.from_bytes(
+    metadata = video.Metadata("mp4", 4, 4, 5, 2.0, "h264")
+    sample = video.Sample.from_bytes(
         b"video-bytes", metadata, source="sample.mp4"
     )
     calls: list[int] = []
@@ -513,7 +509,7 @@ def test_video_frame_features_use_a_bounded_explicit_decoder():
         calls.append(frame_index)
         return numpy.full((2, 2, 3), frame_index, dtype=numpy.uint8)
 
-    prepared = video.VideoDataset((sample,)).prepare_frame_features(
+    prepared = video.Dataset((sample,)).prepare_frame_features(
         decoder, max_frames=3, max_frame_pixels=32
     )
 
@@ -528,13 +524,13 @@ def test_video_frame_features_use_a_bounded_explicit_decoder():
 
 def test_video_frame_features_reject_oversized_decoded_frames():
     """A decoder cannot bypass the configured per-frame resource budget."""
-    metadata = video.VideoMetadata("mp4", 4, 4, 1, 1.0, "h264")
-    sample = video.VideoSample.from_bytes(
+    metadata = video.Metadata("mp4", 4, 4, 1, 1.0, "h264")
+    sample = video.Sample.from_bytes(
         b"video-bytes", metadata, source="sample.mp4"
     )
 
     with pytest.raises(video.VideoValidationError, match="pixel limit"):
-        video.VideoDataset((sample,)).prepare_frame_features(
+        video.Dataset((sample,)).prepare_frame_features(
             lambda payload, frame_index: numpy.zeros((8, 8), dtype=numpy.uint8),
             max_frame_pixels=16,
         )
@@ -543,16 +539,16 @@ def test_video_frame_features_reject_oversized_decoded_frames():
 def test_video_split_keeps_explicit_subject_groups_together():
     """Grouped splitting prevents subject leakage across partitions."""
     samples = tuple(
-        video.VideoSample.from_bytes(
+        video.Sample.from_bytes(
             f"video-{index}".encode(),
-            video.VideoMetadata("mp4", 2, 2, 2, 2.0, "h264"),
+            video.Metadata("mp4", 2, 2, 2, 2.0, "h264"),
             source=f"clip-{index}.mp4",
             label="action",
             group_id=f"subject-{index // 2}",
         )
         for index in range(6)
     )
-    dataset = video.VideoDataset(samples)
+    dataset = video.Dataset(samples)
 
     first = dataset.split(validation_fraction=0.25, test_fraction=0.25, seed=3)
     second = dataset.split(validation_fraction=0.25, test_fraction=0.25, seed=3)
@@ -570,7 +566,7 @@ def test_video_split_keeps_explicit_subject_groups_together():
 
 def test_geospatial_feature_collection_preserves_bounds_and_crs():
     """GeoJSON validation produces deterministic geometry understanding."""
-    dataset = geospatial.GeospatialDataset.from_geojson(
+    dataset = geospatial.Dataset.from_geojson(
         {
             "type": "FeatureCollection",
             "features": [
@@ -611,13 +607,13 @@ def test_geospatial_identity_binds_crs_and_ignores_feature_order():
     second_feature = geospatial.GeoFeature(
         "second", {"type": "Point", "coordinates": [1, 1]}
     )
-    first = geospatial.GeospatialDataset(
+    first = geospatial.Dataset(
         (first_feature, second_feature), crs=" EPSG:4326 "
     )
-    reordered = geospatial.GeospatialDataset(
+    reordered = geospatial.Dataset(
         (second_feature, first_feature), crs="EPSG:4326"
     )
-    projected = geospatial.GeospatialDataset(
+    projected = geospatial.Dataset(
         (first_feature, second_feature), crs="EPSG:3857"
     )
 
@@ -629,11 +625,11 @@ def test_geospatial_identity_binds_crs_and_ignores_feature_order():
 def test_geospatial_identity_binds_labels_and_properties():
     """Feature metadata changes produce a new immutable dataset identity."""
     geometry = {"type": "Point", "coordinates": [0, 0]}
-    baseline = geospatial.GeospatialDataset(
+    baseline = geospatial.Dataset(
         (geospatial.GeoFeature("feature", geometry, {"kind": "park"}, "open"),),
         crs="EPSG:4326",
     )
-    changed_label = geospatial.GeospatialDataset(
+    changed_label = geospatial.Dataset(
         (
             geospatial.GeoFeature(
                 "feature", geometry, {"kind": "park"}, "closed"
@@ -641,7 +637,7 @@ def test_geospatial_identity_binds_labels_and_properties():
         ),
         crs="EPSG:4326",
     )
-    changed_property = geospatial.GeospatialDataset(
+    changed_property = geospatial.Dataset(
         (
             geospatial.GeoFeature(
                 "feature", geometry, {"kind": "school"}, "open"
@@ -658,7 +654,7 @@ def test_geospatial_identity_binds_labels_and_properties():
 
 def test_geospatial_spatial_join_records_bounded_same_crs_evidence():
     """A caller predicate produces deterministic, hash-bound join evidence."""
-    left = geospatial.GeospatialDataset(
+    left = geospatial.Dataset(
         (
             geospatial.GeoFeature(
                 "left-a", {"type": "Point", "coordinates": [0, 0]}
@@ -669,7 +665,7 @@ def test_geospatial_spatial_join_records_bounded_same_crs_evidence():
         ),
         crs="EPSG:3857",
     )
-    right = geospatial.GeospatialDataset(
+    right = geospatial.Dataset(
         (
             geospatial.GeoFeature(
                 "right-a", {"type": "Point", "coordinates": [1, 0]}
@@ -703,8 +699,8 @@ def test_geospatial_spatial_join_rejects_crs_mismatch_and_unbounded_work():
     feature = geospatial.GeoFeature(
         "feature", {"type": "Point", "coordinates": [0, 0]}
     )
-    left = geospatial.GeospatialDataset((feature,), crs="EPSG:4326")
-    right = geospatial.GeospatialDataset((feature,), crs="EPSG:3857")
+    left = geospatial.Dataset((feature,), crs="EPSG:4326")
+    right = geospatial.Dataset((feature,), crs="EPSG:3857")
 
     with pytest.raises(
         geospatial.GeospatialValidationError, match="matching CRS"
@@ -716,7 +712,7 @@ def test_geospatial_spatial_join_rejects_crs_mismatch_and_unbounded_work():
         match="comparison limit",
     ):
         left.spatial_join(
-            geospatial.GeospatialDataset(
+            geospatial.Dataset(
                 tuple(
                     geospatial.GeoFeature(
                         f"right-{index}",
@@ -737,7 +733,7 @@ def test_geospatial_spatial_join_rejects_invalid_predicate_output():
     feature = geospatial.GeoFeature(
         "feature", {"type": "Point", "coordinates": [0, 0]}
     )
-    dataset = geospatial.GeospatialDataset((feature,), crs="EPSG:4326")
+    dataset = geospatial.Dataset((feature,), crs="EPSG:4326")
 
     with pytest.raises(
         geospatial.GeospatialValidationError,
@@ -749,7 +745,7 @@ def test_geospatial_spatial_join_rejects_invalid_predicate_output():
 def test_geospatial_reprojection_records_source_and_target_identity():
     """An explicit transformer preserves metadata and binds both snapshots."""
     observation_time = datetime(2026, 1, 1, tzinfo=UTC)
-    dataset = geospatial.GeospatialDataset(
+    dataset = geospatial.Dataset(
         (
             geospatial.GeoFeature(
                 "feature",
@@ -798,7 +794,7 @@ def test_geospatial_reprojection_rejects_metadata_changes():
         {"type": "Point", "coordinates": [0, 0]},
         label="open",
     )
-    dataset = geospatial.GeospatialDataset((feature,), crs="EPSG:4326")
+    dataset = geospatial.Dataset((feature,), crs="EPSG:4326")
 
     def changes_label(
         value: geospatial.GeoFeature, source_crs: str, target_crs: str
@@ -827,7 +823,7 @@ def test_geospatial_rejects_invalid_geometry():
 
 def test_geospatial_curation_blocks_missing_crs():
     """Spatial coordinates cannot enter modelling without a reference CRS."""
-    dataset = geospatial.GeospatialDataset.from_geojson(
+    dataset = geospatial.Dataset.from_geojson(
         {
             "type": "FeatureCollection",
             "features": [
@@ -850,7 +846,7 @@ def test_geospatial_curation_blocks_missing_crs():
 
 def test_geospatial_curation_reports_mixed_label_state():
     """Spatial curation exposes mixed labels before spatial modelling."""
-    dataset = geospatial.GeospatialDataset(
+    dataset = geospatial.Dataset(
         (
             geospatial.GeoFeature(
                 "a",
@@ -877,7 +873,7 @@ def test_geospatial_curation_reports_mixed_label_state():
 
 def test_geospatial_curation_records_deterministic_spatial_autocorrelation():
     """Numeric labels expose bounded spatial-dependence evidence."""
-    dataset = geospatial.GeospatialDataset(
+    dataset = geospatial.Dataset(
         tuple(
             geospatial.GeoFeature(
                 f"feature-{index}",
@@ -918,7 +914,7 @@ def test_spatial_autocorrelation_rejects_non_numeric_and_constant_values():
         )
         for index in range(3)
     )
-    dataset = geospatial.GeospatialDataset(features, crs="EPSG:3857")
+    dataset = geospatial.Dataset(features, crs="EPSG:3857")
 
     with pytest.raises(geospatial.GeospatialValidationError, match="numeric"):
         dataset.spatial_autocorrelation()
@@ -939,7 +935,7 @@ def test_geospatial_spatial_split_keeps_blocks_together():
         )
         for index in range(6)
     )
-    dataset = geospatial.GeospatialDataset(features, crs="EPSG:3857")
+    dataset = geospatial.Dataset(features, crs="EPSG:3857")
 
     first = dataset.split_spatial(
         block_size=5, validation_fraction=0.25, test_fraction=0.25, seed=3
@@ -957,7 +953,7 @@ def test_geospatial_spatial_split_keeps_blocks_together():
 
 def test_geospatial_boundary_leakage_reports_conservative_envelope_crossings():
     """Bounds crossing blocks are surfaced before centroid-based splitting."""
-    dataset = geospatial.GeospatialDataset(
+    dataset = geospatial.Dataset(
         (
             geospatial.GeoFeature(
                 "point", {"type": "Point", "coordinates": [0, 0]}
@@ -997,7 +993,7 @@ def test_geospatial_temporal_split_normalizes_time_and_curates_coverage():
             )
         )
     )
-    dataset = geospatial.GeospatialDataset(features, crs="EPSG:3857")
+    dataset = geospatial.Dataset(features, crs="EPSG:3857")
 
     split = dataset.split_temporal("2026-01-02T00:00:00+00:00")
     report = dataset.curate()
@@ -1014,7 +1010,7 @@ def test_geospatial_temporal_split_normalizes_time_and_curates_coverage():
 
 def test_geospatial_temporal_state_fails_closed_when_incomplete():
     """Missing or malformed observation times remain explicit before splitting."""
-    mixed = geospatial.GeospatialDataset(
+    mixed = geospatial.Dataset(
         (
             geospatial.GeoFeature(
                 "timed",
@@ -1047,7 +1043,7 @@ def test_geospatial_temporal_state_fails_closed_when_incomplete():
 
 def test_geospatial_feature_preparation_preserves_crs_units():
     """Geometry envelopes are prepared only after CRS provenance exists."""
-    dataset = geospatial.GeospatialDataset(
+    dataset = geospatial.Dataset(
         (
             geospatial.GeoFeature(
                 "point", {"type": "Point", "coordinates": [2, 1]}
@@ -1105,7 +1101,7 @@ def test_geospatial_raw_axis_mask_rejects_invalid_axis():
 
 def test_geospatial_feature_preparation_rejects_missing_crs():
     """Coordinates cannot become model features without a reference CRS."""
-    dataset = geospatial.GeospatialDataset(
+    dataset = geospatial.Dataset(
         (
             geospatial.GeoFeature(
                 "point", {"type": "Point", "coordinates": [0, 0]}

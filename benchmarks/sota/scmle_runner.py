@@ -28,6 +28,7 @@ from sklearn import metrics
 from benchmarks.sota import records
 from benchmarks.sota import split
 import scmle
+import scmle.api.project
 
 LOGGER = logging.getLogger(__name__)
 
@@ -215,7 +216,7 @@ def run_frames(
     )
     started = time.monotonic()
     try:
-        project = scmle.MLProject(
+        project = scmle.api.project.Project(
             train,
             target,
             task="regression" if kind == "regression" else "classification",

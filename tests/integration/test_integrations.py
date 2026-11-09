@@ -88,12 +88,12 @@ def test_ray_run_matches_sequential(binary_frame, tmp_path):
     pytest.importorskip("ray")
 
     def spec_with(workers, executor):
-        return tasks.ProjectSpec(
-            data=tasks.DataSpec(uri="<in-memory>", target="y"),
-            resources=tasks.ResourceSpec(
+        return tasks.Config(
+            data=tasks.Dataset(uri="<in-memory>", target="y"),
+            resources=tasks.Resources(
                 time_budget_seconds=300, workers=workers, executor=executor
             ),
-            search=tasks.SearchSpec(top_models=0),
+            search=tasks.Search(top_models=0),
             strategies=support.NO_STRATEGIES,
             ensemble=support.NO_ENSEMBLE,
             models=support.FAST_MODELS,

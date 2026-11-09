@@ -10,7 +10,7 @@ from scmle.experimentation import stores
 def make_trial(
     trial_id="trial_001", status=experiments.TrialStatus.OK, **kwargs
 ):
-    return experiments.TrialResult(
+    return experiments.Trial(
         trial_id,
         "ridge",
         status,

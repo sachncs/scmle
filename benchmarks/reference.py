@@ -60,7 +60,7 @@ def reference_score(
     dev, test = manifest["train_ids"], manifest["test_ids"]
     estimator.fit(features.iloc[dev], frame[target].iloc[dev])
     metric = metrics.CATALOG.metrics[metric_name]
-    positive = metrics.positive_label(frame[target], tasks.TaskType(task))
+    positive = metrics.positive_label(frame[target], tasks.Task(task))
     return metric.score(
         estimator, features.iloc[test], frame[target].iloc[test], positive
     )

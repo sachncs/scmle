@@ -30,7 +30,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
   <h2>3. Signing-key rotation</h2>
   <ol>
     <li>Produce a signed bundle with the current key.</li>
-    <li>Run <code>ModelBundle.rotate_signing_key(bundle_dir, old_key, new_key)</code>.</li>
+    <li>Run <code>Bundle.rotate_signing_key(bundle_dir, old_key, new_key)</code>.</li>
     <li>Load the bundle with the new key and verify predictions against a saved parity sample.</li>
     <li>Confirm the old key is rejected and no temporary signature file remains.</li>
     <li>Only then retire the old key in the secret manager.</li>

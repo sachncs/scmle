@@ -191,7 +191,7 @@ def capped(task: str, status: str) -> str:
     """
     if status != CONFIRMED:
         return status
-    return task_gate.tier_ceiling(tasks.TaskType(task), status)
+    return task_gate.tier_ceiling(tasks.Task(task), status)
 
 
 def inside_of(
@@ -281,7 +281,7 @@ def evaluate_document(
         **result,
         "task_gate": {
             "task": task,
-            "gate": task_gate.status(tasks.TaskType(task)),
+            "gate": task_gate.status(tasks.Task(task)),
             "capped": result["status"] != tested,
         },
         "rows_read": "once, by the ledger's opening of C",

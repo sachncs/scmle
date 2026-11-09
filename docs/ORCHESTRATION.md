@@ -8,7 +8,7 @@ durable state.
 
 A `Workflow` is named, versioned `Step`s with explicit `depends_on`. A step
 has a kind (`ingest`, `train`, `evaluate`, `monitor`, `batch_predict`,
-`approval`), a timeout, a `RetryPolicy` (attempts, first delay, factor,
+`approval`), a timeout, a `Retries` (attempts, first delay, factor,
 ceiling), an optional cost budget and an optional concurrency group. The
 workflow adds an optional `Schedule`, `max_concurrent_runs`, a run cost budget,
 group limits and `max_parallel`. Dependency cycles, unknown dependencies and

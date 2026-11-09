@@ -8,7 +8,7 @@ from scmle.data.detectors import certificates
 
 
 def test_certificate_file_is_current_and_passing():
-    store = certificates.CertificateStore.load(ingest_certify.STORE_PATH)
+    store = certificates.Store.load(ingest_certify.STORE_PATH)
     assert ingest_certify.problems(store) == []
     assert ingest_certify.audit_labels(store)["uncertified"] == []
     ids = {c.detector_id for c in store.certificates}

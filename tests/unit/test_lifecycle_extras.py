@@ -16,7 +16,7 @@ from scmle.monitoring import abtest
 from scmle.monitoring import shadow
 
 PLAN = data.FeaturePlan(("a", "b"), ())
-MODELS = scmle.models.registry.ModelRegistry.with_builtins()
+MODELS = scmle.models.registry.Catalog.with_builtins()
 APPROVAL_KEY = "promotion-review-key"
 
 
@@ -33,9 +33,9 @@ def traffic(rows=600, seed=0, flip=False):
 def bundle_of(name, frame):
     features = frame.drop(columns="y")
     fitted = preprocessing.build_pipeline(
-        PLAN, MODELS.get(name), tasks.TaskType.BINARY, 0
+        PLAN, MODELS.get(name), tasks.Task.BINARY, 0
     ).fit(features, frame.y)
-    return bundle.ModelBundle.create(
+    return bundle.Bundle.create(
         fitted, PLAN, features, "y", "binary_classification", "roc_auc", name
     )
 
@@ -106,7 +106,7 @@ def test_a_clearly_better_treatment_is_adopted(good, weak):
     treatment = arm_of(good, traffic(1500, seed=11))
 
     result = abtest.compare_arms(
-        tasks.TaskType.BINARY, "roc_auc", control, treatment
+        tasks.Task.BINARY, "roc_auc", control, treatment
     )
 
     assert result.decision == "adopt" and result.interval[0] > 0
@@ -117,7 +117,7 @@ def test_a_clearly_worse_treatment_is_kept_out(good, weak):
     treatment = arm_of(weak, traffic(1500, seed=13))
 
     result = abtest.compare_arms(
-        tasks.TaskType.BINARY, "roc_auc", control, treatment
+        tasks.Task.BINARY, "roc_auc", control, treatment
     )
 
     assert result.decision == "keep" and result.interval[1] < 0
@@ -128,7 +128,7 @@ def test_identical_models_are_inconclusive(good):
     treatment = arm_of(good, traffic(1200, seed=15))
 
     result = abtest.compare_arms(
-        tasks.TaskType.BINARY, "roc_auc", control, treatment
+        tasks.Task.BINARY, "roc_auc", control, treatment
     )
 
     assert result.decision == "inconclusive"
@@ -139,7 +139,7 @@ def test_too_few_requests_never_decide(good, weak):
     treatment = arm_of(good, traffic(60, seed=17))
 
     result = abtest.compare_arms(
-        tasks.TaskType.BINARY, "roc_auc", control, treatment
+        tasks.Task.BINARY, "roc_auc", control, treatment
     )
 
     assert result.decision == "inconclusive"
@@ -147,7 +147,7 @@ def test_too_few_requests_never_decide(good, weak):
 
 def registry_with(tmp_path, first, second):
     store = scmle.governance.registry.ModelRegistryStore(tmp_path / "registry")
-    manager = lifecycle.LifecycleManager(store, "m", str(tmp_path / "work"))
+    manager = lifecycle.Maintainer(store, "m", str(tmp_path / "work"))
     for index, model in enumerate((first, second), start=1):
         directory = model.save(tmp_path / f"export{index}")
         record = store.register("m", directory, trusted=True)
@@ -203,7 +203,7 @@ def test_a_new_champion_that_holds_up_stays(good, tmp_path):
     outcome = manager.check_rollback(
         traffic(1200, seed=21),
         "y",
-        lifecycle.RollbackPolicy(tolerance=0.02),
+        lifecycle.Trigger(tolerance=0.02),
     )
 
     assert not outcome.rolled_back and store.resolve("m").version == 2
@@ -211,7 +211,7 @@ def test_a_new_champion_that_holds_up_stays(good, tmp_path):
 
 def test_nothing_to_roll_back_to_or_too_little_evidence(good, tmp_path):
     store = scmle.governance.registry.ModelRegistryStore(tmp_path / "registry")
-    manager = lifecycle.LifecycleManager(store, "m", str(tmp_path / "work"))
+    manager = lifecycle.Maintainer(store, "m", str(tmp_path / "work"))
     record = store.register("m", good.save(tmp_path / "e"), trusted=True)
     store.promote(
         "m",

@@ -25,7 +25,7 @@ NEIGHBORS = 5
 
 
 def fingerprint(
-    profile: data.DatasetProfile, task: tasks.TaskType
+    profile: data.DatasetProfile, task: tasks.Task
 ) -> dict[str, float]:
     """Summarizes a dataset as a small numeric vector.
 
@@ -83,7 +83,7 @@ class MetaLearner:
         self.neighbors = neighbors
 
     def eligible(
-        self, task: tasks.TaskType, dataset_id: str, data_hash: str
+        self, task: tasks.Task, dataset_id: str, data_hash: str
     ) -> list[experiments.HistoricalRun]:
         """Selects past runs on a different dataset with the same task.
 
@@ -108,7 +108,7 @@ class MetaLearner:
     def recommend(
         self,
         current: dict[str, float],
-        task: tasks.TaskType,
+        task: tasks.Task,
         dataset_id: str,
         data_hash: str,
     ) -> list[tuple[str, float]]:

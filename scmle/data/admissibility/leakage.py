@@ -94,7 +94,7 @@ Splits = list[tuple[numpy.ndarray, numpy.ndarray]]
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class LeakageConfig:
+class Config:
     """Pre-registered settings of the leakage tests.
 
     Attributes:
@@ -292,7 +292,7 @@ def out_of_fold(
     y: numpy.ndarray,
     task: str,
     splits: Splits,
-    cfg: LeakageConfig,
+    cfg: Config,
     seed: int,
 ) -> numpy.ndarray:
     """Predicts every row from a small tree fitted on the other folds.
@@ -393,7 +393,7 @@ def cross_fit_skill(
     x: numpy.ndarray,
     y: numpy.ndarray,
     task: str,
-    cfg: LeakageConfig,
+    cfg: Config,
     groups: numpy.ndarray | None,
     block_size: int | None,
     seed: int,
@@ -455,7 +455,7 @@ def lower_bound(
     pred: numpy.ndarray,
     y: numpy.ndarray,
     task: str,
-    cfg: LeakageConfig,
+    cfg: Config,
     groups: numpy.ndarray | None,
     rng: numpy.random.Generator,
 ) -> float:
@@ -506,7 +506,7 @@ def permutation_p(observed: float, null: Sequence[float]) -> float:
     return (1.0 + exceed) / (len(null) + 1.0)
 
 
-def enough_rows(y: numpy.ndarray, task: str, cfg: LeakageConfig) -> bool:
+def enough_rows(y: numpy.ndarray, task: str, cfg: Config) -> bool:
     """Decides whether there are enough rows for the tests to have any power.
 
     Args:
@@ -581,7 +581,7 @@ def skill_test(
     feature: pandas.Series,
     target: pandas.Series,
     task: str,
-    cfg: LeakageConfig,
+    cfg: Config,
     groups: pandas.Series | None = None,
     block_size: int | None = None,
     gate: certificates.GateStatus = certificates.GateStatus.DESCRIPTIVE,
@@ -679,7 +679,7 @@ def skill_test(
 
 
 def strata_labels(
-    feature: pandas.Series, others: pandas.DataFrame, cfg: LeakageConfig
+    feature: pandas.Series, others: pandas.DataFrame, cfg: Config
 ) -> numpy.ndarray:
     """Strata for the conditional permutation: leaves of a small tree.
 
@@ -774,7 +774,7 @@ def conditional_test(
     others: pandas.DataFrame,
     target: pandas.Series,
     task: str,
-    cfg: LeakageConfig,
+    cfg: Config,
     groups: pandas.Series | None = None,
     block_size: int | None = None,
     set_id: qualification.SetId = qualification.SetId.EXPLORATION,
@@ -919,7 +919,7 @@ def missingness_test(
     feature: pandas.Series,
     target: pandas.Series,
     task: str,
-    cfg: LeakageConfig,
+    cfg: Config,
     gate: certificates.GateStatus = certificates.GateStatus.DESCRIPTIVE,
     set_id: qualification.SetId = qualification.SetId.EXPLORATION,
 ) -> MissingnessTest | None:
@@ -1023,7 +1023,7 @@ def assess_feature(
     others: pandas.DataFrame,
     target: pandas.Series,
     task: str,
-    cfg: LeakageConfig,
+    cfg: Config,
     groups: pandas.Series | None = None,
     block_size: int | None = None,
     gate: certificates.GateStatus = certificates.GateStatus.DESCRIPTIVE,
@@ -1066,7 +1066,7 @@ def assess_feature(
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class LeakageReport:
+class Assessments:
     """Leakage tests for many features, reported as suspicions only.
 
     Attributes:
@@ -1134,13 +1134,13 @@ def scan(
     frame: pandas.DataFrame,
     target: str,
     task: str,
-    cfg: LeakageConfig,
+    cfg: Config,
     features: Sequence[Hashable] | None = None,
     groups: pandas.Series | None = None,
     block_size: int | None = None,
     gate: certificates.GateStatus = certificates.GateStatus.DESCRIPTIVE,
     set_id: qualification.SetId = qualification.SetId.EXPLORATION,
-) -> LeakageReport:
+) -> Assessments:
     """Tests every feature of the exploration set for leakage suspicion.
 
     Args:
@@ -1183,15 +1183,15 @@ def scan(
         )
         for name in chosen
     )
-    return LeakageReport(assessments, gate)
+    return Assessments(assessments, gate)
 
 
-CERTIFIED = LeakageConfig(skill_ceiling=0.95, association_ceiling=0.9)
+CERTIFIED = Config(skill_ceiling=0.95, association_ceiling=0.9)
 
 
 def gate_status(
-    store: certificates.CertificateStore,
-    cfg: LeakageConfig,
+    store: certificates.Store,
+    cfg: Config,
     task: str = "classification",
     n_classes: int = 2,
 ) -> certificates.GateStatus:

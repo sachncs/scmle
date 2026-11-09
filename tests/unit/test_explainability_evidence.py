@@ -92,7 +92,7 @@ def build_inputs() -> EvidenceInputs:
 def build_evidence(
     result: dict[str, object] | None = None,
     **overrides: Any,
-) -> explanations.ExplanationEvidence:
+) -> explanations.Evidence:
     """Builds evidence using the test diagnostic and explicit identities."""
     values = cast(EvidenceInputs, {**build_inputs(), **overrides})
     return suite.ExplanationEvidenceBuilder().build(

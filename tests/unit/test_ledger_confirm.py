@@ -281,9 +281,9 @@ def test_thresholdout_is_refused_before_anything_happens():
 def test_rules_change_the_family_adjustment():
     results = {}
     for rule in (
-        budget.MultiplicityRule.BH,
-        budget.MultiplicityRule.BY,
-        budget.MultiplicityRule.HOLM,
+        budget.Correction.BH,
+        budget.Correction.BY,
+        budget.Correction.HOLM,
     ):
         ledger = explored()
         results[rule] = confirm.confirm(
@@ -292,11 +292,11 @@ def test_rules_change_the_family_adjustment():
         assert results[rule].rule == rule.value
     by = {
         c.claim_id: c.adjusted_p_value
-        for c in results[budget.MultiplicityRule.BY].claims
+        for c in results[budget.Correction.BY].claims
     }
     bh = {
         c.claim_id: c.adjusted_p_value
-        for c in results[budget.MultiplicityRule.BH].claims
+        for c in results[budget.Correction.BH].claims
     }
     assert all(by[i] >= bh[i] for i in by)
 

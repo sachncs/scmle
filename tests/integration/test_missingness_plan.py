@@ -29,8 +29,8 @@ def run(informative, tmp_path):
         "y",
         time_budget=300,
         output_dir=tmp_path,
-        strategies=tasks.StrategySpec(names=["missing_indicators"]),
-        models=tasks.ModelSpec(exclude_families=["deep_learning"]),
+        strategies=tasks.Strategies(names=["missing_indicators"]),
+        models=tasks.Candidates(exclude_families=["deep_learning"]),
     ).run()
     log = json.loads(
         (result.run_dir / "diagnostics/decision_log.json").read_text()

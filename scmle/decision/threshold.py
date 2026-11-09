@@ -243,7 +243,7 @@ def cross_fitted(
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ThresholdRule:
+class Threshold:
     """A frozen decision rule: act iff the (recalibrated) probability >= t.
 
     Attributes:
@@ -314,7 +314,7 @@ class ThresholdDecision:
             net benefit beats treating all and treating none, or None.
     """
 
-    rule: ThresholdRule
+    rule: Threshold
     tier: str
     check: CalibrationCheck
     recheck: CalibrationCheck | None
@@ -396,7 +396,7 @@ def cost_interval(
 def stable_span(
     p: NDArray[numpy.float64],
     y: NDArray[numpy.float64],
-    rule: ThresholdRule,
+    rule: Threshold,
     model: costs.DecisionCostModel,
     points: int = 41,
 ) -> tuple[float, float] | None:
@@ -465,21 +465,21 @@ def choose_threshold(
     recheck = None
     target = bayes_threshold(model.c_fp, model.c_fn)
     if first.calibrated:
-        rule = ThresholdRule(target, "bayes")
+        rule = Threshold(target, "bayes")
     else:
         recheck = calibration_check(
             cross_fitted(risk, labels, seed), labels, level
         )
         platt = fit_recalibrator(risk, labels)
         if recheck.calibrated and platt.slope > 0:
-            rule = ThresholdRule(target, "recalibrated", platt)
+            rule = Threshold(target, "recalibrated", platt)
         else:
             cut, ignored = thresholds.optimize_threshold(
                 risk,
                 labels.astype(bool),
                 thresholds.CostObjective(model.c_fp, model.c_fn),
             )
-            rule = ThresholdRule(cut, "grid")
+            rule = Threshold(cut, "grid")
     acts = rule.act(risk)
     tier = (
         "attested"

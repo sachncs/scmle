@@ -82,7 +82,7 @@ def wald_test(name: str, kind: str, estimate: float, se: float) -> Test:
 
 
 @dataclasses.dataclass(frozen=True)
-class BatteryReport:
+class Battery:
     """Outcome of the battery.
 
     Attributes:
@@ -115,7 +115,7 @@ class BatteryReport:
         }
 
 
-def run_battery(tests: list[Test], alpha: float) -> BatteryReport:
+def run_battery(tests: list[Test], alpha: float) -> Battery:
     """Applies Holm's step-down over all tests at familywise level `alpha`.
 
     Args:
@@ -137,7 +137,7 @@ def run_battery(tests: list[Test], alpha: float) -> BatteryReport:
         else []
     )
     rejected = tuple(t.name for t, f in zip(tests, flags, strict=True) if f)
-    return BatteryReport(
+    return Battery(
         alpha, tuple(tests), rejected, bool(tests) and not rejected, bool(tests)
     )
 

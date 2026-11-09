@@ -34,22 +34,18 @@ def reference():
 
 
 def make_gateway(clock, **options):
-    check = tokens.TokenVerifier(
+    check = tokens.Verifier(
         tokens.KeySet(
             [
-                tokens.VerificationKey.from_jwk(
-                    support_identity.hs_jwk("hs-1")
-                ),
-                tokens.VerificationKey.from_jwk(
-                    support_identity.rsa_jwk("k1", "rs-1")
-                ),
+                tokens.Key.from_jwk(support_identity.hs_jwk("hs-1")),
+                tokens.Key.from_jwk(support_identity.rsa_jwk("k1", "rs-1")),
             ]
         ),
         support_identity.ISSUER,
         support_identity.AUDIENCE,
         clock=clock,
     )
-    log = audit.AuditLog.open(None, clock=clock)
+    log = audit.Log.open(None, clock=clock)
     return access.Gateway(check, audit=log, **options)
 
 
@@ -206,11 +202,9 @@ def test_audit_records_activation_access_and_admin_in_a_valid_chain(
 ):
     clock = support_identity.Clock()
     path = tmp_path / "audit.jsonl"
-    log = audit.AuditLog.open(path, clock=clock)
-    check = tokens.TokenVerifier(
-        tokens.KeySet(
-            [tokens.VerificationKey.from_jwk(support_identity.hs_jwk("hs-1"))]
-        ),
+    log = audit.Log.open(path, clock=clock)
+    check = tokens.Verifier(
+        tokens.KeySet([tokens.Key.from_jwk(support_identity.hs_jwk("hs-1"))]),
         support_identity.ISSUER,
         support_identity.AUDIENCE,
         clock=clock,
@@ -225,11 +219,7 @@ def test_audit_records_activation_access_and_admin_in_a_valid_chain(
         adapter.stop()
     gateway.rotate(
         tokens.KeySet(
-            [
-                tokens.VerificationKey.from_jwk(
-                    support_identity.rsa_jwk("k1", "rs-2")
-                )
-            ]
+            [tokens.Key.from_jwk(support_identity.rsa_jwk("k1", "rs-2"))]
         ),
         actor="ops",
         reason="scheduled",
@@ -255,7 +245,7 @@ def test_audit_records_activation_access_and_admin_in_a_valid_chain(
 
 
 def test_an_edited_audit_row_breaks_the_chain(tmp_path):
-    log = audit.AuditLog.open(tmp_path / "a.jsonl")
+    log = audit.Log.open(tmp_path / "a.jsonl")
     log.admin("ops", "one")
     log.admin("ops", "two")
     lines = (tmp_path / "a.jsonl").read_text().splitlines()
@@ -375,10 +365,10 @@ def test_the_modality_service_is_gated_the_same_way(tmp_path):
     from tests.unit import test_modality_serving
 
     reference = test_modality_serving.adapter()
-    report = modality_lifecycle.ModalityLifecycle().run(
+    report = modality_lifecycle.Lifecycle().run(
         reference, tmp_path / "package", signing_key="serving-key"
     )
-    predictor = modality_lifecycle.ModalityPredictor.from_package(
+    predictor = modality_lifecycle.Predictor.from_package(
         reference, report.package.path, "serving-key"
     )
     open_host = modality_serving.ModalityHttpServing(

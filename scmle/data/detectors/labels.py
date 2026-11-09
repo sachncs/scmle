@@ -74,7 +74,7 @@ class NoiseRate:
 
 
 @dataclasses.dataclass(frozen=True)
-class LabelReport:
+class Noise:
     """Result of the two-detector label-noise check.
 
     Attributes:
@@ -423,7 +423,7 @@ def detect(
     labels: pandas.Series,
     seed: int = 0,
     audit: pandas.Series | None = None,
-) -> LabelReport:
+) -> Noise:
     """Runs both detectors and reports where they agree.
 
     Too few rows or classes raise `ValueError` (see
@@ -475,7 +475,7 @@ def detect(
     union = int((cl_flags | aum_flags).sum())
     agreement = 1.0 if union == 0 else float(both.sum()) / union
     capped = input_rows > len(features)
-    return LabelReport(
+    return Noise(
         confident_learning=tuple(int(i) for i in numpy.flatnonzero(cl_flags)),
         margin=tuple(int(i) for i in numpy.flatnonzero(aum_flags)),
         suspects=tuple(int(i) for i in numpy.flatnonzero(both)),

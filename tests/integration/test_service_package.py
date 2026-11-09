@@ -36,11 +36,11 @@ def boosted(tmp_path_factory):
     plan = data.FeaturePlan(("a", "b"), ())
     fitted = preprocessing.build_pipeline(
         plan,
-        registry.ModelRegistry.with_builtins().get("hist_gradient_boosting"),
-        tasks.TaskType.BINARY,
+        registry.Catalog.with_builtins().get("hist_gradient_boosting"),
+        tasks.Task.BINARY,
         0,
     ).fit(frame, target)
-    bundle = scmle.artifacts.bundle.ModelBundle.create(
+    bundle = scmle.artifacts.bundle.Bundle.create(
         fitted, plan, frame, "y", "binary_classification", "roc_auc", "boost"
     )
     return bundle, frame, tmp_path_factory.mktemp("service")

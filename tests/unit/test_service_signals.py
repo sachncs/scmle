@@ -64,9 +64,7 @@ def test_every_finished_request_is_recorded_with_route_status_and_time(
 
 def test_scored_features_are_sampled_into_the_monitor(reference):
     bundle, golden = reference
-    monitor = signals.SignalMonitor(
-        signals.WindowPolicy(sample_rate=1.0, seed=1)
-    )
+    monitor = signals.SignalMonitor(signals.Window(sample_rate=1.0, seed=1))
     adapter = serving.HttpServing(bundle, monitor=monitor)
     adapter.start()
     try:

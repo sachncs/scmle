@@ -14,7 +14,7 @@ def load_model(
     directory: str | pathlib.Path,
     trusted: bool = False,
     signing_key: str | bytes | None = None,
-) -> bundle.ModelBundle:
+) -> bundle.Bundle:
     """Loads a saved model bundle.
 
     Bundles are pickle-based, so loading is refused unless the signature
@@ -31,7 +31,7 @@ def load_model(
     Returns:
         The bundle, after its checksums and signature checks.
     """
-    return bundle.ModelBundle.load(
+    return bundle.Bundle.load(
         directory, trusted=trusted, signing_key=signing_key
     )
 

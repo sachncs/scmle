@@ -73,10 +73,10 @@ class TrialPayload:
     """
 
     job: TrialJob
-    adapter: models.ModelAdapter
-    strategy: strategies.DataStrategy
+    adapter: models.Model
+    strategy: strategies.Strategy
     feature_plan: data.FeaturePlan
-    task: tasks.TaskType
+    task: tasks.Task
     seed: int
     metric: scmle.contracts.metrics.Metric
     positive_label: Any
@@ -107,7 +107,7 @@ def access_record(row_ids: pandas.Index) -> dict[str, Any]:
     return {"rows": len(ordered), "digest": digest[:16]}
 
 
-def runtime_requirements(adapter: models.ModelAdapter) -> dict[str, Any]:
+def runtime_requirements(adapter: models.Model) -> dict[str, Any]:
     """Lists the Python version and the library versions a model needs.
 
     Args:
@@ -146,7 +146,7 @@ def fold_weights(
     return {"sample_weight": values}
 
 
-def evaluate_payload(payload: TrialPayload) -> experiments.TrialResult:
+def evaluate_payload(payload: TrialPayload) -> experiments.Trial:
     """Cross-validates one job; never raises for model failures.
 
     Args:
@@ -159,7 +159,7 @@ def evaluate_payload(payload: TrialPayload) -> experiments.TrialResult:
     job, metric = payload.job, payload.metric
     folds = payload.folds[: job.fold_count]
     started = time.monotonic()
-    result = experiments.TrialResult(
+    result = experiments.Trial(
         job.trial_id,
         job.model_name,
         experiments.TrialStatus.FAILED,
@@ -232,9 +232,7 @@ def evaluate_payload(payload: TrialPayload) -> experiments.TrialResult:
     return result
 
 
-def lost_trial(
-    payload: TrialPayload, error: Exception
-) -> experiments.TrialResult:
+def lost_trial(payload: TrialPayload, error: Exception) -> experiments.Trial:
     """Builds a failed result for a trial whose worker was lost.
 
     Args:
@@ -245,7 +243,7 @@ def lost_trial(
         A `FAILED` result whose error starts with `WorkerLost`.
     """
     job = payload.job
-    return experiments.TrialResult(
+    return experiments.Trial(
         job.trial_id,
         job.model_name,
         experiments.TrialStatus.FAILED,
@@ -256,7 +254,7 @@ def lost_trial(
     )
 
 
-def guarded_evaluate(payload: TrialPayload) -> experiments.TrialResult:
+def guarded_evaluate(payload: TrialPayload) -> experiments.Trial:
     """Evaluates a job in a supervised process under hard limits.
 
     A trial killed for exceeding a limit, or lost with its process, becomes a
@@ -269,14 +267,12 @@ def guarded_evaluate(payload: TrialPayload) -> experiments.TrialResult:
         The trial result, `FAILED` with a `TrialLimitError` message if a limit
         was exceeded.
     """
-    supervisor = limits.TrialSupervisor(
-        payload.ceiling_seconds, payload.memory_gb
-    )
+    supervisor = limits.Supervisor(payload.ceiling_seconds, payload.memory_gb)
     try:
         return supervisor.run(evaluate_payload, payload)
     except limits.TrialLimitError as error:
         job = payload.job
-        return experiments.TrialResult(
+        return experiments.Trial(
             job.trial_id,
             job.model_name,
             experiments.TrialStatus.FAILED,
@@ -299,7 +295,7 @@ class TrialRunner:
         folds: Cross-validation folds as lists of positions.
     """
 
-    def __init__(self, context: scmle.core.context.RunContext) -> None:
+    def __init__(self, context: scmle.core.context.Context) -> None:
         """Initializes the runner from a context holding a split and plan.
 
         Args:
@@ -363,7 +359,7 @@ class TrialRunner:
         model_name: str,
         params: Mapping[str, Any] | None = None,
         fold_count: int | None = None,
-    ) -> experiments.TrialResult:
+    ) -> experiments.Trial:
         """Evaluates a single candidate.
 
         Args:
@@ -378,9 +374,7 @@ class TrialRunner:
         job = TrialJob(trial_id, model_name, dict(params or {}), fold_count)
         return self.run_many([job])[0]
 
-    def run_many(
-        self, jobs: Sequence[TrialJob]
-    ) -> list[experiments.TrialResult]:
+    def run_many(self, jobs: Sequence[TrialJob]) -> list[experiments.Trial]:
         """Evaluates independent jobs, concurrently if the backend allows.
 
         Checkpointed results from an interrupted run are reused; only the
@@ -392,7 +386,7 @@ class TrialRunner:
         Returns:
             Results in the order of `jobs`.
         """
-        results: list[experiments.TrialResult | None] = [None] * len(jobs)
+        results: list[experiments.Trial | None] = [None] * len(jobs)
         slots: list[int] = []
         payloads: list[TrialPayload] = []
         for index, job in enumerate(jobs):
@@ -409,7 +403,7 @@ class TrialRunner:
             results[index] = output
         return [r for r in results if r is not None]
 
-    def reuse(self, job: TrialJob) -> experiments.TrialResult | None:
+    def reuse(self, job: TrialJob) -> experiments.Trial | None:
         """Returns a checkpointed result from an interrupted run, if valid.
 
         A checkpoint is reused only if the trial id, model and parameters
@@ -437,7 +431,7 @@ class TrialRunner:
         if len(checkpoint.fold_scores) < wanted:
             return None
         scores = checkpoint.fold_scores[:wanted]
-        return experiments.TrialResult(
+        return experiments.Trial(
             job.trial_id,
             job.model_name,
             experiments.TrialStatus.OK,
@@ -459,7 +453,7 @@ class TrialRunner:
 
     def skip(
         self, trial_id: str, model_name: str, reason: str
-    ) -> experiments.TrialResult:
+    ) -> experiments.Trial:
         """Creates a `SKIPPED` result.
 
         Args:
@@ -470,7 +464,7 @@ class TrialRunner:
         Returns:
             The result, with the reason as its error text.
         """
-        return experiments.TrialResult(
+        return experiments.Trial(
             trial_id,
             model_name,
             experiments.TrialStatus.SKIPPED,

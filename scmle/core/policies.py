@@ -45,7 +45,7 @@ class Approval:
     reason: str = ""
 
 
-class PolicyCheckpoint(abc.ABC):
+class Reviewer(abc.ABC):
     """An approval gate.
 
     Attributes:
@@ -68,7 +68,7 @@ class PolicyCheckpoint(abc.ABC):
         """
 
 
-class AutoApprove(PolicyCheckpoint):
+class Approver(Reviewer):
     """Approves everything (fully automatic operation)."""
 
     def review(self, review: GateReview) -> Approval:
@@ -83,7 +83,7 @@ class AutoApprove(PolicyCheckpoint):
         return Approval(True, "auto", "automatic approval")
 
 
-class CallbackCheckpoint(PolicyCheckpoint):
+class Callback(Reviewer):
     """Delegates the decision to a function (a UI, a ticket, a script)."""
 
     def __init__(
@@ -119,7 +119,7 @@ class CallbackCheckpoint(PolicyCheckpoint):
 
 
 def describe(
-    gate: state.RunState, context: scmle.core.context.RunContext
+    gate: state.RunState, context: scmle.core.context.Context
 ) -> GateReview:
     """Builds the review shown at `gate`.
 

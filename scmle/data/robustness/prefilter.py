@@ -3,7 +3,7 @@
 `governed.run_governed` calls `StabilityStage` after exploration and the
 negative control and before `C` is opened. The stage re-runs the survivors
 over the declared specification grid on the exploration set and, when the
-charter's `RunRules.stability_filter` is true and the verdicts are allowed to
+charter's `Procedure.stability_filter` is true and the verdicts are allowed to
 gate, withdraws the `fragile` survivors from the family tested on `C`.
 
 Error control (see `confirm.STAGE_TWO_STATEMENT` and the "Second stage"
@@ -51,7 +51,7 @@ MAX_FEATURE_ROWS = 200
 
 
 def feature_checks(
-    result: shift.ShiftResult, rows: int, seed: int
+    result: shift.Shift, rows: int, seed: int
 ) -> tuple[qualification.Check, ...]:
     """Per-column shift tests as checks (descriptive, never gating).
 

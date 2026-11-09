@@ -5,7 +5,7 @@ import pandas
 import pytest
 import support
 
-import scmle
+import scmle.artifacts.bundle
 from scmle.contracts import errors
 
 
@@ -62,7 +62,7 @@ def test_quantile_intervals_survive_saving_and_loading(result, tmp_path):
     expected = result.bundle.predict_interval(grid, method="quantile")
 
     result.bundle.save(tmp_path / "copy")
-    loaded = scmle.ModelBundle.load(tmp_path / "copy", trusted=True)
+    loaded = scmle.artifacts.bundle.Bundle.load(tmp_path / "copy", trusted=True)
 
     pandas.testing.assert_frame_equal(
         loaded.predict_interval(grid, method="quantile"), expected

@@ -1,6 +1,6 @@
 """Applying custody to a split: development rows become `X`, `C` is sealed.
 
-Runs after `SplitManager.split` and before profiling, so the profiler,
+Runs after `Splitter.split` and before profiling, so the profiler,
 feature selection and every trial see only exploration rows. The final test
 set keeps its role; `C` is a separate carve-out of the
 development rows, so confirmed claims never shape the model that `C` scores.
@@ -26,7 +26,7 @@ TEMPORAL = frozenset({"temporal", "rolling"})
 
 
 @dataclasses.dataclass(slots=True)
-class CustodyOutcome:
+class Outcome:
     """Everything custody produced for a run.
 
     Attributes:
@@ -36,9 +36,9 @@ class CustodyOutcome:
         feasibility: Whether `C` can support the promised power.
     """
 
-    split: splitters.SplitResult
+    split: splitters.Split
     view: sealed.ExplorationView
-    manifest: scmle.data.custody.manifest.CustodyManifest
+    manifest: scmle.data.custody.manifest.Manifest
     feasibility: feasibility.Feasibility
 
 
@@ -136,9 +136,9 @@ def empty_carve(
 def measured_embargo(
     frame: pandas.DataFrame,
     dev_ids: numpy.ndarray,
-    data: tasks.DataSpec,
+    data: tasks.Dataset,
     times: numpy.ndarray | None,
-    task: tasks.TaskType,
+    task: tasks.Task,
 ) -> int:
     """Measures the embargo in rows from the target's autocorrelation, or 0.
 
@@ -172,13 +172,13 @@ def measured_embargo(
 def apply_custody(
     *,
     charter: contracts.AnalysisCharter,
-    split: splitters.SplitResult,
+    split: splitters.Split,
     frame: pandas.DataFrame,
-    spec: tasks.ProjectSpec,
-    task: tasks.TaskType,
+    spec: tasks.Config,
+    task: tasks.Task,
     data_hash: str,
-    vault: sealed.CustodyVault,
-) -> CustodyOutcome:
+    vault: sealed.Vault,
+) -> Outcome:
     """Carves `C` out of the development rows and seals it.
 
     Args:
@@ -229,7 +229,7 @@ def apply_custody(
             "measured autocorrelation of the target"
         )
         embargo_rows = measured
-    columns = splitters.SplitManager(spec, task).feature_columns(frame)
+    columns = splitters.Splitter(spec, task).feature_columns(frame)
     copies = duplicates.duplicate_groups(frame, columns)[dev_ids]
     fraction = charter.sets.confirmation_fraction
     estimate = assess(
@@ -299,16 +299,16 @@ def apply_custody(
 
 def finish(
     charter: contracts.AnalysisCharter,
-    split: splitters.SplitResult,
+    split: splitters.Split,
     frame: pandas.DataFrame,
-    spec: tasks.ProjectSpec,
+    spec: tasks.Config,
     carved: carve.Carve,
     dev_ids: numpy.ndarray,
     report: feasibility.Feasibility,
     data_hash: str,
-    vault: sealed.CustodyVault,
+    vault: sealed.Vault,
     embargo_rows: int,
-) -> CustodyOutcome:
+) -> Outcome:
     """Builds the restricted split, seals `C` and records the manifest.
 
     Args:
@@ -348,7 +348,7 @@ def finish(
         )
         isolation.insert(0, ("C", vault.level))
     notes = (*old.notes, *carved.notes)
-    restricted = splitters.SplitManifest(
+    restricted = splitters.Manifest(
         strategy=old.strategy,
         seed=old.seed,
         train_ids=exploration,
@@ -356,7 +356,7 @@ def finish(
         folds=folds,
         notes=notes,
     )
-    manifest = scmle.data.custody.manifest.CustodyManifest(
+    manifest = scmle.data.custody.manifest.Manifest(
         strategy=old.strategy,
         seed=charter.seed,
         embargo_rows=embargo_rows,
@@ -379,7 +379,7 @@ def finish(
             )
         ),
     )
-    result = splitters.SplitResult(
+    result = splitters.Split(
         restricted,
         split.dev_features.iloc[keep].reset_index(drop=True),
         split.dev_target.iloc[keep].reset_index(drop=True),
@@ -392,4 +392,4 @@ def finish(
         folds=folds,
         manifest_sha256=manifest.sha256,
     )
-    return CustodyOutcome(result, view, manifest, report)
+    return Outcome(result, view, manifest, report)

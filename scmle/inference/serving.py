@@ -1,9 +1,9 @@
 """Serving adapters: how a bundle is exposed to callers.
 
-`ServingAdapter` is the contract; `BatchServing` scores files and
+`Server` is the contract; `BatchServing` scores files and
 `HttpServing` exposes a JSON API using only the standard library, so serving
 needs no extra dependencies. Online and batch scoring share one path,
-`ServingAdapter.respond_frame`, so they cannot drift apart: the same
+`Server.respond_frame`, so they cannot drift apart: the same
 validation, the same preprocessing, the same model call, the same response.
 """
 
@@ -37,15 +37,15 @@ MAX_REQUEST_RECORDS = 10_000
 MAX_CONCURRENT_REQUESTS = 8
 SCORING_TIMEOUT_SECONDS = 30.0
 BATCH_CHUNK_ROWS = 10_000
-Loader = Callable[[guard.Readiness], scmle.artifacts.bundle.ModelBundle]
+Loader = Callable[[guard.Readiness], scmle.artifacts.bundle.Bundle]
 
 
-class ServingAdapter(abc.ABC):
+class Server(abc.ABC):
     """Exposes a model bundle to callers."""
 
     def __init__(
         self,
-        bundle: scmle.artifacts.bundle.ModelBundle | None,
+        bundle: scmle.artifacts.bundle.Bundle | None,
         on_null: str = "impute",
         on_unseen: str = "report",
         warmup_records: list[dict[str, Any]] | None = None,
@@ -90,7 +90,7 @@ class ServingAdapter(abc.ABC):
             self.readiness.complete(guard.Phase.LOADING, note)
 
     @property
-    def bundle(self) -> scmle.artifacts.bundle.ModelBundle:
+    def bundle(self) -> scmle.artifacts.bundle.Bundle:
         """The loaded bundle.
 
         Raises:
@@ -275,7 +275,7 @@ class ServingAdapter(abc.ABC):
         """Stops serving and releases resources."""
 
 
-class BatchServing(ServingAdapter):
+class BatchServing(Server):
     """Scores CSV / Parquet files through the same path as online serving."""
 
     def start(self) -> None:
@@ -386,7 +386,7 @@ class RequestObserver(Protocol):
         """
 
 
-class HttpServing(ServingAdapter):
+class HttpServing(Server):
     """JSON-over-HTTP serving on a background thread.
 
     Endpoints:
@@ -406,7 +406,7 @@ class HttpServing(ServingAdapter):
 
     def __init__(
         self,
-        bundle: scmle.artifacts.bundle.ModelBundle | None = None,
+        bundle: scmle.artifacts.bundle.Bundle | None = None,
         host: str = "127.0.0.1",
         port: int = 0,
         max_request_bytes: int = MAX_REQUEST_BYTES,
@@ -439,8 +439,8 @@ class HttpServing(ServingAdapter):
                 with the reason if either fails.
             max_concurrent: Requests allowed in flight.
             scoring_timeout_seconds: Time one scoring call may take.
-            on_null: `impute` or `reject` (see `ServingAdapter`).
-            on_unseen: `report` or `reject` (see `ServingAdapter`).
+            on_null: `impute` or `reject` (see `Server`).
+            on_unseen: `report` or `reject` (see `Server`).
             warmup_records: Records for the warm-up call.
             gateway: Authenticates, authorizes, rate-limits and audits every
                 request except `/livez` and `/readyz`. Without it the server
@@ -648,7 +648,7 @@ class HttpServing(ServingAdapter):
             daemon_threads = True
             allow_reuse_address = True
 
-        class Handler(server.BaseHTTPRequestHandler):
+        class Responder(server.BaseHTTPRequestHandler):
             request_id = ""
             started = 0.0
 
@@ -734,7 +734,7 @@ class HttpServing(ServingAdapter):
                         self.client_address[0],
                         self.request_id,
                     )
-                except access.AccessDenied as denied:
+                except access.DeniedError as denied:
                     self.fail(
                         denied.status,
                         denied.body["error"],
@@ -907,7 +907,7 @@ class HttpServing(ServingAdapter):
                     *args: Unused format arguments.
                 """
 
-        self.httpd = ReferenceServer((self.host, self.port), Handler)
+        self.httpd = ReferenceServer((self.host, self.port), Responder)
         self.thread = threading.Thread(
             target=self.httpd.serve_forever, daemon=True
         )

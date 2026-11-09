@@ -57,7 +57,7 @@ class Spread:
 
 
 @dataclasses.dataclass(frozen=True)
-class SensitivityReport:
+class Sensitivity:
     """The three sensitivities of one model on one dataset.
 
     Attributes:
@@ -291,7 +291,7 @@ def analyze(
     scorer: Scorer,
     repeats: int = 10,
     seed: int = 0,
-) -> SensitivityReport:
+) -> Sensitivity:
     """Computes training, evaluation and performance sensitivity of a model.
 
     The noise curve is computed for a model fitted on the 70% training part of
@@ -327,4 +327,4 @@ def analyze(
     curve, slope = performance_sensitivity(
         model, features.iloc[test], target.iloc[test], scorer, seed=seed
     )
-    return SensitivityReport(by_seed, by_resample, by_split, curve, slope)
+    return Sensitivity(by_seed, by_resample, by_split, curve, slope)

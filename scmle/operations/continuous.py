@@ -341,7 +341,7 @@ def judge_retraining(
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class MetricSpec:
+class Indicator:
     """A metric watched after a promotion.
 
     Attributes:
@@ -402,7 +402,7 @@ def bootstrap_difference(
 
 
 def post_promotion_check(
-    specs: Sequence[MetricSpec],
+    specs: Sequence[Indicator],
     before: Mapping[str, Sequence[float]],
     after: Mapping[str, Sequence[float]],
     *,
@@ -553,7 +553,7 @@ def holdback_assignment(
 
 
 def holdback_check(
-    specs: Sequence[MetricSpec],
+    specs: Sequence[Indicator],
     holdback: Mapping[str, Sequence[float]],
     promoted: Mapping[str, Sequence[float]],
     *,
@@ -805,7 +805,7 @@ class ContinuousEvaluation:
         self.retain("business_outcomes", outcomes)
         return self.loop.mature(losses, challengers=paired or None)
 
-    def advance(self) -> scmle.governance.loop.StepResult:
+    def advance(self) -> scmle.governance.loop.Outcome:
         """Steps the loop and writes new proposals to the history.
 
         Returns:
@@ -1134,7 +1134,7 @@ class ContinuousEvaluation:
 
     def check_after_promotion(
         self,
-        specs: Sequence[MetricSpec],
+        specs: Sequence[Indicator],
         before: Mapping[str, Sequence[float]],
         after: Mapping[str, Sequence[float]],
         **options: Any,

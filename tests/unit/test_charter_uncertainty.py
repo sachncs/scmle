@@ -22,7 +22,7 @@ FORMAT_TEN_SIGNATURE = (
 
 
 def with_cap(size=5_000_000):
-    return make_charter(uncertainty=uncertainty.UncertaintySpec(size))
+    return make_charter(uncertainty=uncertainty.Uncertainty(size))
 
 
 def test_a_charter_without_the_block_keeps_its_hash_and_format():
@@ -34,7 +34,7 @@ def test_a_charter_without_the_block_keeps_its_hash_and_format():
 
 
 def test_an_empty_block_is_an_empty_record_and_still_format_ten():
-    charter = make_charter(uncertainty=uncertainty.UncertaintySpec())
+    charter = make_charter(uncertainty=uncertainty.Uncertainty())
     record = json.loads(json.dumps(charter.to_dict()))
     assert record["uncertainty"] == {}
     assert charter.format_version == 10
@@ -69,12 +69,12 @@ def test_the_block_in_an_older_format_is_refused(tmp_path):
 @pytest.mark.parametrize("bad", [0, -5, 1.5, True])
 def test_a_cap_must_be_a_positive_integer(bad):
     with pytest.raises((ValueError, TypeError)):
-        uncertainty.UncertaintySpec(bad)
+        uncertainty.Uncertainty(bad)
 
 
 def test_unknown_fields_are_refused():
     with pytest.raises(ValueError, match="unknown"):
-        uncertainty.UncertaintySpec.from_dict({"cv_plus_max_bytes": 5, "x": 1})
+        uncertainty.Uncertainty.from_dict({"cv_plus_max_bytes": 5, "x": 1})
 
 
 def stage_context(path):
@@ -99,7 +99,7 @@ def test_the_stage_reads_the_cap_from_the_charter(tmp_path):
 
 
 def test_slice_columns_round_trip_and_leave_a_cap_only_charter_alone():
-    spec = uncertainty.UncertaintySpec(5_000_000, ("grp", "region"))
+    spec = uncertainty.Uncertainty(5_000_000, ("grp", "region"))
     charter = make_charter(uncertainty=spec)
     record = json.loads(json.dumps(charter.to_dict()))
     assert record["uncertainty"]["slice_columns"] == ["grp", "region"]
@@ -112,11 +112,11 @@ def test_slice_columns_round_trip_and_leave_a_cap_only_charter_alone():
 @pytest.mark.parametrize("bad", [("a", "a"), ("",), (" ",), ["a"]])
 def test_slice_columns_are_distinct_non_blank_names(bad):
     with pytest.raises((ValueError, TypeError)):
-        uncertainty.UncertaintySpec(None, bad)
+        uncertainty.Uncertainty(None, bad)
 
 
 def test_the_confirmation_coverage_flag_needs_format_eleven_and_round_trips():
-    spec = uncertainty.UncertaintySpec(None, (), True)
+    spec = uncertainty.Uncertainty(None, (), True)
     charter = make_charter(uncertainty=spec)
     assert charter.format_version == 11
     record = json.loads(json.dumps(charter.to_dict()))
@@ -124,12 +124,12 @@ def test_the_confirmation_coverage_flag_needs_format_eleven_and_round_trips():
     assert contracts.AnalysisCharter.from_dict(record) == charter
     assert (
         charter.charter_hash
-        != make_charter(uncertainty=uncertainty.UncertaintySpec()).charter_hash
+        != make_charter(uncertainty=uncertainty.Uncertainty()).charter_hash
     )
 
 
 def test_without_the_flag_a_format_ten_charter_keeps_its_hash():
-    off = uncertainty.UncertaintySpec(5_000_000, (), False)
+    off = uncertainty.Uncertainty(5_000_000, (), False)
     charter = make_charter(uncertainty=off)
     assert charter.format_version == 10
     assert charter.charter_hash == FORMAT_TEN_HASH
@@ -138,7 +138,7 @@ def test_without_the_flag_a_format_ten_charter_keeps_its_hash():
 
 def test_the_flag_in_an_older_format_is_refused(tmp_path):
     path = tmp_path / "charter.json"
-    on = make_charter(uncertainty=uncertainty.UncertaintySpec(None, (), True))
+    on = make_charter(uncertainty=uncertainty.Uncertainty(None, (), True))
     sealing.write_charter(path, on, signing_key="k")
     wrapper = json.loads(path.read_text())
     wrapper["format"] = 10
@@ -150,4 +150,4 @@ def test_the_flag_in_an_older_format_is_refused(tmp_path):
 @pytest.mark.parametrize("bad", [1, "yes", None])
 def test_the_flag_must_be_a_bool(bad):
     with pytest.raises(ValueError):
-        uncertainty.UncertaintySpec(None, (), bad)
+        uncertainty.Uncertainty(None, (), bad)

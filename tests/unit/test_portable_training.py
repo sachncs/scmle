@@ -36,15 +36,15 @@ def spec_for(run_id="run-1", **changes):
         "project": {"data": "data/t.csv", "target": "y"},
         "identity": TRAIN,
         "resources": base.Resources(cpu=1.0, memory_mb=1024),
-        "retries": retry.RetryPolicy(3, 10.0, 2.0, 60.0),
+        "retries": retry.Retries(3, 10.0, 2.0, 60.0),
     }
     values.update(changes)
-    return base.JobSpec(**values)
+    return base.Job(**values)
 
 
 def local_runner(store, clock, workload=None, **options):
     workload = workload or support_runners.toy_workload(clock)
-    return local.LocalRunner(
+    return local.Runner(
         store,
         workload,
         serving_identity=SERVE,

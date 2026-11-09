@@ -17,7 +17,7 @@ MAX_ROWS = 10000
 MAX_FEATURES = 500
 
 
-class TabPfnEngine:
+class Learner:
     """Common behaviour of the TabPFN engines.
 
     Attributes:
@@ -60,7 +60,7 @@ class TabPfnEngine:
 
     def fit(
         self, features: Any, target: Any, sample_weight: Any = None
-    ) -> "TabPfnEngine":
+    ) -> "Learner":
         """Stores the training rows with the model (in-context learning).
 
         Args:
@@ -144,7 +144,7 @@ class TabPfnEngine:
         return numpy.asarray(features, dtype=numpy.float32)
 
 
-class ClassifierEngine(TabPfnEngine):
+class Classifier(Learner):
     """TabPFN classifier."""
 
     class_name = "TabPFNClassifier"
@@ -180,7 +180,7 @@ class ClassifierEngine(TabPfnEngine):
         return numpy.asarray(self.model_.predict(self.rows(features)))
 
 
-class RegressorEngine(TabPfnEngine):
+class Regressor(Learner):
     """TabPFN regressor."""
 
     class_name = "TabPFNRegressor"

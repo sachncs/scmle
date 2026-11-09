@@ -18,7 +18,6 @@ from typing import ClassVar
 
 import pandas
 
-from scmle import DatasetCatalog
 from scmle import durability
 from scmle.api import project
 from scmle.artifacts import bundle
@@ -27,6 +26,7 @@ from scmle.contracts import errors
 from scmle.contracts import signing
 from scmle.contracts import tasks
 from scmle.core import config
+from scmle.data.catalog import Catalog
 from scmle.data.charter import contracts
 from scmle.data.charter import feasibility
 from scmle.data.charter import sealing
@@ -94,7 +94,7 @@ class Command(abc.ABC):
 
 
 class ProjectCommand(Command):
-    """Shared arguments for commands that build an `MLProject`."""
+    """Shared arguments for commands that build an `Project`."""
 
     def configure(self, parser: argparse.ArgumentParser) -> None:
         """Adds data and project options.
@@ -253,7 +253,7 @@ class ProjectCommand(Command):
             "(same fields as the specification classes)",
         )
 
-    def build_project(self, args: argparse.Namespace) -> project.MLProject:
+    def build_project(self, args: argparse.Namespace) -> project.Project:
         """Creates the project described by the arguments.
 
         Args:
@@ -267,7 +267,7 @@ class ProjectCommand(Command):
         sections = config.load_sections(args.config)
         sections.setdefault(
             "search",
-            tasks.SearchSpec(
+            tasks.Search(
                 top_models=args.top_models,
                 configs_per_model=args.configs_per_model,
                 optimizer=args.optimizer,
@@ -276,16 +276,16 @@ class ProjectCommand(Command):
         if args.exclude_models or args.exclude_families:
             sections.setdefault(
                 "models",
-                tasks.ModelSpec(
+                tasks.Candidates(
                     exclude_models=args.exclude_models,
                     exclude_families=args.exclude_families,
                 ),
             )
         if args.strategies is not None:
             sections.setdefault(
-                "strategies", tasks.StrategySpec(names=args.strategies)
+                "strategies", tasks.Strategies(names=args.strategies)
             )
-        return project.MLProject(
+        return project.Project(
             args.data,
             args.target[0] if len(args.target) == 1 else args.target,
             task=args.task,
@@ -407,7 +407,7 @@ class ResumeCommand(Command):
                 from it, cannot be found.
         """
         try:
-            result = project.MLProject.resume(args.run_directory)
+            result = project.Project.resume(args.run_directory)
         except FileNotFoundError as error:
             raise errors.ArtifactError(str(error)) from error
         LOGGER.info("%s", result.summary())
@@ -528,7 +528,7 @@ class CatalogCommand(Command):
             source = args.source_uri or args.input
 
         try:
-            result = DatasetCatalog.from_data(
+            result = Catalog.from_data(
                 catalog_input,
                 source=source,
                 label_column=args.label_column,
@@ -592,7 +592,7 @@ class PredictCommand(Command):
         Returns:
             The exit status, EXIT_OK (0).
         """
-        model = bundle.ModelBundle.load(args.bundle, trusted=args.trusted)
+        model = bundle.Bundle.load(args.bundle, trusted=args.trusted)
         mapping = scmle.inference.mapping.ColumnMapping(
             dict(pair.split("=", 1) for pair in args.rename),
             args.case_insensitive,
@@ -652,7 +652,7 @@ class BatchCommand(Command):
         Returns:
             The exit status, EXIT_OK (0).
         """
-        model = bundle.ModelBundle.load(args.bundle, trusted=args.trusted)
+        model = bundle.Bundle.load(args.bundle, trusted=args.trusted)
         adapter = serving.BatchServing(
             model, on_null=args.on_null, on_unseen=args.on_unseen
         )
@@ -691,7 +691,7 @@ class ServeCommand(Command):
         Returns:
             The exit status, EXIT_OK (0), once serving has stopped.
         """
-        model = bundle.ModelBundle.load(args.bundle, trusted=args.trusted)
+        model = bundle.Bundle.load(args.bundle, trusted=args.trusted)
         adapter = serving.HttpServing(
             model,
             args.host,
@@ -737,7 +737,7 @@ class ExportOnnxCommand(Command):
         Returns:
             The exit status, EXIT_OK (0).
         """
-        model = bundle.ModelBundle.load(args.bundle, trusted=args.trusted)
+        model = bundle.Bundle.load(args.bundle, trusted=args.trusted)
         check = None if args.check is None else model.read_frame(args.check)
         written = model.export_onnx(args.output, check=check)
         LOGGER.info("wrote %s", written)
@@ -769,7 +769,7 @@ class PackageCommand(Command):
         Returns:
             The exit status, EXIT_OK (0).
         """
-        model = bundle.ModelBundle.load(args.bundle, trusted=args.trusted)
+        model = bundle.Bundle.load(args.bundle, trusted=args.trusted)
         folder = model.export_service(args.output)
         LOGGER.info("wrote service folder %s", folder)
         return EXIT_OK
@@ -826,7 +826,7 @@ class IngestCommand(Command):
             declared = scmle.data.ingest.plan.declared_from_json(
                 json.loads(pathlib.Path(args.foreign_keys).read_text())
             )
-        settings = scmle.data.ingest.plan.IngestSettings(
+        settings = scmle.data.ingest.plan.Config(
             tables=tuple(t for t in args.tables.split(",") if t),
             unit=args.unit,
             target_table=args.target_table,
@@ -836,11 +836,11 @@ class IngestCommand(Command):
             max_key_size=args.max_key_size,
             declared=declared,
         )
-        plan = scmle.data.ingest.plan.IngestPlan(
+        plan = scmle.data.ingest.plan.Plan(
             pathlib.Path(args.output),
             scmle.data.ingest.plan.sqlite_factory(args.sqlite),
             settings,
-            budget.IngestBudget(
+            budget.Budget(
                 args.max_queries, args.max_rows_scanned, args.max_seconds
             ),
         )
@@ -1049,7 +1049,7 @@ class LoopCommand(Command):
         Returns:
             The exit status, EXIT_OK (0).
         """
-        policy = scmle.governance.loop.LoopPolicy.from_dict(
+        policy = scmle.governance.loop.Preregistration.from_dict(
             json.loads(pathlib.Path(args.policy).read_text())
         )
         charter = types.SimpleNamespace(charter_hash=args.charter_hash)
@@ -1837,7 +1837,7 @@ class FrameCommand(Command):
             )
             tau = recorded.get("tau")
         result = draft.frame(
-            draft.FramingRequest(text, source),
+            draft.Request(text, source),
             frame,
             cost_model=model,
             baseline_column=args.baseline_column,

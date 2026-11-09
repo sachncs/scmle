@@ -251,8 +251,8 @@ def passing_store(detector_id, defect):
     cert = qualification.Certificate(
         detector_id, defect, 300, 300, 500, 0, (0, "c", 0)
     )
-    policy = certificates.CertificationPolicy(0.8, 0.05, 0.95)
-    return certificates.CertificateStore(
+    policy = certificates.Standard(0.8, 0.05, 0.95)
+    return certificates.Store(
         [
             certificates.certify(
                 detector_id, spec.code_hash(), "c" * 64, (0,), [cert], policy
@@ -267,7 +267,7 @@ def test_gate_status_is_descriptive_without_a_current_passing_certificate():
     store = passing_store("f5-sentinel", "sentinel")
     status = pipeline.gate_status(store, "f5-sentinel")
     assert status["sentinel"] is certificates.GateStatus.GATING
-    empty = pipeline.gate_status(certificates.CertificateStore(), "f5-sentinel")
+    empty = pipeline.gate_status(certificates.Store(), "f5-sentinel")
     assert empty["sentinel"] is certificates.GateStatus.DESCRIPTIVE
     other = passing_store("f5-duplicates", "duplicate_exact")
     assert pipeline.gate_status(other, "f5-sentinel")["sentinel"] is (

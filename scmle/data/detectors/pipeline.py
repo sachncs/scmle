@@ -26,7 +26,7 @@ from scmle.data.detectors import sentinels
 
 
 @dataclasses.dataclass(frozen=True)
-class PipelineResult:
+class Findings:
     """What the detectors found and how far each may be trusted.
 
     Attributes:
@@ -46,7 +46,7 @@ class PipelineResult:
 
 
 def gate_status(
-    store: certificates.CertificateStore | None, detector_id: str
+    store: certificates.Store | None, detector_id: str
 ) -> dict[str, certificates.GateStatus]:
     """Looks up the gating status of each defect type of a detector.
 
@@ -73,10 +73,10 @@ def gate_status(
 def run(
     frame: pandas.DataFrame,
     target: str | None = None,
-    store: certificates.CertificateStore | None = None,
+    store: certificates.Store | None = None,
     seed: int = 0,
     provenance: Mapping[str, outliers.FieldProvenance] | None = None,
-) -> PipelineResult:
+) -> Findings:
     """Runs all detectors on exploration rows.
 
     Args:
@@ -116,12 +116,12 @@ def run(
             continue
         results[detector_id] = steps[detector_id](working)
     status = {d: gate_status(store, d) for d in registry.SPECS}
-    return PipelineResult(tuple(order), results, status, tuple(log), skipped)
+    return Findings(tuple(order), results, status, tuple(log), skipped)
 
 
 def label_step(
     frame: pandas.DataFrame, target: str | None, seed: int
-) -> labels.LabelReport | str:
+) -> labels.Noise | str:
     """Runs the label-noise detector, or says why it was declined.
 
     Args:

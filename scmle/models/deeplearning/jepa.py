@@ -26,7 +26,7 @@ class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):
     candidate in the default model search.
     """
 
-    engine_path = "scmle.models.deeplearning.jepa_engine.JepaEngine"
+    engine_path = "scmle.models.deeplearning.jepa_engine.Trainer"
     CHECKPOINT_FORMAT = "scmle.tabular-jepa.v2"
     CHECKPOINT_SCHEMA_VERSION = 1
 

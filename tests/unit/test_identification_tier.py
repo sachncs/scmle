@@ -11,7 +11,7 @@ NEEDED = ("positivity", "no_interference")
 GATES = {"overlap", "coverage_aipw", "battery_nco", "sensitivity_bound"}
 
 
-def facts(**changes) -> tier.TierInputs:
+def facts(**changes) -> tier.Inputs:
     values = {
         "identified": True,
         "needed": NEEDED,
@@ -32,7 +32,7 @@ def facts(**changes) -> tier.TierInputs:
         "certified": GATES,
     }
     values.update(changes)
-    return tier.TierInputs(**values)
+    return tier.Inputs(**values)
 
 
 def test_all_five_conditions_with_certificates_confirm():

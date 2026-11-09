@@ -14,9 +14,7 @@ from scmle.data.detectors import certificates
 
 
 def stored():
-    return certificates.CertificateStore.load(
-        scmle.data.admissibility.screen.STORE_PATH
-    )
+    return certificates.Store.load(scmle.data.admissibility.screen.STORE_PATH)
 
 
 def test_the_shipped_store_is_inside_the_package():
@@ -33,7 +31,7 @@ def test_the_shipped_store_is_inside_the_package():
 
 def test_the_stored_certificate_is_for_the_current_code():
     state = stored().state(screen.DETECTOR_ID, screen.code_digest())
-    assert state is certificates.CertificateState.CURRENT
+    assert state is certificates.Freshness.CURRENT
     assert screen_certify.problems(stored()) == []
 
 
@@ -45,7 +43,7 @@ def test_every_leak_type_of_every_mechanism_has_an_outcome_on_file():
 
 
 def test_stale_and_missing_certificates_are_reported():
-    empty = certificates.CertificateStore()
+    empty = certificates.Store()
     assert all(p.endswith(": missing") for p in screen_certify.problems(empty))
     assert screen_certify.problems(empty)
     digest = screen.code_digest()

@@ -75,7 +75,7 @@ def load_run(directory: str | pathlib.Path) -> dict[str, Any]:
     if parameter_path.exists():
         from scmle.evaluation import parameter_estimation
 
-        parameter_digest = parameter_estimation.EstimationResult.read(
+        parameter_digest = parameter_estimation.Estimation.read(
             parameter_path
         ).digest()
     return {

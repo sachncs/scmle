@@ -110,8 +110,8 @@ class Step:
     kind: StepKind
     depends_on: tuple[str, ...] = ()
     timeout_seconds: float = 3600.0
-    retries: retry.RetryPolicy = dataclasses.field(
-        default_factory=lambda: retry.RetryPolicy(3, 5.0, 2.0, 300.0)
+    retries: retry.Retries = dataclasses.field(
+        default_factory=lambda: retry.Retries(3, 5.0, 2.0, 300.0)
     )
     cost_budget: float | None = None
     concurrency_group: str | None = None

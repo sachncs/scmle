@@ -9,7 +9,7 @@ import pytest
 from sklearn import dummy
 import support
 
-import scmle
+import scmle.api.project
 from scmle.contracts import errors
 from scmle.contracts import models
 from scmle.contracts import tasks
@@ -18,7 +18,7 @@ from scmle.experimentation import stores
 from scmle.experimentation import trials
 import scmle.models.registry
 
-BINARY = frozenset({tasks.TaskType.BINARY})
+BINARY = frozenset({tasks.Task.BINARY})
 
 
 class Counting(dummy.DummyClassifier):
@@ -40,7 +40,7 @@ class Canceller(Counting):
         return super().fit(features, target)
 
 
-class CountedAdapter(models.ModelAdapter):
+class CountedAdapter(models.Model):
     name = "counted"
     family = "test"
     capabilities = models.Capabilities(BINARY, cost=2)
@@ -67,7 +67,7 @@ def test_cancelled_run_resumes_and_reuses_completed_trials(
     counting, canceller = Counting, Canceller
     counting.fits = canceller.fits = 0
     canceller.armed = True
-    registry = scmle.models.registry.ModelRegistry.with_builtins()
+    registry = scmle.models.registry.Catalog.with_builtins()
     registry.register(CountedAdapter())
     registry.register(CancellerAdapter())
     project = support.make_project(binary_frame, "y", output_dir=tmp_path)
@@ -112,7 +112,7 @@ def test_cancelled_run_resumes_and_reuses_completed_trials(
 def test_resume_of_tuned_run_recomputes_nothing(
     binary_frame, tmp_path, monkeypatch
 ):
-    search = tasks.SearchSpec(top_models=1, configs_per_model=4)
+    search = tasks.Search(top_models=1, configs_per_model=4)
     original = support.make_project(
         binary_frame, "y", time_budget=300, output_dir=tmp_path, search=search
     ).run()
@@ -126,7 +126,9 @@ def test_resume_of_tuned_run_recomputes_nothing(
         "evaluate_payload",
         lambda *a, **k: calls.append(1) or real(*a, **k),
     )
-    resumed = scmle.MLProject.resume(original.run_dir, data=binary_frame)
+    resumed = scmle.api.project.Project.resume(
+        original.run_dir, data=binary_frame
+    )
     assert calls == [], "all trials were checkpointed, none may be recomputed"
     assert [(t.trial_id, t.status, t.params) for t in resumed.trials] == [
         (t.trial_id, t.status, t.params) for t in original.trials
@@ -143,13 +145,13 @@ def test_resume_of_tuned_run_recomputes_nothing(
 def test_cannot_resume_completed_run_or_changed_config(binary_frame, tmp_path):
     result = support.make_project(binary_frame, "y", output_dir=tmp_path).run()
     with pytest.raises(errors.ConfigError, match="already completed"):
-        scmle.MLProject.resume(result.run_dir, data=binary_frame)
+        scmle.api.project.Project.resume(result.run_dir, data=binary_frame)
     (result.run_dir / "evaluation.json").unlink()
     changed = support.make_project(binary_frame, "y", seed=1).orchestrator
     with pytest.raises(errors.ConfigError, match="configuration differs"):
         changed.resume(result.run_dir)
     with pytest.raises(FileNotFoundError):
-        scmle.MLProject.resume(tmp_path / "nope")
+        scmle.api.project.Project.resume(tmp_path / "nope")
 
 
 def test_tracking_database_records_runs_trials_and_lineage(
@@ -211,7 +213,7 @@ def test_resume_refuses_checkpoints_computed_on_different_data(
     counting, canceller = Counting, Canceller
     counting.fits = canceller.fits = 0
     canceller.armed = True
-    registry = scmle.models.registry.ModelRegistry.with_builtins()
+    registry = scmle.models.registry.Catalog.with_builtins()
     registry.register(CancellerAdapter())
     project = support.make_project(binary_frame, "y", output_dir=tmp_path)
     project.orchestrator.registry = registry

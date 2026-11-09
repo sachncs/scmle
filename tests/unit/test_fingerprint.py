@@ -11,12 +11,12 @@ from scmle.data.validation import columns
 from scmle.intelligence import fingerprint
 
 
-def profile_of(frame, task=tasks.TaskType.BINARY, **data_overrides):
-    spec = tasks.ProjectSpec(
-        data=tasks.DataSpec(uri="m", target="y", **data_overrides)
+def profile_of(frame, task=tasks.Task.BINARY, **data_overrides):
+    spec = tasks.Config(
+        data=tasks.Dataset(uri="m", target="y", **data_overrides)
     )
     manifest = tabular.build_manifest(frame, "y")
-    return profiler.DatasetProfiler(spec).profile(frame, manifest, task, 0.25)
+    return profiler.Profiler(spec).profile(frame, manifest, task, 0.25)
 
 
 def test_entropy_of_known_distributions():
@@ -132,7 +132,7 @@ def test_regression_target_fingerprint():
     rng = numpy.random.default_rng(3)
     frame = pandas.DataFrame({"x": rng.normal(size=300)})
     frame["y"] = numpy.exp(frame.x * 2)
-    result = profile_of(frame, tasks.TaskType.REGRESSION).dataset_statistics
+    result = profile_of(frame, tasks.Task.REGRESSION).dataset_statistics
     assert result["target"]["skew"] > 1 and result["target"]["outlier_rate"] > 0
     assert "structure" in result and result["structure"] == {}
 
@@ -171,11 +171,11 @@ def test_ml_difficulty_fails_closed_when_scores_are_all_undefined(
     monkeypatch.setattr(
         fingerprint.model_selection, "cross_val_score", undefined_scores
     )
-    spec = tasks.ProjectSpec(data=tasks.DataSpec(uri="m", target="y"))
+    spec = tasks.Config(data=tasks.Dataset(uri="m", target="y"))
     manifest = tabular.build_manifest(frame, "y")
-    task = tasks.TaskType.BINARY
+    task = tasks.Task.BINARY
     plan = (
-        profiler.DatasetProfiler(spec)
+        profiler.Profiler(spec)
         .profile(frame, manifest, task, 0.25)
         .feature_plan
     )

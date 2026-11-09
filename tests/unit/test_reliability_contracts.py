@@ -13,9 +13,9 @@ def make_evidence(
     outcome: reliability.EvidenceOutcome = (
         reliability.EvidenceOutcome.SAFE_OUTCOME_OBSERVED
     ),
-) -> reliability.FaultEvidence:
+) -> reliability.Evidence:
     """Build one concrete evidence record for contract tests."""
-    return reliability.FaultEvidence(
+    return reliability.Evidence(
         evidence_type=evidence_type,
         execution_id="fault-run-2026-10-20-001",
         artifact_uri=f"artifact://faults/{evidence_type}.json",
@@ -29,10 +29,10 @@ def make_evidence(
 
 def make_plan(
     status: reliability.VerificationStatus = reliability.VerificationStatus.PLANNED,
-    evidence: tuple[reliability.FaultEvidence, ...] = (),
-) -> reliability.FaultScenarioPlan:
+    evidence: tuple[reliability.Evidence, ...] = (),
+) -> reliability.Plan:
     """Build one representative scenario plan."""
-    return reliability.FaultScenarioPlan(
+    return reliability.Plan(
         scenario=reliability.FaultScenario.PROCESS_DEATH,
         expected_safe_outcome=reliability.SafeOutcome.RESUME_DURABLE_CHECKPOINT,
         recoverability=reliability.Recoverability.AUTOMATIC,
@@ -44,7 +44,7 @@ def make_plan(
 
 
 def test_default_plan_declares_every_required_scenario_without_claiming_execution():
-    registry = reliability.FaultInjectionPlanRegistry.production_beta()
+    registry = reliability.Registry.production_beta()
 
     assert set(registry.plans) == set(reliability.FaultScenario)
     assert all(
@@ -129,7 +129,7 @@ def test_evidence_rejects_empty_review_fields():
 
 
 def test_registry_rejects_duplicate_scenarios():
-    registry = reliability.FaultInjectionPlanRegistry()
+    registry = reliability.Registry()
     registry.register(make_plan())
 
     with pytest.raises(ValueError, match="already registered"):
@@ -137,7 +137,7 @@ def test_registry_rejects_duplicate_scenarios():
 
 
 def test_registry_rejects_incomplete_plan_before_serialization():
-    registry = reliability.FaultInjectionPlanRegistry()
+    registry = reliability.Registry()
     registry.register(make_plan())
 
     with pytest.raises(ValueError, match="plan is incomplete"):
@@ -145,11 +145,11 @@ def test_registry_rejects_incomplete_plan_before_serialization():
 
 
 def test_registry_serialization_is_deterministic_and_round_trips():
-    registry = reliability.FaultInjectionPlanRegistry.production_beta()
+    registry = reliability.Registry.production_beta()
 
     first = registry.to_json()
-    second = reliability.FaultInjectionPlanRegistry.production_beta().to_json()
-    restored = reliability.FaultInjectionPlanRegistry.from_json(first)
+    second = reliability.Registry.production_beta().to_json()
+    restored = reliability.Registry.from_json(first)
 
     assert first == second
     assert json.loads(first) == json.loads(second)
@@ -160,23 +160,23 @@ def test_registry_serialization_is_deterministic_and_round_trips():
 
 
 def test_registry_rejects_missing_scenario_in_serialized_plan():
-    record = reliability.FaultInjectionPlanRegistry.production_beta().to_dict()
+    record = reliability.Registry.production_beta().to_dict()
     record["scenarios"] = record["scenarios"][:-1]
 
     with pytest.raises(ValueError, match="plan is incomplete"):
-        reliability.FaultInjectionPlanRegistry.from_dict(record)
+        reliability.Registry.from_dict(record)
 
 
 def test_evidence_round_trip_preserves_observed_result():
     evidence = make_evidence("checkpoint_resume")
 
-    restored = reliability.FaultEvidence.from_dict(evidence.to_dict())
+    restored = reliability.Evidence.from_dict(evidence.to_dict())
 
     assert restored == evidence
 
 
 def test_registry_marks_a_scenario_passed_only_after_full_safe_evidence():
-    registry = reliability.FaultInjectionPlanRegistry()
+    registry = reliability.Registry()
     registry.register(make_plan())
 
     plan = registry.record_evidence(
@@ -192,7 +192,7 @@ def test_registry_marks_a_scenario_passed_only_after_full_safe_evidence():
 
 
 def test_registry_marks_unsafe_evidence_failed_and_incomplete_safe_evidence_inconclusive():
-    registry = reliability.FaultInjectionPlanRegistry()
+    registry = reliability.Registry()
     registry.register(make_plan())
 
     inconclusive = registry.record_evidence(
@@ -218,7 +218,7 @@ def test_registry_marks_unsafe_evidence_failed_and_incomplete_safe_evidence_inco
 
 
 def test_registry_rejects_evidence_not_declared_by_scenario():
-    registry = reliability.FaultInjectionPlanRegistry()
+    registry = reliability.Registry()
     registry.register(make_plan())
 
     with pytest.raises(ValueError, match="unexpected requirements"):
@@ -230,7 +230,7 @@ def test_registry_rejects_evidence_not_declared_by_scenario():
 
 def test_registry_rejects_evidence_mixed_across_executions():
     """A scenario result cannot combine unrelated execution evidence."""
-    registry = reliability.FaultInjectionPlanRegistry()
+    registry = reliability.Registry()
     registry.register(make_plan())
     second_execution = dataclasses.replace(
         make_evidence("checkpoint_resume"), execution_id="fault-run-002"

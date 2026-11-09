@@ -19,7 +19,7 @@ import pandas
 import pytest
 import support
 
-import scmle
+import scmle.api.project
 import scmle.artifacts.bundle
 from scmle.contracts import errors
 from scmle.contracts import events
@@ -65,14 +65,14 @@ def frame():
 @pytest.fixture(scope="module")
 def run(frame, tmp_path_factory):
     """One complete run with every default feature enabled."""
-    project = scmle.MLProject(
+    project = scmle.api.project.Project(
         frame,
         "y",
         task="classification",
         metric="roc_auc",
         time_budget=600,
         output_dir=tmp_path_factory.mktemp("spec"),
-        decision=tasks.DecisionSpec(threshold_objective="f1"),
+        decision=tasks.Threshold(threshold_objective="f1"),
     )
     return project, project.run()
 
@@ -91,19 +91,19 @@ def test_l5_to_l11_python_package_tabular_scope():
     assert meta["requires-python"].startswith(">=3.11")
     assert meta["license"] == "Apache-2.0"
     assert {
-        tasks.TaskType.BINARY,
-        tasks.TaskType.MULTICLASS,
-        tasks.TaskType.REGRESSION,
+        tasks.Task.BINARY,
+        tasks.Task.MULTICLASS,
+        tasks.Task.REGRESSION,
     } == tasks.STANDARD_TASKS
     # Survival is an addition beyond the specified scope, never a replacement.
-    assert set(tasks.TaskType) - tasks.STANDARD_TASKS == {
-        tasks.TaskType.SURVIVAL,
-        tasks.TaskType.ORDINAL,
-        tasks.TaskType.RANKING,
-        tasks.TaskType.MULTILABEL,
-        tasks.TaskType.MULTIOUTPUT,
-        tasks.TaskType.FORECAST,
-        tasks.TaskType.UPLIFT,
+    assert set(tasks.Task) - tasks.STANDARD_TASKS == {
+        tasks.Task.SURVIVAL,
+        tasks.Task.ORDINAL,
+        tasks.Task.RANKING,
+        tasks.Task.MULTILABEL,
+        tasks.Task.MULTIOUTPUT,
+        tasks.Task.FORECAST,
+        tasks.Task.UPLIFT,
     }
 
 
@@ -141,10 +141,8 @@ def test_l23_to_l39_decision_table(run):
     meta = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]
     assert meta["requires-python"].startswith(">=3.11")  # Python 3.11+
     assert meta["license"] == "Apache-2.0" and (ROOT / "LICENSE").exists()
-    assert issubclass(
-        tasks.ProjectSpec, tasks.pydantic.BaseModel
-    )  # typed config
-    assert issubclass(models.ModelAdapter, object) and hasattr(
+    assert issubclass(tasks.Config, tasks.pydantic.BaseModel)  # typed config
+    assert issubclass(models.Model, object) and hasattr(
         project.spec, "config_hash"
     )
     assert hasattr(project, "plan") and hasattr(
@@ -155,8 +153,8 @@ def test_l23_to_l39_decision_table(run):
         is state.RunState.VALIDATING
     )
     assert {"sequential", "process", "ray"} <= {
-        scheduler.SequentialBackend.name,
-        scheduler.ProcessBackend.name,
+        scheduler.Serial.name,
+        scheduler.Pool.name,
         ray_backend.RayBackend.name,
     }  # local-first, distributed-capable
     assert (
@@ -206,7 +204,7 @@ def test_l41_l43_no_mandatory_infrastructure_on_the_base_install():
     assert not names & forbidden
     code = (
         "import sys, scmle; from scmle.models import registry; "
-        "registry.ModelRegistry.with_builtins(); "
+        "registry.Catalog.with_builtins(); "
         "bad=[m for m in ('ray','mlflow','torch','kubernetes') if m in sys.modules]; "
         "assert not bad, bad"
     )
@@ -322,12 +320,12 @@ def test_l186_l194_explicit_versioned_serializable_hashable_saved_spec(run):
     project, result = run
     spec = project.spec
     assert spec.version == tasks.CONFIG_VERSION
-    assert tasks.ProjectSpec.model_validate_json(spec.model_dump_json()) == spec
+    assert tasks.Config.model_validate_json(spec.model_dump_json()) == spec
     assert (
         len(spec.config_hash()) == 16
         and spec.config_hash() == spec.config_hash()
     )
-    saved = tasks.ProjectSpec.model_validate_json(
+    saved = tasks.Config.model_validate_json(
         (result.run_dir / "config.json").read_text()
     )
     assert saved.config_hash() == spec.config_hash()
@@ -336,27 +334,27 @@ def test_l186_l194_explicit_versioned_serializable_hashable_saved_spec(run):
 def test_l192_cross_field_validation():
     """Group needs a group column; temporal needs a time column; binary metrics need binary targets."""
     with pytest.raises(ValueError, match="group_column"):
-        tasks.ProjectSpec(
-            data=tasks.DataSpec(uri="x", target="y"),
-            validation=tasks.ValidationSpec(strategy="group"),
+        tasks.Config(
+            data=tasks.Dataset(uri="x", target="y"),
+            validation=tasks.Validation(strategy="group"),
         )
     with pytest.raises(ValueError, match="time_column"):
-        tasks.ProjectSpec(
-            data=tasks.DataSpec(uri="x", target="y"),
-            validation=tasks.ValidationSpec(strategy="temporal"),
+        tasks.Config(
+            data=tasks.Dataset(uri="x", target="y"),
+            validation=tasks.Validation(strategy="temporal"),
         )
     from scmle.evaluation import metrics
 
     with pytest.raises(errors.ConfigError):
-        metrics.CATALOG.resolve("pr_auc", tasks.TaskType.MULTICLASS)
+        metrics.CATALOG.resolve("pr_auc", tasks.Task.MULTICLASS)
     from scmle.data.splitting import splitters
 
     frame = make_frame(100).assign(t="not a date")
-    spec = tasks.ProjectSpec(
-        data=tasks.DataSpec(uri="x", target="y", time_column="t")
+    spec = tasks.Config(
+        data=tasks.Dataset(uri="x", target="y", time_column="t")
     )
     with pytest.raises(errors.BlockedError, match="ambiguous"):
-        splitters.SplitManager(spec, tasks.TaskType.BINARY).split(frame)
+        splitters.Splitter(spec, tasks.Task.BINARY).split(frame)
 
 
 def test_l198_l206_foundational_and_production_contracts(run):
@@ -417,11 +415,11 @@ def test_l210_l224_module_io_matrix_invariants(run, tmp_path):
     spec = project.spec
     manifest = tabular.build_manifest(frame, "y")
     task = scmle.data.validation.target.TaskResolver(spec).resolve(frame["y"])
-    profiler.DatasetProfiler(spec).profile(frame, manifest, task)
+    profiler.Profiler(spec).profile(frame, manifest, task)
     pandas.testing.assert_frame_equal(
         frame, before
     )  # profiling: no fitted state, no mutation
-    split = splitters.SplitManager(spec, task).split(frame)
+    split = splitters.Splitter(spec, task).split(frame)
     assert not set(split.manifest.train_ids) & set(
         split.manifest.test_ids
     )  # splitting
@@ -430,7 +428,7 @@ def test_l210_l224_module_io_matrix_invariants(run, tmp_path):
     assert (
         result.run_dir / "model" / "model_manifest.json"
     ).exists()  # artifact builder
-    bundle = scmle.artifacts.bundle.ModelBundle.load(
+    bundle = scmle.artifacts.bundle.Bundle.load(
         result.save(tmp_path / "b"), trusted=True
     )
     features = frame.drop(columns="y")
@@ -446,10 +444,10 @@ def test_l210_l224_module_io_matrix_invariants(run, tmp_path):
 def test_l226_plugins_are_conformance_tested():
     """Third-party plugins cannot violate expectations."""
 
-    class Bad(models.ModelAdapter):
+    class Bad(models.Model):
         name = "bad"
         family = "x"
-        capabilities = models.Capabilities(frozenset({tasks.TaskType.BINARY}))
+        capabilities = models.Capabilities(frozenset({tasks.Task.BINARY}))
 
         def build(self, task, seed, params=None):
             class Broken:
@@ -549,7 +547,7 @@ def test_l278_l288_orchestrator_support(frame, tmp_path):
     first = project.run()
     (first.run_dir / "evaluation.json").unlink()
     shutil.rmtree(first.run_dir / "model")
-    resumed = scmle.MLProject.resume(
+    resumed = scmle.api.project.Project.resume(
         first.run_dir, data=frame
     )  # idempotent retry / restart
     assert [t.trial_id for t in resumed.trials] == [
@@ -570,7 +568,7 @@ def test_l278_l288_orchestrator_support(frame, tmp_path):
         frame, "y", time_budget=1, output_dir=tmp_path / "b"
     ).run()
     assert budget.state == "COMPLETED"  # budget exhaustion handled
-    assert scheduler.ProcessBackend(2).map(abs, [-1, -2]) == [
+    assert scheduler.Pool(2).map(abs, [-1, -2]) == [
         1,
         2,
     ]  # parallel independent work
@@ -631,7 +629,7 @@ def test_l311_l321_decision_policy_examples():
     frame = pandas.DataFrame({"x": rng.normal(size=300)})
     frame["c"] = rng.choice([f"k{i}" for i in range(200)], 300)
     frame["y"] = (rng.random(300) < 0.05).astype(int)
-    plan = scmle.MLProject(frame, "y", time_budget=60).plan()
+    plan = scmle.api.project.Project(frame, "y", time_budget=60).plan()
     names = set(plan.candidate_models)
     assert (
         "dummy" in names and "logistic_regression" in names
@@ -666,7 +664,7 @@ def test_l327_l345_stages_a_to_e(run):
 
 def test_l347_l356_model_family_registry():
     """The initial model families."""
-    names = set(scmle.models.registry.ModelRegistry.with_builtins().adapters)
+    names = set(scmle.models.registry.Catalog.with_builtins().adapters)
     assert {
         "dummy",
         "logistic_regression",
@@ -700,14 +698,14 @@ def test_l358_adapter_capability_declarations():
     } <= declared
     for (
         adapter
-    ) in scmle.models.registry.ModelRegistry.with_builtins().adapters.values():
+    ) in scmle.models.registry.Catalog.with_builtins().adapters.values():
         assert adapter.capabilities.memory_factor >= 1.0
 
 
 def test_l360_planner_reads_capabilities_not_library_names():
     """Planning uses declared capabilities (here: size limits and tasks)."""
-    registry = scmle.models.registry.ModelRegistry.with_builtins()
-    rejected = registry.candidates(tasks.TaskType.REGRESSION, 1_000_000)[1]
+    registry = scmle.models.registry.Catalog.with_builtins()
+    rejected = registry.candidates(tasks.Task.REGRESSION, 1_000_000)[1]
     assert (
         "svm" in rejected and "logistic_regression" in rejected
     )  # max_rows, task support
@@ -750,16 +748,16 @@ def test_l374_l393_balancing_and_augmentation(frame):
     # Sampling happens inside the training fold (inside fit), never on the full dataset.
     assert "fit" in resampling.ResamplingClassifier.__dict__
     # Regression does not reuse classification resampling.
-    spec = tasks.ProjectSpec(data=tasks.DataSpec(uri="x", target="y"))
+    spec = tasks.Config(data=tasks.Dataset(uri="x", target="y"))
     reg = pandas.DataFrame(
         {"x": numpy.arange(100.0), "y": numpy.arange(100.0) * 2}
     )
-    profile = profiler.DatasetProfiler(spec).profile(
-        reg, tabular.build_manifest(reg, "y"), tasks.TaskType.REGRESSION
+    profile = profiler.Profiler(spec).profile(
+        reg, tabular.build_manifest(reg, "y"), tasks.Task.REGRESSION
     )
-    adapter = scmle.models.registry.ModelRegistry.with_builtins().get("ridge")
+    adapter = scmle.models.registry.Catalog.with_builtins().get("ridge")
     reason = strategies.STRATEGIES["random_oversample"].applicability(
-        profile, tasks.TaskType.REGRESSION, adapter
+        profile, tasks.Task.REGRESSION, adapter
     )
     assert reason is not None and "classification" in reason
     assert isinstance(profile, scmle.contracts.data.DatasetProfile)
@@ -799,10 +797,10 @@ def test_l399_l409_evaluation_contract(run):
     assert (
         result.evaluation["metric"] == "roc_auc"
     )  # user-selected objective honoured
-    reg = metrics.CATALOG.report_names[tasks.TaskType.REGRESSION]
+    reg = metrics.CATALOG.report_names[tasks.Task.REGRESSION]
     assert set(reg) == {"mae", "rmse", "r2"}
     assert {"log_loss", "f1_macro", "balanced_accuracy"} <= set(
-        metrics.CATALOG.report_names[tasks.TaskType.MULTICLASS]
+        metrics.CATALOG.report_names[tasks.Task.MULTICLASS]
     )
 
 
@@ -825,7 +823,7 @@ def test_l411_l417_selection_constraints_measured_on_this_machine(
         frame,
         "y",
         output_dir=tmp_path,
-        selection=tasks.SelectionSpec(max_model_mb=50, max_p95_latency_ms=1000),
+        selection=tasks.Selection(max_model_mb=50, max_p95_latency_ms=1000),
     ).run()
     usage = result.evaluation["resources"]
     assert (
@@ -851,8 +849,8 @@ def test_l421_l437_leakage_invariants(run, frame, tmp_path):
     from scmle.data.splitting import splitters
 
     assert (
-        dataclasses.is_dataclass(splitters.SplitManifest)
-        and splitters.SplitManifest.__dataclass_params__.frozen
+        dataclasses.is_dataclass(splitters.Manifest)
+        and splitters.Manifest.__dataclass_params__.frozen
     )
     ledger = json.loads(
         (result.run_dir / "diagnostics" / "data_access.json").read_text()
@@ -860,7 +858,7 @@ def test_l421_l437_leakage_invariants(run, frame, tmp_path):
     assert all(
         ledger["verified"].values()
     )  # 3 record of data accessed per fitted operation
-    split = splitters.SplitManager(project.spec, tasks.TaskType.BINARY).split(
+    split = splitters.Splitter(project.spec, tasks.Task.BINARY).split(
         make_frame(200)
     )
     with pytest.raises(errors.LeakageError):
@@ -890,11 +888,11 @@ def test_l439_deployment_scenario_splits(frame):
         frame.assign(g=numpy.arange(len(frame)) % 40), "y", group_column="g"
     ).spec
     assert (
-        splitters.resolve_strategy_name(with_time, tasks.TaskType.BINARY)
+        splitters.resolve_strategy_name(with_time, tasks.Task.BINARY)
         == "temporal"
     )
     assert (
-        splitters.resolve_strategy_name(with_group, tasks.TaskType.BINARY)
+        splitters.resolve_strategy_name(with_group, tasks.Task.BINARY)
         == "group"
     )
 
@@ -940,13 +938,13 @@ def test_l470_l474_artifact_format_and_untrusted_artifacts(run, tmp_path):
         and manifest["files"]
     )  # checksums
     with pytest.raises(errors.ArtifactError, match="unauthenticated"):
-        scmle.artifacts.bundle.ModelBundle.load(
+        scmle.artifacts.bundle.Bundle.load(
             directory
         )  # untrusted artifacts not loaded
     with (directory / "pipeline.joblib").open("ab") as handle:
         handle.write(b"x")
     with pytest.raises(errors.ArtifactError, match="checksum"):
-        scmle.artifacts.bundle.ModelBundle.load(directory, trusted=True)
+        scmle.artifacts.bundle.Bundle.load(directory, trusted=True)
     assert (
         manifest["python"] and manifest["sklearn"]
     )  # dependency compatibility
@@ -962,7 +960,7 @@ def test_l476_exact_replay_vs_comparable_rerun(run):
         reproducibility.DIFFERENT,
     } == {"exact", "comparable", "different"}
     assert "reproducibility" in run[1].evaluation
-    assert hasattr(scmle.MLProject, "verify_replay")
+    assert hasattr(scmle.api.project.Project, "verify_replay")
 
 
 def test_l480_l496_inference_contract(run, frame, tmp_path):
@@ -1034,7 +1032,7 @@ def test_l548_no_heavy_imports_until_a_model_is_selected():
     """A registry entry must not import GPU/deep-learning dependencies."""
     code = (
         "import sys; from scmle.contracts import tasks; from scmle.models import registry; "
-        "r = registry.ModelRegistry.with_builtins(); r.candidates(tasks.TaskType.BINARY, 100); "
+        "r = registry.Catalog.with_builtins(); r.candidates(tasks.Task.BINARY, 100); "
         "assert not [m for m in ('lightgbm','xgboost','catboost','torch','tensorflow') if m in sys.modules]"
     )
     assert (
@@ -1078,7 +1076,7 @@ def test_l610_l629_backlog_priorities(run):
     assert len(result.predict(make_frame().drop(columns="y"))) == len(
         make_frame()
     )  # project API and inference-ready artifact
-    assert issubclass(serving.HttpServing, serving.ServingAdapter)  # serving
+    assert issubclass(serving.HttpServing, serving.Server)  # serving
     assert callable(registry.ModelRegistryStore.promote)  # deployment
     report = monitor.ModelMonitor(result.bundle).assess(
         make_frame(seed=3).drop(columns="y"), make_frame(seed=3)["y"]
@@ -1088,7 +1086,7 @@ def test_l610_l629_backlog_priorities(run):
         importance.PermutationImportance, diagnostics.Diagnostic
     )  # explainability
     assert "permutation_importance" in result.diagnostics
-    assert issubclass(ensembles.StackingAdapter, models.ModelAdapter)
+    assert issubclass(ensembles.Stacking, models.Model)
     generator = synthesis.GaussianCopulaGenerator().fit(
         make_frame()[["a", "b"]]
     )
@@ -1152,7 +1150,7 @@ def test_l679_l735_v01_scope_matches_the_spec(frame, tmp_path):
         ).run()
         assert result.state == "COMPLETED"
     assert issubclass(
-        ray_backend.RayBackend, scheduler.ExecutionBackend
+        ray_backend.RayBackend, scheduler.Executor
     )  # distributed: optional
 
 
@@ -1169,9 +1167,9 @@ def test_l739_l747_first_sprint_outcomes(run):
     frame = make_frame()
     manifest = tabular.build_manifest(frame, "y", "<memory>")
     assert manifest.row_count == len(frame)  # 3 ingestion
-    profile = profiler.DatasetProfiler(
-        tasks.ProjectSpec(data=tasks.DataSpec(uri="x", target="y"))
-    ).profile(frame, manifest, tasks.TaskType.BINARY)
+    profile = profiler.Profiler(
+        tasks.Config(data=tasks.Dataset(uri="x", target="y"))
+    ).profile(frame, manifest, tasks.Task.BINARY)
     assert set(profile.feature_plan.features) == {"a", "b", "c"}  # profiling
     assert {"stratified", "random", "group", "temporal"} <= set(
         splitters.STRATEGIES
@@ -1184,7 +1182,7 @@ def test_l739_l747_first_sprint_outcomes(run):
 
 def test_l751_l761_frozen_api(frame, tmp_path):
     """The API as written, incl. approved plans and the classification alias."""
-    project = scmle.MLProject(
+    project = scmle.api.project.Project(
         frame,
         "y",
         task="classification",
@@ -1229,7 +1227,7 @@ def test_l765_l778_future_expansion_commitments(frame, tmp_path):
     from scmle.sampling import resampling
     from scmle.sampling import synthesis
 
-    registry = scmle.models.registry.ModelRegistry.with_builtins()
+    registry = scmle.models.registry.Catalog.with_builtins()
     neural = registry.get("neural_network")  # deep learning: a plugin family
     conformance.check_conformance(neural)
 
@@ -1240,21 +1238,21 @@ def test_l765_l778_future_expansion_commitments(frame, tmp_path):
             "y": numpy.arange(120) % 2,
         }
     )
-    spec = tasks.ProjectSpec(
-        data=tasks.DataSpec(
+    spec = tasks.Config(
+        data=tasks.Dataset(
             uri="x",
             target="y",
             time_column="t",
             unavailable_at_prediction=["a"],
         ),
-        validation=tasks.ValidationSpec(
+        validation=tasks.Validation(
             strategy="temporal", folds=3, embargo_rows=5
         ),
     )
-    split = splitters.SplitManager(spec, tasks.TaskType.BINARY).split(series)
+    split = splitters.Splitter(spec, tasks.Task.BINARY).split(series)
     gaps = [min(held) - max(fit) for fit, held in split.manifest.folds]
     assert all(gap > 5 for gap in gaps)  # time-series: embargo is honoured
-    profile = scmle.MLProject(
+    profile = scmle.api.project.Project(
         series.drop(columns="a").assign(b=numpy.arange(120.0) % 7),
         "y",
         time_column="t",
@@ -1268,10 +1266,10 @@ def test_l765_l778_future_expansion_commitments(frame, tmp_path):
     assert fake.shape == (40, 2) and report.max_marginal_ks < 0.5
     assert issubclass(synthesis.GeneratorOverSampler, resampling.Resampler)
 
-    one = tasks.FeatureGraphSpec(
+    one = tasks.FeatureGraph(
         nodes=[tasks.FeatureNode(name="sq", op="square", inputs=["b"])]
     )
-    two = tasks.FeatureGraphSpec(
+    two = tasks.FeatureGraph(
         nodes=[tasks.FeatureNode(name="sq", op="sqrt", inputs=["b"])]
     )
     assert one.fingerprint() != two.fingerprint()  # versioned graph
@@ -1280,12 +1278,12 @@ def test_l765_l778_future_expansion_commitments(frame, tmp_path):
     numpy.testing.assert_allclose(out["sq"], frame["b"] ** 2)
 
     vector = knowledge.fingerprint(
-        scmle_profile(frame), tasks.TaskType.BINARY
+        scmle_profile(frame), tasks.Task.BINARY
     )  # meta-learning fingerprint
     assert set(vector) == set(knowledge.FIELDS)
 
-    rejecting = policies.CallbackCheckpoint(lambda review: False)
-    gated = scmle.MLProject(
+    rejecting = policies.Callback(lambda review: False)
+    gated = scmle.api.project.Project(
         frame, "y", output_dir=tmp_path, checkpoints=(rejecting,)
     )
     with pytest.raises(errors.BlockedError):
@@ -1301,7 +1299,7 @@ def test_l765_l778_future_expansion_commitments(frame, tmp_path):
 
     job = trials.TrialJob("trial_001", "dummy", {"strategy": "x"})
     assert pickle.loads(pickle.dumps(job)) == job  # scheduler-independent
-    for backend in (scheduler.SequentialBackend(), scheduler.ProcessBackend(2)):
+    for backend in (scheduler.Serial(), scheduler.Pool(2)):
         assert backend.map(abs, [-1, -2, -3]) == [1, 2, 3]
 
 
@@ -1311,10 +1309,8 @@ def scmle_profile(frame):
     from scmle.data.readers import tabular
 
     manifest = tabular.build_manifest(frame, "y", "<memory>")
-    spec = tasks.ProjectSpec(data=tasks.DataSpec(uri="x", target="y"))
-    return profiler.DatasetProfiler(spec).profile(
-        frame, manifest, tasks.TaskType.BINARY
-    )
+    spec = tasks.Config(data=tasks.Dataset(uri="x", target="y"))
+    return profiler.Profiler(spec).profile(frame, manifest, tasks.Task.BINARY)
 
 
 def test_l786_l801_risks_have_mitigations_and_candidates_are_whole_pipelines(
@@ -1323,15 +1319,15 @@ def test_l786_l801_risks_have_mitigations_and_candidates_are_whole_pipelines(
     """A candidate is a complete, independently evaluable pipeline."""
     from scmle.sampling import strategies
 
-    registry = scmle.models.registry.ModelRegistry.with_builtins()
-    plan = scmle.MLProject(frame, "y").plan()
-    profile = scmle.MLProject(frame, "y")
+    registry = scmle.models.registry.Catalog.with_builtins()
+    plan = scmle.api.project.Project(frame, "y").plan()
+    profile = scmle.api.project.Project(frame, "y")
     profile.plan()
     feature_plan = profile.profile.feature_plan
     candidate = strategies.STRATEGIES["default"].build(
         feature_plan,
         registry.get("random_forest"),
-        tasks.TaskType.BINARY,
+        tasks.Task.BINARY,
         0,
         {"max_depth": 4},
     )
@@ -1340,13 +1336,13 @@ def test_l786_l801_risks_have_mitigations_and_candidates_are_whole_pipelines(
     )  # preprocessing + estimator
     assert candidate.named_steps["model"].max_depth == 4  # hyperparameters
     resampled = strategies.STRATEGIES["random_undersample"].build(
-        feature_plan, registry.get("random_forest"), tasks.TaskType.BINARY, 0
+        feature_plan, registry.get("random_forest"), tasks.Task.BINARY, 0
     )
     assert hasattr(
         resampled, "resampler"
     )  # sampling policy part of the candidate
     assert plan.metric and plan.validation_strategy  # evaluation configuration
-    bundle = scmle.artifacts.bundle.BundleInfo("m", "v1", "roc_auc")
+    bundle = scmle.artifacts.bundle.Manifest("m", "v1", "roc_auc")
     assert bundle.python and bundle.sklearn  # runtime requirements
 
 
@@ -1359,13 +1355,11 @@ def test_l805_l829_five_abstractions_and_the_core_path(run):
     assert isinstance(
         result.profile.manifest, scmle.contracts.data.DatasetManifest
     )  # Dataset
-    assert isinstance(result.plan, experiments.ExperimentPlan)  # Plan
+    assert isinstance(result.plan, experiments.Plan)  # Plan
     assert all(
-        isinstance(t, experiments.TrialResult) for t in result.trials
+        isinstance(t, experiments.Trial) for t in result.trials
     )  # Experiment
     assert isinstance(
-        result.bundle, scmle.artifacts.bundle.ModelBundle
+        result.bundle, scmle.artifacts.bundle.Bundle
     )  # Model Bundle
-    assert (
-        registry.ModelRegistryStore and lifecycle.LifecycleManager
-    )  # Lifecycle
+    assert registry.ModelRegistryStore and lifecycle.Maintainer  # Lifecycle

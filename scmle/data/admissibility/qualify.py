@@ -63,7 +63,7 @@ class LoadedStore:
         note: Why `store` is None, or an empty string.
     """
 
-    store: certificates.CertificateStore | None
+    store: certificates.Store | None
     note: str = ""
 
 
@@ -86,7 +86,7 @@ def load_store(name: str, directory: Path | None = None) -> LoadedStore:
             None, f"{name} not found at {path}: detectors are descriptive"
         )
     try:
-        return LoadedStore(certificates.CertificateStore.load(path))
+        return LoadedStore(certificates.Store.load(path))
     except (ValueError, KeyError, OSError) as error:
         return LoadedStore(
             None, f"{name} unreadable ({error}): detectors are descriptive"
@@ -113,10 +113,10 @@ class Qualification:
             otherwise.
     """
 
-    table: rules.AdmissibilityTable | None
-    leakage: screen.ScreenReport | None
-    detectors: pipeline.PipelineResult
-    f5_store: certificates.CertificateStore | None
+    table: rules.Admissibility | None
+    leakage: screen.Screen | None
+    detectors: pipeline.Findings
+    f5_store: certificates.Store | None
     notes: tuple[str, ...]
     diagnostics: tuple[tuple[str, qualification.Check], ...] = ()
     dag: dict[str, object] | None = None
@@ -257,12 +257,12 @@ def attestation_check(
 def causal_admissibility(
     frame: pandas.DataFrame,
     candidates: Sequence[str],
-    spec: scmle.data.charter.causal.CausalSpec,
+    spec: scmle.data.charter.causal.Question,
     graph: scmle.data.admissibility.dag.Dag,
     seed: int,
     day: datetime.date,
-    result: pipeline.PipelineResult,
-    store: certificates.CertificateStore | None,
+    result: pipeline.Findings,
+    store: certificates.Store | None,
     notes: list[str],
 ) -> Qualification:
     """Applies the graph rules to every candidate and tests the graph.
@@ -295,10 +295,10 @@ def causal_admissibility(
         the falsification outcome. Its diagnostics are the checks of the
         falsification, if it ran.
     """
-    records = provenance.ProvenanceTable.covering([str(c) for c in candidates])
+    records = provenance.Dictionary.covering([str(c) for c in candidates])
     members = scmle.data.charter.causal.covariates_of(spec.assumptions) or ()
     try:
-        table: rules.AdmissibilityTable | None = rules.build_table(
+        table: rules.Admissibility | None = rules.build_table(
             records,
             "causal",
             rules.Mode.PERMISSIVE,
@@ -382,7 +382,7 @@ def run(
     ] = (),
     scope: str = "",
     today: datetime.date | None = None,
-    causal: scmle.data.charter.causal.CausalSpec | None = None,
+    causal: scmle.data.charter.causal.Question | None = None,
     dag: scmle.data.admissibility.dag.Dag | None = None,
     declared: Sequence[provenance.FieldProvenance] = (),
 ) -> Qualification:
@@ -457,7 +457,7 @@ def run(
         seed,
         group_column,
         time_column,
-        store=store or certificates.CertificateStore(),
+        store=store or certificates.Store(),
     )
     if not any(
         g is certificates.GateStatus.GATING for g in report.gates.values()
@@ -482,7 +482,7 @@ def run(
             )
     attested = {i.field().name for i in used.values()}
     names = {str(c) for c in candidates}
-    records = provenance.ProvenanceTable.covering(
+    records = provenance.Dictionary.covering(
         [str(c) for c in candidates],
         [
             *(i.field() for i in used.values()),

@@ -13,7 +13,7 @@ import pytest
 from scipy import sparse
 import support
 
-import scmle
+import scmle.api.predict
 from scmle.contracts import tasks
 from scmle.models import conformance
 from scmle.models import registry
@@ -24,7 +24,7 @@ pytestmark = pytest.mark.skipif(
     importlib.util.find_spec("torch") is None, reason="torch is not installed"
 )
 
-REGISTRY = registry.ModelRegistry.with_builtins()
+REGISTRY = registry.Catalog.with_builtins()
 FAST = {"epochs": 60, "patience": 6}
 
 
@@ -143,7 +143,7 @@ def test_adapters_pass_conformance_and_support_every_task(name):
     conformance.check_conformance(adapter)
 
     assert adapter.capabilities.tasks == tasks.STANDARD_TASKS
-    assert adapter.rejection_reason(tasks.TaskType.BINARY) is None
+    assert adapter.rejection_reason(tasks.Task.BINARY) is None
 
 
 def test_a_pytorch_model_family_trains_packages_and_predicts(
@@ -155,7 +155,7 @@ def test_a_pytorch_model_family_trains_packages_and_predicts(
         time_budget=600,
         output_dir=tmp_path,
         enforcement="hard",
-        models=tasks.ModelSpec(),
+        models=tasks.Candidates(),
     )
     plan = project.plan()
     only_torch = dataclasses.replace(
@@ -167,7 +167,7 @@ def test_a_pytorch_model_family_trains_packages_and_predicts(
     assert result.selected_model == "torch_residual"
     features = binary_frame.drop(columns="y").head(20)
     result.save(tmp_path / "net")
-    reloaded = scmle.load_model(tmp_path / "net", trusted=True)
+    reloaded = scmle.api.predict.load_model(tmp_path / "net", trusted=True)
     numpy.testing.assert_array_equal(
         reloaded.predict(features), result.predict(features)
     )
@@ -183,8 +183,8 @@ def test_serving_limits_are_checked_for_a_pytorch_candidate(
         time_budget=600,
         output_dir=tmp_path,
         enforcement="hard",
-        models=tasks.ModelSpec(),
-        selection=tasks.SelectionSpec(max_model_mb=50.0),
+        models=tasks.Candidates(),
+        selection=tasks.Selection(max_model_mb=50.0),
     )
     only_torch = dataclasses.replace(
         project.plan(), candidate_models=("torch_mlp",)

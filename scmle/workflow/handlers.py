@@ -11,7 +11,7 @@ from scmle.workflow import executor
 
 def runner_handler(
     runner: base.Runner,
-    make_spec: Callable[[executor.StepContext], base.JobSpec],
+    make_spec: Callable[[executor.StepContext], base.Job],
 ) -> executor.Handler:
     """A handler that runs a training job through a `Runner`.
 
@@ -22,7 +22,7 @@ def runner_handler(
 
     Args:
         runner: Where the job runs.
-        make_spec: Builds the `JobSpec` for a step execution.
+        make_spec: Builds the `Job` for a step execution.
 
     Returns:
         A handler. A job that succeeds returns its run id, manifest digest

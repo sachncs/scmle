@@ -15,7 +15,7 @@ from scmle.data.curation import preprocessing
 from scmle.models import registry
 
 PLAN = data.FeaturePlan(("age", "income"), ("city",))
-REGISTRY = registry.ModelRegistry.with_builtins()
+REGISTRY = registry.Catalog.with_builtins()
 
 
 def people(rows=800, seed=0):
@@ -41,10 +41,10 @@ def classifier():
     fitted = preprocessing.build_pipeline(
         PLAN,
         REGISTRY.get("logistic_regression"),
-        tasks.TaskType.BINARY,
+        tasks.Task.BINARY,
         0,
     ).fit(features, frame.approved)
-    bundle = scmle.artifacts.bundle.ModelBundle.create(
+    bundle = scmle.artifacts.bundle.Bundle.create(
         fitted,
         PLAN,
         features,
@@ -141,10 +141,10 @@ def test_regression_aims_for_a_range():
         REGISTRY.get("ridge")
         if "ridge" in REGISTRY.adapters
         else REGISTRY.get("elastic_net"),
-        tasks.TaskType.REGRESSION,
+        tasks.Task.REGRESSION,
         0,
     ).fit(features, target)
-    bundle = scmle.artifacts.bundle.ModelBundle.create(
+    bundle = scmle.artifacts.bundle.Bundle.create(
         fitted, PLAN, features, "y", "regression", "rmse", "linear"
     )
     row = features.iloc[0].to_dict()

@@ -37,7 +37,7 @@ def make_policy(**changes):
         "outcome_window": 0,
     }
     values.update(changes)
-    return scmle.governance.loop.LoopPolicy(**values)
+    return scmle.governance.loop.Preregistration(**values)
 
 
 def open_loop(tmp_path, policy=None, hooks=None, **kwargs):

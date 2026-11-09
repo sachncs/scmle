@@ -27,7 +27,7 @@ def unverified(name="u"):
 def test_a_planted_mediator_known_before_the_moment_is_admitted():
     # T -> M -> Y: M is a mediator, known an hour before the moment.
     graph = dag.Dag.build([("T", "M"), ("M", "Y")], "expert")
-    table = provenance.ProvenanceTable(
+    table = provenance.Dictionary(
         (make_field("M", lead=3600.0), make_field("T", lead=7200.0))
     )
     out = rules.build_table(table, "predictive", graph=graph)
@@ -36,7 +36,7 @@ def test_a_planted_mediator_known_before_the_moment_is_admitted():
 
 
 def test_a_planted_post_outcome_field_is_quarantined():
-    table = provenance.ProvenanceTable((make_field("after", lead=-60.0),))
+    table = provenance.Dictionary((make_field("after", lead=-60.0),))
     out = rules.build_table(table, "predictive", mode=rules.Mode.PERMISSIVE)
     assert out.names(Q) == ("after",)
     assert "less than the declared" in out.decisions[0].reasons[0]
@@ -77,7 +77,7 @@ def test_unknown_serving_availability_follows_the_mode():
 
 
 def test_strict_quarantines_every_unverified_field_permissive_flags_it():
-    table = provenance.ProvenanceTable.covering(["a", "b"], [make_field("b")])
+    table = provenance.Dictionary.covering(["a", "b"], [make_field("b")])
     strict = rules.build_table(
         table, "predictive", rules.Mode.STRICT, today=DAY
     )
@@ -210,7 +210,7 @@ def test_without_a_valid_adjustment_set_covariates_are_flagged():
 def test_causal_table_records_the_graph_hash_and_set():
     fields = [make_field(n) for n in ("C", "K", "M", "P", "T", "Y")]
     out = rules.build_table(
-        provenance.ProvenanceTable(tuple(fields)),
+        provenance.Dictionary(tuple(fields)),
         "causal",
         graph=GRAPH,
         treatment="T",
@@ -224,18 +224,16 @@ def test_causal_table_records_the_graph_hash_and_set():
 
 
 def test_arguments_of_the_table_are_validated():
-    table = provenance.ProvenanceTable((make_field("a"),))
+    table = provenance.Dictionary((make_field("a"),))
     with pytest.raises(ValueError, match="kind"):
         rules.build_table(table, "descriptive")
     with pytest.raises(ValueError, match="graph, treatment, outcome"):
         rules.build_table(table, "causal")
     with pytest.raises(ValueError, match="unique"):
         d = rules.decide_predictive(make_field("a"))
-        rules.AdmissibilityTable(
-            "predictive", rules.Mode.STRICT, (d, d), None, None
-        )
+        rules.Admissibility("predictive", rules.Mode.STRICT, (d, d), None, None)
     with pytest.raises(ValueError, match="kind"):
-        rules.AdmissibilityTable("x", rules.Mode.STRICT, (), None, None)
+        rules.Admissibility("x", rules.Mode.STRICT, (), None, None)
 
 
 def test_decisions_round_trip():
@@ -246,7 +244,7 @@ def test_decisions_round_trip():
 
 
 def test_a_gate_per_field_blocks_only_the_field_it_names():
-    table = provenance.ProvenanceTable.covering(["a", "b"])
+    table = provenance.Dictionary.covering(["a", "b"])
     out = rules.build_table(
         table,
         "predictive",

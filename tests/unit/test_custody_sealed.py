@@ -95,7 +95,7 @@ def test_the_log_never_contains_row_values():
 
 def test_the_vault_gives_each_set_its_own_token():
     log = sealed.OpenLog()
-    vault = sealed.CustodyVault(log)
+    vault = sealed.Vault(log)
     first = vault.adopt("C", resident())
     second = vault.adopt("final_test", resident())
     assert first.issue_token() != second.issue_token()
@@ -105,7 +105,7 @@ def test_the_vault_gives_each_set_its_own_token():
 
 
 def test_the_vault_refuses_a_duplicate_set_name():
-    vault = sealed.CustodyVault(sealed.OpenLog())
+    vault = sealed.Vault(sealed.OpenLog())
     vault.adopt("C", resident())
     with pytest.raises(ValueError, match="already"):
         vault.adopt("C", resident())

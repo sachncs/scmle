@@ -13,11 +13,11 @@ from scmle.sampling import strategies
 
 
 def best_default_trials(
-    screened: list[experiments.TrialResult],
+    screened: list[experiments.Trial],
     metric_greater_is_better: bool,
     limit: int,
     baseline_family_names: frozenset[str],
-) -> list[experiments.TrialResult]:
+) -> list[experiments.Trial]:
     """Ranks successful default-pipeline trials best-first.
 
     Args:
@@ -54,7 +54,7 @@ class StrategySearch:
     """
 
     def __init__(
-        self, context: scmle.core.context.RunContext, runner: trials.TrialRunner
+        self, context: scmle.core.context.Context, runner: trials.TrialRunner
     ) -> None:
         """Initializes the search.
 
@@ -68,7 +68,7 @@ class StrategySearch:
         self.task = scmle.core.context.require(context.task, "task")
         self.profile = scmle.core.context.require(context.profile, "profile")
 
-    def search(self, screened: list[experiments.TrialResult]) -> None:
+    def search(self, screened: list[experiments.Trial]) -> None:
         """Runs the search; results and verdicts go to the context.
 
         Args:
@@ -92,9 +92,7 @@ class StrategySearch:
             self.context.check_cancelled()
             self.search_model(leader, spec.names)
 
-    def search_model(
-        self, leader: experiments.TrialResult, names: list[str]
-    ) -> None:
+    def search_model(self, leader: experiments.Trial, names: list[str]) -> None:
         """Tries every applicable strategy for one model.
 
         Inapplicable strategies are rejected with the reason; the others are
@@ -127,7 +125,7 @@ class StrategySearch:
             self.judge(leader, outcome)
 
     def judge(
-        self, leader: experiments.TrialResult, outcome: experiments.TrialResult
+        self, leader: experiments.Trial, outcome: experiments.Trial
     ) -> None:
         """Compares a strategy trial with its model's default pipeline.
 

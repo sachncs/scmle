@@ -14,7 +14,7 @@ from scmle.core import orchestrator
 import scmle.core.stages
 import scmle.models.registry
 
-BINARY = frozenset({tasks.TaskType.BINARY})
+BINARY = frozenset({tasks.Task.BINARY})
 
 
 class ExplodingEstimator(dummy.DummyClassifier):
@@ -22,7 +22,7 @@ class ExplodingEstimator(dummy.DummyClassifier):
         raise RuntimeError("boom")
 
 
-class ExplodingAdapter(models.ModelAdapter):
+class ExplodingAdapter(models.Model):
     name = "exploding"
     family = "test"
     capabilities = models.Capabilities(BINARY, cost=1)
@@ -37,7 +37,7 @@ def read_events(run_dir):
 
 
 def project_with(adapter, frame, tmp_path, **kwargs):
-    registry = scmle.models.registry.ModelRegistry.with_builtins()
+    registry = scmle.models.registry.Catalog.with_builtins()
     registry.register(adapter)
     project = support.make_project(frame, "y", output_dir=tmp_path, **kwargs)
     project.orchestrator.registry = registry
@@ -54,7 +54,7 @@ def test_failed_trial_is_isolated(binary_frame, tmp_path):
 
 
 def test_all_trials_failing_ends_in_failed_state(binary_frame, tmp_path):
-    registry = scmle.models.registry.ModelRegistry((ExplodingAdapter(),))
+    registry = scmle.models.registry.Catalog((ExplodingAdapter(),))
     project = support.make_project(binary_frame, "y", output_dir=tmp_path)
     project.orchestrator.registry = registry
     with pytest.raises(errors.ScmleError, match="all trials failed") as caught:

@@ -60,7 +60,7 @@ def test_budget_stops_profile_at_a_table_boundary():
     for name in ("t1", "t2"):
         db.execute(f"CREATE TABLE {name} (a INTEGER, b INTEGER)")
         db.execute(f"INSERT INTO {name} VALUES (?, ?)", [(1, 2), (3, 4)])
-    meter = budget.BudgetMeter(budget.IngestBudget(max_queries=5))
+    meter = budget.BudgetMeter(budget.Budget(max_queries=5))
     source = profile.SqlSource(db.factory, meter)
     catalog = profile.profile_catalog(source, ["t1", "t2"])
     assert catalog.partial
@@ -126,7 +126,7 @@ def test_read_without_a_token_is_marked_unverified():
 def test_budget_meter_is_deterministic_and_validates():
     def run():
         meter = budget.BudgetMeter(
-            budget.IngestBudget(max_rows_scanned=100, max_queries=10)
+            budget.Budget(max_rows_scanned=100, max_queries=10)
         )
         done = [meter.admit("s", f"u{k}", 30) for k in range(6)]
         return done, [s.to_dict() for s in meter.stops], meter.rows
@@ -137,13 +137,13 @@ def test_budget_meter_is_deterministic_and_validates():
     assert rows == 90
     assert len(stops) == 1
     with pytest.raises(ValueError):
-        budget.IngestBudget(max_queries=-1)
+        budget.Budget(max_queries=-1)
 
 
 def test_wall_time_limit_uses_the_clock():
     ticks = iter(range(100))
     meter = budget.BudgetMeter(
-        budget.IngestBudget(max_seconds=3), lambda: float(next(ticks))
+        budget.Budget(max_seconds=3), lambda: float(next(ticks))
     )
     outcomes = [meter.admit("s", f"u{k}", 0) for k in range(5)]
     assert outcomes[0] and not outcomes[-1]

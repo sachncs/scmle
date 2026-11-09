@@ -14,11 +14,11 @@ from scmle.contracts import tasks
 from scmle.models.ordinal import estimators
 from scmle.models.sklearn import classical
 
-ORDINAL = frozenset({tasks.TaskType.ORDINAL})
+ORDINAL = frozenset({tasks.Task.ORDINAL})
 LEVELS = "levels"
 
 
-class OrdinalAdapter(classical.SklearnAdapter):
+class Ordinal(classical.Learner):
     """Wraps a scikit-learn regressor as an ordinal classifier.
 
     The pipeline passes the number of levels as the `levels` parameter, so a
@@ -31,7 +31,7 @@ class OrdinalAdapter(classical.SklearnAdapter):
 
     def build(
         self,
-        task: tasks.TaskType,
+        task: tasks.Task,
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
@@ -49,11 +49,11 @@ class OrdinalAdapter(classical.SklearnAdapter):
         """
         settings = dict(params or {})
         levels = settings.pop(LEVELS, None)
-        inner = super().build(tasks.TaskType.REGRESSION, seed, settings)
+        inner = super().build(tasks.Task.REGRESSION, seed, settings)
         return estimators.CumulativeThresholdRegressor(inner, levels, seed)
 
 
-class OrdinalRidgeAdapter(OrdinalAdapter):
+class OrdinalRidge(Ordinal):
     """Linear latent score."""
 
     name = "ordinal_ridge"
@@ -67,7 +67,7 @@ class OrdinalRidgeAdapter(OrdinalAdapter):
     )
 
 
-class OrdinalForestAdapter(OrdinalAdapter):
+class OrdinalForest(Ordinal):
     """Random-forest latent score."""
 
     name = "ordinal_random_forest"
@@ -84,7 +84,7 @@ class OrdinalForestAdapter(OrdinalAdapter):
     )
 
 
-class OrdinalBoostingAdapter(OrdinalAdapter):
+class OrdinalBoosting(Ordinal):
     """Gradient-boosted latent score."""
 
     name = "ordinal_hist_gradient_boosting"
@@ -105,8 +105,8 @@ class OrdinalBoostingAdapter(OrdinalAdapter):
     )
 
 
-ORDINAL_ADAPTERS: tuple[type[models.ModelAdapter], ...] = (
-    OrdinalRidgeAdapter,
-    OrdinalForestAdapter,
-    OrdinalBoostingAdapter,
+ORDINAL_ADAPTERS: tuple[type[models.Model], ...] = (
+    OrdinalRidge,
+    OrdinalForest,
+    OrdinalBoosting,
 )

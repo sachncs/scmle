@@ -1,4 +1,4 @@
-"""Runs an `MLProject` as the workload of a job, unchanged.
+"""Runs an `Project` as the workload of a job, unchanged.
 
 The project specification is a JSON mapping::
 
@@ -6,13 +6,13 @@ The project specification is a JSON mapping::
         "data": "data/train.csv",  # a key in the store
         "target": "churn",
         "options": {"time_budget": 600},
-    }  # keyword arguments of MLProject
+    }  # keyword arguments of Project
 
 The data object is copied from the store to local scratch space, the project
 runs there, and its run directory is mirrored to ``runs/<id>/workdir/`` in the
 store: periodically while it runs (`WorkdirSync`) and once more when it ends,
 however it ends. After a restart on a machine with an empty disk the
-workdir is restored and `MLProject.resume` reuses the completed trials. A
+workdir is restored and `Project.resume` reuses the completed trials. A
 hard kill therefore loses at most the trials finished since the last
 periodic sync (default 30 seconds). The pipeline itself is not modified:
 this module only moves files and calls the public API.
@@ -27,7 +27,7 @@ import tempfile
 import threading
 from typing import Any
 
-import scmle
+import scmle.api.project
 from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.data.store import objectstore
@@ -35,15 +35,15 @@ from scmle.runners import local
 
 SYNC_SECONDS = 30.0
 SECTIONS = {
-    "search": tasks.SearchSpec,
-    "strategies": tasks.StrategySpec,
-    "models": tasks.ModelSpec,
-    "ensemble": tasks.EnsembleSpec,
-    "feature_graph": tasks.FeatureGraphSpec,
-    "selection": tasks.SelectionSpec,
-    "decision": tasks.DecisionSpec,
-    "fairness": tasks.FairnessSpec,
-    "problem": tasks.ProblemSpec,
+    "search": tasks.Search,
+    "strategies": tasks.Strategies,
+    "models": tasks.Candidates,
+    "ensemble": tasks.Stacking,
+    "feature_graph": tasks.FeatureGraph,
+    "selection": tasks.Selection,
+    "decision": tasks.Threshold,
+    "fairness": tasks.Parity,
+    "problem": tasks.Problem,
 }
 CONFIG_NAMES = ("config.json", "spec.json")
 
@@ -169,7 +169,7 @@ def saved_run(directory: pathlib.Path) -> pathlib.Path | None:
 
 
 def project_options(options: Mapping[str, Any]) -> dict[str, Any]:
-    """Builds keyword arguments for `MLProject` from a JSON mapping.
+    """Builds keyword arguments for `Project` from a JSON mapping.
 
     The nested sections (`search`, `models`, ...) arrive as mappings and are
     turned into their specification types; everything else passes through.
@@ -204,7 +204,7 @@ def run_project(
     Args:
         context: The job context; its spec's `project` is the mapping above.
         sync_seconds: Seconds between mirrors of the run directory.
-        on_start: Called with the `MLProject` just before it runs (a hook for
+        on_start: Called with the `Project` just before it runs (a hook for
             cancellation).
 
     Raises:
@@ -256,7 +256,7 @@ def execute(
         data_path: Local copy of the training data.
         workdir: Directory for the run, possibly restored from the store.
         restored: Whether the workdir was restored from earlier attempts.
-        on_start: Called with a newly started `MLProject` before it runs.
+        on_start: Called with a newly started `Project` before it runs.
 
     Returns:
         The run result and whether it was resumed.
@@ -269,11 +269,11 @@ def execute(
     previous = saved_run(workdir) if restored else None
     if previous is not None:
         try:
-            return scmle.MLProject.resume(previous), True
+            return scmle.api.project.Project.resume(previous), True
         except errors.ConfigError as error:
             if "already completed" not in str(error):
                 raise
-    started = scmle.MLProject(
+    started = scmle.api.project.Project(
         data_path,
         spec["target"],
         output_dir=workdir,

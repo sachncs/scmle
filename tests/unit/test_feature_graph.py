@@ -19,7 +19,7 @@ def node(name, op, inputs, **params):
 
 
 def data_spec(**kwargs):
-    return tasks.DataSpec(uri="m", target="y", **kwargs)
+    return tasks.Dataset(uri="m", target="y", **kwargs)
 
 
 def transform(nodes, frame, fit_frame=None):
@@ -242,7 +242,7 @@ def test_validation_rejects_bad_graphs():
 
     def check(nodes, **data):
         feature_graph.validate_graph(
-            tasks.FeatureGraphSpec(nodes=nodes), available, data_spec(**data)
+            tasks.FeatureGraph(nodes=nodes), available, data_spec(**data)
         )
 
     check([node("s", "sum", ["a", "b"])])
@@ -275,25 +275,25 @@ def test_validation_rejects_bad_graphs():
 
 def test_spec_rejects_cycles_duplicates_and_forward_references():
     with pytest.raises(ValueError, match="unique"):
-        tasks.FeatureGraphSpec(
+        tasks.FeatureGraph(
             nodes=[node("a", "abs", ["x"]), node("a", "abs", ["x"])]
         )
     with pytest.raises(ValueError, match="defined later"):
-        tasks.FeatureGraphSpec(
+        tasks.FeatureGraph(
             nodes=[node("a", "abs", ["b"]), node("b", "abs", ["x"])]
         )
     with pytest.raises(ValueError, match="itself"):
-        tasks.FeatureGraphSpec(nodes=[node("a", "abs", ["a"])])
+        tasks.FeatureGraph(nodes=[node("a", "abs", ["a"])])
     with pytest.raises(ValueError, match="no inputs"):
-        tasks.FeatureGraphSpec(nodes=[node("a", "abs", [])])
+        tasks.FeatureGraph(nodes=[node("a", "abs", [])])
 
 
 def test_graph_is_versioned_and_fingerprinted():
-    one = tasks.FeatureGraphSpec(nodes=[node("a", "log1p", ["x"])])
-    same = tasks.FeatureGraphSpec(nodes=[node("a", "log1p", ["x"])])
-    other = tasks.FeatureGraphSpec(nodes=[node("a", "sqrt", ["x"])])
+    one = tasks.FeatureGraph(nodes=[node("a", "log1p", ["x"])])
+    same = tasks.FeatureGraph(nodes=[node("a", "log1p", ["x"])])
+    other = tasks.FeatureGraph(nodes=[node("a", "sqrt", ["x"])])
     assert one.fingerprint() == same.fingerprint() != other.fingerprint()
-    spec = tasks.ProjectSpec(data=data_spec(), feature_graph=one)
-    plain = tasks.ProjectSpec(data=data_spec())
+    spec = tasks.Config(data=data_spec(), feature_graph=one)
+    plain = tasks.Config(data=data_spec())
     assert spec.config_hash() != plain.config_hash()
     assert one.version == tasks.GRAPH_VERSION

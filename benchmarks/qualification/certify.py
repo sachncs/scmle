@@ -94,9 +94,9 @@ def certify_detector(
     frame: pandas.DataFrame,
     plans: Sequence[DefectPlan],
     seeds: Sequence[int],
-    policy: certificates.CertificationPolicy,
+    policy: certificates.Standard,
     created: str | None = None,
-) -> certificates.DetectorCertificate:
+) -> certificates.Certification:
     """Plants defects, runs the detector and issues a certificate.
 
     Args:

@@ -29,7 +29,7 @@ def small_view(rule=None, permissive=False):
             "val": [10.0, 20.0, 30.0, 40.0],
         }
     )
-    rule = rule or asof_view.TimeRule(asof_view.TRANSACTION, "rec")
+    rule = rule or asof_view.KnownTime(asof_view.TRANSACTION, "rec")
     return asof_view.AsOfView(
         frame, "cid", rule, "ev", "events", permissive=permissive
     )
@@ -52,14 +52,14 @@ def test_late_arrival_is_excluded_by_recorded_time():
 
 
 def test_event_delay_mode_uses_the_declared_delay():
-    rule = asof_view.TimeRule(asof_view.EVENT_DELAY, None, 2.0)
+    rule = asof_view.KnownTime(asof_view.EVENT_DELAY, None, 2.0)
     seen = small_view(rule).visible(asked(10.0))
     assert seen["val"].tolist() == [10.0, 20.0]  # 9.0 + 2.0 > 10
     assert small_view(rule).tier is qualification.Tier.UNVERIFIED
 
 
 def test_non_versioned_table_is_refused_unless_permissive():
-    rule = asof_view.TimeRule(asof_view.NON_VERSIONED)
+    rule = asof_view.KnownTime(asof_view.NON_VERSIONED)
     frame = pandas.DataFrame({"cid": [1], "segment": ["gold"]})
     view = asof_view.AsOfView(frame, "cid", rule, name="dim")
     with pytest.raises(asof_view.NoAsOfRuleError):
@@ -73,27 +73,29 @@ def test_non_versioned_table_is_refused_unless_permissive():
 
 def test_time_rule_validation_and_tiers():
     with pytest.raises(ValueError):
-        asof_view.TimeRule(asof_view.TRANSACTION)
+        asof_view.KnownTime(asof_view.TRANSACTION)
     with pytest.raises(ValueError):
-        asof_view.TimeRule(asof_view.EVENT_DELAY)
+        asof_view.KnownTime(asof_view.EVENT_DELAY)
     with pytest.raises(ValueError):
-        asof_view.TimeRule("nope")
+        asof_view.KnownTime("nope")
     with pytest.raises(ValueError):
-        asof_view.TimeRule(asof_view.EVENT_DELAY, None, -1.0)
+        asof_view.KnownTime(asof_view.EVENT_DELAY, None, -1.0)
     good = provenance.LogCheck(100, 0, 0.01)
     bad = provenance.LogCheck(100, 50, 0.01)
     assert (
-        asof_view.TimeRule(
+        asof_view.KnownTime(
             asof_view.TRANSACTION, "rec", None, None, good
         ).tier()
         is qualification.Tier.CONFIRMED
     )
     assert (
-        asof_view.TimeRule(asof_view.TRANSACTION, "rec", None, None, bad).tier()
+        asof_view.KnownTime(
+            asof_view.TRANSACTION, "rec", None, None, bad
+        ).tier()
         is qualification.Tier.UNVERIFIED
     )
     assert (
-        asof_view.TimeRule(asof_view.EVENT_DELAY, None, 1.0, None, good).tier()
+        asof_view.KnownTime(asof_view.EVENT_DELAY, None, 1.0, None, good).tier()
         is qualification.Tier.UNVERIFIED
     )
 
@@ -104,14 +106,14 @@ def test_reserved_and_missing_columns_are_rejected():
         asof_view.AsOfView(
             frame,
             "cid",
-            asof_view.TimeRule(asof_view.EVENT_DELAY, None, 0),
+            asof_view.KnownTime(asof_view.EVENT_DELAY, None, 0),
             "ev",
         )
     with pytest.raises(ValueError):
         asof_view.AsOfView(
             pandas.DataFrame({"cid": [1]}),
             "cid",
-            asof_view.TimeRule(asof_view.EVENT_DELAY, None, 0),
+            asof_view.KnownTime(asof_view.EVENT_DELAY, None, 0),
             "ev",
         )
 
@@ -124,7 +126,10 @@ def test_datetime_columns_become_days_and_null_keys_never_match():
         }
     )
     view = asof_view.AsOfView(
-        frame, "cid", asof_view.TimeRule(asof_view.EVENT_DELAY, None, 0.0), "ev"
+        frame,
+        "cid",
+        asof_view.KnownTime(asof_view.EVENT_DELAY, None, 0.0),
+        "ev",
     )
     seen = view.visible(asked(20_000.0, key=1))
     assert len(seen) == 1
@@ -137,7 +142,7 @@ def test_datetime_columns_become_days_and_null_keys_never_match():
 def test_scope_boundaries_match_the_reference_on_a_small_table():
     source = synthesize.Source(small_view(), "cid")
     targets = pandas.DataFrame({"cid": [1], "moment": [11.0]})
-    spec = synthesize.FeatureSpec("f", "aggregate", 0, "sum", "val", None)
+    spec = synthesize.Feature("f", "aggregate", 0, "sum", "val", None)
     got = synthesize.evaluate(spec, targets, "moment", [source], [], 1.0)
     assert got.tolist() == [40.0]  # cutoff 10: values 10 and 30
 
@@ -174,7 +179,7 @@ def test_synthesis_declares_family_size_and_drops_with_reasons():
     view = asof_view.AsOfView(
         events,
         "cid",
-        asof_view.TimeRule(asof_view.EVENT_DELAY, None, 0.0),
+        asof_view.KnownTime(asof_view.EVENT_DELAY, None, 0.0),
         "ev",
         "events",
     )
@@ -198,7 +203,7 @@ def test_synthesis_declares_family_size_and_drops_with_reasons():
 def test_mutable_dimension_is_excluded_by_default_and_unverified_when_opened():
     targets = pandas.DataFrame({"cid": [1, 2, 3], "moment": [10.0, 10.0, 10.0]})
     dim = pandas.DataFrame({"cid": [1, 2, 3], "segment": ["a", "b", "a"]})
-    rule = asof_view.TimeRule(asof_view.NON_VERSIONED)
+    rule = asof_view.KnownTime(asof_view.NON_VERSIONED)
     closed = asof_view.AsOfView(dim, "cid", rule, name="dim")
     out = synthesize.synthesize(
         targets, "moment", [synthesize.Source(closed, "cid", synthesize.PARENT)]
@@ -228,8 +233,8 @@ def attested_rule(kind=asof_view.EVENT_DELAY):
         "2099-01-01",
     )
     if kind == asof_view.EVENT_DELAY:
-        return asof_view.TimeRule(kind, None, 2.0, note)
-    return asof_view.TimeRule(
+        return asof_view.KnownTime(kind, None, 2.0, note)
+    return asof_view.KnownTime(
         kind, "rec", 2.0, note, provenance.LogCheck(100, 0, 0.01)
     )
 
@@ -240,7 +245,7 @@ def test_feature_tier_is_the_weakest_source_tier():
     weak = asof_view.AsOfView(
         pandas.DataFrame({"cid": [1, 2], "ev": [1.0, 1.0], "x": [1.0, 2.0]}),
         "cid",
-        asof_view.TimeRule(asof_view.EVENT_DELAY, None, 0.0),
+        asof_view.KnownTime(asof_view.EVENT_DELAY, None, 0.0),
         "ev",
         "weak",
     )
@@ -290,7 +295,7 @@ def test_multiplicity_matches_registered_hypotheses_and_mismatch_fails():
     view = asof_view.AsOfView(
         events,
         "cid",
-        asof_view.TimeRule(asof_view.EVENT_DELAY, None, 0.0),
+        asof_view.KnownTime(asof_view.EVENT_DELAY, None, 0.0),
         "ev",
         "events",
     )
@@ -356,11 +361,11 @@ def test_evidence_and_expressions_are_stated_exactly():
         "delta_rec_days": None,
         "tier": "unverified",
     }
-    aggregate = synthesize.FeatureSpec("f", "aggregate", 0, "sum", "val", 7.0)
+    aggregate = synthesize.Feature("f", "aggregate", 0, "sum", "val", 7.0)
     assert aggregate.expression() == "sum(val) over 7d"
-    free = synthesize.FeatureSpec("f", "aggregate", 0, "count", None, None)
+    free = synthesize.Feature("f", "aggregate", 0, "count", None, None)
     assert free.expression() == "count(*) over all"
-    nested = synthesize.FeatureSpec(
+    nested = synthesize.Feature(
         "f", "nested", 0, "mean", "q", 30.0, nest=0, inner="sum"
     )
     assert nested.expression() == "mean(per-row sum(q) in 30d)"

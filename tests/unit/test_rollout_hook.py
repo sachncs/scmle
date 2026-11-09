@@ -1,4 +1,4 @@
-"""The decision layer's rollout through LifecycleManager and the ledger."""
+"""The decision layer's rollout through Maintainer and the ledger."""
 
 from fractions import Fraction
 import json
@@ -28,7 +28,7 @@ def staged(tmp_path):
         "logistic_regression", test_lifecycle_extras.traffic(seed=1)
     )
     store = registry.ModelRegistryStore(tmp_path / "registry")
-    manager = lifecycle.LifecycleManager(store, "m", str(tmp_path / "work"))
+    manager = lifecycle.Maintainer(store, "m", str(tmp_path / "work"))
     first = store.register("m", good.save(tmp_path / "e1"), trusted=True)
     store.promote(
         "m",
@@ -227,7 +227,7 @@ def broken_champion(tmp_path):
         "logistic_regression", test_lifecycle_extras.traffic(seed=0, flip=True)
     )
     store = registry.ModelRegistryStore(tmp_path / "registry")
-    manager = lifecycle.LifecycleManager(store, "m", str(tmp_path / "work"))
+    manager = lifecycle.Maintainer(store, "m", str(tmp_path / "work"))
     for index, model in enumerate((good, broken), start=1):
         record = store.register(
             "m", model.save(tmp_path / f"export{index}"), trusted=True

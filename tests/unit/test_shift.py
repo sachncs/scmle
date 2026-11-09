@@ -10,7 +10,7 @@ from scmle.evaluation import shift
 
 
 def shifted_inputs(offset):
-    base = test_diagnostics.make_inputs(tasks.TaskType.BINARY, rows=1200)
+    base = test_diagnostics.make_inputs(tasks.Task.BINARY, rows=1200)
     reference = base.features.copy()
     moved = base.features.copy()
     moved["signal"] = moved["signal"] + offset
@@ -20,7 +20,7 @@ def shifted_inputs(offset):
 
 
 def test_identical_distributions_are_indistinguishable():
-    base = test_diagnostics.make_inputs(tasks.TaskType.BINARY, rows=1200)
+    base = test_diagnostics.make_inputs(tasks.Task.BINARY, rows=1200)
     rng = numpy.random.default_rng(5)
     order = rng.permutation(len(base.features))
     half = len(order) // 2
@@ -45,7 +45,7 @@ def test_a_moved_feature_is_detected_and_named():
 
 
 def test_category_frequency_changes_are_ranked_too():
-    base = test_diagnostics.make_inputs(tasks.TaskType.BINARY, rows=1200)
+    base = test_diagnostics.make_inputs(tasks.Task.BINARY, rows=1200)
     moved = base.features.copy()
     moved["group"] = "a"
     data = dataclasses.replace(
@@ -59,7 +59,7 @@ def test_category_frequency_changes_are_ranked_too():
 
 
 def test_without_reference_rows_the_report_says_so():
-    base = test_diagnostics.make_inputs(tasks.TaskType.BINARY)
+    base = test_diagnostics.make_inputs(tasks.Task.BINARY)
 
     assert shift.AdversarialValidation().compute(base) == {
         "available": False,
@@ -100,7 +100,7 @@ def test_without_a_shift_the_odds_stay_moderate_and_weights_are_possible():
 
 
 def no_shift():
-    base = test_diagnostics.make_inputs(tasks.TaskType.BINARY, rows=1200)
+    base = test_diagnostics.make_inputs(tasks.Task.BINARY, rows=1200)
     rng = numpy.random.default_rng(5)
     order = rng.permutation(len(base.features))
     half = len(order) // 2

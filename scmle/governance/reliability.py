@@ -53,7 +53,7 @@ class FaultInjectionHarness:
 
     def __init__(
         self,
-        registry: reliability.FaultInjectionPlanRegistry,
+        registry: reliability.Registry,
         artifact_root: str | pathlib.Path,
         execution_id: str,
         reviewer: str,
@@ -71,12 +71,12 @@ class FaultInjectionHarness:
             recorded_at: When the evidence is recorded.
 
         Raises:
-            TypeError: If `registry` is not a `FaultInjectionPlanRegistry`.
+            TypeError: If `registry` is not a `Registry`.
             ValueError: If the execution id, reviewer or time is blank, or the
                 execution id is not a path-safe name.
         """
-        if not isinstance(registry, reliability.FaultInjectionPlanRegistry):
-            raise TypeError("registry must be FaultInjectionPlanRegistry")
+        if not isinstance(registry, reliability.Registry):
+            raise TypeError("registry must be Registry")
         for name, value in (
             ("execution_id", execution_id),
             ("reviewer", reviewer),
@@ -99,7 +99,7 @@ class FaultInjectionHarness:
         executor: Callable[
             [reliability.FaultScenario], tuple[FaultArtifact, ...]
         ],
-    ) -> reliability.FaultScenarioPlan:
+    ) -> reliability.Plan:
         """Runs an injected executor and records durable evidence.
 
         The executor must return one artifact for each evidence requirement
@@ -156,14 +156,14 @@ class FaultInjectionHarness:
                 + f"unexpected={','.join(unexpected)}"
                 + ")"
             )
-        evidence: list[reliability.FaultEvidence] = []
+        evidence: list[reliability.Evidence] = []
         for artifact in artifacts:
             path = self.artifact_root / (
                 f"{self.execution_id}-{scenario.value}-{artifact.evidence_type}.bin"
             )
             self.write_atomically(path, artifact.content)
             evidence.append(
-                reliability.FaultEvidence(
+                reliability.Evidence(
                     evidence_type=artifact.evidence_type,
                     execution_id=self.execution_id,
                     artifact_uri=path.as_uri(),

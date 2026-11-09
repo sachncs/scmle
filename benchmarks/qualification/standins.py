@@ -41,7 +41,7 @@ SENTINEL_RATE = 0.10
 DUPLICATE_RATE = 0.10
 # Fixed in advance: 50 percent recall floor, 10 percent false-alarm ceiling,
 # 95 percent Wilson intervals.
-POLICY = certificates.CertificationPolicy(
+POLICY = certificates.Standard(
     recall_floor=0.5, false_alarm_ceiling=0.10, confidence=0.95
 )
 DEFAULT_SEEDS = (0, 1, 2)
@@ -171,7 +171,7 @@ STANDINS: dict[str, StandIn] = {
 def certify_all(
     seeds: Sequence[int] = DEFAULT_SEEDS,
     frame: pandas.DataFrame | None = None,
-) -> certificates.CertificateStore:
+) -> certificates.Store:
     """Certifies every stand-in on the demo table.
 
     Args:
@@ -182,7 +182,7 @@ def certify_all(
         A store holding one certificate per stand-in.
     """
     data = demo_frame() if frame is None else frame
-    store = certificates.CertificateStore()
+    store = certificates.Store()
     for name, standin in STANDINS.items():
         store.add(
             certify.certify_detector(
@@ -198,7 +198,7 @@ def certify_all(
     return store
 
 
-def sample_problems(store: certificates.CertificateStore) -> list[str]:
+def sample_problems(store: certificates.Store) -> list[str]:
     """Why a store of stand-in certificates is not current (empty if fine).
 
     Args:
@@ -212,6 +212,6 @@ def sample_problems(store: certificates.CertificateStore) -> list[str]:
     for name, standin in STANDINS.items():
         digest = standin.code_hash()
         state = store.state(name, digest)
-        if state is not certificates.CertificateState.CURRENT:
+        if state is not certificates.Freshness.CURRENT:
             problems.append(f"{name}: certificate is {state.value}")
     return problems

@@ -44,8 +44,8 @@ def classification_frame(rows=1200):
 
 
 def manifest_of(spec, task, frame):
-    split = splitters.SplitManager(spec, task).split(frame)
-    vault = sealed.CustodyVault(sealed.OpenLog(), process=False)
+    split = splitters.Splitter(spec, task).split(frame)
+    vault = sealed.Vault(sealed.OpenLog(), process=False)
     return pipeline.apply_custody(
         charter=make_charter(min_effect=0.3, k_max=5),
         split=split,
@@ -58,19 +58,19 @@ def manifest_of(spec, task, frame):
 
 
 def grouped():
-    spec = tasks.ProjectSpec(
-        data=tasks.DataSpec(uri="m", target="y", group_column="g"),
-        validation=tasks.ValidationSpec(strategy="group", seed=5),
+    spec = tasks.Config(
+        data=tasks.Dataset(uri="m", target="y", group_column="g"),
+        validation=tasks.Validation(strategy="group", seed=5),
     )
-    return manifest_of(spec, tasks.TaskType.BINARY, classification_frame())
+    return manifest_of(spec, tasks.Task.BINARY, classification_frame())
 
 
 def temporal():
-    spec = tasks.ProjectSpec(
-        data=tasks.DataSpec(uri="m", target="y", time_column="t"),
-        validation=tasks.ValidationSpec(strategy="temporal", seed=5),
+    spec = tasks.Config(
+        data=tasks.Dataset(uri="m", target="y", time_column="t"),
+        validation=tasks.Validation(strategy="temporal", seed=5),
     )
-    return manifest_of(spec, tasks.TaskType.BINARY, classification_frame())
+    return manifest_of(spec, tasks.Task.BINARY, classification_frame())
 
 
 def test_the_grouped_manifest_has_its_pinned_hash():

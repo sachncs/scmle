@@ -125,7 +125,7 @@ class Outcome:
     """
 
     documents: dict[str, dict[str, Any]]
-    decision: tier.TierDecision
+    decision: tier.Assignment
     hashes: dict[str, str]
 
 
@@ -182,7 +182,7 @@ def wald_from(est: Est, name: str, kind: str) -> battery.Test | None:
     return battery.wald_test(name, kind, est.estimate, est.se)
 
 
-class Adapter:
+class Estimator:
     """What a strategy needs: design check, estimator, controls, extras.
 
     Subclasses fix `name` and implement the hooks. `prepare` runs on `X`
@@ -206,7 +206,7 @@ class Adapter:
 
     def __init__(
         self,
-        spec: causal.CausalSpec,
+        spec: causal.Question,
         x: pandas.DataFrame,
         seed: int,
         learner: str,
@@ -304,7 +304,7 @@ class Adapter:
         }
 
 
-class BackdoorAdapter(Adapter):
+class BackdoorEstimator(Estimator):
     """AIPW with nuisances frozen on `X` and no cross-fitting."""
 
     name = "backdoor_aipw"
@@ -528,7 +528,7 @@ class BackdoorAdapter(Adapter):
         return out
 
 
-class RandomizedAdapter(Adapter):
+class RandomizedEstimator(Estimator):
     """Difference in means under a recorded assignment mechanism."""
 
     name = "randomized_diff"
@@ -605,7 +605,7 @@ class RandomizedAdapter(Adapter):
         }
 
 
-class DidAdapter(Adapter):
+class DidEstimator(Estimator):
     """Group-time difference in differences."""
 
     name = "did"
@@ -641,7 +641,7 @@ class DidAdapter(Adapter):
 
     def fit(
         self, c: pandas.DataFrame, level: float, outcome: str | None = None
-    ) -> did.DidResult:
+    ) -> did.Estimate:
         """Fits the difference-in-differences estimator on the given rows.
 
         Args:
@@ -764,7 +764,7 @@ class DidAdapter(Adapter):
         }
 
 
-class IvAdapter(Adapter):
+class IvEstimator(Estimator):
     """Just-identified instrumental variables."""
 
     name = "iv"
@@ -780,7 +780,7 @@ class IvAdapter(Adapter):
 
     def fit(
         self, frame: pandas.DataFrame, level: float, outcome: str | None = None
-    ) -> iv.IvResult:
+    ) -> iv.Estimate:
         """Fits the just-identified IV model on the given rows.
 
         Args:
@@ -892,7 +892,7 @@ class IvAdapter(Adapter):
         return tests
 
 
-class RdAdapter(Adapter):
+class RdEstimator(Estimator):
     """Sharp regression discontinuity with a bandwidth frozen on `X`."""
 
     name = "rd"
@@ -956,7 +956,7 @@ class RdAdapter(Adapter):
         level: float,
         outcome: str | None = None,
         covariates: tuple[str, ...] = (),
-    ) -> rd.RdResult:
+    ) -> rd.Estimate:
         """Fits the discontinuity at the frozen bandwidth.
 
         Args:
@@ -1089,7 +1089,7 @@ class RdAdapter(Adapter):
         }
 
 
-class SynthAdapter(Adapter):
+class SynthEstimator(Estimator):
     """Synthetic control with one treated unit; runs on `X` alone."""
 
     name = "synth"
@@ -1172,19 +1172,19 @@ class SynthAdapter(Adapter):
         raise NotImplementedError
 
 
-ADAPTERS: dict[str, type[Adapter]] = {
-    "backdoor_aipw": BackdoorAdapter,
-    "randomized_diff": RandomizedAdapter,
-    "did": DidAdapter,
-    "iv": IvAdapter,
-    "rd": RdAdapter,
-    "synth": SynthAdapter,
+ADAPTERS: dict[str, type[Estimator]] = {
+    "backdoor_aipw": BackdoorEstimator,
+    "randomized_diff": RandomizedEstimator,
+    "did": DidEstimator,
+    "iv": IvEstimator,
+    "rd": RdEstimator,
+    "synth": SynthEstimator,
 }
 
 
 def refusal_outcome(
     plan: select.Plan,
-    spec: causal.CausalSpec,
+    spec: causal.Question,
     reason: str | None = None,
     dag_checks: Mapping[str, Any] | None = None,
 ) -> Outcome:
@@ -1205,7 +1205,7 @@ def refusal_outcome(
     if dag_checks is not None:
         report["dag"] = dict(dag_checks)
     decision = tier.decide(
-        tier.TierInputs(
+        tier.Inputs(
             False,
             (),
             {},
@@ -1230,11 +1230,11 @@ def refusal_outcome(
 
 def assemble(
     plan: select.Plan,
-    spec: causal.CausalSpec,
+    spec: causal.Question,
     report: dict[str, Any],
     falsification: dict[str, Any],
     sens: dict[str, Any],
-    decision: tier.TierDecision,
+    decision: tier.Assignment,
     strategy: str,
     needed: tuple[str, ...],
     attestors: Mapping[str, str] | None = None,
@@ -1320,7 +1320,7 @@ def alphas(error_budget: budget.ErrorBudget) -> tuple[float, float]:
 
 
 def replication(
-    adapter: Adapter,
+    adapter: Estimator,
     c: pandas.DataFrame,
     level: float,
     pooled: float,
@@ -1373,7 +1373,7 @@ def replication(
 
 
 def subgroup_report(
-    adapter: Adapter,
+    adapter: Estimator,
     c: pandas.DataFrame,
     level: float,
     subgroups: tuple[causal.Subgroup, ...],
@@ -1451,7 +1451,7 @@ def subgroup_report(
     alpha = Fraction(1.0 - level).limit_denominator(10**9)
     adjusted = multiplicity.adjust(
         [r["p_value"] for r in rows],
-        scmle.data.ledger.budget.MultiplicityRule.HOLM,
+        scmle.data.ledger.budget.Correction.HOLM,
         alpha,
     )
     for row, p_adj, flag in zip(
@@ -1460,11 +1460,11 @@ def subgroup_report(
         row["adjusted_p"] = p_adj
         row["rejected"] = bool(flag)
     return {
-        "rule": scmle.data.ledger.budget.MultiplicityRule.HOLM.value,
+        "rule": scmle.data.ledger.budget.Correction.HOLM.value,
         "alpha": float(alpha),
         "family_size": len(rows),
         "statement": multiplicity.STATEMENTS[
-            scmle.data.ledger.budget.MultiplicityRule.HOLM
+            scmle.data.ledger.budget.Correction.HOLM
         ],
         "hypotheses": rows,
         "rejected": [
@@ -1529,7 +1529,7 @@ def label_subgroups(
 
 
 def identify(
-    spec: causal.CausalSpec,
+    spec: causal.Question,
     x: pandas.DataFrame,
     c: pandas.DataFrame,
     error_budget: budget.ErrorBudget,
@@ -1639,7 +1639,7 @@ def identify(
     needed = needed_assumptions(strategy, spec)
     checked = strategy != "backdoor_aipw" or plan.verdict(strategy).checked
     holds = sens.get("holds")
-    facts = tier.TierInputs(
+    facts = tier.Inputs(
         identified=True,
         needed=needed,
         attestors=dict(attestors or {}),
@@ -1719,7 +1719,7 @@ NOT_ESTIMATED = (
 
 
 def design_only(
-    spec: causal.CausalSpec,
+    spec: causal.Question,
     x: pandas.DataFrame,
     error_budget: budget.ErrorBudget,
     dag: scmle.data.admissibility.dag.Dag | None = None,
@@ -1772,7 +1772,7 @@ def design_only(
     }
     if dag_checks is not None:
         report["dag"] = dict(dag_checks)
-    decision = tier.TierDecision(
+    decision = tier.Assignment(
         qualification.Tier.UNVERIFIED,
         "identified",
         dict.fromkeys(tier.CONDITIONS, False),
@@ -1791,7 +1791,7 @@ def design_only(
     )
 
 
-def verdict_of(spec: causal.CausalSpec, est: Est) -> dict[str, Any]:
+def verdict_of(spec: causal.Question, est: Est) -> dict[str, Any]:
     """States the primary hypothesis `theta = 0` in words.
 
     Args:
@@ -1809,9 +1809,7 @@ def verdict_of(spec: causal.CausalSpec, est: Est) -> dict[str, Any]:
     }
 
 
-def needed_assumptions(
-    strategy: str, spec: causal.CausalSpec
-) -> tuple[str, ...]:
+def needed_assumptions(strategy: str, spec: causal.Question) -> tuple[str, ...]:
     """Lists the attested assumptions the chosen strategy relies on.
 
     Args:

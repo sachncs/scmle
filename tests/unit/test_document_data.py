@@ -28,28 +28,28 @@ def malformed_bytes() -> bytes:
 
 
 @pytest.fixture
-def duplicate_dataset() -> document.DocumentDataset:
+def duplicate_dataset() -> document.Dataset:
     """Returns a dataset containing one deterministic content duplicate."""
-    return document.DocumentDataset(
+    return document.Dataset(
         (
-            document.DocumentSample("first", "same content"),
-            document.DocumentSample("second", "same content"),
-            document.DocumentSample("third", "different content"),
+            document.Sample("first", "same content"),
+            document.Sample("second", "same content"),
+            document.Sample("third", "different content"),
         )
     )
 
 
 @pytest.fixture
-def shifted_dataset() -> document.DocumentDataset:
+def shifted_dataset() -> document.Dataset:
     """Returns chunked documents with a shifted document in the corpus."""
-    return document.DocumentDataset(
+    return document.Dataset(
         (
-            document.DocumentSample("doc-a", "alpha train chunk"),
-            document.DocumentSample("doc-a", "alpha shifted chunk"),
-            document.DocumentSample("doc-b", "beta train chunk"),
-            document.DocumentSample("doc-c", "gamma shifted chunk"),
-            document.DocumentSample("doc-d", "delta train chunk"),
-            document.DocumentSample("doc-e", "epsilon test chunk"),
+            document.Sample("doc-a", "alpha train chunk"),
+            document.Sample("doc-a", "alpha shifted chunk"),
+            document.Sample("doc-b", "beta train chunk"),
+            document.Sample("doc-c", "gamma shifted chunk"),
+            document.Sample("doc-d", "delta train chunk"),
+            document.Sample("doc-e", "epsilon test chunk"),
         )
     )
 
@@ -58,13 +58,13 @@ def test_reader_loads_utf8_markdown_and_builds_identity_and_provenance(
     valid_markdown: bytes,
 ):
     """Markdown is decoded without optional dependencies."""
-    sample = document.DocumentReader().load(
+    sample = document.Reader().load(
         valid_markdown,
         document_id="guide-1",
-        document_format=document.DocumentFormat.MARKDOWN,
+        document_format=document.Format.MARKDOWN,
     )
 
-    assert sample.format is document.DocumentFormat.MARKDOWN
+    assert sample.format is document.Format.MARKDOWN
     assert sample.encoding == "utf-8"
     assert sample.size_bytes == len(valid_markdown)
     assert len(sample.content_hash) == 64
@@ -88,9 +88,9 @@ def test_plain_text_reader_infers_path_format(tmp_path):
     path = tmp_path / "notes.txt"
     path.write_text("A small plain-text document.", encoding="utf-8")
 
-    sample = document.DocumentReader().load(path)
+    sample = document.Reader().load(path)
 
-    assert sample.format is document.DocumentFormat.TEXT
+    assert sample.format is document.Format.TEXT
     assert sample.document_id == "notes.txt"
     assert sample.source_uri == path.resolve().as_uri()
     assert sample.source_digest == hashlib.sha256(path.read_bytes()).hexdigest()
@@ -103,8 +103,8 @@ def test_reader_accepts_an_explicit_layout_extractor_contract():
     def layout_reader(
         raw_bytes: bytes,
         document_id: str,
-        document_format: document.DocumentFormat,
-    ) -> document.DocumentLayout:
+        document_format: document.Format,
+    ) -> document.Layout:
         observed.update(
             {
                 "raw_bytes": raw_bytes,
@@ -112,22 +112,22 @@ def test_reader_accepts_an_explicit_layout_extractor_contract():
                 "document_format": document_format,
             }
         )
-        return document.DocumentLayout(
+        return document.Layout(
             source="layout://run-1",
             provider="fixture-layout",
             provider_version="1",
-            elements=(document.DocumentElement("heading", 0, 7, 1),),
+            elements=(document.Element("heading", 0, 7, 1),),
             source_digest=hashlib.sha256(raw_bytes).hexdigest(),
         )
 
-    sample = document.DocumentReader(layout_reader=layout_reader).load(
+    sample = document.Reader(layout_reader=layout_reader).load(
         b"Heading", document_id="doc-1"
     )
 
     assert observed == {
         "raw_bytes": b"Heading",
         "document_id": "doc-1",
-        "document_format": document.DocumentFormat.TEXT,
+        "document_format": document.Format.TEXT,
     }
     assert sample.layout is not None
     assert sample.layout.source_digest == sample.source_digest
@@ -137,7 +137,7 @@ def test_reader_accepts_an_explicit_layout_extractor_contract():
     ("reader", "expected_error", "code"),
     (
         (
-            document.DocumentReader(
+            document.Reader(
                 layout_reader=lambda *arguments: (
                     generator for generator in ()
                 ).throw(ImportError())
@@ -146,7 +146,7 @@ def test_reader_accepts_an_explicit_layout_extractor_contract():
             "missing_dependency",
         ),
         (
-            document.DocumentReader(
+            document.Reader(
                 layout_reader=lambda *arguments: "invalid"  # type: ignore[return-value]
             ),
             document.DocumentValidationError,
@@ -164,30 +164,26 @@ def test_layout_extractor_failures_are_structured(reader, expected_error, code):
 
 def test_layout_source_digest_mismatch_fails_closed():
     """Layout provenance cannot be attached to a different raw source."""
-    layout = document.DocumentLayout(
+    layout = document.Layout(
         source="layout://run-2",
         provider="fixture-layout",
         provider_version="1",
-        elements=(document.DocumentElement("text", 0, 7, 1),),
+        elements=(document.Element("text", 0, 7, 1),),
         source_digest="0" * 64,
     )
 
     with pytest.raises(
         document.DocumentValidationError, match="does not match"
     ):
-        document.DocumentReader().load(
-            b"Heading", document_id="doc-1", layout=layout
-        )
+        document.Reader().load(b"Heading", document_id="doc-1", layout=layout)
 
 
 def test_curation_reports_source_traceability_without_inventing_citations():
     """Curation exposes raw-source coverage and preserves missing identity."""
-    sourced = document.DocumentReader().load(
-        b"source-backed", document_id="sourced"
-    )
-    in_memory = document.DocumentSample("manual", "manual content")
+    sourced = document.Reader().load(b"source-backed", document_id="sourced")
+    in_memory = document.Sample("manual", "manual content")
 
-    report = document.DocumentDataset((sourced, in_memory)).curate()
+    report = document.Dataset((sourced, in_memory)).curate()
 
     assert report.source_traceability_coverage == 0.5
     assert report.citation_count == len(sourced.citations())
@@ -197,13 +193,13 @@ def test_curation_reports_source_traceability_without_inventing_citations():
 
 def test_partial_source_identity_is_visible_as_a_quality_finding():
     """A URI without a raw digest cannot claim citation traceability."""
-    sample = document.DocumentSample(
+    sample = document.Sample(
         "partial",
         "content",
         source_uri="file:///tmp/partial.txt",
     )
 
-    report = document.DocumentDataset((sample,)).curate()
+    report = document.Dataset((sample,)).curate()
 
     assert [finding.finding_id for finding in report.quality_findings] == [
         "quality.document-source-traceability-incomplete",
@@ -213,21 +209,21 @@ def test_partial_source_identity_is_visible_as_a_quality_finding():
 def test_document_layout_records_ocr_and_table_provenance():
     """Curation preserves caller-owned layout extraction evidence."""
     content = "Heading\nrow one\nrow two"
-    layout = document.DocumentLayout(
+    layout = document.Layout(
         source="ocr://run-4",
         provider="layout-engine",
         provider_version="3.2",
         ocr_confidence=0.93,
         elements=(
-            document.DocumentElement("heading", 0, 7, 1, 0.99),
-            document.DocumentElement(
+            document.Element("heading", 0, 7, 1, 0.99),
+            document.Element(
                 "table", 8, len(content), 1, 0.88, table_rows=2, table_columns=1
             ),
         ),
     )
-    sample = document.DocumentSample("structured", content, layout=layout)
+    sample = document.Sample("structured", content, layout=layout)
 
-    report = document.DocumentDataset((sample,)).curate()
+    report = document.Dataset((sample,)).curate()
 
     assert sample.layout is layout
     assert layout.table_count == 1
@@ -244,34 +240,34 @@ def test_document_layout_records_ocr_and_table_provenance():
 def test_document_layout_confidence_and_offsets_fail_closed():
     """Missing OCR confidence is visible and offsets cannot escape content."""
     content = "OCR text"
-    layout = document.DocumentLayout(
+    layout = document.Layout(
         source="ocr://run-5",
         provider="layout-engine",
         provider_version="3.2",
-        elements=(document.DocumentElement("ocr", 0, len(content), 1),),
+        elements=(document.Element("ocr", 0, len(content), 1),),
     )
-    report = document.DocumentDataset(
-        (document.DocumentSample("uncertain", content, layout=layout),)
+    report = document.Dataset(
+        (document.Sample("uncertain", content, layout=layout),)
     ).curate()
 
     assert [finding.finding_id for finding in report.quality_findings] == [
         "quality.document-ocr-confidence-missing",
     ]
-    invalid_layout = document.DocumentLayout(
+    invalid_layout = document.Layout(
         source="ocr://run-6",
         provider="layout-engine",
         provider_version="3.2",
-        elements=(document.DocumentElement("ocr", 0, 9, 1),),
+        elements=(document.Element("ocr", 0, 9, 1),),
     )
     with pytest.raises(document.DocumentValidationError, match="exceeds"):
-        document.DocumentSample("invalid", content, layout=invalid_layout)
+        document.Sample("invalid", content, layout=invalid_layout)
 
 
 def test_document_sensitive_content_is_detected_without_leaking_values():
     """Curation counts PII and redaction removes values from derived text."""
     content = "Contact alice@example.com; SSN 123-45-6789."
-    sample = document.DocumentSample("sensitive", content)
-    report = document.DocumentDataset((sample,)).curate()
+    sample = document.Sample("sensitive", content)
+    report = document.Dataset((sample,)).curate()
 
     assert document.sensitive_matches(content) == {"email": 1, "ssn": 1}
     assert document.redact_sensitive_text(content) == (
@@ -289,7 +285,7 @@ def test_document_sensitive_content_is_detected_without_leaking_values():
 def test_empty_fixture_fails_with_structured_validation(empty_document: bytes):
     """Whitespace-only content cannot enter the immutable contract."""
     with pytest.raises(document.DocumentValidationError) as caught:
-        document.DocumentReader().load(empty_document, document_id="empty")
+        document.Reader().load(empty_document, document_id="empty")
 
     assert caught.value.category == "document_validation"
     assert caught.value.details == {
@@ -303,7 +299,7 @@ def test_malformed_bytes_fixture_reports_encoding_offset(
 ):
     """Malformed bytes fail closed with the decoder offset."""
     with pytest.raises(document.DocumentValidationError) as caught:
-        document.DocumentReader().load(malformed_bytes, document_id="bad")
+        document.Reader().load(malformed_bytes, document_id="bad")
 
     assert caught.value.details["code"] == "invalid_encoding"
     assert caught.value.details["encoding"] == "utf-8"
@@ -313,7 +309,7 @@ def test_malformed_bytes_fixture_reports_encoding_offset(
 def test_size_validation_is_bounded_and_structured():
     """Oversized input is rejected before decoding."""
     with pytest.raises(document.DocumentValidationError) as caught:
-        document.DocumentReader(max_bytes=4).load(b"hello", document_id="large")
+        document.Reader(max_bytes=4).load(b"hello", document_id="large")
 
     assert caught.value.details == {
         "code": "size_limit",
@@ -325,7 +321,7 @@ def test_size_validation_is_bounded_and_structured():
 def test_duplicate_fixture_is_deterministic(duplicate_dataset):
     """Identical content is grouped independently of sample order."""
     assert duplicate_dataset.duplicate_groups() == (("first", "second"),)
-    reversed_dataset = document.DocumentDataset(
+    reversed_dataset = document.Dataset(
         tuple(reversed(duplicate_dataset.samples))
     )
     assert (
@@ -337,7 +333,7 @@ def test_duplicate_fixture_is_deterministic(duplicate_dataset):
 
 def test_profile_is_bounded_and_uses_a_conservative_language_heuristic():
     """Long content is profiled within both requested bounds."""
-    sample = document.DocumentSample("profiled", "hello world " * 100)
+    sample = document.Sample("profiled", "hello world " * 100)
 
     profile = sample.profile(max_characters=32, max_tokens=4)
 
@@ -376,7 +372,7 @@ def test_shifted_fixture_splits_by_document_id_without_leakage(shifted_dataset):
 def test_pdf_without_optional_reader_has_structured_dependency_error():
     """PDF support fails explicitly when the optional reader is absent."""
     with pytest.raises(document.DocumentDependencyError) as caught:
-        document.DocumentReader().load(
+        document.Reader().load(
             b"%PDF-1.7", document_id="pdf", document_format="pdf"
         )
 
@@ -391,7 +387,7 @@ def test_pdf_without_optional_reader_has_structured_dependency_error():
 
 def test_injected_pdf_reader_provides_page_provenance():
     """An optional parser can be supplied without adding a core dependency."""
-    reader = document.DocumentReader(
+    reader = document.Reader(
         pdf_reader=lambda raw_bytes: ("first page", "second page")
     )
 
@@ -408,7 +404,7 @@ def test_injected_pdf_reader_provides_page_provenance():
 
 def test_contracts_are_immutable_and_profile_is_json_native():
     """Frozen contracts prevent mutation and profiles remain serializable."""
-    sample = document.DocumentSample("immutable", "content")
+    sample = document.Sample("immutable", "content")
     with pytest.raises(dataclasses.FrozenInstanceError):
         sample.content = "changed"  # type: ignore[misc]
 
@@ -445,11 +441,11 @@ def test_curation_reports_composition_duplicates_and_bounded_profiles(
 
 def test_curation_blocks_identical_content_with_conflicting_labels():
     """Duplicate content with different labels is a supervised-data risk."""
-    dataset = document.DocumentDataset(
+    dataset = document.Dataset(
         (
-            document.DocumentSample("positive", "same text", label="yes"),
-            document.DocumentSample("negative", "same text", label="no"),
-            document.DocumentSample("unlabeled", "other text"),
+            document.Sample("positive", "same text", label="yes"),
+            document.Sample("negative", "same text", label="no"),
+            document.Sample("unlabeled", "other text"),
         )
     )
 
@@ -467,9 +463,7 @@ def test_curation_blocks_identical_content_with_conflicting_labels():
 
 def test_curation_bounds_must_be_positive():
     """Curation cannot silently turn off the bounded inspection contract."""
-    dataset = document.DocumentDataset(
-        (document.DocumentSample("doc", "content"),)
-    )
+    dataset = document.Dataset((document.Sample("doc", "content"),))
 
     with pytest.raises(ValueError, match="curation bounds"):
         dataset.curate(max_characters=0)

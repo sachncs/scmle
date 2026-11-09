@@ -22,7 +22,7 @@ alphas = strategies.fractions(
 )
 wealths = strategies.fractions(min_value=0, max_value=1, max_denominator=1000)
 amounts = strategies.fractions(min_value=0, max_value=1, max_denominator=1000)
-rules = strategies.sampled_from(list(scmle.data.ledger.budget.MultiplicityRule))
+rules = strategies.sampled_from(list(scmle.data.ledger.budget.Correction))
 
 
 def budget_from(alpha, wealth):
@@ -79,14 +79,14 @@ def test_exploration_spending_never_touches_the_confirmation_budget(
     before = [
         scmle.data.ledger.budget.confirmation_alpha(budget, n, r)
         for n in (1, 5)
-        for r in scmle.data.ledger.budget.MultiplicityRule
+        for r in scmle.data.ledger.budget.Correction
     ]
     if amount <= wealth:
         budget = scmle.data.ledger.budget.spend(budget, amount)
     after = [
         scmle.data.ledger.budget.confirmation_alpha(budget, n, r)
         for n in (1, 5)
-        for r in scmle.data.ledger.budget.MultiplicityRule
+        for r in scmle.data.ledger.budget.Correction
     ]
     assert before == after
     assert budget.confirmation.alpha_confirm == alpha
@@ -129,7 +129,7 @@ def test_confirmation_alpha_is_bounded_and_decreasing_in_n(alpha, n, rule):
 def test_bonferroni_levels_add_back_to_alpha(alpha, n):
     budget = budget_from(alpha, Fraction(1, 10))
     level = scmle.data.ledger.budget.confirmation_alpha(
-        budget, n, scmle.data.ledger.budget.MultiplicityRule.BONFERRONI
+        budget, n, scmle.data.ledger.budget.Correction.BONFERRONI
     )
     assert level * n == pytest.approx(float(alpha), rel=1e-12)
 
@@ -139,10 +139,10 @@ def test_bonferroni_levels_add_back_to_alpha(alpha, n):
 def test_benjamini_yekutieli_is_never_looser_than_benjamini_hochberg(alpha, n):
     budget = budget_from(alpha, Fraction(1, 10))
     bh = scmle.data.ledger.budget.confirmation_alpha(
-        budget, n, scmle.data.ledger.budget.MultiplicityRule.BH
+        budget, n, scmle.data.ledger.budget.Correction.BH
     )
     by = scmle.data.ledger.budget.confirmation_alpha(
-        budget, n, scmle.data.ledger.budget.MultiplicityRule.BY
+        budget, n, scmle.data.ledger.budget.Correction.BY
     )
     assert by <= bh
 

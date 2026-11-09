@@ -28,7 +28,7 @@ DENIED = "denied"
 SERVICE_CHARTER = "service-audit"
 
 
-class AuditLog:
+class Log:
     """Appends audit rows to a deployment ledger, one at a time.
 
     Attributes:
@@ -57,7 +57,7 @@ class AuditLog:
         cls,
         path: str | pathlib.Path | None,
         clock: Callable[[], float] = time.time,
-    ) -> "AuditLog":
+    ) -> "Log":
         """Loads the ledger at `path` (verifying its chain) or creates it.
 
         Args:

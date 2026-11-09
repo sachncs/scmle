@@ -176,8 +176,8 @@ def scale_range(frame: pandas.DataFrame, numeric: tuple[str, ...]) -> float:
 
 def ml_difficulty(
     frame: pandas.DataFrame,
-    spec: tasks.ProjectSpec,
-    task: tasks.TaskType,
+    spec: tasks.Config,
+    task: tasks.Task,
     plan: scmle.contracts.data.FeaturePlan,
 ) -> dict[str, Any]:
     """Runs cheap baselines that show how hard the problem looks.
@@ -208,9 +208,7 @@ def ml_difficulty(
     target = sample[spec.data.target]
     if task.is_classification:
         scoring = (
-            "roc_auc"
-            if task is tasks.TaskType.BINARY
-            else ("balanced_accuracy")
+            "roc_auc" if task is tasks.Task.BINARY else ("balanced_accuracy")
         )
         estimators = {
             "constant": dummy.DummyClassifier(strategy="prior"),
@@ -228,7 +226,7 @@ def ml_difficulty(
                 max_iter=60, random_state=0
             ),
         }
-    options = scmle.contracts.data.PreprocessingOptions(scale=True)
+    options = scmle.contracts.data.Preprocessing(scale=True)
     scores: dict[str, float] = {}
     started = time.monotonic()
     try:
@@ -267,9 +265,7 @@ def ml_difficulty(
     }
 
 
-def structure(
-    frame: pandas.DataFrame, spec: tasks.ProjectSpec
-) -> dict[str, Any]:
+def structure(frame: pandas.DataFrame, spec: tasks.Config) -> dict[str, Any]:
     """Describes group and temporal structure.
 
     Args:
@@ -306,8 +302,8 @@ def structure(
 
 def build_fingerprint(
     frame: pandas.DataFrame,
-    spec: tasks.ProjectSpec,
-    task: tasks.TaskType,
+    spec: tasks.Config,
+    task: tasks.Task,
     plan: scmle.contracts.data.FeaturePlan,
     column_statistics: dict[str, dict[str, Any]],
     duplicate_rows: int,

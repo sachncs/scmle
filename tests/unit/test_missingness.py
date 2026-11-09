@@ -84,13 +84,11 @@ def test_indicators_are_added_only_for_flagged_columns():
         (),
         informative_missing=("informative",),
     )
-    adapter = registry.ModelRegistry.with_builtins().get("logistic_regression")
-    options = data.PreprocessingOptions(
-        scale=True, impute=True, missing="indicator"
-    )
+    adapter = registry.Catalog.with_builtins().get("logistic_regression")
+    options = data.Preprocessing(scale=True, impute=True, missing="indicator")
 
     fitted = preprocessing.build_pipeline(
-        plan, adapter, tasks.TaskType.BINARY, 0, options=options
+        plan, adapter, tasks.Task.BINARY, 0, options=options
     ).fit(frame, target)
 
     names = list(fitted.steps[0][1].get_feature_names_out())
@@ -105,22 +103,18 @@ def test_monotonic_signs_that_missing_indicators_would_misalign_are_refused():
         informative_missing=("informative",),
         monotonic={"random": 1},
     )
-    adapter = registry.ModelRegistry.with_builtins().get(
-        "hist_gradient_boosting"
-    )
-    options = data.PreprocessingOptions(
-        scale=False, impute=True, missing="indicator"
-    )
+    adapter = registry.Catalog.with_builtins().get("hist_gradient_boosting")
+    options = data.Preprocessing(scale=False, impute=True, missing="indicator")
 
     with pytest.raises(errors.ConfigError, match="monotonic"):
         preprocessing.build_pipeline(
-            plan, adapter, tasks.TaskType.BINARY, 0, options=options
+            plan, adapter, tasks.Task.BINARY, 0, options=options
         )
     with pytest.raises(errors.ConfigError, match="monotonic"):
         preprocessing.build_pipeline(
             plan,
             adapter,
-            tasks.TaskType.BINARY,
+            tasks.Task.BINARY,
             0,
             options=dataclasses.replace(options, missing="median", select=True),
         )

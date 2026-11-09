@@ -8,10 +8,10 @@ from scmle.contracts import search
 from scmle.contracts import tasks
 from scmle.models.survival import estimators
 
-SURVIVAL = frozenset({tasks.TaskType.SURVIVAL})
+SURVIVAL = frozenset({tasks.Task.SURVIVAL})
 
 
-class CoxAdapter(models.ModelAdapter):
+class Cox(models.Model):
     """Penalised Cox proportional hazards."""
 
     name = "cox_ph"
@@ -23,7 +23,7 @@ class CoxAdapter(models.ModelAdapter):
 
     def build(
         self,
-        task: tasks.TaskType,
+        task: tasks.Task,
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
@@ -40,7 +40,7 @@ class CoxAdapter(models.ModelAdapter):
         return estimators.CoxRegressor(**dict(params or {}))
 
 
-class DiscreteTimeAdapter(models.ModelAdapter):
+class DiscreteTime(models.Model):
     """Boosted trees on a discrete-time hazard."""
 
     name = "discrete_time_boosting"
@@ -57,7 +57,7 @@ class DiscreteTimeAdapter(models.ModelAdapter):
 
     def build(
         self,
-        task: tasks.TaskType,
+        task: tasks.Task,
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
@@ -76,7 +76,7 @@ class DiscreteTimeAdapter(models.ModelAdapter):
         )
 
 
-SURVIVAL_ADAPTERS: tuple[type[models.ModelAdapter], ...] = (
-    CoxAdapter,
-    DiscreteTimeAdapter,
+SURVIVAL_ADAPTERS: tuple[type[models.Model], ...] = (
+    Cox,
+    DiscreteTime,
 )

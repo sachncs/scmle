@@ -50,7 +50,7 @@ class Event:
         return json.dumps(dataclasses.asdict(self), default=str, sort_keys=True)
 
 
-class EventLog:
+class Log:
     """Append-only event sink: in memory always, JSONL on disk if configured."""
 
     def __init__(self, path: pathlib.Path | None = None) -> None:

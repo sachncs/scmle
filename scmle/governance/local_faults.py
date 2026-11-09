@@ -722,14 +722,14 @@ class LocalFaultExecutor:
         """
         scenario = reliability.FaultScenario.DUPLICATE_EVENT
         path = self.root / "duplicate-events.json"
-        ledger = incremental.IncrementalIngestionLedger(path, "local-source")
-        event = incremental.IncrementalEvent(
+        ledger = incremental.IngestionLedger(path, "local-source")
+        event = incremental.Event(
             "event-1", 1, "2026-10-20T10:00:00+00:00", {"value": 1}
         )
         accepted: list[str] = []
 
         def write_events(
-            events: tuple[incremental.IncrementalEvent, ...],
+            events: tuple[incremental.Event, ...],
         ) -> None:
             accepted.extend(item.event_id for item in events)
 
@@ -773,16 +773,12 @@ class LocalFaultExecutor:
             block and audit record.
         """
         scenario = reliability.FaultScenario.INCOMPLETE_LINEAGE
-        graph = lineage.EvidenceGraph(
-            (
-                lineage.EvidenceNode(
-                    "raw", lineage.EvidenceNodeKind.RAW_SOURCE, "raw"
-                ),
-            )
+        graph = lineage.Graph(
+            (lineage.Node("raw", lineage.Kind.RAW_SOURCE, "raw"),)
         )
         rejected = False
         try:
-            graph.add_edge(lineage.EvidenceEdge("raw", "curation", "produced"))
+            graph.add_edge(lineage.Edge("raw", "curation", "produced"))
         except ValueError:
             rejected = True
         return (

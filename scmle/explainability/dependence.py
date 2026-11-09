@@ -93,7 +93,7 @@ class PartialDependence(diagnostics.Diagnostic):
             regression, otherwise 1.0 where the target equals the positive
             label and 0.0 elsewhere.
         """
-        if inputs.task is tasks.TaskType.REGRESSION:
+        if inputs.task is tasks.Task.REGRESSION:
             return pandas.to_numeric(inputs.target).reset_index(drop=True)
         return (
             (inputs.target == inputs.positive_label)
@@ -121,6 +121,6 @@ class PartialDependence(diagnostics.Diagnostic):
             positive-class probability for classification.
         """
         swept = sample.assign(**{column: value})
-        if inputs.task is tasks.TaskType.REGRESSION:
+        if inputs.task is tasks.Task.REGRESSION:
             return numpy.asarray(inputs.estimator.predict(swept))
         return numpy.asarray(inputs.estimator.predict_proba(swept))[:, 1]

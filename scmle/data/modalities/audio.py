@@ -21,8 +21,8 @@ from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.data.modalities.curation import build_finding
 from scmle.data.modalities.curation import conflicting_label_groups
+from scmle.data.modalities.curation import Curation
 from scmle.data.modalities.curation import label_counts
-from scmle.data.modalities.curation import ModalityCurationReport
 
 
 class AudioValidationError(errors.DataError):
@@ -38,7 +38,7 @@ class AudioDependencyError(errors.DataError):
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class AudioMetadata:
+class Metadata:
     """Decoded metadata required to identify an audio sample.
 
     Attributes:
@@ -81,7 +81,7 @@ class AudioMetadata:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class AudioTranscriptSegment:
+class TranscriptSegment:
     """One time-local transcript segment with provenance and confidence.
 
     Attributes:
@@ -122,7 +122,7 @@ class AudioTranscriptSegment:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class AudioTranscript:
+class Transcript:
     """Immutable transcript output tied to its extraction provenance.
 
     Attributes:
@@ -140,7 +140,7 @@ class AudioTranscript:
     provider: str
     provider_version: str
     language: str
-    segments: tuple[AudioTranscriptSegment, ...] = ()
+    segments: tuple[TranscriptSegment, ...] = ()
     confidence: float | None = None
 
     def __post_init__(self) -> None:
@@ -151,7 +151,7 @@ class AudioTranscript:
                 not finite or outside [0, 1], or the segments are not
                 ordered by start time.
             TypeError: If segments is not a tuple of
-                AudioTranscriptSegment.
+                TranscriptSegment.
         """
         for field_name, value in (
             ("text", self.text),
@@ -171,8 +171,7 @@ class AudioTranscript:
         if not isinstance(self.segments, tuple):
             raise TypeError("segments must be a tuple")
         if not all(
-            isinstance(segment, AudioTranscriptSegment)
-            for segment in self.segments
+            isinstance(segment, TranscriptSegment) for segment in self.segments
         ):
             raise TypeError("segments must contain transcript segments")
         if any(
@@ -195,7 +194,7 @@ class AudioTranscript:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class AudioProfile:
+class Profile:
     """Bounded data-understanding summary for one audio sample.
 
     Attributes:
@@ -222,7 +221,7 @@ class AudioProfile:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class AudioFeatures:
+class Features:
     """Bounded numeric signal features with their observation boundary.
 
     Attributes:
@@ -255,7 +254,7 @@ class AudioFeatures:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class AudioSplit:
+class Split:
     """Group-aware audio split that keeps related clips together.
 
     Attributes:
@@ -264,9 +263,9 @@ class AudioSplit:
         test: Samples assigned to testing.
     """
 
-    train: tuple["AudioSample", ...]
-    validation: tuple["AudioSample", ...]
-    test: tuple["AudioSample", ...]
+    train: tuple["Sample", ...]
+    validation: tuple["Sample", ...]
+    test: tuple["Sample", ...]
 
     def group_ids(self) -> dict[str, tuple[str, ...]]:
         """Returns the stable groups assigned to each partition.
@@ -288,7 +287,7 @@ class AudioSplit:
         }
 
 
-AudioProbe = Callable[[bytes], AudioMetadata]
+AudioProbe = Callable[[bytes], Metadata]
 
 
 def canonical_source(source: str | pathlib.Path) -> str:
@@ -309,7 +308,7 @@ def canonical_source(source: str | pathlib.Path) -> str:
     return pathlib.Path(value).expanduser().resolve(strict=False).as_uri()
 
 
-def wav_metadata(encoded_bytes: bytes) -> AudioMetadata:
+def wav_metadata(encoded_bytes: bytes) -> Metadata:
     """Reads WAV metadata using the standard library.
 
     Args:
@@ -324,7 +323,7 @@ def wav_metadata(encoded_bytes: bytes) -> AudioMetadata:
     """
     try:
         with wave.open(io.BytesIO(encoded_bytes), "rb") as opened:
-            return AudioMetadata(
+            return Metadata(
                 format="wav",
                 sample_rate=opened.getframerate(),
                 channels=opened.getnchannels(),
@@ -591,7 +590,7 @@ def wav_payload_from_pcm(
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class AudioSample:
+class Sample:
     """Immutable encoded audio plus the metadata observed at ingestion.
 
     Attributes:
@@ -608,10 +607,10 @@ class AudioSample:
     source: str
     encoded_bytes: bytes = dataclasses.field(repr=False)
     file_hash: str
-    metadata: AudioMetadata
+    metadata: Metadata
     label: str | int | float | bool | None = None
     group_id: str | None = None
-    transcript: AudioTranscript | None = None
+    transcript: Transcript | None = None
     byte_size: int = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
@@ -658,7 +657,7 @@ class AudioSample:
         max_bytes: int | None = 500 * 1024 * 1024,
         label: str | int | float | bool | None = None,
         group_id: str | None = None,
-        transcript: AudioTranscript | None = None,
+        transcript: Transcript | None = None,
     ) -> Self:
         """Creates a sample from bytes and an explicit codec probe.
 
@@ -723,13 +722,13 @@ class AudioSample:
             transcript=transcript,
         )
 
-    def profile(self) -> AudioProfile:
+    def profile(self) -> Profile:
         """Returns bounded metadata suitable for curation and data cards.
 
         Returns:
             The profile of this sample.
         """
-        return AudioProfile(
+        return Profile(
             source=self.source,
             format=self.metadata.format,
             sample_rate=self.metadata.sample_rate,
@@ -745,7 +744,7 @@ class AudioSample:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class AudioDataset:
+class Dataset:
     """Immutable audio collection with deterministic identity and splitting.
 
     Attributes:
@@ -754,7 +753,7 @@ class AudioDataset:
             sample order; set on construction.
     """
 
-    samples: tuple[AudioSample, ...]
+    samples: tuple[Sample, ...]
     content_hash: str = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
@@ -784,7 +783,7 @@ class AudioDataset:
         object.__setattr__(self, "samples", normalized)
         object.__setattr__(self, "content_hash", digest)
 
-    def profiles(self) -> tuple[AudioProfile, ...]:
+    def profiles(self) -> tuple[Profile, ...]:
         """Returns profiles in sample order for deterministic curation.
 
         Returns:
@@ -796,7 +795,7 @@ class AudioDataset:
         self,
         max_frames: int = 100_000,
         start_frame: int = 0,
-    ) -> AudioFeatures:
+    ) -> Features:
         """Prepares bounded PCM and metadata features for an audio baseline.
 
         Core decoding is intentionally limited to WAV. Samples ingested with
@@ -861,7 +860,7 @@ class AudioDataset:
             )
             frames_observed.append(observed)
             frames_truncated.append(observed < sample.metadata.frame_count)
-        return AudioFeatures(
+        return Features(
             sources=tuple(sample.source for sample in self.samples),
             feature_names=feature_names,
             values=tuple(rows),
@@ -874,7 +873,7 @@ class AudioDataset:
         validation_fraction: float = 0.2,
         test_fraction: float = 0.2,
         seed: int = 0,
-    ) -> AudioSplit:
+    ) -> Split:
         """Splits clips by explicit group identity to prevent leakage.
 
         A caller should use a speaker, session, device, or other identity as
@@ -901,7 +900,7 @@ class AudioDataset:
             raise ValueError("test_fraction must be in [0, 1)")
         if validation_fraction + test_fraction >= 1:
             raise ValueError("validation_fraction + test_fraction must be < 1")
-        grouped: dict[str, list[AudioSample]] = {}
+        grouped: dict[str, list[Sample]] = {}
         for sample in self.samples:
             grouped.setdefault(sample.group_id or sample.source, []).append(
                 sample
@@ -927,7 +926,7 @@ class AudioDataset:
             groups[test_count : test_count + validation_count]
         )
 
-        def samples_for(excluded: set[str]) -> tuple[AudioSample, ...]:
+        def samples_for(excluded: set[str]) -> tuple[Sample, ...]:
             return tuple(
                 sample
                 for sample in self.samples
@@ -944,13 +943,13 @@ class AudioDataset:
             for sample in self.samples
             if (sample.group_id or sample.source) in test_groups
         )
-        return AudioSplit(
+        return Split(
             train=samples_for(test_groups | validation_groups),
             validation=validation,
             test=test,
         )
 
-    def curate(self) -> ModalityCurationReport:
+    def curate(self) -> Curation:
         """Builds reviewable metadata and compatibility findings.
 
         Returns:
@@ -1063,7 +1062,7 @@ class AudioDataset:
                     True,
                 )
             )
-        return ModalityCurationReport(
+        return Curation(
             modality="audio",
             dataset_hash=self.content_hash,
             sample_count=len(self.samples),
@@ -1107,17 +1106,17 @@ class AudioDataset:
 
 
 __all__ = [
-    "AudioDataset",
     "AudioDependencyError",
-    "AudioFeatures",
-    "AudioMetadata",
     "AudioProbe",
-    "AudioProfile",
-    "AudioSample",
-    "AudioSplit",
-    "AudioTranscript",
-    "AudioTranscriptSegment",
     "AudioValidationError",
+    "Dataset",
+    "Features",
+    "Metadata",
+    "Profile",
+    "Sample",
+    "Split",
+    "Transcript",
+    "TranscriptSegment",
     "canonical_source",
     "wav_metadata",
     "wav_signal_features",

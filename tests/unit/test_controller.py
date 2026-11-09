@@ -75,7 +75,7 @@ def test_an_unreadable_labels_file_is_rejected(world):
 
 
 def test_no_new_data_opens_one_escalation(world):
-    policy = scmle.operations.controller.ControllerPolicy(max_idle_ticks=2)
+    policy = scmle.operations.controller.Limits(max_idle_ticks=2)
     controller = world.controller(policy=policy)
     controller.tick(world.inbox)
     assert not controller.loop.pending_escalations()
@@ -88,9 +88,7 @@ def test_no_new_data_opens_one_escalation(world):
 
 
 def test_labels_that_never_arrive_open_one_escalation(world):
-    policy = scmle.operations.controller.ControllerPolicy(
-        max_unlabelled_ticks=2
-    )
+    policy = scmle.operations.controller.Limits(max_unlabelled_ticks=2)
     controller = world.controller(policy=policy)
     for index in range(4):
         world.deliver(index, labels=False)
@@ -128,9 +126,9 @@ def test_a_state_that_trails_the_ledger_halts_instead_of_guessing(world):
 
 def test_the_policy_needs_positive_limits():
     with pytest.raises(ValueError):
-        scmle.operations.controller.ControllerPolicy(max_idle_ticks=0)
+        scmle.operations.controller.Limits(max_idle_ticks=0)
     with pytest.raises(ValueError):
-        scmle.operations.controller.ControllerPolicy(max_unlabelled_ticks=0)
+        scmle.operations.controller.Limits(max_unlabelled_ticks=0)
 
 
 def test_the_tick_report_is_json_ready(world):

@@ -145,10 +145,10 @@ def test_a_clean_dataset_passes_both_stages(store):
     frame, record = prepared(store)
     gate = gate_for(
         store,
-        quality.SchemaRule(),
-        quality.FreshnessRule(),
-        quality.MinRowsRule(3),
-        quality.UniqueKeyRule(),
+        quality.SchemaCheck(),
+        quality.FreshnessCheck(),
+        quality.MinRowsCheck(3),
+        quality.UniqueKeyCheck(),
     )
     for stage in quality.Stage:
         result = gate.run(frame, record, CONTRACT, stage)
@@ -158,7 +158,7 @@ def test_a_clean_dataset_passes_both_stages(store):
 
 def test_fail_policy_stops_the_run_with_the_report(store):
     frame, record = prepared(store, hours=9)
-    gate = gate_for(store, quality.FreshnessRule(policy=quality.Policy.FAIL))
+    gate = gate_for(store, quality.FreshnessCheck(policy=quality.Severity.FAIL))
     with pytest.raises(quality.QualityGateError) as raised:
         gate.run(frame, record, CONTRACT, quality.Stage.TRAIN)
     assert not raised.value.quarantined
@@ -172,8 +172,10 @@ def test_row_level_quarantine_removes_and_keeps_the_rows(store):
     )
     gate = gate_for(
         store,
-        quality.UniqueKeyRule(policy=quality.Policy.QUARANTINE),
-        quality.RangeRule("amount", 0, 1000, policy=quality.Policy.QUARANTINE),
+        quality.UniqueKeyCheck(policy=quality.Severity.QUARANTINE),
+        quality.RangeCheck(
+            "amount", 0, 1000, policy=quality.Severity.QUARANTINE
+        ),
     )
     result = gate.run(frame, record, CONTRACT, quality.Stage.INFERENCE)
     assert list(result.frame["id"]) == [1, 2, 3]
@@ -187,12 +189,12 @@ def test_row_level_quarantine_removes_and_keeps_the_rows(store):
 def test_dataset_level_quarantine_holds_the_snapshot_until_released(store):
     frame, record = prepared(store, "id,amount,region\n1,1.0,north\n")
     gate = gate_for(
-        store, quality.MinRowsRule(5, policy=quality.Policy.QUARANTINE)
+        store, quality.MinRowsCheck(5, policy=quality.Severity.QUARANTINE)
     )
     with pytest.raises(quality.QualityGateError) as raised:
         gate.run(frame, record, CONTRACT, quality.Stage.TRAIN)
     assert raised.value.quarantined
-    permissive = gate_for(store, quality.MinRowsRule(1))
+    permissive = gate_for(store, quality.MinRowsCheck(1))
     with pytest.raises(quality.QualityGateError, match="is quarantined"):
         permissive.run(frame, record, CONTRACT, quality.Stage.TRAIN)
     permissive.release(record.snapshot_id)
@@ -203,8 +205,8 @@ def test_warn_policy_records_and_continues(store):
     frame, record = prepared(store, "id,amount,region\n1,,north\n2,2.0,south\n")
     gate = gate_for(
         store,
-        quality.NullFractionRule("amount", 0.1, policy=quality.Policy.WARN),
-        quality.NoNullsRule("amount", policy=quality.Policy.WARN),
+        quality.NullFractionCheck("amount", 0.1, policy=quality.Severity.WARN),
+        quality.NoNullsCheck("amount", policy=quality.Severity.WARN),
     )
     result = gate.run(frame, record, CONTRACT, quality.Stage.TRAIN)
     assert result.report.decision == "passed_with_warnings"
@@ -215,7 +217,7 @@ def test_warn_policy_records_and_continues(store):
 
 def test_rules_apply_only_to_their_stages(store):
     frame, record = prepared(store, "id,amount,region\n1,1.0,north\n")
-    only_train = quality.MinRowsRule(10, stages=[quality.Stage.TRAIN])
+    only_train = quality.MinRowsCheck(10, stages=[quality.Stage.TRAIN])
     gate = gate_for(store, only_train)
     with pytest.raises(quality.QualityGateError):
         gate.run(frame, record, CONTRACT, quality.Stage.TRAIN)
@@ -227,14 +229,14 @@ def test_schema_drift_and_allowed_values_are_caught(store):
     store.put("d.csv", b"id,amount\n1,2.0\n")
     frame, record = reader_for(store, "d.csv").read("d.csv", CONTRACT)
     with pytest.raises(quality.QualityGateError, match="missing column region"):
-        gate_for(store, quality.SchemaRule()).run(
+        gate_for(store, quality.SchemaCheck()).run(
             frame, record, CONTRACT, quality.Stage.INFERENCE
         )
     frame, record = prepared(store, CSV + "6,1.0,mars\n")
     gate = gate_for(
         store,
-        quality.AllowedValuesRule(
-            "region", ["north", "south"], policy=quality.Policy.QUARANTINE
+        quality.AllowedValuesCheck(
+            "region", ["north", "south"], policy=quality.Severity.QUARANTINE
         ),
     )
     result = gate.run(frame, record, CONTRACT, quality.Stage.TRAIN)
@@ -245,7 +247,7 @@ def test_a_gate_needs_rules_and_valid_policies():
     with pytest.raises(errors.ConfigError):
         quality.QualityGate([])
     with pytest.raises(ValueError):
-        quality.MinRowsRule(1, policy="explode")
+        quality.MinRowsCheck(1, policy="explode")
 
 
 # ---- incremental processing ------------------------------------------------
@@ -362,7 +364,7 @@ def test_transient_failures_are_retried_with_backoff(store):
         store,
         CONTRACT,
         flaky,
-        policy=retry.RetryPolicy(4, 1.0, 2.0),
+        policy=retry.Retries(4, 1.0, 2.0),
         sleep=waits.append,
     ).run()
     assert run.failed is None and run.processed == (
@@ -402,7 +404,7 @@ def test_exhausted_or_permanent_failures_stop_at_the_object_and_keep_progress(
         other,
         CONTRACT,
         always_busy,
-        policy=retry.RetryPolicy(2, 0.0),
+        policy=retry.Retries(2, 0.0),
         sleep=lambda s: None,
     ).run()
     assert run.failed == "input/a.csv" and "RetryExhaustedError" in run.error
@@ -413,19 +415,23 @@ def test_the_gate_runs_before_processing_and_quarantine_is_respected(
 ):
     store.put("input/a.csv", (CSV + "9,-1.0,north\n").encode())
     gate = quality.QualityGate(
-        [quality.RangeRule("amount", 0, 100, policy=quality.Policy.QUARANTINE)],
+        [
+            quality.RangeCheck(
+                "amount", 0, 100, policy=quality.Severity.QUARANTINE
+            )
+        ],
         store,
     )
     run = processor(store, gate=gate).run()
     assert run.rows_out == 3
-    strict = quality.QualityGate([quality.RangeRule("amount", 0, 1)], store)
+    strict = quality.QualityGate([quality.RangeCheck("amount", 0, 1)], store)
     other = objectstore.LocalObjectStore(tmp_path / "reference")
     other.put("input/a.csv", CSV.encode())
     failed = processing.IncrementalProcessor(
         other,
         CONTRACT,
         upper,
-        gate=quality.QualityGate([quality.RangeRule("amount", 0, 1)], other),
+        gate=quality.QualityGate([quality.RangeCheck("amount", 0, 1)], other),
         sleep=lambda s: None,
     ).run()
     assert failed.failed == "input/a.csv" and "QualityGateError" in failed.error

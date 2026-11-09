@@ -15,7 +15,7 @@ from typing import Any
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class IngestBudget:
+class Budget:
     """Limits for one ingestion run; `None` means unlimited.
 
     Attributes:
@@ -79,7 +79,7 @@ class StopBoundary:
 
 
 class BudgetMeter:
-    """Charges estimated cost against an `IngestBudget`.
+    """Charges estimated cost against an `Budget`.
 
     Queries and rows are counted from the estimates the stages give before
     they run, so the counts are deterministic: two runs with the same inputs
@@ -89,7 +89,7 @@ class BudgetMeter:
 
     def __init__(
         self,
-        budget: IngestBudget,
+        budget: Budget,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
         """Starts the meter at zero spend.

@@ -329,7 +329,7 @@ class Outcome:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class FalsificationReport:
+class Falsification:
     """Result of testing every implication of a DAG on `X`.
 
     The report has no notion of confirmation: the best a graph can do is
@@ -366,7 +366,7 @@ def falsify(
     alpha: float = 0.05,
     run_seed: int = 0,
     set_id: qualification.SetId = qualification.SetId.EXPLORATION,
-) -> FalsificationReport:
+) -> Falsification:
     """Tests each implied independence of `graph` on the data.
 
     The per-test level is `alpha` divided by the number of implied
@@ -432,7 +432,7 @@ def falsify(
         )
         verdict = Verdict.FALSIFIED if falsified else Verdict.NOT_FALSIFIED
         outcomes.append(Outcome(statement, verdict, result, "", check))
-    return FalsificationReport(
+    return Falsification(
         graph.digest(),
         level_in,
         level,
@@ -441,7 +441,7 @@ def falsify(
     )
 
 
-def describe(report: FalsificationReport) -> dict[str, Any]:
+def describe(report: Falsification) -> dict[str, Any]:
     """Summarises a report without claiming confirmation.
 
     Args:

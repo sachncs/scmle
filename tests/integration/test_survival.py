@@ -5,7 +5,7 @@ import pandas
 import pytest
 import support
 
-import scmle
+import scmle.artifacts.bundle
 from scmle.contracts import errors
 
 
@@ -102,7 +102,7 @@ def test_curves_survive_saving_and_loading(result, tmp_path):
     expected = result.bundle.predict_survival(rows, [0.1, 1.0])
 
     result.bundle.save(tmp_path / "copy")
-    loaded = scmle.ModelBundle.load(tmp_path / "copy", trusted=True)
+    loaded = scmle.artifacts.bundle.Bundle.load(tmp_path / "copy", trusted=True)
 
     numpy.testing.assert_allclose(
         loaded.predict_survival(rows, [0.1, 1.0]), expected

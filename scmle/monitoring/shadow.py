@@ -50,8 +50,8 @@ class ShadowEvaluator:
 
     def __init__(
         self,
-        champion_bundle: bundle.ModelBundle,
-        challenger_bundle: bundle.ModelBundle,
+        champion_bundle: bundle.Bundle,
+        challenger_bundle: bundle.Bundle,
     ) -> None:
         """Binds the pair.
 

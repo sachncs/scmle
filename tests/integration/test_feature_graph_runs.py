@@ -9,7 +9,7 @@ import pandas
 import pytest
 import support
 
-import scmle
+import scmle.artifacts.bundle
 from scmle.contracts import errors
 from scmle.contracts import tasks
 
@@ -41,7 +41,7 @@ def graph_frame(rows=700, seed=0):
     return frame
 
 
-GRAPH = tasks.FeatureGraphSpec(
+GRAPH = tasks.FeatureGraph(
     nodes=[
         node("unit_price", "ratio", ["price", "area"]),
         node("log_unit", "log1p", ["unit_price"]),
@@ -84,7 +84,7 @@ def test_derived_features_are_used_and_inference_needs_only_raw_columns(
     tmp_path,
 ):
     frame = interaction_frame()
-    graph = tasks.FeatureGraphSpec(
+    graph = tasks.FeatureGraph(
         nodes=[
             node("cross", "product", ["x1", "x2"]),
             node("month", "datepart", ["when"], part="month"),
@@ -95,7 +95,7 @@ def test_derived_features_are_used_and_inference_needs_only_raw_columns(
     plain = run(
         frame,
         tmp_path / "without",
-        graph=tasks.FeatureGraphSpec(),
+        graph=tasks.FeatureGraph(),
         models=linear,
     )
     plan = result.profile.feature_plan
@@ -115,7 +115,7 @@ def test_derived_features_are_used_and_inference_needs_only_raw_columns(
 def test_bundle_with_a_graph_roundtrips_and_records_its_fingerprint(tmp_path):
     frame = graph_frame()
     result = run(frame, tmp_path)
-    loaded = scmle.ModelBundle.load(
+    loaded = scmle.artifacts.bundle.Bundle.load(
         result.save(tmp_path / "export"), trusted=True
     )
     raw = frame.drop(columns=["y"])
@@ -155,7 +155,7 @@ def test_fitted_nodes_are_learned_from_training_rows_only(tmp_path):
 
 def test_a_different_graph_is_a_different_configuration(tmp_path):
     frame = graph_frame()
-    other = tasks.FeatureGraphSpec(
+    other = tasks.FeatureGraph(
         nodes=[node("unit_price", "difference", ["price", "area"])]
     )
     one, two = (
@@ -169,15 +169,13 @@ def test_a_different_graph_is_a_different_configuration(tmp_path):
 
 def test_invalid_graphs_are_refused_before_training(tmp_path):
     frame = graph_frame()
-    bad = tasks.FeatureGraphSpec(
-        nodes=[node("oops", "log1p", ["not_a_column"])]
-    )
+    bad = tasks.FeatureGraph(nodes=[node("oops", "log1p", ["not_a_column"])])
     with pytest.raises(errors.ConfigError, match="unknown columns") as caught:
         run(frame, tmp_path, graph=bad)
     events_path = pathlib.Path(caught.value.details["run_dir"]) / "events.jsonl"
     last = json.loads(events_path.read_text().splitlines()[-1])
     assert last["kind"] == "state.FAILED"
-    leaky = tasks.FeatureGraphSpec(nodes=[node("t", "square", ["y"])])
+    leaky = tasks.FeatureGraph(nodes=[node("t", "square", ["y"])])
     with pytest.raises(errors.ConfigError, match="target"):
         run(frame, tmp_path / "leak", graph=leaky)
 
@@ -214,7 +212,7 @@ def series_frame(entities=25, steps=40, seed=1):
     return frame.dropna(subset=["y"])
 
 
-SERIES = tasks.FeatureGraphSpec(
+SERIES = tasks.FeatureGraph(
     nodes=[
         node("load_prev", "lag", ["load"], k=1),
         node("load_change", "diff", ["load"], k=1),
@@ -316,11 +314,11 @@ def test_history_survives_save_and_load_and_tampering_is_detected(tmp_path):
     directory = tmp_path / "saved"
     result.bundle.save(directory)
     assert (directory / bundle.HISTORY_FILE).exists()
-    loaded = bundle.ModelBundle.load(directory, trusted=True)
+    loaded = bundle.Bundle.load(directory, trusted=True)
     pandas.testing.assert_frame_equal(loaded.history, result.bundle.history)
     (directory / bundle.HISTORY_FILE).write_bytes(b"tampered")
     with pytest.raises(errors.ArtifactError, match="series history"):
-        bundle.ModelBundle.load(directory, trusted=True)
+        bundle.Bundle.load(directory, trusted=True)
 
 
 def test_serving_remembers_records_so_the_next_single_record_sees_them(

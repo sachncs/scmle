@@ -1,7 +1,7 @@
 """The pre-registered rules of a charter run (charter format 3).
 
 A charter may carry the ledger rule, the confirmation rule, the failure
-policy and the stability thresholds as `RunRules`. The charter hash and the
+policy and the stability thresholds as `Procedure`. The charter hash and the
 signature cover them, so altering any one of them changes `charter_hash`.
 
 Versioning. A charter without rules serialises exactly as before (the field is
@@ -28,7 +28,7 @@ DEFAULT_Q_MIN = 0.8
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class RunRules:
+class Procedure:
     """Choices that decide which findings are claimed, fixed before data.
 
     Attributes:
@@ -48,7 +48,7 @@ class RunRules:
     """
 
     ledger_rule: str = scmle.data.ledger.online_fdr.ELOND
-    confirmation_rule: str = budget.MultiplicityRule.BY.value
+    confirmation_rule: str = budget.Correction.BY.value
     failure_policy: str = confirm.UNCONFIRMED
     stability_filter: bool = False
     s_min: float = DEFAULT_S_MIN
@@ -60,7 +60,7 @@ class RunRules:
 
         Raises:
             ValueError: If `ledger_rule` is not in `online_fdr.RULE_NAMES`,
-                `confirmation_rule` is not a `MultiplicityRule` value,
+                `confirmation_rule` is not a `Correction` value,
                 `failure_policy` is not `confirm.UNCONFIRMED`,
                 `stability_filter` is not a bool, `s_min` or `q_min` is not
                 finite or outside (0, 1], or `band` is not finite or not
@@ -70,7 +70,7 @@ class RunRules:
             raise ValueError(
                 f"ledger_rule must be one of {online_fdr.RULE_NAMES}"
             )
-        allowed = tuple(r.value for r in budget.MultiplicityRule)
+        allowed = tuple(r.value for r in budget.Correction)
         if self.confirmation_rule not in allowed:
             raise ValueError(f"confirmation_rule must be one of {allowed}")
         if self.failure_policy != confirm.UNCONFIRMED:

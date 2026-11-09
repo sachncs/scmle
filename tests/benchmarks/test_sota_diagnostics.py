@@ -5,7 +5,7 @@ import pandas
 import pytest
 
 from benchmarks.sota import diagnostics
-import scmle
+import scmle.api.project
 
 
 @pytest.fixture(scope="module")
@@ -14,7 +14,7 @@ def summary(tmp_path_factory):
     data = pandas.DataFrame(rng.normal(size=(200, 3)), columns=["a", "b", "c"])
     data["y"] = numpy.where(data["a"] + rng.normal(size=200) > 0, "p", "n")
     root = tmp_path_factory.mktemp("runs")
-    result = scmle.MLProject(
+    result = scmle.api.project.Project(
         data, "y", time_budget=15, seed=3, output_dir=root
     ).run()
     return diagnostics.summarize_run(result.run_dir)

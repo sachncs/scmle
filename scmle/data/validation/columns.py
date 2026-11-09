@@ -245,7 +245,7 @@ class ColumnKind(abc.ABC):
         """
         return None
 
-    def transformer(self, options: data.PreprocessingOptions) -> Any | None:
+    def transformer(self, options: data.Preprocessing) -> Any | None:
         """Builds the preprocessing transformer, or None for non-features.
 
         Args:
@@ -258,7 +258,7 @@ class ColumnKind(abc.ABC):
         return None
 
     def association(
-        self, series: pandas.Series, target: pandas.Series, task: tasks.TaskType
+        self, series: pandas.Series, target: pandas.Series, task: tasks.Task
     ) -> float:
         """Returns a [0, 1] single-feature association with the target.
 
@@ -274,7 +274,7 @@ class ColumnKind(abc.ABC):
         return 0.0
 
     def missingness_association(
-        self, series: pandas.Series, target: pandas.Series, task: tasks.TaskType
+        self, series: pandas.Series, target: pandas.Series, task: tasks.Task
     ) -> float:
         """Measures how strongly *being missing* tells the target apart.
 
@@ -399,9 +399,7 @@ class NumericKind(ColumnKind):
             return experimental_impute()
         raise errors.ConfigError(f"unknown missing-value strategy '{strategy}'")
 
-    def transformer(
-        self, options: data.PreprocessingOptions
-    ) -> pipeline.Pipeline:
+    def transformer(self, options: data.Preprocessing) -> pipeline.Pipeline:
         """Casts, imputes, then optionally log-transforms, scales, crosses.
 
         Args:
@@ -440,7 +438,7 @@ class NumericKind(ColumnKind):
         return pipeline.Pipeline(steps)
 
     def association(
-        self, series: pandas.Series, target: pandas.Series, task: tasks.TaskType
+        self, series: pandas.Series, target: pandas.Series, task: tasks.Task
     ) -> float:
         """Spearman for regression; class purity for classification.
 
@@ -542,9 +540,7 @@ class TextKind(ColumnKind):
         stats["mean_words"] = float(numpy.mean(counts)) if counts else 0.0
         return stats
 
-    def transformer(
-        self, options: data.PreprocessingOptions
-    ) -> pipeline.Pipeline:
+    def transformer(self, options: data.Preprocessing) -> pipeline.Pipeline:
         """Casts to text, then TF-IDF terms (fold-local) or embeddings.
 
         Args:
@@ -622,9 +618,7 @@ class CategoricalKind(ColumnKind):
             return "id-like (near-unique text)"
         return None
 
-    def transformer(
-        self, options: data.PreprocessingOptions
-    ) -> pipeline.Pipeline:
+    def transformer(self, options: data.Preprocessing) -> pipeline.Pipeline:
         """Casts to object, imputes a token, one-hot encodes.
 
         Args:
@@ -702,7 +696,7 @@ class CategoricalKind(ColumnKind):
         return None
 
     def association(
-        self, series: pandas.Series, target: pandas.Series, task: tasks.TaskType
+        self, series: pandas.Series, target: pandas.Series, task: tasks.Task
     ) -> float:
         """Class purity of category values (classification only).
 

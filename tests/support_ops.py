@@ -41,7 +41,7 @@ def profile(rows=2000, seed=99):
 
 def monitor(window=300.0, minimum=30, **thresholds):
     return signals.SignalMonitor(
-        signals.WindowPolicy(window_seconds=window, min_samples=minimum),
+        signals.Window(window_seconds=window, min_samples=minimum),
         signals.SignalThresholds(**thresholds),
         profile(),
     )

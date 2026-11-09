@@ -13,11 +13,11 @@ from scmle.evaluation import release
 
 def make_record(
     criterion_id: str,
-    result: evidence.EvidenceResult = evidence.EvidenceResult.PASS,
-    decision: evidence.EvidenceDecision = evidence.EvidenceDecision.ACCEPTED,
-) -> evidence.EvidenceRecord:
+    result: evidence.Outcome = evidence.Outcome.PASS,
+    decision: evidence.Disposition = evidence.Disposition.ACCEPTED,
+) -> evidence.Record:
     """Build a complete evidence record for the release fixtures."""
-    return evidence.EvidenceRecord(
+    return evidence.Record(
         criterion_id=criterion_id,
         claim=f"evidence for {criterion_id}",
         scope={"release": "beta"},
@@ -36,16 +36,16 @@ def make_policy(
     *,
     fairness: bool = False,
     diagnostic_action: evaluation.DiagnosticAction = evaluation.DiagnosticAction.BLOCK,
-) -> evaluation.EvaluationPolicy:
+) -> evaluation.Criteria:
     """Build a binary policy with representative release gates."""
     fairness_policy = (
-        evaluation.FairnessPolicy(
+        evaluation.Fairness(
             evaluation.FairnessMethod.GROUP_REPORT,
             sensitive_columns=("group",),
             metrics=("demographic_parity_difference",),
         )
         if fairness
-        else evaluation.FairnessPolicy(evaluation.FairnessMethod.NONE)
+        else evaluation.Fairness(evaluation.FairnessMethod.NONE)
     )
     fairness_gates = (
         (
@@ -73,26 +73,22 @@ def make_policy(
                 ("diagnostic.robustness",),
             ),
         )
-    return evaluation.EvaluationPolicy(
-        task=tasks.TaskType.BINARY,
+    return evaluation.Criteria(
+        task=tasks.Task.BINARY,
         primary_metric="roc_auc",
         metrics=(
             evaluation.MetricDeclaration(
                 "roc_auc", evaluation.MetricDirection.MAXIMIZE
             ),
         ),
-        uncertainty=evaluation.UncertaintyPolicy(
-            evaluation.UncertaintyMethod.NONE
-        ),
-        calibration=evaluation.CalibrationPolicy(
-            evaluation.CalibrationMethod.NONE
-        ),
+        uncertainty=evaluation.Uncertainty(evaluation.UncertaintyMethod.NONE),
+        calibration=evaluation.Calibration(evaluation.CalibrationMethod.NONE),
         fairness=fairness_policy,
-        small_groups=evaluation.SmallGroupPolicy(30, 10),
-        explanations=evaluation.ExplanationPolicy(
+        small_groups=evaluation.SmallGroups(30, 10),
+        explanations=evaluation.Explanations(
             evaluation.ExplanationAvailability.NONE
         ),
-        release=evaluation.ReleasePolicy(
+        release=evaluation.Gates(
             metric_gates=(
                 evaluation.MetricGate(
                     "roc_auc", evaluation.MetricDirection.MAXIMIZE, 0.75
@@ -106,13 +102,13 @@ def make_policy(
 
 
 def make_index(
-    policy: evaluation.EvaluationPolicy,
+    policy: evaluation.Criteria,
     *,
-    result: evidence.EvidenceResult = evidence.EvidenceResult.PASS,
-    decision: evidence.EvidenceDecision = evidence.EvidenceDecision.ACCEPTED,
-) -> evidence.EvidenceIndex:
+    result: evidence.Outcome = evidence.Outcome.PASS,
+    decision: evidence.Disposition = evidence.Disposition.ACCEPTED,
+) -> evidence.Index:
     """Build an index for every policy reference."""
-    return evidence.EvidenceIndex(
+    return evidence.Index(
         [
             make_record(reference, result, decision)
             for reference in release.required_evidence_references(policy)
@@ -176,7 +172,7 @@ def test_metric_failure_and_missing_evidence_block_release():
         {"roc_auc": 0.70},
         {"metric_uncertainty": {"estimate": 0.70}},
         {},
-        evidence.EvidenceIndex(),
+        evidence.Index(),
     )
 
     assert not result.passed
@@ -252,8 +248,8 @@ def test_unsupported_reports_and_unaccepted_evidence_block():
         {},
         make_index(
             policy,
-            result=evidence.EvidenceResult.PASS,
-            decision=evidence.EvidenceDecision.REQUIRED,
+            result=evidence.Outcome.PASS,
+            decision=evidence.Disposition.REQUIRED,
         ),
     )
 
@@ -268,7 +264,7 @@ def test_explanation_quality_threshold_is_a_blocking_release_gate():
     """A declared quality threshold must be present and pass."""
     policy = dataclasses.replace(
         make_policy(),
-        explanations=evaluation.ExplanationPolicy(
+        explanations=evaluation.Explanations(
             evaluation.ExplanationAvailability.GLOBAL,
             required_methods=("permutation_importance",),
             required_evidence=("explanation.json",),
@@ -304,7 +300,7 @@ def test_explanation_quality_release_gate_passes_with_valid_evidence():
     """A quality report above its declared threshold permits this gate."""
     policy = dataclasses.replace(
         make_policy(),
-        explanations=evaluation.ExplanationPolicy(
+        explanations=evaluation.Explanations(
             evaluation.ExplanationAvailability.GLOBAL,
             required_methods=("permutation_importance",),
             required_evidence=("explanation.json",),

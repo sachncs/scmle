@@ -56,14 +56,14 @@ class Orchestrator:
 
     def __init__(
         self,
-        spec: tasks.ProjectSpec,
+        spec: tasks.Config,
         frame: pandas.DataFrame | None = None,
-        registry: scmle.models.registry.ModelRegistry | None = None,
-        policy: selection.SelectionPolicy | None = None,
+        registry: scmle.models.registry.Catalog | None = None,
+        policy: selection.Selector | None = None,
         stages: tuple[scmle.core.stages.Stage, ...] | None = None,
         tracker: stores.ExperimentStore | None = None,
-        checkpoints: tuple[policies.PolicyCheckpoint, ...] = (),
-        capability_registry: capabilities.CapabilityRegistry | None = None,
+        checkpoints: tuple[policies.Reviewer, ...] = (),
+        capability_registry: capabilities.Registry | None = None,
     ) -> None:
         """Initializes the orchestrator.
 
@@ -72,7 +72,7 @@ class Orchestrator:
             frame: In-memory dataset, if not read from `spec.data.uri`.
             registry: Model registry; defaults to the built-in adapters plus
                 every installed plugin that passes the conformance suite.
-            policy: Selection policy; defaults to `BestMeanPolicy` (best mean
+            policy: Selection policy; defaults to `MeanSelector` (best mean
                 cross-validation score with the configured tie rule).
             stages: Stage sequence; defaults to the standard workflow.
             checkpoints: Approval gates, each consulted after the stages in
@@ -86,10 +86,10 @@ class Orchestrator:
         self.spec = spec
         self.frame = frame
         if registry is None:
-            registry = scmle.models.registry.ModelRegistry.with_builtins()
+            registry = scmle.models.registry.Catalog.with_builtins()
             registry.load_plugins()
         self.registry = registry
-        self.policy = policy or selection.BestMeanPolicy(spec.selection)
+        self.policy = policy or selection.MeanSelector(spec.selection)
         self.stages = compiler.compile_workflow(
             stages or scmle.core.stages.default_stages()
         )
@@ -106,9 +106,9 @@ class Orchestrator:
     def new_context(
         self,
         store: scmle.artifacts.store.RunStore | None = None,
-        log: events.EventLog | None = None,
-        approved_plan: experiments.ExperimentPlan | None = None,
-    ) -> scmle.core.context.RunContext:
+        log: events.Log | None = None,
+        approved_plan: experiments.Plan | None = None,
+    ) -> scmle.core.context.Context:
         """Creates a run context wired with this orchestrator's services.
 
         Args:
@@ -119,7 +119,7 @@ class Orchestrator:
         Returns:
             A fresh context.
         """
-        return scmle.core.context.RunContext(
+        return scmle.core.context.Context(
             spec=self.spec,
             registry=self.registry,
             catalog=metrics.CATALOG,
@@ -133,7 +133,7 @@ class Orchestrator:
                 store.directory if store is not None else None
             ),
             backend=scheduler.create_backend(
-                limits.ResourceGovernor(self.spec.resources).workers,
+                limits.Governor(self.spec.resources).workers,
                 self.spec.resources.executor,
                 self.spec.resources.cluster_address,
             ),
@@ -163,7 +163,7 @@ class Orchestrator:
             tracker = stores.SqliteExperimentStore(path)
         return tuple(tracker.history())
 
-    def apply_plan(self, approved: experiments.ExperimentPlan | None) -> None:
+    def apply_plan(self, approved: experiments.Plan | None) -> None:
         """Makes an approved or modified plan binding on the specification.
 
         Replaces `self.spec` with a copy whose validation strategy, time
@@ -185,11 +185,11 @@ class Orchestrator:
             approved.optimization_budget_seconds
         )
         record["metric"] = approved.metric
-        self.spec = tasks.ProjectSpec.model_validate(record)
+        self.spec = tasks.Config.model_validate(record)
 
     def prepare(
-        self, approved: experiments.ExperimentPlan | None = None
-    ) -> scmle.core.context.RunContext:
+        self, approved: experiments.Plan | None = None
+    ) -> scmle.core.context.Context:
         """Ingests, profiles and plans without training or writing files.
 
         Args:
@@ -213,10 +213,10 @@ class Orchestrator:
     def run(
         self,
         output_dir: str | pathlib.Path = "runs",
-        approved: experiments.ExperimentPlan | None = None,
+        approved: experiments.Plan | None = None,
         *,
         parameter_estimation_declaration: dict[str, Any] | None = None,
-    ) -> results.RunResult:
+    ) -> results.Run:
         """Executes the full workflow in a new run directory.
 
         Failures surface from `execute`: a run that cannot safely continue
@@ -258,7 +258,7 @@ class Orchestrator:
         store.write_text("environment.lock", environment_lock())
         return self.execute(store, approved, {}, "run created")
 
-    def resume(self, run_directory: str | pathlib.Path) -> results.RunResult:
+    def resume(self, run_directory: str | pathlib.Path) -> results.Run:
         """Continues an interrupted run, reusing its completed trials.
 
         The configuration must be identical (same hash). Stages are
@@ -277,7 +277,7 @@ class Orchestrator:
                 configuration differs from this orchestrator's.
         """
         store = scmle.artifacts.store.RunStore.open(run_directory)
-        saved = tasks.ProjectSpec.model_validate_json(
+        saved = tasks.Config.model_validate_json(
             store.path("config.json").read_text(encoding="utf-8")
         )
         if saved.config_hash() != self.spec.config_hash():
@@ -292,7 +292,7 @@ class Orchestrator:
             raise errors.ConfigError("run already completed; nothing to resume")
         plan_path = store.path("execution_plan.json")
         approved = (
-            experiments.ExperimentPlan.from_dict(
+            experiments.Plan.from_dict(
                 json.loads(plan_path.read_text(encoding="utf-8"))
             )
             if plan_path.exists()
@@ -315,14 +315,14 @@ class Orchestrator:
             An orchestrator whose spec is the run's saved configuration.
         """
         store = scmle.artifacts.store.RunStore.open(run_directory)
-        spec = tasks.ProjectSpec.model_validate_json(
+        spec = tasks.Config.model_validate_json(
             store.path("config.json").read_text(encoding="utf-8")
         )
         return cls(spec, **kwargs)
 
     def load_checkpoints(
         self, store: scmle.artifacts.store.RunStore
-    ) -> dict[str, experiments.TrialResult]:
+    ) -> dict[str, experiments.Trial]:
         """Reads completed trial checkpoints from a run directory.
 
         Args:
@@ -332,11 +332,11 @@ class Orchestrator:
             The stored trial results keyed by trial id, read from the run's
             `trials/trial_*.json` files in file-name order.
         """
-        checkpoints: dict[str, experiments.TrialResult] = {}
+        checkpoints: dict[str, experiments.Trial] = {}
         for path in sorted(store.path("trials").glob("trial_*.json")):
             record = json.loads(path.read_text(encoding="utf-8"))
             record["status"] = experiments.TrialStatus(record["status"])
-            checkpoints[record["trial_id"]] = experiments.TrialResult(**record)
+            checkpoints[record["trial_id"]] = experiments.Trial(**record)
         return checkpoints
 
     def recoverable(self, store: scmle.artifacts.store.RunStore) -> list[str]:
@@ -355,7 +355,7 @@ class Orchestrator:
         return sorted(path.stem for path in trials_dir.glob("trial_*.json"))
 
     def consult_checkpoints(
-        self, gate: state.RunState, context: scmle.core.context.RunContext
+        self, gate: state.RunState, context: scmle.core.context.Context
     ) -> None:
         """Asks every checkpoint registered for `gate` and audits the verdicts.
 
@@ -385,10 +385,10 @@ class Orchestrator:
     def execute(
         self,
         store: scmle.artifacts.store.RunStore,
-        approved: experiments.ExperimentPlan | None,
-        checkpoints: dict[str, experiments.TrialResult],
+        approved: experiments.Plan | None,
+        checkpoints: dict[str, experiments.Trial],
         reason: str,
-    ) -> results.RunResult:
+    ) -> results.Run:
         """Runs the stage sequence under the state machine.
 
         The run ends in the completed, cancelled, blocked or failed state. On a
@@ -410,7 +410,7 @@ class Orchestrator:
                 keyboard.
             ScmleError: If a stage fails; any other exception is wrapped in it.
         """
-        log = events.EventLog(store.path("events.jsonl"))
+        log = events.Log(store.path("events.jsonl"))
         tracker = self.tracker or stores.SqliteExperimentStore(
             store.directory.parent / "experiments.sqlite"
         )
@@ -422,7 +422,7 @@ class Orchestrator:
         )
         tracker.update_run(store.run_id, config_json=self.spec.canonical_json())
         log.subscribe(functools.partial(tracker.listen, store.run_id))
-        machine = state.StateMachine(
+        machine = state.Tracker(
             store.run_id, log, self.spec.config_hash(), reason
         )
         context = self.new_context(store=store, log=log, approved_plan=approved)

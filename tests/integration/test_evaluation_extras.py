@@ -22,7 +22,7 @@ def test_nested_validation_reports_the_optimism_of_the_winning_score(tmp_path):
         "y",
         time_budget=300,
         output_dir=tmp_path,
-        selection=tasks.SelectionSpec(nested_cv=True),
+        selection=tasks.Selection(nested_cv=True),
     ).run()
 
     nested = result.evaluation["nested_cv"]
@@ -64,7 +64,7 @@ def test_the_bias_variance_report_names_the_dominant_error(tmp_path):
         task="regression",
         time_budget=300,
         output_dir=tmp_path,
-        selection=tasks.SelectionSpec(bias_variance_replicates=15),
+        selection=tasks.Selection(bias_variance_replicates=15),
     ).run()
 
     report = result.evaluation["bias_variance"]
@@ -91,7 +91,7 @@ def test_the_sensitivity_report_separates_training_split_and_noise(tmp_path):
         "y",
         time_budget=300,
         output_dir=tmp_path,
-        selection=tasks.SelectionSpec(sensitivity_repeats=4),
+        selection=tasks.Selection(sensitivity_repeats=4),
     ).run()
 
     report = result.evaluation["sensitivity"]

@@ -28,7 +28,7 @@ from scipy import optimize
 
 
 @dataclasses.dataclass(frozen=True)
-class SynthResult:
+class Estimate:
     """A synthetic control fit.
 
     Attributes:
@@ -143,7 +143,7 @@ def estimate(
     treated_unit: Any,
     first_treated: Any,
     alpha: float = 0.05,
-) -> SynthResult:
+) -> Estimate:
     """Fits the synthetic control and its placebo distribution.
 
     Args:
@@ -197,7 +197,7 @@ def estimate(
         placebos[str(donor)] = ratio_for(pre, post, index[donor], others)[2]
     exceed = sum(1 for r in placebos.values() if r >= ratio)
     p_value = (1 + exceed) / (len(donors) + 1)
-    return SynthResult(
+    return Estimate(
         effect=float(gap.mean()),
         gaps=tuple(float(g) for g in gap),
         weights={

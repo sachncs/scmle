@@ -33,7 +33,7 @@ def data(rows=300, seed=0):
 
 
 def spec(column, name=None):
-    return scmle.data.ledger.ledger.HypothesisSpec.create(
+    return scmle.data.ledger.ledger.Test.create(
         name=name or f"{column}~y",
         family="bivariate",
         statistic="spearman",
@@ -131,7 +131,7 @@ def test_a_hypothesis_is_tested_once_and_names_are_unique():
 
 def test_only_exploration_hypotheses_can_be_registered():
     ledger = fresh()
-    on_c = scmle.data.ledger.ledger.HypothesisSpec.create(
+    on_c = scmle.data.ledger.ledger.Test.create(
         name="x",
         family="f",
         statistic="spearman",
@@ -147,20 +147,20 @@ def test_only_exploration_hypotheses_can_be_registered():
 
 def test_spec_validation_and_round_trip():
     s = spec("signal")
-    assert scmle.data.ledger.ledger.HypothesisSpec.from_dict(s.to_dict()) == s
+    assert scmle.data.ledger.ledger.Test.from_dict(s.to_dict()) == s
     assert len(s.code_hash) == 64
     with pytest.raises(ValueError, match="direction"):
-        scmle.data.ledger.ledger.HypothesisSpec.create(
+        scmle.data.ledger.ledger.Test.create(
             name="n", family="f", statistic="spearman", null="x", direction="up"
         )
     with pytest.raises(ValueError, match="name"):
-        scmle.data.ledger.ledger.HypothesisSpec.create(
+        scmle.data.ledger.ledger.Test.create(
             name=" ", family="f", statistic="spearman", null="x"
         )
     record = s.to_dict()
     record["extra"] = 1
     with pytest.raises(ValueError, match="unexpected"):
-        scmle.data.ledger.ledger.HypothesisSpec.from_dict(record)
+        scmle.data.ledger.ledger.Test.from_dict(record)
 
 
 def test_the_file_reloads_replays_and_continues(tmp_path):

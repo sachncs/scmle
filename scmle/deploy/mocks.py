@@ -149,7 +149,7 @@ class ObjectStore(MockServer):
         """
         store = self
 
-        class Handler(server.BaseHTTPRequestHandler):
+        class Responder(server.BaseHTTPRequestHandler):
             """Serves the object store's requests."""
 
             def reply(
@@ -266,7 +266,7 @@ class ObjectStore(MockServer):
                     *args: Format arguments; ignored.
                 """
 
-        return Handler
+        return Responder
 
 
 class MetricsSink(MockServer):
@@ -315,7 +315,7 @@ class MetricsSink(MockServer):
         """
         sink = self
 
-        class Handler(server.BaseHTTPRequestHandler):
+        class Responder(server.BaseHTTPRequestHandler):
             """Serves the metrics sink's requests."""
 
             def reply(self, status: int, payload: dict[str, Any]) -> None:
@@ -387,7 +387,7 @@ class MetricsSink(MockServer):
                     *args: Format arguments; ignored.
                 """
 
-        return Handler
+        return Responder
 
 
 def put_object(base: str, path: str, data: bytes, timeout: float = 30.0) -> str:

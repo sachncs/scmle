@@ -8,11 +8,11 @@ from scmle.evaluation import robustness
 
 
 def inputs():
-    return test_diagnostics.make_inputs(tasks.TaskType.BINARY, rows=800)
+    return test_diagnostics.make_inputs(tasks.Task.BINARY, rows=800)
 
 
 def test_every_scenario_is_scored_and_noise_hurts_a_signal_model():
-    report = robustness.RobustnessReport().compute(inputs())
+    report = robustness.Robustness().compute(inputs())
 
     assert set(report["scenarios"]) == {
         "missing_10pct",
@@ -41,9 +41,9 @@ def test_corruptions_leave_the_input_untouched_and_apply_as_described():
 
 
 def test_a_model_ignoring_the_noise_feature_is_not_fragile_to_it():
-    report = robustness.RobustnessReport(
-        (robustness.UnseenCategories(0.2),)
-    ).compute(inputs())
+    report = robustness.Robustness((robustness.UnseenCategories(0.2),)).compute(
+        inputs()
+    )
 
     assert report["fragile_under"] == []
 

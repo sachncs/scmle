@@ -162,9 +162,9 @@ def test_a_plain_http_url_fails_the_security_check_unless_loopback():
 
 def test_check_results_round_trip_and_refuse_unknown_fields():
     result = support_release.run_live()[0]
-    assert livetests.CheckResult.from_dict(result.to_dict()) == result
+    assert livetests.Check.from_dict(result.to_dict()) == result
     with pytest.raises(errors.ConfigError):
-        livetests.CheckResult.from_dict({**result.to_dict(), "extra": 1})
+        livetests.Check.from_dict({**result.to_dict(), "extra": 1})
 
 
 def test_http_fetch_refuses_a_relative_url():
@@ -214,9 +214,7 @@ def test_a_record_refuses_malformed_fields():
     with pytest.raises(errors.ConfigError):
         dataclasses.replace(record, environment="local")
     with pytest.raises(errors.ConfigError):
-        scmle.deploy.record.DeploymentRecord.from_dict(
-            {**record.to_dict(), "format": 9}
-        )
+        scmle.deploy.record.Record.from_dict({**record.to_dict(), "format": 9})
 
 
 def refused(candidate, expected, certify=False):

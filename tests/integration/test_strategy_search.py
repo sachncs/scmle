@@ -7,11 +7,12 @@ import pandas
 import pytest
 import support
 
-import scmle
+import scmle.api.project
+import scmle.artifacts.bundle
 from scmle.contracts import tasks
 
-STRATEGIES = tasks.StrategySpec(top_models=2)
-NO_SEARCH = tasks.SearchSpec(top_models=0)
+STRATEGIES = tasks.Strategies(top_models=2)
+NO_SEARCH = tasks.Search(top_models=0)
 
 
 def run(frame, tmp_path, strategies=STRATEGIES, search=NO_SEARCH, **kwargs):
@@ -88,7 +89,7 @@ def test_adopted_strategy_is_used_for_the_final_model(
         result.evaluation["selected_cv_score"]
     )
     features = imbalanced_frame.drop(columns="y")
-    loaded = scmle.ModelBundle.load(
+    loaded = scmle.artifacts.bundle.Bundle.load(
         result.save(tmp_path / "exported"), trusted=True
     )
     numpy.testing.assert_allclose(
@@ -100,7 +101,7 @@ def test_adopted_strategy_is_used_for_the_final_model(
 def test_strategies_can_be_forced_to_win_and_are_then_used(
     imbalanced_frame, tmp_path
 ):
-    only = tasks.StrategySpec(names=["random_undersample"], top_models=1)
+    only = tasks.Strategies(names=["random_undersample"], top_models=1)
     result = run(
         imbalanced_frame, tmp_path, strategies=only, metric="balanced_accuracy"
     )
@@ -160,7 +161,7 @@ def test_feature_strategies_apply_to_skewed_linear_models(
 
 
 def test_tuning_runs_under_the_winning_strategy(imbalanced_frame, tmp_path):
-    search = tasks.SearchSpec(top_models=1, configs_per_model=4)
+    search = tasks.Search(top_models=1, configs_per_model=4)
     result = run(imbalanced_frame, tmp_path, search=search)
     tuned = [t for t in result.trials if t.params]
     assert tuned and len({t.strategy for t in tuned}) == 1
@@ -178,7 +179,7 @@ def test_strategy_run_resumes_without_recomputation(
     original = run(
         imbalanced_frame,
         tmp_path,
-        search=tasks.SearchSpec(top_models=1, configs_per_model=2),
+        search=tasks.Search(top_models=1, configs_per_model=2),
     )
     (original.run_dir / "evaluation.json").unlink()
     shutil.rmtree(original.run_dir / "model")
@@ -189,7 +190,9 @@ def test_strategy_run_resumes_without_recomputation(
         "evaluate_payload",
         lambda p: calls.append(p.job.trial_id) or real(p),
     )
-    resumed = scmle.MLProject.resume(original.run_dir, data=imbalanced_frame)
+    resumed = scmle.api.project.Project.resume(
+        original.run_dir, data=imbalanced_frame
+    )
     assert calls == []
     assert (
         resumed.evaluation["selected_strategy"]
@@ -203,7 +206,7 @@ def test_strategy_run_resumes_without_recomputation(
 def test_leaderboard_marks_exactly_the_selected_trial(
     imbalanced_frame, tmp_path
 ):
-    search = tasks.SearchSpec(top_models=1, configs_per_model=4)
+    search = tasks.Search(top_models=1, configs_per_model=4)
     result = run(imbalanced_frame, tmp_path, search=search)
     board = result.leaderboard()
     assert board["selected"].sum() == 1
@@ -229,7 +232,7 @@ def test_smote_variants_are_evaluated_on_the_original_folds_when_installed(
     tmp_path,
 ):
     pytest.importorskip("imblearn")
-    only = tasks.StrategySpec(
+    only = tasks.Strategies(
         names=["smote", "borderline_smote", "adasyn"], top_models=1
     )
     result = run(
@@ -250,10 +253,10 @@ def test_missing_sampling_extra_is_explained_in_the_plan(monkeypatch):
     monkeypatch.setattr(
         scmle.sampling.strategies.importlib.util, "find_spec", lambda name: None
     )
-    plan = scmle.MLProject(
+    plan = scmle.api.project.Project(
         numeric_imbalanced(),
         "y",
-        strategies=tasks.StrategySpec(names=["smote"]),
+        strategies=tasks.Strategies(names=["smote"]),
     ).plan()
     decision = next(d for d in plan.decisions if d.technique == "smote")
     assert decision.action == "reject" and "sampling" in decision.reason
@@ -261,11 +264,11 @@ def test_missing_sampling_extra_is_explained_in_the_plan(monkeypatch):
 
 def test_jitter_augmentation_must_be_requested_explicitly(tmp_path):
     frame = numeric_imbalanced()
-    default_plan = scmle.MLProject(frame, "y").plan()
+    default_plan = scmle.api.project.Project(frame, "y").plan()
     assert not any(
         d.technique == "jitter_augment" for d in default_plan.decisions
     )
-    opted = tasks.StrategySpec(names=["jitter_augment"], top_models=1)
+    opted = tasks.Strategies(names=["jitter_augment"], top_models=1)
     result = run(frame, tmp_path, strategies=opted, metric="pr_auc")
     assert any(t.strategy == "jitter_augment" for t in result.trials)
     verdicts = json.loads(
@@ -278,9 +281,9 @@ def test_copula_augmentation_is_opt_in_and_judged_on_original_folds(tmp_path):
     frame = numeric_imbalanced()
     assert not any(
         d.technique == "copula_augment"
-        for d in scmle.MLProject(frame, "y").plan().decisions
+        for d in scmle.api.project.Project(frame, "y").plan().decisions
     )
-    opted = tasks.StrategySpec(names=["copula_augment"], top_models=1)
+    opted = tasks.Strategies(names=["copula_augment"], top_models=1)
     result = run(frame, tmp_path, strategies=opted, metric="pr_auc")
     tried = [t for t in result.trials if t.strategy == "copula_augment"]
     assert tried and tried[0].status == "ok" and len(tried[0].fold_scores) == 5

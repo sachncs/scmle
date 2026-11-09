@@ -91,7 +91,7 @@ const service = [
 <DocsLayout title="Artifacts & bundles" description="Every file a scmle run, ingestion, framing pass, closed loop and service package writes, and what each one proves." current="artifacts">
   <p class="eyebrow"><span></span> Reference</p>
   <h1>Nothing is hidden<br /><em>in memory.</em></h1>
-  <p class="lead">Every <code>MLProject.run()</code> (or <code>scmle run</code>) creates <code>runs/run_&lt;date&gt;_&lt;n&gt;/</code> under the output directory. That directory is the evidence for the result and is what <code>resume</code> and <code>verify_replay</code> read. A sibling file, <code>runs/experiments.sqlite</code>, tracks run and trial rows.</p>
+  <p class="lead">Every <code>Project.run()</code> (or <code>scmle run</code>) creates <code>runs/run_&lt;date&gt;_&lt;n&gt;/</code> under the output directory. That directory is the evidence for the result and is what <code>resume</code> and <code>verify_replay</code> read. A sibling file, <code>runs/experiments.sqlite</code>, tracks run and trial rows.</p>
   <div class="callout"><p><strong>Reading order.</strong> Open <code>report.html</code>, then <code>diagnostics/decision_log.json</code>. Everything else is there so that a reviewer can check those two.</p></div>
 
   <h2>Read first</h2>
@@ -109,7 +109,7 @@ const service = [
   <DocTable label="Decision-layer files" head={["File", "Contents"]} rows={decisionKeys} />
 
   <h2 id="ingest">Raw-data ingestion (<code>scmle ingest</code>)</h2>
-  <p><code>scmle ingest --sqlite FILE --tables a,b</code> (a read-only connection) or <code>IngestPlan</code> writes into <code>--output</code>:</p>
+  <p><code>scmle ingest --sqlite FILE --tables a,b</code> (a read-only connection) or <code>Plan</code> writes into <code>--output</code>:</p>
   <DocTable label="Ingestion files" head={["File", "Contents"]} rows={ingestFiles} />
   <p>A charter run with an <code>ingest</code> block calls the ingestion stage. It reads SQLite only; another SQL backend is open. When the block carries an <code>entity</code> sub-block, the resolved entity becomes the split&rsquo;s group column, and entity resolution without a label is <code>unverified</code>. A <code>reconcile</code> sub-block (charter format 8) reconciles the extract to totals the charter declares and stops the run on a mismatch; it writes <code>extract_reconciliation.json</code> with the declared totals and, under <code>source_checks</code>, the same quantities queried from the source database, each compared with the extract. With a charter that has an <code>ingest</code> block and <code>--ingest-plan</code>, a <code>feature_manifest.json</code> (one record per proposed feature, with its cutoff rule, as-of evidence, tier and the reason it was dropped, if it was) and <code>ingest_field_provenance.json</code> are written beside the four files above.</p>
 

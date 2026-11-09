@@ -46,13 +46,13 @@ class InvalidTransitionError(errors.ScmleError):
     category = "state"
 
 
-class StateMachine:
+class Tracker:
     """Tracks the current run state and records every transition."""
 
     def __init__(
         self,
         run_id: str,
-        log: events.EventLog,
+        log: events.Log,
         config_hash: str = "",
         reason: str = "run created",
     ) -> None:

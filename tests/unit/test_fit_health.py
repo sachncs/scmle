@@ -48,7 +48,7 @@ def test_an_oriented_error_metric_works_the_same_way():
 
 
 def make_trial(name, scores, train, strategy="default"):
-    return experiments.TrialResult(
+    return experiments.Trial(
         "t",
         name,
         experiments.TrialStatus.OK,

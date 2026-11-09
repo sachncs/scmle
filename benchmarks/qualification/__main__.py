@@ -90,18 +90,18 @@ def check_certificates() -> int:
     Returns:
         0 when no family has a problem, otherwise 1.
     """
-    store = certificates.CertificateStore.load(standins.SAMPLE_PATH)
+    store = certificates.Store.load(standins.SAMPLE_PATH)
     problems = standins.sample_problems(store)
     report = certificates.audit(store, GATING)
-    f5_store = certificates.CertificateStore.load(f5.CERT_PATH)
+    f5_store = certificates.Store.load(f5.CERT_PATH)
     f5_problems = f5.problems(f5_store) + f5.audit_problems(f5_store)
-    f6_store = certificates.CertificateStore.load(f6_certify.STORE_PATH)
+    f6_store = certificates.Store.load(f6_certify.STORE_PATH)
     f6_problems = f6_certify.problems(f6_store)
-    screen_store = certificates.CertificateStore.load(
+    screen_store = certificates.Store.load(
         scmle.data.admissibility.screen.STORE_PATH
     )
     screen_problems = screen_certify.problems(screen_store)
-    ingest_store = certificates.CertificateStore.load(ingest_certify.STORE_PATH)
+    ingest_store = certificates.Store.load(ingest_certify.STORE_PATH)
     ingest_problems = ingest_certify.problems(ingest_store)
     uncertainty_problems = uncertainty_certify.problems()
     subgroup_problems = subgroup_certify.problems()

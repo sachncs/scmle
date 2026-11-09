@@ -1,6 +1,6 @@
 """The charter's uncertainty block (format 10).
 
-Everything here is optional: a charter without an `UncertaintySpec`
+Everything here is optional: a charter without an `Uncertainty`
 serialises, hashes and loads exactly as a format 1 to 9 charter did. The
 block fixes, before any data is read, the largest number of bytes of
 cross-validation fold models a regression bundle may carry for CV+ intervals
@@ -19,7 +19,7 @@ from scmle.contracts import qualification
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class UncertaintySpec:
+class Uncertainty:
     """Fixed choices of the interval and set layer.
 
     Attributes:

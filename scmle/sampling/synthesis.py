@@ -241,7 +241,7 @@ class CopulaOverSampler(GeneratorOverSampler):
 
 
 @dataclasses.dataclass(frozen=True)
-class FidelityReport:
+class Fidelity:
     """How closely synthetic rows resemble the real ones.
 
     Attributes:
@@ -265,7 +265,7 @@ class FidelityEvaluator:
 
     def evaluate(
         self, real: pandas.DataFrame, synthetic: pandas.DataFrame
-    ) -> FidelityReport:
+    ) -> Fidelity:
         """Compares marginals, dependence structure and verbatim copying.
 
         Args:
@@ -273,7 +273,7 @@ class FidelityEvaluator:
             synthetic: Synthetic rows with the same columns.
 
         Returns:
-            The fidelity measures; see `FidelityReport` for their meaning.
+            The fidelity measures; see `Fidelity` for their meaning.
         """
         numeric = [
             str(c)
@@ -333,4 +333,4 @@ class FidelityEvaluator:
             tuple(row) in real_keys
             for row in synthetic.astype(str).to_numpy().tolist()
         )
-        return FidelityReport(ks, tv, error, copies / max(len(synthetic), 1))
+        return Fidelity(ks, tv, error, copies / max(len(synthetic), 1))

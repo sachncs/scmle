@@ -5,9 +5,9 @@ import pytest
 from scmle.contracts import observability
 
 
-def policy() -> observability.ObservabilityPolicy:
+def policy() -> observability.Requirements:
     """Builds a representative observability policy."""
-    return observability.ObservabilityPolicy(
+    return observability.Requirements(
         retention_days=30,
         required_signals=(
             observability.SignalKind.ERROR,

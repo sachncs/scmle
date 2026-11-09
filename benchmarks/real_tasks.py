@@ -30,6 +30,7 @@ from sklearn import ensemble
 from sklearn import multioutput
 
 import scmle
+import scmle.api.project
 from scmle.evaluation import concordance
 from scmle.evaluation import multitarget
 from scmle.evaluation import ordinal
@@ -170,14 +171,14 @@ def encode(frame: pandas.DataFrame) -> pandas.DataFrame:
 
 def project(
     frame: pandas.DataFrame, target: Any, root: pathlib.Path, **kw: Any
-) -> scmle.MLProject:
+) -> scmle.api.project.Project:
     """A project with the suite's shared settings.
 
     Args:
         frame: The dataset.
         target: Target column name, or a list of names for multi-target tasks.
         root: Output directory of the run.
-        **kw: Further `MLProject` arguments; `time_budget` defaults to
+        **kw: Further `Project` arguments; `time_budget` defaults to
             `BUDGET`, `workers` to 2 and `leakage_policy` to `"warn"`.
 
     Returns:
@@ -186,7 +187,7 @@ def project(
     kw.setdefault("time_budget", BUDGET)
     kw.setdefault("workers", 2)
     kw.setdefault("leakage_policy", "warn")  # public tables, see run_benchmarks
-    return scmle.MLProject(frame, target, output_dir=root, **kw)
+    return scmle.api.project.Project(frame, target, output_dir=root, **kw)
 
 
 BUDGET = 150
@@ -563,7 +564,7 @@ def streaming_case(root: pathlib.Path) -> Row:
     if not path.exists():
         data = fetch_covtype(as_frame=True).frame
         data.to_parquet(path)
-    result = scmle.MLProject(
+    result = scmle.api.project.Project(
         str(path),
         "Cover_Type",
         task="classification",

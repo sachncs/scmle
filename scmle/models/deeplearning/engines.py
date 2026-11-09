@@ -21,7 +21,7 @@ import scmle.models.deeplearning.training
 MIN_ROWS_FOR_VALIDATION = 30
 
 
-class TabularEngine(base.BaseEstimator, abc.ABC):
+class Trainer(base.BaseEstimator, abc.ABC):
     """Trains a network with early stopping and weighted losses.
 
     The matrix is expected to be numeric, complete and scaled (the standard
@@ -207,7 +207,7 @@ class TabularEngine(base.BaseEstimator, abc.ABC):
 
     def fit(
         self, features: Any, target: Any, sample_weight: Any = None
-    ) -> "TabularEngine":
+    ) -> "Trainer":
         """Trains the network.
 
         An unknown optimizer or loss, or a non-positive accumulation count,
@@ -269,7 +269,7 @@ class TabularEngine(base.BaseEstimator, abc.ABC):
         updates_per_epoch = max(math.ceil(batches_per_epoch / accumulate), 1)
         total_steps = updates_per_epoch * self.epochs
         warmup_steps = updates_per_epoch * self.warmup_epochs
-        monitor = scmle.models.deeplearning.training.TrainingMonitor()
+        monitor = scmle.models.deeplearning.training.Monitor()
         generator = numpy.random.default_rng(self.random_state + 1)
         best, best_state, stale, step = numpy.inf, None, 0, 0
         self.n_iter_ = 0
@@ -570,7 +570,7 @@ class TabularEngine(base.BaseEstimator, abc.ABC):
         return (gradient * tensor).detach().numpy()
 
 
-class ClassifierEngine(base.ClassifierMixin, TabularEngine):
+class Classifier(base.ClassifierMixin, Trainer):
     """Classifier: softmax over class scores, optional class balancing."""
 
     losses = ("default", "focal")
@@ -746,7 +746,7 @@ class ClassifierEngine(base.ClassifierMixin, TabularEngine):
         return self.classes_[self.predict_proba(features).argmax(axis=1)]
 
 
-class RegressorEngine(base.RegressorMixin, TabularEngine):
+class Regressor(base.RegressorMixin, Trainer):
     """Regressor trained on the standardized target (squared or Huber)."""
 
     losses = ("default", "huber")

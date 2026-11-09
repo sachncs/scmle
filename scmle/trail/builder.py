@@ -34,7 +34,7 @@ def build(
     deployment_dir: str | Path,
     inputs_file: str | Path,
     keys: Mapping[str, str | bytes | None],
-) -> chain.Report:
+) -> chain.Verification:
     """Copies the retained records and `inputs.json`, and seals the trail.
 
     Only the files named in `records` that exist are copied; missing ones are

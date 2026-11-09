@@ -8,12 +8,12 @@ from typing import cast
 from scmle.contracts import explanations
 
 
-class ExplanationHtmlReport:
+class Renderer:
     """Renders one explanation record as a self-contained HTML artifact."""
 
     def render(
         self,
-        evidence: explanations.ExplanationEvidence,
+        evidence: explanations.Evidence,
         title: str | None = None,
     ) -> str:
         """Builds an escaped, privacy-aware explanation report.

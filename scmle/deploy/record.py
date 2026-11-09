@@ -32,7 +32,7 @@ ENVIRONMENTS = ("staging", "production")
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class DeploymentRecord:
+class Record:
     """A signed account of one release to one environment.
 
     Attributes:
@@ -189,7 +189,7 @@ class DeploymentRecord:
         return cls(**values)
 
 
-def write_record(path: str | pathlib.Path, record: DeploymentRecord) -> None:
+def write_record(path: str | pathlib.Path, record: Record) -> None:
     """Writes the record as JSON.
 
     Args:
@@ -205,7 +205,7 @@ def write_record(path: str | pathlib.Path, record: DeploymentRecord) -> None:
     )
 
 
-def read_record(path: str | pathlib.Path) -> DeploymentRecord:
+def read_record(path: str | pathlib.Path) -> Record:
     """Reads a record; the caller still verifies the signature.
 
     Args:
@@ -225,4 +225,4 @@ def read_record(path: str | pathlib.Path) -> DeploymentRecord:
         raise errors.ArtifactError(f"cannot read record {path}") from error
     if not isinstance(data, dict):
         raise errors.ArtifactError(f"{path} is not a record")
-    return DeploymentRecord.from_dict(data)
+    return Record.from_dict(data)

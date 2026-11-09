@@ -52,7 +52,7 @@ class ObservabilityEvaluation:
 
 def evaluate(
     metrics: Sequence[observability.MetricSample],
-    policy: observability.ObservabilityPolicy,
+    policy: observability.Requirements,
     *,
     observed_at: str,
 ) -> ObservabilityEvaluation:

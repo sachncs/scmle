@@ -14,22 +14,18 @@ import scmle.models.registry
 
 
 def test_defaults_and_multiclass_alias():
-    assert (
-        metrics.CATALOG.resolve(None, tasks.TaskType.BINARY).name == "roc_auc"
+    assert metrics.CATALOG.resolve(None, tasks.Task.BINARY).name == "roc_auc"
+    assert metrics.CATALOG.resolve(None, tasks.Task.REGRESSION).name == "rmse"
+    assert metrics.CATALOG.resolve("roc_auc", tasks.Task.MULTICLASS).name == (
+        "roc_auc_ovr"
     )
-    assert (
-        metrics.CATALOG.resolve(None, tasks.TaskType.REGRESSION).name == "rmse"
-    )
-    assert metrics.CATALOG.resolve(
-        "roc_auc", tasks.TaskType.MULTICLASS
-    ).name == ("roc_auc_ovr")
 
 
 def test_unknown_and_incompatible_metrics():
     with pytest.raises(errors.ConfigError, match="unknown"):
-        metrics.CATALOG.resolve("nope", tasks.TaskType.BINARY)
+        metrics.CATALOG.resolve("nope", tasks.Task.BINARY)
     with pytest.raises(errors.ConfigError, match="not defined"):
-        metrics.CATALOG.resolve("pr_auc", tasks.TaskType.MULTICLASS)
+        metrics.CATALOG.resolve("pr_auc", tasks.Task.MULTICLASS)
 
 
 def test_orientation_natural_units():
@@ -42,14 +38,14 @@ def test_evaluate_classification_and_regression():
     labels = pandas.Series([0, 1] * 20)
     classifier = dummy.DummyClassifier(strategy="prior").fit(features, labels)
     scores = metrics.CATALOG.evaluate(
-        classifier, features, labels, tasks.TaskType.BINARY
+        classifier, features, labels, tasks.Task.BINARY
     )
     assert scores["roc_auc"] == 0.5
     assert scores["log_loss"] == pytest.approx(0.6931, abs=1e-3)
     values = pandas.Series(numpy.arange(40.0))
     regressor = dummy.DummyRegressor().fit(features, values)
     scores = metrics.CATALOG.evaluate(
-        regressor, features, values, tasks.TaskType.REGRESSION
+        regressor, features, values, tasks.Task.REGRESSION
     )
     assert scores["rmse"] > 0 and scores["mae"] > 0
     assert scores["r2"] == pytest.approx(0.0, abs=1e-9)
@@ -61,24 +57,22 @@ def test_evaluate_reports_nan_for_undefined_metric():
     classifier = dummy.DummyClassifier(strategy="prior").fit(features, labels)
     single_class = pandas.Series([1] * 40)
     scores = metrics.CATALOG.evaluate(
-        classifier, features, single_class, tasks.TaskType.BINARY
+        classifier, features, single_class, tasks.Task.BINARY
     )
     assert numpy.isnan(scores["roc_auc"])
 
 
 def make_trial(name, score, status=experiments.TrialStatus.OK):
-    return experiments.TrialResult(
-        f"t_{name}", name, status, "m", score_mean=score
-    )
+    return experiments.Trial(f"t_{name}", name, status, "m", score_mean=score)
 
 
 @pytest.fixture(scope="module")
 def registry():
-    return scmle.models.registry.ModelRegistry.with_builtins()
+    return scmle.models.registry.Catalog.with_builtins()
 
 
 def test_best_mean_respects_orientation(registry):
-    policy = selection.BestMeanPolicy()
+    policy = selection.MeanSelector()
     trials = [
         make_trial("decision_tree", 0.7),
         make_trial("random_forest", 0.9),
@@ -90,7 +84,7 @@ def test_best_mean_respects_orientation(registry):
 
 
 def test_ties_prefer_cheaper_model_and_baseline_excluded(registry):
-    policy = selection.BestMeanPolicy()
+    policy = selection.MeanSelector()
     trials = [
         make_trial("random_forest", 0.8),
         make_trial("decision_tree", 0.8),
@@ -101,7 +95,7 @@ def test_ties_prefer_cheaper_model_and_baseline_excluded(registry):
 
 
 def test_baseline_selected_only_when_alone(registry):
-    policy = selection.BestMeanPolicy()
+    policy = selection.MeanSelector()
     trials = [
         make_trial("dummy", 0.5),
         make_trial("ridge", 0.0, experiments.TrialStatus.FAILED),
@@ -111,7 +105,7 @@ def test_baseline_selected_only_when_alone(registry):
 
 
 def test_all_failed_raises(registry):
-    policy = selection.BestMeanPolicy()
+    policy = selection.MeanSelector()
     trials = [make_trial("ridge", 0.0, experiments.TrialStatus.FAILED)]
     with pytest.raises(errors.ScmleError, match="all trials failed"):
         policy.select(trials, metrics.CATALOG.metrics["rmse"], registry)
@@ -133,7 +127,7 @@ def test_binary_metrics_work_with_string_labels(name):
     features, labels = string_problem()
     model = linear_model.LogisticRegression().fit(features, labels)
     metric = metrics.CATALOG.metrics[name]
-    positive = metrics.positive_label(labels, tasks.TaskType.BINARY)
+    positive = metrics.positive_label(labels, tasks.Task.BINARY)
     assert positive == "true"
     score = metric.score(model, features, labels, positive)
     assert 0.6 < score <= 1.0
@@ -156,22 +150,21 @@ def test_evaluate_reports_f1_for_string_labels_instead_of_nan():
     features, labels = string_problem()
     model = linear_model.LogisticRegression().fit(features, labels)
     scores = metrics.CATALOG.evaluate(
-        model, features, labels, tasks.TaskType.BINARY
+        model, features, labels, tasks.Task.BINARY
     )
     assert not any(numpy.isnan(value) for value in scores.values()), scores
 
 
 def test_positive_label_is_none_outside_binary_tasks():
     labels = pandas.Series([0, 1, 2])
-    assert metrics.positive_label(labels, tasks.TaskType.MULTICLASS) is None
+    assert metrics.positive_label(labels, tasks.Task.MULTICLASS) is None
     assert (
-        metrics.positive_label(pandas.Series([3, 7, 3]), tasks.TaskType.BINARY)
-        == 7
+        metrics.positive_label(pandas.Series([3, 7, 3]), tasks.Task.BINARY) == 7
     )
 
 
 def scored_trial(name, score, std, folds=5):
-    return experiments.TrialResult(
+    return experiments.Trial(
         f"t_{name}",
         name,
         experiments.TrialStatus.OK,
@@ -188,11 +181,11 @@ def test_tolerance_turns_small_gaps_into_ties_resolved_by_simplicity(registry):
         scored_trial("decision_tree", 0.800, 0.01),
     ]
     auc = metrics.CATALOG.metrics["roc_auc"]
-    strict = selection.BestMeanPolicy().select(trials, auc, registry)
+    strict = selection.MeanSelector().select(trials, auc, registry)
     assert strict.model_name == "random_forest"
-    loose = selection.BestMeanPolicy(
-        tasks.SelectionSpec(tie_tolerance=0.005)
-    ).select(trials, auc, registry)
+    loose = selection.MeanSelector(tasks.Selection(tie_tolerance=0.005)).select(
+        trials, auc, registry
+    )
     assert loose.model_name == "decision_tree"  # cheaper wins the tie
 
 
@@ -202,8 +195,8 @@ def test_one_standard_error_rule_treats_noise_as_a_tie(registry):
         scored_trial("decision_tree", 0.790, 0.05),
     ]
     auc = metrics.CATALOG.metrics["roc_auc"]
-    rule = tasks.SelectionSpec(uncertainty="one_standard_error")
-    policy = selection.BestMeanPolicy(rule)
+    rule = tasks.Selection(uncertainty="one_standard_error")
+    policy = selection.MeanSelector(rule)
     assert policy.select(trials, auc, registry).model_name == "decision_tree"
     assert "one standard error" in policy.description
 
@@ -214,25 +207,25 @@ def test_lower_variance_tie_breaker_prefers_the_steadier_model(registry):
         scored_trial("random_forest", 0.800, 0.01),
     ]
     auc = metrics.CATALOG.metrics["roc_auc"]
-    policy = selection.BestMeanPolicy(
-        tasks.SelectionSpec(tie_breaker="lower_variance")
+    policy = selection.MeanSelector(
+        tasks.Selection(tie_breaker="lower_variance")
     )
     assert policy.select(trials, auc, registry).model_name == "random_forest"
-    default = selection.BestMeanPolicy().select(trials, auc, registry)
+    default = selection.MeanSelector().select(trials, auc, registry)
     assert default.model_name == "decision_tree"
 
 
 def test_maximize_sets_the_metric_and_conflicts_are_rejected():
-    spec = tasks.ProjectSpec(
-        data=tasks.DataSpec(uri="x", target="y"),
-        selection=tasks.SelectionSpec(maximize="pr_auc"),
+    spec = tasks.Config(
+        data=tasks.Dataset(uri="x", target="y"),
+        selection=tasks.Selection(maximize="pr_auc"),
     )
     assert spec.primary_metric == "pr_auc"
     with pytest.raises(ValueError, match="conflicts with metric"):
-        tasks.ProjectSpec(
-            data=tasks.DataSpec(uri="x", target="y"),
+        tasks.Config(
+            data=tasks.Dataset(uri="x", target="y"),
             metric="roc_auc",
-            selection=tasks.SelectionSpec(maximize="pr_auc"),
+            selection=tasks.Selection(maximize="pr_auc"),
         )
 
 
@@ -249,7 +242,7 @@ def test_latency_safety_factor_scales_the_measured_latency():
 
 
 def folds_trial(name, scores):
-    return experiments.TrialResult(
+    return experiments.Trial(
         f"t_{name}",
         name,
         experiments.TrialStatus.OK,
@@ -263,9 +256,7 @@ def folds_trial(name, scores):
 def test_bayesian_selection_prefers_the_simpler_model_when_gain_is_noise(
     registry,
 ):
-    policy = selection.BestMeanPolicy(
-        tasks.SelectionSpec(uncertainty="bayesian")
-    )
+    policy = selection.MeanSelector(tasks.Selection(uncertainty="bayesian"))
     noisy_winner = folds_trial("random_forest", [0.80, 0.86, 0.78, 0.85, 0.79])
     simpler = folds_trial("decision_tree", [0.83, 0.82, 0.82, 0.82, 0.83])
 
@@ -278,9 +269,7 @@ def test_bayesian_selection_prefers_the_simpler_model_when_gain_is_noise(
 
 
 def test_bayesian_selection_keeps_a_credibly_better_model(registry):
-    policy = selection.BestMeanPolicy(
-        tasks.SelectionSpec(uncertainty="bayesian")
-    )
+    policy = selection.MeanSelector(tasks.Selection(uncertainty="bayesian"))
     clear_winner = folds_trial("random_forest", [0.90, 0.91, 0.90, 0.92, 0.91])
     simpler = folds_trial("decision_tree", [0.80, 0.81, 0.80, 0.82, 0.81])
 
@@ -293,8 +282,8 @@ def test_bayesian_selection_keeps_a_credibly_better_model(registry):
 
 
 def test_a_rope_makes_negligible_gains_ties(registry):
-    policy = selection.BestMeanPolicy(
-        tasks.SelectionSpec(uncertainty="bayesian", rope=0.02)
+    policy = selection.MeanSelector(
+        tasks.Selection(uncertainty="bayesian", rope=0.02)
     )
     slightly_better = folds_trial(
         "random_forest", [0.851, 0.852, 0.851, 0.852, 0.851]
@@ -317,7 +306,7 @@ def test_a_lower_is_better_positive_label_metric_scores_sign_adjusted():
         "false_f1",
         "f1",
         False,
-        frozenset({tasks.TaskType.BINARY}),
+        frozenset({tasks.Task.BINARY}),
         sklearn.metrics.f1_score,
         ("predict",),
     )
@@ -335,4 +324,4 @@ def test_a_lower_is_better_positive_label_metric_scores_sign_adjusted():
 
 def test_positive_label_needs_two_distinct_labels():
     with pytest.raises(ValueError, match="two distinct labels"):
-        metrics.positive_label(pandas.Series([1, 1, 1]), tasks.TaskType.BINARY)
+        metrics.positive_label(pandas.Series([1, 1, 1]), tasks.Task.BINARY)

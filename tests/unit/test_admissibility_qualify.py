@@ -172,7 +172,7 @@ def causal_world(rows=500, seed=0):
 
 
 def spec(assumptions):
-    return scmle.data.charter.causal.CausalSpec(
+    return scmle.data.charter.causal.Question(
         treatment="t",
         outcome="y",
         estimand="ATE",

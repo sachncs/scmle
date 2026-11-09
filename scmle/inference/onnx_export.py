@@ -255,7 +255,7 @@ def export(bundle: Any, path: str | pathlib.Path) -> pathlib.Path:
     back to labels. The file is written atomically.
 
     Args:
-        bundle: A fitted `ModelBundle`.
+        bundle: A fitted `Bundle`.
         path: Destination file.
 
     Returns:

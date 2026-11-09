@@ -68,7 +68,7 @@ class ModelCard:
         cls,
         manifest: data.DatasetManifest,
         profile: data.DatasetProfile,
-        bundle: scmle.artifacts.bundle.ModelBundle,
+        bundle: scmle.artifacts.bundle.Bundle,
         evaluation: Mapping[str, Any],
         model_fingerprint: str,
     ) -> "ModelCard":

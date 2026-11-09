@@ -7,11 +7,11 @@ from scmle.contracts import tasks
 
 
 def release_policy_from_criteria(
-    task: tasks.TaskType,
+    task: tasks.Task,
     primary_metric: str,
     primary_greater_is_better: bool,
     success_criteria: Mapping[str, float],
-) -> evaluation.EvaluationPolicy | None:
+) -> evaluation.Criteria | None:
     """Builds a release policy when the project declares score thresholds.
 
     The project-level success criteria are the only source of numeric release
@@ -63,22 +63,18 @@ def release_policy_from_criteria(
         )
         gates.append(evaluation.MetricGate(name, direction, float(threshold)))
     evidence_ref = "diagnostics/metric_uncertainty.json"
-    return evaluation.EvaluationPolicy(
+    return evaluation.Criteria(
         task=task,
         primary_metric=primary_metric,
         metrics=tuple(declarations.values()),
-        uncertainty=evaluation.UncertaintyPolicy(
-            evaluation.UncertaintyMethod.NONE
-        ),
-        calibration=evaluation.CalibrationPolicy(
-            evaluation.CalibrationMethod.NONE
-        ),
-        fairness=evaluation.FairnessPolicy(evaluation.FairnessMethod.NONE),
-        small_groups=evaluation.SmallGroupPolicy(warning_threshold=30),
-        explanations=evaluation.ExplanationPolicy(
+        uncertainty=evaluation.Uncertainty(evaluation.UncertaintyMethod.NONE),
+        calibration=evaluation.Calibration(evaluation.CalibrationMethod.NONE),
+        fairness=evaluation.Fairness(evaluation.FairnessMethod.NONE),
+        small_groups=evaluation.SmallGroups(warning_threshold=30),
+        explanations=evaluation.Explanations(
             evaluation.ExplanationAvailability.NONE
         ),
-        release=evaluation.ReleasePolicy(
+        release=evaluation.Gates(
             metric_gates=tuple(gates),
             diagnostic_gates=(
                 evaluation.DiagnosticGate(

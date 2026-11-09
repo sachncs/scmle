@@ -49,17 +49,17 @@ def test_parameters_are_immutable_and_comparable():
 
 
 def test_adapters_apply_sampled_params():
-    registry = scmle.models.registry.ModelRegistry.with_builtins()
+    registry = scmle.models.registry.Catalog.with_builtins()
     forest = registry.get("random_forest")
     sampled = forest.search_space.sample(random.Random(0))
-    estimator = forest.build(tasks.TaskType.BINARY, 0, sampled)
+    estimator = forest.build(tasks.Task.BINARY, 0, sampled)
     for key, value in sampled.items():
         assert estimator.get_params()[key] == value
     assert registry.get("dummy").search_space is None
 
 
 def test_every_tunable_builtin_samples_valid_configurations():
-    registry = scmle.models.registry.ModelRegistry.with_builtins()
+    registry = scmle.models.registry.Catalog.with_builtins()
     for adapter in registry.adapters.values():
         if not adapter.is_available():
             continue  # Optional library not installed in this environment.
@@ -75,10 +75,10 @@ def test_conformance_rejects_ignored_search_parameter():
 
     from scmle.contracts import models
 
-    class Ignoring(models.ModelAdapter):
+    class Ignoring(models.Model):
         name = "ignoring"
         family = "x"
-        capabilities = models.Capabilities(frozenset({tasks.TaskType.BINARY}))
+        capabilities = models.Capabilities(frozenset({tasks.Task.BINARY}))
         search_space = search.SearchSpace(
             (search.FloatParameter("alpha", 0.1, 1.0),)
         )
@@ -91,10 +91,10 @@ def test_conformance_rejects_ignored_search_parameter():
 
 
 def test_search_spec_defaults_and_hash_sensitivity():
-    base = tasks.ProjectSpec(data=tasks.DataSpec(uri="x", target="y"))
-    off = tasks.ProjectSpec(
-        data=tasks.DataSpec(uri="x", target="y"),
-        search=tasks.SearchSpec(top_models=0),
+    base = tasks.Config(data=tasks.Dataset(uri="x", target="y"))
+    off = tasks.Config(
+        data=tasks.Dataset(uri="x", target="y"),
+        search=tasks.Search(top_models=0),
     )
     assert base.search.top_models == 2 and base.search.optimizer == "random"
     assert base.config_hash() != off.config_hash()

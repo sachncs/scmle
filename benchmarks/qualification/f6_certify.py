@@ -91,11 +91,11 @@ SHIFT_NULL = 1000
 MMD_NULL = 5000
 SHIFT_PLANTED = 300
 PLANTED_AUC = 0.60
-SHIFT_POLICY = certificates.CertificationPolicy(0.80, 0.075, 0.95)
+SHIFT_POLICY = certificates.Standard(0.80, 0.075, 0.95)
 STABILITY_ROWS = 400
 STABLE_REPS = 300
 PLANT_REPS = 200
-STABILITY_POLICY = certificates.CertificationPolicy(0.80, 0.10, 0.95)
+STABILITY_POLICY = certificates.Standard(0.80, 0.10, 0.95)
 MISSING_RATE = 0.15
 STABLE_BETA = 0.5
 REVERSAL_BETA = 0.6
@@ -279,7 +279,7 @@ def run_jobs(
 
 def shift_certificate(
     test: str, offset: int, workers: int
-) -> tuple[certificates.DetectorCertificate, dict[str, Any]]:
+) -> tuple[certificates.Certification, dict[str, Any]]:
     """Measures one two-sample test on nulls and planted shifts.
 
     Args:
@@ -354,7 +354,7 @@ def shift_certificate(
 
 def stability_certificate(
     offset: int, workers: int
-) -> tuple[certificates.DetectorCertificate, dict[str, Any]]:
+) -> tuple[certificates.Certification, dict[str, Any]]:
     """Measures the survival rule on genuine and planted findings.
 
     Args:
@@ -441,7 +441,7 @@ def stability_certificate(
 
 def certify_all(
     workers: int = 1, offset: int = 0
-) -> tuple[certificates.CertificateStore, dict[str, Any]]:
+) -> tuple[certificates.Store, dict[str, Any]]:
     """Measures every robustness check; `offset` shifts the seed range.
 
     Args:
@@ -452,7 +452,7 @@ def certify_all(
         The certificate store and the measurements document.
     """
     started = time.monotonic()
-    store = certificates.CertificateStore()
+    store = certificates.Store()
     document: dict[str, Any] = {}
     for test in (shift.C2ST_ID, shift.MMD_ID):
         cert, measured = shift_certificate(test, offset, workers)
@@ -492,7 +492,7 @@ def required_defects() -> dict[str, tuple[str, ...]]:
     }
 
 
-def audit_labels(store: certificates.CertificateStore) -> dict[str, list[str]]:
+def audit_labels(store: certificates.Store) -> dict[str, list[str]]:
     """Detector/defect pairs by why they may not gate.
 
     Args:
@@ -520,7 +520,7 @@ def audit_labels(store: certificates.CertificateStore) -> dict[str, list[str]]:
     return found
 
 
-def problems(store: certificates.CertificateStore) -> list[str]:
+def problems(store: certificates.Store) -> list[str]:
     """Why the certificate file is unusable: missing or stale entries.
 
     Args:
@@ -596,7 +596,7 @@ def main(arguments: list[str] | None = None) -> int:
         print(json.dumps(development_look(options.workers), default=str))
         return 0
     if options.check:
-        store = certificates.CertificateStore.load(STORE_PATH)
+        store = certificates.Store.load(STORE_PATH)
         found = problems(store)
         report = {
             "ok": not found,
@@ -606,7 +606,7 @@ def main(arguments: list[str] | None = None) -> int:
         print(json.dumps(report, indent=2))
         return 1 if found else 0
     if options.only_mmd:
-        store = certificates.CertificateStore.load(STORE_PATH)
+        store = certificates.Store.load(STORE_PATH)
         document = json.loads(MEASUREMENTS_PATH.read_text(encoding="utf-8"))
         cert, document[shift.MMD_ID] = shift_certificate(
             shift.MMD_ID, 0, options.workers

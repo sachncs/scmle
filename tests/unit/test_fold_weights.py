@@ -20,7 +20,7 @@ def payload(weighted):
         adapter=None,
         strategy=None,
         feature_plan=data.FeaturePlan(("x",), (), weight_column="w"),
-        task=tasks.TaskType.REGRESSION,
+        task=tasks.Task.REGRESSION,
         seed=0,
         metric=None,
         positive_label=None,

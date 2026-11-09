@@ -50,7 +50,7 @@ Rules (all enforced by CI):
 
 ## Adding a model family
 
-Implement the `ModelAdapter` contract, register it, and make
+Implement the `Model` contract, register it, and make
 `scmle.models.conformance.check_conformance` pass for it (see
 `docs/TUTORIAL.md`).
 

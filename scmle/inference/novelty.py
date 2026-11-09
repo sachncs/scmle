@@ -70,7 +70,7 @@ class NoveltyDetector:
         if not (numeric or categorical):
             return None
         plan = data.FeaturePlan(numeric, categorical)
-        options = data.PreprocessingOptions(scale=True)
+        options = data.Preprocessing(scale=True)
         encoder = preprocessing.build_preprocessor(plan, options)
         model = pipeline.Pipeline(
             [

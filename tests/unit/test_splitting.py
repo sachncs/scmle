@@ -10,14 +10,14 @@ from scmle.data.splitting import splitters
 
 
 def make_spec(strategy="auto", **data_overrides):
-    return tasks.ProjectSpec(
-        data=tasks.DataSpec(uri="m", target="y", **data_overrides),
-        validation=tasks.ValidationSpec(strategy=strategy),
+    return tasks.Config(
+        data=tasks.Dataset(uri="m", target="y", **data_overrides),
+        validation=tasks.Validation(strategy=strategy),
     )
 
 
-def split(frame, spec=None, task=tasks.TaskType.BINARY):
-    return splitters.SplitManager(spec or make_spec(), task).split(frame)
+def split(frame, spec=None, task=tasks.Task.BINARY):
+    return splitters.Splitter(spec or make_spec(), task).split(frame)
 
 
 @pytest.fixture
@@ -113,10 +113,10 @@ def test_folds_shrink_to_minority_size(frame):
 
 def test_regression_defaults_to_random_and_rejects_stratified(frame):
     regression = frame.assign(y=frame.x * 2)
-    result = split(regression, task=tasks.TaskType.REGRESSION)
+    result = split(regression, task=tasks.Task.REGRESSION)
     assert result.manifest.strategy == "random"
     with pytest.raises(errors.BlockedError):
-        splitters.StratifiedSplit(make_spec(), tasks.TaskType.REGRESSION)
+        splitters.StratifiedSplit(make_spec(), tasks.Task.REGRESSION)
 
 
 def test_strategy_registry_is_polymorphic():
@@ -147,15 +147,15 @@ def test_locked_test_set_opens_once(frame):
 
 
 def temporal_spec(embargo):
-    return tasks.ProjectSpec(
-        data=tasks.DataSpec(uri="m", target="y", time_column="t"),
-        validation=tasks.ValidationSpec(embargo_rows=embargo),
+    return tasks.Config(
+        data=tasks.Dataset(uri="m", target="y", time_column="t"),
+        validation=tasks.Validation(embargo_rows=embargo),
     )
 
 
 def test_embargo_keeps_a_gap_between_training_and_validation_windows(frame):
     manifest = (
-        splitters.SplitManager(temporal_spec(10), tasks.TaskType.BINARY)
+        splitters.Splitter(temporal_spec(10), tasks.Task.BINARY)
         .split(frame)
         .manifest
     )
@@ -168,12 +168,12 @@ def test_embargo_keeps_a_gap_between_training_and_validation_windows(frame):
 
 def test_embargo_rows_before_the_test_set_belong_to_neither_partition(frame):
     plain = (
-        splitters.SplitManager(temporal_spec(0), tasks.TaskType.BINARY)
+        splitters.Splitter(temporal_spec(0), tasks.Task.BINARY)
         .split(frame)
         .manifest
     )
     embargoed = (
-        splitters.SplitManager(temporal_spec(10), tasks.TaskType.BINARY)
+        splitters.Splitter(temporal_spec(10), tasks.Task.BINARY)
         .split(frame)
         .manifest
     )
@@ -199,14 +199,12 @@ def test_embargo_rows_before_the_test_set_belong_to_neither_partition(frame):
 
 def test_embargo_requires_a_time_column_and_enough_rows(frame):
     with pytest.raises(Exception, match="time_column"):
-        tasks.ProjectSpec(
-            data=tasks.DataSpec(uri="m", target="y"),
-            validation=tasks.ValidationSpec(embargo_rows=5),
+        tasks.Config(
+            data=tasks.Dataset(uri="m", target="y"),
+            validation=tasks.Validation(embargo_rows=5),
         )
     with pytest.raises(errors.BlockedError, match="too few"):
-        splitters.SplitManager(temporal_spec(400), tasks.TaskType.BINARY).split(
-            frame
-        )
+        splitters.Splitter(temporal_spec(400), tasks.Task.BINARY).split(frame)
 
 
 def group_classification_frame(groups=30, per_group=10, seed=0):
@@ -223,11 +221,11 @@ def group_classification_frame(groups=30, per_group=10, seed=0):
 
 def test_group_folds_keep_groups_apart_and_every_class_in_every_fold():
     frame = group_classification_frame()
-    spec = tasks.ProjectSpec(
-        data=tasks.DataSpec(uri="x", target="y", group_column="unit"),
-        validation=tasks.ValidationSpec(strategy="group"),
+    spec = tasks.Config(
+        data=tasks.Dataset(uri="x", target="y", group_column="unit"),
+        validation=tasks.Validation(strategy="group"),
     )
-    part = splitters.SplitManager(spec, tasks.TaskType.BINARY).split(frame)
+    part = splitters.Splitter(spec, tasks.Task.BINARY).split(frame)
     dev_groups = frame.unit.to_numpy()[list(part.manifest.train_ids)]
     labels = frame.y.to_numpy()[list(part.manifest.train_ids)]
     for fit, held in part.manifest.folds:
@@ -239,12 +237,12 @@ def test_group_folds_keep_groups_apart_and_every_class_in_every_fold():
 def test_group_validation_blocks_when_classes_hide_in_one_group():
     frame = group_classification_frame(groups=8, per_group=10)
     frame["y"] = (frame.unit == 0).astype(int)  # one group holds the class
-    spec = tasks.ProjectSpec(
-        data=tasks.DataSpec(uri="x", target="y", group_column="unit"),
-        validation=tasks.ValidationSpec(strategy="group", folds=3),
+    spec = tasks.Config(
+        data=tasks.Dataset(uri="x", target="y", group_column="unit"),
+        validation=tasks.Validation(strategy="group", folds=3),
     )
     with pytest.raises(errors.BlockedError):
-        splitters.SplitManager(spec, tasks.TaskType.BINARY).split(frame)
+        splitters.Splitter(spec, tasks.Task.BINARY).split(frame)
 
 
 def test_temporal_folds_are_listed_latest_window_first():
@@ -256,20 +254,20 @@ def test_temporal_folds_are_listed_latest_window_first():
             "y": numpy.arange(rows) % 2,
         }
     )
-    spec = tasks.ProjectSpec(
-        data=tasks.DataSpec(uri="x", target="y", time_column="t"),
-        validation=tasks.ValidationSpec(strategy="temporal", folds=4),
+    spec = tasks.Config(
+        data=tasks.Dataset(uri="x", target="y", time_column="t"),
+        validation=tasks.Validation(strategy="temporal", folds=4),
     )
-    part = splitters.SplitManager(spec, tasks.TaskType.BINARY).split(frame)
+    part = splitters.Splitter(spec, tasks.Task.BINARY).split(frame)
     sizes = [len(fit) for fit, held in part.manifest.folds]
     assert sizes == sorted(sizes, reverse=True)  # largest training first
     assert any("latest window first" in n for n in part.manifest.notes)
 
 
 def rolling_spec(**validation):
-    return tasks.ProjectSpec(
-        data=tasks.DataSpec(uri="m", target="y", time_column="t"),
-        validation=tasks.ValidationSpec(strategy="rolling", **validation),
+    return tasks.Config(
+        data=tasks.Dataset(uri="m", target="y", time_column="t"),
+        validation=tasks.Validation(strategy="rolling", **validation),
     )
 
 
@@ -315,24 +313,22 @@ def test_rolling_blocks_when_no_window_fits(frame):
 
 def test_the_rolling_strategy_needs_a_time_column_and_its_options_need_rolling():
     with pytest.raises(ValueError, match=r"requires data\.time_column"):
-        tasks.ProjectSpec(
-            data=tasks.DataSpec(uri="m", target="y"),
-            validation=tasks.ValidationSpec(strategy="rolling"),
+        tasks.Config(
+            data=tasks.Dataset(uri="m", target="y"),
+            validation=tasks.Validation(strategy="rolling"),
         )
     with pytest.raises(ValueError, match="rolling strategy"):
-        tasks.ProjectSpec(
-            data=tasks.DataSpec(uri="m", target="y", time_column="t"),
-            validation=tasks.ValidationSpec(
-                strategy="stratified", horizon_rows=10
-            ),
+        tasks.Config(
+            data=tasks.Dataset(uri="m", target="y", time_column="t"),
+            validation=tasks.Validation(strategy="stratified", horizon_rows=10),
         )
 
 
 def test_feature_delays_become_lagged_nodes_and_exclusions_idempotently():
-    data = tasks.DataSpec(
+    data = tasks.Dataset(
         uri="m", target="y", time_column="t", feature_delays={"report": 3}
     )
-    spec = tasks.ProjectSpec(data=data)
+    spec = tasks.Config(data=data)
 
     node = spec.feature_graph.nodes[0]
     assert (node.name, node.op, node.params) == (
@@ -341,23 +337,23 @@ def test_feature_delays_become_lagged_nodes_and_exclusions_idempotently():
         {"k": 3},
     )
     assert "report" in spec.data.excluded_columns
-    again = tasks.ProjectSpec.model_validate_json(spec.canonical_json())
+    again = tasks.Config.model_validate_json(spec.canonical_json())
     assert again == spec and len(again.feature_graph.nodes) == 1
 
 
 def test_feature_delays_need_a_time_column_and_forbid_reading_the_raw_column():
     with pytest.raises(ValueError, match=r"requires data\.time_column"):
-        tasks.ProjectSpec(
-            data=tasks.DataSpec(
+        tasks.Config(
+            data=tasks.Dataset(
                 uri="m", target="y", feature_delays={"report": 2}
             )
         )
     with pytest.raises(ValueError, match="read a delayed column"):
-        tasks.ProjectSpec(
-            data=tasks.DataSpec(
+        tasks.Config(
+            data=tasks.Dataset(
                 uri="m", target="y", time_column="t", feature_delays={"r": 2}
             ),
-            feature_graph=tasks.FeatureGraphSpec(
+            feature_graph=tasks.FeatureGraph(
                 nodes=[
                     tasks.FeatureNode(name="doubled", op="log1p", inputs=["r"])
                 ]

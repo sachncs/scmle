@@ -49,7 +49,7 @@ class Candidate:
 
 
 @dataclasses.dataclass(frozen=True)
-class ClusterReport:
+class Clustering:
     """The candidates, the choice and a profile of the chosen clusters.
 
     Attributes:
@@ -203,7 +203,7 @@ def find_clusters(
     methods: tuple[str, ...] = METHODS,
     rounds: int = 10,
     seed: int = 0,
-) -> ClusterReport:
+) -> Clustering:
     """Tries each method at each count and picks the best stable one.
 
     Args:
@@ -244,7 +244,7 @@ def find_clusters(
         int(str(k)): int(v)
         for k, v in pandas.Series(labels).value_counts().items()
     }
-    return ClusterReport(candidates, best, bool(stable), labels, sizes, profile)
+    return Clustering(candidates, best, bool(stable), labels, sizes, profile)
 
 
 def external_scores(truth: Any, labels: Any) -> dict[str, float]:

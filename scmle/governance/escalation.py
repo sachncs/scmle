@@ -126,7 +126,7 @@ class Step:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ThresholdResult:
+class Threshold:
     """The selected threshold and the sequence that led to it.
 
     Attributes:
@@ -220,7 +220,7 @@ def select_threshold(
     weights: Any = None,
     grid: Sequence[float] | None = None,
     minimum: int = 1,
-) -> ThresholdResult:
+) -> Threshold:
     """Fixed-sequence selection of the least conservative safe ``tau``.
 
     Args:
@@ -296,12 +296,12 @@ def select_threshold(
             break
         chosen = float(tau)
     if math.isinf(chosen):
-        return ThresholdResult(
+        return Threshold(
             chosen, 0.0, math.nan, r_star, delta, w is not None, tuple(steps)
         )
     answered = g >= chosen
     risk = float(losses[answered].mean())
-    return ThresholdResult(
+    return Threshold(
         chosen,
         float(answered.mean()),
         risk,

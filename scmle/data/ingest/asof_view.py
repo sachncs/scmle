@@ -85,7 +85,7 @@ def to_days(values: pandas.Series) -> numpy.ndarray:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class TimeRule:
+class KnownTime:
     """How a table's known time is obtained, and what vouches for it.
 
     Attributes:
@@ -172,7 +172,7 @@ class AsOfView:
         self,
         frame: pandas.DataFrame,
         key: str,
-        rule: TimeRule,
+        rule: KnownTime,
         event_time: str | None = None,
         name: str = "",
         permissive: bool = False,
@@ -313,7 +313,7 @@ class AsOfView:
         cls,
         connector: connectors.SourceConnector,
         key: str,
-        rule: TimeRule,
+        rule: KnownTime,
         event_time: str | None = None,
         name: str = "",
         permissive: bool = False,

@@ -307,12 +307,12 @@ def test_shift_weights_estimate_and_refuse() -> None:
 
 def test_every_task_type_has_a_gate_status() -> None:
     listed = task_gate.load()
-    assert set(listed) == {t.value for t in tasks.TaskType}
-    for task in tasks.TaskType:
+    assert set(listed) == {t.value for t in tasks.Task}
+    for task in tasks.Task:
         assert task_gate.status(task) in task_gate.STATUSES
         if task_gate.status(task) != task_gate.PASSED:
             assert task_gate.tier_ceiling(task, "confirmed") == "unverified"
     assert (
-        task_gate.tier_ceiling(tasks.TaskType.REGRESSION, "confirmed")
+        task_gate.tier_ceiling(tasks.Task.REGRESSION, "confirmed")
         == "confirmed"
     )

@@ -8,9 +8,9 @@ from typing import Any
 
 import pandas
 
-import scmle
 from scmle import durability
 from scmle.api import results
+import scmle.api.project
 from scmle.contracts import errors
 import scmle.governance.registry
 from scmle.monitoring import champion
@@ -67,7 +67,7 @@ def split_fresh(
 
 
 @dataclasses.dataclass(frozen=True)
-class RetrainPolicy:
+class Cadence:
     """When a drifting model may be retrained, so checks do not pile up.
 
     Attributes:
@@ -82,7 +82,7 @@ class RetrainPolicy:
 
 
 @dataclasses.dataclass(frozen=True)
-class RollbackPolicy:
+class Trigger:
     """When a promoted model must be taken back.
 
     Attributes:
@@ -140,7 +140,7 @@ class LifecycleOutcome:
         monitoring: Monitoring report for the current champion.
         retrained: Whether a challenger was trained.
         comparison: Champion-challenger comparison, if a challenger exists.
-        promoted_version: Always None as `LifecycleManager.review` returns
+        promoted_version: Always None as `Maintainer.review` returns
             it, since `review` only stages a challenger; promotion is a
             separate call.
         notes: Human-readable explanation.
@@ -148,7 +148,7 @@ class LifecycleOutcome:
             `cooldown` or `too_few_rows`), if it did not.
     """
 
-    monitoring: monitor.MonitoringReport
+    monitoring: monitor.Assessment
     retrained: bool
     comparison: champion.Comparison | None
     promoted_version: int | None
@@ -156,7 +156,7 @@ class LifecycleOutcome:
     skipped: str | None = None
 
 
-class LifecycleManager:
+class Maintainer:
     """Keeps a registered model fresh and safe to serve."""
 
     def __init__(
@@ -164,7 +164,7 @@ class LifecycleManager:
         registry: scmle.governance.registry.ModelRegistryStore,
         model: str,
         work_dir: str,
-        policy: RetrainPolicy | None = None,
+        policy: Cadence | None = None,
     ) -> None:
         """Initializes the manager.
 
@@ -177,7 +177,7 @@ class LifecycleManager:
         self.registry = registry
         self.model = model
         self.work_dir = work_dir
-        self.policy = policy or RetrainPolicy()
+        self.policy = policy or Cadence()
         self.rollout_decides = False
 
     def defer_to_rollout(self) -> None:
@@ -249,7 +249,7 @@ class LifecycleManager:
 
     def register_run(
         self,
-        result: results.RunResult,
+        result: results.Run,
         promote: bool = False,
         approval: scmle.governance.registry.PromotionApproval | None = None,
         signing_key: str | bytes | None = None,
@@ -351,7 +351,7 @@ class LifecycleManager:
             target: Name of the target column.
             retrain: Whether a recommended retrain may run; when False the
                 champion is only monitored.
-            project_options: Extra `MLProject` options for the challenger.
+            project_options: Extra `Project` options for the challenger.
 
         Returns:
             The outcome.
@@ -421,7 +421,7 @@ class LifecycleManager:
         options = dict(project_options or {})
         options.setdefault("task", current.schema.task)
         options.setdefault("metric", current.info.metric)
-        challenger_run = scmle.MLProject(
+        challenger_run = scmle.api.project.Project(
             train, target, output_dir=self.work_dir, **options
         ).run()
         comparison = champion.ChampionChallenger(
@@ -471,7 +471,7 @@ class LifecycleManager:
         self,
         fresh: pandas.DataFrame,
         target: str,
-        policy: RollbackPolicy | None = None,
+        policy: Trigger | None = None,
         approval: scmle.governance.registry.PromotionApproval | None = None,
         signing_key: str | bytes | None = None,
     ) -> RollbackOutcome:
@@ -496,7 +496,7 @@ class LifecycleManager:
         Args:
             fresh: Recent served rows including the true target.
             target: Name of the target column.
-            policy: Evidence required; defaults to `RollbackPolicy()`.
+            policy: Evidence required; defaults to `Trigger()`.
             approval: Independent approval for the rollback promotion.
             signing_key: HMAC key for the approval signature.
 
@@ -506,7 +506,7 @@ class LifecycleManager:
             restored when there is no previous version, too few rows, the new
             champion holds up, no approval was given, or a rollout decides.
         """
-        rule = policy or RollbackPolicy()
+        rule = policy or Trigger()
         aliases = self.registry.aliases(self.model)
         previous = aliases.get(scmle.governance.registry.PREVIOUS)
         if previous is None:
@@ -664,7 +664,7 @@ class LifecycleManager:
         self.write_state(state)
 
 
-def read_run_config(result: results.RunResult) -> dict[str, Any]:
+def read_run_config(result: results.Run) -> dict[str, Any]:
     """Reads the saved project configuration of a run.
 
     Args:

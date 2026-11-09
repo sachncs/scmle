@@ -22,7 +22,7 @@ class BenchmarkDataset(abc.ABC):
     Attributes:
         name: Display name.
         target: Target column name.
-        task: Task request passed to `MLProject`.
+        task: Task request passed to `Project`.
         metric: Primary metric.
         max_rows: Stratification-free row cap for slow downloads (None = all).
         drop: Columns that are identifiers or free text, never features.
@@ -225,7 +225,7 @@ def open_ml(
         name: Display name.
         openml_name: Dataset name on OpenML.
         target: Target column name.
-        task: Task request passed to `MLProject`.
+        task: Task request passed to `Project`.
         metric: Primary metric.
         version: OpenML dataset version.
         max_rows: Row cap applied when loading (None = all rows).
@@ -387,7 +387,7 @@ def hugging_face(
         name: Display name.
         filename: CSV or Parquet file inside the repository.
         target: Target column name.
-        task: Task request passed to `MLProject`.
+        task: Task request passed to `Project`.
         metric: Primary metric.
         repo: Repository id of the dataset repository.
         max_rows: Row cap applied when loading (None = all rows).

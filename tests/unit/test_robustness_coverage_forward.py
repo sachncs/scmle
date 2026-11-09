@@ -71,7 +71,7 @@ def forward_set(rows=300, beta=0.8, seed=0):
     x = rng.normal(size=rows)
     frame = pandas.DataFrame({"f": x, "g": rng.normal(size=rows)})
     target = pandas.Series(beta * x + rng.normal(size=rows), name="y")
-    vault = sealed.CustodyVault(sealed.OpenLog(), process=False)
+    vault = sealed.Vault(sealed.OpenLog(), process=False)
     held = vault.seal("final_test", frame, target, tuple(range(rows)))
     return vault, held
 

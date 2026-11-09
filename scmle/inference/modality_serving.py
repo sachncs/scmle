@@ -72,7 +72,7 @@ class ModalityHttpServing:
 
     def __init__(
         self,
-        predictor: modality_lifecycle.ModalityPredictor,
+        predictor: modality_lifecycle.Predictor,
         decoder: ModalitySampleDecoder,
         host: str = "127.0.0.1",
         port: int = 0,
@@ -264,7 +264,7 @@ class ModalityHttpServing:
             raise errors.ScmleError("server is already running")
         adapter = self
 
-        class Handler(server.BaseHTTPRequestHandler):
+        class Responder(server.BaseHTTPRequestHandler):
             """Handles one modality reference-server request."""
 
             def request_identity(self) -> tuple[str, str | None]:
@@ -338,7 +338,7 @@ class ModalityHttpServing:
                         self.client_address[0],
                         request_id,
                     )
-                except access.AccessDenied as denied:
+                except access.DeniedError as denied:
                     self.send_json(
                         denied.status, denied.body, request_id, denied.headers
                     )
@@ -547,7 +547,9 @@ class ModalityHttpServing:
                 """
 
         access.require_authentication_for(self.host, self.gateway)
-        self.httpd = server.ThreadingHTTPServer((self.host, self.port), Handler)
+        self.httpd = server.ThreadingHTTPServer(
+            (self.host, self.port), Responder
+        )
         self.thread = threading.Thread(
             target=self.httpd.serve_forever,
             daemon=True,

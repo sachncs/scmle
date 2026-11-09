@@ -26,7 +26,7 @@ def run(frame, tmp_path, **kwargs):
         "y",
         time_budget=300,
         output_dir=tmp_path,
-        models=tasks.ModelSpec(exclude_families=["deep_learning"]),
+        models=tasks.Candidates(exclude_families=["deep_learning"]),
         **kwargs,
     ).run()
 
@@ -117,7 +117,7 @@ def test_selection_can_opt_out_of_weighted_scores(tmp_path):
         weights_frame(),
         tmp_path,
         weight_column="w",
-        selection=tasks.SelectionSpec(weighted=False),
+        selection=tasks.Selection(weighted=False),
     )
 
     configs = [

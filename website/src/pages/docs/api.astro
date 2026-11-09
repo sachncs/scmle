@@ -7,12 +7,13 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 <DocsLayout title="Python API" description="The supported top-level Python API for scmle." current="api">
   <p class="eyebrow"><span></span> Stable surface</p>
   <h1>Use the API<br /><em>with intent.</em></h1>
-  <p class="lead">The package keeps its supported surface small: define an <code>MLProject</code>, inspect a <code>RunResult</code>, save or load a signed <code>ModelBundle</code>, and extend registries when the built-ins are not enough.</p>
+  <p class="lead">The package keeps its supported surface small: define an <code>Project</code>, inspect a <code>RunResult</code>, save or load a signed <code>Bundle</code>, and extend registries when the built-ins are not enough.</p>
 
   <h2>The lifecycle objects</h2>
-  <pre><code>from scmle import MLProject, load_model, predict
+  <pre><code>from scmle.api.project import Project
+from scmle.api.predict import load_model, predict
 
-project = MLProject(data=df, target="outcome", task="regression")
+project = Project(data=df, target="outcome", task="regression")
 plan = project.plan()
 result = project.run()
 print(result.metrics)
@@ -22,35 +23,35 @@ bundle.save("artifacts/outcome-model")
 loaded = load_model("artifacts/outcome-model")
 predictions = predict(loaded, new_rows)</code></pre>
   <ul>
-    <li><code>MLProject</code> is the declarative input and policy boundary.</li>
+    <li><code>Project</code> is the declarative input and policy boundary.</li>
     <li><code>RunResult</code> points to metrics, evidence, and the selected model.</li>
-    <li><code>ModelBundle</code> packages the schema, preprocessing, estimator, provenance, and signature.</li>
+    <li><code>Bundle</code> packages the schema, preprocessing, estimator, provenance, and signature.</li>
     <li><code>load_model</code> verifies a bundle before it is used for inference.</li>
   </ul>
 
   <h2>Declare the dataset family</h2>
   <p><code>modality</code> is keyword-only and becomes part of the dataset manifest and capability decision. The current supported workflow is explicitly tabular; declaring another family preserves the claim in evidence and fails closed before modelling until that lifecycle is registered.</p>
-  <pre><code>project = MLProject(
+  <pre><code>project = Project(
     data=records,
     target="outcome",
     modality="tabular",
 )</code></pre>
 
   <h2>Run a non-tabular lifecycle explicitly</h2>
-  <p><code>ModalityProject</code> is the public entry point for typed experimental adapters. It accepts the built-in document, image, audio, video, graph, geospatial-vector, and raster families, or a caller-defined <code>ExtensionModality</code>, through the same fifteen-stage lifecycle. The adapter owns decoding and representation policy; the project owns signed packaging, evidence persistence, inference parity, monitoring, documentation, and recovery checks. <code>ModalityPredictor</code>, <code>ModalityHttpServing</code>, and <code>ModalitySampleDecoder</code> are also exported for verified library inference and explicit reference serving.</p>
-  <pre><code>from scmle import ModalityProject
-from scmle.data.modalities import DocumentDataset, DocumentSample
-from scmle.models.modality_lifecycle import TextAdapter
+  <p><code>ModalityProject</code> is the public entry point for typed experimental adapters. It accepts the built-in document, image, audio, video, graph, geospatial-vector, and raster families, or a caller-defined <code>ExtensionModality</code>, through the same fifteen-stage lifecycle. The adapter owns decoding and representation policy; the project owns signed packaging, evidence persistence, inference parity, monitoring, documentation, and recovery checks. <code>Predictor</code>, <code>ModalityHttpServing</code>, and <code>ModalitySampleDecoder</code> are also exported for verified library inference and explicit reference serving.</p>
+  <pre><code>from scmle.api.project import ModalityProject
+from scmle.data.modalities import Dataset, Sample
+from scmle.models.modality_lifecycle import TextPreparer
 
-adapter = TextAdapter(DocumentDataset((
-    DocumentSample("a", "red apple", label="fruit"),
-    DocumentSample("b", "blue ocean", label="water"),
-    DocumentSample("c", "red orchard", label="fruit"),
-    DocumentSample("d", "blue lake", label="water"),
-    DocumentSample("e", "sweet fruit", label="fruit"),
-    DocumentSample("f", "deep water", label="water"),
-    DocumentSample("g", "orange crop", label="fruit"),
-    DocumentSample("h", "lake vessel", label="water"),
+adapter = TextPreparer(Dataset((
+    Sample("a", "red apple", label="fruit"),
+    Sample("b", "blue ocean", label="water"),
+    Sample("c", "red orchard", label="fruit"),
+    Sample("d", "blue lake", label="water"),
+    Sample("e", "sweet fruit", label="fruit"),
+    Sample("f", "deep water", label="water"),
+    Sample("g", "orange crop", label="fruit"),
+    Sample("h", "lake vessel", label="water"),
 )))
 project = ModalityProject(
     adapter,
@@ -59,13 +60,13 @@ project = ModalityProject(
 )
 report = project.run()
 print(report.documentation["status"])  # experimental</code></pre>
-  <p>This surface does not promote the modality to supported production status. The report says <code>experimental</code> until decoder ownership, modality-specific fidelity, external serving and fault evidence, and independent review are complete. For verified package inference, use the exported <code>ModalityPredictor</code> with the same typed adapter. Do not pass raw bytes to <code>MLProject</code> and expect a tabular estimator to infer their semantics.</p>
+  <p>This surface does not promote the modality to supported production status. The report says <code>experimental</code> until decoder ownership, modality-specific fidelity, external serving and fault evidence, and independent review are complete. For verified package inference, use the exported <code>Predictor</code> with the same typed adapter. Do not pass raw bytes to <code>Project</code> and expect a tabular estimator to infer their semantics.</p>
 
   <h2>Use the bounded non-tabular model API</h2>
-  <p><code>NonTabularModelProject</code> is the narrower modelling boundary for applications that need a durable package around an existing built-in representation. It allowlists the exact document, text, image, audio, video, graph, geospatial, and raster adapter types; it does not discover codecs, accept arbitrary adapter subclasses, infer semantics from raw bytes, or claim Transformer, JEPA, GNN, OCR, layout, or foundation-model support. Video and raster metadata-only paths remain metadata representations, not visual modelling.</p>
-  <pre><code>{`from scmle import NonTabularModelProject
+  <p><code>Modeler</code> is the narrower modelling boundary for applications that need a durable package around an existing built-in representation. It allowlists the exact document, text, image, audio, video, graph, geospatial, and raster adapter types; it does not discover codecs, accept arbitrary adapter subclasses, infer semantics from raw bytes, or claim Transformer, JEPA, GNN, OCR, layout, or foundation-model support. Video and raster metadata-only paths remain metadata representations, not visual modelling.</p>
+  <pre><code>{`from scmle.api.non_tabular import Modeler
 
-project = NonTabularModelProject(
+project = Modeler(
     adapter,
     signing_key="load-this-from-your-secret-manager",
     experimental_opt_in=True,
@@ -78,11 +79,11 @@ print(result.predict(adapter.samples[:2]))`}</code></pre>
   <p>The explicit opt-in is required because these are bounded, production-oriented artifacts—not supported production capabilities. The result verifies the signed lifecycle report and package, preserves the exact feature schema and dataset identity, and exposes prediction health. Custom adapter subclasses and curation-only extension adapters fail before fitting; use <code>ModalityProject</code> for broader experimental extension work.</p>
 
   <h2>Bring a new dataset family</h2>
-  <p>Use <code>ExtensionModality</code> when your dataset does not fit a built-in identity. It gives the family a stable serialized name and keeps the declaration <code>extension-only</code> even when all fifteen local stages have evidence. For raw records that are not ready for modelling, <code>ExtensionCurationAdapter</code> supplies only source identity, sample ownership, and a caller-owned curation callback; it does not force unused split or feature methods. Read the <a href={`${base}/docs/extensions/`}>extension contract guide</a> for the raw-fixture, curation, adapter, and promotion requirements.</p>
+  <p>Use <code>ExtensionModality</code> when your dataset does not fit a built-in identity. It gives the family a stable serialized name and keeps the declaration <code>extension-only</code> even when all fifteen local stages have evidence. For raw records that are not ready for modelling, <code>ExtensionCurator</code> supplies only source identity, sample ownership, and a caller-owned curation callback; it does not force unused split or feature methods. Read the <a href={`${base}/docs/extensions/`}>extension contract guide</a> for the raw-fixture, curation, adapter, and promotion requirements.</p>
   <pre><code>{`from scmle.contracts import modalities
 from scmle.models import modality_lifecycle
 
-class PointCloudAdapter(modality_lifecycle.ModalityAdapter):
+class PointCloudAdapter(modality_lifecycle.Preparer):
     modality = modalities.ExtensionModality("acme/point-cloud")
     # Implement the complete adapter contract for your raw source.
 
@@ -91,7 +92,7 @@ report = ModalityProject(
     signing_key="load-this-from-your-secret-manager",
 ).run()
 assert report.documentation["status"] == "extension-only"`}</code></pre>
-  <p>For raw or unlabeled data, start with <code>ModalityCurationProject</code>. It produces signed curation and dataset-card evidence without forcing a modelling stage; use <code>ModalityProject</code> only when the curation decision supports a supervised lifecycle.</p>
+  <p>For raw or unlabeled data, start with <code>Curator</code>. It produces signed curation and dataset-card evidence without forcing a modelling stage; use <code>ModalityProject</code> only when the curation decision supports a supervised lifecycle.</p>
 
   <h2>Connect a warehouse without hiding its boundary</h2>
   <p><code>WarehouseConnector</code> is a transport-neutral contract for a caller-owned warehouse or lakehouse engine. Inject callbacks for schema and bounded batches; the connector records the query in source identity, validates row shape, retries engine failures, and returns a resumable checkpoint. It does not pretend that a callback is a broker, a distributed transaction, or an exactly-once guarantee.</p>
@@ -111,101 +112,101 @@ next_batch = connector.read_rows(batch.checkpoint, limit=10_000)</code></pre>
   <p>Curated media reports include duplicate-content label conflicts as blocking risk evidence. That is intentionally stricter than merely counting labels: two source files can be different files but the same underlying image, audio bytes, or video bytes. Image curation also blocks sensitive EXIF metadata until a privacy reviewer records a disposition.</p>
 
   <h2>What is safe to depend on</h2>
-  <p>The supported top-level exports are <code>MLProject</code>, <code>ModalityProject</code>, <code>NonTabularModelProject</code>, <code>NonTabularModelResult</code>, <code>ModalityPredictor</code>, <code>ModalityHttpServing</code>, <code>ModalitySampleDecoder</code>, <code>RunResult</code>, <code>ModelBundle</code>, <code>load_model</code>, <code>predict</code>, <code>register_estimator</code>, <code>unregister_estimator</code>, and <code>register_metric</code>. Internal modules under <code>scmle.core</code>, <code>scmle.data</code>, and <code>scmle.models</code> may change until promoted into a documented contract.</p>
+  <p>The supported top-level exports are <code>Project</code>, <code>ModalityProject</code>, <code>Modeler</code>, <code>Predictor</code>, <code>Predictor</code>, <code>ModalityHttpServing</code>, <code>ModalitySampleDecoder</code>, <code>RunResult</code>, <code>Bundle</code>, <code>load_model</code>, <code>predict</code>, <code>register_estimator</code>, <code>unregister_estimator</code>, and <code>register_metric</code>. Internal modules under <code>scmle.core</code>, <code>scmle.data</code>, and <code>scmle.models</code> may change until promoted into a documented contract.</p>
 
   <h2>Experimental document baseline</h2>
   <p>Documents have a deliberately bounded library path for exploration. It curates labelled samples before fitting, evaluates a TF-IDF/logistic baseline on a held-out split, exposes linear global/local term evidence and bounded raw-text term ablation, and writes an atomic package whose manifest verifies both the payload and model digests.</p>
-  <pre><code>from scmle.data.modalities import DocumentDataset, DocumentSample
-from scmle.data.modalities import DocumentReader
-from scmle.models.documents import DocumentClassifier, DocumentModelConfig
+  <pre><code>from scmle.data.modalities import Dataset, Sample
+from scmle.data.modalities import Reader
+from scmle.models.documents import Classifier, Config
 
-train = DocumentDataset((
-    DocumentSample("a", "red apple orchard", label="fruit"),
-    DocumentSample("b", "blue ocean water", label="water"),
-    DocumentSample("c", "red orange harvest", label="fruit"),
-    DocumentSample("d", "blue lake sailing", label="water"),
-    DocumentSample("e", "sweet apple fruit", label="fruit"),
-    DocumentSample("f", "deep ocean boat", label="water"),
-    DocumentSample("g", "orchard orange crop", label="fruit"),
-    DocumentSample("h", "lake water vessel", label="water"),
+train = Dataset((
+    Sample("a", "red apple orchard", label="fruit"),
+    Sample("b", "blue ocean water", label="water"),
+    Sample("c", "red orange harvest", label="fruit"),
+    Sample("d", "blue lake sailing", label="water"),
+    Sample("e", "sweet apple fruit", label="fruit"),
+    Sample("f", "deep ocean boat", label="water"),
+    Sample("g", "orchard orange crop", label="fruit"),
+    Sample("h", "lake water vessel", label="water"),
 ))
 split = train.split(validation_fraction=0, test_fraction=0.25, seed=7)
-model = DocumentClassifier(DocumentModelConfig()).fit(split.train)
+model = Classifier(Config()).fit(split.train)
 evaluation = model.evaluate(split.test)
 ablation = model.term_ablation_explanation(split.test[0], top_k=5)
 artifact = model.save("artifacts/document-model")
-restored = DocumentClassifier.load(artifact.path, trusted=True)</code></pre>
-  <p>Term ablation removes lexical matches from the original text one at a time and measures the predicted-class score change; its candidate work is explicitly bounded by <code>max_terms</code>. This is perturbation evidence, not semantic citation grounding or a causal claim. The path is not part of the supported <code>MLProject</code> workflow. <code>trusted=True</code> is required because loading a serialized estimator is executable-code deserialization; the package checks its manifest, payload digest, model digest, and fitted type before returning it.</p>
+restored = Classifier.load(artifact.path, trusted=True)</code></pre>
+  <p>Term ablation removes lexical matches from the original text one at a time and measures the predicted-class score change; its candidate work is explicitly bounded by <code>max_terms</code>. This is perturbation evidence, not semantic citation grounding or a causal claim. The path is not part of the supported <code>Project</code> workflow. <code>trusted=True</code> is required because loading a serialized estimator is executable-code deserialization; the package checks its manifest, payload digest, model digest, and fitted type before returning it.</p>
   <h3>Attach source-backed citations</h3>
-  <p><code>DocumentReader</code> hashes the raw bytes before decoding them. A loaded sample carries the source URI, raw-source SHA-256 digest, and deterministic page or section locators. Local explanations and raw-span occlusion include those citations when the sample has a source identity. Manually created in-memory samples remain explicitly citation-free; the curation report exposes their traceability coverage instead of inventing a source.</p>
-  <pre><code>reader = DocumentReader()
+  <p><code>Reader</code> hashes the raw bytes before decoding them. A loaded sample carries the source URI, raw-source SHA-256 digest, and deterministic page or section locators. Local explanations and raw-span occlusion include those citations when the sample has a source identity. Manually created in-memory samples remain explicitly citation-free; the curation report exposes their traceability coverage instead of inventing a source.</p>
+  <pre><code>reader = Reader()
 sample = reader.load("policy.txt", document_id="policy-2026")
-curation = DocumentDataset((sample,)).curate()
+curation = Dataset((sample,)).curate()
 explanation = model.local_explanation(sample)
 
 assert curation.source_traceability_coverage == 1.0
 assert explanation.to_dict()["citations"][0]["source_digest"] == sample.source_digest</code></pre>
-  <p>Layout, OCR, and table extraction stay an explicit dependency boundary. Supply a <code>layout_reader</code> callback when you own a parser; it receives the raw bytes, document ID, and resolved format. The reader validates the returned <code>DocumentLayout</code>, rejects malformed extraction results, and fails closed when the optional parser is unavailable.</p>
+  <p>Layout, OCR, and table extraction stay an explicit dependency boundary. Supply a <code>layout_reader</code> callback when you own a parser; it receives the raw bytes, document ID, and resolved format. The reader validates the returned <code>Layout</code>, rejects malformed extraction results, and fails closed when the optional parser is unavailable.</p>
   <pre><code>{`def extract_layout(raw_bytes, document_id, document_format):
-    # Call your pinned parser and return DocumentLayout(...).
+    # Call your pinned parser and return Layout(...).
     return layout
 
-reader = DocumentReader(layout_reader=extract_layout)
+reader = Reader(layout_reader=extract_layout)
 sample = reader.load("policy.pdf", document_id="policy-2026")`}</code></pre>
-  <p>OCR, layout, tables, signed <code>ModelBundle</code> integration, HTTP serving, and release-grade document evidence are still outside this experimental boundary. A source-backed locator proves where the decoded span came from; it does not prove that a generated answer is semantically grounded in that span.</p>
+  <p>OCR, layout, tables, signed <code>Bundle</code> integration, HTTP serving, and release-grade document evidence are still outside this experimental boundary. A source-backed locator proves where the decoded span came from; it does not prove that a generated answer is semantically grounded in that span.</p>
 
   <h2>Experimental image baseline</h2>
-  <p>The image path follows the same evidence-first boundary. Labelled <code>ImageDataset</code> samples are curated for exact and near-duplicate content, mixed label state, augmentation lineage, and sensitive metadata, resized into a bounded pixel matrix, evaluated with held-out data, and explained with global/local pixel contributions plus a deterministic black-baseline occlusion report.</p>
-  <pre><code>from scmle.data.modalities import ImageAugmentation, ImageDataset
-from scmle.data.modalities import ImageSample
-from scmle.models.images import ImageClassifier, ImageModelConfig
+  <p>The image path follows the same evidence-first boundary. Labelled <code>Dataset</code> samples are curated for exact and near-duplicate content, mixed label state, augmentation lineage, and sensitive metadata, resized into a bounded pixel matrix, evaluated with held-out data, and explained with global/local pixel contributions plus a deterministic black-baseline occlusion report.</p>
+  <pre><code>from scmle.data.modalities import Augmentation, Dataset
+from scmle.data.modalities import Sample
+from scmle.models.images import Classifier, Config
 
-train = ImageDataset((
-    ImageSample.from_path("red.png", label="red"),
-    ImageSample.from_path("blue.png", label="blue"),
+train = Dataset((
+    Sample.from_path("red.png", label="red"),
+    Sample.from_path("blue.png", label="blue"),
 ))
-model = ImageClassifier(ImageModelConfig(target_size=(16, 16))).fit(train)
+model = Classifier(Config(target_size=(16, 16))).fit(train)
 prediction = model.predict(train)
 explanation = model.local_explanation(train.samples[0])
 occlusion = model.occlusion_explanation(
     train.samples[0], patch_size=(4, 4), top_k=5
 )
 artifact = model.save("artifacts/image-model")
-restored = ImageClassifier.load(artifact.path, trusted=True)</code></pre>
-  <p>The occlusion report replaces transformed pixels with a zero-valued black baseline and reports the predicted-class score change for each region. It is perturbation evidence, not raw-image saliency or object localization. This is an experimental library path, not a supported image capability. It does not claim saliency fidelity, localization, OCR, signed <code>ModelBundle</code> integration, HTTP serving, or full release recovery evidence.</p>
-  <p><code>ImageDataset.near_duplicate_groups()</code> computes a bounded quantized-luminance signature for likely visually similar samples. This is review evidence, not a semantic similarity model. If a caller creates a transformed sample, <code>ImageAugmentation</code> records the parent source, operation, parameters, and tool; that provenance is included in dataset identity and curation.</p>
-  <pre><code>{`augmented = ImageSample.from_bytes(
+restored = Classifier.load(artifact.path, trusted=True)</code></pre>
+  <p>The occlusion report replaces transformed pixels with a zero-valued black baseline and reports the predicted-class score change for each region. It is perturbation evidence, not raw-image saliency or object localization. This is an experimental library path, not a supported image capability. It does not claim saliency fidelity, localization, OCR, signed <code>Bundle</code> integration, HTTP serving, or full release recovery evidence.</p>
+  <p><code>Dataset.near_duplicate_groups()</code> computes a bounded quantized-luminance signature for likely visually similar samples. This is review evidence, not a semantic similarity model. If a caller creates a transformed sample, <code>Augmentation</code> records the parent source, operation, parameters, and tool; that provenance is included in dataset identity and curation.</p>
+  <pre><code>{`augmented = Sample.from_bytes(
     transformed_bytes,
     source="augmented.png",
-    augmentation=ImageAugmentation(
+    augmentation=Augmentation(
         parent_source="original.png",
         operation="horizontal_flip",
         parameters={"axis": "x"},
         tool="transformer/1",
     ),
 )
-dataset = ImageDataset((original, augmented))
+dataset = Dataset((original, augmented))
 print(dataset.curate().profile["near_duplicate_groups"])
 print(dataset.curate().profile["augmentation"])`}</code></pre>
   <p>Near-duplicate findings should be reviewed before splitting. The framework does not infer augmentation from pixels, repair missing lineage, or claim object identity, localization, or saliency.</p>
 
   <h2>Image metadata review</h2>
-  <p><code>ImageSample.from_bytes()</code> keeps source bytes and records EXIF tags as lineage evidence. Use the curation report to find metadata that can identify a person, device, location, or capture event.</p>
-  <pre><code>{`sample = ImageSample.from_path("field-photo.jpg")
+  <p><code>Sample.from_bytes()</code> keeps source bytes and records EXIF tags as lineage evidence. Use the curation report to find metadata that can identify a person, device, location, or capture event.</p>
+  <pre><code>{`sample = Sample.from_path("field-photo.jpg")
 print(sample.exif_tags)
 print(sample.sensitive_metadata)
-report = ImageDataset((sample,)).curate()
+report = Dataset((sample,)).curate()
 assert report.release_ready is False if sample.sensitive_metadata else True`}</code></pre>
   <p>The framework does not silently strip metadata because redaction is a data-governance decision. The blocking finding must be resolved by an approved redaction or documented privacy exception before the asset is used in a release workflow.</p>
 
   <h2>Experimental audio feature preparation</h2>
   <p>The audio foundation can produce bounded signal statistics for inspection and future baseline work. It makes the observation boundary explicit; it is not an audio classifier and does not silently decode non-WAV containers.</p>
-  <pre><code>from scmle.data.modalities import AudioDataset, AudioSample
+  <pre><code>from scmle.data.modalities import Dataset, Sample
 
-clip = AudioSample.from_bytes(
+clip = Sample.from_bytes(
     wav_bytes, source="clip.wav", group_id="speaker-17"
 )
-dataset = AudioDataset((clip,))
+dataset = Dataset((clip,))
 features = dataset.prepare_features(max_frames=100_000)
 split = dataset.split(test_fraction=0)
 print(features.feature_names)
@@ -215,32 +216,32 @@ print(features.frames_truncated)</code></pre>
 
   <h2>Experimental video metadata features</h2>
   <p>Video exposes metadata evidence by default. When you own a versioned decoder, you can opt into a bounded temporal baseline without hiding codec or resource decisions inside the core package.</p>
-  <pre><code>from scmle.data.modalities import VideoDataset, VideoSample
+  <pre><code>from scmle.data.modalities import Dataset, Sample
 
-clip = VideoSample.from_bytes(encoded, metadata, source="clip.mp4")
-features = VideoDataset((clip,)).prepare_metadata_features()
+clip = Sample.from_bytes(encoded, metadata, source="clip.mp4")
+features = Dataset((clip,)).prepare_metadata_features()
 print(features.feature_names)
 print(features.to_numpy())</code></pre>
   <pre><code>def decode_frame(encoded_bytes, frame_index):
     # Bind this to your audited codec/runtime.
     return decoder.read(encoded_bytes, frame_index)
 
-temporal = VideoDataset((clip,)).prepare_frame_features(
+temporal = Dataset((clip,)).prepare_frame_features(
     decode_frame, max_frames=8, max_frame_pixels=1_000_000
 )
 print(temporal.sampled_frame_indices)</code></pre>
   <p><code>prepare_frame_features</code> selects evenly spaced frames, records their indices, computes bounded pixel statistics, and rejects oversized, malformed, or non-finite decoder output. The lifecycle can use the same explicit decoder to emit frame-statistics occlusion evidence. This is not raw saliency, motion attribution, synchronization proof, or a production video model; those require a versioned decoder policy, temporal leakage review, independent evaluation, serving, and recovery evidence. Use <code>group_id</code> for subject, session, camera, or other identity-aware splits; without it, the source is the only safe grouping unit.</p>
   <h2>Video temporal boundaries</h2>
-  <p>A video clip may have an observation time independent of its encoded container timestamp. Pass a timezone-aware ISO-8601 value or <code>datetime</code> to <code>VideoSample.from_bytes</code>. The sample stores the canonical UTC value and binds it into the dataset identity. <code>VideoDataset.curate()</code> reports absent, mixed, or complete temporal coverage; <code>split_temporal</code> fails closed unless every clip is timed. To make the experimental lifecycle use this policy, pass the same cutoff as <code>VideoAdapter(temporal_cutoff=...)</code>; otherwise the adapter retains its explicit group-aware split.</p>
-  <pre><code>{`from scmle.data.modalities import VideoDataset, VideoSample
+  <p>A video clip may have an observation time independent of its encoded container timestamp. Pass a timezone-aware ISO-8601 value or <code>datetime</code> to <code>Sample.from_bytes</code>. The sample stores the canonical UTC value and binds it into the dataset identity. <code>Dataset.curate()</code> reports absent, mixed, or complete temporal coverage; <code>split_temporal</code> fails closed unless every clip is timed. To make the experimental lifecycle use this policy, pass the same cutoff as <code>VideoPreparer(temporal_cutoff=...)</code>; otherwise the adapter retains its explicit group-aware split.</p>
+  <pre><code>{`from scmle.data.modalities import Dataset, Sample
 
-clip = VideoSample.from_bytes(
+clip = Sample.from_bytes(
     encoded,
     metadata,
     source="clip.mp4",
     observation_time="2026-01-03T00:00:00+00:00",
 )
-dataset = VideoDataset((clip,))
+dataset = Dataset((clip,))
 future_boundary = dataset.split_temporal("2026-01-02T00:00:00Z")
 print(future_boundary.cutoff)
 print(future_boundary.future)`}</code></pre>
@@ -255,7 +256,7 @@ print(future_boundary.future)`}</code></pre>
     seed=7,
 )
 print(split.block_ids())</code></pre>
-  <p><code>block_size</code> is expressed in the declared CRS units. The implementation uses feature centroids and reports the assigned block IDs. Before the split, <code>GeospatialDataset.boundary_leakage(block_size)</code> counts the blocks touched by each feature envelope; the modality adapter carries crossings into curation as <code>quality.geospatial-boundary-leakage</code>. This is conservative review evidence, not proof that the exact geometry occupies every touched block. Spatial autocorrelation diagnostics and map-based explanation remain domain-specific work.</p>
+  <p><code>block_size</code> is expressed in the declared CRS units. The implementation uses feature centroids and reports the assigned block IDs. Before the split, <code>Dataset.boundary_leakage(block_size)</code> counts the blocks touched by each feature envelope; the modality adapter carries crossings into curation as <code>quality.geospatial-boundary-leakage</code>. This is conservative review evidence, not proof that the exact geometry occupies every touched block. Spatial autocorrelation diagnostics and map-based explanation remain domain-specific work.</p>
   <pre><code>features = places.prepare_features()
 print(features.feature_names)
 print(features.to_numpy())</code></pre>

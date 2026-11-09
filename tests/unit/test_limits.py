@@ -7,7 +7,7 @@ from scmle.core import limits
 
 
 def governor(**kwargs):
-    return limits.ResourceGovernor(tasks.ResourceSpec(**kwargs))
+    return limits.Governor(tasks.Resources(**kwargs))
 
 
 def test_cpu_limit_caps_workers_and_splits_threads():
@@ -20,8 +20,8 @@ def test_cpu_limit_caps_workers_and_splits_threads():
 
 
 def test_first_trial_always_runs_then_budget_and_memory_apply(monkeypatch):
-    tight = limits.ResourceGovernor(
-        tasks.ResourceSpec(time_budget_seconds=1),
+    tight = limits.Governor(
+        tasks.Resources(time_budget_seconds=1),
         started_at=time.monotonic() - 5,
     )
     assert tight.skip_reason(first=True) is None

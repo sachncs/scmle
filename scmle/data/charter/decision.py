@@ -75,7 +75,7 @@ def open_unit(value: Any, name: str) -> float:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class OffPolicyRules:
+class Gates:
     """Declared gates of off-policy evaluation, fixed before the outcome.
 
     Attributes:
@@ -149,9 +149,7 @@ class DecisionModel:
     baselines: tuple[str, ...] = BASELINES
     treatment_cost: float | None = None
     calibration_level: float = DEFAULT_CALIBRATION_LEVEL
-    off_policy: OffPolicyRules = dataclasses.field(
-        default_factory=OffPolicyRules
-    )
+    off_policy: Gates = dataclasses.field(default_factory=Gates)
 
     def __post_init__(self) -> None:
         """Validates the model.
@@ -209,7 +207,7 @@ class DecisionModel:
             baselines=tuple(record["baselines"]),
             treatment_cost=record["treatment_cost"],
             calibration_level=record["calibration_level"],
-            off_policy=OffPolicyRules.from_dict(record["off_policy"]),
+            off_policy=Gates.from_dict(record["off_policy"]),
         )
 
 

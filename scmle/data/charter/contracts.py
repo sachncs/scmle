@@ -5,7 +5,7 @@ claim will be judged and what error the run may spend. Its estimand follows
 the attributes of the ICH E9 addendum: population, target variable, intercurrent
 events and their handling strategy, and a summary measure; a prediction task
 adds the prediction moment. The class is named `AnalysisEstimand` because
-`EstimandSpec` already exists for parameter estimation.
+`Estimand` already exists for parameter estimation.
 
 The charter hash is the SHA-256 of its canonical JSON, so it is identical
 across runs and platforms and any one-byte edit changes it.
@@ -140,7 +140,7 @@ class AnalysisEstimand:
     prediction_moment: str
     intercurrent_events: tuple[IntercurrentEvent, ...]
     summary_measure: str
-    causal: scmle.data.charter.causal.CausalSpec | None = None
+    causal: scmle.data.charter.causal.Question | None = None
 
     def __post_init__(self) -> None:
         """Validates the estimand.
@@ -219,7 +219,7 @@ class AnalysisEstimand:
             causal=(
                 None
                 if block is None
-                else scmle.data.charter.causal.CausalSpec.from_dict(block)
+                else scmle.data.charter.causal.Question.from_dict(block)
             ),
         )
 
@@ -489,11 +489,11 @@ class AnalysisCharter:
     multiverse: tuple[Choice, ...]
     seed: int
     cost_model: costs.DecisionCostModel | None = None
-    rules: scmle.data.charter.rules.RunRules | None = None
+    rules: scmle.data.charter.rules.Procedure | None = None
     decision: scmle.data.charter.decision.DecisionLayer | None = None
     unit_of_prediction: str | None = None
-    ingest: scmle.data.charter.ingest.IngestSpec | None = None
-    uncertainty: scmle.data.charter.uncertainty.UncertaintySpec | None = None
+    ingest: scmle.data.charter.ingest.Ingestion | None = None
+    uncertainty: scmle.data.charter.uncertainty.Uncertainty | None = None
 
     def __post_init__(self) -> None:
         """Validates the charter, including the decision-map lint.
@@ -712,7 +712,7 @@ class AnalysisCharter:
             rules=(
                 None
                 if chosen is None
-                else scmle.data.charter.rules.RunRules.from_dict(chosen)
+                else scmle.data.charter.rules.Procedure.from_dict(chosen)
             ),
             decision=(
                 None
@@ -723,12 +723,12 @@ class AnalysisCharter:
             ingest=(
                 None
                 if block is None
-                else scmle.data.charter.ingest.IngestSpec.from_dict(block)
+                else scmle.data.charter.ingest.Ingestion.from_dict(block)
             ),
             uncertainty=(
                 None
                 if bounds is None
-                else scmle.data.charter.uncertainty.UncertaintySpec.from_dict(
+                else scmle.data.charter.uncertainty.Uncertainty.from_dict(
                     bounds
                 )
             ),

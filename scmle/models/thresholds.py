@@ -1,7 +1,7 @@
 """Decision-threshold optimization for binary classifiers.
 
 The threshold is chosen on out-of-fold validation probabilities against an
-explicit objective, then frozen into `ThresholdClassifier`; the test set is
+explicit objective, then frozen into `Classifier`; the test set is
 never consulted.
 """
 
@@ -20,11 +20,11 @@ from sklearn import base
 GRID = tuple(round(0.01 * step, 2) for step in range(1, 100))
 
 
-class ThresholdObjective(abc.ABC):
+class Objective(abc.ABC):
     """A score to maximize when choosing the decision threshold.
 
     Attributes:
-        name: Name used in `DecisionSpec.threshold_objective`.
+        name: Name used in `Threshold.threshold_objective`.
     """
 
     name: ClassVar[str]
@@ -42,7 +42,7 @@ class ThresholdObjective(abc.ABC):
         """
 
 
-class F1Objective(ThresholdObjective):
+class F1Objective(Objective):
     """Harmonic mean of precision and recall for the positive class."""
 
     name = "f1"
@@ -63,7 +63,7 @@ class F1Objective(ThresholdObjective):
         return 2 * true_positive / denominator if denominator else 0.0
 
 
-class AccuracyObjective(ThresholdObjective):
+class AccuracyObjective(Objective):
     """Plain accuracy."""
 
     name = "accuracy"
@@ -81,7 +81,7 @@ class AccuracyObjective(ThresholdObjective):
         return float((actual == flagged).mean())
 
 
-class BalancedAccuracyObjective(ThresholdObjective):
+class BalancedAccuracyObjective(Objective):
     """Mean of sensitivity and specificity."""
 
     name = "balanced_accuracy"
@@ -105,7 +105,7 @@ class BalancedAccuracyObjective(ThresholdObjective):
 
 
 @dataclasses.dataclass(frozen=True)
-class CostObjective(ThresholdObjective):
+class CostObjective(Objective):
     """Negative expected cost of errors (explicit operational costs).
 
     Attributes:
@@ -135,7 +135,7 @@ class CostObjective(ThresholdObjective):
         return -total / max(len(actual), 1)
 
 
-OBJECTIVES: dict[str, Callable[..., ThresholdObjective]] = {
+OBJECTIVES: dict[str, Callable[..., Objective]] = {
     "f1": F1Objective,
     "accuracy": AccuracyObjective,
     "balanced_accuracy": BalancedAccuracyObjective,
@@ -146,7 +146,7 @@ OBJECTIVES: dict[str, Callable[..., ThresholdObjective]] = {
 def optimize_threshold(
     probabilities: numpy.ndarray,
     actual: numpy.ndarray,
-    objective: ThresholdObjective,
+    objective: Objective,
     grid: Sequence[float] = GRID,
 ) -> tuple[float, float]:
     """Finds the threshold that maximizes the objective.
@@ -172,7 +172,7 @@ def optimize_threshold(
     return best[1], best[0]
 
 
-class ThresholdClassifier(base.ClassifierMixin, base.BaseEstimator):
+class Classifier(base.ClassifierMixin, base.BaseEstimator):
     """Applies a fixed decision threshold to a probabilistic classifier.
 
     Attributes:
@@ -345,7 +345,7 @@ class GroupAssigner:
         return values.astype(object).where(values.notna()).astype(str)
 
 
-class GroupThresholdClassifier(base.ClassifierMixin, base.BaseEstimator):
+class GroupClassifier(base.ClassifierMixin, base.BaseEstimator):
     """Decides with a separate probability threshold for each group.
 
     The wrapped classifier is untouched; only the cut between the two classes

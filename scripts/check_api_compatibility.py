@@ -4,6 +4,7 @@
 import argparse
 import enum
 import hashlib
+import importlib
 import inspect
 import json
 from pathlib import Path
@@ -36,26 +37,29 @@ from scmle.runners import roles
 from scmle.security import access
 from scmle.security import audit
 from scmle.security import tokens
-import scmle.trail
+import scmle.trail.builder
+import scmle.trail.chain
+import scmle.trail.show
+import scmle.trail.trace
 from scmle.workflow import definition
 from scmle.workflow import executor
 from scmle.workflow import schedule
 
 # Extension surfaces: documented contracts below the top-level API. Their
-# signatures are pinned too, without changing any `scmle.__all__` entry.
+# signatures are pinned too.
 EXTENSION_SURFACES = {
     "scmle.deploy.contract": (
         contract,
         (
             "Architecture",
             "BundleRef",
-            "DeploymentEnvironment",
-            "DeploymentSpec",
-            "HealthSpec",
+            "Environment",
+            "Deployment",
+            "Probes",
             "ImageRef",
-            "ProviderAdapter",
+            "Provider",
             "Resources",
-            "RuntimeReport",
+            "Runtime",
             "SecretRef",
             "SecretSource",
             "conformance_problems",
@@ -64,7 +68,7 @@ EXTENSION_SURFACES = {
     "scmle.deploy.control": (
         control,
         (
-            "ConfirmPolicy",
+            "Polling",
             "ControlPlane",
             "RuntimeUnconfirmed",
             "Unsupported",
@@ -77,7 +81,7 @@ EXTENSION_SURFACES = {
         (
             "Finding",
             "Outcome",
-            "ReconcileReport",
+            "Reconciliation",
             "ReleaseRegistry",
             "ReleaseState",
             "RuntimeDisagrees",
@@ -96,11 +100,11 @@ EXTENSION_SURFACES = {
     ),
     "scmle.deploy.record": (
         record,
-        ("DeploymentRecord", "read_record", "write_record"),
+        ("Record", "read_record", "write_record"),
     ),
     "scmle.deploy.livetests": (
         livetests,
-        ("CheckResult", "Response", "Target", "http_fetch", "run_checks"),
+        ("Check", "Response", "Target", "http_fetch", "run_checks"),
     ),
     "scmle.deploy.observation": (
         observation,
@@ -113,26 +117,26 @@ EXTENSION_SURFACES = {
             "Principal",
             "RevocationList",
             "TokenError",
-            "TokenVerifier",
-            "VerificationKey",
+            "Verifier",
+            "Key",
             "sign_hs256",
         ),
     ),
     "scmle.security.access": (
         access,
         (
-            "AccessDenied",
+            "DeniedError",
             "Gateway",
             "RateLimiter",
             "gateway_from_environment",
             "require_authentication_for",
         ),
     ),
-    "scmle.security.audit": (audit, ("AuditLog",)),
+    "scmle.security.audit": (audit, ("Log",)),
     "scmle.core.retry": (
         retry,
         (
-            "RetryPolicy",
+            "Retries",
             "RetryExhaustedError",
             "TransientError",
             "call_with_retries",
@@ -155,11 +159,11 @@ EXTENSION_SURFACES = {
     "scmle.data.store.quality": (
         quality,
         (
-            "GateReport",
-            "Policy",
+            "Assessment",
+            "Severity",
             "QualityGate",
             "QualityGateError",
-            "Rule",
+            "Check",
             "Stage",
         ),
     ),
@@ -168,14 +172,14 @@ EXTENSION_SURFACES = {
         (
             "CostBudget",
             "CostRate",
-            "JobSpec",
+            "Job",
             "Resources",
             "RunManifest",
             "RunState",
             "Runner",
         ),
     ),
-    "scmle.runners.local": (local, ("LocalRunner",)),
+    "scmle.runners.local": (local, ("Runner",)),
     "scmle.runners.roles": (
         roles,
         ("Role", "RoleStore", "check_distinct", "check_separation"),
@@ -198,12 +202,12 @@ EXTENSION_SURFACES = {
     ),
     "scmle.workflow.executor": (
         executor,
-        ("ApprovalError", "LocalExecutor", "RunState", "StepContext"),
+        ("ApprovalError", "Executor", "RunState", "StepContext"),
     ),
-    "scmle.workflow.schedule": (schedule, ("Scheduler", "TickReport")),
+    "scmle.workflow.schedule": (schedule, ("Scheduler", "Tick")),
     "scmle.data.store.processing": (
         processing,
-        ("Checkpoint", "IncrementalProcessor", "RunResult"),
+        ("Checkpoint", "IncrementalProcessor", "Processing"),
     ),
     "scmle.operations.signals": (
         signals,
@@ -213,7 +217,7 @@ EXTENSION_SURFACES = {
             "SignalMonitor",
             "SignalThresholds",
             "Status",
-            "WindowPolicy",
+            "Window",
         ),
     ),
     "scmle.operations.classify": (
@@ -224,7 +228,7 @@ EXTENSION_SURFACES = {
         continuous,
         (
             "ContinuousEvaluation",
-            "MetricSpec",
+            "Indicator",
             "Replacement",
             "RetrainDecision",
             "RetrainPolicy",
@@ -234,16 +238,19 @@ EXTENSION_SURFACES = {
     ),
     "scmle.operations.recovery": (
         recovery,
-        ("Fault", "Measurement", "Objective", "Result", "Runner"),
+        ("Fault", "Measurement", "Objective", "Outcome", "Runner"),
     ),
     "scmle.operations.spool": (
         spool,
-        ("FlushResult", "MetricsSpool"),
+        ("Flush", "MetricsSpool"),
     ),
-    "scmle.trail": (
-        scmle.trail,
-        ("Finding", "Report", "build", "render", "seal", "verify"),
+    "scmle.trail.builder": (scmle.trail.builder, ("build",)),
+    "scmle.trail.chain": (
+        scmle.trail.chain,
+        ("Verification", "seal", "verify"),
     ),
+    "scmle.trail.show": (scmle.trail.show, ("render",)),
+    "scmle.trail.trace": (scmle.trail.trace, ("Finding",)),
     "scmle.operations.notify": (
         notify,
         (
@@ -254,6 +261,72 @@ EXTENSION_SURFACES = {
             "sign",
             "verify_signature",
         ),
+    ),
+}
+
+
+# The names the package root used to re-export, pinned by the module that
+# defines them. The package root itself exports nothing.
+ROOT_SURFACES = {
+    "scmle.api.non_tabular": (
+        "Modeler",
+        "Predictor",
+        "Scope",
+        "UnsupportedNonTabularModelError",
+    ),
+    "scmle.api.predict": (
+        "load_model",
+        "predict",
+    ),
+    "scmle.api.project": (
+        "Curator",
+        "ModalityProject",
+        "Project",
+    ),
+    "scmle.api.results": ("Run",),
+    "scmle.api.sequential": ("Estimation",),
+    "scmle.artifacts.bundle": ("Bundle",),
+    "scmle.data.catalog": ("Catalog",),
+    "scmle.evaluation.longitudinal": (
+        "Config",
+        "Estimand",
+        "Estimation",
+        "Estimator",
+        "PeriodATE",
+    ),
+    "scmle.evaluation.metrics": ("register_metric",),
+    "scmle.evaluation.parameter_estimation": (
+        "BayesianPrior",
+        "Config",
+        "Estimand",
+        "Estimation",
+        "ParameterEstimate",
+        "estimate_parameters",
+    ),
+    "scmle.evaluation.sequential": (
+        "Config",
+        "Estimand",
+        "Estimation",
+        "Estimator",
+        "PeriodDiagnostics",
+        "RegimeEstimate",
+    ),
+    "scmle.inference.modality_serving": (
+        "ModalityHttpServing",
+        "ModalitySampleDecoder",
+    ),
+    "scmle.models.custom": (
+        "register_estimator",
+        "unregister_estimator",
+    ),
+    "scmle.models.modality_lifecycle": (
+        "Cancellation",
+        "Checkpoint",
+        "Curation",
+        "Curator",
+        "ExtensionCurator",
+        "LifecycleCancelledError",
+        "Predictor",
     ),
 }
 
@@ -371,26 +444,24 @@ def signature_digest(value: Any) -> str:
 
 
 def current_snapshot() -> dict[str, Any]:
-    """Returns the current top-level API in canonical JSON form.
+    """Returns the current API in canonical JSON form.
 
     Returns:
-        The schema version, the release, the digest of each name in
-        `scmle.__all__` and the digest of each name of the extension
-        surfaces.
+        The schema version, the release and, for every pinned module, the
+        digest of each pinned name. The package root exports nothing, so
+        every pinned name is read from the module that defines it.
     """
-    exports: dict[str, Any] = {}
-    for name in sorted(scmle.__all__):
-        value = getattr(scmle, name)
-        if name == "__version__":
-            exports[name] = {"kind": "value", "value": value}
-        else:
-            exports[name] = {
-                "kind": "class" if inspect.isclass(value) else "callable",
-                "signature_sha256": signature_digest(value),
-            }
-    extensions: dict[str, Any] = {}
+    modules: dict[str, tuple[Any, tuple[str, ...]]] = {}
     for module_name, (module, names) in EXTENSION_SURFACES.items():
-        extensions[module_name] = {
+        modules[module_name] = (module, tuple(names))
+    for module_name, names in ROOT_SURFACES.items():
+        module, known = modules.get(
+            module_name, (importlib.import_module(module_name), ())
+        )
+        modules[module_name] = (module, tuple(sorted({*known, *names})))
+    surfaces: dict[str, Any] = {}
+    for module_name, (module, names) in modules.items():
+        surfaces[module_name] = {
             name: {
                 "kind": "class"
                 if inspect.isclass(getattr(module, name))
@@ -400,10 +471,9 @@ def current_snapshot() -> dict[str, Any]:
             for name in sorted(names)
         }
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "release": scmle.__version__,
-        "exports": exports,
-        "extension_surfaces": extensions,
+        "surfaces": surfaces,
     }
 
 
@@ -429,17 +499,8 @@ def differences(
             f"release changed: {expected.get('release')} -> "
             f"{observed.get('release')}"
         )
-    expected_exports = expected.get("exports", {})
-    observed_exports = observed.get("exports", {})
-    for name in sorted(set(expected_exports) | set(observed_exports)):
-        if name not in observed_exports:
-            differences_found.append(f"export removed: {name}")
-        elif name not in expected_exports:
-            differences_found.append(f"export added: {name}")
-        elif expected_exports[name] != observed_exports[name]:
-            differences_found.append(f"export contract changed: {name}")
-    expected_extensions = expected.get("extension_surfaces", {})
-    observed_extensions = observed.get("extension_surfaces", {})
+    expected_extensions = expected.get("surfaces", {})
+    observed_extensions = observed.get("surfaces", {})
     for module_name in sorted(
         set(expected_extensions) | set(observed_extensions)
     ):
@@ -448,11 +509,11 @@ def differences(
         for name in sorted(set(before) | set(after)):
             label = f"{module_name}.{name}"
             if name not in after:
-                differences_found.append(f"extension removed: {label}")
+                differences_found.append(f"surface removed: {label}")
             elif name not in before:
-                differences_found.append(f"extension added: {label}")
+                differences_found.append(f"surface added: {label}")
             elif before[name] != after[name]:
-                differences_found.append(f"extension contract changed: {label}")
+                differences_found.append(f"surface contract changed: {label}")
     return differences_found
 
 
@@ -512,7 +573,7 @@ def main(arguments: list[str] | None = None) -> int:
             {
                 "compatible": True,
                 "release": scmle.__version__,
-                "exports": len(scmle.__all__),
+                "surfaces": len(current_snapshot()["surfaces"]),
             },
             sort_keys=True,
         )

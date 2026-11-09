@@ -1,7 +1,7 @@
 """Tests for the TabPFN adapter and engines.
 
 The engines are real production classes whose only external dependency is the
-`tabpfn` package, reached through `TabPfnEngine.build`. The tests below
+`tabpfn` package, reached through `Learner.build`. The tests below
 override that one documented factory with ordinary scikit-learn models, so the
 store, rebuild, limit and worker paths run for real without the licensed
 package. Tests against the real package run only when it is installed and
@@ -26,7 +26,7 @@ from scmle.models.deeplearning import worker
 HERE = str(pathlib.Path(__file__).resolve().parent)
 
 
-class SklearnClassifierEngine(foundation.ClassifierEngine):
+class SklearnClassifierEngine(foundation.Classifier):
     """The classifier engine with scikit-learn behind `build`."""
 
     def build(self):
@@ -34,7 +34,7 @@ class SklearnClassifierEngine(foundation.ClassifierEngine):
         return linear_model.LogisticRegression(max_iter=500)
 
 
-class SklearnRegressorEngine(foundation.RegressorEngine):
+class SklearnRegressorEngine(foundation.Regressor):
     """The regressor engine with scikit-learn behind `build`."""
 
     def build(self):
@@ -136,19 +136,17 @@ def test_the_default_build_uses_the_named_tabpfn_class(monkeypatch):
         foundation.importlib, "import_module", lambda name: Library
     )
 
-    foundation.ClassifierEngine(
-        device="cuda", random_state=5, n_estimators=4
-    ).build()
+    foundation.Classifier(device="cuda", random_state=5, n_estimators=4).build()
 
     assert seen == {"device": "cuda", "random_state": 5, "n_estimators": 4}
 
 
 def test_the_adapter_is_rejected_without_the_package_and_explains_why():
-    adapter = registry.ModelRegistry.with_builtins().get("tabpfn")
+    adapter = registry.Catalog.with_builtins().get("tabpfn")
 
     if adapter.is_available():
         pytest.skip("tabpfn is installed here")
-    reason = adapter.rejection_reason(tasks.TaskType.BINARY)
+    reason = adapter.rejection_reason(tasks.Task.BINARY)
 
     assert reason is not None and "missing dependency: tabpfn" in reason
     assert adapter.family == "foundation"
@@ -159,10 +157,10 @@ def test_the_adapter_stays_extension_only_when_its_package_is_available(
     monkeypatch,
 ):
     """Installing TabPFN must not silently promote it into the beta."""
-    adapter = registry.ModelRegistry.with_builtins().get("tabpfn")
+    adapter = registry.Catalog.with_builtins().get("tabpfn")
     monkeypatch.setattr(adapter, "is_available", lambda: True)
 
-    reason = adapter.rejection_reason(tasks.TaskType.BINARY)
+    reason = adapter.rejection_reason(tasks.Task.BINARY)
 
     assert reason is not None and "extension-only" in reason
 
@@ -201,8 +199,8 @@ def test_real_tabpfn_classifies_through_the_engine():
         pytest.skip(reason)
     features, labels = separable(200)
 
-    engine = foundation.ClassifierEngine(device="cpu").fit(features, labels)
-    restored = foundation.ClassifierEngine.__new__(foundation.ClassifierEngine)
+    engine = foundation.Classifier(device="cpu").fit(features, labels)
+    restored = foundation.Classifier.__new__(foundation.Classifier)
     restored.__setstate__(engine.__getstate__())
 
     assert (engine.predict(features) == labels).mean() > 0.9
@@ -221,6 +219,6 @@ def test_real_tabpfn_regresses_through_the_engine():
     features = rng.normal(size=(200, 2)).astype(numpy.float32)
     target = features[:, 0] * 3
 
-    engine = foundation.RegressorEngine(device="cpu").fit(features, target)
+    engine = foundation.Regressor(device="cpu").fit(features, target)
 
     assert numpy.corrcoef(engine.predict(features), target)[0, 1] > 0.95

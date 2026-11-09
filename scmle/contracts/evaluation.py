@@ -85,8 +85,8 @@ class UndeclaredEvaluationPolicyError(UnsupportedEvaluationPolicyError):
     """Raised when no policy was declared for a requested task."""
 
 
-SUPPORTED_METRICS: Mapping[tasks.TaskType, frozenset[str]] = {
-    tasks.TaskType.BINARY: frozenset(
+SUPPORTED_METRICS: Mapping[tasks.Task, frozenset[str]] = {
+    tasks.Task.BINARY: frozenset(
         {
             "roc_auc",
             "pr_auc",
@@ -97,23 +97,21 @@ SUPPORTED_METRICS: Mapping[tasks.TaskType, frozenset[str]] = {
             "accuracy",
         }
     ),
-    tasks.TaskType.MULTICLASS: frozenset(
+    tasks.Task.MULTICLASS: frozenset(
         {"roc_auc_ovr", "log_loss", "f1_macro", "balanced_accuracy", "accuracy"}
     ),
-    tasks.TaskType.REGRESSION: frozenset({"mae", "rmse", "r2"}),
-    tasks.TaskType.SURVIVAL: frozenset({"c_index", "ibs", "td_auc"}),
-    tasks.TaskType.ORDINAL: frozenset({"qwk", "mace", "accuracy_levels"}),
-    tasks.TaskType.RANKING: frozenset(
+    tasks.Task.REGRESSION: frozenset({"mae", "rmse", "r2"}),
+    tasks.Task.SURVIVAL: frozenset({"c_index", "ibs", "td_auc"}),
+    tasks.Task.ORDINAL: frozenset({"qwk", "mace", "accuracy_levels"}),
+    tasks.Task.RANKING: frozenset(
         {"ndcg", "map", "mrr", "precision_at_10", "recall_at_10"}
     ),
-    tasks.TaskType.MULTILABEL: frozenset(
+    tasks.Task.MULTILABEL: frozenset(
         {"f1_macro_labels", "f1_micro_labels", "hamming", "subset_accuracy"}
     ),
-    tasks.TaskType.MULTIOUTPUT: frozenset({"r2_mean", "mae_scaled"}),
-    tasks.TaskType.FORECAST: frozenset(
-        {"mase", "forecast_mae", "forecast_smape"}
-    ),
-    tasks.TaskType.UPLIFT: frozenset({"qini", "uplift_at_30"}),
+    tasks.Task.MULTIOUTPUT: frozenset({"r2_mean", "mae_scaled"}),
+    tasks.Task.FORECAST: frozenset({"mase", "forecast_mae", "forecast_smape"}),
+    tasks.Task.UPLIFT: frozenset({"qini", "uplift_at_30"}),
 }
 """Built-in metric names that the current evaluation catalog can score."""
 
@@ -156,26 +154,26 @@ METRIC_DIRECTIONS: Mapping[str, MetricDirection] = {
 """Direction for every built-in metric declared in ``SUPPORTED_METRICS``."""
 
 
-DEFAULT_METRICS: Mapping[tasks.TaskType, str] = {
-    tasks.TaskType.BINARY: "roc_auc",
-    tasks.TaskType.MULTICLASS: "log_loss",
-    tasks.TaskType.REGRESSION: "rmse",
-    tasks.TaskType.SURVIVAL: "c_index",
-    tasks.TaskType.ORDINAL: "qwk",
-    tasks.TaskType.RANKING: "ndcg",
-    tasks.TaskType.MULTILABEL: "f1_macro_labels",
-    tasks.TaskType.MULTIOUTPUT: "r2_mean",
-    tasks.TaskType.FORECAST: "mase",
-    tasks.TaskType.UPLIFT: "qini",
+DEFAULT_METRICS: Mapping[tasks.Task, str] = {
+    tasks.Task.BINARY: "roc_auc",
+    tasks.Task.MULTICLASS: "log_loss",
+    tasks.Task.REGRESSION: "rmse",
+    tasks.Task.SURVIVAL: "c_index",
+    tasks.Task.ORDINAL: "qwk",
+    tasks.Task.RANKING: "ndcg",
+    tasks.Task.MULTILABEL: "f1_macro_labels",
+    tasks.Task.MULTIOUTPUT: "r2_mean",
+    tasks.Task.FORECAST: "mase",
+    tasks.Task.UPLIFT: "qini",
 }
 
 
-SUPPORTED_UNCERTAINTY: Mapping[tasks.TaskType, frozenset[UncertaintyMethod]] = {
-    task: frozenset({UncertaintyMethod.NONE}) for task in tasks.TaskType
+SUPPORTED_UNCERTAINTY: Mapping[tasks.Task, frozenset[UncertaintyMethod]] = {
+    task: frozenset({UncertaintyMethod.NONE}) for task in tasks.Task
 }
 SUPPORTED_UNCERTAINTY = {
     **SUPPORTED_UNCERTAINTY,
-    tasks.TaskType.BINARY: frozenset(
+    tasks.Task.BINARY: frozenset(
         {
             UncertaintyMethod.NONE,
             UncertaintyMethod.CALIBRATED_PROBABILITY,
@@ -183,7 +181,7 @@ SUPPORTED_UNCERTAINTY = {
             UncertaintyMethod.ABSTENTION,
         }
     ),
-    tasks.TaskType.MULTICLASS: frozenset(
+    tasks.Task.MULTICLASS: frozenset(
         {
             UncertaintyMethod.NONE,
             UncertaintyMethod.CALIBRATED_PROBABILITY,
@@ -191,7 +189,7 @@ SUPPORTED_UNCERTAINTY = {
             UncertaintyMethod.ABSTENTION,
         }
     ),
-    tasks.TaskType.REGRESSION: frozenset(
+    tasks.Task.REGRESSION: frozenset(
         {
             UncertaintyMethod.NONE,
             UncertaintyMethod.PREDICTION_INTERVAL,
@@ -199,18 +197,18 @@ SUPPORTED_UNCERTAINTY = {
             UncertaintyMethod.ABSTENTION,
         }
     ),
-    tasks.TaskType.SURVIVAL: frozenset(
+    tasks.Task.SURVIVAL: frozenset(
         {UncertaintyMethod.NONE, UncertaintyMethod.SURVIVAL_CURVE}
     ),
 }
 
 
-SUPPORTED_CALIBRATION: Mapping[tasks.TaskType, frozenset[CalibrationMethod]] = {
-    task: frozenset({CalibrationMethod.NONE}) for task in tasks.TaskType
+SUPPORTED_CALIBRATION: Mapping[tasks.Task, frozenset[CalibrationMethod]] = {
+    task: frozenset({CalibrationMethod.NONE}) for task in tasks.Task
 }
 SUPPORTED_CALIBRATION = {
     **SUPPORTED_CALIBRATION,
-    tasks.TaskType.BINARY: frozenset(
+    tasks.Task.BINARY: frozenset(
         {
             CalibrationMethod.NONE,
             CalibrationMethod.RELIABILITY_CURVE,
@@ -218,7 +216,7 @@ SUPPORTED_CALIBRATION = {
             CalibrationMethod.ISOTONIC,
         }
     ),
-    tasks.TaskType.MULTICLASS: frozenset(
+    tasks.Task.MULTICLASS: frozenset(
         {
             CalibrationMethod.NONE,
             CalibrationMethod.RELIABILITY_CURVE,
@@ -228,19 +226,19 @@ SUPPORTED_CALIBRATION = {
 }
 
 
-SUPPORTED_FAIRNESS: Mapping[tasks.TaskType, frozenset[FairnessMethod]] = {
-    task: frozenset({FairnessMethod.NONE}) for task in tasks.TaskType
+SUPPORTED_FAIRNESS: Mapping[tasks.Task, frozenset[FairnessMethod]] = {
+    task: frozenset({FairnessMethod.NONE}) for task in tasks.Task
 }
 SUPPORTED_FAIRNESS = {
     **SUPPORTED_FAIRNESS,
-    tasks.TaskType.BINARY: frozenset(
+    tasks.Task.BINARY: frozenset(
         {
             FairnessMethod.NONE,
             FairnessMethod.GROUP_REPORT,
             FairnessMethod.MITIGATION,
         }
     ),
-    tasks.TaskType.REGRESSION: frozenset(
+    tasks.Task.REGRESSION: frozenset(
         {
             FairnessMethod.NONE,
             FairnessMethod.GROUP_REPORT,
@@ -251,16 +249,16 @@ SUPPORTED_FAIRNESS = {
 
 
 SUPPORTED_EXPLANATIONS: Mapping[
-    tasks.TaskType, frozenset[ExplanationAvailability]
+    tasks.Task, frozenset[ExplanationAvailability]
 ] = {
     task: frozenset(
         {ExplanationAvailability.NONE, ExplanationAvailability.GLOBAL}
     )
-    for task in tasks.TaskType
+    for task in tasks.Task
 }
 SUPPORTED_EXPLANATIONS = {
     **SUPPORTED_EXPLANATIONS,
-    tasks.TaskType.BINARY: frozenset(
+    tasks.Task.BINARY: frozenset(
         {
             ExplanationAvailability.NONE,
             ExplanationAvailability.GLOBAL,
@@ -269,7 +267,7 @@ SUPPORTED_EXPLANATIONS = {
             ExplanationAvailability.FULL,
         }
     ),
-    tasks.TaskType.REGRESSION: frozenset(
+    tasks.Task.REGRESSION: frozenset(
         {
             ExplanationAvailability.NONE,
             ExplanationAvailability.GLOBAL,
@@ -289,12 +287,12 @@ COMMON_DIAGNOSTICS = frozenset(
         "adversarial_validation",
     }
 )
-SUPPORTED_DIAGNOSTICS: Mapping[tasks.TaskType, frozenset[str]] = dict.fromkeys(
-    tasks.TaskType, COMMON_DIAGNOSTICS
+SUPPORTED_DIAGNOSTICS: Mapping[tasks.Task, frozenset[str]] = dict.fromkeys(
+    tasks.Task, COMMON_DIAGNOSTICS
 )
 SUPPORTED_DIAGNOSTICS = {
     **SUPPORTED_DIAGNOSTICS,
-    tasks.TaskType.BINARY: COMMON_DIAGNOSTICS
+    tasks.Task.BINARY: COMMON_DIAGNOSTICS
     | frozenset(
         {
             "classification_report",
@@ -303,15 +301,15 @@ SUPPORTED_DIAGNOSTICS = {
             "fairness",
         }
     ),
-    tasks.TaskType.MULTICLASS: COMMON_DIAGNOSTICS
+    tasks.Task.MULTICLASS: COMMON_DIAGNOSTICS
     | frozenset({"classification_report", "calibration"}),
-    tasks.TaskType.REGRESSION: COMMON_DIAGNOSTICS
+    tasks.Task.REGRESSION: COMMON_DIAGNOSTICS
     | frozenset({"residuals", "fairness"}),
 }
 
 
-FAIRNESS_METRICS: Mapping[tasks.TaskType, frozenset[str]] = {
-    tasks.TaskType.BINARY: frozenset(
+FAIRNESS_METRICS: Mapping[tasks.Task, frozenset[str]] = {
+    tasks.Task.BINARY: frozenset(
         {
             "demographic_parity_difference",
             "equal_opportunity_difference",
@@ -319,7 +317,7 @@ FAIRNESS_METRICS: Mapping[tasks.TaskType, frozenset[str]] = {
             "disparate_impact_ratio",
         }
     ),
-    tasks.TaskType.REGRESSION: frozenset({"bias_gap"}),
+    tasks.Task.REGRESSION: frozenset({"bias_gap"}),
 }
 
 
@@ -465,7 +463,7 @@ class MetricGate:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class UncertaintyPolicy:
+class Uncertainty:
     """Task-specific uncertainty promise and statistical requirements."""
 
     method: UncertaintyMethod
@@ -537,7 +535,7 @@ class UncertaintyPolicy:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class CalibrationPolicy:
+class Calibration:
     """Task-specific calibration method and release error threshold."""
 
     method: CalibrationMethod
@@ -579,7 +577,7 @@ class CalibrationPolicy:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class FairnessPolicy:
+class Fairness:
     """Sensitive-group evaluation or mitigation declaration."""
 
     method: FairnessMethod
@@ -664,7 +662,7 @@ class FairnessGate:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class SmallGroupPolicy:
+class SmallGroups:
     """Power warning and release-blocking thresholds for subgroup reports."""
 
     warning_threshold: int
@@ -697,7 +695,7 @@ class SmallGroupPolicy:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ExplanationPolicy:
+class Explanations:
     """Availability and evidence requirements for model explanations."""
 
     availability: ExplanationAvailability
@@ -819,7 +817,7 @@ class DiagnosticGate:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ReleasePolicy:
+class Gates:
     """Evidence-backed thresholds required before a model is released."""
 
     metric_gates: tuple[MetricGate, ...]
@@ -871,18 +869,18 @@ class ReleasePolicy:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class EvaluationPolicy:
+class Criteria:
     """Complete task-aware evaluation and release declaration."""
 
-    task: tasks.TaskType
+    task: tasks.Task
     primary_metric: str
     metrics: tuple[MetricDeclaration, ...]
-    uncertainty: UncertaintyPolicy
-    calibration: CalibrationPolicy
-    fairness: FairnessPolicy
-    small_groups: SmallGroupPolicy
-    explanations: ExplanationPolicy
-    release: ReleasePolicy
+    uncertainty: Uncertainty
+    calibration: Calibration
+    fairness: Fairness
+    small_groups: SmallGroups
+    explanations: Explanations
+    release: Gates
     schema_version: int = POLICY_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
@@ -893,7 +891,7 @@ class EvaluationPolicy:
         """Validates task support and all cross-field policy references.
 
         Raises:
-            TypeError: If the task is not a `TaskType`.
+            TypeError: If the task is not a `Task`.
             UnsupportedEvaluationPolicyError: If a metric, uncertainty,
                 calibration, fairness, explanation or diagnostic choice is not
                 supported for the task.
@@ -903,8 +901,8 @@ class EvaluationPolicy:
                 wrong direction, or a release gate is inconsistent with the
                 declarations.
         """
-        if not isinstance(self.task, tasks.TaskType):
-            raise TypeError("policy.task must be TaskType")
+        if not isinstance(self.task, tasks.Task):
+            raise TypeError("policy.task must be Task")
         if self.schema_version < 1:
             raise ValueError("policy.schema_version must be at least 1")
         validate_text(self.primary_metric, "policy.primary_metric")
@@ -1089,20 +1087,20 @@ class EvaluationPolicy:
         )
 
 
-class EvaluationPolicyRegistry:
+class Registry:
     """Explicit registry that fails closed for undeclared task policies."""
 
-    def __init__(self, policies: Iterable[EvaluationPolicy] = ()) -> None:
+    def __init__(self, policies: Iterable[Criteria] = ()) -> None:
         """Creates a registry from complete policy declarations.
 
         Args:
             policies: The policies to register.
         """
-        self.records: dict[tasks.TaskType, EvaluationPolicy] = {}
+        self.records: dict[tasks.Task, Criteria] = {}
         for policy in policies:
             self.register(policy)
 
-    def register(self, policy: EvaluationPolicy) -> None:
+    def register(self, policy: Criteria) -> None:
         """Registers a policy without silently replacing another policy.
 
         The policy is stored under its task.
@@ -1120,7 +1118,7 @@ class EvaluationPolicyRegistry:
             )
         self.records[policy.task] = policy
 
-    def require(self, task: tasks.TaskType) -> EvaluationPolicy:
+    def require(self, task: tasks.Task) -> Criteria:
         """Returns a task policy or rejects an undeclared task explicitly.
 
         Args:
@@ -1130,12 +1128,12 @@ class EvaluationPolicyRegistry:
             The task's policy.
 
         Raises:
-            TypeError: If `task` is not a `TaskType`.
+            TypeError: If `task` is not a `Task`.
             UndeclaredEvaluationPolicyError: If no policy is declared for the
                 task.
         """
-        if not isinstance(task, tasks.TaskType):
-            raise TypeError("task must be TaskType")
+        if not isinstance(task, tasks.Task):
+            raise TypeError("task must be Task")
         policy = self.records.get(task)
         if policy is None:
             raise UndeclaredEvaluationPolicyError(
@@ -1143,7 +1141,7 @@ class EvaluationPolicyRegistry:
             )
         return policy
 
-    def list_policies(self) -> tuple[EvaluationPolicy, ...]:
+    def list_policies(self) -> tuple[Criteria, ...]:
         """Returns policies in deterministic task order."""
         return tuple(
             self.records[task]

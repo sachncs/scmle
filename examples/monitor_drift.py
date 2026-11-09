@@ -5,7 +5,7 @@ import logging
 import numpy
 import pandas
 
-import scmle
+import scmle.api.project
 from scmle.monitoring import monitor
 
 LOGGER = logging.getLogger(__name__)
@@ -31,7 +31,7 @@ def make_dataset(
 def main() -> None:
     """Trains once, then assesses a healthy and a drifted batch."""
     logging.basicConfig(level=logging.INFO, format="%(message)s")
-    result = scmle.MLProject(
+    result = scmle.api.project.Project(
         make_dataset(800), "fault", metric="roc_auc", time_budget=60
     ).run()
     watcher = monitor.ModelMonitor(result.bundle)

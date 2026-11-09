@@ -24,7 +24,7 @@ import scmle.models.survival.adapters
 import scmle.models.uplift.adapters
 
 ENTRY_POINT_GROUP = "scmle.models"
-USER_ADAPTERS: dict[str, models.ModelAdapter] = {}
+USER_ADAPTERS: dict[str, models.Model] = {}
 """Adapters added with `register_estimator`, shared by later projects.
 
 Change it only through `add_user_adapter` and `remove_user_adapter`, and read
@@ -34,7 +34,7 @@ USER_LOCK = threading.RLock()
 """Serializes check-then-act changes to `USER_ADAPTERS`."""
 
 
-def user_adapters() -> dict[str, models.ModelAdapter]:
+def user_adapters() -> dict[str, models.Model]:
     """Returns a consistent copy of the registered user adapters.
 
     Returns:
@@ -45,9 +45,7 @@ def user_adapters() -> dict[str, models.ModelAdapter]:
         return dict(USER_ADAPTERS)
 
 
-def add_user_adapter(
-    adapter: models.ModelAdapter, replace: bool = False
-) -> None:
+def add_user_adapter(adapter: models.Model, replace: bool = False) -> None:
     """Registers a user adapter atomically.
 
     Args:
@@ -81,19 +79,19 @@ def builtin_names() -> frozenset[str]:
     Returns:
         The names of the built-in adapters, excluding user registrations.
     """
-    return frozenset(ModelRegistry.with_builtins(include_user=False).adapters)
+    return frozenset(Catalog.with_builtins(include_user=False).adapters)
 
 
-class ModelRegistry:
-    """Name-indexed collection of `ModelAdapter` instances."""
+class Catalog:
+    """Name-indexed collection of `Model` instances."""
 
-    def __init__(self, adapters: tuple[models.ModelAdapter, ...] = ()) -> None:
+    def __init__(self, adapters: tuple[models.Model, ...] = ()) -> None:
         """Initializes the registry.
 
         Args:
             adapters: Adapters to register immediately.
         """
-        self.adapters: dict[str, models.ModelAdapter] = {}
+        self.adapters: dict[str, models.Model] = {}
         self.plugin_failures: dict[str, str] = {}
         for adapter in adapters:
             self.register(adapter)
@@ -127,16 +125,14 @@ class ModelRegistry:
             *scmle.models.uplift.adapters.UPLIFT_ADAPTERS,
         )
         registry = cls(tuple(adapter() for adapter in classes))
-        registry.register(ensembles.StackingAdapter(registry))
-        registry.register(ensembles.BlendingAdapter(registry))
+        registry.register(ensembles.Stacking(registry))
+        registry.register(ensembles.Blending(registry))
         if include_user:
             for adapter in user_adapters().values():
                 registry.register(adapter, overwrite=True)
         return registry
 
-    def register(
-        self, adapter: models.ModelAdapter, overwrite: bool = False
-    ) -> None:
+    def register(self, adapter: models.Model, overwrite: bool = False) -> None:
         """Adds an adapter.
 
         Args:
@@ -187,7 +183,7 @@ class ModelRegistry:
                 )
         return failed
 
-    def get(self, name: str) -> models.ModelAdapter:
+    def get(self, name: str) -> models.Model:
         """Returns the adapter called `name`.
 
         Args:
@@ -207,10 +203,10 @@ class ModelRegistry:
 
     def candidates(
         self,
-        task: tasks.TaskType,
+        task: tasks.Task,
         row_count: int | None = None,
         experimental_models: tuple[str, ...] = (),
-    ) -> tuple[list[models.ModelAdapter], dict[str, str]]:
+    ) -> tuple[list[models.Model], dict[str, str]]:
         """Splits adapters into compatible ones and rejection reasons.
 
         Args:
@@ -233,7 +229,7 @@ class ModelRegistry:
                 "unknown experimental model(s): "
                 f"{unknown}; registered: {sorted(self.adapters)}"
             )
-        compatible: list[models.ModelAdapter] = []
+        compatible: list[models.Model] = []
         rejected: dict[str, str] = {}
         ordered = sorted(
             self.adapters.values(),

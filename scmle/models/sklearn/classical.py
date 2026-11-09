@@ -1,7 +1,7 @@
 """Built-in scikit-learn model adapters.
 
 Concrete adapters only declare data (estimator classes, parameters,
-capabilities); construction logic lives once in `SklearnAdapter.build`.
+capabilities); construction logic lives once in `Learner.build`.
 """
 
 from collections.abc import Mapping
@@ -29,14 +29,14 @@ import scmle.models.ranking.estimators
 import scmle.models.survival.estimators
 import scmle.models.uplift.estimators
 
-CLASSIFICATION = frozenset({tasks.TaskType.BINARY, tasks.TaskType.MULTICLASS})
-REGRESSION_ONLY = frozenset({tasks.TaskType.REGRESSION})
+CLASSIFICATION = frozenset({tasks.Task.BINARY, tasks.Task.MULTICLASS})
+REGRESSION_ONLY = frozenset({tasks.Task.REGRESSION})
 ALL_TASKS = CLASSIFICATION | REGRESSION_ONLY
 CALIBRATION_FOLDS = 3
 NO_PARAMS: types.MappingProxyType = types.MappingProxyType({})
 
 
-class SklearnAdapter(models.ModelAdapter):
+class Learner(models.Model):
     """Adapter whose estimators are scikit-learn classes.
 
     Attributes:
@@ -51,7 +51,7 @@ class SklearnAdapter(models.ModelAdapter):
 
     def build(
         self,
-        task: tasks.TaskType,
+        task: tasks.Task,
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
@@ -81,7 +81,7 @@ class SklearnAdapter(models.ModelAdapter):
         return estimator_class(**kwargs)
 
 
-class DummyAdapter(models.ModelAdapter):
+class Dummy(models.Model):
     """Prior / mean predictor used as the mandatory baseline."""
 
     name = "dummy"
@@ -90,13 +90,13 @@ class DummyAdapter(models.ModelAdapter):
         ALL_TASKS
         | frozenset(
             {
-                tasks.TaskType.SURVIVAL,
-                tasks.TaskType.ORDINAL,
-                tasks.TaskType.RANKING,
-                tasks.TaskType.MULTILABEL,
-                tasks.TaskType.MULTIOUTPUT,
-                tasks.TaskType.FORECAST,
-                tasks.TaskType.UPLIFT,
+                tasks.Task.SURVIVAL,
+                tasks.Task.ORDINAL,
+                tasks.Task.RANKING,
+                tasks.Task.MULTILABEL,
+                tasks.Task.MULTIOUTPUT,
+                tasks.Task.FORECAST,
+                tasks.Task.UPLIFT,
             }
         ),
         sparse_input=True,
@@ -105,7 +105,7 @@ class DummyAdapter(models.ModelAdapter):
 
     def build(
         self,
-        task: tasks.TaskType,
+        task: tasks.Task,
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
@@ -123,25 +123,25 @@ class DummyAdapter(models.ModelAdapter):
         Returns:
             An unfitted baseline estimator for the task.
         """
-        if task is tasks.TaskType.SURVIVAL:
+        if task is tasks.Task.SURVIVAL:
             return scmle.models.survival.estimators.MarginalSurvival()
-        if task is tasks.TaskType.UPLIFT:
+        if task is tasks.Task.UPLIFT:
             return scmle.models.uplift.estimators.ZeroEffect()
         if task in (
-            tasks.TaskType.MULTILABEL,
-            tasks.TaskType.MULTIOUTPUT,
-            tasks.TaskType.FORECAST,
+            tasks.Task.MULTILABEL,
+            tasks.Task.MULTIOUTPUT,
+            tasks.Task.FORECAST,
         ):
-            classify = task is tasks.TaskType.MULTILABEL
+            classify = task is tasks.Task.MULTILABEL
             return scmle.models.multitarget.estimators.PerTarget(
                 dummy.DummyClassifier(strategy="prior")
                 if classify
                 else dummy.DummyRegressor(strategy="mean"),
                 classify,
             )
-        if task is tasks.TaskType.RANKING:
+        if task is tasks.Task.RANKING:
             return scmle.models.ranking.estimators.ConstantRanker()
-        if task is tasks.TaskType.ORDINAL:
+        if task is tasks.Task.ORDINAL:
             return scmle.models.ordinal.estimators.CumulativeThresholdRegressor(
                 dummy.DummyRegressor(strategy="median"),
                 (params or {}).get("levels"),
@@ -152,7 +152,7 @@ class DummyAdapter(models.ModelAdapter):
         return dummy.DummyRegressor(strategy="mean")
 
 
-class LogisticRegressionAdapter(SklearnAdapter):
+class LogisticRegression(Learner):
     """Regularized logistic regression."""
 
     name = "logistic_regression"
@@ -167,7 +167,7 @@ class LogisticRegressionAdapter(SklearnAdapter):
     )
 
 
-class RidgeAdapter(SklearnAdapter):
+class Ridge(Learner):
     """Ridge regression."""
 
     name = "ridge"
@@ -184,7 +184,7 @@ class RidgeAdapter(SklearnAdapter):
     )
 
 
-class SgdLogisticAdapter(SklearnAdapter):
+class SgdLogistic(Learner):
     """Logistic regression trained by stochastic gradient descent."""
 
     name = "sgd_logistic"
@@ -206,7 +206,7 @@ class SgdLogisticAdapter(SklearnAdapter):
     )
 
 
-class SgdRegressionAdapter(SklearnAdapter):
+class SgdRegression(Learner):
     """Linear regression trained by stochastic gradient descent."""
 
     name = "sgd_regression"
@@ -226,7 +226,7 @@ class SgdRegressionAdapter(SklearnAdapter):
     )
 
 
-class ElasticNetAdapter(SklearnAdapter):
+class ElasticNet(Learner):
     """Elastic-net regression."""
 
     name = "elastic_net"
@@ -248,7 +248,7 @@ class ElasticNetAdapter(SklearnAdapter):
     )
 
 
-class DecisionTreeAdapter(SklearnAdapter):
+class DecisionTree(Learner):
     """Single decision tree."""
 
     name = "decision_tree"
@@ -266,7 +266,7 @@ class DecisionTreeAdapter(SklearnAdapter):
     )
 
 
-class RandomForestAdapter(SklearnAdapter):
+class RandomForest(Learner):
     """Random forest."""
 
     name = "random_forest"
@@ -284,7 +284,7 @@ class RandomForestAdapter(SklearnAdapter):
     )
 
 
-class ExtraTreesAdapter(SklearnAdapter):
+class ExtraTrees(Learner):
     """Extremely randomized trees."""
 
     name = "extra_trees"
@@ -302,7 +302,7 @@ class ExtraTreesAdapter(SklearnAdapter):
     )
 
 
-class HistGradientBoostingAdapter(SklearnAdapter):
+class HistGradientBoosting(Learner):
     """Histogram-based gradient boosting."""
 
     name = "hist_gradient_boosting"
@@ -341,7 +341,7 @@ class HistGradientBoostingAdapter(SklearnAdapter):
     )
 
 
-class SupportVectorAdapter(SklearnAdapter):
+class SupportVector(Learner):
     """Support vector machine with sigmoid-calibrated probabilities.
 
     scikit-learn deprecated `SVC(probability=True)` in 1.9; the supported
@@ -370,7 +370,7 @@ class SupportVectorAdapter(SklearnAdapter):
 
     def build(
         self,
-        task: tasks.TaskType,
+        task: tasks.Task,
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
@@ -396,7 +396,7 @@ class SupportVectorAdapter(SklearnAdapter):
         )
 
 
-class KnnAdapter(SklearnAdapter):
+class Knn(Learner):
     """k-nearest neighbours."""
 
     name = "knn"
@@ -419,10 +419,10 @@ class KnnAdapter(SklearnAdapter):
     )
 
 
-class NeuralNetworkAdapter(SklearnAdapter):
+class NeuralNetwork(Learner):
     """Multi-layer perceptron: the deep-learning family plugin.
 
-    Deep architectures register exactly like this: a `ModelAdapter` with
+    Deep architectures register exactly like this: a `Model` with
     declared capabilities and a search space. Larger frameworks (PyTorch,
     Keras) plug in through the same contract and the `scmle.models` entry point.
     """
@@ -453,18 +453,18 @@ class NeuralNetworkAdapter(SklearnAdapter):
     )
 
 
-BUILTIN_ADAPTERS: tuple[type[models.ModelAdapter], ...] = (
-    DummyAdapter,
-    LogisticRegressionAdapter,
-    RidgeAdapter,
-    SgdLogisticAdapter,
-    SgdRegressionAdapter,
-    ElasticNetAdapter,
-    DecisionTreeAdapter,
-    RandomForestAdapter,
-    ExtraTreesAdapter,
-    HistGradientBoostingAdapter,
-    SupportVectorAdapter,
-    KnnAdapter,
-    NeuralNetworkAdapter,
+BUILTIN_ADAPTERS: tuple[type[models.Model], ...] = (
+    Dummy,
+    LogisticRegression,
+    Ridge,
+    SgdLogistic,
+    SgdRegression,
+    ElasticNet,
+    DecisionTree,
+    RandomForest,
+    ExtraTrees,
+    HistGradientBoosting,
+    SupportVector,
+    Knn,
+    NeuralNetwork,
 )

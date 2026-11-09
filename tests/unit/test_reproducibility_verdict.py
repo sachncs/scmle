@@ -229,7 +229,7 @@ def test_load_run_digests_parameter_estimation(tmp_path):
     result = parameter_estimation.estimate_parameters(
         features,
         outcome,
-        parameter_estimation.EstimandSpec(
+        parameter_estimation.Estimand(
             name="effect",
             outcome="y",
             population="synthetic rows",
@@ -237,7 +237,7 @@ def test_load_run_digests_parameter_estimation(tmp_path):
             feature_names=("x1", "x2"),
             assumptions=("independent errors",),
         ),
-        parameter_estimation.EstimationPolicy(estimator="linear"),
+        parameter_estimation.Config(estimator="linear"),
     )
     expected = result.write(tmp_path / "parameter_estimation.json")
 

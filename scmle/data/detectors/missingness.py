@@ -56,7 +56,7 @@ HOLDOUT_SHARE = 0.1
 
 
 @dataclasses.dataclass(frozen=True)
-class EmResult:
+class Moments:
     """Maximum-likelihood mean and covariance under a normal model.
 
     Attributes:
@@ -73,7 +73,7 @@ class EmResult:
 
 
 @dataclasses.dataclass(frozen=True)
-class LittleResult:
+class Mcar:
     """Outcome of Little's MCAR test.
 
     Attributes:
@@ -96,7 +96,7 @@ class LittleResult:
 
 
 @dataclasses.dataclass(frozen=True)
-class IndicatorResult:
+class Predictability:
     """Can the other columns predict that this column is missing?
 
     Attributes:
@@ -113,7 +113,7 @@ class IndicatorResult:
 
 
 @dataclasses.dataclass(frozen=True)
-class MissingnessReport:
+class Missingness:
     """Evidence about the missingness mechanism of a table.
 
     Attributes:
@@ -130,8 +130,8 @@ class MissingnessReport:
 
     rows_checked: int
     input_rows: int
-    little: LittleResult | None
-    indicators: tuple[IndicatorResult, ...]
+    little: Mcar | None
+    indicators: tuple[Predictability, ...]
     mcar_rejected: bool
     alpha: float
     skipped: tuple[str, ...]
@@ -186,7 +186,7 @@ def em_normal(
     values: numpy.ndarray,
     max_iter: int = EM_MAX_ITER,
     tolerance: float = EM_TOLERANCE,
-) -> EmResult:
+) -> Moments:
     """EM estimate of the mean and covariance with missing entries.
 
     Standard EM for the multivariate normal (Dempster, Laird and Rubin
@@ -240,7 +240,7 @@ def em_normal(
         if change <= tolerance * scale:
             converged = True
             break
-    return EmResult(mean, covariance, iterations, converged)
+    return Moments(mean, covariance, iterations, converged)
 
 
 def row_patterns(
@@ -306,7 +306,7 @@ def expect_block(
     return filled, extra
 
 
-def little_statistic(values: numpy.ndarray, fit: EmResult) -> tuple[float, int]:
+def little_statistic(values: numpy.ndarray, fit: Moments) -> tuple[float, int]:
     """Little's d2 and its degrees of freedom for given ML estimates.
 
     d2 = sum over patterns j of n_j (ybar_j - mu_j)' S_j^{-1} (ybar_j - mu_j),
@@ -363,7 +363,7 @@ def little_mcar_test(
     frame: pandas.DataFrame,
     columns: Sequence[Any] | None = None,
     transform: str = "normal_scores",
-) -> LittleResult | None:
+) -> Mcar | None:
     """Little's test of missing completely at random.
 
     Args:
@@ -398,7 +398,7 @@ def little_mcar_test(
     statistic, df = little_statistic(values, fit)
     if df <= 0:
         return None
-    return LittleResult(
+    return Mcar(
         statistic=statistic,
         df=df,
         p_value=float(stats.chi2.sf(statistic, df)),
@@ -456,7 +456,7 @@ def indicator_model_test(
     seed: int = 0,
     permutations: int = PERMUTATIONS,
     folds: int = FOLDS,
-) -> IndicatorResult | None:
+) -> Predictability | None:
     """Tests whether other columns predict that `column` is missing.
 
     A least-squares linear probability model on the standardized, mean-filled
@@ -503,7 +503,7 @@ def indicator_model_test(
             oof_linear_scores(design, shuffled.astype(float), parts), shuffled
         )
         beaten += int(null >= observed)
-    return IndicatorResult(
+    return Predictability(
         column=str(column),
         auc=float(observed),
         p_value=(1 + beaten) / (permutations + 1),
@@ -516,7 +516,7 @@ def assess_mechanism(
     seed: int = 0,
     alpha: float = ALPHA,
     permutations: int = PERMUTATIONS,
-) -> MissingnessReport:
+) -> Missingness:
     """Collects the evidence about the missingness mechanism.
 
     Args:
@@ -569,7 +569,7 @@ def assess_mechanism(
         (little is not None and little.p_value < alpha / 2.0)
         or any(r.p_value < alpha / 2.0 / len(results) for r in results)
     )
-    return MissingnessReport(
+    return Missingness(
         rows_checked=len(frame),
         input_rows=input_rows,
         little=little,

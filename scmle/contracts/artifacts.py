@@ -102,7 +102,7 @@ class BundleSchema:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class SchemaReport:
+class Conformance:
     """Result of validating input data against a bundle schema.
 
     Attributes:

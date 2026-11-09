@@ -22,8 +22,8 @@ from scmle.contracts import data
 from scmle.contracts import errors
 
 
-class DocumentFormat(enum.StrEnum):
-    """Document formats understood by :class:`DocumentReader`."""
+class Format(enum.StrEnum):
+    """Document formats understood by :class:`Reader`."""
 
     TEXT = "text"
     MARKDOWN = "markdown"
@@ -131,7 +131,7 @@ def redact_sensitive_text(content: str) -> str:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class DocumentSpan:
+class Span:
     """A character range with simple document provenance.
 
     Attributes:
@@ -167,7 +167,7 @@ class DocumentSpan:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class DocumentCitation:
+class Citation:
     """A source-backed locator for a document character span.
 
     Attributes:
@@ -219,7 +219,7 @@ class DocumentCitation:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class DocumentElement:
+class Element:
     """One extracted layout, OCR, or table element with source offsets.
 
     Attributes:
@@ -272,7 +272,7 @@ class DocumentElement:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class DocumentLayout:
+class Layout:
     """Caller-owned extraction provenance for OCR, layout, and tables.
 
     Attributes:
@@ -288,7 +288,7 @@ class DocumentLayout:
     source: str
     provider: str
     provider_version: str
-    elements: tuple[DocumentElement, ...]
+    elements: tuple[Element, ...]
     ocr_confidence: float | None = None
     source_digest: str | None = None
 
@@ -299,7 +299,7 @@ class DocumentLayout:
             ValueError: If source, provider or provider_version is blank, the
                 OCR confidence is a bool, not finite or outside [0, 1], or
                 source_digest is not a lowercase SHA-256 digest.
-            TypeError: If elements is not a tuple of DocumentElement.
+            TypeError: If elements is not a tuple of Element.
         """
         for field_name, value in (
             ("source", self.source),
@@ -312,10 +312,8 @@ class DocumentLayout:
                 )
         if not isinstance(self.elements, tuple):
             raise TypeError("document layout elements must be a tuple")
-        if not all(
-            isinstance(element, DocumentElement) for element in self.elements
-        ):
-            raise TypeError("elements must contain DocumentElement values")
+        if not all(isinstance(element, Element) for element in self.elements):
+            raise TypeError("elements must contain Element values")
         if self.ocr_confidence is not None and (
             isinstance(self.ocr_confidence, bool)
             or not math.isfinite(self.ocr_confidence)
@@ -342,7 +340,7 @@ class DocumentLayout:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class DocumentProfile:
+class Profile:
     """Bounded lexical profile for one document.
 
     Attributes:
@@ -376,7 +374,7 @@ class DocumentProfile:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class DocumentCurationReport:
+class Curation:
     """Reviewable data-understanding evidence for a document dataset.
 
     The report describes the observed corpus before any modelling decision.
@@ -415,7 +413,7 @@ class DocumentCurationReport:
     dataset_hash: str
     sample_count: int
     document_count: int
-    profiles: tuple[DocumentProfile, ...]
+    profiles: tuple[Profile, ...]
     duplicate_groups: tuple[tuple[str, ...], ...]
     language_counts: dict[str, int]
     format_counts: dict[str, int]
@@ -509,7 +507,7 @@ class DocumentCurationReport:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class DocumentSample:
+class Sample:
     """Immutable decoded document content and its identity.
 
     Attributes:
@@ -533,13 +531,13 @@ class DocumentSample:
 
     document_id: str
     content: str
-    format: DocumentFormat = DocumentFormat.TEXT
+    format: Format = Format.TEXT
     source_uri: str = ""
     encoding: str = "utf-8"
     source_digest: str | None = None
     label: str | int | float | bool | None = None
-    provenance: tuple[DocumentSpan, ...] = ()
-    layout: DocumentLayout | None = None
+    provenance: tuple[Span, ...] = ()
+    layout: Layout | None = None
     content_hash: str = dataclasses.field(init=False)
     size_bytes: int = dataclasses.field(init=False)
 
@@ -578,8 +576,8 @@ class DocumentSample:
                 "invalid_source_digest",
                 {"document_id": self.document_id},
             )
-        if not isinstance(self.format, DocumentFormat):
-            object.__setattr__(self, "format", DocumentFormat(self.format))
+        if not isinstance(self.format, Format):
+            object.__setattr__(self, "format", Format(self.format))
         normalized_provenance = tuple(self.provenance)
         if not normalized_provenance:
             normalized_provenance = provenance_for_content(self.content)
@@ -611,7 +609,7 @@ class DocumentSample:
         )
         object.__setattr__(self, "size_bytes", len(content_bytes))
 
-    def citations(self) -> tuple[DocumentCitation, ...]:
+    def citations(self) -> tuple[Citation, ...]:
         """Returns source-backed citations for the document provenance spans.
 
         A citation is intentionally unavailable when the caller created an
@@ -627,7 +625,7 @@ class DocumentSample:
         if not self.source_uri.strip() or self.source_digest is None:
             return ()
         return tuple(
-            DocumentCitation(
+            Citation(
                 document_id=self.document_id,
                 source_uri=self.source_uri,
                 source_digest=self.source_digest,
@@ -643,7 +641,7 @@ class DocumentSample:
         self,
         max_characters: int = 100_000,
         max_tokens: int = 20_000,
-    ) -> DocumentProfile:
+    ) -> Profile:
         """Builds a bounded lexical profile without external dependencies.
 
         Args:
@@ -665,7 +663,7 @@ class DocumentSample:
         truncated = (
             len(self.content) > max_characters or len(tokens) > max_tokens
         )
-        return DocumentProfile(
+        return Profile(
             document_id=self.document_id,
             character_count=len(sample),
             token_count=min(len(tokens), max_tokens),
@@ -675,7 +673,7 @@ class DocumentSample:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class DocumentSplit:
+class Split:
     """Leakage-aware document-level split.
 
     Attributes:
@@ -684,9 +682,9 @@ class DocumentSplit:
         test: Samples assigned to testing.
     """
 
-    train: tuple[DocumentSample, ...]
-    validation: tuple[DocumentSample, ...]
-    test: tuple[DocumentSample, ...]
+    train: tuple[Sample, ...]
+    validation: tuple[Sample, ...]
+    test: tuple[Sample, ...]
 
     def document_ids(self) -> dict[str, tuple[str, ...]]:
         """Returns sorted document IDs assigned to each split.
@@ -707,7 +705,7 @@ class DocumentSplit:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class DocumentDataset:
+class Dataset:
     """Immutable collection of documents with identity and split operations.
 
     Attributes:
@@ -717,7 +715,7 @@ class DocumentDataset:
             construction.
     """
 
-    samples: tuple[DocumentSample, ...]
+    samples: tuple[Sample, ...]
     content_hash: str = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
@@ -725,7 +723,7 @@ class DocumentDataset:
 
         Raises:
             DocumentValidationError: If there are no samples.
-            TypeError: If an element is not a DocumentSample.
+            TypeError: If an element is not a Sample.
         """
         normalized_samples = tuple(self.samples)
         if not normalized_samples:
@@ -733,11 +731,8 @@ class DocumentDataset:
                 "document dataset must contain at least one sample",
                 "empty_dataset",
             )
-        if any(
-            not isinstance(sample, DocumentSample)
-            for sample in normalized_samples
-        ):
-            raise TypeError("samples must contain only DocumentSample values")
+        if any(not isinstance(sample, Sample) for sample in normalized_samples):
+            raise TypeError("samples must contain only Sample values")
         identities = sorted(
             f"{sample.document_id}\0{sample.content_hash}"
             for sample in normalized_samples
@@ -769,7 +764,7 @@ class DocumentDataset:
         self,
         max_characters: int = 100_000,
         max_tokens: int = 20_000,
-    ) -> tuple[DocumentProfile, ...]:
+    ) -> tuple[Profile, ...]:
         """Profiles every sample using the same bounded limits.
 
         Args:
@@ -778,7 +773,7 @@ class DocumentDataset:
 
         Returns:
             One profile per sample, in sample order. A bound that is not
-            positive raises ValueError from `DocumentSample.profile`.
+            positive raises ValueError from `Sample.profile`.
         """
         return tuple(
             sample.profile(max_characters, max_tokens)
@@ -789,7 +784,7 @@ class DocumentDataset:
         self,
         max_characters: int = 100_000,
         max_tokens: int = 20_000,
-    ) -> DocumentCurationReport:
+    ) -> Curation:
         """Builds bounded, reviewable curation evidence for the corpus.
 
         Duplicate content is reported separately from conflicting labels. A
@@ -1040,7 +1035,7 @@ class DocumentDataset:
                 )
             )
 
-        return DocumentCurationReport(
+        return Curation(
             dataset_hash=self.content_hash,
             sample_count=len(self.samples),
             document_count=len({sample.document_id for sample in self.samples}),
@@ -1081,7 +1076,7 @@ class DocumentDataset:
         validation_fraction: float = 0.2,
         test_fraction: float = 0.2,
         seed: int = 0,
-    ) -> DocumentSplit:
+    ) -> Split:
         """Splits samples without placing one document ID in two partitions.
 
         Samples are shuffled at the document-ID group level, then emitted in
@@ -1111,7 +1106,7 @@ class DocumentDataset:
         if validation_fraction + test_fraction >= 1:
             raise ValueError("validation_fraction + test_fraction must be < 1")
 
-        grouped: defaultdict[str, list[DocumentSample]] = defaultdict(list)
+        grouped: defaultdict[str, list[Sample]] = defaultdict(list)
         for sample in self.samples:
             grouped[sample.document_id].append(sample)
         document_ids = sorted(grouped)
@@ -1153,15 +1148,15 @@ class DocumentDataset:
         test = tuple(
             sample for sample in self.samples if sample.document_id in test_ids
         )
-        return DocumentSplit(train=train, validation=validation, test=test)
+        return Split(train=train, validation=validation, test=test)
 
 
 DocumentSource = bytes | str | pathlib.Path
 PdfPageReader = Callable[[bytes], Sequence[str]]
-LayoutReader = Callable[[bytes, str, DocumentFormat], DocumentLayout | None]
+LayoutReader = Callable[[bytes, str, Format], Layout | None]
 
 
-class DocumentReader:
+class Reader:
     """Reads UTF-8 text, Markdown, and optionally injected PDF pages.
 
     Attributes:
@@ -1198,8 +1193,8 @@ class DocumentReader:
     def format_for(
         self,
         source: str | pathlib.Path,
-        document_format: DocumentFormat | str | None = None,
-    ) -> DocumentFormat:
+        document_format: Format | str | None = None,
+    ) -> Format:
         """Resolves a format from an explicit value or a path suffix.
 
         Args:
@@ -1217,14 +1212,14 @@ class DocumentReader:
                 raises ValueError from the enum.
         """
         if document_format is not None:
-            return DocumentFormat(document_format)
+            return Format(document_format)
         suffix = pathlib.Path(source).suffix.lower()
         if suffix in {".md", ".markdown"}:
-            return DocumentFormat.MARKDOWN
+            return Format.MARKDOWN
         if suffix == ".pdf":
-            return DocumentFormat.PDF
+            return Format.PDF
         if suffix in {".txt", ".text", ""}:
-            return DocumentFormat.TEXT
+            return Format.TEXT
         raise DocumentValidationError(
             f"unsupported document suffix '{suffix}'",
             "unsupported_format",
@@ -1235,10 +1230,10 @@ class DocumentReader:
         self,
         source: DocumentSource,
         document_id: str | None = None,
-        document_format: DocumentFormat | str | None = None,
+        document_format: Format | str | None = None,
         label: str | int | float | bool | None = None,
-        layout: DocumentLayout | None = None,
-    ) -> DocumentSample:
+        layout: Layout | None = None,
+    ) -> Sample:
         """Loads one document and validates its source bytes and content.
 
         Args:
@@ -1262,9 +1257,7 @@ class DocumentReader:
         path: pathlib.Path | None = None
         if isinstance(source, bytes):
             raw_bytes = source
-            resolved_format = DocumentFormat(
-                document_format or DocumentFormat.TEXT
-            )
+            resolved_format = Format(document_format or Format.TEXT)
             source_uri = "memory://"
         else:
             path = pathlib.Path(source)
@@ -1296,7 +1289,7 @@ class DocumentReader:
                 {"actual_bytes": len(raw_bytes), "max_bytes": self.max_bytes},
             )
         resolved_id = document_id or self.default_document_id(raw_bytes, path)
-        if resolved_format is DocumentFormat.PDF:
+        if resolved_format is Format.PDF:
             content = self.read_pdf(raw_bytes)
         else:
             content = self.decode_utf8(raw_bytes, resolved_id)
@@ -1305,7 +1298,7 @@ class DocumentReader:
             resolved_layout = self.read_layout(
                 raw_bytes, resolved_id, resolved_format
             )
-        return DocumentSample(
+        return Sample(
             document_id=resolved_id,
             content=content,
             format=resolved_format,
@@ -1366,7 +1359,7 @@ class DocumentReader:
                 "PDF input requires the optional document parser extra",
                 dependency="pypdf",
                 extra="documents",
-                details={"format": DocumentFormat.PDF.value},
+                details={"format": Format.PDF.value},
             )
         try:
             pages = tuple(self.pdf_reader(raw_bytes))
@@ -1375,13 +1368,13 @@ class DocumentReader:
                 "PDF input requires the optional document parser extra",
                 dependency="pypdf",
                 extra="documents",
-                details={"format": DocumentFormat.PDF.value},
+                details={"format": Format.PDF.value},
             ) from error
         except Exception as error:
             raise DocumentValidationError(
                 "PDF parser could not decode the source",
                 "pdf_parse_error",
-                {"format": DocumentFormat.PDF.value},
+                {"format": Format.PDF.value},
             ) from error
         if not pages or any(not isinstance(page, str) for page in pages):
             raise DocumentValidationError(
@@ -1395,8 +1388,8 @@ class DocumentReader:
         self,
         raw_bytes: bytes,
         document_id: str,
-        document_format: DocumentFormat,
-    ) -> DocumentLayout | None:
+        document_format: Format,
+    ) -> Layout | None:
         """Reads optional layout, OCR, or table evidence through a callback.
 
         Args:
@@ -1411,7 +1404,7 @@ class DocumentReader:
         Raises:
             DocumentDependencyError: If the callback fails with ImportError.
             DocumentValidationError: If the callback fails with any other
-                exception or returns something other than a DocumentLayout
+                exception or returns something other than a Layout
                 or None.
         """
         if self.layout_reader is None:
@@ -1431,7 +1424,7 @@ class DocumentReader:
                 "layout_parse_error",
                 {"document_id": document_id, "format": document_format.value},
             ) from error
-        if layout is not None and not isinstance(layout, DocumentLayout):
+        if layout is not None and not isinstance(layout, Layout):
             raise DocumentValidationError(
                 "document layout extractor returned an invalid contract",
                 "layout_invalid_result",
@@ -1482,7 +1475,7 @@ def language_heuristic(content: str) -> str:
     return "unknown"
 
 
-def provenance_for_content(content: str) -> tuple[DocumentSpan, ...]:
+def provenance_for_content(content: str) -> tuple[Span, ...]:
     """Builds page and Markdown-heading spans from character offsets.
 
     Args:
@@ -1494,7 +1487,7 @@ def provenance_for_content(content: str) -> tuple[DocumentSpan, ...]:
         heading to the next heading or the end, and carries the page number
         of its heading.
     """
-    spans: list[DocumentSpan] = []
+    spans: list[Span] = []
     page_starts = [0]
     page_ends: list[int] = []
     for match in re.finditer("\f", content):
@@ -1506,7 +1499,7 @@ def provenance_for_content(content: str) -> tuple[DocumentSpan, ...]:
     ):
         if end > start:
             spans.append(
-                DocumentSpan(
+                Span(
                     kind="page",
                     start=start,
                     end=end,
@@ -1525,7 +1518,7 @@ def provenance_for_content(content: str) -> tuple[DocumentSpan, ...]:
         label = heading.group(1).strip()
         page_number = content.count("\f", 0, heading.start()) + 1
         spans.append(
-            DocumentSpan(
+            Span(
                 kind="section",
                 start=heading.start(),
                 end=end,

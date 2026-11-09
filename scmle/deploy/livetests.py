@@ -63,7 +63,7 @@ Fetch = Callable[[str, str, Mapping[str, str], bytes | None], Response]
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class CheckResult:
+class Check:
     """The outcome of one check, bound to the build it ran against.
 
     Attributes:
@@ -97,7 +97,7 @@ class CheckResult:
         return record
 
     @classmethod
-    def from_dict(cls, record: Mapping[str, Any]) -> "CheckResult":
+    def from_dict(cls, record: Mapping[str, Any]) -> "Check":
         """Rebuilds a result from `to_dict`.
 
         Args:
@@ -225,7 +225,7 @@ def json_headers(token: str | None) -> dict[str, str]:
 
 def finish(
     name: str, target: Target, wire: Recorder, problems: list[str]
-) -> CheckResult:
+) -> Check:
     """Builds the result of one check.
 
     Args:
@@ -237,7 +237,7 @@ def finish(
     Returns:
         A result that passes exactly when ``problems`` is empty.
     """
-    return CheckResult(
+    return Check(
         name,
         not problems,
         tuple(problems),
@@ -249,7 +249,7 @@ def finish(
     )
 
 
-def check_health(fetch: Fetch, target: Target) -> CheckResult:
+def check_health(fetch: Fetch, target: Target) -> Check:
     """Checks `/livez`, `/readyz` and `/health` and the model identity.
 
     Args:
@@ -279,7 +279,7 @@ def check_health(fetch: Fetch, target: Target) -> CheckResult:
     return finish("health", target, wire, problems)
 
 
-def check_schema(fetch: Fetch, target: Target) -> CheckResult:
+def check_schema(fetch: Fetch, target: Target) -> Check:
     """Checks that `/schema` serves the contract, digest and model identity.
 
     Args:
@@ -316,7 +316,7 @@ def check_inference(
     target: Target,
     golden: parity.GoldenSet,
     expected: dict[str, Any],
-) -> CheckResult:
+) -> Check:
     """Checks that the golden records score within the declared bound.
 
     Args:
@@ -354,7 +354,7 @@ def check_inference(
     return finish("inference", target, wire, problems)
 
 
-def check_security(fetch: Fetch, target: Target) -> CheckResult:
+def check_security(fetch: Fetch, target: Target) -> Check:
     """Checks that anonymous and forged callers are refused, over TLS.
 
     Args:
@@ -407,7 +407,7 @@ def run_checks(
     target: Target,
     golden: parity.GoldenSet,
     expected: dict[str, Any],
-) -> list[CheckResult]:
+) -> list[Check]:
     """Runs the four checks in order; a failing check does not stop the rest.
 
     Args:

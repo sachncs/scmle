@@ -81,7 +81,7 @@ BASE_SENSITIVITY = 0.6
 BASE_FALSE_POSITIVE = 0.2
 LABEL_ROWS = 1000
 LABEL_RUNS = 500
-LABEL_POLICY = certificates.CertificationPolicy(0.95, 0.05, 0.95)
+LABEL_POLICY = certificates.Standard(0.95, 0.05, 0.95)
 FEASIBILITY_RUNS = 500
 FEASIBILITY_ROWS = 600
 FEASIBILITY_CLUSTERS = 60
@@ -334,7 +334,7 @@ def label_world(
 
 def label_certificate(
     offset: int,
-) -> tuple[certificates.DetectorCertificate, dict[str, Any]]:
+) -> tuple[certificates.Certification, dict[str, Any]]:
     """Measures the selective-label detector.
 
     Args:
@@ -525,7 +525,7 @@ def omission_asks(seed: int, flips: bool, given: bool) -> bool:
         tuple(frame.columns),
         primary_key=("customer_id",),
     )
-    request = draft.FramingRequest("Predict churn for each customer.", source)
+    request = draft.Request("Predict churn for each customer.", source)
     model = (
         costs.DecisionCostModel(
             0.0,
@@ -627,7 +627,7 @@ def fuzz_rows(count: int = 1000) -> dict[str, Any]:
 
 def certify_all(
     offset: int = 0, runs: int = RUNS
-) -> tuple[certificates.CertificateStore, dict[str, Any]]:
+) -> tuple[certificates.Store, dict[str, Any]]:
     """Measures every framing method; `offset` shifts the seed range.
 
     Args:
@@ -638,7 +638,7 @@ def certify_all(
         The certificate store and the measurements document.
     """
     started = time.monotonic()
-    store = certificates.CertificateStore()
+    store = certificates.Store()
     cert, labels = label_certificate(offset)
     store.add(cert)
     sizes = size_rows(offset, runs)
@@ -659,7 +659,7 @@ def certify_all(
 
 
 def problems(
-    store: certificates.CertificateStore, document: dict[str, Any] | None
+    store: certificates.Store, document: dict[str, Any] | None
 ) -> list[str]:
     """Why the files are unusable: stale, missing or inconsistent.
 
@@ -691,7 +691,7 @@ def problems(
 
 
 def descriptive_only(
-    store: certificates.CertificateStore, document: dict[str, Any] | None
+    store: certificates.Store, document: dict[str, Any] | None
 ) -> list[str]:
     """Methods measured and not meeting their floor (not an error).
 
@@ -741,7 +741,7 @@ def check() -> dict[str, Any]:
         `ok`, the problems, the descriptive-only methods and a note that no
         gold corpus exists.
     """
-    store = certificates.CertificateStore.load(STORE_PATH)
+    store = certificates.Store.load(STORE_PATH)
     document = load_document()
     found = problems(store, document)
     return {

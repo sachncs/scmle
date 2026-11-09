@@ -412,7 +412,7 @@ class Measurement:
 
 
 @dataclasses.dataclass(slots=True)
-class Result:
+class Outcome:
     """The outcome of one fault.
 
     Attributes:
@@ -467,7 +467,7 @@ class Result:
         }
 
 
-Scenario = Callable[[], Result]
+Scenario = Callable[[], Outcome]
 
 
 class Runner:
@@ -526,7 +526,7 @@ class Runner:
                 result = scenario()
                 result.judge()
             except Exception as error:  # a crash is a failed fault
-                result = Result(fault.id, FAILED, "crashed")
+                result = Outcome(fault.id, FAILED, "crashed")
                 result.problems = [
                     f"{type(error).__name__}: {error}",
                     traceback.format_exc()[-600:],
@@ -535,7 +535,7 @@ class Runner:
             results.append(result)
         return self.report(results)
 
-    def not_run(self, fault: Fault, selected: bool) -> Result:
+    def not_run(self, fault: Fault, selected: bool) -> Outcome:
         """Builds the not-run result of a fault.
 
         Args:
@@ -554,14 +554,14 @@ class Runner:
             reason = "no scenario was provided"
         else:
             reason = "needs a real cloud environment: " + fault.cloud_needs
-        return Result(
+        return Outcome(
             fault.id,
             NOT_RUN,
             "not run",
             problems=[reason],
         )
 
-    def report(self, results: Sequence[Result]) -> dict[str, Any]:
+    def report(self, results: Sequence[Outcome]) -> dict[str, Any]:
         """Builds the report of a run from its results.
 
         Args:

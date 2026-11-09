@@ -1,7 +1,7 @@
 """Detector certificates: measured operating characteristics tied to code.
 
 A check may gate a run only if its operating characteristic has been measured
-and is on file. A `DetectorCertificate` records, per defect type, how
+and is on file. A `Certification` records, per defect type, how
 many planted defects a detector found and how many clean rows it flagged, with
 Wilson intervals. It is keyed by a hash of the detector's code, so a code
 change without re-certification leaves the old certificate stale, and the
@@ -61,7 +61,7 @@ class GateStatus(enum.StrEnum):
     DESCRIPTIVE = "descriptive"
 
 
-class CertificateState(enum.StrEnum):
+class Freshness(enum.StrEnum):
     """How the store relates to a detector's current code."""
 
     CURRENT = "current"
@@ -222,7 +222,7 @@ def require_digest(value: Any, name: str) -> str:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class CertificationPolicy:
+class Standard:
     """Pre-registered floors a detector must clear to be certified.
 
     Attributes:
@@ -316,7 +316,7 @@ class DefectOutcome:
     def measure(
         cls,
         certificate: qualification.Certificate,
-        policy: CertificationPolicy,
+        policy: Standard,
     ) -> Self:
         """Computes the intervals and verdict for `certificate`.
 
@@ -357,9 +357,7 @@ class DefectOutcome:
         }
 
     @classmethod
-    def from_dict(
-        cls, record: Mapping[str, Any], policy: CertificationPolicy
-    ) -> Self:
+    def from_dict(cls, record: Mapping[str, Any], policy: Standard) -> Self:
         """Rebuilds an outcome and checks it against its own counts.
 
         Args:
@@ -394,7 +392,7 @@ class DefectOutcome:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class DetectorCertificate:
+class Certification:
     """Certificate for one detector version on one corpus and seed set.
 
     Attributes:
@@ -412,7 +410,7 @@ class DetectorCertificate:
     code_hash: str
     corpus_hash: str
     seeds: tuple[int, ...]
-    policy: CertificationPolicy
+    policy: Standard
     outcomes: tuple[DefectOutcome, ...]
     created: str | None = None
 
@@ -490,7 +488,7 @@ class DetectorCertificate:
             `CertificateError`.
         """
         qualification.require_fields(cls, record)
-        policy = CertificationPolicy.from_dict(record["policy"])
+        policy = Standard.from_dict(record["policy"])
         return cls(
             detector_id=record["detector_id"],
             code_hash=record["code_hash"],
@@ -511,9 +509,9 @@ def certify(
     corpus_digest: str,
     seeds: Sequence[int],
     results: Sequence[qualification.Certificate],
-    policy: CertificationPolicy,
+    policy: Standard,
     created: str | None = None,
-) -> DetectorCertificate:
+) -> Certification:
     """Judges measured results against a policy.
 
     Args:
@@ -530,7 +528,7 @@ def certify(
         or a repeated defect type raises `ValueError`.
     """
     outcomes = tuple(DefectOutcome.measure(r, policy) for r in results)
-    return DetectorCertificate(
+    return Certification(
         detector_id=detector_id,
         code_hash=code_digest,
         corpus_hash=corpus_digest,
@@ -565,7 +563,7 @@ def demote(
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class AuditReport:
+class Audit:
     """Gating detectors that lack a usable certificate.
 
     Attributes:
@@ -585,25 +583,25 @@ class AuditReport:
         return not (self.missing or self.stale or self.uncertified)
 
 
-class CertificateStore:
+class Store:
     """The set of certificates written as `detector_certificates.json`."""
 
-    def __init__(self, items: Iterable[DetectorCertificate] = ()) -> None:
+    def __init__(self, items: Iterable[Certification] = ()) -> None:
         """Creates a store, keeping the last certificate for each key.
 
         Args:
             items: Certificates to add, in order.
         """
-        self.by_key: dict[tuple[Any, ...], DetectorCertificate] = {}
+        self.by_key: dict[tuple[Any, ...], Certification] = {}
         for item in items:
             self.add(item)
 
     @property
-    def certificates(self) -> tuple[DetectorCertificate, ...]:
+    def certificates(self) -> tuple[Certification, ...]:
         """The stored certificates, ordered by key."""
         return tuple(self.by_key[key] for key in sorted(self.by_key))
 
-    def add(self, item: DetectorCertificate) -> None:
+    def add(self, item: Certification) -> None:
         """Stores a certificate, replacing one with the same key.
 
         Args:
@@ -613,7 +611,7 @@ class CertificateStore:
 
     def current(
         self, detector_id: str, code_digest: str
-    ) -> tuple[DetectorCertificate, ...]:
+    ) -> tuple[Certification, ...]:
         """Finds the certificates issued for exactly this code.
 
         Args:
@@ -629,7 +627,7 @@ class CertificateStore:
             if c.detector_id == detector_id and c.code_hash == code_digest
         )
 
-    def state(self, detector_id: str, code_digest: str) -> CertificateState:
+    def state(self, detector_id: str, code_digest: str) -> Freshness:
         """Finds how the store relates to a detector's current code.
 
         Args:
@@ -642,10 +640,10 @@ class CertificateStore:
             `missing`.
         """
         if self.current(detector_id, code_digest):
-            return CertificateState.CURRENT
+            return Freshness.CURRENT
         if any(c.detector_id == detector_id for c in self.certificates):
-            return CertificateState.STALE
-        return CertificateState.MISSING
+            return Freshness.STALE
+        return Freshness.MISSING
 
     def status(
         self, detector_id: str, code_digest: str, defect_type: str
@@ -685,11 +683,11 @@ class CertificateStore:
                 for `defect_type`.
         """
         state = self.state(detector_id, code_digest)
-        if state is CertificateState.MISSING:
+        if state is Freshness.MISSING:
             raise CertificateError(
                 f"no certificate for detector '{detector_id}'"
             )
-        if state is CertificateState.STALE:
+        if state is Freshness.STALE:
             raise StaleCertificateError(
                 f"certificate for '{detector_id}' is for different code"
             )
@@ -738,8 +736,7 @@ class CertificateStore:
         if extra:
             raise ValueError(f"unexpected field(s): {extra}")
         return cls(
-            DetectorCertificate.from_dict(item)
-            for item in document["certificates"]
+            Certification.from_dict(item) for item in document["certificates"]
         )
 
     def save(self, path: Path) -> None:
@@ -766,9 +763,7 @@ class CertificateStore:
         return cls.from_dict(json.loads(path.read_text(encoding="utf-8")))
 
 
-def audit(
-    store: CertificateStore, gating: Mapping[str, tuple[str, str]]
-) -> AuditReport:
+def audit(store: Store, gating: Mapping[str, tuple[str, str]]) -> Audit:
     """Checks every gating detector has a current, passing certificate.
 
     Args:
@@ -784,12 +779,12 @@ def audit(
     for detector_id in sorted(gating):
         digest, defect = gating[detector_id]
         state = store.state(detector_id, digest)
-        if state is CertificateState.MISSING:
+        if state is Freshness.MISSING:
             missing.append(detector_id)
-        elif state is CertificateState.STALE:
+        elif state is Freshness.STALE:
             stale.append(detector_id)
         elif store.status(detector_id, digest, defect) is not (
             GateStatus.GATING
         ):
             uncertified.append(detector_id)
-    return AuditReport(tuple(missing), tuple(stale), tuple(uncertified))
+    return Audit(tuple(missing), tuple(stale), tuple(uncertified))

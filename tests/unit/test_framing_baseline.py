@@ -116,7 +116,7 @@ def rows(seed=0, g=60, se_a=0.85, fp_a=0.1):
 
 
 def guard(alpha=0.05):
-    return baseline.BaselineGuard(baseline.register(MODEL, RULE, alpha))
+    return baseline.Evaluator(baseline.register(MODEL, RULE, alpha))
 
 
 def test_claim_is_issued_with_a_real_gain_and_only_once():

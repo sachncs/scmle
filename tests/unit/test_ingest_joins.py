@@ -149,7 +149,7 @@ def test_many_to_many_charges_the_budget_per_pair_and_stops_at_a_boundary():
     assert len(free) == 3
 
     # room for exactly one pair (60 rows scanned, two queries)
-    meter = budget.BudgetMeter(budget.IngestBudget(max_rows_scanned=60))
+    meter = budget.BudgetMeter(budget.Budget(max_rows_scanned=60))
     limited = profile.SqlSource(db.factory, meter)
     found = joins.many_to_many(limited, catalog, scans)
     assert len(found) == 1
@@ -164,7 +164,7 @@ def test_many_to_many_without_a_meter_or_with_room_is_unchanged():
     plain = db.source()
     catalog = profile.profile_catalog(plain, ["a", "b", "c"])
     scans = {t.name: grain.infer_keys(plain, t) for t in catalog.tables}
-    meter = budget.BudgetMeter(budget.IngestBudget())
+    meter = budget.BudgetMeter(budget.Budget())
     roomy = profile.SqlSource(db.factory, meter)
     assert len(joins.many_to_many(roomy, catalog, scans)) == 3
     assert not meter.partial

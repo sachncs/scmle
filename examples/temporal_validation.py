@@ -8,7 +8,7 @@ import logging
 import numpy
 import pandas
 
-import scmle
+import scmle.api.project
 from scmle.contracts import tasks
 
 LOGGER = logging.getLogger(__name__)
@@ -35,7 +35,7 @@ def make_dataset(days: int = 500) -> pandas.DataFrame:
 def main() -> None:
     """Runs with temporal validation and a declarative feature graph."""
     logging.basicConfig(level=logging.INFO, format="%(message)s")
-    graph = tasks.FeatureGraphSpec(
+    graph = tasks.FeatureGraph(
         nodes=[
             tasks.FeatureNode(
                 name="temperature_prev_week",
@@ -51,7 +51,7 @@ def main() -> None:
             ),
         ]
     )
-    project = scmle.MLProject(
+    project = scmle.api.project.Project(
         make_dataset(),
         "demand",
         metric="rmse",

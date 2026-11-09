@@ -121,7 +121,7 @@ def test_prediction_log_joins_late_outcomes(trained, tmp_path):
 def test_prediction_log_can_emit_redacted_observability_sidecar(
     trained, tmp_path
 ):
-    policy = observability.ObservabilityPolicy(
+    policy = observability.Requirements(
         retention_days=30,
         required_signals=(
             observability.SignalKind.LATENCY,
@@ -166,18 +166,18 @@ def test_bundles_without_reference_cannot_be_monitored(trained):
 
 
 def test_advisor_combines_rules_and_keeps_all_reasons():
-    drift = scmle.monitoring.monitor.DriftReport(100, [], 0.4, "high")
-    performance = scmle.monitoring.monitor.PerformanceReport(
+    drift = scmle.monitoring.monitor.Drift(100, [], 0.4, "high")
+    performance = scmle.monitoring.monitor.Performance(
         100, 100, 1.0, {}, {}, {"roc_auc": -0.3}, "degraded"
     )
     verdict = scmle.monitoring.monitor.advise(
-        drift, performance, scmle.monitoring.monitor.MonitoringThresholds()
+        drift, performance, scmle.monitoring.monitor.Thresholds()
     )
     assert verdict.action == "retrain" and len(verdict.reasons) == 2
     calm = scmle.monitoring.monitor.advise(
-        scmle.monitoring.monitor.DriftReport(10, [], 0.01, "stable"),
+        scmle.monitoring.monitor.Drift(10, [], 0.01, "stable"),
         None,
-        scmle.monitoring.monitor.MonitoringThresholds(),
+        scmle.monitoring.monitor.Thresholds(),
     )
     assert calm.action == "none" and calm.reasons == []
 

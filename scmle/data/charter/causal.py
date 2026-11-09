@@ -1,6 +1,6 @@
 """The causal block of a charter estimand (charter format 4).
 
-A `kind="causal"` estimand may carry a `CausalSpec`: the treatment, the
+A `kind="causal"` estimand may carry a `Question`: the treatment, the
 outcome, the estimand, the design columns, the assumptions the analyst
 attests, the priority order of strategies, the pre-registered negative
 controls and the sensitivity benchmark. The identification step reads this
@@ -266,7 +266,7 @@ class Attestor:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class SensitivitySpec:
+class Confounding:
     """How strong an unmeasured confounder the claim must survive.
 
     Attributes:
@@ -327,7 +327,7 @@ class SensitivitySpec:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class CausalSpec:
+class Question:
     """The causal question of a charter.
 
     Attributes:
@@ -378,7 +378,7 @@ class CausalSpec:
     strategies: tuple[str, ...] = ()
     negative_controls: tuple[NegativeControl, ...] = ()
     strata: tuple[str, ...] = ()
-    sensitivity: SensitivitySpec | None = None
+    sensitivity: Confounding | None = None
     trim: float = 0.0
     min_share: float = 0.5
     subgroups: tuple[Subgroup, ...] = ()
@@ -529,7 +529,7 @@ class CausalSpec:
             sensitivity=(
                 None
                 if sensitivity is None
-                else SensitivitySpec.from_dict(sensitivity)
+                else Confounding.from_dict(sensitivity)
             ),
             trim=record["trim"],
             min_share=record["min_share"],

@@ -18,8 +18,8 @@ controller adds is what a person did by typing commands:
   there, and halts and escalates if the counter fits neither case. A file that
   cannot be read is ``rejected`` once and escalated, never retried.
 * **Authority.** The loop calls its retrain hook only when its policy says an
-  alarm may gate retraining (`LoopPolicy.alarm_gates_retrain`, off until the
-  alarm design is certified). Even then the hook first spends one use of an
+  alarm may gate retraining (`Preregistration.alarm_gates_retrain`, off until
+  the alarm design is certified). Even then the hook first spends one use of an
   envelope (`scmle.governance.envelope`); without one it escalates and trains
   nothing. A training that fails is escalated and the loop goes on.
 * **Dead-man rules.** Ticks with no new batch, or with matured batches that
@@ -57,7 +57,7 @@ Checkpoint = Callable[[str], None]
 
 
 @dataclasses.dataclass(frozen=True)
-class ControllerPolicy:
+class Limits:
     """When the controller asks a person because nothing is happening.
 
     Attributes:
@@ -81,7 +81,7 @@ class ControllerPolicy:
 
 
 @dataclasses.dataclass(frozen=True)
-class TickResult:
+class Tick:
     """What one tick did.
 
     Attributes:
@@ -141,7 +141,7 @@ class Controller:
         verification_keys: Mapping[str, str | bytes] | None = None,
         system_keys: tuple[str | bytes, ...] = (),
         today: Callable[[], datetime.date] = datetime.date.today,
-        policy: ControllerPolicy | None = None,
+        policy: Limits | None = None,
         checkpoint: Checkpoint | None = None,
     ) -> None:
         """Opens an existing deployment (`scmle loop init` creates one).
@@ -163,7 +163,7 @@ class Controller:
                 tests, absent in production.
         """
         self.retrain = retrain
-        self.policy = policy or ControllerPolicy()
+        self.policy = policy or Limits()
         self.checkpoint = checkpoint
         self.loop = scmle.governance.loop.Loop.resume(
             deploy_dir,
@@ -489,7 +489,7 @@ class Controller:
 
     # ----------------------------------------------------------------- tick
 
-    def tick(self, inbox: str | pathlib.Path) -> TickResult:
+    def tick(self, inbox: str | pathlib.Path) -> Tick:
         """Applies the new inbox files, steps the loop and journals the tick.
 
         Args:
@@ -561,7 +561,7 @@ class Controller:
         matured: int,
         rejected: tuple[str, ...],
         events: tuple[tuple[str, str], ...],
-    ) -> TickResult:
+    ) -> Tick:
         """Builds the report, with the escalations now open.
 
         Args:
@@ -574,7 +574,7 @@ class Controller:
         Returns:
             The tick report.
         """
-        return TickResult(
+        return Tick(
             status,
             observed,
             matured,

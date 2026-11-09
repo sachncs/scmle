@@ -191,7 +191,7 @@ class InferenceEvent:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ObservabilityPolicy:
+class Requirements:
     """Retention, redaction, and alert requirements for emitted signals."""
 
     retention_days: int
@@ -244,7 +244,7 @@ class ObservabilityPolicy:
 def canonical_json(
     metrics: Sequence[MetricSample],
     events: Sequence[InferenceEvent],
-    policy: ObservabilityPolicy,
+    policy: Requirements,
 ) -> str:
     """Returns deterministic redacted observability evidence.
 

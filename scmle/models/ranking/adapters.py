@@ -8,10 +8,10 @@ from scmle.contracts import search
 from scmle.contracts import tasks
 from scmle.models.ranking import estimators
 
-RANKING = frozenset({tasks.TaskType.RANKING})
+RANKING = frozenset({tasks.Task.RANKING})
 
 
-class PointwiseAdapter(models.ModelAdapter):
+class Pointwise(models.Model):
     """Gradient boosting regression on the relevance grade."""
 
     name = "pointwise_ranker"
@@ -22,7 +22,7 @@ class PointwiseAdapter(models.ModelAdapter):
 
     def build(
         self,
-        task: tasks.TaskType,
+        task: tasks.Task,
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
@@ -52,7 +52,7 @@ class PointwiseAdapter(models.ModelAdapter):
     )
 
 
-class LibraryRankerAdapter(models.ModelAdapter):
+class Ranker(models.Model):
     """Base for LightGBM and XGBoost rankers.
 
     Attributes:
@@ -73,7 +73,7 @@ class LibraryRankerAdapter(models.ModelAdapter):
 
     def build(
         self,
-        task: tasks.TaskType,
+        task: tasks.Task,
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
@@ -92,7 +92,7 @@ class LibraryRankerAdapter(models.ModelAdapter):
         )
 
 
-class LightGbmRankerAdapter(LibraryRankerAdapter):
+class LightGbmRanker(Ranker):
     """LightGBM LambdaRank."""
 
     name = "lightgbm_ranker"
@@ -100,7 +100,7 @@ class LightGbmRankerAdapter(LibraryRankerAdapter):
     requires = ("lightgbm",)
 
 
-class XgboostRankerAdapter(LibraryRankerAdapter):
+class XgboostRanker(Ranker):
     """XGBoost NDCG ranker."""
 
     name = "xgboost_ranker"
@@ -108,8 +108,8 @@ class XgboostRankerAdapter(LibraryRankerAdapter):
     requires = ("xgboost",)
 
 
-RANKING_ADAPTERS: tuple[type[models.ModelAdapter], ...] = (
-    PointwiseAdapter,
-    LightGbmRankerAdapter,
-    XgboostRankerAdapter,
+RANKING_ADAPTERS: tuple[type[models.Model], ...] = (
+    Pointwise,
+    LightGbmRanker,
+    XgboostRanker,
 )

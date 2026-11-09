@@ -70,13 +70,13 @@ def test_calibrating_a_multiclass_bundle_lowers_its_calibration_error():
     plan = data.FeaturePlan(("a", "b"), ())
     pipe = preprocessing.build_pipeline(
         plan,
-        registry.ModelRegistry.with_builtins().get("logistic_regression"),
-        tasks.TaskType.MULTICLASS,
+        registry.Catalog.with_builtins().get("logistic_regression"),
+        tasks.Task.MULTICLASS,
         0,
     )
     pipe.steps[-1] = ("model", Overconfident())
     pipe.fit(features, target)
-    bundle = scmle.artifacts.bundle.ModelBundle.create(
+    bundle = scmle.artifacts.bundle.Bundle.create(
         pipe, plan, features, "y", "multiclass_classification", "log_loss", "x"
     )
 
@@ -100,13 +100,13 @@ def overconfident_bundle():
     plan = data.FeaturePlan(("a", "b"), ())
     pipe = preprocessing.build_pipeline(
         plan,
-        registry.ModelRegistry.with_builtins().get("logistic_regression"),
-        tasks.TaskType.MULTICLASS,
+        registry.Catalog.with_builtins().get("logistic_regression"),
+        tasks.Task.MULTICLASS,
         0,
     )
     pipe.steps[-1] = ("model", Overconfident())
     pipe.fit(features, target)
-    bundle = scmle.artifacts.bundle.ModelBundle.create(
+    bundle = scmle.artifacts.bundle.Bundle.create(
         pipe, plan, features, "y", "multiclass_classification", "log_loss", "x"
     )
     return bundle, features, target
@@ -121,7 +121,7 @@ def test_dirichlet_calibration_lowers_error_and_survives_a_round_trip(tmp_path):
     assert report["brier_after"] < report["brier_before"]
     probabilities = bundle.predict_proba(features)
     numpy.testing.assert_allclose(probabilities.sum(axis=1), 1.0, atol=1e-9)
-    loaded = scmle.artifacts.bundle.ModelBundle.load(
+    loaded = scmle.artifacts.bundle.Bundle.load(
         bundle.save(tmp_path / "b"), trusted=True
     )
     numpy.testing.assert_allclose(loaded.predict_proba(features), probabilities)

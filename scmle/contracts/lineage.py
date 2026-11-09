@@ -16,7 +16,7 @@ from typing import Any
 from typing import Self
 
 
-class EvidenceNodeKind(enum.StrEnum):
+class Kind(enum.StrEnum):
     """Evidence object categories in the lifecycle graph."""
 
     RAW_SOURCE = "raw_source"
@@ -52,11 +52,11 @@ def require_text(value: str, name: str) -> str:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class EvidenceNode:
+class Node:
     """One immutable content identity in an evidence graph."""
 
     node_id: str
-    kind: EvidenceNodeKind
+    kind: Kind
     digest: str
     attributes: Mapping[str, str] = dataclasses.field(default_factory=dict)
 
@@ -70,8 +70,8 @@ class EvidenceNode:
         """
         require_text(self.node_id, "node_id")
         require_text(self.digest, "digest")
-        if not isinstance(self.kind, EvidenceNodeKind):
-            object.__setattr__(self, "kind", EvidenceNodeKind(self.kind))
+        if not isinstance(self.kind, Kind):
+            object.__setattr__(self, "kind", Kind(self.kind))
         normalized = dict(self.attributes)
         if any(not key.strip() for key in normalized):
             raise ValueError("attribute names must not be empty")
@@ -100,14 +100,14 @@ class EvidenceNode:
         """
         return cls(
             node_id=str(record["node_id"]),
-            kind=EvidenceNodeKind(record["kind"]),
+            kind=Kind(record["kind"]),
             digest=str(record["digest"]),
             attributes=dict(record.get("attributes", {})),
         )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class EvidenceEdge:
+class Edge:
     """A directed lifecycle relationship between two evidence nodes."""
 
     source_id: str
@@ -152,7 +152,7 @@ class EvidenceEdge:
         )
 
 
-class EvidenceGraph:
+class Graph:
     """Deterministic directed acyclic graph of run evidence.
 
     Node registration is idempotent only when the complete node identity is
@@ -162,35 +162,35 @@ class EvidenceGraph:
 
     schema_version = 1
 
-    def __init__(self, nodes: Iterable[EvidenceNode] = ()) -> None:
+    def __init__(self, nodes: Iterable[Node] = ()) -> None:
         """Creates a graph and registers initial nodes.
 
         Args:
             nodes: The nodes to register.
         """
-        self.nodes: dict[str, EvidenceNode] = {}
-        self.edges: list[EvidenceEdge] = []
+        self.nodes: dict[str, Node] = {}
+        self.edges: list[Edge] = []
         for node in nodes:
             self.add_node(node)
 
-    def add_node(self, node: EvidenceNode) -> None:
+    def add_node(self, node: Node) -> None:
         """Registers one node without silently replacing an identity.
 
         Args:
             node: The node to register.
 
         Raises:
-            TypeError: If `node` is not an `EvidenceNode`.
+            TypeError: If `node` is not an `Node`.
             ValueError: If a different node already has the same id.
         """
-        if not isinstance(node, EvidenceNode):
-            raise TypeError("node must be EvidenceNode")
+        if not isinstance(node, Node):
+            raise TypeError("node must be Node")
         existing = self.nodes.get(node.node_id)
         if existing is not None and existing != node:
             raise ValueError(f"conflicting evidence node: {node.node_id}")
         self.nodes[node.node_id] = node
 
-    def add_edge(self, edge: EvidenceEdge) -> None:
+    def add_edge(self, edge: Edge) -> None:
         """Registers one edge and rejects dangling or cyclic lineage.
 
         An edge that is already registered is ignored.
@@ -199,12 +199,12 @@ class EvidenceGraph:
             edge: The edge to register.
 
         Raises:
-            TypeError: If `edge` is not an `EvidenceEdge`.
+            TypeError: If `edge` is not an `Edge`.
             ValueError: If an endpoint is not a registered node, or the edge
                 would create a cycle.
         """
-        if not isinstance(edge, EvidenceEdge):
-            raise TypeError("edge must be EvidenceEdge")
+        if not isinstance(edge, Edge):
+            raise TypeError("edge must be Edge")
         if edge.source_id not in self.nodes or edge.target_id not in self.nodes:
             raise ValueError("evidence edge refers to an unknown node")
         if edge in self.edges:
@@ -288,7 +288,7 @@ class EvidenceGraph:
             ValueError: If an edge has an unknown endpoint, an edge is
                 duplicated, or the graph contains a cycle.
         """
-        seen: set[EvidenceEdge] = set()
+        seen: set[Edge] = set()
         for edge in self.edges:
             if (
                 edge.source_id not in self.nodes
@@ -395,11 +395,9 @@ class EvidenceGraph:
         """
         if int(record.get("schema_version", 0)) != cls.schema_version:
             raise ValueError("unsupported evidence graph schema version")
-        graph = cls(
-            EvidenceNode.from_dict(item) for item in record.get("nodes", ())
-        )
+        graph = cls(Node.from_dict(item) for item in record.get("nodes", ()))
         for item in record.get("edges", ()):
-            graph.add_edge(EvidenceEdge.from_dict(item))
+            graph.add_edge(Edge.from_dict(item))
         graph.validate()
         expected_order = tuple(record.get("topological_order", ()))
         if expected_order and expected_order != graph.topological_order():
@@ -408,9 +406,9 @@ class EvidenceGraph:
 
 
 __all__ = [
-    "EvidenceEdge",
-    "EvidenceGraph",
-    "EvidenceNode",
-    "EvidenceNodeKind",
+    "Edge",
+    "Graph",
+    "Kind",
+    "Node",
     "require_text",
 ]

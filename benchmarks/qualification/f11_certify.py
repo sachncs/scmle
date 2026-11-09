@@ -113,7 +113,7 @@ Online (level `alpha_promote = 1/50` for one experiment, `alpha_rollback =
   to -0.06: rollback share filed. Amendment of 2026-11-06, written before the
   first run of the hook path and leaving the four floors above as they were:
   the same worlds are also run through `RolloutHook` on a real
-  `LifecycleManager` and a registry of two small bundles (`through_hook`). Per
+  `Maintainer` and a registry of two small bundles (`through_hook`). Per
   scenario `HOOK_WORLDS = 100` worlds (seeds `0 .. 99` of the scenario's
   stream, the first worlds of the vectorised run), fed in batches of 500 to
   `hook.observe` (promotion scenarios a, b) or `hook.watch` after a real
@@ -1248,7 +1248,7 @@ def compare_arms_rate(base: int) -> dict[str, Any]:
                 classes=classes,
             )
             result = abtest.compare_arms(
-                tasks.TaskType.BINARY,
+                tasks.Task.BINARY,
                 "accuracy",
                 control,
                 treat,
@@ -1658,7 +1658,7 @@ HOOK_BATCH = 500
 HOOK_KEY = "f11-b9-approval-key"
 
 
-def hook_bundle(seed: int) -> bundle.ModelBundle:
+def hook_bundle(seed: int) -> bundle.Bundle:
     """A small fitted logistic model for the registry the hook runs on.
 
     Args:
@@ -1675,12 +1675,12 @@ def hook_bundle(seed: int) -> bundle.ModelBundle:
         int
     )
     plan = scmle.contracts.data.FeaturePlan(("a", "b"), ())
-    models = scmle.models.registry.ModelRegistry.with_builtins()
+    models = scmle.models.registry.Catalog.with_builtins()
     features = frame.drop(columns="y")
     fitted = preprocessing.build_pipeline(
-        plan, models.get("logistic_regression"), tasks.TaskType.BINARY, 0
+        plan, models.get("logistic_regression"), tasks.Task.BINARY, 0
     ).fit(features, frame.y)
-    return bundle.ModelBundle.create(
+    return bundle.Bundle.create(
         fitted,
         plan,
         features,
@@ -1723,7 +1723,7 @@ def hook_registry(root: Path) -> tuple[Any, Any, Any]:
         record.
     """
     store = scmle.governance.registry.ModelRegistryStore(root / "registry")
-    manager = lifecycle.LifecycleManager(store, "m", str(root / "work"))
+    manager = lifecycle.Maintainer(store, "m", str(root / "work"))
     first = store.register(
         "m", hook_bundle(0).save(root / "export1"), trusted=True
     )
@@ -2105,7 +2105,7 @@ def sources() -> dict[str, list[Any]]:
             threshold.calibration_check,
             threshold.fit_recalibrator,
             threshold.cross_fitted,
-            threshold.ThresholdRule,
+            threshold.Threshold,
             threshold.bayes_threshold,
             gate_a1,
             f11_generators.calibration_world,
@@ -2222,7 +2222,7 @@ def sources() -> dict[str, list[Any]]:
             rollout.Rollout,
             rollout.RollbackMonitor,
             rollout_hook.RolloutHook,
-            lifecycle.LifecycleManager.defer_to_rollout,
+            lifecycle.Maintainer.defer_to_rollout,
             hook_bundle,
             hook_approval,
             hook_registry,

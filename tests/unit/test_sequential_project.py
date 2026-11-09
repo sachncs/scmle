@@ -6,15 +6,15 @@ import numpy
 import pandas
 import pytest
 
+from scmle.api.sequential import Estimation
 from scmle.api.sequential import resolve_tabular_input
-from scmle.api.sequential import SequentialEstimationProject
-from scmle.evaluation.sequential import SequentialEstimand
-from scmle.evaluation.sequential import SequentialEstimationPolicy
+from scmle.evaluation.sequential import Config
+from scmle.evaluation.sequential import Estimand
 
 
-def make_estimand() -> SequentialEstimand:
+def make_estimand() -> Estimand:
     """Return a complete sequential causal declaration."""
-    return SequentialEstimand(
+    return Estimand(
         name="sustained_treatment_effect",
         subject_identity="subject_id",
         time_column="time",
@@ -34,9 +34,9 @@ def make_estimand() -> SequentialEstimand:
     )
 
 
-def make_policy() -> SequentialEstimationPolicy:
+def make_policy() -> Config:
     """Return a bounded policy suitable for the small test panel."""
-    return SequentialEstimationPolicy(
+    return Config(
         minimum_subjects=60,
         minimum_effective_sample_size=2.0,
     )
@@ -83,12 +83,12 @@ def make_frame() -> pandas.DataFrame:
 def test_project_requires_explicit_estimator_declarations() -> None:
     """The project cannot silently choose a sequential estimand or policy."""
     frame = make_frame()
-    with pytest.raises(TypeError, match="SequentialEstimand"):
-        SequentialEstimationProject(frame, object(), make_policy())
-    with pytest.raises(TypeError, match="SequentialEstimationPolicy"):
-        SequentialEstimationProject(frame, make_estimand(), object())
+    with pytest.raises(TypeError, match="Estimand"):
+        Estimation(frame, object(), make_policy())
+    with pytest.raises(TypeError, match="Config"):
+        Estimation(frame, make_estimand(), object())
     with pytest.raises(TypeError, match="supported tabular"):
-        SequentialEstimationProject(object(), make_estimand(), make_policy())
+        Estimation(object(), make_estimand(), make_policy())
 
 
 def test_resolve_tabular_input_copies_frames_and_loads_supported_paths(
@@ -111,11 +111,11 @@ def test_project_result_can_be_loaded_from_a_verified_artifact(
     tmp_path,
 ) -> None:
     """A new project instance can expose its digest-verified durable result."""
-    project = SequentialEstimationProject(
+    project = Estimation(
         make_frame(), make_estimand(), make_policy(), output_dir=tmp_path
     )
     result = project.run()
-    restored = SequentialEstimationProject(
+    restored = Estimation(
         make_frame(), make_estimand(), make_policy(), output_dir=tmp_path
     ).load_result()
 
@@ -126,12 +126,12 @@ def test_project_result_can_be_loaded_from_a_verified_artifact(
 def test_replay_detects_policy_changes(tmp_path) -> None:
     """Replay verification reports a changed policy instead of hiding it."""
     policy = make_policy()
-    project = SequentialEstimationProject(
+    project = Estimation(
         make_frame(), make_estimand(), policy, output_dir=tmp_path
     )
     project.run()
     changed = dataclasses.replace(policy, maximum_weight=10.0)
-    replay = SequentialEstimationProject(
+    replay = Estimation(
         make_frame(), make_estimand(), changed, output_dir=project.output_dir
     ).verify_replay()
 

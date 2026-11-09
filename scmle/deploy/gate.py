@@ -89,9 +89,9 @@ class Candidate:
     approver: str
     approved_at: str
     scan: ImageScan | None = None
-    checks: Sequence[livetests.CheckResult] = ()
+    checks: Sequence[livetests.Check] = ()
     observation: scmle.deploy.observation.Observation | None = None
-    staging_record: scmle.deploy.record.DeploymentRecord | None = None
+    staging_record: scmle.deploy.record.Record | None = None
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -107,7 +107,7 @@ class GateDecision:
 
     allowed: bool
     reasons: tuple[str, ...]
-    record: scmle.deploy.record.DeploymentRecord | None = None
+    record: scmle.deploy.record.Record | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Builds a JSON-ready record.
@@ -331,7 +331,7 @@ def certify(
     if problems or seen is None:
         return GateDecision(False, tuple(problems))
     results = {item.name: item.evidence_digest for item in candidate.checks}
-    unsigned = scmle.deploy.record.DeploymentRecord(
+    unsigned = scmle.deploy.record.Record(
         source_commit=candidate.source_commit,
         model=candidate.model.model,
         model_version=candidate.model.version,

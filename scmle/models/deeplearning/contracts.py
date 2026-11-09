@@ -212,7 +212,7 @@ class ModelFamilyContract:
     """
 
     model_family: str
-    status: capabilities.CapabilityStatus
+    status: capabilities.Status
     modalities: tuple[capabilities.Modality, ...]
     required_extras: tuple[str, ...]
     checkpoint: CheckpointContract
@@ -346,7 +346,7 @@ class ModelFamilyContract:
         """Returns the explicit fail-closed boundary for multimodal models."""
         return cls(
             model_family=capabilities.ModelFamily.MULTIMODAL_TRANSFORMER.value,
-            status=capabilities.CapabilityStatus.EXTENSION_ONLY,
+            status=capabilities.Status.EXTENSION_ONLY,
             modalities=(capabilities.Modality.TABULAR,),
             required_extras=("deeplearning",),
             checkpoint=CheckpointContract(
@@ -371,7 +371,7 @@ class ModelFamilyContract:
 
 TABULAR_TRANSFORMER_CONTRACT = ModelFamilyContract(
     model_family=capabilities.ModelFamily.TRANSFORMER.value,
-    status=capabilities.CapabilityStatus.EXPERIMENTAL,
+    status=capabilities.Status.EXPERIMENTAL,
     modalities=(capabilities.Modality.TABULAR,),
     required_extras=("deeplearning",),
     checkpoint=CheckpointContract(
@@ -405,7 +405,7 @@ TABULAR_TRANSFORMER_CONTRACT = ModelFamilyContract(
 
 TABULAR_JEPA_CONTRACT = ModelFamilyContract(
     model_family=capabilities.ModelFamily.JEPA.value,
-    status=capabilities.CapabilityStatus.EXPERIMENTAL,
+    status=capabilities.Status.EXPERIMENTAL,
     modalities=(capabilities.Modality.TABULAR,),
     required_extras=("deeplearning",),
     checkpoint=CheckpointContract("scmle.tabular-jepa.v2", 1, True, True),
@@ -437,7 +437,7 @@ TABULAR_JEPA_CONTRACT = ModelFamilyContract(
 
 TABULAR_TORCH_CONTRACT = ModelFamilyContract(
     model_family="deep_learning",
-    status=capabilities.CapabilityStatus.SUPPORTED,
+    status=capabilities.Status.SUPPORTED,
     modalities=(capabilities.Modality.TABULAR,),
     required_extras=("deeplearning",),
     checkpoint=CheckpointContract("scmle.tabular-torch.v1", 1, True, True),

@@ -8,13 +8,14 @@ import numpy
 import pandas
 import pytest
 
-import scmle
+import scmle.api.project
 from scmle.artifacts import bundle
 from scmle.contracts import errors
-from scmle.evaluation.parameter_estimation import EstimandSpec
-from scmle.evaluation.parameter_estimation import EstimationPolicy
-from scmle.evaluation.parameter_estimation import EstimationResult
-from scmle.inference.evidence import InferenceEvidenceLinker
+import scmle.evaluation.parameter_estimation
+from scmle.evaluation.parameter_estimation import Config
+from scmle.evaluation.parameter_estimation import Estimand
+from scmle.evaluation.parameter_estimation import Estimation
+from scmle.inference.evidence import Linker
 
 
 def estimation_frame() -> pandas.DataFrame:
@@ -28,9 +29,9 @@ def estimation_frame() -> pandas.DataFrame:
     )
 
 
-def declared_estimand() -> EstimandSpec:
+def declared_estimand() -> Estimand:
     """Return the explicit scientific quantity used by the tests."""
-    return EstimandSpec(
+    return Estimand(
         name="signal_slope",
         outcome="outcome",
         population="the declared project dataset",
@@ -40,28 +41,28 @@ def declared_estimand() -> EstimandSpec:
     )
 
 
-def project_with_estimation(output_dir) -> scmle.MLProject:
+def project_with_estimation(output_dir) -> scmle.api.project.Project:
     """Build the deterministic project used by artifact-binding tests."""
-    return scmle.MLProject(
+    return scmle.api.project.Project(
         estimation_frame(),
         "outcome",
         task="regression",
         time_budget=30,
         estimand=declared_estimand(),
-        estimation_policy=EstimationPolicy(estimator="linear"),
+        estimation_policy=Config(estimator="linear"),
         output_dir=output_dir,
     )
 
 
 def test_project_run_persists_separate_estimation_evidence(tmp_path):
     """Declared estimation is persisted without changing model selection."""
-    project = scmle.MLProject(
+    project = scmle.api.project.Project(
         estimation_frame(),
         "outcome",
         task="regression",
         time_budget=30,
         estimand=declared_estimand(),
-        estimation_policy=EstimationPolicy(
+        estimation_policy=Config(
             estimator="linear", covariance="clustered", cluster_name="site"
         ),
         output_dir=tmp_path,
@@ -72,7 +73,7 @@ def test_project_run_persists_separate_estimation_evidence(tmp_path):
     artifact = result.run_dir / "parameter_estimation.json"
     assert artifact.exists()
     assert result.estimation is not None
-    restored = EstimationResult.read(artifact)
+    restored = Estimation.read(artifact)
     assert restored.digest() == result.estimation.digest()
     assert restored.policy.covariance == "clustered"
     assert result.evaluation["selected_model"] == result.selected_model
@@ -87,7 +88,7 @@ def test_project_run_persists_separate_estimation_evidence(tmp_path):
         persisted_evaluation["parameter_estimation"]
         == result.evaluation["parameter_estimation"]
     )
-    graph = InferenceEvidenceLinker.load(result.run_dir / "evidence_graph.json")
+    graph = Linker.load(result.run_dir / "evidence_graph.json")
     parameter_node = graph.nodes["parameter-estimation"]
     assert parameter_node.digest == restored.digest()
     assert parameter_node.attributes["artifact"] == "parameter_estimation.json"
@@ -118,7 +119,7 @@ def test_project_dispatches_and_serializes_bayesian_ate(tmp_path):
     frame = estimation_frame().assign(
         treatment=numpy.arange(80, dtype=float) % 2.0,
     )
-    estimand = EstimandSpec(
+    estimand = Estimand(
         name="treatment_effect",
         outcome="outcome",
         population="the declared project dataset",
@@ -126,11 +127,11 @@ def test_project_dispatches_and_serializes_bayesian_ate(tmp_path):
         feature_names=("treatment", "signal"),
         assumptions=("the declared causal assumptions hold",),
     )
-    prior = scmle.BayesianPrior(
+    prior = scmle.evaluation.parameter_estimation.BayesianPrior(
         mean=(0.0, 0.0, 0.0),
         precision=((0.01, 0.0, 0.0), (0.0, 0.01, 0.0), (0.0, 0.0, 0.01)),
     )
-    policy = EstimationPolicy(
+    policy = Config(
         estimator="bayesian_ate",
         covariance="iid",
         prior=prior,
@@ -142,7 +143,7 @@ def test_project_dispatches_and_serializes_bayesian_ate(tmp_path):
             "positivity",
         ),
     )
-    project = scmle.MLProject(
+    project = scmle.api.project.Project(
         frame,
         "outcome",
         task="uplift",
@@ -183,22 +184,20 @@ def test_resume_reconstructs_estimation_and_rebinds_evidence(tmp_path):
     """Resume restores the declaration and follows the fresh-run path."""
     original = interrupted_estimation_run(tmp_path)
 
-    resumed = scmle.MLProject.resume(original.run_dir, data=estimation_frame())
+    resumed = scmle.api.project.Project.resume(
+        original.run_dir, data=estimation_frame()
+    )
 
     assert resumed.estimation is not None
-    report = EstimationResult.read(
-        original.run_dir / "parameter_estimation.json"
-    )
+    report = Estimation.read(original.run_dir / "parameter_estimation.json")
     assert report.digest() == resumed.estimation.digest()
     assert report.estimand == declared_estimand()
-    assert report.policy == EstimationPolicy(estimator="linear")
+    assert report.policy == Config(estimator="linear")
     assert resumed.evaluation["parameter_estimation"] == {
         "artifact": "parameter_estimation.json",
         "digest": report.digest(),
     }
-    graph = InferenceEvidenceLinker.load(
-        original.run_dir / "evidence_graph.json"
-    )
+    graph = Linker.load(original.run_dir / "evidence_graph.json")
     assert graph.nodes["parameter-estimation"].digest == report.digest()
     assert graph.path_exists("snapshot", "parameter-estimation")
     assert graph.path_exists("evaluation", "parameter-estimation")
@@ -210,7 +209,9 @@ def test_resume_fails_closed_when_estimation_declaration_is_missing(tmp_path):
     (original.run_dir / "parameter_estimation_declaration.json").unlink()
 
     with pytest.raises(errors.ArtifactError, match="declaration"):
-        scmle.MLProject.resume(original.run_dir, data=estimation_frame())
+        scmle.api.project.Project.resume(
+            original.run_dir, data=estimation_frame()
+        )
 
 
 def test_resume_fails_closed_for_corrupt_estimation_declaration(tmp_path):
@@ -221,7 +222,9 @@ def test_resume_fails_closed_for_corrupt_estimation_declaration(tmp_path):
     )
 
     with pytest.raises(errors.ArtifactError, match="declaration"):
-        scmle.MLProject.resume(original.run_dir, data=estimation_frame())
+        scmle.api.project.Project.resume(
+            original.run_dir, data=estimation_frame()
+        )
 
 
 def test_resume_fails_closed_for_tampered_estimation_declaration(tmp_path):
@@ -233,18 +236,20 @@ def test_resume_fails_closed_for_tampered_estimation_declaration(tmp_path):
     path.write_text(json.dumps(envelope), encoding="utf-8")
 
     with pytest.raises(errors.ArtifactError, match="digest"):
-        scmle.MLProject.resume(original.run_dir, data=estimation_frame())
+        scmle.api.project.Project.resume(
+            original.run_dir, data=estimation_frame()
+        )
 
 
 def test_project_run_rejects_missing_estimation_artifact(monkeypatch, tmp_path):
     """A missing persisted report cannot produce a completed result."""
-    original_read = EstimationResult.read
+    original_read = Estimation.read
 
     def remove_artifact(path):
         path.unlink()
         return original_read(path)
 
-    monkeypatch.setattr(EstimationResult, "read", remove_artifact)
+    monkeypatch.setattr(Estimation, "read", remove_artifact)
 
     with pytest.raises(errors.ArtifactError, match="cannot be read"):
         project_with_estimation(tmp_path).run()
@@ -260,7 +265,7 @@ def test_project_run_rejects_valid_digest_for_tampered_report(
     monkeypatch, tmp_path
 ):
     """A report changed and re-digested after writing is still rejected."""
-    original_read = EstimationResult.read
+    original_read = Estimation.read
 
     def tamper_artifact(path):
         envelope = json.loads(path.read_text(encoding="utf-8"))
@@ -275,7 +280,7 @@ def test_project_run_rejects_valid_digest_for_tampered_report(
         path.write_text(json.dumps(envelope), encoding="utf-8")
         return original_read(path)
 
-    monkeypatch.setattr(EstimationResult, "read", tamper_artifact)
+    monkeypatch.setattr(Estimation, "read", tamper_artifact)
 
     with pytest.raises(
         errors.ArtifactError, match="does not match the persisted estimate"
@@ -291,7 +296,7 @@ def test_project_run_rejects_valid_digest_for_tampered_report(
 
 def test_estimation_fails_closed_without_both_declarations(tmp_path):
     """Undeclared estimation cannot silently infer a scientific policy."""
-    project = scmle.MLProject(
+    project = scmle.api.project.Project(
         estimation_frame(), "outcome", output_dir=tmp_path
     )
 
@@ -302,7 +307,7 @@ def test_estimation_fails_closed_without_both_declarations(tmp_path):
 def test_partial_estimation_declaration_is_rejected(tmp_path):
     """An estimand without its policy is not a usable evidence contract."""
     with pytest.raises(errors.ConfigError, match="both"):
-        scmle.MLProject(
+        scmle.api.project.Project(
             estimation_frame(),
             "outcome",
             estimand=declared_estimand(),
@@ -312,7 +317,7 @@ def test_partial_estimation_declaration_is_rejected(tmp_path):
 
 def test_incompatible_likelihood_fails_before_model_selection(tmp_path):
     """Likelihood mismatch is rejected before the orchestrator is called."""
-    estimand = EstimandSpec(
+    estimand = Estimand(
         name="wrong_likelihood",
         outcome="outcome",
         population="the declared project dataset",
@@ -320,13 +325,13 @@ def test_incompatible_likelihood_fails_before_model_selection(tmp_path):
         feature_names=("signal",),
         assumptions=("the conditional mean is linear",),
     )
-    project = scmle.MLProject(
+    project = scmle.api.project.Project(
         estimation_frame(),
         "outcome",
         task="regression",
         time_budget=30,
         estimand=estimand,
-        estimation_policy=EstimationPolicy(estimator="linear"),
+        estimation_policy=Config(estimator="linear"),
         output_dir=tmp_path,
     )
 
@@ -339,7 +344,7 @@ def test_incompatible_likelihood_fails_before_model_selection(tmp_path):
 def test_ipw_declaration_binds_the_project_treatment_column(tmp_path):
     """IPW cannot infer or silently substitute a treatment column."""
     frame = estimation_frame().assign(treatment=(numpy.arange(80) % 2))
-    estimand = EstimandSpec(
+    estimand = Estimand(
         name="treatment_effect",
         outcome="outcome",
         population="the declared project dataset",
@@ -347,7 +352,7 @@ def test_ipw_declaration_binds_the_project_treatment_column(tmp_path):
         feature_names=("treatment", "signal"),
         assumptions=("the declared causal assumptions hold",),
     )
-    policy = EstimationPolicy(
+    policy = Config(
         estimator="ipw_ate",
         covariance="iid",
         treatment_position=0,
@@ -358,7 +363,7 @@ def test_ipw_declaration_binds_the_project_treatment_column(tmp_path):
         ),
     )
 
-    project = scmle.MLProject(
+    project = scmle.api.project.Project(
         frame,
         "outcome",
         estimand=estimand,
@@ -372,11 +377,11 @@ def test_ipw_declaration_binds_the_project_treatment_column(tmp_path):
 
 def test_project_rejects_missing_cluster_and_missingness_columns(tmp_path):
     """Project declarations fail closed before estimation consumes rows."""
-    project = scmle.MLProject(
+    project = scmle.api.project.Project(
         estimation_frame(),
         "outcome",
         estimand=declared_estimand(),
-        estimation_policy=EstimationPolicy(
+        estimation_policy=Config(
             estimator="linear", covariance="clustered", cluster_name="missing"
         ),
         output_dir=tmp_path,
@@ -386,11 +391,11 @@ def test_project_rejects_missing_cluster_and_missingness_columns(tmp_path):
 
     missing_frame = estimation_frame()
     missing_frame.loc[0, "signal"] = numpy.nan
-    project = scmle.MLProject(
+    project = scmle.api.project.Project(
         missing_frame,
         "outcome",
         estimand=declared_estimand(),
-        estimation_policy=EstimationPolicy(estimator="linear"),
+        estimation_policy=Config(estimator="linear"),
         output_dir=tmp_path,
     )
     with pytest.raises(errors.DataError, match="missing values"):
@@ -401,22 +406,20 @@ def test_complete_case_binds_missingness_and_run_artifact_to_result(tmp_path):
     """The result exposes the digest-verified, complete persisted report."""
     frame = estimation_frame()
     frame.loc[0, "signal"] = numpy.nan
-    project = scmle.MLProject(
+    project = scmle.api.project.Project(
         frame,
         "outcome",
         task="regression",
         time_budget=30,
         estimand=declared_estimand(),
-        estimation_policy=EstimationPolicy(
-            estimator="linear", missing="complete_case"
-        ),
+        estimation_policy=Config(estimator="linear", missing="complete_case"),
         output_dir=tmp_path,
     )
 
     result = project.run()
 
     artifact = result.run_dir / "parameter_estimation.json"
-    restored = EstimationResult.read(artifact)
+    restored = Estimation.read(artifact)
     assert result.estimation is not None
     assert result.estimation.digest() == restored.digest()
     assert result.estimation.rows_dropped == 1
@@ -433,11 +436,11 @@ def test_project_estimation_records_file_source_identity(tmp_path):
     source = tmp_path / "estimation.csv"
     frame = estimation_frame()
     frame.to_csv(source, index=False)
-    project = scmle.MLProject(
+    project = scmle.api.project.Project(
         source,
         "outcome",
         estimand=declared_estimand(),
-        estimation_policy=EstimationPolicy(estimator="linear"),
+        estimation_policy=Config(estimator="linear"),
         output_dir=tmp_path / "runs",
     )
 
@@ -453,7 +456,7 @@ def test_verify_replay_preserves_parameter_estimation_evidence(tmp_path):
     project = project_with_estimation(tmp_path)
     original = project.run()
 
-    verdict = scmle.MLProject.verify_replay(
+    verdict = scmle.api.project.Project.verify_replay(
         original.run_dir,
         data=estimation_frame(),
         output_dir=tmp_path / "replay",

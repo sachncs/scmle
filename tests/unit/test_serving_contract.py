@@ -37,9 +37,7 @@ def expected():
 def bundle(golden, tmp_path_factory):
     folder = tmp_path_factory.mktemp("golden")
     parity.reference_bundle(golden.spec).save(folder / "bundle")
-    return scmle.artifacts.bundle.ModelBundle.load(
-        folder / "bundle", trusted=True
-    )
+    return scmle.artifacts.bundle.Bundle.load(folder / "bundle", trusted=True)
 
 
 def call_full(url, payload=None, raw=None, headers=None):
@@ -167,7 +165,7 @@ def test_every_response_carries_version_and_artifact_digest(
 
 def test_the_artifact_digest_names_the_saved_manifest(bundle, tmp_path):
     folder = bundle.save(tmp_path / "saved")
-    loaded = scmle.artifacts.bundle.ModelBundle.load(folder, trusted=True)
+    loaded = scmle.artifacts.bundle.Bundle.load(folder, trusted=True)
     assert provenance.bundle_digest(folder) == provenance.manifest_digest(
         loaded.info.to_dict()
     )

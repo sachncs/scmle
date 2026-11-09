@@ -12,7 +12,8 @@ import tempfile
 import numpy
 import pandas
 
-import scmle
+import scmle.api.predict
+import scmle.api.project
 from scmle.contracts import errors
 
 LOGGER = logging.getLogger(__name__)
@@ -38,7 +39,7 @@ def main() -> None:
     """Trains, signs, reloads and scores; then shows a rejected key."""
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     data = make_dataset()
-    result = scmle.MLProject(
+    result = scmle.api.project.Project(
         data, "approved", metric="roc_auc", time_budget=60
     ).run()
     with tempfile.TemporaryDirectory() as directory:
@@ -48,10 +49,14 @@ def main() -> None:
         features = data.drop(columns="approved").head(5)
         LOGGER.info(
             "verified load: %s",
-            scmle.predict(bundle_directory, features, signing_key=SIGNING_KEY),
+            scmle.api.predict.predict(
+                bundle_directory, features, signing_key=SIGNING_KEY
+            ),
         )
         try:
-            scmle.load_model(bundle_directory, signing_key="wrong-key")
+            scmle.api.predict.load_model(
+                bundle_directory, signing_key="wrong-key"
+            )
         except errors.ScmleError as error:
             LOGGER.info("wrong key refused: %s", type(error).__name__)
 

@@ -38,6 +38,7 @@ import urllib.request
 import pandas
 
 import scmle
+import scmle.api.project
 from scmle.artifacts import bundle
 from scmle.contracts import errors
 from scmle.contracts import observability
@@ -60,10 +61,10 @@ REVIEWER = "demo-reviewer"
 READY_TIMEOUT_SECONDS = 120.0
 LATENCY_REQUESTS = 120
 FAST_OPTIONS: dict[str, Any] = {
-    "search": tasks.SearchSpec(top_models=0),
-    "strategies": tasks.StrategySpec(top_models=0),
-    "ensemble": tasks.EnsembleSpec(size=0),
-    "models": tasks.ModelSpec(
+    "search": tasks.Search(top_models=0),
+    "strategies": tasks.Strategies(top_models=0),
+    "ensemble": tasks.Stacking(size=0),
+    "models": tasks.Candidates(
         exclude_families=["bagging", "deep_learning", "foundation"]
     ),
     "enforcement": "cooperative",
@@ -158,7 +159,7 @@ def train(name: str, data: pathlib.Path) -> scmle.RunResult:
         The run result, including the model bundle and its evaluation.
     """
     frame = pandas.read_csv(data)
-    return scmle.MLProject(
+    return scmle.api.project.Project(
         frame,
         TARGET,
         output_dir=str(tempfile.mkdtemp(prefix=name)),
@@ -226,7 +227,7 @@ def start_service(
     )
 
 
-class BearerHandler(urllib.request.BaseHandler):
+class Authenticator(urllib.request.BaseHandler):
     """Adds one bearer token to requests for the listed services only.
 
     Attributes:
@@ -297,7 +298,7 @@ def install_bearer(
             "scope": "model:read model:predict",
         },
     )
-    opener = urllib.request.build_opener(BearerHandler(token, prefixes))
+    opener = urllib.request.build_opener(Authenticator(token, prefixes))
     urllib.request.install_opener(opener)
     return True
 
@@ -554,9 +555,7 @@ def predict_checks(
         response and in the batch manifest, and whether they are the same.
     """
     frame = pandas.read_csv(data / "fresh.csv").drop(columns=[TARGET])
-    direct = bundle.ModelBundle.load(
-        model_directory, signing_key=DEMO_SIGNING_KEY
-    )
+    direct = bundle.Bundle.load(model_directory, signing_key=DEMO_SIGNING_KEY)
     rows = frame.head(60).to_dict("records")
     status, body = post_json(f"{base}/predict", {"records": rows})
     online_match = (
@@ -692,7 +691,7 @@ def drill_steps(workdir: pathlib.Path, data: pathlib.Path) -> dict[str, Any]:
     registry = scmle.governance.registry.ModelRegistryStore(
         workdir / "registry"
     )
-    manager = lifecycle.LifecycleManager(registry, MODEL, str(workdir / "work"))
+    manager = lifecycle.Maintainer(registry, MODEL, str(workdir / "work"))
     fresh = pandas.read_csv(data / "fresh.csv")
     good_record = registry.versions(MODEL)[0]
     bad_record = registry.versions(MODEL)[1]
@@ -714,7 +713,7 @@ def drill_steps(workdir: pathlib.Path, data: pathlib.Path) -> dict[str, Any]:
         signing_key=DEMO_SIGNING_KEY,
     )
     restored = registry.load(MODEL, signing_key=DEMO_SIGNING_KEY)
-    original = bundle.ModelBundle.load(
+    original = bundle.Bundle.load(
         workdir / "export-v1", signing_key=DEMO_SIGNING_KEY
     )
     adapter = serving.HttpServing(restored)

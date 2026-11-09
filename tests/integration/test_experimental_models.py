@@ -7,7 +7,8 @@ import numpy
 import pandas
 import pytest
 
-import scmle
+import scmle.api.predict
+import scmle.api.project
 from scmle.contracts import capabilities
 from scmle.contracts import errors
 from scmle.contracts import tasks
@@ -23,14 +24,14 @@ from scmle.models.sklearn import classical
 
 def test_unknown_experimental_model_fails_closed():
     """A typo in the public opt-in list cannot silently change the candidate set."""
-    registry = scmle.models.registry.ModelRegistry((classical.DummyAdapter(),))
+    registry = scmle.models.registry.Catalog((classical.Dummy(),))
 
     with pytest.raises(
         errors.ConfigError,
         match="unknown experimental model",
     ):
         registry.candidates(
-            tasks.TaskType.BINARY,
+            tasks.Task.BINARY,
             row_count=100,
             experimental_models=("torch_jepa",),
         )
@@ -38,10 +39,10 @@ def test_unknown_experimental_model_fails_closed():
 
 def test_unavailable_explicit_experimental_model_fails_closed(monkeypatch):
     """An explicit model cannot silently fall back when its extra is absent."""
-    representation = networks.TorchJepaAdapter()
+    representation = networks.Jepa()
     monkeypatch.setattr(representation, "is_available", lambda: False)
-    registry = scmle.models.registry.ModelRegistry(
-        (classical.DummyAdapter(), representation)
+    registry = scmle.models.registry.Catalog(
+        (classical.Dummy(), representation)
     )
 
     with pytest.raises(
@@ -49,7 +50,7 @@ def test_unavailable_explicit_experimental_model_fails_closed(monkeypatch):
         match="explicit experimental model 'torch_jepa'",
     ):
         registry.candidates(
-            tasks.TaskType.BINARY,
+            tasks.Task.BINARY,
             row_count=100,
             experimental_models=("torch_jepa",),
         )
@@ -57,21 +58,21 @@ def test_unavailable_explicit_experimental_model_fails_closed(monkeypatch):
 
 def test_transformer_and_jepa_are_explicit_opt_in_candidates(monkeypatch):
     """Both experimental adapters enter planning only after opt-in."""
-    transformer = networks.TorchTransformerAdapter()
-    representation = networks.TorchJepaAdapter()
+    transformer = networks.FtTransformer()
+    representation = networks.Jepa()
     monkeypatch.setattr(transformer, "is_available", lambda: True)
     monkeypatch.setattr(representation, "is_available", lambda: True)
-    registry = scmle.models.registry.ModelRegistry(
-        (classical.DummyAdapter(), transformer, representation)
+    registry = scmle.models.registry.Catalog(
+        (classical.Dummy(), transformer, representation)
     )
-    spec = tasks.ProjectSpec(
-        data=tasks.DataSpec(uri="<in-memory>", target="y"),
-        models=tasks.ModelSpec(
+    spec = tasks.Config(
+        data=tasks.Dataset(uri="<in-memory>", target="y"),
+        models=tasks.Candidates(
             experimental_models=[transformer.name, representation.name]
         ),
-        search=tasks.SearchSpec(top_models=0),
-        strategies=tasks.StrategySpec(top_models=0),
-        ensemble=tasks.EnsembleSpec(size=0),
+        search=tasks.Search(top_models=0),
+        strategies=tasks.Strategies(top_models=0),
+        ensemble=tasks.Stacking(size=0),
     )
     frame = pandas.DataFrame(
         {"feature": numpy.arange(120.0), "y": numpy.arange(120) % 2}
@@ -79,7 +80,7 @@ def test_transformer_and_jepa_are_explicit_opt_in_candidates(monkeypatch):
     project = orchestrator.Orchestrator(spec, frame, registry=registry)
     context = project.new_context()
     context.capability_registry.bind_runtime_environment(
-        capabilities.CapabilityEnvironment(
+        capabilities.Environment(
             available_extras=frozenset({"core", "deeplearning"}),
             cpu_cores=1,
             memory_gb=8.0,
@@ -109,9 +110,9 @@ def test_jepa_has_a_complete_experimental_tabular_capability():
     """The public JEPA path has a task-level capability declaration."""
     registry = scmle.core.context.tabular_beta_capability_registry()
 
-    key = capabilities.CapabilityKey(
+    key = capabilities.Coordinate(
         modality=capabilities.Modality.TABULAR,
-        task=tasks.TaskType.BINARY,
+        task=tasks.Task.BINARY,
         model_family=capabilities.ModelFamily.JEPA.value,
         evaluation=capabilities.Evaluation.STANDARD,
         uncertainty=capabilities.Uncertainty.NONE,
@@ -123,7 +124,7 @@ def test_jepa_has_a_complete_experimental_tabular_capability():
     declaration = registry.find(key)
 
     assert declaration is not None
-    assert declaration.status is capabilities.CapabilityStatus.EXPERIMENTAL
+    assert declaration.status is capabilities.Status.EXPERIMENTAL
     assert declaration.required_extras == ("deeplearning",)
     assert "multimodal JEPA" in " ".join(declaration.limitations)
 
@@ -150,11 +151,11 @@ def test_jepa_adapter_builds_a_serializable_pipeline_when_torch_is_available(
     monkeypatch,
 ):
     """The adapter exposes representation and prediction stages together."""
-    adapter = networks.TorchJepaAdapter()
+    adapter = networks.Jepa()
     monkeypatch.setattr(adapter, "is_available", lambda: True)
 
     candidate = adapter.build(
-        tasks.TaskType.BINARY,
+        tasks.Task.BINARY,
         seed=11,
         params={"hidden_size": 32, "embedding_size": 16, "epochs": 3},
     )
@@ -179,16 +180,16 @@ def test_explicit_deep_model_project_packages_and_predicts(
     binary_frame, tmp_path, model_name
 ):
     """An opt-in tabular deep model uses normal package/predict APIs."""
-    project = scmle.MLProject(
+    project = scmle.api.project.Project(
         binary_frame,
         "y",
         time_budget=600,
         output_dir=tmp_path,
         enforcement="cooperative",
-        search=tasks.SearchSpec(top_models=0),
-        strategies=tasks.StrategySpec(top_models=0),
-        ensemble=tasks.EnsembleSpec(size=0),
-        models=tasks.ModelSpec(experimental_models=[model_name]),
+        search=tasks.Search(top_models=0),
+        strategies=tasks.Strategies(top_models=0),
+        ensemble=tasks.Stacking(size=0),
+        models=tasks.Candidates(experimental_models=[model_name]),
     )
     plan = dataclasses.replace(
         project.plan(),
@@ -198,7 +199,7 @@ def test_explicit_deep_model_project_packages_and_predicts(
     result = project.run(plan)
     features = binary_frame.drop(columns="y").head(12)
     saved = result.save(tmp_path / f"{model_name}-bundle")
-    loaded = scmle.load_model(saved, trusted=True)
+    loaded = scmle.api.predict.load_model(saved, trusted=True)
 
     assert result.selected_model == model_name
     assert len(result.predict(features)) == 12

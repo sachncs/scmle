@@ -29,7 +29,7 @@ def make(**overrides):
         "notes": ("note",),
     }
     values.update(overrides)
-    return scmle.data.custody.manifest.CustodyManifest(**values)
+    return scmle.data.custody.manifest.Manifest(**values)
 
 
 def test_hash_is_a_full_sha256_and_deterministic():
@@ -94,7 +94,7 @@ def test_unknown_field_is_refused():
 
 
 def test_v1_manifest_is_still_readable_and_verified():
-    v1 = splitters.SplitManifest(
+    v1 = splitters.Manifest(
         strategy="random",
         seed=3,
         train_ids=(0, 1, 2),
@@ -105,13 +105,13 @@ def test_v1_manifest_is_still_readable_and_verified():
     loaded = scmle.data.custody.manifest.load_manifest(
         json.loads(json.dumps(v1.to_dict()))
     )
-    assert isinstance(loaded, splitters.SplitManifest)
+    assert isinstance(loaded, splitters.Manifest)
     assert loaded == v1
     assert loaded.fingerprint == v1.fingerprint
 
 
 def test_v1_manifest_with_a_bad_fingerprint_is_refused():
-    v1 = splitters.SplitManifest("random", 3, (0, 1), (2,), (((0,), (1,)),))
+    v1 = splitters.Manifest("random", 3, (0, 1), (2,), (((0,), (1,)),))
     record = v1.to_dict()
     record["fingerprint"] = "0" * 16
     with pytest.raises(errors.ArtifactError, match="fingerprint"):

@@ -39,7 +39,7 @@ def store(tmp_path):
 
 
 def fast():
-    return retry.RetryPolicy(3, 2.0, 2.0, 60.0)
+    return retry.Retries(3, 2.0, 2.0, 60.0)
 
 
 def pipeline(**changes):
@@ -96,7 +96,7 @@ class Recorder:
 
 
 def executor_for(store, workflow, recorder, clock, **options):
-    return scmle.workflow.executor.LocalExecutor(
+    return scmle.workflow.executor.Executor(
         workflow,
         store,
         recorder.handlers(workflow),
@@ -453,7 +453,7 @@ def test_independent_steps_run_in_parallel_and_a_group_limit_holds(store):
         return {}
 
     handlers_ = {"a": meet, "b": meet, "c": grouped, "d": grouped}
-    record = scmle.workflow.executor.LocalExecutor(
+    record = scmle.workflow.executor.Executor(
         flow, store, handlers_, clock=clock, sleep=clock.sleep
     ).start("p", "a")
     assert record["state"] == "succeeded"
@@ -537,7 +537,7 @@ def test_a_changed_definition_cannot_continue_an_old_run(store):
 
 def test_every_non_approval_step_needs_a_handler(store):
     with pytest.raises(errors.ConfigError, match="no handler"):
-        scmle.workflow.executor.LocalExecutor(
+        scmle.workflow.executor.Executor(
             definition.standard_workflow(), store, {}
         )
 
@@ -639,7 +639,7 @@ def test_a_training_step_runs_through_a_runner_and_resumes_inside_it(tmp_path):
     clock = Clock()
     fake = support_runners.FakeClock()
     durable = objectstore.LocalObjectStore(tmp_path / "jobs")
-    runner = local.LocalRunner(
+    runner = local.Runner(
         durable,
         support_runners.toy_workload(fake),
         serving_identity="serve",
@@ -649,7 +649,7 @@ def test_a_training_step_runs_through_a_runner_and_resumes_inside_it(tmp_path):
     )
 
     def spec_for(context):
-        return base.JobSpec(
+        return base.Job(
             run_id="job-" + context.idempotency_key[:16],
             name="train",
             project={"data": "d", "target": "y"},
@@ -661,7 +661,7 @@ def test_a_training_step_runs_through_a_runner_and_resumes_inside_it(tmp_path):
     flow = pipeline()
     handlers_ = recorder.handlers(flow)
     handlers_["train"] = handlers.runner_handler(runner, spec_for)
-    executor = scmle.workflow.executor.LocalExecutor(
+    executor = scmle.workflow.executor.Executor(
         flow,
         objectstore.LocalObjectStore(tmp_path / "state"),
         handlers_,

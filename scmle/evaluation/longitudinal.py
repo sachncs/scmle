@@ -39,7 +39,7 @@ REQUIRED_ASSUMPTIONS = frozenset(
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class LongitudinalEstimand:
+class Estimand:
     """Declaration of the period-specific longitudinal causal quantity.
 
     Attributes:
@@ -106,7 +106,7 @@ class LongitudinalEstimand:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class LongitudinalEstimationPolicy:
+class Config:
     """Bounded numerical and missingness policy for longitudinal IPW.
 
     Attributes:
@@ -300,7 +300,7 @@ class PeriodATE:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class LongitudinalEstimationResult:
+class Estimation:
     """Complete serializable evidence for one longitudinal estimation run.
 
     Attributes:
@@ -320,8 +320,8 @@ class LongitudinalEstimationResult:
             frame.
     """
 
-    estimand: LongitudinalEstimand
-    policy: LongitudinalEstimationPolicy
+    estimand: Estimand
+    policy: Config
     periods: tuple[PeriodATE, ...]
     covariance: tuple[tuple[float, ...], ...]
     rows_input: int
@@ -476,7 +476,7 @@ class LongitudinalEstimationResult:
         return self.digest()
 
     @classmethod
-    def read(cls, path: str | Path) -> "LongitudinalEstimationResult":
+    def read(cls, path: str | Path) -> "Estimation":
         """Reads and verifies an atomic report envelope.
 
         Args:
@@ -511,9 +511,7 @@ class LongitudinalEstimationResult:
         return report
 
     @classmethod
-    def from_dict(
-        cls, record: Mapping[str, Any]
-    ) -> "LongitudinalEstimationResult":
+    def from_dict(cls, record: Mapping[str, Any]) -> "Estimation":
         """Rebuilds a result from its JSON-compatible representation.
 
         Args:
@@ -552,9 +550,9 @@ class LongitudinalEstimationResult:
             )
             for item in record["periods"]
         )
-        policy = LongitudinalEstimationPolicy(**dict(record["policy"]))
+        policy = Config(**dict(record["policy"]))
         return cls(
-            LongitudinalEstimand(**estimand_values),
+            Estimand(**estimand_values),
             policy,
             periods,
             tuple(
@@ -571,7 +569,7 @@ class LongitudinalEstimationResult:
         )
 
 
-class LongitudinalIPWEstimator:
+class Estimator:
     """Estimates period-specific binary-treatment ATEs with Hájek IPW.
 
     Attributes:
@@ -582,25 +580,25 @@ class LongitudinalIPWEstimator:
 
     def __init__(
         self,
-        estimand: LongitudinalEstimand,
-        policy: LongitudinalEstimationPolicy | None = None,
+        estimand: Estimand,
+        policy: Config | None = None,
     ) -> None:
         """Stores a validated declaration and policy.
 
         Args:
             estimand: The causal quantity to estimate.
-            policy: Estimation policy; `LongitudinalEstimationPolicy()` is
+            policy: Estimation policy; `Config()` is
                 used when None.
 
         Raises:
-            TypeError: If `estimand` is not a `LongitudinalEstimand`.
+            TypeError: If `estimand` is not a `Estimand`.
         """
-        if not isinstance(estimand, LongitudinalEstimand):
-            raise TypeError("estimand must be LongitudinalEstimand")
+        if not isinstance(estimand, Estimand):
+            raise TypeError("estimand must be Estimand")
         self.estimand = estimand
-        self.policy = policy or LongitudinalEstimationPolicy()
+        self.policy = policy or Config()
 
-    def fit(self, frame: pandas.DataFrame) -> LongitudinalEstimationResult:
+    def fit(self, frame: pandas.DataFrame) -> Estimation:
         """Fits one covariate-adjusted period-specific ATE per time value.
 
         Args:
@@ -644,7 +642,7 @@ class LongitudinalIPWEstimator:
         reference = independent_reference(
             fitted, self.policy.reference_tolerance
         )
-        return LongitudinalEstimationResult(
+        return Estimation(
             estimand=self.estimand,
             policy=self.policy,
             periods=periods,
@@ -834,8 +832,8 @@ class LongitudinalIPWEstimator:
 
 def prepare_longitudinal_frame(
     frame: pandas.DataFrame,
-    estimand: LongitudinalEstimand,
-    policy: LongitudinalEstimationPolicy,
+    estimand: Estimand,
+    policy: Config,
 ) -> tuple[pandas.DataFrame, int]:
     """Validates and numerically prepares a long-format input frame.
 
@@ -925,9 +923,7 @@ def prepare_longitudinal_frame(
     return prepared, rows_dropped
 
 
-def validate_time_order(
-    frame: pandas.DataFrame, estimand: LongitudinalEstimand
-) -> None:
+def validate_time_order(frame: pandas.DataFrame, estimand: Estimand) -> None:
     """Requires strictly increasing time values within each subject.
 
     Args:
@@ -964,7 +960,7 @@ def validate_time_order(
 
 
 def validate_baseline_covariates(
-    frame: pandas.DataFrame, estimand: LongitudinalEstimand
+    frame: pandas.DataFrame, estimand: Estimand
 ) -> None:
     """Checks the declared no-time-varying-covariates condition in the data.
 
@@ -990,7 +986,7 @@ def validate_baseline_covariates(
 def fit_logistic_propensity(
     covariates: numpy.ndarray,
     treatment: numpy.ndarray,
-    policy: LongitudinalEstimationPolicy,
+    policy: Config,
 ) -> tuple[numpy.ndarray, int]:
     """Fits a deterministic ridge-logistic propensity model by Newton steps.
 

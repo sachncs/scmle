@@ -28,7 +28,7 @@ from scmle.data.modalities import image
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ImageModelConfig:
+class Config:
     """Bounded configuration for the deterministic pixel baseline.
 
     Attributes:
@@ -78,7 +78,7 @@ class ImageModelConfig:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ImageEvaluation:
+class Evaluation:
     """Evaluation evidence for a held-out image dataset.
 
     Attributes:
@@ -106,7 +106,7 @@ class ImageEvaluation:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ImageExplanation:
+class Explanation:
     """Global or local signed pixel-contribution evidence.
 
     Attributes:
@@ -142,7 +142,7 @@ class ImageExplanation:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ImageModelArtifact:
+class Package:
     """Identity of an atomically written trusted-model package.
 
     Attributes:
@@ -165,7 +165,7 @@ class ImageModelArtifact:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ImageDriftReport:
+class Drift:
     """Profile drift evidence comparing reference and observed images.
 
     Attributes:
@@ -200,7 +200,7 @@ class ImageDriftReport:
         return {**dataclasses.asdict(self), "shifted": self.shifted}
 
 
-class ImageClassifier:
+class Classifier:
     """Pixel-baseline classifier with evidence and safe package boundaries.
 
     Attributes:
@@ -212,16 +212,16 @@ class ImageClassifier:
             before fitting.
     """
 
-    def __init__(self, config: ImageModelConfig | None = None) -> None:
+    def __init__(self, config: Config | None = None) -> None:
         """Initializes an unfitted classifier.
 
         Args:
-            config: Configuration to use; defaults to `ImageModelConfig()`.
+            config: Configuration to use; defaults to `Config()`.
         """
-        self.config = config or ImageModelConfig()
+        self.config = config or Config()
         self.estimator: LogisticRegression | None = None
         self.feature_names: tuple[str, ...] = ()
-        self.curation_report: image.ModalityCurationReport | None = None
+        self.curation_report: image.Curation | None = None
 
     @property
     def fitted(self) -> bool:
@@ -264,7 +264,7 @@ class ImageClassifier:
         ).encode("utf-8")
         return hashlib.sha256(encoded).hexdigest()
 
-    def fit(self, training_data: image.ImageDataset) -> Self:
+    def fit(self, training_data: image.Dataset) -> Self:
         """Fits the baseline on labelled, deduplicated images.
 
         Args:
@@ -323,7 +323,7 @@ class ImageClassifier:
         self.curation_report = report
         return self
 
-    def predict(self, dataset: image.ImageDataset) -> tuple[Any, ...]:
+    def predict(self, dataset: image.Dataset) -> tuple[Any, ...]:
         """Predicts labels for validated images.
 
         Args:
@@ -346,7 +346,7 @@ class ImageClassifier:
 
     def predict_proba(
         self,
-        dataset: image.ImageDataset,
+        dataset: image.Dataset,
     ) -> tuple[tuple[float, ...], ...]:
         """Predicts class probabilities for validated images.
 
@@ -369,7 +369,7 @@ class ImageClassifier:
         probabilities = estimator.predict_proba(self.transform(dataset))
         return tuple(tuple(row) for row in probabilities)
 
-    def evaluate(self, dataset: image.ImageDataset) -> ImageEvaluation:
+    def evaluate(self, dataset: image.Dataset) -> Evaluation:
         """Evaluates labelled images without refitting or changing features.
 
         Args:
@@ -392,7 +392,7 @@ class ImageClassifier:
         actual = list(labels)
         predicted = self.predict(dataset)
         probabilities = self.predict_proba(dataset)
-        return ImageEvaluation(
+        return Evaluation(
             sample_count=len(dataset.samples),
             accuracy=float(accuracy_score(actual, predicted)),
             macro_f1=float(f1_score(actual, predicted, average="macro")),
@@ -402,7 +402,7 @@ class ImageClassifier:
             labels=tuple(str(value) for value in self.classes),
         )
 
-    def global_explanation(self, top_k: int = 10) -> ImageExplanation:
+    def global_explanation(self, top_k: int = 10) -> Explanation:
         """Ranks pixels by their mean absolute linear coefficient.
 
         Args:
@@ -427,7 +427,7 @@ class ImageClassifier:
             zip(self.feature_names, strengths, strict=True),
             key=lambda item: (-float(item[1]), item[0]),
         )[:top_k]
-        return ImageExplanation(
+        return Explanation(
             model_digest=self.model_digest,
             input_hash=None,
             method="linear_global_pixel_weight",
@@ -441,9 +441,9 @@ class ImageClassifier:
 
     def local_explanation(
         self,
-        sample: image.ImageSample,
+        sample: image.Sample,
         top_k: int = 10,
-    ) -> ImageExplanation:
+    ) -> Explanation:
         """Computes signed pixel contributions for one image.
 
         Args:
@@ -465,7 +465,7 @@ class ImageClassifier:
         estimator = self.estimator
         if estimator is None:
             raise RuntimeError("classifier is not fitted")
-        matrix = self.transform(image.ImageDataset((sample,)))
+        matrix = self.transform(image.Dataset((sample,)))
         predicted_label = estimator.predict(matrix)[0]
         class_index = int(
             numpy.flatnonzero(estimator.classes_ == predicted_label)[0]
@@ -483,7 +483,7 @@ class ImageClassifier:
             ),
             key=lambda item: (-abs(float(item[1])), item[0]),
         )[:top_k]
-        return ImageExplanation(
+        return Explanation(
             model_digest=self.model_digest,
             input_hash=sample.content_hash,
             method="linear_local_pixel_contribution",
@@ -496,10 +496,10 @@ class ImageClassifier:
 
     def occlusion_explanation(
         self,
-        sample: image.ImageSample,
+        sample: image.Sample,
         top_k: int = 10,
         patch_size: tuple[int, int] = (4, 4),
-    ) -> ImageExplanation:
+    ) -> Explanation:
         """Measures predicted-class score changes under regional occlusion.
 
         Occlusion is performed after the declared resize and color transform.
@@ -525,7 +525,7 @@ class ImageClassifier:
         if len(patch_size) != 2 or any(size < 1 for size in patch_size):
             raise ValueError("patch_size must contain positive dimensions")
         self.require_fitted()
-        features = self.transform(image.ImageDataset((sample,)))
+        features = self.transform(image.Dataset((sample,)))
         original_score = self.predicted_class_score(features)
         width, height = self.config.target_size
         channels = 1 if self.config.mode == "L" else len(self.config.mode)
@@ -554,7 +554,7 @@ class ImageClassifier:
             terms,
             key=lambda item: (-abs(item[1]), item[0]),
         )[:top_k]
-        return ImageExplanation(
+        return Explanation(
             model_digest=self.model_digest,
             input_hash=sample.content_hash,
             method="occlusion_pixel_region",
@@ -591,7 +591,7 @@ class ImageClassifier:
             return raw_score if class_index == 1 else -raw_score
         return float(decision[0, class_index])
 
-    def save(self, path: str | pathlib.Path) -> ImageModelArtifact:
+    def save(self, path: str | pathlib.Path) -> Package:
         """Atomically saves this fitted classifier as a verified package.
 
         Args:
@@ -644,7 +644,7 @@ class ImageClassifier:
             if temporary_directory is not None:
                 shutil.rmtree(temporary_directory, ignore_errors=True)
             raise
-        return ImageModelArtifact(str(target), str(manifest["artifact_digest"]))
+        return Package(str(target), str(manifest["artifact_digest"]))
 
     @classmethod
     def load(cls, path: str | pathlib.Path, trusted: bool = False) -> Self:
@@ -663,7 +663,7 @@ class ImageClassifier:
             FileNotFoundError: If `path` is not a directory.
             ValueError: If the manifest or payload is missing, the version
                 is unsupported, or a digest does not match.
-            TypeError: If the payload is not an `ImageClassifier`.
+            TypeError: If the payload is not an `Classifier`.
         """
         if not trusted:
             raise PermissionError(
@@ -686,13 +686,13 @@ class ImageClassifier:
             raise ValueError("image model payload digest does not match")
         loaded = joblib.load(model_path)
         if not isinstance(loaded, cls):
-            raise TypeError("package does not contain an ImageClassifier")
+            raise TypeError("package does not contain an Classifier")
         loaded.require_fitted()
         if loaded.model_digest != manifest.get("model_digest"):
             raise ValueError("image model digest does not match manifest")
         return loaded
 
-    def transform(self, dataset: image.ImageDataset) -> numpy.ndarray:
+    def transform(self, dataset: image.Dataset) -> numpy.ndarray:
         """Prepares pixels with the fitted configuration.
 
         Args:
@@ -734,7 +734,7 @@ class ImageClassifier:
             raise RuntimeError("image classifier has not been fitted")
 
 
-class ImageMonitor:
+class Monitor:
     """Monitors bounded image-profile signals against a reference snapshot.
 
     Attributes:
@@ -744,7 +744,7 @@ class ImageMonitor:
 
     def __init__(
         self,
-        reference: image.ModalityCurationReport,
+        reference: image.Curation,
         threshold: float = 0.25,
     ) -> None:
         """Initializes a monitor with an explicit normalized threshold.
@@ -762,7 +762,7 @@ class ImageMonitor:
         self.reference = reference
         self.threshold = threshold
 
-    def observe(self, observed: image.ImageDataset) -> ImageDriftReport:
+    def observe(self, observed: image.Dataset) -> Drift:
         """Compares observed mean pixels and duplicate rate with reference.
 
         Args:
@@ -786,7 +786,7 @@ class ImageMonitor:
         duplicate_rate = current.profile["duplicate_count"] / max(
             current.sample_count, 1
         )
-        return ImageDriftReport(
+        return Drift(
             reference_hash=self.reference.dataset_hash,
             observed_hash=current.dataset_hash,
             mean_pixel_distance=distance,
@@ -821,13 +821,13 @@ def flush_directory(path: pathlib.Path) -> None:
 
 
 __all__ = [
-    "ImageClassifier",
-    "ImageDriftReport",
-    "ImageEvaluation",
-    "ImageExplanation",
-    "ImageModelArtifact",
-    "ImageModelConfig",
-    "ImageMonitor",
+    "Classifier",
+    "Config",
+    "Drift",
+    "Evaluation",
+    "Explanation",
+    "Monitor",
+    "Package",
     "file_digest",
     "flush_directory",
 ]

@@ -21,7 +21,7 @@ class InputValidator:
         """
         self.schema = schema
 
-    def report(self, frame: pandas.DataFrame) -> artifacts.SchemaReport:
+    def report(self, frame: pandas.DataFrame) -> artifacts.Conformance:
         """Describes how the data differs from the schema, without raising.
 
         Args:
@@ -42,7 +42,7 @@ class InputValidator:
                 new = sorted(set(frame[column].dropna().astype(str)) - known)
                 if new:
                     unseen[column] = new[:MAX_REPORTED_UNSEEN]
-        return artifacts.SchemaReport(
+        return artifacts.Conformance(
             missing=tuple(c for c in wanted if c not in frame.columns),
             extra=tuple(
                 c

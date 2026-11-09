@@ -15,7 +15,7 @@ Modules interact only through the typed contracts in `scmle.contracts`.
 
 ## The run
 
-`Orchestrator` walks a tuple of `Stage` objects under a `StateMachine`
+`Orchestrator` walks a tuple of `Stage` objects under a `Tracker`
 (`CREATED -> VALIDATING -> PROFILING -> PLANNING -> TRAINING -> SELECTING ->
 TESTING -> PACKAGING -> COMPLETED`, with `FAILED`, `CANCELLED`, `BLOCKED` as
 exits). Each transition is an event in `events.jsonl` and a row update in the
@@ -25,19 +25,19 @@ tracking database.
    newline-delimited JSON, Parquet, Feather/Arrow), pandas/Arrow-compatible
    in-memory tables, and bounded streaming sources. It fingerprints the data
    and maps infinities to missing values (reported as findings).
-2. **Profile** resolves the task, splits the data (`SplitStrategy`) behind a
+2. **Profile** resolves the task, splits the data (`Partitioner`) behind a
    `LockedTestSet`, then classifies columns (`ColumnKind`) and raises leakage
    *hypotheses* (value association, outcome-dependent recording) from the
    development rows only.
-3. **Plan** asks the `Planner` (a chain of `PlanningRule`s) for candidates,
+3. **Plan** asks the `Planner` (a chain of `Refiner`s) for candidates,
    recording every included, rejected and deferred technique.
-4. **Train** screens the planned compatible `ModelAdapter`s within the time
+4. **Train** screens the planned compatible `Model`s within the time
    budget (what was cut is in the plan), then evaluates data
-   strategies (`DataStrategy`), tunes the winners with pruned search, and
+   strategies (`Strategy`), tunes the winners with pruned search, and
    assembles a cross-fitted stack. Every candidate is a complete pipeline
    (preprocessing + estimator) evaluated on the same folds, in parallel via an
-   `ExecutionBackend`, with failure isolation and checkpoints.
-5. **Select** ranks by cross-validation (`SelectionPolicy`) and applies serving
+   `Executor`, with failure isolation and checkpoints.
+5. **Select** ranks by cross-validation (`Selector`) and applies serving
    constraints (size, p95 latency) measured on the running machine.
 6. **Test** refits the frozen candidate, optimizes the decision threshold on
    out-of-fold predictions, opens the locked test set exactly once, and runs
@@ -48,7 +48,7 @@ tracking database.
 
 ## Governance
 
-* **Policy checkpoints** (`PolicyCheckpoint`) gate the run after planning and
+* **Policy checkpoints** (`Reviewer`) gate the run after planning and
   after selection. The selection gate fires *before the test set is opened*.
   Every verdict is a `policy.approved` / `policy.rejected` event.
 * **Audit events** record the feature set and exclusions (`features.selected`),
@@ -59,7 +59,7 @@ tracking database.
 * **Resource governor** applies CPU / time / memory limits (every trial supervised in its own
   process, killed at a hard time ceiling or memory limit) and
   reports, per limit, how it was enforced and what was observed.
-* **Replay verification** (`MLProject.verify_replay`) classifies a rerun as
+* **Replay verification** (`Project.verify_replay`) classifies a rerun as
   `exact`, `comparable` or `different`.
 
 ## Raw-data ingestion
@@ -146,16 +146,16 @@ decision boundary, not merely rename a function call.
 | a column family | `ColumnKind` | `columns.KINDS` |
 | a feature operation | `FeatureOp` | `feature_graph.OPS` |
 | a synthetic-data generator | `SyntheticGenerator` | `GeneratorOverSampler.generator_class` |
-| a validation protocol | `SplitStrategy` | `splitting.STRATEGIES` |
-| a model family | `ModelAdapter` | `ModelRegistry.register` or the `scmle.models` entry point |
-| a data strategy | `DataStrategy` | `strategies.STRATEGIES` |
-| a planning policy | `PlanningRule` | `Planner(rules=...)` |
+| a validation protocol | `Partitioner` | `splitting.STRATEGIES` |
+| a model family | `Model` | `Catalog.register` or the `scmle.models` entry point |
+| a data strategy | `Strategy` | `strategies.STRATEGIES` |
+| a planning policy | `Refiner` | `Planner(rules=...)` |
 | a search algorithm | `Optimizer` | `optimizers.OPTIMIZERS` |
-| a selection rule | `SelectionPolicy` | `Orchestrator(policy=...)` |
+| a selection rule | `Selector` | `Orchestrator(policy=...)` |
 | a diagnostic | `Diagnostic` | `diagnostics.run_suite(suite=...)` |
-| an executor | `ExecutionBackend` | `execution.create_backend` |
+| an executor | `Executor` | `execution.create_backend` |
 | a tracker | `ExperimentStore` | `Orchestrator(tracker=...)` |
-| a serving surface | `ServingAdapter` | direct use |
+| a serving surface | `Server` | direct use |
 | a workflow stage | `Stage` | `Orchestrator(stages=...)` |
 
 Third-party model adapters must pass
@@ -175,18 +175,18 @@ on the free-threaded build (`tests/unit/test_thread_safety.py`).
 * **Registries.** `register_estimator` / `unregister_estimator`
   (`models.registry.USER_ADAPTERS`) and `register_metric`
   (`MetricCatalog`) check and change under a lock, so a duplicate name has
-  exactly one winner. Readers take a snapshot: `ModelRegistry.with_builtins`
+  exactly one winner. Readers take a snapshot: `Catalog.with_builtins`
   copies the user adapters once, and `MetricCatalog` replaces its tables
   rather than editing them, so a run that is scoring never sees a metric
   vanish halfway. A registration made while a run is in flight may or may
   not be visible to that run; register before you start.
-* **Runs.** Each `MLProject.run()` owns its context, run directory (made
+* **Runs.** Each `Project.run()` owns its context, run directory (made
   with an atomic `mkdir`) and seeded random state, so parallel runs give the
   results a sequential run with the same seed gives. Runs that share an
   `output_dir` share one `experiments.sqlite`, whose connections are
   per call. `limits.forkserver_environment` reference-counts its change to
   `VECLIB_MAXIMUM_THREADS` so overlapping trials restore the original value.
-* **Prediction.** `ModelBundle.predict`, `predict_proba` and `score` only
+* **Prediction.** `Bundle.predict`, `predict_proba` and `score` only
   read the bundle. `remember` (series history) is serialized by
   `history_lock`; `calibrate` and other methods that replace fitted parts are
   setup steps, not safe to run beside predictions.
@@ -204,7 +204,7 @@ journal or run directory are not coordinated (SQLite and `os.replace` keep
 single files intact, but a read-modify-write can still lose an update).
 `ShadowEvaluator` and `SigningKeyRegistry` are thread safe; the
 `Embedder` cache and `optuna` verbosity live in worker or global state that
-only a single caller drives. One `RunContext` must not be used by two
+only a single caller drives. One `Context` must not be used by two
 threads. Registry locks are never held while a user estimator runs, but a
-`LifecycleManager.review` holds its state lock for the whole retrain.
+`Maintainer.review` holds its state lock for the whole retrain.
 

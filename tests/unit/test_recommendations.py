@@ -11,16 +11,14 @@ from scmle.intelligence import recommendations
 
 
 def profile_of(frame, **spec_fields):
-    spec = tasks.ProjectSpec(
-        data=tasks.DataSpec(uri="<in-memory>", target="y"), **spec_fields
+    spec = tasks.Config(
+        data=tasks.Dataset(uri="<in-memory>", target="y"), **spec_fields
     )
     task = scmle.data.validation.target.TaskResolver(spec).resolve(frame["y"])
     manifest = scmle.contracts.data.DatasetManifest(
         "d", "s", "h", len(frame), frame.shape[1], "y"
     )
-    return spec, profiler.DatasetProfiler(spec).profile(
-        frame, manifest, task, 0.0
-    )
+    return spec, profiler.Profiler(spec).profile(frame, manifest, task, 0.0)
 
 
 def rare_frame(rows=800):
@@ -44,7 +42,7 @@ def test_severe_imbalance_suggests_metric_and_threshold():
 def test_a_chosen_threshold_objective_is_not_suggested_again():
     spec, profile = profile_of(
         rare_frame(),
-        decision=tasks.DecisionSpec(threshold_objective="f1"),
+        decision=tasks.Threshold(threshold_objective="f1"),
     )
 
     settings = {r.setting for r in recommendations.recommend(profile, spec)}

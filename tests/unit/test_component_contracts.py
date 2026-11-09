@@ -52,23 +52,23 @@ def concrete_subclasses(base, *modules):
     [
         (tabular.TableReader, [tabular]),
         (columns.ColumnKind, [columns]),
-        (splitters.SplitStrategy, [splitters]),
-        (strategies.DataStrategy, [strategies]),
+        (splitters.Partitioner, [splitters]),
+        (strategies.Strategy, [strategies]),
         (diagnostics.Diagnostic, [diagnostics]),
-        (planner.PlanningRule, [planner]),
-        (selection.SelectionPolicy, [selection]),
+        (planner.Refiner, [planner]),
+        (selection.Selector, [selection]),
         (stages.Stage, [stages]),
-        (policies.PolicyCheckpoint, [policies]),
+        (policies.Reviewer, [policies]),
         (resampling.Resampler, [resampling]),
         (resampling.IndexResampler, [resampling]),
         (feature_graph.FeatureOp, [feature_graph]),
         (synthesis.SyntheticGenerator, [synthesis]),
-        (thresholds.ThresholdObjective, [thresholds]),
-        (monitor.AdvisoryRule, [monitor]),
-        (scheduler.ExecutionBackend, [scheduler]),
+        (thresholds.Objective, [thresholds]),
+        (monitor.Advisor, [monitor]),
+        (scheduler.Executor, [scheduler]),
         (optimizers.Optimizer, [optimizers]),
         (stores.ExperimentStore, [stores]),
-        (serving.ServingAdapter, [serving]),
+        (serving.Server, [serving]),
     ],
     ids=lambda value: getattr(value, "__name__", ""),
 )
@@ -115,10 +115,10 @@ def test_abstract_bases_cannot_be_instantiated():
     for base in (
         tabular.TableReader,
         columns.ColumnKind,
-        splitters.SplitStrategy,
-        strategies.DataStrategy,
+        splitters.Partitioner,
+        strategies.Strategy,
         resampling.IndexResampler,
-        models.ModelAdapter,
+        models.Model,
         stores.ExperimentStore,
     ):
         assert inspect.isabstract(base)
@@ -144,8 +144,8 @@ def test_registering_and_planning_never_imports_optional_libraries():
         import scmle
         from scmle.contracts import tasks
         from scmle.models import registry
-        reg = registry.ModelRegistry.with_builtins()
-        reg.candidates(tasks.TaskType.BINARY, 1000)
+        reg = registry.Catalog.with_builtins()
+        reg.candidates(tasks.Task.BINARY, 1000)
         heavy = ["lightgbm", "xgboost", "catboost", "optuna", "imblearn",
                  "mlflow", "ray", "torch", "tensorflow"]
         loaded = [name for name in heavy if name in sys.modules]
@@ -162,9 +162,9 @@ def test_a_model_is_imported_only_when_it_is_built():
         import sys
         from scmle.contracts import tasks
         from scmle.models import registry
-        reg = registry.ModelRegistry.with_builtins()
+        reg = registry.Catalog.with_builtins()
         assert "lightgbm" not in sys.modules
-        reg.get("lightgbm").build(tasks.TaskType.BINARY, 0)
+        reg.get("lightgbm").build(tasks.Task.BINARY, 0)
         assert "lightgbm" in sys.modules
         """
     )

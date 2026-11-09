@@ -21,7 +21,7 @@ WORST = 5
 RANKING_METRICS = frozenset({"roc_auc", "roc_auc_ovr", "pr_auc"})
 
 
-class SliceReport(diagnostics.Diagnostic):
+class Slices(diagnostics.Diagnostic):
     """Metric per slice, with the worst slices surfaced."""
 
     name = "slice_performance"

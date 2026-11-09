@@ -22,7 +22,7 @@ def artifact(evidence_type: str) -> scmle.governance.reliability.FaultArtifact:
 def harness(tmp_path):
     """Build a complete plan and deterministic evidence writer."""
     return scmle.governance.reliability.FaultInjectionHarness(
-        reliability.FaultInjectionPlanRegistry.production_beta(),
+        reliability.Registry.production_beta(),
         tmp_path,
         execution_id="fault-run-001",
         reviewer="reliability-reviewer",

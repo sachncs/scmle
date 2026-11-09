@@ -42,7 +42,7 @@ class ExplanationEvidenceBuilder:
         causal_warning: str,
         privacy_decision: explanations.PrivacyDecision,
         evidence_links: Sequence[explanations.EvidenceLink],
-    ) -> explanations.ExplanationEvidence:
+    ) -> explanations.Evidence:
         """Builds deterministic explanation evidence from a diagnostic result.
 
         Args:
@@ -68,7 +68,7 @@ class ExplanationEvidenceBuilder:
 
         Any explicit identity or evidence field that violates the portable
         explanation contract is rejected with a ``pydantic.ValidationError``
-        raised by ``explanations.ExplanationEvidence``.
+        raised by ``explanations.Evidence``.
 
         Raises:
             ValueError: If the diagnostic does not declare a usable name.
@@ -84,13 +84,13 @@ class ExplanationEvidenceBuilder:
                 "evidence_links must be a sequence of EvidenceLink values"
             )
 
-        return explanations.ExplanationEvidence(
+        return explanations.Evidence(
             model_fingerprint=model_fingerprint,
             bundle_digest=bundle_digest,
             input_fingerprint=input_fingerprint,
             dataset_snapshot=dataset_snapshot,
             feature_graph=feature_graph,
-            method=explanations.ExplanationMethod(
+            method=explanations.Method(
                 name=method_name,
                 parameters=dict(method_parameters),
             ),

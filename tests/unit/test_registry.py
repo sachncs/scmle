@@ -13,12 +13,12 @@ from scmle.models.sklearn import classical
 
 @pytest.fixture
 def registry():
-    return scmle.models.registry.ModelRegistry.with_builtins()
+    return scmle.models.registry.Catalog.with_builtins()
 
 
 def test_candidates_depend_on_task(registry):
-    classifiers = registry.candidates(tasks.TaskType.BINARY)[0]
-    regressors, rejected = registry.candidates(tasks.TaskType.REGRESSION)
+    classifiers = registry.candidates(tasks.Task.BINARY)[0]
+    regressors, rejected = registry.candidates(tasks.Task.REGRESSION)
     assert "logistic_regression" in {a.name for a in classifiers}
     assert "logistic_regression" not in {a.name for a in regressors}
     assert "does not support" in rejected["logistic_regression"]
@@ -35,23 +35,21 @@ def test_builtins_pass_conformance(adapter_class):
 
 def test_builtin_estimator_types(registry):
     assert type(
-        registry.get("random_forest").build(tasks.TaskType.BINARY, 0)
+        registry.get("random_forest").build(tasks.Task.BINARY, 0)
     ).__name__ == ("RandomForestClassifier")
     assert type(
-        registry.get("random_forest").build(tasks.TaskType.REGRESSION, 0)
+        registry.get("random_forest").build(tasks.Task.REGRESSION, 0)
     ).__name__ == ("RandomForestRegressor")
     assert (
-        registry.get("random_forest")
-        .build(tasks.TaskType.BINARY, 5)
-        .random_state
+        registry.get("random_forest").build(tasks.Task.BINARY, 5).random_state
         == 5
     )
 
 
-class ThirdPartyAdapter(models.ModelAdapter):
+class ThirdPartyAdapter(models.Model):
     name = "third_party"
     family = "baseline"
-    capabilities = models.Capabilities(frozenset({tasks.TaskType.BINARY}))
+    capabilities = models.Capabilities(frozenset({tasks.Task.BINARY}))
 
     def build(self, task, seed, params=None):
         return dummy.DummyClassifier(strategy="prior")
@@ -62,7 +60,7 @@ def test_third_party_registration_without_core_edits(registry):
     registry.register(adapter)
     conformance.check_conformance(adapter)
     assert "third_party" in {
-        a.name for a in registry.candidates(tasks.TaskType.BINARY)[0]
+        a.name for a in registry.candidates(tasks.Task.BINARY)[0]
     }
     with pytest.raises(errors.ConfigError):
         registry.register(adapter)
@@ -80,22 +78,22 @@ def test_rejects_missing_dependency_and_oversized_data(registry):
     class NeedsPackage(ThirdPartyAdapter):
         name = "needs_package"
         capabilities = models.Capabilities(
-            frozenset({tasks.TaskType.BINARY}), max_rows=10
+            frozenset({tasks.Task.BINARY}), max_rows=10
         )
         requires = ("definitely_not_installed_pkg",)
 
     registry.register(NeedsPackage())
-    rejected = registry.candidates(tasks.TaskType.BINARY, row_count=5)[1]
+    rejected = registry.candidates(tasks.Task.BINARY, row_count=5)[1]
     assert "missing dependency" in rejected["needs_package"]
 
     class Small(ThirdPartyAdapter):
         name = "small"
         capabilities = models.Capabilities(
-            frozenset({tasks.TaskType.BINARY}), max_rows=10
+            frozenset({tasks.Task.BINARY}), max_rows=10
         )
 
     registry.register(Small())
-    rejected = registry.candidates(tasks.TaskType.BINARY, row_count=500)[1]
+    rejected = registry.candidates(tasks.Task.BINARY, row_count=500)[1]
     assert "too large" in rejected["small"]
 
 
@@ -156,23 +154,21 @@ def test_svm_and_knn_pass_conformance_and_respect_size_limits(registry):
     for name in ("svm", "knn"):
         conformance.check_conformance(registry.get(name))
     compatible, rejected = registry.candidates(
-        tasks.TaskType.BINARY, row_count=100_000
+        tasks.Task.BINARY, row_count=100_000
     )
     assert (
         "svm" not in {a.name for a in compatible}
         and "too large" in rejected["svm"]
     )
     assert "too large" in rejected["knn"]
-    small = registry.candidates(tasks.TaskType.BINARY, row_count=1_000)[0]
+    small = registry.candidates(tasks.Task.BINARY, row_count=1_000)[0]
     assert {"svm", "knn"} <= {a.name for a in small}
 
 
 def test_svm_classifier_is_calibrated_and_regressor_is_plain(registry):
-    estimator = registry.get("svm").build(
-        tasks.TaskType.REGRESSION, 0, {"C": 2.0}
-    )
+    estimator = registry.get("svm").build(tasks.Task.REGRESSION, 0, {"C": 2.0})
     assert type(estimator).__name__ == "SVR" and estimator.C == 2.0
-    classifier = registry.get("svm").build(tasks.TaskType.BINARY, 3, {"C": 0.5})
+    classifier = registry.get("svm").build(tasks.Task.BINARY, 3, {"C": 0.5})
     assert type(classifier).__name__ == "CalibratedClassifierCV"
     assert (
         classifier.estimator.random_state == 3 and classifier.estimator.C == 0.5
@@ -184,13 +180,13 @@ def test_neural_family_registers_through_the_same_plugin_contract(registry):
     adapter = registry.get("neural_network")
     conformance.check_conformance(adapter)
     assert adapter.family == "neural" and adapter.capabilities.early_stopping
-    compatible = registry.candidates(tasks.TaskType.BINARY, row_count=1_000)[0]
+    compatible = registry.candidates(tasks.Task.BINARY, row_count=1_000)[0]
     assert "neural_network" in {a.name for a in compatible}
     tuned = adapter.build(
-        tasks.TaskType.BINARY, 0, {"hidden_layer_sizes": (16,), "alpha": 0.01}
+        tasks.Task.BINARY, 0, {"hidden_layer_sizes": (16,), "alpha": 0.01}
     )
     assert tuned.hidden_layer_sizes == (16,) and tuned.alpha == 0.01
-    assert registry.candidates(tasks.TaskType.BINARY, row_count=500_000)[1][
+    assert registry.candidates(tasks.Task.BINARY, row_count=500_000)[1][
         "neural_network"
     ]
 
@@ -198,11 +194,11 @@ def test_neural_family_registers_through_the_same_plugin_contract(registry):
 def test_a_third_party_deep_learning_adapter_needs_no_core_edit(registry):
     from sklearn import neural_network
 
-    class TinyNet(models.ModelAdapter):
+    class TinyNet(models.Model):
         name = "tiny_net"
         family = "neural"
         capabilities = models.Capabilities(
-            frozenset({tasks.TaskType.BINARY}), gpu=True
+            frozenset({tasks.Task.BINARY}), gpu=True
         )
 
         def build(self, task, seed, params=None):
@@ -254,7 +250,7 @@ def test_a_default_orchestrator_discovers_conforming_plugins_only(
             Entry("bad", [NonConforming()]),
         ],
     )
-    spec = tasks.ProjectSpec(data=tasks.DataSpec(uri="<in-memory>", target="y"))
+    spec = tasks.Config(data=tasks.Dataset(uri="<in-memory>", target="y"))
     engine = orchestrator.Orchestrator(spec, binary_frame)
     assert "third_party" in engine.registry.adapters
     assert "non_conforming" not in engine.registry.adapters

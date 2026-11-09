@@ -19,7 +19,7 @@ CONNECT_SECONDS = 120.0
 POLL_SECONDS = 0.05
 
 
-class HelperStartError(OSError):
+class StartError(OSError):
     """Raised when a helper process exits or never connects."""
 
 
@@ -35,7 +35,7 @@ def start_helper(
         The helper process and the parent end of the channel.
 
     Raises:
-        HelperStartError: If the helper exits before connecting, does not
+        StartError: If the helper exits before connecting, does not
             connect within `CONNECT_SECONDS`, or the connection attempt fails.
             The helper is killed first.
     """
@@ -64,13 +64,13 @@ def start_helper(
         while thread.is_alive():
             thread.join(POLL_SECONDS)
             if process.poll() is not None and thread.is_alive():
-                raise HelperStartError(
+                raise StartError(
                     f"{module} exited with code {process.returncode} "
                     "before connecting"
                 )
             if time.monotonic() > deadline:
-                raise HelperStartError(f"{module} did not connect in time")
-    except HelperStartError:
+                raise StartError(f"{module} did not connect in time")
+    except StartError:
         process.kill()
         process.wait()
         raise
@@ -80,7 +80,7 @@ def start_helper(
     if failures:
         process.kill()
         process.wait()
-        raise HelperStartError(f"{module} failed to connect: {failures[0]}")
+        raise StartError(f"{module} failed to connect: {failures[0]}")
     return process, accepted[0]
 
 

@@ -8,9 +8,9 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
   <p class="lead">A project declaration is a decision record. It says what the target means, when a feature is available, how rows may be split, how much compute is allowed, and what evidence must exist before a result is used.</p>
 
   <h2>Declare the problem</h2>
-  <pre><code>from scmle import MLProject
+  <pre><code>from scmle.api.project import Project
 
-project = MLProject(
+project = Project(
     data="data/orders.parquet",
     target="renewed",
     task="binary_classification",

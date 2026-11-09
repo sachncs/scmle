@@ -5,7 +5,7 @@ import logging
 import numpy
 import pandas
 
-import scmle
+import scmle.api.project
 from scmle.contracts import errors
 from scmle.core import policies
 from scmle.core import state
@@ -34,11 +34,11 @@ def reviewer(review: policies.GateReview) -> bool:
 def main() -> None:
     """Shows a rejected selection leaving the run BLOCKED, test set locked."""
     logging.basicConfig(level=logging.INFO, format="%(message)s")
-    project = scmle.MLProject(
+    project = scmle.api.project.Project(
         make_dataset(),
         "y",
         time_budget=60,
-        checkpoints=(policies.CallbackCheckpoint(reviewer),),
+        checkpoints=(policies.Callback(reviewer),),
     )
     try:
         project.run()

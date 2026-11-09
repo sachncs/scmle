@@ -39,7 +39,7 @@ def test_certification_seeds_do_not_overlap_development_seeds() -> None:
 
 def test_gate_status_file_agrees_with_the_certificates() -> None:
     gates = stored()["gates"]
-    for task in tasks.TaskType:
+    for task in tasks.Task:
         if task_gate.status(task) != task_gate.PASSED:
             continue
         needed = task_gate.load()[task.value]["gates"]

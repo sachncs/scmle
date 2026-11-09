@@ -13,17 +13,15 @@ from scmle.models.multitarget import estimators
 
 MULTI = frozenset(
     {
-        tasks.TaskType.MULTILABEL,
-        tasks.TaskType.MULTIOUTPUT,
-        tasks.TaskType.FORECAST,
+        tasks.Task.MULTILABEL,
+        tasks.Task.MULTIOUTPUT,
+        tasks.Task.FORECAST,
     }
 )
-REGRESSION_LIKE = frozenset(
-    {tasks.TaskType.MULTIOUTPUT, tasks.TaskType.FORECAST}
-)
+REGRESSION_LIKE = frozenset({tasks.Task.MULTIOUTPUT, tasks.Task.FORECAST})
 
 
-class MultiTargetAdapter(models.ModelAdapter):
+class Multitarget(models.Model):
     """Base: one estimator class per kind of target.
 
     Attributes:
@@ -36,7 +34,7 @@ class MultiTargetAdapter(models.ModelAdapter):
 
     def build(
         self,
-        task: tasks.TaskType,
+        task: tasks.Task,
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
@@ -51,7 +49,7 @@ class MultiTargetAdapter(models.ModelAdapter):
         Returns:
             An unfitted estimator that fits one clone per target column.
         """
-        classify = task is tasks.TaskType.MULTILABEL
+        classify = task is tasks.Task.MULTILABEL
         kind = self.classifier if classify else self.regressor
         assert kind is not None  # nosec B101 - capability guard
         settings = dict(params or {})
@@ -62,13 +60,13 @@ class MultiTargetAdapter(models.ModelAdapter):
         return estimators.PerTarget(inner, classify)
 
 
-class MultilabelLogisticAdapter(MultiTargetAdapter):
+class MultilabelLogistic(Multitarget):
     """Logistic regression for every label."""
 
     name = "multilabel_logistic"
     family = "linear"
     capabilities = models.Capabilities(
-        frozenset({tasks.TaskType.MULTILABEL}), needs_scaling=True, cost=2
+        frozenset({tasks.Task.MULTILABEL}), needs_scaling=True, cost=2
     )
     search_space = search.SearchSpace(
         (search.FloatParameter("C", 1e-3, 100.0, log=True),)
@@ -76,7 +74,7 @@ class MultilabelLogisticAdapter(MultiTargetAdapter):
 
     def build(
         self,
-        task: tasks.TaskType,
+        task: tasks.Task,
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
@@ -98,7 +96,7 @@ class MultilabelLogisticAdapter(MultiTargetAdapter):
         )
 
 
-class MultioutputRidgeAdapter(MultiTargetAdapter):
+class MultioutputRidge(Multitarget):
     """Ridge regression for every quantity."""
 
     name = "multioutput_ridge"
@@ -112,7 +110,7 @@ class MultioutputRidgeAdapter(MultiTargetAdapter):
 
     def build(
         self,
-        task: tasks.TaskType,
+        task: tasks.Task,
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
@@ -131,7 +129,7 @@ class MultioutputRidgeAdapter(MultiTargetAdapter):
         )
 
 
-class MultiBoostingAdapter(MultiTargetAdapter):
+class MultiBoosting(Multitarget):
     """Histogram gradient boosting for every target."""
 
     name = "multi_hist_gradient_boosting"
@@ -149,7 +147,7 @@ class MultiBoostingAdapter(MultiTargetAdapter):
     )
 
 
-class MultiForestAdapter(models.ModelAdapter):
+class MultiForest(models.Model):
     """One random forest over all targets jointly."""
 
     name = "multi_random_forest"
@@ -158,7 +156,7 @@ class MultiForestAdapter(models.ModelAdapter):
 
     def build(
         self,
-        task: tasks.TaskType,
+        task: tasks.Task,
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
@@ -173,12 +171,12 @@ class MultiForestAdapter(models.ModelAdapter):
         Returns:
             An unfitted forest that models all targets jointly.
         """
-        return estimators.forest(task is tasks.TaskType.MULTILABEL, seed)
+        return estimators.forest(task is tasks.Task.MULTILABEL, seed)
 
 
-MULTITARGET_ADAPTERS: tuple[type[models.ModelAdapter], ...] = (
-    MultilabelLogisticAdapter,
-    MultioutputRidgeAdapter,
-    MultiBoostingAdapter,
-    MultiForestAdapter,
+MULTITARGET_ADAPTERS: tuple[type[models.Model], ...] = (
+    MultilabelLogistic,
+    MultioutputRidge,
+    MultiBoosting,
+    MultiForest,
 )

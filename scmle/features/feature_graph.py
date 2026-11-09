@@ -785,7 +785,7 @@ def get_op(name: str) -> FeatureOp:
 
 
 def split_nodes(
-    spec: tasks.FeatureGraphSpec,
+    spec: tasks.FeatureGraph,
 ) -> tuple[list[tasks.FeatureNode], list[tasks.FeatureNode]]:
     """Separates ordered (series) nodes from row-wise nodes.
 
@@ -802,9 +802,9 @@ def split_nodes(
 
 
 def validate_graph(
-    spec: tasks.FeatureGraphSpec,
+    spec: tasks.FeatureGraph,
     available: set[str],
-    data: tasks.DataSpec,
+    data: tasks.Dataset,
 ) -> None:
     """Validates a graph against the dataset's columns and the data spec.
 

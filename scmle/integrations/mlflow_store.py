@@ -177,7 +177,7 @@ class MlflowExperimentStore(stores.ExperimentStore):
         if state in TERMINAL:
             self.client.set_terminated(parent, TERMINAL[state])
 
-    def record_trial(self, run_id: str, trial: experiments.TrialResult) -> None:
+    def record_trial(self, run_id: str, trial: experiments.Trial) -> None:
         """Logs a trial as a child run of the parent run.
 
         Does nothing if the parent run is unknown. The child run is ended as

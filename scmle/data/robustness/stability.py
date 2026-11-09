@@ -83,7 +83,7 @@ SIGNIFICANCE = 0.05
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class Rule:
+class Thresholds:
     """The survival rule, fixed before any result exists.
 
     Attributes:
@@ -122,7 +122,7 @@ class Rule:
         return dataclasses.asdict(self)
 
 
-DEFAULT_RULE = Rule()
+DEFAULT_RULE = Thresholds()
 
 
 def applicable_choices(
@@ -363,7 +363,7 @@ def estimate_spec(
 
 
 def verdict(
-    effects: Sequence[SpecEffect], headline: float | None, rule: Rule
+    effects: Sequence[SpecEffect], headline: float | None, rule: Thresholds
 ) -> tuple[str, str, dict[str, float | None]]:
     """Applies the survival rule to per-specification effects.
 
@@ -651,7 +651,7 @@ def assess_finding(
     grid: multiverse.Grid,
     seed: int,
     *,
-    rule: Rule = DEFAULT_RULE,
+    rule: Thresholds = DEFAULT_RULE,
     bootstrap: int = BOOTSTRAP,
     strata: numpy.ndarray | None = None,
     curve_permutations: int = 0,
@@ -781,7 +781,7 @@ def code_digest() -> str:
 
 
 def gate_status(
-    store: certificates.CertificateStore | None,
+    store: certificates.Store | None,
 ) -> certificates.GateStatus:
     """Decides whether stability verdicts may act.
 

@@ -68,12 +68,12 @@ def plan(**kwargs):
 
 
 def test_calibration_strategy_uses_the_structured_splitter():
-    registry = scmle.models.registry.ModelRegistry.with_builtins()
+    registry = scmle.models.registry.Catalog.with_builtins()
     strategy = strategies.get_strategy("calibrated")
     candidate = strategy.build(
         plan(group_column="unit"),
         registry.get("random_forest"),
-        tasks.TaskType.BINARY,
+        tasks.Task.BINARY,
         0,
     )
     assert isinstance(candidate.cv, inner_cv.StructuredKFold)
@@ -84,14 +84,14 @@ def test_calibration_strategy_uses_the_structured_splitter():
 
 
 def test_stack_members_are_full_pipelines_cross_fitted_by_group():
-    registry = scmle.models.registry.ModelRegistry.with_builtins()
+    registry = scmle.models.registry.Catalog.with_builtins()
     params = {"members": [{"model": "decision_tree"}, {"model": "extra_trees"}]}
     from scmle.data.curation import preprocessing
 
     stack = preprocessing.build_pipeline(
         plan(group_column="unit"),
         registry.get("stacking"),
-        tasks.TaskType.BINARY,
+        tasks.Task.BINARY,
         0,
         params,
     )

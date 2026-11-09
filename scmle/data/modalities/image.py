@@ -23,9 +23,9 @@ from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.data.modalities.curation import build_finding
 from scmle.data.modalities.curation import conflicting_label_groups
+from scmle.data.modalities.curation import Curation
 from scmle.data.modalities.curation import dataset_hash
 from scmle.data.modalities.curation import label_counts
-from scmle.data.modalities.curation import ModalityCurationReport
 
 PillowModule: Any = None
 try:
@@ -202,7 +202,7 @@ def image_content_hash(
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ImageAugmentation:
+class Augmentation:
     """Caller-declared provenance for a transformed image sample.
 
     Attributes:
@@ -277,7 +277,7 @@ class ImageAugmentation:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ImageSample:
+class Sample:
     """An immutable, validated image snapshot.
 
     The encoded bytes are retained so a sample remains tied to the identities
@@ -318,7 +318,7 @@ class ImageSample:
     group_id: str | None = None
     exif_tags: tuple[str, ...] = ()
     sensitive_metadata: tuple[str, ...] = ()
-    augmentation: ImageAugmentation | None = None
+    augmentation: Augmentation | None = None
 
     def __post_init__(self) -> None:
         """Validates immutable identity and geometry metadata.
@@ -328,7 +328,7 @@ class ImageSample:
                 differs from the payload length, a dimension or the channel
                 count is not positive, or a hash is not 64 characters.
             TypeError: If augmentation is neither None nor an
-                ImageAugmentation.
+                Augmentation.
         """
         object.__setattr__(self, "encoded_bytes", bytes(self.encoded_bytes))
         if not self.source.strip():
@@ -340,9 +340,9 @@ class ImageSample:
             self, "sensitive_metadata", tuple(self.sensitive_metadata)
         )
         if self.augmentation is not None and not isinstance(
-            self.augmentation, ImageAugmentation
+            self.augmentation, Augmentation
         ):
-            raise TypeError("augmentation must be ImageAugmentation or None")
+            raise TypeError("augmentation must be Augmentation or None")
         if len(self.encoded_bytes) != self.byte_size:
             raise ValueError("byte_size does not match encoded_bytes")
         if self.width <= 0 or self.height <= 0:
@@ -361,7 +361,7 @@ class ImageSample:
         max_pixels: int | None = DEFAULT_MAX_PIXELS,
         label: str | int | float | bool | None = None,
         group_id: str | None = None,
-        augmentation: ImageAugmentation | None = None,
+        augmentation: Augmentation | None = None,
     ) -> Self:
         """Builds a validated image sample from encoded bytes.
 
@@ -471,7 +471,7 @@ class ImageSample:
         max_pixels: int | None = DEFAULT_MAX_PIXELS,
         label: str | int | float | bool | None = None,
         group_id: str | None = None,
-        augmentation: ImageAugmentation | None = None,
+        augmentation: Augmentation | None = None,
     ) -> Self:
         """Builds a validated image sample from a local file.
 
@@ -658,7 +658,7 @@ class ImageSample:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ImageProfile:
+class Profile:
     """Bounded, deterministic summary of an image dataset.
 
     Attributes:
@@ -709,7 +709,7 @@ class ImageProfile:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ImageSplit:
+class Split:
     """Group-aware image split that keeps related samples together.
 
     Attributes:
@@ -718,9 +718,9 @@ class ImageSplit:
         test: Samples assigned to testing.
     """
 
-    train: tuple[ImageSample, ...]
-    validation: tuple[ImageSample, ...]
-    test: tuple[ImageSample, ...]
+    train: tuple[Sample, ...]
+    validation: tuple[Sample, ...]
+    test: tuple[Sample, ...]
 
     def group_ids(self) -> dict[str, tuple[str, ...]]:
         """Returns the stable groups assigned to each partition.
@@ -743,7 +743,7 @@ class ImageSplit:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ImageDataset:
+class Dataset:
     """Immutable collection of validated image samples.
 
     Attributes:
@@ -752,18 +752,18 @@ class ImageDataset:
             and augmentation identities; set on construction.
     """
 
-    samples: tuple[ImageSample, ...] = ()
+    samples: tuple[Sample, ...] = ()
     content_hash: str = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
         """Normalizes samples to an immutable tuple and validates types.
 
         Raises:
-            TypeError: If an element is not an ImageSample.
+            TypeError: If an element is not an Sample.
         """
         normalized = tuple(self.samples)
-        if any(not isinstance(sample, ImageSample) for sample in normalized):
-            raise TypeError("samples must contain only ImageSample objects")
+        if any(not isinstance(sample, Sample) for sample in normalized):
+            raise TypeError("samples must contain only Sample objects")
         object.__setattr__(self, "samples", normalized)
         identities = (
             f"{sample.source}\0{sample.content_hash}"
@@ -794,12 +794,11 @@ class ImageDataset:
 
         Returns:
             The dataset; deduplicated when requested. Failures of
-            `ImageSample.from_path` propagate unchanged.
+            `Sample.from_path` propagate unchanged.
         """
         dataset = cls(
             tuple(
-                ImageSample.from_path(path, max_bytes, max_pixels)
-                for path in paths
+                Sample.from_path(path, max_bytes, max_pixels) for path in paths
             )
         )
         return dataset.deduplicate() if deduplicate else dataset
@@ -820,7 +819,7 @@ class ImageDataset:
             A new dataset with one sample per distinct content hash, ordered
             by content hash and then source.
         """
-        selected: dict[str, ImageSample] = {}
+        selected: dict[str, Sample] = {}
         for sample in self.samples:
             previous = selected.get(sample.content_hash)
             if previous is None or (
@@ -868,7 +867,7 @@ class ImageDataset:
             ValueError: If ``max_samples`` is not a positive integer or
                 ``max_hamming_distance`` is not a non-negative integer. An
                 invalid ``hash_size`` also raises ValueError, from
-                `ImageSample.perceptual_hash`.
+                `Sample.perceptual_hash`.
         """
         if not isinstance(max_samples, int) or isinstance(max_samples, bool):
             raise ValueError("max_samples must be a positive integer")
@@ -922,7 +921,7 @@ class ImageDataset:
         self,
         max_samples: int = 1024,
         profile_size: tuple[int, int] = DEFAULT_PROFILE_SIZE,
-    ) -> ImageProfile:
+    ) -> Profile:
         """Profiles at most ``max_samples`` images and bounded pixels.
 
         Args:
@@ -945,7 +944,7 @@ class ImageDataset:
         validate_feature_options(profile_size, "RGB")
         profiled = self.samples[:max_samples]
         if not profiled:
-            return ImageProfile(
+            return Profile(
                 dataset_count=0,
                 profiled_count=0,
                 truncated=False,
@@ -987,7 +986,7 @@ class ImageDataset:
             )
         )
         unique_count = len({sample.content_hash for sample in profiled})
-        return ImageProfile(
+        return Profile(
             dataset_count=len(self.samples),
             profiled_count=len(profiled),
             truncated=len(profiled) < len(self.samples),
@@ -1012,7 +1011,7 @@ class ImageDataset:
         self,
         max_samples: int = 1024,
         profile_size: tuple[int, int] = DEFAULT_PROFILE_SIZE,
-    ) -> ModalityCurationReport:
+    ) -> Curation:
         """Builds bounded image statistics and reviewable findings.
 
         Args:
@@ -1164,7 +1163,7 @@ class ImageDataset:
                     False,
                 )
             )
-        return ModalityCurationReport(
+        return Curation(
             modality="image",
             dataset_hash=self.content_hash,
             sample_count=len(self.samples),
@@ -1216,7 +1215,7 @@ class ImageDataset:
         validation_fraction: float = 0.2,
         test_fraction: float = 0.2,
         seed: int = 0,
-    ) -> ImageSplit:
+    ) -> Split:
         """Splits samples by explicit group identity to prevent leakage.
 
         A caller should use a subject, capture session, or other identity as
@@ -1244,7 +1243,7 @@ class ImageDataset:
             raise ValueError("test_fraction must be in [0, 1)")
         if validation_fraction + test_fraction >= 1:
             raise ValueError("validation_fraction + test_fraction must be < 1")
-        grouped: dict[str, list[ImageSample]] = {}
+        grouped: dict[str, list[Sample]] = {}
         for sample in self.samples:
             grouped.setdefault(sample.group_id or sample.source, []).append(
                 sample
@@ -1270,7 +1269,7 @@ class ImageDataset:
             groups[test_count : test_count + validation_count]
         )
 
-        def samples_for(excluded: set[str]) -> tuple[ImageSample, ...]:
+        def samples_for(excluded: set[str]) -> tuple[Sample, ...]:
             return tuple(
                 sample
                 for sample in self.samples
@@ -1287,7 +1286,7 @@ class ImageDataset:
             for sample in self.samples
             if (sample.group_id or sample.source) in test_groups
         )
-        return ImageSplit(
+        return Split(
             train=samples_for(test_groups | validation_groups),
             validation=validation,
             test=test,

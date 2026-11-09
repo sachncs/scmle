@@ -154,10 +154,10 @@ class ChunkSource(abc.ABC):
 
     def read_batch(
         self,
-        checkpoint: "StreamCheckpoint | None" = None,
+        checkpoint: "Checkpoint | None" = None,
         rows: int = BATCH_ROWS,
         watermark_column: str | None = None,
-    ) -> "StreamBatch":
+    ) -> "Batch":
         """Reads one bounded batch bound to an immutable source snapshot.
 
         The source is re-opened from row zero for each call because file
@@ -262,14 +262,14 @@ class ChunkSource(abc.ABC):
             current.watermark,
             identity,
         )
-        next_checkpoint = StreamCheckpoint(
+        next_checkpoint = Checkpoint(
             identity,
             observed_snapshot,
             current.offset + len(selected),
             next_watermark,
             effective_watermark_column,
         )
-        return StreamBatch(
+        return Batch(
             identity,
             observed_snapshot,
             current.offset,
@@ -279,8 +279,8 @@ class ChunkSource(abc.ABC):
         )
 
     def validate_checkpoint(
-        self, checkpoint: "StreamCheckpoint | None", snapshot: str
-    ) -> "StreamCheckpoint":
+        self, checkpoint: "Checkpoint | None", snapshot: str
+    ) -> "Checkpoint":
         """Binds a checkpoint to this source and current raw snapshot.
 
         Args:
@@ -297,7 +297,7 @@ class ChunkSource(abc.ABC):
         """
         identity = self.source_identity()
         if checkpoint is None:
-            return StreamCheckpoint(identity, snapshot)
+            return Checkpoint(identity, snapshot)
         if checkpoint.source_identity != identity:
             raise StreamingError(
                 "checkpoint_source_mismatch",
@@ -393,7 +393,7 @@ def validate_timestamp(value: str, field_name: str) -> datetime.datetime:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class StreamCheckpoint:
+class Checkpoint:
     """A durable row position bound to a source and exact raw snapshot.
 
     Attributes:
@@ -550,7 +550,7 @@ def watermark_value(
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class StreamBatch:
+class Batch:
     """A bounded frame plus the checkpoint it may advance.
 
     Attributes:
@@ -570,7 +570,7 @@ class StreamBatch:
     snapshot_sha256: str
     start_offset: int
     frame: pandas.DataFrame = dataclasses.field(repr=False)
-    next_checkpoint: StreamCheckpoint
+    next_checkpoint: Checkpoint
     has_more: bool = False
     batch_id: str = dataclasses.field(init=False)
 
@@ -606,7 +606,7 @@ class StreamBatch:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class StreamAcknowledgement:
+class Acknowledgement:
     """Durable evidence awaiting delivery to an external transport.
 
     Attributes:
@@ -619,7 +619,7 @@ class StreamAcknowledgement:
     source_identity: str
     consumer_group: str
     batch_id: str
-    checkpoint: StreamCheckpoint
+    checkpoint: Checkpoint
 
     def __post_init__(self) -> None:
         """Validates acknowledgement identity and checkpoint binding.
@@ -671,7 +671,7 @@ class StreamAcknowledgement:
             source_identity=str(record["source_identity"]),
             consumer_group=str(record["consumer_group"]),
             batch_id=str(record["batch_id"]),
-            checkpoint=StreamCheckpoint.from_dict(record["checkpoint"]),
+            checkpoint=Checkpoint.from_dict(record["checkpoint"]),
         )
 
 
@@ -688,7 +688,7 @@ class SinkCommitReceipt:
 
     source_identity: str
     batch_id: str
-    checkpoint: StreamCheckpoint
+    checkpoint: Checkpoint
     receipt: str
 
     def __post_init__(self) -> None:
@@ -734,7 +734,7 @@ class SinkCommitReceipt:
         return cls(
             source_identity=str(record["source_identity"]),
             batch_id=str(record["batch_id"]),
-            checkpoint=StreamCheckpoint.from_dict(record["checkpoint"]),
+            checkpoint=Checkpoint.from_dict(record["checkpoint"]),
             receipt=str(record["receipt"]),
         )
 
@@ -750,7 +750,7 @@ class TransactionalSink(abc.ABC):
     """
 
     @abc.abstractmethod
-    def commit(self, batch: StreamBatch) -> SinkCommitReceipt:
+    def commit(self, batch: Batch) -> SinkCommitReceipt:
         """Commits one batch and returns its transport-owned receipt.
 
         Args:
@@ -764,7 +764,7 @@ class TransactionalSink(abc.ABC):
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class StreamCommitEvidence:
+class CommitEvidence:
     """Durable binding of a sink receipt and checkpoint acknowledgement.
 
     Attributes:
@@ -777,7 +777,7 @@ class StreamCommitEvidence:
     source_identity: str
     batch_id: str
     sink_receipt: SinkCommitReceipt
-    acknowledgement: StreamAcknowledgement
+    acknowledgement: Acknowledgement
 
     def __post_init__(self) -> None:
         """Validates all identities in one durable transaction record.
@@ -832,14 +832,14 @@ class StreamCommitEvidence:
             source_identity=str(record["source_identity"]),
             batch_id=str(record["batch_id"]),
             sink_receipt=SinkCommitReceipt.from_dict(record["sink_receipt"]),
-            acknowledgement=StreamAcknowledgement.from_dict(
+            acknowledgement=Acknowledgement.from_dict(
                 record["acknowledgement"]
             ),
         )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class StreamState:
+class CommittedState:
     """Durable idempotency and checkpoint state for one source snapshot.
 
     Attributes:
@@ -850,9 +850,9 @@ class StreamState:
             batch identity; may cover only some committed batches.
     """
 
-    checkpoint: StreamCheckpoint
+    checkpoint: Checkpoint
     committed_batch_ids: tuple[str, ...] = ()
-    transaction_evidence: tuple[StreamCommitEvidence, ...] = ()
+    transaction_evidence: tuple[CommitEvidence, ...] = ()
 
     def __post_init__(self) -> None:
         """Validates deterministic committed batch identities.
@@ -909,19 +909,19 @@ class StreamState:
         if record.get("schema_version") not in (1, STREAM_STATE_SCHEMA):
             raise ValueError("unsupported streaming state schema")
         return cls(
-            checkpoint=StreamCheckpoint.from_dict(record["checkpoint"]),
+            checkpoint=Checkpoint.from_dict(record["checkpoint"]),
             committed_batch_ids=tuple(
                 str(value) for value in record["committed_batch_ids"]
             ),
             transaction_evidence=tuple(
-                StreamCommitEvidence.from_dict(value)
+                CommitEvidence.from_dict(value)
                 for value in record.get("transaction_evidence", [])
             ),
         )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class StreamCommitReceipt:
+class CommitReceipt:
     """Evidence from one idempotent streaming commit attempt.
 
     Attributes:
@@ -939,9 +939,9 @@ class StreamCommitReceipt:
     batch_id: str
     accepted: bool
     duplicate: bool
-    checkpoint: StreamCheckpoint
+    checkpoint: Checkpoint
     sink_receipt: SinkCommitReceipt | None = None
-    acknowledgement: StreamAcknowledgement | None = None
+    acknowledgement: Acknowledgement | None = None
 
     def __post_init__(self) -> None:
         """Validates mutually exclusive commit classification.
@@ -970,7 +970,7 @@ class StreamCommitReceipt:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class StreamingLedger:
+class CommitLedger:
     """Atomic local ledger for replay-safe streaming evidence.
 
     This ledger provides a durable idempotency boundary for a caller-owned
@@ -1027,7 +1027,7 @@ class StreamingLedger:
                 else:
                     fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
-    def load(self) -> StreamState:
+    def load(self) -> CommittedState:
         """Loads state, failing closed if the source snapshot changed.
 
         Returns:
@@ -1042,9 +1042,9 @@ class StreamingLedger:
         snapshot = self.source.snapshot_sha256()
         identity = self.source.source_identity()
         if not self.path.exists():
-            return StreamState(StreamCheckpoint(identity, snapshot))
+            return CommittedState(Checkpoint(identity, snapshot))
         try:
-            state = StreamState.from_dict(
+            state = CommittedState.from_dict(
                 json.loads(self.path.read_text(encoding="utf-8"))
             )
         except (OSError, TypeError, ValueError, json.JSONDecodeError) as error:
@@ -1091,7 +1091,7 @@ class StreamingLedger:
         self,
         rows: int = BATCH_ROWS,
         watermark_column: str | None = None,
-    ) -> StreamBatch:
+    ) -> Batch:
         """Reads the next bounded batch from the durable checkpoint.
 
         Failures from `load` and from the source's `read_batch` propagate
@@ -1110,7 +1110,7 @@ class StreamingLedger:
             state.checkpoint, rows=rows, watermark_column=watermark_column
         )
 
-    def write_atomically(self, state: StreamState) -> None:
+    def write_atomically(self, state: CommittedState) -> None:
         """Publishes state with durable temporary-file replacement.
 
         Args:
@@ -1143,7 +1143,7 @@ class StreamingLedger:
         )
 
     def write_pending_acknowledgement(
-        self, acknowledgement: StreamAcknowledgement
+        self, acknowledgement: Acknowledgement
     ) -> None:
         """Persists an acknowledgement while the ledger lock is held.
 
@@ -1178,7 +1178,7 @@ class StreamingLedger:
             ).encode("utf-8"),
         )
 
-    def load_pending_acknowledgement(self) -> StreamAcknowledgement | None:
+    def load_pending_acknowledgement(self) -> Acknowledgement | None:
         """Loads the pending acknowledgement, if one exists.
 
         Returns:
@@ -1191,7 +1191,7 @@ class StreamingLedger:
         if not self.pending_acknowledgement_path.exists():
             return None
         try:
-            acknowledgement = StreamAcknowledgement.from_dict(
+            acknowledgement = Acknowledgement.from_dict(
                 json.loads(
                     self.pending_acknowledgement_path.read_text(
                         encoding="utf-8"
@@ -1234,7 +1234,7 @@ class StreamingLedger:
         except FileNotFoundError:
             return
 
-    def validate_batch(self, batch: StreamBatch) -> None:
+    def validate_batch(self, batch: Batch) -> None:
         """Validates a batch against this ledger's source snapshot.
 
         Args:
@@ -1261,7 +1261,7 @@ class StreamingLedger:
             )
 
     def validate_acknowledgement(
-        self, batch: StreamBatch, acknowledgement: StreamAcknowledgement
+        self, batch: Batch, acknowledgement: Acknowledgement
     ) -> None:
         """Validates the acknowledgement that will be bound to a batch.
 
@@ -1297,7 +1297,7 @@ class StreamingLedger:
             )
 
     def validate_sink_receipt(
-        self, batch: StreamBatch, receipt: SinkCommitReceipt
+        self, batch: Batch, receipt: SinkCommitReceipt
     ) -> None:
         """Validates a sink receipt before it enters durable state.
 
@@ -1334,10 +1334,10 @@ class StreamingLedger:
 
     def commit_transaction(
         self,
-        batch: StreamBatch,
+        batch: Batch,
         sink: TransactionalSink,
-        acknowledgement: StreamAcknowledgement,
-    ) -> StreamCommitReceipt:
+        acknowledgement: Acknowledgement,
+    ) -> CommitReceipt:
         """Commits a batch and atomically persists its receipt evidence.
 
         The sink is caller-owned and must deduplicate ``batch.batch_id`` when
@@ -1362,7 +1362,7 @@ class StreamingLedger:
 
         Raises:
             TypeError: If `sink` is not a TransactionalSink or
-                `acknowledgement` is not a StreamAcknowledgement.
+                `acknowledgement` is not a Acknowledgement.
             StreamingError: If the batch, acknowledgement or sink receipt does
                 not match the source and snapshot, the batch is bound to a
                 different acknowledgement, the batch is recorded as committed
@@ -1372,8 +1372,8 @@ class StreamingLedger:
         """
         if not isinstance(sink, TransactionalSink):
             raise TypeError("sink must implement TransactionalSink")
-        if not isinstance(acknowledgement, StreamAcknowledgement):
-            raise TypeError("acknowledgement must be StreamAcknowledgement")
+        if not isinstance(acknowledgement, Acknowledgement):
+            raise TypeError("acknowledgement must be Acknowledgement")
         self.validate_batch(batch)
         self.validate_acknowledgement(batch, acknowledgement)
         with self.lock():
@@ -1394,7 +1394,7 @@ class StreamingLedger:
                         self.source.source_identity(),
                         {},
                     )
-                return StreamCommitReceipt(
+                return CommitReceipt(
                     batch.source_identity,
                     batch.batch_id,
                     accepted=False,
@@ -1429,13 +1429,13 @@ class StreamingLedger:
                     {"type": type(sink_receipt).__name__},
                 )
             self.validate_sink_receipt(batch, sink_receipt)
-            evidence = StreamCommitEvidence(
+            evidence = CommitEvidence(
                 batch.source_identity,
                 batch.batch_id,
                 sink_receipt,
                 acknowledgement,
             )
-            state = StreamState(
+            state = CommittedState(
                 batch.next_checkpoint,
                 tuple(sorted((*current.committed_batch_ids, batch.batch_id))),
                 tuple(
@@ -1446,7 +1446,7 @@ class StreamingLedger:
                 ),
             )
             self.write_atomically(state)
-            return StreamCommitReceipt(
+            return CommitReceipt(
                 batch.source_identity,
                 batch.batch_id,
                 accepted=True,
@@ -1458,10 +1458,10 @@ class StreamingLedger:
 
     def commit_with_writer(
         self,
-        batch: StreamBatch,
+        batch: Batch,
         writer: Callable[[pandas.DataFrame, str], None],
-        acknowledgement: StreamAcknowledgement | None = None,
-    ) -> StreamCommitReceipt:
+        acknowledgement: Acknowledgement | None = None,
+    ) -> CommitReceipt:
         """Commits a batch once and stages its external acknowledgement.
 
         The writer receives the stable batch idempotency key. If it succeeds
@@ -1522,7 +1522,7 @@ class StreamingLedger:
             if batch.batch_id in current.committed_batch_ids:
                 if acknowledgement is not None:
                     self.write_pending_acknowledgement(acknowledgement)
-                return StreamCommitReceipt(
+                return CommitReceipt(
                     batch.source_identity,
                     batch.batch_id,
                     accepted=False,
@@ -1540,7 +1540,7 @@ class StreamingLedger:
                     },
                 )
             writer(batch.frame, batch.batch_id)
-            state = StreamState(
+            state = CommittedState(
                 batch.next_checkpoint,
                 tuple(sorted((*current.committed_batch_ids, batch.batch_id))),
                 current.transaction_evidence,
@@ -1552,7 +1552,7 @@ class StreamingLedger:
                         acknowledgement, checkpoint=batch.next_checkpoint
                     )
                 )
-            return StreamCommitReceipt(
+            return CommitReceipt(
                 batch.source_identity,
                 batch.batch_id,
                 accepted=True,
@@ -1561,7 +1561,7 @@ class StreamingLedger:
             )
 
 
-class StreamingConsumer:
+class Consumer:
     """Coordinate a durable writer with an explicit external ack callback.
 
     Attributes:
@@ -1574,10 +1574,10 @@ class StreamingConsumer:
 
     def __init__(
         self,
-        ledger: StreamingLedger,
+        ledger: CommitLedger,
         consumer_group: str,
         writer: Callable[[pandas.DataFrame, str], None],
-        acknowledge: Callable[[StreamAcknowledgement], None],
+        acknowledge: Callable[[Acknowledgement], None],
     ) -> None:
         """Initializes a transport-neutral consumer boundary.
 
@@ -1639,7 +1639,7 @@ class StreamingConsumer:
         self,
         rows: int = BATCH_ROWS,
         watermark_column: str | None = None,
-    ) -> StreamCommitReceipt:
+    ) -> CommitReceipt:
         """Commits one batch and acknowledges it only after durable state.
 
         A previously staged acknowledgement is delivered first. Failures from
@@ -1655,7 +1655,7 @@ class StreamingConsumer:
         """
         self.deliver_pending_acknowledgement()
         batch = self.ledger.read_batch(rows, watermark_column)
-        acknowledgement = StreamAcknowledgement(
+        acknowledgement = Acknowledgement(
             batch.source_identity,
             self.consumer_group,
             batch.batch_id,

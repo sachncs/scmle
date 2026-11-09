@@ -74,15 +74,15 @@ def test_a_table_declined_for_too_many_permutations_is_loud(monkeypatch):
 
 
 def profile_of(frame, budget):
-    spec = tasks.ProjectSpec(
-        data=tasks.DataSpec(uri="m", target="y"),
-        resources=tasks.ResourceSpec(time_budget_seconds=budget),
+    spec = tasks.Config(
+        data=tasks.Dataset(uri="m", target="y"),
+        resources=tasks.Resources(time_budget_seconds=budget),
     )
     resolved = scmle.data.validation.target.TaskResolver(spec).resolve(
         frame["y"]
     )
     manifest = tabular.build_manifest(frame, "y")
-    return profiler.DatasetProfiler(spec).profile(frame, manifest, resolved)
+    return profiler.Profiler(spec).profile(frame, manifest, resolved)
 
 
 def test_the_profiler_passes_the_projects_budget_and_warns_first():

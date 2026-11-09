@@ -128,30 +128,30 @@ def test_split_budget_rejects_bad_weights(weights):
 def test_confirmation_alpha_for_each_rule():
     budget = make_budget()
     assert scmle.data.ledger.budget.confirmation_alpha(
-        budget, 10, scmle.data.ledger.budget.MultiplicityRule.BONFERRONI
+        budget, 10, scmle.data.ledger.budget.Correction.BONFERRONI
     ) == (pytest.approx(0.005))
     assert scmle.data.ledger.budget.confirmation_alpha(
-        budget, 10, scmle.data.ledger.budget.MultiplicityRule.HOLM
+        budget, 10, scmle.data.ledger.budget.Correction.HOLM
     ) == (pytest.approx(0.005))
     assert scmle.data.ledger.budget.confirmation_alpha(
-        budget, 10, scmle.data.ledger.budget.MultiplicityRule.BH
+        budget, 10, scmle.data.ledger.budget.Correction.BH
     ) == (pytest.approx(0.005))
     harmonic = sum(1 / k for k in range(1, 11))
     assert scmle.data.ledger.budget.confirmation_alpha(
-        budget, 10, scmle.data.ledger.budget.MultiplicityRule.BY
+        budget, 10, scmle.data.ledger.budget.Correction.BY
     ) == (pytest.approx(0.05 / (10 * harmonic)))
 
 
 def test_confirmation_alpha_with_no_survivors_is_the_full_alpha():
     assert scmle.data.ledger.budget.confirmation_alpha(
-        make_budget(), 0, scmle.data.ledger.budget.MultiplicityRule.BH
+        make_budget(), 0, scmle.data.ledger.budget.Correction.BH
     ) == pytest.approx(0.05)
 
 
 def test_confirmation_alpha_rejects_negative_counts():
     with pytest.raises(ValueError, match="n_survivors"):
         scmle.data.ledger.budget.confirmation_alpha(
-            make_budget(), -1, scmle.data.ledger.budget.MultiplicityRule.BH
+            make_budget(), -1, scmle.data.ledger.budget.Correction.BH
         )
 
 

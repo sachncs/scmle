@@ -266,7 +266,7 @@ def test_result_round_trips_and_states_the_floor_message():
     counts = tuple([0] * 20)
     result = controls.summarize("permuted_target", "strata", 0, counts)
     assert "do not clearly exceed" in result.message
-    assert controls.ControlResult.from_dict(result.to_dict()) == result
+    assert controls.Control.from_dict(result.to_dict()) == result
     good = controls.summarize("permuted_target", "strata", 4, counts)
     assert "exceed the 95th percentile" in good.message
     assert good.to_dict()["note"]

@@ -248,7 +248,7 @@ def test_sampling_keeps_a_share_and_is_deterministic():
     kept = []
     for ignored in range(2):
         watch = signals.SignalMonitor(
-            signals.WindowPolicy(sample_rate=0.25, seed=7),
+            signals.Window(sample_rate=0.25, seed=7),
             profile=support_ops.profile(),
         )
         kept.append(
@@ -258,9 +258,9 @@ def test_sampling_keeps_a_share_and_is_deterministic():
         )
     assert kept[0] == kept[1] and 800 < kept[0] < 1200
     with pytest.raises(ValueError):
-        signals.WindowPolicy(sample_rate=0.0)
+        signals.Window(sample_rate=0.0)
     with pytest.raises(ValueError):
-        signals.WindowPolicy(window_seconds=0)
+        signals.Window(window_seconds=0)
 
 
 def test_signals_become_metric_samples_for_export():
@@ -594,7 +594,7 @@ def test_rates_and_usage_are_validated():
 def make_desk(tmp_path, script=(200,)):
     pager, ignored, ignored = sender(list(script), "pager")
     ticket, ignored, ignored = sender(list(script), "ticket")
-    log = audit.AuditLog.open(tmp_path / "audit.jsonl")
+    log = audit.Log.open(tmp_path / "audit.jsonl")
     desk = respond.ResponseDesk(
         tmp_path / "ops",
         log,

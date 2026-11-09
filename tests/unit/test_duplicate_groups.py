@@ -9,9 +9,7 @@ from scmle.data.splitting import splitters
 
 
 def spec(task="binary_classification"):
-    return tasks.ProjectSpec(
-        data=tasks.DataSpec(uri="x", target="y"), task=task
-    )
+    return tasks.Config(data=tasks.Dataset(uri="x", target="y"), task=task)
 
 
 def frame_with_copies(rows=600, copies=200, seed=0):
@@ -51,7 +49,7 @@ def test_no_duplicate_group_straddles_the_holdout_or_any_fold():
     frame = frame_with_copies()
     groups = duplicates.duplicate_groups(frame, ["a", "b"])
 
-    split = splitters.SplitManager(spec(), tasks.TaskType.BINARY).split(frame)
+    split = splitters.Splitter(spec(), tasks.Task.BINARY).split(frame)
 
     dev = set(split.manifest.train_ids)
     test = set(split.manifest.test_ids)
@@ -69,10 +67,10 @@ def test_no_duplicate_group_straddles_the_holdout_or_any_fold():
 
 def test_data_without_copies_keeps_the_plain_split():
     frame = frame_with_copies(copies=0)
-    manager = splitters.SplitManager(spec(), tasks.TaskType.BINARY)
+    manager = splitters.Splitter(spec(), tasks.Task.BINARY)
 
     plain = splitters.STRATEGIES[manager.strategy_name](
-        spec(), tasks.TaskType.BINARY
+        spec(), tasks.Task.BINARY
     ).partition(frame)
     split = manager.split(frame)
 
@@ -84,7 +82,7 @@ def test_data_without_copies_keeps_the_plain_split():
 def test_every_row_still_lands_in_exactly_one_place():
     frame = frame_with_copies()
 
-    split = splitters.SplitManager(spec(), tasks.TaskType.BINARY).split(frame)
+    split = splitters.Splitter(spec(), tasks.Task.BINARY).split(frame)
 
     dev, test = split.manifest.train_ids, split.manifest.test_ids
     assert sorted(dev + test) == list(range(len(frame)))
