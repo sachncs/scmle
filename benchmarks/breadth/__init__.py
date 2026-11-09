@@ -45,7 +45,7 @@ LIFECYCLE = (
     "ingestion",
     "evaluation",
     "packaging",
-    "cloud_deployment",
+    "deployment",
     "monitoring",
     "recovery",
 )

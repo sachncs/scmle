@@ -14,9 +14,8 @@ A slice is **qualified** only when all three hold:
    [`benchmarks/breadth/`](../benchmarks/breadth/__init__.py) do that) and
    was then run, with a public or domain benchmark and an independent
    replication;
-2. it completes ingestion, evaluation, packaging, cloud deployment,
-   monitoring and recovery, on both providers (the F14 production claim,
-   which has not been made: see [RELEASING](RELEASING.md));
+2. it completes ingestion, evaluation, packaging, deployment,
+   monitoring and recovery;
 3. its deployment requirement was declared by a named owner.
 
 **Partial** means some code exists and is tested but not all of that. **Not
@@ -35,9 +34,9 @@ in them is unset until the owner fixes it.
 | `clustering` | `library_only` | no | `scmle.unsupervised.clustering.find_clusters`: k-means, Gaussian mixture and agglomerative at several counts, scored by silhouette, Davies-Bouldin and Calinski-Harabasz, with bootstrap stability (mean adjusted Rand index) and `external_scores`; unit tests on planted blobs and uniform noise | Nothing runs it: not in `MLProject`, the CLI, the charter run, a bundle, serving or monitoring. No packaging, no deployment, no drift, explanation or monitoring benchmark, no declared use |
 | `association` | `none` | no | Nothing | Everything |
 | `dimensionality_reduction` | `none` | no | Nothing as an estimator or task. The `select_features` search strategy picks columns for a supervised model; it is not an unsupervised representation | Everything |
-| `forecasting` | `tabular_beta_path` | no | `TaskType.FORECAST`, forecasting estimators, the feature graph's lag and rolling operations, a rolling validation strategy; the tabular-beta capability registry lists baseline, linear, tree and boosting paths as supported with library inference only and no portable explanation or uncertainty contract; `benchmarks/real_tasks.py` compares one real series with last-value and seasonal-naive | Robustness, drift, explanation and monitoring benchmarks; a declared horizon and decision; cloud deployment of a forecaster; an independent replication |
+| `forecasting` | `tabular_beta_path` | no | `TaskType.FORECAST`, forecasting estimators, the feature graph's lag and rolling operations, a rolling validation strategy; the tabular-beta capability registry lists baseline, linear, tree and boosting paths as supported with library inference only and no portable explanation or uncertainty contract; `benchmarks/real_tasks.py` compares one real series with last-value and seasonal-naive | Robustness, drift, explanation and monitoring benchmarks; a declared horizon and decision; deployment of a forecaster; an independent replication |
 | `ranking` | `tabular_beta_path` | no | `TaskType.RANKING`, pointwise and LightGBM and XGBoost rankers, NDCG evaluation, the same registry entries and library-only limits | The same list as forecasting |
-| `document_nlp` | `experimental_lifecycle` | no | Document and text adapters run the fifteen lifecycle stages locally with a signed report and a regularized linear baseline on character and token counts. Extracted elements and citations are data contracts | The baseline does no OCR and no semantic reading. No OCR confidence gate, no citation-grounding test, no benchmark, no cloud deployment |
+| `document_nlp` | `experimental_lifecycle` | no | Document and text adapters run the fifteen lifecycle stages locally with a signed report and a regularized linear baseline on character and token counts. Extracted elements and citations are data contracts | The baseline does no OCR and no semantic reading. No OCR confidence gate, no citation-grounding test, no benchmark, no served deployment |
 | `image` | `experimental_lifecycle` | no | Image adapter and the same local lifecycle with a linear baseline on resized pixels | Decoding and perturbation benchmarks, versioned preprocessing, runtime controls proved on a deployment, explanation and drift benchmarks |
 | `audio` | `experimental_lifecycle` | no | Audio adapter and the same local lifecycle with a baseline on bounded WAV statistics | No transcript, speaker or event claim; no noise-robustness or drift benchmark; no deployment |
 | `video` | `experimental_lifecycle` | no | Video adapter and the same local lifecycle on evenly sampled frames or probed metadata | The same list as audio, plus decode failure handling at scale |

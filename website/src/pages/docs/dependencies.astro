@@ -26,7 +26,7 @@ const extras = [
   <p class="lead">SCMLE needs CPython 3.11 or newer and is tested on 3.11, 3.12, 3.13 and 3.14, including the free-threaded 3.14 build. The base install is deliberately small, and nothing optional is imported unless you use it.</p>
 
   <h2>The base install</h2>
-  <p>numpy, pandas, pyarrow, pydantic, scikit-learn, joblib and threadpoolctl. No GPU, service, database server or cloud account is required. The install commands are on the <a href={`${base}/docs/quickstart/`}>quickstart</a>.</p>
+  <p>numpy, pandas, pyarrow, pydantic, scikit-learn, joblib and threadpoolctl. No GPU, service, database server or hosted account is required. The install commands are on the <a href={`${base}/docs/quickstart/`}>quickstart</a>.</p>
 
   <h2>Optional extras</h2>
   <DocTable label="Optional extras" head={["Extra", "Adds", "Notes"]} rows={extras} />
@@ -34,6 +34,7 @@ const extras = [
 
   <h2>Version policy</h2>
   <ul>
+    <li><strong>No cloud SDK.</strong> No cloud-provider SDK and no SDK for a hosted-compute service is a dependency, a base requirement or an optional extra, and none may be added. Code that talks to a hosted service belongs to your own adapter, written against the interfaces the package ships.</li>
     <li><strong>Lower bounds are tested, not guessed.</strong> CI resolves the lowest direct versions and runs the unit, property and leakage suites on them (pandas 3.0, scikit-learn 1.8, numpy 2.3 and so on).</li>
     <li><strong>Upper bounds</strong> are not pinned in the library. The lock file records the combination that CI exercises.</li>
     <li><strong>Audit.</strong> <code>pip-audit</code> runs in CI; a vulnerable release fails the build.</li>

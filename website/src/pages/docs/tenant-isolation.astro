@@ -15,7 +15,7 @@ const config = [
 <DocsLayout title="Tenant isolation" description="What a tenant is in scmle, the nine rules that isolate tenants in the prediction service, the environment variables that configure them, and what isolation does not give you." current="tenant-isolation">
   <p class="eyebrow"><span></span> Trust</p>
   <h1>One deployment,<br /><em>one tenant.</em></h1>
-  <p class="lead">What "tenant" means here, what isolates tenants, and what does not. This page covers the prediction service behind the security layer. Cloud-level isolation (accounts, networks, buckets, IAM) is declared per provider in the <a href={`${base}/docs/infrastructure/`}>infrastructure</a> and is not claimed here.</p>
+  <p class="lead">What "tenant" means here, what isolates tenants, and what does not. This page covers the prediction service behind the security layer. Infrastructure-level isolation (accounts, networks, storage permissions) belongs to wherever you host it and is not claimed here.</p>
 
   <h2>The model</h2>
   <ul>
@@ -30,7 +30,7 @@ const config = [
     <li><strong>Scope, then tenant.</strong> A route needs its scope: <code>model:read</code> for <code>/health</code> and <code>/schema</code>, <code>model:predict</code> for <code>/predict</code>. If the deployment names a tenant, a token whose tenant is absent or different is refused with 403, whatever its scopes.</li>
     <li><strong>No cross-tenant scope.</strong> There is no wildcard tenant and no scope that spans tenants. Operating several tenants means several deployments, each with its own tenant name, key set and audit file.</li>
     <li><strong>Separate keys.</strong> Each tenant's tokens are verified against that tenant's key set. A key shared by two tenants would let either mint the other's tokens; do not do it.</li>
-    <li><strong>Separate storage.</strong> Each tenant's bundles, snapshots, checkpoints and run manifests live under their own prefix or bucket. The storage role of the service can read only that prefix.</li>
+    <li><strong>Separate storage.</strong> Each tenant's bundles, snapshots, checkpoints and run manifests live under their own prefix or root. The storage role of the service can read only that prefix.</li>
     <li><strong>Separate roles.</strong> Training and serving use different roles. Serving can read bundles and write nothing but its own audit trail; training can write checkpoints and manifests and cannot load or activate a service.</li>
     <li><strong>Safe errors.</strong> A refusal says only "authentication required", "forbidden" or "too many requests". It never says which check failed, which key id was tried, or whether a tenant exists. The precise reason is written to the audit log.</li>
     <li><strong>Audit.</strong> Every activation, access decision (allowed or denied) and administrative action (key rotation) is a hash-chained <code>audit</code> row of the deployment ledger: who, what, outcome, request id; never a credential or a request body.</li>
@@ -44,7 +44,7 @@ const config = [
     <li><strong>Revocation latency.</strong> A revoked token is refused from the next request if the revocation file is current. Propagating that file to every replica is the deployment's job, and short token lifetimes bound the exposure.</li>
     <li><strong>A tail-complete audit trail.</strong> The chain shows that rows were not edited, removed from the middle or reordered, not that the newest rows were never removed. Keep the ledger head somewhere else.</li>
     <li><strong>Noisy-neighbour isolation</strong> between processes of the same host, and side channels.</li>
-    <li><strong>Provider-level isolation.</strong> Not tested; it needs the cloud accounts.</li>
+    <li><strong>Platform-level isolation.</strong> Not tested; it depends on where you host the service.</li>
   </ul>
 
   <h2>Remote keys, discovery and revocation</h2>

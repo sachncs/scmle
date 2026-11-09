@@ -124,25 +124,20 @@ against planted problems and is on file as a certificate. Everything else is
 * Latency and availability objectives are **targets measured on a developer
   machine**, not promises under load ([`SERVICE_SLO.md`](SERVICE_SLO.md)).
 
-## The cloud has not been proven
+## Deployment has not been proven end to end
 
-* AWS and Google Cloud release, deployment and recovery have **never been run
-  against a real account**. The workflows, Terraform and the release gate are
-  tested against recorded answers, scripted platforms and mocks.
-  The answers were shaped from the platforms' documentation, not captured
-  from them ([`CLOUD_RELEASE.md`](CLOUD_RELEASE.md)).
+* The package has **never been run against a hosted platform**. The release
+  gate and the release registry are tested against recorded answers, scripted
+  runtimes and local processes. How a model reaches a runtime is the user's
+  own adapter.
 * The local demo ran on a developer machine, but **Docker was not run**: no
   image was built and no container started
   ([`LOCAL.md`](LOCAL.md)). The container steps in
   [Start here](START_HERE.md) (`build.sh`) are untested end to end.
-* Staged traffic (canary) is library code that is **not wired into the
-  production workflow** yet ([`CLOUD_RELEASE.md`](CLOUD_RELEASE.md)).
-* No production-qualified claim on AWS or GCP may be made until the evidence
-  for both providers exists and passes the project's own check
-  ([`RELEASING.md`](RELEASING.md)). A passing local run is not a step towards
-  that sentence.
-* Cost, multi-region availability and latency equivalence between providers are
-  not claimed.
+* Staged traffic (canary) is library code that **no release workflow in this
+  repository drives**.
+* No production-qualified claim is made. A passing local run is not one.
+* Cost, availability and latency under load on any platform are not claimed.
 
 ## Scope of what it models
 
@@ -165,7 +160,7 @@ against planted problems and is on file as a certificate. Everything else is
 | `confirmed` means it works | It means one narrow test passed on sealed rows |
 | `unverified` means broken | It means nobody checked a default |
 | A green drift report means safe | It means no drift was detected, not that none exists |
-| The cloud steps are tested | They are tested on mocks only |
+| The deployment steps are tested on a real platform | They are tested on mocks and local processes only |
 | SCMLE chose the right metric | It chose a default. Check it |
 | Signing means trusted | Signing proves the key, not the person |
 | The tool will tell me my target is wrong | It cannot see what your target means |

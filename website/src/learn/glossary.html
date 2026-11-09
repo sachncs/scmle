@@ -1,5 +1,5 @@
 <p class="lead">Every word you will meet, in plain language. Each entry has a meaning, an example and why it matters. The examples use the Titanic passenger table from <a href="@@BASE@@/docs/start-here/">Start here</a>. Entries are in groups, from the first ideas to the production ones. Use the search box above to find a word.</p>
-<ul><li><a href="#the-data-and-the-question">The data and the question</a></li><li><a href="#scores">Scores</a></li><li><a href="#honest-testing">Honest testing</a></li><li><a href="#charter-custody-and-claims">Charter, custody and claims</a></li><li><a href="#models-and-decisions">Models and decisions</a></li><li><a href="#watching-a-model-in-use">Watching a model in use</a></li><li><a href="#shipping-and-trust">Shipping and trust</a></li><li><a href="#cloud-and-operations">Cloud and operations</a></li></ul>
+<ul><li><a href="#the-data-and-the-question">The data and the question</a></li><li><a href="#scores">Scores</a></li><li><a href="#honest-testing">Honest testing</a></li><li><a href="#charter-custody-and-claims">Charter, custody and claims</a></li><li><a href="#models-and-decisions">Models and decisions</a></li><li><a href="#watching-a-model-in-use">Watching a model in use</a></li><li><a href="#shipping-and-trust">Shipping and trust</a></li><li><a href="#serving-and-operations">Serving and operations</a></li></ul>
 <h2 id="the-data-and-the-question">The data and the question</h2>
 <h3 id="target">target</h3>
 <p><strong>Meaning.</strong> The one column you want to predict.</p>
@@ -316,7 +316,7 @@
 <p><strong>Meaning.</strong> A short description of a model's intended use, scores and limits.</p>
 <p><strong>Example.</strong> <code>model_card.json</code> in every run.</p>
 <p><strong>Why it matters.</strong> The next person should not have to guess what the model is for.</p>
-<h2 id="cloud-and-operations">Cloud and operations</h2>
+<h2 id="serving-and-operations">Serving and operations</h2>
 <h3 id="service-endpoint-liveness-readiness">service, endpoint, liveness, readiness</h3>
 <p><strong>Meaning.</strong> A service is a running program that answers requests. An endpoint is one address on it. Liveness (<code>/livez</code>) says it runs. Readiness (<code>/readyz</code>) says it is verified, loaded and can answer.</p>
 <p><strong>Example.</strong> <code>/predict</code> returns predictions.</p>
@@ -336,7 +336,7 @@
 <h3 id="canary-staged-traffic">canary (staged traffic)</h3>
 <p><strong>Meaning.</strong> Sending a small share of traffic to a new version first, watching, then sending more.</p>
 <p><strong>Example.</strong> 10 percent, then 50, then 100.</p>
-<p><strong>Why it matters.</strong> A bad release hurts few people and can be reversed. The staged-traffic code exists for Cloud Run; it is not yet wired into the production workflow (see <a href="@@BASE@@/docs/cloud-release/"><code>CLOUD_RELEASE.md</code></a>).</p>
+<p><strong>Why it matters.</strong> A bad release hurts few people and can be reversed. The staged-traffic helpers are library code; no release workflow in this repository drives them.</p>
 <h3 id="release-gate">release gate</h3>
 <p><strong>Meaning.</strong> The check that allows or refuses a release from its evidence.</p>
 <p><strong>Example.</strong> <code>scmle deploy gate admit manifest.json --key-file key</code>.</p>
@@ -346,7 +346,7 @@
 <p><strong>Example.</strong> <code>scmle deploy verify-record record.json</code>.</p>
 <p><strong>Why it matters.</strong> It is your audit trail.</p>
 <h3 id="reconcile">reconcile</h3>
-<p><strong>Meaning.</strong> Comparing what the registry and ledger say with what the cloud really runs.</p>
+<p><strong>Meaning.</strong> Comparing what the registry and ledger say with what the runtime really runs.</p>
 <p><strong>Example.</strong> <code>scmle deploy reconcile</code>.</p>
 <p><strong>Why it matters.</strong> It catches "the label says v1 but v2 is running".</p>
 <h3 id="rto-and-rpo">RTO and RPO</h3>

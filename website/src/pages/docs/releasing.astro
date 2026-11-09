@@ -4,9 +4,9 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 ---
 
 <DocsLayout title="Releasing the package" description="How a scmle package release works: version bump, tag, preflight, the tag pipeline that refuses to publish without evidence, and the two controls that need people." current="releasing">
-  <p class="eyebrow"><span></span> Cloud and release</p>
+  <p class="eyebrow"><span></span> Release</p>
   <h1>A tag is a claim<br /><em>the pipeline checks.</em></h1>
-  <p class="lead">A release is a version bump, a tag, and a pipeline that refuses to publish unless the evidence holds. This page is about releasing the Python package. Releasing a trained model is a different act, covered on <a href={`${base}/docs/cloud-release/`}>Cloud release</a>.</p>
+  <p class="lead">A release is a version bump, a tag, and a pipeline that refuses to publish unless the evidence holds. This page is about releasing the Python package. Releasing a trained model is a different act: the package provides the release gate, live checks and signed deployment record (<code>scmle deploy</code>), and how a model reaches a runtime is your own adapter.</p>
 
   <h2>Before tagging</h2>
   <ol>
@@ -31,12 +31,6 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
     <li><strong>publish:</strong> the full test suite, the benchmark regression gate, build, <code>twine check</code>, a reproducibility and offline-install check, a wheel and sdist smoke test, PyPI trusted publishing, and finally an external check that compares the public tag and PyPI files with the local build by digest.</li>
   </ol>
   <p>PyPI publishing uses OIDC trusted publishing, so no token is stored. The <code>pypi</code> GitHub environment should require approval.</p>
-
-  <h2 id="production-claim">The production claim</h2>
-  <p>One sentence is the claim, and nothing else may be said in its place:</p>
-  <blockquote><p>SCMLE is production-qualified on AWS and GCP: every P0 acceptance criterion passed in staging on both providers, with evidence signed by a reviewer other than the author.</p></blockquote>
-  <div class="callout"><p><strong>Status: this has not happened.</strong> No acceptance run, recovery run or reviewer sign-off exists for AWS or GCP, so the claim must not be made, and neither the changelog, the README nor this site may suggest it.</p></div>
-  <p>A claim checker refuses the sentence unless, for each provider, the acceptance, deployment, recovery, observability, continuous-evaluation and sign-off records are present, signed, from staging, for one commit and passing. The recovery run must cover every fault in the catalogue in that provider's own staging environment within the declared recovery time and data-loss objectives, and the sign-off must name a reviewer who is not the requester and cover the current digest of each file. It is run with the pipeline's key and the reviewer's own key; the pipeline must not hold the second. The local evidence does not count: it ran no provider, and a passing local run is not a step towards the sentence. The local measurements are on <a href={`${base}/docs/observability/#recovery`}>Observability &amp; incident response</a>.</p>
 
   <h2>Evidence the pipeline cannot produce</h2>
   <p>Two controls need people, and the release stays open without them:</p>

@@ -4,7 +4,7 @@
   including the free-threaded 3.14 build.
 * **Base install** is deliberately light: numpy, pandas, pyarrow, pydantic,
   scikit-learn, joblib, threadpoolctl. No GPU, service, database server or
-  cloud account is required.
+  hosted account is required.
 * **Optional extras** are never imported unless used:
 
 | Extra | Adds | Notes |
@@ -30,6 +30,11 @@
   on those versions (pandas 3.0, scikit-learn 1.8, numpy 2.3, ...).
 * **Upper bounds** are not pinned in the library; `uv.lock` records the
   combination that CI exercises.
+* **No cloud SDK.** No cloud-provider SDK (for example boto3, google-cloud
+  or azure packages) and no SDK for a hosted-compute service is a dependency,
+  a base requirement or an optional extra, and none may be added. Code that
+  talks to a hosted service belongs to the user's own adapter, written against
+  the interfaces the package ships.
 * **Audit:** `pip-audit` runs in CI; a vulnerable release fails the build.
 * **Licenses:** the project is Apache-2.0. CI traverses the installed base
   runtime dependency closure and publishes `dependency-licenses.json`. A

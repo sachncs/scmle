@@ -135,7 +135,7 @@ executor = LocalFaultExecutor(Path("rehearsal/faults"))
 for scenario in reliability.FaultScenario:
     artifacts = executor.execute(scenario)
     print(scenario.value, len(artifacts))`}</code></pre>
-  <p>Pass the executor to <code>FaultInjectionHarness</code> to persist digest-bound evidence and update the release plan. The disk and memory cases use deterministic local capacity guards; they do not claim physical disk exhaustion or host-wide OOM coverage. Cloud transport outages and kernel-level resource tests require environment-specific injectors before a release can be marked production-proven.</p>
+  <p>Pass the executor to <code>FaultInjectionHarness</code> to persist digest-bound evidence and update the release plan. The disk and memory cases use deterministic local capacity guards; they do not claim physical disk exhaustion or host-wide OOM coverage. Remote transport outages and kernel-level resource tests require environment-specific injectors before a release can be marked production-proven.</p>
 
   <h2>Promote only an approved bundle</h2>
   <p>A better challenger is not automatically the new champion. The lifecycle stages it under the <code>challenger</code> alias. An independent reviewer must approve the exact model version and content digest, and the approval must be HMAC-signed, before the registry moves <code>champion</code>.</p>

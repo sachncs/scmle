@@ -1,5 +1,5 @@
 # Local environment: the API, a mock object store, a mock metrics sink and a
-# test runner, all built from the same image. No cloud account is involved.
+# test runner, all built from the same image. No hosted account is involved.
 #
 #   make image && make demo-compose        # needs Docker with Compose v2
 #

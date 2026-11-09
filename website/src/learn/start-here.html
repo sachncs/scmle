@@ -279,7 +279,7 @@ serve.py
 vuln-policy.json</code></pre>
 <p>What these are:</p>
 <ul><li><code>Dockerfile</code> and <code>build.sh</code> build the container image. You need Docker and network access to run them. The author did <strong>not</strong> build an image for this page.</li><li><code>sbom.cdx.json</code> is a <strong>software bill of materials</strong>: a list of every library inside, so a security tool can check for known flaws.</li><li><code>provenance.json</code> is a signed statement of what the package was made from. The service checks it when it starts.</li></ul>
-<p>The cloud steps after this (release gate, live checks, promotion to AWS or Google Cloud) are in <a href="@@BASE@@/docs/cloud-release/"><code>CLOUD_RELEASE.md</code></a>. They have not been run against a real cloud account. See <a href="@@BASE@@/docs/what-scmle-cannot-do/">What SCMLE cannot do</a>.</p>
+<p>Releasing the model to a runtime (release gate, live checks, signed deployment record) is covered by <code>scmle deploy</code> in <a href="@@BASE@@/docs/cli/"><code>CLI.md</code></a>. It has not been run against a hosted platform. See <a href="@@BASE@@/docs/what-scmle-cannot-do/">What SCMLE cannot do</a>.</p>
 <h2 id="step-10-monitor">Step 10. Monitor</h2>
 <p>A model is correct only about the world it was trained on. When the world changes, it gets worse, quietly. <strong>Monitoring</strong> compares new data and new outcomes with what the model saw in training.</p>
 <p>For this walk-through we pretend a batch of rows is new. Real monitoring uses rows that arrived after training. Our pretend rows were seen during training, so the performance number below is too good. What matters is how the alarm behaves. Save as <code>monitor_model.py</code>:</p>

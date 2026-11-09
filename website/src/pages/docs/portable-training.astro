@@ -4,37 +4,35 @@ import DocTable from "../../components/DocTable.astro";
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 const adapters = [
   ["<code>LocalRunner</code>", "the workload, in this process", "the training role of <code>RoleStore</code>", "injected, or <code>JobInterruptedError</code>"],
-  ["<code>AwsContainerJobRunner</code>", "one ECS <code>RunTask</code> (Fargate or a capacity provider)", "<code>overrides.taskRoleArn</code>", "<code>SpotInterruption</code>, exit 143"],
-  ["<code>GcpJobRunner</code>", "one Cloud Run job execution", "the job's own service account, checked against the spec", "preemption or SIGTERM condition"],
 ];
 ---
 
-<DocsLayout title="Portable training" description="One scmle job spec, a runner per place it can run: durable run ids, checkpoints, retries, cost budgets, separated training and serving roles, and what has not run in a cloud." current="portable-training">
+<DocsLayout title="Portable training" description="One scmle job spec, a runner interface: durable run ids, checkpoints, retries, cost budgets, separated training and serving roles, and what has not been run." current="portable-training">
   <p class="eyebrow"><span></span> Serve and operate</p>
   <h1>One job spec,<br /><em>any place to run it.</em></h1>
-  <p class="lead">A <code>JobSpec</code> and a <code>Runner</code> per place it can run. The local half runs and is tested without a cloud account; the cloud adapters have run only against scripted responses.</p>
+  <p class="lead">A <code>JobSpec</code> and a <code>Runner</code> interface. The package ships the local runner, which runs and is tested; a runner for any other place is written by the user against the same interface.</p>
 
   <h2>The spec and the run</h2>
-  <p>A <code>JobSpec</code> names a durable <code>run_id</code> (the idempotency key), the project specification (opaque JSON), the training identity, resources, a timeout, a <code>RetryPolicy</code>, an optional <code>CostBudget</code> and a non-secret environment. A GPU needs a stated <code>gpu_reason</code>: specialised compute only behind a declared need. <code>Runner.run(spec)</code> behaves the same on every adapter:</p>
+  <p>A <code>JobSpec</code> names a durable <code>run_id</code> (the idempotency key), the project specification (opaque JSON), the training identity, resources, a timeout, a <code>RetryPolicy</code>, an optional <code>CostBudget</code> and a non-secret environment. A GPU needs a stated <code>gpu_reason</code>: specialised compute only behind a declared need. <code>Runner.run(spec)</code> behaves the same on every runner:</p>
   <ul>
     <li>The spec is stored at <code>runs/&lt;id&gt;/spec.json</code>. The same id with a different spec is a <code>RunConflictError</code>; a finished id returns its recorded manifest and starts nothing.</li>
     <li><code>runs/&lt;id&gt;/manifest.json</code> is rewritten atomically at every transition: attempts with state, seconds, cost and reason; checkpoint digests; result digest; evidence list; final state.</li>
     <li>An attempt that ends <strong>interrupted</strong> (preemption, spot reclaim, SIGTERM) or <strong>failed with a retryable cause</strong> is retried after the policy's backoff, up to its attempt limit, and the retry resumes from the run's checkpoints. Other failures, timeouts and budget stops are final.</li>
-    <li>The <strong>cost budget</strong> is the declared rate times resources times elapsed time, accumulated across attempts. Past the ceiling the job is cancelled and the run ends <code>budget_stopped</code>. It is an estimate from declared rates, not billing data, and a billing alarm in the cloud is still needed.</li>
+    <li>The <strong>cost budget</strong> is the declared rate times resources times elapsed time, accumulated across attempts. Past the ceiling the job is cancelled and the run ends <code>budget_stopped</code>. It is an estimate from declared rates, not billing data.</li>
     <li>Final states: <code>succeeded</code>, <code>failed</code>, <code>budget_stopped</code>, <code>timed_out</code>, <code>retries_exhausted</code>.</li>
   </ul>
   <p>Workloads save progress with <code>context.step(n, state)</code> and read it back with <code>context.resume()</code>. Each checkpoint carries its own digest; a damaged newest one is skipped and the one before it is used.</p>
 
   <h2>Roles</h2>
-  <p>Training and serving are different identities with different permissions. Training reads <code>data/</code>, <code>runs/</code> and <code>artifacts/</code> and writes <code>runs/</code>, <code>artifacts/</code> and <code>evidence/</code>. Serving reads <code>bundles/</code> and <code>artifacts/</code> and writes <code>audit/</code>. A separation check refuses overlapping write prefixes, a training role that can write <code>bundles/</code> and a serving role that can write <code>runs/</code>. Workloads receive a <code>RoleStore</code> that enforces the training role, and a job spec naming the serving identity is refused by every adapter. Releasing a bundle is a third act, with an approval, outside both (see <a href={`${base}/docs/cloud-release/`}>Cloud release</a>).</p>
+  <p>Training and serving are different identities with different permissions. Training reads <code>data/</code>, <code>runs/</code> and <code>artifacts/</code> and writes <code>runs/</code>, <code>artifacts/</code> and <code>evidence/</code>. Serving reads <code>bundles/</code> and <code>artifacts/</code> and writes <code>audit/</code>. A separation check refuses overlapping write prefixes, a training role that can write <code>bundles/</code> and a serving role that can write <code>runs/</code>. Workloads receive a <code>RoleStore</code> that enforces the training role, and a job spec naming the serving identity is refused by every runner. Releasing a bundle is a third act, with an approval, outside both.</p>
 
-  <h2>Adapters</h2>
-  <DocTable label="Runner adapters" head={["Adapter", "Runs the attempt as", "Identity", "Interruption"]} rows={adapters} />
-  <p>The cloud adapters start the runner entrypoint in the image. It opens the store named by <code>SCMLE_STORE_URI</code> (<code>file://</code>, <code>s3://</code> or <code>gs://</code>), loads the stored spec, refuses it if its digest is not the one the runner started, and runs the workload named by <code>SCMLE_WORKLOAD</code>. The default workload runs an unchanged <code>MLProject</code>: it copies the data from the store, mirrors the run directory to <code>runs/&lt;id&gt;/workdir/</code> every 30 seconds and at the end, and after a restart on an empty disk restores it and calls <code>MLProject.resume</code>. A hard kill loses at most the trials since the last mirror.</p>
+  <h2>Runners</h2>
+  <DocTable label="Runners" head={["Runner", "Runs the attempt as", "Identity", "Interruption"]} rows={adapters} />
+  <p>A runner for a container platform starts the runner entrypoint in the image. It opens the <code>file://</code> store named by <code>SCMLE_STORE_URI</code>, loads the stored spec, refuses it if its digest is not the one the runner started, and runs the workload named by <code>SCMLE_WORKLOAD</code>. The default workload runs an unchanged <code>MLProject</code>: it copies the data from the store, mirrors the run directory to <code>runs/&lt;id&gt;/workdir/</code> every 30 seconds and at the end, and after a restart on an empty disk restores it and calls <code>MLProject.resume</code>. A hard kill loses at most the trials since the last mirror.</p>
   <p>A reproducibility report compares each metric of a result against tolerances declared before the runs; a miss is published, not hidden.</p>
 
   <h2>What was not done</h2>
-  <p>The ECS and Cloud Run adapters ran only against scripted responses of the documented shapes, not against AWS or GCP. The wrapper around the Cloud Run client library has not been exercised even that far. No image was built or pushed, no container ran, no job was interrupted in a cloud, no cost was measured against a bill, and no same-spec result was compared across local, AWS and GCP. The reproducibility-tolerance report for that comparison therefore does not exist yet.</p>
+  <p>Only the local runner ships and is tested. No container image was built, no job was interrupted on a remote platform, and no cost was measured against a bill. The reproducibility-tolerance report against a second place does not exist.</p>
 
   <p class="meta">Training runners of the 0.1 beta line</p>
 </DocsLayout>

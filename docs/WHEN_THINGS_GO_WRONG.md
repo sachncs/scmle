@@ -701,8 +701,8 @@ judgement, and two of its detection-delay gates missed their floor. See
 
 ## Release gate and live checks
 
-These run when you release to a cloud. They have been exercised on recorded
-and mock data only, not on a real cloud account.
+These run when you release a model to a runtime. They have been exercised on
+recorded and mock data only, not on a hosted platform.
 
 ### `scmle deploy gate admit|certify manifest.json --key-file KEY` refuses (exit 2)
 
@@ -742,7 +742,7 @@ not the test.
 
 ### `scmle deploy reconcile` exits 1
 
-The registry, the ledger and the cloud disagree. The finding codes are
+The registry, the ledger and the runtime disagree. The finding codes are
 `no_registry_record`, `revision_mismatch`, `digest_mismatch`, `traffic_split`,
 `state_mismatch`, `not_ready`, `alias_not_deployed`, `ledger_missing`,
 `ledger_disagrees`. It repairs nothing; a person decides which side is right.

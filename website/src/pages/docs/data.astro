@@ -13,7 +13,7 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
     <div class="doc-card"><small>IN MEMORY</small><h3>Table interchange</h3><p>pandas DataFrame, PyArrow Table, Polars DataFrame or LazyFrame, and Arrow stream protocol objects.</p></div>
     <div class="doc-card"><small>STREAMING</small><h3>Large inputs</h3><p>Chunked CSV and newline-delimited JSON can be profiled without loading every row into memory.</p></div>
     <div class="doc-card"><small>INCREMENTAL</small><h3>Event semantics</h3><p>Event IDs, ordered checkpoints, watermarks, duplicate classification, late-data policy, atomic commit state, and an idempotent sink boundary are transport-neutral. <code>EventConsumer</code> stages broker acknowledgements durably after the sink commit and retries them after a restart. It does not claim distributed exactly-once delivery.</p></div>
-    <div class="doc-card"><small>WAREHOUSE</small><h3>Query engines</h3><p><code>WarehouseConnector</code> gives warehouse and lakehouse engines one bounded reader contract. Inject a schema callback and a paged batch callback; the connector owns query-bound identity, retries, row limits, schema validation, and resumable checkpoints without hiding a cloud SDK.</p></div>
+    <div class="doc-card"><small>WAREHOUSE</small><h3>Query engines</h3><p><code>WarehouseConnector</code> gives warehouse and lakehouse engines one bounded reader contract. Inject a schema callback and a paged batch callback; the connector owns query-bound identity, retries, row limits, schema validation, and resumable checkpoints without hiding a vendor SDK.</p></div>
     <div class="doc-card"><small>EVENT STREAMS</small><h3>Bounded broker polling</h3><p><code>EventStreamSource</code> accepts a caller-owned poll callback for Kafka-, Pulsar-, Kinesis-, Pub/Sub-, Event Hubs-, NATS-, and Redpanda-style URI boundaries. Pair it with <code>EventConsumer</code> to bind a consumer group, retry reads, reject oversized batches, persist pending acknowledgements, and keep the broker SDK at the transport edge.</p></div>
     <div class="doc-card"><small>RANGE READS</small><h3>Bounded object scans</h3><p>Range-backed JSONL and NDJSON sources read only the requested byte windows and resume from byte checkpoints. Record-size limits, invalid JSON, and in-object schema changes fail with structured errors; arbitrary binary formats still require an explicit decoder or streaming adapter.</p></div>
     <div class="doc-card"><small>OBJECT BYTES</small><h3>Bring a versioned decoder</h3><p><code>ObjectStoreConnector</code> accepts bounded bytes from any object store and a caller-owned decoder that returns a DataFrame. The decoder name and version become part of source identity, so checkpoints cannot mix decoding semantics.</p></div>
@@ -43,7 +43,7 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 
 catalog = DatasetCatalog.from_data(
     records,
-    source="s3://warehouse/orders?versionId=17",
+    source="warehouse://orders?versionId=17",
     label_column="outcome",
 )
 catalog.write("artifacts/orders-catalog.json")
@@ -104,7 +104,7 @@ def decode_custom(uri: str, payload: bytes) -> pd.DataFrame:
 
 
 connector = ObjectStoreConnector(
-    "s3://bucket/events.custom",
+    "store://events/events.custom",
     read_bytes=object_store.read,
     decoder=decode_custom,
     decoder_name="events-jsonl-v2",

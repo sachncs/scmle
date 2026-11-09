@@ -37,45 +37,12 @@ unless the evidence holds. The checks live in [`scripts/`](../scripts/README.md)
 PyPI publishing uses OIDC trusted publishing; no token is stored. The `pypi`
 GitHub environment should require approval.
 
-## Releasing a model to a cloud
+## Releasing a model
 
-That is a different release from the package. The model path, its gate and its
-records are in [`CLOUD_RELEASE.md`](CLOUD_RELEASE.md); the infrastructure is in
-[`INFRASTRUCTURE.md`](INFRASTRUCTURE.md). `cloud-release.yml` does nothing
-unless `SCMLE_CLOUD_RELEASE` is set and runs only by hand.
-
-## The production claim
-
-One sentence is the claim, and nothing else may be said in its place:
-
-<!-- claim:start -->
-> SCMLE is production-qualified on AWS and GCP: every P0 acceptance
-> criterion passed in staging on both providers, with evidence signed by a
-> reviewer other than the author.
-<!-- claim:end -->
-
-**Status: this has NOT happened.** No acceptance run, recovery run or
-reviewer sign-off exists for AWS or GCP. `plan/evidence/phase-17/aws/` and
-`plan/evidence/phase-17/gcp/` hold no records, so the claim must not be made,
-and neither the changelog, the README nor the site may suggest it.
-
-The claim may be made only when this passes, with the pipeline's key and the
-reviewer's own key (the pipeline must not hold the second):
-
-```bash
-python scripts/check_production_claim.py --root plan/evidence/phase-17 \
-    --key-file pipeline.key --reviewer-key-file reviewer.key
-```
-
-It refuses unless, for each provider, `acceptance.json`, `deployment.json`,
-`recovery.json`, `observability.json`, `continuous-evaluation.json` and
-`signoff.json` are present, signed, from staging, for one commit and passing,
-the recovery run covers every fault in the catalogue in that provider's own
-staging environment within the declared RTO and RPO, and the sign-off names a
-reviewer who is not the requester and covers the current digest of each
-file. The local evidence in `plan/evidence/phase-17/local/` does not count:
-it ran no provider ([`OPERATIONS.md`](OPERATIONS.md)). A passing local run is
-not a step towards the sentence above.
+That is a different release from the package. The package provides the release
+gate, the live checks, the signed deployment record and the release registry
+(`scmle deploy`, see [`CLI.md`](CLI.md)); how a model reaches a runtime is the
+user's own adapter, written against the interfaces the package ships.
 
 ## Evidence the pipeline cannot produce
 

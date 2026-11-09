@@ -12,7 +12,7 @@ the production ones. Use your browser's search to find a word.
 * [Models and decisions](#models-and-decisions)
 * [Watching a model in use](#watching-a-model-in-use)
 * [Shipping and trust](#shipping-and-trust)
-* [Cloud and operations](#cloud-and-operations)
+* [Serving and operations](#serving-and-operations)
 
 ## The data and the question
 
@@ -644,7 +644,7 @@ note by an independent reviewer bound to one exact model.
 **Why it matters.** The next person should not have to guess what the model is
 for.
 
-## Cloud and operations
+## Serving and operations
 
 ### service, endpoint, liveness, readiness
 
@@ -682,8 +682,8 @@ container is a running image.
 then sending more.
 **Example.** 10 percent, then 50, then 100.
 **Why it matters.** A bad release hurts few people and can be reversed. The
-staged-traffic code exists for Cloud Run; it is not yet wired into the
-production workflow (see [`CLOUD_RELEASE.md`](CLOUD_RELEASE.md)).
+staged-traffic helpers are library code; no release workflow in this
+repository drives them.
 
 ### release gate
 
@@ -701,7 +701,7 @@ approved it.
 
 ### reconcile
 
-**Meaning.** Comparing what the registry and ledger say with what the cloud
+**Meaning.** Comparing what the registry and ledger say with what the runtime
 really runs.
 **Example.** `scmle deploy reconcile`.
 **Why it matters.** It catches "the label says v1 but v2 is running".

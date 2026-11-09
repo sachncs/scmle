@@ -2,10 +2,8 @@
 
 What `scmle.operations` does once a model is serving: measure it, tell a
 fault from a drift from a worse model, tell people, keep evaluating, replace
-it only through the gate, recover from failures, and decide whether the
-production claim may be made. Everything here ran locally; nothing ran on AWS
-or GCP. Evidence: `plan/evidence/phase-17/local/`. Feature:
-F14 items 11 to 13.
+it only through the gate, and recover from failures. Everything here ran
+locally.
 
 | Module | What it is |
 | --- | --- |
@@ -13,13 +11,11 @@ F14 items 11 to 13.
 | `logs` | JSON lines with `trace_id`, `model_version` and `artifact_digest`; W3C `traceparent`; credential-like fields are replaced. |
 | `signals` | Windowed monitors over requests, feature rows and delayed labels, with configurable window, minimum samples, sampling rate and thresholds. |
 | `classify` | Infrastructure, data quality, model performance, mixed or indeterminate. |
-| `exporters` | CloudWatch (embedded metric format, `PutMetricData`) and Cloud Monitoring (`timeSeries.create`) payloads, checked against recorded shapes. |
 | `notify` | Pager and ticket webhooks: HMAC-signed, retried, idempotent, injected transport. |
 | `respond` | Classify, notify, retain telemetry, audit the operator's actions. |
 | `cost` | Cost by service and deployed version from declared rates. |
 | `continuous` | Labels and outcomes into the F13 loop, the retraining policy, history, gated replacement, the post-promotion check. |
 | `recovery`, `faults`, `spool` | The fault catalogue, the objectives, the local scenarios, the telemetry spool. |
-| `claim` | The production claim and the checker that guards it. |
 
 ## Telemetry
 
@@ -119,28 +115,20 @@ generated `serve.py` as a subprocess), the local object-store and metrics
 emulators, a real ledger writer and a real workflow executor, and records for
 each component the measured RTO and RPO and how they were measured. In
 `bad_release` the revisions are local processes behind a control plane that
-implements the ECS and Cloud Run adapter interface, so the release registry's
-promote, confirm, restore and rollback logic runs for real against them.
+implements the `ControlPlane` interface, so the release registry's promote,
+confirm, restore and rollback logic runs for real against them.
 
-Not run: the rollback to a real managed revision, a zone or region loss, a
-container orchestrator's health-driven replacement, IAM or bucket-policy
-failures, a managed-service outage, secret-manager rotation, and on any
-machine a crash, power loss, full disk or network partition. The ledger and
+Not run: the rollback to a managed revision on a hosted platform, a zone or
+region loss, a container orchestrator's health-driven replacement,
+permission failures of a hosted store, a managed-service outage, secret-manager
+rotation, and on any machine a crash, power loss, full disk or network
+partition. The ledger and
 state files are shown to survive a killed process; no `fsync` guarantee
 against power loss is claimed.
 
-## The production claim
-
-[`RELEASING.md`](RELEASING.md) holds the fixed sentence and says it has not
-been made. `scripts/check_production_claim.py` refuses it unless both
-providers' signed staging records are complete and a reviewer other than the
-author has signed them.
-
 ## Not claimed
 
-Anything on a cloud. The local scenarios measure these processes, emulators
-and files under the stated methods; they are not availability, not a cloud's
-behaviour, and not a recovery objective for a provider. The exporters were
-checked against shapes written from the API references, not against a
-service. The controlled degradation is a simulated stream with labels that
-arrive at once.
+Anything on a hosted platform. The local scenarios measure these processes,
+emulators and files under the stated methods; they are not availability and
+not a recovery objective for a deployment. The controlled degradation is a
+simulated stream with labels that arrive at once.

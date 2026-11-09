@@ -134,8 +134,6 @@ scmle deploy live --url https://staging.example --token-file token --environment
 scmle deploy gate admit|certify manifest.json --key-file key [--output record.json]
 scmle deploy verify-record record.json --key-file key
 scmle deploy model-digest REGISTRY --model churn --version 3
-scmle deploy observe --provider aws --input services.json --tasks tasks.json [--task-definition td.json] --output observed.json
-scmle deploy observe --provider gcp --input service.json --revisions revisions.json --output observed.json
 scmle deploy reconcile REGISTRY --model churn --environment production --observation observed.json [--ledger deployment_ledger.jsonl]
 ```
 
@@ -144,7 +142,7 @@ any fails. `gate` reads a release manifest and the evidence it names and exits
 2 with every reason when the release is refused; `certify` writes the signed
 deployment record. Keys are read from files, never from the command line.
 `reconcile` exits 1 when the registry, the ledger and the observation
-disagree. See [`CLOUD_RELEASE.md`](CLOUD_RELEASE.md).
+disagree. The observation file is written by the runtime adapter you provide.
 
 ## Examples
 

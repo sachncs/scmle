@@ -182,9 +182,10 @@ and, inside `decision`, `f11`. `scmle.data.ledger.budget` gained
 ## Deployment contract
 
 `scmle.deploy.contract` is an extension surface, not a top-level export. It
-holds the typed spec every provider adapter must satisfy (`DeploymentSpec`
-with `ImageRef`, `BundleRef`, `SecretRef`, `Resources`, `HealthSpec`),
-`RuntimeReport`, `conformance_problems` and the `ProviderAdapter` base class.
+holds the typed deployment spec (`DeploymentSpec` with `ImageRef`,
+`BundleRef`, `SecretRef`, `Resources`, `HealthSpec`), `RuntimeReport`,
+`conformance_problems` and the `ProviderAdapter` base class that a runtime
+adapter written by a user implements.
 Because it sits below `scmle.__all__`, no entry of `exports` in
 `tests/fixtures/public_api.json` changed; the snapshot gained a separate
 `extension_surfaces` block that pins the signature of each name above, and
@@ -207,7 +208,7 @@ The deployment ledger gained the row kind `audit`.
 
 ## Governed-data surface
 
-`scmle.data.store` (`objectstore`, `cloud`, `snapshot`, `quality`,
+`scmle.data.store` (`objectstore`, `snapshot`, `quality`,
 `processing`) and `scmle.core.retry` are extension surfaces pinned in the
 snapshot's `extension_surfaces` block; no `exports` entry changed. Pinned
 signatures avoid function-valued defaults (a `None` default is resolved in the
@@ -216,30 +217,26 @@ snapshot differ between runs.
 
 ## Training runners
 
-`scmle.runners` (`base`, `local`, `aws`, `gcp`, `roles`, `checkpoint`,
+`scmle.runners` (`base`, `local`, `roles`, `checkpoint`,
 `reproducibility`) is an extension surface pinned like the others; the
 entrypoint, project workload and fakes are not pinned.
 
 ## Workflow surface
 
 `scmle.workflow.definition` (`Workflow`, `Step`, `StepKind`, `Schedule`,
-`CatchUp`), `executor` (`LocalExecutor`), `schedule` (`Scheduler`) and `emit`
-(the two emitters and validators) are extension surfaces pinned like the
-others.
+`CatchUp`), `executor` (`LocalExecutor`) and `schedule` (`Scheduler`) are
+extension surfaces pinned like the others.
 
-## Infrastructure and release surfaces
+## Release surfaces
 
-`scmle.deploy.iac_policy` (`check_tree`, `Violation`), `orphans` (`find_orphans`),
-`gate` (`admit`, `certify`, `Candidate`, `GateDecision`, `ImageScan`,
+`scmle.deploy.gate` (`admit`, `certify`, `Candidate`, `GateDecision`, `ImageScan`,
 `model_digest_of`), `record` (`DeploymentRecord`), `livetests` (`run_checks`,
 `Target`, `CheckResult`, `Response`, `http_fetch`), `observation`
 (`Observation`, `Traffic`), `control` (`ControlPlane`, `confirm`,
-`expecting`, `ConfirmPolicy`), `ecs` (`EcsControlPlane`, `observe_services`),
-`cloudrun` (`CloudRunControlPlane`, `observe_service`) and
-`scmle.governance.release_state` (`ReleaseRegistry`, `ReleaseState`,
+`expecting`, `ConfirmPolicy`) and `scmle.governance.release_state` (`ReleaseRegistry`, `ReleaseState`,
 `Outcome`, `ReconcileReport`, `Finding`, `RuntimeDisagrees`) are extension
-surfaces pinned like the others. The Terraform reader (`hcl`) and the release
-manifest loader (`release`) are not pinned. The `deployment` row kind of the
+surfaces pinned like the others. The release manifest loader (`release`) is
+not pinned. The `deployment` row kind of the
 deployment ledger and the `release_state.json` file are additions; existing
 ledgers and registries load unchanged.
 
@@ -248,14 +245,11 @@ ledgers and registries load unchanged.
 `scmle.operations.signals` (`SignalMonitor`, `Signal`, `SignalThresholds`,
 `WindowPolicy`, `Category`, `Status`), `classify` (`classify`,
 `Classification`, `Verdict`), `notify` (`WebhookSender`, `Notifier`,
-`Request`, `Delivery`, `sign`, `verify_signature`), `exporters`
-(`CloudWatchExporter`, `CloudMonitoringExporter` and the two client
-protocols) and `continuous` (`ContinuousEvaluation`, `RetrainPolicy`,
+`Request`, `Delivery`, `sign`, `verify_signature`) and `continuous` (`ContinuousEvaluation`, `RetrainPolicy`,
 `RetrainDecision`, `MetricSpec`, `Replacement`, `TrainingHistory`,
 `post_promotion_check`), `recovery` (`Fault`, `Objective`, `Measurement`,
-`Result`, `Runner`), `spool` (`MetricsSpool`, `FlushResult`) and `claim`
-(`check_claim`, `ClaimVerdict`, `claim_text_problems`) are extension surfaces
-pinned like the others. The metrics
+`Result`, `Runner`) and `spool` (`MetricsSpool`, `FlushResult`) are extension
+surfaces pinned like the others. The metrics
 registry, the log writer, the cost report and the response desk are not
 pinned.
 

@@ -1,38 +1,31 @@
 # Governed data
 
 How data is read, checked and processed before training and inference
-(`scmle.data.store`). Local half of F14 item 7; what needs a cloud account is
-listed at the end.
+(`scmle.data.store`). What is not covered is listed at the end.
 
 ## Object stores
 
 `ObjectStore` is bytes under keys: `put` (atomic replace; `if_absent=True`
 creates only), `get`, `head`, `list_objects`, `delete`, `exists`. Metadata
-always carries a SHA-256 computed by this code; the S3 and GCS backends keep
-it as user metadata and verify it on read, so a changed object raises
-`CorruptObjectError`. Backends:
+always carries a SHA-256 computed by this code, so a changed object raises
+`CorruptObjectError`. The package ships the interface and one backend:
 
 | Backend | Class | Client |
 | --- | --- | --- |
 | Directory | `LocalObjectStore(root)` | none |
-| S3, MinIO | `S3ObjectStore(client, bucket, prefix)` or `s3_store(...)` | a boto3 S3 client, or anything with `put_object`, `get_object`, `head_object`, `list_objects_v2`, `delete_object` |
-| GCS | `GcsObjectStore(client, bucket, prefix)` or `gcs_store(...)` | a `google.cloud.storage.Client`, or anything with `bucket()`, and on it `blob()`, `get_blob()`, `list_blobs()` |
 
-Neither SDK is a dependency: the factories import `boto3` or
-`google.cloud.storage` only when called and explain how to install them; a
-caller may pass a client it built (credentials, endpoint, proxies). Keys are
-validated before they reach a backend (no `..`, empty segment or leading
-slash). `RetryingStore` retries `TransientStoreError` (throttling, timeouts,
-5xx) under a `RetryPolicy`.
+Any other backend is written by the user against the same `ObjectStore`
+interface; no object-store SDK is a dependency. Keys are validated before
+they reach a backend (no `..`, empty segment or leading slash).
+`RetryingStore` retries `TransientStoreError` (throttling, timeouts, 5xx)
+under a `RetryPolicy`.
 
 `scmle.data.store.conformance.run_conformance(store)` is the one conformance
-suite: round trip, binary and empty and large objects, overwrite, missing
+suite, to be run against any backend you write: round trip, binary and empty and large objects, overwrite, missing
 keys, `head` against `get`, conditional create, a race of eight conditional
 creates (exactly one wins), sorted prefix listing, pagination, idempotent
 delete, key rules and prefix isolation. The tests run it on the directory
-backend and on the S3 and GCS backends over in-memory clients;
-`scripts/run_object_store_conformance.py` runs it against MinIO, the GCS
-emulator or a bucket.
+backend.
 
 ## Snapshots
 
@@ -82,9 +75,6 @@ millions of keys and not beyond.
 
 ## Not done here
 
-MinIO and the GCS emulator were not started, and no real bucket was touched:
-the S3 and GCS code ran only against in-memory clients written to the same
-protocol, so differences in a real service (consistency, error codes,
-conditional-write support in older S3-compatible servers) are untested. One
-warehouse per cloud, and a dataset ingested, validated, trained on and traced
-in a real account, need the cloud accounts.
+Only the directory backend is tested. A backend you supply is yours to
+qualify with the conformance suite; differences in a remote service
+(consistency, error codes, conditional-write support) are not covered here.

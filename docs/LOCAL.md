@@ -1,8 +1,7 @@
 # Local environment
 
-Everything here runs on one machine with no cloud account. It is the portable
-core that the AWS and GCP phases build on: the same bundle, service and
-contracts, run locally first.
+Everything here runs on one machine with no hosted account: the same bundle,
+service and contracts that any deployment uses, run locally.
 
 ## One command
 
@@ -92,7 +91,7 @@ Recorded plainly, because the point of this file is not to overclaim:
   against a live database, the image attestation of a real build, the arm64
   build, and the two-build digest comparison. Image reproducibility is not
   claimed.
-* Nothing here touches AWS or GCP.
+* Nothing here touches a hosted service.
 
 ## Troubleshooting
 

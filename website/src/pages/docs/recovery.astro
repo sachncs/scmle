@@ -43,7 +43,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
   decision: restarted
   replacement_run: run-43
   reviewer: ml-on-call`}</code></pre>
-  <p>The local fault harness exercises these boundaries with bounded fixtures. It does not prove physical disk-full, host-wide OOM, cloud transport, container, kernel, or external pager behavior; those need environment-specific rehearsals.</p>
+  <p>The local fault harness exercises these boundaries with bounded fixtures. It does not prove physical disk-full, host-wide OOM, remote transport, container, kernel, or external pager behavior; those need environment-specific rehearsals.</p>
 
   <h2>After recovery: evaluate again</h2>
   <p>Compare the replacement run with the same declared metrics, uncertainty, fairness slices, resource budget, and explanation checks. A successful restart proves execution recovered; it does not prove that the new model is equivalent or safe to promote.</p>

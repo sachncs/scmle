@@ -73,7 +73,7 @@ const objectives = [
   <h2>Objectives</h2>
   <p>These are declared targets for one replica of the container, with the limits in the deployment spec (0.5 CPU request, 1 CPU limit, 512 MiB memory limit), a tabular bundle of up to 50 MiB and requests of up to 100 records. They were set before measurement and not tuned afterwards. Numbers measured on a developer machine were recorded during the project; shared CI runners are too noisy to gate on them, so the test suite checks the mechanisms (limits, readiness, parity) and reports the timings.</p>
   <DocTable label="Service objectives" head={["Objective", "Target"]} rows={objectives} />
-  <div class="callout"><p><strong>Not claimed.</strong> Latency under load on any cloud, autoscaling behaviour, or availability. Those need cloud tests that have not been run, and will be reported per provider without being equalised.</p></div>
+  <div class="callout"><p><strong>Not claimed.</strong> Latency under load on any hosting platform, autoscaling behaviour, or availability. Those depend on the platform you run it on and need load tests there.</p></div>
 
   <h2 id="parity">Parity</h2>
   <p>The local deployment files hold a hand-written model, records that include nulls, an unseen category, an extra column and extreme values, expected outputs computed in closed form with numpy alone, and tolerances declared in advance: labels exact, probabilities within 1e-9 inside one process and within 1e-6 across environments. Tests check the in-process, online, batch and packaged-service paths against them, and a script can run the same check against any running service by URL.</p>

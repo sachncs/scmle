@@ -58,7 +58,7 @@ beginner has not tested these pages.
 
 * A real beginner. Everything above is from the author's own pass.
 * A build of the container from `scmle package` (no Docker was run).
-* The cloud steps (`CLOUD_RELEASE.md`). No cloud account was used.
+* A release against a live deployment. Only the local steps were run.
 * `scmle frame` (the plain-request drafting) and `scmle ingest` (raw tables)
   were not exercised.
 * A full charter run with a leakage attestation. The file format is taken

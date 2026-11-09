@@ -89,9 +89,9 @@ Declared targets for one replica of the container with the limits in the
 deployment spec (0.5 CPU request, 1 CPU limit, 512 MiB memory limit), a
 tabular bundle of up to 50 MiB and requests of up to 100 records. They are
 targets set before measurement and not tuned afterwards. The numbers measured
-on a developer machine are in `plan/evidence/phase-14/`; shared CI runners are
-too noisy to gate on them, so the repository tests the mechanisms (limits,
-readiness, parity) and reports the timings.
+on a developer machine are not committed; shared CI runners are too noisy to
+gate on them, so the repository tests the mechanisms (limits, readiness,
+parity) and reports the timings.
 
 | Objective | Target |
 | --- | --- |
@@ -103,9 +103,9 @@ readiness, parity) and reports the timings.
 | Availability | not claimed: it depends on the platform and replica count |
 | Error rate from the service itself (5xx) | 0 on valid requests; every 5xx is a defect |
 
-Not claimed: latency under load on any cloud, autoscaling behaviour, or
-availability. Those need the cloud tests of F14 item 5 and are reported
-per provider without being equalised.
+Not claimed: latency under load on any hosting platform, autoscaling
+behaviour, or availability. Those depend on the platform you run it on and
+need load tests there.
 
 ## Parity
 

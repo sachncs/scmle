@@ -1,7 +1,8 @@
 # Portable training
 
-One job spec, a `Runner` per place it can run (`scmle.runners`). Local half of
-F14 item 6; what needs a cloud account is listed at the end.
+One job spec and a `Runner` interface (`scmle.runners`). The package ships the
+local runner; a runner for any other place is written by the user against the
+same interface.
 
 ## The spec and the run
 
@@ -9,7 +10,7 @@ F14 item 6; what needs a cloud account is listed at the end.
 specification (opaque JSON), the training identity, resources, a timeout, a
 `RetryPolicy`, an optional `CostBudget` and a non-secret environment. A GPU
 needs a stated `gpu_reason`: specialised compute only behind a declared need.
-`Runner.run(spec)` is the same on every adapter:
+`Runner.run(spec)` is the same on every runner:
 
 * the spec is stored at `runs/<id>/spec.json`; the same id with a different
   spec is `RunConflictError`; a finished id returns its recorded manifest and
@@ -24,7 +25,7 @@ needs a stated `gpu_reason`: specialised compute only behind a declared need.
 * the **cost budget** is the declared rate times resources times elapsed time,
   accumulated across attempts; past the ceiling the job is cancelled and the
   run ends `budget_stopped`. It is an estimate from declared rates, not
-  billing data, and a billing alarm in the cloud is still needed;
+  billing data;
 * final states: `succeeded`, `failed`, `budget_stopped`, `timed_out`,
   `retries_exhausted`.
 
@@ -41,20 +42,18 @@ writes `runs/`, `artifacts/`, `evidence/`; serving reads `bundles/`,
 write prefixes, a training role that can write `bundles/` and a serving role
 that can write `runs/`. Workloads receive a `RoleStore` that enforces the
 training role. A job spec naming the serving identity is refused by every
-adapter. Releasing a bundle is a third act, with an approval, outside both.
+runner. Releasing a bundle is a third act, with an approval, outside both.
 
-## Adapters
+## Runners
 
-| Adapter | Runs the attempt as | Identity | Interruption |
+| Runner | Runs the attempt as | Identity | Interruption |
 | --- | --- | --- | --- |
 | `LocalRunner` | the workload, in this process | the training role of `RoleStore` | injected, or `JobInterruptedError` |
-| `AwsContainerJobRunner` | one ECS `RunTask` (Fargate or a capacity provider) | `overrides.taskRoleArn` | `SpotInterruption`, exit 143 |
-| `GcpJobRunner` | one Cloud Run job execution | the job's own service account, checked against the spec | preemption or SIGTERM condition |
 
-The cloud adapters start `python -m scmle.runners.entrypoint` in the image,
-which opens the store named by `SCMLE_STORE_URI` (`file://`, `s3://`,
-`gs://`), loads the stored spec, refuses it if its digest is not the one the
-runner started, and runs the workload (`SCMLE_WORKLOAD`, default
+A runner for a container platform starts `python -m scmle.runners.entrypoint`
+in the image, which opens the `file://` store named by `SCMLE_STORE_URI`, loads
+the stored spec, refuses it if its digest is not the one the runner started,
+and runs the workload (`SCMLE_WORKLOAD`, default
 `scmle.runners.project:run_project`). `run_project` runs an unchanged
 `MLProject`: it copies the data from the store, mirrors the run directory to
 `runs/<id>/workdir/` every 30 seconds and at the end, and after a restart on an
@@ -65,10 +64,7 @@ published, not hidden.
 
 ## Not done here
 
-The ECS and Cloud Run adapters ran only against scripted responses of the
-documented shapes (`tests/support_runners.py`), not against AWS or GCP; the
-wrapper around `google.cloud.run_v2` has not been exercised even that far. No
-image was built or pushed, no container ran, no job was interrupted in a cloud,
-no cost was measured against a bill, and no same-spec result was compared
-across local, AWS and GCP. The reproducibility-tolerance report therefore
-does not exist yet.
+Only the local runner ships and is tested. No container image was built, no
+job was interrupted on a remote platform, and no cost was measured against a
+bill. The reproducibility-tolerance report against a second place does not
+exist.

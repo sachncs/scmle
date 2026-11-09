@@ -18,7 +18,7 @@ const commands = [
   ["<code>scmle ingest</code>", "Profile a read-only SQLite source, find grain and joins, and write the ingestion catalog (see <a href=\"" + base + "/docs/artifacts/#ingest\">artifacts</a>)."],
   ["<code>scmle loop init|verify</code>", "Open and verify the hash-chained deployment ledger of the closed loop."],
   ["<code>scmle trail build|verify|show</code>", "Join the charter, framing, claim ledger, registry and deployment ledger into one sealed folder, check it against itself, or print it. See the <a href=\"" + base + "/docs/trail/\">business trail</a>."],
-  ["<code>scmle deploy …</code>", "Live checks, the promotion gate, signed deployment records, platform observation and reconcile. See <a href=\"" + base + "/docs/cloud-release/\">Cloud release</a>."],
+  ["<code>scmle deploy …</code>", "Live checks, the promotion gate, signed deployment records, and reconcile against an observation file."],
 ];
 const options = [
   ["<code>--target COL [COL …]</code>", "Target column(s). Required."],
@@ -92,10 +92,8 @@ SCMLE_SIGNING_KEY=... scmle claims verify runs/run_x [--json]`}</code></pre>
 scmle deploy gate admit|certify manifest.json --key-file key [--output record.json]
 scmle deploy verify-record record.json --key-file key
 scmle deploy model-digest REGISTRY --model churn --version 3
-scmle deploy observe --provider aws --input services.json --tasks tasks.json [--task-definition td.json] --output observed.json
-scmle deploy observe --provider gcp --input service.json --revisions revisions.json --output observed.json
 scmle deploy reconcile REGISTRY --model churn --environment production --observation observed.json [--ledger deployment_ledger.jsonl]`}</code></pre>
-  <p><code>live</code> runs the health, schema, inference and security checks and exits 1 if any fails. <code>gate</code> reads a release manifest and the evidence it names and exits 2 with every reason when the release is refused; <code>certify</code> writes the signed deployment record. Keys are read from files, never from the command line. <code>reconcile</code> exits 1 when the registry, the ledger and the observation disagree. The <a href={`${base}/docs/cloud-release/`}>Cloud release</a> page walks through the whole chain.</p>
+  <p><code>live</code> runs the health, schema, inference and security checks and exits 1 if any fails. <code>gate</code> reads a release manifest and the evidence it names and exits 2 with every reason when the release is refused; <code>certify</code> writes the signed deployment record. Keys are read from files, never from the command line. <code>reconcile</code> exits 1 when the registry, the ledger and the observation disagree.</p>
 
   <h2 id="bundles">Bundles: signed versus trusted</h2>
   <p><code>predict</code>, <code>serve</code>, <code>export-onnx</code> and <code>package</code> load a bundle. Bundles are pickle-based, so loading requires a valid signature (set <code>SCMLE_SIGNING_KEY</code>). <code>--trusted</code> skips that for an unsigned bundle you produced yourself; never use it on a bundle from elsewhere. When <code>SCMLE_ENV=production</code>, <code>--trusted</code> (and <code>SCMLE_TRUSTED=1</code>) is refused for every command: sign the bundle and supply <code>SCMLE_SIGNING_KEY</code> instead. <code>predict</code> also takes <code>--rename INCOMING=EXPECTED</code>, <code>--case-insensitive</code> and <code>--strip-whitespace</code> for explicit column mapping.</p>

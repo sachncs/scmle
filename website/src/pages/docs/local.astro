@@ -14,10 +14,10 @@ const files = [
 ];
 ---
 
-<DocsLayout title="Local environment" description="Run the whole scmle lifecycle on one machine with no cloud account: the make demo steps, the explicit files, the container variant, and what has and has not been run." current="local">
+<DocsLayout title="Local environment" description="Run the whole scmle lifecycle on one machine with no hosted account: the make demo steps, the explicit files, the container variant, and what has and has not been run." current="local">
   <p class="eyebrow"><span></span> Serve and operate</p>
   <h1>The whole lifecycle,<br /><em>on one machine.</em></h1>
-  <p class="lead">Everything here runs locally with no cloud account. It is the portable core that the AWS and GCP work builds on: the same bundle, service and contracts, run locally first.</p>
+  <p class="lead">Everything here runs locally with no hosted account: the same bundle, service and contracts that any deployment uses, run locally.</p>
 
   <h2>One command</h2>
   <pre><code>make demo        # native: needs only the project's Python environment</code></pre>
@@ -51,7 +51,7 @@ make demo-compose PLATFORM=linux/arm64`}</code></pre>
     <li><strong>Run on a developer machine:</strong> <code>make demo</code> end to end, the unit and integration tests, and the parsing of <code>compose.yaml</code> plus client-side <code>docker compose config</code> validation.</li>
     <li><strong>Docker was not run.</strong> The CLI was installed but its daemon was not running, so no image was built and no container started. The compose file, the Dockerfiles, <code>build.sh</code> and <code>make demo-compose</code> are therefore untested as a whole. Treat the first container run as the first test of them.</li>
     <li><strong>Not run:</strong> the registry lookup of the base digest, the vulnerability scan against a live database, the image attestation of a real build, the arm64 build, and the two-build digest comparison. Image reproducibility is not claimed.</li>
-    <li><strong>Nothing here touches AWS or GCP.</strong></li>
+    <li><strong>Nothing here touches a hosted service.</strong></li>
   </ul>
 
   <h2>Troubleshooting</h2>

@@ -2,8 +2,8 @@
 
 What "tenant" means here, what isolates tenants, and what does not. It covers
 the prediction service (`scmle.inference.serving`, `modality_serving`) behind
-`scmle.security`. Cloud-level isolation (accounts, networks, buckets, IAM) is
-declared per provider under `deploy/terraform/` and is not claimed here.
+`scmle.security`. Infrastructure-level isolation (accounts, networks, storage
+permissions) belongs to wherever you host it and is not claimed here.
 
 ## Model
 
@@ -34,7 +34,7 @@ declared per provider under `deploy/terraform/` and is not claimed here.
    tenant's key set (`SCMLE_AUTH_KEYS_FILE`). A key shared by two tenants
    would let either mint the other's tokens; do not do it.
 5. **Separate storage.** Each tenant's bundles, snapshots, checkpoints and
-   run manifests live under their own prefix or bucket
+   run manifests live under their own prefix or root
    (`scmle.data.store` / `scmle.runners` take the prefix from the
    deployment). The storage role of the service can read only that prefix.
 6. **Separate roles.** Training and serving use different roles
@@ -70,7 +70,7 @@ declared per provider under `deploy/terraform/` and is not claimed here.
   were never removed. Keep the ledger `head` somewhere else.
 * **Noisy-neighbour isolation** between processes of the same host, and
   side channels.
-* **Provider-level isolation.** Not tested; it needs the cloud accounts.
+* **Platform-level isolation.** Not tested; it depends on where you host the service.
 
 ## Configuration
 

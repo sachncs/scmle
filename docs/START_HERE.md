@@ -649,9 +649,9 @@ What these are:
 * `provenance.json` is a signed statement of what the package was made from.
   The service checks it when it starts.
 
-The cloud steps after this (release gate, live checks, promotion to AWS or
-Google Cloud) are in [`CLOUD_RELEASE.md`](CLOUD_RELEASE.md). They have not
-been run against a real cloud account. See
+Releasing the model to a runtime (release gate, live checks, signed
+deployment record) is covered by `scmle deploy` in [`CLI.md`](CLI.md). It has
+not been run against a hosted platform. See
 [What SCMLE cannot do](WHAT_SCMLE_CANNOT_DO.md).
 
 ## Step 10. Monitor

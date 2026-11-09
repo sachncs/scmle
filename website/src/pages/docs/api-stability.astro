@@ -9,10 +9,10 @@ const surfaces = [
   ["Closed loop", "<code>scmle.monitoring.sequential_tests</code>, <code>scmle.monitoring.labels</code>, <code>scmle.governance.escalation</code>, <code>deployment_ledger</code>, <code>never_list</code>, <code>loop</code>, and the <code>scmle loop</code> command"],
   ["Deployment contract", "<code>scmle.deploy.contract</code>: <code>DeploymentSpec</code> with <code>ImageRef</code>, <code>BundleRef</code>, <code>SecretRef</code>, <code>Resources</code>, <code>HealthSpec</code>; <code>RuntimeReport</code>; <code>conformance_problems</code>; <code>ProviderAdapter</code>"],
   ["Security", "<code>scmle.security.tokens</code> (<code>TokenVerifier</code>, <code>KeySet</code>, <code>VerificationKey</code>, <code>RevocationList</code>, <code>Principal</code>), <code>access</code> (<code>Gateway</code>, <code>RateLimiter</code>, <code>AccessDenied</code>), <code>audit</code> (<code>AuditLog</code>)"],
-  ["Governed data", "<code>scmle.data.store</code> (<code>objectstore</code>, <code>cloud</code>, <code>snapshot</code>, <code>quality</code>, <code>processing</code>) and <code>scmle.core.retry</code>"],
-  ["Training runners", "<code>scmle.runners</code> (<code>base</code>, <code>local</code>, <code>aws</code>, <code>gcp</code>, <code>roles</code>, <code>checkpoint</code>, <code>reproducibility</code>); the entrypoint, project workload and fakes are not pinned"],
-  ["Workflow", "<code>scmle.workflow.definition</code> (<code>Workflow</code>, <code>Step</code>, <code>StepKind</code>, <code>Schedule</code>, <code>CatchUp</code>), <code>executor</code>, <code>schedule</code>, <code>emit</code>"],
-  ["Infrastructure and release", "<code>scmle.deploy.iac_policy</code>, <code>orphans</code>, <code>gate</code>, <code>record</code>, <code>livetests</code>, <code>observation</code>, <code>control</code>, <code>ecs</code>, <code>cloudrun</code>, and <code>scmle.governance.release_state</code>. The Terraform reader and the release-manifest loader are not pinned."],
+  ["Governed data", "<code>scmle.data.store</code> (<code>objectstore</code>, <code>snapshot</code>, <code>quality</code>, <code>processing</code>) and <code>scmle.core.retry</code>"],
+  ["Training runners", "<code>scmle.runners</code> (<code>base</code>, <code>local</code>, <code>roles</code>, <code>checkpoint</code>, <code>reproducibility</code>); the entrypoint, project workload and fakes are not pinned"],
+  ["Workflow", "<code>scmle.workflow.definition</code> (<code>Workflow</code>, <code>Step</code>, <code>StepKind</code>, <code>Schedule</code>, <code>CatchUp</code>), <code>executor</code>, <code>schedule</code>"],
+  ["Release", "<code>scmle.deploy.gate</code>, <code>record</code>, <code>livetests</code>, <code>observation</code>, <code>control</code>, and <code>scmle.governance.release_state</code>. The release-manifest loader is not pinned."],
 ];
 ---
 

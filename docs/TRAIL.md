@@ -87,30 +87,27 @@ caused the outcome, because no counterfactual was observed. The cost is that
 of the rule on every case; cases the loop escalated to a person are counted by
 the deployment ledger and still costed here.
 
-## The local evidence and its limits
+## Limits of a trail built on one machine
 
-`plan/evidence/phase-18/local/` holds a trail for one model, produced by
-`scripts/make_phase18_evidence.py` with the real commands: `scmle frame`,
-`charter sign`, `run`, `package`, the local registry, `scmle loop`, then
-`trail build`. Read these limits before relying on it.
+A trail produced by one person on one machine shows the mechanism, not an
+independent review. Read these limits before relying on one.
 
-* The analyst, stakeholder and reviewer were all the author, with three
-  different keys. The reviewer-independence check compares names, and the
-  names are role labels. **No independent person has traced or signed this
+* If the analyst, stakeholder and reviewer are the same person with three
+  different keys, the reviewer-independence check compares names, and the
+  names are role labels. **No independent person has traced or signed such a
   trail.** The gate "a reviewer who did not build the model traces one
-  deployed model" is open.
-* The Titanic extract has no key and no timestamp. The framing step used a
-  row number as the unit and a constant boarding date as the prediction
-  moment, both assumptions. Because the extract is ordered, the row number
-  correlates with the target, and the claim ledger tested it.
-* The observed outcomes replay the held-out test rows through the loop. They
-  agree with the expectation by construction, so they show the mechanism and
-  not the model's cost in use. The cost ceiling was set after the held-out
-  evaluation was seen.
-* The confirmation set was smaller than the chartered power needs, so the run's
+  deployed model" stays open until one has.
+* A flat extract with no key and no timestamp forces the framing step to use a
+  row number as the unit and a constant date as the prediction moment, both
+  assumptions. If the extract is ordered, the row number correlates with the
+  target, and the claim ledger tests it.
+* Observed outcomes that replay held-out test rows through the loop agree with
+  the expectation by construction, so they show the mechanism and not the
+  model's cost in use.
+* If the confirmation set is smaller than the chartered power needs, the run's
   scope is `exploratory_unconfirmed`; the trail carries that fact.
-* The release state is `approved`, not `production`: no runtime confirmed a
-  deployment. Nothing ran on AWS or GCP.
+* The release state is `approved`, not `production`, unless a runtime
+  confirmed a deployment.
 
 ## Reviewing a trail
 
@@ -120,6 +117,6 @@ scmle trail verify trail --keys keys.json
 ```
 
 `keys.json` maps `analyst`, `stakeholder` and `reviewer` to the keys that
-verify them. The keys in the committed evidence are published demonstration
-keys: they show tamper evidence, not a statement by their holder. Without
+verify them. Demonstration keys show tamper evidence, not a statement by their
+holder. Without
 keys the script exits 2 and says which signatures it did not check.
