@@ -89,6 +89,22 @@ def test_late_data_policy_is_explicit():
         ).read_events(checkpoint)
 
 
+def test_accepting_only_late_events_never_moves_the_checkpoint_back():
+    source = incremental.SequenceEventSource(
+        "memory://events",
+        [event("late", 1, 0)],
+        incremental.LateDataPolicy.ACCEPT,
+    )
+    checkpoint = incremental.EventCheckpoint(
+        source.source_identity, sequence=5, watermark="2026-10-20T10:01:00+00:00"
+    )
+
+    batch = source.read_events(checkpoint)
+
+    assert batch.event_ids == ("late",)
+    assert batch.next_checkpoint.sequence == 5
+
+
 def test_event_stream_source_polls_bounded_batches_with_retry_and_checkpoint():
     """Broker callbacks receive bounded, resumable transport positions."""
     calls = []

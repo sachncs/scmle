@@ -648,6 +648,7 @@ class IncrementalEventSource(abc.ABC):
         next_sequence = max(
             (event.sequence for event in selected), default=current.sequence
         )
+        next_sequence = max(next_sequence, current.sequence)
         timestamps = [
             parse_timestamp(event.event_time, "event_time")
             for event in selected
