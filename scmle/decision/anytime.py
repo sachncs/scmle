@@ -491,14 +491,19 @@ def difference_stream(
 
     Args:
         assignment_prob: The recorded probability `q` of the challenger,
-            expected strictly between 0 and 1 (not validated here).
+            strictly between 0 and 1.
         null: The null mean difference.
         direction: `greater` or `less`.
 
     Returns:
         The stream on `[-1/(1 - q), 1/q]`.
+
+    Raises:
+        ValueError: If `assignment_prob` is not strictly between 0 and 1.
     """
     q = assignment_prob
+    if not 0.0 < q < 1.0:
+        raise ValueError("assignment_prob must be strictly between 0 and 1")
     return Stream(-1.0 / (1.0 - q), 1.0 / q, null, direction)
 
 

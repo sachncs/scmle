@@ -200,3 +200,9 @@ def test_centring_shortens_the_time_to_find_an_effect_on_a_high_mean_metric():
     assert (centred.max(axis=1) >= target).mean() > (
         (plain.max(axis=1) >= target).mean() + 0.3
     )
+
+
+def test_the_difference_stream_refuses_an_assignment_probability_outside_0_1():
+    for q in (0.0, 1.0, -0.2, float("nan")):
+        with pytest.raises(ValueError, match="assignment_prob"):
+            anytime.difference_stream(q, 0.0)
