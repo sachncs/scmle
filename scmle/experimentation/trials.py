@@ -269,7 +269,7 @@ def guarded_evaluate(payload: TrialPayload) -> experiments.Trial:
     """
     supervisor = limits.Supervisor(payload.ceiling_seconds, payload.memory_gb)
     try:
-        return supervisor.run(evaluate_payload, payload)
+        trial: experiments.Trial = supervisor.run(evaluate_payload, payload)
     except limits.TrialLimitError as error:
         job = payload.job
         return experiments.Trial(
@@ -281,6 +281,7 @@ def guarded_evaluate(payload: TrialPayload) -> experiments.Trial:
             strategy=job.strategy,
             error=f"TrialLimitError: {error}",
         )
+    return trial
 
 
 class TrialRunner:

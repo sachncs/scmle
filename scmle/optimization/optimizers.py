@@ -149,8 +149,10 @@ def suggest_float(parameter: search.FloatParameter, trial: Any) -> float:
         A float within the parameter's bounds, on a log scale if the parameter
         is logarithmic.
     """
-    return trial.suggest_float(
-        parameter.name, parameter.low, parameter.high, log=parameter.log
+    return float(
+        trial.suggest_float(
+            parameter.name, parameter.low, parameter.high, log=parameter.log
+        )
     )
 
 
@@ -166,8 +168,10 @@ def suggest_int(parameter: search.IntParameter, trial: Any) -> int:
         An integer within the parameter's bounds, on a log scale if the
         parameter is logarithmic.
     """
-    return trial.suggest_int(
-        parameter.name, parameter.low, parameter.high, log=parameter.log
+    return int(
+        trial.suggest_int(
+            parameter.name, parameter.low, parameter.high, log=parameter.log
+        )
     )
 
 

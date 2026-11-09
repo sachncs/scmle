@@ -95,12 +95,16 @@ class PartialDependence(diagnostics.Diagnostic):
             label and 0.0 elsewhere.
         """
         if inputs.task is tasks.Task.REGRESSION:
-            return pandas.to_numeric(inputs.target).reset_index(drop=True)
-        return (
+            numeric: pandas.Series = pandas.to_numeric(
+                inputs.target
+            ).reset_index(drop=True)
+            return numeric
+        indicator: pandas.Series = (
             (inputs.target == inputs.positive_label)
             .astype(float)
             .reset_index(drop=True)
         )
+        return indicator
 
     @staticmethod
     def prediction(
