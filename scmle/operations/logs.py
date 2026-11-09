@@ -114,7 +114,8 @@ def scrub(value: Any) -> Any:
 
     Returns:
         The structure with the values of credential-like keys replaced by a
-        redaction marker; tuples become lists, other values are unchanged.
+        redaction marker. Mappings become dicts with string keys and tuples
+        become lists; other values, including sets, are returned unchanged.
     """
     if isinstance(value, Mapping):
         return {
@@ -149,7 +150,7 @@ class StructuredLog:
             artifact_digest: Digest of the served artifact.
             path: File that lines are appended to.
             sink: Called with each line instead (for tests and shippers).
-            clock: Epoch seconds.
+            clock: Callable that returns the current time in epoch seconds.
 
         Raises:
             ValueError: If neither or both of ``path`` and ``sink`` are given.
@@ -176,7 +177,7 @@ class StructuredLog:
         Args:
             level: The log level; one of the allowed levels.
             message: The message.
-            trace_id: Trace id for the line; a new one if None.
+            trace_id: Trace id for the line; a new one if None or empty.
             **fields: Extra fields, scrubbed of credential-like values.
 
         Returns:
@@ -223,7 +224,8 @@ class StructuredLog:
             route: The route served.
             status: The HTTP status; 500 and above logs at error level.
             seconds: Duration of the request in seconds.
-            **fields: Extra fields.
+            **fields: Extra fields, passed on to `emit`; they must not use a
+                reserved name or ``route``, ``status`` or ``duration_ms``.
 
         Returns:
             The record that was written.

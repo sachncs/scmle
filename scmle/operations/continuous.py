@@ -93,7 +93,8 @@ def load_dataset(directory: str | pathlib.Path, version: str) -> pd.DataFrame:
 
     Args:
         directory: The directory holding the preserved datasets.
-        version: The dataset version, as returned by `dataset_version`.
+        version: The dataset version, as returned by `dataset_version`. The
+            file read is named after it, with the colon replaced by a hyphen.
 
     Returns:
         The stored dataset.
@@ -161,8 +162,10 @@ class TrainingHistory:
 
         Args:
             kind: The kind of event.
-            at: Time of the event, in seconds.
-            **facts: Facts recorded with the event.
+            at: Time of the event, in epoch seconds; stored rounded to three
+                decimals.
+            **facts: Facts recorded with the event; values that JSON cannot
+                encode are stored as their string form.
 
         Returns:
             The row, with its sequence number, previous hash and own hash.
@@ -413,8 +416,8 @@ def post_promotion_check(
     when its whole interval lies beyond ``margin`` on that side; otherwise it
     is ``inconclusive``, as it is when either period has fewer than
     ``min_samples`` observations. The overall verdict is ``harmed`` if any
-    metric is worse, ``helped`` if every primary metric improved and none is
-    worse, otherwise ``inconclusive``.
+    metric is worse, ``helped`` if there is at least one primary metric, every
+    primary metric improved and none is worse, otherwise ``inconclusive``.
 
     This is a comparison of two periods. It cannot separate the model from
     anything else that changed between them; the statement says so.
@@ -429,8 +432,10 @@ def post_promotion_check(
         seed: Seed of the resampling.
 
     Returns:
-        The overall verdict, one record per metric (verdict, interval and
-        sample counts) and a statement of what the comparison shows.
+        The overall verdict, one record per metric in the order of `specs`
+        (verdict, interval and sample counts; a metric with too few samples
+        has a reason and no interval instead of the other fields) and a
+        statement of what the comparison shows.
 
     Raises:
         ValueError: If a metric has no values for a period or ``specs`` is
@@ -566,9 +571,11 @@ def holdback_check(
     assignment was random and the units do not influence each other.
 
     The check first compares the observed split with `expected_fraction` by an
-    exact two-sided binomial test at `ratio_level` (a sample-ratio check). A
-    split that does not match means the assignment was not what was declared:
-    the verdict is then capped at ``inconclusive`` and the statement says so.
+    exact two-sided binomial test at `ratio_level` (a sample-ratio check). The
+    group sizes are taken from the first metric in `specs`. A split that does
+    not match means the assignment was not what was declared: the overall
+    verdict is then capped at ``inconclusive`` (the per-metric verdicts are
+    left as computed) and the statement says so.
     Otherwise the metric intervals and verdicts are those of
     `post_promotion_check`, with the holdback as the reference period.
 
@@ -690,9 +697,10 @@ class ContinuousEvaluation:
             loop: The closed loop of the deployment.
             directory: Where history, retained outcomes and datasets live.
             policy: The retraining policy.
-            retrain: Trains and stages a challenger, returns its name. Needed
-                for ``trigger`` mode and for `run_approved_retrain`.
-            clock: Epoch seconds.
+            retrain: Hook that trains and stages a challenger and returns its
+                name, or None if it started none. Without it a trigger or an
+                approved retrain starts no challenger.
+            clock: Callable that returns the current time in epoch seconds.
         """
         self.loop = loop
         self.directory = pathlib.Path(directory)
@@ -821,16 +829,22 @@ class ContinuousEvaluation:
         """Applies the policy to a window of signals.
 
         A proposal always goes through `Loop.escalate`. In ``trigger`` mode a
-        challenger is also trained and registered with the loop at once.
+        challenger is also started through `start_challenger` at once (which
+        starts none without a retrain hook or while one is already queued).
+        A review that makes no proposal is written to the history as
+        ``retrain_review`` and changes no state; a proposal is written as
+        ``retrain_decision`` and moves the alarm count and the cooldown
+        reference to the present.
 
         Args:
             rows: The window's signals.
             age_days: Age of the model in days, if known.
 
         Returns:
-            The decision: none, with the reason for holding back if there was a
-            primary reason, or the policy's mode with the escalation and, in
-            trigger mode, the challenger.
+            The decision: action ``none`` (with the reason for holding back
+            if there was a primary reason), or the policy's mode with the
+            pending escalation's id and, in trigger mode, the challenger's
+            name if one was started.
         """
         alarms = sum(
             1
@@ -930,8 +944,10 @@ class ContinuousEvaluation:
             The challenger's name, or None if none was started.
 
         Raises:
-            ValueError: If no allowing, signed reply to this escalation is in
-                the ledger.
+            ValueError: If the ledger holds no attestation for this
+                escalation whose decision approves or overrides. Only the
+                ledger row is looked at; its signature and expiry are not
+                checked here.
         """
         for row in self.loop.ledger.rows:
             body = row["body"]
@@ -959,9 +975,11 @@ class ContinuousEvaluation:
         Args:
             name: Model or challenger name.
             frame: The training data as used.
-            metrics: Held-out evaluation metrics.
+            metrics: Evaluation metrics of the run, recorded as given.
             reason: Why it was trained.
-            preserve: Keep a copy of the dataset beside the history.
+            preserve: Whether to write a copy of the dataset (as its
+                canonical CSV, unless one with the same version already
+                exists) under the datasets folder of the directory.
 
         Returns:
             The history row.
@@ -1011,8 +1029,9 @@ class ContinuousEvaluation:
     ) -> champion_module.Comparison:
         """Compares two bundles on rows with known outcomes and records it.
 
-        This is the offline check (`ChampionChallenger`, a paired bootstrap).
-        The sequential evidence on live traffic is the loop's own e-process.
+        This is the offline check (`ChampionChallenger`). The sequential
+        evidence on live traffic is the loop's own e-process. The comparison
+        is written to the history as ``offline_comparison``.
 
         Args:
             champion: The current model bundle.
@@ -1053,8 +1072,12 @@ class ContinuousEvaluation:
 
         Refuses unless (1) the loop recorded a promotion proposal for the
         challenger, (2) the promotion gate admits the candidate and (3) the
-        release registry has a valid approval for it. The registry changes
-        only after the runtime confirms.
+        release registry has a valid approval for it. If an offline
+        `comparison` is given its decision must be ``promote``. The registry
+        changes only after the runtime confirms. A refusal or an unconfirmed
+        rollout does not raise; it returns ``done=False``. Invalid `steps` or
+        a candidate container digest that is not a digest raise the registry's
+        ``ConfigError``. Every outcome is written to the history.
 
         Args:
             challenger: Name of the challenger.
@@ -1063,9 +1086,10 @@ class ContinuousEvaluation:
             candidate: The candidate the gate judges.
             key: Key that verifies the approval and the gate evidence.
             health: Called after each traffic step; reasons stop the rollout.
-            steps: Traffic shares to pass through, ending in 100.
-            comparison: An offline comparison, which must favour promotion if
-                given.
+            steps: Traffic shares in percent to pass through, increasing and
+                ending in 100.
+            comparison: An offline comparison; if given, its decision must be
+                ``promote``.
 
         Returns:
             Whether the replacement was done and, if not, the reasons.

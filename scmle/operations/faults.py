@@ -148,12 +148,16 @@ class Fleet:
     def start(
         self, folder: pathlib.Path, key: str = KEY, port: int | None = None
     ) -> Instance:
-        """Starts ``serve.py`` of a folder under production rules.
+        """Starts ``serve.py`` of a folder in a subprocess, in production mode.
+
+        The service runs with ``SCMLE_ENV=production`` on 127.0.0.1, with the
+        published-key allowance set and ``SCMLE_TRUSTED`` removed from its
+        environment. Its output is discarded.
 
         Args:
             folder: A service folder.
             key: The signing key given to the service.
-            port: The port to listen on; a free one if None.
+            port: The port to listen on; a free one if None or 0.
 
         Returns:
             The running instance, which the fleet remembers.
@@ -194,14 +198,15 @@ class Fleet:
         return server
 
     def child(self, code: str, *arguments: str) -> subprocess.Popen[str]:
-        """Starts a Python child that prints one line per acknowledged unit.
+        """Starts a Python child process whose standard output is piped.
 
         Args:
-            code: The Python source to run.
+            code: The Python source to run with ``python -c``.
             *arguments: Command-line arguments for the code.
 
         Returns:
-            The child process, which the fleet remembers.
+            The child process (standard output piped as text, standard error
+            discarded), which the fleet remembers.
         """
         process = subprocess.Popen(  # nosec B603 - our interpreter, our code
             [sys.executable, "-c", code, *arguments],
@@ -213,10 +218,12 @@ class Fleet:
         return process
 
     def close(self) -> int:
-        """Stops everything; returns how many processes were still alive.
+        """Stops the emulators, kills every process and closes their pipes.
 
         Returns:
-            The number of processes that did not exit after being killed.
+            The number of service and child processes that had not exited 15
+            seconds after being killed. Errors from stopping an emulator are
+            ignored.
         """
         for server in self.servers:
             with contextlib.suppress(OSError, errors.ScmleError):
@@ -240,15 +247,15 @@ class Fleet:
 
 
 def predict(base: str, count: int = 3) -> tuple[int, dict[str, Any]]:
-    """POSTs the golden records; an unreachable service is ``(0, {})``.
+    """POSTs the golden records to ``/predict``; unreachable is ``(0, {})``.
 
     Args:
         base: Base URL of the service.
         count: Number of golden records to send.
 
     Returns:
-        The HTTP status and the JSON body; ``(0, {})`` if the service cannot
-        be reached.
+        The HTTP status (also for HTTP errors) and the JSON body; ``(0, {})``
+        if the connection fails or times out.
     """
     try:
         return demo.post_json(
@@ -271,7 +278,7 @@ def ready_after(
 
     Returns:
         The seconds it took to become ready, or None if it did not within
-        the timeout.
+        the timeout or the process exited first.
     """
     limit = recovery.scaled(READY_SECONDS) if timeout is None else timeout
     return demo.wait_ready(instance.base, instance.process, limit)
@@ -280,17 +287,20 @@ def ready_after(
 def await_unready(
     instance: Instance, timeout: float | None = None
 ) -> dict[str, Any]:
-    """Waits for a service to report why it will not become ready.
+    """Polls ``/readyz`` until the service reports phase ``failed``.
 
-    The default wait is 20 s, multiplied by the run's time scale.
+    Polling stops at the first ``failed`` phase or when the wait ends. The
+    default wait is 20 s, multiplied by the run's time scale.
 
     Args:
         instance: The running instance.
         timeout: Seconds to wait; the time-scaled default if None.
 
     Returns:
-        The last readiness status, phase and reason observed, and the
-        liveness and prediction statuses afterwards.
+        A dict with the last ``/readyz`` status (``readyz``), ``phase`` and
+        ``reason`` observed (0, None and None if it never answered), then the
+        ``/livez`` status (``livez``) and the ``/predict`` status
+        (``predict``) taken afterwards; 0 where the service cannot be reached.
     """
     deadline = time.monotonic() + (
         recovery.scaled(20.0) if timeout is None else timeout
@@ -319,11 +329,11 @@ def await_unready(
 
 
 def corrupt_copy(service: pathlib.Path, target: pathlib.Path) -> pathlib.Path:
-    """A copy of a service folder whose model file was tampered with.
+    """A copy of a service folder whose model file had bytes appended.
 
     Args:
         service: The service folder to copy.
-        target: The folder to create.
+        target: The folder to create; it must not exist yet.
 
     Returns:
         `target`.
@@ -418,15 +428,21 @@ def kill_after(
 
 
 def state_writer_trials(fleet: Fleet, base: pathlib.Path) -> dict[str, Any]:
-    """Kills an atomic state writer at random points.
+    """Kills an atomic state writer ten times and reads its file back.
+
+    Each trial kills the writer after a number of acknowledged writes drawn
+    from 5 to 60 with a fixed seed, so the points are random but the same on
+    every run.
 
     Args:
         fleet: The fleet that owns the writer processes.
         base: Directory for the writers' state files.
 
     Returns:
-        The number of trials, the acknowledged writes lost, the unreadable
-        files and the longest read time over ten trials.
+        A dict with ``trials`` (always 10), ``acknowledged_writes_lost`` (the
+        sum over trials of how far the stored counter is below the last
+        acknowledged one), ``unreadable_files`` (trials whose file could not
+        be read back) and ``read_seconds_max`` (the longest read time).
     """
     rng = np.random.default_rng(7)
     lost = 0
@@ -454,7 +470,10 @@ def state_writer_trials(fleet: Fleet, base: pathlib.Path) -> dict[str, Any]:
 
 
 def process_kill() -> recovery.Result:
-    """Kills the service process three times; restarts it; checks state.
+    """Kills the service process three times, restarting it each time.
+
+    After the three kills it also runs `state_writer_trials` on atomic state
+    files.
 
     Returns:
         The recovery result of this fault: its checks, its RTO and RPO
@@ -566,7 +585,11 @@ class Client(threading.Thread):
 
 
 def rolling_restart() -> recovery.Result:
-    """An unready replacement is refused; a ready one takes over cleanly.
+    """Replaces an instance under client load: a tampered copy, then a good one.
+
+    The tampered replacement must stay alive but unready and never receive
+    traffic. The good replacement takes over once its ``/readyz`` is 200; the
+    old instance is then terminated and the failures a client saw are counted.
 
     Returns:
         The recovery result of this fault: its checks, its RTO and RPO
@@ -705,7 +728,11 @@ def invalid_credentials() -> recovery.Result:
 
 
 def secret_rotation() -> recovery.Result:
-    """A rotated key and a re-signed bundle; the stale key cannot verify.
+    """A bundle re-signed under a rotated key is refused under the old key.
+
+    The service is shown to run under the old key, the re-signed bundle to be
+    unready under the old key and to serve under the rotated key, and the
+    rotation to be recorded in an audit ledger.
 
     Returns:
         The recovery result of this fault: its checks, its RTO and RPO
@@ -763,7 +790,7 @@ def secret_rotation() -> recovery.Result:
 
 
 def upload(base: str, folder: pathlib.Path, prefix: str) -> dict[str, str]:
-    """Uploads a service folder; returns key to etag.
+    """Uploads every file of a service folder to the object store.
 
     Args:
         base: Base URL of the object store.
@@ -771,7 +798,8 @@ def upload(base: str, folder: pathlib.Path, prefix: str) -> dict[str, str]:
         prefix: Key prefix for the uploaded objects.
 
     Returns:
-        A mapping from object key to its entity tag.
+        A mapping from each file's path relative to `folder` to the entity
+        tag the store returned (not the full object key with `prefix`).
     """
     return demo.upload_folder(base, folder, prefix)
 
@@ -994,7 +1022,12 @@ def corrupted_bundle() -> recovery.Result:
 
 
 def incompatible_schema() -> recovery.Result:
-    """Refused requests are precise; the service stays up; a caller adapts.
+    """Requests with a wrong schema digest, version or column are refused.
+
+    A different expected digest and an unserved schema version are checked to
+    be refused with 409, records missing a column with 422, and the refusals
+    to classify as data quality. The service must stay ready, and a caller
+    that reads ``/schema`` and sends the digest must get a 200.
 
     Returns:
         The recovery result of this fault: its checks, its RTO and RPO
@@ -1091,7 +1124,8 @@ class ProcessPlane(control.ControlPlane):
     ``deploy(digest)`` starts a revision of the folder registered for the
     digest and leaves earlier ones running, as a managed platform keeps
     earlier revisions; ``set_traffic`` points the single entry at one of
-    them; ``observe`` reads each revision's ``/health`` and ``/readyz``.
+    them; ``observe`` reports the revision that holds the traffic, with its
+    readiness from ``/readyz``.
     """
 
     provider = "local"
@@ -1110,7 +1144,10 @@ class ProcessPlane(control.ControlPlane):
         self.count = 0
 
     def register_image(self, folder: pathlib.Path) -> str:
-        """Learns the digest a folder's service reports; returns it.
+        """Starts a folder's service once to learn its digest and registers it.
+
+        The service is started, its ``/health`` ``artifact_digest`` is read, and
+        the process is killed; the digest then maps to the folder for `deploy`.
 
         Args:
             folder: A service folder.
@@ -1133,13 +1170,15 @@ class ProcessPlane(control.ControlPlane):
         return digest
 
     def deploy(self, image_digest: str) -> str:
-        """Starts a revision of an image.
+        """Starts a revision of an image; the first one gets the traffic.
+
+        Earlier revisions are left running.
 
         Args:
             image_digest: The digest of a registered image.
 
         Returns:
-            The name of the new revision.
+            The name of the new revision, ``local-<n>``.
         """
         self.count += 1
         revision = f"local-{self.count}"
@@ -1185,7 +1224,8 @@ class ProcessPlane(control.ControlPlane):
 
         Returns:
             An observation of the revision that holds the traffic, with its
-            digest and readiness.
+            image digest, its readiness (from ``/readyz``) and the sorted
+            (revision, digest) pairs of every revision deployed.
 
         Raises:
             ArtifactError: If nothing is deployed.
@@ -1250,10 +1290,14 @@ def register(
 
 
 def bad_release() -> recovery.Result:
-    """Detects a wrong release from labels and rolls it back.
+    """Promotes a wrong release, detects it from labels and rolls it back.
 
-    A release that never becomes ready is not promoted and the previous
-    revision is restored.
+    A good and an inverted-coefficient version are promoted in turn. Noisy
+    labels taken from the good model's answers are fed to a signal monitor
+    until the loss is classified as model performance, then the release is
+    rolled back and the registry, ledger and runtime are reconciled. A third
+    release whose image cannot become ready must then be refused, leave the
+    registry unchanged and leave the previous revision serving.
 
     Returns:
         The recovery result of this fault: its checks, its RTO and RPO
@@ -1421,7 +1465,10 @@ print(json.dumps({"state": record["state"]}), flush=True)
 
 
 def job_interruption() -> recovery.Result:
-    """A workflow run is killed mid-step and continues from its state.
+    """A three-step workflow run kills itself in step two; a rerun resumes it.
+
+    A second process started after the one-second lease runs the same trigger
+    from the stored state.
 
     Returns:
         The recovery result of this fault: its checks, its RTO and RPO
@@ -1479,7 +1526,10 @@ def job_interruption() -> recovery.Result:
 
 
 def audit_continuity() -> recovery.Result:
-    """The ledger writer is killed five times; the chain always verifies.
+    """Kills an audit-log writer five times and reopens each log.
+
+    Each reopened log must verify, hold every acknowledged row, continue after
+    three more rows and verify again.
 
     Returns:
         The recovery result of this fault: its checks, its RTO and RPO
@@ -1557,12 +1607,15 @@ SCENARIOS: dict[str, Callable[[], recovery.Result]] = {
 
 
 def run_all(only: list[str] | None = None) -> dict[str, Any]:
-    """Runs every local scenario and returns the report.
+    """Runs the local scenarios of the fault catalogue and builds the report.
 
     Args:
-        only: Fault ids to run; all scenarios if None.
+        only: Fault ids to run; all if None. Faults that are not selected or
+            have no local scenario are reported as not run, and ids outside
+            the catalogue are ignored.
 
     Returns:
-        The report built by `Runner.run`.
+        The report built by `Runner.run`. A scenario that raises is recorded
+        in it as a failed fault rather than propagated.
     """
     return recovery.Runner(SCENARIOS).run(only)

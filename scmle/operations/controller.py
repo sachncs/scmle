@@ -63,8 +63,8 @@ class ControllerPolicy:
     Attributes:
         max_idle_ticks: Consecutive ticks without a new batch before the
             escalation ``controller_no_new_data``.
-        max_unlabelled_ticks: Consecutive ticks in which the loop had no
-            matured labels to use before ``controller_labels_not_arriving``.
+        max_unlabelled_ticks: Consecutive ticks whose loop status was
+            ``insufficient_labels`` before ``controller_labels_not_arriving``.
     """
 
     max_idle_ticks: int = 3
@@ -86,9 +86,10 @@ class TickResult:
 
     Attributes:
         status: ``ok``, ``insufficient_labels`` or ``halted``.
-        observed: Batch files applied.
-        matured: Cases whose label matched a pending batch.
-        rejected: Names of files rejected (unreadable or malformed).
+        observed: Batch files applied in this tick.
+        matured: Cases whose label matched a pending batch in this tick.
+        rejected: Names of the files rejected in this tick (unreadable or
+            malformed), sorted.
         events: Ledger events the loop wrote while stepping.
         escalations: Ids of escalations open after the tick.
     """
@@ -154,10 +155,12 @@ class Controller:
                 person's attestations and envelopes.
             system_keys: Keys the system holds; signatures under them are
                 refused.
-            today: Clock, replaceable in tests.
+            today: Callable that returns today's date; replaceable in tests.
             policy: Dead-man limits.
-            checkpoint: Called with a label after each step of a tick; a seam
-                for crash tests, absent in production.
+            checkpoint: Called with a label at fixed points while a file is
+                applied (after the intent, after the loop took it, after the
+                result) and after the loop has stepped; a seam for crash
+                tests, absent in production.
         """
         self.retrain = retrain
         self.policy = policy or ControllerPolicy()
@@ -180,9 +183,10 @@ class Controller:
         """The loop's retrain hook: spend an envelope, then train.
 
         Returns:
-            The name of the challenger that was trained, or None if no envelope
-            authorized the retrain, none is configured or the training failed;
-            each of those cases opens an escalation.
+            The name returned by the retrain callable. None if no envelope
+            authorized the retrain, no callable is configured or the training
+            raised (each of these opens an escalation), or if the callable
+            itself returned None.
         """
         loop = self.loop
         try:
@@ -289,6 +293,8 @@ class Controller:
 
         Raises:
             ValueError: If a required column is missing or the file has no rows.
+                An unreadable or unparseable file raises the error of the CSV
+                reader or of the file system instead.
         """
         frame = pd.read_csv(path)
         for name in required:
@@ -362,7 +368,10 @@ class Controller:
         return self.run_labels(path)
 
     def apply(self, what: str, path: pathlib.Path, digest: str) -> int:
-        """Journals the intent, applies one file and journals the result.
+        """Applies one file once: intent row, loop call, applied row.
+
+        A file that cannot be read, lacks a required column or has no rows is
+        instead journalled as rejected and escalated, before any intent row.
 
         Args:
             what: The kind of input, batches or labels.
@@ -406,13 +415,18 @@ class Controller:
     def recover(self, inbox: pathlib.Path) -> bool:
         """Finishes inputs whose intent has no result; False if it cannot.
 
+        A batch whose counter already moved by one is only marked applied; a
+        batch whose counter fits neither case, and a file that is missing or
+        changed since its intent, halt the loop and open an escalation. A
+        labels file is applied again.
+
         Args:
             inbox: The inbox directory holding the batch and label files.
 
         Returns:
             True if every unfinished input was completed; False if the loop
-            state is unclear or a file changed, in which case the loop is
-            halted.
+            state is unclear or a file is missing or changed, in which case
+            the loop has been halted.
         """
         ledger = self.loop.ledger
         for digest, intent in list(ledger.intents.items()):
@@ -455,14 +469,15 @@ class Controller:
     def fresh(
         self, inbox: pathlib.Path, folder: str
     ) -> list[tuple[pathlib.Path, str]]:
-        """Files of a folder not yet applied or rejected, oldest name first.
+        """CSV files of a folder not yet applied or rejected, by name.
 
         Args:
             inbox: The inbox directory.
             folder: The sub-folder to scan.
 
         Returns:
-            Pairs of path and digest for the CSV files, in name order.
+            Pairs of path and digest for the CSV files whose digest is in
+            neither the applied nor the rejected set, in name order.
         """
         ledger = self.loop.ledger
         found = []
@@ -481,8 +496,10 @@ class Controller:
             inbox: The inbox directory with its batch and label folders.
 
         Returns:
-            The report of the tick; its status is halted, with nothing
-            applied, if the loop is halted or recovery fails.
+            The report of the tick. If the loop was already halted or recovery
+            fails, nothing is applied or journalled and the status is
+            ``halted``; otherwise the status is the loop's status after
+            stepping.
         """
         folder = pathlib.Path(inbox)
         loop = self.loop
