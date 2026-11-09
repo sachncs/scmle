@@ -46,3 +46,12 @@ def test_a_model_ignoring_the_noise_feature_is_not_fragile_to_it():
     ).compute(inputs())
 
     assert report["fragile_under"] == []
+
+
+def test_gaussian_noise_leaves_a_column_with_undefined_spread_unchanged():
+    data = inputs()
+    one = data.features.iloc[:1].copy()
+    out = robustness.GaussianNoise(0.5).corrupt(
+        one, data, np.random.default_rng(0)
+    )
+    assert np.isfinite(out["signal"]).all()

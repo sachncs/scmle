@@ -115,7 +115,9 @@ class GaussianNoise(Stressor):
         """
         damaged = features.copy()
         for column in inputs.feature_plan.numeric:
-            spread = float(pd.to_numeric(damaged[column]).std() or 0.0)
+            spread = float(pd.to_numeric(damaged[column]).std())
+            if not np.isfinite(spread):
+                spread = 0.0
             damaged[column] = pd.to_numeric(damaged[column]) + rng.normal(
                 0.0, self.scale * spread, len(damaged)
             )
