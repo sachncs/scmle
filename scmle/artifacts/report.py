@@ -13,14 +13,17 @@ class HtmlReport:
     def render(
         self, result: results.RunResult, leaderboard: pd.DataFrame
     ) -> str:
-        """Builds the report.
+        """Builds the HTML page summarizing a run.
 
         Args:
             result: The completed run.
-            leaderboard: Ranked trials.
+            leaderboard: Ranked trials, shown as a table.
 
         Returns:
-            An HTML document as a string.
+            An HTML string with the run summary, findings (the screening
+            warning first), leaderboard, test metrics, top-10 permutation
+            importance, calibration scores when present, reliability checks,
+            links to the per-method explanation pages and the execution plan summary.
         """
         escape = html.escape
         metric_rows = "".join(
@@ -86,14 +89,18 @@ class HtmlReport:
 
     @staticmethod
     def reliability(result: results.RunResult) -> str:
-        """Summarizes fit health, shift, robustness and weak subgroups.
+        """Summarizes the reliability checks that have results.
+
+        The checks are fit health, learning curve, development-versus-test
+        shift, robustness, the weakest slice and flagged fairness columns.
 
         Args:
             result: The completed run.
 
         Returns:
-            HTML paragraphs, one per check that has results, or a single
-            paragraph saying no checks were available.
+            HTML paragraphs, one per check that has results (one per flagged
+            fairness column), or a single paragraph saying no checks were
+            available.
         """
         escape = html.escape
         lines = []

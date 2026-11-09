@@ -27,9 +27,12 @@ class ExplanationHtmlReport:
             title: Optional document title. The method name is used by default.
 
         Returns:
-            A self-contained HTML document with a summary, output, links, and
-            the canonical evidence record. If the privacy decision is `denied`,
-            the output is replaced by a withheld notice with the reason.
+            A self-contained HTML document with the method name and
+            parameters, the privacy decision, the output, the limitations, the
+            evidence links (as text) and the canonical evidence record. If the
+            privacy decision is `denied`, the output, in the page body and in
+            the canonical record, is replaced by a withheld notice with the
+            reason.
         """
         record = evidence.to_dict()
         privacy = cast(dict[str, Any], record["privacy_decision"])

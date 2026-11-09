@@ -12,7 +12,10 @@ from scmle import durability
 
 
 class RunStore:
-    """A uniquely named run directory with typed write helpers.
+    """A run directory with helpers that write files inside it.
+
+    `create` allocates a new uniquely named directory and `open` wraps an
+    existing one.
 
     Attributes:
         run_id: Identifier of the run.
@@ -62,7 +65,7 @@ class RunStore:
             A store over it.
 
         Raises:
-            FileNotFoundError: If the directory does not exist.
+            FileNotFoundError: If the path is not an existing directory.
         """
         path = pathlib.Path(directory)
         if not path.is_dir():
@@ -70,13 +73,14 @@ class RunStore:
         return cls(path.name, path)
 
     def path(self, relative: str) -> pathlib.Path:
-        """Returns an absolute path inside the run directory.
+        """Returns a path inside the run directory.
 
         Args:
             relative: Path relative to the run directory.
 
         Returns:
-            The path (the file need not exist).
+            The run directory joined with `relative` (absolute only if the
+            directory is; the file need not exist).
         """
         return self.directory / relative
 
@@ -96,7 +100,8 @@ class RunStore:
     def write_json(self, relative: str, payload: Any) -> None:
         """Writes `payload` as indented JSON, creating parent directories.
 
-        Unknown value types are rendered as strings.
+        Values `json` cannot encode are rendered with `str`. The write goes
+        through `write_text`, so it is atomic.
 
         Args:
             relative: File path relative to the run directory.
@@ -105,10 +110,14 @@ class RunStore:
         self.write_text(relative, json.dumps(payload, indent=2, default=str))
 
     def write_text(self, relative: str, text: str) -> None:
-        """Atomically writes plain text.
+        """Atomically writes plain text, creating parent directories.
 
-        The temporary file is created beside the destination so `os.replace`
-        remains atomic on the supported operating systems and filesystems.
+        The text goes to a temporary file beside the destination, is flushed
+        and fsynced, and then replaces the destination with `os.replace`; the
+        directory is synced afterwards (not on Windows). Any failure removes
+        the temporary file and propagates. The temporary file sits in the same
+        directory so the replace stays atomic on the supported operating
+        systems and filesystems.
 
         Args:
             relative: File path relative to the run directory.

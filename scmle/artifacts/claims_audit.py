@@ -140,7 +140,8 @@ def read_claims(run_dir: str | Path) -> dict[str, Any]:
         The parsed claims document.
 
     Raises:
-        ArtifactError: If the file is missing or is not a JSON object.
+        ArtifactError: If the file is missing or unreadable, or is not a JSON
+            object with a `claims` key.
     """
     path = Path(run_dir) / confirm.CLAIMS_FILE
     try:
@@ -219,8 +220,10 @@ def registered_rows(
 ) -> list[dict[str, Any]]:
     """Lists one row per claim registered by hash (baseline, causal primary).
 
-    The tier and status come from the report files the sealed ledger binds; a
-    file that is missing is reported as such rather than guessed.
+    The tier and identification detail come from the baseline or causal report
+    file in the run directory, and the status from the sealed confirmation row.
+    A missing or unreadable report file leaves the tier `unverified` and the
+    identification None.
 
     Args:
         run_dir: The run directory.
@@ -377,9 +380,11 @@ def check_charter(
         signing_key: Key for the charter signature, or None.
 
     Returns:
-        A finding for the charter (skipped if the file is absent, failing if it
-        does not verify or names another hash), plus one for the chartered rules
-        (skipped if the charter fixes none).
+        A single finding for the charter if the file is absent (skipped), does
+        not verify or names another hash (failing). Otherwise two findings: the
+        passing charter finding, then one for the chartered rules (skipped if
+        the charter fixes none, failing if the ledger or confirmation used
+        other rules, else passing).
     """
     path = run_dir / CHARTER_FILE
     name = "charter verifies and matches the ledger"
@@ -528,8 +533,9 @@ def check_stage_two(
 
     Returns:
         A finding: skipped if no withdrawal rule ran, passing if the family, its
-        hash and the checks on `C` are consistent with the frozen survivors,
-        otherwise failing with the problems.
+        hash and the checks on `C` are consistent with the frozen survivors and
+        no withdrawn survivor is confirmed, otherwise failing with the
+        problems (also failing if the ledger has no frozen survivors).
     """
     name = "second-stage accounting is consistent"
     record = document.get("stage_two")
@@ -585,7 +591,8 @@ def check_custody(
         A finding: skipped if there is no custody log, failing if the log is
         invalid, `C` was opened more than once, a confirmed outcome has no open
         event, the selection was not frozen exactly once before the open, or the
-        frozen hashes differ from the claims; otherwise passing.
+        frozen hashes differ from the claims; otherwise passing (including a
+        non-confirmed run in which `C` was never opened).
     """
     name = "custody log: selection frozen before C opened, C opened once"
     path = run_dir / CUSTODY_FILE
@@ -694,10 +701,9 @@ def check_coverage_claim(
 
     Returns:
         A finding, or None when the run holds neither the claim nor a coverage
-        report. The report must name the claim's hash. It is skipped without a
-        custody log, and failing if the claim is unreadable, not registered
-        exactly once, differs from the registered hash, or the report names
-        another claim.
+        report. It is skipped without a custody log, and failing if the log is
+        invalid, the claim is unreadable, not registered exactly once, differs
+        from the registered hash, or the report does not name the claim's hash.
     """
     name = "coverage claim: registered before the rows were read"
     claim_path = run_dir / coverage_run.CLAIM_FILE
@@ -756,10 +762,12 @@ def check_coverage_confirmation(
 
     Returns:
         A finding, or None when the run holds no `coverage_confirmation.json`.
-        It is skipped when the claim could not be tested on `C`, and failing if
-        the claim is not registered, the document is malformed, the registration
-        or claim hash differs, the p-value or status does not recompute, or the
-        status differs from the sealed ledger row.
+        It is skipped when the document says the claim was not evaluated and the
+        ledger has no registration for it. It fails if the claim is registered
+        but not evaluated, is evaluated but not registered, the document is
+        malformed, the registration or claim hash differs, the p-value or
+        status does not recompute, or the status differs from the sealed ledger
+        row.
     """
     name = "coverage claim on C: registered, recomputed, status matches"
     document = read_optional(run_dir / coverage_confirm.DOCUMENT)
@@ -892,14 +900,18 @@ def check_attestations(
 
     Args:
         run_dir: The run directory.
-        signing_key: Key for the attestation signatures, or None.
+        signing_key: Key for the attestation signatures, or None to use the
+            environment key.
 
     Returns:
-        A finding: skipped without causal claims, a charter file or a causal
-        block, or when no key is available to check the signatures; failing if a
-        tier is raised without attestors or an accepted attestation is
-        malformed, not permitted, for another charter, outside its validity
-        window or has an invalid signature; otherwise passing.
+        A finding: skipped without a causal claims file, a charter file or a
+        charter causal block. Failing if the charter cannot be read, a tier
+        above `unverified` has no named attestors or no accepted attestation,
+        an assumption's named attestor has no accepted attestation, or an
+        accepted attestation is malformed, not permitted, scoped to another
+        charter, outside its validity window or has an invalid signature.
+        Otherwise skipped if no key is available to check the signatures, else
+        passing.
     """
     name = "causal attestations verify"
     claims = read_optional(run_dir / CAUSAL_FILE)
@@ -976,7 +988,8 @@ def verify(
 
     Args:
         run_dir: The run directory.
-        signing_key: Key for the charter signature and the custody log MACs.
+        signing_key: Key for the charter signature, the custody log MACs and
+            the attestation signatures, or None.
 
     Returns:
         Every step with its status; `ok` is false if any step failed. The result

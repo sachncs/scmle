@@ -14,8 +14,9 @@ class BundleSchema:
         task: Task type value.
         numeric: Numeric feature columns.
         categorical: Categorical feature columns.
-        dtypes: Training dtype per feature.
-        known_categories: Categories seen in training per categorical column.
+        dtypes: Training dtype name per numeric and categorical feature.
+        known_categories: Sorted categories seen in training per categorical
+            column (when built from training data, capped in number).
         classes: Class labels for classification, else None.
         extra_inputs: Raw columns the caller must supply because the feature
             graph reads them, although the model does not use them directly.
@@ -106,9 +107,12 @@ class SchemaReport:
 
     Attributes:
         missing: Required columns absent from the input.
-        extra: Input columns the model ignores.
-        missing_value_counts: Missing values per present feature.
-        unseen_categories: Categories never seen in training.
+        extra: Input columns that are neither required features nor the
+            target column.
+        missing_value_counts: Count of missing values for each present feature
+            that has at least one.
+        unseen_categories: Per categorical column with any, the sorted values
+            never seen in training (at most the first 20).
     """
 
     missing: tuple[str, ...]

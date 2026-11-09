@@ -29,10 +29,14 @@ class ReplayVerdict:
 
     Attributes:
         level: `exact`, `comparable` or `different`.
-        reasons: Why the level is not `exact`.
-        max_abs_difference: Largest absolute fold-score difference.
-        trials_compared: Number of trials compared.
-        notes: Caveats, such as differing environments.
+        reasons: Why the level is not `exact` (empty for `exact`).
+        max_abs_difference: Largest absolute fold-score difference over the
+            compared trials whose status matches; 0.0 for `exact`, and NaN
+            when the runs differ before any trial is compared.
+        trials_compared: Number of trials compared (0 when the runs differ
+            before any trial is compared).
+        notes: Caveats, such as differing environments (they do not change
+            the level).
     """
 
     level: str
@@ -49,10 +53,14 @@ def load_run(directory: str | pathlib.Path) -> dict[str, Any]:
         directory: A completed run directory.
 
     Returns:
-        A dict with the configuration, dataset manifest, split fingerprint,
-        trials, the selected candidate, the environment lock text (empty if
-        absent) and the parameter-estimation digest (None if the run has no such
-        report).
+        A dict with the keys `config`, `dataset` (the manifest), `split`
+        (the split fingerprint), `trials` (the `trials/trial_*.json` records
+        in file-name order), `selected` (a tuple of the selected model, its
+        strategy and its parameters as sorted-key JSON text), `environment`
+        (the environment lock text, empty if absent) and
+        `parameter_estimation` (the report digest, None if the run has no such
+        report). A missing required file raises the underlying file or JSON
+        error.
     """
     root = pathlib.Path(directory)
     trials = [
@@ -101,11 +109,16 @@ def compare_runs(
     Args:
         first: Facts of the original run (see `load_run`).
         second: Facts of the rerun.
-        tolerance_std: Allowed mean-score difference, in units of the larger
-            fold standard deviation, for a `comparable` verdict.
+        tolerance_std: Allowed difference between a trial's mean scores, in
+            units of the larger of the two trials' score standard deviations
+            (floored at 1e-9), for a `comparable` verdict.
 
     Returns:
-        The verdict.
+        `different` if the configuration, dataset hash, split, parameter
+        estimation digest or executed trials (id, model, strategy, params)
+        differ, if a trial's status changed, a mean moved beyond the
+        tolerance, or a different candidate was selected. Otherwise `exact` if
+        every fold score is identical, else `comparable`.
     """
     reasons: list[str] = []
     notes: list[str] = []

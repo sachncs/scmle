@@ -346,7 +346,7 @@ class PlanCommand(ProjectCommand):
     help = "analyze the data and print the proposed plan"
 
     def execute(self, args: argparse.Namespace) -> int:
-        """Prints the summary of the execution plan.
+        """Logs the summary of the execution plan at INFO level.
 
         Args:
             args: The parsed command-line arguments.
@@ -365,7 +365,7 @@ class RunCommand(ProjectCommand):
     help = "execute the full workflow"
 
     def execute(self, args: argparse.Namespace) -> int:
-        """Runs the project and prints the result summary.
+        """Runs the project and logs the result summary and run directory.
 
         Args:
             args: The parsed command-line arguments.
@@ -394,7 +394,7 @@ class ResumeCommand(Command):
         parser.add_argument("run_directory")
 
     def execute(self, args: argparse.Namespace) -> int:
-        """Resumes the run and prints the result summary.
+        """Resumes the run and logs the result summary and run directory.
 
         Args:
             args: The parsed command-line arguments.
@@ -403,7 +403,8 @@ class ResumeCommand(Command):
             The exit status, EXIT_OK (0).
 
         Raises:
-            ArtifactError: If the run directory cannot be found.
+            ArtifactError: If the run directory, or a file the resume reads
+                from it, cannot be found.
         """
         try:
             result = project.MLProject.resume(args.run_directory)
@@ -485,7 +486,11 @@ class CatalogCommand(Command):
         return payload
 
     def execute(self, args: argparse.Namespace) -> int:
-        """Builds, emits and optionally persists catalog evidence.
+        """Catalogs a tabular file or raw bytes and prints the JSON evidence.
+
+        The input is raw bytes when `--raw-bytes` is given or the positional
+        input is `-`; otherwise it is loaded as a table. The evidence is also
+        written to `--output` when that is given.
 
         Args:
             args: The parsed command-line arguments.
@@ -576,7 +581,10 @@ class PredictCommand(Command):
         )
 
     def execute(self, args: argparse.Namespace) -> int:
-        """Writes predictions (and probabilities for classifiers).
+        """Writes a predictions CSV to `--output`.
+
+        The file has a `prediction` column and, when the bundle has class
+        labels, one `proba_<label>` column per class.
 
         Args:
             args: The parsed command-line arguments.
@@ -725,7 +733,7 @@ class ExportOnnxCommand(Command):
         parser.add_argument("--trusted", action="store_true")
 
     def execute(self, args: argparse.Namespace) -> int:
-        """Writes the graph, optionally verifying it on sample rows.
+        """Exports the ONNX graph, optionally comparing it on sample rows.
 
         Args:
             args: The parsed command-line arguments.
@@ -759,7 +767,7 @@ class PackageCommand(Command):
         parser.add_argument("--trusted", action="store_true")
 
     def execute(self, args: argparse.Namespace) -> int:
-        """Writes the folder.
+        """Writes the deployable service folder for the bundle.
 
         Args:
             args: The parsed command-line arguments.
@@ -809,7 +817,10 @@ class IngestCommand(Command):
         )
 
     def execute(self, args: argparse.Namespace) -> int:
-        """Runs the stages and prints a summary; 2 if the unit blocks.
+        """Runs the ingest stages and prints the JSON summary.
+
+        A blocking unit verdict is raised after the summary is printed, which
+        `main` turns into exit status 2.
 
         Args:
             args: The parsed command-line arguments.
@@ -1038,7 +1049,9 @@ class LoopCommand(Command):
 
     @staticmethod
     def run_init(args: argparse.Namespace) -> int:
-        """Creates the ledger from a policy file and a charter hash.
+        """Opens the deployment, creating its ledger on first use.
+
+        The ledger is created from the policy file and the charter hash.
 
         Args:
             args: The parsed command-line arguments.
@@ -1331,7 +1344,9 @@ class OperateCommand(Command):
 
     @classmethod
     def run_grant(cls, args: argparse.Namespace) -> int:
-        """Records an envelope after checking its signature.
+        """Records an envelope after verifying its signature.
+
+        The signature is verified under the key from the key file.
 
         Args:
             args: The parsed command-line arguments.
@@ -1382,7 +1397,10 @@ class OperateCommand(Command):
 
     @classmethod
     def run_halt(cls, args: argparse.Namespace) -> int:
-        """Halts the loop; only a passing recalibration releases it.
+        """Halts the loop and prints the controller state.
+
+        Nothing is recorded again if the loop is already halted. Only a
+        recalibration that passes releases the halt.
 
         Args:
             args: The parsed command-line arguments.
@@ -1404,7 +1422,10 @@ class DeployCommand(Command):
     help = "live checks of a service, the promotion gate, deployment records"
 
     def configure(self, parser: argparse.ArgumentParser) -> None:
-        """Adds the `live`, `gate` and `verify-record` actions.
+        """Adds the deployment actions.
+
+        The actions are `live`, `gate`, `model-digest`, `reconcile` and
+        `verify-record`.
 
         Args:
             parser: The argument parser of this command.
@@ -1490,7 +1511,10 @@ class DeployCommand(Command):
 
     @staticmethod
     def run_live(args: argparse.Namespace) -> int:
-        """Runs the four live checks; exit 1 if any failed.
+        """Runs the four live checks and writes their results JSON.
+
+        The checks are health, schema, inference and security. The results go
+        to `--output` and a name-to-passed map is printed.
 
         Args:
             args: The parsed command-line arguments.
@@ -1531,7 +1555,10 @@ class DeployCommand(Command):
 
     @staticmethod
     def run_gate(args: argparse.Namespace) -> int:
-        """Prints the decision; a refusal exits with the blocked status.
+        """Prints the gate decision; a refusal returns the blocked status.
+
+        When the decision allows the release and carries a signed record, the
+        record is written to `--output` if that is given.
 
         Args:
             args: The parsed command-line arguments.
@@ -1554,7 +1581,9 @@ class DeployCommand(Command):
 
     @staticmethod
     def run_reconcile(args: argparse.Namespace) -> int:
-        """Exits 1 if the registry, ledger and runtime disagree.
+        """Prints the reconciliation report; status 1 if the sources disagree.
+
+        The report is also written to `--output` when that is given.
 
         Args:
             args: The parsed command-line arguments.
@@ -1599,7 +1628,7 @@ class DeployCommand(Command):
 
     @staticmethod
     def run_verify_record(args: argparse.Namespace) -> int:
-        """Exits 0 only if the record's signature verifies.
+        """Prints whether the record's signature verifies, with its digest.
 
         Args:
             args: The parsed command-line arguments.
@@ -1659,7 +1688,7 @@ class ClaimsCommand(Command):
 
     @staticmethod
     def run_list(args: argparse.Namespace) -> int:
-        """Prints the claims of a run.
+        """Prints the claims of a run, optionally only those of one tier.
 
         Args:
             args: The parsed command-line arguments.
@@ -1717,7 +1746,9 @@ class ClaimsCommand(Command):
 
     @staticmethod
     def run_verify(args: argparse.Namespace) -> int:
-        """Verifies the run's artifacts; a failed step makes the exit code 1.
+        """Verifies the run's artifacts and prints each step.
+
+        A failed step raises, which `main` turns into exit status 1.
 
         Args:
             args: The parsed command-line arguments.
@@ -1783,7 +1814,10 @@ class FrameCommand(Command):
         parser.add_argument("--output", required=True, help="output directory")
 
     def execute(self, args: argparse.Namespace) -> int:
-        """Writes the framing artifacts and the unsigned draft charter.
+        """Writes the framing artifacts and, if one was drafted, the charter.
+
+        The draft charter goes to `charter.json` in the output directory; it
+        is unsigned.
 
         Args:
             args: The parsed command-line arguments.
@@ -1917,7 +1951,10 @@ class TrailCommand(Command):
 
     @staticmethod
     def keys(path: str | None) -> dict[str, str | None]:
-        """Keys by role from a file, else the environment key as analyst.
+        """Returns the signing keys by role.
+
+        The keys come from the file if one is given, else only the analyst's
+        key comes from the environment.
 
         Args:
             path: A JSON file mapping role to key, or None.
@@ -1976,13 +2013,14 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Entry point.
+    """Parses the arguments, runs the chosen command and returns its status.
 
     Args:
         argv: Arguments; defaults to `sys.argv[1:]`.
 
     Returns:
-        0 on success, 2 when the run was blocked, 1 on other failures.
+        The command's own status on success, 2 if it raised a blocked error
+        and 1 if it raised any other `ScmleError`. Other exceptions propagate.
     """
     args = build_parser().parse_args(argv)
     logging.basicConfig(level=args.log_level, format="%(message)s")
