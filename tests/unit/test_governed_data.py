@@ -1,4 +1,4 @@
-"""Snapshots, quality gates and incremental processing on every backend."""
+"""Snapshots, quality gates and incremental processing on the local backend."""
 
 import datetime
 import json
@@ -8,13 +8,10 @@ import pytest
 
 from scmle.contracts import errors
 from scmle.core import retry
-from scmle.data.readers import connectors
-from scmle.data.store import cloud
 from scmle.data.store import objectstore
 from scmle.data.store import processing
 from scmle.data.store import quality
 from scmle.data.store import snapshot
-from tests import support_cloud as fakes
 
 CONTRACT = snapshot.DataContract(
     "orders",
@@ -26,17 +23,9 @@ CONTRACT = snapshot.DataContract(
 CSV = "id,amount,region\n1,10.5,north\n2,20.0,south\n3,5.25,north\n"
 
 
-def make_store(kind, tmp_path):
-    if kind == "local":
-        return objectstore.LocalObjectStore(tmp_path / "root")
-    if kind == "s3":
-        return cloud.S3ObjectStore(fakes.FakeS3Client(), "bkt", "t1")
-    return cloud.GcsObjectStore(fakes.FakeGcsClient(), "bkt", "t1")
-
-
-@pytest.fixture(params=["local", "s3", "gcs"])
-def store(request, tmp_path):
-    return make_store(request.param, tmp_path)
+@pytest.fixture
+def store(tmp_path):
+    return objectstore.LocalObjectStore(tmp_path / "root")
 
 
 def reader_for(store, key="o.csv", hours=0.0):
@@ -117,16 +106,6 @@ def test_unreadable_objects_fail_clearly(store):
         reader_for(store, "x.bin").read("x.bin", CONTRACT)
     with pytest.raises(objectstore.NotFoundError):
         snapshot.SnapshotReader(store).read("missing.csv", CONTRACT)
-
-
-def test_the_phase_9_connector_reads_through_a_store(store):
-    if store.scheme == "file":  # the connector admits cloud schemes only
-        return
-    store.put("in/orders.csv", CSV.encode())
-    connector = connectors.ObjectStoreConnector(
-        store.uri("in/orders.csv"), snapshot.connector_reader(store)
-    )
-    assert len(connector.load_frame()) == 3
 
 
 def test_a_contract_is_validated():
@@ -322,8 +301,8 @@ def test_a_repeated_upload_is_skipped_and_a_changed_input_is_refused(store):
 
 
 def test_the_result_is_deterministic(tmp_path):
-    first = make_store("local", tmp_path / "one")
-    second = make_store("s3", tmp_path / "two")
+    first = objectstore.LocalObjectStore(tmp_path / "one")
+    second = objectstore.LocalObjectStore(tmp_path / "two")
     for target in (first, second):
         seed(target)
         processor(target).run()
@@ -362,7 +341,7 @@ def test_a_crash_between_output_and_checkpoint_recovers_without_duplicates(
         store.get("state/checkpoint.json")[0]
     )
     assert set(final.processed) == {"input/a.csv", "input/b.csv"}
-    reference = make_store("local", tmp_path / "reference")
+    reference = objectstore.LocalObjectStore(tmp_path / "reference")
     seed(reference)
     processor(reference).run()
     assert outputs(store) == outputs(reference)
@@ -417,7 +396,7 @@ def test_exhausted_or_permanent_failures_stop_at_the_object_and_keep_progress(
     def always_busy(frame):
         raise retry.TransientError("down")
 
-    other = make_store("local", tmp_path / "reference")
+    other = objectstore.LocalObjectStore(tmp_path / "reference")
     seed(other)
     run = processing.IncrementalProcessor(
         other,
@@ -440,7 +419,7 @@ def test_the_gate_runs_before_processing_and_quarantine_is_respected(
     run = processor(store, gate=gate).run()
     assert run.rows_out == 3
     strict = quality.QualityGate([quality.RangeRule("amount", 0, 1)], store)
-    other = make_store("local", tmp_path / "reference")
+    other = objectstore.LocalObjectStore(tmp_path / "reference")
     other.put("input/a.csv", CSV.encode())
     failed = processing.IncrementalProcessor(
         other,

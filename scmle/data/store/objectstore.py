@@ -142,7 +142,7 @@ class ObjectStore(abc.ABC):
         """Initializes the store.
 
         Args:
-            location: Human-readable root, for lineage (`s3://bucket/prefix`).
+            location: Human-readable root, for lineage (`file:///data/prefix`).
         """
         self.location = location.rstrip("/")
 

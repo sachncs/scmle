@@ -2,9 +2,7 @@
 
 `run_conformance(store)` exercises the behaviour the `ObjectStore` interface
 promises and returns a report; the same function runs against the local
-backend, against the S3 and GCS backends over in-memory fakes in the unit
-tests, and (when a deployment points it at them) against MinIO, the GCS
-emulator or a real bucket, through `scripts/run_object_store_conformance.py`.
+backend in the unit tests and against any other backend a user supplies.
 Each check works under a unique prefix and removes what it wrote. A check
 passes by returning; it fails by raising.
 """
