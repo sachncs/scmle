@@ -5,7 +5,7 @@
       "code_hash": "facf63e831d366b2238eb51d4d45d5e8b46b72d87fe1e56a3d425db8128e5868",
       "passed": true,
       "replicates": 200,
-      "seconds": 7.3,
+      "seconds": 7.4,
       "seeds": [
         0,
         200
@@ -100,7 +100,7 @@
       "code_hash": "c0a6e85acb658c3e690f207f954952a183f66cf3b4001637997fba459e7572fd",
       "passed": false,
       "replicates": 2000,
-      "seconds": 111.1,
+      "seconds": 110.3,
       "seeds": [
         0,
         2000
@@ -185,7 +185,7 @@
         "1.5": 0.9133333333333333
       },
       "replicates": 2000,
-      "seconds": 40.6,
+      "seconds": 42.0,
       "seeds": [
         0,
         2000
@@ -283,7 +283,7 @@
         }
       },
       "replicates": 2000,
-      "seconds": 2.4,
+      "seconds": 2.7,
       "seeds": [
         0,
         2000
@@ -371,7 +371,7 @@
       },
       "passed": true,
       "replicates": 2000,
-      "seconds": 12.5,
+      "seconds": 13.3,
       "seeds": [
         0,
         2000
@@ -390,7 +390,7 @@
         "q95": 0.004483527626684906
       },
       "replicates": 20,
-      "seconds": 59.3,
+      "seconds": 61.8,
       "seeds": [
         0,
         20
@@ -440,7 +440,7 @@
       "passed": true,
       "rate": 0.0037,
       "replicates": 10000,
-      "seconds": 172.6,
+      "seconds": 182.4,
       "seeds": [
         0,
         10000
@@ -473,7 +473,7 @@
       "promotions": 6,
       "rate": 0.0012,
       "replicates": 5000,
-      "seconds": 12.2,
+      "seconds": 12.5,
       "seeds": [
         0,
         5000
@@ -566,7 +566,7 @@
         ]
       },
       "replicates": 1000,
-      "seconds": 6.2,
+      "seconds": 6.3,
       "seeds": [
         0,
         1000
@@ -638,7 +638,7 @@
       "promote_bound": 0.026260990336999412,
       "replicates": 2000,
       "rollback_bound": 0.014449719092257398,
-      "seconds": 69.1,
+      "seconds": 72.7,
       "seeds": [
         0,
         2000
