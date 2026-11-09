@@ -28,6 +28,7 @@ from scmle.core import retry
 NAME_CHARACTERS = frozenset(
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_"
 )
+MAX_NAME_LENGTH = 64
 AUTOMATIC = "automatic"
 APPROVED = "approved"
 
@@ -80,7 +81,7 @@ def check_name(name: str, what: str) -> str:
         ConfigError: If the name is empty, longer than 64 characters or holds
             another character.
     """
-    if not name or len(name) > 64 or set(name) - NAME_CHARACTERS:
+    if not name or len(name) > MAX_NAME_LENGTH or set(name) - NAME_CHARACTERS:
         raise errors.ConfigError(
             f"{what} must be 1-64 characters of letters, digits, - and _"
         )
