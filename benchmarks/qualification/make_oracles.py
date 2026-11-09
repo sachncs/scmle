@@ -46,7 +46,7 @@ class Family:
 
 def sample(
     seed: int, size: int, shift: float = 0.0, scale: float = 1.0
-) -> list:
+) -> list[Any]:
     """Reproducible normal sample rounded to fixed decimals.
 
     Args:
@@ -63,7 +63,7 @@ def sample(
     return [round(float(v), SAMPLE_DECIMALS) for v in values]
 
 
-def numbered(prefix: str, items: Sequence[dict[str, Any]]) -> list:
+def numbered(prefix: str, items: Sequence[dict[str, Any]]) -> list[Any]:
     """Pairs each input with a stable id.
 
     Args:
@@ -76,7 +76,7 @@ def numbered(prefix: str, items: Sequence[dict[str, Any]]) -> list:
     return [(f"{prefix}-{i}", dict(item)) for i, item in enumerate(items)]
 
 
-def proportion_inputs(pairs: Sequence[tuple[int, int, float]]) -> list:
+def proportion_inputs(pairs: Sequence[tuple[int, int, float]]) -> list[Any]:
     """Cases for a binomial proportion interval.
 
     Args:
@@ -91,7 +91,7 @@ def proportion_inputs(pairs: Sequence[tuple[int, int, float]]) -> list:
     )
 
 
-def wilson_inputs() -> list:
+def wilson_inputs() -> list[Any]:
     """Wilson interval cases, including both edges and n = 1.
 
     Returns:
@@ -141,7 +141,7 @@ def interval(method: str) -> Callable[[dict[str, Any]], dict[str, Any]]:
     return compute
 
 
-def clopper_inputs() -> list:
+def clopper_inputs() -> list[Any]:
     """Exact-interval cases.
 
     Returns:
@@ -158,7 +158,7 @@ def clopper_inputs() -> list:
     )
 
 
-def chi2_inputs() -> list:
+def chi2_inputs() -> list[Any]:
     """Contingency tables, 2x2 up to 3x3.
 
     Returns:
@@ -191,7 +191,7 @@ def chi2_compute(given: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def fisher_inputs() -> list:
+def fisher_inputs() -> list[Any]:
     """2x2 tables with no empty margin cell that makes the ratio infinite.
 
     Returns:
@@ -222,7 +222,7 @@ def fisher_compute(given: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def two_sample_inputs() -> list:
+def two_sample_inputs() -> list[Any]:
     """Pairs of samples with and without a location shift.
 
     Returns:
@@ -274,7 +274,7 @@ def mannwhitney_compute(given: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def kruskal_inputs() -> list:
+def kruskal_inputs() -> list[Any]:
     """Three groups of different size and location.
 
     Returns:
@@ -312,7 +312,7 @@ def kruskal_compute(given: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def paired_inputs() -> list:
+def paired_inputs() -> list[Any]:
     """Pairs with weak, moderate and strong monotone association.
 
     Returns:
@@ -331,7 +331,9 @@ def paired_inputs() -> list:
     return numbered("pair", items)
 
 
-def correlation(function: Callable[..., Any]) -> Callable[[dict], dict]:
+def correlation(
+    function: Callable[..., Any],
+) -> Callable[[dict[str, Any]], dict[str, Any]]:
     """Builds the computation for a scipy correlation test.
 
     Args:
@@ -360,7 +362,7 @@ def correlation(function: Callable[..., Any]) -> Callable[[dict], dict]:
     return compute
 
 
-def fdr_inputs() -> list:
+def fdr_inputs() -> list[Any]:
     """P-value vectors under both adjustment methods.
 
     Returns:
@@ -390,7 +392,7 @@ def fdr_compute(given: dict[str, Any]) -> dict[str, Any]:
     return {"adjusted": [float(v) for v in adjusted]}
 
 
-def harmonic_inputs() -> list:
+def harmonic_inputs() -> list[Any]:
     """Harmonic numbers across the exact and asymptotic ranges.
 
     Returns:

@@ -1394,7 +1394,8 @@ def fixed_horizon_normal(
     per_arm = (z_a * math.sqrt(v0) + z_b * math.sqrt(v1)) ** 2 / (
         delta - delta_min
     ) ** 2
-    return math.ceil(2 * per_arm)
+    runs: int = math.ceil(2 * per_arm)
+    return runs
 
 
 def esn_metric(kind: str, runs: int, base: int) -> dict[str, Any]:

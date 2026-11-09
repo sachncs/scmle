@@ -57,7 +57,8 @@ def sklearn_table(loader: Any) -> pandas.DataFrame:
     Returns:
         The frame (features and target) with a fresh 0..n-1 index.
     """
-    return loader(as_frame=True).frame.reset_index(drop=True)
+    frame: pandas.DataFrame = loader(as_frame=True).frame
+    return frame.reset_index(drop=True)
 
 
 def screened(frame: pandas.DataFrame, target: str) -> screen.Screen:

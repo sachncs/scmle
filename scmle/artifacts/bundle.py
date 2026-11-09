@@ -1397,12 +1397,17 @@ class Bundle:
             back from codes for ordinal tasks, values for regression, one column
             per target for multi-target models).
         """
-        predictions = self.pipeline.predict(self.prepare_frame(data, mapping))
+        predictions: numpy.ndarray = self.pipeline.predict(
+            self.prepare_frame(data, mapping)
+        )
         if self.schema.targets:
             return numpy.asarray(predictions)
         if self.schema.task == tasks.Task.ORDINAL.value:
             labels = numpy.asarray(self.schema.classes, dtype=object)
-            return labels[numpy.asarray(predictions).astype(int)]
+            decoded: numpy.ndarray = labels[
+                numpy.asarray(predictions).astype(int)
+            ]
+            return decoded
         return predictions
 
     def predict_proba(
@@ -1432,9 +1437,12 @@ class Bundle:
                 "this model does not provide probabilities"
             )
         frame = self.prepare_frame(data, mapping)
+        probabilities: numpy.ndarray
         if self.calibrator is not None:
-            return self.calibrator.predict_proba(frame)
-        return self.pipeline.predict_proba(frame)
+            probabilities = self.calibrator.predict_proba(frame)
+        else:
+            probabilities = self.pipeline.predict_proba(frame)
+        return probabilities
 
     def explain(
         self,
@@ -1752,7 +1760,10 @@ class Bundle:
                 Returns:
                     A boolean per row.
                 """
-                return numpy.asarray(self.predict(rows)) == desired
+                matches: numpy.ndarray = (
+                    numpy.asarray(self.predict(rows)) == desired
+                )
+                return matches
 
         else:
             low, high = desired
@@ -1768,10 +1779,11 @@ class Bundle:
                     (0 inside it).
                 """
                 values = numpy.asarray(self.predict(rows), dtype=float)
-                return -(
+                distance: numpy.ndarray = -(
                     numpy.maximum(low - values, 0)
                     + numpy.maximum(values - high, 0)
                 )
+                return distance
 
             def reached(rows: pandas.DataFrame) -> numpy.ndarray:
                 """Tests whether rows have a prediction inside the wanted range.
@@ -1783,7 +1795,8 @@ class Bundle:
                     A boolean per row.
                 """
                 values = numpy.asarray(self.predict(rows), dtype=float)
-                return (values >= low) & (values <= high)
+                inside: numpy.ndarray = (values >= low) & (values <= high)
+                return inside
 
         search = scmle.explainability.counterfactual.CounterfactualSearch(
             progress,

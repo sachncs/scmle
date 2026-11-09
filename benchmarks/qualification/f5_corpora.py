@@ -77,7 +77,7 @@ def corpus_frame(name: str) -> pandas.DataFrame:
     Returns:
         The table with constant columns dropped and a fresh 0..n-1 index.
     """
-    frame = CORPORA[name](as_frame=True).frame
+    frame: pandas.DataFrame = CORPORA[name](as_frame=True).frame
     frame = frame.rename(columns={"target": standins.TARGET})
     constant = [c for c in frame.columns if frame[c].nunique() < 2]
     return frame.drop(columns=constant).reset_index(drop=True)

@@ -63,7 +63,7 @@ class IncidentStatus(enum.StrEnum):
     RESOLVED = "resolved"
 
 
-def require_text(value: str, field_name: str) -> str:
+def require_text(value: object, field_name: str) -> str:
     """Returns non-empty incident metadata.
 
     Args:
@@ -166,8 +166,9 @@ class Incident:
             "rollback_target",
         ):
             require_text(getattr(self, field_name), field_name)
-        if not isinstance(self.status, IncidentStatus):
-            object.__setattr__(self, "status", IncidentStatus(self.status))
+        status: Any = self.status  # may be text from a persisted record
+        if not isinstance(status, IncidentStatus):
+            object.__setattr__(self, "status", IncidentStatus(status))
         slo.parse_timestamp(self.opened_at, "opened_at")
         slo.parse_timestamp(self.observed_at, "observed_at")
         if self.acknowledged_at is not None:

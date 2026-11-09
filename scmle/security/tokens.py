@@ -315,9 +315,8 @@ class KeySet:
             ConfigError: If the document is not an object with a `keys`
                 list. A malformed entry is refused with the same error.
         """
-        entries = (
-            document.get("keys") if isinstance(document, Mapping) else None
-        )
+        parsed: object = document  # may be any parsed JSON value
+        entries = parsed.get("keys") if isinstance(parsed, Mapping) else None
         if not isinstance(entries, list):
             raise errors.ConfigError("a JWKS document needs a keys list")
         return cls([Key.from_jwk(entry) for entry in entries])

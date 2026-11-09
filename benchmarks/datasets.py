@@ -88,7 +88,7 @@ class SklearnDataset(BenchmarkDataset):
             target is added under `target`.
         """
         bunch = getattr(datasets, self.loader)(as_frame=True)
-        frame = bunch.frame.copy()
+        frame: pandas.DataFrame = bunch.frame.copy()
         if self.target not in frame.columns:
             frame[self.target] = bunch.target
         return frame
@@ -116,7 +116,7 @@ class OpenMlDataset(BenchmarkDataset):
         bunch = datasets.fetch_openml(
             self.openml_name, version=self.version, as_frame=True, parser="auto"
         )
-        frame = bunch.frame.copy()
+        frame: pandas.DataFrame = bunch.frame.copy()
         for column in frame.select_dtypes("category").columns:
             frame[column] = frame[column].astype(object)
         return frame

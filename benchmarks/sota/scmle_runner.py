@@ -49,7 +49,10 @@ def load_split() -> dict[str, Any]:
     Returns:
         The parsed `split.json`.
     """
-    return json.loads(split.OUTPUT.read_text(encoding="utf-8"))
+    assignment: dict[str, Any] = json.loads(
+        split.OUTPUT.read_text(encoding="utf-8")
+    )
+    return assignment
 
 
 def check_task_ids(task_ids: list[int], open_holdout: bool = False) -> None:
@@ -270,6 +273,7 @@ def main(argv: list[str] | None = None) -> int:
     done = records.completed(args.output)
     failures = 0
     for task_id in args.tasks:
+        error = ""
         try:
             frames = load_task(task_id, args.fold, args.repeat)
         except Exception:  # A task that cannot load is still recorded.

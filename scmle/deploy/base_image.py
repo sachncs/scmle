@@ -110,7 +110,7 @@ def fetch_registry_digest(image: str, timeout: float = 30.0) -> str:
     )
     with urllib.request.urlopen(request, timeout=timeout) as reply:  # noqa: S310 -- the URL is https by construction  # nosec B310
         kind = reply.headers.get("Content-Type", "").split(";")[0]
-        digest = reply.headers.get("Docker-Content-Digest", "")
+        digest: str = reply.headers.get("Docker-Content-Digest", "")
     if kind not in INDEX_TYPES:
         raise errors.ArtifactError(
             f"{image} is not a multi-architecture index ({kind or 'unknown'})"

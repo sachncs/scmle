@@ -13,16 +13,19 @@ for alerting are computed from events by `scmle.operations.signals`.
 
 from collections.abc import Mapping
 import http
+import importlib
 import math
 import re
 import sys
 import threading
 import time
+from typing import Any
 
+resource: Any  # the `resource` module, or None where it is missing
 try:
-    import resource
+    resource = importlib.import_module("resource")
 except ImportError:  # Windows has no `resource` module.
-    resource = None  # type: ignore[assignment]
+    resource = None
 
 DEFAULT_BUCKETS = (
     0.005,

@@ -293,6 +293,7 @@ def select_threshold(
         if w is None:
             errors = math.ceil(float(losses[answered].sum()) - 1e-12)
         else:
+            weight = w[answered]
             rate = float(
                 (weight * losses[answered]).sum() / float(weight.sum())
             )
@@ -482,7 +483,8 @@ class Routing:
     @property
     def answered(self) -> numpy.ndarray:
         """Cases the model answers."""
-        return self.status == ANSWERED
+        answered: numpy.ndarray = self.status == ANSWERED
+        return answered
 
     @property
     def coverage(self) -> float:

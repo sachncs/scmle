@@ -77,9 +77,10 @@ class Scope:
                 raise ValueError(f"{name} must be a non-empty string")
         if self.status != "experimental":
             raise ValueError("non-tabular model paths must remain experimental")
-        if not self.limitations or any(
+        limitations: tuple[object, ...] = self.limitations
+        if not limitations or any(
             not isinstance(value, str) or not value.strip()
-            for value in self.limitations
+            for value in limitations
         ):
             raise ValueError("limitations must contain non-empty strings")
         object.__setattr__(self, "limitations", tuple(self.limitations))

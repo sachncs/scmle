@@ -21,7 +21,7 @@ from scmle import durability
 from scmle.artifacts import bundle
 from scmle.contracts import errors
 from scmle.contracts import events
-from scmle.governance import attestation
+from scmle.contracts import signing
 from scmle.governance import never_list
 
 INDEX_FILE = "registry.json"
@@ -77,16 +77,16 @@ class PromotionApproval:
                 raise ValueError(f"{name} must not be empty")
         if self.version < 1:
             raise ValueError("version must be positive")
-        if not isinstance(self.decision, PromotionDecision):
-            object.__setattr__(
-                self, "decision", PromotionDecision(self.decision)
-            )
+        decision: Any = self.decision  # may be text from a persisted record
+        if not isinstance(decision, PromotionDecision):
+            object.__setattr__(self, "decision", PromotionDecision(decision))
         if not self.evidence or any(not item.strip() for item in self.evidence):
             raise ValueError("evidence must contain non-empty references")
         if not isinstance(self.independent, bool):
             raise TypeError("independent must be bool")
-        if self.signature is not None and (
-            not isinstance(self.signature, str) or not self.signature.strip()
+        signature: object = self.signature  # may be any value from a record
+        if signature is not None and (
+            not isinstance(signature, str) or not signature.strip()
         ):
             raise ValueError("signature must be non-empty text")
 
@@ -118,9 +118,7 @@ class PromotionApproval:
         """
         return dataclasses.replace(
             self,
-            signature=attestation.sign_payload(
-                self.unsigned_dict(), signing_key
-            ),
+            signature=signing.sign_payload(self.unsigned_dict(), signing_key),
         )
 
     def verify(self, signing_key: str | bytes | None = None) -> bool:
@@ -136,10 +134,10 @@ class PromotionApproval:
         """
         if self.signature is None:
             return False
-        key = attestation.resolve_key(signing_key)
+        key = signing.resolve_key(signing_key)
         if key is None:
             return False
-        expected = attestation.sign_payload(self.unsigned_dict(), key)
+        expected = signing.sign_payload(self.unsigned_dict(), key)
         return hmac.compare_digest(self.signature, expected)
 
     def validate_target(
@@ -283,7 +281,8 @@ class ModelRegistryStore:
         path = self.root / INDEX_FILE
         if not path.exists():
             return {"models": {}}
-        return json.loads(path.read_text(encoding="utf-8"))
+        index: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
+        return index
 
     def write_index(self, index: dict[str, Any]) -> None:
         """Writes the index atomically (temp file + rename).
@@ -522,7 +521,7 @@ class ModelRegistryStore:
         """
         if index is None:
             index = self.read_index()
-        entry = index["models"].get(model)
+        entry: dict[str, Any] | None = index["models"].get(model)
         if entry is None or str(version) not in entry["versions"]:
             raise errors.ArtifactError(f"{model} v{version} is not registered")
         record = VersionRecord(**entry["versions"][str(version)])

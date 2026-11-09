@@ -31,6 +31,7 @@ from scmle.contracts import experiments
 from scmle.contracts import explanations
 from scmle.contracts import lineage
 from scmle.contracts import reliability
+from scmle.contracts import signing
 from scmle.contracts import tasks
 import scmle.contracts.data
 import scmle.contracts.evaluation
@@ -3960,7 +3961,7 @@ class PackageStage(Stage):
             return
 
         evidence_index = self.evidence_index(context, store, policy)
-        signing_key = attestation.resolve_key(None)
+        signing_key = signing.resolve_key(None)
         if signing_key is not None:
             evidence_index.sign(signing_key)
         declared_metrics = {metric.name for metric in policy.metrics}
@@ -3987,7 +3988,7 @@ class PackageStage(Stage):
             verification = release_attestation.verify(
                 evaluation["provenance"],
                 evaluation["sbom"],
-                signing_key=attestation.resolve_key(None),
+                signing_key=signing.resolve_key(None),
             )
         except (KeyError, TypeError, ValueError):
             verification = False
@@ -5079,7 +5080,7 @@ class PackageStage(Stage):
         release_attestation = attestation.ReleaseAttestation.from_records(
             evaluation["provenance"],
             evaluation["sbom"],
-            signing_key=attestation.resolve_key(None),
+            signing_key=signing.resolve_key(None),
         ).to_dict()
         evaluation["release_attestation"] = release_attestation
         store.write_json("release_attestation.json", release_attestation)

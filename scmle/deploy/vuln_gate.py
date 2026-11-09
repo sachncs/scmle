@@ -59,7 +59,9 @@ def load_json(path: Path) -> Any:
         raise GateError(f"cannot read {path}: {error}") from error
 
 
-def parse_pip_audit(report: dict[str, Any]) -> tuple[list[dict], set[str], str]:
+def parse_pip_audit(
+    report: dict[str, Any],
+) -> tuple[list[dict[str, Any]], set[str], str]:
     """Parses a pip-audit report.
 
     Args:
@@ -75,7 +77,7 @@ def parse_pip_audit(report: dict[str, Any]) -> tuple[list[dict], set[str], str]:
     dependencies = report.get("dependencies")
     if not isinstance(dependencies, list):
         raise GateError("pip-audit report has no 'dependencies' list")
-    findings = []
+    findings: list[dict[str, Any]] = []
     scanned = set()
     for dependency in dependencies:
         name = str(dependency.get("name", "")).lower().replace("_", "-")
@@ -95,7 +97,9 @@ def parse_pip_audit(report: dict[str, Any]) -> tuple[list[dict], set[str], str]:
     return findings, scanned, "pip-audit"
 
 
-def parse_trivy(report: dict[str, Any]) -> tuple[list[dict], set[str], str]:
+def parse_trivy(
+    report: dict[str, Any],
+) -> tuple[list[dict[str, Any]], set[str], str]:
     """Parses a Trivy report.
 
     Args:
@@ -111,7 +115,7 @@ def parse_trivy(report: dict[str, Any]) -> tuple[list[dict], set[str], str]:
     results = report.get("Results")
     if not isinstance(results, list):
         raise GateError("Trivy report has no 'Results' list")
-    findings = []
+    findings: list[dict[str, Any]] = []
     scanned = set()
     for result in results:
         for package in result.get("Packages", []) or []:
@@ -135,7 +139,7 @@ def parse_trivy(report: dict[str, Any]) -> tuple[list[dict], set[str], str]:
     return findings, scanned, "trivy"
 
 
-def parse_report(report: Any) -> tuple[list[dict], set[str], str]:
+def parse_report(report: Any) -> tuple[list[dict[str, Any]], set[str], str]:
     """Detects the scanner format and parses it.
 
     Args:

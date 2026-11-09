@@ -40,7 +40,8 @@ class FaultArtifact:
             raise ValueError("evidence_type must not be empty")
         if "/" in self.evidence_type or "\\" in self.evidence_type:
             raise ValueError("evidence_type must be a path-safe name")
-        if not isinstance(self.content, bytes) or not self.content:
+        content: object = self.content  # may be any value from a caller
+        if not isinstance(content, bytes) or not content:
             raise ValueError("content must be non-empty bytes")
         if not isinstance(self.observed_outcome, reliability.EvidenceOutcome):
             raise TypeError("observed_outcome must be EvidenceOutcome")
@@ -77,11 +78,12 @@ class FaultInjectionHarness:
         """
         if not isinstance(registry, reliability.Registry):
             raise TypeError("registry must be Registry")
-        for name, value in (
+        identity: tuple[tuple[str, object], ...] = (
             ("execution_id", execution_id),
             ("reviewer", reviewer),
             ("recorded_at", recorded_at),
-        ):
+        )
+        for name, value in identity:
             if not isinstance(value, str) or not value.strip():
                 raise ValueError(f"{name} must not be empty")
         if "/" in execution_id or "\\" in execution_id:
@@ -131,7 +133,7 @@ class FaultInjectionHarness:
         if not isinstance(scenario, reliability.FaultScenario):
             raise TypeError("scenario must be FaultScenario")
         try:
-            artifacts = executor(scenario)
+            artifacts: object = executor(scenario)  # an injected callable
         except Exception as error:
             raise errors.ReliabilityError(
                 "fault executor failed before evidence was recorded",

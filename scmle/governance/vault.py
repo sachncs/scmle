@@ -169,7 +169,8 @@ class SealedTestSet(splitters.LockedTestSet):
             raise errors.LeakageError(f"test set is locked: {value}")
         self.opened = True
         self.close()
-        return value
+        rows: tuple[pandas.DataFrame, pandas.Series] = value
+        return rows
 
     def close(self) -> None:
         """Ends the vault process."""

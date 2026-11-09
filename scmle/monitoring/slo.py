@@ -26,7 +26,7 @@ class SLOStatus(enum.StrEnum):
     INVALID = "invalid"
 
 
-def require_text(value: str, field_name: str) -> str:
+def require_text(value: object, field_name: str) -> str:
     """Returns a non-empty SLO field.
 
     Args:
@@ -107,10 +107,9 @@ class SLOTarget:
             "alert_route",
         ):
             require_text(getattr(self, field_name), field_name)
-        if not isinstance(self.kind, observability.SignalKind):
-            object.__setattr__(
-                self, "kind", observability.SignalKind(self.kind)
-            )
+        kind: Any = self.kind  # may be text from a persisted record
+        if not isinstance(kind, observability.SignalKind):
+            object.__setattr__(self, "kind", observability.SignalKind(kind))
         if not math.isfinite(self.maximum) or self.maximum < 0:
             raise ValueError("maximum must be finite and non-negative")
         if self.window_days < 1:
@@ -174,8 +173,9 @@ class SLOEvaluation:
         if not isinstance(self.target, SLOTarget):
             raise TypeError("target must be SLOTarget")
         parse_timestamp(self.observed_at, "observed_at")
-        if not isinstance(self.status, SLOStatus):
-            object.__setattr__(self, "status", SLOStatus(self.status))
+        status: Any = self.status  # may be text from a persisted record
+        if not isinstance(status, SLOStatus):
+            object.__setattr__(self, "status", SLOStatus(status))
         if self.sample_count < 0 or self.in_window_count < 0:
             raise ValueError("sample counts must not be negative")
         if self.in_window_count > self.sample_count:
