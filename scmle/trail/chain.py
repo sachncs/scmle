@@ -5,7 +5,7 @@ file is signed with the analyst key over the head and the digest of every
 retained record. A step edited after the fact, a step removed, a record
 replaced or a signature that does not verify is a finding. The chain shows
 that nothing was changed after sealing; it does not show the first write was
-honest, and a party holding every key can reseal a changed set (canon P6).
+honest, and a party holding every key can reseal a changed set.
 """
 
 from collections.abc import Mapping
@@ -48,11 +48,20 @@ class Report:
         return not self.findings
 
     def kinds(self) -> set[str]:
-        """The kinds of finding present."""
+        """Lists the kinds of finding present.
+
+        Returns:
+            The set of finding kinds.
+        """
         return {f.kind for f in self.findings}
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Builds a JSON-ready record.
+
+        Returns:
+            A dict with the directory, `ok`, the head, the step count, the
+            findings and a note on what a trail does not show.
+        """
         return {
             "directory": self.directory,
             "ok": self.ok,
@@ -64,7 +73,15 @@ class Report:
 
 
 def link(steps: tuple[dict[str, Any], ...]) -> list[dict[str, Any]]:
-    """Adds ``prev`` and ``hash`` to each step."""
+    """Adds ``prev`` and ``hash`` to each step.
+
+    Args:
+        steps: The derived steps, in order.
+
+    Returns:
+        Copies of the steps in which each carries the hash of the previous one
+        (`GENESIS` for the first) and its own hash.
+    """
     chained: list[dict[str, Any]] = []
     previous = GENESIS
     for step in steps:
@@ -76,7 +93,14 @@ def link(steps: tuple[dict[str, Any], ...]) -> list[dict[str, Any]]:
 
 
 def manifest_of(directory: Path) -> dict[str, str]:
-    """Digest of every retained record and of ``inputs.json``."""
+    """Digests every retained record and ``inputs.json``.
+
+    Args:
+        directory: The trail folder.
+
+    Returns:
+        A mapping from each file's path relative to the folder to its SHA-256.
+    """
     held = {}
     base = directory / records.RETAINED
     for path in sorted(p for p in base.rglob("*") if p.is_file()):
@@ -88,7 +112,16 @@ def manifest_of(directory: Path) -> dict[str, str]:
 
 
 def signature_for(head: str, held: Mapping[str, str], key: str | bytes) -> str:
-    """The analyst's signature over the head and the record digests."""
+    """Signs the head and the record digests.
+
+    Args:
+        head: Hash of the last step.
+        held: Digest of each retained record, by path.
+        key: The analyst's key.
+
+    Returns:
+        The signature over the head and the digest of the record digests.
+    """
     return signing.sign_payload(
         {"head": head, "retained": records.digest(dict(held))}, key
     )
@@ -99,10 +132,13 @@ def seal(
 ) -> Report:
     """Derives the steps from the retained records and writes the trail.
 
+    The derived reports are written first and the steps are derived again, so
+    the steps see the reports' digests.
+
     Args:
         directory: A trail folder with ``retained/`` and ``inputs.json``.
-        keys: Keys by role. ``analyst`` signs the file; every role's key is
-            also needed to check that role's signatures.
+        keys: Keys by role. ``analyst`` signs the file; every role's key is also
+            needed to check that role's signatures.
 
     Returns:
         The verification of what was just written.
@@ -139,7 +175,17 @@ def seal(
 def check_chain(
     document: Mapping[str, Any], keys: Mapping[str, Any]
 ) -> list[trace.Finding]:
-    """Hash chain, head and signature of ``trail.json``."""
+    """Checks the hash chain, head and signature of ``trail.json``.
+
+    Args:
+        document: The parsed ``trail.json``.
+        keys: Verification keys by role; the analyst key checks the signature.
+
+    Returns:
+        A finding for each step that does not continue the chain, a head that is
+        not the last step, and a signature that is absent, cannot be checked for
+        lack of a key, or is invalid.
+    """
     found: list[trace.Finding] = []
     previous = GENESIS
     for index, step in enumerate(document.get("steps", [])):
@@ -189,7 +235,16 @@ def check_chain(
 def check_manifest(
     folder: Path, document: Mapping[str, Any]
 ) -> list[trace.Finding]:
-    """Every listed record exists and has the recorded digest."""
+    """Checks that every listed record exists and has the recorded digest.
+
+    Args:
+        folder: The trail folder.
+        document: The parsed ``trail.json``.
+
+    Returns:
+        A finding for each record that is absent or differs from the sealed
+        copy.
+    """
     found: list[trace.Finding] = []
     for relative, expected in sorted(document.get("retained", {}).items()):
         path = folder / relative
@@ -213,7 +268,16 @@ def check_manifest(
 def check_steps(
     document: Mapping[str, Any], derived: trace.Derived
 ) -> list[trace.Finding]:
-    """The stored steps must be what the retained records give now."""
+    """Checks that the stored steps are what the retained records give now.
+
+    Args:
+        document: The parsed ``trail.json``.
+        derived: The steps and findings derived from the retained records.
+
+    Returns:
+        A finding for each step that is absent from the trail or whose facts,
+        records, requirements or title differ from the derived ones.
+    """
     found: list[trace.Finding] = []
     stored = {s.get("kind"): s for s in document.get("steps", [])}
     for step in derived.steps:
@@ -249,9 +313,9 @@ def verify(
         keys: Verification keys by role.
 
     Returns:
-        Every finding. A trail with a missing link, a broken chain, an
-        unsigned or unapproved step or an outcome outside the approved
-        expectation reports that kind.
+        The report. A missing or unreadable ``trail.json`` is itself a finding.
+        A trail with a missing link, a broken chain, an unsigned or unapproved
+        step or an outcome outside the approved expectation reports that kind.
     """
     folder = Path(directory)
     path = folder / records.TRAIL_FILE

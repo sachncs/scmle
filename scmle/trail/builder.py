@@ -9,7 +9,14 @@ from scmle.trail import records
 
 
 def copy_present(source: Path, target: Path, names: tuple[str, ...]) -> None:
-    """Copies the named files that exist, keeping their relative paths."""
+    """Copies the named files that exist, keeping their relative paths.
+
+    Args:
+        source: Directory the files are read from.
+        target: Directory the files are copied into; subdirectories are created
+            as needed.
+        names: Paths relative to `source`; those that are not files are skipped.
+    """
     for name in names:
         found = source / name
         if found.is_file():

@@ -28,10 +28,14 @@ UNCERTAINTY = (
 
 
 def optimal_threshold(costs: Mapping[str, float]) -> float:
-    """Cut on the probability that minimises expected cost.
+    """Computes the cut on the probability that minimises expected cost.
 
     Args:
-        costs: The cost model with ``c_00``, ``c_01``, ``c_10``, ``c_11``.
+        costs: The cost model with ``c_00``, ``c_01``, ``c_10``, ``c_11`` (the
+            first index is the action, the second the outcome).
+
+    Returns:
+        The probability at which acting and not acting cost the same.
     """
     false_positive = costs["c_10"] - costs["c_00"]
     false_negative = costs["c_01"] - costs["c_11"]
@@ -44,7 +48,17 @@ def case_costs(
     probability: list[float],
     label: list[int],
 ) -> list[float]:
-    """Cost of each case when the rule acts at ``probability >= threshold``."""
+    """Computes the cost of each case when the rule acts at the threshold.
+
+    Args:
+        costs: The cost model with ``c_00``, ``c_01``, ``c_10``, ``c_11``.
+        threshold: The rule acts when the probability is at least this.
+        probability: Predicted probability of each case.
+        label: Observed outcome (0 or 1) of each case.
+
+    Returns:
+        The cost of each case, in the order given.
+    """
     found = []
     for p_value, outcome in zip(probability, label, strict=True):
         action = 1 if p_value >= threshold else 0
@@ -53,7 +67,15 @@ def case_costs(
 
 
 def interval(values: list[float]) -> tuple[float, float, float]:
-    """Mean and normal-approximation 95% interval of ``values``."""
+    """Computes the mean and a normal-approximation 95% interval.
+
+    Args:
+        values: Costs of the cases; at least one.
+
+    Returns:
+        The mean, the lower bound and the upper bound; both bounds equal the
+        mean when there is a single value.
+    """
     n = len(values)
     mean = math.fsum(values) / n
     if n < 2:
@@ -79,7 +101,8 @@ def track(
 
     Returns:
         A JSON-ready record; ``status`` is ``within``, ``above``, ``below``,
-        ``insufficient`` or ``absent``.
+        ``insufficient`` or ``absent``. ``above`` means the interval lies wholly
+        over the approved range, ``below`` wholly under it.
     """
     if not feed or not feed.get("batches"):
         return {"status": ABSENT, "cases": 0}

@@ -9,12 +9,28 @@ WIDTH = 78
 
 
 def clip(text: str) -> str:
-    """Shortens a line to the display width."""
+    """Shortens a line to the display width.
+
+    Args:
+        text: The line.
+
+    Returns:
+        The line, or its first `WIDTH - 3` characters followed by `...` if it is
+        longer than `WIDTH`.
+    """
     return text if len(text) <= WIDTH else text[: WIDTH - 3] + "..."
 
 
 def facts_lines(facts: dict[str, Any]) -> list[str]:
-    """One line per fact; long values are cut."""
+    """Formats the facts of a step.
+
+    Args:
+        facts: The step's facts.
+
+    Returns:
+        One line per fact, sorted by name; long values are cut. A list of
+        criteria with `passed` flags gets one line per criterion.
+    """
     lines = []
     for key in sorted(facts):
         value = facts[key]
@@ -36,10 +52,14 @@ def facts_lines(facts: dict[str, Any]) -> list[str]:
 
 
 def render(directory: str | Path) -> str:
-    """Text of the trail in ``directory``.
+    """Renders the trail in ``directory`` as text.
 
-    Raises:
-        FileNotFoundError: If there is no ``trail.json``.
+    Args:
+        directory: The trail folder.
+
+    Returns:
+        The model, version, charter hash and head, then each step with its facts
+        and records. A folder without ``trail.json`` raises `FileNotFoundError`.
     """
     document = records.read_json(Path(directory) / records.TRAIL_FILE)
     lines = [

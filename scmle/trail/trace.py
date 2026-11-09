@@ -73,7 +73,11 @@ class Finding:
     detail: str
 
     def to_dict(self) -> dict[str, str]:
-        """JSON-ready record."""
+        """Builds a JSON-ready record.
+
+        Returns:
+            A dict with `kind`, `step` and `detail`.
+        """
         return dataclasses.asdict(self)
 
 
@@ -94,12 +98,31 @@ class Derived:
 
 
 class Tracer:
-    """One derivation over one trail folder."""
+    """One derivation over one trail folder.
+
+    Attributes:
+        directory: The trail folder.
+        base: The folder's ``retained/`` directory.
+        keys: Verification keys by role.
+        findings: Problems found so far.
+        steps: Steps derived so far, by kind.
+        cache: Retained JSON records already read, by relative path.
+        charter_hash: Digest of the chartered question, once derived.
+        content_id: Digest of the model manifest, once derived.
+        run_id: Identifier of the run that produced the model, once derived.
+        inputs: The parsed ``inputs.json``.
+        derived: Derived reports by relative path or pseudo-file name.
+    """
 
     def __init__(
         self, directory: Path, keys: Mapping[str, str | bytes | None]
     ) -> None:
-        """Binds the folder and the verification keys by role."""
+        """Binds the folder and the verification keys by role.
+
+        Args:
+            directory: The trail folder.
+            keys: Verification keys by role.
+        """
         self.directory = directory
         self.base = directory / records.RETAINED
         self.keys = dict(keys)
@@ -113,11 +136,25 @@ class Tracer:
         self.derived: dict[str, Any] = {}
 
     def problem(self, kind: str, step: str, detail: str) -> None:
-        """Records a finding."""
+        """Records a finding.
+
+        Args:
+            kind: One of the finding kinds defined in this module.
+            step: The step kind it belongs to.
+            detail: One sentence.
+        """
         self.findings.append(Finding(kind, step, detail))
 
     def need(self, relative: str, step: str) -> Path | None:
-        """The path of a retained record, or a finding when it is absent."""
+        """Finds a retained record, recording a finding when it is absent.
+
+        Args:
+            relative: Path relative to ``retained/``.
+            step: The step that needs the record.
+
+        Returns:
+            The path, or None if the record is not a file.
+        """
         path = self.base / relative
         if not path.is_file():
             self.problem(MISSING_LINK, step, f"retained/{relative} is absent")
@@ -125,7 +162,17 @@ class Tracer:
         return path
 
     def json(self, relative: str, step: str) -> Any:
-        """A retained JSON record, or None with a finding."""
+        """Reads a retained JSON record, or None with a finding.
+
+        Results are cached, including a failure.
+
+        Args:
+            relative: Path relative to ``retained/``.
+            step: The step that needs the record.
+
+        Returns:
+            The parsed record, or None if it is absent or not valid JSON.
+        """
         if relative in self.cache:
             return self.cache[relative]
         path = self.need(relative, step)
@@ -141,7 +188,16 @@ class Tracer:
         return value
 
     def rows(self, relative: str, step: str) -> list[dict[str, Any]] | None:
-        """A retained JSON-lines record, or None with a finding."""
+        """Reads a retained JSON-lines record, or None with a finding.
+
+        Args:
+            relative: Path relative to ``retained/``.
+            step: The step that needs the record.
+
+        Returns:
+            The parsed rows, or None if the record is absent or not valid JSON
+            lines.
+        """
         path = self.need(relative, step)
         if path is None:
             return None
@@ -160,7 +216,15 @@ class Tracer:
         facts: dict[str, Any],
         requires: list[str],
     ) -> None:
-        """Stores a step with the digest of each record it rests on."""
+        """Stores a step with the digest of each record it rests on.
+
+        Args:
+            kind: The step kind.
+            files: Records the step rests on, relative to ``retained/`` (or
+                ``inputs.json``); those that do not exist are left out.
+            facts: The facts read from the records.
+            requires: Kinds of the steps this one builds on.
+        """
         held = {}
         for relative in files:
             path = (
@@ -181,7 +245,7 @@ class Tracer:
     # -- the steps -----------------------------------------------------------
 
     def question(self) -> None:
-        """The chartered question; the charter must be signed."""
+        """Derives the chartered question; the charter must be signed."""
         name = "question"
         wrapper = self.json("run/analysis_charter.json", name)
         facts: dict[str, Any] = {}
@@ -211,7 +275,13 @@ class Tracer:
     def check_charter_signature(
         self, wrapper: Mapping[str, Any], charter: Any, step: str
     ) -> None:
-        """Requires the charter's HMAC to verify under the analyst key."""
+        """Requires the charter's HMAC to verify under the analyst key.
+
+        Args:
+            wrapper: The stored charter with its signature and hash.
+            charter: The charter text that was signed.
+            step: The step kind findings are recorded against.
+        """
         signature = wrapper.get("signature")
         key = self.keys.get("analyst")
         if not signature:
@@ -228,7 +298,7 @@ class Tracer:
                 )
 
     def framing(self) -> None:
-        """The framing draft, its questions and the cost model."""
+        """Derives the framing draft, its questions and the cost model."""
         name = "framing"
         files = [f"framing/{n}" for n in records.FRAMING_FILES]
         draft = self.json(files[0], name)
@@ -271,7 +341,7 @@ class Tracer:
         self.add(name, files, facts, ["question"])
 
     def stakeholder(self) -> None:
-        """KPIs, acceptance criteria and the approved expectation."""
+        """Derives the KPIs, acceptance criteria and approved expectation."""
         name = "stakeholder"
         found = inputs_module.structure_problems(self.inputs)
         for detail in found:
@@ -312,7 +382,17 @@ class Tracer:
     def evaluate(
         self, criteria: list[dict[str, Any]], step: str
     ) -> list[dict[str, Any]]:
-        """Checks each criterion against the retained records."""
+        """Checks each criterion against the retained records.
+
+        Args:
+            criteria: Criteria with `id`, `path`, `op` and `value`.
+            step: The step kind findings are recorded against.
+
+        Returns:
+            One result per criterion with the observed value and whether it
+            passed. A criterion whose path cannot be resolved is recorded as a
+            finding and counts as not passed.
+        """
         results = []
         for item in criteria:
             observed: Any = None
@@ -345,7 +425,14 @@ class Tracer:
     def report_step(
         self, name: str, relative: str, fresh: dict[str, Any], files: list[str]
     ) -> None:
-        """A derived report: the stored copy must equal the recomputation."""
+        """Derives a report step: the stored copy must equal the recomputation.
+
+        Args:
+            name: The step kind.
+            relative: Path of the stored report, relative to the trail folder.
+            fresh: The report recomputed from the retained records.
+            files: Records the step rests on.
+        """
         stored_path = self.directory / relative
         if not stored_path.is_file():
             self.problem(MISSING_LINK, name, f"{relative} is absent")
@@ -369,7 +456,7 @@ class Tracer:
         )
 
     def exploration(self) -> None:
-        """The exploratory report."""
+        """Derives the exploratory report."""
         name = "exploration"
         base = "run/"
         files = [
@@ -391,7 +478,7 @@ class Tracer:
         self.report_step(name, records.EXPLORATORY, fresh, files)
 
     def experiments(self) -> None:
-        """The experiment comparison."""
+        """Derives the experiment comparison."""
         name = "experiments"
         files = ["run/evaluation.json"]
         trials = sorted((self.base / "run" / "trials").glob("trial_*.json"))
@@ -406,7 +493,7 @@ class Tracer:
         self.report_step(name, records.EXPERIMENTS, fresh, files)
 
     def quality(self) -> None:
-        """Domain thresholds; the reviewer signs and names what was read."""
+        """Derives the domain thresholds, which the reviewer signs."""
         name = "quality"
         problem = inputs_module.signature_problem(
             self.inputs, "reviewer", self.keys.get("reviewer")
@@ -449,7 +536,7 @@ class Tracer:
         )
 
     def selection(self) -> None:
-        """The selected model, its claims and the bundle identity."""
+        """Derives the selected model, its claims and the bundle identity."""
         name = "selection"
         evaluation = self.json("run/evaluation.json", name) or {}
         manifest = self.need("run/model/model_manifest.json", name)
@@ -498,7 +585,7 @@ class Tracer:
         self.add(name, files, facts, ["question", "experiments", "quality"])
 
     def approval(self) -> None:
-        """The registered version, its signed approval and release state."""
+        """Derives the registered version, its approval and release state."""
         name = "approval"
         facts: dict[str, Any] = {}
         index = self.json("registry/registry.json", name)
@@ -566,7 +653,21 @@ class Tracer:
         version: Any,
         step: str,
     ) -> dict[str, Any] | None:
-        """The champion promotion row's approval, checked."""
+        """Checks the approval row of the champion promotion.
+
+        Args:
+            audit: Rows of the registry's audit log.
+            model: Model name.
+            version: Model version.
+            step: The step kind findings are recorded against.
+
+        Returns:
+            The approval record of the latest champion promotion of this
+            version, or None if there is none or it cannot be used. Findings are
+            recorded for a missing, unsigned or unverifiable approval, for an
+            approval that is not valid for this model version and bundle, and
+            for an approval by the person who built the model.
+        """
         rows = [
             r
             for r in audit
@@ -619,7 +720,7 @@ class Tracer:
         return record
 
     def deployment(self) -> None:
-        """The deployment ledger: its chain, charter, model and feed."""
+        """Derives the deployment ledger: chain, charter, model and feed."""
         name = "deployment"
         path = self.need("deployment/deployment_ledger.jsonl", name)
         facts: dict[str, Any] = {}
@@ -673,7 +774,12 @@ class Tracer:
     def reconcile_feed(
         self, summaries: list[dict[str, Any]], step: str
     ) -> None:
-        """The outcome feed must cover the cases the ledger saw."""
+        """Requires the outcome feed to cover the cases the ledger saw.
+
+        Args:
+            summaries: The ledger's observation summaries.
+            step: The step kind findings are recorded against.
+        """
         feed = self.json("deployment/observed_outcomes.json", step)
         if not isinstance(feed, dict):
             return

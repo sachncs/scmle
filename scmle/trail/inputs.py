@@ -21,7 +21,16 @@ EXPECTATION_FIELDS = ("kpi", "metric", "low", "high", "level", "basis")
 
 
 def section_payload(record: Mapping[str, Any], role: str) -> dict[str, Any]:
-    """The bytes a section's signature covers, as a mapping."""
+    """Builds the content that a section's signature covers.
+
+    Args:
+        record: The inputs.
+        role: `stakeholder` or `reviewer`.
+
+    Returns:
+        A mapping with the role, model, version, charter hash and the section
+        body without its signature.
+    """
     body = {
         key: value
         for key, value in dict(record[role]).items()
@@ -44,6 +53,9 @@ def sign_inputs(
     Args:
         record: The inputs, without signatures.
         keys: Signing key by role (``stakeholder``, ``reviewer``).
+
+    Returns:
+        The record with a `signature` in each section.
     """
     signed = {
         key: dict(value) if isinstance(value, Mapping) else value
@@ -59,7 +71,17 @@ def sign_inputs(
 def signature_problem(
     record: Mapping[str, Any], role: str, key: str | bytes | None
 ) -> str | None:
-    """Why a section's signature is not valid, or None when it is."""
+    """Explains why a section's signature is not valid.
+
+    Args:
+        record: The inputs.
+        role: `stakeholder` or `reviewer`.
+        key: The role's key, or None if none was supplied.
+
+    Returns:
+        The reason (section absent, unsigned, no key supplied, or the signature
+        does not verify), or None when the signature is valid.
+    """
     section = record.get(role)
     if not isinstance(section, Mapping):
         return f"the {role} section is absent"
@@ -75,7 +97,15 @@ def signature_problem(
 
 
 def structure_problems(record: Mapping[str, Any]) -> list[str]:
-    """Missing or malformed fields in the inputs."""
+    """Lists missing or malformed fields in the inputs.
+
+    Args:
+        record: The inputs.
+
+    Returns:
+        One message per missing top-level field, section field, KPI field,
+        criterion field, unknown criterion operator or expectation field.
+    """
     found: list[str] = []
     for name in ("model", "version", "charter_hash", "builder"):
         if name not in record:

@@ -15,15 +15,30 @@ BAR_WIDTH = 30
 
 
 def with_hash(body: dict[str, Any]) -> dict[str, Any]:
-    """Adds the digest of ``body`` under ``sha256``."""
+    """Adds the digest of ``body`` under ``sha256``.
+
+    Args:
+        body: The report content.
+
+    Returns:
+        A copy of the body with a `sha256` entry.
+    """
     return {**body, "sha256": records.digest(body)}
 
 
 def exploratory(directory: Path) -> dict[str, Any]:
-    """What the data looked like and what exploration was allowed to do.
+    """Reports what the data looked like and what exploration was allowed to do.
 
     Reads the run's curation report, dataset manifest, feasibility verdict,
     hypothesis ledger and claims. Only the exploration rows were profiled.
+
+    Args:
+        directory: The trail folder.
+
+    Returns:
+        The report with its digest: dataset identity, profiled rows, columns,
+        quality findings, feasibility, ledger row counts and the confirmation
+        outcome.
     """
     base = directory / records.RETAINED / "run"
     curation = records.read_json(base / "curation_report.json")
@@ -73,17 +88,34 @@ def exploratory(directory: Path) -> dict[str, Any]:
 
 
 def bar(score: float, top: float) -> str:
-    """A text bar for a score between 0 and ``top``."""
+    """Draws a text bar.
+
+    Args:
+        score: The score; negative values count as zero.
+        top: The score that fills the bar.
+
+    Returns:
+        A string of `#` up to `BAR_WIDTH` long, empty if `top` is not positive.
+    """
     filled = round(BAR_WIDTH * max(score, 0.0) / top) if top > 0 else 0
     return "#" * filled
 
 
 def experiments(directory: Path) -> dict[str, Any]:
-    """Every candidate the search tried, ranked, with its spread.
+    """Ranks every candidate the search tried, with its spread.
 
-    The comparison states whether the selected model's lead over the runner
-    up is larger than the spread of the cross-validation scores; when it is
-    not, the choice among them is not statistically separated.
+    The comparison states whether the selected model's lead over the runner up
+    is larger than the spread of the cross-validation scores; when it is not,
+    the choice among them is not statistically separated.
+
+    Args:
+        directory: The trail folder.
+
+    Returns:
+        The report with its digest: the ranked scored trials, the trials that
+        were not scored, the lead over the runner-up and whether it exceeds the
+        spread, the baseline score, the interval, the test metrics and a
+        reading.
     """
     base = directory / records.RETAINED / "run"
     evaluation = records.read_json(base / "evaluation.json")
