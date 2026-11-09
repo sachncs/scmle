@@ -150,11 +150,15 @@ def shift_report(found: qualify.Robustness) -> dict[str, Any]:
         "certificate": {"gates": gates, "note": found.store_note},
         "assumptions": [
             "Selection into the deployment sample is assumed random.",
-            "Two-sample tests detect covariate shift, not label or concept "
-            "shift.",
+            (
+                "Two-sample tests detect covariate shift, not label or concept "
+                "shift."
+            ),
             "A pass means no shift was detected, not that none exists.",
-            "Exact only under exchangeability of the sides; clustered or "
-            "temporal data need block-matched samples.",
+            (
+                "Exact only under exchangeability of the sides; clustered or "
+                "temporal data need block-matched samples."
+            ),
         ],
     }
 

@@ -59,8 +59,8 @@ def curve(specs: list[dict[str, Any]]) -> str:
     if not points:
         return "<p>no specification produced an estimate</p>"
     points = sorted(points, key=lambda s: s["effect"])
-    low = min(min(s["low"] for s in points), 0.0)
-    high = max(max(s["high"] for s in points), 0.0)
+    low = min(*(s["low"] for s in points), 0.0)
+    high = max(*(s["high"] for s in points), 0.0)
     span = (high - low) or 1.0
 
     def y(value: float) -> float:
@@ -77,10 +77,14 @@ def curve(specs: list[dict[str, Any]]) -> str:
 
     step = (WIDTH - 2 * PAD) / max(len(points) - 1, 1)
     parts = [
-        f'<svg width="{WIDTH}" height="{HEIGHT}" role="img" '
-        f'aria-label="specification curve of {len(points)} specifications">',
-        f'<line x1="{PAD}" x2="{WIDTH - PAD}" y1="{y(0.0):.1f}" '
-        f'y2="{y(0.0):.1f}" stroke="#888" stroke-dasharray="3"/>',
+        (
+            f'<svg width="{WIDTH}" height="{HEIGHT}" role="img" '
+            f'aria-label="specification curve of {len(points)} specifications">'
+        ),
+        (
+            f'<line x1="{PAD}" x2="{WIDTH - PAD}" y1="{y(0.0):.1f}" '
+            f'y2="{y(0.0):.1f}" stroke="#888" stroke-dasharray="3"/>'
+        ),
     ]
     for index, spec in enumerate(points):
         x = PAD + index * step
@@ -109,20 +113,22 @@ def stability_section(document: dict[str, Any]) -> str:
     """
     rows = [
         "<h2>Stability</h2>",
-        f"<p>status: <b>{esc(document['status'])}</b>. "
-        f"{esc(document['reason'])}</p>",
+        (
+            f"<p>status: <b>{esc(document['status'])}</b>. "
+            f"{esc(document['reason'])}</p>"
+        ),
         f"<p>counts: {esc(document['counts'])}</p>",
     ]
     findings = document["findings"]
     if not findings:
         rows.append("<p>no findings were evaluated.</p>")
-    for item in findings:
-        rows.append(
-            f"<h3>{esc(item['name'])}: {esc(item['status'])}</h3>"
-            f"<p>{esc(item.get('reason', ''))}</p>"
-            f"<p>{esc(item.get('headline', ''))}</p>"
-            f"{curve(item.get('specs', []))}"
-        )
+    rows.extend(
+        f"<h3>{esc(item['name'])}: {esc(item['status'])}</h3>"
+        f"<p>{esc(item.get('reason', ''))}</p>"
+        f"<p>{esc(item.get('headline', ''))}</p>"
+        f"{curve(item.get('specs', []))}"
+        for item in findings
+    )
     rows.append(f"<p><i>{esc(document['guarantee'])}</i></p>")
     return "".join(rows)
 

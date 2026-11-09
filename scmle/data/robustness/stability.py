@@ -68,6 +68,7 @@ NOT_EVALUABLE = "not_evaluable"
 IMPUTATION = "imputation"
 OUTLIER_RULE = "outlier_rule"
 INCLUSION = "inclusion"
+MIN_CHOICE_LEVELS = 2
 IMPLEMENTED: dict[str, tuple[str, ...]] = {
     IMPUTATION: ("median", "mean", "zero", "complete_case"),
     OUTLIER_RULE: ("none", "winsorize", "iqr_drop"),
@@ -390,8 +391,10 @@ def verdict(
     if headline is None or len(defined) < MIN_SPECS:
         return (
             NOT_EVALUABLE,
-            f"fewer than {MIN_SPECS} specifications gave an estimate "
-            "(or the headline specification did not)",
+            (
+                f"fewer than {MIN_SPECS} specifications gave an estimate "
+                "(or the headline specification did not)"
+            ),
             numbers,
         )
     median = float(numpy.median(defined))
@@ -467,7 +470,7 @@ def attribution(
         groups: dict[str, list[float]] = {}
         for e, value in zip(rows, values, strict=True):
             groups.setdefault(e.choices[name], []).append(float(value))
-        if len(groups) < 2:
+        if len(groups) < MIN_CHOICE_LEVELS:
             continue
         means = {k: float(numpy.mean(v)) for k, v in sorted(groups.items())}
         between = sum(
