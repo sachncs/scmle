@@ -16,9 +16,8 @@ provenance the caller supplies (the field records):
 Rows that are neither candidates nor violations get `none`. Without
 provenance every candidate is `unclassified` and the result is `unverified`.
 Candidates are ranked with the maximum robust z-score over columns
-(median and normal-consistent MAD); an Isolation Forest ranking is offered
-for multivariate ordering. The candidate cutoff only selects whom to look at
-and never assigns a class.
+(median and normal-consistent MAD). The candidate cutoff only selects whom
+to look at and never assigns a class.
 """
 
 from collections.abc import Callable
@@ -28,9 +27,6 @@ from typing import Any
 
 import numpy
 import pandas
-from sklearn import ensemble
-
-from scmle.core import randomness
 
 MAD_SCALE = 1.4826
 CANDIDATE_Z = 6.0
@@ -116,29 +112,6 @@ def row_scores(frame: pandas.DataFrame, columns: list[str]) -> pandas.Series:
         return pandas.Series(0.0, index=frame.index)
     table = pandas.concat([robust_z(frame[c]) for c in columns], axis=1)
     return table.max(axis=1)
-
-
-def isolation_rank(
-    frame: pandas.DataFrame, columns: list[str], seed: int
-) -> pandas.Series:
-    """Scores rows with an Isolation Forest, for ordering.
-
-    Missing values are filled with the column median.
-
-    Args:
-        frame: Table.
-        columns: Numeric columns to use.
-        seed: Run seed from which the forest's seed is derived.
-
-    Returns:
-        The anomaly score of each row (higher is more isolated).
-    """
-    block = frame[columns].astype(float)
-    block = block.fillna(block.median())
-    forest = ensemble.IsolationForest(
-        random_state=randomness.derive_int_seed(seed, "outliers.forest", 0)
-    ).fit(block)
-    return pandas.Series(-forest.score_samples(block), index=frame.index)
 
 
 def outside(

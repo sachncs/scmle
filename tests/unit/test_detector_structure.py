@@ -188,11 +188,8 @@ def test_triage_rejects_bad_provenance_and_contracts():
         outliers.triage(frame, None, {"bad": lambda f: f["v"]})
 
 
-def test_isolation_rank_orders_the_outlier_first_and_is_deterministic():
+def test_triage_without_provenance_is_unverified():
     frame = triage_frame()
-    rank = outliers.isolation_rank(frame, ["v", "w"], 0)
-    assert rank.idxmax() in (0, 2)
-    assert rank.equals(outliers.isolation_rank(frame, ["v", "w"], 0))
     assert outliers.summary(outliers.triage(frame))["tier"] == "unverified"
 
 
