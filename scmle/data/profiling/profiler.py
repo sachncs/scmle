@@ -32,6 +32,24 @@ DATETIME_PARTS = (
     "dayofyear",
     "timestamp",
 )
+OPTIONAL_COLUMN_ROLES = (
+    ("treatment_column", "treatment indicator (used by uplift models only)"),
+    (
+        "baseline_column",
+        "current process decision (used by the baseline claim only)",
+    ),
+    (
+        "logged_action_column",
+        "logged action (used by off-policy evaluation only)",
+    ),
+    (
+        "propensity_column",
+        "logged propensity (used by off-policy evaluation only)",
+    ),
+    ("query_column", "query identifier (ranking only)"),
+    ("event_column", "event indicator (used by survival models only)"),
+    ("weight_column", "sample weight (used for training only)"),
+)
 
 
 def column_exclusion_reason(
@@ -134,30 +152,10 @@ class Profiler:
             roles[extra] = "additional target (multi-target task)"
         if streaming.SPLIT_COLUMN in frame.columns:
             roles[streaming.SPLIT_COLUMN] = "split side chosen while streaming"
-        if data.treatment_column:
-            roles[data.treatment_column] = (
-                "treatment indicator (used by uplift models only)"
-            )
-        if data.baseline_column:
-            roles[data.baseline_column] = (
-                "current process decision (used by the baseline claim only)"
-            )
-        if data.logged_action_column:
-            roles[data.logged_action_column] = (
-                "logged action (used by off-policy evaluation only)"
-            )
-        if data.propensity_column:
-            roles[data.propensity_column] = (
-                "logged propensity (used by off-policy evaluation only)"
-            )
-        if data.query_column:
-            roles[data.query_column] = "query identifier (ranking only)"
-        if data.event_column:
-            roles[data.event_column] = (
-                "event indicator (used by survival models only)"
-            )
-        if data.weight_column:
-            roles[data.weight_column] = "sample weight (used for training only)"
+        for attribute, reason in OPTIONAL_COLUMN_ROLES:
+            column = getattr(data, attribute)
+            if column:
+                roles[column] = reason
         for column in roles:
             if column not in frame.columns:
                 raise errors.DataError(
@@ -275,9 +273,9 @@ class Profiler:
             values = pandas.to_datetime(frame[column], errors="coerce")
             for part in DATETIME_PARTS:
                 if part == "timestamp":
-                    varies = values.nunique() > 1
+                    varies = values.nunique() > 1  # noqa: PD101 -- counts distinct non-missing values; an equality check against the first value would treat NaT as different
                 else:
-                    varies = getattr(values.dt, part).nunique() > 1
+                    varies = getattr(values.dt, part).nunique() > 1  # noqa: PD101 -- counts distinct non-missing values; an equality check against the first value would treat NaT as different
                 if varies:
                     nodes.append(
                         tasks.FeatureNode(
@@ -323,11 +321,16 @@ class Profiler:
         if not task.is_classification or len(target) < MIN_BALANCE_ROWS:
             return []
         counts = target.value_counts()
-        if len(counts) >= MIN_BALANCE_CLASSES and counts.nunique() == 1:
+        if (
+            len(counts) >= MIN_BALANCE_CLASSES
+            and (counts == counts.iloc[0]).all()
+        ):
             return [
-                f"every class has exactly {int(counts.iloc[0])} rows: if the "
-                "table was balanced by sampling, test scores reflect equal "
-                "prevalence, not the real-world mix"
+                (
+                    f"every class has exactly {int(counts.iloc[0])} rows: "
+                    "if the table was balanced by sampling, test scores "
+                    "reflect equal prevalence, not the real-world mix"
+                )
             ]
         return []
 
