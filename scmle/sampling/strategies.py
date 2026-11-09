@@ -53,8 +53,8 @@ class Strategy(abc.ABC):
 
     def applicability(
         self,
-        profile: data.DatasetProfile,
-        task: tasks.Task,
+        profile: data.DatasetProfile,  # noqa: ARG002 -- subclasses override with it
+        task: tasks.Task,  # noqa: ARG002 -- subclasses override with it
         adapter: models.Model,
     ) -> str | None:
         """Explains why the strategy does not apply, if it does not.
@@ -102,9 +102,9 @@ class Default(Strategy):
 
     def applicability(
         self,
-        profile: data.DatasetProfile,
-        task: tasks.Task,
-        adapter: models.Model,
+        profile: data.DatasetProfile,  # noqa: ARG002 -- Strategy interface
+        task: tasks.Task,  # noqa: ARG002 -- Strategy interface
+        adapter: models.Model,  # noqa: ARG002 -- Strategy interface
     ) -> str | None:
         """Always applicable.
 
@@ -335,7 +335,9 @@ class Recalibration(Strategy):
         return calibration.CalibratedClassifierCV(
             inner,
             method="sigmoid",
-            cv=inner_cv.for_plan(plan, True, CALIBRATION_FOLDS, seed),
+            cv=inner_cv.for_plan(
+                plan, classification=True, folds=CALIBRATION_FOLDS, seed=seed
+            ),
         )
 
 
@@ -848,7 +850,7 @@ class MissingIndicators(Imputation):
             return reason
         plan = profile.feature_plan
         problem = preprocessing.monotonic_layout_problem(
-            plan, False, self.missing
+            plan, select=False, missing=self.missing
         )
         if problem:
             return problem
