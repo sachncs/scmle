@@ -339,20 +339,6 @@ def show_claim(run_dir: str | Path, claim_id: str) -> dict[str, Any]:
     }
 
 
-def step(name: str, status: str, detail: str) -> Finding:
-    """Builds a finding.
-
-    Args:
-        name: What was checked.
-        status: `pass`, `fail` or `skipped`.
-        detail: One sentence.
-
-    Returns:
-        The finding.
-    """
-    return Finding(name, status, detail)
-
-
 def check_ledger_head(
     document: dict[str, Any], ledger: scmle.data.ledger.ledger.Ledger
 ) -> Finding:
@@ -367,8 +353,8 @@ def check_ledger_head(
     """
     name = "claims file names the ledger head"
     if document.get("ledger_head") == ledger.head:
-        return step(name, PASS, f"head {ledger.head[:12]}")
-    return step(
+        return Finding(name, PASS, f"head {ledger.head[:12]}")
+    return Finding(
         name, FAIL, "confirmed_claims.json names a different ledger head"
     )
 
@@ -395,19 +381,21 @@ def check_charter(
     path = run_dir / CHARTER_FILE
     name = "charter verifies and matches the ledger"
     if not path.exists():
-        return [step(name, SKIPPED, f"{CHARTER_FILE} is not in the run")]
+        return [Finding(name, SKIPPED, f"{CHARTER_FILE} is not in the run")]
     try:
         loaded = sealing.read_verified(path, signing_key=signing_key)
     except errors.ScmleError as error:
-        return [step(name, FAIL, str(error))]
+        return [Finding(name, FAIL, str(error))]
     if loaded.charter_hash != ledger.header.get("charter_hash"):
-        return [step(name, FAIL, "the ledger names another charter hash")]
+        return [Finding(name, FAIL, "the ledger names another charter hash")]
     how = "signature verified" if loaded.signed else "hash only, not signed"
-    findings = [step(name, PASS, f"{loaded.charter_hash[:12]} ({how})")]
+    findings = [Finding(name, PASS, f"{loaded.charter_hash[:12]} ({how})")]
     rules = loaded.charter.rules
     rule_step = "chartered rules were used"
     if rules is None:
-        findings.append(step(rule_step, SKIPPED, "the charter fixes no rules"))
+        findings.append(
+            Finding(rule_step, SKIPPED, "the charter fixes no rules")
+        )
     else:
         used = ledger.header["rule"]["rule"]
         confirmed_with = (ledger.confirmation or {}).get("rule")
@@ -416,7 +404,7 @@ def check_charter(
             rules.confirmation_rule,
         ):
             findings.append(
-                step(
+                Finding(
                     rule_step,
                     FAIL,
                     f"ledger rule {used!r} / confirmation rule "
@@ -426,7 +414,9 @@ def check_charter(
             )
         else:
             findings.append(
-                step(rule_step, PASS, f"{used} and {rules.confirmation_rule}")
+                Finding(
+                    rule_step, PASS, f"{used} and {rules.confirmation_rule}"
+                )
             )
     return findings
 
@@ -449,7 +439,7 @@ def check_claims_against_ledger(
     sealed_row = ledger.confirmation
     survivors = ledger.survivor_set
     if sealed_row is None or survivors is None:
-        return step(name, FAIL, "the ledger is not sealed")
+        return Finding(name, FAIL, "the ledger is not sealed")
     problems = []
     if document.get("survivors_sha256") != survivors.sha256:
         problems.append("survivor hash")
@@ -472,10 +462,12 @@ def check_claims_against_ledger(
     if document.get("stage_two") != sealed_row.get("stage_two"):
         problems.append("second-stage accounting")
     if problems:
-        return step(
+        return Finding(
             name, FAIL, "differs from the ledger: " + ", ".join(problems)
         )
-    return step(name, PASS, f"{len(confirmed)} confirmed of {len(ids)} claims")
+    return Finding(
+        name, PASS, f"{len(confirmed)} confirmed of {len(ids)} claims"
+    )
 
 
 def is_confirmed(claim: dict[str, Any]) -> bool:
@@ -503,7 +495,7 @@ def check_replay(document: dict[str, Any]) -> Finding:
     """
     name = "confirmation replays from the p-values on C"
     if document.get("outcome") != confirm.CONFIRMED:
-        return step(name, SKIPPED, f"outcome is {document.get('outcome')!r}")
+        return Finding(name, SKIPPED, f"outcome is {document.get('outcome')!r}")
     try:
         by_check = {c["check_id"]: c for c in document["checks"]}
         tested = [
@@ -520,19 +512,19 @@ def check_replay(document: dict[str, Any]) -> Finding:
             if recorded is None or not math.isclose(
                 recorded, adjustment.adjusted[index], abs_tol=TOLERANCE
             ):
-                return step(
+                return Finding(
                     name, FAIL, f"{claim['claim_id']}: adjusted p differs"
                 )
             if is_confirmed(claim) != adjustment.rejected[index]:
-                return step(name, FAIL, f"{claim['claim_id']}: tier differs")
+                return Finding(name, FAIL, f"{claim['claim_id']}: tier differs")
     except (
         ValueError,
         KeyError,
         TypeError,
         ZeroDivisionError,
     ) as error:
-        return step(name, FAIL, f"cannot replay: {error!r}")
-    return step(
+        return Finding(name, FAIL, f"cannot replay: {error!r}")
+    return Finding(
         name, PASS, f"{len(tested)} hypotheses, rule {document['rule']}"
     )
 
@@ -555,10 +547,10 @@ def check_stage_two(
     name = "second-stage accounting is consistent"
     record = document.get("stage_two")
     if record is None:
-        return step(name, SKIPPED, "no withdrawal rule ran")
+        return Finding(name, SKIPPED, "no withdrawal rule ran")
     survivors = ledger.survivor_set
     if survivors is None:
-        return step(name, FAIL, "the ledger has no frozen survivors")
+        return Finding(name, FAIL, "the ledger has no frozen survivors")
     withdrawn = set(record["withdrawn"])
     family = [i for i in survivors.hypothesis_ids if i not in withdrawn]
     expected = scmle.data.ledger.ledger.digest(
@@ -582,8 +574,8 @@ def check_stage_two(
         if claim["claim_id"] in withdrawn and is_confirmed(claim):
             problems.append("a withdrawn survivor is confirmed")
     if problems:
-        return step(name, FAIL, "; ".join(problems))
-    return step(
+        return Finding(name, FAIL, "; ".join(problems))
+    return Finding(
         name,
         PASS,
         f"{len(family)} tested, {len(withdrawn)} withdrawn before C opened",
@@ -612,35 +604,41 @@ def check_custody(
     name = "custody log: selection frozen before C opened, C opened once"
     path = run_dir / CUSTODY_FILE
     if not path.exists():
-        return step(name, SKIPPED, f"{CUSTODY_FILE} is not in the run")
+        return Finding(name, SKIPPED, f"{CUSTODY_FILE} is not in the run")
     try:
         log = sealed.OpenLog(path, signing_key)
     except errors.ScmleError as error:
-        return step(name, FAIL, str(error))
+        return Finding(name, FAIL, str(error))
     entries = [e for e in log.entries if e.get("set") == "C"]
     names = [e["event"] for e in entries]
     opened = names.count("open")
     if opened > 1:
-        return step(name, FAIL, f"C was opened {opened} times")
+        return Finding(name, FAIL, f"C was opened {opened} times")
     if document.get("outcome") == confirm.CONFIRMED and opened != 1:
-        return step(name, FAIL, "outcome is confirmed but C has no open event")
+        return Finding(
+            name, FAIL, "outcome is confirmed but C has no open event"
+        )
     if opened == 0 and document.get("outcome") != confirm.CONFIRMED:
-        return step(name, PASS, f"C not opened (outcome {document['outcome']})")
+        return Finding(
+            name, PASS, f"C not opened (outcome {document['outcome']})"
+        )
     frozen = [e for e in entries if e["event"] == "selection_frozen"]
     if len(frozen) != 1 or names.index("selection_frozen") > names.index(
         "open"
     ):
-        return step(name, FAIL, "no single selection_frozen before the open")
+        return Finding(name, FAIL, "no single selection_frozen before the open")
     detail = frozen[0].get("detail", {})
     if detail.get("survivors_sha256") != document.get("survivors_sha256"):
-        return step(name, FAIL, "frozen survivor hash differs from the claims")
+        return Finding(
+            name, FAIL, "frozen survivor hash differs from the claims"
+        )
     record = document.get("stage_two")
     if (
         record is not None
         and detail.get("family_sha256") != record["family_sha256"]
     ):
-        return step(name, FAIL, "frozen family hash differs from the claims")
-    return step(name, PASS, f"{len(log.entries)} entries, chain verified")
+        return Finding(name, FAIL, "frozen family hash differs from the claims")
+    return Finding(name, PASS, f"{len(log.entries)} entries, chain verified")
 
 
 def check_decision_files(
@@ -665,7 +663,7 @@ def check_decision_files(
         try:
             log = sealed.OpenLog(path, signing_key)
         except errors.ScmleError as error:
-            return step(name, FAIL, str(error))
+            return Finding(name, FAIL, str(error))
         entries = [
             e
             for e in log.entries
@@ -677,13 +675,13 @@ def check_decision_files(
     if not entries:
         if not present:
             return None
-        return step(
+        return Finding(
             name,
             SKIPPED,
             "the run registered no decision file hashes (older run)",
         )
     if len(entries) > 1:
-        return step(name, FAIL, "the decision files were registered twice")
+        return Finding(name, FAIL, "the decision files were registered twice")
     registered = entries[0].get("detail", {}).get("files", {})
     problems = []
     for file_name in decision_reports.DECISION_FILES:
@@ -700,9 +698,9 @@ def check_decision_files(
         elif found != expected:
             problems.append(f"{file_name}: differs from the registered hash")
     if problems:
-        return step(name, FAIL, "; ".join(problems))
+        return Finding(name, FAIL, "; ".join(problems))
     count = sum(1 for v in registered.values() if v is not None)
-    return step(name, PASS, f"{count} file(s) hash to the registration")
+    return Finding(name, PASS, f"{count} file(s) hash to the registration")
 
 
 def check_coverage_claim(
@@ -737,7 +735,7 @@ def check_coverage_claim(
         try:
             log = sealed.OpenLog(log_path, signing_key)
         except errors.ScmleError as error:
-            return step(name, FAIL, str(error))
+            return Finding(name, FAIL, str(error))
         entries = [
             e
             for e in log.entries
@@ -753,7 +751,7 @@ def check_coverage_claim(
                 f"{coverage_run.CLAIM_FILE}: differs from the registered hash"
             )
     else:
-        return step(name, SKIPPED, f"{CUSTODY_FILE} is not in the run")
+        return Finding(name, SKIPPED, f"{CUSTODY_FILE} is not in the run")
     if report_path.exists():
         try:
             report = json.loads(report_path.read_text(encoding="utf-8"))
@@ -762,8 +760,8 @@ def check_coverage_claim(
         if found is not None and report.get("claim_sha256") != found:
             problems.append(f"{coverage_run.REPORT_FILE}: names another claim")
     if problems:
-        return step(name, FAIL, "; ".join(problems))
-    return step(name, PASS, "claim hash registered; the report names it")
+        return Finding(name, FAIL, "; ".join(problems))
+    return Finding(name, PASS, "claim hash registered; the report names it")
 
 
 def check_coverage_confirmation(
@@ -791,12 +789,12 @@ def check_coverage_confirmation(
     registered = ledger.claims.get(coverage_confirm.CLAIM_ID)
     if document.get("status") == confirm.NOT_EVALUATED:
         if registered is not None:
-            return step(
+            return Finding(
                 name, FAIL, "a registered claim has no evaluation document"
             )
-        return step(name, SKIPPED, "the claim could not be tested on C")
+        return Finding(name, SKIPPED, "the claim could not be tested on C")
     if registered is None:
-        return step(name, FAIL, "the claim is not registered in the ledger")
+        return Finding(name, FAIL, "the claim is not registered in the ledger")
     problems = []
     claim = read_optional(run_dir / coverage_run.CLAIM_FILE)
     try:
@@ -811,7 +809,7 @@ def check_coverage_confirmation(
             int(document["covered"]), int(document["rows"]), choice
         )
     except (KeyError, TypeError, ValueError):
-        return step(name, FAIL, "the document is malformed")
+        return Finding(name, FAIL, "the document is malformed")
     if abs(redone["p_value"] - float(document["p_value"])) > TOLERANCE:
         problems.append("the p-value does not recompute from the counts")
     gate = document.get("task_gate")
@@ -825,8 +823,8 @@ def check_coverage_confirmation(
     if stated != document.get("status"):
         problems.append("the status differs from the sealed ledger row")
     if problems:
-        return step(name, FAIL, "; ".join(problems))
-    return step(
+        return Finding(name, FAIL, "; ".join(problems))
+    return Finding(
         name,
         PASS,
         f"{document['covered']} of {document['rows']} covered; "
@@ -878,8 +876,8 @@ def check_registered(
         ):
             problems.append(f"{claim_id}: report names another registration")
     if problems:
-        return step(name, FAIL, "; ".join(problems))
-    return step(
+        return Finding(name, FAIL, "; ".join(problems))
+    return Finding(
         name,
         PASS,
         f"{len(ledger.claims)} claim(s), {len(attachments)} file(s) bound",
@@ -902,14 +900,14 @@ def check_control(
     name = "negative control matches the ledger"
     path = run_dir / CONTROL_FILE
     if not path.exists() or ledger.control is None:
-        return step(name, SKIPPED, "no control file or no control row")
+        return Finding(name, SKIPPED, "no control file or no control row")
     try:
         body = json.loads(path.read_text(encoding="utf-8"))
     except ValueError:
-        return step(name, FAIL, f"{CONTROL_FILE} is not JSON")
+        return Finding(name, FAIL, f"{CONTROL_FILE} is not JSON")
     if scmle.data.ledger.ledger.digest(body) == ledger.control.get("sha256"):
-        return step(name, PASS, "hash equal")
-    return step(name, FAIL, "the file differs from the ledger's control row")
+        return Finding(name, PASS, "hash equal")
+    return Finding(name, FAIL, "the file differs from the ledger's control row")
 
 
 def check_attestations(
@@ -936,14 +934,14 @@ def check_attestations(
     claims = read_optional(run_dir / CAUSAL_FILE)
     record = read_optional(run_dir / CHARTER_FILE)
     if claims is None or record is None:
-        return step(name, SKIPPED, "no causal claims or charter file")
+        return Finding(name, SKIPPED, "no causal claims or charter file")
     try:
         charter = contracts.charter_from_record(record.get("charter", record))
     except errors.ConfigError as error:
-        return step(name, FAIL, str(error))
+        return Finding(name, FAIL, str(error))
     block = charter.estimand.causal
     if block is None:
-        return step(name, SKIPPED, "the charter has no causal block")
+        return Finding(name, SKIPPED, "the charter has no causal block")
     report = claims.get("attestations") or {}
     raised = claims.get("tier") in ("attested", "confirmed")
     problems = []
@@ -986,10 +984,10 @@ def check_attestations(
     if raised and not accepted:
         problems.append("tier above unverified with no accepted attestation")
     if problems:
-        return step(name, FAIL, "; ".join(problems))
+        return Finding(name, FAIL, "; ".join(problems))
     if unchecked:
-        return step(name, SKIPPED, "no signing key to check the signatures")
-    return step(
+        return Finding(name, SKIPPED, "no signing key to check the signatures")
+    return Finding(
         name,
         PASS,
         f"{len(accepted)} attestation(s), none required"
@@ -1021,14 +1019,16 @@ def verify(
             folder / scmle.data.ledger.ledger.FILE_NAME
         )
     except scmle.data.ledger.ledger.LedgerError as error:
-        return Verification(str(folder), (step(chain, FAIL, str(error)),))
+        return Verification(str(folder), (Finding(chain, FAIL, str(error)),))
     findings.append(
-        step(chain, PASS, f"{len(ledger.rows)} rows, head {ledger.head[:12]}")
+        Finding(
+            chain, PASS, f"{len(ledger.rows)} rows, head {ledger.head[:12]}"
+        )
     )
     try:
         document = read_claims(folder)
     except errors.ArtifactError as error:
-        findings.append(step("claims file reads", FAIL, str(error)))
+        findings.append(Finding("claims file reads", FAIL, str(error)))
         return Verification(str(folder), tuple(findings))
     findings.append(check_ledger_head(document, ledger))
     findings.extend(check_charter(folder, ledger, signing_key))
