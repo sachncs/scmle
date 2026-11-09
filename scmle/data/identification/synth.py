@@ -26,6 +26,9 @@ import numpy
 import pandas
 from scipy import optimize
 
+MIN_PRE_PERIODS = 2
+MIN_DONOR_WEIGHT = 1e-6
+
 
 @dataclasses.dataclass(frozen=True)
 class Estimate:
@@ -169,13 +172,15 @@ def estimate(
             precede `first_treated` or none follow it, or fewer than
             `min_donors(alpha)` donors exist.
     """
-    wide = frame.pivot(index=time, columns=unit, values=outcome).sort_index()
+    wide = frame.pivot(  # noqa: PD010 -- pivot_table would average repeated unit-period rows; pivot raises on them, as documented
+        index=time, columns=unit, values=outcome
+    ).sort_index()
     if wide.isna().any().any():
         raise ValueError("the panel must be balanced with no missing outcomes")
     if treated_unit not in wide.columns:
         raise ValueError("the treated unit is not in the panel")
     is_pre = wide.index < first_treated
-    if is_pre.sum() < 2 or (~is_pre).sum() < 1:
+    if is_pre.sum() < MIN_PRE_PERIODS or (~is_pre).sum() < 1:
         raise ValueError("need two pre-periods and one post-period")
     units = list(wide.columns)
     donors = [u for u in units if u != treated_unit]
@@ -201,7 +206,9 @@ def estimate(
         effect=float(gap.mean()),
         gaps=tuple(float(g) for g in gap),
         weights={
-            str(d): float(x) for d, x in zip(donors, w, strict=True) if x > 1e-6
+            str(d): float(x)
+            for d, x in zip(donors, w, strict=True)
+            if x > MIN_DONOR_WEIGHT
         },
         pre_rmspe=pre_r,
         post_rmspe=post_r,

@@ -44,6 +44,7 @@ OVERLAP_EPS = 0.05
 OVERLAP_SHARE = 0.05
 MIN_ARM = 10
 CLIP = 1e-6
+MIN_SCORED_ARM_ROWS = 2
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -467,7 +468,7 @@ def estimate(
             f"trimming at {trim} keeps {keep.mean():.3f} of the rows, below "
             f"the declared minimum share {min_share}"
         )
-    if min(t[keep].sum(), keep.sum() - t[keep].sum()) < 2:
+    if min(t[keep].sum(), keep.sum() - t[keep].sum()) < MIN_SCORED_ARM_ROWS:
         raise ValueError("each arm needs at least two scored rows")
     t, y, e, m0, m1 = (a[keep] for a in (t, y, e, m0, m1))
     theta, influence = scores(estimand, t, y, e, m0, m1)
@@ -546,7 +547,7 @@ def difference_in_means(
     t = binary(frame[treatment], treatment)
     y = frame[outcome].to_numpy(dtype=float)
     y1, y0 = y[t == 1], y[t == 0]
-    if min(len(y1), len(y0)) < 2:
+    if min(len(y1), len(y0)) < MIN_SCORED_ARM_ROWS:
         raise ValueError("each arm needs at least two rows")
     v1, v0 = y1.var(ddof=1) / len(y1), y0.var(ddof=1) / len(y0)
     se = float(numpy.sqrt(v1 + v0))

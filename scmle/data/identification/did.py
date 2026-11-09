@@ -27,6 +27,8 @@ is measured in the certificate, and the literature details above were not
 re-verified against the papers in this environment.
 """
 
+from collections.abc import Mapping
+from collections.abc import Sequence
 import dataclasses
 import itertools
 from typing import Any
@@ -36,6 +38,7 @@ import pandas
 from scipy import stats
 
 MIN_PERIODS = 3
+MIN_NEVER_TREATED = 2
 
 
 @dataclasses.dataclass(frozen=True)
@@ -141,7 +144,9 @@ def wide_panel(
         ValueError: If any unit-period outcome is missing or a unit-period
             pair occurs more than once.
     """
-    table = frame.pivot(index=unit, columns=time, values=outcome)
+    table = frame.pivot(  # noqa: PD010 -- pivot_table would average repeated unit-period rows; pivot raises on them, as documented
+        index=unit, columns=time, values=outcome
+    )
     if table.isna().any().any():
         raise ValueError("the panel must be balanced with no missing outcomes")
     return table.sort_index(axis=1)
@@ -165,9 +170,209 @@ def adoption_of(
         ValueError: If the adoption value varies within a unit.
     """
     per_unit = frame.groupby(unit)[adoption]
-    if (per_unit.nunique(dropna=False) > 1).any():
+    if (per_unit.nunique(dropna=False) > 1).any():  # noqa: PD101 -- a per-unit count on a SeriesGroupBy, not a check that one Series is constant
         raise ValueError("adoption must be constant within a unit")
     return per_unit.first()
+
+
+def event_arms(
+    y: numpy.ndarray,
+    index: Mapping[Any, int],
+    n_periods: int,
+    groups: Sequence[Any],
+    sizes: Mapping[Any, int],
+    members: Mapping[Any, numpy.ndarray],
+    never: numpy.ndarray,
+    events: Sequence[int],
+) -> tuple[dict[int, dict[Any, numpy.ndarray]], dict[int, numpy.ndarray]]:
+    """Builds the per-unit outcome changes of each event time.
+
+    Args:
+        y: Outcomes, units by periods.
+        index: Position of each period.
+        n_periods: Number of periods.
+        groups: Adoption periods, one per cohort.
+        sizes: Number of units of each cohort.
+        members: Mask of the units of each cohort.
+        never: Mask of the never-treated units.
+        events: Event times, in periods from adoption.
+
+    Returns:
+        For each event time, the cohort-weighted changes of the treated
+        units of each cohort, and the cohort-weighted changes of the
+        never-treated units; changes are taken from the period before
+        adoption.
+    """
+    treated_vars: dict[int, dict[Any, numpy.ndarray]] = {}
+    control_vars: dict[int, numpy.ndarray] = {}
+    for e in events:
+        cells = [g for g in groups if 0 <= index[g] + e < n_periods]
+        total = sum(sizes[g] for g in cells)
+        treated_vars[e] = {}
+        control = numpy.zeros(int(never.sum()))
+        for g in cells:
+            base = index[g] - 1
+            delta = y[:, index[g] + e] - y[:, base]
+            weight = sizes[g] / total
+            treated_vars[e][g] = weight * delta[members[g]]
+            control += weight * delta[never]
+        control_vars[e] = control
+    return treated_vars, control_vars
+
+
+def event_coefficients(
+    events: Sequence[int],
+    treated_vars: Mapping[int, Mapping[Any, numpy.ndarray]],
+    control_vars: Mapping[int, numpy.ndarray],
+) -> list[float]:
+    """Computes the event-study coefficients.
+
+    Args:
+        events: Event times.
+        treated_vars: Treated changes per event time and cohort.
+        control_vars: Never-treated changes per event time.
+
+    Returns:
+        For each event time, the mean treated change minus the mean
+        never-treated change.
+    """
+    coefficients = []
+    for e in events:
+        mean_treated = sum(v.mean() for v in treated_vars[e].values())
+        coefficients.append(float(mean_treated - control_vars[e].mean()))
+    return coefficients
+
+
+def event_covariance(
+    events: Sequence[int],
+    groups: Sequence[Any],
+    sizes: Mapping[Any, int],
+    treated_vars: Mapping[int, Mapping[Any, numpy.ndarray]],
+    control_vars: Mapping[int, numpy.ndarray],
+    n_never: int,
+) -> numpy.ndarray:
+    """Estimates the covariance of the event-study coefficients.
+
+    Args:
+        events: Event times.
+        groups: Adoption periods, one per cohort.
+        sizes: Number of units of each cohort.
+        treated_vars: Treated changes per event time and cohort.
+        control_vars: Never-treated changes per event time.
+        n_never: Number of never-treated units.
+
+    Returns:
+        The events by events covariance matrix.
+    """
+    covariance = numpy.zeros((len(events), len(events)))
+    for a, e in enumerate(events):
+        for b, f in enumerate(events):
+            value = 0.0
+            for g in groups:
+                if g in treated_vars[e] and g in treated_vars[f]:
+                    value += (
+                        numpy.cov(treated_vars[e][g], treated_vars[f][g])[0, 1]
+                        / sizes[g]
+                        if sizes[g] > 1
+                        else 0.0
+                    )
+            value += numpy.cov(control_vars[e], control_vars[f])[0, 1] / n_never
+            covariance[a, b] = value
+    return covariance
+
+
+def overall_att(
+    y: numpy.ndarray,
+    index: Mapping[Any, int],
+    post_cells: Sequence[tuple[Any, int]],
+    weights: numpy.ndarray,
+    members: Mapping[Any, numpy.ndarray],
+    sizes: Mapping[Any, int],
+    never: numpy.ndarray,
+) -> tuple[float, float]:
+    """Aggregates the post-adoption cells into one ATT and its standard error.
+
+    Args:
+        y: Outcomes, units by periods.
+        index: Position of each period.
+        post_cells: Pairs of adoption period and post-adoption period
+            position.
+        weights: Weight of each cell, summing to one.
+        members: Mask of the units of each cohort.
+        sizes: Number of units of each cohort.
+        never: Mask of the never-treated units.
+
+    Returns:
+        The weighted ATT and its standard error.
+    """
+    n_never = int(never.sum())
+    theta_parts = []
+    treated_unit: dict[Any, numpy.ndarray] = {}
+    control_unit = numpy.zeros(n_never)
+    for (g, j), w in zip(post_cells, weights, strict=True):
+        delta = y[:, j] - y[:, index[g] - 1]
+        treated_unit[g] = treated_unit.get(g, 0.0) + w * delta[members[g]]
+        control_unit += w * delta[never]
+        theta_parts.append(w * (delta[members[g]].mean() - delta[never].mean()))
+    theta = float(sum(theta_parts))
+    variance = (
+        sum(
+            treated_unit[g].var(ddof=1) / sizes[g]
+            for g in treated_unit
+            if sizes[g] > 1
+        )
+        + control_unit.var(ddof=1) / n_never
+    )
+    return theta, float(numpy.sqrt(variance))
+
+
+def pretrend_p_value(
+    events: Sequence[int],
+    coefficients: Sequence[float],
+    covariance: numpy.ndarray,
+) -> float | None:
+    """Tests that the pre-period event-study coefficients are jointly zero.
+
+    Args:
+        events: Event times.
+        coefficients: The event-study coefficients.
+        covariance: Their covariance matrix.
+
+    Returns:
+        The chi-squared p-value, or None when no event time is before the
+        reference period.
+    """
+    pre = [k for k, e in enumerate(events) if e < -1]
+    if not pre:
+        return None
+    beta = numpy.array([coefficients[k] for k in pre])
+    cov = covariance[numpy.ix_(pre, pre)]
+    stat = float(beta @ numpy.linalg.pinv(cov) @ beta)
+    return float(stats.chi2.sf(stat, len(pre)))
+
+
+def max_pre_event_change(
+    events: Sequence[int], coefficients: Sequence[float]
+) -> float | None:
+    """Finds the largest change between consecutive pre-period coefficients.
+
+    Args:
+        events: Event times.
+        coefficients: The event-study coefficients.
+
+    Returns:
+        The largest absolute change along the pre-period chain that ends at
+        the reference period (whose coefficient is 0), or None when there
+        is no pre-period besides the reference one.
+    """
+    pre_events = [e for e in events if e < 0]
+    if not [e for e in pre_events if e < -1]:
+        return None
+    chain = {e: coefficients[events.index(e)] for e in pre_events}
+    chain[-1] = 0.0
+    ordered = sorted(chain)
+    jumps = [abs(chain[b] - chain[a]) for a, b in itertools.pairwise(ordered)]
+    return float(max(jumps))
 
 
 def estimate(
@@ -206,7 +411,7 @@ def estimate(
         raise ValueError(f"at least {MIN_PERIODS} periods are needed")
     adopt = adoption_of(frame, unit, adoption).reindex(wide.index)
     never = adopt.isna().to_numpy()
-    if never.sum() < 2:
+    if never.sum() < MIN_NEVER_TREATED:
         raise ValueError("at least two never-treated units are needed")
     y = wide.to_numpy(dtype=float)
     index = {p: i for i, p in enumerate(periods)}
@@ -224,78 +429,23 @@ def estimate(
             if j != index[g] - 1
         }
     )
-    treated_vars: dict[int, dict[Any, numpy.ndarray]] = {}
-    control_vars: dict[int, numpy.ndarray] = {}
-    for e in events:
-        cells = [g for g in groups if 0 <= index[g] + e < len(periods)]
-        total = sum(sizes[g] for g in cells)
-        treated_vars[e] = {}
-        control = numpy.zeros(int(never.sum()))
-        for g in cells:
-            base = index[g] - 1
-            delta = y[:, index[g] + e] - y[:, base]
-            weight = sizes[g] / total
-            treated_vars[e][g] = weight * delta[members[g]]
-            control += weight * delta[never]
-        control_vars[e] = control
-    coefficients = []
-    for e in events:
-        mean_treated = sum(v.mean() for v in treated_vars[e].values())
-        coefficients.append(float(mean_treated - control_vars[e].mean()))
+    treated_vars, control_vars = event_arms(
+        y, index, len(periods), groups, sizes, members, never, events
+    )
+    coefficients = event_coefficients(events, treated_vars, control_vars)
     n_never = int(never.sum())
-    covariance = numpy.zeros((len(events), len(events)))
-    for a, e in enumerate(events):
-        for b, f in enumerate(events):
-            value = 0.0
-            for g in groups:
-                if g in treated_vars[e] and g in treated_vars[f]:
-                    value += (
-                        numpy.cov(treated_vars[e][g], treated_vars[f][g])[0, 1]
-                        / sizes[g]
-                        if sizes[g] > 1
-                        else 0.0
-                    )
-            value += numpy.cov(control_vars[e], control_vars[f])[0, 1] / n_never
-            covariance[a, b] = value
+    covariance = event_covariance(
+        events, groups, sizes, treated_vars, control_vars, n_never
+    )
     post_cells = [(g, j) for g in groups for j in range(index[g], len(periods))]
     weights = numpy.array([sizes[cell[0]] for cell in post_cells], dtype=float)
     weights /= weights.sum()
-    theta_parts = []
-    treated_unit: dict[Any, numpy.ndarray] = {}
-    control_unit = numpy.zeros(n_never)
-    for (g, j), w in zip(post_cells, weights, strict=True):
-        delta = y[:, j] - y[:, index[g] - 1]
-        treated_unit[g] = treated_unit.get(g, 0.0) + w * delta[members[g]]
-        control_unit += w * delta[never]
-        theta_parts.append(w * (delta[members[g]].mean() - delta[never].mean()))
-    theta = float(sum(theta_parts))
-    variance = (
-        sum(
-            treated_unit[g].var(ddof=1) / sizes[g]
-            for g in treated_unit
-            if sizes[g] > 1
-        )
-        + control_unit.var(ddof=1) / n_never
+    theta, se = overall_att(
+        y, index, post_cells, weights, members, sizes, never
     )
-    se = float(numpy.sqrt(variance))
     z = float(stats.norm.ppf(0.5 + level / 2))
-    pre = [k for k, e in enumerate(events) if e < -1]
-    pretrend_p = None
-    if pre:
-        beta = numpy.array([coefficients[k] for k in pre])
-        cov = covariance[numpy.ix_(pre, pre)]
-        stat = float(beta @ numpy.linalg.pinv(cov) @ beta)
-        pretrend_p = float(stats.chi2.sf(stat, len(pre)))
-    max_change = None
-    pre_events = [e for e in events if e < 0]
-    if len([e for e in pre_events if e < -1]) >= 1:
-        chain = {e: coefficients[events.index(e)] for e in pre_events}
-        chain[-1] = 0.0
-        ordered = sorted(chain)
-        jumps = [
-            abs(chain[b] - chain[a]) for a, b in itertools.pairwise(ordered)
-        ]
-        max_change = float(max(jumps))
+    pretrend_p = pretrend_p_value(events, coefficients, covariance)
+    max_change = max_pre_event_change(events, coefficients)
     horizon = float(
         numpy.average(
             [j - index[g] + 1 for g, j in post_cells], weights=weights

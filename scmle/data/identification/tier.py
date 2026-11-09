@@ -122,6 +122,127 @@ class Assignment:
         }
 
 
+def tier_conditions(
+    facts: Inputs, certified: Collection[str]
+) -> dict[str, bool]:
+    """Evaluates the five conditions of the tier rule.
+
+    Args:
+        facts: The facts about the run.
+        certified: The gates that carry a passing certificate.
+
+    Returns:
+        Whether each of the five conditions holds.
+    """
+    gates_ok = all(g in certified for g in facts.design_gates)
+    return {
+        "estimated_on_c": facts.estimated_on_c and not facts.single_unit,
+        "design_diagnostics": facts.design_passed
+        and facts.adjustment_checked
+        and gates_ok
+        and facts.interval_gate in certified
+        and not facts.weak_instrument,
+        "falsification_battery": facts.battery_ran
+        and facts.battery_passed
+        and facts.negative_control_declared
+        and facts.battery_gate in certified,
+        "replication": bool(facts.replication_passed),
+        "sensitivity": bool(facts.sensitivity_holds)
+        and (
+            facts.sensitivity_gate is None
+            or facts.sensitivity_gate in certified
+        ),
+    }
+
+
+def failure_reasons(facts: Inputs, unnamed: Collection[str]) -> list[str]:
+    """Lists the failures that make a claim `unverified`.
+
+    Args:
+        facts: The facts about the run.
+        unnamed: The needed assumptions that have no named attestor.
+
+    Returns:
+        The reasons, for an assumption without an attestor, a failed design
+        diagnostic and a rejecting falsification test, in that order.
+    """
+    reasons: list[str] = []
+    if unnamed:
+        reasons.append("no named attestor for: " + ", ".join(unnamed))
+    if not facts.design_passed:
+        reasons.append("a design diagnostic failed")
+    if facts.battery_ran and not facts.battery_passed:
+        reasons.append("a falsification test rejected")
+    return reasons
+
+
+def design_shortfalls(
+    facts: Inputs, conditions: Mapping[str, bool], certified: Collection[str]
+) -> list[str]:
+    """Lists why the design conditions fall short of `confirmed`.
+
+    Args:
+        facts: The facts about the run.
+        conditions: Whether each of the five conditions holds.
+        certified: The gates that carry a passing certificate.
+
+    Returns:
+        The reasons for the use of `C`, a weak instrument, an unchecked
+        adjustment set and a design gate without a certificate, in that
+        order.
+    """
+    reasons: list[str] = []
+    if not conditions["estimated_on_c"]:
+        reasons.append(
+            "one treated unit: nothing to hold out"
+            if facts.single_unit
+            else "the estimate did not use C"
+        )
+    if facts.weak_instrument:
+        reasons.append("weak instrument: only the robust interval is valid")
+    if not facts.adjustment_checked:
+        reasons.append(
+            "the adjustment set is an unchecked attestation (no declared "
+            "DAG confirms it)"
+        )
+    gates_ok = all(g in certified for g in facts.design_gates)
+    if not gates_ok or facts.interval_gate not in certified:
+        reasons.append("a design gate has no passing certificate")
+    return reasons
+
+
+def evidence_shortfalls(
+    facts: Inputs, conditions: Mapping[str, bool], certified: Collection[str]
+) -> list[str]:
+    """Lists why the falsification, replication and sensitivity fall short.
+
+    Args:
+        facts: The facts about the run.
+        conditions: Whether each of the five conditions holds.
+        certified: The gates that carry a passing certificate.
+
+    Returns:
+        The reasons for the negative control and battery, the replication
+        and the sensitivity analysis, in that order.
+    """
+    reasons: list[str] = []
+    if not facts.battery_ran or not facts.negative_control_declared:
+        reasons.append("no negative control ran")
+    elif facts.battery_gate not in certified:
+        reasons.append("the battery has no passing certificate")
+    if facts.replication_passed is None:
+        reasons.append("replication did not run (fewer than two strata)")
+    elif not facts.replication_passed:
+        reasons.append("strata disagree or are heterogeneous")
+    if facts.sensitivity_holds is None:
+        reasons.append("no sensitivity analysis was declared or possible")
+    elif not facts.sensitivity_holds:
+        reasons.append("the sensitivity gate failed at the declared strength")
+    elif conditions["sensitivity"] is False:
+        reasons.append("the sensitivity analysis has no passing certificate")
+    return reasons
+
+
 def decide(facts: Inputs) -> Assignment:
     """Applies the tier rule.
 
@@ -146,35 +267,11 @@ def decide(facts: Inputs) -> Assignment:
             "refuse_claim",
         )
     certified = set(facts.certified)
-    reasons: list[str] = []
     unnamed = [
         a for a in facts.needed if not facts.attestors.get(a, "").strip()
     ]
-    gates_ok = all(g in certified for g in facts.design_gates)
-    conditions = {
-        "estimated_on_c": facts.estimated_on_c and not facts.single_unit,
-        "design_diagnostics": facts.design_passed
-        and facts.adjustment_checked
-        and gates_ok
-        and facts.interval_gate in certified
-        and not facts.weak_instrument,
-        "falsification_battery": facts.battery_ran
-        and facts.battery_passed
-        and facts.negative_control_declared
-        and facts.battery_gate in certified,
-        "replication": bool(facts.replication_passed),
-        "sensitivity": bool(facts.sensitivity_holds)
-        and (
-            facts.sensitivity_gate is None
-            or facts.sensitivity_gate in certified
-        ),
-    }
-    if unnamed:
-        reasons.append("no named attestor for: " + ", ".join(unnamed))
-    if not facts.design_passed:
-        reasons.append("a design diagnostic failed")
-    if facts.battery_ran and not facts.battery_passed:
-        reasons.append("a falsification test rejected")
+    conditions = tier_conditions(facts, certified)
+    reasons = failure_reasons(facts, unnamed)
     if (
         unnamed
         or not facts.design_passed
@@ -187,35 +284,8 @@ def decide(facts: Inputs) -> Assignment:
             tuple(reasons),
             "downgrade_tier",
         )
-    if not conditions["estimated_on_c"]:
-        reasons.append(
-            "one treated unit: nothing to hold out"
-            if facts.single_unit
-            else "the estimate did not use C"
-        )
-    if facts.weak_instrument:
-        reasons.append("weak instrument: only the robust interval is valid")
-    if not facts.adjustment_checked:
-        reasons.append(
-            "the adjustment set is an unchecked attestation (no declared "
-            "DAG confirms it)"
-        )
-    if not gates_ok or facts.interval_gate not in certified:
-        reasons.append("a design gate has no passing certificate")
-    if not facts.battery_ran or not facts.negative_control_declared:
-        reasons.append("no negative control ran")
-    elif facts.battery_gate not in certified:
-        reasons.append("the battery has no passing certificate")
-    if facts.replication_passed is None:
-        reasons.append("replication did not run (fewer than two strata)")
-    elif not facts.replication_passed:
-        reasons.append("strata disagree or are heterogeneous")
-    if facts.sensitivity_holds is None:
-        reasons.append("no sensitivity analysis was declared or possible")
-    elif not facts.sensitivity_holds:
-        reasons.append("the sensitivity gate failed at the declared strength")
-    elif conditions["sensitivity"] is False:
-        reasons.append("the sensitivity analysis has no passing certificate")
+    reasons.extend(design_shortfalls(facts, conditions, certified))
+    reasons.extend(evidence_shortfalls(facts, conditions, certified))
     if all(conditions.values()):
         return Assignment(
             qualification.Tier.CONFIRMED, "identified", conditions, (), ""

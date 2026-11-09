@@ -269,8 +269,10 @@ def check_adjustment(
     if not valid:
         return (
             [
-                "the declared adjustment set is not a valid back-door set "
-                "for the declared DAG"
+                (
+                    "the declared adjustment set is not a valid back-door set "
+                    "for the declared DAG"
+                )
             ],
             False,
         )
@@ -296,7 +298,9 @@ def select(
         strategy = STRATEGIES.get(name)
         if strategy is None:
             verdicts.append(
-                Verdict(name, False, reasons=(f"unknown strategy {name}",))
+                Verdict(
+                    name, eligible=False, reasons=(f"unknown strategy {name}",)
+                )
             )
         else:
             verdicts.append(judge(strategy, spec, dag))

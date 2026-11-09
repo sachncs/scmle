@@ -35,6 +35,7 @@ import pandas
 from scipy import stats
 
 F_THRESHOLD = 10.0
+FIRST_STAGE_TOLERANCE = 1e-12
 
 
 @dataclasses.dataclass(frozen=True)
@@ -217,7 +218,7 @@ def estimate(
     w = data[:, 3:] if controls else numpy.empty((n, 0))
     d, y, z = residualise([d, y, z], w)
     szd, szz = float(z @ d), float(z @ z)
-    if szz <= 1e-12 or abs(szd) <= 1e-12:
+    if szz <= FIRST_STAGE_TOLERANCE or abs(szd) <= FIRST_STAGE_TOLERANCE:
         raise ValueError("the instrument has no first-stage variation")
     scale = n / (n - 2 - w.shape[1])
     beta = float(z @ y) / szd

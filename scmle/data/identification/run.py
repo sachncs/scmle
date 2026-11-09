@@ -39,6 +39,7 @@ from scmle.data.identification import select
 from scmle.data.identification import sensitivity
 from scmle.data.identification import synth
 from scmle.data.identification import tier
+import scmle.data.identification.certified
 from scmle.data.ledger import budget
 from scmle.data.ledger import multiplicity
 import scmle.data.ledger.budget
@@ -275,7 +276,7 @@ class Estimator:
         """
         raise NotImplementedError
 
-    def controls(self, c: pandas.DataFrame, level: float) -> list[battery.Test]:
+    def controls(self, c: pandas.DataFrame, level: float) -> list[battery.Test]:  # noqa: ARG002 -- base-class hook; overriding strategies use these arguments
         """Runs the falsification tests on `C` (negative controls and placebos).
 
         Args:
@@ -287,7 +288,7 @@ class Estimator:
         """
         return []
 
-    def sensitivity(self, c: pandas.DataFrame, level: float) -> dict[str, Any]:
+    def sensitivity(self, c: pandas.DataFrame, level: float) -> dict[str, Any]:  # noqa: ARG002 -- base-class hook; overriding strategies use these arguments
         """Assesses sensitivity to unmeasured confounding.
 
         Args:
@@ -588,7 +589,7 @@ class RandomizedEstimator(Estimator):
                 tests.append(test)
         return tests
 
-    def sensitivity(self, c: pandas.DataFrame, level: float) -> dict[str, Any]:
+    def sensitivity(self, c: pandas.DataFrame, level: float) -> dict[str, Any]:  # noqa: ARG002 -- overrides Estimator.sensitivity, which fixes this signature
         """Reports that randomization leaves no unmeasured confounding to bound.
 
         Args:
@@ -1103,7 +1104,7 @@ class SynthEstimator(Estimator):
         super().__init__(*args)
         self.single_unit = True
 
-    def estimate(self, c: pandas.DataFrame, level: float) -> Est:
+    def estimate(self, c: pandas.DataFrame, level: float) -> Est:  # noqa: ARG002 -- overrides Estimator.estimate, which fixes this signature
         """Computes the synthetic control effect on `X`.
 
         With one treated unit there is nothing to hold out, so the rows of
@@ -1206,23 +1207,23 @@ def refusal_outcome(
         report["dag"] = dict(dag_checks)
     decision = tier.decide(
         tier.Inputs(
-            False,
-            (),
-            {},
-            False,
-            False,
-            (),
-            "",
-            False,
-            False,
-            False,
-            "",
-            None,
-            None,
-            None,
-            False,
-            False,
-            (),
+            identified=False,
+            needed=(),
+            attestors={},
+            estimated_on_c=False,
+            design_passed=False,
+            design_gates=(),
+            interval_gate="",
+            battery_ran=False,
+            battery_passed=False,
+            negative_control_declared=False,
+            battery_gate="",
+            replication_passed=None,
+            sensitivity_holds=None,
+            sensitivity_gate=None,
+            single_unit=False,
+            weak_instrument=False,
+            certified=(),
         )
     )
     return assemble(plan, spec, report, {}, {}, decision, "", ())
@@ -1408,7 +1409,7 @@ def subgroup_report(
     saved = dict(adapter.design)
     rows: list[dict[str, Any]] = []
     for group in subgroups:
-        for value in group.values:
+        for value in group.values:  # noqa: PD011 -- `Subgroup.values` is a dataclass field, not a pandas attribute
             row: dict[str, Any] = {
                 "column": group.column,
                 "value": value,
@@ -1494,8 +1495,6 @@ def label_subgroups(
             from the shipped certificate (None when it is absent, so every
             estimated subgroup then counts as certified size).
     """
-    import scmle.data.identification.certified
-
     gate = scmle.data.identification.certified.subgroup_gate(subgroup_report)
     if named is not None:
         listed = scmle.data.identification.certified.SUBGROUP_GATE in named
@@ -1526,6 +1525,137 @@ def label_subgroups(
         "tests are not certified, so read a rejected level as exploratory; "
         f"{gate.reason}"
     )
+
+
+def strata_replication(
+    adapter: Estimator,
+    spec: causal.Question,
+    c: pandas.DataFrame,
+    level: float,
+    pooled: float,
+    alpha: float,
+) -> dict[str, Any]:
+    """Runs the replication test when the charter declares strata.
+
+    Args:
+        adapter: The strategy's estimator.
+        spec: The charter's causal block.
+        c: The confirmation rows.
+        level: Confidence level.
+        pooled: The pooled estimate on `C`.
+        alpha: Level of the agreement and heterogeneity tests.
+
+    Returns:
+        The `replication` result, or an empty one that has not passed or
+        failed (`passed` None) when there are no strata or a single treated
+        unit.
+    """
+    if spec.strata and not adapter.single_unit:
+        return replication(adapter, c, level, pooled, alpha)
+    return {"by_column": {}, "passed": None}
+
+
+def sensitivity_of(
+    adapter: Estimator, c: pandas.DataFrame, level: float
+) -> dict[str, Any]:
+    """Assesses sensitivity to unmeasured confounding, if it can be done.
+
+    Args:
+        adapter: The strategy's estimator.
+        c: The confirmation rows.
+        level: Confidence level.
+
+    Returns:
+        The sensitivity document of the strategy, or a note that a single
+        treated unit has only the placebo permutation.
+    """
+    if adapter.single_unit:
+        return {
+            "holds": None,
+            "note": "single treated unit: inference is the placebo permutation",
+        }
+    return adapter.sensitivity(c, level)
+
+
+def subgroup_results(
+    adapter: Estimator,
+    spec: causal.Question,
+    c: pandas.DataFrame,
+    level: float,
+    named: tuple[str, ...] | None,
+) -> dict[str, Any] | None:
+    """Estimates and labels the declared subgroups.
+
+    The adapter's `weak` flag is restored afterwards.
+
+    Args:
+        adapter: The strategy's estimator.
+        spec: The charter's causal block.
+        c: The confirmation rows.
+        level: Confidence level.
+        named: The certified gates the caller names, or None to read the
+            shipped certificate (see `label_subgroups`).
+
+    Returns:
+        The labelled subgroup report, or None when no subgroups are
+        declared or there is a single treated unit.
+    """
+    weak_before_subgroups = adapter.weak
+    found = (
+        subgroup_report(adapter, c, level, spec.subgroups)
+        if spec.subgroups and not adapter.single_unit
+        else None
+    )
+    adapter.weak = weak_before_subgroups
+    if found is not None:
+        label_subgroups(found, named)
+    return found
+
+
+def primary_verdict(spec: causal.Question, primary: Est) -> dict[str, Any]:
+    """States the primary hypothesis and whether its interval excludes zero.
+
+    Args:
+        spec: The charter's causal block.
+        primary: The primary estimate.
+
+    Returns:
+        The `verdict_of` sentence with `interval_excludes_zero`, None when
+        the interval is not finite.
+    """
+    verdict = verdict_of(spec)
+    verdict["interval_excludes_zero"] = (
+        primary.excludes_zero() if numpy.isfinite(primary.low) else None
+    )
+    return verdict
+
+
+def closing_notes(
+    spec: causal.Question, strategy: str, *, checked: bool
+) -> list[str]:
+    """Lists the notes about what the run could not do or check.
+
+    Args:
+        spec: The charter's causal block.
+        strategy: Registry name of the strategy.
+        checked: Whether a declared DAG verified the adjustment set.
+
+    Returns:
+        A note for each negative-control exposure that the strategy does
+        not support, then a note when the adjustment set is unchecked.
+    """
+    notes = [
+        f"negative-control exposure {control.variable} is only "
+        "supported for backdoor_aipw and was not run"
+        for control in spec.negative_controls
+        if control.kind == "exposure" and strategy != "backdoor_aipw"
+    ]
+    if not checked:
+        notes.append(
+            "the adjustment set is an unchecked attestation (no DAG): the "
+            "tier cannot exceed attested"
+        )
+    return notes
 
 
 def identify(
@@ -1575,8 +1705,6 @@ def identify(
         return refusal_outcome(plan, spec, dag_checks=dag_checks)
     named = certified
     if certified is None:
-        import scmle.data.identification.certified
-
         certified = tuple(
             sorted(scmle.data.identification.certified.certified_gates())
         )
@@ -1602,43 +1730,14 @@ def identify(
         tests = adapter.controls(c, level)
     except ValueError as error:
         notes.append(f"controls could not run: {error}")
-    for control in spec.negative_controls:
-        if control.kind == "exposure" and strategy != "backdoor_aipw":
-            notes.append(
-                f"negative-control exposure {control.variable} is only "
-                "supported for backdoor_aipw and was not run"
-            )
     report_battery = battery.run_battery(tests, alpha_falsify)
-    rep = (
-        replication(adapter, c, level, primary.estimate, alpha_falsify)
-        if spec.strata and not adapter.single_unit
-        else {"by_column": {}, "passed": None}
+    rep = strata_replication(
+        adapter, spec, c, level, primary.estimate, alpha_falsify
     )
-    sens: dict[str, Any] = (
-        adapter.sensitivity(c, level)
-        if not adapter.single_unit
-        else {
-            "holds": None,
-            "note": "single treated unit: inference is the placebo permutation",
-        }
-    )
-    weak_before_subgroups = adapter.weak
-    subgroup_found = (
-        subgroup_report(adapter, c, level, spec.subgroups)
-        if spec.subgroups and not adapter.single_unit
-        else None
-    )
-    adapter.weak = weak_before_subgroups
-    if subgroup_found is not None:
-        label_subgroups(subgroup_found, named)
-    verdict = verdict_of(spec, primary)
-    verdict_sig = (
-        primary.excludes_zero() if numpy.isfinite(primary.low) else None
-    )
-    verdict["interval_excludes_zero"] = verdict_sig
+    sens = sensitivity_of(adapter, c, level)
+    subgroup_found = subgroup_results(adapter, spec, c, level, named)
     needed = needed_assumptions(strategy, spec)
     checked = strategy != "backdoor_aipw" or plan.verdict(strategy).checked
-    holds = sens.get("holds")
     facts = tier.Inputs(
         identified=True,
         needed=needed,
@@ -1652,7 +1751,7 @@ def identify(
         negative_control_declared=bool(spec.negative_controls),
         battery_gate=BATTERY_GATES[strategy],
         replication_passed=rep["passed"],
-        sensitivity_holds=holds,
+        sensitivity_holds=sens.get("holds"),
         sensitivity_gate=SENSITIVITY_GATES.get(strategy),
         single_unit=adapter.single_unit,
         weak_instrument=adapter.weak,
@@ -1660,11 +1759,7 @@ def identify(
         adjustment_checked=checked,
     )
     decision = tier.decide(facts)
-    if not checked:
-        notes.append(
-            "the adjustment set is an unchecked attestation (no DAG): the "
-            "tier cannot exceed attested"
-        )
+    notes.extend(closing_notes(spec, strategy, checked=checked))
     report = {
         "status": select.IDENTIFIED,
         "strategy": strategy,
@@ -1683,7 +1778,7 @@ def identify(
         "design": adapter.design,
         "multiverse_not_run": list(plan.multiverse),
         "notes": notes,
-        "verdict": verdict,
+        "verdict": primary_verdict(spec, primary),
     }
     if dag_checks is not None:
         report["dag"] = dict(dag_checks)
@@ -1791,12 +1886,11 @@ def design_only(
     )
 
 
-def verdict_of(spec: causal.Question, est: Est) -> dict[str, Any]:
+def verdict_of(spec: causal.Question) -> dict[str, Any]:
     """States the primary hypothesis `theta = 0` in words.
 
     Args:
         spec: The charter's causal block.
-        est: The primary estimate (not read).
 
     Returns:
         The hypothesis sentence and how the result is labelled.
@@ -1824,9 +1918,11 @@ def needed_assumptions(strategy: str, spec: causal.Question) -> tuple[str, ...]:
     out = []
     for word in required:
         if word == "unconfoundedness_given":
-            for item in spec.assumptions:
-                if item.startswith(causal.UNCONFOUNDEDNESS_PREFIX):
-                    out.append(item)
+            out.extend(
+                item
+                for item in spec.assumptions
+                if item.startswith(causal.UNCONFOUNDEDNESS_PREFIX)
+            )
         else:
             out.append(word)
     return tuple(out)

@@ -61,6 +61,7 @@ from scipy import stats
 
 D_TO_RR = 0.91
 INFEASIBLE = 0.999
+MIN_RESIDUAL_DOF = 3
 
 
 def evalue(rr: float) -> float:
@@ -191,7 +192,7 @@ def ols_fit(
     y = frame[outcome].to_numpy(dtype=float)
     full = numpy.column_stack([numpy.ones(n), d, x])
     dof = n - full.shape[1]
-    if dof < 3:
+    if dof < MIN_RESIDUAL_DOF:
         raise ValueError("too few rows for the regression")
     coef = numpy.linalg.lstsq(full, y, rcond=None)[0]
     resid = y - full @ coef
