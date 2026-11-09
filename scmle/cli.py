@@ -14,7 +14,6 @@ import pathlib
 import sys
 import threading
 import types
-from typing import Any
 from typing import ClassVar
 
 import pandas as pd
@@ -38,8 +37,6 @@ from scmle.data.ingest import budget as ingest_budget
 from scmle.data.ingest import grain as ingest_grain
 from scmle.data.ingest import plan as ingest_plan
 from scmle.data.readers import tabular
-from scmle.deploy import cloudrun
-from scmle.deploy import ecs
 from scmle.deploy import gate as deploy_gate
 from scmle.deploy import livetests
 from scmle.deploy import record as deploy_record
@@ -1126,24 +1123,6 @@ class DeployCommand(Command):
         digest.add_argument("registry", help="registry directory")
         digest.add_argument("--model", required=True)
         digest.add_argument("--version", type=int, required=True)
-        observe = actions.add_parser(
-            "observe",
-            help="turn recorded ECS or Cloud Run answers into a report",
-        )
-        observe.add_argument(
-            "--provider", choices=["aws", "gcp"], required=True
-        )
-        observe.add_argument(
-            "--input", required=True, help="DescribeServices or Service JSON"
-        )
-        observe.add_argument("--tasks", help="DescribeTasks JSON (aws)")
-        observe.add_argument(
-            "--task-definition", help="DescribeTaskDefinition JSON (aws)"
-        )
-        observe.add_argument(
-            "--revisions", help="JSON of revision name to Revision (gcp)"
-        )
-        observe.add_argument("--output", required=True)
         reconcile = actions.add_parser(
             "reconcile",
             help="compare the registry and ledger with the runtime report",
@@ -1152,7 +1131,9 @@ class DeployCommand(Command):
         reconcile.add_argument("--model", required=True)
         reconcile.add_argument("--environment", required=True)
         reconcile.add_argument(
-            "--observation", required=True, help="report from `deploy observe`"
+            "--observation",
+            required=True,
+            help="observation JSON (Observation.to_dict)",
         )
         reconcile.add_argument(
             "--ledger", help="deployment ledger file (deployment_ledger.jsonl)"
@@ -1225,32 +1206,6 @@ class DeployCommand(Command):
             return EXIT_BLOCKED
         if decision.record is not None and args.output:
             deploy_record.write_record(args.output, decision.record)
-        return EXIT_OK
-
-    @staticmethod
-    def run_observe(args: argparse.Namespace) -> int:
-        """Writes an observation from recorded or live platform answers."""
-        read = deploy_release.read_json
-
-        def optional(path: str | None) -> Any:
-            return None if path is None else read(pathlib.Path(path))
-
-        source = read(pathlib.Path(args.input))
-        if args.provider == "aws":
-            seen = ecs.observe_services(
-                source, optional(args.tasks), optional(args.task_definition)
-            )
-        else:
-            revisions = optional(args.revisions)
-            if not isinstance(revisions, dict):
-                raise errors.ConfigError("--revisions is required for gcp")
-            seen = cloudrun.observe_service(source, revisions)
-        pathlib.Path(args.output).write_text(
-            json.dumps(seen.to_dict(), indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
-            newline="\n",
-        )
-        print(json.dumps({"revision": seen.revision, "ready": seen.ready}))
         return EXIT_OK
 
     @staticmethod
