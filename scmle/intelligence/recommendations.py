@@ -33,7 +33,11 @@ class Recommendation:
     setting: str = ""
 
     def to_dict(self) -> dict[str, Any]:
-        """Returns a JSON-serializable mapping."""
+        """Returns a JSON-serializable mapping.
+
+        Returns:
+            A dict of the topic, message and setting.
+        """
         return dataclasses.asdict(self)
 
 
@@ -49,6 +53,9 @@ class RecommendationRule(abc.ABC):
         Args:
             profile: Profile of the development partition.
             spec: The project specification in force.
+
+        Returns:
+            The recommendations; empty if the rule has nothing to say.
         """
 
 
@@ -58,7 +65,17 @@ class ImbalanceAdvice(RecommendationRule):
     def advise(
         self, profile: data_contracts.DatasetProfile, spec: tasks.ProjectSpec
     ) -> list[Recommendation]:
-        """Advises on a severely imbalanced binary target."""
+        """Advises on a severely imbalanced binary target.
+
+        Args:
+            profile: Profile of the development partition.
+            spec: The project specification in force.
+
+        Returns:
+            Advice on the metric, and on the decision threshold if none is set,
+            when the target is binary with an imbalance ratio of at least
+            `SEVERE_IMBALANCE`; otherwise empty.
+        """
         ratio = float(profile.target_summary.get("imbalance_ratio", 0.0))
         binary = profile.target_summary.get("task") == str(
             tasks.TaskType.BINARY
@@ -92,7 +109,17 @@ class MissingnessAdvice(RecommendationRule):
     def advise(
         self, profile: data_contracts.DatasetProfile, spec: tasks.ProjectSpec
     ) -> list[Recommendation]:
-        """Advises on heavy missingness."""
+        """Advises on heavy missingness.
+
+        Args:
+            profile: Profile of the development partition.
+            spec: The project specification in force. Unused.
+
+        Returns:
+            One recommendation when the overall missing rate reaches
+            `MISSING_SHARE` or a quality finding reports a column mostly
+            missing; otherwise empty.
+        """
         overall = float(
             profile.dataset_statistics.get("missingness", {}).get(
                 "overall_rate", 0.0
@@ -118,7 +145,16 @@ class LeakageAdvice(RecommendationRule):
     def advise(
         self, profile: data_contracts.DatasetProfile, spec: tasks.ProjectSpec
     ) -> list[Recommendation]:
-        """Advises when leakage hypotheses exist and are not blocking."""
+        """Advises when leakage hypotheses exist and are not blocking.
+
+        Args:
+            profile: Profile of the development partition.
+            spec: The project specification in force.
+
+        Returns:
+            Advice naming the suspects, plus advice to block training if the
+            leakage policy is not `block`; empty if there are no suspects.
+        """
         suspects = tuple(profile.leakage.get("suspects", ()))
         if not suspects:
             return []
@@ -150,7 +186,16 @@ class DuplicateAdvice(RecommendationRule):
     def advise(
         self, profile: data_contracts.DatasetProfile, spec: tasks.ProjectSpec
     ) -> list[Recommendation]:
-        """Advises when many rows are exact duplicates."""
+        """Advises when many rows are exact duplicates.
+
+        Args:
+            profile: Profile of the development partition.
+            spec: The project specification in force.
+
+        Returns:
+            One recommendation when the duplicate share reaches
+            `DUPLICATE_SHARE` and no group column is set; otherwise empty.
+        """
         share = float(
             profile.dataset_statistics.get("quality", {}).get(
                 "duplicate_share", 0.0
@@ -176,7 +221,16 @@ class SmallDataAdvice(RecommendationRule):
     def advise(
         self, profile: data_contracts.DatasetProfile, spec: tasks.ProjectSpec
     ) -> list[Recommendation]:
-        """Advises on small development sets."""
+        """Advises on small development sets.
+
+        Args:
+            profile: Profile of the development partition.
+            spec: The project specification in force. Unused.
+
+        Returns:
+            One recommendation when there are fewer than `SMALL_DATA_ROWS` rows;
+            otherwise empty (also when the row count is unknown).
+        """
         rows = int(profile.dataset_statistics.get("shape", {}).get("rows", 0))
         if rows == 0 or rows >= SMALL_DATA_ROWS:
             return []
@@ -192,7 +246,11 @@ class SmallDataAdvice(RecommendationRule):
 
 
 def default_rules() -> tuple[RecommendationRule, ...]:
-    """Returns the standard recommendation rules."""
+    """Returns the standard recommendation rules.
+
+    Returns:
+        One instance of each standard rule, in the order they are applied.
+    """
     return (
         ImbalanceAdvice(),
         MissingnessAdvice(),

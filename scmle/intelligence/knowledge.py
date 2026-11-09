@@ -61,7 +61,12 @@ def fingerprint(
 
 
 class MetaLearner:
-    """Recommends models by similarity to historical datasets."""
+    """Recommends models by similarity to historical datasets.
+
+    Attributes:
+        history: Past runs.
+        neighbors: How many similar datasets vote.
+    """
 
     def __init__(
         self,
@@ -80,7 +85,17 @@ class MetaLearner:
     def eligible(
         self, task: tasks.TaskType, dataset_id: str, data_hash: str
     ) -> list[experiments.HistoricalRun]:
-        """Past runs on a different dataset with the same task."""
+        """Selects past runs on a different dataset with the same task.
+
+        Args:
+            task: Resolved task type.
+            dataset_id: Identity of the new dataset, which is excluded.
+            data_hash: Content hash of the new dataset, which is excluded.
+
+        Returns:
+            The past runs with the same task, a different dataset identity and
+            content hash, and a score that is not NaN.
+        """
         return [
             run
             for run in self.history

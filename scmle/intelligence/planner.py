@@ -73,10 +73,11 @@ class PlanningRule(abc.ABC):
             decisions: Decision log to append to.
 
         Returns:
-            The candidates that remain.
+            The candidates that remain, in the order they will be searched.
 
         Raises:
-            ConfigError: If the rule's input is inconsistent.
+            ConfigError: If the rule's input is inconsistent. A rule may also
+                raise `BlockedError` when it leaves no workable candidate.
         """
 
 
@@ -93,7 +94,17 @@ class MemoryRule(PlanningRule):
         candidates: list[models.ModelAdapter],
         decisions: list[experiments.Decision],
     ) -> list[models.ModelAdapter]:
-        """Drops candidates that would not fit in `memory_limit_gb`."""
+        """Drops candidates that would not fit in `memory_limit_gb`.
+
+        Args:
+            context: Planning facts.
+            candidates: Candidates surviving earlier rules.
+            decisions: Decision log; a rejection is appended for each model
+                dropped.
+
+        Returns:
+            The candidates whose estimated training memory is within the limit.
+        """
         rows = context.profile.manifest.row_count
         width = max(len(context.profile.feature_plan.features), 1)
         limit = context.spec.resources.memory_limit_gb
@@ -126,6 +137,16 @@ class GpuRule(PlanningRule):
     ) -> list[models.ModelAdapter]:
         """Filters for GPU capability when a GPU is required.
 
+        Args:
+            context: Planning facts.
+            candidates: Candidates surviving earlier rules.
+            decisions: Decision log; a rejection is appended for each model that
+                cannot use a GPU.
+
+        Returns:
+            All candidates unless `resources.gpu` is `required`; then only those
+            that can use a GPU.
+
         Raises:
             BlockedError: If a GPU is required but no candidate can use one.
         """
@@ -156,7 +177,18 @@ class FastBudgetRule(PlanningRule):
         candidates: list[models.ModelAdapter],
         decisions: list[experiments.Decision],
     ) -> list[models.ModelAdapter]:
-        """Drops expensive models and shrinks the search on a tight budget."""
+        """Drops expensive models and shrinks the search on a tight budget.
+
+        Args:
+            context: Planning facts.
+            candidates: Candidates surviving earlier rules.
+            decisions: Decision log; the reduced search and each rejection are
+                appended.
+
+        Returns:
+            All candidates if the budget is not tight; otherwise those with a
+            cost below 3 or listed in `FAST_EXCEPTIONS`.
+        """
         if not context.spec.fast_budget:
             return candidates
         search = context.spec.effective_search()
@@ -197,7 +229,20 @@ class IncrementalRule(PlanningRule):
         candidates: list[models.ModelAdapter],
         decisions: list[experiments.Decision],
     ) -> list[models.ModelAdapter]:
-        """Drops non-incremental models when training on a stream."""
+        """Drops non-incremental models when training on a stream.
+
+        When not streaming, models built only for streaming are dropped instead.
+
+        Args:
+            context: Planning facts.
+            candidates: Candidates surviving earlier rules.
+            decisions: Decision log; a rejection is appended for each model
+                dropped.
+
+        Returns:
+            When streaming, the incremental models and the dummy baseline;
+            otherwise the models that are not stream-only.
+        """
         if context.spec.data.training != "stream":
             kept = []
             for adapter in candidates:
@@ -238,7 +283,17 @@ class SerializableRule(PlanningRule):
         candidates: list[models.ModelAdapter],
         decisions: list[experiments.Decision],
     ) -> list[models.ModelAdapter]:
-        """Drops adapters whose models are not serializable."""
+        """Drops adapters whose models are not serializable.
+
+        Args:
+            context: Planning facts. Unused.
+            candidates: Candidates surviving earlier rules.
+            decisions: Decision log; a rejection is appended for each model
+                dropped.
+
+        Returns:
+            The candidates that can be persisted in a bundle.
+        """
         kept = []
         for adapter in candidates:
             if adapter.capabilities.serializable:
@@ -267,7 +322,19 @@ class HighCardinalityRule(PlanningRule):
         candidates: list[models.ModelAdapter],
         decisions: list[experiments.Decision],
     ) -> list[models.ModelAdapter]:
-        """Prefers native-categorical models when such features exist."""
+        """Prefers native-categorical models when such features exist.
+
+        Args:
+            context: Planning facts.
+            candidates: Candidates surviving earlier rules.
+            decisions: Decision log; records the native-categorical and
+                target-encoding decisions.
+
+        Returns:
+            The candidates unchanged if there are no high-cardinality features;
+            otherwise the same candidates reordered as baselines, native
+            categorical models, then the rest.
+        """
         wide = context.profile.feature_plan.high_cardinality
         if not wide:
             return candidates
@@ -325,7 +392,17 @@ class ExcludedModelsRule(PlanningRule):
         candidates: list[models.ModelAdapter],
         decisions: list[experiments.Decision],
     ) -> list[models.ModelAdapter]:
-        """Drops excluded models, recording why."""
+        """Drops excluded models, recording why.
+
+        Args:
+            context: Planning facts.
+            candidates: Candidates surviving earlier rules.
+            decisions: Decision log; a rejection is appended for each model
+                dropped.
+
+        Returns:
+            The candidates whose name and family are not excluded.
+        """
         spec = context.spec.models
         kept = []
         for adapter in candidates:
@@ -352,6 +429,16 @@ class MonotonicRule(PlanningRule):
         decisions: list[experiments.Decision],
     ) -> list[models.ModelAdapter]:
         """Drops models that cannot enforce monotonic constraints.
+
+        Args:
+            context: Planning facts.
+            candidates: Candidates surviving earlier rules.
+            decisions: Decision log; a rejection is appended for each model
+                dropped.
+
+        Returns:
+            The candidates unchanged if no constraints are requested; otherwise
+            those that can enforce them, plus baselines.
 
         Raises:
             BlockedError: For multiclass tasks (not enforceable) or when no
@@ -393,7 +480,21 @@ class ApprovedModelsRule(PlanningRule):
         candidates: list[models.ModelAdapter],
         decisions: list[experiments.Decision],
     ) -> list[models.ModelAdapter]:
-        """Keeps only approved models; rejects unknown approvals."""
+        """Keeps only approved models; refuses unknown approvals.
+
+        Args:
+            context: Planning facts.
+            candidates: Candidates surviving earlier rules.
+            decisions: Decision log; a rejection is appended for each model not
+                approved.
+
+        Returns:
+            The candidates unchanged if no approval list was given; otherwise
+            the approved ones.
+
+        Raises:
+            ConfigError: If an approved model is not among the candidates.
+        """
         approved = context.approved_models
         if approved is None:
             return candidates
@@ -426,7 +527,18 @@ class HistoryRule(PlanningRule):
         candidates: list[models.ModelAdapter],
         decisions: list[experiments.Decision],
     ) -> list[models.ModelAdapter]:
-        """Moves historically successful models ahead of the others."""
+        """Moves historically successful models ahead of the others.
+
+        Args:
+            context: Planning facts, including the history.
+            candidates: Candidates surviving earlier rules.
+            decisions: Decision log; records whether comparable history existed.
+
+        Returns:
+            The candidates reordered as baselines, models that won on similar
+            past datasets (best first), then the rest; unchanged if there is no
+            comparable history.
+        """
         manifest = context.profile.manifest
         learner = knowledge.MetaLearner(list(context.history))
         recommendations = learner.recommend(
@@ -473,7 +585,16 @@ class StrategyRule(PlanningRule):
         candidates: list[models.ModelAdapter],
         decisions: list[experiments.Decision],
     ) -> list[models.ModelAdapter]:
-        """Documents strategy applicability; leaves candidates unchanged."""
+        """Documents strategy applicability; leaves candidates unchanged.
+
+        Args:
+            context: Planning facts.
+            candidates: Candidates surviving earlier rules.
+            decisions: Decision log; one entry for each configured strategy.
+
+        Returns:
+            The candidates, unchanged.
+        """
         spec = context.spec.effective_strategies()
         for name in spec.names:
             strategy = strategies.get_strategy(name)
@@ -524,7 +645,16 @@ class TuningRule(PlanningRule):
         candidates: list[models.ModelAdapter],
         decisions: list[experiments.Decision],
     ) -> list[models.ModelAdapter]:
-        """Documents the search decision; leaves candidates unchanged."""
+        """Documents the search decision; leaves candidates unchanged.
+
+        Args:
+            context: Planning facts.
+            candidates: Candidates surviving earlier rules.
+            decisions: Decision log; one entry for hyperparameter tuning.
+
+        Returns:
+            The candidates, unchanged.
+        """
         search = context.spec.effective_search()
         tunable = [a.name for a in candidates if a.search_space is not None]
         if search.top_models == 0 or not tunable:
@@ -558,7 +688,16 @@ class EnsembleRule(PlanningRule):
         candidates: list[models.ModelAdapter],
         decisions: list[experiments.Decision],
     ) -> list[models.ModelAdapter]:
-        """Documents the ensemble decision; leaves candidates unchanged."""
+        """Documents the ensemble decision; leaves candidates unchanged.
+
+        Args:
+            context: Planning facts.
+            candidates: Candidates surviving earlier rules.
+            decisions: Decision log; one entry each for stacking and blending.
+
+        Returns:
+            The candidates, unchanged.
+        """
         size = context.spec.ensemble.size
         distinct = sum(
             1 for a in candidates if a.family not in ("baseline", "ensemble")
@@ -583,7 +722,11 @@ class EnsembleRule(PlanningRule):
 
 
 def default_rules() -> tuple[PlanningRule, ...]:
-    """Returns the standard rule chain."""
+    """Returns the standard rule chain.
+
+    Returns:
+        One instance of each rule, in the order they are applied.
+    """
     return (
         ExcludedModelsRule(),
         MonotonicRule(),
@@ -602,7 +745,13 @@ def default_rules() -> tuple[PlanningRule, ...]:
 
 
 class Planner:
-    """Builds an `ExperimentPlan` from a profile."""
+    """Builds an `ExperimentPlan` from a profile.
+
+    Attributes:
+        registry: Source of candidate adapters.
+        catalog: Metric catalog used to resolve the primary metric.
+        rules: The rule chain.
+    """
 
     def __init__(
         self,
@@ -622,13 +771,17 @@ class Planner:
         self.rules = rules if rules is not None else default_rules()
 
     def plan(self, context: PlanningContext) -> experiments.ExperimentPlan:
-        """Creates the plan.
+        """Builds the experiment plan.
+
+        Models the registry rejects are logged first, then each rule is applied
+        in order, and the surviving candidates are logged as included.
 
         Args:
             context: Planning facts.
 
         Returns:
-            A deterministic, auditable plan.
+            A deterministic, auditable plan whose id is derived from the
+            resolved configuration, the data hash and the candidate names.
 
         Raises:
             ConfigError: If no candidate model remains.

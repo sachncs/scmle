@@ -69,10 +69,19 @@ def redundant_pairs(
 
 
 def order_drift(frame: pd.DataFrame, numeric: tuple[str, ...]) -> float:
-    """Largest adjusted PSI between the first and last third of the rows.
+    """Measures drift along row order.
 
-    A high value means the data's distribution changes along row order,
-    hinting at temporal shift worth a temporal validation scheme.
+    Compares the first and last third of the rows. A high value means the data's
+    distribution changes along row order, hinting at temporal shift worth a
+    temporal validation scheme.
+
+    Args:
+        frame: The dataset.
+        numeric: Numeric feature columns.
+
+    Returns:
+        The largest adjusted PSI over the numeric columns; 0.0 if there are
+        fewer than 90 rows or no numeric columns.
     """
     if len(frame) < 3 * 30 or not numeric:
         return 0.0
@@ -88,10 +97,13 @@ def order_drift(frame: pd.DataFrame, numeric: tuple[str, ...]) -> float:
 def missingness_patterns(features: pd.DataFrame) -> dict[str, Any]:
     """Summarizes how values go missing together.
 
+    Args:
+        features: The feature columns.
+
     Returns:
-        The number of distinct row-level missingness patterns, the share of
-        the most common non-empty pattern, and how many column pairs go
-        missing together (indicator correlation above 0.8).
+        The number of distinct row-level missingness patterns, the share of the
+        most common non-empty pattern, and how many column pairs go missing
+        together (indicator correlation above 0.8).
     """
     missing = features.isna()
     holes = missing.loc[:, missing.any()]
@@ -119,7 +131,16 @@ def missingness_patterns(features: pd.DataFrame) -> dict[str, Any]:
 def text_like_columns(
     frame: pd.DataFrame, plan: data_contracts.FeaturePlan
 ) -> list[str]:
-    """Categorical columns holding free text rather than short labels."""
+    """Finds categorical columns holding free text rather than short labels.
+
+    Args:
+        frame: The dataset.
+        plan: The feature plan, naming categorical, text and dropped columns.
+
+    Returns:
+        The non-numeric columns among those whose mean string length exceeds
+        `TEXT_MEAN_LENGTH`.
+    """
     found = []
     for name in (*plan.categorical, *plan.text, *plan.dropped):
         if name not in frame.columns or pd.api.types.is_numeric_dtype(
@@ -133,7 +154,16 @@ def text_like_columns(
 
 
 def scale_range(frame: pd.DataFrame, numeric: tuple[str, ...]) -> float:
-    """Orders of magnitude between the widest and narrowest numeric column."""
+    """Measures the orders of magnitude between the widest and narrowest column.
+
+    Args:
+        frame: The dataset.
+        numeric: Numeric feature columns.
+
+    Returns:
+        The base-10 logarithm of the ratio of the largest to the smallest
+        positive standard deviation; 0.0 with fewer than two such columns.
+    """
     spreads = [
         float(frame[c].astype(float).std())
         for c in numeric
@@ -150,13 +180,26 @@ def ml_difficulty(
     task: tasks.TaskType,
     plan: data_contracts.FeaturePlan,
 ) -> dict[str, Any]:
-    """Cheap baselines that show how hard the problem looks.
+    """Runs cheap baselines that show how hard the problem looks.
 
-    A few-second cross-validation on a subsample compares a constant
-    predictor, a linear model and a boosted-tree model, so the planner and the
-    user can see the headroom: baseline performance, the gain from
-    non-linearity, and (for classification) how separable the classes are.
-    Baselines are hypotheses about difficulty, not model selection.
+    A few-second cross-validation on a subsample compares a constant predictor,
+    a linear model and a boosted-tree model, so the planner and the user can see
+    the headroom: baseline performance, the gain from non-linearity, and (for
+    classification) how separable the classes are. Baselines are hypotheses
+    about difficulty, not model selection.
+
+    Args:
+        frame: The dataset.
+        spec: Project specification.
+        task: Resolved task type.
+        plan: Feature plan.
+
+    Returns:
+        A mapping with `available` False and a `reason` if a baseline cannot be
+        scored. Otherwise `available` True, the scoring metric, the rows used,
+        the three baseline scores, the nonlinearity gain, the headroom over the
+        constant baseline, the separability (the linear score for
+        classification, else None) and the seconds taken.
     """
     sample = frame
     if len(sample) > DIFFICULTY_ROWS:
@@ -225,7 +268,17 @@ def ml_difficulty(
 
 
 def structure(frame: pd.DataFrame, spec: tasks.ProjectSpec) -> dict[str, Any]:
-    """Describes group and temporal structure."""
+    """Describes group and temporal structure.
+
+    Args:
+        frame: The dataset.
+        spec: Project specification, naming the group and time columns.
+
+    Returns:
+        A mapping with `groups` (group count, mean rows per group, share of
+        repeated entities) and `time` (range, unparseable count and whether the
+        rows are in time order) for the columns that are configured.
+    """
     data = spec.data
     result: dict[str, Any] = {}
     if data.group_column:
