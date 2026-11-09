@@ -14,7 +14,6 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from scmle.deploy import ecs
 from scmle.governance import deployment_ledger as dl
 from scmle.operations import continuous
 from scmle.operations import signals
@@ -339,8 +338,7 @@ def test_production_replacement_needs_the_signed_staging_record(tmp_path):
 def test_a_platform_that_does_not_confirm_leaves_the_registry_alone(tmp_path):
     ignored, ev = winning_challenger(tmp_path)
     release, ignored, store = release_world(tmp_path)
-    stuck = rt.FakeEcs(never_settles=True)
-    plane = ecs.EcsControlPlane(stuck, "scmle-staging", "serve")
+    plane = rt.MemoryPlane(never_settles=True)
     result = ev.replace(
         "challenger-1", release, plane, candidate_for(store), sr.KEY
     )

@@ -6,7 +6,6 @@ import types
 import numpy as np
 import pandas as pd
 
-from scmle.deploy import ecs
 from scmle.governance import deployment_ledger as dl
 from scmle.governance import loop as loop_module
 from scmle.governance import release_state as rs
@@ -162,8 +161,7 @@ def release_world(tmp_path):
     release = rs.ReleaseRegistry(store, None, rt.NO_WAIT)
     release.approve(MODEL, 1, rt.approval_for(1), sr.KEY)
     release.approve(MODEL, 2, rt.approval_for(2), sr.KEY)
-    fake = rt.FakeEcs()
-    plane = ecs.EcsControlPlane(fake, "scmle-staging", "serve")
+    plane = rt.MemoryPlane()
     return release, plane, store
 
 

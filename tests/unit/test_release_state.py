@@ -1,21 +1,17 @@
-"""Adapters, release states, promotion, rollback and reconcile.
+"""Release states, promotion, rollback and reconcile.
 
-The ECS and Cloud Run answers are recorded JSON shaped by the documented
-responses (tests/fixtures/cloud) and the fakes in tests/support_runtime.py
-change them as the real services would be expected to. Nothing here called
-AWS or Google Cloud.
+The control plane is the in-memory `MemoryPlane` in tests/support_runtime.py,
+which can settle after a number of reads, never settle, run another image or
+refuse a traffic split.
 """
 
-import copy
 import json
 
 import pytest
 
 from scmle import cli
 from scmle.contracts import errors
-from scmle.deploy import cloudrun
 from scmle.deploy import control
-from scmle.deploy import ecs
 from scmle.deploy import observation
 from scmle.governance import deployment_ledger
 from scmle.governance import registry
@@ -27,7 +23,7 @@ MODEL = "churn"
 PRODUCTION = "production"
 
 
-def world(tmp_path, kind="ecs", **options):
+def world(tmp_path, split=True, **options):
     store = rt.make_registry(tmp_path / "registry")
     ledger = deployment_ledger.DeploymentLedger.create(
         None, charter_hash="c" * 8, policy={}, alpha_promo="1/20"
@@ -35,13 +31,8 @@ def world(tmp_path, kind="ecs", **options):
     release = rs.ReleaseRegistry(store, ledger, rt.NO_WAIT)
     for number in (1, 2, 3):
         release.approve(MODEL, number, rt.approval_for(number), sr.KEY)
-    if kind == "ecs":
-        fake = rt.FakeEcs(**options)
-        plane = ecs.EcsControlPlane(fake, "scmle-staging", "serve")
-    else:
-        fake = rt.FakeCloudRun(**options)
-        plane = cloudrun.CloudRunControlPlane(fake, fake.name)
-    return release, plane, fake
+    plane = rt.MemoryPlane(split=split, **options)
+    return release, plane, plane
 
 
 def promote(release, plane, version, digest, **keywords):
@@ -66,118 +57,19 @@ def snapshot(release):
     }
 
 
-KINDS = ["ecs", "cloudrun"]
+SPLITS = [True, False]
 
 
-# ---- adapters over the recorded answers --------------------------------
+# ---- observations ------------------------------------------------------
 
 
-def test_ecs_answers_become_an_observation():
-    seen = ecs.observe_services(
-        rt.load("ecs-describe-services"),
-        rt.load("ecs-describe-tasks"),
-        None,
-        sr.NOW,
-    )
-    assert seen.provider == "aws" and seen.service == "serve"
-    assert seen.revision == "scmle-staging-serve:12"
-    assert seen.image_digest == rt.OLD and seen.ready
-    assert [(t.revision, t.percent) for t in seen.traffic] == [
-        ("scmle-staging-serve:12", 100)
-    ]
-
-
-def test_ecs_falls_back_to_the_pinned_task_definition_image():
-    seen = ecs.observe_services(
-        rt.load("ecs-describe-services"),
-        None,
-        rt.load("ecs-describe-task-definition"),
-        sr.NOW,
-    )
-    assert seen.image_digest == rt.OLD
-
-
-def test_ecs_without_a_digest_is_an_error_not_a_guess():
-    with pytest.raises(errors.ArtifactError, match="digest"):
-        ecs.observe_services(rt.load("ecs-describe-services"), None, None)
-
-
-def test_ecs_tasks_of_one_revision_that_disagree_are_an_error():
-    tasks = rt.load("ecs-describe-tasks")
-    tasks["tasks"][1]["containers"][0]["imageDigest"] = rt.OTHER
-    with pytest.raises(errors.ArtifactError, match="different image digests"):
-        ecs.observe_services(rt.load("ecs-describe-services"), tasks)
-
-
-@pytest.mark.parametrize("missing", ["services", "primary"])
-def test_ecs_answers_without_a_service_or_a_primary_are_errors(missing):
-    document = rt.load("ecs-describe-services")
-    if missing == "services":
-        document["services"] = []
-        document["failures"] = [{"reason": "MISSING"}]
-    else:
-        document["services"][0]["deployments"][0]["status"] = "ACTIVE"
-    with pytest.raises(errors.ArtifactError):
-        ecs.observe_services(document, rt.load("ecs-describe-tasks"))
-
-
-def test_a_rolling_ecs_deployment_is_not_ready_and_splits_traffic():
-    fake = rt.FakeEcs(never_settles=True)
-    plane = ecs.EcsControlPlane(fake, "c", "serve")
+def test_a_plane_that_has_not_settled_is_not_ready():
+    plane = rt.MemoryPlane(never_settles=True)
+    assert plane.observe().ready
     plane.deploy(rt.NEW)
     seen = plane.observe()
     assert not seen.ready
-    assert [t.percent for t in seen.traffic] == [50, 50]
-    assert seen.digest_of("scmle-staging-serve:13") == rt.NEW
-
-
-def test_cloud_run_answers_become_an_observation():
-    seen = cloudrun.observe_service(
-        rt.load("cloudrun-service"), rt.load("cloudrun-revisions"), sr.NOW
-    )
-    assert seen.provider == "gcp" and seen.ready
-    assert seen.revision == "scmle-staging-serve-00011-abc"
-    assert seen.image_digest == rt.OLD
-    assert seen.share_of(seen.revision) == 100
-
-
-def test_cloud_run_reports_what_is_served_not_what_was_requested():
-    service = rt.load("cloudrun-service")
-    service["traffic"] = [
-        {
-            "type": cloudrun.REVISION_TARGET,
-            "revision": "scmle-staging-serve-00012-new",
-            "percent": 100,
-        }
-    ]
-    seen = cloudrun.observe_service(service, rt.load("cloudrun-revisions"))
-    assert seen.revision == "scmle-staging-serve-00011-abc"
-
-
-def test_cloud_run_latest_target_resolves_to_the_latest_ready_revision():
-    service = rt.load("cloudrun-service")
-    service["trafficStatuses"] = [
-        {"type": cloudrun.LATEST_TARGET, "percent": 100}
-    ]
-    seen = cloudrun.observe_service(service, rt.load("cloudrun-revisions"))
-    assert seen.revision == "scmle-staging-serve-00011-abc"
-
-
-def test_cloud_run_revision_not_pinned_by_digest_is_an_error():
-    revisions = rt.load("cloudrun-revisions")
-    revisions["scmle-staging-serve-00011-abc"]["containers"][0]["image"] = (
-        "europe-west1-docker.pkg.dev/p/r/serve:latest"
-    )
-    with pytest.raises(errors.ArtifactError, match="not pinned"):
-        cloudrun.observe_service(rt.load("cloudrun-service"), revisions)
-
-
-def test_cloud_run_unready_service_is_not_ready():
-    service = rt.load("cloudrun-service")
-    service["terminalCondition"]["state"] = "CONDITION_FAILED"
-    assert not cloudrun.observe_service(
-        service, rt.load("cloudrun-revisions")
-    ).ready
+    assert seen.digest_of("serve-2") == rt.NEW
 
 
 def test_an_observation_refuses_a_tag_and_a_broken_split():
@@ -246,9 +138,9 @@ def test_an_unsigned_bundle_cannot_be_approved(tmp_path):
 # ---- promotion ----------------------------------------------------------
 
 
-@pytest.mark.parametrize("kind", KINDS)
-def test_a_confirmed_promotion_changes_state_alias_and_ledger(tmp_path, kind):
-    release, plane, ignored = world(tmp_path, kind)
+@pytest.mark.parametrize("split", SPLITS)
+def test_a_confirmed_promotion_changes_state_alias_and_ledger(tmp_path, split):
+    release, plane, ignored = world(tmp_path, split)
     first = promote(release, plane, 1, rt.OLD)
     assert first.done and first.restored is None
     second = promote(release, plane, 2, rt.NEW)
@@ -268,9 +160,9 @@ def test_a_confirmed_promotion_changes_state_alias_and_ledger(tmp_path, kind):
     assert release.deployed_version(MODEL, PRODUCTION, seen) == 2
 
 
-@pytest.mark.parametrize("kind", KINDS)
-def test_a_staging_release_does_not_make_a_version_production(tmp_path, kind):
-    release, plane, ignored = world(tmp_path, kind)
+@pytest.mark.parametrize("split", SPLITS)
+def test_a_staging_release_does_not_make_a_version_production(tmp_path, split):
+    release, plane, ignored = world(tmp_path, split)
     outcome = promote(release, plane, 1, rt.OLD, environment="staging")
     assert outcome.done
     assert release.state_of(MODEL, 1) is rs.ReleaseState.APPROVED
@@ -279,11 +171,11 @@ def test_a_staging_release_does_not_make_a_version_production(tmp_path, kind):
     assert release.reconcile(MODEL, "staging", plane.observe()).consistent
 
 
-@pytest.mark.parametrize("kind", KINDS)
-def test_a_staged_rollout_passes_through_each_share_only_on_cloud_run(
-    tmp_path, kind
+@pytest.mark.parametrize("split", SPLITS)
+def test_a_staged_rollout_passes_through_each_share_only_where_traffic_splits(
+    tmp_path, split
 ):
-    release, plane, ignored = world(tmp_path, kind)
+    release, plane, ignored = world(tmp_path, split)
     assert promote(release, plane, 1, rt.OLD).done
     seen_shares = []
 
@@ -294,9 +186,9 @@ def test_a_staged_rollout_passes_through_each_share_only_on_cloud_run(
     outcome = promote(
         release, plane, 2, rt.NEW, steps=(10, 50, 100), health=watch
     )
-    if kind == "ecs":
+    if not split:
         assert not outcome.done
-        assert "all traffic to one revision" in outcome.reasons[0]
+        assert "cannot split traffic" in outcome.reasons[0]
         assert outcome.restored is True
     else:
         assert outcome.done
@@ -305,7 +197,7 @@ def test_a_staged_rollout_passes_through_each_share_only_on_cloud_run(
 
 
 def test_each_unconfirmed_or_refused_promotion_changes_nothing(tmp_path):
-    release, plane, ignored = world(tmp_path, "cloudrun")
+    release, plane, ignored = world(tmp_path)
     assert promote(release, plane, 1, rt.OLD).done
     release.transition(MODEL, 3, rs.ReleaseState.RETIRED, "withdrawn")
     before = snapshot(release)
@@ -322,11 +214,11 @@ def test_each_unconfirmed_or_refused_promotion_changes_nothing(tmp_path):
     }
 
 
-@pytest.mark.parametrize("kind", KINDS)
+@pytest.mark.parametrize("split", SPLITS)
 def test_a_platform_that_never_confirms_leaves_the_registry_unchanged(
-    tmp_path, kind
+    tmp_path, split
 ):
-    release, plane, fake = world(tmp_path, kind)
+    release, plane, fake = world(tmp_path, split)
     assert promote(release, plane, 1, rt.OLD).done
     before = snapshot(release)
     fake.never_settles = True
@@ -342,9 +234,9 @@ def test_a_platform_that_never_confirms_leaves_the_registry_unchanged(
     assert release.environment(MODEL, PRODUCTION)["version"] == 1
 
 
-@pytest.mark.parametrize("kind", KINDS)
-def test_a_platform_that_runs_another_image_is_not_confirmed(tmp_path, kind):
-    release, plane, fake = world(tmp_path, kind)
+@pytest.mark.parametrize("split", SPLITS)
+def test_a_platform_that_runs_another_image_is_not_confirmed(tmp_path, split):
+    release, plane, fake = world(tmp_path, split)
     assert promote(release, plane, 1, rt.OLD).done
     before = snapshot(release)
     fake.runs = rt.OTHER
@@ -359,7 +251,7 @@ def test_a_platform_that_runs_another_image_is_not_confirmed(tmp_path, kind):
 
 
 def test_a_failing_health_check_stops_a_staged_rollout_and_restores(tmp_path):
-    release, plane, ignored = world(tmp_path, "cloudrun")
+    release, plane, ignored = world(tmp_path)
     assert promote(release, plane, 1, rt.OLD).done
     before = snapshot(release)
     outcome = promote(
@@ -385,7 +277,7 @@ def test_a_failing_health_check_stops_a_staged_rollout_and_restores(tmp_path):
 
 
 def test_a_failed_restore_is_reported_and_reconcile_flags_the_runtime(tmp_path):
-    release, plane, fake = world(tmp_path, "ecs")
+    release, plane, fake = world(tmp_path, split=False)
     assert promote(release, plane, 1, rt.OLD).done
     fake.never_settles = True
     outcome = promote(release, plane, 2, rt.NEW)
@@ -395,7 +287,7 @@ def test_a_failed_restore_is_reported_and_reconcile_flags_the_runtime(tmp_path):
 
 
 def test_the_registry_refusing_the_alias_restores_the_platform(tmp_path):
-    release, plane, ignored = world(tmp_path, "cloudrun")
+    release, plane, ignored = world(tmp_path)
     assert promote(release, plane, 1, rt.OLD).done
     release.store.attach_guard(RefusingGuard(), "scope")
     before = snapshot(release)
@@ -415,9 +307,9 @@ class RefusingGuard:
 # ---- rollback -----------------------------------------------------------
 
 
-@pytest.mark.parametrize("kind", KINDS)
-def test_rollback_restores_the_previous_known_good_revision(tmp_path, kind):
-    release, plane, ignored = world(tmp_path, kind)
+@pytest.mark.parametrize("split", SPLITS)
+def test_rollback_restores_the_previous_known_good_revision(tmp_path, split):
+    release, plane, ignored = world(tmp_path, split)
     assert promote(release, plane, 1, rt.OLD).done
     first = release.environment(MODEL, PRODUCTION)
     assert promote(release, plane, 2, rt.NEW).done
@@ -434,7 +326,7 @@ def test_rollback_restores_the_previous_known_good_revision(tmp_path, kind):
 
 
 def test_rollback_without_a_previous_revision_does_nothing(tmp_path):
-    release, plane, ignored = world(tmp_path, "cloudrun")
+    release, plane, ignored = world(tmp_path)
     assert promote(release, plane, 1, rt.OLD).done
     before = snapshot(release)
     outcome = release.rollback(MODEL, PRODUCTION, plane, sr.KEY)
@@ -443,7 +335,7 @@ def test_rollback_without_a_previous_revision_does_nothing(tmp_path):
 
 
 def test_an_unconfirmed_rollback_changes_nothing(tmp_path):
-    release, plane, fake = world(tmp_path, "cloudrun")
+    release, plane, fake = world(tmp_path)
     assert promote(release, plane, 1, rt.OLD).done
     assert promote(release, plane, 2, rt.NEW).done
     before = snapshot(release)
@@ -463,7 +355,7 @@ def test_an_unconfirmed_rollback_changes_nothing(tmp_path):
 
 @pytest.fixture
 def released(tmp_path):
-    release, plane, ignored = world(tmp_path, "cloudrun")
+    release, plane, ignored = world(tmp_path)
     assert promote(release, plane, 1, rt.OLD).done
     assert promote(release, plane, 2, rt.NEW).done
     return release, plane.observe()
@@ -481,7 +373,7 @@ def test_reconcile_is_clean_after_a_success(released):
 def test_reconcile_detects_a_seeded_revision_and_digest_disagreement(released):
     release = released[0]
     other = sr.seen(
-        provider="gcp",
+        provider="memory",
         revision="scmle-staging-serve-00099-zzz",
         image_digest=rt.OTHER,
         traffic=(observation.Traffic("scmle-staging-serve-00099-zzz", 100),),
@@ -496,7 +388,7 @@ def test_reconcile_detects_a_seeded_revision_and_digest_disagreement(released):
 def test_reconcile_detects_partial_traffic_and_unreadiness(released):
     release, seen = released
     split = sr.seen(
-        provider="gcp",
+        provider="memory",
         revision=seen.revision,
         image_digest=seen.image_digest,
         traffic=(
@@ -553,18 +445,18 @@ def test_reconcile_detects_a_ledger_that_disagrees_or_is_empty(released):
 
 
 def test_the_runtime_running_something_unrecorded_is_a_finding(tmp_path):
-    release, plane, ignored = world(tmp_path, "ecs")
+    release, plane, ignored = world(tmp_path, split=False)
     report = release.reconcile(MODEL, PRODUCTION, plane.observe())
     assert [f.kind for f in report.findings] == ["no_registry_record"]
     with pytest.raises(rs.RuntimeDisagrees):
         release.deployed_version(MODEL, PRODUCTION, plane.observe())
 
 
-@pytest.mark.parametrize("kind", KINDS)
+@pytest.mark.parametrize("split", SPLITS)
 def test_registry_and_runtime_reconcile_after_a_success_and_a_failure(
-    tmp_path, kind
+    tmp_path, split
 ):
-    release, plane, fake = world(tmp_path, kind)
+    release, plane, fake = world(tmp_path, split)
     assert promote(release, plane, 1, rt.OLD).done
     assert release.reconcile(MODEL, PRODUCTION, plane.observe()).consistent
     fake.runs = rt.OTHER
@@ -577,32 +469,12 @@ def test_registry_and_runtime_reconcile_after_a_success_and_a_failure(
 # ---- the command line ----------------------------------------------------
 
 
-def write(path, document):
-    path.write_text(json.dumps(document), encoding="utf-8")
-    return str(path)
-
-
-def test_observe_and_reconcile_commands(tmp_path, capsys):
-    release, plane, fake = world(tmp_path, "cloudrun")
+def test_reconcile_command(tmp_path, capsys):
+    release, plane, ignored = world(tmp_path)
     assert promote(release, plane, 1, rt.OLD).done
     seen = plane.observe()
     observed = tmp_path / "observed.json"
-    code = cli.main(
-        [
-            "deploy",
-            "observe",
-            "--provider",
-            "gcp",
-            "--input",
-            write(tmp_path / "service.json", fake.service),
-            "--revisions",
-            write(tmp_path / "revisions.json", fake.revisions),
-            "--output",
-            str(observed),
-        ]
-    )
-    assert code == cli.EXIT_OK
-    capsys.readouterr()
+    observed.write_text(json.dumps(seen.to_dict()), encoding="utf-8")
     base = [
         "deploy",
         "reconcile",
@@ -626,64 +498,20 @@ def test_observe_and_reconcile_commands(tmp_path, capsys):
     assert seen.revision == document["revision"]
 
 
-def test_observe_ecs_command_and_missing_inputs(tmp_path, capsys):
-    base = [
-        "deploy",
-        "observe",
-        "--provider",
-        "aws",
-        "--input",
-        str(rt.FIXTURES / "ecs-describe-services.json"),
-        "--output",
-        str(tmp_path / "o.json"),
-    ]
-    assert cli.main(base) == cli.EXIT_FAILED
-    code = cli.main(
-        [
-            *base,
-            "--tasks",
-            str(rt.FIXTURES / "ecs-describe-tasks.json"),
-        ]
-    )
-    assert code == cli.EXIT_OK
-    saved = json.loads((tmp_path / "o.json").read_text())
-    assert saved["image_digest"] == rt.OLD
-    code = cli.main(
-        [
-            "deploy",
-            "observe",
-            "--provider",
-            "gcp",
-            "--input",
-            str(rt.FIXTURES / "cloudrun-service.json"),
-            "--output",
-            str(tmp_path / "g.json"),
-        ]
-    )
-    assert code == cli.EXIT_FAILED
-
-
 def test_confirm_waits_and_then_gives_up():
     waits = []
     policy = control.ConfirmPolicy(attempts=3, delay=2, sleep=waits.append)
-    fake = rt.FakeEcs(never_settles=True)
-    plane = ecs.EcsControlPlane(fake, "c", "serve")
-    plane.deploy(rt.NEW)
+    plane = rt.MemoryPlane(never_settles=True)
+    revision = plane.deploy(rt.NEW)
     with pytest.raises(control.RuntimeUnconfirmed):
-        control.confirm(
-            plane,
-            control.expecting("scmle-staging-serve:13", rt.NEW, 100),
-            policy,
-        )
+        control.confirm(plane, control.expecting(revision, rt.NEW, 100), policy)
     assert waits == [2, 2]
     with pytest.raises(errors.ConfigError):
         control.ConfirmPolicy(attempts=0)
 
 
-def test_the_ecs_plane_refuses_a_traffic_split_and_an_unpinned_deploy():
-    plane = ecs.EcsControlPlane(rt.FakeEcs(), "c", "serve")
+def test_a_plane_that_cannot_split_traffic_refuses_a_split():
+    plane = rt.MemoryPlane(split=False)
     with pytest.raises(control.Unsupported):
-        plane.set_traffic({"a:1": 50, "a:2": 50})
-    with pytest.raises(errors.ConfigError):
-        plane.deploy("repo:latest")
-    assert copy.deepcopy(plane.deploy(rt.NEW)) == "scmle-staging-serve:13"
+        plane.set_traffic({"serve-1": 50, "serve-2": 50})
+    assert plane.deploy(rt.NEW) == "serve-2"
