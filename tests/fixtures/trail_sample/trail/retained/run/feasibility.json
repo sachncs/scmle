@@ -1,0 +1,9 @@
+{
+  "verdict": "downgrade",
+  "scope": "exploratory_unconfirmed",
+  "n_confirmation": 273,
+  "n_required": 333,
+  "mde": 0.22082664643697447,
+  "power_at_min_effect": 0.6905847659860584,
+  "reason": "273 rows < 333 needed for power 0.8 at effect 0.2; detectable effect is 0.221"
+}

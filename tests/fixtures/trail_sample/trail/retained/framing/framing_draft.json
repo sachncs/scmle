@@ -1,0 +1,93 @@
+{
+  "charter": {
+    "cost_model": {
+      "c_00": 0.0,
+      "c_01": 5.0,
+      "c_10": 1.0,
+      "c_11": 0.0,
+      "range_source": "human",
+      "sources": [
+        "human",
+        "human",
+        "human",
+        "human"
+      ],
+      "t_hi": 0.5,
+      "t_lo": 0.05
+    },
+    "decision_map": [],
+    "deployment_population": "same as file://titanic_extract.csv",
+    "error_budget": {
+      "confirmation": {
+        "alpha_confirm": "1/20"
+      },
+      "detector_tolerances": [],
+      "exploration": {
+        "initial": "1/10",
+        "wealth": "1/10"
+      },
+      "permutations_b": 20
+    },
+    "estimand": {
+      "intercurrent_events": [
+        {
+          "event": "none",
+          "strategy": "not applicable"
+        }
+      ],
+      "kind": "predictive",
+      "population": "all rows of file://titanic_extract.csv",
+      "prediction_moment": "boarding_date",
+      "summary_measure": "net benefit over thresholds [0.05, 0.5]",
+      "target": "survived"
+    },
+    "gating_checks": [],
+    "k_max": 10,
+    "min_effect": 0.2,
+    "multiverse": [],
+    "power": 0.8,
+    "question": "Predict `survived` for each passenger at boarding, so the purser can decide whom to brief first.",
+    "seed": 0,
+    "sets": {
+      "confirmation_fraction": 0.25,
+      "embargo_rows": 0
+    },
+    "unit": "passenger_id"
+  },
+  "charter_hash": "fc0aaf6b55fb4ea2f4b07713c5d916c9ccdba0a93feb28050bd8f640cf7271c6",
+  "checks": [
+    {
+      "blocking": false,
+      "detail": "missing share 0.000; constant=False",
+      "name": "target_complete",
+      "ok": true
+    },
+    {
+      "blocking": false,
+      "detail": "duplicate share 0.0000",
+      "name": "unit_unique",
+      "ok": true
+    }
+  ],
+  "discarded": [],
+  "fields": {
+    "baseline_decision_column": "template",
+    "deployment_population": "template",
+    "intercurrent_events": "template",
+    "population": "template",
+    "prediction_moment": "template",
+    "question": "template",
+    "target": "template",
+    "unit": "template"
+  },
+  "label": "a drafted charter is a draft: nothing here shows it is correct; llm fields are unverified until a person signs",
+  "llm": null,
+  "open_items": [
+    "population",
+    "deployment_population",
+    "intercurrent_events",
+    "baseline_decision_column"
+  ],
+  "schema_version": 1,
+  "status": "issued_with_questions"
+}

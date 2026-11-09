@@ -1,0 +1,88 @@
+{
+  "trial_id": "trial_009",
+  "model_name": "hist_gradient_boosting",
+  "status": "ok",
+  "metric": "roc_auc",
+  "score_mean": 0.8320161045075342,
+  "score_std": 0.03161084136470989,
+  "fold_scores": [
+    0.8629941893585508,
+    0.7936728395061728,
+    0.8058333333333334,
+    0.8744621342512908,
+    0.8231180260883231
+  ],
+  "fit_seconds": 1.4431393749837298,
+  "error": "",
+  "params": {},
+  "strategy": "construct_features",
+  "observed_access": [
+    {
+      "fit": {
+        "rows": 621,
+        "digest": "4f624ed98e819e2e"
+      },
+      "evaluate": {
+        "rows": 198,
+        "digest": "60a66d708031485a"
+      }
+    },
+    {
+      "fit": {
+        "rows": 651,
+        "digest": "3d524448a068cf45"
+      },
+      "evaluate": {
+        "rows": 168,
+        "digest": "fb0119700aaa21ab"
+      }
+    },
+    {
+      "fit": {
+        "rows": 669,
+        "digest": "c8885065e870f45d"
+      },
+      "evaluate": {
+        "rows": 150,
+        "digest": "742054cca4e89a98"
+      }
+    },
+    {
+      "fit": {
+        "rows": 680,
+        "digest": "0fc8101c2e5cd20c"
+      },
+      "evaluate": {
+        "rows": 139,
+        "digest": "610e1247c763b8d4"
+      }
+    },
+    {
+      "fit": {
+        "rows": 655,
+        "digest": "4ebb33bfca85f260"
+      },
+      "evaluate": {
+        "rows": 164,
+        "digest": "0425b785a66a191f"
+      }
+    }
+  ],
+  "evaluation_config": {
+    "metric": "roc_auc",
+    "folds": 5,
+    "seed": 7,
+    "weighted": false
+  },
+  "runtime": {
+    "python": "3.11.16",
+    "libraries": {}
+  },
+  "train_scores": [
+    0.9961992595675698,
+    0.9956489009334537,
+    0.9955745834054085,
+    0.9944232558139535,
+    0.995630069119821
+  ]
+}

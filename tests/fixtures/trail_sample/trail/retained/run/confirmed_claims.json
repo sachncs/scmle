@@ -1,0 +1,194 @@
+{
+  "alpha_confirm": "1/20",
+  "checks": [
+    {
+      "check_id": "h000001:C",
+      "decision": "warn",
+      "effect": -0.23817922494863583,
+      "interval": null,
+      "n": 273,
+      "null_hypothesis": "passenger_id is not monotonically associated with the target",
+      "p_value": 7.048010663799839e-05,
+      "seed_path": [
+        0,
+        "confirm.spearman",
+        0
+      ],
+      "set_id": "C",
+      "statistic": -0.23817922494863583,
+      "tier": "confirmed"
+    },
+    {
+      "check_id": "h000002:C",
+      "decision": "warn",
+      "effect": -0.2847238443405471,
+      "interval": null,
+      "n": 273,
+      "null_hypothesis": "pclass is not monotonically associated with the target",
+      "p_value": 1.7341184859501561e-06,
+      "seed_path": [
+        0,
+        "confirm.spearman",
+        1
+      ],
+      "set_id": "C",
+      "statistic": -0.2847238443405471,
+      "tier": "confirmed"
+    },
+    {
+      "check_id": "h000005:C",
+      "decision": "pass",
+      "effect": 0.13365493176888446,
+      "interval": null,
+      "n": 273,
+      "null_hypothesis": "parch is not monotonically associated with the target",
+      "p_value": 0.027235541096228087,
+      "seed_path": [
+        0,
+        "confirm.spearman",
+        2
+      ],
+      "set_id": "C",
+      "statistic": 0.13365493176888446,
+      "tier": "unverified"
+    },
+    {
+      "check_id": "h000006:C",
+      "decision": "warn",
+      "effect": 0.25959030602728533,
+      "interval": null,
+      "n": 273,
+      "null_hypothesis": "fare is not monotonically associated with the target",
+      "p_value": 1.3981207531187497e-05,
+      "seed_path": [
+        0,
+        "confirm.spearman",
+        3
+      ],
+      "set_id": "C",
+      "statistic": 0.25959030602728533,
+      "tier": "confirmed"
+    }
+  ],
+  "claims": [
+    {
+      "adjusted_p_value": 0.00019577807399444,
+      "assumptions": [
+        "FDR <= alpha * m0 / m under arbitrary dependence (rule by, family of 4 survivors fixed before C was opened)",
+        "rows of C are independent of rows of X (grouped split by entity, embargo for temporal data)",
+        "C was opened once and its rows were used only by this confirmation",
+        "each statistic is valid under its null on C: Spearman and Kruskal assume independent rows",
+        "exploration FDR is a triage budget, not part of this guarantee"
+      ],
+      "check_ids": [
+        "h000001:X",
+        "h000001:C"
+      ],
+      "claim_id": "h000001",
+      "effect": -0.23817922494863583,
+      "statement": "passenger_id~target: evidence against 'passenger_id is not monotonically associated with the target'",
+      "tier": "confirmed"
+    },
+    {
+      "adjusted_p_value": 1.4450987382917968e-05,
+      "assumptions": [
+        "FDR <= alpha * m0 / m under arbitrary dependence (rule by, family of 4 survivors fixed before C was opened)",
+        "rows of C are independent of rows of X (grouped split by entity, embargo for temporal data)",
+        "C was opened once and its rows were used only by this confirmation",
+        "each statistic is valid under its null on C: Spearman and Kruskal assume independent rows",
+        "exploration FDR is a triage budget, not part of this guarantee"
+      ],
+      "check_ids": [
+        "h000002:X",
+        "h000002:C"
+      ],
+      "claim_id": "h000002",
+      "effect": -0.2847238443405471,
+      "statement": "pclass~target: evidence against 'pclass is not monotonically associated with the target'",
+      "tier": "confirmed"
+    },
+    {
+      "adjusted_p_value": 0.05674071061714185,
+      "assumptions": [
+        "FDR <= alpha * m0 / m under arbitrary dependence (rule by, family of 4 survivors fixed before C was opened)",
+        "rows of C are independent of rows of X (grouped split by entity, embargo for temporal data)",
+        "C was opened once and its rows were used only by this confirmation",
+        "each statistic is valid under its null on C: Spearman and Kruskal assume independent rows",
+        "exploration FDR is a triage budget, not part of this guarantee"
+      ],
+      "check_ids": [
+        "h000005:X",
+        "h000005:C"
+      ],
+      "claim_id": "h000005",
+      "effect": 0.13365493176888446,
+      "statement": "parch~target: evidence against 'parch is not monotonically associated with the target'",
+      "tier": "unverified"
+    },
+    {
+      "adjusted_p_value": 5.8255031379947906e-05,
+      "assumptions": [
+        "FDR <= alpha * m0 / m under arbitrary dependence (rule by, family of 4 survivors fixed before C was opened)",
+        "rows of C are independent of rows of X (grouped split by entity, embargo for temporal data)",
+        "C was opened once and its rows were used only by this confirmation",
+        "each statistic is valid under its null on C: Spearman and Kruskal assume independent rows",
+        "exploration FDR is a triage budget, not part of this guarantee"
+      ],
+      "check_ids": [
+        "h000006:X",
+        "h000006:C"
+      ],
+      "claim_id": "h000006",
+      "effect": 0.25959030602728533,
+      "statement": "fare~target: evidence against 'fare is not monotonically associated with the target'",
+      "tier": "confirmed"
+    }
+  ],
+  "custody_head": "34c38b4b78af3ea7aa8241815ec69aa5676e07bd2ebee8fae6a6d8c804bddc7c",
+  "guarantee": "FDR <= alpha * m0 / m under arbitrary dependence",
+  "ledger_head": "dc840a81744211f3d57ee12038d93d4b11eb3605b1ba26a2ade7a6d14d1288b2",
+  "negative_control": {
+    "b": 20,
+    "exceedance_p": 0.047619047619047616,
+    "exceeds": true,
+    "kind": "permuted_target",
+    "message": "4 discoveries exceed the 95th percentile (0) of 20 permuted_target re-runs",
+    "note": "The 95th percentile is estimated from B re-runs and has Monte Carlo error; the interval is approximate and distribution-free.",
+    "observed": 4,
+    "p95": 0,
+    "p95_interval": [
+      0,
+      0
+    ],
+    "p95_interval_confidence": 0.9,
+    "permuted": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scope": "global",
+    "sha256": "4c52eb27e7792ff5126ed5124c7ac18f93d0664ad497a3ac5bf6cc4cfd539ad4"
+  },
+  "note": "Only claims with tier 'confirmed' carry the FDR/FWER guarantee, and only under the assumptions listed on them. Exploration findings that are not confirmed do not change feature admission or preprocessing.",
+  "outcome": "confirmed",
+  "reason": "3 of 4 survivors confirmed on C by by at 0.05",
+  "rule": "by",
+  "survivors_sha256": "4249179dde0d8f321de1eb7e8be8cf9c1165431a13700ea5d2c4cd7327664429"
+}

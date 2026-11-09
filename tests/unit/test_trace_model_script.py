@@ -16,7 +16,7 @@ import pytest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts" / "trace_model.py"
-EVIDENCE = ROOT / "plan" / "evidence" / "phase-18" / "local"
+EVIDENCE = ROOT / "tests" / "fixtures" / "trail_sample"
 
 
 @pytest.fixture

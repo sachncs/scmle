@@ -23,7 +23,7 @@ from scmle.trail import show
 from scmle.trail import trace
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-EVIDENCE = ROOT / "plan" / "evidence" / "phase-18" / "local"
+EVIDENCE = ROOT / "tests" / "fixtures" / "trail_sample"
 KEYS = json.loads((EVIDENCE / "keys.json").read_text(encoding="utf-8"))
 
 

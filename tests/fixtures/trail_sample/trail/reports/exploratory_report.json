@@ -1,0 +1,71 @@
+{
+  "confirmation": {
+    "checks_by_tier": {
+      "confirmed": 3,
+      "unverified": 1
+    },
+    "outcome": "confirmed"
+  },
+  "dataset": {
+    "columns": 12,
+    "data_hash": "3b4683ab7409c5be",
+    "rows": 1309,
+    "schema_hash": "8ca499be89ce8a75",
+    "target": "survived"
+  },
+  "dropped_columns": {
+    "boarding_date": "excluded by user",
+    "boat": "not available at prediction time (feature-availability contract)",
+    "body": "not available at prediction time (feature-availability contract)",
+    "passenger_id": "id column"
+  },
+  "feasibility": {
+    "mde": 0.22082664643697447,
+    "n_confirmation": 273,
+    "n_required": 333,
+    "power_at_min_effect": 0.6905847659860584,
+    "reason": "273 rows < 333 needed for power 0.8 at effect 0.2; detectable effect is 0.221",
+    "scope": "exploratory_unconfirmed",
+    "verdict": "downgrade"
+  },
+  "feature_columns": [
+    "categorical",
+    "numeric",
+    "text"
+  ],
+  "findings": [
+    {
+      "disposition": "open",
+      "message": "111 duplicate rows",
+      "severity": "warning"
+    },
+    {
+      "disposition": "open",
+      "message": "21 feature combinations have inconsistent labels",
+      "severity": "warning"
+    },
+    {
+      "disposition": "open",
+      "message": "missingness of 'age' is associated with the target (chi-square, effect 0.12, p=8.7e-04)",
+      "severity": "warning"
+    },
+    {
+      "disposition": "open",
+      "message": "label noise: 20% of 819 checked rows have a label that a model trained without them contradicts confidently; review before trusting scores",
+      "severity": "warning"
+    }
+  ],
+  "kind": "exploratory_report",
+  "ledger_rows": {
+    "confirmation": 1,
+    "control": 1,
+    "diagnostic": 20,
+    "open": 1,
+    "register": 6,
+    "result": 6,
+    "survivors": 1
+  },
+  "profiled_rows": 819,
+  "profiled_set": "exploration rows only",
+  "sha256": "5fd5f30e3b4a6707f0c26da7a287dc3f55521f248c9efad78eee3d971b276d13"
+}

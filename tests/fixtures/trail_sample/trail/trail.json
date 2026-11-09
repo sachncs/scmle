@@ -1,0 +1,469 @@
+{
+  "builder_signature": "8c7d7481750e8fe7c9a9e69476982cda6f5b2adc4c59f0d0becdb01f6bc3f6f9",
+  "charter_hash": "fc0aaf6b55fb4ea2f4b07713c5d916c9ccdba0a93feb28050bd8f640cf7271c6",
+  "format": 1,
+  "head": "d75a704650bd0258280ce205ab7d19e8276294f81c8a46f6e7fa35a7f60089a1",
+  "model": "titanic_survival",
+  "retained": {
+    "inputs.json": "952988bdd6177affc0faec247e83864d8f7eaf4c5067b253c4c6da0e7e7d99b3",
+    "retained/deployment/deployment_ledger.jsonl": "8bae7c6fd5eb1440d302a8577734d7e5067d04ef9641268f5309c983b271954e",
+    "retained/deployment/loop_state.json": "c0dce85fc4df085294a66a57083a6314f4c58b04fe5864cd9a17fafef1f675da",
+    "retained/deployment/observed_outcomes.json": "0cb5a6e0c7861ef0e524f0738c733ffd4359a97e3bfe4fd4311207a60bbaceb6",
+    "retained/framing/decision_cost_model.json": "0e949805821c910588acfc9806623142b5ed42144e93ed7ec6dfcc89bb2080c3",
+    "retained/framing/framing_draft.json": "bbe18a2f8f2d1705d9c594e23af6e5cd76183da6cf7cc2261abc1940905e3728",
+    "retained/framing/framing_questions.json": "f2c7b8315b41af217ff9b60dc0a90dd77f5d85b67aa56b0aa97718c419aa3cdf",
+    "retained/registry/audit.jsonl": "6100704c92bba0da1cb58edae60b38f075fa4a622eea548f47044d2e281d4690",
+    "retained/registry/registry.json": "9bb7e086a021ac3dcac4c8f269c968cbfd7b9c48f02322c2cf7d83fb80ff0dc2",
+    "retained/registry/release_state.json": "136f1249d9af58da68b6ab37ba3ca4c3a3a8e747db616ac8e0edf37826f15fbd",
+    "retained/run/analysis_charter.json": "4df5c9ae690aaa56e7af1f1c21f9ffef2f47fb44705772763226e68cca77f812",
+    "retained/run/confirmed_claims.json": "14b5ad47e82c09cf02899b2a239d52ffae7c753282686c6f0f0ddb4bfe47de11",
+    "retained/run/curation_report.json": "1fbea8e3d281c12cbf3484952417e18f9905286d6f80917a89d30489ba03e689",
+    "retained/run/custody_log.jsonl": "8453ba8339aa783b594a905a0e7665910c5227f04491b379dd603685f4cfa6b1",
+    "retained/run/dataset_manifest.json": "c493eeb8bc9e0b2403c6b93974a83b37f2eab64b010a29b6a8863110aeb32f36",
+    "retained/run/error_budget.json": "862e343ed3c04a64942491412749c6173e602d9d019d7d7acac3be1b11bf0598",
+    "retained/run/evaluation.json": "958226495038977a613ed6a5c72b412f4a0b5a3a36a380879a14078cb4c8d058",
+    "retained/run/feasibility.json": "b2cda9c718d646ceecf1d888421dc78b46375829a61b8036131a51c00479c14d",
+    "retained/run/framing_link.json": "10c62159def452115d1e35c19c4c749a88f4bac7c284e64c2e884bc20f709739",
+    "retained/run/hypothesis_ledger.jsonl": "e9a87c39262b38b8b380e78a0c6a3f61e560e0f26cfc13251b1646b0764c6ac7",
+    "retained/run/model/model_manifest.json": "76e653b1ad6e29ee9332fc6196cc8a33da2028f757751b2fffb82717c48efc7c",
+    "retained/run/negative_control.json": "3dab9f02d2a061231cdecdee46379cf45fba462eeed17882026efab3b00611f4",
+    "retained/run/split_manifest.json": "6be8e318be3b5877a88bd639804f6169d24a6ddd0bb3856029ea84fefe0f6e29",
+    "retained/run/trials/trial_001.json": "e5fe6c159b78aaa4ba1f968b9971bd79285c6bd254bdd939519610e7879772b6",
+    "retained/run/trials/trial_002.json": "53497b19191030c3ecfa8f9b23c61f5124b467205982382a08fbf45855936a0a",
+    "retained/run/trials/trial_003.json": "ac860c48efcaf1ab56e6c9ca0413713ab7c0ae7b64440992188ab5547e72ab08",
+    "retained/run/trials/trial_004.json": "28b63a564f7a99f6d765bbbf1802fa1aec0cf007c63e1003dc5494889eaae2be",
+    "retained/run/trials/trial_005.json": "fbaceed2845983b272381b70bacffdfd0166f7d0045a0a9bd767765477ab9ae9",
+    "retained/run/trials/trial_006.json": "3634cbf559e02528a3b8691cd5af97934cb8d17b41f2ace76e0c261727e9f395",
+    "retained/run/trials/trial_007.json": "7b49ddf536afa05bce911c5f5700800136986d5ec621cad6c96a564b38f26937",
+    "retained/run/trials/trial_008.json": "5444fb68d39b0a51420e0e0ee091534b70a6fdcec3ca6bb19186585279abcbef",
+    "retained/run/trials/trial_009.json": "38c38b5e2ec9fd157ac85d7790afb2aad038c0482a0fc6a2d5adcf9ed55fe055",
+    "retained/run/trials/trial_010.json": "99b3b62af9593e946803fe29ad146358318bdcfc46808674a8cc41877565ba99",
+    "retained/run/trials/trial_011.json": "9a0820578d38d01d1bc9851e1e547be1c4cb93b01ad9e6faa09b0e5eef957683",
+    "retained/run/trials/trial_012.json": "74454d18b460a459c2fe3d17168c5ff8c8d0cfdc3c995a63b79be9c857106137",
+    "retained/run/trials/trial_013.json": "a475825e32c25cb1ab82e411bf4f7e475145566ce597c00228037ddda1bfd12b",
+    "retained/run/trials/trial_014.json": "103c12febf50ab1c664462eb29adb7bd742cdef351de8fc616a13542cabad853"
+  },
+  "steps": [
+    {
+      "facts": {
+        "alpha_confirm": "1/20",
+        "charter_hash": "fc0aaf6b55fb4ea2f4b07713c5d916c9ccdba0a93feb28050bd8f640cf7271c6",
+        "population": "all rows of file://titanic_extract.csv",
+        "prediction_moment": "boarding_date",
+        "question": "Predict `survived` for each passenger at boarding, so the purser can decide whom to brief first.",
+        "summary_measure": "net benefit over thresholds [0.05, 0.5]",
+        "target": "survived",
+        "unit": "passenger_id"
+      },
+      "hash": "0ea38c6afdca684e0beb6dbc0ffb3140e59ddc1d403b3d2b9aa6f4b9dc72bb3c",
+      "kind": "question",
+      "prev": "0000000000000000000000000000000000000000000000000000000000000000",
+      "records": {
+        "run/analysis_charter.json": "4df5c9ae690aaa56e7af1f1c21f9ffef2f47fb44705772763226e68cca77f812"
+      },
+      "requires": [],
+      "title": "The business question and the signed charter"
+    },
+    {
+      "facts": {
+        "cost_sources": [
+          "human",
+          "human",
+          "human",
+          "human"
+        ],
+        "costs": {
+          "c_00": 0.0,
+          "c_01": 5.0,
+          "c_10": 1.0,
+          "c_11": 0.0
+        },
+        "data_checks_passed": true,
+        "field_sources": [
+          "template"
+        ],
+        "framing_status": "issued_with_questions",
+        "llm_filled": [],
+        "open_items": [
+          "population",
+          "deployment_population",
+          "intercurrent_events",
+          "baseline_decision_column"
+        ],
+        "open_questions": 0,
+        "threshold": 0.16666666666666666
+      },
+      "hash": "08c27a7ac146fa1e1fc1a294969efcf6c921b91a320ed56705134d4f5a297cbc",
+      "kind": "framing",
+      "prev": "0ea38c6afdca684e0beb6dbc0ffb3140e59ddc1d403b3d2b9aa6f4b9dc72bb3c",
+      "records": {
+        "framing/decision_cost_model.json": "0e949805821c910588acfc9806623142b5ed42144e93ed7ec6dfcc89bb2080c3",
+        "framing/framing_draft.json": "bbe18a2f8f2d1705d9c594e23af6e5cd76183da6cf7cc2261abc1940905e3728",
+        "framing/framing_questions.json": "f2c7b8315b41af217ff9b60dc0a90dd77f5d85b67aa56b0aa97718c419aa3cdf"
+      },
+      "requires": [
+        "question"
+      ],
+      "title": "Problem framing and the decision-cost model"
+    },
+    {
+      "facts": {
+        "acceptance": [
+          {
+            "id": "A1",
+            "observed": 0.903616573033708,
+            "op": ">=",
+            "passed": true,
+            "path": "run/evaluation.json#test_metrics.roc_auc",
+            "reason": "ranking must beat a coin by a wide margin",
+            "value": 0.8
+          },
+          {
+            "id": "A2",
+            "observed": 217,
+            "op": ">=",
+            "passed": true,
+            "path": "outcomes#cases",
+            "reason": "enough matured outcomes to judge",
+            "value": 200
+          },
+          {
+            "id": "A3",
+            "observed": 0.4009216589861751,
+            "op": "<=",
+            "passed": true,
+            "path": "outcomes#mean_cost",
+            "reason": "set after seeing the held-out evaluation, so it is a post-hoc ceiling, not a prospective one",
+            "value": 0.52
+          }
+        ],
+        "expectation": {
+          "basis": "95% normal interval of the cost per case of the rule on the 217 held-out test rows, widened by 0.005 and rounded; fixed before the replay was scored through the loop",
+          "high": 0.52,
+          "kpi": "cost per case",
+          "level": 0.95,
+          "low": 0.28,
+          "metric": "outcomes#mean_cost"
+        },
+        "kpis": [
+          {
+            "direction": "lower_is_better",
+            "kpi": "Expected cost of mis-prioritised briefings per passenger (missing a survivor costs 5, briefing a non-survivor costs 1)",
+            "metric": "outcomes#mean_cost",
+            "owner": "purser"
+          },
+          {
+            "direction": "higher_is_better",
+            "kpi": "Survivors ranked ahead of non-survivors",
+            "metric": "run/evaluation.json#test_metrics.roc_auc",
+            "owner": "purser"
+          }
+        ],
+        "signed": true,
+        "stakeholder": "stakeholder-role (the author, with the stakeholder key)"
+      },
+      "hash": "60fc4499965603958f2014e52e0dfefaeec9c6a6bd5ef9e9fd9b5e0391df01c7",
+      "kind": "stakeholder",
+      "prev": "08c27a7ac146fa1e1fc1a294969efcf6c921b91a320ed56705134d4f5a297cbc",
+      "records": {
+        "inputs.json": "952988bdd6177affc0faec247e83864d8f7eaf4c5067b253c4c6da0e7e7d99b3"
+      },
+      "requires": [
+        "question",
+        "framing"
+      ],
+      "title": "KPIs, acceptance criteria and the approved expectation"
+    },
+    {
+      "facts": {
+        "report": "reports/exploratory_report.json",
+        "sha256": "5fd5f30e3b4a6707f0c26da7a287dc3f55521f248c9efad78eee3d971b276d13"
+      },
+      "hash": "11085612732da2e1f26670e2f664bd0679bbfd032f01ac20b68b52ce4ce6a3fe",
+      "kind": "exploration",
+      "prev": "60fc4499965603958f2014e52e0dfefaeec9c6a6bd5ef9e9fd9b5e0391df01c7",
+      "records": {
+        "run/confirmed_claims.json": "14b5ad47e82c09cf02899b2a239d52ffae7c753282686c6f0f0ddb4bfe47de11",
+        "run/curation_report.json": "1fbea8e3d281c12cbf3484952417e18f9905286d6f80917a89d30489ba03e689",
+        "run/dataset_manifest.json": "c493eeb8bc9e0b2403c6b93974a83b37f2eab64b010a29b6a8863110aeb32f36",
+        "run/feasibility.json": "b2cda9c718d646ceecf1d888421dc78b46375829a61b8036131a51c00479c14d",
+        "run/hypothesis_ledger.jsonl": "e9a87c39262b38b8b380e78a0c6a3f61e560e0f26cfc13251b1646b0764c6ac7"
+      },
+      "requires": [
+        "question"
+      ],
+      "title": "Exploratory report on the exploration rows"
+    },
+    {
+      "facts": {
+        "report": "reports/experiment_comparison.json",
+        "sha256": "17f52d6b63c5eab16b0a4e9c26a39d2b26829d35b4f7b09be1ea58ad8c539183"
+      },
+      "hash": "664ed3a5f9e95ceeec6123ebebfa2c55b36692450761b71089fd007d824ecd73",
+      "kind": "experiments",
+      "prev": "11085612732da2e1f26670e2f664bd0679bbfd032f01ac20b68b52ce4ce6a3fe",
+      "records": {
+        "run/evaluation.json": "958226495038977a613ed6a5c72b412f4a0b5a3a36a380879a14078cb4c8d058",
+        "run/trials/trial_001.json": "e5fe6c159b78aaa4ba1f968b9971bd79285c6bd254bdd939519610e7879772b6",
+        "run/trials/trial_002.json": "53497b19191030c3ecfa8f9b23c61f5124b467205982382a08fbf45855936a0a",
+        "run/trials/trial_003.json": "ac860c48efcaf1ab56e6c9ca0413713ab7c0ae7b64440992188ab5547e72ab08",
+        "run/trials/trial_004.json": "28b63a564f7a99f6d765bbbf1802fa1aec0cf007c63e1003dc5494889eaae2be",
+        "run/trials/trial_005.json": "fbaceed2845983b272381b70bacffdfd0166f7d0045a0a9bd767765477ab9ae9",
+        "run/trials/trial_006.json": "3634cbf559e02528a3b8691cd5af97934cb8d17b41f2ace76e0c261727e9f395",
+        "run/trials/trial_007.json": "7b49ddf536afa05bce911c5f5700800136986d5ec621cad6c96a564b38f26937",
+        "run/trials/trial_008.json": "5444fb68d39b0a51420e0e0ee091534b70a6fdcec3ca6bb19186585279abcbef",
+        "run/trials/trial_009.json": "38c38b5e2ec9fd157ac85d7790afb2aad038c0482a0fc6a2d5adcf9ed55fe055",
+        "run/trials/trial_010.json": "99b3b62af9593e946803fe29ad146358318bdcfc46808674a8cc41877565ba99",
+        "run/trials/trial_011.json": "9a0820578d38d01d1bc9851e1e547be1c4cb93b01ad9e6faa09b0e5eef957683",
+        "run/trials/trial_012.json": "74454d18b460a459c2fe3d17168c5ff8c8d0cfdc3c995a63b79be9c857106137",
+        "run/trials/trial_013.json": "a475825e32c25cb1ab82e411bf4f7e475145566ce597c00228037ddda1bfd12b",
+        "run/trials/trial_014.json": "103c12febf50ab1c664462eb29adb7bd742cdef351de8fc616a13542cabad853"
+      },
+      "requires": [
+        "question"
+      ],
+      "title": "Experiment comparison"
+    },
+    {
+      "facts": {
+        "reviewer": "reviewer-role (the author, with the reviewer key)",
+        "signed": true,
+        "statement": "Read the listed records. The confirmation set (273 rows) was smaller than the 333 the chartered power needs, so the charter run's scope is exploratory_unconfirmed and its claims are tiered accordingly. The extract has no timestamp or key, so the row number and boarding date are assumptions, and the row number correlates with the target because the extract is ordered. Played by the author.",
+        "thresholds": [
+          {
+            "id": "Q1",
+            "observed": 1309,
+            "op": ">=",
+            "passed": true,
+            "path": "run/dataset_manifest.json#row_count",
+            "reason": "fewer rows than this make the interval too wide",
+            "value": 1000
+          },
+          {
+            "id": "Q2",
+            "observed": "healthy",
+            "op": "==",
+            "passed": true,
+            "path": "run/evaluation.json#fit_health.verdict",
+            "reason": "training gain must carry over to validation",
+            "value": "healthy"
+          },
+          {
+            "id": "Q3",
+            "observed": 0.7898062883802117,
+            "op": ">=",
+            "passed": true,
+            "path": "run/evaluation.json#cv_confidence.interval.0",
+            "reason": "lower end of the cross-validated ROC AUC",
+            "value": 0.75
+          },
+          {
+            "id": "Q4",
+            "observed": 217,
+            "op": ">=",
+            "passed": true,
+            "path": "run/evaluation.json#n_test",
+            "reason": "rows in the final test",
+            "value": 200
+          }
+        ]
+      },
+      "hash": "025bfdb08a52bd1f725b881ad48c6340f15e5fa564336295b9dc30134531b55c",
+      "kind": "quality",
+      "prev": "664ed3a5f9e95ceeec6123ebebfa2c55b36692450761b71089fd007d824ecd73",
+      "records": {
+        "framing/decision_cost_model.json": "0e949805821c910588acfc9806623142b5ed42144e93ed7ec6dfcc89bb2080c3",
+        "inputs.json": "952988bdd6177affc0faec247e83864d8f7eaf4c5067b253c4c6da0e7e7d99b3",
+        "run/confirmed_claims.json": "14b5ad47e82c09cf02899b2a239d52ffae7c753282686c6f0f0ddb4bfe47de11",
+        "run/curation_report.json": "1fbea8e3d281c12cbf3484952417e18f9905286d6f80917a89d30489ba03e689",
+        "run/dataset_manifest.json": "c493eeb8bc9e0b2403c6b93974a83b37f2eab64b010a29b6a8863110aeb32f36",
+        "run/evaluation.json": "958226495038977a613ed6a5c72b412f4a0b5a3a36a380879a14078cb4c8d058",
+        "run/feasibility.json": "b2cda9c718d646ceecf1d888421dc78b46375829a61b8036131a51c00479c14d"
+      },
+      "requires": [
+        "stakeholder",
+        "exploration",
+        "experiments"
+      ],
+      "title": "Domain quality thresholds with reviewer evidence"
+    },
+    {
+      "facts": {
+        "claims_outcome": "confirmed",
+        "claims_steps": [
+          [
+            "ledger chain verifies and decisions replay",
+            "pass"
+          ],
+          [
+            "claims file names the ledger head",
+            "pass"
+          ],
+          [
+            "charter verifies and matches the ledger",
+            "pass"
+          ],
+          [
+            "chartered rules were used",
+            "skipped"
+          ],
+          [
+            "claims agree with the sealed ledger",
+            "pass"
+          ],
+          [
+            "confirmation replays from the p-values on C",
+            "pass"
+          ],
+          [
+            "second-stage accounting is consistent",
+            "skipped"
+          ],
+          [
+            "custody log: selection frozen before C opened, C opened once",
+            "pass"
+          ],
+          [
+            "negative control matches the ledger",
+            "pass"
+          ],
+          [
+            "causal attestations verify",
+            "skipped"
+          ]
+        ],
+        "confirmation_tiers": [
+          "confirmed",
+          "unverified"
+        ],
+        "content_id": "76e653b1ad6e29ee9332fc6196cc8a33da2028f757751b2fffb82717c48efc7c",
+        "cv_interval": [
+          0.7898062883802117,
+          0.9318629898555293
+        ],
+        "cv_score": 0.8608346391178705,
+        "metric": "roc_auc",
+        "n_test": 217,
+        "run_id": "run_20261106_001",
+        "selected_model": "stacking",
+        "test_metrics": {
+          "accuracy": 0.8294930875576036,
+          "balanced_accuracy": 0.8280811095505618,
+          "f1": 0.7978142076502732,
+          "log_loss": 0.3995155174707099,
+          "pr_auc": 0.8910016298936917,
+          "roc_auc": 0.903616573033708
+        }
+      },
+      "hash": "b0724947206207a386f239f7ae49a9ca499b2a40eda2b3a3a2aeeabb83c1a7d3",
+      "kind": "selection",
+      "prev": "025bfdb08a52bd1f725b881ad48c6340f15e5fa564336295b9dc30134531b55c",
+      "records": {
+        "run/confirmed_claims.json": "14b5ad47e82c09cf02899b2a239d52ffae7c753282686c6f0f0ddb4bfe47de11",
+        "run/custody_log.jsonl": "8453ba8339aa783b594a905a0e7665910c5227f04491b379dd603685f4cfa6b1",
+        "run/evaluation.json": "958226495038977a613ed6a5c72b412f4a0b5a3a36a380879a14078cb4c8d058",
+        "run/hypothesis_ledger.jsonl": "e9a87c39262b38b8b380e78a0c6a3f61e560e0f26cfc13251b1646b0764c6ac7",
+        "run/model/model_manifest.json": "76e653b1ad6e29ee9332fc6196cc8a33da2028f757751b2fffb82717c48efc7c",
+        "run/split_manifest.json": "6be8e318be3b5877a88bd639804f6169d24a6ddd0bb3856029ea84fefe0f6e29"
+      },
+      "requires": [
+        "question",
+        "experiments",
+        "quality"
+      ],
+      "title": "Model selection, claims and the bundle identity"
+    },
+    {
+      "facts": {
+        "approval": {
+          "approved_at": "2026-11-06T08:24:18.090036+00:00",
+          "decision": "approved",
+          "evidence": [
+            "run/evaluation.json",
+            "reports/experiment_comparison.json"
+          ],
+          "independent": true,
+          "reviewer": "reviewer-role (the author, with the reviewer key)"
+        },
+        "bundle_signed": true,
+        "champion_version": 1,
+        "model": "titanic_survival",
+        "registered_content_id": "76e653b1ad6e29ee9332fc6196cc8a33da2028f757751b2fffb82717c48efc7c",
+        "release_state": "approved",
+        "run_id": "run_20261106_001",
+        "version": 1
+      },
+      "hash": "4031e2ac06baa4dde3e9ad10c4318ef10e7bec9990b5c344e1b32396069d932b",
+      "kind": "approval",
+      "prev": "b0724947206207a386f239f7ae49a9ca499b2a40eda2b3a3a2aeeabb83c1a7d3",
+      "records": {
+        "registry/audit.jsonl": "6100704c92bba0da1cb58edae60b38f075fa4a622eea548f47044d2e281d4690",
+        "registry/registry.json": "9bb7e086a021ac3dcac4c8f269c968cbfd7b9c48f02322c2cf7d83fb80ff0dc2",
+        "registry/release_state.json": "136f1249d9af58da68b6ab37ba3ca4c3a3a8e747db616ac8e0edf37826f15fbd"
+      },
+      "requires": [
+        "selection"
+      ],
+      "title": "Deployment approval and release state"
+    },
+    {
+      "facts": {
+        "answered": 217,
+        "batches": 7,
+        "cases": 217,
+        "charter_hash": "fc0aaf6b55fb4ea2f4b07713c5d916c9ccdba0a93feb28050bd8f640cf7271c6",
+        "escalated": 0,
+        "halted": false,
+        "ledger_head": "14c4ac7999fee68fa0f38773214cc8bc04845d67eecb333ebc17ad26244c17f0",
+        "ledger_rows": 8,
+        "row_kinds": {
+          "observe_summary": 7,
+          "open": 1
+        },
+        "scope": "76e653b1ad6e29ee9332fc6196cc8a33da2028f757751b2fffb82717c48efc7c:titanic-replay"
+      },
+      "hash": "217c5d9f525651226d9b08e9d629a86bc8093dc9aa52f330d6355132cfeb9ece",
+      "kind": "deployment",
+      "prev": "4031e2ac06baa4dde3e9ad10c4318ef10e7bec9990b5c344e1b32396069d932b",
+      "records": {
+        "deployment/deployment_ledger.jsonl": "8bae7c6fd5eb1440d302a8577734d7e5067d04ef9641268f5309c983b271954e",
+        "deployment/loop_state.json": "c0dce85fc4df085294a66a57083a6314f4c58b04fe5864cd9a17fafef1f675da",
+        "deployment/observed_outcomes.json": "0cb5a6e0c7861ef0e524f0738c733ffd4359a97e3bfe4fd4311207a60bbaceb6"
+      },
+      "requires": [
+        "approval"
+      ],
+      "title": "Production decisions in the deployment ledger"
+    },
+    {
+      "facts": {
+        "approved_range": [
+          0.28,
+          0.52
+        ],
+        "cases": 217,
+        "interval": [
+          0.28926509807597345,
+          0.5125782198963768
+        ],
+        "mean_cost": 0.4009216589861751,
+        "report": "reports/outcome_tracking.json",
+        "sha256": "4f8f25428291d56955e7727e1dbd312ec9d42b7f250c4c04b5823fb16e3bbf01",
+        "status": "within"
+      },
+      "hash": "d75a704650bd0258280ce205ab7d19e8276294f81c8a46f6e7fa35a7f60089a1",
+      "kind": "outcomes",
+      "prev": "217c5d9f525651226d9b08e9d629a86bc8093dc9aa52f330d6355132cfeb9ece",
+      "records": {
+        "deployment/observed_outcomes.json": "0cb5a6e0c7861ef0e524f0738c733ffd4359a97e3bfe4fd4311207a60bbaceb6",
+        "framing/decision_cost_model.json": "0e949805821c910588acfc9806623142b5ed42144e93ed7ec6dfcc89bb2080c3"
+      },
+      "requires": [
+        "stakeholder",
+        "deployment"
+      ],
+      "title": "Observed outcomes against the approved expectation"
+    }
+  ],
+  "version": 1
+}
