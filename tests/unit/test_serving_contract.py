@@ -602,3 +602,17 @@ def test_a_remote_answer_without_predictions_is_reported_as_failed():
         server.server_close()
     assert report["passed"] is False
     assert any("predictions" in m for m in report["mismatches"])
+
+
+def test_a_timeout_raised_by_the_work_itself_is_not_a_deadline_error():
+    control = guard.AdmissionControl(1, 5.0)
+
+    def work():
+        raise TimeoutError("upstream lookup timed out")
+
+    try:
+        with pytest.raises(TimeoutError) as caught:
+            control.run(work)
+        assert not isinstance(caught.value, guard.DeadlineError)
+    finally:
+        control.close()

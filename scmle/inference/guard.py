@@ -196,9 +196,8 @@ class AdmissionControl:
     def run(self, work: Callable[[], Any]) -> Any:
         """Runs `work` and waits at most the timeout for its result.
 
-        An exception raised by `work` propagates to the caller; a
-        `TimeoutError` raised by `work` itself is also reported as a
-        `DeadlineError`.
+        An exception raised by `work` propagates to the caller, including a
+        `TimeoutError` of its own, which is not a `DeadlineError`.
 
         Args:
             work: Zero-argument callable executed on a worker thread.
@@ -214,6 +213,8 @@ class AdmissionControl:
         try:
             return future.result(timeout=self.timeout_seconds)
         except concurrent.futures.TimeoutError as error:
+            if future.done():
+                return future.result()
             raise DeadlineError(
                 f"request exceeded {self.timeout_seconds} seconds"
             ) from error
