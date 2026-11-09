@@ -131,3 +131,8 @@ def test_halt_answers_nothing_and_blocked_cases_are_escalated():
     assert routing.answered.sum() == 7
     with pytest.raises(ValueError):
         escalation.route(score, 0.5, 1.5)
+
+
+def test_risk_coverage_of_an_empty_calibration_set_is_a_value_error():
+    with pytest.raises(ValueError, match="empty"):
+        escalation.risk_coverage([], [])

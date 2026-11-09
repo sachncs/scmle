@@ -348,7 +348,7 @@ def risk_coverage(
     """Risk-coverage curve on a fixed grid, optionally weighted.
 
     Inputs are validated as in `validate_calibration`, which raises
-    `ValueError` for invalid ones.
+    `ValueError` for invalid ones; an empty set also raises `ValueError`.
 
     Args:
         score: The score of each case, in [0, 1].
@@ -361,6 +361,8 @@ def risk_coverage(
         the curve; risk is NaN where nothing is answered.
     """
     g, losses, w = validate_calibration(score, loss, weights)
+    if g.size == 0:
+        raise ValueError("calibration set is empty")
     grid = np.linspace(1.0, 0.0, points)
     weight = np.ones_like(g) if w is None else w
     coverage = np.empty(points)
