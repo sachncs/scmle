@@ -12,7 +12,14 @@ AMBIGUOUS_MAX_RATIO = 0.05
 
 
 def is_numeric_target(target: pd.Series) -> bool:
-    """Whether the target is numeric and not boolean."""
+    """Reports whether the target is numeric and not boolean.
+
+    Args:
+        target: The target column.
+
+    Returns:
+        True for a numeric, non-boolean dtype.
+    """
     return pd.api.types.is_numeric_dtype(
         target
     ) and not pd.api.types.is_bool_dtype(target)
@@ -24,6 +31,10 @@ MIN_ARM_ROWS = 20
 
 def check_events(frame: pd.DataFrame, column: str | None) -> None:
     """Requires a complete 0/1 event column with enough observed events.
+
+    Args:
+        frame: Data containing the event column.
+        column: Name of the event column, or None if not configured.
 
     Raises:
         BlockedError: If the column is missing, not 0/1, has gaps, or records
@@ -48,7 +59,16 @@ def check_events(frame: pd.DataFrame, column: str | None) -> None:
 def encode_ordinal(
     frame: pd.DataFrame, column: str, order: list[str | int]
 ) -> pd.DataFrame:
-    """Copy of `frame` whose ordinal labels are replaced by integer ranks."""
+    """Copies `frame`, replacing ordinal labels by integer ranks.
+
+    Args:
+        frame: Data containing the ordinal column.
+        column: Name of the ordinal column.
+        order: Labels from lowest to highest; a label's rank is its index.
+
+    Returns:
+        A copy of `frame` whose `column` holds integer ranks.
+    """
     ranks = {label: rank for rank, label in enumerate(order)}
     encoded = frame.copy()
     encoded[column] = frame[column].map(ranks).astype(int)
@@ -57,6 +77,10 @@ def encode_ordinal(
 
 def check_treatment(frame: pd.DataFrame, column: str | None) -> None:
     """Requires a complete 0/1 treatment column with both arms present.
+
+    Args:
+        frame: Data containing the treatment column.
+        column: Name of the treatment column, or None if not configured.
 
     Raises:
         BlockedError: If the column is missing, not 0/1, has gaps, or one
@@ -80,6 +104,12 @@ def check_targets(
     frame: pd.DataFrame, columns: list[str], task: tasks.TaskType
 ) -> None:
     """Requires every target column to exist, be complete and fit the task.
+
+    Args:
+        frame: Data containing the target columns.
+        columns: Names of the target columns.
+        task: Resolved task type; multilabel columns must hold 0/1, all
+            others must be numeric and non-boolean.
 
     Raises:
         BlockedError: For a missing column, gaps, labels that are not 0/1
@@ -105,7 +135,12 @@ def check_targets(
 
 
 class TaskResolver:
-    """Resolves the requested task against the actual target values."""
+    """Resolves the requested task against the actual target values.
+
+    Attributes:
+        request: The task requested in the project specification.
+        order: Listed ordinal label order (empty when none is given).
+    """
 
     def __init__(self, spec: tasks.ProjectSpec) -> None:
         """Initializes the resolver.
@@ -123,11 +158,13 @@ class TaskResolver:
             target: The target column.
 
         Returns:
-            Binary, multiclass or regression.
+            The concrete task type: the validated requested type, or for
+            `auto` the inferred binary, multiclass or regression type.
 
         Raises:
-            BlockedError: If the request and the data are inconsistent or the
-                task is ambiguous.
+            BlockedError: If the target has no non-missing values, the
+                request and the data are inconsistent, or an `auto` request
+                is ambiguous.
         """
         if target.isna().all():
             raise errors.BlockedError(
@@ -150,7 +187,18 @@ class TaskResolver:
         return self.resolve_classification(target)
 
     def resolve_survival(self, target: pd.Series) -> tasks.TaskType:
-        """Validates a survival request: durations must be positive numbers."""
+        """Validates a survival request: durations must be positive numbers.
+
+        Args:
+            target: The duration column.
+
+        Returns:
+            `TaskType.SURVIVAL`.
+
+        Raises:
+            BlockedError: If the target is not numeric or has a value that
+                is not greater than zero.
+        """
         if not is_numeric_target(target) or (target <= 0).any():
             raise errors.BlockedError(
                 "survival needs a numeric duration target greater than zero"
@@ -158,13 +206,34 @@ class TaskResolver:
         return tasks.TaskType.SURVIVAL
 
     def resolve_uplift(self, target: pd.Series) -> tasks.TaskType:
-        """The outcome must be numeric (0/1 labels or a quantity)."""
+        """The outcome must be numeric (0/1 labels or a quantity).
+
+        Args:
+            target: The outcome column.
+
+        Returns:
+            `TaskType.UPLIFT`.
+
+        Raises:
+            BlockedError: If the outcome is not numeric.
+        """
         if not is_numeric_target(target):
             raise errors.BlockedError("uplift needs a numeric outcome")
         return tasks.TaskType.UPLIFT
 
     def resolve_ranking(self, target: pd.Series) -> tasks.TaskType:
-        """Relevance grades must be non-negative whole numbers."""
+        """Relevance grades must be non-negative whole numbers.
+
+        Args:
+            target: The relevance column.
+
+        Returns:
+            `TaskType.RANKING`.
+
+        Raises:
+            BlockedError: If any grade is missing, unparseable, negative or
+                not a whole number.
+        """
         values = pd.to_numeric(target, errors="coerce")
         if values.isna().any() or (values < 0).any() or (values % 1 != 0).any():
             raise errors.BlockedError(
@@ -174,7 +243,18 @@ class TaskResolver:
         return tasks.TaskType.RANKING
 
     def resolve_ordinal(self, target: pd.Series) -> tasks.TaskType:
-        """Requires the listed order to match the labels in the data."""
+        """Requires the listed order to match the labels in the data.
+
+        Args:
+            target: The ordinal label column.
+
+        Returns:
+            `TaskType.ORDINAL`.
+
+        Raises:
+            BlockedError: If a label in the data is missing from the listed
+                order, or a listed label has no rows.
+        """
         present = set(target.dropna().unique())
         listed = set(self.order)
         if present - listed:
@@ -190,7 +270,17 @@ class TaskResolver:
         return tasks.TaskType.ORDINAL
 
     def resolve_regression(self, target: pd.Series) -> tasks.TaskType:
-        """Validates an explicit regression request."""
+        """Validates an explicit regression request.
+
+        Args:
+            target: The target column.
+
+        Returns:
+            `TaskType.REGRESSION`.
+
+        Raises:
+            BlockedError: If the target is not numeric.
+        """
         if not is_numeric_target(target):
             raise errors.BlockedError(
                 "regression requested but the target is not numeric"
@@ -198,7 +288,20 @@ class TaskResolver:
         return tasks.TaskType.REGRESSION
 
     def resolve_classification(self, target: pd.Series) -> tasks.TaskType:
-        """Validates an explicit (possibly generic) classification request."""
+        """Validates an explicit (possibly generic) classification request.
+
+        Args:
+            target: The target column.
+
+        Returns:
+            `TaskType.BINARY` for two classes, otherwise
+            `TaskType.MULTICLASS`.
+
+        Raises:
+            BlockedError: If the target has fewer than two classes, a
+                `binary_classification` request does not have exactly two,
+                or a `multiclass_classification` request has only two.
+        """
         classes = target.nunique(dropna=True)
         if classes < 2:
             raise errors.BlockedError(
@@ -217,7 +320,22 @@ class TaskResolver:
         return tasks.TaskType.BINARY if binary else tasks.TaskType.MULTICLASS
 
     def resolve_auto(self, target: pd.Series) -> tasks.TaskType:
-        """Infers the task; blocks when the choice is genuinely ambiguous."""
+        """Infers the task; blocks when the choice is genuinely ambiguous.
+
+        Args:
+            target: The target column.
+
+        Returns:
+            `TaskType.BINARY` for two distinct values, `TaskType.MULTICLASS`
+            for a non-numeric target with more, otherwise
+            `TaskType.REGRESSION`.
+
+        Raises:
+            BlockedError: If the target has fewer than two distinct values,
+                is non-numeric and looks like an identifier or free text,
+                or is a small-cardinality integer for which classification
+                versus regression is ambiguous.
+        """
         classes = target.nunique(dropna=True)
         if classes < 2:
             raise errors.BlockedError(
