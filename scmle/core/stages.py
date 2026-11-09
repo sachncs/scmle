@@ -270,7 +270,7 @@ class IngestStage(Stage):
             )
         started = time.monotonic()
         if context.input_frame is not None:
-            frame = context.input_frame.copy()
+            frame = context.input_frame.copy(deep=False)
         elif self.must_stream(data):
             frame = self.read_stream(context, data)
         else:
