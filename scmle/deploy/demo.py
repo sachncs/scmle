@@ -37,8 +37,8 @@ import urllib.request
 
 import pandas
 
-import scmle
 import scmle.api.project
+import scmle.api.results
 from scmle.artifacts import bundle
 from scmle.contracts import errors
 from scmle.contracts import observability
@@ -148,7 +148,7 @@ def now() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime())
 
 
-def train(name: str, data: pathlib.Path) -> scmle.RunResult:
+def train(name: str, data: pathlib.Path) -> scmle.api.results.Run:
     """Trains one model on a CSV with the demo's fixed, fast options.
 
     Args:

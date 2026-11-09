@@ -79,3 +79,29 @@ def test_the_check_finds_a_class_that_was_renamed():
 
     assert "Trainer" in defined(tree)
     assert "TabularEngine" not in defined(tree)
+
+
+def test_nothing_reads_a_name_from_the_bare_package_root():
+    """The package root exports only `__version__` and its subpackages.
+
+    A stale `scmle.Name` in an annotation is a lazily evaluated reference on
+    Python 3.14 and an error at import on 3.13 and earlier, so a suite that runs
+    only on 3.14 never sees it. This reads the syntax instead.
+    """
+    allowed = {path.stem for path in (ROOT / "scmle").glob("*.py")} | {
+        path.name for path in (ROOT / "scmle").iterdir() if path.is_dir()
+    }
+    offenders = []
+    for folder in ("scmle", "tests", "benchmarks", "scripts", "examples"):
+        for path in sorted((ROOT / folder).rglob("*.py")):
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            offenders.extend(
+                f"{path.relative_to(ROOT)}:{node.lineno} scmle.{node.attr}"
+                for node in ast.walk(tree)
+                if isinstance(node, ast.Attribute)
+                and isinstance(node.value, ast.Name)
+                and node.value.id == "scmle"
+                and node.attr not in allowed
+                and not node.attr.startswith("__")
+            )
+    assert offenders == []
