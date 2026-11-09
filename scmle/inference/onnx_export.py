@@ -387,7 +387,7 @@ def verify(
         identical predicted labels, 1.0 for regression).
 
     Raises:
-        ArtifactError: If the difference exceeds `tolerance`.
+        ArtifactError: If the difference exceeds `tolerance` or is NaN.
     """
     runtime = load_converter()[1]
     session = runtime.InferenceSession(str(path))
@@ -409,7 +409,7 @@ def verify(
             np.abs(np.asarray(outputs[0]).ravel() - expected).max() / scale
         )
         agreement = 1.0
-    if difference > tolerance:
+    if not difference <= tolerance:
         raise errors.ArtifactError(
             f"the ONNX graph differs from the pipeline by {difference:.2e} "
             f"(tolerance {tolerance:.0e})"

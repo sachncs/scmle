@@ -179,3 +179,34 @@ def test_a_refusal_points_to_the_service_package(tmp_path):
 
     with pytest.raises(errors.ArtifactError, match="export_service"):
         bundle.export_onnx(tmp_path / "m.onnx")
+
+
+def test_nan_outputs_do_not_pass_the_parity_check(monkeypatch, tmp_path):
+    import types
+
+    class Pipeline:
+        def predict(self, rows):
+            return np.zeros(len(rows))
+
+    class Session:
+        def __init__(self, path):
+            pass
+
+        def run(self, names, inputs):
+            return [np.full(3, np.nan)]
+
+    bundle = types.SimpleNamespace(
+        classes=None,
+        pipeline=Pipeline(),
+        prepare_frame=lambda rows: rows,
+    )
+    monkeypatch.setattr(
+        onnx_export,
+        "load_converter",
+        lambda: (None, types.SimpleNamespace(InferenceSession=Session)),
+    )
+    monkeypatch.setattr(onnx_export, "feed", lambda b, rows: {})
+    with pytest.raises(errors.ArtifactError, match="differs"):
+        onnx_export.verify(
+            bundle, tmp_path / "m.onnx", pd.DataFrame({"a": [1, 2, 3]})
+        )
