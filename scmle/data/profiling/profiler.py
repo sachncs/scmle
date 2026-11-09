@@ -8,6 +8,7 @@ control, not from a fixed cutoff.
 """
 
 import dataclasses
+from typing import Any
 
 import numpy
 import pandas
@@ -53,7 +54,7 @@ OPTIONAL_COLUMN_ROLES = (
 
 
 def column_exclusion_reason(
-    kind: columns.ColumnKind, series: pandas.Series, stats: dict
+    kind: columns.ColumnKind, series: pandas.Series, stats: dict[str, Any]
 ) -> str | None:
     """Finds why a column cannot be a feature.
 
@@ -77,7 +78,7 @@ def column_exclusion_reason(
 
 def summarize_target(
     target: pandas.Series, task: tasks.Task
-) -> tuple[dict, list[str]]:
+) -> tuple[dict[str, Any], list[str]]:
     """Summarizes the target distribution and imbalance risk.
 
     Args:
@@ -188,7 +189,12 @@ class Profiler:
 
     def inspect_columns(
         self, frame: pandas.DataFrame, roles: dict[str, str]
-    ) -> tuple[dict, dict[str, str], dict[str, list[str]], list[str]]:
+    ) -> tuple[
+        dict[str, dict[str, Any]],
+        dict[str, str],
+        dict[str, list[str]],
+        list[str],
+    ]:
         """Computes statistics and decides which columns become features.
 
         Args:
@@ -199,7 +205,7 @@ class Profiler:
             Per-column statistics, dropped-column reasons, feature columns
             grouped by kind name, and quality findings.
         """
-        statistics: dict[str, dict] = {}
+        statistics: dict[str, dict[str, Any]] = {}
         dropped = dict(roles)
         features: dict[str, list[str]] = {
             "numeric": [],
@@ -371,7 +377,7 @@ class Profiler:
     def describe_associations(
         self,
         frame: pandas.DataFrame,
-        statistics: dict[str, dict],
+        statistics: dict[str, dict[str, Any]],
         feature_columns: list[str],
         task: tasks.Task,
     ) -> None:
