@@ -28,6 +28,7 @@ VARIABLE_PATTERN = re.compile(r"[A-Z][A-Z0-9_]{0,63}")
 VERSION_PATTERN = re.compile(r"[0-9A-Za-z][0-9A-Za-z.+_-]{0,63}")
 SECRET_WORDS = ("SECRET", "PASSWORD", "TOKEN", "CREDENTIAL", "PRIVATE", "KEY")
 PRIVATE_KEY_MARKER = "-----BEGIN"
+PORT_LIMIT = 65536  # exclusive upper bound of a TCP port number
 PRODUCTION = "production"
 TRUSTED_VARIABLE = "SCMLE_TRUSTED"
 ENVIRONMENT_VARIABLE = "SCMLE_ENV"
@@ -510,6 +511,75 @@ def canonical_json(payload: Mapping[str, Any]) -> bytes:
     ).encode("utf-8")
 
 
+def check_config_entries(config: Mapping[str, str]) -> None:
+    """Checks that every config entry is a plain, non-secret variable.
+
+    Args:
+        config: The environment variables of a deployment.
+
+    Raises:
+        ConfigError: If a key is not an upper-case variable name, a value is
+            not text, a name looks like a secret or a value holds key
+            material.
+    """
+    for key, value in config.items():
+        if VARIABLE_PATTERN.fullmatch(key) is None:
+            raise errors.ConfigError(f"config key {key!r} is not valid")
+        if not isinstance(value, str):
+            raise errors.ConfigError(f"config {key} must be text")
+        if looks_secret(key):
+            raise errors.ConfigError(
+                f"config {key} looks like a secret: declare it in "
+                "`secrets` as a reference"
+            )
+        if PRIVATE_KEY_MARKER in value:
+            raise errors.ConfigError(f"config {key} holds key material")
+
+
+def check_secret_names(
+    secrets: tuple[SecretRef, ...], config: Mapping[str, str]
+) -> None:
+    """Checks that secret names are unique and distinct from config names.
+
+    Args:
+        secrets: The secret references of a deployment.
+        config: The environment variables of a deployment.
+
+    Raises:
+        ConfigError: If secret names repeat or collide with config names.
+    """
+    names = [secret.name for secret in secrets]
+    if len(set(names)) != len(names):
+        raise errors.ConfigError("secret names must be unique")
+    clash = sorted(set(names) & set(config))
+    if clash:
+        raise errors.ConfigError(
+            f"names are both config and secret: {', '.join(clash)}"
+        )
+
+
+def check_production_rules(spec: "Deployment") -> None:
+    """Applies the production-only rules to a deployment.
+
+    Args:
+        spec: The deployment to check.
+
+    Raises:
+        ConfigError: If the spec targets production (by environment or by
+            config) and is marked trusted or has an unsigned bundle.
+    """
+    production = (
+        spec.environment is Environment.PRODUCTION
+        or spec.config.get(ENVIRONMENT_VARIABLE) == PRODUCTION
+    )
+    if production and spec.config.get(TRUSTED_VARIABLE) == "1":
+        raise errors.ConfigError(
+            f"{TRUSTED_VARIABLE}=1 is refused in production"
+        )
+    if production and not spec.bundle.signed:
+        raise errors.ConfigError("production requires a signed bundle")
+
+
 @dataclasses.dataclass(frozen=True, slots=True)
 class Deployment:
     """Everything a provider needs to run one version of one service.
@@ -553,38 +623,11 @@ class Deployment:
         object.__setattr__(self, "environment", Environment(self.environment))
         object.__setattr__(self, "config", dict(sorted(self.config.items())))
         object.__setattr__(self, "secrets", tuple(self.secrets))
-        if not (0 < self.port < 65536):
+        if not (0 < self.port < PORT_LIMIT):
             raise errors.ConfigError("port must be between 1 and 65535")
-        for key, value in self.config.items():
-            if VARIABLE_PATTERN.fullmatch(key) is None:
-                raise errors.ConfigError(f"config key {key!r} is not valid")
-            if not isinstance(value, str):
-                raise errors.ConfigError(f"config {key} must be text")
-            if looks_secret(key):
-                raise errors.ConfigError(
-                    f"config {key} looks like a secret: declare it in "
-                    "`secrets` as a reference"
-                )
-            if PRIVATE_KEY_MARKER in value:
-                raise errors.ConfigError(f"config {key} holds key material")
-        names = [secret.name for secret in self.secrets]
-        if len(set(names)) != len(names):
-            raise errors.ConfigError("secret names must be unique")
-        clash = sorted(set(names) & set(self.config))
-        if clash:
-            raise errors.ConfigError(
-                f"names are both config and secret: {', '.join(clash)}"
-            )
-        production = (
-            self.environment is Environment.PRODUCTION
-            or self.config.get(ENVIRONMENT_VARIABLE) == PRODUCTION
-        )
-        if production and self.config.get(TRUSTED_VARIABLE) == "1":
-            raise errors.ConfigError(
-                f"{TRUSTED_VARIABLE}=1 is refused in production"
-            )
-        if production and not self.bundle.signed:
-            raise errors.ConfigError("production requires a signed bundle")
+        check_config_entries(self.config)
+        check_secret_names(self.secrets, self.config)
+        check_production_rules(self)
 
     def to_dict(self) -> dict[str, Any]:
         """Builds a deterministic JSON-compatible record.
@@ -686,18 +729,15 @@ class Runtime:
         require_digest(self.bundle_digest, "report.bundle_digest")
 
 
-def conformance_problems(spec: Deployment, report: Runtime) -> list[str]:
-    """Lists every way the running service differs from the spec.
-
-    An empty list means the platform runs exactly what the spec says. The
-    comparison is on digests and limits, never on tags or names.
+def identity_problems(spec: Deployment, report: Runtime) -> list[str]:
+    """Lists the differences in what runs: spec, image, bundle and readiness.
 
     Args:
         spec: What was meant to run.
         report: What the platform says is running.
 
     Returns:
-        One message per difference; empty if the runtime conforms.
+        One message per difference; empty if the identity matches.
     """
     problems = []
     if report.spec_digest != spec.digest():
@@ -714,6 +754,20 @@ def conformance_problems(spec: Deployment, report: Runtime) -> list[str]:
         problems.append("model version differs from the spec")
     if not report.ready:
         problems.append("service is not ready")
+    return problems
+
+
+def secret_problems(spec: Deployment, report: Runtime) -> list[str]:
+    """Lists the differences in which secrets are mounted.
+
+    Args:
+        spec: What was meant to run.
+        report: What the platform says is running.
+
+    Returns:
+        One message per difference; empty if the mounted secrets match.
+    """
+    problems = []
     expected = {secret.name for secret in spec.secrets if secret.required}
     missing = sorted(expected - set(report.secret_names))
     if missing:
@@ -721,6 +775,20 @@ def conformance_problems(spec: Deployment, report: Runtime) -> list[str]:
     extra = sorted(set(report.secret_names) - {s.name for s in spec.secrets})
     if extra:
         problems.append(f"undeclared secrets mounted: {', '.join(extra)}")
+    return problems
+
+
+def isolation_problems(spec: Deployment, report: Runtime) -> list[str]:
+    """Lists the differences in filesystem, user and resource limits.
+
+    Args:
+        spec: What was meant to run.
+        report: What the platform says is running.
+
+    Returns:
+        One message per difference; empty if isolation and limits conform.
+    """
+    problems = []
     if not report.read_only_root:
         problems.append("root filesystem is writable")
     if not report.run_as_non_root:
@@ -736,6 +804,26 @@ def conformance_problems(spec: Deployment, report: Runtime) -> list[str]:
     ):
         problems.append("cpu limit exceeds the spec")
     return problems
+
+
+def conformance_problems(spec: Deployment, report: Runtime) -> list[str]:
+    """Lists every way the running service differs from the spec.
+
+    An empty list means the platform runs exactly what the spec says. The
+    comparison is on digests and limits, never on tags or names.
+
+    Args:
+        spec: What was meant to run.
+        report: What the platform says is running.
+
+    Returns:
+        One message per difference; empty if the runtime conforms.
+    """
+    return [
+        *identity_problems(spec, report),
+        *secret_problems(spec, report),
+        *isolation_problems(spec, report),
+    ]
 
 
 class Provider(abc.ABC):

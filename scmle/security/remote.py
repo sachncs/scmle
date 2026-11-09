@@ -69,11 +69,11 @@ def fetch_json(
     scheme = urllib.parse.urlparse(url).scheme
     if scheme != "https" and not (allow_http and scheme == "http"):
         raise errors.ConfigError(f"only https URLs are fetched, not {url!r}")
-    request = urllib.request.Request(
+    request = urllib.request.Request(  # noqa: S310 -- the scheme was checked above
         url, headers={"Accept": "application/json"}
     )
     try:
-        with urllib.request.urlopen(  # nosec B310
+        with urllib.request.urlopen(  # noqa: S310 -- the scheme was checked above  # nosec B310
             request, timeout=timeout
         ) as response:
             body = response.read(max_bytes + 1)
@@ -234,6 +234,28 @@ class KeySet(tokens.KeySet):
         return super().get(kid)
 
 
+def revocation_list_of(document: Any) -> tokens.RevocationList:
+    """Builds a revocation list from a fetched document.
+
+    Args:
+        document: The parsed JSON; an object with optional `tokens`,
+            `subjects` and `key_ids`.
+
+    Returns:
+        The revocation list.
+
+    Raises:
+        ConfigError: If the document is not an object.
+    """
+    if not isinstance(document, dict):
+        raise errors.ConfigError("the revocation list is not an object")
+    return tokens.RevocationList(
+        document.get("tokens", ()),
+        document.get("subjects", ()),
+        document.get("key_ids", ()),
+    )
+
+
 class Revocations:
     """A pulled revocation list, usable as `Verifier(revocations=...)`.
 
@@ -297,13 +319,8 @@ class Revocations:
         if self.current is not None and now - self.fetched_at < self.ttl:
             return self.current
         try:
-            document = self.fetcher(self.url, allow_http=self.allow_http)
-            if not isinstance(document, dict):
-                raise errors.ConfigError("the revocation list is not an object")
-            fresh = tokens.RevocationList(
-                document.get("tokens", ()),
-                document.get("subjects", ()),
-                document.get("key_ids", ()),
+            fresh = revocation_list_of(
+                self.fetcher(self.url, allow_http=self.allow_http)
             )
         except errors.ConfigError:
             if (

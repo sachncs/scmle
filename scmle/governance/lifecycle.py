@@ -393,7 +393,11 @@ class Maintainer:
         if report.recommendation.action != "retrain" or not retrain:
             self.note_rows(state, fresh)
             return LifecycleOutcome(
-                report, False, None, None, notes or ["healthy"]
+                monitoring=report,
+                retrained=False,
+                comparison=None,
+                promoted_version=None,
+                notes=notes or ["healthy"],
             )
         skip = self.skip_reason(state, fresh)
         if skip is not None:
@@ -406,7 +410,12 @@ class Maintainer:
             self.note_rows(state, fresh)
             notes.append(f"retraining skipped: {skip}")
             return LifecycleOutcome(
-                report, False, None, None, notes, skipped=skip
+                monitoring=report,
+                retrained=False,
+                comparison=None,
+                promoted_version=None,
+                notes=notes,
+                skipped=skip,
             )
         digest = fingerprint(fresh)
         self.registry.audit(
@@ -445,7 +454,13 @@ class Maintainer:
                 **evidence,
             )
             notes.append("challenger was not clearly better; champion kept")
-            return LifecycleOutcome(report, True, comparison, None, notes)
+            return LifecycleOutcome(
+                monitoring=report,
+                retrained=True,
+                comparison=comparison,
+                promoted_version=None,
+                notes=notes,
+            )
         record = self.register_run(challenger_run)
         self.registry.promote(
             self.model, record.version, scmle.governance.registry.CHALLENGER
@@ -465,7 +480,13 @@ class Maintainer:
             f"staged challenger as v{record.version}; independent approval "
             "required before champion promotion"
         )
-        return LifecycleOutcome(report, True, comparison, None, notes)
+        return LifecycleOutcome(
+            monitoring=report,
+            retrained=True,
+            comparison=comparison,
+            promoted_version=None,
+            notes=notes,
+        )
 
     def check_rollback(
         self,
@@ -510,10 +531,18 @@ class Maintainer:
         aliases = self.registry.aliases(self.model)
         previous = aliases.get(scmle.governance.registry.PREVIOUS)
         if previous is None:
-            return RollbackOutcome(False, None, None, "no previous version")
+            return RollbackOutcome(
+                rolled_back=False,
+                comparison=None,
+                restored_version=None,
+                reason="no previous version",
+            )
         if len(fresh) < rule.min_rows:
             return RollbackOutcome(
-                False, None, None, f"fewer than {rule.min_rows} labeled rows"
+                rolled_back=False,
+                comparison=None,
+                restored_version=None,
+                reason=f"fewer than {rule.min_rows} labeled rows",
             )
         current = self.registry.load(self.model)
         old = self.registry.load(self.model, previous)
@@ -534,10 +563,10 @@ class Maintainer:
                 **dataclasses.asdict(comparison),
             )
             return RollbackOutcome(
-                False,
-                comparison,
-                None,
-                "descriptive: the bootstrap interval "
+                rolled_back=False,
+                comparison=comparison,
+                restored_version=None,
+                reason="descriptive: the bootstrap interval "
                 f"[{comparison.interval[0]:.4f}, {comparison.interval[1]:.4f}]"
                 f" {'is' if worse else 'is not'} below the tolerance; "
                 "nothing moved, the rollback e-process decides",
@@ -565,7 +594,10 @@ class Maintainer:
             )
         if not worse:
             return RollbackOutcome(
-                False, comparison, None, "the new champion holds up"
+                rolled_back=False,
+                comparison=comparison,
+                restored_version=None,
+                reason="the new champion holds up",
             )
         if not restore:
             self.registry.audit(
@@ -575,16 +607,16 @@ class Maintainer:
                 reason="new champion is clearly worse",
             )
             return RollbackOutcome(
-                False,
-                comparison,
-                None,
-                "rollback requires independent approval",
+                rolled_back=False,
+                comparison=comparison,
+                restored_version=None,
+                reason="rollback requires independent approval",
             )
         return RollbackOutcome(
-            True,
-            comparison,
-            previous,
-            f"restored v{previous}: the new champion trails it by "
+            rolled_back=True,
+            comparison=comparison,
+            restored_version=previous,
+            reason=f"restored v{previous}: the new champion trails it by "
             f"{-comparison.advantage:.4f} (interval "
             f"[{comparison.interval[0]:.4f}, {comparison.interval[1]:.4f}])",
         )

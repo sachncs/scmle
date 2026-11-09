@@ -82,16 +82,16 @@ def parse_pip_audit(report: dict[str, Any]) -> tuple[list[dict], set[str], str]:
         version = str(dependency.get("version", ""))
         if "skip_reason" not in dependency:
             scanned.add(f"{name}=={version}")
-        for vulnerability in dependency.get("vulns", []):
-            findings.append(
-                {
-                    "id": vulnerability.get("id", "unknown"),
-                    "aliases": vulnerability.get("aliases", []),
-                    "package": f"{name}=={version}",
-                    "severity": None,
-                    "fixed": vulnerability.get("fix_versions", []),
-                }
-            )
+        findings.extend(
+            {
+                "id": vulnerability.get("id", "unknown"),
+                "aliases": vulnerability.get("aliases", []),
+                "package": f"{name}=={version}",
+                "severity": None,
+                "fixed": vulnerability.get("fix_versions", []),
+            }
+            for vulnerability in dependency.get("vulns", [])
+        )
     return findings, scanned, "pip-audit"
 
 
@@ -119,19 +119,19 @@ def parse_trivy(report: dict[str, Any]) -> tuple[list[dict], set[str], str]:
                 f"{str(package.get('Name', '')).lower()}=="
                 f"{package.get('Version', '')}"
             )
-        for item in result.get("Vulnerabilities", []) or []:
-            findings.append(
-                {
-                    "id": item.get("VulnerabilityID", "unknown"),
-                    "aliases": [],
-                    "package": f"{item.get('PkgName', '')}=="
-                    f"{item.get('InstalledVersion', '')}",
-                    "severity": str(item.get("Severity", "UNKNOWN")).upper(),
-                    "fixed": [item["FixedVersion"]]
-                    if item.get("FixedVersion")
-                    else [],
-                }
-            )
+        findings.extend(
+            {
+                "id": item.get("VulnerabilityID", "unknown"),
+                "aliases": [],
+                "package": f"{item.get('PkgName', '')}=="
+                f"{item.get('InstalledVersion', '')}",
+                "severity": str(item.get("Severity", "UNKNOWN")).upper(),
+                "fixed": [item["FixedVersion"]]
+                if item.get("FixedVersion")
+                else [],
+            }
+            for item in result.get("Vulnerabilities", []) or []
+        )
     return findings, scanned, "trivy"
 
 
@@ -322,9 +322,9 @@ def main(arguments: list[str] | None = None) -> int:
         sbom = load_json(options.sbom) if options.sbom else None
         verdict = evaluate(load_json(options.report), policy, sbom)
     except GateError as error:
-        print(json.dumps({"passed": False, "error": str(error)}, indent=2))
+        print(json.dumps({"passed": False, "error": str(error)}, indent=2))  # noqa: T201 -- command-line output
         return 2
-    print(json.dumps(verdict, indent=2, sort_keys=True))
+    print(json.dumps(verdict, indent=2, sort_keys=True))  # noqa: T201 -- command-line output
     return 0 if verdict["passed"] else 1
 
 

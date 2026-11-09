@@ -3,6 +3,7 @@
 import abc
 import dataclasses
 from typing import Any
+from typing import TYPE_CHECKING
 
 import numpy
 import pandas
@@ -11,7 +12,9 @@ import scmle.artifacts.bundle
 from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.evaluation import metrics
-from scmle.monitoring import reference
+
+if TYPE_CHECKING:
+    from scmle.monitoring import reference
 
 STABLE = "stable"
 MODERATE = "moderate"
@@ -191,9 +194,9 @@ class PerformanceAdvisor(Advisor):
 
     def evaluate(
         self,
-        drift: Drift,
+        drift: Drift,  # noqa: ARG002 -- Advisor.evaluate signature
         performance: Performance | None,
-        thresholds: Thresholds,
+        thresholds: Thresholds,  # noqa: ARG002 -- Advisor.evaluate signature
     ) -> tuple[str, str] | None:
         """Fires on degraded performance.
 
@@ -212,8 +215,10 @@ class PerformanceAdvisor(Advisor):
             )
             return (
                 "retrain",
-                f"{worst[0]} degraded {abs(worst[1]):.0%} vs training on "
-                f"{performance.labeled_rows} labeled rows",
+                (
+                    f"{worst[0]} degraded {abs(worst[1]):.0%} vs training on "
+                    f"{performance.labeled_rows} labeled rows"
+                ),
             )
         return None
 
@@ -224,7 +229,7 @@ class FeatureDriftAdvisor(Advisor):
     def evaluate(
         self,
         drift: Drift,
-        performance: Performance | None,
+        performance: Performance | None,  # noqa: ARG002 -- Advisor.evaluate signature
         thresholds: Thresholds,
     ) -> tuple[str, str] | None:
         """Fires on feature drift.
@@ -266,7 +271,7 @@ class OutputDriftAdvisor(Advisor):
         self,
         drift: Drift,
         performance: Performance | None,
-        thresholds: Thresholds,
+        thresholds: Thresholds,  # noqa: ARG002 -- Advisor.evaluate signature
     ) -> tuple[str, str] | None:
         """Fires on output drift.
 
@@ -299,7 +304,7 @@ class UnseenCategoryAdvisor(Advisor):
     def evaluate(
         self,
         drift: Drift,
-        performance: Performance | None,
+        performance: Performance | None,  # noqa: ARG002 -- Advisor.evaluate signature
         thresholds: Thresholds,
     ) -> tuple[str, str] | None:
         """Fires on unseen categories.
@@ -317,8 +322,10 @@ class UnseenCategoryAdvisor(Advisor):
             if feature.unseen_rate >= thresholds.unseen_category_rate:
                 return (
                     "investigate",
-                    f"{feature.unseen_rate:.0%} of '{feature.feature}' values "
-                    "are categories unseen in training",
+                    (
+                        f"{feature.unseen_rate:.0%} of '{feature.feature}' "
+                        "values are categories unseen in training"
+                    ),
                 )
         return None
 

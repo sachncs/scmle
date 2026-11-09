@@ -266,10 +266,12 @@ class RunAuditor:
         found: list[dict[str, Any]] = []
         log = root / DECISION_LOG
         if log.exists():
-            for item in json.loads(log.read_text(encoding="utf-8")).get(
-                "plan", []
-            ):
-                found.append({"source": "planner", **item})
+            found.extend(
+                {"source": "planner", **item}
+                for item in json.loads(log.read_text(encoding="utf-8")).get(
+                    "plan", []
+                )
+            )
         for record in records:
             kind = record["kind"]
             if kind in {SELECTION_FROZEN, TEST_OPENED} or kind.startswith(

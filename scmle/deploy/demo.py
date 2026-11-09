@@ -22,16 +22,19 @@ The demo signing key below is a published fixture, not a secret.
 import argparse
 from collections.abc import Mapping
 import dataclasses
+import http
 import json
 import os
 import pathlib
 import shutil
+import socket
 import statistics
 import subprocess  # nosec B404 - runs the generated serve.py and ps
 import sys
 import tempfile
 import time
 from typing import Any
+from typing import NoReturn
 import urllib.error
 import urllib.request
 
@@ -60,6 +63,10 @@ GOLDEN_DIRECTORY = pathlib.Path("deploy/local/golden")
 REVIEWER = "demo-reviewer"
 READY_TIMEOUT_SECONDS = 120.0
 LATENCY_REQUESTS = 120
+EXPECTED_SAMPLES = 4  # metric samples the demo ships to the sink
+MINIMUM_ROC_AUC = 0.8  # a trained demo model must beat this on the test set
+PROBABILITY_TOLERANCE = 1e-9  # online and batch probabilities must agree
+PROMOTED_VERSION = 2  # the bad release is registered second and promoted
 FAST_OPTIONS: dict[str, Any] = {
     "search": tasks.Search(top_models=0),
     "strategies": tasks.Strategies(top_models=0),
@@ -218,7 +225,7 @@ def start_service(
     }
     env.pop("SCMLE_TRUSTED", None)
     folder = folder.resolve()
-    return subprocess.Popen(  # nosec B603 - our own interpreter and script
+    return subprocess.Popen(  # noqa: S603 -- our own interpreter and script  # nosec B603
         [sys.executable, str(folder / "serve.py")],
         cwd=folder,
         env=env,
@@ -314,7 +321,7 @@ def get_json(url: str, timeout: float = 10.0) -> tuple[int, dict[str, Any]]:
         The HTTP status and the parsed JSON body.
     """
     try:
-        with urllib.request.urlopen(url, timeout=timeout) as reply:  # nosec B310
+        with urllib.request.urlopen(url, timeout=timeout) as reply:  # noqa: S310 -- URLs are http://127.0.0.1 addresses built by the demo  # nosec B310
             return reply.status, json.loads(reply.read())
     except urllib.error.HTTPError as error:
         return error.code, json.loads(error.read())
@@ -333,13 +340,13 @@ def post_json(
     Returns:
         The HTTP status and the parsed JSON body.
     """
-    request = urllib.request.Request(
+    request = urllib.request.Request(  # noqa: S310 -- URLs are http://127.0.0.1 addresses built by the demo
         url,
         json.dumps(payload).encode(),
         {"Content-Type": "application/json"},
     )
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as reply:  # nosec B310
+        with urllib.request.urlopen(request, timeout=timeout) as reply:  # noqa: S310 -- URLs are http://127.0.0.1 addresses built by the demo  # nosec B310
             return reply.status, json.loads(reply.read())
     except urllib.error.HTTPError as error:
         return error.code, json.loads(error.read())
@@ -369,7 +376,7 @@ def wait_ready(
             status = get_json(f"{base}/readyz", timeout=2.0)[0]
         except OSError:
             status = 0
-        if status == 200:
+        if status == http.HTTPStatus.OK:
             return time.monotonic() - started
         time.sleep(0.2)
     return None
@@ -402,8 +409,6 @@ def free_port() -> int:
     Returns:
         A port on 127.0.0.1 that was free when probed.
     """
-    import socket
-
     with socket.socket() as probe:
         probe.bind(("127.0.0.1", 0))
         return int(probe.getsockname()[1])
@@ -488,7 +493,10 @@ def prepare(
     log.record(
         "train and evaluate",
         started,
-        ok=all(metrics["roc_auc"] > 0.8 for metrics in evaluation.values()),
+        ok=all(
+            metrics["roc_auc"] > MINIMUM_ROC_AUC
+            for metrics in evaluation.values()
+        ),
         test_metrics=evaluation,
     )
 
@@ -559,14 +567,16 @@ def predict_checks(
     rows = frame.head(60).to_dict("records")
     status, body = post_json(f"{base}/predict", {"records": rows})
     online_match = (
-        status == 200
+        status == http.HTTPStatus.OK
         and body["predictions"] == direct.predict(frame.head(60)).tolist()
     )
     worst = 0.0
-    if status == 200:
+    if status == http.HTTPStatus.OK:
         expected = direct.predict_proba(frame.head(60))
         worst = float(
-            abs(expected - pandas.DataFrame(body["probabilities"]).values).max()
+            abs(
+                expected - pandas.DataFrame(body["probabilities"]).to_numpy()
+            ).max()
         )
     batch = serving.BatchServing(direct)
     batch_path = workdir / "batch-predictions.csv"
@@ -738,7 +748,7 @@ def drill_steps(workdir: pathlib.Path, data: pathlib.Path) -> dict[str, Any]:
         "rolled_back": outcome.rolled_back,
         "restored_version": outcome.restored_version,
         "champion_after_rollback": registry.resolve(MODEL).version,
-        "serves_restored_model": status == 200
+        "serves_restored_model": status == http.HTTPStatus.OK
         and body["predictions"] == original.predict(features.head(40)).tolist(),
         "audit_has_rollback_check": "lifecycle.rollback_check" in audit,
         "bad_release_metrics_on_fresh": getattr(
@@ -774,8 +784,8 @@ def process_memory_mb(process: subprocess.Popen[bytes] | None) -> float | None:
     """
     if process is None:
         return None
-    result = subprocess.run(  # nosec B603 B607 - fixed arguments
-        ["ps", "-o", "rss=", "-p", str(process.pid)],
+    result = subprocess.run(  # noqa: S603 -- fixed arguments  # nosec B603 B607
+        ["ps", "-o", "rss=", "-p", str(process.pid)],  # noqa: S607 -- ps is looked up on PATH, as on every POSIX host
         capture_output=True,
         text=True,
         check=False,
@@ -807,7 +817,7 @@ def measure_latency(
     for attempt in range(count):
         started = time.perf_counter()
         status = post_json(f"{base}/predict", {"records": rows})[0]
-        if status != 200:
+        if status != http.HTTPStatus.OK:
             raise errors.ScmleError(
                 f"measurement request {attempt} failed: {status}"
             )
@@ -870,6 +880,138 @@ def push_metrics(
     return mocks.post_metrics(sink, samples)
 
 
+def round_trip_object_store(
+    transcript: Transcript,
+    store_url: str,
+    service: pathlib.Path,
+    workdir: pathlib.Path,
+) -> pathlib.Path:
+    """Uploads the service folder, fetches it back and records the result.
+
+    Args:
+        transcript: Where the step is recorded.
+        store_url: Base URL of the object store.
+        service: The service folder to upload.
+        workdir: Working directory; the copy is fetched into
+            `fetched-service` below it, replacing an earlier copy.
+
+    Returns:
+        The folder the service was fetched into.
+    """
+    started = time.monotonic()
+    etags = upload_folder(store_url, service, "models/churn/v1")
+    fetched = workdir / "fetched-service"
+    if fetched.exists():
+        shutil.rmtree(fetched)
+    download_folder(store_url, "models/churn/v1", etags, fetched)
+    same = provenance.bundle_digest(
+        fetched / "model"
+    ) == provenance.bundle_digest(service / "model")
+    transcript.record(
+        "object store round trip",
+        started,
+        ok=same and len(etags) > 0,
+        objects=len(etags),
+    )
+    return fetched
+
+
+def check_golden_parity(
+    transcript: Transcript,
+    golden_service: pathlib.Path,
+    processes: list[subprocess.Popen[bytes]],
+) -> None:
+    """Serves the golden-record service and checks parity against it.
+
+    Args:
+        transcript: Where the step is recorded.
+        golden_service: The service folder holding the golden bundle.
+        processes: Started services; the new process is appended so the
+            caller stops it.
+    """
+    started = time.monotonic()
+    golden_port = free_port()
+    golden_base = f"http://127.0.0.1:{golden_port}"
+    golden_process = start_service(golden_service, golden_port)
+    processes.append(golden_process)
+    golden_ready = wait_ready(golden_base, golden_process)
+    report: dict[str, Any] = {"passed": False}
+    if golden_ready is not None:
+        report = parity.check_remote(
+            golden_base, GOLDEN_DIRECTORY, "cross_environment", 30.0
+        )
+    transcript.record(
+        "golden-record parity",
+        started,
+        ok=bool(report["passed"]),
+        max_probability_error=report.get("max_probability_error"),
+        tolerance=report.get("tolerance"),
+    )
+
+
+def fail_not_ready(process: subprocess.Popen[bytes]) -> NoReturn:
+    """Raises the error for a service that did not become ready.
+
+    Args:
+        process: The service process; the tail of its stderr is the message.
+
+    Raises:
+        ArtifactError: Always, carrying the last 800 characters of stderr.
+    """
+    raise errors.ArtifactError(
+        (process.stderr.read().decode() if process.stderr else "")[-800:]
+    )
+
+
+def measure_and_ship_metrics(
+    transcript: Transcript,
+    *,
+    base: str,
+    process: subprocess.Popen[bytes],
+    data: pathlib.Path,
+    metrics_url: str,
+    rolled_back: bool,
+    startup: float | None,
+) -> None:
+    """Measures latency and memory, ships them to the sink and records it.
+
+    Args:
+        transcript: Where the step is recorded.
+        base: Base URL of the service.
+        process: The service process, whose memory is read.
+        data: Directory holding the demo datasets.
+        metrics_url: Base URL of the metrics sink.
+        rolled_back: Whether the rollback drill rolled back.
+        startup: Seconds the service took to become ready, if it did.
+    """
+    started = time.monotonic()
+    frame = pandas.read_csv(data / "fresh.csv").drop(columns=[TARGET])
+    single = measure_latency(base, records_of(frame.head(1)))
+    hundred = measure_latency(base, records_of(frame.head(100)), 40)
+    memory = process_memory_mb(process)
+    accepted = push_metrics(
+        metrics_url,
+        {
+            "latency_single_p95": (single["p95_ms"], "ms"),
+            "latency_hundred_p95": (hundred["p95_ms"], "ms"),
+            "memory_resident": (memory or 0.0, "MiB"),
+            "drift_rollback_drill": (1.0 if rolled_back else 0.0, "bool"),
+        },
+        "v1",
+    )
+    count = get_json(f"{metrics_url}/metrics")[1]["count"]
+    transcript.record(
+        "measure and ship metrics",
+        started,
+        ok=accepted == EXPECTED_SAMPLES and count >= EXPECTED_SAMPLES,
+        single_record=single,
+        hundred_records=hundred,
+        resident_mib=memory,
+        startup_seconds=None if startup is None else round(startup, 2),
+        samples_in_sink=count,
+    )
+
+
 def run(
     workdir: pathlib.Path,
     data: pathlib.Path = DATA_DIRECTORY,
@@ -909,20 +1051,8 @@ def run(
         paths = prepare(workdir, data, transcript)
         service, golden_service = paths["service"], paths["golden_service"]
 
-        started = time.monotonic()
-        etags = upload_folder(store_url, service, "models/churn/v1")
-        fetched = workdir / "fetched-service"
-        if fetched.exists():
-            shutil.rmtree(fetched)
-        download_folder(store_url, "models/churn/v1", etags, fetched)
-        same = provenance.bundle_digest(
-            fetched / "model"
-        ) == provenance.bundle_digest(service / "model")
-        transcript.record(
-            "object store round trip",
-            started,
-            ok=same and len(etags) > 0,
-            objects=len(etags),
+        fetched = round_trip_object_store(
+            transcript, store_url, service, workdir
         )
 
         started = time.monotonic()
@@ -935,17 +1065,13 @@ def run(
         transcript.record(
             "serve under production rules",
             started,
-            ok=startup is not None and status == 200,
+            ok=startup is not None and status == http.HTTPStatus.OK,
             startup_seconds=None if startup is None else round(startup, 2),
             artifact_digest=ready.get("artifact_digest"),
             verify_note=ready.get("notes", {}).get("verifying"),
         )
         if startup is None:
-            raise errors.ArtifactError(
-                (process.stderr.read().decode() if process.stderr else "")[
-                    -800:
-                ]
-            )
+            fail_not_ready(process)
 
         started = time.monotonic()
         checks = predict_checks(base, fetched / "model", data, workdir)
@@ -955,28 +1081,11 @@ def run(
             ok=checks["online_matches_bundle"]
             and checks["batch_matches_bundle"]
             and checks["same_digest"]
-            and checks["max_probability_difference"] < 1e-9,
+            and checks["max_probability_difference"] < PROBABILITY_TOLERANCE,
             **checks,
         )
 
-        started = time.monotonic()
-        golden_port = free_port()
-        golden_base = f"http://127.0.0.1:{golden_port}"
-        golden_process = start_service(golden_service, golden_port)
-        processes.append(golden_process)
-        golden_ready = wait_ready(golden_base, golden_process)
-        report: dict[str, Any] = {"passed": False}
-        if golden_ready is not None:
-            report = parity.check_remote(
-                golden_base, GOLDEN_DIRECTORY, "cross_environment", 30.0
-            )
-        transcript.record(
-            "golden-record parity",
-            started,
-            ok=bool(report["passed"]),
-            max_probability_error=report.get("max_probability_error"),
-            tolerance=report.get("tolerance"),
-        )
+        check_golden_parity(transcript, golden_service, processes)
 
         started = time.monotonic()
         negatives = corrupted_and_unsigned_stay_unready(service, workdir)
@@ -984,9 +1093,9 @@ def run(
             "corrupted and unsigned bundles never become ready",
             started,
             ok=all(
-                item["livez"] == 200
-                and item["readyz"] == 503
-                and item["predict"] == 503
+                item["livez"] == http.HTTPStatus.OK
+                and item["readyz"] == http.HTTPStatus.SERVICE_UNAVAILABLE
+                and item["predict"] == http.HTTPStatus.SERVICE_UNAVAILABLE
                 for item in negatives.values()
             ),
             **negatives,
@@ -998,43 +1107,23 @@ def run(
             "monitor and rollback drill",
             started,
             ok=drill["rolled_back"]
-            and drill["champion_before_rollback"] == 2
+            and drill["champion_before_rollback"] == PROMOTED_VERSION
             and drill["champion_after_rollback"] == 1
             and drill["serves_restored_model"]
             and drill["audit_has_rollback_check"],
             **drill,
         )
 
-        started = time.monotonic()
-        frame = pandas.read_csv(data / "fresh.csv").drop(columns=[TARGET])
-        single = measure_latency(base, records_of(frame.head(1)))
-        hundred = measure_latency(base, records_of(frame.head(100)), 40)
-        memory = process_memory_mb(process)
-        accepted = push_metrics(
-            metrics_url,
-            {
-                "latency_single_p95": (single["p95_ms"], "ms"),
-                "latency_hundred_p95": (hundred["p95_ms"], "ms"),
-                "memory_resident": (memory or 0.0, "MiB"),
-                "drift_rollback_drill": (
-                    1.0 if drill["rolled_back"] else 0.0,
-                    "bool",
-                ),
-            },
-            "v1",
+        measure_and_ship_metrics(
+            transcript,
+            base=base,
+            process=process,
+            data=data,
+            metrics_url=metrics_url,
+            rolled_back=drill["rolled_back"],
+            startup=startup,
         )
-        count = get_json(f"{metrics_url}/metrics")[1]["count"]
-        transcript.record(
-            "measure and ship metrics",
-            started,
-            ok=accepted == 4 and count >= 4,
-            single_record=single,
-            hundred_records=hundred,
-            resident_mib=memory,
-            startup_seconds=None if startup is None else round(startup, 2),
-            samples_in_sink=count,
-        )
-    except Exception as error:  # the transcript must show why it stopped
+    except Exception as error:  # noqa: BLE001 -- the transcript must show why it stopped
         transcript.record(
             "demo stopped", time.monotonic(), ok=False, error=repr(error)[:500]
         )

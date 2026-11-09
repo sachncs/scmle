@@ -43,7 +43,7 @@ def marker_applies(marker: str) -> bool:
     if "extra" in marker:
         return False
     try:
-        from packaging import markers
+        from packaging import markers  # noqa: PLC0415 -- optional dependency
     except ImportError:
         return False
     return bool(markers.Marker(marker).evaluate({"extra": ""}))

@@ -62,6 +62,28 @@ class OutcomeEvent:
     actual: Any
 
 
+def inference_timestamp(line: str) -> datetime.datetime:
+    """Reads the timestamp of one observability sidecar line.
+
+    Args:
+        line: One JSON line of the sidecar.
+
+    Returns:
+        The record's `timestamp`, parsed.
+
+    Raises:
+        ValueError: If the record is not a JSON object of type `inference`.
+    """
+    record = json.loads(line)
+    if not isinstance(record, dict):
+        raise ValueError("observability records must be JSON objects")
+    if record.get("type") != "inference":
+        raise ValueError("observability records must have type inference")
+    return scmle.monitoring.observability.parse_timestamp(
+        str(record["timestamp"]), "event.timestamp"
+    )
+
+
 class PredictionLog:
     """Append-only JSONL log of predictions and outcomes.
 
@@ -302,20 +324,7 @@ class PredictionLog:
             ) as handle:
                 with path.open(encoding="utf-8") as source:
                     for line in source:
-                        record = json.loads(line)
-                        if not isinstance(record, dict):
-                            raise ValueError(
-                                "observability records must be JSON objects"
-                            )
-                        if record.get("type") != "inference":
-                            raise ValueError(
-                                "observability records must have type inference"
-                            )
-                        timestamp = (
-                            scmle.monitoring.observability.parse_timestamp(
-                                str(record["timestamp"]), "event.timestamp"
-                            )
-                        )
+                        timestamp = inference_timestamp(line)
                         if timestamp < cutoff:
                             removed += 1
                             continue
@@ -323,7 +332,7 @@ class PredictionLog:
                         retained += 1
                 handle.flush()
                 os.fsync(handle.fileno())
-            os.replace(temporary_name, path)
+            pathlib.Path(temporary_name).replace(path)
             durability.sync_directory(path.parent)
         except BaseException:
             pathlib.Path(temporary_name).unlink(missing_ok=True)

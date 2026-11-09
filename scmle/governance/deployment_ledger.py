@@ -159,6 +159,19 @@ class ReplyDecision(enum.StrEnum):
     CANNOT_DECIDE = "cannot_decide"
 
 
+def require_object_body(body: Any) -> None:
+    """Checks that a ledger row body is an object.
+
+    Args:
+        body: The body of a row.
+
+    Raises:
+        TypeError: If `body` is not a dict.
+    """
+    if not isinstance(body, dict):
+        raise TypeError("body must be an object")
+
+
 def key_fingerprint(key: str | bytes) -> str:
     """A short public fingerprint of a signing key (never the key).
 
@@ -685,8 +698,7 @@ class DeploymentLedger:
             CONTROLLER: self.apply_controller,
         }
         try:
-            if not isinstance(body, dict):
-                raise TypeError("body must be an object")
+            require_object_body(body)
             handlers.get(kind, self.apply_free)(body)
         except DeploymentLedgerError:
             raise

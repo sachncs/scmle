@@ -20,6 +20,7 @@ from collections.abc import Mapping
 import dataclasses
 import hashlib
 import hmac
+import http
 import json
 import math
 import time
@@ -156,14 +157,14 @@ def urllib_transport(timeout_seconds: float = 5.0) -> Transport:
         parsed = urllib.parse.urlparse(request.url)
         if parsed.scheme != "https":
             raise ValueError("webhook URL must use HTTPS")
-        outgoing = urllib.request.Request(
+        outgoing = urllib.request.Request(  # noqa: S310 -- the scheme was checked to be https above
             request.url,
             data=request.body,
             headers=dict(request.headers),
             method="POST",
         )
         try:
-            with urllib.request.urlopen(  # nosec B310
+            with urllib.request.urlopen(  # noqa: S310 -- the scheme was checked to be https above  # nosec B310
                 outgoing, timeout=timeout_seconds
             ) as reply:
                 return int(reply.status)
@@ -294,25 +295,42 @@ class WebhookSender:
                 status = None
                 reason = f"transport error: {type(error).__name__}"
             else:
-                if 200 <= status < 300:
+                if (
+                    http.HTTPStatus.OK
+                    <= status
+                    < http.HTTPStatus.MULTIPLE_CHOICES
+                ):
                     return Delivery(
-                        self.kind, True, attempt, status, "delivered", key
+                        self.kind,
+                        delivered=True,
+                        attempts=attempt,
+                        http_status=status,
+                        reason="delivered",
+                        idempotency_key=key,
                     )
                 reason = f"HTTP {status}"
-                final = status < 500 and status not in RETRY_STATUSES
+                final = (
+                    status < http.HTTPStatus.INTERNAL_SERVER_ERROR
+                    and status not in RETRY_STATUSES
+                )
                 if final:
                     return Delivery(
-                        self.kind, False, attempt, status, reason, key
+                        self.kind,
+                        delivered=False,
+                        attempts=attempt,
+                        http_status=status,
+                        reason=reason,
+                        idempotency_key=key,
                     )
             if attempt < self.max_attempts:
                 self.sleep(self.backoff_seconds * 2 ** (attempt - 1))
         return Delivery(
             self.kind,
-            False,
-            self.max_attempts,
-            status,
-            f"{reason} after {self.max_attempts} attempts",
-            key,
+            delivered=False,
+            attempts=self.max_attempts,
+            http_status=status,
+            reason=f"{reason} after {self.max_attempts} attempts",
+            idempotency_key=key,
         )
 
 
@@ -360,7 +378,14 @@ class Notifier:
             sender = self.pager if kind == "pager" else self.ticket
             if sender is None:
                 results.append(
-                    Delivery(kind, False, 0, None, "no sender configured", "")
+                    Delivery(
+                        kind,
+                        delivered=False,
+                        attempts=0,
+                        http_status=None,
+                        reason="no sender configured",
+                        idempotency_key="",
+                    )
                 )
             else:
                 results.append(sender.send(notification))

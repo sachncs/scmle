@@ -261,6 +261,38 @@ def event_digest(event: Mapping[str, Any]) -> str:
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
+def check_transition(incident: Incident, previous: Incident) -> None:
+    """Checks that a journal event continues the previous state of an incident.
+
+    Args:
+        incident: The incident as recorded by the event.
+        previous: The incident as recorded by the previous event.
+
+    Raises:
+        ValueError: If the opening time changed, a timestamp needed for the
+            comparison is missing, or the transition is dated before the
+            previous state.
+    """
+    if incident.opened_at != previous.opened_at:
+        raise ValueError("incident journal identity changed")
+    transition_at = (
+        incident.acknowledged_at
+        if incident.status is IncidentStatus.ACKNOWLEDGED
+        else incident.resolved_at
+    )
+    previous_at = (
+        previous.opened_at
+        if previous.status is IncidentStatus.OPEN
+        else previous.acknowledged_at
+    )
+    if transition_at is None or previous_at is None:
+        raise ValueError("incident journal timestamps are invalid")
+    if slo.parse_timestamp(
+        transition_at, "incident.transition_at"
+    ) < slo.parse_timestamp(previous_at, "incident.previous_at"):
+        raise ValueError("incident journal timestamps are invalid")
+
+
 class IncidentWorkflow:
     """Append-only incident workflow with idempotent transitions.
 
@@ -328,25 +360,9 @@ class IncidentWorkflow:
             if previous_status not in allowed_previous:
                 raise ValueError("incident journal transition is invalid")
             if previous_status is not None:
-                previous = previous_records[incident.incident_id]
-                if incident.opened_at != previous.opened_at:
-                    raise ValueError("incident journal identity changed")
-                transition_at = (
-                    incident.acknowledged_at
-                    if incident.status is IncidentStatus.ACKNOWLEDGED
-                    else incident.resolved_at
+                check_transition(
+                    incident, previous_records[incident.incident_id]
                 )
-                previous_at = (
-                    previous.opened_at
-                    if previous.status is IncidentStatus.OPEN
-                    else previous.acknowledged_at
-                )
-                if transition_at is None or previous_at is None:
-                    raise ValueError("incident journal timestamps are invalid")
-                if slo.parse_timestamp(
-                    transition_at, "incident.transition_at"
-                ) < slo.parse_timestamp(previous_at, "incident.previous_at"):
-                    raise ValueError("incident journal timestamps are invalid")
             statuses[incident.incident_id] = incident.status
             previous_records[incident.incident_id] = incident
             events.append(record)

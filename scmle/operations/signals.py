@@ -21,6 +21,7 @@ from collections import deque
 from collections.abc import Sequence
 import dataclasses
 import enum
+import http
 import threading
 from typing import Any
 
@@ -366,9 +367,18 @@ class SignalMonitor:
         minimum = self.policy.min_samples
         statuses = numpy.array([r[2] for r in requests], dtype=int)
         seconds = numpy.array([r[3] for r in requests], dtype=float)
-        server = float(numpy.mean(statuses >= 500)) if size else None
+        server = (
+            float(numpy.mean(statuses >= http.HTTPStatus.INTERNAL_SERVER_ERROR))
+            if size
+            else None
+        )
         unavailable = (
-            float(numpy.mean((statuses >= 500) | (statuses == 429)))
+            float(
+                numpy.mean(
+                    (statuses >= http.HTTPStatus.INTERNAL_SERVER_ERROR)
+                    | (statuses == http.HTTPStatus.TOO_MANY_REQUESTS)
+                )
+            )
             if size
             else None
         )

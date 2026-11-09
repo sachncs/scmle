@@ -15,6 +15,7 @@ from scmle.contracts import errors
 from scmle.deploy import contract
 
 REVISION_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}")
+FULL_TRAFFIC = 100  # traffic shares are percentages that sum to this
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -38,7 +39,10 @@ class Traffic:
         """
         if REVISION_PATTERN.fullmatch(self.revision) is None:
             raise errors.ConfigError(f"bad revision {self.revision!r}")
-        if isinstance(self.percent, bool) or not 0 <= self.percent <= 100:
+        if (
+            isinstance(self.percent, bool)
+            or not 0 <= self.percent <= FULL_TRAFFIC
+        ):
             raise errors.ConfigError("percent must be between 0 and 100")
 
 
@@ -77,7 +81,7 @@ class Observation:
         if REVISION_PATTERN.fullmatch(self.revision) is None:
             raise errors.ConfigError(f"bad revision {self.revision!r}")
         contract.require_digest(self.image_digest, "observation.image_digest")
-        if sum(item.percent for item in self.traffic) != 100:
+        if sum(item.percent for item in self.traffic) != FULL_TRAFFIC:
             raise errors.ConfigError("traffic shares must sum to 100")
 
     def digest_of(self, revision: str) -> str | None:

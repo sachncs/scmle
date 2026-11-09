@@ -5,6 +5,7 @@ from collections.abc import Mapping
 import dataclasses
 import datetime
 import hashlib
+import http
 import json
 import os
 from pathlib import Path
@@ -63,9 +64,7 @@ class Alert:
             if not isinstance(value, str) or not value.strip():
                 raise ValueError(f"{name} must not be empty")
         try:
-            datetime.datetime.fromisoformat(
-                self.created_at.replace("Z", "+00:00")
-            )
+            datetime.datetime.fromisoformat(self.created_at)
         except ValueError as error:
             raise ValueError("created_at must be ISO-8601") from error
         if not isinstance(self.details, Mapping):
@@ -315,16 +314,20 @@ class WebhookAlertSink(AlertSink):
             headers["Authorization"] = f"Bearer {self.token}"
         last_reason = "webhook did not respond"
         for attempt in range(1, self.max_attempts + 1):
-            request = urllib.request.Request(
+            request = urllib.request.Request(  # noqa: S310 -- the scheme is validated in the constructor
                 self.url, data=body, headers=headers, method="POST"
             )
             try:
-                with urllib.request.urlopen(
+                with urllib.request.urlopen(  # noqa: S310 -- the scheme is validated in the constructor
                     request,
                     timeout=self.timeout_seconds,  # nosec B310 - URL scheme is validated in the constructor.
                 ) as response:
                     status = int(response.status)
-                    if 200 <= status < 300:
+                    if (
+                        http.HTTPStatus.OK
+                        <= status
+                        < http.HTTPStatus.MULTIPLE_CHOICES
+                    ):
                         return AlertDelivery(
                             alert.alert_id,
                             alert.route,

@@ -95,8 +95,10 @@ class ModelCard:
         release = evaluation.get("release_evaluation", {})
         limitations = [
             "This machine-generated card requires human review before release.",
-            "Evaluation results describe the declared snapshot and split; "
-            "they do not establish production-population performance.",
+            (
+                "Evaluation results describe the declared snapshot and split; "
+                "they do not establish production-population performance."
+            ),
             "Associational explanations are not causal claims.",
         ]
         if release.get("blocked", False):
@@ -117,10 +119,14 @@ class ModelCard:
                 "the packaged schema and preprocessing pipeline."
             ),
             out_of_scope=(
-                "It is not evidence of causal effect or fairness outside "
-                "the declared evaluation slices.",
-                "It must not be used with inputs that fail the packaged "
-                "schema.",
+                (
+                    "It is not evidence of causal effect or fairness outside "
+                    "the declared evaluation slices."
+                ),
+                (
+                    "It must not be used with inputs that fail the packaged "
+                    "schema."
+                ),
                 "It is not a production approval without independent review.",
             ),
             limitations=tuple(limitations),

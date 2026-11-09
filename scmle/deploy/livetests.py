@@ -16,6 +16,7 @@ from collections.abc import Callable
 from collections.abc import Mapping
 import dataclasses
 import hashlib
+import http
 import json
 from typing import Any
 import urllib.error
@@ -28,7 +29,7 @@ from scmle.inference import parity
 
 CHECK_NAMES = ("health", "schema", "inference", "security")
 LOOPBACK = ("localhost", "127.0.0.1", "::1")
-DENIED = (401, 403)
+DENIED = (http.HTTPStatus.UNAUTHORIZED, http.HTTPStatus.FORBIDDEN)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -264,15 +265,15 @@ def check_health(fetch: Fetch, target: Target) -> Check:
     wire = Recorder(fetch)
     problems: list[str] = []
     live = wire.call("GET", "/livez")
-    if live.status != 200:
+    if live.status != http.HTTPStatus.OK:
         problems.append(f"/livez answered {live.status}")
     ready = wire.call("GET", "/readyz")
     body = ready.json()
-    if ready.status != 200 or body.get("ready") is not True:
+    if ready.status != http.HTTPStatus.OK or body.get("ready") is not True:
         problems.append(f"/readyz answered {ready.status} and is not ready")
     health = wire.call("GET", "/health", bearer(target.token))
     info = health.json()
-    if health.status != 200 or info.get("status") != "ok":
+    if health.status != http.HTTPStatus.OK or info.get("status") != "ok":
         problems.append(f"/health answered {health.status}")
     elif info.get("artifact_digest") != target.model_digest:
         problems.append("the service runs a different model than the release")
@@ -295,17 +296,19 @@ def check_schema(fetch: Fetch, target: Target) -> Check:
     problems: list[str] = []
     reply = wire.call("GET", "/schema", bearer(target.token))
     body = reply.json()
-    if reply.status != 200:
+    if reply.status != http.HTTPStatus.OK:
         problems.append(f"/schema answered {reply.status}")
     else:
-        for key in (
-            "schema_version",
-            "schema_digest",
-            "request_schema",
-            "response_schema",
-        ):
-            if key not in body:
-                problems.append(f"/schema lacks {key}")
+        problems.extend(
+            f"/schema lacks {key}"
+            for key in (
+                "schema_version",
+                "schema_digest",
+                "request_schema",
+                "response_schema",
+            )
+            if key not in body
+        )
         if body.get("artifact_digest") != target.model_digest:
             problems.append("/schema names a different model digest")
     return finish("schema", target, wire, problems)
@@ -335,7 +338,7 @@ def check_inference(
     request = json.dumps({"records": golden.records}).encode()
     reply = wire.call("POST", "/predict", json_headers(target.token), request)
     body = reply.json()
-    if reply.status != 200:
+    if reply.status != http.HTTPStatus.OK:
         problems.append(f"/predict answered {reply.status}")
         return finish("inference", target, wire, problems)
     missing = [k for k in serving.RESPONSE_KEYS if k not in body]
@@ -387,15 +390,16 @@ def check_security(fetch: Fetch, target: Target) -> Check:
     if anonymous.status not in DENIED:
         problems.append(f"/schema without a token answered {anonymous.status}")
     challenge = wire.call("POST", "/predict", json_headers(None), request)
-    if challenge.status == 401 and "www-authenticate" not in {
-        k.lower() for k in challenge.headers
-    }:
+    if (
+        challenge.status == http.HTTPStatus.UNAUTHORIZED
+        and "www-authenticate" not in {k.lower() for k in challenge.headers}
+    ):
         problems.append("a 401 carries no WWW-Authenticate header")
     if target.read_only_token is not None:
         scoped = wire.call(
             "POST", "/predict", json_headers(target.read_only_token), request
         )
-        if scoped.status != 403:
+        if scoped.status != http.HTTPStatus.FORBIDDEN:
             problems.append(
                 f"a read-only token reached /predict: {scoped.status}"
             )
@@ -451,16 +455,12 @@ def http_fetch(base_url: str, timeout: float = 30.0) -> Fetch:
         """Redirects are answers, not something to follow with a token."""
 
         def redirect_request(self, *arguments: Any, **keywords: Any) -> None:
-            """Refuses to follow a redirect.
+            """Refuses to follow a redirect, so the caller gets the response.
 
             Args:
                 *arguments: Ignored.
                 **keywords: Ignored.
-
-            Returns:
-                None, so the redirect response is returned to the caller.
             """
-            return None
 
     opener = urllib.request.build_opener(NoRedirect)
 
@@ -482,7 +482,7 @@ def http_fetch(base_url: str, timeout: float = 30.0) -> Fetch:
             The response, with lower-case header names. A non-2xx status is
             returned, not raised.
         """
-        request = urllib.request.Request(
+        request = urllib.request.Request(  # noqa: S310 -- root was checked to be http(s) above
             root + path, data=body, headers=dict(headers), method=method
         )
         try:

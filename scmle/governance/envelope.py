@@ -175,6 +175,25 @@ class EnvelopeGuard:
             for action, limit in grant["limits"].items()
         }
 
+    def invalidity(self, grant: Mapping[str, Any]) -> str | None:
+        """Why an envelope is not valid now, or None if it is.
+
+        Args:
+            grant: The envelope's stored record.
+
+        Returns:
+            ``not valid today`` outside its dates, ``its signature does not
+            verify`` for a bad signature, otherwise None.
+        """
+        today = self.today()
+        issued = deployment_ledger.parse_date(grant["date"], "date")
+        expires = deployment_ledger.parse_date(grant["expires"], "expires")
+        if not issued <= today <= expires:
+            return "not valid today"
+        if not self.signature_ok(deployment_ledger.Envelope.from_dict(grant)):
+            return "its signature does not verify"
+        return None
+
     def refusal(
         self, identity: str, grant: Mapping[str, Any], action: str, scope: str
     ) -> str | None:
@@ -197,13 +216,9 @@ class EnvelopeGuard:
             return "a different scope"
         if action not in grant["limits"]:
             return f"does not cover {action}"
-        today = self.today()
-        issued = deployment_ledger.parse_date(grant["date"], "date")
-        expires = deployment_ledger.parse_date(grant["expires"], "expires")
-        if not issued <= today <= expires:
-            return "not valid today"
-        if not self.signature_ok(deployment_ledger.Envelope.from_dict(grant)):
-            return "its signature does not verify"
+        invalid = self.invalidity(grant)
+        if invalid is not None:
+            return invalid
         if self.remaining(identity).get(action, 0) < 1:
             return "its uses are spent"
         return None

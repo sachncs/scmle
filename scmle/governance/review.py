@@ -124,6 +124,71 @@ class ReviewClaim:
         )
 
 
+def require_independence(
+    reviewer_id: str, implementer_ids: tuple[str, ...]
+) -> None:
+    """Checks the implementers are named and do not include the reviewer.
+
+    Args:
+        reviewer_id: Identity of the reviewer.
+        implementer_ids: Identities of the implementers.
+
+    Raises:
+        ValueError: If there are no implementers, one is not non-empty text, or
+            the reviewer is one of them.
+    """
+    if not implementer_ids:
+        raise ValueError("implementer_ids must not be empty")
+    if any(
+        not isinstance(item, str) or not item.strip()
+        for item in implementer_ids
+    ):
+        raise ValueError("implementer_ids must contain non-empty values")
+    if reviewer_id in implementer_ids:
+        raise ValueError("reviewer must be independent of implementers")
+
+
+def require_claims(claims: tuple[ReviewClaim, ...]) -> None:
+    """Checks the claims are present, typed and about distinct criteria.
+
+    Args:
+        claims: The claims of a review.
+
+    Raises:
+        TypeError: If a claim is not a `ReviewClaim`.
+        ValueError: If there are no claims or a criterion repeats.
+    """
+    if not claims:
+        raise ValueError("claims must not be empty")
+    if not all(isinstance(item, ReviewClaim) for item in claims):
+        raise TypeError("claims must contain ReviewClaim values")
+    claim_ids = [claim.criterion_id for claim in claims]
+    if len(claim_ids) != len(set(claim_ids)):
+        raise ValueError("claims must not contain duplicate criteria")
+
+
+def require_artifact_digests(artifact_digests: Mapping[str, str]) -> None:
+    """Checks the artifact digests are present and named.
+
+    Args:
+        artifact_digests: Digest of each reviewed artifact, by name.
+
+    Raises:
+        ValueError: If there are none or a name or digest is not non-empty
+            text.
+    """
+    if not artifact_digests:
+        raise ValueError("artifact_digests must not be empty")
+    if any(
+        not isinstance(name, str)
+        or not name.strip()
+        or not isinstance(digest, str)
+        or not digest.strip()
+        for name, digest in artifact_digests.items()
+    ):
+        raise ValueError("artifact_digests must contain named digests")
+
+
 @dataclasses.dataclass(frozen=True, slots=True)
 class IndependentReleaseReview:
     """Signed proof that an independent reviewer checked a release."""
@@ -164,40 +229,17 @@ class IndependentReleaseReview:
             "observed_at",
         ):
             require_text(getattr(self, field_name), field_name)
-        if not self.implementer_ids:
-            raise ValueError("implementer_ids must not be empty")
-        if any(
-            not isinstance(item, str) or not item.strip()
-            for item in self.implementer_ids
-        ):
-            raise ValueError("implementer_ids must contain non-empty values")
-        if self.reviewer_id in self.implementer_ids:
-            raise ValueError("reviewer must be independent of implementers")
+        require_independence(self.reviewer_id, self.implementer_ids)
         if not self.commands or any(not item.strip() for item in self.commands):
             raise ValueError("commands must contain reproducible commands")
-        if not self.claims:
-            raise ValueError("claims must not be empty")
-        if not all(isinstance(item, ReviewClaim) for item in self.claims):
-            raise TypeError("claims must contain ReviewClaim values")
-        claim_ids = [claim.criterion_id for claim in self.claims]
-        if len(claim_ids) != len(set(claim_ids)):
-            raise ValueError("claims must not contain duplicate criteria")
-        if not self.artifact_digests:
-            raise ValueError("artifact_digests must not be empty")
-        if any(
-            not isinstance(name, str)
-            or not name.strip()
-            or not isinstance(digest, str)
-            or not digest.strip()
-            for name, digest in self.artifact_digests.items()
-        ):
-            raise ValueError("artifact_digests must contain named digests")
+        require_claims(self.claims)
+        require_artifact_digests(self.artifact_digests)
         if not isinstance(self.decision, ReviewDecision):
             object.__setattr__(self, "decision", ReviewDecision(self.decision))
         if self.signature is not None:
             require_text(self.signature, "signature")
         timestamp = datetime.datetime.fromisoformat(
-            self.observed_at.replace("Z", "+00:00")
+            self.observed_at.replace("Z", "+00:00")  # noqa: FURB162 -- keeps the exact set of accepted inputs
         )
         if timestamp.tzinfo is None or timestamp.utcoffset() is None:
             raise ValueError("observed_at must include timezone information")
@@ -324,7 +366,7 @@ class IndependentReleaseReview:
                 )
                 stream.flush()
                 os.fsync(stream.fileno())
-            os.replace(temporary, target)
+            temporary.replace(target)
             durability.sync_directory(target.parent)
         except Exception:
             if temporary.exists():

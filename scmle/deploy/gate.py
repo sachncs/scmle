@@ -329,7 +329,7 @@ def certify(
     problems.extend(runtime_problems(candidate))
     seen = candidate.observation
     if problems or seen is None:
-        return GateDecision(False, tuple(problems))
+        return GateDecision(allowed=False, reasons=tuple(problems))
     results = {item.name: item.evidence_digest for item in candidate.checks}
     unsigned = scmle.deploy.record.Record(
         source_commit=candidate.source_commit,
@@ -347,4 +347,4 @@ def certify(
         revision=seen.revision,
         recorded_at=now or events.utc_timestamp(),
     )
-    return GateDecision(True, (), unsigned.signed(key))
+    return GateDecision(allowed=True, reasons=(), record=unsigned.signed(key))

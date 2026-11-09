@@ -56,6 +56,7 @@ TITLES = {
     "outcomes": "Observed outcomes against the approved expectation",
 }
 MINIMUM_CASES = 100
+CUT_TOLERANCE = 1e-9  # the served threshold must equal the chartered cut
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -829,7 +830,10 @@ class Tracer:
                     MISMATCH, name, "the outcome feed cannot be evaluated"
                 )
             expected_cut = outcomes.optimal_threshold(cost)
-            if abs(float(feed.get("threshold", -1)) - expected_cut) > 1e-9:
+            if (
+                abs(float(feed.get("threshold", -1)) - expected_cut)
+                > CUT_TOLERANCE
+            ):
                 self.problem(
                     IDENTITY,
                     name,

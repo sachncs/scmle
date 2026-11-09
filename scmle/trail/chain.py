@@ -297,15 +297,15 @@ def check_steps(
                 )
             )
             continue
-        for field in ("facts", "records", "requires", "title"):
-            if stored[kind].get(field) != step[field]:
-                found.append(
-                    trace.Finding(
-                        trace.MISMATCH,
-                        kind,
-                        f"the stored {field} differ from the retained records",
-                    )
-                )
+        found.extend(
+            trace.Finding(
+                trace.MISMATCH,
+                kind,
+                f"the stored {field} differ from the retained records",
+            )
+            for field in ("facts", "records", "requires", "title")
+            if stored[kind].get(field) != step[field]
+        )
     return found
 
 

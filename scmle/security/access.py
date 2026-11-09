@@ -18,6 +18,7 @@ from collections.abc import Callable
 from collections.abc import Mapping
 import dataclasses
 import hashlib
+import http
 import ipaddress
 import threading
 import time
@@ -140,9 +141,9 @@ class DeniedError(errors.ScmleError):
         ``retry_after`` rounded up to whole seconds (at least 1), and a 403
         none.
         """
-        if self.status == 401:
+        if self.status == http.HTTPStatus.UNAUTHORIZED:
             return {"WWW-Authenticate": 'Bearer realm="scmle"'}
-        if self.status == 429:
+        if self.status == http.HTTPStatus.TOO_MANY_REQUESTS:
             wait = max(1, int(-(-(self.retry_after or 1.0) // 1)))
             return {"Retry-After": str(wait)}
         return {}
