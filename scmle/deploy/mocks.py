@@ -2,7 +2,7 @@
 
 They exist so the local demo exercises the same moves a real deployment makes
 (upload an artifact and read it back by digest, ship metrics somewhere else)
-with no cloud account. They are not S3 or a metrics backend: no
+with no cloud account. They are not a hosted object store or metrics backend: no
 authentication, no multipart, no retention. Everything is in the standard
 library and bound to a port chosen by the caller.
 
