@@ -44,6 +44,7 @@ import json
 import math
 from pathlib import Path
 from typing import Any
+from typing import cast
 
 from scmle.contracts import errors
 from scmle.contracts import signing
@@ -974,7 +975,9 @@ def check_coverage_confirmation(
         body = coverage_confirm.registration_body(claim_hash, choice)
         if document.get("coverage_claim_sha256") != claim_hash:
             problems.append("the document names another coverage claim")
-        if scmle.data.ledger.ledger.digest(body) != registered["sha256"]:
+        # `unregistered_coverage_finding` returned None: it is registered.
+        registration = cast("dict[str, Any]", registered)
+        if scmle.data.ledger.ledger.digest(body) != registration["sha256"]:
             problems.append("the registration hash differs from the ledger's")
         redone = coverage_confirm.decide(
             int(document["covered"]), int(document["rows"]), choice

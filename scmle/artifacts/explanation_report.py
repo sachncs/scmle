@@ -52,7 +52,7 @@ class Renderer:
             cast("list[str]", record["limitations"]),
             privacy,
             cast("list[dict[str, Any]]", record["evidence_links"]),
-            cast("dict[str, Any]", rendered_record),
+            rendered_record,
         )
 
     @staticmethod
