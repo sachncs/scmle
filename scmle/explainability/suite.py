@@ -66,10 +66,13 @@ class ExplanationEvidenceBuilder:
         Returns:
             A validated, portable explanation evidence record.
 
+        Any explicit identity or evidence field that violates the portable
+        explanation contract is rejected with a ``pydantic.ValidationError``
+        raised by ``explanations.ExplanationEvidence``.
+
         Raises:
             ValueError: If the diagnostic does not declare a usable name.
-            pydantic.ValidationError: If any explicit identity or evidence
-                field violates the portable explanation contract.
+            TypeError: If ``limitations`` or ``evidence_links`` is a string.
         """
         method_name = getattr(diagnostic, "name", None)
         if not isinstance(method_name, str) or not method_name.strip():
@@ -104,7 +107,12 @@ class ExplanationEvidenceBuilder:
 
 
 def default_suite() -> tuple[diagnostics.Diagnostic, ...]:
-    """Returns the standard explanation diagnostics."""
+    """Returns the standard explanation diagnostics.
+
+    Returns:
+        Permutation importance, partial dependence and pairwise interaction,
+        in that order.
+    """
     return (
         importance.PermutationImportance(),
         dependence.PartialDependence(),

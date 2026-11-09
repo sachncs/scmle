@@ -67,13 +67,32 @@ class PartialDependence(diagnostics.Diagnostic):
     def association(
         sample: pd.DataFrame, name: str, outcome: pd.Series
     ) -> float:
-        """Absolute Spearman correlation of a feature with the outcome."""
+        """Absolute Spearman correlation of a feature with the outcome.
+
+        Args:
+            sample: Rows holding the feature.
+            name: Column of `sample` to correlate.
+            outcome: Numeric outcome aligned by position with `sample`.
+
+        Returns:
+            The absolute rank correlation, or 0.0 when it is undefined.
+        """
         values = pd.Series(sample[name].to_numpy(), dtype=float)
         return abs(values.corr(outcome, method="spearman") or 0.0)
 
     @staticmethod
     def numeric_target(inputs: diagnostics.DiagnosticInput) -> pd.Series:
-        """The target as numbers (1 for the positive class when binary)."""
+        """Returns the target as numbers (1 for the positive class if binary).
+
+        Args:
+            inputs: The diagnostic inputs holding the task, target and
+                positive label.
+
+        Returns:
+            The target with a fresh positional index: numeric values for
+            regression, otherwise 1.0 where the target equals the positive
+            label and 0.0 elsewhere.
+        """
         if inputs.task is tasks.TaskType.REGRESSION:
             return pd.to_numeric(inputs.target).reset_index(drop=True)
         return (
@@ -89,7 +108,18 @@ class PartialDependence(diagnostics.Diagnostic):
         column: str,
         value: float,
     ) -> np.ndarray:
-        """Predictions for the sample with one column held at `value`."""
+        """Predicts for the sample with one column held at `value`.
+
+        Args:
+            inputs: The diagnostic inputs holding the task and estimator.
+            sample: Rows to predict for.
+            column: Column of `sample` that is overwritten.
+            value: Value written into every row of `column`.
+
+        Returns:
+            One prediction per row: the regression value, or the
+            positive-class probability for classification.
+        """
         swept = sample.assign(**{column: value})
         if inputs.task is tasks.TaskType.REGRESSION:
             return np.asarray(inputs.estimator.predict(swept))

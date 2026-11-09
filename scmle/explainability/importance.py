@@ -22,6 +22,17 @@ class PermutationImportance(diagnostics.Diagnostic):
         features are visited in a random order and the loop stops when the
         diagnostic's time allowance is spent. The report then covers a random
         subset of the features and says so.
+
+        Args:
+            inputs: The fitted candidate, evaluation data, metric, seed and
+                time allowance.
+
+        Returns:
+            The metric name, whether the feature loop was cut short
+            (`truncated`), the counts of features measured and available,
+            and the measured features ranked by mean metric drop, largest
+            first, each with its mean `importance` and standard deviation
+            `std` over the shuffle repeats.
         """
         columns = list(inputs.feature_plan.input_columns)
         rng = np.random.default_rng(inputs.seed)

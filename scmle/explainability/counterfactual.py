@@ -44,7 +44,7 @@ class Counterfactual:
 
     @property
     def n_changed(self) -> int:
-        """How many columns changed."""
+        """The number of columns changed."""
         return len(self.changed)
 
 
@@ -82,7 +82,17 @@ class CounterfactualSearch:
 
     @staticmethod
     def candidate_values(column: pd.Series) -> list[Any]:
-        """Values worth trying: quantiles for numbers, common categories."""
+        """Values worth trying: quantiles for numbers, common categories.
+
+        Args:
+            column: Background values of one actionable column.
+
+        Returns:
+            For a numeric (non-boolean) column, the sorted distinct values at
+            `QUANTILE_STEPS` evenly spaced quantiles; otherwise the up to
+            `MAX_CATEGORIES` most frequent values, most frequent first.
+            Missing values are ignored.
+        """
         present = column.dropna()
         if pd.api.types.is_numeric_dtype(present) and not (
             pd.api.types.is_bool_dtype(present)
@@ -93,7 +103,16 @@ class CounterfactualSearch:
 
     @staticmethod
     def scale_of(column: pd.Series) -> float:
-        """Interquartile range of a numeric column (1 for categories)."""
+        """Interquartile range of a numeric column (1 for categories).
+
+        Args:
+            column: Background values of one actionable column.
+
+        Returns:
+            For a numeric (non-boolean) column, the largest of its
+            interquartile range, its standard deviation and `MIN_SCALE`;
+            1.0 for any other column.
+        """
         present = column.dropna()
         if pd.api.types.is_numeric_dtype(present) and not (
             pd.api.types.is_bool_dtype(present)
@@ -103,7 +122,17 @@ class CounterfactualSearch:
         return 1.0
 
     def cost(self, column: str, old: Any, new: Any) -> float:
-        """Price of changing one column."""
+        """Price of changing one column.
+
+        Args:
+            column: Name of the changed column.
+            old: Original value.
+            new: Replacement value.
+
+        Returns:
+            The absolute numeric change divided by the column's scale when
+            `new` is a number (booleans excluded), otherwise 1.0.
+        """
         if isinstance(new, (int, float, np.number)) and not isinstance(
             new, bool
         ):
@@ -113,7 +142,16 @@ class CounterfactualSearch:
     def distance(
         self, original: Mapping[str, Any], current: Mapping[str, Any]
     ) -> float:
-        """Total cost of the differences between two rows."""
+        """Total cost of the differences between two rows.
+
+        Args:
+            original: The row as given.
+            current: The changed row.
+
+        Returns:
+            The summed `cost` over the actionable columns whose values
+            differ.
+        """
         return float(
             sum(
                 self.cost(c, original[c], current[c])
@@ -125,7 +163,16 @@ class CounterfactualSearch:
     def candidates(
         self, current: dict[str, Any], locked: set[str]
     ) -> tuple[pd.DataFrame, list[tuple[str, Any]]]:
-        """Every one-column change from `current`, as a batch of rows."""
+        """Every one-column change from `current`, as a batch of rows.
+
+        Args:
+            current: The row being changed.
+            locked: Columns that have already been changed and are skipped.
+
+        Returns:
+            A frame with one row per candidate change, and the matching list
+            of (column, new value) moves in the same order.
+        """
         rows, moves = [], []
         for column in self.actionable:
             if column in locked:
@@ -137,7 +184,16 @@ class CounterfactualSearch:
         return pd.DataFrame(rows), moves
 
     def search(self, row: Mapping[str, Any]) -> Counterfactual:
-        """Finds a small change reaching the wanted outcome, if one exists."""
+        """Finds a small change reaching the wanted outcome, if one exists.
+
+        Args:
+            row: The row to change, holding every column the model needs.
+
+        Returns:
+            The search outcome. When the outcome is reached, unnecessary
+            changes have been reverted; otherwise `found` is False and the
+            changes made before the search stopped are reported.
+        """
         original = dict(row)
         current = dict(row)
         changed: dict[str, Any] = {}
@@ -175,7 +231,17 @@ class CounterfactualSearch:
         current: dict[str, Any],
         changed: dict[str, Any],
     ) -> tuple[dict[str, Any], dict[str, Any]]:
-        """Reverts changes that were not needed, largest cost first."""
+        """Reverts changes that were not needed, largest cost first.
+
+        Args:
+            original: The row as given.
+            current: The row after all changes.
+            changed: The changed columns and their new values.
+
+        Returns:
+            The row after reverting every change whose reversal keeps the
+            outcome reached, and the changes that remain.
+        """
         kept = dict(changed)
         order = sorted(
             kept,

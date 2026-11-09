@@ -24,7 +24,24 @@ class PairwiseInteraction(diagnostics.Diagnostic):
     applies_to = diagnostics.CLASSIFICATION | diagnostics.REGRESSION_ONLY
 
     def compute(self, inputs: diagnostics.DiagnosticInput) -> dict[str, Any]:
-        """Return deterministic interaction strengths for bounded pairs."""
+        """Return deterministic interaction strengths for bounded pairs.
+
+        Only the first `MAX_INTERACTION_FEATURES` numeric features and the
+        first `MAX_INTERACTION_ROWS` rows are used. Pairs are visited in
+        declaration order until the diagnostic's time allowance is spent.
+
+        Args:
+            inputs: The fitted candidate, evaluation data, feature plan and
+                time allowance.
+
+        Returns:
+            The compared pairs (`features`) ordered by decreasing
+            `mean_absolute_interaction`, then by feature names; the numeric
+            features considered; the number of rows used; whether the pair
+            loop was cut short (`truncated`); and the stated limitations.
+            When fewer than two numeric features or no rows are available,
+            `features` is empty and the limitations say so.
+        """
         columns = list(inputs.feature_plan.input_columns)
         numeric = [
             column
@@ -82,7 +99,20 @@ class PairwiseInteraction(diagnostics.Diagnostic):
                 break
 
         def sort_key(item: dict[str, object]) -> tuple[float, tuple[str, ...]]:
-            """Order interaction terms by strength and feature names."""
+            """Order interaction terms by strength and feature names.
+
+            Args:
+                item: One interaction term with its feature pair and mean
+                    absolute interaction.
+
+            Returns:
+                The negated strength followed by the feature names, so that
+                ascending sorting puts the strongest term first.
+
+            Raises:
+                TypeError: If the strength is not a number or the features
+                    are not a list.
+            """
             score = item["mean_absolute_interaction"]
             features = item["features"]
             if not isinstance(score, (int, float)) or not isinstance(
@@ -108,7 +138,16 @@ class PairwiseInteraction(diagnostics.Diagnostic):
     def score(
         inputs: diagnostics.DiagnosticInput, frame: pd.DataFrame
     ) -> np.ndarray:
-        """Return one comparable model-output score per row."""
+        """Return one comparable model-output score per row.
+
+        Args:
+            inputs: The diagnostic inputs holding the task and estimator.
+            frame: Rows to score.
+
+        Returns:
+            The regression prediction, the positive-class probability for
+            binary tasks, or the largest class probability otherwise.
+        """
         if inputs.task in diagnostics.REGRESSION_ONLY:
             return np.asarray(inputs.estimator.predict(frame), dtype=float)
         probabilities = np.asarray(inputs.estimator.predict_proba(frame))
