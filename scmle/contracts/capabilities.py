@@ -275,7 +275,7 @@ class CapabilityKey:
 
     Attributes:
         modality: Input data modality.
-        task: Existing framework task contract.
+        task: Task type the capability covers.
         model_family: Lowercase family identifier, not an adapter name.
         evaluation: Evaluation policy that must be available.
         uncertainty: Uncertainty contract that must be available.
@@ -421,7 +421,7 @@ class Capability:
     limitations: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
-        """Require complete declarations rather than optimistic defaults.
+        """Requires complete declarations rather than optimistic defaults.
 
         Raises:
             TypeError: If the key, status or resources have the wrong type.
@@ -615,6 +615,9 @@ class CapabilityRegistry:
 
     Attributes:
         records: Registered capabilities keyed by their complete coordinate.
+        model_families: Registered family declarations keyed by family name.
+        runtime_environment: The bound runtime environment, or None until
+            :meth:`bind_runtime_environment` is called.
     """
 
     def __init__(
@@ -727,7 +730,7 @@ class CapabilityRegistry:
     def bind_runtime_environment(
         self, environment: CapabilityEnvironment
     ) -> None:
-        """Bind observed facts used when a caller omits an environment.
+        """Binds observed facts used when a caller omits an environment.
 
         Args:
             environment: The observed runtime environment.
@@ -762,9 +765,13 @@ class CapabilityRegistry:
             row_count: Dataset size used to check a declared row limit.
 
         Returns:
-            The diagnostics. A key with no declaration yields only the facts
-            about its model family; otherwise a disallowed status and any
-            unmet resource assumption are listed.
+            The diagnostics. A key with no declaration yields a missing
+            declaration entry plus, when its model family is catalogued, an
+            entry for an unsupported modality or a disallowed family status.
+            A declared key yields an entry for a disallowed status and the
+            resource diagnostics. Resource checks run only when an
+            environment is available, except that the row limit is checked
+            whenever a row count is given or the declaration has a limit.
 
         Raises:
             TypeError: If `key`, `environment` or a status has the wrong type.
@@ -867,7 +874,9 @@ class CapabilityRegistry:
 
         Returns:
             A diagnostic for each missing extra and unmet numeric, GPU or
-            network assumption, and for an exceeded or unknown row count.
+            network assumption, which are checked only when an environment is
+            available. If the capability declares a row limit, a diagnostic
+            is also returned for an exceeded limit or an unknown row count.
 
         Raises:
             TypeError: If `capability` or `environment` has the wrong type.
@@ -1010,13 +1019,15 @@ class CapabilityRegistry:
         environment: CapabilityEnvironment | None = None,
         row_count: int | None = None,
     ) -> Capability:
-        """Require a capability to be eligible before training begins.
+        """Requires a capability to be eligible before training begins.
 
         By default only ``supported`` declarations cross the boundary.
         Experimental or extension-only declarations may be used only when the
         caller explicitly includes their status in ``allowed_statuses``. A
         request with any diagnostic is refused with
-        `UnsupportedCapabilityError` (raised by `raise_unsupported`).
+        `UnsupportedCapabilityError` (raised by `raise_unsupported`) whose
+        message is the first diagnostic. `TypeError` from `diagnose` for
+        arguments of the wrong type propagates unchanged.
 
         Args:
             key: Complete capability request.
@@ -1028,8 +1039,8 @@ class CapabilityRegistry:
             The registered capability declaration.
 
         Raises:
-            ConfigError: If the capability cannot be resolved after the
-                diagnostics found nothing wrong.
+            ConfigError: Defensive guard that cannot trigger in practice,
+                since an unregistered key always produces a diagnostic.
         """
         capability = self.find(key)
         diagnostics = self.diagnose(

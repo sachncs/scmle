@@ -65,8 +65,8 @@ class EvidenceNode:
 
         Raises:
             TypeError: If an attribute value is not a string.
-            ValueError: If the id or digest is blank or an attribute name is
-                empty.
+            ValueError: If the id or digest is blank, the kind is not a valid
+                node kind, or an attribute name is empty.
         """
         require_text(self.node_id, "node_id")
         require_text(self.digest, "digest")
@@ -90,7 +90,7 @@ class EvidenceNode:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild a node from its serialized representation.
+        """Rebuilds a node from its serialized representation.
 
         Args:
             record: A mapping as produced by `to_dict`.
@@ -137,7 +137,7 @@ class EvidenceEdge:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild an edge from its serialized representation.
+        """Rebuilds an edge from its serialized representation.
 
         Args:
             record: A mapping as produced by `to_dict`.
@@ -163,7 +163,7 @@ class EvidenceGraph:
     schema_version = 1
 
     def __init__(self, nodes: Iterable[EvidenceNode] = ()) -> None:
-        """Creates a graph and register initial nodes.
+        """Creates a graph and registers initial nodes.
 
         Args:
             nodes: The nodes to register.
@@ -191,7 +191,7 @@ class EvidenceGraph:
         self.nodes[node.node_id] = node
 
     def add_edge(self, edge: EvidenceEdge) -> None:
-        """Registers one edge and reject dangling or cyclic lineage.
+        """Registers one edge and rejects dangling or cyclic lineage.
 
         An edge that is already registered is ignored.
 
@@ -303,6 +303,9 @@ class EvidenceGraph:
     def topological_order_without_validation(self) -> tuple[str, ...]:
         """Computes order without recursively invoking ``validate``.
 
+        The caller must already have checked that every edge joins registered
+        nodes; an unknown endpoint raises `KeyError` instead.
+
         Returns:
             The node ids ordered so every edge goes forward; ties are broken by
             sorted id.
@@ -331,7 +334,11 @@ class EvidenceGraph:
         return tuple(order)
 
     def to_dict(self) -> dict[str, Any]:
-        """Returns deterministic graph content without an external digest."""
+        """Returns deterministic graph content without an external digest.
+
+        The graph is validated first, so a dangling, duplicate or cyclic
+        edge raises `ValueError`.
+        """
         self.validate()
         return {
             "schema_version": self.schema_version,
@@ -364,12 +371,16 @@ class EvidenceGraph:
         )
 
     def digest(self) -> str:
-        """Returns the SHA-256 digest of canonical graph content."""
+        """Returns the hex SHA-256 digest of the canonical graph content."""
         return hashlib.sha256(self.canonical_json().encode("utf-8")).hexdigest()
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild and validate a graph from serialized evidence.
+        """Rebuilds and validates a graph from serialized evidence.
+
+        Nodes and edges are registered in order, so a conflicting node or an
+        edge with an unknown endpoint or that closes a cycle also raises
+        `ValueError`.
 
         Args:
             record: A mapping with the schema version, nodes, edges and, if

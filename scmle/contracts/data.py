@@ -21,8 +21,8 @@ def normalize_quality_evidence(
 ) -> QualityEvidence:
     """Validates and normalizes one JSON-native quality evidence record.
 
-    A floating-point value that is not finite is refused by the JSON
-    validation (`ValueError`).
+    A floating-point value that is not finite is refused with a
+    `ValueError` by the JSON validation.
 
     Args:
         evidence: Mapping containing only JSON-native values.
@@ -46,7 +46,7 @@ class QualityObservation:
     """One quality check result and its reproducible evidence.
 
     Attributes:
-        note: Existing human-readable finding, when the check raises one.
+        note: Human-readable finding text, if the check raised one.
         evidence: JSON-native method, threshold, sampling, metric, and
             limitation details for the check.
     """
@@ -56,6 +56,9 @@ class QualityObservation:
 
     def __post_init__(self) -> None:
         """Validates and detaches the evidence from mutable caller state.
+
+        The evidence is replaced by a normalized copy; invalid evidence is
+        rejected as described for `normalize_quality_evidence`.
 
         Raises:
             ValueError: If the note is given but blank.
@@ -123,9 +126,12 @@ class CurationFinding:
     def __post_init__(self) -> None:
         """Validates fields that determine finding identity and decisions.
 
+        A severity or disposition given as a string is converted to its enum.
+
         Raises:
             ValueError: If the id, rule version, remediation, owner or timestamp
-                is blank, or the confidence is not a finite number in [0, 1].
+                is blank, the confidence is not a finite number in [0, 1], or
+                the severity or disposition is not a valid value.
         """
         if not self.finding_id.strip():
             raise ValueError("finding_id must not be empty")
@@ -214,6 +220,9 @@ class CurationFinding:
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
         """Rebuilds a finding from its serialized representation.
+
+        A missing required key raises `KeyError`, and an invalid value is
+        rejected by the constructor. Only `reviewer` may be absent.
 
         Args:
             record: A mapping as produced by `to_dict`.
@@ -461,12 +470,12 @@ class DatasetManifest:
         """Validates dataset identity before it enters a run or artifact.
 
         Raises:
-            TypeError: If a count is not an integer, a metadata component has
-                the
-                wrong type, or a finding is not a `CurationFinding`.
-            ValueError: If an identity field is blank, a count is negative, or
-                the
-                schema version is below one.
+            TypeError: If a count or the schema version is not an integer,
+                a metadata component has the wrong type, or a finding is not
+                a `CurationFinding`.
+            ValueError: If an identity field (dataset id, hashes, target or
+                modality) is blank or not a string, a count is negative, or
+                the schema version is below one.
         """
         for field_name, field_value in (
             ("dataset_id", self.dataset_id),
@@ -591,9 +600,8 @@ class ModalityManifest:
                 component has the wrong type, or a finding is not a
                 `CurationFinding`.
             ValueError: If an identity field is blank, the sample count is
-                negative, the schema version is below one, or the content hash
-                is
-                not a SHA-256 hex digest.
+                negative, the schema version is below one, or the content
+                hash is not 64 lowercase hexadecimal characters.
         """
         for name, value in (
             ("dataset_id", self.dataset_id),
@@ -648,7 +656,7 @@ class ModalityManifest:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild a modality manifest from serialized evidence.
+        """Rebuilds a modality manifest from serialized evidence.
 
         Args:
             record: A mapping as produced by `to_dict`.
@@ -757,11 +765,16 @@ class FeaturePlan:
     def columns_for(self, kind_name: str) -> tuple[str, ...]:
         """Returns the feature columns of one kind.
 
+        The name is looked up with `getattr`, so any attribute name returns
+        that attribute's value unchanged.
+
         Args:
-            kind_name: `numeric` or `categorical`.
+            kind_name: Name of a column kind such as `numeric` or
+                `categorical`.
 
         Returns:
-            Matching columns, empty if the kind carries no features.
+            The attribute stored under that name, or an empty tuple if there
+            is no such attribute.
         """
         return getattr(self, kind_name, ())
 
@@ -955,9 +968,11 @@ class DatasetCard:
         """Validates the fields that make the card useful to reviewers.
 
         Raises:
-            ValueError: If a required text field is blank, the schema version is
-                below one, a composition count is negative, or the out-of-scope
-                or limitations list is empty.
+            ValueError: If a required text field (dataset id, modality,
+                intended use, owner, review status or generation time) is
+                blank, the schema version is below one, a composition count
+                is negative, or the out-of-scope or limitations list is
+                empty.
         """
         for name, value in (
             ("dataset_id", self.dataset_id),

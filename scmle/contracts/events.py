@@ -43,7 +43,9 @@ class Event:
         """Serializes the event as one canonical JSON line.
 
         Returns:
-            The event's fields as compact JSON with sorted keys, on one line.
+            The event's fields as a single line of JSON with sorted keys and
+            the default separators. A value that JSON cannot encode is
+            written as its `str` form.
         """
         return json.dumps(dataclasses.asdict(self), default=str, sort_keys=True)
 
@@ -70,10 +72,15 @@ class EventLog:
         self.listeners.append(listener)
 
     def emit(self, event: Event) -> None:
-        """Records an event.
+        """Records an event, logs it, appends it to the file and notifies.
+
+        The event is added to the in-memory list and logged at INFO level.
+        If a path is set, one JSON line is appended to that file. Listeners
+        are then called in subscription order; an exception from the file
+        write or from a listener propagates to the caller.
 
         Args:
-            event: The event to append.
+            event: The event to record.
         """
         self.events.append(event)
         LOGGER.info("[%s] %s: %s", event.run_id, event.kind, event.reason)

@@ -225,7 +225,9 @@ class EvidenceLink(ContractModel):
     @pydantic.field_validator("relation", "uri")
     @classmethod
     def validate_text(cls, value: str, info: Any) -> str:
-        """Requires link metadata and a non-empty URI.
+        """Requires a non-empty relation and URI.
+
+        A blank value is rejected with a `ValueError`.
 
         Args:
             value: The relation or URI text.
@@ -294,6 +296,7 @@ class ExplanationEvidence(ContractModel):
         causal_warning: Explicit causal-versus-associational warning.
         privacy_decision: Disclosure and redaction decision.
         evidence_links: Supporting artifact or report references.
+        schema_version: Version of the evidence record layout; at least one.
     """
 
     schema_version: int = pydantic.Field(
@@ -349,7 +352,8 @@ class ExplanationEvidence(ContractModel):
             The value as JSON-native data.
 
         Raises:
-            ValueError: If the value is not JSON-native.
+            ValueError: If the value is not JSON-native; this wraps the
+                `TypeError` or `ValueError` of the JSON validation.
         """
         try:
             return validate_json_value(value, info.field_name)
@@ -389,7 +393,7 @@ class ExplanationEvidence(ContractModel):
             The limitations with surrounding whitespace removed.
 
         Raises:
-            ValueError: If there is none.
+            ValueError: If there is none, or an item is blank.
         """
         if not value:
             raise ValueError("limitations must contain at least one item")
@@ -453,7 +457,9 @@ class ExplanationEvidence(ContractModel):
             The evidence as JSON-native data.
 
         Raises:
-            TypeError: If the serialized evidence is not an object.
+            TypeError: If the serialized evidence is not an object, which
+                cannot happen in practice because a model dump is always a
+                mapping.
         """
         record = self.model_dump(mode="json")
         normalized = validate_json_value(record, "evidence")

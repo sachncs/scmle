@@ -83,8 +83,9 @@ class EvidenceRecord:
 
         Raises:
             ValueError: If a text field is blank, the scope, raw inputs,
-                artifact or limitations are empty or contain blanks, or the
-                observation time has no timezone.
+                artifact or limitations are empty, a limitation is blank, the
+                result or decision is not a valid value, the observation time
+                is not an ISO-8601 timestamp, or it has no timezone.
         """
         for field_name, value in (
             ("criterion_id", self.criterion_id),
@@ -167,6 +168,10 @@ class EvidenceIndex:
     ) -> None:
         """Creates an index and registers the supplied records.
 
+        A non-blank signature marks the index as signed, and a signed index
+        refuses new records, so records can be supplied together with a
+        signature only when the iterable is empty.
+
         Args:
             records: The evidence records to register.
             signature: The index signature, if it is already signed.
@@ -236,7 +241,7 @@ class EvidenceIndex:
         }
 
     def sign(self, signing_key: str | bytes) -> str:
-        """Signs the complete index and return its HMAC value.
+        """Signs the complete index and returns its HMAC value.
 
         Args:
             signing_key: The key to sign with.
@@ -273,7 +278,7 @@ class EvidenceIndex:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild and validate a versioned evidence index.
+        """Rebuilds and validates a versioned evidence index.
 
         Args:
             record: A mapping with schema version 1, a list of records and an
@@ -284,9 +289,8 @@ class EvidenceIndex:
 
         Raises:
             ValueError: If the schema version is unsupported, the records are
-                not
-                a list, or the signature is malformed or uses an unsupported
-                algorithm.
+                not a list, or the signature is malformed or uses an
+                unsupported algorithm.
         """
         if record.get("schema_version") != 1:
             raise ValueError("unsupported evidence index schema version")

@@ -90,6 +90,9 @@ class ExperimentPlan:
     def from_dict(cls, record: dict[str, Any]) -> Self:
         """Rebuilds a plan from `to_dict` output.
 
+        Every key written by `to_dict` is required; a missing key raises
+        `KeyError`.
+
         Args:
             record: A mapping as produced by `to_dict`.
 
@@ -143,10 +146,12 @@ class TrialResult:
         params: Hyperparameter overrides (empty for default configuration).
         strategy: Data strategy the candidate was built with.
         observed_access: What each fold's fit and scoring actually received:
-            per fold the row count and a digest of the row ids. The ledger
-            checks these observations against the split manifest.
-        evaluation_config: How the candidate was evaluated (metric, folds,
-            seed), so a trial is reproducible from its own record.
+            per fold, one record for the fit rows and one for the evaluated
+            rows, each holding the row count and a digest of the row ids.
+            The ledger checks these observations against the split manifest.
+        evaluation_config: How the candidate was evaluated (metric, number
+            of folds, seed, whether weights were used), so a trial is
+            reproducible from its own record.
         runtime: Runtime requirements of the candidate (Python version and
             the libraries its model needs).
         train_scores: Per-fold scores on the rows each model was fitted on,

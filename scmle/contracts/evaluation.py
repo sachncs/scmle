@@ -360,8 +360,9 @@ def validate_evidence(
         `values`, unchanged.
 
     Raises:
-        TypeError: If `values` is not a tuple.
-        ValueError: If a reference repeats.
+        TypeError: If `values` is not a tuple or an entry is not a string.
+        ValueError: If an entry is blank or has surrounding whitespace, or a
+            reference repeats.
     """
     if not isinstance(values, tuple):
         raise TypeError(f"{field_name} must be a tuple of strings")
@@ -408,8 +409,11 @@ class MetricDeclaration:
         """Validates the declaration before it enters a task policy.
 
         Raises:
-            TypeError: If the direction is not a `MetricDirection`.
-            ValueError: If a custom metric has no evidence.
+            TypeError: If the name is not a string, the direction is not a
+                `MetricDirection`, or the evidence is not a tuple of strings.
+            ValueError: If the name is blank or padded with whitespace, the
+                evidence is invalid or repeats, or a custom metric has no
+                evidence.
         """
         validate_text(self.name, "metric.name")
         if not isinstance(self.direction, MetricDirection):
@@ -438,10 +442,13 @@ class MetricGate:
     threshold: float
 
     def __post_init__(self) -> None:
-        """Validates the metric gate's direction and threshold shape.
+        """Validates the metric gate's name, direction and threshold.
 
         Raises:
-            TypeError: If the direction is not a `MetricDirection`.
+            TypeError: If the metric name is not a string, the direction is
+                not a `MetricDirection`, or the threshold is not numeric.
+            ValueError: If the metric name is blank or padded with
+                whitespace, or the threshold is not finite.
         """
         validate_text(self.metric, "metric_gate.metric")
         if not isinstance(self.direction, MetricDirection):
@@ -472,11 +479,11 @@ class UncertaintyPolicy:
 
         Raises:
             TypeError: If the method is not an `UncertaintyMethod`.
-            ValueError: If uncertainty is required with no method, the
+            ValueError: If uncertainty is required with method none, the
                 confidence level or coverage target is not strictly between 0
-                and
-                1, the minimum rows is below one, or a required method lacks the
-                confidence level or coverage target it needs.
+                and 1, the minimum rows is below one, a required method has
+                no confidence level, or a required prediction-interval,
+                conformal or survival-curve method has no coverage target.
         """
         if not isinstance(self.method, UncertaintyMethod):
             raise TypeError("uncertainty.method must be UncertaintyMethod")
@@ -542,9 +549,9 @@ class CalibrationPolicy:
 
         Raises:
             TypeError: If the method is not a `CalibrationMethod`.
-            ValueError: If requirements are stated without a method, a required
-                calibration has no maximum error, or the maximum error is
-                negative.
+            ValueError: If requirements are stated without a method, a
+                required calibration has no maximum error, or the maximum
+                error is negative or not finite.
         """
         if not isinstance(self.method, CalibrationMethod):
             raise TypeError("calibration.method must be CalibrationMethod")
@@ -584,7 +591,8 @@ class FairnessPolicy:
 
         Raises:
             TypeError: If the method is not a `FairnessMethod`.
-            ValueError: If a method of none comes with columns or metrics, or a
+            ValueError: If a column or metric entry is invalid or repeats,
+                a method of none comes with columns or metrics, or any other
                 method comes without sensitive columns or metrics.
         """
         if not isinstance(self.method, FairnessMethod):
@@ -622,11 +630,12 @@ class FairnessGate:
     required_evidence: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
-        """Require one explicit bound and its supporting evidence.
+        """Requires one explicit bound and its supporting evidence.
 
         Raises:
-            ValueError: If not exactly one of the maximum and minimum is given,
-                the maximum is negative, or there is no required evidence.
+            ValueError: If not exactly one of the maximum and minimum is
+                given, the maximum is negative, a bound is not finite, or
+                there is no required evidence.
         """
         validate_text(self.metric, "fairness_gate.metric")
         if (self.maximum is None) == (self.minimum is None):
@@ -704,12 +713,10 @@ class ExplanationPolicy:
 
         Raises:
             TypeError: If the availability is not an `ExplanationAvailability`.
-            ValueError: If a stability or fidelity threshold is outside [0, 1]
-                or
-                lacks its requirement flag, a requirement lacks its threshold,
-                requirements come with availability none, or an availability
-                level
-                has no required methods.
+            ValueError: If a stability or fidelity threshold is outside
+                [0, 1] or lacks its requirement flag, a requirement lacks its
+                threshold, requirements come with availability none, or an
+                availability level other than none has no required methods.
         """
         if not isinstance(self.availability, ExplanationAvailability):
             raise TypeError(
@@ -790,7 +797,8 @@ class DiagnosticGate:
 
         Raises:
             TypeError: If the action is not a `DiagnosticAction`.
-            ValueError: If there is no required evidence.
+            ValueError: If the name is blank, the evidence is invalid or
+                repeats, or there is no required evidence.
         """
         validate_text(self.name, "diagnostic_gate.name")
         if not isinstance(self.action, DiagnosticAction):
@@ -820,12 +828,13 @@ class ReleasePolicy:
     fairness_gates: tuple[FairnessGate, ...] = ()
 
     def __post_init__(self) -> None:
-        """Require explicit thresholds, diagnostics, and evidence.
+        """Requires explicit thresholds, diagnostics, and evidence.
 
         Raises:
             ValueError: If there are no metric gates, diagnostic gates or
-                evidence, no diagnostic gate blocks, or a metric, diagnostic or
-                fairness gate repeats.
+                evidence, the evidence is invalid or repeats, no diagnostic
+                gate blocks, or a metric, diagnostic or fairness gate names
+                the same metric or diagnostic twice.
         """
         if not self.metric_gates:
             raise ValueError("release policy requires metric_gates")
@@ -888,8 +897,9 @@ class EvaluationPolicy:
             UnsupportedEvaluationPolicyError: If a metric, uncertainty,
                 calibration, fairness, explanation or diagnostic choice is not
                 supported for the task.
-            ValueError: If the schema version is below one, metrics are missing,
-                repeated or lack the primary metric, a built-in metric has the
+            ValueError: If the schema version is below one, the primary
+                metric is blank, not among the metrics or not required,
+                metrics are missing or repeated, a built-in metric has the
                 wrong direction, or a release gate is inconsistent with the
                 declarations.
         """
@@ -998,11 +1008,14 @@ class EvaluationPolicy:
         """Validates release gates against declared metrics and diagnostics.
 
         Raises:
-            UnsupportedEvaluationPolicyError: If a gate names a metric or
-                diagnostic that is not supported for the task.
-            ValueError: If a gate names an undeclared metric, has a mismatched
-                direction, or the fairness gates and fairness declaration do not
-                match.
+            UnsupportedEvaluationPolicyError: If a metric gate names an
+                undeclared metric that the task does not support, or a
+                diagnostic gate names a diagnostic the task does not support.
+            ValueError: If a metric gate names an undeclared supported metric
+                or has a direction that differs from the declaration, a
+                fairness gate names a metric absent from the fairness
+                declaration, or fairness gates exist without a fairness
+                method or a fairness method has no gates.
         """
         declared_metrics = {metric.name: metric for metric in self.metrics}
         for gate in self.release.metric_gates:
@@ -1092,6 +1105,8 @@ class EvaluationPolicyRegistry:
     def register(self, policy: EvaluationPolicy) -> None:
         """Registers a policy without silently replacing another policy.
 
+        The policy is stored under its task.
+
         Args:
             policy: The policy to register.
 
@@ -1106,7 +1121,7 @@ class EvaluationPolicyRegistry:
         self.records[policy.task] = policy
 
     def require(self, task: tasks.TaskType) -> EvaluationPolicy:
-        """Returns a task policy or reject an undeclared task explicitly.
+        """Returns a task policy or rejects an undeclared task explicitly.
 
         Args:
             task: The task.
