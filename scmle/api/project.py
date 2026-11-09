@@ -21,11 +21,14 @@ from scmle.contracts import experiments
 from scmle.contracts import lineage
 from scmle.contracts import modalities
 from scmle.contracts import performance
+from scmle.contracts import signing
 from scmle.contracts import tasks
 import scmle.contracts.data
 from scmle.core import policies
 import scmle.core.context
 import scmle.core.orchestrator
+from scmle.data.modalities import curation
+from scmle.data.modalities import document
 from scmle.data.readers import connectors
 from scmle.data.readers import interchange
 from scmle.data.readers import tabular
@@ -1422,8 +1425,8 @@ class Curator:
         if not isinstance(
             report,
             (
-                modality_lifecycle.curation.Curation,
-                modality_lifecycle.document.Curation,
+                curation.Curation,
+                document.Curation,
             ),
         ):
             raise TypeError(
@@ -1436,7 +1439,7 @@ class Curator:
             raise ValueError("curation dataset_hash must match adapter")
         if reported_sample_count != sample_count:
             raise ValueError("curation sample_count must match adapter")
-        card = modality_lifecycle.curation.DatasetCard.from_report(
+        card = curation.DatasetCard.from_report(
             modality,
             curation_payload,
             self.adapter.modality_notes(),
@@ -1452,7 +1455,7 @@ class Curator:
             "curation": curation_payload,
             "dataset_card": card.to_dict(),
         }
-        signature = attestation.sign_payload(unsigned, self.signing_key)
+        signature = signing.sign_payload(unsigned, self.signing_key)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         path = self.output_dir / "modality_curation.json"
         candidate = modality_lifecycle.Curation(
