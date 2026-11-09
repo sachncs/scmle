@@ -92,7 +92,7 @@ def sentinel_standin(frame: pandas.DataFrame) -> pandas.Series:
         A boolean Series with the index of `frame`; True for a row with a
         sentinel in any column.
     """
-    flags = pandas.Series(False, index=frame.index)
+    flags = pandas.Series(data=False, index=frame.index)
     for name in frame.columns:
         column = frame[name]
         if pandas.api.types.is_numeric_dtype(column):

@@ -36,6 +36,7 @@ import sys
 from typing import Any
 
 GENESIS = "0" * 64
+CUT_TOLERANCE = 1e-9
 Z95 = 1.959964
 OPERATORS = {
     ">=": lambda a, b: a >= b,
@@ -211,7 +212,7 @@ class Walk:
         """
         key = self.keys.get(role)
         if not signature:
-            return self.check(False, f"{text}: no signature")
+            return self.check(passed=False, text=f"{text}: no signature")
         if key is None:
             self.unchecked += 1
             self.say(f"  [--] {text}: not checked, no {role} key supplied")
@@ -345,7 +346,7 @@ class Walk:
         """
         feed = load(self.base / "deployment/observed_outcomes.json")
         self.check(
-            abs(feed["threshold"] - cut) < 1e-9,
+            abs(feed["threshold"] - cut) < CUT_TOLERANCE,
             "the served cut is the chartered cut",
         )
         spent = []
@@ -403,7 +404,7 @@ class Walk:
                 f"{relative} is unchanged since the reviewer signed",
             )
         self.say(f"  statement: {inputs['reviewer']['evidence']['statement']}")
-        self.selection_and_approval(inputs, trail)
+        self.selection_and_approval(inputs)
         self.deployment(trail)
         self.say("8. Observed outcomes against the approved expectation")
         expectation = inputs["stakeholder"]["expectation"]
@@ -426,14 +427,11 @@ class Walk:
             "it does not show the model caused the outcome."
         )
 
-    def selection_and_approval(
-        self, inputs: dict[str, Any], trail: dict[str, Any]
-    ) -> None:
+    def selection_and_approval(self, inputs: dict[str, Any]) -> None:
         """Step 6: model identity and the signed approval.
 
         Args:
             inputs: The stakeholder and reviewer inputs.
-            trail: The parsed `trail.json`.
         """
         self.say("6. Selection, registry and the signed approval")
         evaluation = load(self.base / "run/evaluation.json")

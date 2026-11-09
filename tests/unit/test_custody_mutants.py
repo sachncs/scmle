@@ -110,9 +110,9 @@ def forged(path, change):
         body = {k: v for k, v in record.items() if k not in ("hash", "mac")}
         body["seq"], body["prev"] = index, previous
         body.update(change(index))
-        record = {**body, "hash": sealed.entry_hash(body)}
-        previous = record["hash"]
-        out.append(json.dumps(record))
+        rewritten = {**body, "hash": sealed.entry_hash(body)}
+        previous = rewritten["hash"]
+        out.append(json.dumps(rewritten))
     path.write_text("\n".join(out) + "\n")
 
 
@@ -132,9 +132,9 @@ def test_the_chain_fails_on_either_a_wrong_sequence_or_a_wrong_link(
         body["prev"] = previous
         if index == 1:
             body[field] = 7 if field == "seq" else "f" * 64
-        record = {**body, "hash": sealed.entry_hash(body)}
-        previous = record["hash"]
-        out.append(json.dumps(record))
+        rewritten = {**body, "hash": sealed.entry_hash(body)}
+        previous = rewritten["hash"]
+        out.append(json.dumps(rewritten))
     path.write_text("\n".join(out) + "\n")
     with pytest.raises(errors.ArtifactError) as caught:
         sealed.OpenLog(path)

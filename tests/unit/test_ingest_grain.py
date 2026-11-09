@@ -116,7 +116,7 @@ def test_budget_stops_the_lattice_at_a_level_boundary():
 @pytest.mark.parametrize("unit", ingest_worlds.UNITS)
 @pytest.mark.parametrize("shape", ingest_worlds.SHAPES)
 def test_unit_verdict_matches_construction(unit, shape):
-    db, table = ingest_worlds.grain_world(7, unit, shape)
+    db, table = ingest_worlds.grain_world(7, shape)
     source = db.source()
     profiled = profile.profile_table(source, table)
     scan = grain.infer_keys(source, profiled)
@@ -125,7 +125,7 @@ def test_unit_verdict_matches_construction(unit, shape):
 
 
 def test_unmapped_unit_words_are_unknown_and_asked():
-    db, table = ingest_worlds.grain_world(7, "customer", "customers")
+    db, table = ingest_worlds.grain_world(7, "customers")
     source = db.source()
     profiled = profile.profile_table(source, table)
     scan = grain.infer_keys(source, profiled)
@@ -145,9 +145,7 @@ def test_no_key_at_tolerance_is_unknown():
 def test_coarser_is_never_match_across_tolerances():
     for eps in (0.0, 0.01, 0.05, 0.2):
         for seed in range(8):
-            db, table = ingest_worlds.grain_world(
-                seed, "customer-month", "customers"
-            )
+            db, table = ingest_worlds.grain_world(seed, "customers")
             source = db.source()
             profiled = profile.profile_table(source, table)
             scan = grain.infer_keys(source, profiled, eps_key=eps)

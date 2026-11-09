@@ -477,19 +477,18 @@ def test_missing_for_class_is_found_by_both_tests():
 
 
 def store_for(digest, defects=leakage.LEAK_DEFECTS, passed=True):
-    results = []
-    for defect in defects:
-        results.append(
-            qualification.Certificate(
-                leakage.DETECTOR_ID,
-                defect,
-                200,
-                200 if passed else 100,
-                1000,
-                0,
-                (0, "t", 0),
-            )
+    results = [
+        qualification.Certificate(
+            leakage.DETECTOR_ID,
+            defect,
+            200,
+            200 if passed else 100,
+            1000,
+            0,
+            (0, "t", 0),
         )
+        for defect in defects
+    ]
     cert = certificates.certify(
         leakage.DETECTOR_ID,
         digest,

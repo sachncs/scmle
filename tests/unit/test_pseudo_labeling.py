@@ -47,7 +47,7 @@ def test_too_few_confident_rows_leave_the_model_unchanged():
 def test_judging_reports_the_gain_over_the_plain_fit():
     features, labels = blobs(120, 0)
     unlabeled = blobs(800, 1)[0]
-    folds = [(list(range(0, 90)), list(range(90, 120)))]
+    folds = [(list(range(90)), list(range(90, 120)))]
 
     outcome = pseudo_labeling.judge(
         linear_model.LogisticRegression(),

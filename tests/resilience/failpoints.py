@@ -172,7 +172,7 @@ def kill_process():
 
 
 def raise_crash():
-    raise Crash()
+    raise Crash
 
 
 class Trigger:
@@ -232,7 +232,7 @@ class FailpointStore(objectstore.ObjectStore):
 
     def around(self, operation, key, action, if_absent=False):
         if self.dead:
-            raise Crash()
+            raise Crash
         label = self.label_of(operation, key, if_absent)
         if label is None:
             return action()

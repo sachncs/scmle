@@ -45,6 +45,11 @@ KS_FLOOR = 1e-3
 CONTROL_B = 20
 WorldDraw = tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]
 
+# largest gap between the vectorized and the bivariate Spearman
+SPEARMAN_TOLERANCE = 1e-9
+# lower tail whose share of null p-values is reported
+UNIFORM_TAIL = 0.05
+
 
 @dataclasses.dataclass(frozen=True)
 class Finding:
@@ -180,7 +185,7 @@ def check_tester(seed: int) -> Finding:
     gap = float(numpy.max(numpy.abs(fast - slow) / numpy.maximum(slow, 1e-300)))
     return Finding(
         "vectorized Spearman equals bivariate.spearman",
-        gap < 1e-9,
+        gap < SPEARMAN_TOLERANCE,
         f"largest relative difference {gap:.2e}",
         {"max_relative_difference": gap},
     )
@@ -242,7 +247,7 @@ def iid_null(seed: int, rows: int = 200, columns: int = 20) -> FdrWorld:
         x = rng.normal(size=(rows, columns))
         return RankTester(x), rng.normal(size=rows), numpy.zeros(columns, bool)
 
-    return FdrWorld("independent global null", True, make)
+    return FdrWorld("independent global null", independent=True, make=make)
 
 
 def diabetes_null(seed: int) -> FdrWorld:
@@ -274,7 +279,9 @@ def diabetes_null(seed: int) -> FdrWorld:
         return tester, rng.permutation(outcome), planted
 
     return FdrWorld(
-        "correlated global null (diabetes, permuted outcome)", False, make
+        "correlated global null (diabetes, permuted outcome)",
+        independent=False,
+        make=make,
     )
 
 
@@ -511,7 +518,7 @@ def check_uniformity(seed: int) -> list[Finding]:
         for _ in range(KS_DRAWS)
     ]
     result = stats.kstest(draws, "uniform")
-    share = float(numpy.mean(numpy.array(draws) <= 0.05))
+    share = float(numpy.mean(numpy.array(draws) <= UNIFORM_TAIL))
     return [
         Finding(
             "null p-values are uniform",
@@ -605,7 +612,7 @@ def control_exceed_rate(
         tester = RankTester(x)
 
         def count(
-            frame: pandas.DataFrame,
+            frame: pandas.DataFrame,  # noqa: ARG001 -- permuted_target_control calls count(frame, shuffled)
             shuffled: pandas.Series,
             tester: RankTester = tester,
         ) -> int:

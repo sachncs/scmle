@@ -65,7 +65,7 @@ def test_openml_credit_german_with_mixed_types(tmp_path):
     dataset = by_name("credit-g")
     try:
         dataset.load()
-    except Exception as error:  # No network / OpenML unavailable.
+    except Exception as error:  # noqa: BLE001 -- no network or OpenML down: any failure means skip
         pytest.skip(f"OpenML unavailable: {error}")
     frame, result = run_dataset(dataset, tmp_path)
     assert result.evaluation["test_metrics"]["roc_auc"] > 0.7
@@ -77,7 +77,7 @@ def test_openml_titanic_leakage_is_flagged(tmp_path):
     dataset = by_name("titanic")
     try:
         frame = dataset.load()
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001 -- no network or OpenML down: any failure means skip
         pytest.skip(f"OpenML unavailable: {error}")
     project = support.make_project(
         frame,

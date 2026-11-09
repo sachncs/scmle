@@ -33,6 +33,7 @@ MAX_LABEL_CLASSES = 10
 BISECTION_STEPS = 80
 LOGIT_BRACKET = 60.0
 TEXT_SENTINEL = "N/A"
+MINIMUM_CLASSES = 2
 
 
 @dataclasses.dataclass(frozen=True, eq=False)
@@ -76,7 +77,7 @@ def changed_cells(
     """
     index = mutated.index
     known = index.isin(original.index)
-    result = pandas.DataFrame(False, index=index, columns=mutated.columns)
+    result = pandas.DataFrame(data=False, index=index, columns=mutated.columns)
     for name in mutated.columns:
         if name not in original.columns:
             result[name] = True
@@ -224,7 +225,9 @@ def blank_mask(frame: pandas.DataFrame) -> pandas.DataFrame:
     Returns:
         A boolean frame of False values.
     """
-    return pandas.DataFrame(False, index=frame.index, columns=frame.columns)
+    return pandas.DataFrame(
+        data=False, index=frame.index, columns=frame.columns
+    )
 
 
 def mark(mask: pandas.DataFrame, column: str, positions: numpy.ndarray) -> None:
@@ -322,7 +325,7 @@ def flip_labels(
         raise ValueError(f"mode must be one of {LABEL_MODES}")
     series = frame[target]
     classes = list(pandas.unique(series.dropna()))
-    if len(classes) < 2:
+    if len(classes) < MINIMUM_CLASSES:
         raise ValueError("flipping needs at least two classes")
     rng = stream(seed, "label_flip", index)
     labelled = numpy.flatnonzero(series.notna().to_numpy())
@@ -414,6 +417,57 @@ def calibrated_probabilities(
     return 1.0 / (1.0 + numpy.exp(-(strength * z + (low + high) / 2.0)))
 
 
+def missing_strength(mechanism: str, strength: float) -> float:
+    """Validates the mechanism and the logit slope of a missingness model.
+
+    Args:
+        mechanism: `mcar`, `mar` or `mnar`.
+        strength: Logit slope per standard deviation.
+
+    Returns:
+        The slope as a finite float.
+
+    Raises:
+        ValueError: On an invalid mechanism or a zero slope for MAR or MNAR.
+    """
+    if mechanism not in MECHANISMS:
+        raise ValueError(f"mechanism must be one of {MECHANISMS}")
+    scale = qualification.finite(strength, "strength")
+    if mechanism != "mcar" and scale == 0.0:
+        raise ValueError("strength must be nonzero for MAR and MNAR")
+    return scale
+
+
+def check_missing_driver(
+    frame: pandas.DataFrame,
+    names: Sequence[str],
+    mechanism: str,
+    driver: str | None,
+) -> None:
+    """Validates the driver column of a missingness model.
+
+    Args:
+        frame: The table to copy.
+        names: The columns to delete from.
+        mechanism: `mcar`, `mar` or `mnar`.
+        driver: Numeric column MAR depends on.
+
+    Raises:
+        ValueError: If MAR lacks a usable driver, another mechanism has one,
+            or a column the mechanism reads is not numeric.
+    """
+    if mechanism == "mar":
+        if driver is None or driver not in frame.columns:
+            raise ValueError("MAR needs a driver column in the frame")
+        if driver in names:
+            raise ValueError("the driver must not be one of the columns")
+        require_numeric(frame, [driver])
+    elif driver is not None:
+        raise ValueError("only MAR takes a driver")
+    if mechanism == "mnar":
+        require_numeric(frame, names)
+
+
 def inject_missing(
     frame: pandas.DataFrame,
     columns: Sequence[str],
@@ -451,21 +505,8 @@ def inject_missing(
     check_frame(frame)
     names = check_columns(frame, columns)
     check_rate(rate)
-    if mechanism not in MECHANISMS:
-        raise ValueError(f"mechanism must be one of {MECHANISMS}")
-    scale = qualification.finite(strength, "strength")
-    if mechanism != "mcar" and scale == 0.0:
-        raise ValueError("strength must be nonzero for MAR and MNAR")
-    if mechanism == "mar":
-        if driver is None or driver not in frame.columns:
-            raise ValueError("MAR needs a driver column in the frame")
-        if driver in names:
-            raise ValueError("the driver must not be one of the columns")
-        require_numeric(frame, [driver])
-    elif driver is not None:
-        raise ValueError("only MAR takes a driver")
-    if mechanism == "mnar":
-        require_numeric(frame, names)
+    scale = missing_strength(mechanism, strength)
+    check_missing_driver(frame, names, mechanism, driver)
     rng = stream(seed, "missing", index)
     out = frame.copy()
     mask = blank_mask(out)
@@ -771,6 +812,83 @@ def is_classification(series: pandas.Series) -> bool:
     return (not is_numeric(series)) or series.nunique() <= MAX_LABEL_CLASSES
 
 
+def noisy_leak(
+    series: pandas.Series, rng: numpy.random.Generator, noise: float
+) -> tuple[pandas.Series, float]:
+    """A noisy copy of the target: flipped classes or added Gaussian noise.
+
+    Args:
+        series: The target column.
+        rng: Random generator.
+        noise: Flip probability in (0, 1) for classes, or standard
+            deviations of Gaussian noise for a continuous target.
+
+    Returns:
+        The noisy column and the finite noise level.
+
+    Raises:
+        ValueError: On a bad noise level, too few classes or a target
+            without spread.
+    """
+    level = qualification.finite(noise, "noise")
+    if is_classification(series):
+        if not 0.0 < level < 1.0:
+            raise ValueError("noise must be within (0, 1) for classes")
+        classes = list(pandas.unique(series.dropna()))
+        if len(classes) < MINIMUM_CLASSES:
+            raise ValueError("a noisy label copy needs two classes")
+        codes = pandas.Index(classes).get_indexer(series)
+        flip = rng.random(len(series)) < level
+        flip &= codes >= 0
+        new_codes = codes.copy()
+        new_codes[flip] = other_classes(rng, codes[flip], len(classes))
+        added = series.copy()
+        added.iloc[numpy.flatnonzero(flip)] = [
+            classes[code] for code in new_codes[flip]
+        ]
+        return added, level
+    if level <= 0.0:
+        raise ValueError("noise must be positive")
+    spread = float(series.std())
+    if not math.isfinite(spread) or spread == 0.0:
+        raise ValueError("target has no spread")
+    added = series.astype("float64") + rng.normal(
+        scale=level * spread, size=len(series)
+    )
+    return added, level
+
+
+def class_gated_leak(
+    series: pandas.Series, rng: numpy.random.Generator, missing_class: Any
+) -> tuple[pandas.Series, Any]:
+    """Random values recorded only when the target is not `missing_class`.
+
+    Args:
+        series: The target column.
+        rng: Random generator.
+        missing_class: Class whose rows are left blank; `None` means the
+            first class seen.
+
+    Returns:
+        The new column and the class whose rows are blank.
+
+    Raises:
+        ValueError: If the target has fewer than two classes or lacks the
+            class.
+    """
+    classes = list(pandas.unique(series.dropna()))
+    if len(classes) < MINIMUM_CLASSES:
+        raise ValueError("missing_for_class needs at least two classes")
+    blank = classes[0] if missing_class is None else missing_class
+    if blank not in classes:
+        raise ValueError(f"class {blank!r} is not in the target")
+    added = pandas.Series(
+        rng.normal(size=len(series)), index=series.index, dtype="float64"
+    )
+    added[(series == blank).to_numpy()] = numpy.nan
+    return added, blank
+
+
 def inject_leak(
     frame: pandas.DataFrame,
     target: str,
@@ -820,44 +938,11 @@ def inject_leak(
     if kind == "copy":
         added = series.copy()
     elif kind == "noisy_copy":
-        level = qualification.finite(noise, "noise")
-        if is_classification(series):
-            if not 0.0 < level < 1.0:
-                raise ValueError("noise must be within (0, 1) for classes")
-            classes = list(pandas.unique(series.dropna()))
-            if len(classes) < 2:
-                raise ValueError("a noisy label copy needs two classes")
-            codes = pandas.Index(classes).get_indexer(series)
-            flip = rng.random(len(series)) < level
-            flip &= codes >= 0
-            new_codes = codes.copy()
-            new_codes[flip] = other_classes(rng, codes[flip], len(classes))
-            added = series.copy()
-            added.iloc[numpy.flatnonzero(flip)] = [
-                classes[code] for code in new_codes[flip]
-            ]
-        else:
-            if level <= 0.0:
-                raise ValueError("noise must be positive")
-            spread = float(series.std())
-            if not math.isfinite(spread) or spread == 0.0:
-                raise ValueError("target has no spread")
-            added = series.astype("float64") + rng.normal(
-                scale=level * spread, size=len(series)
-            )
-        info["noise"] = level
+        added, info["noise"] = noisy_leak(series, rng, noise)
     else:
-        classes = list(pandas.unique(series.dropna()))
-        if len(classes) < 2:
-            raise ValueError("missing_for_class needs at least two classes")
-        blank = classes[0] if missing_class is None else missing_class
-        if blank not in classes:
-            raise ValueError(f"class {blank!r} is not in the target")
-        added = pandas.Series(
-            rng.normal(size=len(series)), index=series.index, dtype="float64"
+        added, info["missing_class"] = class_gated_leak(
+            series, rng, missing_class
         )
-        added[(series == blank).to_numpy()] = numpy.nan
-        info["missing_class"] = blank
     out = frame.copy()
     out[column] = added
     mask = blank_mask(out)

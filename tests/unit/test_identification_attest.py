@@ -59,7 +59,7 @@ def test_valid_signed_attestations_name_every_assumption():
 
 
 @pytest.mark.parametrize(
-    "mutate, reason",
+    ("mutate", "reason"),
     [
         (
             lambda r: attest.Attestation(**{**r.to_dict(), "statement": "x"}),

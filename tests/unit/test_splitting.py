@@ -213,10 +213,9 @@ def group_classification_frame(groups=30, per_group=10, seed=0):
     positive_groups = rng.choice(groups, groups // 3, replace=False)
     label = numpy.isin(unit, positive_groups).astype(int)
     flip = rng.random(len(label)) < 0.1
-    frame = pandas.DataFrame(
+    return pandas.DataFrame(
         {"unit": unit, "a": rng.normal(size=len(unit)), "y": label ^ flip}
     )
-    return frame
 
 
 def test_group_folds_keep_groups_apart_and_every_class_in_every_fold():

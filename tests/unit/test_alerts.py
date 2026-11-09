@@ -79,7 +79,7 @@ def test_webhook_delivers_json_with_bounded_attempts():
             self.send_response(204)
             self.end_headers()
 
-        def log_message(self, format, *args):
+        def log_message(self, message_format, *args):
             """Keep the test receiver silent."""
 
     receiver = server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)

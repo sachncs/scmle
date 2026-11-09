@@ -35,6 +35,8 @@ RESAMPLES = 10000
 MEDIAN_GAP = 0.02
 UPPER_GAP = 0.05
 ALPHA = 0.05
+# fewest systems and tasks for the Friedman test
+FRIEDMAN_MINIMUM = 3
 
 
 def load(directory: pathlib.Path) -> list[records.RunRecord]:
@@ -192,7 +194,7 @@ def comparison_tests(
         s: [normalized[t][s] for t in sorted(normalized)] for s in systems
     }
     out: dict[str, Any] = {}
-    if len(systems) >= 3 and len(normalized) >= 3:
+    if len(systems) >= FRIEDMAN_MINIMUM and len(normalized) >= FRIEDMAN_MINIMUM:
         statistic, p = stats.friedmanchisquare(*columns.values())
         out["friedman"] = {"statistic": float(statistic), "p": float(p)}
     pvalues: dict[tuple[str, str], float] = {}

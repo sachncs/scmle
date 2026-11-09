@@ -109,8 +109,8 @@ def test_complete_declaration_serializes_evidence_in_required_stage_order():
     assert declaration.complete
     assert declaration.missing_stages == ()
     payload = declaration.to_dict()
-    stage_records = cast(list[dict[str, object]], payload["stage_evidence"])
-    resources = cast(dict[str, object], payload["resources"])
+    stage_records = cast("list[dict[str, object]]", payload["stage_evidence"])
+    resources = cast("dict[str, object]", payload["resources"])
 
     assert payload["status"] == "supported"
     assert payload["complete"] is True
@@ -225,7 +225,7 @@ def test_modality_manifest_round_trip_binds_governance_to_content():
     assert restored.privacy.contains_pii is True
 
 
-@pytest.mark.parametrize("sample_count", (True, 1.5))
+@pytest.mark.parametrize("sample_count", [True, 1.5])
 def test_modality_manifest_rejects_non_integer_sample_counts(sample_count):
     """Lifecycle counts must remain exact integers in persisted evidence."""
     with pytest.raises(TypeError, match="sample_count must be an integer"):

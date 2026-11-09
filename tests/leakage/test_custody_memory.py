@@ -84,7 +84,7 @@ def holders(values):
                 column.tolist()
             ):
                 found.append(type(item).__name__)
-        except Exception:
+        except Exception:  # noqa: BLE001 -- scanning arbitrary objects; any unreadable one is skipped
             continue
     return found
 

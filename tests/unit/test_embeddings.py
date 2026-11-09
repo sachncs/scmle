@@ -47,7 +47,10 @@ def test_the_framework_process_never_imports_torch():
     )
 
     done = subprocess.run(
-        [sys.executable, "-c", script], capture_output=True, text=True
+        [sys.executable, "-c", script],
+        capture_output=True,
+        text=True,
+        check=False,
     )
 
     assert done.returncode == 0, done.stderr

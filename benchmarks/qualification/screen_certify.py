@@ -104,7 +104,9 @@ def real_columns(frame: pandas.DataFrame, count: int, seed: int) -> list[str]:
     """
     rng = randomness.component_rng(seed, "screen.columns", 0)
     names = [c for c in frame.columns if c != f4_certify.TARGET]
-    return [names[i] for i in sorted(rng.choice(len(names), count, False))]
+    return [
+        names[i] for i in sorted(rng.choice(len(names), count, replace=False))
+    ]
 
 
 def with_gaps(features: pandas.DataFrame, seed: int) -> pandas.DataFrame:

@@ -76,7 +76,7 @@ def test_non_integer_ids_are_refused_by_name(field):
 
 
 @pytest.mark.parametrize(
-    "field,other",
+    ("field", "other"),
     [
         ("exploration_ids", (9, 9)),
         ("confirmation_ids", (9, 9)),

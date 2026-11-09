@@ -97,8 +97,8 @@ def test_out_of_fold_probabilities_cover_validation_rows_only_once():
     features = pandas.DataFrame({"a": rng.normal(size=120)})
     target = pandas.Series((features.a > 0).astype(int))
     folds = [
-        (list(range(0, 60)), list(range(60, 90))),
-        (list(range(0, 90)), list(range(90, 120))),
+        (list(range(60)), list(range(60, 90))),
+        (list(range(90)), list(range(90, 120))),
     ]
     probability, positions = thresholds.out_of_fold_probabilities(
         linear_model.LogisticRegression, features, target, folds

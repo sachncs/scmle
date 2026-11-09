@@ -135,7 +135,7 @@ def test_choice_messages():
 
 
 @pytest.mark.parametrize(
-    "field,bad,expected",
+    ("field", "bad", "expected"),
     [
         ("question", " ", "question must not be empty"),
         ("unit", " ", "unit must not be empty"),

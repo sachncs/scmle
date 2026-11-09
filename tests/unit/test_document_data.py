@@ -135,7 +135,7 @@ def test_reader_accepts_an_explicit_layout_extractor_contract():
 
 @pytest.mark.parametrize(
     ("reader", "expected_error", "code"),
-    (
+    [
         (
             document.Reader(
                 layout_reader=lambda *arguments: (
@@ -152,7 +152,7 @@ def test_reader_accepts_an_explicit_layout_extractor_contract():
             document.DocumentValidationError,
             "layout_invalid_result",
         ),
-    ),
+    ],
 )
 def test_layout_extractor_failures_are_structured(reader, expected_error, code):
     """Optional extraction failures never become silent metadata loss."""

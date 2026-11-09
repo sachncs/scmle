@@ -1,7 +1,7 @@
 """Failure isolation, cancellation, budget handling and extensibility."""
 
 import json
-import os
+import pathlib
 
 import pytest
 from sklearn import dummy
@@ -32,7 +32,7 @@ class ExplodingAdapter(models.Model):
 
 
 def read_events(run_dir):
-    with open(f"{run_dir}/events.jsonl") as handle:
+    with pathlib.Path(f"{run_dir}/events.jsonl").open() as handle:
         return [json.loads(line) for line in handle]
 
 
@@ -85,7 +85,8 @@ def test_cancellation_keeps_completed_trials(binary_frame, tmp_path):
         project.run()
     run_dir = caught.value.details["run_dir"]
     assert any(
-        name.endswith(".json") for name in os.listdir(f"{run_dir}/trials")
+        path.name.endswith(".json")
+        for path in pathlib.Path(f"{run_dir}/trials").iterdir()
     )
     assert read_events(run_dir)[-1]["kind"] == "state.CANCELLED"
 

@@ -331,6 +331,25 @@ ROOT_SURFACES = {
 }
 
 
+def stable_collection(value: list | tuple | set | frozenset) -> list[Any]:
+    """Convert a collection default into a deterministic list.
+
+    Args:
+        value: A list, tuple, set or frozenset default.
+
+    Returns:
+        The items converted with `stable_value`; sorted when the collection
+        is a set or when all its items are enumeration members, otherwise in
+        the collection's own order.
+    """
+    values = [stable_value(item) for item in value]
+    if isinstance(value, (set, frozenset)) or all(
+        isinstance(item, enum.Enum) for item in value
+    ):
+        return sorted(values, key=lambda item: json.dumps(item, sort_keys=True))
+    return values
+
+
 def stable_value(value: Any) -> Any:
     """Convert a default value into deterministic JSON-native evidence.
 
@@ -351,17 +370,8 @@ def stable_value(value: Any) -> Any:
             "enum": f"{type(value).__module__}.{type(value).__qualname__}",
             "value": stable_value(value.value),
         }
-    if isinstance(value, (list, tuple)):
-        values = [stable_value(item) for item in value]
-        if all(isinstance(item, enum.Enum) for item in value):
-            return sorted(
-                values,
-                key=lambda item: json.dumps(item, sort_keys=True),
-            )
-        return values
-    if isinstance(value, (set, frozenset)):
-        values = [stable_value(item) for item in value]
-        return sorted(values, key=lambda item: json.dumps(item, sort_keys=True))
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return stable_collection(value)
     if str(value) == "<factory>":
         return "<factory>"
     if isinstance(value, (str, int, float, bool)) or value is None:

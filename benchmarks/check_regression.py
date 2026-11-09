@@ -22,6 +22,39 @@ BASELINE = pathlib.Path(__file__).with_name("baseline.json")
 LOWER_IS_BETTER = {"log_loss", "rmse", "mae"}
 
 
+def limit_problems(
+    name: str, record: dict[str, Any], expected: dict[str, Any]
+) -> list[str]:
+    """Lists the runtime, memory and failure-rate limits a record exceeds.
+
+    Args:
+        name: Dataset name.
+        record: The benchmark record.
+        expected: The baseline entry, with optional `max_seconds`,
+            `max_peak_memory_gb` and `max_failure_rate`.
+
+    Returns:
+        One message per limit that is exceeded or lacks evidence.
+    """
+    problems = []
+    for field, label in (
+        ("seconds", "runtime"),
+        ("peak_memory_gb", "peak memory"),
+        ("failure_rate", "failure rate"),
+    ):
+        limit = expected.get(f"max_{field}")
+        if limit is None:
+            continue
+        observed = record.get(field)
+        if observed is None:
+            problems.append(f"{name}: {label} evidence is missing")
+        elif observed > limit:
+            problems.append(
+                f"{name}: {label} {observed:.4f} exceeds limit {limit}"
+            )
+    return problems
+
+
 def violations(
     results: list[dict[str, Any]], baseline: dict[str, dict[str, Any]]
 ) -> list[str]:
@@ -65,21 +98,7 @@ def violations(
             problems.append(
                 f"{name}: {metric} {score:.4f} breaches bound {bound}"
             )
-        for field, label in (
-            ("seconds", "runtime"),
-            ("peak_memory_gb", "peak memory"),
-            ("failure_rate", "failure rate"),
-        ):
-            limit = expected.get(f"max_{field}")
-            if limit is None:
-                continue
-            observed = record.get(field)
-            if observed is None:
-                problems.append(f"{name}: {label} evidence is missing")
-            elif observed > limit:
-                problems.append(
-                    f"{name}: {label} {observed:.4f} exceeds limit {limit}"
-                )
+        problems.extend(limit_problems(name, record, expected))
     return problems
 
 

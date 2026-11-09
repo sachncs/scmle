@@ -43,8 +43,8 @@ def test_weighted_intervals_need_attached_weights(result):
     )
     with pytest.raises(errors.ArtifactError, match="conformal"):
         plain.predict_interval(world(5, 3)[["x"]], shift=True)
+    result.bundle.shift_weights = None
     with pytest.raises(errors.ArtifactError, match="no shift weights"):
-        result.bundle.shift_weights = None
         result.bundle.predict_interval(world(5, 3)[["x"]], shift=True)
 
 

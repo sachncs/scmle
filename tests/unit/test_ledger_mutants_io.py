@@ -264,13 +264,19 @@ def test_the_claims_file_is_indented_sorted_json_in_a_new_folder(tmp_path):
 def test_assumptions_are_stated_in_full():
     texts = confirm.assumptions(budget.Correction.BY, 3)
     assert texts == (
-        "FDR <= alpha * m0 / m under arbitrary dependence (rule by, family "
-        "of 3 survivors fixed before C was opened)",
-        "rows of C are independent of rows of X (grouped split by entity, "
-        "embargo for temporal data)",
+        (
+            "FDR <= alpha * m0 / m under arbitrary dependence (rule by, "
+            "family of 3 survivors fixed before C was opened)"
+        ),
+        (
+            "rows of C are independent of rows of X (grouped split by entity, "
+            "embargo for temporal data)"
+        ),
         "C was opened once and its rows were used only by this confirmation",
-        "each statistic is valid under its null on C: Spearman and Kruskal "
-        "assume independent rows",
+        (
+            "each statistic is valid under its null on C: Spearman and "
+            "Kruskal assume independent rows"
+        ),
         "exploration FDR is a triage budget, not part of this guarantee",
     )
 

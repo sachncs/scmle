@@ -4,12 +4,15 @@
 from __future__ import annotations
 
 import argparse
-from collections.abc import Iterable
 from importlib import metadata
 import json
 from pathlib import Path
 import re
 import tomllib
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 FORBIDDEN_LICENSES = re.compile(
     r"(?:^|[^A-Z])(AGPL|BUSL|GPL|LGPL|SSPL|ELASTIC)(?:[^A-Z]|$)",

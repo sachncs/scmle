@@ -64,6 +64,8 @@ CORPORA: dict[str, Callable[..., Any]] = {
 }
 SENTINEL_COUNT = 2
 OUTLIER_COUNT = 3
+# a column with fewer distinct values than this is constant
+CONSTANT_DISTINCT_LIMIT = 2
 FIRST_CLASS_RATE = 0.20
 OTHER_CLASS_RATE = 0.05
 
@@ -79,7 +81,9 @@ def corpus_frame(name: str) -> pandas.DataFrame:
     """
     frame: pandas.DataFrame = CORPORA[name](as_frame=True).frame
     frame = frame.rename(columns={"target": standins.TARGET})
-    constant = [c for c in frame.columns if frame[c].nunique() < 2]
+    constant = [
+        c for c in frame.columns if frame[c].nunique() < CONSTANT_DISTINCT_LIMIT
+    ]
     return frame.drop(columns=constant).reset_index(drop=True)
 
 

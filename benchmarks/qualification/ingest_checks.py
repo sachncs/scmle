@@ -26,6 +26,14 @@ from scmle.data.ingest import asof_view
 from scmle.data.ingest import synthesize
 
 RTOL = 1e-9
+# share of feature values left missing
+MISSING_VALUE_SHARE = 0.15
+# share of recording times left missing
+MISSING_RECORDED_SHARE = 0.1
+# chance that a view declares its recording time known
+KNOWN_SHARE = 0.5
+# chance that a random schema is nested
+NESTED_SHARE = 0.3
 
 
 @dataclasses.dataclass
@@ -87,9 +95,9 @@ def random_schema(seed: int, name: str = "ingest.check.schema") -> Schema:
     rows = int(rng.integers(0, 40))
     event = numpy.round(rng.uniform(0, 100, rows), int(rng.integers(0, 2)))
     value = rng.normal(size=rows).round(int(rng.integers(0, 3)))
-    value[rng.random(rows) < 0.15] = numpy.nan
+    value[rng.random(rows) < MISSING_VALUE_SHARE] = numpy.nan
     recorded = event + rng.exponential(2.0, rows).round(1)
-    recorded[rng.random(rows) < 0.1] = numpy.nan
+    recorded[rng.random(rows) < MISSING_RECORDED_SHARE] = numpy.nan
     orders = pandas.DataFrame(
         {
             "cid": rng.integers(0, keys, rows),
@@ -104,9 +112,9 @@ def random_schema(seed: int, name: str = "ingest.check.schema") -> Schema:
         rng.uniform(0, 100, leaf_rows), int(rng.integers(0, 2))
     )
     leaf_value = rng.normal(size=leaf_rows).round(2)
-    leaf_value[rng.random(leaf_rows) < 0.15] = numpy.nan
+    leaf_value[rng.random(leaf_rows) < MISSING_VALUE_SHARE] = numpy.nan
     leaf_recorded = leaf_event + rng.exponential(3.0, leaf_rows).round(1)
-    leaf_recorded[rng.random(leaf_rows) < 0.1] = numpy.nan
+    leaf_recorded[rng.random(leaf_rows) < MISSING_RECORDED_SHARE] = numpy.nan
     items = pandas.DataFrame(
         {
             "oid": rng.integers(0, max(rows, 1), leaf_rows),
@@ -119,15 +127,15 @@ def random_schema(seed: int, name: str = "ingest.check.schema") -> Schema:
         targets,
         orders,
         items,
-        known=bool(rng.random() < 0.5),
-        leaf_known=bool(rng.random() < 0.5),
+        known=bool(rng.random() < KNOWN_SHARE),
+        leaf_known=bool(rng.random() < KNOWN_SHARE),
         delta=float(rng.choice([0.0, 1.0, 2.5])),
         lag=float(rng.choice([0.0, 1.5, 3.0])),
         window=(None, 7.0, 30.0)[int(rng.integers(0, 3))],
         primitive=str(rng.choice(synthesize.PRIMITIVES)),
         inner=str(rng.choice(synthesize.NESTED_INNER)),
         outer=str(rng.choice(["mean", "max", "sum", "count", "last", "std"])),
-        nested=bool(rng.random() < 0.3),
+        nested=bool(rng.random() < NESTED_SHARE),
     )
 
 

@@ -74,10 +74,14 @@ def test_hist_gradient_boosting_exports_when_the_converter_supports_it(
 ):
     bundle, features = make_bundle("hist_gradient_boosting", tasks.Task.BINARY)
 
+    refusal = None
+    path = None
     try:
         path = bundle.export_onnx(tmp_path / "m.onnx", check=features)
     except errors.ArtifactError as error:
-        assert "hist_gradient_boosting" in str(error)
+        refusal = error
+    if refusal is not None:
+        assert "hist_gradient_boosting" in str(refusal)
     else:
         assert path.exists()
 

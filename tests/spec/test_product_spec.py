@@ -1125,7 +1125,9 @@ def test_l669_no_arbitrary_performance_promises():
         ROOT / "docs" / "TUTORIAL.md"
     ).read_text()
     assert not re.search(
-        r"\d+\s*%\s*(faster|better|more accurate|improvement)", text, re.I
+        r"\d+\s*%\s*(faster|better|more accurate|improvement)",
+        text,
+        re.IGNORECASE,
     )
 
 

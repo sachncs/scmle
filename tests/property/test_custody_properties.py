@@ -63,9 +63,12 @@ def test_sets_never_overlap_and_units_never_straddle(scenario):
         "duplicates": duplicates,
         "embargo_rows": embargo,
     }
+    refusal = None
     try:
         result = carve.carve_confirmation(dev, folds, **arguments)
-    except errors.ConfigError as refusal:
+    except errors.ConfigError as error:
+        refusal = error
+    if refusal is not None:
         # An explicit refusal is allowed only for structured input, and only
         # for the documented reason; plain random data must always succeed.
         assert kind != "plain", refusal

@@ -194,9 +194,9 @@ def test_the_reference_run_reports_what_the_plan_expects(references):
 
 
 @pytest.mark.parametrize(
-    "label,phase,index",
+    ("label", "phase", "index"),
     plain_cases(),
-    ids=lambda value: str(value),
+    ids=str,
 )
 def test_a_kill_at_each_boundary_resumes_to_identical_output(
     root, references, label, phase, index
@@ -205,9 +205,9 @@ def test_a_kill_at_each_boundary_resumes_to_identical_output(
 
 
 @pytest.mark.parametrize(
-    "label,phase,index",
+    ("label", "phase", "index"),
     GATED_CASES,
-    ids=lambda value: str(value),
+    ids=str,
 )
 def test_a_kill_while_the_gate_writes_resumes_to_identical_output(
     root, references, label, phase, index

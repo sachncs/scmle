@@ -28,7 +28,7 @@ def make_ledger(path=None):
 
 
 def make_guard(ledger=None, today=TODAY, keys=True):
-    guard = envelope.EnvelopeGuard(
+    return envelope.EnvelopeGuard(
         ledger or make_ledger(),
         today=lambda: today,
         verification_keys=(
@@ -37,7 +37,6 @@ def make_guard(ledger=None, today=TODAY, keys=True):
             else None
         ),
     )
-    return guard
 
 
 def signed(key=PERSON_KEY, **changes):

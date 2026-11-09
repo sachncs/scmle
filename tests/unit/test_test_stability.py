@@ -94,7 +94,9 @@ def test_active_quarantine_is_visible_but_not_silent():
 
 def test_expired_quarantine_fails_even_if_test_is_not_collected():
     """Stale exceptions cannot remain in policy indefinitely."""
-    yesterday = datetime.date.today() - datetime.timedelta(days=1)
+    yesterday = (
+        datetime.datetime.now().astimezone().date() - datetime.timedelta(days=1)
+    )
     quarantine = entry(yesterday.isoformat())
     policy = check_test_stability.StabilityPolicy(
         {quarantine.test_id: quarantine}

@@ -339,7 +339,7 @@ class TestCheckAll:
                         or (["x"] if failing == "f10" else [])
                     ),
                 )
-                monkeypatch.setattr(module, "descriptive_only", lambda: [])
+                monkeypatch.setattr(module, "descriptive_only", list)
             else:
                 monkeypatch.setattr(module, "check", fake(name))
         return benchmarks.qualification.__main__, calls

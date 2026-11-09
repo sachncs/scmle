@@ -192,6 +192,50 @@ HILLSTROM_SHA256 = (
 )
 ALPHA_PROMOTE = 0.02
 ALPHA_ROLLBACK = 0.01
+# gate A1: median excess cost of the frozen rule, relative to the oracle
+EXCESS_COST_CEILING = 0.01
+# gate A1c: power of the calibration check at skews 0.6 and 1.6
+POWER_FLOOR = 0.8
+# gate A2: share of rows the rule acts on in the random tables
+RANDOM_TABLE_ACT_SHARE = 0.4
+# gate A2: largest net benefit identity error allowed
+IDENTITY_TOLERANCE = 1e-12
+# gates A3, A5, A7: floor on the Wilson lower bound of coverage
+WILSON_LOWER_FLOOR = 0.93
+# gate A5: replicates below this ESS/n are not used for coverage
+ESS_RATIO_FLOOR = 0.2
+# gate A5: x0 above this is nearly never treated in the weak-support worlds
+WEAK_SUPPORT_CUT = 1.5
+# gate A5: share of planted support violations that must be refused
+REFUSAL_RATE_FLOOR = 0.95
+# gate A5: floor on the Wilson lower bound of the refusal rate
+REFUSAL_LOWER_FLOOR = 0.90
+# gate A5: share of clean worlds that may be refused
+FALSE_REFUSAL_CEILING = 0.05
+# gate A6: share of biased subsamples whose interval must cover
+HILLSTROM_COVERAGE_FLOOR = 0.90
+# share assigned to the treated arm in the randomized worlds
+ARM_SHARE = 0.5
+# gate B8: share of positive-control runs that must promote
+PROMOTED_SHARE_FLOOR = 0.9
+# gate A7: the largest true-positive-rate gap that is acceptable
+FAIRNESS_MAX_GAP = 0.05
+# gate A7: Wilson upper bound on "satisfied" when the gap is too large
+WRONG_VERDICT_CEILING = 0.08
+# gate A7: point rate of "satisfied" when the gap is too large
+SATISFIED_RATE_CEILING = 0.05
+# gate A7b: worst relative net benefit loss of the group thresholds
+RELATIVE_LOSS_CEILING = 0.02
+# gate B1: outcome rate of the comparison worlds
+BASE_EVENT_RATE = 0.10
+# gate B1: the comparison is run only from this many replicates
+COMPARE_MINIMUM_RUNS = 1000
+# gate B5: share of random budgets drawn without a horizon
+OPEN_HORIZON_SHARE = 0.5
+# gate B6: power floor of the anytime and exact sample-ratio tests
+ANYTIME_POWER_FLOOR = 0.95
+# fewest replicates a scaled gate is run with
+MINIMUM_RUNS = 2
 C_FP, C_FN = 5.0, 100.0
 GATES = (
     "A1",
@@ -342,7 +386,7 @@ def gate_a1(runs: int, base: int = 0) -> dict[str, Any]:
             )
             excess.append((cost - oracle) / oracle)
         values = numpy.array(excess)
-        meets = float(numpy.median(values)) <= 0.01
+        meets = float(numpy.median(values)) <= EXCESS_COST_CEILING
         passed = passed and meets
         result["worlds"][str(skew)] = {
             "oracle_cost": oracle,
@@ -377,7 +421,7 @@ def gate_a1c(runs: int, base: int = 0) -> dict[str, Any]:
     size = rejects[1.0] / runs
     power = {str(k): v / runs for k, v in rejects.items() if k != 1.0}
     meets_size = size <= level + tol(level, runs)
-    meets_power = all(v >= 0.8 for v in power.values())
+    meets_power = all(v >= POWER_FLOOR for v in power.values())
     return {
         "level": level,
         "false_alarm_rate": size,
@@ -406,7 +450,7 @@ def gate_a2(runs: int, base: int = 0) -> dict[str, Any]:
     for _ in range(1000):
         n = 300
         y = (rng.random(n) < rng.uniform(0.1, 0.6)).astype(float)
-        a = (rng.random(n) < 0.4).astype(float)
+        a = (rng.random(n) < RANDOM_TABLE_ACT_SHARE).astype(float)
         fp, fn = rng.uniform(1, 9), rng.uniform(1, 90)
         human = (costs.CostSource.HUMAN,) * 4
         model = costs.DecisionCostModel(
@@ -434,7 +478,7 @@ def gate_a2(runs: int, base: int = 0) -> dict[str, Any]:
         "monte_carlo_mean": float(arr.mean()),
         "truth": truth,
         "se": se,
-        "passed": bool(worst <= 1e-12 and inside),
+        "passed": bool(worst <= IDENTITY_TOLERANCE and inside),
         "replicates": runs,
     }
 
@@ -496,7 +540,7 @@ def band_setting(runs: int, n: int, cluster: bool, base: int) -> dict[str, Any]:
         "runs": runs,
         "coverage": hits / runs,
         "interval": wilson(hits, runs),
-        "meets_floor": wilson(hits, runs)[0] >= 0.93,
+        "meets_floor": wilson(hits, runs)[0] >= WILSON_LOWER_FLOOR,
     }
 
 
@@ -667,7 +711,7 @@ def gate_a5(runs: int, base: int = 0) -> dict[str, Any]:
                 continue
             low, high = estimate.interval or (math.nan, math.nan)
             tally[name]["values"].append(estimate.value)
-            if estimate.ess_ratio >= 0.2:
+            if estimate.ess_ratio >= ESS_RATIO_FLOOR:
                 tally[name]["used"] += 1
                 tally[name]["hits"] += int(low <= truth <= high)
     table = {}
@@ -683,7 +727,7 @@ def gate_a5(runs: int, base: int = 0) -> dict[str, Any]:
         }
     dr_ok = all(
         table[name]["interval"] is not None
-        and table[name]["interval"][0] >= 0.93
+        and table[name]["interval"][0] >= WILSON_LOWER_FLOOR
         for name in ("dr", "dr_misspec")
     )
     refusals = refusal_rows(base)
@@ -721,7 +765,7 @@ def refusal_rows(base: int) -> dict[str, Any]:
                 )
             else:
                 data = f11_generators.bandit(rng, BANDIT_ROWS, 1.0)
-                tail = data["x"][:, 0] > 1.5
+                tail = data["x"][:, 0] > WEAK_SUPPORT_CUT
                 data["behaviour"][tail] = numpy.array([0.995, 0.005])
             target = f11_generators.target_policy(data["x"])
             log = ope.LoggedBandit(
@@ -732,11 +776,11 @@ def refusal_rows(base: int) -> dict[str, Any]:
     hard = wilson(fired["hard"], runs)
     weak = wilson(fired["weak"], runs)
     meets = (
-        fired["hard"] / runs >= 0.95
-        and hard[0] >= 0.90
-        and fired["weak"] / runs >= 0.95
-        and weak[0] >= 0.90
-        and fired["clean"] / runs <= 0.05
+        fired["hard"] / runs >= REFUSAL_RATE_FLOOR
+        and hard[0] >= REFUSAL_LOWER_FLOOR
+        and fired["weak"] / runs >= REFUSAL_RATE_FLOOR
+        and weak[0] >= REFUSAL_LOWER_FLOOR
+        and fired["clean"] / runs <= FALSE_REFUSAL_CEILING
     )
     return {
         "hard_violation": {"refused": fired["hard"], "interval": hard},
@@ -880,7 +924,7 @@ def gate_a6(runs: int, base: int = 0) -> dict[str, Any]:
         "interval": wilson(hits, runs),
         "mean_kept_rows": float(numpy.mean(kept_rows)),
         "data_sha256": HILLSTROM_SHA256,
-        "passed": bool(coverage >= 0.90),
+        "passed": bool(coverage >= HILLSTROM_COVERAGE_FLOOR),
         "replicates": runs,
     }
 
@@ -928,7 +972,7 @@ def gate_b7(runs: int, base: int = 0) -> dict[str, Any]:
         size = min(chunk, runs - start)
         rng = rng_for(base, "b7", start)
         y = numpy.stack([rng.permutation(y_all)[:n_max] for _ in range(size)])
-        arm = (rng.random((size, n_max)) < 0.5).astype(float)
+        arm = (rng.random((size, n_max)) < ARM_SHARE).astype(float)
         paths = peeking_paths(arm, y, 0.5, delta_min)
         hits += int((paths.max(axis=1) >= -math.log(ALPHA_PROMOTE)).sum())
     rate = hits / runs
@@ -1003,7 +1047,7 @@ def gate_b8(runs: int, base: int = 0) -> dict[str, Any]:
         "full_sample_lower_bound": bound + 0.0,
         "rows": len(y_all),
         "data_sha256": HILLSTROM_SHA256,
-        "passed": bool(share_promoted >= 0.9 and direction),
+        "passed": bool(share_promoted >= PROMOTED_SHARE_FLOOR and direction),
         "replicates": runs,
     }
 
@@ -1063,10 +1107,14 @@ def gate_a7(runs: int, base: int = 0) -> dict[str, Any]:
             "bound_covers": covered / runs,
             "bound_cover_interval": cover,
         }
-        meets = cover[0] >= 0.93
-        if gap > 0.05:
+        meets = cover[0] >= WILSON_LOWER_FLOOR
+        if gap > FAIRNESS_MAX_GAP:
             wrong = wilson(satisfied, runs)
-            meets = meets and wrong[1] <= 0.08 and satisfied / runs <= 0.05
+            meets = (
+                meets
+                and wrong[1] <= WRONG_VERDICT_CEILING
+                and satisfied / runs <= SATISFIED_RATE_CEILING
+            )
         row["meets_floor"] = bool(meets)
         passed = passed and meets
         table[str(gap)] = row
@@ -1112,7 +1160,7 @@ def gate_a7b(runs: int, base: int = 0) -> dict[str, Any]:
     return {
         "oracle_net_benefit": oracle,
         "relative_loss": summary(numpy.array(losses)),
-        "passed": bool(worst <= 0.02),
+        "passed": bool(worst <= RELATIVE_LOSS_CEILING),
         "replicates": runs,
     }
 
@@ -1232,8 +1280,8 @@ def compare_arms_rate(base: int) -> dict[str, Any]:
     adopted = 0
     for index in range(runs):
         rng = rng_for(base, "b1.compare", index)
-        arm = rng.random(n) < 0.5
-        y = (rng.random(n) < 0.10).astype(int)
+        arm = rng.random(n) < ARM_SHARE
+        y = (rng.random(n) < BASE_EVENT_RATE).astype(int)
         for look in range(1, looks + 1):
             m = look * (n // looks)
             seen_arm, seen_y = arm[:m], y[:m]
@@ -1317,7 +1365,7 @@ def gate_b1(runs: int, base: int = 0) -> dict[str, Any]:
         hits += int((paths.max(axis=1) >= -math.log(ALPHA_PROMOTE)).sum())
     bound = ALPHA_PROMOTE + tol(ALPHA_PROMOTE, runs)
     agreement = class_agreement(base)
-    compare = compare_arms_rate(base) if runs >= 1000 else None
+    compare = compare_arms_rate(base) if runs >= COMPARE_MINIMUM_RUNS else None
     return {
         "ever_promote": hits,
         "rate": hits / runs,
@@ -1350,7 +1398,7 @@ def gate_b2(runs: int, base: int = 0) -> dict[str, Any]:
     for start in range(0, runs, chunk):
         size = min(chunk, runs - start)
         rng = rng_for(base, "b2", start)
-        arm = (rng.random((size, plan.n_max)) < 0.5).astype(float)
+        arm = (rng.random((size, plan.n_max)) < ARM_SHARE).astype(float)
         primary = (rng.random(arm.shape) < 0.10 + 0.06 * arm).astype(float)
         bounce = (rng.random(arm.shape) < 0.20 + 0.05 * arm).astype(float)
         target = -math.log(ALPHA_PROMOTE)
@@ -1416,7 +1464,7 @@ def esn_metric(kind: str, runs: int, base: int) -> dict[str, Any]:
     for start in range(0, runs, chunk):
         size = min(chunk, runs - start)
         rng = rng_for(base, f"b3.{kind}", start)
-        arm = (rng.random((size, plan.n_max)) < 0.5).astype(float)
+        arm = (rng.random((size, plan.n_max)) < ARM_SHARE).astype(float)
         if kind == "binary":
             y = (rng.random(arm.shape) < 0.10 + 0.04 * arm).astype(float)
         else:
@@ -1569,7 +1617,11 @@ def gate_b5(runs: int, base: int = 0) -> dict[str, Any]:
         alpha = scmle.data.ledger.budget.exact(
             float(rng.integers(1, 100)) / 1000, "a"
         )
-        horizon = None if rng.random() < 0.5 else int(rng.integers(1, 30))
+        horizon = (
+            None
+            if rng.random() < OPEN_HORIZON_SHARE
+            else int(rng.integers(1, 30))
+        )
         budget = scmle.data.ledger.budget.DecisionBudget(
             alpha, scmle.data.ledger.budget.exact(0.01, "b"), horizon
         )
@@ -1643,8 +1695,8 @@ def gate_b6(runs: int, base: int = 0) -> dict[str, Any]:
     meets = (
         out["size"]["anytime"] <= bound
         and out["size"]["exact"] <= bound
-        and out["power"]["anytime"] >= 0.95
-        and out["power"]["exact"] >= 0.95
+        and out["power"]["anytime"] >= ANYTIME_POWER_FLOOR
+        and out["power"]["exact"] >= ANYTIME_POWER_FLOOR
     )
     out.update({"level": level, "size_bound": bound, "passed": bool(meets)})
     out["replicates"] = runs
@@ -1766,7 +1818,7 @@ def hook_promotes(
     """
     hook.start(f"promote-{seed}")
     rng = numpy.random.default_rng(seed)
-    arm = (rng.random(6000) < 0.5).astype(float)
+    arm = (rng.random(6000) < ARM_SHARE).astype(float)
     outcome = (rng.random(6000) < 0.15 + 0.25 * arm).astype(float)
     hook.observe(arm, outcome)
     hook.promote(hook_approval(record), signing_key=HOOK_KEY)
@@ -2002,7 +2054,9 @@ def forbidden_imports() -> list[str]:
                 ]
             elif isinstance(node, ast.Import):
                 names = [a.name for a in node.names]
-            for name in names:
+            found.extend(
+                f"{path.name}: {name}"
+                for name in names
                 if any(
                     part in name
                     for part in (
@@ -2011,8 +2065,8 @@ def forbidden_imports() -> list[str]:
                         "ledger.ledger",
                         "ledger.confirm",
                     )
-                ):
-                    found.append(f"{path.name}: {name}")
+                )
+            )
     return found
 
 
@@ -2035,7 +2089,7 @@ def battery_digest(base: int) -> str:
         rng, 2000, 0.2, 1.5, 10, 0.5
     )
     band = netbenefit.net_benefit_band(
-        outcome, (sample >= 0.8).astype(float), RANGE, clusters=groups, seed=2
+        outcome, (sample >= CUT).astype(float), RANGE, clusters=groups, seed=2
     )
     arm, y2 = f11_generators.experiment(rng, 1, 3000, 0.5, 0.1, 0.04)
     run = rollout.Rollout(plan_for(), "e", ALPHA_PROMOTE).observe(arm[0], y2[0])
@@ -2047,7 +2101,7 @@ def battery_digest(base: int) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
-def gate_b10(runs: int, base: int = 0) -> dict[str, Any]:
+def gate_b10(runs: int, base: int = 0) -> dict[str, Any]:  # noqa: ARG001 -- every runner in RUNNERS takes (runs, base)
     """Determinism and the import graph.
 
     Args:
@@ -2266,7 +2320,7 @@ def certify_all(base: int = 0, scale: float = 1.0) -> dict[str, Any]:
     digests = current_digests()
     for name, (runner, runs) in RUNNERS.items():
         started = time.monotonic()
-        count = max(2, int(runs * scale)) if runs > 2 else runs
+        count = max(2, int(runs * scale)) if runs > MINIMUM_RUNS else runs
         measured = runner(count, base)
         measured["code_hash"] = digests[name]
         measured["seeds"] = [base, base + count]

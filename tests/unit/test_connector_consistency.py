@@ -123,7 +123,7 @@ def test_snapshot_query_is_the_token_source():
 )
 def test_write_statements_are_refused_at_construction(query):
     with pytest.raises(connectors.ConnectorError) as caught:
-        connectors.DbApiConnector(URI, query, lambda: make_db())
+        connectors.DbApiConnector(URI, query, make_db)
     assert caught.value.code == "write_statement_refused"
 
 

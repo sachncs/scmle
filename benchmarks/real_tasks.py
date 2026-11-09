@@ -193,6 +193,7 @@ def project(
 
 
 BUDGET = 150
+PBC_DEATH_STATUS = 2
 
 
 def forecast_case(
@@ -243,11 +244,11 @@ def forecast_case(
         "forecast",
         len(frame),
         "mean MAE over steps",
-        False,
-        model,
-        naive[best],
-        best,
-        result.selected_model,
+        higher_is_better=False,
+        framework=model,
+        baseline=naive[best],
+        baseline_name=best,
+        selected=result.selected_model,
         note=f"{horizon} steps ahead, period {period}; baselines "
         + ", ".join(f"{k} {v:.2f}" for k, v in naive.items()),
     )
@@ -298,11 +299,11 @@ def survival_case(
         "survival",
         len(frame),
         "c_index",
-        True,
-        result.evaluation["test_metrics"]["c_index"],
-        base,
-        "untuned ridge Cox",
-        result.selected_model,
+        higher_is_better=True,
+        framework=result.evaluation["test_metrics"]["c_index"],
+        baseline=base,
+        baseline_name="untuned ridge Cox",
+        selected=result.selected_model,
         note=note + f" events {int(frame[event].sum())}/{len(frame)}",
     )
 
@@ -321,7 +322,7 @@ def ordinal_case(
     Returns:
         The row, scored by quadratic weighted kappa on the locked rows.
     """
-    order = sorted(frame[target].unique(), key=lambda v: float(v))
+    order = sorted(frame[target].unique(), key=float)
     result = project(
         frame, target, root, task="ordinal", ordinal_order=order
     ).run()
@@ -338,11 +339,11 @@ def ordinal_case(
         "ordinal",
         len(frame),
         "qwk",
-        True,
-        result.evaluation["test_metrics"]["qwk"],
-        base,
-        "multiclass boosted classifier",
-        result.selected_model,
+        higher_is_better=True,
+        framework=result.evaluation["test_metrics"]["qwk"],
+        baseline=base,
+        baseline_name="multiclass boosted classifier",
+        selected=result.selected_model,
         note=f"{len(order)} ordered levels; MAE in levels "
         f"{result.evaluation['test_metrics']['mace']:.3f} vs "
         f"{ordinal.mean_absolute_class_error(ranks[test], guess):.3f}",
@@ -385,11 +386,11 @@ def multilabel_case(
         "multilabel",
         len(frame),
         "macro F1",
-        True,
-        result.evaluation["test_metrics"]["f1_macro_labels"],
-        base,
-        "one boosted classifier per label",
-        result.selected_model,
+        higher_is_better=True,
+        framework=result.evaluation["test_metrics"]["f1_macro_labels"],
+        baseline=base,
+        baseline_name="one boosted classifier per label",
+        selected=result.selected_model,
         note=f"{len(labels)} labels; split "
         f"{result.evaluation['split_strategy']}",
     )
@@ -424,11 +425,11 @@ def multioutput_case(
         "multioutput",
         len(frame),
         "mean R2",
-        True,
-        result.evaluation["test_metrics"]["r2_mean"],
-        base,
-        "one boosted regressor per target",
-        result.selected_model,
+        higher_is_better=True,
+        framework=result.evaluation["test_metrics"]["r2_mean"],
+        baseline=base,
+        baseline_name="one boosted regressor per target",
+        selected=result.selected_model,
     )
 
 
@@ -475,11 +476,11 @@ def uplift_case(
         "uplift",
         len(frame),
         "qini",
-        True,
-        result.evaluation["test_metrics"]["qini"],
-        chance,
-        "random ranking (mean of 50)",
-        result.selected_model,
+        higher_is_better=True,
+        framework=result.evaluation["test_metrics"]["qini"],
+        baseline=chance,
+        baseline_name="random ranking (mean of 50)",
+        selected=result.selected_model,
         note=note + f" propensity AUC {report['propensity']['auc']:.2f}; "
         f"overall effect {report['average_effect']:+.4f}",
     )
@@ -540,11 +541,11 @@ def ranking_case(root: pathlib.Path) -> Row:
         "ranking",
         len(frame),
         "ndcg@10",
-        True,
-        result.evaluation["test_metrics"]["ndcg"],
-        base,
-        "pointwise boosting",
-        result.selected_model,
+        higher_is_better=True,
+        framework=result.evaluation["test_metrics"]["ndcg"],
+        baseline=base,
+        baseline_name="pointwise boosting",
+        selected=result.selected_model,
         note=f"{frame['query'].nunique()} queries, 136 features",
     )
 
@@ -597,11 +598,11 @@ def streaming_case(root: pathlib.Path) -> Row:
         "streamed",
         len(frame),
         "accuracy on all locked rows",
-        True,
-        streamed["metrics"]["accuracy"],
-        base,
-        "boosting on every development row",
-        result.selected_model,
+        higher_is_better=True,
+        framework=streamed["metrics"]["accuracy"],
+        baseline=base,
+        baseline_name="boosting on every development row",
+        selected=result.selected_model,
         note=f"{streamed['rows']} locked rows scored by streaming; "
         f"{result.evaluation['n_dev']} development rows in memory",
     )
@@ -651,11 +652,11 @@ def text_case(root: pathlib.Path) -> Row:
         "text",
         len(frame),
         "roc_auc",
-        True,
-        runs["embedding"].evaluation["test_metrics"]["roc_auc"],
-        runs["tfidf"].evaluation["test_metrics"]["roc_auc"],
-        "TF-IDF terms",
-        runs["embedding"].selected_model,
+        higher_is_better=True,
+        framework=runs["embedding"].evaluation["test_metrics"]["roc_auc"],
+        baseline=runs["tfidf"].evaluation["test_metrics"]["roc_auc"],
+        baseline_name="TF-IDF terms",
+        selected=runs["embedding"].selected_model,
         note="same framework run with the text encoder switched",
     )
 
@@ -732,7 +733,9 @@ def build_cases(root: pathlib.Path) -> dict[str, Callable[[], Row]]:
             "PBC liver (418)",
             rdataset("survival/pbc.csv")
             .drop(columns=["id"])
-            .assign(status=lambda f: (f.status == 2).astype(int)),
+            .assign(
+                status=lambda f: (f.status == PBC_DEATH_STATUS).astype(int)
+            ),
             "time",
             "status",
             r("pbc"),
@@ -822,9 +825,10 @@ def criteo() -> pandas.DataFrame:
             "https://huggingface.co/datasets/criteo/criteo-uplift/resolve/"
             "main/criteo-research-uplift-v2.1.csv.gz"
         )
-        parts = []
-        for chunk in pandas.read_csv(url, chunksize=1_000_000):
-            parts.append(chunk.sample(frac=0.03, random_state=0))
+        parts = [
+            chunk.sample(frac=0.03, random_state=0)
+            for chunk in pandas.read_csv(url, chunksize=1_000_000)
+        ]
         return pandas.concat(parts, ignore_index=True).drop(
             columns=["conversion", "exposure"]
         )
@@ -842,8 +846,10 @@ def format_table(rows: list[Row]) -> str:
         The table text; a failed row shows only its name, task and `ERROR`.
     """
     lines = [
-        "| dataset | task | rows | metric | framework | baseline | "
-        "baseline is | verdict | selected |",
+        (
+            "| dataset | task | rows | metric | framework | baseline | "
+            "baseline is | verdict | selected |"
+        ),
         "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for row in rows:
@@ -883,7 +889,7 @@ def main(argv: list[str] | None = None) -> int:
         level=logging.WARNING, format="%(message)s", stream=sys.stdout
     )
     LOGGER.setLevel(logging.INFO)
-    global BUDGET
+    global BUDGET  # noqa: PLW0603 -- a module setting the command line sets once, before any case runs
     BUDGET = args.budget
     rows: list[Row] = []
     with tempfile.TemporaryDirectory() as scratch:
@@ -895,9 +901,9 @@ def main(argv: list[str] | None = None) -> int:
             started = time.monotonic()
             try:
                 row = case()
-            except Exception:  # Report every case, even when one fails.
+            except Exception:  # noqa: BLE001 -- report every case, even when one fails
                 row = Row(name, "?", error=traceback.format_exc(limit=5))
-                LOGGER.error("%s failed:\n%s", name, row.error)
+                LOGGER.error("%s failed:\n%s", name, row.error)  # noqa: TRY400 -- row.error already holds the limited traceback
             row.seconds = time.monotonic() - started
             rows.append(row)
             LOGGER.info("%s", format_table([row]).splitlines()[-1])

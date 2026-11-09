@@ -26,6 +26,8 @@ from scmle.core import limits
 LOGGER = logging.getLogger(__name__)
 
 HIGHER_IS_BETTER = {"roc_auc", "pr_auc", "r2", "accuracy"}
+# fewest seeds for which the advantage has an interval
+MINIMUM_SEEDS = 2
 
 
 @dataclasses.dataclass
@@ -174,7 +176,7 @@ def run_one(
             "high": high,
             "verdict": intervals.verdict(low, high, seeds),
         }
-    except Exception:  # Report every dataset, even when one fails.
+    except Exception:  # noqa: BLE001 -- report every dataset, even when one fails
         record.status = "error"
         record.error = traceback.format_exc(limit=4)
     finally:
@@ -231,7 +233,7 @@ def describe_advantage(record: BenchmarkRecord) -> str:
         the interval as `[low, high]`.
     """
     found = record.advantage
-    if record.seeds < 2:
+    if record.seeds < MINIMUM_SEEDS:
         return f"{found['mean']:+.4f}"
     return f"{found['mean']:+.4f} [{found['low']:+.4f}, {found['high']:+.4f}]"
 

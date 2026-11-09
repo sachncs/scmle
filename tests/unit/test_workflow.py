@@ -337,7 +337,7 @@ def test_a_crashed_executor_is_taken_over_after_its_lease(store):
     executor = executor_for(store, flow, recorder, clock, lease_seconds=300.0)
 
     def dies(context):
-        raise support_runners.Killed()
+        raise support_runners.Killed
 
     recorder.behaviour["train"] = dies
     with pytest.raises(support_runners.Killed):

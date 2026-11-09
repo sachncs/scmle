@@ -116,7 +116,7 @@ def test_asof_world_is_clean_and_overwrites_are_found_exactly():
     rows, log = f4_certify.asof_world(0)
     detect = f4_certify.asof_detector(log)
     assert not detect(rows).any()
-    plan = f4_certify.overwrite_plan(rows)
+    plan = f4_certify.overwrite_plan()
     planted = plan.plant(rows, 0)
     flags = detect(planted.frame)
     assert flags.sum() == planted.row_mask.sum() > 0

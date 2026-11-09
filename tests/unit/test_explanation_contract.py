@@ -119,7 +119,9 @@ def test_required_fields_cannot_be_silent_or_empty(field: str, value: object):
 
 def test_naive_timestamp_is_rejected():
     with pytest.raises(pydantic.ValidationError, match="timezone"):
-        build_evidence(timestamp=datetime.datetime(2026, 10, 20, 10, 30))
+        build_evidence(
+            timestamp=datetime.datetime(2026, 10, 20, 10, 30)  # noqa: DTZ001 -- the test needs a naive timestamp
+        )
 
 
 @pytest.mark.parametrize(

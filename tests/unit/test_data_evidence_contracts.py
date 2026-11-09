@@ -200,7 +200,7 @@ def test_dataset_profile_rejects_non_json_quality_evidence():
 
 @pytest.mark.parametrize(
     ("field", "value", "message"),
-    (
+    [
         ("dataset_id", "", "dataset_id"),
         ("schema_hash", "", "schema_hash"),
         ("data_hash", "", "data_hash"),
@@ -208,7 +208,7 @@ def test_dataset_profile_rejects_non_json_quality_evidence():
         ("row_count", -1, "row_count"),
         ("column_count", -1, "column_count"),
         ("schema_version", 0, "schema_version"),
-    ),
+    ],
 )
 def test_dataset_manifest_rejects_invalid_identity(field, value, message):
     """Dataset identity cannot be persisted with incomplete metadata."""

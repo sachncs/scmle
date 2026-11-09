@@ -193,7 +193,7 @@ def test_capability_reports_existing_metadata_representation():
 
 
 @pytest.mark.parametrize(
-    "factory,representation",
+    ("factory", "representation"),
     [
         (image_adapter, "decoded_resized_rgb_pixels"),
         (audio_adapter, "bounded_decoded_wav_signal_statistics"),

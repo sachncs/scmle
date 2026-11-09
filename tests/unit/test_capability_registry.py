@@ -225,7 +225,7 @@ def test_transformer_and_jepa_family_statuses_are_explicit():
 
 @pytest.mark.parametrize(
     ("model_family", "modality"),
-    (
+    [
         (capabilities.ModelFamily.JEPA.value, capabilities.Modality.IMAGE),
         (
             capabilities.ModelFamily.TRANSFORMER.value,
@@ -235,7 +235,7 @@ def test_transformer_and_jepa_family_statuses_are_explicit():
             capabilities.ModelFamily.MULTIMODAL_TRANSFORMER.value,
             capabilities.Modality.GRAPH,
         ),
-    ),
+    ],
 )
 def test_unsupported_family_modality_reports_structured_diagnostic(
     model_family, modality

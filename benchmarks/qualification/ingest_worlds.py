@@ -26,6 +26,18 @@ from scmle.data.readers import connectors
 
 DEV_SEED_BASE = 10_000
 URI = "sqlite://ingest/world"
+# share of rows that arrive late
+LATE_SHARE = 0.2
+# share of rows whose event time is backfilled
+BACKFILL_SHARE = 0.05
+# chance that the fact table links to a given parent
+PARENT_LINK_SHARE = 0.8
+# shortest text that can receive a typo
+MINIMUM_TYPO_LENGTH = 4
+# chance that an entity has a second, duplicated record
+SECOND_COPY_SHARE = 0.5
+# chance that a duplicated record has no date of birth
+BLANK_DOB_SHARE = 0.1
 
 
 @dataclasses.dataclass
@@ -337,9 +349,9 @@ def late_world(seed: int) -> LateWorld:
     rows = int(rng.integers(100, 300))
     event = rng.uniform(0, 100, rows).round(1)
     delay = rng.exponential(1.0, rows)
-    late = rng.random(rows) < 0.2
+    late = rng.random(rows) < LATE_SHARE
     delay[late] += rng.uniform(5, 60, int(late.sum()))
-    backfill = rng.random(rows) < 0.05
+    backfill = rng.random(rows) < BACKFILL_SHARE
     event[backfill] = rng.uniform(0, 30, int(backfill.sum())).round(1)
     delay[backfill] = rng.uniform(40, 120, int(backfill.sum()))
     child = pandas.DataFrame(
@@ -377,12 +389,11 @@ def expected_verdict(unit: str, shape: str) -> str:
     return "match" if shape == "customer_months" else "finer"
 
 
-def grain_world(seed: int, unit: str, shape: str) -> tuple[Database, str]:
-    """A table whose grain is `shape`, with decoy columns, for a unit text.
+def grain_world(seed: int, shape: str) -> tuple[Database, str]:
+    """A table whose grain is `shape`, with decoy columns.
 
     Args:
         seed: Run seed.
-        unit: The intended unit of analysis; it does not change the table.
         shape: One of `SHAPES`, the grain to build.
 
     Returns:
@@ -463,7 +474,7 @@ def surrogate_world(seed: int) -> JoinWorld:
     fact = int(rng.integers(150, 400))
     frame = pandas.DataFrame({"id": numpy.arange(1, fact + 1)})
     for parent in ("customer", "product", "store"):
-        if rng.random() < 0.8:
+        if rng.random() < PARENT_LINK_SHARE:
             frame[f"{parent}_id"] = rng.integers(1, sizes[parent] + 1, fact)
             truth.add(("fact", f"{parent}_id", parent))
     frame["user_id"] = rng.integers(
@@ -558,7 +569,7 @@ def typo(text: str, rng: numpy.random.Generator, rate: float) -> str:
         The text, changed in one inner character with that probability
         and unchanged otherwise or when shorter than four characters.
     """
-    if len(text) < 4 or rng.random() >= rate:
+    if len(text) < MINIMUM_TYPO_LENGTH or rng.random() >= rate:
         return text
     k = int(rng.integers(1, len(text) - 1))
     choice = int(rng.integers(0, 3))
@@ -595,14 +606,14 @@ def er_world(seed: int, entities: int = 300) -> pandas.DataFrame:
         )
         dob = f"{year}-{month:02d}-{day:02d}"
         addr = f"{rng.integers(1, 999)} {rng.choice(LAST)} street"
-        for copy in range(1 + int(rng.random() < 0.5)):
+        for copy in range(1 + int(rng.random() < SECOND_COPY_SHARE)):
             del copy
             rows.append(
                 (
                     entity,
                     typo(first, rng, 0.3),
                     typo(last, rng, 0.3),
-                    dob if rng.random() > 0.1 else "",
+                    dob if rng.random() > BLANK_DOB_SHARE else "",
                     typo(addr, rng, 0.3),
                 )
             )

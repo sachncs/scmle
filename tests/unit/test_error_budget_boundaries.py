@@ -364,7 +364,7 @@ def test_confirmation_alpha_never_exceeds_alpha_and_shrinks_with_survivors():
     for rule in scmle.data.ledger.budget.Correction:
         levels = [
             scmle.data.ledger.budget.confirmation_alpha(budget, n, rule)
-            for n in range(0, 12)
+            for n in range(12)
         ]
         assert levels[0] == 0.05
         assert all(0 < x <= 0.05 for x in levels)

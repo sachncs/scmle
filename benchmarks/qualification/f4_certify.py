@@ -334,11 +334,8 @@ def asof_detector(log: pandas.DataFrame) -> certify.Detector:
     return detect
 
 
-def overwrite_plan(rows: pandas.DataFrame) -> certify.DefectPlan:
+def overwrite_plan() -> certify.DefectPlan:
     """Plants overwrites by replacing stored values with the latest one.
-
-    Args:
-        rows: The clean rows (unused; the plant reads the frame it is given).
 
     Returns:
         The plan for the as-of reconstruction defect.
@@ -380,7 +377,7 @@ def certify_asof() -> certificates.Certification:
         asof_detector(log),
         certificates.code_hash(asof),
         rows,
-        [overwrite_plan(rows)],
+        [overwrite_plan()],
         SEEDS,
         LEAK_POLICY,
     )
@@ -548,9 +545,9 @@ def audit_labels(store: certificates.Store) -> dict[str, list[str]]:
             report = certificates.audit(
                 store, {detector: (digests[detector], defect)}
             )
-            for label in found:
+            for label, entries in found.items():
                 if getattr(report, label):
-                    found[label].append(f"{detector}/{defect}")
+                    entries.append(f"{detector}/{defect}")
     return found
 
 

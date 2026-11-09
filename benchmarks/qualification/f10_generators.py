@@ -20,6 +20,14 @@ import numpy
 import pandas
 
 COVARIATES = 5
+# minimum propensity at which treatment is a fair coin and nothing is planted
+BALANCED_PROPENSITY = 0.5
+# share of rows in the north region
+NORTH_SHARE = 0.5
+# share of rows treated in the randomized world
+TREATED_SHARE = 0.5
+# lower edge of the window whose units can move above the cutoff
+SORTING_LOWER_EDGE = -0.2
 
 
 def covariates(rng: numpy.random.Generator, n: int) -> numpy.ndarray:
@@ -92,7 +100,11 @@ def backdoor(
     """
     x = covariates(rng, n)
     u = rng.standard_normal(n)
-    strength = math.log((1 - p_min) / p_min) / 2 if p_min < 0.5 else 0.0
+    strength = (
+        math.log((1 - p_min) / p_min) / 2
+        if p_min < BALANCED_PROPENSITY
+        else 0.0
+    )
     logit = strength * numpy.clip(x[:, 0], -2, 2) + 0.3 * x[:, 1] + hidden_d * u
     t = (rng.uniform(size=n) < 1 / (1 + numpy.exp(-logit))).astype(float)
     base = outcome_surface(x, nonlinear)
@@ -101,7 +113,7 @@ def backdoor(
     nco = base + shared * u + rng.standard_normal(n)
     frame = pandas.DataFrame(x, columns=[f"x{j}" for j in range(COVARIATES)])
     frame["t"], frame["y"], frame["nco"] = t, y, nco
-    frame["region"] = numpy.where(rng.uniform(size=n) < 0.5, "n", "s")
+    frame["region"] = numpy.where(rng.uniform(size=n) < NORTH_SHARE, "n", "s")
     return frame
 
 
@@ -120,8 +132,8 @@ def randomized(
         and outcome `y`.
     """
     x = covariates(rng, n)
-    t = (rng.uniform(size=n) < 0.5).astype(float)
-    y = tau * t + outcome_surface(x, False) + rng.standard_normal(n)
+    t = (rng.uniform(size=n) < TREATED_SHARE).astype(float)
+    y = tau * t + outcome_surface(x, nonlinear=False) + rng.standard_normal(n)
     frame = pandas.DataFrame(x, columns=[f"x{j}" for j in range(COVARIATES)])
     frame["t"], frame["y"] = t, y
     return frame
@@ -227,7 +239,9 @@ def discontinuity(
     """
     x = rng.uniform(-1, 1, n)
     if sorting:
-        move = (x < 0) & (x > -0.2) & (rng.uniform(size=n) < sorting)
+        move = (
+            (x < 0) & (x > SORTING_LOWER_EDGE) & (rng.uniform(size=n) < sorting)
+        )
         x = numpy.where(move, -x, x)
     y = 2 * x + x**2 + tau * (x >= 0) + rng.normal(scale=0.5, size=n)
     z = 0.5 * x + jump * (x >= 0) + rng.normal(scale=0.3, size=n)

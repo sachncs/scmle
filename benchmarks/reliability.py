@@ -53,6 +53,12 @@ LOGGER = logging.getLogger(__name__)
 SIGNING_KEY = "reliability-benchmark-key"
 NOISE_SEEDS = (0, 1, 2, 3, 4)
 CRASH_ROWS = 200
+# largest AUC difference between two identical runs
+SCORE_TOLERANCE = 1e-9
+# largest mean AUC gap from chance on noise labels
+MEAN_GAP_CEILING = 0.08
+# largest single AUC gap from chance on noise labels
+WORST_GAP_CEILING = 0.15
 
 
 class CrashingClassifier(base.ClassifierMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
@@ -237,7 +243,7 @@ def check_determinism(directory: pathlib.Path) -> CheckRecord:
     }
     record.passed = (
         runs[0].selected_model == runs[1].selected_model
-        and record.measured["score_difference"] <= 1e-9
+        and record.measured["score_difference"] <= SCORE_TOLERANCE
     )
     return record
 
@@ -297,7 +303,10 @@ def check_no_false_skill(directory: pathlib.Path) -> CheckRecord:
         ).run()
         gaps.append(abs(result.evaluation["test_metrics"]["roc_auc"] - 0.5))
     record.measured = {"mean_gap": float(numpy.mean(gaps)), "worst": max(gaps)}
-    record.passed = record.measured["mean_gap"] <= 0.08 and max(gaps) <= 0.15
+    record.passed = (
+        record.measured["mean_gap"] <= MEAN_GAP_CEILING
+        and max(gaps) <= WORST_GAP_CEILING
+    )
     return record
 
 
@@ -560,7 +569,7 @@ def run_check(name: str) -> CheckRecord:
     with tempfile.TemporaryDirectory() as scratch:
         try:
             record = CHECKS[name](pathlib.Path(scratch))
-        except Exception:
+        except Exception:  # noqa: BLE001 -- a check that raises becomes a failed record
             record = CheckRecord(name, CHECKS[name].__doc__ or "")
             record.error = traceback.format_exc()
     record.seconds = round(time.perf_counter() - started, 2)

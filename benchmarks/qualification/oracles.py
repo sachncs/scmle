@@ -181,6 +181,91 @@ def is_number(value: Any) -> bool:
     return isinstance(value, int | float) and not isinstance(value, bool)
 
 
+def mapping_differences(
+    actual: Any,
+    expected: Mapping[str, Any],
+    rel_tol: float,
+    abs_tol: float,
+    path: str,
+) -> list[tuple[str, str, float]]:
+    """Disagreements between two mappings, key by key.
+
+    Args:
+        actual: Value from our code.
+        expected: Reference mapping.
+        rel_tol: Relative tolerance.
+        abs_tol: Absolute tolerance.
+        path: Location of this value, used to label disagreements.
+
+    Returns:
+        One tuple per disagreement, or a single one when the keys differ.
+    """
+    if not isinstance(actual, Mapping) or set(actual) != set(expected):
+        return [(path, "keys differ", math.inf)]
+    found: list[tuple[str, str, float]] = []
+    for key in sorted(expected):
+        found += differences(
+            actual[key], expected[key], rel_tol, abs_tol, f"{path}.{key}"
+        )
+    return found
+
+
+def sequence_differences(
+    actual: Any,
+    expected: list | tuple,
+    rel_tol: float,
+    abs_tol: float,
+    path: str,
+) -> list[tuple[str, str, float]]:
+    """Disagreements between two sequences, item by item.
+
+    Args:
+        actual: Value from our code.
+        expected: Reference sequence.
+        rel_tol: Relative tolerance.
+        abs_tol: Absolute tolerance.
+        path: Location of this value, used to label disagreements.
+
+    Returns:
+        One tuple per disagreement, or a single one when the lengths differ.
+    """
+    if not isinstance(actual, list | tuple) or len(actual) != len(expected):
+        return [(path, "shape differs", math.inf)]
+    found: list[tuple[str, str, float]] = []
+    for position, (a, e) in enumerate(zip(actual, expected, strict=True)):
+        found += differences(a, e, rel_tol, abs_tol, f"{path}[{position}]")
+    return found
+
+
+def number_differences(
+    a: float, e: float, rel_tol: float, abs_tol: float, path: str
+) -> list[tuple[str, str, float]]:
+    """Disagreement between two numbers.
+
+    Args:
+        a: Value from our code.
+        e: Reference value.
+        rel_tol: Relative tolerance.
+        abs_tol: Absolute tolerance.
+        path: Location of this value, used to label the disagreement.
+
+    Returns:
+        Empty when they agree (NaN equals NaN, infinities must be equal);
+        otherwise one tuple with the relative error.
+    """
+    if math.isnan(a) or math.isnan(e):
+        return (
+            [] if math.isnan(a) and math.isnan(e) else [(path, "nan", math.inf)]
+        )
+    if math.isinf(a) or math.isinf(e):
+        return [] if a == e else [(path, "infinity differs", math.inf)]
+    gap = abs(a - e)
+    if gap <= rel_tol * abs(e) + abs_tol:
+        return []
+    error = gap / abs(e) if e != 0.0 else math.inf
+    return [(path, f"{a!r} vs {e!r}", error)]
+
+
 def differences(
     actual: Any,
     expected: Any,
@@ -205,35 +290,14 @@ def differences(
         (infinite for structural or non-numeric differences).
     """
     if isinstance(expected, Mapping):
-        if not isinstance(actual, Mapping) or set(actual) != set(expected):
-            return [(path, "keys differ", math.inf)]
-        found: list[tuple[str, str, float]] = []
-        for key in sorted(expected):
-            found += differences(
-                actual[key], expected[key], rel_tol, abs_tol, f"{path}.{key}"
-            )
-        return found
+        return mapping_differences(actual, expected, rel_tol, abs_tol, path)
     if isinstance(expected, list | tuple):
-        if not isinstance(actual, list | tuple) or len(actual) != len(expected):
-            return [(path, "shape differs", math.inf)]
-        found = []
-        for position, (a, e) in enumerate(zip(actual, expected, strict=True)):
-            found += differences(a, e, rel_tol, abs_tol, f"{path}[{position}]")
-        return found
+        return sequence_differences(actual, expected, rel_tol, abs_tol, path)
     if not is_number(actual) or not is_number(expected):
         return [] if actual == expected else [(path, "values differ", math.inf)]
-    a, e = float(actual), float(expected)
-    if math.isnan(a) or math.isnan(e):
-        return (
-            [] if math.isnan(a) and math.isnan(e) else [(path, "nan", math.inf)]
-        )
-    if math.isinf(a) or math.isinf(e):
-        return [] if a == e else [(path, "infinity differs", math.inf)]
-    gap = abs(a - e)
-    if gap <= rel_tol * abs(e) + abs_tol:
-        return []
-    error = gap / abs(e) if e != 0.0 else math.inf
-    return [(path, f"{a!r} vs {e!r}", error)]
+    return number_differences(
+        float(actual), float(expected), rel_tol, abs_tol, path
+    )
 
 
 def assert_agrees(

@@ -77,7 +77,7 @@ def label_detector(frame: pandas.DataFrame) -> pandas.Series:
     report = labels.detect(
         frame.drop(columns=[standins.TARGET]), frame[standins.TARGET], 0
     )
-    flags = pandas.Series(False, index=frame.index)
+    flags = pandas.Series(data=False, index=frame.index)
     flags.iloc[list(report.suspects)] = True
     return flags
 
@@ -384,9 +384,11 @@ def gating(
     registered = []
     for detector_id, spec in registry.SPECS.items():
         digest = spec.code_hash()
-        for item in store.current(detector_id, digest):
-            for defect in item.certified_defect_types:
-                registered.append((detector_id, digest, defect))
+        registered.extend(
+            (detector_id, digest, defect)
+            for item in store.current(detector_id, digest)
+            for defect in item.certified_defect_types
+        )
     return registered
 
 

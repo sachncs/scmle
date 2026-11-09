@@ -5,12 +5,15 @@ Everything is a plain Python loop. Times are floats measured in days.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from collections.abc import Sequence
 import math
 from typing import Any
+from typing import TYPE_CHECKING
 
-import pandas
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+    from collections.abc import Sequence
+
+    import pandas
 
 PRIMITIVES = (
     "count",
@@ -26,6 +29,7 @@ PRIMITIVES = (
 )
 
 NAN = float("nan")
+MINIMUM_OBSERVATIONS = 2
 
 
 def is_missing(value: Any) -> bool:
@@ -41,7 +45,7 @@ def is_missing(value: Any) -> bool:
     if value is None:
         return True
     try:
-        return bool(value != value)
+        return bool(value != value)  # noqa: PLR0124 -- NaN is the only value unequal to itself
     except (TypeError, ValueError):
         return False
 
@@ -55,10 +59,9 @@ def records(frame: pandas.DataFrame) -> list[Mapping[str, Any]]:
     Returns:
         One dict per row, with column names converted to text.
     """
-    out: list[Mapping[str, Any]] = []
-    for rec in frame.to_dict("records"):
-        out.append({str(k): v for k, v in rec.items()})
-    return out
+    return [
+        {str(k): v for k, v in rec.items()} for rec in frame.to_dict("records")
+    ]
 
 
 def known_time(
@@ -127,6 +130,138 @@ def scope_rows(
     return out
 
 
+def sequential_sum(values: Sequence[float]) -> float:
+    """Adds the values one by one, left to right, from 0.0.
+
+    Args:
+        values: The numbers.
+
+    Returns:
+        The running total (no compensated summation).
+    """
+    total = 0.0
+    for v in values:
+        total += v
+    return total
+
+
+def last_by_time(
+    valid: Sequence[Mapping[str, Any]],
+    vals: Sequence[float],
+    event_col: str,
+    known_col: str | None,
+    delta_rec_days: float,
+) -> float:
+    """The value of the row with the latest (event, known) time pair.
+
+    Args:
+        valid: Rows with a value, in table order.
+        vals: The values of those rows.
+        event_col: Event time column.
+        known_col: Known time column, or None.
+        delta_rec_days: Recording delay fallback.
+
+    Returns:
+        The value of the latest row; a later row wins a tie.
+    """
+    best = 0
+    for i in range(1, len(vals)):
+        cand = (
+            float(valid[i][event_col]),
+            known_time(valid[i], event_col, known_col, delta_rec_days),
+        )
+        cur = (
+            float(valid[best][event_col]),
+            known_time(valid[best], event_col, known_col, delta_rec_days),
+        )
+        if cand >= cur:
+            best = i
+    return vals[best]
+
+
+def moment_primitive(
+    name: str,
+    valid: Sequence[Mapping[str, Any]],
+    vals: Sequence[float],
+    event_col: str,
+) -> float:
+    """The mean, standard deviation or slope of at least one value.
+
+    Args:
+        name: One of `mean`, `std` or `slope`.
+        valid: Rows with a value, in table order.
+        vals: The values of those rows (not empty).
+        event_col: Event time column, the abscissa of the slope.
+
+    Returns:
+        The statistic; NaN for a spread or slope of fewer than two values
+        or of a slope with no variation in time.
+    """
+    n = len(vals)
+    mean = sequential_sum(vals) / n
+    if name == "mean":
+        return mean
+    if n < MINIMUM_OBSERVATIONS:
+        return NAN
+    if name == "std":
+        ss = 0.0
+        for v in vals:
+            ss += (v - mean) ** 2
+        return math.sqrt(ss / (n - 1))
+    xs = [float(row[event_col]) for row in valid]
+    xbar = sequential_sum(xs) / n
+    sxx = 0.0
+    sxy = 0.0
+    for i in range(n):
+        sxx += (xs[i] - xbar) ** 2
+        sxy += (xs[i] - xbar) * (vals[i] - mean)
+    if sxx == 0.0:
+        return NAN
+    return sxy / sxx
+
+
+def column_primitive(
+    name: str,
+    valid: Sequence[Mapping[str, Any]],
+    vals: Sequence[float],
+    event_col: str,
+    known_col: str | None,
+    delta_rec_days: float,
+) -> float:
+    """Applies a primitive that reads the value column.
+
+    Args:
+        name: One of ``PRIMITIVES`` other than `count` and `time_since_last`.
+        valid: Rows with a value, in table order.
+        vals: The values of those rows.
+        event_col: Event time column.
+        known_col: Known time column, or None.
+        delta_rec_days: Recording delay fallback.
+
+    Returns:
+        The primitive value; NaN when there is no value (except for `sum`,
+        0.0, and `nunique`, 0.0).
+    """
+    if name == "sum":
+        return sequential_sum(vals)
+    if name == "nunique":
+        seen: list[float] = []
+        for v in vals:
+            if v not in seen:
+                seen.append(v)
+        return float(len(seen))
+    if not vals:
+        return NAN
+    if name in ("min", "max"):
+        best = vals[0]
+        for v in vals:
+            best = min(best, v) if name == "min" else max(best, v)
+        return best
+    if name == "last":
+        return last_by_time(valid, vals, event_col, known_col, delta_rec_days)
+    return moment_primitive(name, valid, vals, event_col)
+
+
 def primitive(
     name: str,
     rows: Sequence[Mapping[str, Any]],
@@ -164,83 +299,19 @@ def primitive(
         for row in rows:
             latest = max(latest, float(row[event_col]))
         return cutoff - latest
-    valid: list[Mapping[str, Any]] = []
-    for row in rows:
-        if value_col is not None and not is_missing(row.get(value_col)):
-            valid.append(row)
-    vals: list[float] = []
-    if value_col is not None:
-        for row in valid:
-            vals.append(float(row[value_col]))
-    n = len(vals)
-    if name == "sum":
-        total = 0.0
-        for v in vals:
-            total += v
-        return total
-    if name == "nunique":
-        seen: list[float] = []
-        for v in vals:
-            if v not in seen:
-                seen.append(v)
-        return float(len(seen))
-    if n == 0:
-        return NAN
-    if name == "min":
-        low = vals[0]
-        for v in vals:
-            if v < low:
-                low = v
-        return low
-    if name == "max":
-        high = vals[0]
-        for v in vals:
-            if v > high:
-                high = v
-        return high
-    if name == "last":
-        best = 0
-        for i in range(1, n):
-            cand = (
-                float(valid[i][event_col]),
-                known_time(valid[i], event_col, known_col, delta_rec_days),
-            )
-            cur = (
-                float(valid[best][event_col]),
-                known_time(valid[best], event_col, known_col, delta_rec_days),
-            )
-            if cand >= cur:
-                best = i
-        return vals[best]
-    total = 0.0
-    for v in vals:
-        total += v
-    mean = total / n
-    if name == "mean":
-        return mean
-    if name == "std":
-        if n < 2:
-            return NAN
-        ss = 0.0
-        for v in vals:
-            ss += (v - mean) ** 2
-        return math.sqrt(ss / (n - 1))
-    # slope
-    if n < 2:
-        return NAN
-    xs = [float(row[event_col]) for row in valid]
-    xsum = 0.0
-    for x in xs:
-        xsum += x
-    xbar = xsum / n
-    sxx = 0.0
-    sxy = 0.0
-    for i in range(n):
-        sxx += (xs[i] - xbar) ** 2
-        sxy += (xs[i] - xbar) * (vals[i] - mean)
-    if sxx == 0.0:
-        return NAN
-    return sxy / sxx
+    valid = [
+        row
+        for row in rows
+        if value_col is not None and not is_missing(row.get(value_col))
+    ]
+    vals = (
+        [float(row[value_col]) for row in valid]
+        if value_col is not None
+        else []
+    )
+    return column_primitive(
+        name, valid, vals, event_col, known_col, delta_rec_days
+    )
 
 
 def aggregate_feature(

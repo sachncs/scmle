@@ -198,9 +198,9 @@ def rechain(path, key=None):
     for index, record in enumerate(lines):
         body = {k: v for k, v in record.items() if k not in ("hash", "mac")}
         body["seq"], body["prev"] = index, previous
-        record = {**body, "hash": sealed.entry_hash(body)}
-        previous = record["hash"]
-        out.append(json.dumps(record))
+        rewritten = {**body, "hash": sealed.entry_hash(body)}
+        previous = rewritten["hash"]
+        out.append(json.dumps(rewritten))
     path.write_text("\n".join(out) + "\n")
 
 

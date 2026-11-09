@@ -805,7 +805,7 @@ def run_worker(args: argparse.Namespace) -> int:
     started = time.monotonic()
     try:
         outcome = work(job, args.cpus)
-    except Exception:  # Every failure must become a record.
+    except Exception:  # noqa: BLE001 -- every failure must become a record
         outcome = Outcome(
             "failed",
             seconds=time.monotonic() - started,
@@ -865,7 +865,7 @@ def main(argv: list[str] | None = None) -> int:
             return run_worker(args)
         return run_all(args)
     except HoldoutRefusedError as error:
-        LOGGER.error("%s", error)
+        LOGGER.error("%s", error)  # noqa: TRY400 -- a refusal is a user error: the message alone is the report
         return 2
 
 

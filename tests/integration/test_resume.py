@@ -57,7 +57,7 @@ class CancellerAdapter(CountedAdapter):
 
 
 def read_events(run_dir):
-    with open(f"{run_dir}/events.jsonl") as handle:
+    with pathlib.Path(f"{run_dir}/events.jsonl").open() as handle:
         return [json.loads(line) for line in handle]
 
 

@@ -163,7 +163,9 @@ def test_verify_rows_passes_on_the_original_rows():
     rooted().verify_rows(table())
 
 
-@pytest.mark.parametrize("row,name", [(1, "exploration"), (4, "confirmation")])
+@pytest.mark.parametrize(
+    ("row", "name"), [(1, "exploration"), (4, "confirmation")]
+)
 def test_a_changed_value_inside_a_row_is_caught_though_ids_are_equal(row, name):
     manifest = rooted()
     edited = table()

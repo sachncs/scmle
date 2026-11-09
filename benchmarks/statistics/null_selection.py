@@ -237,18 +237,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--output", type=pathlib.Path, default=DEFAULT_OUTPUT)
     args = parser.parse_args(argv)
-    records = []
     with tempfile.TemporaryDirectory() as scratch:
-        for index in range(args.runs):
-            records.append(
-                one_run(
-                    index,
-                    args.rows,
-                    args.folds,
-                    args.seed,
-                    pathlib.Path(scratch) / f"run_{index}",
-                )
+        records = [
+            one_run(
+                index,
+                args.rows,
+                args.folds,
+                args.seed,
+                pathlib.Path(scratch) / f"run_{index}",
             )
+            for index in range(args.runs)
+        ]
     result = {
         "configuration": {
             "runs": args.runs,

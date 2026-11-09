@@ -67,7 +67,7 @@ def run_together(
         try:
             barrier.wait(timeout=30)
             results[index] = work(index)
-        except BaseException as error:  # Reported to the test, not lost.
+        except BaseException as error:  # noqa: BLE001 -- reported to the test, not lost
             with guard:
                 failures.append(error)
 
@@ -317,15 +317,13 @@ def test_concurrent_predict_on_one_bundle_matches_sequential(trained):
     want_proba = [bundle.predict_proba(batch) for batch in batches]
 
     def work(index):
-        out = []
-        for round_number in range(10):  # noqa: B007
-            out.append(
-                (
-                    bundle.predict(batches[index]),
-                    bundle.predict_proba(batches[index]),
-                )
+        return [
+            (
+                bundle.predict(batches[index]),
+                bundle.predict_proba(batches[index]),
             )
-        return out
+            for round_number in range(10)
+        ]
 
     outcomes, failures = run_together(THREADS, work)
 
@@ -711,7 +709,7 @@ def test_bundle_remember_does_not_lose_rows():
             return combined
 
     bundle.history = None
-    bundle.series_builder = lambda: Builder()
+    bundle.series_builder = Builder
     bundle.read_frame = lambda data: data
     bundle.history_lock = threading.RLock()
 

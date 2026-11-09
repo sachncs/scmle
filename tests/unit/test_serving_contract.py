@@ -132,7 +132,7 @@ def test_batch_serving_shares_the_online_path(
     report = parity.compare(
         expected,
         scored["prediction"].tolist(),
-        scored[["proba_0", "proba_1"]].values.tolist(),
+        scored[["proba_0", "proba_1"]].to_numpy().tolist(),
         golden.same_process,
     )
     assert report.passed, report.mismatches
@@ -516,7 +516,7 @@ def test_the_batch_command_scores_a_file_and_writes_a_manifest(
     report = parity.compare(
         expected,
         scored["prediction"].tolist(),
-        scored[["proba_0", "proba_1"]].values.tolist(),
+        scored[["proba_0", "proba_1"]].to_numpy().tolist(),
         golden.same_process,
     )
     assert report.passed, report.mismatches
