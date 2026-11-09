@@ -323,3 +323,8 @@ def test_a_lower_is_better_positive_label_metric_scores_sign_adjusted():
 
     assert scorer(fitted, features, target) <= 0
     assert metric.score(fitted, features, target, "a") >= 0
+
+
+def test_positive_label_needs_two_distinct_labels():
+    with pytest.raises(ValueError, match="two distinct labels"):
+        metrics.positive_label(pd.Series([1, 1, 1]), tasks.TaskType.BINARY)

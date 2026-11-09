@@ -41,7 +41,7 @@ def positive_label(target: pd.Series, task: tasks.TaskType) -> Any:
 
     Follows scikit-learn's convention: the second class in sorted order
     among the non-missing labels, which is `classes_[1]` of every fitted
-    classifier. Fewer than two distinct labels raise `IndexError`.
+    classifier.
 
     Args:
         target: Labels.
@@ -49,10 +49,19 @@ def positive_label(target: pd.Series, task: tasks.TaskType) -> Any:
 
     Returns:
         The positive class for a binary task, otherwise None.
+
+    Raises:
+        ValueError: If a binary target has fewer than two distinct labels.
     """
     if task is not BINARY:
         return None
-    return sorted(target.dropna().unique())[1]
+    labels = sorted(target.dropna().unique())
+    if len(labels) < 2:
+        raise ValueError(
+            "a binary target needs at least two distinct labels to name "
+            f"the positive class; found {len(labels)}"
+        )
+    return labels[1]
 
 
 DEFAULT_METRICS = (
