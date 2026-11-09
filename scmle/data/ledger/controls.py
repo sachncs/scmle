@@ -61,7 +61,7 @@ COUNT_FUNCTION = Callable[[pd.DataFrame, pd.Series], int]
 
 
 def quantile_index(b: int, q: float = QUANTILE) -> int:
-    """0-based index of the ``ceil(q * (B + 1))``-th smallest of `b` counts.
+    """Returns the 0-based index of the ``ceil(q * (B + 1))``-th smallest count.
 
     Using ``B + 1`` (the observed count plus the B re-runs) makes the gate a
     Monte Carlo test: if the observed count is exchangeable with the re-run
@@ -81,7 +81,7 @@ def quantile_index(b: int, q: float = QUANTILE) -> int:
 
 
 def percentile(counts: tuple[int, ...], q: float = QUANTILE) -> int:
-    """The conservative order-statistic percentile of discovery counts.
+    """Returns the conservative order-statistic percentile of the counts.
 
     It is the ``ceil(q * (B + 1))``-th smallest value (see `quantile_index`).
 
@@ -105,7 +105,7 @@ def percentile_interval(
     q: float = QUANTILE,
     confidence: float = INTERVAL_CONFIDENCE,
 ) -> tuple[int, int]:
-    """Approximate distribution-free interval for the q-quantile.
+    """Returns an approximate distribution-free interval for the q-quantile.
 
     Uses the binomial distribution of the number of draws below the quantile
     to pick two order statistics. With few repeats the interval is wide and
@@ -168,14 +168,16 @@ def permute_within(
 
 
 def block_labels(order: np.ndarray, block_size: int) -> np.ndarray:
-    """Labels that cut rows, ordered by `order`, into contiguous blocks.
+    """Builds labels that cut rows, ordered by `order`, into contiguous blocks.
 
     Args:
         order: Sort key per row (for example a timestamp or row position).
         block_size: Rows per block, at least 2.
 
     Returns:
-        An integer block label per row; ties in `order` keep row order.
+        An integer block label per row; ties in `order` keep row order. A
+        `block_size` that is not an integer of at least 2 raises a
+        `ValueError` from `qualification.count`.
     """
     qualification.count(block_size, "block_size", minimum=2)
     ranks = np.empty(len(order), dtype=int)
@@ -261,7 +263,9 @@ class ControlResult:
             record: A mapping with the fields written by `to_dict`.
 
         Returns:
-            The result described by the record.
+            The result described by the record. The fields are not
+            validated, `b`, `message` and the other derived entries are
+            ignored, and a missing key raises `KeyError`.
         """
         counts = tuple(int(c) for c in record["permuted"])
         low, high = record["p95_interval"]
@@ -294,7 +298,7 @@ def summarize(
 
     Raises:
         ValueError: If there are fewer re-runs than the minimum number of
-            permutations.
+            permutations, or `observed` is not a non-negative integer.
     """
     qualification.count(observed, "observed")
     if len(counts) < budget_module.MIN_PERMUTATIONS:
@@ -343,7 +347,8 @@ def permuted_target_control(
         component: Name of the random stream.
 
     Returns:
-        The control result.
+        The control result, of kind `permuted_target` and scope `global`
+        (no strata) or `strata`.
 
     Raises:
         ValueError: If `b` is below the minimum or `strata` has the wrong
@@ -375,7 +380,7 @@ def shuffle_columns(
 
     Args:
         features: The columns to shuffle.
-        rng: Random generator; advanced once per column.
+        rng: Random generator; advanced by each column's shuffle.
         strata: Label per row within which values are shuffled, or None for
             a global shuffle.
 
@@ -436,7 +441,7 @@ def resampling_control(
     blocks: np.ndarray | None = None,
     component: str = "ledger.control.resampling",
 ) -> ControlResult:
-    """Control for findings that do not use the target.
+    """Re-runs the exploration with the features shuffled, ignoring the target.
 
     Args:
         discoveries: Runs the whole exploration and returns the rejections.
@@ -453,10 +458,12 @@ def resampling_control(
         component: Name of the random stream.
 
     Returns:
-        The control result (kind `resampling`).
+        The control result (kind `resampling`); its scope is `blocks` in
+        `blocks` mode, otherwise `strata` or `global`.
 
     Raises:
-        ValueError: On an unknown mode or `blocks` mode without labels.
+        ValueError: On an unknown mode, `blocks` mode without labels, or
+            `b` below the minimum.
     """
     qualification.count(b, "b", minimum=budget_module.MIN_PERMUTATIONS)
     if mode not in ("columns", "blocks"):

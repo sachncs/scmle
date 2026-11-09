@@ -103,7 +103,7 @@ def encode_target(
 def plan_exploration(
     features: pd.DataFrame, kind: str, exclude: tuple[str, ...] = ()
 ) -> Plan:
-    """Chooses the hypotheses from the feature names and the target kind.
+    """Chooses the hypotheses from the feature columns and the target kind.
 
     Args:
         features: Exploration features.
@@ -111,8 +111,10 @@ def plan_exploration(
         exclude: Columns that are structure, not candidates (group, time).
 
     Returns:
-        The plan. Non-numeric features, all-missing and constant features are
-        listed in `skipped`: they are descriptive only.
+        The plan, with a Kruskal-Wallis hypothesis per usable feature for a
+        `multiclass` target and a Spearman one otherwise. Excluded,
+        non-numeric, all-missing and constant features are listed in
+        `skipped` and are not tested.
     """
     statistic = "kruskal" if kind == MULTICLASS else "spearman"
     specs = []

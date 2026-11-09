@@ -64,11 +64,12 @@ class GovernedRun:
 
         Returns:
             A JSON-ready mapping with the online rule name, the numbers of
-            hypotheses, tested and rejected hypotheses, skipped features and
-            confirmed claims, the confirmation outcome, the negative control
-            figures (exceeds, observed, 95th percentile, scope), the ledger
-            head, the survivors hash and the number of survivors withdrawn
-            by the second stage (None when there was no second stage).
+            hypotheses, tested hypotheses, hypotheses rejected on `X`,
+            skipped features and confirmed claims, the confirmation outcome,
+            the negative control figures (exceeds, observed, 95th
+            percentile, scope), the ledger head, the survivors hash and the
+            number of survivors withdrawn by the second stage (None when no
+            withdrawal was accounted).
         """
         results = self.ledger.results.values()
         return {
@@ -99,10 +100,13 @@ def strata_labels(
     time_column: str | None,
     blocks: int = DEFAULT_BLOCKS,
 ) -> np.ndarray | None:
-    """Labels within which the target may be permuted.
+    """Builds the labels within which the target may be permuted.
 
     Groups win over time: rows of one entity stay together. With only a time
-    column the rows are cut into `blocks` contiguous blocks in time order.
+    column the rows are cut, in time order, into contiguous blocks of
+    ``max(2, n // blocks)`` rows, so about `blocks` blocks (a few more when
+    the division leaves a remainder). A named column that is not among the
+    features is ignored.
     Blocks must be short against the timescale of the drift: on random-walk
     data 10 blocks let the control be exceeded in about 7.7% of null worlds
     and 20 blocks in about 3.7% (see `benchmarks.qualification.ledger_checks`).
@@ -116,7 +120,8 @@ def strata_labels(
         blocks: Number of contiguous time blocks.
 
     Returns:
-        One label per row, or None for exchangeable rows.
+        One label per row (the group as text, or an integer block number),
+        or None for exchangeable rows.
     """
     if group_column and group_column in features.columns:
         return features[group_column].astype(str).to_numpy()
@@ -194,7 +199,8 @@ def run_governed(
         confirmation_rule: Multiplicity rule for the confirmation.
         policy: Failure policy of the confirmation.
         diagnostics: (source, check) pairs from detectors run on `X`; they
-            are logged once, before exploration, and spend no wealth.
+            are logged once, before exploration, and spend no wealth (they
+            are skipped when the ledger already holds diagnostics).
         second_stage: Pre-registered withdrawal rule. It receives the
             survivors (rejected hypotheses, in order) after the negative
             control and must compute its answer from `X` alone; the closure
@@ -206,6 +212,9 @@ def run_governed(
 
     Returns:
         The governed run; artifacts are written when `run_dir` is given.
+        Errors from the steps it calls (a `ConfigError` for an unavailable
+        policy, a `LedgerError`, a `LeakageError` for a second confirmation)
+        propagate.
     """
     explored = explore_governed(
         charter=charter,
@@ -246,7 +255,7 @@ def explore_governed(
     ]
     | None = None,
 ) -> Explored:
-    """Everything of `run_governed` that precedes the opening of `C`.
+    """Runs the part of `run_governed` that precedes the opening of `C`.
 
     The arguments are those of `run_governed` without the confirmation ones.
     A caller that needs something computed after exploration (a selected
@@ -265,7 +274,8 @@ def explore_governed(
         policy: Failure policy of the confirmation; checked before anything
             else is done.
         diagnostics: (source, check) pairs from detectors run on `X`; they
-            are logged once, before exploration, and spend no wealth.
+            are logged once, before exploration, and spend no wealth (they
+            are skipped when the ledger already holds diagnostics).
         second_stage: Pre-registered withdrawal rule that receives the
             survivors and computes its answer from `X` alone, or None.
 
@@ -363,7 +373,10 @@ def confirm_explored(
 
     Returns:
         The governed run. When the exploration has a run directory, the
-        claims file and the negative control record are written there.
+        claims file and the negative control record are written there after
+        the confirmation returns; a second confirmation raises
+        `LeakageError` and writes nothing. A withdrawal that is not
+        accounted is not passed to the confirmation.
     """
     charter = explored.charter
     classification = explored.classification

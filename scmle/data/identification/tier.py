@@ -133,7 +133,9 @@ def decide(facts: TierInputs) -> TierDecision:
         was eligible; `unverified` when an assumption lacks a named
         attestor, a design diagnostic failed or a falsification test
         rejected; `confirmed` when all five conditions hold; otherwise
-        `attested`. The reasons list every shortfall.
+        `attested`. For `attested` the reasons list every shortfall; for
+        `unverified` they list only the failures that caused it; they are
+        empty for `confirmed`.
     """
     if not facts.identified:
         return TierDecision(

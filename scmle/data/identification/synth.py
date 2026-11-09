@@ -34,7 +34,7 @@ class SynthResult:
     Attributes:
         effect: Mean post-period gap (treated minus synthetic).
         gaps: Gap per post period.
-        weights: Donor to weight (non-zero weights only).
+        weights: Donor to weight (only weights above 1e-6 are kept).
         pre_rmspe: Pre-period root mean squared prediction error.
         post_rmspe: Post-period root mean squared gap.
         ratio: Post over pre RMSPE.
@@ -157,12 +157,17 @@ def estimate(
         alpha: The level the donor count must be able to reach.
 
     Returns:
-        The effect (mean post-period gap), the donor weights, the RMSPE
-        ratio, the placebo-in-space p-value and the placebo ratios.
+        The effect (mean post-period gap) and the gap per post period, the
+        donor weights, the pre and post RMSPE and their ratio, the
+        placebo-in-space p-value, the donor count with its smallest
+        attainable p-value, and the placebo ratios keyed by donor.
 
     Raises:
-        ValueError: If the panel is unbalanced, a period range is empty, or
-            fewer than `min_donors(alpha)` donors exist.
+        ValueError: If any outcome is missing after pivoting to one row per
+            period and one column per unit (or a unit-period pair is
+            repeated), the treated unit is absent, fewer than two periods
+            precede `first_treated` or none follow it, or fewer than
+            `min_donors(alpha)` donors exist.
     """
     wide = frame.pivot(index=time, columns=unit, values=outcome).sort_index()
     if wide.isna().any().any():

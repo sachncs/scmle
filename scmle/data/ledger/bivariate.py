@@ -111,7 +111,7 @@ def tail_probability(t_value: float, freedom: int, direction: str) -> float:
 def spearman(
     x: np.ndarray, y: np.ndarray, direction: str = TWO_SIDED
 ) -> Outcome:
-    """Spearman rank correlation with the t approximation.
+    """Tests a Spearman rank correlation with the t approximation.
 
     Args:
         x: Feature values.
@@ -119,10 +119,15 @@ def spearman(
         direction: `two-sided`, `greater` (rho > 0) or `less` (rho < 0).
 
     Returns:
-        The outcome; ``statistic`` and ``effect`` are both rho.
+        The outcome; ``statistic`` and ``effect`` are both rho. A pair with
+        fewer than three complete rows or a constant variable is
+        untestable (``p = 1``). When ``|rho| = 1`` the p-value is 0 for the
+        tail that rho points to (both tails for `two-sided`) and 1 for the
+        other.
 
     Raises:
-        ValueError: On an unknown direction or arrays of different shape.
+        ValueError: On an unknown direction, or arrays that differ in shape
+            or are not one-dimensional.
     """
     if direction not in DIRECTIONS:
         raise ValueError(f"direction must be one of {DIRECTIONS}")
@@ -151,7 +156,7 @@ def spearman(
 def kruskal(
     x: np.ndarray, labels: np.ndarray, direction: str = TWO_SIDED
 ) -> Outcome:
-    """Kruskal-Wallis H test of a feature across the classes of a target.
+    """Runs the Kruskal-Wallis H test of a feature across target classes.
 
     Args:
         x: Feature values.
@@ -160,9 +165,12 @@ def kruskal(
 
     Returns:
         The outcome; ``statistic`` is H and ``effect`` is ``H / (n - 1)``.
+        Fewer than two classes, fewer than three complete rows or a
+        constant feature is untestable (``p = 1``).
 
     Raises:
-        ValueError: If `direction` is not `two-sided`.
+        ValueError: If `direction` is not `two-sided`, or `x` and `labels`
+            differ in shape or are not one-dimensional.
     """
     if direction != TWO_SIDED:
         raise ValueError("kruskal supports only the two-sided alternative")
@@ -233,6 +241,8 @@ def run_statistic(
         direction: The alternative.
 
     Returns:
-        The outcome of the statistic on the given data.
+        The outcome of the statistic on the given data. An unknown
+        statistic name, or a direction the statistic rejects, raises a
+        `ValueError` from `lookup` or the statistic.
     """
     return lookup(statistic)(x, y, direction)

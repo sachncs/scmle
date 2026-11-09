@@ -210,8 +210,10 @@ def judge(
     Returns:
         The verdict: eligible only when the estimand matches, every needed
         assumption is attested, every needed design field is declared and,
-        for back-door adjustment, the DAG (when given) accepts the
-        adjustment set.
+        for back-door adjustment, no DAG failure is found: a supplied DAG
+        must accept the adjustment set, and a DAG the charter declares must
+        have been supplied. The back-door check runs only when nothing else
+        is missing.
     """
     reasons: list[str] = []
     if spec.estimand not in strategy.estimands:

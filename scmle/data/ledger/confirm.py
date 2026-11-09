@@ -152,7 +152,7 @@ class ConfirmationSource(Protocol):
             ledger_hash: Head hash of the ledger at the time of binding.
 
         Returns:
-            The digest that binds the release to the two hashes.
+            The binding digest computed from the two hashes.
         """
 
     def open(
@@ -226,7 +226,7 @@ class RegisteredClaim:
 
     Attributes:
         claim_id: Unique id (it must not collide with a hypothesis id).
-        kind: What it is (`baseline`, `causal_primary`).
+        kind: What it is (`baseline`, `causal_primary` or `coverage`).
         statement: The claim in words.
         sha256: Hash of the registration (what was frozen before `C`).
     """
@@ -364,11 +364,11 @@ class Confirmation:
         """Builds the JSON-ready record (``confirmed_claims.json``).
 
         Returns:
-            A mapping with the outcome and its reason, rule and its
-            guarantee statement, level, hashes, negative control, claims,
-            checks and a note;
-            ``stage_two``, ``registered_claims`` and ``attachments`` (a hash
-            per document) are present only when they apply.
+            A mapping with the outcome and its reason, the rule and its
+            guarantee statement, the level, the hashes, the negative
+            control, the claims, the checks and a note. ``stage_two``,
+            ``registered_claims`` and ``attachments`` (a hash per document)
+            are present only when they apply.
         """
         record = {
             "outcome": self.outcome,
@@ -403,10 +403,12 @@ class Confirmation:
         return record
 
     def write(self, path: str | Path) -> None:
-        """Writes ``confirmed_claims.json``.
+        """Writes the `to_dict` record as indented JSON.
 
         Args:
-            path: File to write; missing parent directories are created.
+            path: File to write (``confirmed_claims.json`` by convention);
+                missing parent directories are created and an existing
+                file is overwritten.
         """
         target = Path(path)
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -698,11 +700,14 @@ def run_confirmation(
         rule: Multiplicity rule.
         alpha: Confirmation level.
         encode: Target encoder.
-        stage_two: Accounting from `stage_two_record`; the family is then its
-            ``family`` and the withdrawn survivors get unverified claims.
+        stage_two: Accounting from `stage_two_record`; the survivors in its
+            ``withdrawn`` mapping are left out of the tested family and get
+            unverified claims instead.
 
     Returns:
-        Claims (in survivor order) and the checks on `C`.
+        One claim per frozen survivor, in survivor order (withdrawn ones
+        included), and the checks on `C`, which cover only the tested
+        family.
 
     Raises:
         LedgerError: If the survivors have not been frozen.
@@ -821,8 +826,9 @@ def confirm(
             `bonferroni`.
         policy: Failure policy, `unconfirmed` (default).
         require_control: Whether a missing negative control blocks promotion.
-        custody_log: Log that receives the `selection_frozen` event (the
-            sealed set's own log when omitted).
+        custody_log: Log that receives the `selection_frozen` event and, when
+            they occur, `denied` and `claims_failed` (the sealed set's own
+            log when omitted).
         encode: Turns the opened target into the floats the statistics read;
             it must code classes exactly as exploration did.
         withdrawal: Survivors an exploration-only rule removed from the
@@ -832,12 +838,18 @@ def confirm(
             same opening (module docstring, "Registered claims").
 
     Returns:
-        The confirmation, also recorded in the ledger.
+        The confirmation, also recorded in the ledger. Cases that stop
+        before testing (no survivors, no control, floor not exceeded, no
+        `C`, every survivor withdrawn) and any other failure while opening
+        or testing are returned with a matching outcome and unverified
+        claims, not raised.
 
     Raises:
         LeakageError: If the confirmation was already performed. The attempt
             is written to the custody log. A `LeakageError` from opening the
-            set is also propagated.
+            set is also propagated. A `LedgerError` from registering claims,
+            freezing the survivors or building the withdrawal accounting
+            (a withdrawn id that is not a survivor) is not caught either.
     """
     check_policy(policy)
     if ledger.confirmation is not None:
@@ -1079,7 +1091,7 @@ def family_block(
 
 
 def failure_reason(stage: str, failure: Exception) -> str:
-    """Words why the confirmation crashed, under the 'unconfirmed' policy.
+    """Phrases why the confirmation crashed, under the 'unconfirmed' policy.
 
     Args:
         stage: What was being done when it failed.

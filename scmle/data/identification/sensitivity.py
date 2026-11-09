@@ -164,7 +164,8 @@ def ols_fit(
 ) -> OlsFit:
     """Fits `Y ~ D + X` and the benchmark partial R-squareds.
 
-    Covariates must be numeric (encode categories first).
+    Covariates must be numeric (encode categories first). A singular
+    design matrix propagates numpy's `LinAlgError`.
 
     Args:
         frame: The data.
@@ -229,7 +230,9 @@ def robustness_value(
 
     Returns:
         The robustness value as a partial R-squared; 0.0 when `alpha` is
-        given and the estimate is not significant at that level.
+        given and `q * |t| / sqrt(dof)` does not exceed the critical t
+        value (on `dof - 1` degrees of freedom) over `sqrt(dof - 1)`, that
+        is, when the estimate is already not significant at that level.
     """
     f = abs(t) / math.sqrt(dof)
     fq = q * f
@@ -401,10 +404,14 @@ def assess(
         The report: robustness values, the assumed strengths and their
         bound, the adjusted interval, and whether it still excludes zero.
         When a multiple is infeasible for a covariate its strengths are
-        set to 0.999 and the gate fails.
+        set to 0.999 and the wording records it. A `fixed` strength above
+        0.999 is capped at 0.999 without that note. `rv_alpha` uses
+        `alpha = 1 - level`.
 
     Raises:
-        ValueError: If benchmarking is requested without covariates.
+        ValueError: If benchmarking is requested without covariates, if
+            too few residual degrees of freedom remain, or if a `fixed`
+            strength is negative.
     """
     fit = ols_fit(frame, treatment, outcome, covariates)
     chosen: str | None = None

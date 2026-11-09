@@ -70,7 +70,8 @@ def parse_fraction(text: Any, name: str) -> Fraction:
     """Parses a serialized fraction such as ``"1/20"``.
 
     Args:
-        text: The serialized fraction; any value is converted with `str`.
+        text: The serialized fraction (``"1/20"`` or a decimal such as
+            ``"0.05"``); any value is converted with `str`.
         name: Field name used in the error message.
 
     Returns:
@@ -175,7 +176,9 @@ class DetectorTolerance:
             record: A mapping holding exactly the fields of the class.
 
         Returns:
-            The tolerance described by the record.
+            The tolerance described by the record. A record with an unknown
+            or missing field, or with values the constructor refuses, raises
+            a `ValueError` from `require_fields` or the constructor.
         """
         qualification.require_fields(cls, record)
         return cls(**record)
@@ -415,11 +418,12 @@ def harmonic(n: int) -> float:
 def confirmation_alpha(
     budget: ErrorBudget, n_survivors: int, rule: MultiplicityRule
 ) -> float:
-    """Smallest per-hypothesis level the rule applies to `n_survivors`.
+    """Returns the smallest per-hypothesis level for `n_survivors`.
 
-    This is the level at which a lone hypothesis is certain to be rejected
-    (the rank-1 threshold of the step rule): `alpha / n` for Bonferroni, Holm
-    and Benjamini-Hochberg, and `alpha / (n * H_n)` for Benjamini-Yekutieli.
+    This is the rank-1 threshold of the step rule, so a hypothesis with a
+    p-value at or below it is rejected whatever the others are: `alpha / n`
+    for Bonferroni, Holm and Benjamini-Hochberg, and `alpha / (n * H_n)` for
+    Benjamini-Yekutieli.
     The full rank-dependent thresholds belong to the ledger. With no
     survivors there is nothing to correct and the whole level is returned.
 
@@ -432,7 +436,8 @@ def confirmation_alpha(
         A level in (0, alpha_confirm].
 
     Raises:
-        ValueError: If `n_survivors` is negative or `rule` is unknown.
+        ValueError: If `n_survivors` is not a non-negative integer or `rule`
+            is not a `MultiplicityRule`.
     """
     qualification.count(n_survivors, "n_survivors")
     if not isinstance(rule, MultiplicityRule):
@@ -536,7 +541,9 @@ class DecisionBudget:
                 None for the open-ended sequence.
 
         Returns:
-            A budget with no level assigned and no champion monitored.
+            A budget with no level assigned and no champion monitored. A
+            level outside (0, 1), a non-finite number or an invalid horizon
+            raises a `ValueError` from `exact` or the constructor.
         """
         return cls(
             alpha_promote=exact(alpha_promote, "alpha_promote"),
@@ -577,7 +584,10 @@ class DecisionBudget:
             record: A mapping as written by `to_dict`.
 
         Returns:
-            The budget described by the record.
+            The budget described by the record. An unknown or missing
+            field, an invalid fraction or an overspent state raises a
+            `ValueError` from `require_fields`, `parse_fraction` or the
+            constructor.
         """
         qualification.require_fields(cls, record)
         return cls(
