@@ -43,7 +43,19 @@ Labels = tuple[tuple[str, str], ...]
 
 
 def freeze(labels: Mapping[str, str] | None) -> Labels:
-    """Validates label names and returns them as a sorted tuple."""
+    """Validates label names and returns them as a sorted tuple.
+
+    Args:
+        labels: Label names and values, or None.
+
+    Returns:
+        The label pairs sorted by name; empty for None.
+
+    Raises:
+        TypeError: If a label value is not text.
+        ValueError: If a label name is invalid or starts with two
+            underscores.
+    """
     items = tuple(sorted((labels or {}).items()))
     for key, value in items:
         if not LABEL_PATTERN.match(key) or key.startswith("__"):
@@ -54,12 +66,28 @@ def freeze(labels: Mapping[str, str] | None) -> Labels:
 
 
 def escape(value: str) -> str:
-    """Escapes a label value for the text exposition."""
+    """Escapes a label value for the text exposition.
+
+    Args:
+        value: The label value.
+
+    Returns:
+        The value with backslash, newline and double quote escaped.
+    """
     return value.replace("\\", "\\\\").replace("\n", "\\n").replace('"', '\\"')
 
 
 def render_labels(labels: Labels, extra: Labels = ()) -> str:
-    """Formats ``{a="b",...}`` (empty text for no labels)."""
+    """Formats ``{a="b",...}`` (empty text for no labels).
+
+    Args:
+        labels: The label pairs.
+        extra: Further pairs appended after the labels.
+
+    Returns:
+        The label set in exposition syntax, or an empty string if there are
+        no pairs.
+    """
     pairs = [*labels, *extra]
     if not pairs:
         return ""
@@ -68,7 +96,15 @@ def render_labels(labels: Labels, extra: Labels = ()) -> str:
 
 
 def format_number(value: float) -> str:
-    """Formats a sample value the way the exposition format spells it."""
+    """Formats a sample value the way the exposition format spells it.
+
+    Args:
+        value: The sample value.
+
+    Returns:
+        ``+Inf``, ``-Inf`` or ``NaN`` for non-finite values, an integer
+        without decimals for whole numbers, otherwise the float's repr.
+    """
     if math.isinf(value):
         return "+Inf" if value > 0 else "-Inf"
     if math.isnan(value):
@@ -80,14 +116,23 @@ class Histogram:
     """Cumulative bucket counts, a sum and a count for one label set."""
 
     def __init__(self, buckets: tuple[float, ...]) -> None:
-        """Creates empty buckets (upper bounds, ascending)."""
+        """Creates empty buckets (upper bounds, ascending).
+
+        Args:
+            buckets: The upper bounds of the buckets, ascending.
+        """
         self.buckets = buckets
         self.counts = [0] * len(buckets)
         self.total = 0
         self.sum = 0.0
 
     def observe(self, value: float) -> None:
-        """Adds one observation."""
+        """Adds one observation.
+
+        Args:
+            value: The observed value; it counts in every bucket whose upper
+                bound is at least the value.
+        """
         self.total += 1
         self.sum += value
         for position, bound in enumerate(self.buckets):
@@ -98,7 +143,13 @@ class Histogram:
         """Estimates a quantile by linear interpolation inside a bucket.
 
         This is the estimate Prometheus makes from bucket counts; it is exact
-        only at the bucket edges. None when nothing was observed.
+        only at the bucket edges.
+
+        Args:
+            share: The quantile as a share in [0, 1].
+
+        Returns:
+            The estimate, or None when nothing was observed.
         """
         if self.total == 0:
             return None
@@ -137,7 +188,17 @@ class MetricsRegistry:
         self.histograms: dict[str, dict[Labels, Histogram]] = {}
 
     def declare(self, name: str, kind: str, text: str) -> None:
-        """Declares a metric once; a second declaration must agree."""
+        """Declares a metric once; a second declaration must agree.
+
+        Args:
+            name: Metric name.
+            kind: ``counter``, ``gauge`` or ``histogram``.
+            text: Help text, kept from the first declaration.
+
+        Raises:
+            ValueError: If the name is invalid or the metric was declared as a
+                different kind.
+        """
         if not NAME_PATTERN.match(name):
             raise ValueError(f"invalid metric name {name!r}")
         known = self.kinds.get(name)
@@ -154,6 +215,12 @@ class MetricsRegistry:
         text: str = "",
     ) -> None:
         """Adds to a counter.
+
+        Args:
+            name: Metric name.
+            labels: Label names and values.
+            amount: How much to add.
+            text: Help text.
 
         Raises:
             ValueError: If ``amount`` is negative.
@@ -173,7 +240,17 @@ class MetricsRegistry:
         labels: Mapping[str, str] | None = None,
         text: str = "",
     ) -> None:
-        """Sets a gauge."""
+        """Sets a gauge.
+
+        Args:
+            name: Metric name.
+            value: The new value.
+            labels: Label names and values.
+            text: Help text.
+
+        Raises:
+            ValueError: If the value is not finite.
+        """
         if not math.isfinite(value):
             raise ValueError("a gauge value must be finite")
         with self.lock:
@@ -187,7 +264,17 @@ class MetricsRegistry:
         labels: Mapping[str, str] | None = None,
         text: str = "",
     ) -> None:
-        """Adds an observation to a histogram."""
+        """Adds an observation to a histogram.
+
+        Args:
+            name: Metric name.
+            value: The observation.
+            labels: Label names and values.
+            text: Help text.
+
+        Raises:
+            ValueError: If the value is not finite or is negative.
+        """
         if not math.isfinite(value) or value < 0:
             raise ValueError("an observation must be finite and not negative")
         with self.lock:
@@ -201,12 +288,28 @@ class MetricsRegistry:
     def value(
         self, name: str, labels: Mapping[str, str] | None = None
     ) -> float | None:
-        """Current value of one counter or gauge series (None if absent)."""
+        """Current value of one counter or gauge series (None if absent).
+
+        Args:
+            name: Metric name.
+            labels: Label names and values of the series.
+
+        Returns:
+            The value, or None if there is no such series.
+        """
         with self.lock:
             return self.values.get(name, {}).get(freeze(labels))
 
     def total(self, name: str, **match: str) -> float:
-        """Sum of the series of a counter whose labels contain ``match``."""
+        """Sum of the series of a counter whose labels contain ``match``.
+
+        Args:
+            name: Metric name.
+            **match: Label values the series must have.
+
+        Returns:
+            The summed value; 0 if no series matches.
+        """
         with self.lock:
             return sum(
                 value
@@ -217,17 +320,40 @@ class MetricsRegistry:
     def histogram(
         self, name: str, labels: Mapping[str, str] | None = None
     ) -> Histogram | None:
-        """One histogram series (None if absent)."""
+        """One histogram series (None if absent).
+
+        Args:
+            name: Metric name.
+            labels: Label names and values of the series.
+
+        Returns:
+            The histogram, or None if there is no such series.
+        """
         with self.lock:
             return self.histograms.get(name, {}).get(freeze(labels))
 
     def series(self, name: str) -> dict[Labels, float]:
-        """A copy of every series of a counter or gauge."""
+        """A copy of every series of a counter or gauge.
+
+        Args:
+            name: Metric name.
+
+        Returns:
+            A mapping from label pairs to value; empty if there is none.
+        """
         with self.lock:
             return dict(self.values.get(name, {}))
 
     def merged_histogram(self, name: str) -> Histogram | None:
-        """All series of a histogram added together (None if empty)."""
+        """All series of a histogram added together (None if empty).
+
+        Args:
+            name: Metric name.
+
+        Returns:
+            A histogram whose counts, total and sum add those of every series,
+            or None if the metric has no series.
+        """
         with self.lock:
             found = list(self.histograms.get(name, {}).values())
             if not found:
@@ -243,7 +369,11 @@ class MetricsRegistry:
             return merged
 
     def render(self) -> str:
-        """The Prometheus text exposition of every series, sorted."""
+        """The Prometheus text exposition of every series, sorted.
+
+        Returns:
+            The text exposition, one line per series, ending in a newline.
+        """
         lines: list[str] = []
         with self.lock:
             for name in sorted(self.kinds):
@@ -262,7 +392,14 @@ class MetricsRegistry:
         return "\n".join(lines) + "\n"
 
     def render_histogram(self, name: str) -> list[str]:
-        """Bucket, sum and count lines of one histogram."""
+        """Bucket, sum and count lines of one histogram.
+
+        Args:
+            name: Metric name.
+
+        Returns:
+            The exposition lines for each series: its buckets, sum and count.
+        """
         lines: list[str] = []
         for labels, hist in sorted(self.histograms.get(name, {}).items()):
             for bound, count in zip(hist.buckets, hist.counts, strict=True):
@@ -282,6 +419,9 @@ def resident_bytes() -> int:
 
     ``ru_maxrss`` is a peak, not the current size; it is bytes on macOS and
     kibibytes on Linux.
+
+    Returns:
+        The peak resident memory in bytes; 0 if it cannot be read.
     """
     if resource is None:
         return 0
@@ -290,7 +430,12 @@ def resident_bytes() -> int:
 
 
 def cpu_seconds() -> float:
-    """User plus system CPU time of this process, in seconds."""
+    """User plus system CPU time of this process, in seconds.
+
+    Returns:
+        The user plus system CPU seconds, or the process time where that is
+        not available.
+    """
     if resource is None:
         return time.process_time()
     usage = resource.getrusage(resource.RUSAGE_SELF)
@@ -333,7 +478,13 @@ class ServiceMetrics:
         )
 
     def record_request(self, route: str, status: int, seconds: float) -> None:
-        """Counts a request and observes its latency."""
+        """Counts a request and observes its latency.
+
+        Args:
+            route: The route served.
+            status: The HTTP status.
+            seconds: Duration of the request in seconds.
+        """
         labels = {
             "route": route,
             "status": str(status),
@@ -363,11 +514,22 @@ class ServiceMetrics:
         )
 
     def requests(self) -> float:
-        """Requests counted so far."""
+        """Requests counted so far.
+
+        Returns:
+            The number of requests counted so far.
+        """
         return self.registry.total(self.REQUESTS)
 
     def count_where(self, predicate_statuses: set[int]) -> float:
-        """Requests whose status is in the set."""
+        """Requests whose status is in the set.
+
+        Args:
+            predicate_statuses: HTTP statuses to count.
+
+        Returns:
+            The number of requests with one of those statuses.
+        """
         return sum(
             self.registry.total(self.REQUESTS, status=str(status))
             for status in predicate_statuses
@@ -379,6 +541,11 @@ class ServiceMetrics:
         Rates are None until a request is seen. ``server_error_rate`` is the
         share of 5xx, ``client_error_rate`` the share of 4xx other than 429,
         and ``availability`` the share that was not 5xx or 429.
+
+        Returns:
+            The request count, server and client error rates, availability and
+            the 50th, 95th and 99th percentile latency in seconds; rates and
+            latencies are None until a request is seen.
         """
         total = 0.0
         server = 0.0

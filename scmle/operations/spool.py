@@ -46,6 +46,12 @@ class MetricsSpool:
     ) -> None:
         """Opens the spool at ``path``.
 
+        Args:
+            path: The spool file.
+            send: Called with a batch of samples; returns how many the
+                destination accepted.
+            batch_size: Number of samples per send.
+
         Raises:
             ValueError: If ``batch_size`` is not positive.
         """
@@ -56,7 +62,11 @@ class MetricsSpool:
         self.batch_size = batch_size
 
     def lines(self) -> list[str]:
-        """Spooled lines, oldest first."""
+        """Spooled lines, oldest first.
+
+        Returns:
+            The non-blank lines of the spool file; empty if it does not exist.
+        """
         if not self.path.exists():
             return []
         return [
@@ -66,11 +76,22 @@ class MetricsSpool:
         ]
 
     def pending(self) -> int:
-        """Samples waiting to be sent."""
+        """Samples waiting to be sent.
+
+        Returns:
+            The number of spooled samples.
+        """
         return len(self.lines())
 
     def add(self, samples: Sequence[observability.MetricSample]) -> int:
-        """Spools samples (before anything is sent); returns how many."""
+        """Spools samples (before anything is sent); returns how many.
+
+        Args:
+            samples: The samples to spool.
+
+        Returns:
+            The number of samples spooled.
+        """
         text = "".join(
             json.dumps(s.to_dict(), sort_keys=True) + "\n" for s in samples
         )
@@ -79,7 +100,12 @@ class MetricsSpool:
         return len(samples)
 
     def flush(self) -> FlushResult:
-        """Sends batches in order until the spool is empty or a send fails."""
+        """Sends batches in order until the spool is empty or a send fails.
+
+        Returns:
+            How many samples were sent, how many remain and the error that
+            stopped the flush, if any.
+        """
         sent = 0
         lines = self.lines()
         error: str | None = None

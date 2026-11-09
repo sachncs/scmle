@@ -62,18 +62,34 @@ METHOD_CLOCK = "time.monotonic() in the runner"
 
 
 def records(count: int = 3) -> list[dict[str, Any]]:
-    """The first ordinary golden records."""
+    """The first ordinary golden records.
+
+    Args:
+        count: Number of records to return.
+
+    Returns:
+        The first `count` records of the golden record file.
+    """
     loaded = json.loads((GOLDEN / "records.json").read_text(encoding="utf-8"))
     return list(loaded["records"][:count])
 
 
 def golden_spec() -> dict[str, Any]:
-    """The hand-written reference model's specification."""
+    """The hand-written reference model's specification.
+
+    Returns:
+        The specification of the hand-written reference model.
+    """
     return parity.load_golden(GOLDEN).spec
 
 
 def inverted_spec() -> dict[str, Any]:
-    """The same model with every coefficient negated: a wrong model."""
+    """The same model with every coefficient negated: a wrong model.
+
+    Returns:
+        A copy of the golden specification with negated coefficients and
+        intercept, versioned ``golden-inverted``.
+    """
     spec = copy.deepcopy(golden_spec())
     spec["coefficients"] = {k: -v for k, v in spec["coefficients"].items()}
     spec["intercept"] = -spec["intercept"]
@@ -84,7 +100,16 @@ def inverted_spec() -> dict[str, Any]:
 def export_service(
     folder: pathlib.Path, spec: dict[str, Any], key: str = KEY
 ) -> pathlib.Path:
-    """Writes a signed service folder for a specification."""
+    """Writes a signed service folder for a specification.
+
+    Args:
+        folder: The folder to write.
+        spec: The reference model's specification.
+        key: The signing key.
+
+    Returns:
+        `folder`.
+    """
     parity.reference_bundle(spec).export_service(folder, signing_key=key)
     return folder
 
@@ -103,7 +128,11 @@ class Instance:
         return f"http://127.0.0.1:{self.port}"
 
     def alive(self) -> bool:
-        """Whether the process is still running."""
+        """Whether the process is still running.
+
+        Returns:
+            True while the process has not exited.
+        """
         return self.process.poll() is None
 
 
@@ -119,7 +148,16 @@ class Fleet:
     def start(
         self, folder: pathlib.Path, key: str = KEY, port: int | None = None
     ) -> Instance:
-        """Starts ``serve.py`` of a folder under production rules."""
+        """Starts ``serve.py`` of a folder under production rules.
+
+        Args:
+            folder: A service folder.
+            key: The signing key given to the service.
+            port: The port to listen on; a free one if None.
+
+        Returns:
+            The running instance, which the fleet remembers.
+        """
         chosen = port or demo.free_port()
         env = {
             **os.environ,
@@ -143,13 +181,28 @@ class Fleet:
         return instance
 
     def serve(self, server: mocks.MockServer) -> mocks.MockServer:
-        """Starts an emulator and remembers it."""
+        """Starts an emulator and remembers it.
+
+        Args:
+            server: The emulator to start.
+
+        Returns:
+            `server`, started.
+        """
         server.start()
         self.servers.append(server)
         return server
 
     def child(self, code: str, *arguments: str) -> subprocess.Popen[str]:
-        """Starts a Python child that prints one line per acknowledged unit."""
+        """Starts a Python child that prints one line per acknowledged unit.
+
+        Args:
+            code: The Python source to run.
+            *arguments: Command-line arguments for the code.
+
+        Returns:
+            The child process, which the fleet remembers.
+        """
         process = subprocess.Popen(  # nosec B603 - our interpreter, our code
             [sys.executable, "-c", code, *arguments],
             stdout=subprocess.PIPE,
@@ -160,7 +213,11 @@ class Fleet:
         return process
 
     def close(self) -> int:
-        """Stops everything; returns how many processes were still alive."""
+        """Stops everything; returns how many processes were still alive.
+
+        Returns:
+            The number of processes that did not exit after being killed.
+        """
         for server in self.servers:
             with contextlib.suppress(OSError, errors.ScmleError):
                 server.stop()
@@ -183,7 +240,16 @@ class Fleet:
 
 
 def predict(base: str, count: int = 3) -> tuple[int, dict[str, Any]]:
-    """POSTs the golden records; an unreachable service is ``(0, {})``."""
+    """POSTs the golden records; an unreachable service is ``(0, {})``.
+
+    Args:
+        base: Base URL of the service.
+        count: Number of golden records to send.
+
+    Returns:
+        The HTTP status and the JSON body; ``(0, {})`` if the service cannot
+        be reached.
+    """
     try:
         return demo.post_json(
             f"{base}/predict",
@@ -197,7 +263,16 @@ def predict(base: str, count: int = 3) -> tuple[int, dict[str, Any]]:
 def ready_after(
     instance: Instance, timeout: float | None = None
 ) -> float | None:
-    """Seconds until ``/readyz`` is 200, or None (time-scaled default)."""
+    """Seconds until ``/readyz`` is 200, or None (time-scaled default).
+
+    Args:
+        instance: The running instance.
+        timeout: Seconds to wait; the time-scaled default if None.
+
+    Returns:
+        The seconds it took to become ready, or None if it did not within
+        the timeout.
+    """
     limit = recovery.scaled(READY_SECONDS) if timeout is None else timeout
     return demo.wait_ready(instance.base, instance.process, limit)
 
@@ -208,6 +283,14 @@ def await_unready(
     """Waits for a service to report why it will not become ready.
 
     The default wait is 20 s, multiplied by the run's time scale.
+
+    Args:
+        instance: The running instance.
+        timeout: Seconds to wait; the time-scaled default if None.
+
+    Returns:
+        The last readiness status, phase and reason observed, and the
+        liveness and prediction statuses afterwards.
     """
     deadline = time.monotonic() + (
         recovery.scaled(20.0) if timeout is None else timeout
@@ -236,7 +319,15 @@ def await_unready(
 
 
 def corrupt_copy(service: pathlib.Path, target: pathlib.Path) -> pathlib.Path:
-    """A copy of a service folder whose model file was tampered with."""
+    """A copy of a service folder whose model file was tampered with.
+
+    Args:
+        service: The service folder to copy.
+        target: The folder to create.
+
+    Returns:
+        `target`.
+    """
     shutil.copytree(service, target)
     with (target / "model" / bundle_module.MODEL_FILE).open("ab") as handle:
         handle.write(b"tampered")
@@ -244,13 +335,27 @@ def corrupt_copy(service: pathlib.Path, target: pathlib.Path) -> pathlib.Path:
 
 
 def model_file_digest(service: pathlib.Path) -> str:
-    """SHA-256 of the model file's bytes (what tampering changes)."""
+    """SHA-256 of the model file's bytes (what tampering changes).
+
+    Args:
+        service: A service folder.
+
+    Returns:
+        The digest of the folder's model file.
+    """
     path = service / "model" / bundle_module.MODEL_FILE
     return provenance.sha256_digest(path.read_bytes())
 
 
 def work_folder(prefix: str) -> pathlib.Path:
-    """A fresh scratch folder."""
+    """A fresh scratch folder.
+
+    Args:
+        prefix: Name part to tell the folder apart.
+
+    Returns:
+        The path of a new temporary directory.
+    """
     return pathlib.Path(tempfile.mkdtemp(prefix=f"scmle-recovery-{prefix}-"))
 
 
@@ -285,6 +390,18 @@ def kill_after(
 
     Runs the writer, SIGKILLs it after ``acknowledged`` lines and returns the
     highest unit it acknowledged on stdout.
+
+    Args:
+        fleet: The fleet that owns the writer process.
+        code: The Python source of the writer.
+        path: The file the writer works on.
+        acknowledged: Number of acknowledged units after which to kill it.
+
+    Returns:
+        The highest unit the writer acknowledged, or -1 if none.
+
+    Raises:
+        ScmleError: If the writer process has no stdout.
     """
     process = fleet.child(code, str(path))
     last = -1
@@ -301,7 +418,16 @@ def kill_after(
 
 
 def state_writer_trials(fleet: Fleet, base: pathlib.Path) -> dict[str, Any]:
-    """Kills an atomic state writer at random points."""
+    """Kills an atomic state writer at random points.
+
+    Args:
+        fleet: The fleet that owns the writer processes.
+        base: Directory for the writers' state files.
+
+    Returns:
+        The number of trials, the acknowledged writes lost, the unreadable
+        files and the longest read time over ten trials.
+    """
     rng = np.random.default_rng(7)
     lost = 0
     torn = 0
@@ -328,7 +454,15 @@ def state_writer_trials(fleet: Fleet, base: pathlib.Path) -> dict[str, Any]:
 
 
 def process_kill() -> recovery.Result:
-    """Kills the service process three times; restarts it; checks state."""
+    """Kills the service process three times; restarts it; checks state.
+
+    Returns:
+        The recovery result of this fault: its checks, its RTO and RPO
+        measurements and the details observed.
+
+    Raises:
+        ScmleError: If the service did not become ready.
+    """
     fleet = Fleet()
     base = work_folder("kill")
     result = recovery.Result("process_kill", environment="local subprocess")
@@ -402,7 +536,11 @@ class Client(threading.Thread):
     """Sends requests to whatever instance the router points at."""
 
     def __init__(self, router: dict[str, Instance]) -> None:
-        """Starts idle; ``start`` begins sending."""
+        """Starts idle; ``start`` begins sending.
+
+        Args:
+            router: Maps ``current`` to the instance that receives requests.
+        """
         super().__init__(daemon=True)
         self.router = router
         self.stop_flag = threading.Event()
@@ -428,7 +566,15 @@ class Client(threading.Thread):
 
 
 def rolling_restart() -> recovery.Result:
-    """An unready replacement is refused; a ready one takes over cleanly."""
+    """An unready replacement is refused; a ready one takes over cleanly.
+
+    Returns:
+        The recovery result of this fault: its checks, its RTO and RPO
+        measurements and the details observed.
+
+    Raises:
+        ScmleError: If the first instance did not become ready.
+    """
     fleet = Fleet()
     base = work_folder("rolling")
     result = recovery.Result(
@@ -509,7 +655,12 @@ def rolling_restart() -> recovery.Result:
 
 
 def invalid_credentials() -> recovery.Result:
-    """A wrong signing key leaves the service unready until corrected."""
+    """A wrong signing key leaves the service unready until corrected.
+
+    Returns:
+        The recovery result of this fault: its checks, its RTO and RPO
+        measurements and the details observed.
+    """
     fleet = Fleet()
     base = work_folder("credentials")
     result = recovery.Result(
@@ -554,7 +705,12 @@ def invalid_credentials() -> recovery.Result:
 
 
 def secret_rotation() -> recovery.Result:
-    """A rotated key and a re-signed bundle; the stale key cannot verify."""
+    """A rotated key and a re-signed bundle; the stale key cannot verify.
+
+    Returns:
+        The recovery result of this fault: its checks, its RTO and RPO
+        measurements and the details observed.
+    """
     fleet = Fleet()
     base = work_folder("rotation")
     result = recovery.Result(
@@ -607,12 +763,29 @@ def secret_rotation() -> recovery.Result:
 
 
 def upload(base: str, folder: pathlib.Path, prefix: str) -> dict[str, str]:
-    """Uploads a service folder; returns key to etag."""
+    """Uploads a service folder; returns key to etag.
+
+    Args:
+        base: Base URL of the object store.
+        folder: The service folder to upload.
+        prefix: Key prefix for the uploaded objects.
+
+    Returns:
+        A mapping from object key to its entity tag.
+    """
     return demo.upload_folder(base, folder, prefix)
 
 
 def object_store_loss() -> recovery.Result:
-    """The store goes away; the service keeps serving; access returns."""
+    """The store goes away; the service keeps serving; access returns.
+
+    Returns:
+        The recovery result of this fault: its checks, its RTO and RPO
+        measurements and the details observed.
+
+    Raises:
+        ScmleError: If the service did not become ready.
+    """
     fleet = Fleet()
     base = work_folder("store")
     result = recovery.Result(
@@ -687,7 +860,15 @@ def object_store_loss() -> recovery.Result:
 
 
 def metrics_destination_outage() -> recovery.Result:
-    """The metrics sink is down; samples are spooled and drained later."""
+    """The metrics sink is down; samples are spooled and drained later.
+
+    Returns:
+        The recovery result of this fault: its checks, its RTO and RPO
+        measurements and the details observed.
+
+    Raises:
+        ScmleError: If the service did not become ready.
+    """
     fleet = Fleet()
     base = work_folder("spool")
     result = recovery.Result("dependency_outage", environment="local emulator")
@@ -757,7 +938,12 @@ def metrics_destination_outage() -> recovery.Result:
 
 
 def corrupted_bundle() -> recovery.Result:
-    """A tampered bundle never serves; a digest-checked copy restores it."""
+    """A tampered bundle never serves; a digest-checked copy restores it.
+
+    Returns:
+        The recovery result of this fault: its checks, its RTO and RPO
+        measurements and the details observed.
+    """
     fleet = Fleet()
     base = work_folder("corrupt")
     result = recovery.Result("corrupted_bundle", environment="local subprocess")
@@ -808,7 +994,15 @@ def corrupted_bundle() -> recovery.Result:
 
 
 def incompatible_schema() -> recovery.Result:
-    """Refused requests are precise; the service stays up; a caller adapts."""
+    """Refused requests are precise; the service stays up; a caller adapts.
+
+    Returns:
+        The recovery result of this fault: its checks, its RTO and RPO
+        measurements and the details observed.
+
+    Raises:
+        ScmleError: If the service did not become ready.
+    """
     fleet = Fleet()
     base = work_folder("schema")
     result = recovery.Result(
@@ -903,7 +1097,11 @@ class ProcessPlane(control.ControlPlane):
     provider = "local"
 
     def __init__(self, fleet: Fleet) -> None:
-        """Starts with no images and no revisions."""
+        """Starts with no images and no revisions.
+
+        Args:
+            fleet: The fleet that owns the processes.
+        """
         self.fleet = fleet
         self.images: dict[str, pathlib.Path] = {}
         self.revisions: dict[str, Instance] = {}
@@ -912,7 +1110,17 @@ class ProcessPlane(control.ControlPlane):
         self.count = 0
 
     def register_image(self, folder: pathlib.Path) -> str:
-        """Learns the digest a folder's service reports; returns it."""
+        """Learns the digest a folder's service reports; returns it.
+
+        Args:
+            folder: A service folder.
+
+        Returns:
+            The artifact digest the service reports.
+
+        Raises:
+            ScmleError: If the service does not become ready.
+        """
         probe = self.fleet.start(folder)
         if ready_after(probe) is None:
             raise errors.ScmleError("the image does not start")
@@ -925,7 +1133,14 @@ class ProcessPlane(control.ControlPlane):
         return digest
 
     def deploy(self, image_digest: str) -> str:
-        """Starts a revision of an image."""
+        """Starts a revision of an image.
+
+        Args:
+            image_digest: The digest of a registered image.
+
+        Returns:
+            The name of the new revision.
+        """
         self.count += 1
         revision = f"local-{self.count}"
         self.revisions[revision] = self.fleet.start(self.images[image_digest])
@@ -935,13 +1150,28 @@ class ProcessPlane(control.ControlPlane):
         return revision
 
     def set_traffic(self, allocation: Mapping[str, int]) -> None:
-        """Points all traffic at one revision."""
+        """Points all traffic at one revision.
+
+        Args:
+            allocation: A mapping from revision to percentage.
+
+        Raises:
+            Unsupported: If the allocation is not 100 percent to a single
+                revision.
+        """
         if len(allocation) != 1 or sum(allocation.values()) != 100:
             raise control.Unsupported("only all traffic to one revision")
         self.primary = next(iter(allocation))
 
     def ready(self, revision: str) -> bool:
-        """Whether a revision answers /readyz with 200."""
+        """Whether a revision answers /readyz with 200.
+
+        Args:
+            revision: The revision to ask.
+
+        Returns:
+            True if it answers with status 200; False otherwise.
+        """
         try:
             return (
                 demo.get_json(f"{self.revisions[revision].base}/readyz", 2.0)[0]
@@ -951,7 +1181,15 @@ class ProcessPlane(control.ControlPlane):
             return False
 
     def observe(self) -> observation.Observation:
-        """What is running and where traffic goes."""
+        """What is running and where traffic goes.
+
+        Returns:
+            An observation of the revision that holds the traffic, with its
+            digest and readiness.
+
+        Raises:
+            ArtifactError: If nothing is deployed.
+        """
         if self.primary is None:
             raise errors.ArtifactError("nothing is deployed")
         return observation.Observation(
@@ -966,7 +1204,14 @@ class ProcessPlane(control.ControlPlane):
         )
 
     def base(self) -> str:
-        """URL of the revision that holds the traffic."""
+        """URL of the revision that holds the traffic.
+
+        Returns:
+            The base URL of the primary revision.
+
+        Raises:
+            ArtifactError: If nothing is deployed.
+        """
         if self.primary is None:
             raise errors.ArtifactError("nothing is deployed")
         return self.revisions[self.primary].base
@@ -979,7 +1224,18 @@ def register(
     work: pathlib.Path,
     label: str,
 ) -> registry_module.VersionRecord:
-    """Registers and approves one signed bundle."""
+    """Registers and approves one signed bundle.
+
+    Args:
+        store: The model registry.
+        release: The release registry.
+        spec: The reference model's specification.
+        work: Directory in which the bundle is saved, under `label`.
+        label: Name of the bundle, also used as the run id.
+
+    Returns:
+        The record of the registered version.
+    """
     exported = parity.reference_bundle(spec).save(work / label, KEY)
     record = store.register(
         MODEL, exported, metrics={}, run_id=label, signing_key=KEY
@@ -998,6 +1254,10 @@ def bad_release() -> recovery.Result:
 
     A release that never becomes ready is not promoted and the previous
     revision is restored.
+
+    Returns:
+        The recovery result of this fault: its checks, its RTO and RPO
+        measurements and the details observed.
     """
     fleet = Fleet()
     base = work_folder("release")
@@ -1161,7 +1421,12 @@ print(json.dumps({"state": record["state"]}), flush=True)
 
 
 def job_interruption() -> recovery.Result:
-    """A workflow run is killed mid-step and continues from its state."""
+    """A workflow run is killed mid-step and continues from its state.
+
+    Returns:
+        The recovery result of this fault: its checks, its RTO and RPO
+        measurements and the details observed.
+    """
     fleet = Fleet()
     base = work_folder("job")
     result = recovery.Result("job_interruption", environment="local subprocess")
@@ -1214,7 +1479,12 @@ def job_interruption() -> recovery.Result:
 
 
 def audit_continuity() -> recovery.Result:
-    """The ledger writer is killed five times; the chain always verifies."""
+    """The ledger writer is killed five times; the chain always verifies.
+
+    Returns:
+        The recovery result of this fault: its checks, its RTO and RPO
+        measurements and the details observed.
+    """
     fleet = Fleet()
     base = work_folder("ledger")
     result = recovery.Result(
@@ -1287,5 +1557,12 @@ SCENARIOS: dict[str, Callable[[], recovery.Result]] = {
 
 
 def run_all(only: list[str] | None = None) -> dict[str, Any]:
-    """Runs every local scenario and returns the report."""
+    """Runs every local scenario and returns the report.
+
+    Args:
+        only: Fault ids to run; all scenarios if None.
+
+    Returns:
+        The report built by `Runner.run`.
+    """
     return recovery.Runner(SCENARIOS).run(only)

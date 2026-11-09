@@ -80,7 +80,11 @@ class Signal:
         return self.status is Status.BREACHED
 
     def to_dict(self) -> dict[str, Any]:
-        """A JSON-ready record."""
+        """A JSON-ready record.
+
+        Returns:
+            The signal's fields as a dict, with enums as their values.
+        """
         return {
             "name": self.name,
             "category": self.category.value,
@@ -110,7 +114,12 @@ class WindowPolicy:
     seed: int = 0
 
     def __post_init__(self) -> None:
-        """Validates ranges."""
+        """Validates ranges.
+
+        Raises:
+            ValueError: If the window length or minimum sample count is not
+                positive, or the sample rate is outside (0, 1].
+        """
         if self.window_seconds <= 0 or self.min_samples < 1:
             raise ValueError("window_seconds and min_samples must be positive")
         if not 0.0 < self.sample_rate <= 1.0:
@@ -167,7 +176,24 @@ def judge(
     minimum: int,
     **detail: Any,
 ) -> Signal:
-    """Compares a value with its limit, or reports too little data."""
+    """Compares a value with its limit, or reports too little data.
+
+    Args:
+        name: Signal name.
+        category: Category the signal belongs to.
+        value: The measured value, or None if it could not be computed.
+        threshold: The limit.
+        direction: ``max`` if the value must not exceed the limit, ``min``
+            if it must not fall below it.
+        samples: Number of samples behind the value.
+        minimum: Fewest samples for a judgement.
+        **detail: Extra facts kept on the signal.
+
+    Returns:
+        The signal: insufficient data if the value is None or the samples
+        are fewer than the minimum, otherwise breached or ok against the
+        limit.
+    """
     if value is None or samples < minimum:
         status = Status.INSUFFICIENT_DATA
         value = None if samples < minimum else value
@@ -211,12 +237,27 @@ class SignalMonitor:
     def record_request(
         self, at: float, route: str, status: int, seconds: float
     ) -> None:
-        """Records one finished request (epoch seconds ``at``)."""
+        """Records one finished request (epoch seconds ``at``).
+
+        Args:
+            at: Time of the request, in epoch seconds.
+            route: The route served.
+            status: The HTTP status.
+            seconds: Duration of the request in seconds.
+        """
         with self.lock:
             self.requests.append((at, route, status, seconds))
 
     def observe_features(self, at: float, frame: pd.DataFrame) -> int:
-        """Keeps a sample of the rows of a scored batch; returns the count."""
+        """Keeps a sample of the rows of a scored batch; returns the count.
+
+        Args:
+            at: Time of the batch, in epoch seconds.
+            frame: The scored rows; each is kept with the policy's sample rate.
+
+        Returns:
+            The number of rows kept.
+        """
         if frame.empty:
             return 0
         keep = self.sampler.random(len(frame)) < self.policy.sample_rate
@@ -230,6 +271,10 @@ class SignalMonitor:
         self, at: float, losses: Sequence[float] | np.ndarray
     ) -> None:
         """Records losses in [0, 1] of cases whose outcome has arrived.
+
+        Args:
+            at: Time the outcomes arrived, in epoch seconds.
+            losses: The loss of each case.
 
         Raises:
             ValueError: If a loss is outside [0, 1] or not finite.
@@ -247,14 +292,25 @@ class SignalMonitor:
             self.outcomes.append((at, values))
 
     def prune(self, now: float) -> None:
-        """Drops everything older than the window."""
+        """Drops everything older than the window.
+
+        Args:
+            now: The current time, in epoch seconds.
+        """
         start = now - self.policy.window_seconds
         for queue in (self.requests, self.features, self.outcomes):
             while queue and queue[0][0] < start:
                 queue.popleft()
 
     def evaluate(self, now: float) -> tuple[Signal, ...]:
-        """Every signal over ``(now - window, now]``."""
+        """Every signal over ``(now - window, now]``.
+
+        Args:
+            now: The current time, in epoch seconds.
+
+        Returns:
+            The service, data and performance signals of the window.
+        """
         with self.lock:
             self.prune(now)
             requests = [r for r in self.requests if r[0] <= now]
@@ -268,7 +324,16 @@ class SignalMonitor:
     def service_signals(
         self, requests: list[tuple[float, str, int, float]]
     ) -> list[Signal]:
-        """Error rate, availability and p95 latency."""
+        """Error rate, availability and p95 latency.
+
+        Args:
+            requests: The requests in the window, as (time, route, status,
+                seconds).
+
+        Returns:
+            The server error rate, availability and 95th percentile latency
+            signals.
+        """
         size = len(requests)
         limits = self.thresholds
         minimum = self.policy.min_samples
@@ -316,7 +381,18 @@ class SignalMonitor:
         frames: list[pd.DataFrame],
         requests: list[tuple[float, str, int, float]],
     ) -> list[Signal]:
-        """Rejected inputs, feature quality and drift."""
+        """Rejected inputs, feature quality and drift.
+
+        Args:
+            frames: The sampled feature rows in the window.
+            requests: The requests in the window, as (time, route, status,
+                seconds).
+
+        Returns:
+            The invalid-request-rate signal and, when a reference profile
+            exists, the signals for the largest increase in missing values, the
+            largest unseen-category rate and the largest drift index.
+        """
         limits = self.thresholds
         minimum = self.policy.min_samples
         size = len(requests)
@@ -401,7 +477,15 @@ class SignalMonitor:
         return found
 
     def performance_signals(self, outcomes: list[np.ndarray]) -> list[Signal]:
-        """Mean loss of cases whose outcome arrived, against the reference."""
+        """Mean loss of cases whose outcome arrived, against the reference.
+
+        Args:
+            outcomes: The loss arrays recorded in the window.
+
+        Returns:
+            The windowed-loss signal, limited by the reference loss plus the
+            tolerance.
+        """
         limits = self.thresholds
         values = np.concatenate(outcomes) if outcomes else np.array([])
         mean = float(values.mean()) if values.size else None
@@ -424,6 +508,13 @@ def zero_one_losses(
 ) -> np.ndarray:
     """Loss 1 where a prediction differs from its label, else 0.
 
+    Args:
+        predictions: The predictions.
+        labels: The observed labels, one per prediction.
+
+    Returns:
+        An array of 0.0 and 1.0.
+
     Raises:
         ValueError: If the lengths differ.
     """
@@ -442,7 +533,16 @@ def as_metric_samples(
     timestamp: str,
     labels: dict[str, str] | None = None,
 ) -> list[observability.MetricSample]:
-    """Signals with a value as `MetricSample` rows for export or retention."""
+    """Signals with a value as `MetricSample` rows for export or retention.
+
+    Args:
+        signals: The evaluated signals.
+        timestamp: Timestamp for every sample.
+        labels: Labels added to every sample.
+
+    Returns:
+        One sample for each signal that has a value, in the signals' order.
+    """
     return [
         observability.MetricSample(
             name=signal.name,

@@ -39,7 +39,12 @@ class Rates:
     source: str = ""
 
     def __post_init__(self) -> None:
-        """Rates must be finite and not negative; a source is required."""
+        """Rates must be finite and not negative; a source is required.
+
+        Raises:
+            ValueError: If a rate is not finite or is negative, or the source
+                is blank.
+        """
         for name in (
             "vcpu_second",
             "gib_second",
@@ -74,7 +79,11 @@ class Usage:
     egress_gb: float = 0.0
 
     def __post_init__(self) -> None:
-        """Usage must be finite and not negative."""
+        """Usage must be finite and not negative.
+
+        Raises:
+            ValueError: If a usage amount is not finite or is negative.
+        """
         for name in ("vcpu_seconds", "gib_seconds", "requests", "egress_gb"):
             value = getattr(self, name)
             if not math.isfinite(value) or value < 0:
@@ -91,7 +100,21 @@ class Usage:
         requests: float = 0.0,
         egress_gb: float = 0.0,
     ) -> "Usage":
-        """Usage of a revision that held an allocation for ``seconds``."""
+        """Usage of a revision that held an allocation for ``seconds``.
+
+        Args:
+            service: Service name.
+            version: Deployed version.
+            vcpus: Number of virtual CPUs allocated.
+            memory_gib: Memory allocated, in GiB.
+            seconds: How long the allocation was held.
+            requests: Number of requests served.
+            egress_gb: Data sent out, in GB.
+
+        Returns:
+            The usage, with vCPU-seconds and GiB-seconds computed from the
+            allocation.
+        """
         return cls(
             service,
             version,
@@ -103,7 +126,17 @@ class Usage:
 
 
 def line(usage: Usage, rates: Rates) -> dict[str, float]:
-    """The cost of one usage record, by component and in total."""
+    """The cost of one usage record, by component and in total.
+
+    Args:
+        usage: The usage record.
+        rates: The unit rates.
+
+    Returns:
+        A mapping with the cost of `compute`, `memory`, `requests` and
+        `egress` and their `total`, in the rates' currency, rounded to six
+        decimals.
+    """
     parts = {
         "compute": usage.vcpu_seconds * rates.vcpu_second,
         "memory": usage.gib_seconds * rates.gib_second,
@@ -118,6 +151,15 @@ def report(usages: Sequence[Usage], rates: Rates) -> dict[str, Any]:
     """Cost grouped by service and, inside it, by deployed version.
 
     Usage records for the same service and version are added together.
+
+    Args:
+        usages: The usage records.
+        rates: The unit rates.
+
+    Returns:
+        The currency, the rates, the cost per service (with each version's
+        components and totals), the grand total and a statement of what the
+        figures are.
     """
     services: dict[str, dict[str, dict[str, float]]] = {}
     for usage in usages:

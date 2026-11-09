@@ -69,12 +69,26 @@ class Delivery:
     idempotency_key: str
 
     def to_dict(self) -> dict[str, Any]:
-        """A JSON-ready record."""
+        """A JSON-ready record.
+
+        Returns:
+            The delivery's fields as a dict.
+        """
         return dataclasses.asdict(self)
 
 
 def sign(secret: str | bytes, timestamp: str, body: bytes) -> str:
-    """``sha256=<hex>`` over ``<timestamp>.<body>``."""
+    """``sha256=<hex>`` over ``<timestamp>.<body>``.
+
+    Args:
+        secret: The shared secret.
+        timestamp: The timestamp sent in the timestamp header.
+        body: The request body.
+
+    Returns:
+        The HMAC-SHA256 of the timestamp, a dot and the body, prefixed with
+        ``sha256=``.
+    """
     key = secret.encode() if isinstance(secret, str) else secret
     mac = hmac.new(key, timestamp.encode() + b"." + body, hashlib.sha256)
     return "sha256=" + mac.hexdigest()
@@ -87,7 +101,19 @@ def verify_signature(
     now: float,
     tolerance_seconds: float = 300.0,
 ) -> bool:
-    """What a receiver checks: a valid signature on a recent timestamp."""
+    """What a receiver checks: a valid signature on a recent timestamp.
+
+    Args:
+        secret: The shared secret.
+        headers: The request headers.
+        body: The request body.
+        now: The receiver's current time, in seconds.
+        tolerance_seconds: Largest accepted age of the timestamp.
+
+    Returns:
+        True if the timestamp is a number within the tolerance of `now` and
+        the signature matches; False otherwise.
+    """
     timestamp = headers.get(TIMESTAMP_HEADER, "")
     given = headers.get(SIGNATURE_HEADER, "")
     try:
@@ -100,7 +126,16 @@ def verify_signature(
 
 
 def urllib_transport(timeout_seconds: float = 5.0) -> Transport:
-    """A transport that POSTs over HTTPS with the standard library."""
+    """A transport that POSTs over HTTPS with the standard library.
+
+    Args:
+        timeout_seconds: Timeout of each request.
+
+    Returns:
+        A function that sends a request and returns the HTTP status code.
+        It raises `ValueError` for a URL that is not HTTPS and `OSError`
+        when the connection fails.
+    """
 
     def send(request: Request) -> int:
         parsed = urllib.parse.urlparse(request.url)
@@ -173,6 +208,14 @@ class WebhookSender:
     def payload(self, notification: Mapping[str, Any]) -> bytes:
         """The canonical JSON body of a notification.
 
+        Args:
+            notification: The notification, which must carry a known
+                ``severity``.
+
+        Returns:
+            The compact, key-sorted JSON of the notification with this sender's
+            kind added, as UTF-8 bytes.
+
         Raises:
             ValueError: If the severity is unknown or the body is too large.
         """
@@ -189,7 +232,16 @@ class WebhookSender:
         return body
 
     def send(self, notification: Mapping[str, Any]) -> Delivery:
-        """Posts the notification, retrying what is worth retrying."""
+        """Posts the notification, retrying what is worth retrying.
+
+        Args:
+            notification: The notification to post.
+
+        Returns:
+            The delivery record: whether it was delivered (a 2xx status), the
+            number of attempts, the last status and the idempotency key. A
+            client error that is not retryable ends the attempts at once.
+        """
         body = self.payload(notification)
         key = hashlib.sha256(self.kind.encode() + b"|" + body).hexdigest()[:32]
         status: int | None = None
@@ -242,7 +294,12 @@ class Notifier:
         pager: WebhookSender | None = None,
         ticket: WebhookSender | None = None,
     ) -> None:
-        """Takes the two senders; either may be absent."""
+        """Takes the two senders; either may be absent.
+
+        Args:
+            pager: Sender for pages, or None.
+            ticket: Sender for tickets, or None.
+        """
         self.pager = pager
         self.ticket = ticket
 
@@ -252,6 +309,12 @@ class Notifier:
         Critical pages and files a ticket, warning files a ticket and info
         sends nothing. A missing sender is reported as an undelivered
         notification, not skipped silently.
+
+        Args:
+            notification: The notification, with its ``severity``.
+
+        Returns:
+            One delivery record for each sender the severity calls for.
         """
         severity = notification.get("severity", "")
         wanted = {

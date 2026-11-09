@@ -47,7 +47,11 @@ ZERO_TRACE = "0" * 32
 
 
 def new_trace_id() -> str:
-    """A random 128-bit trace id as 32 lowercase hex digits."""
+    """A random 128-bit trace id as 32 lowercase hex digits.
+
+    Returns:
+        A trace id that is not the all-zero invalid id.
+    """
     while True:
         found = secrets.token_hex(16)
         if found != ZERO_TRACE:
@@ -55,7 +59,15 @@ def new_trace_id() -> str:
 
 
 def parse_traceparent(header: str | None) -> str | None:
-    """The trace id of a valid W3C ``traceparent`` header, else None."""
+    """The trace id of a valid W3C ``traceparent`` header, else None.
+
+    Args:
+        header: The header value, or None.
+
+    Returns:
+        The 32-digit trace id, or None if the header is absent, malformed or
+        carries the all-zero trace id.
+    """
     if not header:
         return None
     match = TRACEPARENT.match(header.strip())
@@ -65,19 +77,45 @@ def parse_traceparent(header: str | None) -> str | None:
 
 
 def traceparent_for(trace_id: str) -> str:
-    """A ``traceparent`` header for ``trace_id`` with a fresh span id."""
+    """A ``traceparent`` header for ``trace_id`` with a fresh span id.
+
+    Args:
+        trace_id: A trace id of 32 lowercase hex digits.
+
+    Returns:
+        The header, with sampling flag set.
+
+    Raises:
+        ValueError: If `trace_id` is not 32 lowercase hex digits or is all
+            zeros.
+    """
     if not re.fullmatch(r"[0-9a-f]{32}", trace_id) or trace_id == ZERO_TRACE:
         raise ValueError("trace_id must be 32 lowercase hex digits")
     return f"00-{trace_id}-{secrets.token_hex(8)}-01"
 
 
 def trace_for(header: str | None) -> str:
-    """The incoming trace id, or a new one when the header is absent/bad."""
+    """The incoming trace id, or a new one when the header is absent/bad.
+
+    Args:
+        header: The incoming ``traceparent`` header, or None.
+
+    Returns:
+        The header's trace id if valid, else a new trace id.
+    """
     return parse_traceparent(header) or new_trace_id()
 
 
 def scrub(value: Any) -> Any:
-    """Replaces values under credential-like names, recursively."""
+    """Replaces values under credential-like names, recursively.
+
+    Args:
+        value: A value, possibly a nested mapping, list or tuple.
+
+    Returns:
+        The structure with the values of credential-like keys replaced by a
+        redaction marker; tuples become lists, other values are unchanged.
+    """
     if isinstance(value, Mapping):
         return {
             str(key): (
@@ -135,6 +173,15 @@ class StructuredLog:
     ) -> dict[str, Any]:
         """Writes one line and returns the record.
 
+        Args:
+            level: The log level; one of the allowed levels.
+            message: The message.
+            trace_id: Trace id for the line; a new one if None.
+            **fields: Extra fields, scrubbed of credential-like values.
+
+        Returns:
+            The record that was written.
+
         Raises:
             ValueError: If the level is unknown or a field name is reserved.
         """
@@ -169,7 +216,18 @@ class StructuredLog:
         seconds: float,
         **fields: Any,
     ) -> dict[str, Any]:
-        """Writes the line for one finished request."""
+        """Writes the line for one finished request.
+
+        Args:
+            trace_id: Trace id of the request.
+            route: The route served.
+            status: The HTTP status; 500 and above logs at error level.
+            seconds: Duration of the request in seconds.
+            **fields: Extra fields.
+
+        Returns:
+            The record that was written.
+        """
         level = "error" if status >= 500 else "info"
         return self.emit(
             level,

@@ -54,7 +54,12 @@ class Response:
     audit_head: str
 
     def to_dict(self) -> dict[str, Any]:
-        """A JSON-ready record."""
+        """A JSON-ready record.
+
+        Returns:
+            The incident id, classification, deliveries, telemetry digest and
+            audit head as a dict.
+        """
         return {
             "incident_id": self.incident_id,
             "classification": self.classification.to_dict(),
@@ -76,7 +81,16 @@ class ResponseDesk:
         artifact_digest: str,
         clock: Callable[[], float] = time.time,
     ) -> None:
-        """Creates a desk that keeps its telemetry in ``directory``."""
+        """Creates a desk that keeps its telemetry in ``directory``.
+
+        Args:
+            directory: Directory for the retained telemetry.
+            audit: The audit log that records incidents and actions.
+            notifier: Sends the notifications.
+            model_version: Version of the model that is served.
+            artifact_digest: Digest of the served artifact.
+            clock: Source of the current time, in seconds.
+        """
         self.directory = pathlib.Path(directory)
         self.audit = audit
         self.notifier = notifier
@@ -92,7 +106,15 @@ class ResponseDesk:
     def retain(
         self, at: float, signal_rows: Sequence[signals_module.Signal]
     ) -> str:
-        """Appends a window's signals and returns the digest of the line."""
+        """Appends a window's signals and returns the digest of the line.
+
+        Args:
+            at: Time of the window, in seconds.
+            signal_rows: The window's signals.
+
+        Returns:
+            The SHA-256 of the line that was appended.
+        """
         line = json.dumps(
             {
                 "at": round(at, 3),
@@ -106,7 +128,14 @@ class ResponseDesk:
         return hashlib.sha256(line.encode()).hexdigest()
 
     def retained(self, since: float = 0.0) -> list[dict[str, Any]]:
-        """Retained windows at or after ``since``."""
+        """Retained windows at or after ``since``.
+
+        Args:
+            since: Earliest time to include, in seconds.
+
+        Returns:
+            The retained windows, oldest first; empty if none are stored.
+        """
         if not self.telemetry_path.exists():
             return []
         rows = [
@@ -119,7 +148,14 @@ class ResponseDesk:
         return [row for row in rows if row["at"] >= since]
 
     def expire(self, older_than: float) -> int:
-        """Removes windows older than ``older_than``; returns how many."""
+        """Removes windows older than ``older_than``; returns how many.
+
+        Args:
+            older_than: Time before which windows are removed, in seconds.
+
+        Returns:
+            The number of windows removed.
+        """
         rows = self.retained()
         keep = [row for row in rows if row["at"] >= older_than]
         text = "".join(json.dumps(r, sort_keys=True) + "\n" for r in keep)
@@ -131,7 +167,17 @@ class ResponseDesk:
         signal_rows: Sequence[signals_module.Signal],
         trace_id: str | None = None,
     ) -> Response:
-        """Processes one window of signals."""
+        """Processes one window of signals.
+
+        Args:
+            signal_rows: The window's signals.
+            trace_id: Trace id for the notification; a new one if None.
+
+        Returns:
+            The response. When no signal calls for action it has no incident
+            id and no deliveries; otherwise an incident is opened in the audit
+            log and the notifications sent.
+        """
         now = self.clock()
         trace = trace_id or logs.new_trace_id()
         digest = self.retain(now, signal_rows)
@@ -184,6 +230,9 @@ class ResponseDesk:
             operator: Who acted.
             action: ``acknowledged``, ``mitigated`` or ``resolved``.
             note: What was done (no credentials).
+
+        Returns:
+            The audit row that records the action.
 
         Raises:
             ValueError: If the action is unknown, or the incident was never

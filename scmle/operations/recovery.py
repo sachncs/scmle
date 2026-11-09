@@ -40,6 +40,10 @@ TIME_SCALE_ENV = "SCMLE_RECOVERY_TIME_SCALE"
 def time_scale() -> float:
     """The factor applied to scenario waits and allowed RTO (default 1.0).
 
+    Returns:
+        The positive factor read from the environment, or 1.0 if the
+        variable is unset or empty.
+
     Raises:
         ValueError: If the environment variable is not a positive number.
     """
@@ -58,7 +62,14 @@ def time_scale() -> float:
 
 
 def scaled(seconds: float) -> float:
-    """A wait in seconds multiplied by the run's time scale."""
+    """A wait in seconds multiplied by the run's time scale.
+
+    Args:
+        seconds: The unscaled wait.
+
+    Returns:
+        `seconds` times the time scale.
+    """
     return seconds * time_scale()
 
 
@@ -335,7 +346,13 @@ class Measurement:
     method: str
 
     def problems(self) -> list[str]:
-        """Ways the measurement misses the declared objective."""
+        """Ways the measurement misses the declared objective.
+
+        Returns:
+            One message for each way the measurement misses the declared
+            objective: no recovery, a recovery time over the (scaled) objective,
+            an unmeasured recovery point or too much lost; empty if it meets it.
+        """
         goal = OBJECTIVE_OF[self.component]
         found = []
         if self.rto_seconds is None:
@@ -359,7 +376,12 @@ class Measurement:
         return found
 
     def to_dict(self) -> dict[str, Any]:
-        """A JSON-ready record."""
+        """A JSON-ready record.
+
+        Returns:
+            The component, the measured and objective RTO and RPO, the time
+            scale and the method as a dict.
+        """
         return {
             "component": self.component,
             "rto_seconds": None
@@ -407,7 +429,12 @@ class Result:
         self.status = FAILED if found else PASSED
 
     def to_dict(self) -> dict[str, Any]:
-        """A JSON-ready record."""
+        """A JSON-ready record.
+
+        Returns:
+            The fault id, status, environment, seconds, checks, measurements,
+            detail and problems as a dict.
+        """
         return {
             "fault_id": self.fault_id,
             "status": self.status,
@@ -434,6 +461,11 @@ class Runner:
     ) -> None:
         """Binds scenarios to the catalogue.
 
+        Args:
+            scenarios: Scenario functions by fault id.
+            catalogue: The faults that exist.
+            clock: Source of the monotonic time, in seconds.
+
         Raises:
             ValueError: If a scenario names a fault that is not in the
                 catalogue or that the catalogue says cannot run locally.
@@ -449,7 +481,16 @@ class Runner:
         self.clock = clock
 
     def run(self, only: Sequence[str] | None = None) -> dict[str, Any]:
-        """Runs every scenario (or ``only``) and reports all faults."""
+        """Runs every scenario (or ``only``) and reports all faults.
+
+        A scenario that raises is recorded as failed, not propagated.
+
+        Args:
+            only: Fault ids to run; all scenarios if None.
+
+        Returns:
+            The report built by `report`.
+        """
         results = []
         for fault in self.catalogue:
             scenario = self.scenarios.get(fault.id)
@@ -471,7 +512,16 @@ class Runner:
         return self.report(results)
 
     def not_run(self, fault: Fault, selected: bool) -> Result:
-        """The result of a fault with no scenario run."""
+        """The result of a fault with no scenario run.
+
+        Args:
+            fault: The fault.
+            selected: Whether a subset of faults was selected for this run.
+
+        Returns:
+            A not-run result stating why: not selected, no scenario provided or
+            that it needs a real cloud environment.
+        """
         if fault.local and selected:
             reason = "not selected in this run"
         elif fault.local:
@@ -486,7 +536,15 @@ class Runner:
         )
 
     def report(self, results: Sequence[Result]) -> dict[str, Any]:
-        """The report: results, objectives and what no provider ran."""
+        """The report: results, objectives and what no provider ran.
+
+        Args:
+            results: One result for each fault in the catalogue.
+
+        Returns:
+            The objectives, time scale, catalogue, results, summary counts and
+            whether every locally run fault passed.
+        """
         ran = [r for r in results if r.status != NOT_RUN]
         return {
             "objectives": [dataclasses.asdict(o) for o in OBJECTIVES],

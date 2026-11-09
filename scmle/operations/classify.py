@@ -87,7 +87,12 @@ class Classification:
     response: str
 
     def to_dict(self) -> dict[str, Any]:
-        """A JSON-ready record."""
+        """A JSON-ready record.
+
+        Returns:
+            The verdict, categories, breached and unobserved signal names,
+            caveats, severity and response, with enums as their values.
+        """
         return {
             "verdict": self.verdict.value,
             "categories": [c.value for c in self.categories],
@@ -104,7 +109,19 @@ def caveats_for(
     breached: Mapping[str, signals_module.Signal],
     unobserved: Sequence[str],
 ) -> list[str]:
-    """What a verdict leaves open."""
+    """What a verdict leaves open.
+
+    Args:
+        verdict: The verdict reached.
+        breached: The breached signals, by name.
+        unobserved: Names of the signals with insufficient data.
+
+    Returns:
+        Messages for what the verdict cannot exclude: drift without outcomes,
+        a data cause not judged for a model-performance verdict, or model
+        quality not observed during an infrastructure fault; empty if none
+        applies.
+    """
     found = []
     drift_only = set(breached) <= {"feature_psi_max", "unseen_category_rate"}
     if (
@@ -139,7 +156,15 @@ def caveats_for(
 
 
 def classify(signals: Sequence[signals_module.Signal]) -> Classification:
-    """Classifies a set of signals (see the module docstring)."""
+    """Classifies a set of signals (see the module docstring).
+
+    Args:
+        signals: The evaluated signals.
+
+    Returns:
+        The verdict with its categories, breached and unobserved signals,
+        caveats, severity and recommended response.
+    """
     breached = {s.name: s for s in signals if s.breached}
     unobserved = tuple(
         sorted(
@@ -192,7 +217,20 @@ def notification(
     trace_id: str,
     sent_at: str,
 ) -> dict[str, Any]:
-    """The document a pager or ticket sender posts for a classification."""
+    """The document a pager or ticket sender posts for a classification.
+
+    Args:
+        classification: The classification to announce.
+        incident_id: Identifier of the incident.
+        model_version: Version of the model that is served.
+        artifact_digest: Digest of the served artifact.
+        trace_id: Trace id of the evaluation.
+        sent_at: Timestamp of the notification.
+
+    Returns:
+        The notification fields: severity, verdict, a one-line summary,
+        breached signals, caveats, response and the identifying fields.
+    """
     return {
         "incident_id": incident_id,
         "severity": classification.severity,

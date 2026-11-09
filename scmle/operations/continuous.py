@@ -1,4 +1,4 @@
-"""Continuous evaluation on top of the F13 closed loop.
+"""Continuous evaluation on top of the closed loop.
 
 What this adds to `scmle.governance.loop.Loop`, and what it leaves alone:
 
@@ -63,18 +63,40 @@ DATA_FAULTS = frozenset(
 
 
 def canonical_csv(frame: pd.DataFrame) -> bytes:
-    """The bytes a dataset version is computed from."""
+    """The bytes a dataset version is computed from.
+
+    Args:
+        frame: The dataset.
+
+    Returns:
+        The UTF-8 CSV of the frame with columns sorted by name, no index
+        and newline line endings.
+    """
     ordered = frame.reindex(sorted(frame.columns), axis=1)
     return ordered.to_csv(index=False, lineterminator="\n").encode("utf-8")
 
 
 def dataset_version(frame: pd.DataFrame) -> str:
-    """``sha256:<hex>`` of the canonical CSV of a dataset."""
+    """``sha256:<hex>`` of the canonical CSV of a dataset.
+
+    Args:
+        frame: The dataset.
+
+    Returns:
+        The version string.
+    """
     return "sha256:" + hashlib.sha256(canonical_csv(frame)).hexdigest()
 
 
 def load_dataset(directory: str | pathlib.Path, version: str) -> pd.DataFrame:
     """Reads a preserved dataset back and checks its digest.
+
+    Args:
+        directory: The directory holding the preserved datasets.
+        version: The dataset version, as returned by `dataset_version`.
+
+    Returns:
+        The stored dataset.
 
     Raises:
         ValueError: If the stored copy no longer has the digest it is named
@@ -94,11 +116,18 @@ class TrainingHistory:
     """An append-only, hash-chained record of what was trained and decided."""
 
     def __init__(self, path: str | pathlib.Path) -> None:
-        """Opens (or starts) the history at ``path``."""
+        """Opens (or starts) the history at ``path``.
+
+        Args:
+            path: The history file.
+        """
         self.path = pathlib.Path(path)
 
     def rows(self) -> list[dict[str, Any]]:
         """Every row, verified.
+
+        Returns:
+            The rows, oldest first; empty if the file does not exist.
 
         Raises:
             ValueError: If the chain is broken.
@@ -128,7 +157,16 @@ class TrainingHistory:
         return found
 
     def record(self, kind: str, at: float, **facts: Any) -> dict[str, Any]:
-        """Appends one row and returns it."""
+        """Appends one row and returns it.
+
+        Args:
+            kind: The kind of event.
+            at: Time of the event, in seconds.
+            **facts: Facts recorded with the event.
+
+        Returns:
+            The row, with its sequence number, previous hash and own hash.
+        """
         rows = self.rows()
         content = {
             "seq": len(rows),
@@ -149,7 +187,14 @@ class TrainingHistory:
         return row
 
     def of_kind(self, kind: str) -> list[dict[str, Any]]:
-        """Rows of one kind, oldest first."""
+        """Rows of one kind, oldest first.
+
+        Args:
+            kind: The kind of event.
+
+        Returns:
+            The verified rows of that kind.
+        """
         return [row for row in self.rows() if row["kind"] == kind]
 
 
@@ -178,7 +223,13 @@ class RetrainPolicy:
     cooldown_batches: int = 20
 
     def __post_init__(self) -> None:
-        """Validates the choice and the bounds."""
+        """Validates the choice and the bounds.
+
+        Raises:
+            ValueError: If the mode is unknown, the minimum outcomes is below
+                one, the cooldown is negative, or the maximum age is not
+                positive.
+        """
         if self.mode not in MODES:
             raise ValueError(f"mode must be one of {MODES}")
         if self.min_outcomes < 1 or self.cooldown_batches < 0:
@@ -208,7 +259,11 @@ class RetrainDecision:
     alarm_gates_retrain: bool
 
     def to_dict(self) -> dict[str, Any]:
-        """A JSON-ready record."""
+        """A JSON-ready record.
+
+        Returns:
+            The decision's fields as a dict.
+        """
         return dataclasses.asdict(self)
 
 
@@ -220,6 +275,15 @@ def judge_retraining(
     batches_since_proposal: int | None,
 ) -> tuple[list[str], list[str], str | None]:
     """The pure part of the policy.
+
+    Args:
+        policy: The retraining policy.
+        rows: The current window's signals.
+        alarm_since_last: Whether the loop's alarm fired since the last
+            proposal.
+        age_days: Age of the model in days, or None.
+        batches_since_proposal: Batches since the last proposal, or None if
+            there was none.
 
     Returns:
         Primary reasons, supporting reasons and the reason for holding back
@@ -290,7 +354,12 @@ class MetricSpec:
     primary: bool = False
 
     def __post_init__(self) -> None:
-        """Validates the choices."""
+        """Validates the choices.
+
+        Raises:
+            ValueError: If the kind is not operational or business, `better`
+                is not higher or lower, or the margin is negative or not finite.
+        """
         if self.kind not in {"operational", "business"}:
             raise ValueError("kind must be operational or business")
         if self.better not in {"higher", "lower"}:
@@ -306,7 +375,19 @@ def bootstrap_difference(
     resamples: int,
     seed: int,
 ) -> tuple[float, float]:
-    """Percentile interval of mean(after) - mean(before)."""
+    """Percentile interval of mean(after) - mean(before).
+
+    Args:
+        before: Observations of the earlier period.
+        after: Observations of the later period.
+        alpha: Error level; the interval spans the alpha/2 to 1 - alpha/2
+            percentiles.
+        resamples: Number of bootstrap resamples.
+        seed: Seed of the resampling.
+
+    Returns:
+        The lower and upper bounds of the interval.
+    """
     rng = np.random.default_rng(seed)
     first = rng.choice(before, size=(resamples, len(before))).mean(axis=1)
     second = rng.choice(after, size=(resamples, len(after))).mean(axis=1)
@@ -337,6 +418,19 @@ def post_promotion_check(
 
     This is a comparison of two periods. It cannot separate the model from
     anything else that changed between them; the statement says so.
+
+    Args:
+        specs: The metrics to judge.
+        before: Observations of each metric in the earlier period.
+        after: Observations of each metric in the later period.
+        alpha: Joint error level over all metrics.
+        min_samples: Fewest observations in each period for a verdict.
+        resamples: Number of bootstrap resamples.
+        seed: Seed of the resampling.
+
+    Returns:
+        The overall verdict, one record per metric (verdict, interval and
+        sample counts) and a statement of what the comparison shows.
 
     Raises:
         ValueError: If a metric has no values for a period or ``specs`` is
@@ -425,6 +519,15 @@ def holdback_assignment(
     release. The hash is uniform, so each unit is held back independently
     with probability `fraction`.
 
+    Args:
+        unit_ids: Identifiers of the units.
+        fraction: Share of units to hold back, strictly between 0 and 1.
+        salt: Value mixed into the hash, for example the release id.
+
+    Returns:
+        A boolean array, True for each unit that stays on the previous
+        model.
+
     Raises:
         ValueError: If `fraction` is not strictly between 0 and 1.
     """
@@ -468,6 +571,25 @@ def holdback_check(
     the verdict is then capped at ``inconclusive`` and the statement says so.
     Otherwise the metric intervals and verdicts are those of
     `post_promotion_check`, with the holdback as the reference period.
+
+    Args:
+        specs: The metrics to judge.
+        holdback: Observations of each metric for the units kept on the
+            previous model.
+        promoted: Observations of each metric for the units on the promoted
+            model.
+        expected_fraction: The declared share of units held back, strictly
+            between 0 and 1.
+        alpha: Joint error level over all metrics.
+        min_samples: Fewest observations in each group for a verdict.
+        resamples: Number of bootstrap resamples.
+        seed: Seed of the resampling.
+        ratio_level: Level of the sample-ratio test.
+
+    Returns:
+        The result of `post_promotion_check` with the design, the
+        sample-ratio check and a statement added; the overall verdict is
+        capped at inconclusive when the split does not match.
 
     Raises:
         ValueError: As `post_promotion_check`, and for an
@@ -538,7 +660,12 @@ class Replacement:
     outcome: release_state.Outcome | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        """A JSON-ready record."""
+        """A JSON-ready record.
+
+        Returns:
+            Whether it was done, the reasons and the release outcome (or None)
+            as a dict.
+        """
         return {
             "done": self.done,
             "reasons": list(self.reasons),
@@ -560,7 +687,7 @@ class ContinuousEvaluation:
         """Creates the evaluation around an opened loop.
 
         Args:
-            loop: The F13 loop of the deployment.
+            loop: The closed loop of the deployment.
             directory: Where history, retained outcomes and datasets live.
             policy: The retraining policy.
             retrain: Trains and stages a challenger, returns its name. Needed
@@ -584,7 +711,12 @@ class ContinuousEvaluation:
     # -- feeding -----------------------------------------------------------
 
     def retain(self, kind: str, values: Mapping[str, Any]) -> None:
-        """Keeps raw labels or outcomes with the batch they arrived at."""
+        """Keeps raw labels or outcomes with the batch they arrived at.
+
+        Args:
+            kind: The kind of values, for example ``business_outcomes``.
+            values: The raw values by case id.
+        """
         line = json.dumps(
             {
                 "at": round(self.clock(), 3),
@@ -641,6 +773,15 @@ class ContinuousEvaluation:
         as bad as it gets for the purpose of the loop and is declared by the
         owner of the metric, not inferred.
 
+        Args:
+            outcomes: The outcome of each case, by case id.
+            cap: The outcome that counts as the worst possible loss.
+            challengers: The outcomes the challengers would have had, by
+                challenger name and case id.
+
+        Returns:
+            The number of cases the loop matched to earlier batches.
+
         Raises:
             ValueError: If ``cap`` is not positive or an outcome is negative.
         """
@@ -655,7 +796,12 @@ class ContinuousEvaluation:
         return self.loop.mature(losses, challengers=paired or None)
 
     def advance(self) -> loop_module.StepResult:
-        """Steps the loop and writes new proposals to the history."""
+        """Steps the loop and writes new proposals to the history.
+
+        Returns:
+            The loop's step result; new promotion proposals are also written to
+            the history.
+        """
         before = len(self.loop.ledger.rows)
         result = self.loop.step()
         for row in self.loop.ledger.rows[before:]:
@@ -676,6 +822,15 @@ class ContinuousEvaluation:
 
         A proposal always goes through `Loop.escalate`. In ``trigger`` mode a
         challenger is also trained and registered with the loop at once.
+
+        Args:
+            rows: The window's signals.
+            age_days: Age of the model in days, if known.
+
+        Returns:
+            The decision: none, with the reason for holding back if there was a
+            primary reason, or the policy's mode with the escalation and, in
+            trigger mode, the challenger.
         """
         alarms = sum(
             1
@@ -726,7 +881,11 @@ class ContinuousEvaluation:
         return decision
 
     def pending_id(self) -> str | None:
-        """Id of the pending retrain question, if one is open."""
+        """Id of the pending retrain question, if one is open.
+
+        Returns:
+            The identifier of the open retrain escalation, or None.
+        """
         for item in self.loop.pending_escalations():
             if item.question.get("action") == RETRAIN_QUESTION:
                 return item.id
@@ -734,6 +893,9 @@ class ContinuousEvaluation:
 
     def start_challenger(self, reasons: Sequence[str]) -> str | None:
         """Trains a challenger with the hook and registers it with the loop.
+
+        Args:
+            reasons: Why the challenger is trained, recorded in the ledger.
 
         Returns:
             The challenger's name, or None if there is no hook or the loop
@@ -760,6 +922,12 @@ class ContinuousEvaluation:
 
     def run_approved_retrain(self, escalation_id: str) -> str | None:
         """Trains a challenger once a person has approved the recommendation.
+
+        Args:
+            escalation_id: The retrain escalation that was answered.
+
+        Returns:
+            The challenger's name, or None if none was started.
 
         Raises:
             ValueError: If no allowing, signed reply to this escalation is in
@@ -820,7 +988,12 @@ class ContinuousEvaluation:
         )
 
     def promotion_proposals(self) -> list[str]:
-        """Challengers the loop's e-process proposed, oldest first."""
+        """Challengers the loop's e-process proposed, oldest first.
+
+        Returns:
+            The names of the challengers the loop proposed for promotion, in
+            order of proposal.
+        """
         return [
             str(r["body"]["name"])
             for r in self.loop.ledger.rows
@@ -840,6 +1013,17 @@ class ContinuousEvaluation:
 
         This is the offline check (`ChampionChallenger`, a paired bootstrap).
         The sequential evidence on live traffic is the loop's own e-process.
+
+        Args:
+            champion: The current model bundle.
+            challenger: The candidate bundle.
+            data: Rows with the model inputs.
+            outcomes: The observed outcome of each row.
+            metric_name: The metric to compare; the default if None.
+            seed: Seed of the bootstrap.
+
+        Returns:
+            The comparison.
         """
         result = champion_module.ChampionChallenger(
             champion, challenger, seed=seed
@@ -871,6 +1055,20 @@ class ContinuousEvaluation:
         challenger, (2) the promotion gate admits the candidate and (3) the
         release registry has a valid approval for it. The registry changes
         only after the runtime confirms.
+
+        Args:
+            challenger: Name of the challenger.
+            release: The release registry.
+            plane: The control plane of the platform.
+            candidate: The candidate the gate judges.
+            key: Key that verifies the approval and the gate evidence.
+            health: Called after each traffic step; reasons stop the rollout.
+            steps: Traffic shares to pass through, ending in 100.
+            comparison: An offline comparison, which must favour promotion if
+                given.
+
+        Returns:
+            Whether the replacement was done and, if not, the reasons.
         """
         reasons = []
         if challenger not in self.promotion_proposals():
@@ -915,7 +1113,17 @@ class ContinuousEvaluation:
         after: Mapping[str, Sequence[float]],
         **options: Any,
     ) -> dict[str, Any]:
-        """Runs `post_promotion_check` and records the result."""
+        """Runs `post_promotion_check` and records the result.
+
+        Args:
+            specs: The metrics to judge.
+            before: Observations of each metric in the earlier period.
+            after: Observations of each metric in the later period.
+            **options: Further options of `post_promotion_check`.
+
+        Returns:
+            The result of `post_promotion_check`.
+        """
         result = post_promotion_check(specs, before, after, **options)
         self.history.record("post_promotion_check", self.clock(), **result)
         return result

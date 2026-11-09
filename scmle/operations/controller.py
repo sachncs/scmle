@@ -71,7 +71,11 @@ class ControllerPolicy:
     max_unlabelled_ticks: int = 5
 
     def __post_init__(self) -> None:
-        """Both counts are at least one."""
+        """Both counts are at least one.
+
+        Raises:
+            ValueError: If a tick limit is below one.
+        """
         if self.max_idle_ticks < 1 or self.max_unlabelled_ticks < 1:
             raise ValueError("tick limits must be at least 1")
 
@@ -97,7 +101,12 @@ class TickResult:
     escalations: tuple[str, ...]
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready form."""
+        """JSON-ready form.
+
+        Returns:
+            The status, counts, rejected file names, events and open
+            escalations as a dict.
+        """
         return {
             "status": self.status,
             "observed": self.observed,
@@ -109,7 +118,14 @@ class TickResult:
 
 
 def file_digest(path: pathlib.Path) -> str:
-    """SHA-256 of a file's bytes."""
+    """SHA-256 of a file's bytes.
+
+    Args:
+        path: The file.
+
+    Returns:
+        The hex digest.
+    """
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
@@ -161,7 +177,13 @@ class Controller:
     # ------------------------------------------------------------ authority
 
     def authorized_retrain(self) -> str | None:
-        """The loop's retrain hook: spend an envelope, then train."""
+        """The loop's retrain hook: spend an envelope, then train.
+
+        Returns:
+            The name of the challenger that was trained, or None if no envelope
+            authorized the retrain, none is configured or the training failed;
+            each of those cases opens an escalation.
+        """
         loop = self.loop
         try:
             used = self.envelopes.authorize(
@@ -187,17 +209,34 @@ class Controller:
     # -------------------------------------------------------------- journal
 
     def journal(self, body: Mapping[str, Any]) -> None:
-        """Chains a controller row and moves the loop's state with it."""
+        """Chains a controller row and moves the loop's state with it.
+
+        Args:
+            body: The row content.
+        """
         self.loop.ledger.commit(ledger_module.CONTROLLER, dict(body))
         self.loop.save_state()
 
     def mark(self, label: str) -> None:
-        """Reports progress to the crash-test seam."""
+        """Reports progress to the crash-test seam.
+
+        Args:
+            label: Names the point reached; passed to the checkpoint callback
+                if one is set.
+        """
         if self.checkpoint is not None:
             self.checkpoint(label)
 
     def trailing(self, test: Callable[[Mapping[str, Any]], bool]) -> int:
-        """Consecutive newest tick rows for which `test(body)` holds."""
+        """Consecutive newest tick rows for which `test(body)` holds.
+
+        Args:
+            test: Called with a tick row's body.
+
+        Returns:
+            The number of consecutive newest tick rows that satisfy the test;
+            other rows are skipped.
+        """
         count = 0
         for row in reversed(self.loop.ledger.rows):
             body = row["body"]
@@ -216,7 +255,14 @@ class Controller:
     def reject(
         self, what: str, path: pathlib.Path, digest: str, why: str
     ) -> None:
-        """Records a file that cannot be applied, once, and asks a person."""
+        """Records a file that cannot be applied, once, and asks a person.
+
+        Args:
+            what: The kind of input, batches or labels.
+            path: The rejected file.
+            digest: The file's digest.
+            why: Why it cannot be applied.
+        """
         self.journal(
             {
                 "phase": ledger_module.REJECTED,
@@ -232,7 +278,18 @@ class Controller:
 
     @staticmethod
     def read(path: pathlib.Path, required: tuple[str, ...]) -> pd.DataFrame:
-        """A CSV with the required columns and at least one row."""
+        """A CSV with the required columns and at least one row.
+
+        Args:
+            path: The CSV file.
+            required: Column names that must be present.
+
+        Returns:
+            The file's rows.
+
+        Raises:
+            ValueError: If a required column is missing or the file has no rows.
+        """
         frame = pd.read_csv(path)
         for name in required:
             if name not in frame.columns:
@@ -242,7 +299,11 @@ class Controller:
         return frame
 
     def run_batch(self, path: pathlib.Path) -> None:
-        """Gives the loop one batch file."""
+        """Gives the loop one batch file.
+
+        Args:
+            path: A CSV with ``prediction`` and ``decision`` columns.
+        """
         frame = self.read(path, ("prediction", "decision"))
         self.loop.observe(
             frame, frame["prediction"].tolist(), frame["decision"].tolist()
@@ -254,6 +315,12 @@ class Controller:
         Columns: ``case_id`` and ``loss``; optionally ``covered`` and one
         ``challenger:<name>`` column per challenger with its loss on the same
         case (empty where it was not scored).
+
+        Args:
+            path: The labels CSV.
+
+        Returns:
+            The number of cases the loop matched to earlier batches.
         """
         frame = self.read(path, ("case_id", "loss"))
         identities = frame["case_id"].astype(str)
@@ -280,14 +347,32 @@ class Controller:
         )
 
     def run(self, what: str, path: pathlib.Path) -> int:
-        """Gives the loop one file of either kind."""
+        """Gives the loop one file of either kind.
+
+        Args:
+            what: The kind of input, batches or labels.
+            path: The file.
+
+        Returns:
+            The number of cases matched for a labels file; 0 for a batch file.
+        """
         if what == BATCHES:
             self.run_batch(path)
             return 0
         return self.run_labels(path)
 
     def apply(self, what: str, path: pathlib.Path, digest: str) -> int:
-        """Journals the intent, applies one file and journals the result."""
+        """Journals the intent, applies one file and journals the result.
+
+        Args:
+            what: The kind of input, batches or labels.
+            path: The file.
+            digest: The file's digest.
+
+        Returns:
+            The number of cases matched for a labels file; 0 for a batch file
+            or a file that was rejected.
+        """
         try:
             if what == BATCHES:
                 self.read(path, ("prediction", "decision"))
@@ -319,7 +404,16 @@ class Controller:
         return matched
 
     def recover(self, inbox: pathlib.Path) -> bool:
-        """Finishes inputs whose intent has no result; False if it cannot."""
+        """Finishes inputs whose intent has no result; False if it cannot.
+
+        Args:
+            inbox: The inbox directory holding the batch and label files.
+
+        Returns:
+            True if every unfinished input was completed; False if the loop
+            state is unclear or a file changed, in which case the loop is
+            halted.
+        """
         ledger = self.loop.ledger
         for digest, intent in list(ledger.intents.items()):
             if digest in ledger.consumed:
@@ -348,7 +442,12 @@ class Controller:
         return True
 
     def stop(self, reason: str, name: str) -> None:
-        """Halts the loop and asks a person; used when it cannot go on."""
+        """Halts the loop and asks a person; used when it cannot go on.
+
+        Args:
+            reason: Why the controller stops.
+            name: The file involved.
+        """
         self.loop.enter_halt(reason, {"file": name})
         self.loop.escalate(reason, {"file": name})
         self.loop.save_state()
@@ -356,7 +455,15 @@ class Controller:
     def fresh(
         self, inbox: pathlib.Path, folder: str
     ) -> list[tuple[pathlib.Path, str]]:
-        """Files of a folder not yet applied or rejected, oldest name first."""
+        """Files of a folder not yet applied or rejected, oldest name first.
+
+        Args:
+            inbox: The inbox directory.
+            folder: The sub-folder to scan.
+
+        Returns:
+            Pairs of path and digest for the CSV files, in name order.
+        """
         ledger = self.loop.ledger
         found = []
         for path in sorted((inbox / folder).glob("*.csv")):
@@ -368,7 +475,15 @@ class Controller:
     # ----------------------------------------------------------------- tick
 
     def tick(self, inbox: str | pathlib.Path) -> TickResult:
-        """Applies the new inbox files, steps the loop and journals the tick."""
+        """Applies the new inbox files, steps the loop and journals the tick.
+
+        Args:
+            inbox: The inbox directory with its batch and label folders.
+
+        Returns:
+            The report of the tick; its status is halted, with nothing
+            applied, if the loop is halted or recovery fails.
+        """
         folder = pathlib.Path(inbox)
         loop = self.loop
         if loop.halted or not self.recover(folder):
@@ -428,7 +543,18 @@ class Controller:
         rejected: tuple[str, ...],
         events: tuple[tuple[str, str], ...],
     ) -> TickResult:
-        """Builds the report, with the escalations now open."""
+        """Builds the report, with the escalations now open.
+
+        Args:
+            status: The loop's status.
+            observed: Number of batches applied.
+            matured: Number of cases matched.
+            rejected: Names of the rejected files.
+            events: The loop's events.
+
+        Returns:
+            The tick report.
+        """
         return TickResult(
             status,
             observed,
@@ -439,7 +565,13 @@ class Controller:
         )
 
     def status(self) -> dict[str, Any]:
-        """The controller's state as JSON-ready data."""
+        """The controller's state as JSON-ready data.
+
+        Returns:
+            Whether the loop is halted, the batch counter, the numbers of
+            applied and rejected inputs, the open escalations, the uses left
+            per envelope and whether an alarm gates retraining.
+        """
         ledger = self.loop.ledger
         return {
             "halted": self.loop.halted,
