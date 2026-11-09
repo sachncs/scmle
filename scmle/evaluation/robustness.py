@@ -109,7 +109,9 @@ class GaussianNoise(Stressor):
             rng: Source of randomness.
 
         Returns:
-            A copy in which every numeric column has normal noise added.
+            A copy in which every numeric column has normal noise added,
+            with standard deviation `scale` times the column's own (no
+            change when that is 0).
         """
         damaged = features.copy()
         for column in inputs.feature_plan.numeric:
@@ -183,7 +185,8 @@ class RobustnessReport(diagnostics.Diagnostic):
         """Chooses the scenarios (the standard ones by default).
 
         Args:
-            stressors: The scenarios to run, or None for `default_stressors`.
+            stressors: The scenarios to run; None or an empty tuple selects
+                `default_stressors`.
         """
         self.stressors = stressors or default_stressors()
 
@@ -194,10 +197,12 @@ class RobustnessReport(diagnostics.Diagnostic):
             inputs: The fitted candidate and evaluation data.
 
         Returns:
-            The clean score and, per scenario, the score and the loss in the
-            metric's own units (positive means worse) and relative to the
-            clean score, plus the sorted names of scenarios whose relative
-            loss exceeds `FRAGILE_DROP`.
+            A mapping with `metric` (name), `clean_score`, `scenarios` and
+            `fragile_under`. `scenarios` maps each stressor name to its
+            `score`, `loss` in the metric's own units (positive means worse)
+            and `relative_loss` (loss over the absolute clean score; 0 when
+            the clean score is 0). `fragile_under` lists, sorted, the
+            scenarios whose relative loss exceeds `FRAGILE_DROP`.
         """
         metric = inputs.metric
         clean = metric.score(

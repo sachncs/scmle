@@ -14,7 +14,7 @@ def top_label_curve(
     classes: Sequence[Any],
     bins: int = BINS,
 ) -> tuple[float, list[dict[str, float]]]:
-    """Confidence against accuracy of the most likely class.
+    """Computes confidence against accuracy of the most likely class.
 
     Rows are binned by the probability of the predicted class; in a calibrated
     model the share predicted correctly in each bin matches the bin's mean
@@ -27,8 +27,9 @@ def top_label_curve(
         bins: Number of equal-width confidence bins.
 
     Returns:
-        The expected calibration error and the curve, one entry per bin that
-        holds rows.
+        The expected calibration error and the curve. The curve has one
+        mapping per bin that holds rows, in bin order, with keys `bin`
+        (index), `count`, `mean_confidence` and `accuracy`.
     """
     matrix = np.asarray(probabilities, dtype=float)
     guess = np.asarray(classes)[matrix.argmax(axis=1)]

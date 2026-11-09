@@ -37,8 +37,12 @@ class AdversarialValidation(diagnostics.Diagnostic):
                 `reference_features`.
 
         Returns:
-            The separability AUC (0.5 means indistinguishable), a verdict,
-            and the features whose distributions differ most.
+            A mapping `{"available": False, "reason": "no reference rows"}`
+            when `inputs` has no reference rows. Otherwise a mapping with
+            `available` true, the out-of-fold separability `auc` (0.5 means
+            indistinguishable), its `verdict`, the `odds` summary, the
+            `most_shifted` features and the sampled `rows` counts for the
+            reference and evaluation sets.
         """
         reference = inputs.reference_features
         if reference is None:
@@ -73,7 +77,7 @@ class AdversarialValidation(diagnostics.Diagnostic):
 
     @staticmethod
     def odds(scores: np.ndarray, reference_rows: int) -> dict[str, Any]:
-        """The odds that weighted conformal would use, from the same scores.
+        """Returns the odds that weighted conformal would use.
 
         The out-of-fold probability `p` that a row is an evaluation row
         gives the odds `p / (1 - p)`, corrected for the sample sizes and
@@ -91,8 +95,8 @@ class AdversarialValidation(diagnostics.Diagnostic):
             The clip, the size correction, summaries (mean, 95th percentile,
             maximum, clipped share, effective size) of the odds on the
             reference and on the evaluation rows, whether weighted conformal
-            is `possible` or `refused` by the reference effective size, and a
-            note.
+            is `possible` or `refused` by the reference effective size, the
+            minimum effective size used for that decision, and a note.
         """
         new_rows = len(scores) - reference_rows
         clip = shift_weights.DEFAULT_CLIP
@@ -153,7 +157,7 @@ class AdversarialValidation(diagnostics.Diagnostic):
     def encode(
         frame: pd.DataFrame, inputs: diagnostics.DiagnosticInput
     ) -> pd.DataFrame:
-        """Numeric view of the rows: numbers as is, categories as codes.
+        """Returns a numeric view: numbers as is, categories as codes.
 
         Args:
             frame: Rows holding the feature columns.
@@ -199,8 +203,9 @@ class AdversarialValidation(diagnostics.Diagnostic):
         Numeric features use `2 * |AUC - 0.5|` of the single feature as a
         classifier of old versus new rows; categorical features use the
         total-variation distance between level frequencies. Both lie in
-        [0, 1] and are comparable as a ranking. A numeric feature with fewer
-        than two non-missing values is left out.
+        [0, 1] and are comparable as a ranking. A numeric feature is left out
+        when it has fewer than two non-missing values or when its non-missing
+        values come from only one of the two sets.
 
         Args:
             old: Sampled reference rows.
@@ -209,8 +214,8 @@ class AdversarialValidation(diagnostics.Diagnostic):
                 categorical columns.
 
         Returns:
-            Up to `TOP_FEATURES` entries of feature name and distance,
-            largest distance first.
+            Up to `TOP_FEATURES` mappings with keys `feature` and
+            `distance`, largest distance first.
         """
         found = []
         for column in inputs.feature_plan.numeric:

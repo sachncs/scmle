@@ -33,9 +33,12 @@ class SliceReport(diagnostics.Diagnostic):
             inputs: The fitted candidate and evaluation data.
 
         Returns:
-            The overall score, every scored slice with its support and gap
-            to the overall score (positive means worse than overall), the
-            worst slices, and how many were skipped for lack of support.
+            A mapping with `metric` (name), the `overall` score, `slices`,
+            `worst` and `skipped_for_support`. `slices` lists every scored
+            slice (`feature`, `slice`, `rows`, `score`, `gap`), largest gap
+            first, where the gap to the overall score is positive when the
+            slice is worse. `worst` is the first `WORST` of them, and
+            `skipped_for_support` counts slices that could not be scored.
         """
         metric = inputs.metric
         overall = metric.score(
@@ -79,16 +82,18 @@ class SliceReport(diagnostics.Diagnostic):
     def assignments(
         self, inputs: diagnostics.DiagnosticInput
     ) -> list[tuple[str, pd.Series]]:
-        """Slice labels for each feature used to slice the data.
+        """Returns slice labels for each feature used to slice the data.
 
         Args:
             inputs: The fitted candidate, evaluation data and feature plan.
 
         Returns:
             Up to `MAX_FEATURES` pairs of feature name and a slice label per
-            row: the level for a categorical feature with at most
-            `MAX_LEVELS` levels, or a quantile band for a numeric feature
-            (not used for rank-based metrics).
+            row, categorical features first: the level for a categorical
+            feature with between two and `MAX_LEVELS` levels, or a quantile
+            band (missing where the value is missing) for a numeric feature
+            with more than `BANDS` distinct values. Numeric features are not
+            used for rank-based metrics.
         """
         plan = inputs.feature_plan
         found: list[tuple[str, pd.Series]] = []
@@ -118,7 +123,7 @@ class SliceReport(diagnostics.Diagnostic):
         Returns:
             The metric on the slice, or None when it has fewer than
             `MIN_SUPPORT` rows, a classification slice holds one class, or
-            the metric cannot be computed.
+            the metric raises `ValueError`.
         """
         if rows.sum() < MIN_SUPPORT:
             return None

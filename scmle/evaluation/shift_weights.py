@@ -25,14 +25,15 @@ class WeightRefusedError(ValueError):
 
 @dataclasses.dataclass(frozen=True)
 class ShiftWeights:
-    """Estimated likelihood ratios.
+    """Estimated likelihood ratios of calibration and target rows.
 
     Attributes:
         calibration: Weights of the calibration rows.
         target: Weights of the target rows.
         effective_size: Kish effective size of the calibration weights.
-        clip: Upper bound applied to the odds.
-        discriminator: The fitted classifier (target = 1).
+        clip: Upper bound applied to the size-corrected odds.
+        discriminator: The fitted classifier (target = 1); None when not
+            kept, in which case `ratio` cannot be used.
         scale: Calibration rows over target rows, the odds correction.
     """
 
@@ -44,7 +45,7 @@ class ShiftWeights:
     scale: float = 1.0
 
     def ratio(self, features: np.ndarray) -> np.ndarray:
-        """Clipped likelihood ratio at new rows (for test-point weights).
+        """Returns the clipped likelihood ratio at new rows.
 
         Args:
             features: Numeric feature matrix of the new rows, with the
@@ -61,7 +62,7 @@ class ShiftWeights:
 
 
 def effective_sample_size(weights: np.ndarray) -> float:
-    """`(sum w)^2 / sum w^2`.
+    """Returns the Kish effective sample size `(sum w)^2 / sum w^2`.
 
     Args:
         weights: Non-negative weights.
@@ -86,7 +87,7 @@ def estimate_weights(
         calibration: Covariate matrix of the calibration rows.
         target: Covariate matrix of the unlabeled target rows, with the same
             columns.
-        clip: Upper bound applied to the odds.
+        clip: Upper bound applied to the size-corrected odds.
         minimum: Smallest acceptable effective sample size.
 
     Returns:
@@ -134,7 +135,7 @@ class StoredShiftWeights:
     columns: tuple[str, ...]
 
     def test_weights(self, frame: Any) -> np.ndarray:
-        """Likelihood ratios of new rows, read from `columns`.
+        """Returns the likelihood ratios of new rows, read from `columns`.
 
         Args:
             frame: Rows holding the numeric feature columns.

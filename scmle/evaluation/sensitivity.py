@@ -38,7 +38,7 @@ class Spread:
     Attributes:
         scores: The individual scores.
         mean: Their mean.
-        std: Sample standard deviation.
+        std: Sample standard deviation (0.0 for a single score).
         range: Largest minus smallest score.
     """
 
@@ -65,8 +65,8 @@ class SensitivityReport:
         resample: Spread over bootstrap resamples of the training rows.
         split: Spread over random train/test splits.
         noise: Mean score at each added-noise level.
-        decay: Score lost per unit of added noise (least-squares slope,
-            negative when noise hurts).
+        decay: Least-squares slope of the score on the noise level, so
+            negative when noise hurts.
     """
 
     seed: Spread
@@ -91,7 +91,7 @@ class SensitivityReport:
         }
 
     def dominant(self) -> str:
-        """Which source moves the score most: seed, resample or split.
+        """Returns which source moves the score most: seed, resample or split.
 
         Returns:
             The name of the spread with the largest standard deviation.
@@ -123,7 +123,7 @@ def spread_of(scores: list[float]) -> Spread:
 
 
 def reseeded(build: Callable[[], base.BaseEstimator], seed: int) -> Any:
-    """A fresh estimator with its random seed set, when it has one.
+    """Builds a fresh estimator with its random seed set, when it has one.
 
     Args:
         build: Creates an unfitted estimator.
@@ -146,9 +146,12 @@ def training_sensitivity(
     repeats: int = 10,
     seed: int = 0,
 ) -> tuple[Spread, Spread]:
-    """Spread over training seeds and over bootstrap resamples.
+    """Computes the spread over training seeds and bootstrap resamples.
 
-    One fixed split is used so that only training varies.
+    One fixed split (30% held out) is used so that only training varies. The
+    seed spread refits on the same rows with `random_state` 0 to
+    `repeats - 1`; the resample spread refits on bootstrap resamples of the
+    training rows with `random_state` fixed at `seed`.
 
     Args:
         build: Creates an unfitted estimator.
@@ -189,7 +192,10 @@ def evaluation_sensitivity(
     repeats: int = 10,
     seed: int = 0,
 ) -> Spread:
-    """Spread of the score over random train/test splits.
+    """Computes the spread of the score over random train/test splits.
+
+    Each split holds out 30% of the rows and the estimator's `random_state`
+    is fixed at `seed`.
 
     Args:
         build: Creates an unfitted estimator.
@@ -246,7 +252,7 @@ def performance_sensitivity(
     repeats: int = 5,
     seed: int = 0,
 ) -> tuple[dict[float, float], float]:
-    """Score of a fitted model as noise is added to the features.
+    """Scores a fitted model as noise is added to the features.
 
     Args:
         model: A fitted estimator.
@@ -284,7 +290,11 @@ def analyze(
     repeats: int = 10,
     seed: int = 0,
 ) -> SensitivityReport:
-    """Training, evaluation and performance sensitivity of one model.
+    """Computes training, evaluation and performance sensitivity of a model.
+
+    The noise curve is computed for a model fitted on the 70% training part of
+    the same split as `training_sensitivity`, scored on the held-out 30% with
+    the default noise levels and draws.
 
     Args:
         build: Creates an unfitted estimator.

@@ -75,9 +75,9 @@ class ReleaseFinding:
                 `blocking` is not a bool, `evidence` is not a tuple,
                 `observed` or `expected` is a bool, or is neither a number,
                 text nor None.
-            ValueError: If `name` or `reason` is blank, an evidence item is
-                blank or repeated, or a numeric `observed` or `expected`
-                is not finite.
+            ValueError: If `name` or `reason` is not a string or is blank,
+                an evidence item is not a string, is blank or is repeated,
+                or a numeric `observed` or `expected` is not finite.
         """
         if not isinstance(self.kind, FindingKind):
             raise TypeError("kind must be FindingKind")
@@ -232,8 +232,9 @@ class ReleaseReadinessSummary:
         """Validates summary counts, status, and kind coverage.
 
         Raises:
-            ValueError: If `task` is blank, `policy_schema_version` is not
-                a non-negative integer, a count is negative, the counts are
+            ValueError: If `task` is not a string or is blank,
+                `policy_schema_version` is not a non-negative integer, a
+                count is negative, the counts are
                 inconsistent with one another, `status` does not match
                 `blocking_failures`, `counts_by_kind` does not cover every
                 finding kind, or its totals differ from the aggregate counts.
@@ -377,10 +378,10 @@ class ReleaseEvaluation:
         """Ensures the aggregate outcome agrees with its findings.
 
         Raises:
-            ValueError: If `task` is blank, `policy_schema_version` is
-                negative, `blocking_reasons` differs from the reasons of
-                the failed blocking findings, or `passed` disagrees with
-                them.
+            ValueError: If `task` is not a string or is blank,
+                `policy_schema_version` is negative, `blocking_reasons`
+                differs from the reasons of the failed blocking findings,
+                or `passed` disagrees with them.
             TypeError: If `passed` is not a bool, `findings` is not a tuple
                 of `ReleaseFinding`, or `blocking_reasons` is not a tuple.
         """
@@ -522,7 +523,8 @@ def fairness_metric_values(report: Any, metric: str) -> tuple[float, ...]:
     Fairness reports may be keyed by sensitive column, or may be wrapped in a
     named report entry. The traversal accepts JSON-like mappings and lists and
     ignores unrelated scalar fields. A non-numeric metric value is not treated
-    as a passing value.
+    as a passing value, and a mapping or list stored under `metric` itself is
+    not searched further.
 
     Args:
         report: A nested JSON-like report of mappings, lists and tuples.
@@ -806,13 +808,17 @@ def evaluate_release(
         diagnostic_reports: Diagnostic reports keyed by diagnostic name.
         fairness_reports: Fairness reports keyed by report name or a direct
             JSON-like fairness report.
-        evidence_index: Accepted release evidence records keyed by the
-            references declared in ``policy``.
+        evidence_index: Evidence index to look the references declared in
+            ``policy`` up in; None or any other type blocks release when the
+            policy declares any reference.
 
     Returns:
-        An immutable evaluation. A warning diagnostic may produce a failed
-        finding without blocking. Unsupported inputs, failed blocking gates,
-        and missing or unaccepted evidence always block.
+        An immutable evaluation. A `policy` that is not an
+        ``EvaluationPolicy`` yields a blocked evaluation with task
+        ``"unknown"`` and one input finding. Otherwise a warning diagnostic
+        may produce a failed finding without blocking. Unsupported inputs,
+        failed blocking gates, and missing or unaccepted evidence always
+        block.
 
     Raises:
         ValueError: If a required explanation quality measure has no

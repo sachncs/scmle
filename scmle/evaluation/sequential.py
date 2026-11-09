@@ -133,8 +133,9 @@ class SequentialEstimationPolicy:
     Attributes:
         confidence_level: Two-sided confidence level of the intervals, in
             (0, 1).
-        propensity_clip: Positivity bound in (0, 0.5); fitted propensities
-            must lie within `[propensity_clip, 1 - propensity_clip]`.
+        propensity_clip: Positivity bound in (0, 0.5); fitted denominator
+            propensities must lie within
+            `[propensity_clip, 1 - propensity_clip]`.
         maximum_weight: Finite cap, greater than 1, applied to the
             cumulative stabilized weight.
         missingness: Either "reject" (any missing value is an error) or
@@ -148,8 +149,10 @@ class SequentialEstimationPolicy:
             per period and in each regime.
         minimum_effective_sample_size: Minimum Kish effective sample size of
             the truncated weights per period and per regime.
-        reference_tolerance: Largest absolute difference allowed between the
-            primary regime means and their independent recomputation.
+        reference_tolerance: Largest absolute difference between a primary
+            regime mean and its independent recomputation that still counts
+            as agreement; a larger difference is recorded in the reference
+            record and does not raise.
     """
 
     confidence_level: float = 0.95
@@ -506,8 +509,11 @@ class SequentialEstimationResult:
         """Returns a JSON-compatible sequential report.
 
         Returns:
-            All report fields keyed by field name, with nested objects
-            converted to dictionaries and tuples to lists.
+            All report fields keyed by field name. The estimand, policy,
+            periods and regimes are the dictionaries from their own
+            `to_dict` (tuples inside them stay tuples); `contrast_interval`
+            and `covariance` are lists; `diagnostics`, `limitations` and
+            `reference` are shallow dictionary copies.
         """
         return {
             "estimand": self.estimand.to_dict(),
@@ -543,10 +549,13 @@ class SequentialEstimationResult:
         return hashlib.sha256(content).hexdigest()
 
     def write(self, path: str | Path) -> str:
-        """Atomically write a digest-bound report.
+        """Atomically writes a digest-bound report.
 
-        The report is written to a temporary file in the destination
-        directory, flushed, and renamed over the destination.
+        The envelope holds `schema_version` 1, the `to_dict` report and its
+        `digest`. It is written as sorted-key JSON to a temporary file in the
+        destination directory, flushed, renamed over the destination, and the
+        directory is then synced. On any failure the temporary file is
+        removed and the exception propagates.
 
         Args:
             path: Destination file; missing parent directories are created.
@@ -555,7 +564,9 @@ class SequentialEstimationResult:
             The report digest stored in the envelope.
 
         Raises:
-            RuntimeError: If the temporary file path was not recorded.
+            RuntimeError: If the temporary file path was not recorded
+                (not reachable in practice, since it is set on entering
+                the file context).
         """
         destination = Path(path)
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -593,6 +604,9 @@ class SequentialEstimationResult:
     def read(cls, path: str | Path) -> "SequentialEstimationResult":
         """Reads and verifies an atomic report envelope.
 
+        An unreadable or malformed file raises the underlying OS or JSON
+        error.
+
         Args:
             path: File previously written by `write`.
 
@@ -626,6 +640,8 @@ class SequentialEstimationResult:
         cls, record: Mapping[str, Any]
     ) -> "SequentialEstimationResult":
         """Rebuilds a result from its JSON-compatible representation.
+
+        A missing key raises `KeyError`.
 
         Args:
             record: Mapping in the form produced by `to_dict`.
@@ -692,7 +708,7 @@ class SequentialEstimationResult:
 
 
 class SequentialIPWEstimator:
-    """Estimate a sustained-treatment contrast with stabilized sequential IPW.
+    """Estimates a sustained-treatment contrast with stabilized sequential IPW.
 
     Attributes:
         estimand: The declared estimand.
@@ -956,7 +972,7 @@ def prepare_sequential_frame(
     estimand: SequentialEstimand,
     policy: SequentialEstimationPolicy,
 ) -> tuple[pd.DataFrame, int, int, int]:
-    """Validates and prepares a balanced numeric long-format panel.
+    """Validates and prepares a balanced long-format panel.
 
     Args:
         frame: Long-format panel to check.
@@ -964,8 +980,9 @@ def prepare_sequential_frame(
         policy: Supplies the missingness rule and the minimum subject count.
 
     Returns:
-        A tuple of the prepared frame (declared columns only, numeric,
-        without dropped subjects), the number of rows dropped, the number of
+        A tuple of the prepared frame (declared columns only, with the
+        treatment, outcome and covariate columns converted to numeric and
+        dropped subjects removed), the number of rows dropped, the number of
         distinct subjects in the input, and the number of subjects dropped.
 
     Raises:
@@ -1061,6 +1078,9 @@ def validate_time_order(
 ) -> None:
     """Rejects repeated consecutive time values within a subject.
 
+    Only equal neighbouring values (in row order) are rejected; descending
+    values are not.
+
     Args:
         frame: Long-format panel.
         estimand: Names the subject and time columns.
@@ -1068,10 +1088,9 @@ def validate_time_order(
     Raises:
         ValueError: If a subject has two equal consecutive time values, or
             its time values cannot be examined in order.
-        TypeError: Only if a `TypeError` raised while examining the values
-            has a message containing "strictly increasing", which the
-            comparisons used do not produce; every other `TypeError` is
-            converted to `ValueError`.
+        TypeError: Re-raised unchanged only if its message contains
+            "strictly increasing", which the comparisons here never
+            produce; every other `TypeError` becomes `ValueError`.
     """
     try:
         for item in frame.groupby(
@@ -1165,7 +1184,8 @@ def build_matrices(
         covariates).
 
     Raises:
-        ValueError: If a subject-time pair maps to more than one row.
+        ValueError: If a subject's first-period subject-time pair maps to
+            more than one row.
     """
     indexed = frame.set_index(
         [estimand.subject_identity, estimand.time_column], drop=False
@@ -1419,7 +1439,7 @@ def independent_reference(
     comparator: SequentialRegimeEstimate,
     tolerance: float,
 ) -> dict[str, Any]:
-    """Recalculate normalized regime means through an independent path.
+    """Recalculates normalized regime means through an independent path.
 
     Args:
         target_mask: Boolean flag per subject for following the target
@@ -1434,9 +1454,11 @@ def independent_reference(
 
     Returns:
         A dictionary with the method name, the tolerance, an overall
-        "passed" flag, one record per regime (recomputed estimate, primary
-        estimate, absolute difference, pass flag, rows), and the recomputed
-        contrast.
+        "passed" flag (true when every regime is within `tolerance`), one
+        record per regime in target then comparator order (regime name,
+        recomputed estimate, primary estimate, absolute difference, pass
+        flag, rows, method name), and the recomputed contrast of target
+        minus comparator.
     """
     records: list[dict[str, Any]] = []
     for name, mask, primary in (

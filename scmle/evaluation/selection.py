@@ -68,8 +68,9 @@ class BestMeanPolicy(SelectionPolicy):
     """Best mean cross-validation score, with an explicit tie policy.
 
     Candidates whose score is indistinguishable from the best (within
-    `tie_tolerance`, and with `uncertainty="one_standard_error"` within one
-    standard error of the best mean) are ordered by the configured
+    `tie_tolerance`; with `uncertainty="one_standard_error"` within one
+    standard error of the best mean; with `uncertainty="bayesian"` not
+    credibly worse than the best) are ordered by the configured
     `tie_breaker`; everyone else follows by score. The dummy baseline is
     excluded whenever another model ran.
 
@@ -88,7 +89,7 @@ class BestMeanPolicy(SelectionPolicy):
 
     @staticmethod
     def describe(rule: tasks.SelectionSpec) -> str:
-        """Human-readable rule recorded in the evaluation report.
+        """Describes the selection rule for the evaluation report.
 
         Args:
             rule: The selection settings.
@@ -118,7 +119,7 @@ class BestMeanPolicy(SelectionPolicy):
         other: experiments.TrialResult,
         sign: int,
     ) -> bool:
-        """Whether the best candidate is not credibly better than `other`.
+        """Returns whether the best trial is not credibly better than `other`.
 
         Only used with `uncertainty="bayesian"` and when both candidates were
         scored on the same number of folds (at least three).
@@ -158,7 +159,8 @@ class BestMeanPolicy(SelectionPolicy):
         Args:
             trials: All trials, any status.
             metric: The optimized metric.
-            registry: Registry used to look up model costs.
+            registry: Registry used to look up model costs; every successful
+                trial's model must be registered.
 
         Returns:
             The successful trials (without the dummy baseline when another

@@ -24,15 +24,18 @@ MIN_CENSORING_PROBABILITY = 0.05
 def censoring_curve(
     duration: np.ndarray, event: np.ndarray
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Kaplan-Meier curve of the censoring times (censoring as the event).
+    """Computes the Kaplan-Meier curve of the censoring times.
+
+    Censoring is treated as the event, so the curve is the probability of
+    remaining uncensored.
 
     Args:
         duration: Observed times.
         event: 1 where the event was observed, 0 where censored.
 
     Returns:
-        The curve as the distinct times and the estimated probability of
-        remaining uncensored at each.
+        The curve as the distinct censoring times and the estimated
+        probability of remaining uncensored just after each.
     """
     return estimators.kaplan_meier(duration, 1 - np.asarray(event))
 
@@ -40,7 +43,7 @@ def censoring_curve(
 def censoring_probability(
     curve: tuple[np.ndarray, np.ndarray], times: np.ndarray
 ) -> np.ndarray:
-    """Chance of still being uncensored at each time, kept above a floor.
+    """Returns the chance of still being uncensored at each time, floored.
 
     Args:
         curve: The censoring curve from `censoring_curve`.
@@ -56,18 +59,19 @@ def censoring_probability(
 
 
 def floored_count(duration: np.ndarray, event: np.ndarray) -> int:
-    """Rows whose censoring probability is below the floor at their time.
+    """Counts rows whose censoring probability is below the floor.
 
-    Their weight is capped at `1 / MIN_CENSORING_PROBABILITY`, a bias that
-    the Brier and AUC scores do not otherwise show. Report it with them.
+    The weight of such rows is capped at `1 / MIN_CENSORING_PROBABILITY`, a
+    bias that the Brier and AUC scores do not otherwise show, so the count is
+    meant to be reported alongside them.
 
     Args:
         duration: Observed times.
         event: 1 where the event was observed.
 
     Returns:
-        The number of rows whose censoring probability at their own time is
-        below `MIN_CENSORING_PROBABILITY`.
+        The number of rows, events and censored alike, whose censoring
+        probability at their own time is below `MIN_CENSORING_PROBABILITY`.
     """
     moments, values = censoring_curve(duration, event)
     found = estimators.step_lookup(moments, values, duration, 1.0)
@@ -75,7 +79,7 @@ def floored_count(duration: np.ndarray, event: np.ndarray) -> int:
 
 
 def time_grid(duration: np.ndarray, event: np.ndarray) -> np.ndarray:
-    """Evaluation times between the 10th and 90th percentile of event times.
+    """Returns evaluation times between the 10th and 90th event-time percentile.
 
     Args:
         duration: Observed times.
@@ -100,7 +104,7 @@ def brier_scores(
     survival: np.ndarray,
     times: np.ndarray,
 ) -> np.ndarray:
-    """Weighted squared error of the predicted survival at each time.
+    """Computes the censoring-weighted squared error of survival at each time.
 
     Args:
         duration: Observed times.
@@ -133,7 +137,7 @@ def integrated_brier(
     survival: np.ndarray,
     times: np.ndarray,
 ) -> float:
-    """Brier score averaged over the time grid (trapezoid rule).
+    """Averages the Brier score over the time grid (trapezoid rule).
 
     Args:
         duration: Observed times.
@@ -155,12 +159,12 @@ def integrated_brier(
 def dynamic_auc(
     duration: np.ndarray, event: np.ndarray, risk: np.ndarray, times: np.ndarray
 ) -> float:
-    """Mean cumulative/dynamic AUC over the time grid.
+    """Computes the mean cumulative/dynamic AUC over the time grid.
 
     At each time, rows whose event happened by then are cases (weighted by
     the inverse censoring probability) and rows still event-free are
     controls; the AUC is the weighted share of case-control pairs the risk
-    score orders correctly.
+    score orders correctly, with ties counting one half.
 
     Args:
         duration: Observed times.
@@ -206,7 +210,9 @@ class SurvivalMetric(metric_contracts.Metric):
     kind: str = "ibs"
 
     def accepts_weights(self) -> bool:
-        """These scores weight by censoring, not by row weights.
+        """Returns whether row weights are accepted.
+
+        These scores weight by censoring, not by row weights.
 
         Returns:
             Always False.
@@ -214,7 +220,7 @@ class SurvivalMetric(metric_contracts.Metric):
         return False
 
     def scorer(self, positive: Any = None) -> Any:
-        """Builds a scorer `(estimator, features, durations)`.
+        """Builds a scorer called as `(estimator, features, durations)`.
 
         Args:
             positive: Unused; survival has no positive class.

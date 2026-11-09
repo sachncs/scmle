@@ -15,7 +15,7 @@ import pandas as pd
 
 
 def reweighing_weights(groups: pd.Series, labels: pd.Series) -> np.ndarray:
-    """Row weights that remove the association of group and label.
+    """Returns row weights that remove the association of group and label.
 
     Args:
         groups: Sensitive group of each row.

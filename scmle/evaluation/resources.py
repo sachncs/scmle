@@ -23,10 +23,11 @@ class ResourceUsage:
     """Measured serving cost of a fitted candidate.
 
     Attributes:
-        model_mb: Serialized size in megabytes.
+        model_mb: Joblib-serialized size in megabytes (1024 * 1024 bytes).
         p95_latency_ms: 95th percentile single-row prediction latency.
         rows_timed: Number of single-row predictions timed.
-        machine: Hardware / OS description the numbers belong to.
+        machine: Architecture, operating system and Python version the
+            numbers belong to.
     """
 
     model_mb: float
@@ -100,8 +101,10 @@ def measure(
 
     Args:
         estimator: Fitted candidate.
-        features: Rows to time predictions on.
-        rows: How many single-row predictions to time.
+        features: Rows to time predictions on; only the first `rows` are
+            used.
+        rows: Maximum number of single-row predictions to time, after one
+            untimed warm-up prediction.
 
     Returns:
         The measured usage.

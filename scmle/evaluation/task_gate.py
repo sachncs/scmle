@@ -30,7 +30,7 @@ def load() -> dict[str, Any]:
 
 
 def status(task: tasks.TaskType) -> str:
-    """The gate status of a task type (`no_referent` when unlisted).
+    """Returns the gate status of a task type (`no_referent` when unlisted).
 
     Args:
         task: The task type.
