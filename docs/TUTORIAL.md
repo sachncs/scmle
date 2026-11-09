@@ -8,7 +8,9 @@ import logging
 import scmle.api.project
 
 logging.basicConfig(level=logging.INFO)
-project = scmle.api.project.Project("customers.parquet", target="churn", metric="roc_auc")
+project = scmle.api.project.Project(
+    "customers.parquet", target="churn", metric="roc_auc"
+)
 logging.info(project.plan().summary())  # nothing is trained or written
 result = project.run()
 logging.info(
@@ -44,7 +46,9 @@ project = scmle.api.project.Project(
 scmle.api.project.Project(
     data, "default", group_column="customer_id"
 )  # no customer in both
-scmle.api.project.Project(data, "default", time_column="event_time")  # train on the past
+scmle.api.project.Project(
+    data, "default", time_column="event_time"
+)  # train on the past
 ```
 
 ## 4. Feature graph
@@ -116,14 +120,18 @@ locked. `diagnostics/data_access.json` and the `policy.*`, `split.created`,
 `selection.frozen`, `test.opened` events in `events.jsonl` are the audit trail.
 
 ```python
-verdict = scmle.api.project.Project.verify_replay("runs/run_20261015_001", data=data)
+verdict = scmle.api.project.Project.verify_replay(
+    "runs/run_20261015_001", data=data
+)
 logging.info(verdict.level)  # exact | comparable | different
 ```
 
 ## 6. Interrupted runs
 
 ```python
-scmle.api.project.Project.resume("runs/run_20261015_001")  # finished trials are reused
+scmle.api.project.Project.resume(
+    "runs/run_20261015_001"
+)  # finished trials are reused
 ```
 
 ## 7. Serve and monitor
@@ -133,7 +141,9 @@ from scmle.governance import lifecycle, registry
 from scmle.inference import serving
 from scmle.monitoring import monitor
 
-bundle = scmle.artifacts.bundle.Bundle.load("artifacts/churn", signing_key="...")
+bundle = scmle.artifacts.bundle.Bundle.load(
+    "artifacts/churn", signing_key="..."
+)
 api = serving.HttpServing(bundle)
 api.start()  # POST /predict {"records": [...]}
 
@@ -222,7 +232,9 @@ project = scmle.api.project.Project(
 )
 
 # Your own metric (a module-level function, so trial processes can import it).
-scmle.evaluation.metrics.register_metric("business_cost", my_module.cost, greater_is_better=False)
+scmle.evaluation.metrics.register_metric(
+    "business_cost", my_module.cost, greater_is_better=False
+)
 project = scmle.api.project.Project(data, "churn", metric="business_cost")
 
 # Domain rules and responsibility.
@@ -281,7 +293,9 @@ default to `cost=3`, and budgets under 300 s only search cheap models, so pass
 [`examples/custom_estimator.py`](../examples/custom_estimator.py)):
 
 ```python
-scmle.models.custom.register_estimator("gaussian_nb", classifier=GaussianNB, cost=1)
+scmle.models.custom.register_estimator(
+    "gaussian_nb", classifier=GaussianNB, cost=1
+)
 ```
 
 ## 10. More runnable examples

@@ -39,7 +39,9 @@ import logging
 import scmle.api.project
 
 logging.basicConfig(level=logging.INFO)
-project = scmle.api.project.Project("customers.parquet", target="churn", metric="roc_auc")
+project = scmle.api.project.Project(
+    "customers.parquet", target="churn", metric="roc_auc"
+)
 logging.info(project.plan().summary())  # inspect before any training
 result = project.run()  # profile, split, search, test, package
 logging.info("\n%s", result.leaderboard())
