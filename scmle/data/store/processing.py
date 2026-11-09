@@ -75,14 +75,20 @@ class Checkpoint:
 
     Attributes:
         processed: Input key to the SHA-256 it had when processed.
-        seen: Sorted row keys already emitted.
+        seen: Row keys already emitted (stored sorted).
     """
 
     processed: dict[str, str] = dataclasses.field(default_factory=dict)
     seen: set[str] = dataclasses.field(default_factory=set)
 
     def to_bytes(self) -> bytes:
-        """Canonical JSON with a digest of its own content."""
+        """Serializes the checkpoint with a digest of its own content.
+
+        Returns:
+            UTF-8 JSON with sorted keys: `format`, `processed`, `seen` (a
+            sorted list) and `digest`, the SHA-256 of the same JSON without
+            the `digest` key.
+        """
         body = {
             "format": FORMAT,
             "processed": dict(sorted(self.processed.items())),
@@ -97,7 +103,16 @@ class Checkpoint:
     def from_bytes(cls, data: bytes) -> "Checkpoint":
         """Parses and verifies a stored checkpoint.
 
+        Args:
+            data: Bytes produced by `to_bytes`.
+
+        Returns:
+            The checkpoint they describe.
+
         Raises:
+            ValueError: Raised inside the parser for a digest or format
+                mismatch; it never escapes, being converted to the error
+                below.
             CheckpointCorruptError: If it is malformed or its digest is wrong.
         """
         try:
@@ -142,17 +157,50 @@ class RunResult:
     retries: tuple[float, ...]
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready form."""
+        """Converts the result to plain data.
+
+        Returns:
+            A dict of the fields; the tuples stay tuples, which JSON writes
+            as arrays.
+        """
         return dataclasses.asdict(self)
 
 
 def row_keys(frame: pd.DataFrame, columns: tuple[str, ...]) -> pd.Series:
-    """One string key per row, from the key columns."""
+    """Builds one string key per row from the key columns.
+
+    Args:
+        frame: The rows to key.
+        columns: Names of the key columns, all present in `frame`.
+
+    Returns:
+        A series with the frame's index; each entry joins the row's key
+        column values, as strings, with `SEPARATOR`.
+    """
     return frame[list(columns)].astype(str).agg(SEPARATOR.join, axis=1)
 
 
 class IncrementalProcessor:
-    """Processes new input objects once each, resuming after a crash."""
+    """Processes new input objects once each, resuming after a crash.
+
+    Attributes:
+        store: Holds inputs, outputs, the checkpoint and the lock.
+        contract: Declares the schema and the row key columns.
+        transform: Maps a clean input frame to an output frame.
+        input_prefix: Where inputs are listed.
+        output_prefix: Where outputs are written.
+        state_key: The checkpoint object.
+        lock_key: The lock object.
+        gate: Quality gate applied to each input, if any.
+        stage: The gate stage.
+        policy: Retry policy for transient errors.
+        sleep: Waits between retries.
+        reader: Snapshot reader that records each read.
+        before_commit: Hook called between writing an output and writing the
+            checkpoint, if any.
+        waits: The retry waits taken in the current or latest run, in
+            seconds.
+    """
 
     def __init__(
         self,
@@ -210,7 +258,15 @@ class IncrementalProcessor:
         self.waits: list[float] = []
 
     def load_checkpoint(self) -> Checkpoint:
-        """The stored checkpoint, or an empty one on the first run."""
+        """Loads the stored checkpoint.
+
+        A damaged checkpoint is not replaced: `CheckpointCorruptError`
+        from `Checkpoint.from_bytes` propagates, as do errors from the
+        store.
+
+        Returns:
+            The stored checkpoint, or an empty one if none exists yet.
+        """
         try:
             data, ignored = self.store.get(self.state_key)
         except objectstore.NotFoundError:
@@ -218,7 +274,11 @@ class IncrementalProcessor:
         return Checkpoint.from_bytes(data)
 
     def save_checkpoint(self, checkpoint: Checkpoint) -> None:
-        """Writes the checkpoint atomically."""
+        """Writes the checkpoint atomically.
+
+        Args:
+            checkpoint: The state to store under `state_key`.
+        """
         self.store.put(self.state_key, checkpoint.to_bytes())
 
     def break_lock(self) -> None:
@@ -226,7 +286,18 @@ class IncrementalProcessor:
         self.store.delete(self.lock_key)
 
     def retrying(self, operation: Callable[[], Any]) -> Any:
-        """Runs an operation, retrying transient errors and noting waits."""
+        """Runs an operation, retrying transient errors and noting waits.
+
+        Each wait between attempts is appended to `waits`. Errors that are
+        not transient propagate at once, and `RetryExhaustedError`
+        propagates when every attempt failed with a transient error.
+
+        Args:
+            operation: Zero-argument callable to run.
+
+        Returns:
+            Whatever the operation returned on the attempt that succeeded.
+        """
 
         def sleeper(seconds: float) -> None:
             self.waits.append(seconds)
@@ -246,8 +317,11 @@ class IncrementalProcessor:
 
         Raises:
             ConcurrentRunError: If another run holds the lock.
-            CheckpointCorruptError: If the checkpoint is damaged.
-            ChangedInputError: If a processed input now differs.
+
+        The lock is released when the run ends, whatever the outcome.
+        `CheckpointCorruptError` propagates if the checkpoint is damaged,
+        and `ChangedInputError` if an input that was already processed now
+        has different bytes; both leave the stored checkpoint as it was.
         """
         try:
             self.store.put(self.lock_key, b"locked", if_absent=True)
@@ -259,7 +333,25 @@ class IncrementalProcessor:
             self.store.delete(self.lock_key)
 
     def run_locked(self, max_objects: int | None) -> RunResult:
-        """The run, with the lock held."""
+        """Runs with the lock held.
+
+        Lists the inputs in key order. An input already in the checkpoint
+        with the same hash is skipped; a new input whose bytes equal a
+        processed one is recorded as a duplicate upload; any other is
+        processed. The run stops at the first input that fails with a
+        framework or retry error, and records it in the result.
+
+        Args:
+            max_objects: Stop after processing this many new objects, or
+                None for no limit. Skipped and duplicate objects do not
+                count.
+
+        Returns:
+            What happened in this run.
+
+        Raises:
+            ChangedInputError: If a processed input now has different bytes.
+        """
         checkpoint = self.load_checkpoint()
         self.waits.clear()
         done: list[str] = []
@@ -313,7 +405,22 @@ class IncrementalProcessor:
     def process(
         self, meta: objectstore.ObjectMeta, checkpoint: Checkpoint
     ) -> tuple[int, int, str]:
-        """Processes one object; returns dropped rows, rows out, output key."""
+        """Processes one object and commits it to the checkpoint.
+
+        Reads and validates the object, applies the gate if there is one,
+        drops rows whose key was seen before or repeats earlier in the
+        object, transforms the rest, writes the output, then adds the
+        object and its row keys to `checkpoint` and saves it. Errors from
+        any step propagate and leave the stored checkpoint unchanged.
+
+        Args:
+            meta: The input object.
+            checkpoint: The state to update in place.
+
+        Returns:
+            The number of rows dropped as repeated keys, the number of rows
+            in the output, and the key the output was written under.
+        """
         frame, record = self.retrying(
             lambda: self.reader.read(meta.key, self.contract)
         )

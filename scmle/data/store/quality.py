@@ -106,7 +106,12 @@ class Finding:
     detail: str
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready form (row positions are capped at 20)."""
+        """Converts the finding to plain data.
+
+        Returns:
+            A dict of the fields, with the policy as its string value and
+            at most the first 20 row positions as a list.
+        """
         record = dataclasses.asdict(self)
         record["policy"] = self.policy.value
         record["rows"] = list(self.rows[:20])
@@ -137,7 +142,12 @@ class GateReport:
     rows_out: int
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready form."""
+        """Converts the report to plain data.
+
+        Returns:
+            A dict with the stage, snapshot id, dataset, decision, row
+            counts and `findings`, a list of `Finding.to_dict` results.
+        """
         return {
             "stage": self.stage,
             "snapshot_id": self.snapshot_id,
@@ -151,7 +161,15 @@ class GateReport:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class GateResult:
-    """The data that may continue, what was held back, and the report."""
+    """The data that may continue, what was held back, and the report.
+
+    Attributes:
+        frame: The rows that continue, keeping their original positions as
+            index labels.
+        quarantined: The rows removed by `quarantine` rules, with the same
+            labels.
+        report: The gate report.
+    """
 
     frame: pd.DataFrame
     quarantined: pd.DataFrame
@@ -159,7 +177,13 @@ class GateResult:
 
 
 class Rule(abc.ABC):
-    """A check with a declared failure policy."""
+    """A check with a declared failure policy.
+
+    Attributes:
+        name: The rule's name, reported in its findings.
+        policy: What a violation means.
+        stages: The stages the rule applies to.
+    """
 
     name = "rule"
 
@@ -184,16 +208,43 @@ class Rule(abc.ABC):
         record: snapshot_module.SnapshotRecord,
         contract: snapshot_module.DataContract,
     ) -> Finding:
-        """Checks the data."""
+        """Checks the data.
+
+        Args:
+            frame: The data, indexed by row position from 0.
+            record: Its snapshot record.
+            contract: What the consumer expects.
+
+        Returns:
+            The rule's finding.
+        """
 
     def dataset_finding(self, ok: bool, detail: str) -> Finding:
-        """A finding about the dataset as a whole."""
+        """Builds a finding about the dataset as a whole.
+
+        Args:
+            ok: Whether the dataset satisfies the rule.
+            detail: Human-readable explanation.
+
+        Returns:
+            A finding with no rows, and one violation when `ok` is false.
+        """
         return Finding(
             self.name, self.policy, ok, 0 if ok else 1, False, (), detail
         )
 
     def row_finding(self, bad: pd.Series, detail: str) -> Finding:
-        """A finding about the rows where `bad` is true."""
+        """Builds a finding about the rows where `bad` is true.
+
+        Args:
+            bad: Boolean series, one entry per row in position order; true
+                marks a violating row.
+            detail: Human-readable explanation.
+
+        Returns:
+            A row-level finding that passes if no row is marked, with the
+            positions of the marked rows in ascending order.
+        """
         rows = tuple(int(i) for i in bad.to_numpy().nonzero()[0])
         return Finding(
             self.name, self.policy, not rows, len(rows), True, rows, detail
@@ -211,7 +262,17 @@ class SchemaRule(Rule):
         record: snapshot_module.SnapshotRecord,
         contract: snapshot_module.DataContract,
     ) -> Finding:
-        """See `Rule.evaluate`."""
+        """Compares the frame's schema with the contract's.
+
+        Args:
+            frame: The data, indexed by row position from 0.
+            record: Its snapshot record. Not used.
+            contract: What the consumer expects.
+
+        Returns:
+            A dataset-level finding that passes when `contract.mismatches` is
+            empty; its detail lists up to five mismatches.
+        """
         problems = contract.mismatches(frame)
         return self.dataset_finding(not problems, "; ".join(problems[:5]))
 
@@ -227,7 +288,17 @@ class FreshnessRule(Rule):
         record: snapshot_module.SnapshotRecord,
         contract: snapshot_module.DataContract,
     ) -> Finding:
-        """See `Rule.evaluate`."""
+        """Checks the snapshot's age against the contract's limit.
+
+        Args:
+            frame: The data. Not used.
+            record: Its snapshot record.
+            contract: What the consumer expects. Not used.
+
+        Returns:
+            A dataset-level finding that fails only when the record's freshness
+            is `stale`; its detail gives the age and the limit.
+        """
         stale = record.freshness == snapshot_module.STALE
         return self.dataset_finding(
             not stale,
@@ -256,7 +327,17 @@ class MinRowsRule(Rule):
         record: snapshot_module.SnapshotRecord,
         contract: snapshot_module.DataContract,
     ) -> Finding:
-        """See `Rule.evaluate`."""
+        """Checks the number of rows.
+
+        Args:
+            frame: The data, indexed by row position from 0.
+            record: Its snapshot record. Not used.
+            contract: What the consumer expects. Not used.
+
+        Returns:
+            A dataset-level finding that passes when the frame has at least
+            `minimum` rows.
+        """
         return self.dataset_finding(
             len(frame) >= self.minimum,
             f"{len(frame)} rows, need {self.minimum}",
@@ -286,7 +367,18 @@ class NullFractionRule(Rule):
         record: snapshot_module.SnapshotRecord,
         contract: snapshot_module.DataContract,
     ) -> Finding:
-        """See `Rule.evaluate`."""
+        """Checks the fraction of nulls in the column.
+
+        Args:
+            frame: The data, indexed by row position from 0.
+            record: Its snapshot record. Not used.
+            contract: What the consumer expects. Not used.
+
+        Returns:
+            A dataset-level finding that passes when the null fraction is at
+            most `maximum`. A missing column fails, and so does an empty
+            frame (its fraction counts as 1.0) unless `maximum` is 1 or more.
+        """
         if self.column not in frame.columns:
             return self.dataset_finding(False, f"no column {self.column}")
         fraction = (
@@ -319,7 +411,17 @@ class NoNullsRule(Rule):
         record: snapshot_module.SnapshotRecord,
         contract: snapshot_module.DataContract,
     ) -> Finding:
-        """See `Rule.evaluate`."""
+        """Checks that the column has no nulls.
+
+        Args:
+            frame: The data, indexed by row position from 0.
+            record: Its snapshot record. Not used.
+            contract: What the consumer expects. Not used.
+
+        Returns:
+            A row-level finding marking each row with a null in the column, or a
+            failing dataset-level finding if the column is missing.
+        """
         if self.column not in frame.columns:
             return self.dataset_finding(False, f"no column {self.column}")
         return self.row_finding(
@@ -339,7 +441,19 @@ class UniqueKeyRule(Rule):
         record: snapshot_module.SnapshotRecord,
         contract: snapshot_module.DataContract,
     ) -> Finding:
-        """See `Rule.evaluate`."""
+        """Checks that no key repeats.
+
+        Args:
+            frame: The data, indexed by row position from 0.
+            record: Its snapshot record. Not used.
+            contract: What the consumer expects.
+
+        Returns:
+            A row-level finding marking each row whose key columns repeat an
+            earlier row (the first occurrence is not marked), or a failing
+            dataset-level finding if the contract has no key columns or the
+            frame lacks one.
+        """
         keys = list(contract.key_columns)
         if not keys or any(k not in frame.columns for k in keys):
             return self.dataset_finding(False, "no usable key columns")
@@ -380,7 +494,21 @@ class RangeRule(Rule):
         record: snapshot_module.SnapshotRecord,
         contract: snapshot_module.DataContract,
     ) -> Finding:
-        """See `Rule.evaluate`; nulls are left to the null rules."""
+        """Checks that values lie within the bounds, which are inclusive.
+
+        Nulls and values that are not numeric are not marked; nulls are
+        left to the null rules.
+
+        Args:
+            frame: The data, indexed by row position from 0.
+            record: Its snapshot record. Not used.
+            contract: What the consumer expects. Not used.
+
+        Returns:
+            A row-level finding marking each numeric value outside the
+            bounds, or a failing dataset-level finding if the column is
+            missing.
+        """
         if self.column not in frame.columns:
             return self.dataset_finding(False, f"no column {self.column}")
         values = pd.to_numeric(frame[self.column], errors="coerce")
@@ -420,7 +548,20 @@ class AllowedValuesRule(Rule):
         record: snapshot_module.SnapshotRecord,
         contract: snapshot_module.DataContract,
     ) -> Finding:
-        """See `Rule.evaluate`; nulls are left to the null rules."""
+        """Checks that values belong to the declared set.
+
+        Nulls are not marked; they are left to the null rules.
+
+        Args:
+            frame: The data, indexed by row position from 0.
+            record: Its snapshot record. Not used.
+            contract: What the consumer expects. Not used.
+
+        Returns:
+            A row-level finding marking each non-null value not in
+            `allowed`, or a failing dataset-level finding if the column is
+            missing.
+        """
         if self.column not in frame.columns:
             return self.dataset_finding(False, f"no column {self.column}")
         column = frame[self.column]
@@ -432,7 +573,12 @@ class AllowedValuesRule(Rule):
 
 
 class QualityGate:
-    """Applies rules to a snapshot and acts on each rule's policy."""
+    """Applies rules to a snapshot and acts on each rule's policy.
+
+    Attributes:
+        rules: The rules, evaluated in order.
+        store: Where reports and quarantined rows are written, if anywhere.
+    """
 
     def __init__(
         self,
@@ -456,11 +602,24 @@ class QualityGate:
         self.store = store
 
     def marker_key(self, snapshot_id: str) -> str:
-        """Where a whole-snapshot quarantine is recorded."""
+        """Names the object that records a whole-snapshot quarantine.
+
+        Args:
+            snapshot_id: The quarantined snapshot.
+
+        Returns:
+            The store key of the marker.
+        """
         return f"{QUARANTINE_PREFIX}/{snapshot_id}/{MARKER}"
 
     def release(self, snapshot_id: str) -> None:
-        """Lifts a whole-snapshot quarantine (an explicit human decision)."""
+        """Lifts a whole-snapshot quarantine (an explicit human decision).
+
+        Does nothing if the gate has no store.
+
+        Args:
+            snapshot_id: The snapshot whose marker is removed.
+        """
         if self.store is not None:
             self.store.delete(self.marker_key(snapshot_id))
 
@@ -481,6 +640,8 @@ class QualityGate:
 
         Returns:
             The rows that may continue, the rows held back, and the report.
+            Both frames keep the original row positions as index labels.
+            The report is also written to the store, if there is one.
 
         Raises:
             QualityGateError: If a `fail` rule is violated, or a dataset
@@ -558,7 +719,22 @@ class QualityGate:
         holds: list[Finding],
         removed: list[int],
     ) -> str:
-        """The overall decision word for a report."""
+        """Chooses the overall decision word for a report.
+
+        Args:
+            failed: The findings that did not pass.
+            stops: The failed findings whose policy is `fail`.
+            holds: The failed dataset-level findings whose policy is
+                `quarantine`.
+            removed: Positions of rows removed by row-level `quarantine`
+                findings.
+
+        Returns:
+            `failed` if any finding stops the run, else `quarantined` if
+            any holds the snapshot, else `rows_quarantined` if rows were
+            removed, else `passed_with_warnings` if any finding failed,
+            else `passed`.
+        """
         if stops:
             return "failed"
         if holds:
@@ -574,7 +750,19 @@ class QualityGate:
         record: snapshot_module.SnapshotRecord,
         whole_snapshot: bool,
     ) -> None:
-        """Writes the report, quarantined rows and the snapshot marker."""
+        """Writes the report, quarantined rows and the snapshot marker.
+
+        Does nothing if the gate has no store. The report goes to
+        `quality/<snapshot id>-<stage>.json`, any held rows to
+        `quarantine/<snapshot id>/rows-<stage>.csv`, and, for a
+        whole-snapshot quarantine, the marker from `marker_key`.
+
+        Args:
+            report: The gate report.
+            held: The rows removed from the data.
+            record: The snapshot checked.
+            whole_snapshot: Whether to write the whole-snapshot marker.
+        """
         if self.store is None:
             return
         body = json.dumps(report.to_dict(), indent=2, sort_keys=True).encode()

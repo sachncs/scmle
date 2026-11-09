@@ -65,7 +65,12 @@ class ConformanceReport:
         return all(result.passed for result in self.results)
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready form."""
+        """Converts the report to plain data.
+
+        Returns:
+            A dict with `backend`, `passed` and `checks`, the last a list
+            with one dict per check holding the `CheckResult` fields.
+        """
         return {
             "backend": self.backend,
             "passed": self.passed,
@@ -74,7 +79,15 @@ class ConformanceReport:
 
 
 def require(condition: bool, message: str) -> None:
-    """Fails the check unless `condition` holds."""
+    """Fails the check unless `condition` holds.
+
+    Args:
+        condition: What the backend must satisfy.
+        message: Describes the failure.
+
+    Raises:
+        ConformanceFailure: If `condition` is false.
+    """
     if not condition:
         raise ConformanceFailure(message)
 
@@ -82,7 +95,17 @@ def require(condition: bool, message: str) -> None:
 def raises(
     expected: type[Exception], operation: Callable[[], object], message: str
 ) -> None:
-    """Fails the check unless `operation` raises `expected`."""
+    """Fails the check unless `operation` raises `expected`.
+
+    Args:
+        expected: The exception type the operation must raise.
+        operation: Zero-argument callable to run.
+        message: Describes the operation, for the failure text.
+
+    Raises:
+        ConformanceFailure: If the operation raises a different exception,
+            or returns without raising.
+    """
     try:
         operation()
     except expected:
@@ -95,7 +118,16 @@ def raises(
 
 
 def check_round_trip(store: objectstore.ObjectStore, base: str) -> None:
-    """Bytes come back unchanged with a correct hash and size."""
+    """Bytes come back unchanged with a correct hash and size.
+
+    The check fails with `ConformanceFailure` (through `require`) if the
+    content, hash, size or key differs from what was written, or the
+    modification time is missing.
+
+    Args:
+        store: The backend under test.
+        base: Key prefix reserved for this check.
+    """
     data = b"hello object store"
     written = store.put(f"{base}/a.txt", data)
     content, meta = store.get(f"{base}/a.txt")
@@ -108,7 +140,15 @@ def check_round_trip(store: objectstore.ObjectStore, base: str) -> None:
 
 
 def check_binary_and_empty(store: objectstore.ObjectStore, base: str) -> None:
-    """Every byte value and the empty object survive."""
+    """Every byte value and the empty object survive.
+
+    The check fails with `ConformanceFailure` (through `require`) if the
+    binary or empty content changes, or the empty object's size is not 0.
+
+    Args:
+        store: The backend under test.
+        base: Key prefix reserved for this check.
+    """
     store.put(f"{base}/bin", BINARY)
     store.put(f"{base}/empty", b"")
     require(store.get(f"{base}/bin")[0] == BINARY, "binary data changed")
@@ -117,14 +157,30 @@ def check_binary_and_empty(store: objectstore.ObjectStore, base: str) -> None:
 
 
 def check_large(store: objectstore.ObjectStore, base: str) -> None:
-    """A one-mebibyte object round-trips."""
+    """A one-mebibyte object round-trips.
+
+    The check fails with `ConformanceFailure` (through `require`) if the
+    content read back differs from what was written.
+
+    Args:
+        store: The backend under test.
+        base: Key prefix reserved for this check.
+    """
     data = (BINARY * (LARGE_BYTES // len(BINARY)))[:LARGE_BYTES]
     store.put(f"{base}/large", data)
     require(store.get(f"{base}/large")[0] == data, "large object changed")
 
 
 def check_overwrite(store: objectstore.ObjectStore, base: str) -> None:
-    """An unconditional put replaces the object."""
+    """An unconditional put replaces the object.
+
+    The check fails with `ConformanceFailure` (through `require`) if the
+    replacement is not what a read returns.
+
+    Args:
+        store: The backend under test.
+        base: Key prefix reserved for this check.
+    """
     store.put(f"{base}/o", b"one")
     store.put(f"{base}/o", b"two!")
     content, meta = store.get(f"{base}/o")
@@ -132,7 +188,16 @@ def check_overwrite(store: objectstore.ObjectStore, base: str) -> None:
 
 
 def check_missing(store: objectstore.ObjectStore, base: str) -> None:
-    """Reading a missing object is `NotFoundError`; `exists` says no."""
+    """Reading a missing object is `NotFoundError`; `exists` says no.
+
+    The check fails with `ConformanceFailure` (through `require`) if if
+    `get` or `head` of a missing key does not raise `NotFoundError`, or
+    `exists` is wrong for a missing or written key.
+
+    Args:
+        store: The backend under test.
+        base: Key prefix reserved for this check.
+    """
     raises(
         objectstore.NotFoundError,
         lambda: store.get(f"{base}/nope"),
@@ -149,7 +214,15 @@ def check_missing(store: objectstore.ObjectStore, base: str) -> None:
 
 
 def check_head_matches_get(store: objectstore.ObjectStore, base: str) -> None:
-    """`head` reports what `get` reports."""
+    """`head` reports what `get` reports.
+
+    The check fails with `ConformanceFailure` (through `require`) if the
+    two disagree on the hash.
+
+    Args:
+        store: The backend under test.
+        base: Key prefix reserved for this check.
+    """
     store.put(f"{base}/h", b"head me")
     require(
         store.head(f"{base}/h").sha256 == store.get(f"{base}/h")[1].sha256,
@@ -158,7 +231,16 @@ def check_head_matches_get(store: objectstore.ObjectStore, base: str) -> None:
 
 
 def check_if_absent(store: objectstore.ObjectStore, base: str) -> None:
-    """A conditional put creates once and then refuses without changes."""
+    """A conditional put creates once and then refuses without changes.
+
+    The check fails with `ConformanceFailure` (through `require`) if the
+    second conditional put does not raise `AlreadyExistsError`, or it
+    changes the object.
+
+    Args:
+        store: The backend under test.
+        base: Key prefix reserved for this check.
+    """
     key = f"{base}/once"
     store.put(key, b"first", if_absent=True)
     raises(
@@ -170,7 +252,16 @@ def check_if_absent(store: objectstore.ObjectStore, base: str) -> None:
 
 
 def check_if_absent_race(store: objectstore.ObjectStore, base: str) -> None:
-    """Of several simultaneous conditional puts exactly one wins."""
+    """Of several simultaneous conditional puts exactly one wins.
+
+    The check fails with `ConformanceFailure` (through `require`) if a
+    racer fails with any error other than `AlreadyExistsError`, a racer does
+    not finish, or the outcomes are not one winner and the rest refused.
+
+    Args:
+        store: The backend under test.
+        base: Key prefix reserved for this check.
+    """
     key = f"{base}/race"
     outcomes: list[str] = []
     guard = threading.Lock()
@@ -204,7 +295,16 @@ def check_if_absent_race(store: objectstore.ObjectStore, base: str) -> None:
 
 
 def check_listing(store: objectstore.ObjectStore, base: str) -> None:
-    """Listing is by prefix, sorted by key, and sees nested keys."""
+    """Listing is by prefix, sorted by key, and sees nested keys.
+
+    The check fails with `ConformanceFailure` (through `require`) if a
+    listing is not exactly the keys under the prefix in sorted order, or an
+    unused prefix is not empty.
+
+    Args:
+        store: The backend under test.
+        base: Key prefix reserved for this check.
+    """
     for name in ("b/2", "a/1", "a/3", "ab/1", "c"):
         store.put(f"{base}/{name}", name.encode())
     keys = [m.key for m in store.list_objects(f"{base}/")]
@@ -218,7 +318,15 @@ def check_listing(store: objectstore.ObjectStore, base: str) -> None:
 
 
 def check_pagination(store: objectstore.ObjectStore, base: str) -> None:
-    """More objects than one page are all listed once."""
+    """More objects than one page are all listed once.
+
+    The check fails with `ConformanceFailure` (through `require`) if the
+    listing loses or repeats a key.
+
+    Args:
+        store: The backend under test.
+        base: Key prefix reserved for this check.
+    """
     names = [f"{base}/page/{n:03d}" for n in range(PAGE_OBJECTS)]
     for name in names:
         store.put(name, name.encode())
@@ -229,7 +337,15 @@ def check_pagination(store: objectstore.ObjectStore, base: str) -> None:
 
 
 def check_delete(store: objectstore.ObjectStore, base: str) -> None:
-    """Delete removes the object and is idempotent."""
+    """Delete removes the object and is idempotent.
+
+    The check fails with `ConformanceFailure` (through `require`) if the
+    object still exists after it is deleted.
+
+    Args:
+        store: The backend under test.
+        base: Key prefix reserved for this check.
+    """
     store.put(f"{base}/d", b"x")
     store.delete(f"{base}/d")
     require(not store.exists(f"{base}/d"), "deleted object still exists")
@@ -238,7 +354,15 @@ def check_delete(store: objectstore.ObjectStore, base: str) -> None:
 
 
 def check_key_rules(store: objectstore.ObjectStore, base: str) -> None:
-    """Unsafe keys are refused before reaching the backend."""
+    """Unsafe keys are refused before reaching the backend.
+
+    The check fails with `ConformanceFailure` (through `require`) if if
+    `put` or `get` of an unsafe key does not raise `StoreError`.
+
+    Args:
+        store: The backend under test.
+        base: Key prefix reserved for this check.
+    """
     for bad in ("", "/lead", "trail/", "a//b", "a/../b", "..", "a/./b"):
         raises(
             objectstore.StoreError,
@@ -253,7 +377,15 @@ def check_key_rules(store: objectstore.ObjectStore, base: str) -> None:
 
 
 def check_isolation(store: objectstore.ObjectStore, base: str) -> None:
-    """Objects written under one prefix are not listed under a sibling."""
+    """Objects written under one prefix are not listed under a sibling.
+
+    The check fails with `ConformanceFailure` (through `require`) if a
+    sibling prefix's objects appear in the listing.
+
+    Args:
+        store: The backend under test.
+        base: Key prefix reserved for this check.
+    """
     store.put(f"{base}/left/x", b"l")
     store.put(f"{base}/right/x", b"r")
     require(
@@ -316,7 +448,13 @@ def run_conformance(
 
 
 def cleanup(store: objectstore.ObjectStore, base: str) -> None:
-    """Removes what a check wrote, ignoring cleanup failures."""
+    """Removes what a check wrote, ignoring cleanup failures.
+
+    Args:
+        store: The backend under test.
+        base: Key prefix the check wrote under; everything below it is
+            deleted. A `StoreError` stops the cleanup quietly.
+    """
     try:
         for meta in store.list_objects(base + "/"):
             store.delete(meta.key)

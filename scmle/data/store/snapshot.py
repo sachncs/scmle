@@ -10,9 +10,9 @@ the same contract always give the same id, and a changed object gives a new
 one. Every read is appended to a `ReadLog` (and to a JSON-lines file when one
 is given), which is what a later training run is traced back through.
 
-This extends the Phase 9 source connectors: `connector_reader` adapts a store
-to the `read_bytes` callable of `ObjectStoreConnector`, and decoding uses the
-same `read_tabular_bytes`.
+`connector_reader` adapts a store to the `read_bytes` callable of
+`ObjectStoreConnector`, and decoding uses the same `read_tabular_bytes` as the
+source connectors.
 """
 
 from collections.abc import Callable
@@ -50,6 +50,13 @@ def kind_of(series: pd.Series) -> str:
 
     `int`, `float`, `bool`, `datetime` or `string`, so a contract does not
     depend on how a particular reader or pandas version names a dtype.
+
+    Args:
+        series: The column.
+
+    Returns:
+        One of `KINDS`: `bool`, `int`, `float` or `datetime` by the
+        series' dtype, tested in that order, and `string` for anything else.
     """
     if pd.api.types.is_bool_dtype(series):
         return "bool"
@@ -63,12 +70,27 @@ def kind_of(series: pd.Series) -> str:
 
 
 def observed_schema(frame: pd.DataFrame) -> dict[str, str]:
-    """Column name to kind, in column order."""
+    """Reads the schema a frame actually has.
+
+    Args:
+        frame: The data.
+
+    Returns:
+        Column name (as a string) to kind, in column order.
+    """
     return {str(name): kind_of(frame[name]) for name in frame.columns}
 
 
 def schema_digest(schema: Mapping[str, str]) -> str:
-    """Hash of a schema, independent of column order."""
+    """Hashes a schema, independent of column order.
+
+    Args:
+        schema: Column name to kind.
+
+    Returns:
+        `sha256:` followed by the hex SHA-256 of the sorted name and kind
+        pairs.
+    """
     text = json.dumps(sorted(schema.items()), separators=(",", ":"))
     return "sha256:" + hashlib.sha256(text.encode()).hexdigest()
 
@@ -118,7 +140,15 @@ class DataContract:
         return schema_digest(self.columns)
 
     def mismatches(self, frame: pd.DataFrame) -> list[str]:
-        """How the frame differs from the declared schema (empty if equal)."""
+        """Lists how the frame differs from the declared schema.
+
+        Args:
+            frame: The data.
+
+        Returns:
+            One message per missing column, unexpected column and column of
+            the wrong kind, in that order; empty if the schemas are equal.
+        """
         seen = observed_schema(frame)
         problems = [
             f"missing column {c}" for c in self.columns if c not in seen
@@ -175,14 +205,23 @@ class SnapshotRecord:
     lineage: tuple[str, ...]
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready form."""
+        """Converts the record to plain data.
+
+        Returns:
+            A dict of the fields, with `lineage` as a list.
+        """
         record = dataclasses.asdict(self)
         record["lineage"] = list(self.lineage)
         return record
 
 
 class ReadLog:
-    """Every snapshot read, in order, in memory and optionally on disk."""
+    """Every snapshot read, in order, in memory and optionally on disk.
+
+    Attributes:
+        path: The JSON-lines file appended to, or None for memory only.
+        records: The records appended so far, in order.
+    """
 
     def __init__(self, path: str | pathlib.Path | None = None) -> None:
         """Initializes the log.
@@ -194,14 +233,25 @@ class ReadLog:
         self.records: list[SnapshotRecord] = []
 
     def append(self, record: SnapshotRecord) -> None:
-        """Adds a record."""
+        """Adds a record, and appends it to the file if there is one.
+
+        Args:
+            record: The snapshot record to log.
+        """
         self.records.append(record)
         if self.path is not None:
             line = json.dumps(record.to_dict(), sort_keys=True) + "\n"
             durability.append_text(self.path, line)
 
     def trace(self, snapshot_id: str) -> list[SnapshotRecord]:
-        """The snapshot and everything it derives from, nearest first.
+        """Follows a snapshot back through the snapshots it derives from.
+
+        Args:
+            snapshot_id: The snapshot to start from.
+
+        Returns:
+            The snapshot and then each ancestor once, breadth first, so the
+            nearest come first.
 
         Raises:
             SnapshotError: If the id or one of its ancestors was never read.
@@ -222,12 +272,28 @@ class ReadLog:
 
 
 def parse_time(text: str) -> datetime.datetime:
-    """An ISO 8601 time as an aware UTC datetime."""
+    """Parses an ISO 8601 time.
+
+    Text that is not ISO 8601 raises ValueError, from
+    `datetime.datetime.fromisoformat`.
+
+    Args:
+        text: The time; a value without an offset is taken to be local time.
+
+    Returns:
+        The same moment as an aware datetime in UTC.
+    """
     return datetime.datetime.fromisoformat(text).astimezone(datetime.UTC)
 
 
 class SnapshotReader:
-    """Reads tabular objects from a store and records each read."""
+    """Reads tabular objects from a store and records each read.
+
+    Attributes:
+        store: Where objects are read from.
+        log: Where reads are recorded.
+        clock: Source of the current time.
+    """
 
     def __init__(
         self,
@@ -256,7 +322,8 @@ class SnapshotReader:
 
         A schema mismatch or a stale object does not stop the read; it is
         recorded, and the quality gate decides what happens (fail,
-        quarantine or warn).
+        quarantine or warn). Errors from the store, such as `NotFoundError`
+        for a missing object, propagate unchanged.
 
         Args:
             key: Object key (CSV, JSON lines or Parquet by extension).
@@ -267,7 +334,6 @@ class SnapshotReader:
             The frame and its record.
 
         Raises:
-            NotFoundError: If the object does not exist.
             SnapshotError: If the object cannot be decoded.
         """
         payload, meta = self.store.get(key)
@@ -317,10 +383,26 @@ def connector_reader(store: objectstore.ObjectStore) -> Callable[[str], bytes]:
 
     The URI's path (after the store's own prefix) is the object key, so a
     connector constructed with `store.uri(key)` reads through the store.
+
+    Args:
+        store: The store to read from.
+
+    Returns:
+        A function from a source URI to the bytes of the object whose key is
+        the URI's path without the store's own prefix. It raises whatever
+        `store.get` raises, such as `NotFoundError`.
     """
     root = urlsplit(store.location).path.strip("/")
 
     def read_bytes(source_uri: str) -> bytes:
+        """Reads the object that a URI under the store names.
+
+        Args:
+            source_uri: A URI whose path ends in an object key.
+
+        Returns:
+            The object's content.
+        """
         path = urlsplit(source_uri).path.strip("/")
         key = path.removeprefix(root + "/") if root else path
         return store.get(key)[0]

@@ -83,20 +83,35 @@ class ObjectMeta:
 
 
 def sha256_of(data: bytes) -> str:
-    """Hex SHA-256 of `data`."""
+    """Computes the SHA-256 of some bytes.
+
+    Args:
+        data: The content to hash.
+
+    Returns:
+        The digest as 64 lowercase hexadecimal characters.
+    """
     return hashlib.sha256(data).hexdigest()
 
 
 def check_key(key: str) -> str:
-    """Returns `key` if it is a safe relative key.
+    """Checks that a key is a safe relative key.
 
     A key is `/`-separated segments; no empty segment, no `.` or `..`, no
     leading or trailing `/`, at most 1024 characters, and a conservative
     character set, so the same key is valid on every backend and cannot
     escape a root directory.
 
+    Args:
+        key: The candidate key.
+
+    Returns:
+        `key`, unchanged.
+
     Raises:
-        StoreError: If the key is not valid.
+        StoreError: If the key is not a non-empty string of at most 1024
+            characters, or a segment is empty, `.`, `..` or uses a character
+            outside the allowed set.
     """
     if not isinstance(key, str) or not key or len(key) > MAX_KEY_LENGTH:
         raise StoreError("a key must be a non-empty string of at most 1024")
@@ -113,6 +128,13 @@ def is_temporary(name: str) -> bool:
     `scmle.durability.write_atomically` (``.<name>.<random>.tmp``) write a
     temp file first. A writer killed between the two steps leaves one behind;
     it must not make the store unlistable.
+
+    Args:
+        name: A file name, without its directory.
+
+    Returns:
+        True if the name is one of the two temp-file shapes, False for a
+        name that may be an object.
     """
     return name.startswith(".put-") or (
         name.startswith(".") and name.endswith(".tmp")
@@ -120,21 +142,44 @@ def is_temporary(name: str) -> bool:
 
 
 def check_prefix(prefix: str) -> str:
-    """Returns `prefix` (empty, or a key optionally ending in `/`)."""
+    """Checks a listing prefix: empty, or a key optionally ending in `/`.
+
+    Args:
+        prefix: The candidate prefix.
+
+    Returns:
+        `prefix`, unchanged. `check_key` raises `StoreError` if a non-empty
+        prefix, without one trailing `/`, is not a valid key (so `/` alone
+        is refused).
+    """
     if prefix:
         check_key(prefix.removesuffix("/"))
     return prefix
 
 
 def iso(moment: float | datetime.datetime) -> str:
-    """ISO 8601 UTC time, to the second."""
+    """Formats a moment as an ISO 8601 UTC time, to the second.
+
+    Args:
+        moment: Seconds since the Unix epoch, or a datetime. A naive
+            datetime is taken to be in local time.
+
+    Returns:
+        The time in UTC with a `+00:00` offset, for example
+        `2024-05-01T12:30:00+00:00`.
+    """
     if isinstance(moment, int | float):
         moment = datetime.datetime.fromtimestamp(moment, datetime.UTC)
     return moment.astimezone(datetime.UTC).isoformat(timespec="seconds")
 
 
 class ObjectStore(abc.ABC):
-    """Bytes under keys, with the same behaviour on every backend."""
+    """Bytes under keys, with the same behaviour on every backend.
+
+    Attributes:
+        scheme: The backend's URI scheme.
+        location: Human-readable root of the store, without a trailing `/`.
+    """
 
     scheme = "memory"
 
@@ -147,7 +192,15 @@ class ObjectStore(abc.ABC):
         self.location = location.rstrip("/")
 
     def uri(self, key: str) -> str:
-        """The URI of an object, for lineage records."""
+        """Builds the URI of an object, for lineage records.
+
+        Args:
+            key: The object key.
+
+        Returns:
+            The store's location, `/` and the key. `check_key` raises
+            `StoreError` if the key is not valid.
+        """
         return f"{self.location}/{check_key(key)}"
 
     @abc.abstractmethod
@@ -156,6 +209,14 @@ class ObjectStore(abc.ABC):
     ) -> ObjectMeta:
         """Stores `data`, replacing any object unless `if_absent`.
 
+        Args:
+            key: The object key.
+            data: The content to store.
+            if_absent: Create the object only if none exists.
+
+        Returns:
+            The metadata of the stored object.
+
         Raises:
             AlreadyExistsError: With `if_absent` and an existing object.
             TransientStoreError: On a retryable service failure.
@@ -163,7 +224,13 @@ class ObjectStore(abc.ABC):
 
     @abc.abstractmethod
     def get(self, key: str) -> tuple[bytes, ObjectMeta]:
-        """The content and metadata of an object.
+        """Reads an object.
+
+        Args:
+            key: The object key.
+
+        Returns:
+            The content and the object's metadata.
 
         Raises:
             NotFoundError: If there is no such object.
@@ -172,7 +239,13 @@ class ObjectStore(abc.ABC):
 
     @abc.abstractmethod
     def head(self, key: str) -> ObjectMeta:
-        """Metadata without the content.
+        """Reads an object's metadata without its content.
+
+        Args:
+            key: The object key.
+
+        Returns:
+            The object's metadata.
 
         Raises:
             NotFoundError: If there is no such object.
@@ -180,14 +253,32 @@ class ObjectStore(abc.ABC):
 
     @abc.abstractmethod
     def list_objects(self, prefix: str = "") -> list[ObjectMeta]:
-        """Metadata of every object whose key starts with `prefix`, by key."""
+        """Lists the objects whose key starts with a prefix.
+
+        Args:
+            prefix: Key prefix; empty for every object.
+
+        Returns:
+            The metadata of each matching object, sorted by key.
+        """
 
     @abc.abstractmethod
     def delete(self, key: str) -> None:
-        """Removes an object; removing a missing object is not an error."""
+        """Removes an object; removing a missing object is not an error.
+
+        Args:
+            key: The object key.
+        """
 
     def exists(self, key: str) -> bool:
-        """Whether an object exists."""
+        """Checks whether an object exists.
+
+        Args:
+            key: The object key.
+
+        Returns:
+            True if `head` finds the object, False if it reports it missing.
+        """
         try:
             self.head(key)
         except NotFoundError:
@@ -212,7 +303,8 @@ def refused_as_existing(error: OSError, path: pathlib.Path) -> bool:
     Returns:
         True for FileExistsError, and for the access or sharing errors
         Windows raises while another writer creates the target, once the
-        target is seen to exist.
+        target is seen to exist; False for any other error, or if the target
+        never appears.
     """
     if isinstance(error, FileExistsError):
         return True
@@ -229,7 +321,13 @@ def refused_as_existing(error: OSError, path: pathlib.Path) -> bool:
 
 
 def unlink_tolerantly(path: pathlib.Path) -> None:
-    """Removes a temp file, retrying while Windows still holds it open."""
+    """Removes a temp file, retrying while Windows still holds it open.
+
+    Gives up quietly after 20 attempts that fail with PermissionError.
+
+    Args:
+        path: The temp file to remove; a missing file is not an error.
+    """
     for attempt in range(RETRY_ATTEMPTS):
         try:
             path.unlink(missing_ok=True)
@@ -239,7 +337,11 @@ def unlink_tolerantly(path: pathlib.Path) -> None:
 
 
 class LocalObjectStore(ObjectStore):
-    """Objects as files under a root directory."""
+    """Objects as files under a root directory.
+
+    Attributes:
+        root: The resolved directory holding the objects.
+    """
 
     scheme = "file"
 
@@ -259,6 +361,15 @@ class LocalObjectStore(ObjectStore):
         validated by `check_key`, and resolving the target would depend on
         which directories exist at that instant (and on 8.3 short names on
         Windows), which a concurrent writer can change.
+
+        Args:
+            key: The object key.
+
+        Returns:
+            The absolute path of the file that holds the object.
+
+        Raises:
+            StoreError: If the key is not valid or its path leaves the root.
         """
         target = pathlib.Path(os.path.abspath(self.root / check_key(key)))
         if self.root not in target.parents:
@@ -266,7 +377,16 @@ class LocalObjectStore(ObjectStore):
         return target
 
     def meta_of(self, key: str, path: pathlib.Path, data: bytes) -> ObjectMeta:
-        """Metadata for a file whose bytes are known."""
+        """Builds the metadata of a file whose bytes are known.
+
+        Args:
+            key: The object key.
+            path: The file holding the object.
+            data: The file's content; its length and hash are reported.
+
+        Returns:
+            The metadata, with the file's modification time and no version.
+        """
         stat = path.stat()
         return ObjectMeta(
             key, len(data), sha256_of(data), iso(stat.st_mtime), None
@@ -275,7 +395,22 @@ class LocalObjectStore(ObjectStore):
     def put(
         self, key: str, data: bytes, *, if_absent: bool = False
     ) -> ObjectMeta:
-        """Stores `data` atomically."""
+        """Stores `data` atomically.
+
+        An unconditional put replaces the file through
+        `scmle.durability.write_atomically`; a conditional one links a
+        fully written temp file into place only if no object exists, and
+        raises `AlreadyExistsError` if one does. An invalid key raises
+        `StoreError`.
+
+        Args:
+            key: The object key.
+            data: The content to store.
+            if_absent: Create the object only if none exists.
+
+        Returns:
+            The metadata of the stored object.
+        """
         path = self.path_of(key)
         path.parent.mkdir(parents=True, exist_ok=True)
         if if_absent:
@@ -285,7 +420,17 @@ class LocalObjectStore(ObjectStore):
         return self.meta_of(key, path, data)
 
     def create_exclusive(self, path: pathlib.Path, data: bytes) -> None:
-        """Writes a temp file, then links it into place only if absent."""
+        """Writes a temp file, then links it into place only if absent.
+
+        Args:
+            path: The destination file; its directory must exist.
+            data: The content to write.
+
+        Raises:
+            AlreadyExistsError: If the destination already exists.
+            OSError: If linking fails for a reason other than the
+                destination existing.
+        """
         descriptor, name = tempfile.mkstemp(dir=path.parent, prefix=".put-")
         temporary = pathlib.Path(name)
         try:
@@ -309,7 +454,21 @@ class LocalObjectStore(ObjectStore):
             unlink_tolerantly(temporary)
 
     def get(self, key: str) -> tuple[bytes, ObjectMeta]:
-        """Reads an object."""
+        """Reads an object.
+
+        An invalid key raises `StoreError`.
+
+        Args:
+            key: The object key.
+
+        Returns:
+            The file's content and its metadata. The hash is computed from
+            the bytes just read, so a changed file is never reported as
+            corrupt.
+
+        Raises:
+            NotFoundError: If there is no file under the key.
+        """
         path = self.path_of(key)
         try:
             data = path.read_bytes()
@@ -318,11 +477,31 @@ class LocalObjectStore(ObjectStore):
         return data, self.meta_of(key, path, data)
 
     def head(self, key: str) -> ObjectMeta:
-        """Metadata of an object (reads the file to hash it)."""
+        """Reads an object's metadata; the file is read to hash it.
+
+        An invalid key raises `StoreError`, and a key with no file raises
+        `NotFoundError`.
+
+        Args:
+            key: The object key.
+
+        Returns:
+            The object's metadata.
+        """
         return self.get(key)[1]
 
     def list_objects(self, prefix: str = "") -> list[ObjectMeta]:
-        """Objects under a prefix, sorted by key."""
+        """Lists the objects under a prefix, sorted by key.
+
+        Temporary files left by interrupted writers are not listed. An
+        invalid prefix raises `StoreError`.
+
+        Args:
+            prefix: Key prefix; empty for every object.
+
+        Returns:
+            The metadata of each matching object, sorted by key.
+        """
         check_prefix(prefix)
         found = []
         for path in sorted(self.root.rglob("*")):
@@ -334,12 +513,24 @@ class LocalObjectStore(ObjectStore):
         return sorted(found, key=lambda meta: meta.key)
 
     def delete(self, key: str) -> None:
-        """Removes an object if present."""
+        """Removes an object if present.
+
+        An invalid key raises `StoreError`.
+
+        Args:
+            key: The object key.
+        """
         self.path_of(key).unlink(missing_ok=True)
 
 
 class RetryingStore(ObjectStore):
-    """Wraps a store so transient failures are retried under a policy."""
+    """Wraps a store so transient failures are retried under a policy.
+
+    Attributes:
+        inner: The wrapped store.
+        policy: Attempts and backoff.
+        sleep: Waits between attempts.
+    """
 
     def __init__(
         self,
@@ -361,7 +552,18 @@ class RetryingStore(ObjectStore):
         self.sleep = sleep
 
     def run(self, operation: Callable[[], T]) -> T:
-        """Runs one operation under the policy."""
+        """Runs one operation under the policy.
+
+        Only transient errors are retried; any other error propagates at
+        once, and when every attempt fails with a transient error
+        `RetryExhaustedError` propagates.
+
+        Args:
+            operation: Zero-argument callable that does the store call.
+
+        Returns:
+            Whatever the operation returned on the attempt that succeeded.
+        """
         return retry.call_with_retries(operation, self.policy, sleep=self.sleep)
 
     def put(
@@ -372,21 +574,54 @@ class RetryingStore(ObjectStore):
         A conditional put whose first try landed but was reported as a
         timeout fails on the retry with `AlreadyExistsError`; that is
         reported as it is, not hidden.
+
+        Args:
+            key: The object key.
+            data: The content to store.
+            if_absent: Create the object only if none exists.
+
+        Returns:
+            The metadata of the stored object.
         """
         return self.run(lambda: self.inner.put(key, data, if_absent=if_absent))
 
     def get(self, key: str) -> tuple[bytes, ObjectMeta]:
-        """See `ObjectStore.get`."""
+        """Reads an object, retrying transient failures.
+
+        Args:
+            key: The object key.
+
+        Returns:
+            The content and metadata, as from `ObjectStore.get`.
+        """
         return self.run(lambda: self.inner.get(key))
 
     def head(self, key: str) -> ObjectMeta:
-        """See `ObjectStore.head`."""
+        """Reads an object's metadata, retrying transient failures.
+
+        Args:
+            key: The object key.
+
+        Returns:
+            The metadata, as from `ObjectStore.head`.
+        """
         return self.run(lambda: self.inner.head(key))
 
     def list_objects(self, prefix: str = "") -> list[ObjectMeta]:
-        """See `ObjectStore.list_objects`."""
+        """Lists objects under a prefix, retrying transient failures.
+
+        Args:
+            prefix: Key prefix; empty for every object.
+
+        Returns:
+            The metadata, as from `ObjectStore.list_objects`.
+        """
         return self.run(lambda: self.inner.list_objects(prefix))
 
     def delete(self, key: str) -> None:
-        """See `ObjectStore.delete`."""
+        """Removes an object, retrying transient failures.
+
+        Args:
+            key: The object key.
+        """
         self.run(lambda: self.inner.delete(key))
