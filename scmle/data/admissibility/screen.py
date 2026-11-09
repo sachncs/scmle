@@ -56,7 +56,7 @@ the share of true nulls, under arbitrary dependence between columns. Under
 the global null (no column is associated with the outcome) this is the
 probability of at least one false alarm, at most `alpha`. The suspect list is
 a subset of the significant list, so its false discoveries cannot exceed those
-of the significant list. Gating follows the certificate rule (canon P1): only
+of the significant list. Gating follows the certificate rule: only
 a mechanism whose leak types have a current, passing certificate
 (`screen_certificates.json`, `benchmarks.qualification.screen_certify`) may
 block a run; anything else is reported as a warning with its p-values.
@@ -140,7 +140,7 @@ Statistic = Callable[[np.ndarray], np.ndarray]
 
 
 def basis(series: pd.Series, knots: int = KNOTS) -> np.ndarray:
-    """Design matrix of one column for the cross-fitted smoother.
+    """Build the design matrix of one column for the cross-fitted smoother.
 
     A numeric column with more than `knots` distinct values becomes a
     continuous piecewise-linear basis (hat functions) on its distinct
@@ -150,6 +150,16 @@ def basis(series: pd.Series, knots: int = KNOTS) -> np.ndarray:
     frequent, the rest pooled) and one for missing values. Empty indicator
     columns are dropped, so the result may have a single column (a constant
     column), which carries no information.
+
+    Args:
+        series: One candidate column.
+        knots: Number of quantile intervals of the piecewise-linear basis; a
+            numeric column with at most this many distinct values gets
+            indicators instead.
+
+    Returns:
+        A float64 array with one row per entry of `series` and one column
+        per retained basis function or indicator.
     """
     numeric = pd.api.types.is_numeric_dtype(
         series
@@ -185,7 +195,17 @@ def basis(series: pd.Series, knots: int = KNOTS) -> np.ndarray:
 def strata_of(
     n: int, groups: np.ndarray | None, block_size: int | None
 ) -> np.ndarray:
-    """Permutation stratum per row: its group, its time block, or one."""
+    """Assign each row its permutation stratum: group, time block, or one.
+
+    Args:
+        n: Number of rows.
+        groups: Group label per row, or None. Takes precedence.
+        block_size: Consecutive rows per time block, or None.
+
+    Returns:
+        An int64 stratum label per row. All zeros when neither `groups` nor
+        `block_size` is given.
+    """
     if groups is not None:
         return pd.factorize(pd.Series(groups).astype(str))[0].astype("int64")
     if block_size is not None:
@@ -200,6 +220,14 @@ def batch_permutations(
 
     Row `i` of the result `p` gives the position whose outcome row `i`
     receives, so `y[p[b]]` is the outcome permuted within strata.
+
+    Args:
+        strata: Stratum label per row.
+        count: Number of permutations to draw.
+        rng: Random generator.
+
+    Returns:
+        An integer array of shape (count, n), one permutation per row.
     """
     n = len(strata)
     base = np.argsort(strata, kind="stable")
@@ -221,6 +249,16 @@ def fold_splits(
 
     Folds fixed before permuting keep the observed statistic and the permuted
     ones the same function of the data, which the exact p-value needs.
+
+    Args:
+        n: Number of rows.
+        folds: Requested number of folds.
+        groups: Group label per row, or None.
+        block_size: Consecutive rows per time block, or None.
+        seed: Seed of the fold shuffling.
+
+    Returns:
+        A list of (train positions, test positions) pairs, one per fold.
     """
     return leakage.make_splits(
         np.zeros(n), "regression", folds, groups, block_size, seed
@@ -267,13 +305,24 @@ def oof_fit(values: np.ndarray, phi: np.ndarray, splits: Splits) -> np.ndarray:
 def fold_concordance(
     score: np.ndarray, positive: np.ndarray, tests: Sequence[np.ndarray]
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Concordant pairs and pairs, per row, counted within folds only.
+    """Count concordant pairs and pairs, per row, within folds only.
 
     Pairs are formed inside each held-out fold, never across folds. Across
     folds a row's prediction was made without its own label but with the
     labels of the rows of the other fold, which orders same-level rows of
     different folds against their labels and biases a pooled AUC downward.
     Ties count one half.
+
+    Args:
+        score: Array of shape (B, n): B versions of the out-of-fold scores.
+        positive: Boolean array of shape (B, n) marking the positive class
+            in each version.
+        tests: Held-out row positions of each fold.
+
+    Returns:
+        A pair of float arrays of length B: for each version, the number of
+        concordant (positive, negative) pairs, ties counting one half, and
+        the number of such pairs, summed over the folds.
     """
     wins = np.zeros(score.shape[0])
     pairs = np.zeros(score.shape[0])
@@ -290,7 +339,16 @@ def fold_concordance(
 def auc_rows(
     score: np.ndarray, positive: np.ndarray, tests: Sequence[np.ndarray]
 ) -> np.ndarray:
-    """Within-fold ROC AUC of each row; NaN when no fold has both classes."""
+    """Compute the within-fold ROC AUC of each version of the scores.
+
+    Args:
+        score: Array of shape (B, n) of out-of-fold scores.
+        positive: Boolean array of shape (B, n) marking the positive class.
+        tests: Held-out row positions of each fold.
+
+    Returns:
+        A length-B array of AUC values; NaN where no fold has both classes.
+    """
     wins, pairs = fold_concordance(score, positive, tests)
     with np.errstate(invalid="ignore", divide="ignore"):
         return wins / pairs
@@ -316,7 +374,18 @@ class Problem:
 
 
 def skill_statistic(problem: Problem, phi: np.ndarray) -> Statistic:
-    """Skill (AUC or R^2) of a column for a batch of permuted outcomes."""
+    """Build the skill statistic of a column for batches of permuted outcomes.
+
+    Args:
+        problem: The outcome, task and folds.
+        phi: Design of the column, of shape (n, p).
+
+    Returns:
+        A function mapping an array of shape (B, n) of outcome versions to
+        a length-B array of skills: R^2 for regression, otherwise the
+        within-fold AUC of class 1 when binary or its macro one-vs-rest
+        average.
+    """
     tests = [split[1] for split in problem.splits]
 
     def compute(labels: np.ndarray) -> np.ndarray:
@@ -340,6 +409,13 @@ def observed_predictions(problem: Problem, phi: np.ndarray) -> list[np.ndarray]:
 
     One array per scored target: the outcome for a regression, the indicator
     of each class for a classification (class 1 only when binary).
+
+    Args:
+        problem: The outcome, task and folds.
+        phi: Design of the column, of shape (n, p).
+
+    Returns:
+        A list of arrays of length n, one per scored target.
     """
     y = problem.y
     if problem.task == "regression":
@@ -357,7 +433,19 @@ def sample_skill(
     index: np.ndarray,
     fold_of: np.ndarray,
 ) -> float | None:
-    """Skill on a bootstrap sample of rows, or None if it lacks a class."""
+    """Compute the skill on a bootstrap sample of rows.
+
+    Args:
+        problem: The outcome, task and folds.
+        predictions: Output of `observed_predictions`.
+        index: Positions of the sampled rows, with repeats.
+        fold_of: Fold number of each row.
+
+    Returns:
+        The skill on the sample, or None when it cannot be computed: a
+        constant regression sample, or a classification sample in which no
+        fold holds both a positive and a negative row.
+    """
     y = problem.y[index]
     if problem.task == "regression":
         total = float(((y - y.mean()) ** 2).sum())
@@ -390,6 +478,16 @@ def skill_bound(
     Rows are resampled, or whole groups when `groups` is given, and the
     out-of-fold predictions stay attached to their rows and folds. Draws that
     lack a class are skipped; with none left the bound is -inf.
+
+    Args:
+        problem: The outcome, task and folds.
+        phi: Design of the column, of shape (n, p).
+        cfg: Settings (`bootstrap`, `confidence`).
+        groups: Group label per row, or None.
+        rng: Random generator.
+
+    Returns:
+        The `1 - confidence` quantile of the bootstrap skills, or -inf.
     """
     predictions = observed_predictions(problem, phi)
     fold_of = np.empty(len(problem.y), dtype="int64")
@@ -420,7 +518,17 @@ def skill_bound(
 def chi_square_rows(
     missing: np.ndarray, labels: np.ndarray, totals: np.ndarray
 ) -> np.ndarray:
-    """Pearson chi-square of the 2 x K (missing by class) table, per row."""
+    """Compute the Pearson chi-square of the 2 x K (missing by class) table.
+
+    Args:
+        missing: Boolean array of length n, True where the value is missing.
+        labels: Array of shape (B, n) of class codes, B versions of the
+            outcome.
+        totals: Number of rows of each class.
+
+    Returns:
+        A length-B array with the chi-square of each version.
+    """
     n = labels.shape[1]
     n_missing = float(missing.sum())
     n_present = n - n_missing
@@ -436,7 +544,16 @@ def chi_square_rows(
 
 
 def missingness_statistic(missing: np.ndarray, totals: np.ndarray) -> Statistic:
-    """Cramer's V of missingness against permuted outcome classes."""
+    """Build the Cramer's V statistic of missingness against the outcome.
+
+    Args:
+        missing: Boolean array of length n, True where the value is missing.
+        totals: Number of rows of each class.
+
+    Returns:
+        A function mapping an array of shape (B, n) of class-code versions
+        to a length-B array of V values.
+    """
     n = len(missing)
 
     def compute(labels: np.ndarray) -> np.ndarray:
@@ -446,7 +563,17 @@ def missingness_statistic(missing: np.ndarray, totals: np.ndarray) -> Statistic:
 
 
 def purity_statistic(recorded: np.ndarray) -> Statistic:
-    """Share of the commonest class among recorded rows, per permutation."""
+    """Build the record-purity statistic.
+
+    Args:
+        recorded: Boolean array of length n, True where the value is
+            recorded.
+
+    Returns:
+        A function mapping an array of shape (B, n) of class-code versions
+        to a length-B array holding, for each, the share of the commonest
+        class among the recorded rows.
+    """
     flags = recorded.astype("float64")
     count = float(flags.sum())
 
@@ -469,6 +596,16 @@ def purity_bound(
     The share is taken among recorded rows. With groups the number of trials
     is the number of groups holding a recorded row (at most the rows), the
     conservative count when rows of one group move together.
+
+    Args:
+        recorded: Boolean array, True where the value is recorded.
+        classes: Class code per row.
+        cfg: Settings (`confidence`).
+        groups: Group label per row, or None.
+
+    Returns:
+        The lower bound of the share, or 0.0 when the rounded count of
+        successes is zero.
     """
     labels = classes[recorded]
     counts = np.bincount(labels)
@@ -495,6 +632,18 @@ def bootstrap_v(
     Rows are resampled, or whole groups when `groups` is given. Draws that
     lose the missing or the present rows are skipped; with none left the bound
     is -inf.
+
+    Args:
+        missing: Boolean array, True where the value is missing.
+        classes: Class code per row.
+        n_classes: Number of classes.
+        cfg: Settings (`bootstrap`, `confidence`).
+        groups: Group label per row, or None.
+        rng: Random generator.
+
+    Returns:
+        The `1 - confidence` quantile of the bootstrap values of V, or
+        -inf.
     """
     members = (
         [np.flatnonzero(groups == g) for g in pd.unique(groups)]
@@ -553,7 +702,15 @@ class Pending:
 
 
 def required_permutations(family: int, alpha: Fraction) -> int:
-    """Smallest `B` with `1 / (B + 1) <= alpha / (family * H_family)`."""
+    """Find the smallest `B` with `1 / (B + 1) <= alpha / (family * H_family)`.
+
+    Args:
+        family: Number of hypotheses adjusted together.
+        alpha: Level of the Benjamini-Yekutieli step.
+
+    Returns:
+        The number of permutations `B`; 0 when `family` is not positive.
+    """
     if family <= 0:
         return 0
     need = family * multiplicity.harmonic_exact(family) / alpha
@@ -569,10 +726,20 @@ def draw_permutations(
     alpha: Fraction,
     seed: int,
 ) -> None:
-    """Draws `total` shared permutations and updates every hypothesis.
+    """Draw `total` shared permutations and update every hypothesis in place.
 
     A hypothesis stops once its final p-value is certain to exceed the
-    largest threshold of the step-up rule.
+    largest threshold of the step-up rule. The `exceed`, `drawn` and
+    `active` fields of each hypothesis in `pending` are updated.
+
+    Args:
+        pending: The hypotheses of the family.
+        labels: Class codes (or values) of the outcome, per row.
+        binned: Binned outcome codes, per row.
+        strata: Permutation stratum per row.
+        total: Number of permutations to draw.
+        alpha: Level of the Benjamini-Yekutieli step.
+        seed: Run seed of the permutation streams.
     """
     family = len(pending)
     ceiling = alpha / multiplicity.harmonic_exact(family)
@@ -636,7 +803,16 @@ class Finding:
         return self.suspect and self.gate is certificates.GateStatus.GATING
 
     def describe(self, ceiling: float) -> str:
-        """One sentence for a profile: what was found, and how to read it."""
+        """Write one sentence for a profile: what was found, how to read it.
+
+        Args:
+            ceiling: The ceiling the lower bound exceeded.
+
+        Returns:
+            A sentence naming the column, the mechanism, the statistic,
+            the bound, both p-values and whether the mechanism is certified,
+            and stating that it is a suspicion and not proof.
+        """
         what = WORDS[self.mechanism]
         bound = "n/a" if self.lower_bound is None else f"{self.lower_bound:.3f}"
         status = (
@@ -706,13 +882,27 @@ class ScreenReport:
         return tuple(f for f in self.findings if f.blocking)
 
     def sentences(self) -> tuple[str, ...]:
-        """One sentence per suspect."""
+        """Write one sentence per suspect.
+
+        Returns:
+            The `describe` sentence of every suspect, in finding order.
+        """
         return tuple(
             f.describe(self.ceilings[f.mechanism]) for f in self.suspects
         )
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready document; a suspicion is not a finding."""
+        """Convert the report to a JSON-ready document.
+
+        A suspicion is not a finding, and the document says so.
+
+        Returns:
+            A dict with a note, the rule, level, rows, family size,
+            permutations, gates, ceilings, notes, unchecked columns,
+            warning, suspect and blocking column names, and the findings
+            that are significant or suspect (an infinite lower bound is
+            written as None).
+        """
         return {
             "note": "statistical suspicion only; not proof of leakage",
             "rule": "benjamini-yekutieli",
@@ -761,6 +951,18 @@ def subsample(
     The choice does not look at the outcome. Groups are kept whole, time
     blocks keep their order (every k-th row), otherwise rows are drawn at
     random.
+
+    Args:
+        n: Number of rows available.
+        groups: Group label per row, or None.
+        block_size: Consecutive rows per time block, or None.
+        seed: Run seed of the draw.
+
+    Returns:
+        A pair (sorted row positions, block size to use). Everything is
+        kept when `n` is at most `MAX_ROWS`. With groups, whole groups are
+        drawn until `MAX_ROWS` rows are reached; with time blocks, every
+        k-th row is kept and the block size shrinks by k (not below 2).
     """
     if n <= MAX_ROWS:
         return np.arange(n), block_size
@@ -788,12 +990,21 @@ def gate_statuses(
     task: str,
     n_classes: int,
 ) -> dict[str, certificates.GateStatus]:
-    """Gate status per mechanism from the certificates on file.
+    """Determine the gate status per mechanism from the certificates on file.
 
     A mechanism gates only when the screen's current code has a passing
     certificate for every leak type of that mechanism, the settings equal the
     certified ones (any run seed), and the target is the one that was
     certified (binary classification). Anything else is descriptive.
+
+    Args:
+        store: Certificates on file, or None.
+        cfg: The settings the screen will run with.
+        task: `classification` or `regression`.
+        n_classes: Number of classes of the target.
+
+    Returns:
+        `GATING` or `DESCRIPTIVE` for each mechanism.
     """
     descriptive = dict.fromkeys(
         MECHANISM_DEFECTS, certificates.GateStatus.DESCRIPTIVE
@@ -820,7 +1031,15 @@ def gate_statuses(
 def load_store(
     path: Path | None = None,
 ) -> certificates.CertificateStore | None:
-    """The shipped certificates of the screen, or None if unusable."""
+    """Load the certificates of the screen.
+
+    Args:
+        path: Certificate file; defaults to the one shipped with the
+            package.
+
+    Returns:
+        The store, or None if the file is missing or unreadable.
+    """
     target = path or STORE_PATH
     if not target.is_file():
         return None
@@ -832,12 +1051,17 @@ def load_store(
 
 @functools.cache
 def shipped_store() -> certificates.CertificateStore | None:
-    """The certificates shipped with the package, read once."""
+    """Load the certificates shipped with the package, once.
+
+    Returns:
+        The store, or None if it is missing or unreadable. The result is
+        cached for the process.
+    """
     return load_store()
 
 
 def work_cap(time_budget_seconds: float | None) -> int | None:
-    """Most cross-fitted fits the screen may use under a time budget.
+    """Compute the most cross-fitted fits the screen may use in a budget.
 
     Deterministic: the budget alone decides, not the machine's speed.
 
@@ -864,7 +1088,7 @@ def screen_table(
     store: certificates.CertificateStore | None = None,
     time_budget_seconds: float | None = None,
 ) -> ScreenReport:
-    """Screens training data with the certified settings.
+    """Screen training data with the certified settings.
 
     Groups keep entities whole. A time column orders the rows and defines
     `TIME_BLOCKS` consecutive blocks; groups win when both are given.
@@ -916,12 +1140,23 @@ def code_digest() -> str:
 
     The key of its certificate: this module, the leakage helpers it reuses
     and the multiplicity step.
+
+    Returns:
+        The combined code hash of those modules.
     """
     return certificates.code_hash(sys.modules[__name__], leakage, multiplicity)
 
 
 def ceilings_of(cfg: leakage.LeakageConfig) -> dict[str, float]:
-    """Pre-registered ceiling of each mechanism's effect size."""
+    """Look up the pre-registered ceiling of each mechanism's effect size.
+
+    Args:
+        cfg: Settings holding the ceilings.
+
+    Returns:
+        A dict from mechanism to ceiling; missingness and record purity
+        share the association ceiling.
+    """
     return {
         SKILL: cfg.skill_ceiling,
         MISSING: cfg.association_ceiling,
@@ -935,7 +1170,18 @@ def empty_report(
     rows: int,
     note: str,
 ) -> ScreenReport:
-    """A report that tested nothing, and says why."""
+    """Build a report that tested nothing, and says why.
+
+    Args:
+        cfg: Settings (`alpha` and the ceilings are recorded).
+        gates: Gate status per mechanism.
+        rows: Rows the screen saw.
+        note: Why nothing was tested.
+
+    Returns:
+        A report with no findings, a family of 0, and `note` as its only
+        note.
+    """
     return ScreenReport(
         (),
         rows,
@@ -955,10 +1201,22 @@ def build_problem(
     groups: np.ndarray | None,
     block_size: int | None,
 ) -> Problem:
-    """Encodes the outcome and fixes the folds.
+    """Encode the outcome and fix the folds.
+
+    Args:
+        target: The outcome.
+        task: `classification` or `regression`.
+        cfg: Settings (`folds`, `run_seed`).
+        groups: Group label per row, or None.
+        block_size: Consecutive rows per time block, or None.
+
+    Returns:
+        The encoded outcome with its folds.
 
     Raises:
-        ValueError: On a degenerate or missing outcome.
+        ValueError: If a regression target is constant, or the outcome is
+            rejected by `leakage.encode_target` (missing values, fewer
+            than two classes, or an unknown task).
     """
     y = leakage.encode_target(target, task)
     folds = fold_splits(len(y), cfg.folds, groups, block_size, cfg.run_seed)
@@ -980,7 +1238,25 @@ def scan_frame(
     gates: Mapping[str, certificates.GateStatus],
     time_budget_seconds: float | None = None,
 ) -> ScreenReport:
-    """Runs the screen on rows that are already chosen."""
+    """Run the screen on rows that are already chosen.
+
+    Args:
+        frame: The chosen rows, including the target.
+        target: Target column.
+        task: `classification` or `regression`.
+        cfg: Settings.
+        names: Candidate columns.
+        groups: Group label per row, or None.
+        block_size: Consecutive rows per time block, or None.
+        gates: Gate status per mechanism.
+        time_budget_seconds: Declared time budget, or None for no cap
+            beyond `MAX_PERMUTATIONS`.
+
+    Returns:
+        The report. It is empty, with the reason in its notes, when the
+        outcome is invalid, there are too few rows, no column could be
+        tested, or the permutations or work needed exceed the limits.
+    """
     n = len(frame)
     try:
         problem = build_problem(frame[target], task, cfg, groups, block_size)
@@ -1150,7 +1426,7 @@ def screen(
     store: certificates.CertificateStore | None = None,
     time_budget_seconds: float | None = None,
 ) -> ScreenReport:
-    """Screens the candidate columns of training data for leakage suspicion.
+    """Screen the candidate columns of training data for leakage suspicion.
 
     Args:
         frame: Training (or exploration) rows including the target. For time
@@ -1173,8 +1449,9 @@ def screen(
         rows: the report is empty and says why.
 
     Raises:
-        ValueError: On both `groups` and `block_size`, a misaligned `groups`
-            or an unknown column.
+        ValueError: If both `groups` and `block_size` are given, `groups`
+            differs in length from `frame`, or `features` names a column
+            that is missing or is the target.
     """
     if groups is not None and block_size is not None:
         raise ValueError("use groups or block_size, not both")

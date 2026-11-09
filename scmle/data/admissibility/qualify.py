@@ -1,15 +1,15 @@
-"""Runs the F4 admissibility tests and the F5 detectors on `X` for a run.
+"""Runs the admissibility tests and the detectors on `X` for a run.
 
 This is the wiring between the feature packages and a charter run. It reads
-the exploration view only (canon P3) and returns plain results; the caller
+the exploration view only and returns plain results; the caller
 decides what to write and what to drop.
 
 Certificates are stored beside the qualification harness
 (`benchmarks/qualification/*.json`). That directory is not part of the
 installed `scmle` package, so the stores are found by path relative to a
 source checkout. When a store cannot be found or read, every detector it
-covers is treated as descriptive and the reason is returned, never hidden
-(canon P1): descriptive suspicions raise warnings and cannot quarantine.
+covers is treated as descriptive and the reason is returned, never hidden:
+descriptive suspicions raise warnings and cannot quarantine.
 
 The charter declares no per-field provenance and no leakage ceilings, so
 fields are undeclared (tier `unverified`) and decided in permissive mode:
@@ -68,7 +68,7 @@ class LoadedStore:
 
 
 def load_store(name: str, directory: Path | None = None) -> LoadedStore:
-    """Reads a certificate store, or says why it could not.
+    """Read a certificate store, or say why it could not be read.
 
     Args:
         name: File name of the store.
@@ -76,7 +76,9 @@ def load_store(name: str, directory: Path | None = None) -> LoadedStore:
             of the source checkout.
 
     Returns:
-        The store, or None with a reason.
+        A `LoadedStore` holding the store, or None and a note saying
+        that the file is missing or unreadable (the detectors it covers are
+        then descriptive).
     """
     path = (directory or STORE_DIRECTORY) / name
     if not path.is_file():
@@ -93,13 +95,13 @@ def load_store(name: str, directory: Path | None = None) -> LoadedStore:
 
 @dataclasses.dataclass(frozen=True)
 class Qualification:
-    """What the F4 and F5 stages found on `X`.
+    """What the admissibility tests and the detectors found on `X`.
 
     Attributes:
         table: Admissibility decisions, or None when they were not run.
         leakage: The leakage screen report, or None when not run.
-        detectors: F5 pipeline result.
-        f5_store: The F5 certificates used, or None.
+        detectors: Detector pipeline result.
+        f5_store: The detector certificates used, or None.
         notes: Plain statements of what was not run or not certified.
         diagnostics: Ledger records (source, check) of the screen and of
             every attestation that overrode a block.
@@ -154,11 +156,25 @@ class Qualification:
 def finding_check(
     finding: screen.Finding, rows: int, seed: int, index: int
 ) -> qualification.Check:
-    """The ledger record of one screen finding.
+    """Build the ledger record of one screen finding.
 
     The record is a wealth-free diagnostic: it carries the permutation
     p-value, never a claim. A suspect whose mechanism is not certified is
-    demoted to a warning (canon P1).
+    demoted to a warning.
+
+    Args:
+        finding: The screen finding.
+        rows: Number of rows the screen used.
+        seed: Charter seed, recorded in the seed path.
+        index: Position of the finding in the report, recorded in the seed
+            path.
+
+    Returns:
+        A check on the exploration set. Its decision is `quarantine` for a
+        suspect from a certified mechanism (demoted to a warning
+        otherwise) and `pass` for a non-suspect. Its statistic is 0 when the
+        finding's statistic is not finite, and its p-value is clipped to
+        [0, 1].
     """
     if finding.suspect:
         decision = certificates.demote(
@@ -192,10 +208,23 @@ def attestation_check(
     seed: int,
     index: int,
 ) -> qualification.Check:
-    """The ledger record of an attestation that overrode a block.
+    """Build the ledger record of an attestation that overrode a block.
 
     Its p-value is the smallest p-value of the screen for the column, so the
     record shows what was overridden; its tier is `attested`.
+
+    Args:
+        item: The attestation that was applied.
+        findings: Screen findings for the attested column.
+        rows: Number of rows the screen used.
+        seed: Charter seed, recorded in the seed path.
+        index: Position of the attestation among those applied, recorded in
+            the seed path.
+
+    Returns:
+        A warning-level check on the exploration set whose statistic and
+        effect are the largest statistic among `findings` (0 if none) and
+        whose p-value is the smallest (1 if none), clipped to [0, 1].
     """
     given = item.attestation
     p_value = min((f.p_value for f in findings), default=1.0)
@@ -230,13 +259,34 @@ def causal_admissibility(
     store: certificates.CertificateStore | None,
     notes: list[str],
 ) -> Qualification:
-    """Graph rules on every candidate and the falsification of the graph.
+    """Apply the graph rules to every candidate and test the graph.
 
     Each candidate gets `rules.decide_causal` (descendants of the treatment
     and colliders are quarantined), the declared adjustment set is checked
     member by member, and the graph's implied independences are tested on
     `X` only. More candidates than `MAX_SEARCH_CANDIDATES` with no declared
     adjustment set leaves the claim `attested` at best, and says so.
+
+    Args:
+        frame: Exploration data with the candidates and the target.
+        candidates: Candidate covariate columns.
+        spec: The charter's causal block.
+        graph: The declared DAG hypothesis.
+        seed: Charter seed.
+        day: Day on which attestations must be valid.
+        result: Detector pipeline result to carry into the return value.
+        store: Detector certificates used, to carry into the return value.
+        notes: Notes so far. This list is appended to in place when the graph
+            rules or the falsification cannot run, when the declared
+            adjustment set holds a refused member, or when the graph has
+            falsified implications.
+
+    Returns:
+        The qualification with the admissibility table (None when the graph
+        rules could not be applied), no leakage report, and the `dag`
+        report holding the graph hash, the refused adjustment members and
+        the falsification outcome. Its diagnostics are the checks of the
+        falsification, if it ran.
     """
     records = provenance.ProvenanceTable.covering([str(c) for c in candidates])
     members = causal_module.covariates_of(spec.assumptions) or ()
@@ -323,7 +373,7 @@ def run(
     dag: dag_module.Dag | None = None,
     declared: Sequence[provenance.FieldProvenance] = (),
 ) -> Qualification:
-    """Runs leakage, admissibility and the detector pipeline on `X`.
+    """Run leakage, admissibility and the detector pipeline on `X`.
 
     Args:
         features: Exploration features.
@@ -334,8 +384,8 @@ def run(
         structure: Group and time columns, which are not candidates.
         group_column: Entity column, so permutations keep entities whole.
         time_column: Time column, so permutations stay within time blocks.
-        directory: Folder of the certificate stores, for tests. The F5 store
-            and the screen store are read from it.
+        directory: Folder of the certificate stores, for tests. The detector
+            store and the screen store are read from it.
         attestations: Per-column statements that a strong predictor is
             legitimate; each counts only if its scope equals `scope` and it
             is valid on `today`.
@@ -344,9 +394,9 @@ def run(
             current date.
         causal: The charter's causal block, for a causal estimand.
         dag: The DAG hypothesis the causal block declares, already loaded.
-        declared: Provenance records for columns the run derived (the F9
-            synthesized features); a column not among the candidates is
-            ignored. The others stay undeclared.
+        declared: Provenance records for columns the run derived (for
+            example synthesized features); a column not among the
+            candidates is ignored. The others stay undeclared.
 
     Returns:
         The results. A causal estimand with a causal block and a declared

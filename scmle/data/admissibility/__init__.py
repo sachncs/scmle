@@ -1,4 +1,4 @@
-"""Admissibility and provenance of fields (feature F4).
+"""Admissibility and provenance of fields.
 
 Decides which fields may enter a model on facts about how each value comes to
 exist, and uses statistics only to raise suspicion about what provenance

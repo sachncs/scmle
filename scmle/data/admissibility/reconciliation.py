@@ -65,7 +65,13 @@ class Explanation:
     attested_by: str | None = None
 
     def __post_init__(self) -> None:
-        """Validates the record."""
+        """Validate the record.
+
+        Raises:
+            ValueError: If `mechanism` is not a `Mechanism`, `detail` or
+                `attested_by` (when given) is empty, or `amount` is not
+                finite.
+        """
         if not isinstance(self.mechanism, Mechanism):
             raise ValueError("mechanism must be a Mechanism")
         evidence.require_text(self.detail, "detail")
@@ -74,7 +80,12 @@ class Explanation:
             evidence.require_text(self.attested_by, "attested_by")
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Convert the explanation to a JSON-ready record.
+
+        Returns:
+            A dict with the mechanism (its string value), detail, amount
+            and attester.
+        """
         return {
             "mechanism": self.mechanism.value,
             "detail": self.detail,
@@ -84,7 +95,15 @@ class Explanation:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds the record, rejecting unknown or missing fields."""
+        """Rebuild the record, rejecting unknown or missing fields.
+
+        Args:
+            record: A mapping in the form `to_dict` returns.
+
+        Returns:
+            The explanation. Unexpected or missing fields, an unknown
+            mechanism and invalid values are rejected with a `ValueError`.
+        """
         qualification.require_fields(cls, record)
         return cls(
             Mechanism(record["mechanism"]),
@@ -113,7 +132,13 @@ class Item:
     explanations: tuple[Explanation, ...] = ()
 
     def __post_init__(self) -> None:
-        """Validates the record."""
+        """Validate the record.
+
+        Raises:
+            ValueError: If `name` or `source_name` is empty, `extract` or
+                `source` is not finite, `source` is zero, or
+                `explanations` is not a tuple.
+        """
         evidence.require_text(self.name, "name")
         evidence.require_text(self.source_name, "source_name")
         qualification.finite(self.extract, "extract")
@@ -149,7 +174,12 @@ class ItemResult:
     check: qualification.Check
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Convert the verdict to a JSON-ready record.
+
+        Returns:
+            A dict with the quantity, both values, gaps, status, tier and
+            the explanations offered.
+        """
         return {
             "name": self.item.name,
             "extract": self.item.extract,
@@ -170,7 +200,7 @@ def reconcile_item(
     set_id: qualification.SetId = qualification.SetId.ALL,
     seed_path: qualification.SeedPath = (0, DETECTOR_ID, 0),
 ) -> ItemResult:
-    """Reconciles one quantity.
+    """Reconcile one quantity.
 
     A gap equal to the tolerance matches. The check blocks when the gap is
     unexplained and `gate` is `GATING`; otherwise it warns.
@@ -183,7 +213,8 @@ def reconcile_item(
         seed_path: Recorded on the check; no randomness is drawn.
 
     Returns:
-        The verdict and its ledger record.
+        The verdict and its ledger record. A `tolerance` outside [0, 1] is
+        rejected with a `ValueError`.
     """
     level = qualification.probability(tolerance, "tolerance")
     gap = item.gap
@@ -251,7 +282,12 @@ class Reconciliation:
         return tuple(r.check for r in self.results)
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready document."""
+        """Convert the reconciliation to a JSON-ready document.
+
+        Returns:
+            A dict with the format version, tolerance, whether it passed
+            and the per-quantity results.
+        """
         return {
             "format_version": FORMAT_VERSION,
             "tolerance": self.tolerance,
@@ -266,7 +302,7 @@ def reconcile(
     gate: certificates.GateStatus = certificates.GateStatus.DESCRIPTIVE,
     set_id: qualification.SetId = qualification.SetId.ALL,
 ) -> Reconciliation:
-    """Reconciles every quantity.
+    """Reconcile every quantity.
 
     Args:
         items: Quantities, with unique names.
@@ -278,7 +314,8 @@ def reconcile(
         The reconciliation; `passed` is False if any gap is unexplained.
 
     Raises:
-        ValueError: On no items or repeated names.
+        ValueError: If `items` is empty, names repeat, or `tolerance` is
+            outside [0, 1].
     """
     if not items:
         raise ValueError("at least one item is required")

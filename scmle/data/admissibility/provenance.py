@@ -3,7 +3,7 @@
 A `FieldProvenance` record says how one field's values come to exist: where
 they originate, who writes them, when, whether they are overwritten, and the
 as-of rule that says how long before the prediction moment each value is
-known. The tier follows canon P4 and the F4 feature file:
+known. The tier of the as-of rule is:
 
 * `confirmed` only when the as-of rule was derived from a change log and the
   reconstruction from that log agrees with the stored values;
@@ -82,7 +82,16 @@ class Availability(enum.StrEnum):
 
 
 def number(value: Any, name: str) -> float:
-    """Returns a finite float."""
+    """Check that a value is a finite number.
+
+    Args:
+        value: The value to check.
+        name: Field name used in the error message.
+
+    Returns:
+        `value` as a float. A value that is not a finite number is
+        rejected with a `ValueError` from `qualification.finite`.
+    """
     return qualification.finite(value, name)
 
 
@@ -102,7 +111,12 @@ class AsOf:
     lead_seconds: float | None
 
     def __post_init__(self) -> None:
-        """Validates the rule."""
+        """Validate the rule.
+
+        Raises:
+            ValueError: If `kind` is not an `AsOfKind`, if an unknown rule
+                has a lead, or if a known rule has no finite lead.
+        """
         if not isinstance(self.kind, AsOfKind):
             raise ValueError("kind must be an AsOfKind")
         if self.kind is AsOfKind.UNKNOWN:
@@ -115,7 +129,11 @@ class AsOf:
 
     @classmethod
     def unknown(cls) -> Self:
-        """The rule of a field nobody has stated or derived."""
+        """Build the rule of a field nobody has stated or derived.
+
+        Returns:
+            A rule of kind `unknown` with no lead.
+        """
         return cls(AsOfKind.UNKNOWN, None)
 
     @property
@@ -124,18 +142,41 @@ class AsOf:
         return self.kind is not AsOfKind.UNKNOWN
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Convert the rule to a JSON-ready record.
+
+        Returns:
+            A dict with `kind` (its string value) and `lead_seconds`.
+        """
         return {"kind": self.kind.value, "lead_seconds": self.lead_seconds}
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds a rule, rejecting unknown or missing fields."""
+        """Rebuild a rule from a record, rejecting unknown or missing fields.
+
+        Args:
+            record: A mapping with exactly `kind` and `lead_seconds`.
+
+        Returns:
+            The rule. Unexpected or missing fields, an unknown `kind` and
+            an invalid rule are rejected with a `ValueError`.
+        """
         qualification.require_fields(cls, record)
         return cls(AsOfKind(record["kind"]), record["lead_seconds"])
 
 
 def parse_date(value: str, name: str) -> datetime.date:
-    """Parses an ISO calendar date."""
+    """Parse an ISO calendar date.
+
+    Args:
+        value: Text in the form YYYY-MM-DD.
+        name: Field name used in the error message.
+
+    Returns:
+        The date.
+
+    Raises:
+        ValueError: If `value` is not an ISO date.
+    """
     try:
         return datetime.date.fromisoformat(value)
     except (TypeError, ValueError) as error:
@@ -166,7 +207,12 @@ class Attestation:
     expires: str
 
     def __post_init__(self) -> None:
-        """Validates the record."""
+        """Validate the record.
+
+        Raises:
+            ValueError: If a text field is empty, a date is not an ISO date,
+                or `expires` precedes `date`.
+        """
         for name in (
             "name_or_id",
             "role",
@@ -180,17 +226,36 @@ class Attestation:
             raise ValueError("expires must not precede date")
 
     def valid_on(self, day: datetime.date) -> bool:
-        """Whether the statement counts on `day` (inclusive of both ends)."""
+        """Test whether the statement counts on a day.
+
+        Args:
+            day: The day to test.
+
+        Returns:
+            True if `day` lies between `date` and `expires`, both included.
+        """
         issued = parse_date(self.date, "date")
         return issued <= day <= parse_date(self.expires, "expires")
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Convert the record to a JSON-ready dict.
+
+        Returns:
+            A dict of the record's fields and their values.
+        """
         return dataclasses.asdict(self)
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds the record, rejecting unknown or missing fields."""
+        """Rebuild the record, rejecting unknown or missing fields.
+
+        Args:
+            record: A mapping holding exactly the record's fields.
+
+        Returns:
+            The record. Unexpected or missing fields and invalid values are
+            rejected with a `ValueError`.
+        """
         qualification.require_fields(cls, record)
         return cls(**record)
 
@@ -210,7 +275,13 @@ class LogCheck:
     tolerance: float
 
     def __post_init__(self) -> None:
-        """Validates the record."""
+        """Validate the record.
+
+        Raises:
+            ValueError: If `rows` is not a positive integer, `mismatched` is
+                not a non-negative integer or exceeds `rows`, or `tolerance`
+                is outside [0, 1].
+        """
         qualification.count(self.rows, "rows", minimum=1)
         qualification.count(self.mismatched, "mismatched")
         if self.mismatched > self.rows:
@@ -228,12 +299,24 @@ class LogCheck:
         return self.rate <= self.tolerance
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Convert the record to a JSON-ready dict.
+
+        Returns:
+            A dict of the record's fields and their values.
+        """
         return dataclasses.asdict(self)
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds the record, rejecting unknown or missing fields."""
+        """Rebuild the record, rejecting unknown or missing fields.
+
+        Args:
+            record: A mapping holding exactly the record's fields.
+
+        Returns:
+            The record. Unexpected or missing fields and invalid values are
+            rejected with a `ValueError`.
+        """
         qualification.require_fields(cls, record)
         return cls(**record)
 
@@ -270,7 +353,14 @@ class FieldProvenance:
     log_check: LogCheck | None = None
 
     def __post_init__(self) -> None:
-        """Validates the record."""
+        """Validate the record.
+
+        Raises:
+            ValueError: If `name` or `writer` is empty, a definition note is
+                empty, `definition_history` is not a tuple, an enum field has
+                the wrong type, or the as-of rule, its source, the
+                attestation and the log check are inconsistent.
+        """
         evidence.require_text(self.name, "name")
         evidence.require_text(self.writer, "writer")
         qualification.require_tuple(
@@ -329,7 +419,12 @@ class FieldProvenance:
         return qualification.Tier.UNVERIFIED
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Convert the record to a JSON-ready dict.
+
+        Returns:
+            A dict of the fields; enums as strings, nested records as dicts
+            (None when absent) and the history as a list.
+        """
         return {
             "name": self.name,
             "origin": self.origin.value,
@@ -350,7 +445,16 @@ class FieldProvenance:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds a record, rejecting unknown or missing fields."""
+        """Rebuild a record, rejecting unknown or missing fields.
+
+        Args:
+            record: A mapping in the form `to_dict` returns.
+
+        Returns:
+            The record. Unexpected or missing fields, an unknown enum
+            value and an inconsistent record are rejected with a
+            `ValueError`.
+        """
         qualification.require_fields(cls, record)
         attestation = record["attestation"]
         log_check = record["log_check"]
@@ -406,7 +510,11 @@ class ProvenanceTable:
     fields: tuple[FieldProvenance, ...]
 
     def __post_init__(self) -> None:
-        """Validates the table."""
+        """Validate the table.
+
+        Raises:
+            ValueError: If `fields` is not a tuple or names repeat.
+        """
         qualification.require_tuple(self.fields, "fields")
         names = [f.name for f in self.fields]
         if len(set(names)) != len(names):
@@ -440,7 +548,13 @@ class ProvenanceTable:
         return cls(tuple(by_name.get(c) or undeclared(c) for c in columns))
 
     def get(self, name: str) -> FieldProvenance:
-        """The record for `name`.
+        """Look up the record of a field.
+
+        Args:
+            name: Column name.
+
+        Returns:
+            The record for `name`.
 
         Raises:
             KeyError: If the table has no such field.
@@ -453,11 +567,23 @@ class ProvenanceTable:
     def tiers(
         self, today: datetime.date | None = None
     ) -> dict[str, qualification.Tier]:
-        """Tier of every field."""
+        """Compute the evidence tier of every field.
+
+        Args:
+            today: Day on which attestations must still be valid; None
+                skips the expiry test.
+
+        Returns:
+            A mapping from field name to tier, in field order.
+        """
         return {f.name: f.tier(today) for f in self.fields}
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready document."""
+        """Convert the table to a JSON-ready document.
+
+        Returns:
+            A dict with `format_version` and the list of field records.
+        """
         return {
             "format_version": FORMAT_VERSION,
             "fields": [f.to_dict() for f in self.fields],
@@ -465,7 +591,19 @@ class ProvenanceTable:
 
     @classmethod
     def from_dict(cls, document: Mapping[str, Any]) -> Self:
-        """Rebuilds a table, rejecting unknown versions and fields."""
+        """Rebuild a table, rejecting unknown versions and fields.
+
+        Args:
+            document: A mapping in the form `to_dict` returns.
+
+        Returns:
+            The table.
+
+        Raises:
+            ValueError: If `format_version` is not supported, the document
+                has keys other than `format_version` and `fields`, or a
+                field record is invalid.
+        """
         if document.get("format_version") != FORMAT_VERSION:
             raise ValueError(
                 f"unsupported format_version: {document.get('format_version')}"
@@ -478,6 +616,11 @@ class ProvenanceTable:
         )
 
     def digest(self) -> str:
-        """SHA-256 of the canonical JSON of the table."""
+        """Hash the table.
+
+        Returns:
+            The hex SHA-256 of the table's JSON with sorted keys and no
+            whitespace.
+        """
         text = json.dumps(self.to_dict(), sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(text.encode("utf-8")).hexdigest()

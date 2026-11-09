@@ -41,7 +41,15 @@ Edge = tuple[str, str]
 
 
 def children_map(edges: Iterable[Edge]) -> dict[str, set[str]]:
-    """Maps each node to the set of its children."""
+    """Map each node to the set of its children.
+
+    Args:
+        edges: Directed edges (parent, child).
+
+    Returns:
+        A dict from parent to the set of its children. Nodes without
+        children are absent.
+    """
     out: dict[str, set[str]] = {}
     for parent, child in edges:
         out.setdefault(parent, set()).add(child)
@@ -49,7 +57,15 @@ def children_map(edges: Iterable[Edge]) -> dict[str, set[str]]:
 
 
 def parents_map(edges: Iterable[Edge]) -> dict[str, set[str]]:
-    """Maps each node to the set of its parents."""
+    """Map each node to the set of its parents.
+
+    Args:
+        edges: Directed edges (parent, child).
+
+    Returns:
+        A dict from child to the set of its parents. Nodes without parents
+        are absent.
+    """
     out: dict[str, set[str]] = {}
     for parent, child in edges:
         out.setdefault(child, set()).add(parent)
@@ -57,7 +73,16 @@ def parents_map(edges: Iterable[Edge]) -> dict[str, set[str]]:
 
 
 def reach(start: Collection[str], step: Mapping[str, set[str]]) -> set[str]:
-    """Nodes reachable from `start` by one or more steps."""
+    """Find the nodes reachable by following a step relation.
+
+    Args:
+        start: Nodes to start from.
+        step: Mapping from a node to the nodes one step away.
+
+    Returns:
+        Nodes reachable from `start` by one or more steps. A start node is
+        included only if a cycle leads back to it.
+    """
     seen: set[str] = set()
     frontier = list(start)
     while frontier:
@@ -70,7 +95,15 @@ def reach(start: Collection[str], step: Mapping[str, set[str]]) -> set[str]:
 
 
 def has_cycle(nodes: Collection[str], edges: Iterable[Edge]) -> bool:
-    """Whether the directed graph contains a cycle."""
+    """Test whether a directed graph contains a cycle.
+
+    Args:
+        nodes: All nodes.
+        edges: Directed edges (parent, child).
+
+    Returns:
+        True if some node can reach itself by one or more edges.
+    """
     kids = children_map(edges)
     return any(n in reach([n], kids) for n in nodes)
 
@@ -151,7 +184,15 @@ class Dag:
     prompt: str
 
     def __post_init__(self) -> None:
-        """Validates the graph."""
+        """Validate the graph.
+
+        Raises:
+            ValueError: If `nodes`, `latent` or `edges` is not a sorted,
+                duplicate-free tuple, a node name is empty, an edge is not
+                a pair of known nodes or is a self loop, a latent node is
+                not a node, the graph has a cycle, or `source` or `prompt`
+                is empty.
+        """
         for name, values in (("nodes", self.nodes), ("latent", self.latent)):
             qualification.require_tuple(values, name)
             for item in values:
@@ -183,7 +224,7 @@ class Dag:
         latent: Iterable[str] = (),
         extra_nodes: Iterable[str] = (),
     ) -> Self:
-        """Builds a graph, sorting and de-duplicating its parts.
+        """Build a graph, sorting and de-duplicating its parts.
 
         Args:
             edges: Directed edges (parent, child).
@@ -193,7 +234,8 @@ class Dag:
             extra_nodes: Nodes with no edges.
 
         Returns:
-            The graph.
+            The graph. Its nodes are those of the edges, `latent` and
+            `extra_nodes`, converted to strings.
         """
         pairs = sorted({(str(a), str(b)) for a, b in edges})
         names = {n for pair in pairs for n in pair}
@@ -217,19 +259,47 @@ class Dag:
         return tuple(n for n in self.nodes if n not in self.latent)
 
     def parents(self, node: str) -> set[str]:
-        """Direct causes of `node`."""
+        """Find the direct causes of a node.
+
+        Args:
+            node: The node.
+
+        Returns:
+            The set of its parents; empty if it has none.
+        """
         return parents_map(self.edges).get(node, set())
 
     def children(self, node: str) -> set[str]:
-        """Direct effects of `node`."""
+        """Find the direct effects of a node.
+
+        Args:
+            node: The node.
+
+        Returns:
+            The set of its children; empty if it has none.
+        """
         return children_map(self.edges).get(node, set())
 
     def ancestors(self, node: str) -> set[str]:
-        """Nodes with a directed path to `node`."""
+        """Find the nodes with a directed path to a node.
+
+        Args:
+            node: The node.
+
+        Returns:
+            The set of its ancestors, not including `node`.
+        """
         return reach([node], parents_map(self.edges))
 
     def descendants(self, node: str) -> set[str]:
-        """Nodes reachable from `node` by a directed path."""
+        """Find the nodes reachable from a node by a directed path.
+
+        Args:
+            node: The node.
+
+        Returns:
+            The set of its descendants, not including `node`.
+        """
         return reach([node], children_map(self.edges))
 
     def d_separated(
@@ -238,7 +308,18 @@ class Dag:
         ys: Collection[str],
         zs: Collection[str] = (),
     ) -> bool:
-        """Whether `zs` d-separates `xs` and `ys`."""
+        """Test whether `zs` d-separates `xs` and `ys`.
+
+        Args:
+            xs: First set of nodes.
+            ys: Second set of nodes.
+            zs: Conditioning set.
+
+        Returns:
+            True when every path between `xs` and `ys` is blocked by `zs`.
+            Overlapping sets and unknown nodes are rejected with a
+            `ValueError` from `separated`.
+        """
         return separated(self.nodes, self.edges, xs, ys, zs)
 
     def backdoor_valid(
@@ -254,6 +335,10 @@ class Dag:
         Returns:
             True when the set holds no descendant of the treatment (and not
             the treatment or outcome) and blocks every back-door path.
+
+        Raises:
+            ValueError: If a node is unknown or `treatment` equals
+                `outcome`.
         """
         chosen = set(adjustment)
         self.require_nodes([treatment, outcome, *chosen])
@@ -265,13 +350,29 @@ class Dag:
         return separated(self.nodes, cut, [treatment], [outcome], chosen)
 
     def require_nodes(self, names: Iterable[str]) -> None:
-        """Raises `ValueError` if any name is not a node."""
+        """Check that every name is a node of the graph.
+
+        Args:
+            names: Names to check.
+
+        Raises:
+            ValueError: If any name is not a node.
+        """
         unknown = sorted(set(names) - set(self.nodes))
         if unknown:
             raise ValueError(f"not nodes of the graph: {unknown}")
 
     def candidates(self, treatment: str, outcome: str) -> list[str]:
-        """Observed nodes that may be adjusted for (not post-treatment)."""
+        """List the observed nodes that may be adjusted for.
+
+        Args:
+            treatment: The treatment node.
+            outcome: The outcome node.
+
+        Returns:
+            Observed nodes other than the treatment, the outcome and the
+            descendants of the treatment, in node order.
+        """
         banned = {treatment, outcome} | self.descendants(treatment)
         return [n for n in self.observed if n not in banned]
 
@@ -308,7 +409,12 @@ class Dag:
         return None
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record, without the hash."""
+        """Convert the graph to a JSON-ready record, without the hash.
+
+        Returns:
+            A dict with the format version, status, nodes, edges (as
+            lists), latent nodes, source and prompt.
+        """
         return {
             "format_version": FORMAT_VERSION,
             "status": STATUS,
@@ -320,17 +426,32 @@ class Dag:
         }
 
     def digest(self) -> str:
-        """SHA-256 of the canonical JSON; any edit changes it."""
+        """Hash the graph; any edit changes the hash.
+
+        Returns:
+            The hex SHA-256 of the record's JSON with sorted keys and no
+            whitespace.
+        """
         text = json.dumps(self.to_dict(), sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
     def artifact(self) -> dict[str, Any]:
-        """The `dag.json` document: the record and its hash."""
+        """Build the `dag.json` document.
+
+        Returns:
+            The record from `to_dict` plus its `hash`.
+        """
         return {**self.to_dict(), "hash": self.digest()}
 
     @classmethod
     def from_artifact(cls, document: Mapping[str, Any]) -> Self:
-        """Rebuilds a graph and verifies its stored hash and status.
+        """Rebuild a graph and verify its stored hash and status.
+
+        Args:
+            document: A mapping in the form `artifact` returns.
+
+        Returns:
+            The graph.
 
         Raises:
             ValueError: On another status, version or field set, or a hash

@@ -62,14 +62,24 @@ class Verdict(enum.StrEnum):
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Statement:
-    """An implied independence: x is independent of y given `given`."""
+    """An implied independence: x is independent of y given `given`.
+
+    Attributes:
+        x: First variable.
+        y: Second variable.
+        given: Conditioning variables, empty for a marginal independence.
+    """
 
     x: str
     y: str
     given: tuple[str, ...]
 
     def text(self) -> str:
-        """The statement in words."""
+        """Write the statement in words.
+
+        Returns:
+            A sentence naming `x`, `y` and, if any, the conditioning set.
+        """
         if not self.given:
             return f"{self.x} is independent of {self.y}"
         return (
@@ -102,7 +112,15 @@ class CITest:
 
 
 def residuals(values: np.ndarray, given: np.ndarray) -> np.ndarray:
-    """Least-squares residuals of `values` on `given` plus an intercept."""
+    """Compute least-squares residuals on a set of columns and an intercept.
+
+    Args:
+        values: The response, one entry per row.
+        given: Regressors, one row per entry of `values`.
+
+    Returns:
+        The response minus its least-squares fit, one entry per row.
+    """
     design = np.column_stack([np.ones(len(values)), given])
     solution = np.linalg.lstsq(design, values, rcond=None)
     return values - design @ solution[0]
@@ -111,7 +129,17 @@ def residuals(values: np.ndarray, given: np.ndarray) -> np.ndarray:
 def partial_correlation(
     frame: pd.DataFrame, x: str, y: str, given: Sequence[str]
 ) -> float:
-    """Sample partial correlation of two columns given others.
+    """Compute the sample partial correlation of two columns given others.
+
+    Args:
+        frame: Numeric data holding all named columns.
+        x: First variable.
+        y: Second variable.
+        given: Conditioning variables.
+
+    Returns:
+        The correlation of the residuals of `x` and `y` after regressing
+        each on `given`, clipped to [-1, 1].
 
     Raises:
         ValueError: If a column has no spread after conditioning.
@@ -143,7 +171,8 @@ def fisher_z(
         0.
 
     Raises:
-        ValueError: If `n - len(given) - 3` is not positive.
+        ValueError: If `n - len(given) - 3` is not positive, or a variable
+            has no spread given the conditioning set.
     """
     n = len(frame)
     dof = n - len(given) - 3
@@ -194,7 +223,14 @@ def stratified_chi2(
 
 
 def is_discrete(series: pd.Series) -> bool:
-    """Whether a column is treated as categorical."""
+    """Decide whether a column is treated as categorical.
+
+    Args:
+        series: The column.
+
+    Returns:
+        True for categorical, boolean and non-numeric dtypes.
+    """
     if isinstance(series.dtype, pd.CategoricalDtype):
         return True
     if pd.api.types.is_bool_dtype(series):
@@ -205,11 +241,22 @@ def is_discrete(series: pd.Series) -> bool:
 def run_test(
     frame: pd.DataFrame, x: str, y: str, given: Sequence[str]
 ) -> CITest:
-    """Chooses Fisher's z for numeric data and chi-square for categories.
+    """Choose Fisher's z for numeric data and chi-square for categories.
+
+    Args:
+        frame: Data holding the named columns.
+        x: First variable.
+        y: Second variable.
+        given: Conditioning variables.
+
+    Returns:
+        The result of the chosen test.
 
     Raises:
         ValueError: On a mix of numeric and categorical columns, a column
-            with too many levels for the chi-square, or missing values.
+            with more than `MAX_DISCRETE_LEVELS` levels for the chi-square,
+            missing values, or an input the chosen test rejects (too few
+            rows, or no spread).
     """
     names = [x, y, *given]
     sub = frame[names]
@@ -228,7 +275,10 @@ def run_test(
 def implied_statements(
     graph: dag_module.Dag,
 ) -> tuple[list[Statement], list[str]]:
-    """Local Markov statements of the observed part of a graph.
+    """List the local Markov statements of the observed part of a graph.
+
+    Args:
+        graph: The DAG hypothesis.
 
     Returns:
         (statements, skipped): statements to test, and the nodes skipped
@@ -313,7 +363,7 @@ def falsify(
     run_seed: int = 0,
     set_id: qualification.SetId = qualification.SetId.EXPLORATION,
 ) -> FalsificationReport:
-    """Tests each implied independence of `graph` on the data.
+    """Test each implied independence of `graph` on the data.
 
     The per-test level is `alpha` divided by the number of testable
     statements (Bonferroni), so the chance of falsifying a true graph in any
@@ -331,8 +381,8 @@ def falsify(
         reason; it is never counted as passed.
 
     Raises:
-        ValueError: On an alpha outside (0, 1) or observed nodes that are not
-            columns.
+        ValueError: If `alpha` is not a finite number in (0, 1) or an
+            observed node is not a column of `frame`.
     """
     level_in = qualification.finite(alpha, "alpha")
     if not 0.0 < level_in < 1.0:
@@ -385,7 +435,16 @@ def falsify(
 
 
 def describe(report: FalsificationReport) -> dict[str, Any]:
-    """JSON-ready summary that never claims confirmation."""
+    """Summarise a report without claiming confirmation.
+
+    Args:
+        report: The falsification report.
+
+    Returns:
+        A JSON-ready dict with the DAG hash, status, family-wise and
+        per-test levels, counts of falsified, not-falsified and skipped
+        statements, and a note.
+    """
     return {
         "dag_hash": report.dag_hash,
         "status": dag_module.STATUS,

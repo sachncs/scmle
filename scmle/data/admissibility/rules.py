@@ -72,7 +72,11 @@ class FieldDecision:
     suspicion_kept: bool = False
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Convert the decision to a JSON-ready record.
+
+        Returns:
+            A dict of the fields; enums as strings, reasons as a list.
+        """
         return {
             "name": self.name,
             "admission": self.admission.value,
@@ -83,7 +87,15 @@ class FieldDecision:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds a decision, rejecting unknown or missing fields."""
+        """Rebuild a decision, rejecting unknown or missing fields.
+
+        Args:
+            record: A mapping in the form `to_dict` returns.
+
+        Returns:
+            The decision. Unexpected or missing fields and unknown enum
+            values are rejected with a `ValueError`.
+        """
         qualification.require_fields(cls, record)
         return cls(
             record["name"],
@@ -95,7 +107,14 @@ class FieldDecision:
 
 
 def unverified_outcome(mode: Mode) -> Admission:
-    """Admission of a field whose provenance cannot be verified."""
+    """Decide the admission of a field whose provenance cannot be verified.
+
+    Args:
+        mode: Strict or permissive.
+
+    Returns:
+        `quarantine` in strict mode, `admit_flagged` otherwise.
+    """
     if mode is Mode.STRICT:
         return Admission.QUARANTINE
     return Admission.ADMIT_FLAGGED
@@ -109,7 +128,7 @@ def decide_timing(
     suspect: bool,
     leakage_gate: certificates.GateStatus,
 ) -> FieldDecision:
-    """Applies the predictive rule to one field.
+    """Apply the timing rule to one field.
 
     Args:
         record: The field's provenance.
@@ -122,7 +141,13 @@ def decide_timing(
         leakage_gate: Whether the leakage detector may gate.
 
     Returns:
-        The decision.
+        The decision, with the reasons that applied. A failed log check,
+        unavailability at serving, or a lead below the declared lag
+        quarantines the field. An unknown serving availability or an
+        unverified tier gives the unverified outcome of `mode`, which is
+        quarantine for a leakage suspect when the detector is gating. A
+        suspect with a confirmed tier is admitted; with an attested tier it
+        is admitted flagged.
     """
     tier = record.tier(today)
     reasons: list[str] = []
@@ -187,7 +212,7 @@ def decide_predictive(
     suspect: bool = False,
     leakage_gate: certificates.GateStatus = certificates.GateStatus.DESCRIPTIVE,
 ) -> FieldDecision:
-    """Admissibility of one field for a predictive estimand.
+    """Decide the admissibility of one field for a predictive estimand.
 
     Causal roles (mediator, collider, post-treatment) are not consulted.
 
@@ -203,7 +228,7 @@ def decide_predictive(
         The decision.
 
     Raises:
-        ValueError: On a negative or non-finite lag.
+        ValueError: If `declared_lag_seconds` is negative or not finite.
     """
     lag = qualification.finite(declared_lag_seconds, "declared_lag_seconds")
     if lag < 0.0:
@@ -222,7 +247,7 @@ def decide_causal(
     suspect: bool = False,
     leakage_gate: certificates.GateStatus = certificates.GateStatus.DESCRIPTIVE,
 ) -> FieldDecision:
-    """Admissibility of one field as a covariate for a causal estimand.
+    """Decide the admissibility of one field as a covariate.
 
     Applies the predictive timing rule first, then the graph rule.
 
@@ -239,7 +264,11 @@ def decide_causal(
 
     Returns:
         The decision. The treatment and outcome themselves are not
-        covariates and are decided on timing alone.
+        covariates and are decided on timing alone. A negative or
+        non-finite lag is rejected with a `ValueError`, as is a
+        treatment or outcome that is not a node of `graph` or a search for
+        the adjustment set that `Dag.adjustment_set` refuses as too large,
+        when the graph rule is reached.
     """
     timing = decide_predictive(
         record, mode, declared_lag_seconds, today, suspect, leakage_gate
@@ -311,7 +340,12 @@ class AdmissibilityTable:
     adjustment_set: tuple[str, ...] | None
 
     def __post_init__(self) -> None:
-        """Validates the table."""
+        """Validate the table.
+
+        Raises:
+            ValueError: If `kind` is not `predictive` or `causal`, or field
+                names repeat.
+        """
         if self.kind not in KINDS:
             raise ValueError(f"kind must be one of {KINDS}")
         names = [d.name for d in self.decisions]
@@ -319,11 +353,23 @@ class AdmissibilityTable:
             raise ValueError("field names must be unique")
 
     def names(self, admission: Admission) -> tuple[str, ...]:
-        """Fields with the given admission."""
+        """List the fields that received an admission.
+
+        Args:
+            admission: The admission to select.
+
+        Returns:
+            Field names with that admission, in decision order.
+        """
         return tuple(d.name for d in self.decisions if d.admission is admission)
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready document."""
+        """Convert the table to a JSON-ready document.
+
+        Returns:
+            A dict with the format version, kind, mode, DAG hash,
+            adjustment set (as a list, or None) and the decisions.
+        """
         return {
             "format_version": FORMAT_VERSION,
             "kind": self.kind,
@@ -350,7 +396,7 @@ def build_table(
     treatment: str | None = None,
     outcome: str | None = None,
 ) -> AdmissibilityTable:
-    """Decides every field of a provenance table.
+    """Decide every field of a provenance table.
 
     Args:
         table: Provenance of every field.
@@ -367,11 +413,11 @@ def build_table(
         outcome: Outcome node; required for `causal`.
 
     Returns:
-        The table.
+        The table, with one decision per field in table order.
 
     Raises:
-        ValueError: On an unknown kind or a causal estimand without a graph,
-            treatment and outcome.
+        ValueError: If `kind` is unknown, or a causal estimand lacks a
+            graph, treatment or outcome.
     """
     if kind not in KINDS:
         raise ValueError(f"kind must be one of {KINDS}")

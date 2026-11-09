@@ -2,7 +2,7 @@
 
 Statistics cannot separate a leak from a strong legitimate predictor, so every
 result here is a suspicion for a person (or a certified gate) to weigh against
-provenance. All tests read the exploration set `X` only (canon P3). Each test
+provenance. All tests read the exploration set `X` only. Each test
 returns a `Check` for the hypothesis ledger.
 
 Tests
@@ -128,7 +128,14 @@ class LeakageConfig:
     run_seed: int = 0
 
     def __post_init__(self) -> None:
-        """Validates the settings."""
+        """Validate the settings.
+
+        Raises:
+            ValueError: If a ceiling is outside (0, 1], `alpha` or
+                `confidence` is outside (0, 1), `permutations` is too few
+                to reach `alpha` (`permutations + 1 < 1 / alpha`), or a
+                count is not an integer at or above its minimum.
+        """
         for name in ("skill_ceiling", "association_ceiling"):
             value = qualification.finite(getattr(self, name), name)
             if not 0.0 < value <= 1.0:
@@ -154,11 +161,18 @@ class LeakageConfig:
 
 
 def design(series: pd.Series) -> np.ndarray:
-    """Numeric design of one feature, with missing values kept as NaN.
+    """Build the numeric design of one feature, keeping missing values as NaN.
 
     A numeric feature is one column (trees send NaN down a learned branch).
     Anything else is one-hot encoded, with a level for missing values; levels
     beyond the `MAX_LEVELS` most frequent are pooled.
+
+    Args:
+        series: One feature.
+
+    Returns:
+        A float64 array with one row per entry of `series`: one column for
+        a numeric (non-boolean) feature, otherwise one column per level.
     """
     if pd.api.types.is_numeric_dtype(series) and not pd.api.types.is_bool_dtype(
         series
@@ -172,7 +186,15 @@ def design(series: pd.Series) -> np.ndarray:
 
 
 def encode_target(y: pd.Series, task: str) -> np.ndarray:
-    """Class codes (classification) or floats (regression).
+    """Encode the target as class codes or floats.
+
+    Args:
+        y: The target.
+        task: `classification` or `regression`.
+
+    Returns:
+        For classification, int64 codes 0..k-1 of the sorted classes; for
+        regression, the target as float64.
 
     Raises:
         ValueError: On a bad task, missing values, or fewer than 2 classes.
@@ -195,7 +217,20 @@ def permute_within(
     groups: np.ndarray | None,
     block_size: int | None,
 ) -> np.ndarray:
-    """Positions that permute rows globally, within groups or time blocks."""
+    """Draw a row permutation, global, within groups, or within time blocks.
+
+    Args:
+        values: The values to be permuted; only their count is used.
+        rng: Random generator.
+        groups: Group label per row, or None. Takes precedence over
+            `block_size`.
+        block_size: Consecutive rows per time block, or None.
+
+    Returns:
+        Integer positions; `values[positions]` is the permuted sequence.
+        With `groups`, rows move only within their group; with
+        `block_size`, only within their block of consecutive rows.
+    """
     n = len(values)
     out = np.arange(n)
     if groups is not None:
@@ -219,7 +254,23 @@ def make_splits(
     block_size: int | None,
     seed: int,
 ) -> Splits:
-    """Cross-fitting folds: by group, contiguous in time, or stratified."""
+    """Make cross-fitting folds: by group, contiguous in time, or stratified.
+
+    Args:
+        y: The encoded target.
+        task: `classification` or `regression`.
+        folds: Requested number of folds; capped at the number of groups
+            when `groups` is given.
+        groups: Group label per row, or None. Whole groups stay in one fold.
+        block_size: Consecutive rows per time block, or None; when given
+            (and `groups` is not), folds are contiguous and unshuffled.
+        seed: Seed of the shuffling for the other cases.
+
+    Returns:
+        A list of (train positions, test positions) pairs, one per fold.
+        Without groups or blocks the folds are shuffled, and stratified by
+        class for classification.
+    """
     rows = np.arange(len(y))
     if groups is not None:
         k = min(folds, len(pd.unique(groups)))
@@ -243,7 +294,22 @@ def out_of_fold(
     cfg: LeakageConfig,
     seed: int,
 ) -> np.ndarray:
-    """Out-of-fold predictions of a small tree: probabilities or values."""
+    """Predict every row from a small tree fitted on the other folds.
+
+    Args:
+        x: Feature design, one row per entry of `y`.
+        y: The encoded target.
+        task: `classification` or `regression`.
+        splits: Cross-fitting folds.
+        cfg: Settings (`max_leaf_nodes`, `min_samples_leaf`).
+        seed: Seed of the tree.
+
+    Returns:
+        For classification, an array of shape (rows, classes) of predicted
+        class probabilities, with 0 for a class absent from a training
+        fold; for regression, one predicted value per row. Each row is
+        predicted only by a tree that did not see it.
+    """
     n_classes = int(y.max()) + 1 if task == "classification" else 0
     shape = (len(y), n_classes) if task == "classification" else (len(y),)
     out = np.zeros(shape)
@@ -266,7 +332,14 @@ def out_of_fold(
 
 
 def binary_auc(truth: np.ndarray, score: np.ndarray) -> float:
-    """ROC AUC by the rank-sum formula, with ties averaged.
+    """Compute the ROC AUC by the rank-sum formula, with ties averaged.
+
+    Args:
+        truth: Labels, 1 for the positive class and 0 otherwise.
+        score: Score per row; higher means more likely positive.
+
+    Returns:
+        The area under the ROC curve, in [0, 1].
 
     Raises:
         ValueError: If `truth` does not hold both classes (0 and 1).
@@ -281,7 +354,17 @@ def binary_auc(truth: np.ndarray, score: np.ndarray) -> float:
 
 
 def skill_of(pred: np.ndarray, y: np.ndarray, task: str) -> float:
-    """Skill of out-of-fold predictions: AUC or R^2.
+    """Measure the skill of out-of-fold predictions: AUC or R^2.
+
+    Args:
+        pred: Output of `out_of_fold`.
+        y: The encoded target.
+        task: `classification` or `regression`.
+
+    Returns:
+        For regression, R^2. For classification, the ROC AUC of the second
+        column when there are two classes, otherwise the macro one-vs-rest
+        AUC.
 
     Raises:
         ValueError: If a classification sample lacks a class or a regression
@@ -314,7 +397,21 @@ def cross_fit_skill(
     block_size: int | None,
     seed: int,
 ) -> tuple[float, np.ndarray]:
-    """Out-of-fold skill of a feature and the predictions behind it."""
+    """Compute the out-of-fold skill of a feature.
+
+    Args:
+        x: Feature design.
+        y: The encoded target.
+        task: `classification` or `regression`.
+        cfg: Settings.
+        groups: Group label per row, or None.
+        block_size: Consecutive rows per time block, or None.
+        seed: Seed of the folds and trees.
+
+    Returns:
+        A pair (skill, out-of-fold predictions), the predictions being the
+        output of `out_of_fold`.
+    """
     splits = make_splits(y, task, cfg.folds, groups, block_size, seed)
     pred = out_of_fold(x, y, task, splits, cfg, seed)
     return skill_of(pred, y, task), pred
@@ -327,7 +424,20 @@ def bootstrap_skill(
     members: list[np.ndarray] | None,
     rng: np.random.Generator,
 ) -> float | None:
-    """Skill on one bootstrap resample, or None if it lacks a class."""
+    """Compute the skill on one bootstrap resample.
+
+    Args:
+        pred: Output of `out_of_fold`.
+        y: The encoded target.
+        task: `classification` or `regression`.
+        members: Row positions of each group, so whole groups are resampled,
+            or None to resample rows.
+        rng: Random generator.
+
+    Returns:
+        The skill on the resample, or None when it cannot be computed (a
+        class is missing, or a regression target is constant).
+    """
     n = len(y)
     if members is not None:
         picks = rng.integers(0, len(members), size=len(members))
@@ -352,6 +462,17 @@ def lower_bound(
 
     Rows are resampled, or whole groups when `groups` is given. Draws that
     lack a class are skipped; if every draw is skipped the bound is -inf.
+
+    Args:
+        pred: Output of `out_of_fold`.
+        y: The encoded target.
+        task: `classification` or `regression`.
+        cfg: Settings (`bootstrap`, `confidence`).
+        groups: Group label per row, or None.
+        rng: Random generator.
+
+    Returns:
+        The `1 - confidence` quantile of the bootstrap skills, or -inf.
     """
     labels = pd.unique(groups) if groups is not None else None
     members = (
@@ -370,13 +491,32 @@ def lower_bound(
 
 
 def permutation_p(observed: float, null: Sequence[float]) -> float:
-    """`(1 + #{null >= observed}) / (B + 1)` (Phipson and Smyth, 2010)."""
+    """Compute `(1 + #{null >= observed}) / (B + 1)` (Phipson and Smyth, 2010).
+
+    Args:
+        observed: The observed statistic.
+        null: Statistics under permutations of the target.
+
+    Returns:
+        The permutation p-value, in (0, 1].
+    """
     exceed = sum(1 for value in null if value >= observed)
     return (1.0 + exceed) / (len(null) + 1.0)
 
 
 def enough_rows(y: np.ndarray, task: str, cfg: LeakageConfig) -> bool:
-    """Whether there are rows enough for the tests to have any power."""
+    """Decide whether there are enough rows for the tests to have any power.
+
+    Args:
+        y: The encoded target.
+        task: `classification` or `regression`.
+        cfg: Settings (`min_rows`, `folds`).
+
+    Returns:
+        False when there are fewer than `min_rows` rows or, for
+        classification, the smallest class has fewer than `folds` rows;
+        True otherwise.
+    """
     if len(y) < cfg.min_rows:
         return False
     if task == "classification":
@@ -414,7 +554,17 @@ class SkillTest:
 def decision_for(
     suspect: bool, low_power: bool, gate: certificates.GateStatus
 ) -> qualification.Decision:
-    """Decision of a leakage test, demoted when not certified."""
+    """Choose the decision of a leakage test, demoted when not certified.
+
+    Args:
+        suspect: Whether the test called the feature a suspect.
+        low_power: Whether there were too few rows.
+        gate: Whether the detector may gate.
+
+    Returns:
+        `quarantine` for a suspect, `warn` for low power, `pass` otherwise;
+        a quarantine is lowered to a warning unless `gate` is gating.
+    """
     if suspect:
         raw = qualification.Decision.QUARANTINE
     elif low_power:
@@ -434,7 +584,7 @@ def skill_test(
     gate: certificates.GateStatus = certificates.GateStatus.DESCRIPTIVE,
     set_id: qualification.SetId = qualification.SetId.EXPLORATION,
 ) -> SkillTest:
-    """Tests whether one feature predicts the target beyond chance.
+    """Test whether one feature predicts the target beyond chance.
 
     Args:
         feature: The feature, aligned to `target`.
@@ -451,7 +601,9 @@ def skill_test(
         The test, with a ledger `Check`.
 
     Raises:
-        ValueError: On misaligned or invalid inputs.
+        ValueError: If both `groups` and `block_size` are given, `feature`
+            and `target` differ in length, or the target is invalid (see
+            `encode_target`).
     """
     if groups is not None and block_size is not None:
         raise ValueError("use groups or block_size, not both")
@@ -563,7 +715,16 @@ def strata_labels(
 def within_strata(
     n: int, members: list[np.ndarray], rng: np.random.Generator
 ) -> np.ndarray:
-    """Row order that permutes rows within each stratum."""
+    """Draw a row order that permutes rows within each stratum.
+
+    Args:
+        n: Number of rows.
+        members: Row positions of each stratum.
+        rng: Random generator.
+
+    Returns:
+        Integer positions; rows move only within their stratum.
+    """
     order = np.arange(n)
     for where in members:
         order[where] = where[rng.permutation(len(where))]
@@ -604,7 +765,7 @@ def conditional_test(
     block_size: int | None = None,
     set_id: qualification.SetId = qualification.SetId.EXPLORATION,
 ) -> ConditionalTest:
-    """Does the feature keep predictive value given the other features?
+    """Test whether the feature keeps predictive value given the others.
 
     Args:
         feature: The feature under test.
@@ -618,6 +779,10 @@ def conditional_test(
 
     Returns:
         The test. It never gates: it only supports an escalation.
+
+    Raises:
+        ValueError: If both `groups` and `block_size` are given, or the
+            target is invalid (see `encode_target`).
     """
     if groups is not None and block_size is not None:
         raise ValueError("use groups or block_size, not both")
@@ -671,7 +836,15 @@ def conditional_test(
 
 
 def cramers_v(table: np.ndarray) -> float:
-    """Cramer's V of a contingency table (no bias correction)."""
+    """Compute Cramer's V of a contingency table (no bias correction).
+
+    Args:
+        table: Counts, rows by columns.
+
+    Returns:
+        V in [0, 1]; 0 when the table is empty or has a single row or
+        column.
+    """
     total = float(table.sum())
     smaller = min(table.shape) - 1
     if total == 0.0 or smaller <= 0:
@@ -681,7 +854,16 @@ def cramers_v(table: np.ndarray) -> float:
 
 
 def binned_target(target: pd.Series, task: str) -> pd.Series:
-    """Classes of the target; quartile bins for a continuous target."""
+    """Bin the target for the missingness test.
+
+    Args:
+        target: The outcome.
+        task: `classification` or `regression`.
+
+    Returns:
+        The classes as objects for classification; quartile bins (duplicate
+        edges dropped) for a continuous target.
+    """
     if task == "classification":
         return target.astype("object")
     return pd.qcut(target, TARGET_BINS, duplicates="drop").astype("object")
@@ -720,7 +902,7 @@ def missingness_test(
     gate: certificates.GateStatus = certificates.GateStatus.DESCRIPTIVE,
     set_id: qualification.SetId = qualification.SetId.EXPLORATION,
 ) -> MissingnessTest | None:
-    """Tests whether recording a value depends on the outcome.
+    """Test whether recording a value depends on the outcome.
 
     Args:
         feature: The feature.
@@ -733,6 +915,9 @@ def missingness_test(
     Returns:
         The test, or None when the feature is never or always missing, or
         the target has a single level.
+
+    Raises:
+        ValueError: If `feature` and `target` differ in length.
     """
     if len(feature) != len(target):
         raise ValueError("feature and target must have the same length")
@@ -820,7 +1005,7 @@ def assess_feature(
     gate: certificates.GateStatus = certificates.GateStatus.DESCRIPTIVE,
     set_id: qualification.SetId = qualification.SetId.EXPLORATION,
 ) -> FeatureAssessment:
-    """Runs the skill, missingness and (for suspects) conditional tests.
+    """Run the skill, missingness and (for suspects) conditional tests.
 
     Args:
         feature: The feature.
@@ -834,7 +1019,9 @@ def assess_feature(
         set_id: Set the rows belong to.
 
     Returns:
-        The assessment.
+        The assessment. A feature is a suspect when its skill test or its
+        missingness test says so, and is escalated when the conditional
+        test, run for suspects only, finds it keeps its signal.
     """
     skill = skill_test(
         feature, target, task, cfg, groups, block_size, gate, set_id
@@ -877,7 +1064,15 @@ class LeakageReport:
         return tuple(c for a in self.assessments for c in a.checks)
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready document; a suspicion is not a finding."""
+        """Convert the report to a JSON-ready document.
+
+        A suspicion is not a finding, and the document says so.
+
+        Returns:
+            A dict with a note, the gate value and, per feature, the
+            suspicion flags, skill, its lower bound (None when infinite)
+            and the p-values of the tests that ran.
+        """
         return {
             "note": "statistical suspicion only; not proof of leakage",
             "gate": self.gate.value,
@@ -920,7 +1115,7 @@ def scan(
     gate: certificates.GateStatus = certificates.GateStatus.DESCRIPTIVE,
     set_id: qualification.SetId = qualification.SetId.EXPLORATION,
 ) -> LeakageReport:
-    """Tests every feature of the exploration set for leakage suspicion.
+    """Test every feature of the exploration set for leakage suspicion.
 
     Args:
         frame: Exploration-set data including the target.
@@ -934,7 +1129,12 @@ def scan(
         set_id: Set the rows belong to.
 
     Returns:
-        The report; use `gate_status` to obtain `gate`.
+        The report, with one assessment per tested feature in the order
+        given; use `gate_status` to obtain `gate`.
+
+    Raises:
+        ValueError: If `features` names a column that is missing or is the
+            target, or a test rejects its inputs.
     """
     names = [c for c in frame.columns if c != target]
     chosen = names if features is None else list(features)
@@ -968,7 +1168,7 @@ def gate_status(
     task: str = "classification",
     n_classes: int = 2,
 ) -> certificates.GateStatus:
-    """Whether the skill test may quarantine, from the certificate store.
+    """Decide whether the skill test may quarantine, from the certificates.
 
     Gating needs a current certificate whose every required leak type
     passed, and settings equal to the certified ones (`CERTIFIED`, any run
@@ -998,5 +1198,10 @@ def gate_status(
 
 
 def code_digest() -> str:
-    """Hash of this module's source, the key of its certificate."""
+    """Hash this module's source, the key of its certificate.
+
+    Returns:
+        The code hash of this module, as computed by
+        `certificates.code_hash`.
+    """
     return certificates.code_hash(sys.modules[__name__])

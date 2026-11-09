@@ -38,7 +38,14 @@ class RowStatus(enum.StrEnum):
 
 
 def to_seconds(values: pd.Series) -> np.ndarray:
-    """Times as float seconds; datetimes count from the Unix epoch.
+    """Convert times to float seconds; datetimes count from the Unix epoch.
+
+    Args:
+        values: A datetime series (timezone is dropped) or a numeric,
+            non-boolean series, which is passed through as seconds.
+
+    Returns:
+        A float64 array of seconds, in the order of `values`.
 
     Raises:
         ValueError: On values that are neither datetimes nor numbers, or on
@@ -119,7 +126,16 @@ def point_in_time(
 
 
 def agrees(stored: pd.Series, reconstructed: pd.Series) -> pd.Series:
-    """Element-wise equality in which two missing values are equal."""
+    """Compare two series element-wise, treating two missing values as equal.
+
+    Args:
+        stored: The stored values.
+        reconstructed: The values to compare with, same length as `stored`.
+
+    Returns:
+        A boolean series on the index of `stored`; True where the values
+        are equal or both missing.
+    """
     left = stored.to_numpy(dtype=object)
     right = reconstructed.to_numpy(dtype=object)
     both_missing = stored.isna().to_numpy() & reconstructed.isna().to_numpy()
@@ -130,7 +146,18 @@ def agrees(stored: pd.Series, reconstructed: pd.Series) -> pd.Series:
 
 
 def classify_rows(stored: pd.Series, joined: pd.DataFrame) -> pd.Series:
-    """Status of every row from its stored value and the reconstruction."""
+    """Classify every row against the reconstruction.
+
+    Args:
+        stored: The stored value of each row.
+        joined: Output of `point_in_time`, aligned to `stored`.
+
+    Returns:
+        A series of `RowStatus` values (as strings) on the index of
+        `stored`: `match` where the values agree, `not_yet_written` where
+        no log entry precedes the moment but a value is stored, and
+        `overwritten` otherwise.
+    """
     match = agrees(stored, joined["reconstructed"])
     not_yet = (~joined["has_entry"]) & stored.notna()
     status = pd.Series(RowStatus.OVERWRITTEN.value, index=stored.index)
@@ -236,7 +263,9 @@ def audit_field(
         The audit, including the `Check` for the ledger.
 
     Raises:
-        ValueError: On an empty table or a bad tolerance.
+        ValueError: If `rows` is empty, if a time is missing or not a
+            datetime or number, or if `tolerance` is rejected by
+            `provenance.LogCheck`.
     """
     if len(rows) == 0:
         raise ValueError("rows must not be empty")

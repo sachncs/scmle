@@ -9,7 +9,7 @@ party could check, the dates it is valid, the charter it covers and how long
 before the prediction moment the value is known. It is the same record as an
 as-of attestation in `provenance.py`, so the admissibility rules treat the
 column exactly as they treat any attested field: it is admitted with a flag,
-its tier is `attested` (canon P4), never `confirmed`.
+its tier is `attested`, never `confirmed`.
 
 Rules, all enforced here or in `qualify.py`:
 
@@ -80,13 +80,24 @@ class LeakageAttestation:
     lead_seconds: float
 
     def __post_init__(self) -> None:
-        """Validates the record."""
+        """Validate the record.
+
+        Raises:
+            ValueError: If `column` is empty or not a string, or
+                `lead_seconds` is not a finite number.
+        """
         if not self.column or not isinstance(self.column, str):
             raise ValueError("column must be a non-empty string")
         qualification.finite(self.lead_seconds, "lead_seconds")
 
     def field(self) -> provenance.FieldProvenance:
-        """The provenance record the admissibility rules consume."""
+        """Build the provenance record the admissibility rules consume.
+
+        Returns:
+            A record for the column with a `lag` as-of rule of
+            `lead_seconds`, source `attested`, serving availability `yes`
+            and all other properties unknown.
+        """
         return provenance.FieldProvenance(
             name=self.column,
             origin=provenance.Origin.DERIVED,
@@ -101,7 +112,12 @@ class LeakageAttestation:
         )
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Convert the record to a JSON-ready dict.
+
+        Returns:
+            A dict with `column`, `lead_seconds` and the fields of the
+            attestation.
+        """
         return {
             "column": self.column,
             "lead_seconds": self.lead_seconds,
@@ -110,7 +126,19 @@ class LeakageAttestation:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds the record, rejecting unknown or missing fields."""
+        """Rebuild the record, rejecting unknown or missing fields.
+
+        Args:
+            record: A mapping with `column`, `lead_seconds` and the fields
+                of an attestation.
+
+        Returns:
+            The record.
+
+        Raises:
+            ValueError: If `column` or `lead_seconds` is missing, or the
+                attestation fields are unexpected, missing or invalid.
+        """
         body = {k: v for k, v in record.items() if k not in OWN_FIELDS}
         own = {k: record[k] for k in OWN_FIELDS if k in record}
         missing = sorted(set(OWN_FIELDS) - set(own))
@@ -137,7 +165,7 @@ class Applied:
 
 
 def load(path: str | Path) -> tuple[LeakageAttestation, ...]:
-    """Reads an attestation file.
+    """Read an attestation file.
 
     Args:
         path: JSON file in the format of the module docstring.
@@ -175,7 +203,7 @@ def apply(
     scope: str,
     today: str,
 ) -> Applied:
-    """Separates the attestations that count from those that do not.
+    """Separate the attestations that count from those that do not.
 
     Args:
         attestations: Everything the run was given.
@@ -183,7 +211,10 @@ def apply(
         today: ISO date on which attestations must be valid.
 
     Returns:
-        The valid ones and a reason for each rejected one.
+        The valid attestations and a reason for each rejected one, each
+        keyed by column. An attestation is rejected when its scope is not
+        `scope` or `today` falls outside its dates. A `today` that is not
+        an ISO date is rejected with a `ValueError`.
     """
     day = provenance.parse_date(today, "today")
     valid: dict[str, LeakageAttestation] = {}
