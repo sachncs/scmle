@@ -58,7 +58,8 @@ class Signal:
         name: Metric name.
         category: Where a breach would point.
         status: ok, breached or insufficient_data.
-        value: Observed value (None without enough data).
+        value: Observed value (None when it could not be computed or
+            there were too few samples to judge).
         threshold: The limit it was compared with.
         direction: ``max`` if larger is worse, ``min`` if smaller is worse.
         samples: Observations behind the value.
@@ -132,14 +133,19 @@ class SignalThresholds:
 
     Attributes:
         server_error_rate: Largest tolerated share of 5xx.
-        availability: Smallest tolerated share of served requests.
+        availability: Smallest tolerated share of requests that were not
+            5xx or 429.
         latency_p95_seconds: Largest tolerated p95 latency.
         invalid_request_rate: Largest tolerated share of rejected inputs.
         missing_rate_increase: Largest rise of a feature's missing share over
             its reference.
-        drift: PSI thresholds, shared with `scmle.monitoring.monitor`.
+        drift: Thresholds shared with `scmle.monitoring.monitor`; the
+            ``psi_high`` limit applies to the largest feature PSI and the
+            ``unseen_category_rate`` limit to the largest unseen-category
+            rate.
         reference_loss: Mean loss at training time.
-        loss_tolerance: Rise over ``reference_loss`` that is a breach.
+        loss_tolerance: Largest tolerated rise of the windowed mean loss
+            over ``reference_loss``; the loss limit is their sum.
     """
 
     server_error_rate: float = 0.05
@@ -178,6 +184,9 @@ def judge(
 ) -> Signal:
     """Compares a value with its limit, or reports too little data.
 
+    A ``max`` signal breaches when the value is above the limit and a ``min``
+    signal when it is below it; a value equal to the limit is ok.
+
     Args:
         name: Signal name.
         category: Category the signal belongs to.
@@ -191,8 +200,9 @@ def judge(
 
     Returns:
         The signal: insufficient data if the value is None or the samples
-        are fewer than the minimum, otherwise breached or ok against the
-        limit.
+        are fewer than the minimum (its value is dropped to None when the
+        samples are too few), otherwise breached or ok against the limit.
+        A direction other than ``max`` or ``min`` is always ok.
     """
     if value is None or samples < minimum:
         status = Status.INSUFFICIENT_DATA
@@ -223,7 +233,9 @@ class SignalMonitor:
             policy: Window, sample size and sampling rate.
             thresholds: Limits.
             profile: Training reference for drift and feature quality; without
-                it only the infrastructure and performance signals exist.
+                it the feature-missing, unseen-category and drift signals are
+                not produced (the infrastructure, invalid-request and
+                performance signals still are).
         """
         self.policy = policy
         self.thresholds = thresholds
@@ -253,7 +265,8 @@ class SignalMonitor:
 
         Args:
             at: Time of the batch, in epoch seconds.
-            frame: The scored rows; each is kept with the policy's sample rate.
+            frame: The scored rows; each is kept independently with
+                probability equal to the policy's sample rate.
 
         Returns:
             The number of rows kept.
@@ -271,6 +284,8 @@ class SignalMonitor:
         self, at: float, losses: Sequence[float] | np.ndarray
     ) -> None:
         """Records losses in [0, 1] of cases whose outcome has arrived.
+
+        An empty sequence records nothing.
 
         Args:
             at: Time the outcomes arrived, in epoch seconds.
@@ -292,7 +307,12 @@ class SignalMonitor:
             self.outcomes.append((at, values))
 
     def prune(self, now: float) -> None:
-        """Drops everything older than the window.
+        """Drops recorded events older than the window.
+
+        Events before ``now - window_seconds`` are dropped from the front of
+        each queue; the scan stops at the first event inside the window, so
+        events are assumed to be recorded in time order. Does not take the
+        lock.
 
         Args:
             now: The current time, in epoch seconds.
@@ -303,13 +323,19 @@ class SignalMonitor:
                 queue.popleft()
 
     def evaluate(self, now: float) -> tuple[Signal, ...]:
-        """Every signal over ``(now - window, now]``.
+        """Evaluates every signal over the window ending at ``now``.
+
+        Prunes events older than the window first. Events stamped after
+        ``now`` are kept but not counted.
 
         Args:
             now: The current time, in epoch seconds.
 
         Returns:
-            The service, data and performance signals of the window.
+            The signals in order: server error rate, availability and p95
+            latency; the invalid-request rate; the feature-missing,
+            unseen-category and drift signals when a reference profile was
+            given; the windowed loss.
         """
         with self.lock:
             self.prune(now)
@@ -324,15 +350,16 @@ class SignalMonitor:
     def service_signals(
         self, requests: list[tuple[float, str, int, float]]
     ) -> list[Signal]:
-        """Error rate, availability and p95 latency.
+        """Judges server error rate, availability and p95 latency.
 
         Args:
             requests: The requests in the window, as (time, route, status,
                 seconds).
 
         Returns:
-            The server error rate, availability and 95th percentile latency
-            signals.
+            The server error rate (share of 5xx), availability (share not 5xx
+            or 429) and 95th percentile latency signals, in that order. All
+            have no value when there are no requests.
         """
         size = len(requests)
         limits = self.thresholds
@@ -381,7 +408,7 @@ class SignalMonitor:
         frames: list[pd.DataFrame],
         requests: list[tuple[float, str, int, float]],
     ) -> list[Signal]:
-        """Rejected inputs, feature quality and drift.
+        """Judges rejected inputs, feature quality and drift.
 
         Args:
             frames: The sampled feature rows in the window.
@@ -389,9 +416,13 @@ class SignalMonitor:
                 seconds).
 
         Returns:
-            The invalid-request-rate signal and, when a reference profile
-            exists, the signals for the largest increase in missing values, the
-            largest unseen-category rate and the largest drift index.
+            The invalid-request-rate signal (share of requests with status
+            400, 409, 413, 415 or 422) and, when a reference profile exists,
+            the signals for the largest increase in missing share over the
+            reference (a feature absent from the rows counts as entirely
+            missing), the largest unseen-category rate and the largest
+            noise-adjusted PSI. The feature signals have no value until the
+            sampled rows number at least the minimum.
         """
         limits = self.thresholds
         minimum = self.policy.min_samples
@@ -477,7 +508,7 @@ class SignalMonitor:
         return found
 
     def performance_signals(self, outcomes: list[np.ndarray]) -> list[Signal]:
-        """Mean loss of cases whose outcome arrived, against the reference.
+        """Judges the mean loss of cases whose outcome arrived.
 
         Args:
             outcomes: The loss arrays recorded in the window.
@@ -533,7 +564,7 @@ def as_metric_samples(
     timestamp: str,
     labels: dict[str, str] | None = None,
 ) -> list[observability.MetricSample]:
-    """Signals with a value as `MetricSample` rows for export or retention.
+    """Converts signals that have a value to `MetricSample` rows.
 
     Args:
         signals: The evaluated signals.
@@ -541,7 +572,12 @@ def as_metric_samples(
         labels: Labels added to every sample.
 
     Returns:
-        One sample for each signal that has a value, in the signals' order.
+        One sample for each signal that has a value, in the signals' order,
+        with the unit ``s`` for names containing ``seconds`` and ``ratio``
+        otherwise.
+
+    Raises:
+        KeyError: If a signal's name has no metric kind.
     """
     return [
         observability.MetricSample(

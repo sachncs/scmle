@@ -3,8 +3,9 @@
 Three kinds of event are recorded, each as an ``audit`` row: ``activation``
 (a model became ready to serve), ``access`` (a request was allowed or
 denied) and ``admin`` (a key rotation or another administrative action). A
-row names who acted, what, the outcome and the request id; it never holds a
-credential or a request body. The ledger chain shows that rows were not
+row names who acted, what and the outcome (an ``access`` row also the
+request id); callers are expected to keep credentials and request bodies out
+of the facts they pass. The ledger chain shows that rows were not
 edited, removed from the middle or reordered; it does not show that the
 newest rows were not removed (compare `head` with a copy kept elsewhere).
 """
@@ -63,9 +64,15 @@ class AuditLog:
             path: Ledger file, or None for an in-memory ledger.
             clock: Source of epoch seconds.
 
+        If the file exists it is loaded; otherwise a new ledger is created
+        (written to `path` when one is given).
+
         Returns:
-            The log. An existing file that is broken raises
-            `DeploymentLedgerError` from the ledger's loader.
+            The log.
+
+        Raises:
+            DeploymentLedgerError: If an existing file is broken (the
+                ledger's loader raises it).
         """
         if path is not None and pathlib.Path(path).exists():
             ledger = deployment_ledger.DeploymentLedger.load(path)
@@ -81,6 +88,10 @@ class AuditLog:
     def record(self, event: str, **fields: Any) -> dict[str, Any]:
         """Appends one audit row.
 
+        The row body holds the event, the time (epoch seconds rounded to
+        milliseconds) and the facts; a fact named ``event`` or ``at``
+        replaces the value set here.
+
         Args:
             event: `activation`, `access` or `admin`.
             **fields: JSON-ready facts (never credentials).
@@ -89,7 +100,8 @@ class AuditLog:
             The chained row.
 
         Raises:
-            DeploymentLedgerError: If `event` is unknown.
+            DeploymentLedgerError: If `event` is unknown or the ledger
+                refuses the row.
         """
         if event not in EVENTS:
             raise deployment_ledger.DeploymentLedgerError(
@@ -133,7 +145,8 @@ class AuditLog:
         """Records an access decision.
 
         Args:
-            principal: The verified caller, or None if authentication failed.
+            principal: The verified caller, or None if the request was refused
+                before authentication succeeded.
             route: The request path.
             outcome: `allowed` or `denied`.
             status: HTTP status given.
@@ -159,10 +172,13 @@ class AuditLog:
     def admin(self, actor: str, action: str, **detail: Any) -> dict[str, Any]:
         """Records an administrative action such as a key rotation.
 
+        The outcome is always recorded as allowed.
+
         Args:
             actor: Who acted.
             action: What was done.
-            **detail: Further JSON-ready facts.
+            **detail: Further JSON-ready facts; none may be named ``actor``,
+                ``action`` or ``outcome``.
 
         Returns:
             The chained row.
@@ -179,7 +195,8 @@ class AuditLog:
                 None for all.
 
         Returns:
-            The chained rows, in ledger order.
+            The audit rows, in ledger order (the ledger's own row dicts,
+            not copies); empty if none match.
         """
         found = [
             row

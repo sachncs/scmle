@@ -336,7 +336,8 @@ class Measurement:
         rto_seconds: Seconds from the fault (or its detection, per
             ``method``) to the component serving again; None if it did
             not.
-        rpo_lost: Acknowledged units found missing after recovery.
+        rpo_lost: Acknowledged units found missing after recovery; None if
+            not measured.
         method: How both were measured.
     """
 
@@ -348,10 +349,18 @@ class Measurement:
     def problems(self) -> list[str]:
         """Ways the measurement misses the declared objective.
 
+        Compares the measurement with the objective declared for its
+        component; the allowed RTO is multiplied by the time scale.
+
         Returns:
             One message for each way the measurement misses the declared
             objective: no recovery, a recovery time over the (scaled) objective,
             an unmeasured recovery point or too much lost; empty if it meets it.
+
+        Raises:
+            KeyError: If the component has no declared objective.
+            ValueError: If the time-scale variable is set to something that
+                is not a positive number.
         """
         goal = OBJECTIVE_OF[self.component]
         found = []
@@ -379,8 +388,14 @@ class Measurement:
         """A JSON-ready record.
 
         Returns:
-            The component, the measured and objective RTO and RPO, the time
-            scale and the method as a dict.
+            The component, the measured RTO (rounded to milliseconds) and
+            RPO, the objective RTO, RPO and RPO unit, the time scale and the
+            method as a dict.
+
+        Raises:
+            KeyError: If the component has no declared objective.
+            ValueError: If the time-scale variable is set to something that
+                is not a positive number.
         """
         return {
             "component": self.component,
@@ -421,7 +436,11 @@ class Result:
     seconds: float = 0.0
 
     def judge(self) -> None:
-        """Sets the status from the checks and the measurements."""
+        """Sets the problems and the status from the checks and measurements.
+
+        The result fails if any check is false or any measurement has
+        problems, and passes otherwise.
+        """
         found = [f"check failed: {k}" for k, v in self.checks.items() if not v]
         for item in self.measurements:
             found.extend(item.problems())
@@ -432,8 +451,9 @@ class Result:
         """A JSON-ready record.
 
         Returns:
-            The fault id, status, environment, seconds, checks, measurements,
-            detail and problems as a dict.
+            The fault id, status, environment, seconds (rounded to two
+            places), checks, measurements as dicts, detail and problems as a
+            dict.
         """
         return {
             "fault_id": self.fault_id,
@@ -483,10 +503,14 @@ class Runner:
     def run(self, only: Sequence[str] | None = None) -> dict[str, Any]:
         """Runs every scenario (or ``only``) and reports all faults.
 
-        A scenario that raises is recorded as failed, not propagated.
+        A scenario that raises an ``Exception`` (or whose result cannot be
+        judged) is recorded as failed with the error and the end of its
+        traceback as problems, not propagated. Each result carries the
+        seconds the scenario took, by the runner's clock.
 
         Args:
-            only: Fault ids to run; all scenarios if None.
+            only: Fault ids to run; all scenarios if None. Ids that are not
+                in the catalogue are ignored.
 
         Returns:
             The report built by `report`.
@@ -512,15 +536,17 @@ class Runner:
         return self.report(results)
 
     def not_run(self, fault: Fault, selected: bool) -> Result:
-        """The result of a fault with no scenario run.
+        """Builds the not-run result of a fault.
 
         Args:
             fault: The fault.
             selected: Whether a subset of faults was selected for this run.
 
         Returns:
-            A not-run result stating why: not selected, no scenario provided or
-            that it needs a real cloud environment.
+            A not-run result whose problem states why: not selected (a local
+            fault when a subset was selected), no scenario provided (a local
+            fault otherwise) or that it needs a real cloud environment (a
+            fault that cannot run locally).
         """
         if fault.local and selected:
             reason = "not selected in this run"
@@ -536,14 +562,18 @@ class Runner:
         )
 
     def report(self, results: Sequence[Result]) -> dict[str, Any]:
-        """The report: results, objectives and what no provider ran.
+        """Builds the report of a run from its results.
 
         Args:
-            results: One result for each fault in the catalogue.
+            results: The results, normally one for each fault in the
+                catalogue.
 
         Returns:
-            The objectives, time scale, catalogue, results, summary counts and
-            whether every locally run fault passed.
+            A dict with the declared ``objectives``, the ``time_scale``, the
+            catalogue as ``faults``, the ``results`` as dicts, a ``summary``
+            of counts (faults, ran_locally, passed, failed, not_run) and
+            ``all_local_passed``, which is true only if at least one fault
+            ran and every fault that ran passed.
         """
         ran = [r for r in results if r.status != NOT_RUN]
         return {

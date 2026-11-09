@@ -40,11 +40,13 @@ class Response:
     """What the desk did for one window.
 
     Attributes:
-        incident_id: Id of the incident, or None when nothing breached.
+        incident_id: Id of the incident, or None when the verdict is none
+            (no signal breached, or no signals at all).
         classification: The verdict and its evidence.
         deliveries: Pager and ticket outcomes.
-        telemetry_digest: SHA-256 of the retained window.
-        audit_head: Hash of the newest audit row.
+        telemetry_digest: SHA-256 of the line retained for the window.
+        audit_head: Hash of the newest audit row: the one that opened the
+            incident, or the current ledger head if none was opened.
     """
 
     incident_id: str | None
@@ -84,7 +86,8 @@ class ResponseDesk:
         """Creates a desk that keeps its telemetry in ``directory``.
 
         Args:
-            directory: Directory for the retained telemetry.
+            directory: Directory for the retained telemetry; it is created
+                when the first window is retained.
             audit: The audit log that records incidents and actions.
             notifier: Sends the notifications.
             model_version: Version of the model that is served.
@@ -106,14 +109,17 @@ class ResponseDesk:
     def retain(
         self, at: float, signal_rows: Sequence[signals_module.Signal]
     ) -> str:
-        """Appends a window's signals and returns the digest of the line.
+        """Appends a window's signals to the telemetry file.
+
+        The line is JSON with the time (rounded to milliseconds), model
+        version, artifact digest and the signals as dicts.
 
         Args:
             at: Time of the window, in seconds.
             signal_rows: The window's signals.
 
         Returns:
-            The SHA-256 of the line that was appended.
+            The SHA-256 of the line that was appended, without its newline.
         """
         line = json.dumps(
             {
@@ -134,7 +140,8 @@ class ResponseDesk:
             since: Earliest time to include, in seconds.
 
         Returns:
-            The retained windows, oldest first; empty if none are stored.
+            The retained windows as decoded, in the order they were
+            appended; empty if there is no telemetry file.
         """
         if not self.telemetry_path.exists():
             return []
@@ -148,7 +155,10 @@ class ResponseDesk:
         return [row for row in rows if row["at"] >= since]
 
     def expire(self, older_than: float) -> int:
-        """Removes windows older than ``older_than``; returns how many.
+        """Removes retained windows older than ``older_than``.
+
+        Rewrites the telemetry file atomically with the windows kept (an
+        empty file if none are kept; the file is created if absent).
 
         Args:
             older_than: Time before which windows are removed, in seconds.
@@ -169,14 +179,20 @@ class ResponseDesk:
     ) -> Response:
         """Processes one window of signals.
 
+        Retains the window, then classifies it. For any verdict other than
+        none (an indeterminate verdict included) it sends the notifications
+        and then records an ``incident_opened`` row in the audit log.
+
         Args:
             signal_rows: The window's signals.
-            trace_id: Trace id for the notification; a new one if None.
+            trace_id: Trace id for the notification; a new one if None or
+                empty.
 
         Returns:
-            The response. When no signal calls for action it has no incident
-            id and no deliveries; otherwise an incident is opened in the audit
-            log and the notifications sent.
+            The response. When the verdict is none it has no incident id and
+            no deliveries and nothing is audited; otherwise it carries the
+            incident id (derived from the verdict and the window's digest),
+            the deliveries and the hash of the new audit row.
         """
         now = self.clock()
         trace = trace_id or logs.new_trace_id()
@@ -232,7 +248,8 @@ class ResponseDesk:
             note: What was done (no credentials).
 
         Returns:
-            The audit row that records the action.
+            The audit row, written under the operator as actor with the
+            action ``incident_<action>``, that records the action.
 
         Raises:
             ValueError: If the action is unknown, or the incident was never

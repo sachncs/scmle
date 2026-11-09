@@ -57,8 +57,12 @@ class Delivery:
         delivered: Whether a 2xx answer was received.
         attempts: Sends made.
         http_status: Last status (None if the last attempt raised).
-        reason: Short text for the outcome; never a credential.
-        idempotency_key: The key sent on every attempt.
+        reason: Short text for the outcome (``delivered``, ``HTTP <status>``,
+            the name of the transport error, or that no sender was
+            configured), with the attempt count added after a final failure
+            that used every attempt; never a credential.
+        idempotency_key: The key sent on every attempt; empty if no sender
+            was configured.
     """
 
     kind: str
@@ -105,14 +109,17 @@ def verify_signature(
 
     Args:
         secret: The shared secret.
-        headers: The request headers.
+        headers: The request headers; the timestamp and signature are looked
+            up under their exact header names.
         body: The request body.
         now: The receiver's current time, in seconds.
-        tolerance_seconds: Largest accepted age of the timestamp.
+        tolerance_seconds: Largest accepted distance in seconds between
+            `now` and the timestamp, in the past or the future.
 
     Returns:
-        True if the timestamp is a number within the tolerance of `now` and
-        the signature matches; False otherwise.
+        True if the timestamp parses as a number within the tolerance of
+        `now` and the signature matches; False if the timestamp is missing,
+        not a number or too far from `now`, or the signature differs.
     """
     timestamp = headers.get(TIMESTAMP_HEADER, "")
     given = headers.get(SIGNATURE_HEADER, "")
@@ -132,9 +139,9 @@ def urllib_transport(timeout_seconds: float = 5.0) -> Transport:
         timeout_seconds: Timeout of each request.
 
     Returns:
-        A function that sends a request and returns the HTTP status code.
-        It raises `ValueError` for a URL that is not HTTPS and `OSError`
-        when the connection fails.
+        A function that sends a request and returns the HTTP status code,
+        including error codes. When called, it raises `ValueError` for a URL
+        that is not HTTPS and `OSError` when the connection fails.
     """
 
     def send(request: Request) -> int:
@@ -206,18 +213,21 @@ class WebhookSender:
         self.clock = clock
 
     def payload(self, notification: Mapping[str, Any]) -> bytes:
-        """The canonical JSON body of a notification.
+        """Builds the canonical JSON body of a notification.
 
         Args:
             notification: The notification, which must carry a known
-                ``severity``.
+                ``severity`` and be JSON-serialisable. A ``kind`` entry in it
+                replaces this sender's kind in the body.
 
         Returns:
-            The compact, key-sorted JSON of the notification with this sender's
-            kind added, as UTF-8 bytes.
+            The compact, key-sorted JSON of the notification with a ``kind``
+            entry holding this sender's kind, as ASCII-only UTF-8 bytes.
 
         Raises:
-            ValueError: If the severity is unknown or the body is too large.
+            ValueError: If the severity is unknown or the body is larger than
+                64 KiB.
+            TypeError: If the notification cannot be serialised to JSON.
         """
         severity = notification.get("severity", "")
         if severity not in SEVERITIES:
@@ -234,13 +244,25 @@ class WebhookSender:
     def send(self, notification: Mapping[str, Any]) -> Delivery:
         """Posts the notification, retrying what is worth retrying.
 
+        Retries 5xx, 408, 425 and 429 statuses and transport errors up to
+        ``max_attempts`` sends in all, waiting ``backoff_seconds`` doubled
+        after each failure between sends. Any other non-2xx status ends the
+        attempts at once. Each attempt is stamped and signed afresh; the
+        idempotency key is a digest of the kind and body, so it is the same
+        for every attempt and for any identical notification.
+
         Args:
             notification: The notification to post.
 
         Returns:
             The delivery record: whether it was delivered (a 2xx status), the
-            number of attempts, the last status and the idempotency key. A
-            client error that is not retryable ends the attempts at once.
+            number of attempts, the last status and the idempotency key.
+
+        Raises:
+            ValueError: If the payload is invalid (see `payload`) or the
+                default transport is given a URL that is not HTTPS. Nothing
+                has been sent for a payload error.
+            TypeError: If the notification cannot be serialised to JSON.
         """
         body = self.payload(notification)
         key = hashlib.sha256(self.kind.encode() + b"|" + body).hexdigest()[:32]
@@ -306,15 +328,19 @@ class Notifier:
     def notify(self, notification: Mapping[str, Any]) -> list[Delivery]:
         """Sends to the senders the severity calls for.
 
-        Critical pages and files a ticket, warning files a ticket and info
-        sends nothing. A missing sender is reported as an undelivered
-        notification, not skipped silently.
+        Critical pages and files a ticket, warning files a ticket, and info
+        or an unrecognised severity sends nothing. A missing sender is
+        reported as an undelivered notification, not skipped silently.
 
         Args:
             notification: The notification, with its ``severity``.
 
         Returns:
-            One delivery record for each sender the severity calls for.
+            One delivery record for each sender the severity calls for, the
+            pager first; empty if none is called for.
+
+        Raises:
+            ValueError: If a sender's body would be larger than 64 KiB.
         """
         severity = notification.get("severity", "")
         wanted = {

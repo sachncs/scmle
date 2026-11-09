@@ -142,14 +142,17 @@ class Histogram:
     def quantile(self, share: float) -> float | None:
         """Estimates a quantile by linear interpolation inside a bucket.
 
-        This is the estimate Prometheus makes from bucket counts; it is exact
-        only at the bucket edges.
+        The first bucket is taken to start at 0. This is the estimate
+        Prometheus makes from bucket counts, so it is only as fine as the
+        buckets are.
 
         Args:
             share: The quantile as a share in [0, 1].
 
         Returns:
-            The estimate, or None when nothing was observed.
+            The estimate, or None when nothing was observed. When the
+            quantile falls among observations above the highest bucket bound,
+            that bound.
         """
         if self.total == 0:
             return None
@@ -176,7 +179,8 @@ class MetricsRegistry:
             buckets: Histogram upper bounds, strictly ascending.
 
         Raises:
-            ValueError: If the buckets are empty or not ascending.
+            ValueError: If the buckets are empty, not ascending or contain
+                duplicates.
         """
         if not buckets or list(buckets) != sorted(set(buckets)):
             raise ValueError("buckets must be non-empty and ascending")
@@ -193,7 +197,8 @@ class MetricsRegistry:
         Args:
             name: Metric name.
             kind: ``counter``, ``gauge`` or ``histogram``.
-            text: Help text, kept from the first declaration.
+            text: Help text. The first declaration's text is kept, even if
+                it was empty.
 
         Raises:
             ValueError: If the name is invalid or the metric was declared as a
@@ -220,10 +225,12 @@ class MetricsRegistry:
             name: Metric name.
             labels: Label names and values.
             amount: How much to add.
-            text: Help text.
+            text: Help text, used only if the metric has none yet.
 
         Raises:
-            ValueError: If ``amount`` is negative.
+            ValueError: If ``amount`` is negative, the metric name or a label
+                name is invalid, or the name was declared as another kind.
+            TypeError: If a label value is not text.
         """
         if amount < 0:
             raise ValueError("a counter only goes up")
@@ -246,10 +253,13 @@ class MetricsRegistry:
             name: Metric name.
             value: The new value.
             labels: Label names and values.
-            text: Help text.
+            text: Help text, used only if the metric has none yet.
 
         Raises:
-            ValueError: If the value is not finite.
+            ValueError: If the value is not finite, the metric name or a
+                label name is invalid, or the name was declared as another
+                kind.
+            TypeError: If a label value is not text.
         """
         if not math.isfinite(value):
             raise ValueError("a gauge value must be finite")
@@ -270,10 +280,13 @@ class MetricsRegistry:
             name: Metric name.
             value: The observation.
             labels: Label names and values.
-            text: Help text.
+            text: Help text, used only if the metric has none yet.
 
         Raises:
-            ValueError: If the value is not finite or is negative.
+            ValueError: If the value is not finite or is negative, the
+                metric name or a label name is invalid, or the name was
+                declared as another kind.
+            TypeError: If a label value is not text.
         """
         if not math.isfinite(value) or value < 0:
             raise ValueError("an observation must be finite and not negative")
@@ -339,7 +352,8 @@ class MetricsRegistry:
             name: Metric name.
 
         Returns:
-            A mapping from label pairs to value; empty if there is none.
+            A mapping from label pairs to value; empty if the metric has no
+            series.
         """
         with self.lock:
             return dict(self.values.get(name, {}))
@@ -369,10 +383,14 @@ class MetricsRegistry:
             return merged
 
     def render(self) -> str:
-        """The Prometheus text exposition of every series, sorted.
+        """Renders every declared metric in the Prometheus text format.
+
+        Metrics are ordered by name and series by label pairs.
 
         Returns:
-            The text exposition, one line per series, ending in a newline.
+            For each metric an optional ``# HELP`` line (only when its help
+            text is not empty), a ``# TYPE`` line and the sample lines of
+            its series, joined by newlines and ending in a newline.
         """
         lines: list[str] = []
         with self.lock:
@@ -392,13 +410,16 @@ class MetricsRegistry:
         return "\n".join(lines) + "\n"
 
     def render_histogram(self, name: str) -> list[str]:
-        """Bucket, sum and count lines of one histogram.
+        """Renders the sample lines of one histogram metric.
+
+        The caller must hold the registry lock.
 
         Args:
             name: Metric name.
 
         Returns:
-            The exposition lines for each series: its buckets, sum and count.
+            For each series, ordered by label pairs, one bucket line per
+            bound, the ``+Inf`` bucket line, then the sum and count lines.
         """
         lines: list[str] = []
         for labels, hist in sorted(self.histograms.get(name, {}).items()):
@@ -418,7 +439,7 @@ def resident_bytes() -> int:
     """Peak resident memory of this process in bytes (0 if unknown).
 
     ``ru_maxrss`` is a peak, not the current size; it is bytes on macOS and
-    kibibytes on Linux.
+    kibibytes elsewhere.
 
     Returns:
         The peak resident memory in bytes; 0 if it cannot be read.
@@ -461,8 +482,9 @@ class ServiceMetrics:
         Args:
             registry: Where series are kept.
             model_version: Version label attached to every series.
-            artifact_digest: Digest of the served artifact; recorded as a
-                gauge label so a scrape shows which bundle answered.
+            artifact_digest: Digest of the served artifact; recorded, with
+                the model version, as labels of the ``scmle_model_info``
+                gauge so a scrape shows which bundle answered.
         """
         self.registry = registry
         self.model_version = model_version
@@ -480,10 +502,17 @@ class ServiceMetrics:
     def record_request(self, route: str, status: int, seconds: float) -> None:
         """Counts a request and observes its latency.
 
+        The request counter is labelled by route, status and model version;
+        the latency histogram by route and model version only.
+
         Args:
             route: The route served.
             status: The HTTP status.
             seconds: Duration of the request in seconds.
+
+        Raises:
+            ValueError: If ``seconds`` is negative or not finite. The request
+                has been counted by then; only its latency is not recorded.
         """
         labels = {
             "route": route,
@@ -522,7 +551,7 @@ class ServiceMetrics:
         return self.registry.total(self.REQUESTS)
 
     def count_where(self, predicate_statuses: set[int]) -> float:
-        """Requests whose status is in the set.
+        """Counts the requests whose status is in the set.
 
         Args:
             predicate_statuses: HTTP statuses to count.

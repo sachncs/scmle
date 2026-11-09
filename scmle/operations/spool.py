@@ -44,7 +44,9 @@ class MetricsSpool:
     def __init__(
         self, path: str | pathlib.Path, send: Send, batch_size: int = 100
     ) -> None:
-        """Opens the spool at ``path``.
+        """Binds the spool to the file at ``path``.
+
+        Nothing is read or created until samples are added.
 
         Args:
             path: The spool file.
@@ -62,10 +64,11 @@ class MetricsSpool:
         self.batch_size = batch_size
 
     def lines(self) -> list[str]:
-        """Spooled lines, oldest first.
+        """Reads the spooled lines.
 
         Returns:
-            The non-blank lines of the spool file; empty if it does not exist.
+            The non-blank lines of the spool file, in file order (oldest
+            first); empty if it does not exist.
         """
         if not self.path.exists():
             return []
@@ -84,7 +87,9 @@ class MetricsSpool:
         return len(self.lines())
 
     def add(self, samples: Sequence[observability.MetricSample]) -> int:
-        """Spools samples (before anything is sent); returns how many.
+        """Appends samples to the spool file without sending anything.
+
+        The file and its parent directories are created if missing.
 
         Args:
             samples: The samples to spool.
@@ -102,9 +107,20 @@ class MetricsSpool:
     def flush(self) -> FlushResult:
         """Sends batches in order until the spool is empty or a send fails.
 
+        Each batch holds up to ``batch_size`` of the oldest lines. A send
+        that raises ``OSError`` or ``ValueError``, or that reports a count
+        other than the batch size, stops the flush and leaves the whole
+        batch in the spool, so samples a destination only partly accepted
+        are sent again. After each accepted batch the file is rewritten
+        atomically without it.
+
         Returns:
             How many samples were sent, how many remain and the error that
-            stopped the flush, if any.
+            stopped the flush (None if the spool was emptied).
+
+        Raises:
+            ValueError: If a spooled line is not valid JSON of a sample.
+            KeyError: If a spooled sample lacks a required field.
         """
         sent = 0
         lines = self.lines()

@@ -114,6 +114,9 @@ class AccessDenied(errors.ScmleError):
             retry_after: Seconds until the caller may retry.
             principal: The verified caller, when the refusal came after
                 authentication (for the audit row).
+
+        Raises:
+            KeyError: If ``status`` is not 401, 403 or 429.
         """
         super().__init__(SAFE_MESSAGES[status])
         self.principal = principal
@@ -131,7 +134,12 @@ class AccessDenied(errors.ScmleError):
 
     @property
     def headers(self) -> dict[str, str]:
-        """The response headers: the challenge or the retry delay."""
+        """The response headers for the refusal.
+
+        A 401 carries the bearer challenge, a 429 a ``Retry-After`` of
+        ``retry_after`` rounded up to whole seconds (at least 1), and a 403
+        none.
+        """
         if self.status == 401:
             return {"WWW-Authenticate": 'Bearer realm="scmle"'}
         if self.status == 429:
@@ -170,7 +178,7 @@ class RateLimiter:
             clock: Monotonic seconds.
 
         Raises:
-            ConfigError: If rate or burst is not positive.
+            ConfigError: If rate is not positive or burst is less than 1.
         """
         if rate <= 0 or burst < 1:
             raise errors.ConfigError("rate and burst must be positive")
@@ -181,7 +189,10 @@ class RateLimiter:
         self.lock = threading.Lock()
 
     def take(self, key: str) -> float | None:
-        """Takes one token.
+        """Takes one token from the bucket of a key.
+
+        A key seen for the first time starts with a full bucket. A refused
+        call takes nothing.
 
         Args:
             key: The bucket to take from (for example a subject or client key).
@@ -250,7 +261,7 @@ class Gateway:
         tenant: The one tenant this deployment serves, or None.
         routes: Scope needed per `(method, path)`.
         limiter: Per-subject request limit.
-        failure_limiter: Per-client limit on refused attempts.
+        failure_limiter: Per-client limit on failed authentication attempts.
         audit: Where decisions are recorded, or None.
     """
 
@@ -272,8 +283,9 @@ class Gateway:
                 whose tenant claim differs, or is absent, is refused (403).
             routes: Scope needed per `(method, path)`.
             limiter: Per-subject request limit (default 20/s, burst 40).
-            failure_limiter: Per-client limit on refused attempts, so that
-                guessing credentials is slowed (default 2/s, burst 10).
+            failure_limiter: Per-client limit on failed authentication
+                attempts (missing or invalid credentials), so that guessing
+                credentials is slowed (default 2/s, burst 10).
             audit: Where decisions are recorded.
         """
         self.verifier = verifier
@@ -295,13 +307,15 @@ class Gateway:
 
         Args:
             method: HTTP method.
-            path: Request path without query string.
+            path: Request path; anything after a ``?`` is ignored.
             authorization: The ``Authorization`` header value, if any.
             remote: The peer address.
             request_id: Request id for the audit row.
 
         Returns:
-            The principal, or None for a public path.
+            The verified principal, or None for a ``GET`` of a public path
+            (which is not audited). Every other decision, allowed or
+            denied, is recorded in the audit log when there is one.
 
         Raises:
             AccessDenied: With status 401, 403 or 429.
@@ -335,7 +349,10 @@ class Gateway:
         authorization: str | None,
         remote: str,
     ) -> tokens.Principal:
-        """Makes the decision itself.
+        """Decides without auditing.
+
+        Checks in order: the credentials, the route table, the scope, the
+        tenant and the caller's rate limit.
 
         Args:
             method: HTTP method.
@@ -349,7 +366,8 @@ class Gateway:
         Raises:
             AccessDenied: With status 401 for missing or invalid credentials,
                 403 for a route not in the table, a missing scope or a tenant
-                mismatch, and 429 when the caller or the client is rate-limited.
+                mismatch, and 429 when the caller is rate-limited or the
+                client has made too many failed attempts.
         """
         token = bearer_token(authorization)
         if token is None:
@@ -390,7 +408,10 @@ class Gateway:
         raise AccessDenied(status, reason)
 
     def rotate(self, keys: tokens.KeySet, actor: str, reason: str) -> None:
-        """Replaces the trusted keys and audits the administrative action.
+        """Replaces the verifier's trusted keys and audits the change.
+
+        The audit row, written only when there is an audit log, lists the
+        key ids before and after.
 
         Args:
             keys: The new key set.
@@ -433,7 +454,11 @@ class AuthSettings:
 
     @classmethod
     def from_environment(cls, environ: Mapping[str, str]) -> "AuthSettings":
-        """Reads `SCMLE_AUTH_*` variables.
+        """Reads the authentication variables of an environment.
+
+        These are `SCMLE_AUTH_KEYS_FILE`, `SCMLE_AUTH_HS256_SECRET`,
+        `SCMLE_AUTH_ISSUER`, `SCMLE_AUTH_AUDIENCE`, `SCMLE_TENANT`,
+        `SCMLE_AUTH_REVOKED_FILE` and `SCMLE_AUDIT_FILE`.
 
         Args:
             environ: The environment; absent variables read as empty.
@@ -461,6 +486,10 @@ class AuthSettings:
 def gateway_from_environment(environ: Mapping[str, str]) -> Gateway | None:
     """Builds the gateway the environment asks for.
 
+    A keys file takes precedence over an inline HS256 secret. The revocation
+    file, if named, is re-read on each token verification rather than here.
+    The audit log is opened from the audit file (in memory if none is named).
+
     Args:
         environ: The environment (`SCMLE_AUTH_*`, `SCMLE_TENANT`,
             `SCMLE_AUDIT_FILE`).
@@ -469,9 +498,9 @@ def gateway_from_environment(environ: Mapping[str, str]) -> Gateway | None:
         The gateway, or None if no key source is configured.
 
     Raises:
-        ConfigError: If keys are configured without an issuer and audience.
-            Unusable key material or revocations are refused with the same error
-            by their loaders.
+        ConfigError: If keys are configured without an issuer and audience,
+            or the key file or inline secret is unusable (for example an
+            HS256 secret under 32 bytes).
     """
     settings = AuthSettings.from_environment(environ)
     if not settings.configured:
