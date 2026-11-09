@@ -24,12 +24,31 @@ STYLE = (
 
 
 def esc(value: Any) -> str:
-    """HTML-escaped text of a value."""
+    """Escapes a value for HTML.
+
+    Args:
+        value: Any value; it is converted with `str` first.
+
+    Returns:
+        The text with `&`, `<`, `>` and both quote characters escaped.
+    """
     return html.escape(str(value), quote=True)
 
 
 def curve(specs: list[dict[str, Any]]) -> str:
-    """Inline SVG of the specification curve of one finding."""
+    """Draws the specification curve of one finding.
+
+    Args:
+        specs: One record per specification, with the keys `effect`, `low`
+            and `high`. Records where any of the three is missing or None
+            are left out.
+
+    Returns:
+        An inline SVG element with the specifications ordered by effect, each
+        drawn as its interval and point estimate against a dashed zero
+        line; or a paragraph saying that no specification produced an
+        estimate when none is left.
+    """
     points = [
         s
         for s in specs
@@ -69,7 +88,16 @@ def curve(specs: list[dict[str, Any]]) -> str:
 
 
 def stability_section(document: dict[str, Any]) -> str:
-    """The stability part of the page."""
+    """Renders the stability part of the page.
+
+    Args:
+        document: The stability report, with the keys `status`, `reason`,
+            `counts`, `findings` (each with `name` and `status`, and
+            optionally `reason`, `headline` and `specs`) and `guarantee`.
+
+    Returns:
+        The HTML fragment, with every taken string escaped.
+    """
     rows = [
         "<h2>Stability</h2>",
         f"<p>status: <b>{esc(document['status'])}</b>. "
@@ -91,7 +119,16 @@ def stability_section(document: dict[str, Any]) -> str:
 
 
 def shift_section(document: dict[str, Any]) -> str:
-    """The shift part of the page."""
+    """Renders the shift part of the page.
+
+    Args:
+        document: The shift report, with the keys `status`, `reason`,
+            `periods` and `forward` (each with `status` and optionally
+            `reason`) and `assumptions` (a list of strings).
+
+    Returns:
+        The HTML fragment, with every taken string escaped.
+    """
     forward = document["forward"]
     periods = document["periods"]
     items = "".join(f"<li>{esc(a)}</li>" for a in document["assumptions"])
@@ -109,7 +146,15 @@ def shift_section(document: dict[str, Any]) -> str:
 
 
 def render(stability: dict[str, Any], shift: dict[str, Any]) -> str:
-    """One self-contained HTML page for the two reports."""
+    """Renders one self-contained HTML page for the two reports.
+
+    Args:
+        stability: The stability report document.
+        shift: The shift report document.
+
+    Returns:
+        The complete HTML page as a string.
+    """
     return (
         '<!doctype html><html lang="en"><head><meta charset="utf-8">'
         "<title>SCMLE stability and shift report</title>"

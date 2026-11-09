@@ -1,9 +1,9 @@
-"""Subgroup coverage: sample share against deployment share (F6).
+"""Subgroup coverage: sample share against deployment share.
 
 For each level of a named subgroup column the sample share carries an exact
 (Clopper-Pearson) binomial interval. The deployment share comes from a
 deployment sample or from stated marginals. Without either, every level is
-`unverifiable`: the check never reports `pass` without a reference (canon P5).
+`unverifiable`: the check never reports `pass` without a reference.
 
 A `pass` means the deployment share lies inside the sample-share interval,
 not that the sample represents the population. The deployment share is
@@ -50,7 +50,12 @@ class LevelCoverage:
     status: shift.Status
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Converts the record to a JSON-ready dictionary.
+
+        Returns:
+            The fields by name, with `status` as its string value and
+            `interval` as a two-element list.
+        """
         record = dataclasses.asdict(self)
         record["status"] = self.status.value
         record["interval"] = list(self.interval)
@@ -58,7 +63,17 @@ class LevelCoverage:
 
 
 def shares(column: pd.Series) -> dict[str, float]:
-    """Level shares of a column, missing values as their own level."""
+    """Computes the level shares of a column.
+
+    Missing values form their own level, named `MISSING_LEVEL`.
+
+    Args:
+        column: The column to tabulate.
+
+    Returns:
+        Level label (as a string) to the share of rows at that level. The
+        shares sum to 1; levels are ordered by decreasing share.
+    """
     labels = column.astype("object").where(column.notna(), MISSING_LEVEL)
     return {
         str(k): float(v)

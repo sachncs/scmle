@@ -1,4 +1,4 @@
-"""The forward-in-time check on the holdout `F` (F6, step 7).
+"""The forward-in-time check on the holdout `F`.
 
 It runs after the survivors are fixed and only for temporal data. Nothing is
 fitted on `F`: each surviving finding's rank correlation is re-estimated on
@@ -61,7 +61,11 @@ class ForwardFinding:
     check: qualification.Check | None
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Converts the record to a JSON-ready dictionary.
+
+        Returns:
+            The fields by name, with `check` as its own dictionary or None.
+        """
         return {
             "name": self.name,
             "effect_x": self.effect_x,
@@ -88,7 +92,11 @@ class ForwardResult:
     findings: tuple[ForwardFinding, ...]
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Converts the record to a JSON-ready dictionary.
+
+        Returns:
+            The fields by name, with `findings` as a list of dictionaries.
+        """
         return {
             "status": self.status,
             "reason": self.reason,
@@ -98,12 +106,31 @@ class ForwardResult:
 
 
 def skipped(reason: str) -> ForwardResult:
-    """A result that says the check did not run, and why."""
+    """Builds a result that says the check did not run, and why.
+
+    Args:
+        reason: One sentence saying why the check was skipped.
+
+    Returns:
+        A `skipped` result with `opened` False and no findings.
+    """
     return ForwardResult("skipped", reason, False, ())
 
 
 def label_for(effect_x: float, low: float, high: float) -> str:
-    """Label from the interval of the forward effect and the sign on `X`."""
+    """Labels a finding from its forward interval and its sign on `X`.
+
+    Args:
+        effect_x: The finding's effect on the exploration set; only its sign
+            is used (zero counts as positive).
+        low: Lower end of the interval of the effect on `F`.
+        high: Upper end of the interval of the effect on `F`.
+
+    Returns:
+        `holds` when the interval excludes zero on the same side as
+        `effect_x`, `unstable_over_time` when it excludes zero on the
+        opposite side, and `inconclusive` when it contains zero.
+    """
     sign = math.copysign(1.0, effect_x)
     if low > 0.0 or high < 0.0:
         return HOLDS if (low > 0.0) == (sign > 0.0) else UNSTABLE
@@ -118,7 +145,25 @@ def evaluate_finding(
     seed: int,
     bootstrap: int,
 ) -> ForwardFinding:
-    """Re-estimates one finding on the forward rows and labels it."""
+    """Re-estimates one finding on the forward rows and labels it.
+
+    The interval is a percentile bootstrap of the rank correlation, widened
+    if needed so that it contains the point estimate.
+
+    Args:
+        name: The finding (feature name).
+        effect_x: Its effect on the exploration set.
+        values: The feature values on the forward rows.
+        target: The encoded target on the forward rows, aligned with
+            `values`.
+        seed: Run seed from which the bootstrap generator is derived.
+        bootstrap: Number of resamples.
+
+    Returns:
+        The finding with its forward effect, label and `Check` record. When
+        the rank correlation is not defined on the forward rows, the effect
+        and the `Check` are None and the label is `inconclusive`.
+    """
     effect = stability.rank_effect(values, target)
     if not math.isfinite(effect):
         return ForwardFinding(name, effect_x, None, INCONCLUSIVE, None)
@@ -180,7 +225,8 @@ def forward_check(
 
     Returns:
         The result. `F` is opened at most once and not at all when the check
-        is skipped.
+        is skipped. A finding whose feature is missing from `F` is reported
+        as `inconclusive` with no forward effect.
     """
     if not temporal:
         return skipped("the data are not temporal: no forward check")

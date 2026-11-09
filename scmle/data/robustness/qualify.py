@@ -1,4 +1,4 @@
-"""Runs the F6 stability and shift checks on `X` for a charter run.
+"""Runs the stability and shift checks on `X` for a charter run.
 
 This is the wiring between the robustness package and a charter run. It reads
 the exploration view and, when the data spec names one, a deployment sample;
@@ -10,7 +10,7 @@ Certificates live beside the qualification harness
 (`benchmarks/qualification/f6_certificates.json`), which the installed
 package does not ship. When the file is missing, unreadable or stale for the
 current code, the checks are descriptive: a `fragile` finding is a warning,
-not a quarantine (canon P1).
+not a quarantine.
 
 The stability verdicts are reported. They remove findings from the
 confirmation family only through the pre-registered second stage
@@ -46,7 +46,7 @@ MAX_REFERENCE_ROWS = 20000
 
 @dataclasses.dataclass(frozen=True)
 class Robustness:
-    """What the F6 stage found on `X`.
+    """What the robustness checks found on `X`.
 
     Attributes:
         grid: The specification grid, or None when stability was not run.
@@ -82,7 +82,7 @@ class Robustness:
 
     @property
     def fragile(self) -> tuple[str, ...]:
-        """Findings whose verdict is `fragile`."""
+        """The names of the findings whose verdict is `fragile`."""
         return tuple(
             f.name for f in self.findings if f.status == stability.FRAGILE
         )
@@ -130,7 +130,11 @@ def run(
             its verdicts are reported and never gate.
 
     Returns:
-        The results.
+        The stability verdicts (at most `MAX_FINDINGS` findings, in the
+        order of `survivors`), the shift comparison, the subgroup coverage
+        rows, a skipped forward check and the certificate gates. Stability
+        is not run, and `stability_note` says why, for a multiclass target,
+        no survivor or too few specifications.
     """
     loaded = admissibility.load_store(F6_STORE, directory)
     store = loaded.store

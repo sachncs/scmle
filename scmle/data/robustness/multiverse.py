@@ -1,4 +1,4 @@
-"""The declared specification grid and a cached, resumable runner (F6).
+"""The declared specification grid and a cached, resumable runner.
 
 The charter declares the defensible analysis choices before any result
 exists (`AnalysisCharter.multiverse`); its hash covers them, so adding an
@@ -33,7 +33,14 @@ DEFAULT_MAX_SPECS = 12
 
 
 def digest(payload: object) -> str:
-    """SHA-256 of canonical JSON."""
+    """Hashes a value through its canonical JSON form.
+
+    Args:
+        payload: A JSON-serialisable value.
+
+    Returns:
+        The hex SHA-256 of the JSON text with sorted keys and no spaces.
+    """
     text = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
@@ -50,20 +57,41 @@ class Specification:
 
     @property
     def sha256(self) -> str:
-        """Hash of the specification."""
+        """The hex SHA-256 of the specification's (choice, option) pairs."""
         return digest([list(pair) for pair in self.values])
 
     def option(self, choice: str, default: str) -> str:
-        """The option chosen for `choice`, or `default` when not varied."""
+        """Looks up the option chosen for a choice.
+
+        Args:
+            choice: Name of the choice.
+            default: Option to return when the specification does not vary
+                the choice.
+
+        Returns:
+            The option chosen for `choice`, or `default` when absent.
+        """
         return dict(self.values).get(choice, default)
 
     def to_dict(self) -> dict[str, str]:
-        """Choice to option."""
+        """Converts the specification to a dictionary.
+
+        Returns:
+            Choice name to the option chosen.
+        """
         return dict(self.values)
 
 
 def declaration_sha256(choices: Sequence[charter_contracts.Choice]) -> str:
-    """Hash of the declared choices, independent of their order."""
+    """Hashes the declared choices.
+
+    Args:
+        choices: The declared choices.
+
+    Returns:
+        The hex SHA-256 of the choices sorted by name, so independent of
+        their order.
+    """
     return digest(
         sorted(
             (c.to_dict() for c in choices), key=lambda record: record["name"]
@@ -78,6 +106,15 @@ def tier_after_declaration(
 
     Adding a specification after exploration is a charter amendment; the
     result is then `unverified` whatever it was.
+
+    Args:
+        declared_sha256: Hash of the grid declared in the charter.
+        used_sha256: Hash of the grid that was run.
+        tier: The tier reached before this check.
+
+    Returns:
+        `tier` when the two hashes are equal, otherwise
+        `Tier.UNVERIFIED`.
     """
     if declared_sha256 == used_sha256:
         return tier
@@ -123,7 +160,8 @@ def enumerate_grid(
         The grid. The default specification is always included.
 
     Raises:
-        ValueError: On repeated choice names or a non-positive size.
+        ValueError: On repeated choice names, or when `max_specs` is not
+            an integer of at least 1.
     """
     qualification.count(max_specs, "max_specs", minimum=1)
     ordered = sorted(choices, key=lambda c: c.name)
@@ -158,20 +196,43 @@ class ResultCache:
     def __init__(
         self, items: Mapping[str, Mapping[str, float]] | None = None
     ) -> None:
-        """Creates a cache, optionally from stored items."""
+        """Creates a cache, optionally from stored items.
+
+        Args:
+            items: Cache key to stored result, as written by `save`. None
+                starts an empty cache.
+        """
         self.items: dict[str, dict[str, float]] = {
             key: dict(value) for key, value in (items or {}).items()
         }
 
     @staticmethod
     def key(finding: str, spec: Specification, seed: int) -> str:
-        """The cache key."""
+        """Builds the cache key.
+
+        Args:
+            finding: Name of the finding.
+            spec: The specification.
+            seed: Run seed.
+
+        Returns:
+            The key `finding|specification hash|seed`.
+        """
         return f"{finding}|{spec.sha256}|{seed}"
 
     def get(
         self, finding: str, spec: Specification, seed: int
     ) -> dict[str, float] | None:
-        """The stored result, or None."""
+        """Looks up a stored result.
+
+        Args:
+            finding: Name of the finding.
+            spec: The specification.
+            seed: Run seed.
+
+        Returns:
+            The stored result, or None when there is none.
+        """
         return self.items.get(self.key(finding, spec, seed))
 
     def put(
@@ -181,11 +242,22 @@ class ResultCache:
         seed: int,
         result: Mapping[str, float],
     ) -> None:
-        """Stores a result."""
+        """Stores a result, replacing any earlier one under the same key.
+
+        Args:
+            finding: Name of the finding.
+            spec: The specification.
+            seed: Run seed.
+            result: The numbers to store; a copy is kept.
+        """
         self.items[self.key(finding, spec, seed)] = dict(result)
 
     def save(self, path: Path) -> None:
-        """Writes the cache as stable JSON."""
+        """Writes the cache as stable JSON.
+
+        Args:
+            path: The file to write; it is overwritten.
+        """
         path.write_text(
             json.dumps(self.items, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
@@ -194,7 +266,14 @@ class ResultCache:
 
     @classmethod
     def load(cls, path: Path) -> "ResultCache":
-        """Reads a cache written by `save`; a missing file is empty."""
+        """Reads a cache written by `save`.
+
+        Args:
+            path: The file to read.
+
+        Returns:
+            The cache, empty when `path` is not a file.
+        """
         if not path.is_file():
             return cls()
         return cls(json.loads(path.read_text(encoding="utf-8")))

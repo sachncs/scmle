@@ -22,7 +22,7 @@ were measured for `stability.DEFAULT_RULE` only
 (`benchmarks/qualification/f6_certificates.json`). The filter acts only if a
 current passing certificate exists and the chartered thresholds equal that
 rule; otherwise the request is recorded as not applied, with the reason, and
-the verdicts stay warnings (canon P1). Findings the estimator cannot assess
+the verdicts stay warnings. Findings the estimator cannot assess
 (multiclass targets, fewer than `MIN_SPECS` specifications, columns beyond
 `MAX_FINDINGS`) are never withdrawn.
 
@@ -94,10 +94,20 @@ def feature_checks(
 def diagnostic_rows(
     found: qualify.Robustness, rows: int, seed: int
 ) -> tuple[tuple[str, qualification.Check], ...]:
-    """Stability and shift results as (source, check) ledger diagnostics.
+    """Collects stability and shift results as ledger diagnostics.
 
     Only checks that read the exploration set are returned; the ledger
     refuses any other.
+
+    Args:
+        found: The robustness results.
+        rows: Exploration rows the tests compared.
+        seed: Run seed, for the per-column checks' seed paths.
+
+    Returns:
+        (source, check) pairs: the per-finding stability checks, the
+        classifier and kernel shift checks that exist, then the per-column
+        shift checks, restricted to those whose set is the exploration set.
     """
     out: list[tuple[str, qualification.Check]] = []
     for finding in found.findings:
@@ -146,7 +156,20 @@ class StabilityStage:
     def __call__(
         self, survivors: Sequence[ledger_module.Hypothesis]
     ) -> confirm.Withdrawal:
-        """Assesses the survivors on `X` and withdraws the fragile ones."""
+        """Assesses the survivors on `X` and withdraws the fragile ones.
+
+        Sets `found`, `applied` and `note` as a side effect.
+
+        Args:
+            survivors: The frozen survivors; those without a feature column
+                are not assessed.
+
+        Returns:
+            The withdrawal. Its reasons name each fragile survivor (by
+            hypothesis id) only when the filter is applied, and are empty
+            otherwise. It also carries the rule record and the diagnostics,
+            and is accounted only when the filter was requested.
+        """
         columns = tuple(h.spec.column for h in survivors if h.spec.column)
         found = self.compute(columns)
         self.found = found

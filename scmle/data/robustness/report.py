@@ -53,13 +53,16 @@ FINDING_STATUSES = (
 def stability_report(
     found: qualify.Robustness, filter_note: str | None = None
 ) -> dict[str, Any]:
-    """The `stability_report.json` document.
+    """Builds the `stability_report.json` document.
 
     Args:
         found: The robustness results.
         filter_note: What the second stage did with the fragile findings, or
             None when no second stage ran (the findings were confirmed or
             left unconfirmed on their own merits).
+
+    Returns:
+        The JSON-ready document, with the keys of `STABILITY_KEYS`.
     """
     grid = found.grid
     counts = {
@@ -117,7 +120,14 @@ def stability_report(
 
 
 def shift_report(found: qualify.Robustness) -> dict[str, Any]:
-    """The `shift_report.json` document."""
+    """Builds the `shift_report.json` document.
+
+    Args:
+        found: The robustness results.
+
+    Returns:
+        The JSON-ready document, with the keys of `SHIFT_KEYS`.
+    """
     result = found.shift.to_dict()
     gates = {
         shift.C2ST_ID: found.c2st_gate.value,
@@ -152,7 +162,17 @@ def shift_report(found: qualify.Robustness) -> dict[str, Any]:
 def require_keys(
     document: dict[str, Any], keys: tuple[str, ...], name: str
 ) -> None:
-    """Raises `ValueError` if `document` lacks a key or has a wrong version."""
+    """Checks that a document has the expected keys and schema version.
+
+    Args:
+        document: The document to check.
+        keys: The keys it must contain.
+        name: What the document is, for the error message.
+
+    Raises:
+        ValueError: When a key is missing or `schema_version` is not the
+            supported one.
+    """
     missing = [k for k in keys if k not in document]
     if missing:
         raise ValueError(f"{name} is missing {missing}")
@@ -162,6 +182,9 @@ def require_keys(
 
 def validate_stability(document: dict[str, Any]) -> None:
     """Checks the structure of a stability report.
+
+    Args:
+        document: The stability report.
 
     Raises:
         ValueError: On a missing key, an unknown status or a finding that
@@ -182,6 +205,9 @@ def validate_stability(document: dict[str, Any]) -> None:
 
 def validate_shift(document: dict[str, Any]) -> None:
     """Checks the structure of a shift report.
+
+    Args:
+        document: The shift report.
 
     Raises:
         ValueError: On a missing key, an unknown status, or a `pass` without

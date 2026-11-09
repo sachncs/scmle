@@ -71,7 +71,18 @@ class Status(enum.StrEnum):
 
 
 def permutation_p_value(observed: float, null: np.ndarray) -> float:
-    """``(1 + #{null >= observed}) / (B + 1)`` with a float tolerance."""
+    """Computes ``(1 + #{null >= observed}) / (B + 1)``.
+
+    A draw counts as at least as large as `observed` when it is within
+    `TIE_TOLERANCE` below it.
+
+    Args:
+        observed: The statistic on the real labels.
+        null: The statistic on the B permuted labellings.
+
+    Returns:
+        The permutation p-value, in (0, 1].
+    """
     draws = np.asarray(null, dtype=float)
     hits = int(np.sum(draws >= observed - TIE_TOLERANCE))
     return (1.0 + hits) / (draws.size + 1.0)
@@ -114,7 +125,19 @@ def auc_delong(
 
 
 def pooled_codes(sample: pd.DataFrame, reference: pd.DataFrame) -> pd.DataFrame:
-    """Both tables stacked, with non-numeric columns as category codes."""
+    """Stacks the two tables into one numeric table.
+
+    Args:
+        sample: Exploration rows.
+        reference: Deployment sample; it must hold every column of
+            `sample`.
+
+    Returns:
+        A float table with the sample rows first and then the reference rows
+        (index reset), the columns of `sample` in order. Non-numeric columns
+        are replaced by the integer codes of their categories (-1 for a
+        missing value).
+    """
     columns = list(sample.columns)
     both = pd.concat([sample[columns], reference[columns]], ignore_index=True)
     for name in columns:
@@ -124,14 +147,34 @@ def pooled_codes(sample: pd.DataFrame, reference: pd.DataFrame) -> pd.DataFrame:
 
 
 def side_labels(sample_rows: int, reference_rows: int) -> np.ndarray:
-    """0 for sample rows, 1 for reference rows."""
+    """Labels the pooled rows by side.
+
+    Args:
+        sample_rows: Number of sample rows.
+        reference_rows: Number of reference rows.
+
+    Returns:
+        A float array of length ``sample_rows + reference_rows``: 0 for each
+        sample row, then 1 for each reference row.
+    """
     return np.r_[np.zeros(sample_rows), np.ones(reference_rows)]
 
 
 def holdout_split(
     side: np.ndarray, rng: np.random.Generator
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Row positions of a stratified train and test split by side."""
+    """Splits the pooled rows into train and test, stratified by side.
+
+    Within each side the rows are shuffled and the first
+    ``round(rows * (1 - HOLDOUT))`` go to the train part.
+
+    Args:
+        side: The side label of each pooled row, 0 or 1.
+        rng: Random generator that shuffles the rows.
+
+    Returns:
+        (train, test) arrays of row positions, each sorted ascending.
+    """
     train: list[int] = []
     test: list[int] = []
     for label in (0.0, 1.0):
@@ -147,7 +190,17 @@ def decide(
     requested: qualification.Decision,
     gate: certificates.GateStatus,
 ) -> qualification.Decision:
-    """The requested action when the test rejects, demoted if not gating."""
+    """Chooses the decision for a test outcome.
+
+    Args:
+        rejected: Whether the test fires.
+        requested: The action asked for when it fires.
+        gate: Whether a current certificate lets the check act.
+
+    Returns:
+        `Decision.PASS` when the test does not fire; otherwise `requested`,
+        limited to a warning when the gate is not gating.
+    """
     if not rejected:
         return qualification.Decision.PASS
     return certificates.demote(requested, gate)
@@ -185,9 +238,8 @@ def c2st(
     Returns:
         A check whose statistic is the held-out AUC, effect the excess over
         0.5, interval the DeLong interval and p-value the permutation value.
-
-    Raises:
-        ValueError: On differing columns, too few rows or a bad level.
+        Differing columns or too few rows raise `ValueError` (see
+        `check_pair`).
     """
     check_pair(sample, reference)
     both = pooled_codes(sample, reference)
@@ -230,7 +282,16 @@ def c2st(
 
 
 def check_pair(sample: pd.DataFrame, reference: pd.DataFrame) -> None:
-    """Requires the same columns and enough rows on both sides."""
+    """Requires the same columns and enough rows on both sides.
+
+    Args:
+        sample: Exploration rows.
+        reference: Deployment sample.
+
+    Raises:
+        ValueError: If the two tables have different column sets, or either
+            has fewer than `MIN_ROWS` rows.
+    """
     if set(sample.columns) != set(reference.columns):
         raise ValueError("sample and reference must have the same columns")
     if min(len(sample), len(reference)) < MIN_ROWS:
@@ -242,6 +303,16 @@ def design_matrix(both: pd.DataFrame, rows: int) -> np.ndarray:
 
     Missing numbers are filled with the pooled median. Categorical columns
     with more than `MAX_ONE_HOT` levels are left out.
+
+    Args:
+        both: The pooled rows. Boolean columns are treated as categorical.
+        rows: Row count of the matrix returned when no column is usable.
+
+    Returns:
+        A float matrix with one row per pooled row: each numeric column
+        standardised to mean 0 and unit spread (left unscaled when constant),
+        then one indicator column per level of each kept categorical column.
+        A single zero column of `rows` rows when no column is kept.
     """
     parts = []
     for name in both.columns:
@@ -267,14 +338,30 @@ def design_matrix(both: pd.DataFrame, rows: int) -> np.ndarray:
 
 
 def median_bandwidth(design: np.ndarray) -> float:
-    """Median pairwise distance of the pooled rows (1 when it is zero)."""
+    """Computes the median-heuristic kernel bandwidth.
+
+    Args:
+        design: The pooled design matrix, one row per observation.
+
+    Returns:
+        The median pairwise Euclidean distance of the rows, or 1 when that
+        median is zero or there are fewer than two rows.
+    """
     pairwise = distance.pdist(design)
     middle = float(np.median(pairwise)) if pairwise.size else 0.0
     return middle if middle > 0.0 else 1.0
 
 
 def gaussian_kernel(design: np.ndarray, bandwidth: float) -> np.ndarray:
-    """``exp(-|a - b|^2 / (2 h^2))`` for every pair of rows."""
+    """Computes ``exp(-|a - b|^2 / (2 h^2))`` for every pair of rows.
+
+    Args:
+        design: The pooled design matrix, one row per observation.
+        bandwidth: The bandwidth h.
+
+    Returns:
+        The symmetric kernel matrix, with ones on the diagonal.
+    """
     squared = distance.cdist(design, design, "sqeuclidean")
     return np.exp(-squared / (2.0 * bandwidth * bandwidth))
 
@@ -288,7 +375,7 @@ def mmd_statistics(kernel: np.ndarray, first: np.ndarray) -> np.ndarray:
             sample. Every column must hold the same two group sizes.
 
     Returns:
-        One statistic per column.
+        A float array with one statistic per column of `first`.
     """
     off = kernel - np.diag(np.diag(kernel))
     second = 1.0 - first
@@ -329,9 +416,8 @@ def mmd_test(
     Returns:
         A check whose statistic is the unbiased squared MMD, effect the MMD
         (square root of its positive part) and p-value the permutation value.
-
-    Raises:
-        ValueError: On differing columns or too few rows.
+        Differing columns or too few rows raise `ValueError` (see
+        `check_pair`).
     """
     check_pair(sample, reference)
     rng = randomness.component_rng(seed, MMD_ID, 0)
@@ -411,14 +497,28 @@ class FeatureShift:
     low_counts: bool = False
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Converts the record to a JSON-ready dictionary.
+
+        Returns:
+            The fields by name.
+        """
         return dataclasses.asdict(self)
 
 
 def categorical_test(
     left: pd.Series, right: pd.Series
 ) -> tuple[float, float, float, bool]:
-    """(chi-square, p-value, Cramer's V, low-counts flag) of two samples."""
+    """Tests whether two samples share one categorical distribution.
+
+    Args:
+        left: The sample values.
+        right: The reference values.
+
+    Returns:
+        (chi-square statistic, p-value, Cramer's V capped at 1, flag that is
+        True when an expected count is below `LOW_EXPECTED`). With fewer
+        than two distinct levels the result is (0, 1, 0, False).
+    """
     table = pd.concat(
         [
             left.astype(str).value_counts(),
@@ -525,7 +625,12 @@ class ShiftResult:
     agreement: bool | None
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Converts the record to a JSON-ready dictionary.
+
+        Returns:
+            The fields by name, with `status` as its string value, the
+            checks as dictionaries (or None) and `features` as a list.
+        """
         return {
             "status": self.status.value,
             "reason": self.reason,
@@ -537,7 +642,14 @@ class ShiftResult:
 
 
 def unverifiable(reason: str) -> ShiftResult:
-    """A result that says nothing could be checked, and why."""
+    """Builds a result that says nothing could be checked, and why.
+
+    Args:
+        reason: One sentence saying why.
+
+    Returns:
+        An `unverifiable` result with no checks and no column tests.
+    """
     return ShiftResult(Status.UNVERIFIABLE, reason, None, None, (), None)
 
 
@@ -554,9 +666,9 @@ def assess(
 ) -> ShiftResult:
     """Compares exploration rows with a deployment sample.
 
-    Without a reference the result is `unverifiable`, never `pass` (canon
-    P5). The status follows the classifier test; the kernel test is a second,
-    independent statistic and their agreement is reported.
+    Without a reference the result is `unverifiable`, never `pass`. The status
+    follows the classifier test; the kernel test is a second, independent
+    statistic and their agreement is reported.
 
     Args:
         sample: Exploration rows.
@@ -569,7 +681,9 @@ def assess(
         mmd_gate: Gate status of the kernel test.
 
     Returns:
-        The verdict with its checks.
+        The verdict with its checks. It is `unverifiable` when there is no
+        reference, no shared column, differing columns or too few rows;
+        otherwise `fail` when the classifier test fires and `pass` if not.
     """
     if reference is None:
         return unverifiable("no deployment sample was supplied")
@@ -610,5 +724,9 @@ def assess(
 
 
 def code_digest() -> str:
-    """Hash of this module's source, the key of its certificates."""
+    """Hashes this module's source.
+
+    Returns:
+        The code hash that keys this module's certificates.
+    """
     return certificates.code_hash(sys.modules[__name__])

@@ -1,4 +1,4 @@
-"""Multiverse stability of an exploration finding (PCS; feature F6, method A).
+"""Multiverse stability of an exploration finding (PCS).
 
 A finding is the rank correlation (Spearman's rho) between one feature and the
 target on the exploration set `X`. The declared specification grid
@@ -100,7 +100,12 @@ class Rule:
     q_min: float = 0.8
 
     def __post_init__(self) -> None:
-        """Validates the thresholds."""
+        """Validates the thresholds.
+
+        Raises:
+            ValueError: If `s_min` or `q_min` is outside (0, 1], or `band` is
+                not positive.
+        """
         for name in ("s_min", "q_min"):
             share = qualification.finite(getattr(self, name), name)
             if not 0.0 < share <= 1.0:
@@ -109,7 +114,11 @@ class Rule:
             raise ValueError("band must be positive")
 
     def to_dict(self) -> dict[str, float]:
-        """JSON-ready record."""
+        """Converts the rule to a JSON-ready dictionary.
+
+        Returns:
+            The thresholds `s_min`, `band` and `q_min` by name.
+        """
         return dataclasses.asdict(self)
 
 
@@ -175,7 +184,10 @@ def prepare(
         spec: The specification.
 
     Returns:
-        The feature and target after inclusion, outlier rule and imputation.
+        The feature and target after inclusion, outlier rule and
+        imputation, as float arrays of equal length. Rows dropped by the
+        outlier rule or by `complete_case`, and rows whose target is not
+        finite, are removed from both.
     """
     inclusion = spec.option(INCLUSION, "all")
     keep = np.ones(len(x), dtype=bool)
@@ -217,7 +229,17 @@ def prepare(
 
 
 def rank_effect(x: np.ndarray, y: np.ndarray) -> float:
-    """Spearman's rho of two arrays, or NaN when it is not defined."""
+    """Computes Spearman's rank correlation of two arrays.
+
+    Args:
+        x: The first array.
+        y: The second array.
+
+    Returns:
+        Spearman's rho, or NaN when it is not defined: fewer than
+        `MIN_PAIRS` pairs, arrays of different length, or either array
+        constant.
+    """
     if len(x) < MIN_PAIRS or len(y) != len(x):
         return math.nan
     ranks_x, ranks_y = stats.rankdata(x), stats.rankdata(y)
@@ -229,7 +251,19 @@ def rank_effect(x: np.ndarray, y: np.ndarray) -> float:
 def resample(
     rows: int, strata: np.ndarray | None, rng: np.random.Generator
 ) -> np.ndarray:
-    """Bootstrap row positions; whole strata are drawn when `strata` is set."""
+    """Draws bootstrap row positions.
+
+    Args:
+        rows: Number of rows.
+        strata: A label per row, or None. When given, whole strata are
+            drawn with replacement instead of single rows.
+        rng: Random generator.
+
+    Returns:
+        An integer array of row positions: `rows` of them without strata,
+        otherwise the concatenated members of the drawn strata (so its
+        length varies with the strata drawn).
+    """
     if strata is None:
         return rng.integers(0, rows, size=rows)
     labels = np.asarray(strata)
@@ -259,7 +293,7 @@ class SpecEffect:
 
     @property
     def excludes_zero(self) -> bool:
-        """Whether the perturbation interval excludes zero."""
+        """Whether the perturbation interval is defined and excludes zero."""
         return (
             self.low is not None
             and self.high is not None
@@ -267,7 +301,11 @@ class SpecEffect:
         )
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Converts the record to a JSON-ready dictionary.
+
+        Returns:
+            The fields by name.
+        """
         return {
             "sha256": self.sha256,
             "choices": self.choices,
@@ -286,11 +324,22 @@ def estimate_spec(
     strata: np.ndarray | None,
     bootstrap: int,
 ) -> dict[str, float]:
-    """Point estimate and bootstrap interval of one specification.
+    """Estimates one specification's effect and its bootstrap interval.
+
+    Args:
+        x: Feature values, NaN where missing.
+        y: Target codes, one per row.
+        spec: The specification.
+        seed: Run seed.
+        finding: Name of the finding, part of the bootstrap stream's name.
+        strata: Group or block labels for resampling, or None.
+        bootstrap: Number of resamples.
 
     Returns:
         ``effect``, ``low`` and ``high``; a key is omitted when it is not
-        defined (so the dictionary can be cached as numbers only).
+        defined (so the dictionary can be cached as numbers only). The
+        interval is left out when fewer than half the resamples (and fewer
+        than two) give a defined effect.
     """
     rows = len(x)
     positions = np.arange(rows)
@@ -318,7 +367,7 @@ def estimate_spec(
 def verdict(
     effects: Sequence[SpecEffect], headline: float | None, rule: Rule
 ) -> tuple[str, str, dict[str, float | None]]:
-    """The survival rule applied to per-specification effects.
+    """Applies the survival rule to per-specification effects.
 
     Args:
         effects: One entry per evaluated specification.
@@ -326,8 +375,12 @@ def verdict(
         rule: Thresholds.
 
     Returns:
-        (status, reason, numbers) where numbers holds `median`,
-        `sign_share`, `size_ratio` and `interval_share`.
+        (status, reason, numbers). The status is `not_evaluable` when there
+        is no headline or fewer than `MIN_SPECS` defined effects, then
+        `fragile` if any threshold fails, otherwise `stable`. The numbers
+        hold `median`, `sign_share`, `size_ratio` (infinite when the
+        headline is zero) and `interval_share`, all None when not
+        evaluable.
     """
     defined = [e.effect for e in effects if e.effect is not None]
     numbers: dict[str, float | None] = {
@@ -390,11 +443,21 @@ def verdict(
 def attribution(
     effects: Sequence[SpecEffect],
 ) -> dict[str, dict[str, Any]]:
-    """Which choice moves the estimate: option means and eta squared.
+    """Attributes the spread of the estimates to the declared choices.
 
     For each varied choice, the share of the variance of the estimates
     between specifications that its options explain (one-way eta squared),
     with the mean estimate under each option.
+
+    Args:
+        effects: One entry per evaluated specification.
+
+    Returns:
+        Choice name to a dictionary with `option_means` (option to mean
+        estimate), `spread` (largest minus smallest option mean) and
+        `eta_squared` (0 when the estimates do not vary). Choices with fewer
+        than two options among the defined estimates are left out; the result
+        is empty when no estimate is defined.
     """
     rows = [e for e in effects if e.effect is not None]
     out: dict[str, dict[str, Any]] = {}
@@ -440,14 +503,31 @@ class CurveTest:
     p_share: float
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Converts the test to a JSON-ready dictionary.
+
+        Returns:
+            The fields by name.
+        """
         return dataclasses.asdict(self)
 
 
 def curve_statistics(
     x: np.ndarray, y: np.ndarray, grid: multiverse.Grid
 ) -> tuple[float, float]:
-    """(median |rho|, share with p <= 0.05) over the grid."""
+    """Summarises the specification curve.
+
+    Specifications with fewer than `MIN_PAIRS` pairs, or a constant feature
+    or target, are left out.
+
+    Args:
+        x: Feature values, NaN where missing.
+        y: Target codes, one per row.
+        grid: The specifications.
+
+    Returns:
+        (median absolute Spearman rho, share of specifications with
+        p <= `SIGNIFICANCE`). Both are 0 when no specification is usable.
+    """
     rows = len(x)
     positions = np.arange(rows)
     effects, flags = [], []
@@ -477,6 +557,20 @@ def curve_test(
 
     The permutation is exact under exchangeability within strata (global
     when `strata` is None); clustered or temporal data must pass strata.
+
+    Args:
+        x: Feature values, NaN where missing.
+        y: Target codes, one per row.
+        grid: The specifications.
+        seed: Run seed.
+        finding: Name of the finding, part of the permutation stream's name.
+        permutations: Number of permuted curves. A value that is not an
+            integer of at least 1 raises `ValueError`.
+        strata: Labels within which the target is permuted, or None.
+
+    Returns:
+        The observed curve statistics and their permutation p-values, each
+        ``(1 + #{permuted >= observed}) / (permutations + 1)``.
     """
     qualification.count(permutations, "permutations", minimum=1)
     median, share = curve_statistics(x, y, grid)
@@ -526,7 +620,13 @@ class Stability:
     check: qualification.Check | None
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record; non-finite numbers are written as null."""
+        """Converts the verdict to a JSON-ready dictionary.
+
+        Returns:
+            The fields by name, with non-finite `numbers` written as None,
+            `specs` and `skipped` as lists and nested records as
+            dictionaries (or None).
+        """
         numbers = {
             k: (v if v is not None and math.isfinite(v) else None)
             for k, v in self.numbers.items()
@@ -580,7 +680,11 @@ def assess_finding(
             quarantine the finding from confirmation.
 
     Returns:
-        The verdict. Fewer than `MIN_SPECS` estimates give `not_evaluable`.
+        The verdict. Fewer than `MIN_SPECS` estimates give `not_evaluable`,
+        with no curve test and no `Check`.
+
+    Raises:
+        ValueError: If `x` and `y` differ in length.
     """
     values = np.asarray(x, dtype=float)
     codes = np.asarray(y, dtype=float)
@@ -669,14 +773,27 @@ def assess_finding(
 
 
 def code_digest() -> str:
-    """Hash of the multiverse and stability sources, the certificate key."""
+    """Hashes the multiverse and stability sources.
+
+    Returns:
+        The code hash that keys the stability certificates.
+    """
     return certificates.code_hash(multiverse, sys.modules[__name__])
 
 
 def gate_status(
     store: certificates.CertificateStore | None,
 ) -> certificates.GateStatus:
-    """Gating only when every planted defect type passed for current code."""
+    """Decides whether stability verdicts may act.
+
+    Args:
+        store: The certificate store, or None when there is none.
+
+    Returns:
+        `GATING` only when every defect type in `DEFECT_TYPES` has a passing
+        certificate for the current code; `DESCRIPTIVE` otherwise, including
+        when `store` is None.
+    """
     if store is None:
         return certificates.GateStatus.DESCRIPTIVE
     digest = code_digest()
