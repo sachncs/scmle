@@ -15,10 +15,10 @@ import pytest
 from scipy import stats
 
 from scmle.data.ledger import bivariate
-from scmle.data.ledger import budget as b
 from scmle.data.ledger import controls
 from scmle.data.ledger import multiplicity
 from scmle.data.ledger import online_fdr
+import scmle.data.ledger.budget
 
 ALPHA = Fraction(1, 10)
 
@@ -177,18 +177,26 @@ def test_calibrator_exact_and_general_forms():
 
 def test_adjustment_carries_its_rule_and_level():
     full = multiplicity.adjust(
-        [0.001, 0.2], b.MultiplicityRule.BH, Fraction(1, 20)
+        [0.001, 0.2],
+        scmle.data.ledger.budget.MultiplicityRule.BH,
+        Fraction(1, 20),
     )
-    assert full.rule is b.MultiplicityRule.BH and full.alpha == Fraction(1, 20)
-    empty = multiplicity.adjust([], b.MultiplicityRule.HOLM, Fraction(1, 10))
-    assert empty.rule is b.MultiplicityRule.HOLM and empty.alpha == Fraction(
-        1, 10
+    assert (
+        full.rule is scmle.data.ledger.budget.MultiplicityRule.BH
+        and full.alpha == Fraction(1, 20)
+    )
+    empty = multiplicity.adjust(
+        [], scmle.data.ledger.budget.MultiplicityRule.HOLM, Fraction(1, 10)
+    )
+    assert (
+        empty.rule is scmle.data.ledger.budget.MultiplicityRule.HOLM
+        and empty.alpha == Fraction(1, 10)
     )
     assert empty.adjusted == ()
 
 
 def test_a_single_hypothesis_family():
-    for rule in b.MultiplicityRule:
+    for rule in scmle.data.ledger.budget.MultiplicityRule:
         out = multiplicity.adjust([0.04], rule, Fraction(1, 20))
         assert out.rejected == (True,)
         assert out.adjusted == (0.04,)
@@ -199,11 +207,15 @@ def test_a_single_hypothesis_family():
 
 def test_holm_adjusted_values_are_monotone_in_the_rank():
     out = multiplicity.adjust(
-        [0.02, 0.021], b.MultiplicityRule.HOLM, Fraction(1, 20)
+        [0.02, 0.021],
+        scmle.data.ledger.budget.MultiplicityRule.HOLM,
+        Fraction(1, 20),
     )
     assert out.adjusted == (0.04, 0.04)
     assert multiplicity.adjust(
-        [0.021, 0.02], b.MultiplicityRule.HOLM, Fraction(1, 20)
+        [0.021, 0.02],
+        scmle.data.ledger.budget.MultiplicityRule.HOLM,
+        Fraction(1, 20),
     ).adjusted == (
         0.04,
         0.04,
@@ -214,9 +226,13 @@ def test_multiplicity_messages_are_exact():
     with raises(ValueError, "rule must be a MultiplicityRule"):
         multiplicity.adjust([0.1], "bh", Fraction(1, 20))  # type: ignore[arg-type]
     with raises(ValueError, "alpha must be strictly between 0 and 1"):
-        multiplicity.adjust([0.1], b.MultiplicityRule.BH, Fraction(1))
+        multiplicity.adjust(
+            [0.1], scmle.data.ledger.budget.MultiplicityRule.BH, Fraction(1)
+        )
     with raises(ValueError, "p-value must be within [0, 1]"):
-        multiplicity.adjust([1.5], b.MultiplicityRule.BH, Fraction(1, 20))
+        multiplicity.adjust(
+            [1.5], scmle.data.ledger.budget.MultiplicityRule.BH, Fraction(1, 20)
+        )
     assert (
         multiplicity.harmonic_exact(0) == 0
         and multiplicity.harmonic_exact(1) == 1

@@ -8,10 +8,10 @@ import numpy
 import pytest
 from test_decision_rollout import make_plan
 from test_decision_rollout import traffic
+import test_lifecycle_extras
 from test_lifecycle_extras import approval_for
 from test_lifecycle_extras import APPROVAL_KEY
 from test_lifecycle_extras import bundle_of
-from test_lifecycle_extras import traffic as rows
 
 from scmle.contracts import errors
 from scmle.data.ledger import budget
@@ -23,8 +23,10 @@ from scmle.governance import rollout_hook
 
 
 def staged(tmp_path):
-    good = bundle_of("logistic_regression", rows())
-    other = bundle_of("logistic_regression", rows(seed=1))
+    good = bundle_of("logistic_regression", test_lifecycle_extras.traffic())
+    other = bundle_of(
+        "logistic_regression", test_lifecycle_extras.traffic(seed=1)
+    )
     store = registry.ModelRegistryStore(tmp_path / "registry")
     manager = lifecycle.LifecycleManager(store, "m", str(tmp_path / "work"))
     first = store.register("m", good.save(tmp_path / "e1"), trusted=True)
@@ -220,8 +222,10 @@ def test_the_budget_survives_in_the_ledger_rows(tmp_path):
 
 def broken_champion(tmp_path):
     """A registry whose new champion is clearly worse than the previous."""
-    good = bundle_of("logistic_regression", rows())
-    broken = bundle_of("logistic_regression", rows(seed=0, flip=True))
+    good = bundle_of("logistic_regression", test_lifecycle_extras.traffic())
+    broken = bundle_of(
+        "logistic_regression", test_lifecycle_extras.traffic(seed=0, flip=True)
+    )
     store = registry.ModelRegistryStore(tmp_path / "registry")
     manager = lifecycle.LifecycleManager(store, "m", str(tmp_path / "work"))
     for index, model in enumerate((good, broken), start=1):
@@ -258,7 +262,7 @@ def test_the_bootstrap_rollback_check_never_moves_the_alias_once_a_hook_is_bound
     hook = rollout_hook.RolloutHook(manager, make_plan(), ledger)
 
     outcome = hook.check_rollback(
-        rows(1200, seed=20),
+        test_lifecycle_extras.traffic(1200, seed=20),
         "y",
         approval=approval_for(store.resolve("m", 1)),
         signing_key=APPROVAL_KEY,
@@ -288,7 +292,7 @@ def test_the_hook_is_the_only_decider_of_promotion_and_rollback(tmp_path):
     arm, primary, guards = traffic(40000, 5, lift=0.05)
     hook.observe(arm, primary, guards)
     hook.promote(approval_for(challenger), signing_key=APPROVAL_KEY)
-    fresh = rows(1200, seed=20)
+    fresh = test_lifecycle_extras.traffic(1200, seed=20)
 
     bootstrap = manager.check_rollback(
         fresh,

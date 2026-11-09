@@ -26,7 +26,7 @@ import pandas
 from scipy import stats
 from sklearn import neighbors
 
-from scmle.data.splitting import duplicates as groups
+import scmle.data.splitting.duplicates
 
 DEFAULT_CUT = 0.01
 MIN_BLOCK = 2
@@ -79,11 +79,11 @@ def exact_flags(
     Returns:
         A boolean per row, True for a row that repeats an earlier row.
     """
-    ids = groups.duplicate_groups(frame, list(columns))
+    ids = scmle.data.splitting.duplicates.duplicate_groups(frame, list(columns))
     flags = numpy.zeros(len(frame), dtype=bool)
     seen: set[int] = set()
     for position, group in enumerate(ids):
-        if group == groups.NOT_DUPLICATED:
+        if group == scmle.data.splitting.duplicates.NOT_DUPLICATED:
             continue
         if int(group) in seen:
             flags[position] = True
@@ -221,8 +221,8 @@ def assess_duplicates(
     names = list(frame.columns) if columns is None else list(columns)
     exact = exact_flags(frame, names)
     near = near_flags(frame, names, cut) & ~exact
-    ids = groups.duplicate_groups(frame, names)
-    members = ids[ids != groups.NOT_DUPLICATED]
+    ids = scmle.data.splitting.duplicates.duplicate_groups(frame, names)
+    members = ids[ids != scmle.data.splitting.duplicates.NOT_DUPLICATED]
     conflicts = 0
     if target is not None:
         for group in numpy.unique(members):

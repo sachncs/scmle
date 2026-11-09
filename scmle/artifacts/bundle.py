@@ -23,7 +23,7 @@ from typing import Self
 
 import joblib
 import numpy
-import pandas as pd
+import pandas
 import sklearn
 from sklearn import calibration
 from sklearn import frozen
@@ -297,7 +297,7 @@ class BundleInfo:
     scmle_version: str = scmle.__version__
     python: str = dataclasses.field(default_factory=platform.python_version)
     sklearn: str = sklearn.__version__
-    pandas: str = pd.__version__
+    pandas: str = pandas.__version__
     files: dict[str, str] = dataclasses.field(default_factory=dict)
     model_params: dict[str, Any] = dataclasses.field(default_factory=dict)
     strategy: str = "default"
@@ -351,9 +351,9 @@ class BundleInfo:
         running = platform.python_version()
         if minor_version(self.python) != minor_version(running):
             problems.append(f"python {self.python} (running {running})")
-        if minor_version(self.pandas) != minor_version(pd.__version__):
+        if minor_version(self.pandas) != minor_version(pandas.__version__):
             problems.append(
-                f"pandas {self.pandas} (installed {pd.__version__})"
+                f"pandas {self.pandas} (installed {pandas.__version__})"
             )
         current = installed_versions()
         for library, built in sorted(self.libraries.items()):
@@ -389,7 +389,7 @@ class ModelBundle:
         schema: artifacts.BundleSchema,
         info: BundleInfo,
         reference: scmle.monitoring.reference.ReferenceProfile | None = None,
-        history: pd.DataFrame | None = None,
+        history: pandas.DataFrame | None = None,
         calibrator: Any = None,
         conformal: scmle.evaluation.conformal.ConformalCalibrator | None = None,
         novelty: scmle.inference.novelty.NoveltyDetector | None = None,
@@ -438,7 +438,7 @@ class ModelBundle:
         cls,
         pipeline: Any,
         plan: scmle.contracts.data.FeaturePlan,
-        dev_features: pd.DataFrame,
+        dev_features: pandas.DataFrame,
         target: str,
         task: str,
         metric: str,
@@ -451,7 +451,7 @@ class ModelBundle:
         graph_fingerprint: str = "",
         group_column: str | None = None,
         time_column: str | None = None,
-        history_source: pd.DataFrame | None = None,
+        history_source: pandas.DataFrame | None = None,
         class_labels: tuple[Any, ...] | None = None,
     ) -> Self:
         """Builds a bundle from a fitted pipeline and its training data.
@@ -547,7 +547,7 @@ class ModelBundle:
     def verify_round_trip(
         self,
         directory: str | pathlib.Path,
-        sample: pd.DataFrame,
+        sample: pandas.DataFrame,
         tolerance: float = PARITY_TOLERANCE,
     ) -> dict[str, Any]:
         """Reloads the saved bundle and checks it predicts like this one.
@@ -601,7 +601,7 @@ class ModelBundle:
 
     def score(
         self,
-        data: str | pathlib.Path | pd.DataFrame,
+        data: str | pathlib.Path | pandas.DataFrame,
         mapping: scmle.inference.mapping.ColumnMapping | None = None,
     ) -> dict[str, Any]:
         """Predicts and reports the schema diagnostics in one structured result.
@@ -644,9 +644,9 @@ class ModelBundle:
 
     def novelty_of(
         self,
-        data: str | pathlib.Path | pd.DataFrame,
+        data: str | pathlib.Path | pandas.DataFrame,
         mapping: scmle.inference.mapping.ColumnMapping | None = None,
-    ) -> pd.DataFrame:
+    ) -> pandas.DataFrame:
         """Flags rows that look unlike the training data.
 
         Args:
@@ -667,7 +667,7 @@ class ModelBundle:
 
     def calibrate(
         self,
-        data: str | pathlib.Path | pd.DataFrame,
+        data: str | pathlib.Path | pandas.DataFrame,
         target: Any,
         method: str = "sigmoid",
     ) -> dict[str, float]:
@@ -749,7 +749,7 @@ class ModelBundle:
             self.history,
         )
 
-    def remember(self, data: str | pathlib.Path | pd.DataFrame) -> None:
+    def remember(self, data: str | pathlib.Path | pandas.DataFrame) -> None:
         """Adds scored rows to the history later records will look back on.
 
         Call this after scoring when the rows are real, ordered observations
@@ -769,7 +769,7 @@ class ModelBundle:
             parts = [frame[columns]]
             if self.history is not None:
                 parts.insert(0, self.history)
-            combined = pd.concat(parts, ignore_index=True)
+            combined = pandas.concat(parts, ignore_index=True)
             key = [
                 c
                 for c in (self.schema.group_column, self.schema.time_column)
@@ -1088,7 +1088,7 @@ class ModelBundle:
                 raise errors.ArtifactError(
                     "checksum mismatch: series history was modified"
                 )
-            history = pd.read_parquet(history_path)
+            history = pandas.read_parquet(history_path)
         calibrator = None
         if CALIBRATOR_FILE in info.files:
             calibrator_path = root / CALIBRATOR_FILE
@@ -1199,8 +1199,8 @@ class ModelBundle:
         return self.schema.classes
 
     def read_frame(
-        self, data: str | pathlib.Path | pd.DataFrame
-    ) -> pd.DataFrame:
+        self, data: str | pathlib.Path | pandas.DataFrame
+    ) -> pandas.DataFrame:
         """Loads inference input from a path or converts an in-memory table.
 
         Args:
@@ -1216,7 +1216,7 @@ class ModelBundle:
 
     def validate(
         self,
-        data: str | pathlib.Path | pd.DataFrame,
+        data: str | pathlib.Path | pandas.DataFrame,
         mapping: scmle.inference.mapping.ColumnMapping | None = None,
     ) -> artifacts.SchemaReport:
         """Checks input against the schema without predicting.
@@ -1236,9 +1236,9 @@ class ModelBundle:
 
     def prepare_frame(
         self,
-        data: str | pathlib.Path | pd.DataFrame,
+        data: str | pathlib.Path | pandas.DataFrame,
         mapping: scmle.inference.mapping.ColumnMapping | None = None,
-    ) -> pd.DataFrame:
+    ) -> pandas.DataFrame:
         """Validates input and returns the feature columns.
 
         Missing columns, or non-numeric values in numeric columns, raise
@@ -1270,7 +1270,7 @@ class ModelBundle:
 
     def predict(
         self,
-        data: str | pathlib.Path | pd.DataFrame,
+        data: str | pathlib.Path | pandas.DataFrame,
         mapping: scmle.inference.mapping.ColumnMapping | None = None,
     ) -> numpy.ndarray:
         """Predicts labels or values through the full fitted pipeline.
@@ -1294,9 +1294,9 @@ class ModelBundle:
 
     def predict_frame(
         self,
-        data: str | pathlib.Path | pd.DataFrame,
+        data: str | pathlib.Path | pandas.DataFrame,
         mapping: scmle.inference.mapping.ColumnMapping | None = None,
-    ) -> pd.DataFrame:
+    ) -> pandas.DataFrame:
         """Predicts a multi-target model, one named column per target.
 
         Args:
@@ -1311,13 +1311,13 @@ class ModelBundle:
         """
         if not self.schema.targets:
             raise errors.ArtifactError("this bundle has a single target")
-        return pd.DataFrame(
+        return pandas.DataFrame(
             self.predict(data, mapping), columns=list(self.schema.targets)
         )
 
     def predict_proba(
         self,
-        data: str | pathlib.Path | pd.DataFrame,
+        data: str | pathlib.Path | pandas.DataFrame,
         mapping: scmle.inference.mapping.ColumnMapping | None = None,
     ) -> numpy.ndarray:
         """Predicts class probabilities.
@@ -1348,11 +1348,11 @@ class ModelBundle:
 
     def explain(
         self,
-        data: str | pathlib.Path | pd.DataFrame,
-        background: str | pathlib.Path | pd.DataFrame,
+        data: str | pathlib.Path | pandas.DataFrame,
+        background: str | pathlib.Path | pandas.DataFrame,
         mapping: scmle.inference.mapping.ColumnMapping | None = None,
         class_label: Any = None,
-    ) -> pd.DataFrame:
+    ) -> pandas.DataFrame:
         """Explains individual predictions against a background sample.
 
         Args:
@@ -1390,7 +1390,7 @@ class ModelBundle:
             column = classes.index(class_label)
             estimator = self.calibrator or self.pipeline
 
-            def score(frame: pd.DataFrame) -> numpy.ndarray:
+            def score(frame: pandas.DataFrame) -> numpy.ndarray:
                 """Scores rows for the explained output.
 
                 Args:
@@ -1408,12 +1408,12 @@ class ModelBundle:
 
     def predict_interval(
         self,
-        data: str | pathlib.Path | pd.DataFrame,
+        data: str | pathlib.Path | pandas.DataFrame,
         coverage: float = scmle.evaluation.conformal.DEFAULT_COVERAGE,
         mapping: scmle.inference.mapping.ColumnMapping | None = None,
         method: str = "residual",
         shift: bool = False,
-    ) -> pd.DataFrame:
+    ) -> pandas.DataFrame:
         """Returns prediction intervals with a stated coverage (regression).
 
         Args:
@@ -1455,7 +1455,7 @@ class ModelBundle:
             predictions = numpy.asarray(
                 self.pipeline.predict(frame), dtype=float
             )
-            return pd.DataFrame(
+            return pandas.DataFrame(
                 {
                     "prediction": predictions,
                     "lower": numpy.minimum(lower, predictions),
@@ -1475,7 +1475,7 @@ class ModelBundle:
             predictions = numpy.asarray(
                 self.pipeline.predict(frame), dtype=float
             )
-            return pd.DataFrame(
+            return pandas.DataFrame(
                 {"prediction": predictions, "lower": lower, "upper": upper}
             )
         if method != "residual":
@@ -1488,14 +1488,14 @@ class ModelBundle:
             return self.shifted_interval(calibrator, data, coverage, mapping)
         predictions = numpy.asarray(self.predict(data, mapping), dtype=float)
         lower, upper = calibrator.interval(predictions, coverage)
-        return pd.DataFrame(
+        return pandas.DataFrame(
             {"prediction": predictions, "lower": lower, "upper": upper}
         )
 
     def attach_shift_weights(
         self,
-        calibration_rows: pd.DataFrame,
-        target_rows: pd.DataFrame,
+        calibration_rows: pandas.DataFrame,
+        target_rows: pandas.DataFrame,
         columns: Sequence[str] | None = None,
         clip: float = shift_weights.DEFAULT_CLIP,
     ) -> shift_weights.StoredShiftWeights:
@@ -1535,12 +1535,12 @@ class ModelBundle:
             else (
                 c
                 for c in self.features
-                if pd.api.types.is_numeric_dtype(calibration_rows[c])
+                if pandas.api.types.is_numeric_dtype(calibration_rows[c])
             )
         )
         if not chosen or any(
             c not in self.features
-            or not pd.api.types.is_numeric_dtype(calibration_rows[c])
+            or not pandas.api.types.is_numeric_dtype(calibration_rows[c])
             for c in chosen
         ):
             raise errors.ArtifactError(
@@ -1557,10 +1557,10 @@ class ModelBundle:
     def shifted_interval(
         self,
         calibrator: scmle.evaluation.conformal.ConformalCalibrator,
-        data: str | pathlib.Path | pd.DataFrame,
+        data: str | pathlib.Path | pandas.DataFrame,
         coverage: float,
         mapping: scmle.inference.mapping.ColumnMapping | None,
-    ) -> pd.DataFrame:
+    ) -> pandas.DataFrame:
         """Computes weighted conformal intervals with the stored shift weights.
 
         Args:
@@ -1587,16 +1587,16 @@ class ModelBundle:
             self.shift_weights.test_weights(frame),
             coverage,
         )
-        return pd.DataFrame(
+        return pandas.DataFrame(
             {"prediction": predictions, "lower": lower, "upper": upper}
         )
 
     def counterfactual(
         self,
-        row: pd.DataFrame | dict[str, Any],
+        row: pandas.DataFrame | dict[str, Any],
         desired: Any,
         actionable: list[str],
-        background: str | pathlib.Path | pd.DataFrame,
+        background: str | pathlib.Path | pandas.DataFrame,
         max_changes: int = 3,
     ) -> scmle.explainability.counterfactual.Counterfactual:
         """Searches greedily for a small change that reaches the wanted outcome.
@@ -1630,7 +1630,7 @@ class ModelBundle:
             raise errors.ArtifactError(
                 f"not model features, so they cannot be changed: {unknown}"
             )
-        frame = pd.DataFrame([row] if isinstance(row, dict) else row)
+        frame = pandas.DataFrame([row] if isinstance(row, dict) else row)
         if len(frame) != 1:
             raise errors.ArtifactError("give exactly one row")
         reference = self.read_frame(background)
@@ -1642,7 +1642,7 @@ class ModelBundle:
                 )
             column = list(self.schema.classes).index(desired)
 
-            def progress(rows: pd.DataFrame) -> numpy.ndarray:
+            def progress(rows: pandas.DataFrame) -> numpy.ndarray:
                 """Measures how close rows are to the wanted class.
 
                 Args:
@@ -1653,7 +1653,7 @@ class ModelBundle:
                 """
                 return numpy.asarray(self.predict_proba(rows))[:, column]
 
-            def reached(rows: pd.DataFrame) -> numpy.ndarray:
+            def reached(rows: pandas.DataFrame) -> numpy.ndarray:
                 """Tests whether rows are predicted as the wanted class.
 
                 Args:
@@ -1667,7 +1667,7 @@ class ModelBundle:
         else:
             low, high = desired
 
-            def progress(rows: pd.DataFrame) -> numpy.ndarray:
+            def progress(rows: pandas.DataFrame) -> numpy.ndarray:
                 """Measures how close rows are to the wanted range.
 
                 Args:
@@ -1683,7 +1683,7 @@ class ModelBundle:
                     + numpy.maximum(values - high, 0)
                 )
 
-            def reached(rows: pd.DataFrame) -> numpy.ndarray:
+            def reached(rows: pandas.DataFrame) -> numpy.ndarray:
                 """Tests whether rows have a prediction inside the wanted range.
 
                 Args:
@@ -1748,7 +1748,7 @@ class ModelBundle:
     def export_onnx(
         self,
         path: str | pathlib.Path,
-        check: pd.DataFrame | None = None,
+        check: pandas.DataFrame | None = None,
         tolerance: float = onnx_export.DEFAULT_TOLERANCE,
     ) -> pathlib.Path:
         """Writes the pipeline as an ONNX graph (`onnx` extra).
@@ -1774,7 +1774,7 @@ class ModelBundle:
 
     def predict_survival(
         self,
-        data: str | pathlib.Path | pd.DataFrame,
+        data: str | pathlib.Path | pandas.DataFrame,
         times: Any,
         mapping: scmle.inference.mapping.ColumnMapping | None = None,
     ) -> numpy.ndarray:
@@ -1802,10 +1802,10 @@ class ModelBundle:
 
     def forecast(
         self,
-        history: str | pathlib.Path | pd.DataFrame,
+        history: str | pathlib.Path | pandas.DataFrame,
         steps: int | None = None,
         mapping: scmle.inference.mapping.ColumnMapping | None = None,
-    ) -> pd.DataFrame:
+    ) -> pandas.DataFrame:
         """Forecasts the next values of every series in `history`.
 
         The history supplies each series' recent values (the lag and rolling
@@ -1844,7 +1844,7 @@ class ModelBundle:
         clock, entity = self.schema.time_column, self.schema.group_column
         time_name = clock or "time"
         prepared = self.prepare_frame(frame)
-        stamps = pd.to_datetime(frame[clock], errors="coerce")
+        stamps = pandas.to_datetime(frame[clock], errors="coerce")
         numeric_clock = stamps.isna().any()
         order = frame[clock].to_numpy() if numeric_clock else stamps.to_numpy()
         positions = numpy.arange(len(frame))
@@ -1882,14 +1882,14 @@ class ModelBundle:
                         "forecast": float(predicted[row, step]),
                     }
                 )
-        return pd.DataFrame(rows)
+        return pandas.DataFrame(rows)
 
     def rank(
         self,
-        data: str | pathlib.Path | pd.DataFrame,
+        data: str | pathlib.Path | pandas.DataFrame,
         query_column: str,
         mapping: scmle.inference.mapping.ColumnMapping | None = None,
-    ) -> pd.DataFrame:
+    ) -> pandas.DataFrame:
         """Scores rows and orders them within each query (ranking tasks).
 
         Args:
@@ -1925,10 +1925,10 @@ class ModelBundle:
 
     def rank_for_labeling(
         self,
-        data: str | pathlib.Path | pd.DataFrame,
+        data: str | pathlib.Path | pandas.DataFrame,
         count: int = 10,
         mapping: scmle.inference.mapping.ColumnMapping | None = None,
-    ) -> pd.DataFrame:
+    ) -> pandas.DataFrame:
         """Picks the unlabeled rows a person should label next.
 
         Classification ranks by the smallest gap between the two most likely
@@ -1965,13 +1965,13 @@ class ModelBundle:
             lower, upper = self.quantile.raw_band(frame)
             uncertainty = upper - lower
         order = numpy.argsort(-uncertainty, kind="stable")[:count]
-        return pd.DataFrame(
+        return pandas.DataFrame(
             {"position": order, "uncertainty": uncertainty[order]}
         )
 
     def predict_set(
         self,
-        data: str | pathlib.Path | pd.DataFrame,
+        data: str | pathlib.Path | pandas.DataFrame,
         coverage: float = scmle.evaluation.conformal.DEFAULT_COVERAGE,
         mapping: scmle.inference.mapping.ColumnMapping | None = None,
         conditional: str | None = None,

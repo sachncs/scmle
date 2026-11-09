@@ -305,7 +305,7 @@ class TestCheckAll:
 
     @staticmethod
     def patch(monkeypatch, failing=None):
-        from benchmarks.qualification import __main__ as entry
+        import benchmarks.qualification.__main__
 
         calls = []
 
@@ -317,18 +317,18 @@ class TestCheckAll:
             return check
 
         monkeypatch.setattr(
-            entry,
+            benchmarks.qualification.__main__,
             "check_certificates",
             lambda: (
                 calls.append("certificates") or int(failing == "certificates")
             ),
         )
         for name, module in (
-            ("f10", entry.f10_certify),
-            ("f11", entry.f11_certify),
-            ("loop", entry.loop_certify),
-            ("framing", entry.framing_certify),
-            ("ingest", entry.ingest_certify),
+            ("f10", benchmarks.qualification.__main__.f10_certify),
+            ("f11", benchmarks.qualification.__main__.f11_certify),
+            ("loop", benchmarks.qualification.__main__.loop_certify),
+            ("framing", benchmarks.qualification.__main__.framing_certify),
+            ("ingest", benchmarks.qualification.__main__.ingest_certify),
         ):
             if name == "f10":
                 monkeypatch.setattr(
@@ -342,7 +342,7 @@ class TestCheckAll:
                 monkeypatch.setattr(module, "descriptive_only", lambda: [])
             else:
                 monkeypatch.setattr(module, "check", fake(name))
-        return entry, calls
+        return benchmarks.qualification.__main__, calls
 
     def test_every_family_is_run_and_all_passing_exits_zero(
         self, monkeypatch, capsys

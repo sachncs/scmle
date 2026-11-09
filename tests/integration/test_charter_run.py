@@ -7,8 +7,8 @@ import pytest
 import support
 
 from scmle.contracts import errors
-from scmle.data.charter import contracts as c
 from scmle.data.charter import sealing
+import scmle.data.charter.contracts
 from scmle.data.custody import sealed
 import scmle.data.custody.manifest
 from tests.unit.test_charter_contracts import make_charter
@@ -360,9 +360,15 @@ def test_a_run_without_a_charter_writes_no_admissibility_artifacts(
 
 
 RICH_MULTIVERSE = (
-    c.Choice("imputation", ("median", "complete_case"), "median"),
-    c.Choice("outlier_rule", ("none", "winsorize", "iqr_drop"), "none"),
-    c.Choice("inclusion", ("all", "first_half", "second_half"), "all"),
+    scmle.data.charter.contracts.Choice(
+        "imputation", ("median", "complete_case"), "median"
+    ),
+    scmle.data.charter.contracts.Choice(
+        "outlier_rule", ("none", "winsorize", "iqr_drop"), "none"
+    ),
+    scmle.data.charter.contracts.Choice(
+        "inclusion", ("all", "first_half", "second_half"), "all"
+    ),
 )
 
 
