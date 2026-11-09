@@ -19,7 +19,7 @@ jobs:
           init=$(python3 -c "import re; print(re.search(r'__version__ = \"(.+?)\"', open('scmle/__init__.py').read()).group(1))")
           [ "${GITHUB_REF_NAME}" = "v${version}" ] || { echo "tag ${GITHUB_REF_NAME} != v${version}"; exit 1; }
           [ "${init}" = "${version}" ] || { echo "scmle.__version__ ${init} != ${version}"; exit 1; }
-          grep -q "^## ${version}" CHANGELOG.md || { echo "CHANGELOG has no ${version} section"; exit 1; }
+          grep -qE "^## \[?${version}\]?( |$)" CHANGELOG.md || { echo "CHANGELOG has no ${version} section"; exit 1; }
 
   test:
     needs: verify
@@ -100,7 +100,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           version="${GITHUB_REF_NAME#v}"
-          awk -v v="## ${version}" '$0 ~ "^"v {f=1; next} /^## /{f=0} f' CHANGELOG.md > notes.md
+          awk -v v="${version}" '$0 ~ "^## \\[?" v "\\]?( |$)" {f=1; next} /^## /{f=0} f' CHANGELOG.md > notes.md
           gh release create "${GITHUB_REF_NAME}" dist/* --title "${GITHUB_REF_NAME}" --notes-file notes.md
       - name: Verify public release bytes without credentials
         run: >-

@@ -6,7 +6,7 @@ unless the evidence holds. The checks live in [`scripts/`](../scripts/README.md)
 ## Before tagging
 
 1. Set the version in `pyproject.toml` and `scmle/__init__.py`.
-2. Move the `Unreleased` entries in `CHANGELOG.md` under `## <version>`.
+2. Move the `Unreleased` entries in `CHANGELOG.md` under `## [<version>] - <date>`, as Keep a Changelog does.
 3. If the public API changed deliberately, regenerate
    `tests/fixtures/public_api.json` with
    `python scripts/check_api_compatibility.py tests/fixtures/public_api.json --write` and note the change in the changelog and
