@@ -43,6 +43,7 @@ INCOMPATIBLE = (
 )
 GRID = 99
 MIN_CLUSTERS = 20
+MIN_GROUPS = 2
 
 
 class InfeasibleConstraintsError(ValueError):
@@ -244,7 +245,7 @@ def satisfaction_test(
             if total < constraint.min_group
         }
     )
-    if small or len(names) < 2:
+    if small or len(names) < MIN_GROUPS:
         return SatisfactionTest(
             NOT_ASSESSABLE,
             constraint.criterion,
@@ -279,7 +280,7 @@ def satisfaction_test(
 
 
 RATE_PARTS = {
-    "selection": lambda y, a: (a, numpy.ones_like(a)),
+    "selection": lambda y, a: (a, numpy.ones_like(a)),  # noqa: ARG005 -- table entries share the (y, a) call
     "tpr": lambda y, a: (a * y, y),
     "fpr": lambda y, a: (a * (1.0 - y), 1.0 - y),
     "ppv": lambda y, a: (a * y, a),
@@ -360,7 +361,7 @@ def cluster_satisfaction_test(
         }
     )
     cluster_ids, inverse = numpy.unique(keys, return_inverse=True)
-    if small or len(names) < 2 or len(cluster_ids) < MIN_CLUSTERS:
+    if small or len(names) < MIN_GROUPS or len(cluster_ids) < MIN_CLUSTERS:
         return SatisfactionTest(
             NOT_ASSESSABLE,
             constraint.criterion,
@@ -627,7 +628,7 @@ def fit_group_thresholds(
             None,
             costs.net_benefit(outcomes, common, t),
             gap,
-            False,
+            constrained=False,
         )
     positive_only = constraint.criterion in (
         "equal_opportunity",
@@ -643,7 +644,9 @@ def fit_group_thresholds(
                 break
             cuts[name] = float(numpy.quantile(pool, 1.0 - rate))
         else:
-            acts = GroupThresholds(cuts, rate, 0.0, 0.0, True).act(s, labels)
+            acts = GroupThresholds(cuts, rate, 0.0, 0.0, constrained=True).act(
+                s, labels
+            )
             achieved = development_gap(
                 outcomes, acts, labels, constraint.criterion
             )
@@ -651,7 +654,9 @@ def fit_group_thresholds(
                 continue
             value = costs.net_benefit(outcomes, acts, t)
             if best is None or value > best.net_benefit:
-                best = GroupThresholds(cuts, float(rate), value, achieved, True)
+                best = GroupThresholds(
+                    cuts, float(rate), value, achieved, constrained=True
+                )
     if best is None:
         raise InfeasibleConstraintsError(
             "no group thresholds meet the development bound "
