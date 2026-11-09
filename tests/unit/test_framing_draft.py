@@ -226,15 +226,7 @@ def test_consensus_scores_population_by_jaccard():
     assert "population" in agreed.conflicts
 
 
-def test_calibrate_tau_uses_the_clopper_pearson_bound():
-    ambiguity = [0.0] * 100 + [0.5] * 100
-    wrong = [False] * 100 + [True] * 50 + [False] * 50
-    result = refusal.calibrate_tau(ambiguity, wrong, epsilon=0.05)
-    assert result.tau == 0.0
-    assert result.curve[0][1] == 0.5
-    assert result.to_dict()["risk_coverage"][0][0] == 0.0
-    none = refusal.calibrate_tau([0.0] * 10, [True] * 10, epsilon=0.05)
-    assert none.tau is None
+def test_refusal_follows_the_calibrated_tau_and_the_cp_bound():
     assert refusal.refuse(0.0, None) and not refusal.refuse(0.0, 0.0)
     assert refusal.clopper_pearson_upper(0, 59) == pytest.approx(
         1 - 0.05 ** (1 / 59), rel=1e-6

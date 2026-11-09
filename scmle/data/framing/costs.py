@@ -341,22 +341,6 @@ def expected_cost(
     return float(numpy.mean(cost))
 
 
-def cost_constant(y: ArrayLike, model: DecisionCostModel) -> float:
-    """Returns `const = c_00 (1 - P) + c_01 P` in `Cost = const - c_FN NB(t)`.
-
-    Input that `binary_vector` rejects raises `ValueError`.
-
-    Args:
-        y: Outcomes, 0 or 1.
-        model: The cost model.
-
-    Returns:
-        The cost of never acting, given the prevalence of `y`.
-    """
-    prevalence = float(numpy.mean(binary_vector(y, "y")))
-    return model.c_00 * (1.0 - prevalence) + model.c_01 * prevalence
-
-
 def net_benefit_curve(
     y: ArrayLike, a: ArrayLike, thresholds: ArrayLike
 ) -> dict[str, list[float]]:
