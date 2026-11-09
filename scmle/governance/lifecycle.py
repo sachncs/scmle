@@ -209,7 +209,10 @@ class Maintainer:
         with durability.path_lock(self.state_path):
             if not self.state_path.exists():
                 return {"last_digest": None, "rows_since_attempt": 0}
-            return json.loads(self.state_path.read_text(encoding="utf-8"))
+            state: dict[str, Any] = json.loads(
+                self.state_path.read_text(encoding="utf-8")
+            )
+            return state
 
     def write_state(self, state: dict[str, Any]) -> None:
         """Saves the state atomically.
@@ -711,4 +714,5 @@ def read_run_config(result: results.Run) -> dict[str, Any]:
     path = result.run_dir / "config.json"
     if not path.exists():
         raise errors.ArtifactError("run has no config.json")
-    return json.loads(path.read_text(encoding="utf-8"))
+    config: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
+    return config

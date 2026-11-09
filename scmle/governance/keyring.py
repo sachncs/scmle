@@ -21,7 +21,7 @@ from typing import Any
 from typing import Self
 
 from scmle import durability
-from scmle.governance import attestation
+from scmle.contracts import signing
 
 
 class KeyState(enum.StrEnum):
@@ -32,7 +32,7 @@ class KeyState(enum.StrEnum):
     REVOKED = "revoked"
 
 
-def require_text(value: str, field_name: str) -> str:
+def require_text(value: object, field_name: str) -> str:
     """Returns a non-empty string suitable for a key record.
 
     Args:
@@ -101,8 +101,9 @@ class SigningKeyRecord:
             expires = parse_timestamp(self.expires_at, "expires_at")
             if expires <= created:
                 raise ValueError("expires_at must be after created_at")
-        if not isinstance(self.state, KeyState):
-            object.__setattr__(self, "state", KeyState(self.state))
+        state: Any = self.state  # may be text from a persisted record
+        if not isinstance(state, KeyState):
+            object.__setattr__(self, "state", KeyState(state))
         if self.state is not KeyState.ACTIVE:
             if self.state_changed_at is None:
                 raise ValueError("non-active keys require state_changed_at")
@@ -239,7 +240,7 @@ class SignatureEnvelope:
     key_id: str
     signed_at: str
     value: str
-    algorithm: str = attestation.SIGNATURE_ALGORITHM
+    algorithm: str = signing.SIGNATURE_ALGORITHM
 
     def __post_init__(self) -> None:
         """Validates signature identity and algorithm.
@@ -251,7 +252,7 @@ class SignatureEnvelope:
         require_text(self.key_id, "key_id")
         parse_timestamp(self.signed_at, "signed_at")
         require_text(self.value, "value")
-        if self.algorithm != attestation.SIGNATURE_ALGORITHM:
+        if self.algorithm != signing.SIGNATURE_ALGORITHM:
             raise ValueError("unsupported signature algorithm")
 
     def to_dict(self) -> dict[str, str]:
@@ -464,7 +465,7 @@ class SigningKeyRegistry:
         return SignatureEnvelope(
             key_id=key_id,
             signed_at=signed_at,
-            value=attestation.sign_payload(payload, secret),
+            value=signing.sign_payload(payload, secret),
         )
 
     def verify(
@@ -500,7 +501,7 @@ class SigningKeyRegistry:
             return False
         if not record.can_verify(envelope.signed_at, observed_at, historical):
             return False
-        expected = attestation.sign_payload(payload, secret)
+        expected = signing.sign_payload(payload, secret)
         return hmac.compare_digest(envelope.value, expected)
 
     def to_dict(self) -> dict[str, Any]:

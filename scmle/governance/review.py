@@ -14,7 +14,7 @@ from typing import Any
 from typing import Self
 
 from scmle import durability
-from scmle.governance import attestation
+from scmle.contracts import signing
 
 
 class ReviewDecision(enum.StrEnum):
@@ -34,7 +34,7 @@ class ReviewClaimKind(enum.StrEnum):
     SECURITY = "security"
 
 
-def require_text(value: str, field_name: str) -> str:
+def require_text(value: object, field_name: str) -> str:
     """Returns a non-empty release-review string.
 
     Args:
@@ -82,8 +82,9 @@ class ReviewClaim:
             "notes",
         ):
             require_text(getattr(self, field_name), field_name)
-        if not isinstance(self.kind, ReviewClaimKind):
-            object.__setattr__(self, "kind", ReviewClaimKind(self.kind))
+        kind: Any = self.kind  # may be text from a persisted record
+        if not isinstance(kind, ReviewClaimKind):
+            object.__setattr__(self, "kind", ReviewClaimKind(kind))
         if not isinstance(self.passed, bool):
             raise TypeError("passed must be bool")
 
@@ -125,7 +126,7 @@ class ReviewClaim:
 
 
 def require_independence(
-    reviewer_id: str, implementer_ids: tuple[str, ...]
+    reviewer_id: str, implementer_ids: tuple[object, ...]
 ) -> None:
     """Checks the implementers are named and do not include the reviewer.
 
@@ -167,7 +168,7 @@ def require_claims(claims: tuple[ReviewClaim, ...]) -> None:
         raise ValueError("claims must not contain duplicate criteria")
 
 
-def require_artifact_digests(artifact_digests: Mapping[str, str]) -> None:
+def require_artifact_digests(artifact_digests: Mapping[Any, Any]) -> None:
     """Checks the artifact digests are present and named.
 
     Args:
@@ -234,8 +235,9 @@ class IndependentReleaseReview:
             raise ValueError("commands must contain reproducible commands")
         require_claims(self.claims)
         require_artifact_digests(self.artifact_digests)
-        if not isinstance(self.decision, ReviewDecision):
-            object.__setattr__(self, "decision", ReviewDecision(self.decision))
+        decision: Any = self.decision  # may be text from a persisted record
+        if not isinstance(decision, ReviewDecision):
+            object.__setattr__(self, "decision", ReviewDecision(decision))
         if self.signature is not None:
             require_text(self.signature, "signature")
         timestamp = datetime.datetime.fromisoformat(
@@ -321,9 +323,7 @@ class IndependentReleaseReview:
         """
         return dataclasses.replace(
             self,
-            signature=attestation.sign_payload(
-                self.unsigned_dict(), signing_key
-            ),
+            signature=signing.sign_payload(self.unsigned_dict(), signing_key),
         )
 
     def verify_signature(self, signing_key: str | bytes) -> bool:
@@ -340,7 +340,7 @@ class IndependentReleaseReview:
         """
         if self.signature is None:
             return False
-        expected = attestation.sign_payload(self.unsigned_dict(), signing_key)
+        expected = signing.sign_payload(self.unsigned_dict(), signing_key)
         return hmac.compare_digest(self.signature, expected)
 
     def write(self, path: str | Path) -> None:
@@ -397,7 +397,7 @@ class IndependentReleaseReview:
     def accepted(
         self,
         source_commit: str,
-        required_kinds: Iterable[ReviewClaimKind],
+        required_kinds: Iterable[ReviewClaimKind | str],
         signing_key: str | bytes,
     ) -> bool:
         """Returns whether this signed review satisfies release proof gates.

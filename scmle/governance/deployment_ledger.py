@@ -408,7 +408,8 @@ class Envelope:
             raise DeploymentLedgerError(
                 "an envelope permits at least one action"
             )
-        for action, limit in self.limits.items():
+        for action, raw_limit in self.limits.items():
+            limit: object = raw_limit  # may be any value from a record
             if action not in ENVELOPE_ACTIONS:
                 raise DeploymentLedgerError(
                     f"{action!r} cannot be put in an envelope; only "

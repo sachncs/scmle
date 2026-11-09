@@ -61,6 +61,7 @@ import pandas
 from scmle.contracts import errors
 from scmle.contracts import qualification
 from scmle.contracts import signing
+from scmle.data.ledger import online_fdr
 import scmle.data.ledger.ledger
 from scmle.governance import deployment_ledger
 from scmle.governance import escalation
@@ -1448,7 +1449,7 @@ class Loop:
                 break
             step = sequence.rule.step(
                 sequence.state,
-                deployment_ledger.sequential_tests.online_fdr.Evidence(e=value),
+                online_fdr.Evidence(e=value),
             )
             self.ledger.commit(
                 deployment_ledger.CHALLENGER_RESULT,
