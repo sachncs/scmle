@@ -4790,7 +4790,7 @@ class PackagingStage(Stage):
         try:
             model_path = temporary / "model.joblib"
             joblib.dump(model, model_path, compress=3)
-            sync_file(model_path)
+            durability.sync_file(model_path)
             unsigned = {
                 "schema_version": 1,
                 "modality": modalities.modality_value(context.adapter.modality),
@@ -4819,10 +4819,10 @@ class PackagingStage(Stage):
                 encoding="utf-8",
                 newline="\n",
             )
-            sync_file(manifest_path)
-            sync_directory(temporary)
+            durability.sync_file(manifest_path)
+            durability.sync_directory(temporary)
             os.replace(temporary, target)
-            sync_directory(target.parent)
+            durability.sync_directory(target.parent)
             context.package = Package(
                 str(target), str(unsigned["model_sha256"]), signature
             )
@@ -5475,24 +5475,6 @@ def file_digest(path: Path) -> str:
         for block in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(block)
     return digest.hexdigest()
-
-
-def sync_file(path: Path) -> None:
-    """Flushes a file before it becomes visible through an atomic rename.
-
-    Args:
-        path: File to flush.
-    """
-    durability.sync_file(path)
-
-
-def sync_directory(path: Path) -> None:
-    """Flushes a directory entry after an atomic replacement.
-
-    Args:
-        path: Directory whose entry must reach stable storage.
-    """
-    durability.sync_directory(path)
 
 
 def load_package(

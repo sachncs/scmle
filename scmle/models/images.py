@@ -637,9 +637,9 @@ class Classifier:
                 stream.write("\n")
                 stream.flush()
                 os.fsync(stream.fileno())
-            flush_directory(temporary_directory)
+            durability.sync_directory(temporary_directory)
             os.replace(temporary_directory, target)
-            flush_directory(target.parent)
+            durability.sync_directory(target.parent)
         except Exception:
             if temporary_directory is not None:
                 shutil.rmtree(temporary_directory, ignore_errors=True)
@@ -811,15 +811,6 @@ def file_digest(path: pathlib.Path) -> str:
     return digest.hexdigest()
 
 
-def flush_directory(path: pathlib.Path) -> None:
-    """Flushes a directory entry after an atomic package replacement.
-
-    Args:
-        path: Directory whose entry must reach stable storage.
-    """
-    durability.sync_directory(path)
-
-
 __all__ = [
     "Classifier",
     "Config",
@@ -829,5 +820,4 @@ __all__ = [
     "Monitor",
     "Package",
     "file_digest",
-    "flush_directory",
 ]
