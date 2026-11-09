@@ -31,16 +31,18 @@ benchmarks, which are not a head-to-head with people.
 * **Choosing the best of many models is slightly optimistic.** The more models
   tried, the more the winner's practice score flatters it. The exam score is
   the one to trust ([`README.md`](../README.md) says the same).
-* **When no model has any skill, the winner's band is too narrow and too
-  often above chance.** In 200 simulated runs (1,000 rows, a target drawn
+* **When no model has any skill, the winner's band can still sit above
+  chance too often.** In 200 simulated runs (1,000 rows, a target drawn
   independently of every column, three candidate models, true ROC AUC 0.5,
   one process on one machine, `benchmarks/statistics/null_selection.py`):
   the run's 95 percent band on the winner's exam score lay wholly above 0.5 in
-  13 runs (6.5 percent; exact 95 percent interval 3.5 to 10.9) and contained
-  the true value 0.5 in 176 (88 percent; 82.7 to 92.2), where 95 percent is
-  the promise. The cross-validation band did better: 94 percent covered (89.8
-  to 96.9) and 6.0 percent wholly above the baseline (3.1 to 10.2). No run
-  labelled its winner `healthy`, and the leakage screen flagged no honest
+  10 runs (5.0 percent; exact 95 percent interval 2.4 to 9.0) and contained
+  the true value 0.5 in 184 (92 percent; 87.3 to 95.4), where 95 percent is
+  the promise. An earlier build, which drew 200 bootstrap resamples instead of
+  up to 2,000, covered 88 percent (82.7 to 92.2) and lay above 0.5 in 6.5
+  percent of the same runs. The cross-validation band covered 94 percent (89.8
+  to 96.9) and lay wholly above the baseline in 6.0 percent (3.1 to 10.2). No
+  run labelled its winner `healthy`, and the leakage screen flagged no honest
   column. Selection among candidates is not corrected for multiplicity and
   nested validation is off by default, so read a small lead over the baseline,
   or a band whose lower end is just above it, as weak evidence. Only these

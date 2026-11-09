@@ -829,6 +829,12 @@ marked `Breaking:` and listed first in their group.
 - A fit that has standard errors but no interval errors now builds its
   intervals from the standard errors, as documented, instead of raising
   `TypeError`.
+- The bootstrap band on the winner's exam score (`metric_uncertainty`) draws up
+  to 2,000 resamples on small evaluation sets (200 on large ones, within a
+  budget of 4 million rows scored) instead of always 200. In 200 simulated
+  null runs its coverage of the true value rose from 88 to 92 percent
+  (`benchmarks/statistics/null_selection.py`); it is still below the 95
+  percent promise in the point estimate, and the run takes about twice as long.
 - The coverage ledger reports the exact `interval_coverage` and
   `p95_interval_achieved_confidence` in place of `percentile_interval`, which
   covered only 0.626 at 20 reruns.

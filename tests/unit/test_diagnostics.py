@@ -328,3 +328,12 @@ def test_uncertainty_is_unavailable_when_every_resample_fails():
     report = diagnostics.MetricUncertainty().compute(inputs)
     assert report["ci_95"] is None and report["resamples"] == 0
     assert report["estimate"] == 0.5
+
+
+def test_small_evaluation_sets_get_more_resamples_than_large_ones():
+    diagnostic = diagnostics.MetricUncertainty()
+
+    assert diagnostic.resample_count(200) == diagnostic.resamples
+    assert diagnostic.resample_count(100_000) == diagnostic.minimum_resamples
+    assert diagnostic.resample_count(10**9) == diagnostic.minimum_resamples
+    assert diagnostic.resample_count(4000) == 1000
