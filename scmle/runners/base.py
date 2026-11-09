@@ -2,7 +2,7 @@
 
 One `JobSpec` describes a training run independent of where it runs. A
 `Runner` adapter knows how to start, poll and cancel a job in one place
-(this process, an AWS container job, a GCP job). The shared `Runner.run`
+(this process, a container job, a managed service). The shared `Runner.run`
 does everything that must not differ between places:
 
 * **Durable run id.** The spec is stored at ``runs/<id>/spec.json``; running

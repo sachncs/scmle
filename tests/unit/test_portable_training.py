@@ -6,35 +6,27 @@ import pytest
 
 from scmle.contracts import errors
 from scmle.core import retry
-from scmle.data.store import cloud
 from scmle.data.store import objectstore
-from scmle.runners import aws
 from scmle.runners import base
 from scmle.runners import checkpoint
 from scmle.runners import entrypoint
-from scmle.runners import gcp
 from scmle.runners import local
 from scmle.runners import reproducibility
 from scmle.runners import roles
-from tests import support_cloud as fakes
 from tests import support_runners as sr
 
-TRAIN = "arn:aws:iam::1:role/scmle-training"
-SERVE = "arn:aws:iam::1:role/scmle-serving"
+TRAIN = "scmle-training"
+SERVE = "scmle-serving"
 RATE = base.CostRate(per_cpu_hour=3.6)
 
 
-def make_store(kind, tmp_path):
-    if kind == "local":
-        return objectstore.LocalObjectStore(tmp_path / "durable")
-    if kind == "s3":
-        return cloud.S3ObjectStore(fakes.FakeS3Client(), "bkt", "runs-area")
-    return cloud.GcsObjectStore(fakes.FakeGcsClient(), "bkt", "runs-area")
+def make_store(tmp_path):
+    return objectstore.LocalObjectStore(tmp_path / "durable")
 
 
-@pytest.fixture(params=["local", "s3", "gcs"])
-def store(request, tmp_path):
-    return make_store(request.param, tmp_path)
+@pytest.fixture
+def store(tmp_path):
+    return make_store(tmp_path)
 
 
 def spec_for(run_id="run-1", **changes):
@@ -290,323 +282,11 @@ def test_checkpoints_skip_a_damaged_newest_one(store):
         checkpoints.save(-1, {})
 
 
-# ---- AWS ------------------------------------------------------------------
-
-
-def aws_runner(store, ecs, clock, **options):
-    return aws.AwsContainerJobRunner(
-        ecs,
-        store,
-        cluster="scmle",
-        task_definition="scmle-train:7",
-        container="trainer",
-        subnets=["subnet-1"],
-        security_groups=["sg-1"],
-        store_uri="s3://bkt/runs-area",
-        serving_identity=SERVE,
-        clock=base.Clock(clock.now, clock.sleep),
-        poll_seconds=1.0,
-        **options,
-    )
-
-
-def test_aws_runs_the_same_spec_and_resumes_after_a_spot_interruption(
-    tmp_path,
-):
-    clock = sr.FakeClock()
-    store = make_store("local", tmp_path)
-    killed = []
-
-    def first(context):
-        found = context.resume()
-        start = found.step if found else 0
-        weight = found.state["w"] if found else 0.0
-        for step in range(start + 1, 7):
-            weight += 0.5 * (3.0 - weight)
-            context.step(step, {"w": weight})
-            if step == 3 and not killed:
-                killed.append(True)
-                raise sr.Killed()
-        context.finish({"metrics": {"w": weight}, "steps": 6})
-
-    containers = [sr.ecs_container(store, first)] * 2
-    ecs = sr.FakeEcs(store, containers)
-    manifest = aws_runner(store, ecs, clock).run(spec_for())
-    assert manifest.state == "succeeded"
-    assert [a.state for a in manifest.attempts] == ["interrupted", "succeeded"]
-    assert [c["step"] for c in manifest.checkpoints] == [1, 2, 3, 4, 5, 6]
-    result = json.loads(store.get("runs/run-1/result.json")[0])
-    assert result == reference_result(tmp_path)
-    request = ecs.requests[0]
-    assert request["overrides"]["taskRoleArn"] == TRAIN
-    assert (
-        request["clientToken"] == "run-1-1"
-        and request["launchType"] == "FARGATE"
-    )
-    assert request["overrides"]["containerOverrides"][0]["command"] == [
-        "python",
-        "-m",
-        "scmle.runners.entrypoint",
-    ]
-    assert SERVE not in json.dumps(request)
-
-
-def test_aws_budget_and_timeout_stop_the_task(tmp_path):
-    clock = sr.FakeClock()
-    store = make_store("local", tmp_path)
-
-    def forever(context):
-        raise AssertionError("not reached")
-
-    ecs = sr.FakeEcs(store, [lambda env: {"lastStatus": "RUNNING"}])
-    manifest = aws_runner(store, ecs, clock).run(
-        spec_for("cost", budget=base.CostBudget(0.01, RATE))
-    )
-    assert manifest.state == "budget_stopped"
-    assert ecs.stopped and ecs.stopped[0][1].startswith("scmle: budget_stopped")
-    ecs = sr.FakeEcs(store, [lambda env: {"lastStatus": "RUNNING"}])
-    manifest = aws_runner(store, ecs, clock).run(
-        spec_for("late", timeout_seconds=30.0)
-    )
-    assert manifest.state == "timed_out" and ecs.stopped
-
-
-def test_aws_requests_carry_gpu_capacity_and_a_stable_spec_digest(tmp_path):
-    clock = sr.FakeClock()
-    store = make_store("local", tmp_path)
-    ecs = sr.FakeEcs(store, [])
-    runner = aws_runner(store, ecs, clock, capacity_provider="FARGATE_SPOT")
-    spec = spec_for(resources=base.Resources(2, 4096, 1, "deep tabular model"))
-    request = runner.request(spec, 1)
-    assert request["capacityProviderStrategy"][0]["capacityProvider"] == (
-        "FARGATE_SPOT"
-    )
-    assert "launchType" not in request
-    override = request["overrides"]["containerOverrides"][0]
-    assert override["resourceRequirements"] == [{"type": "GPU", "value": "1"}]
-    env = {e["name"]: e["value"] for e in override["environment"]}
-    assert env["SCMLE_SPEC_DIGEST"] == spec.digest()
-    assert not any("KEY" in name or "TOKEN" in name for name in env)
-
-
-def test_aws_maps_task_outcomes():
-    runner = aws_runner(None, None, sr.FakeClock())
-    table = [
-        (sr.stopped(0), "succeeded", False),
-        (sr.stopped(143, reason="SIGTERM"), "interrupted", False),
-        (sr.stopped(137, "SpotInterruption", "spot"), "interrupted", False),
-        (sr.stopped(137, reason="OutOfMemoryError"), "failed", False),
-        (sr.stopped(1), "failed", False),
-        (sr.stopped(None, "UserInitiated", "stop"), "cancelled", False),
-        (
-            {
-                "lastStatus": "STOPPED",
-                "stopCode": "TaskFailedToStart",
-                "stoppedReason": "RESOURCE:CPU capacity unavailable",
-            },
-            "failed",
-            True,
-        ),
-        ({"lastStatus": "PENDING"}, "pending", False),
-        ({"lastStatus": "RUNNING"}, "running", False),
-    ]
-    for task, state, retryable in table:
-        status = runner.map_task(task)
-        assert (status.state.value, status.retryable) == (state, retryable), (
-            task
-        )
-
-
-def test_aws_capacity_failures_at_placement_are_retried(tmp_path):
-    clock = sr.FakeClock()
-    store = make_store("local", tmp_path)
-
-    def work(context):
-        context.finish({"metrics": {}})
-
-    ecs = sr.FakeEcs(store, [sr.ecs_container(store, work)])
-    ecs.placement_failures = ["RESOURCE:FARGATE capacity unavailable"]
-    manifest = aws_runner(store, ecs, clock).run(spec_for("place"))
-    assert manifest.state == "succeeded" and len(manifest.attempts) == 2
-    assert manifest.attempts[0].state == "failed"
-
-
-# ---- GCP ------------------------------------------------------------------
-
-
-JOB = "projects/p/locations/europe-west1/jobs/scmle-train"
-GCP_TRAIN = "scmle-training@p.iam.gserviceaccount.com"
-GCP_SERVE = "scmle-serving@p.iam.gserviceaccount.com"
-
-
-def gcp_runner(store, client, clock, **options):
-    values = {
-        "job_name": JOB,
-        "job_service_account": GCP_TRAIN,
-        "job_cpu": 2.0,
-        "job_memory_mb": 4096,
-        "store_uri": "gs://bkt/runs-area",
-        "serving_identity": GCP_SERVE,
-        "clock": base.Clock(clock.now, clock.sleep),
-        "poll_seconds": 1.0,
-    }
-    values.update(options)
-    return gcp.GcpJobRunner(client, store, **values)
-
-
-def test_gcp_resumes_after_a_preemption_and_matches_the_reference(tmp_path):
-    clock = sr.FakeClock()
-    store = make_store("local", tmp_path)
-    killed = []
-
-    def work(context):
-        found = context.resume()
-        start = found.step if found else 0
-        weight = found.state["w"] if found else 0.0
-        for step in range(start + 1, 7):
-            weight += 0.5 * (3.0 - weight)
-            context.step(step, {"w": weight})
-            if step == 4 and not killed:
-                killed.append(True)
-                raise sr.Killed()
-        context.finish({"metrics": {"w": weight}, "steps": 6})
-
-    client = sr.FakeCloudRun([sr.run_v2_container(store, work)] * 2)
-    manifest = gcp_runner(store, client, clock).run(
-        spec_for(identity=GCP_TRAIN)
-    )
-    assert manifest.state == "succeeded"
-    assert [a.state for a in manifest.attempts] == ["interrupted", "succeeded"]
-    assert json.loads(store.get("runs/run-1/result.json")[0]) == (
-        reference_result(tmp_path)
-    )
-    name, overrides = client.started[0]
-    assert name == JOB and overrides["task_count"] == 1
-    assert overrides["timeout"] == "3600s"
-    env = {
-        e["name"]: e["value"]
-        for e in overrides["container_overrides"][0]["env"]
-    }
-    assert env["SCMLE_SPEC_DIGEST"] == spec_for(identity=GCP_TRAIN).digest()
-
-
-def test_gcp_refuses_mismatched_identity_resources_and_the_serving_account(
-    tmp_path,
-):
-    clock = sr.FakeClock()
-    store = make_store("local", tmp_path)
-    client = sr.FakeCloudRun([])
-    runner = gcp_runner(store, client, clock)
-    with pytest.raises(errors.ConfigError, match="own service account"):
-        runner.submit(spec_for(identity="someone@else"), 1)
-    with pytest.raises(errors.ConfigError, match="more than the job"):
-        runner.submit(
-            spec_for(identity=GCP_TRAIN, resources=base.Resources(8, 1024)), 1
-        )
-    with pytest.raises(errors.ConfigError, match="more than the job"):
-        runner.submit(
-            spec_for(
-                identity=GCP_TRAIN, resources=base.Resources(1, 1024, 1, "x")
-            ),
-            1,
-        )
-    with pytest.raises(errors.ConfigError, match="serving identity"):
-        gcp_runner(store, client, clock, job_service_account=GCP_SERVE)
-    assert client.started == []
-
-
-def test_gcp_budget_cancels_the_execution_and_outcomes_are_mapped(tmp_path):
-    clock = sr.FakeClock()
-    store = make_store("local", tmp_path)
-    client = sr.FakeCloudRun([lambda env: {"running_count": 1}])
-    manifest = gcp_runner(store, client, clock).run(
-        spec_for(identity=GCP_TRAIN, budget=base.CostBudget(0.01, RATE))
-    )
-    assert manifest.state == "budget_stopped" and client.cancelled
-    runner = gcp_runner(store, client, clock)
-
-    def handle():
-        return base.JobHandle("e", 1)
-
-    table = [
-        ({"succeeded_count": 1}, "succeeded", False),
-        ({"cancelled_count": 1}, "cancelled", False),
-        ({"running_count": 1}, "running", False),
-        ({"running_count": 0}, "pending", False),
-        (
-            {"failed_count": 1, "conditions": [{"reason": "Preempted"}]},
-            "interrupted",
-            False,
-        ),
-        (
-            {"failed_count": 1, "conditions": [{"message": "Quota exceeded"}]},
-            "failed",
-            True,
-        ),
-        (
-            {
-                "failed_count": 1,
-                "conditions": [{"message": "Memory limit exceeded"}],
-            },
-            "failed",
-            False,
-        ),
-    ]
-    for execution, state, retryable in table:
-        client.executions["e"] = {"polls": 5, "done": execution}
-        status = runner.poll(handle())
-        assert (status.state.value, status.retryable) == (state, retryable)
-
-
-def test_run_v2_client_wraps_the_sdk_shapes():
-    class Operation:
-        class metadata:  # noqa: N801
-            name = "exec-1"
-
-    class Jobs:
-        def run_job(self, request):
-            self.request = request
-            return Operation()
-
-    class Condition:
-        reason = "Preempted"
-        message = "SIGTERM"
-
-    class Execution:
-        running_count = 0
-        succeeded_count = 0
-        failed_count = 1
-        cancelled_count = 0
-        completion_time = "t"
-        conditions = [Condition()]
-
-    class Executions:
-        def get_execution(self, name):
-            return Execution()
-
-        def cancel_execution(self, request):
-            self.cancelled = request
-
-    wrapped = gcp.RunV2Client(Jobs(), Executions())
-    assert wrapped.run_job("job", {"task_count": 1}) == "exec-1"
-    assert wrapped.get_execution("e")["conditions"][0]["reason"] == "Preempted"
-    wrapped.cancel_execution("e")
-    assert wrapped.executions.cancelled == {"name": "e"}
-
-    def missing(name):
-        raise ImportError(name)
-
-    with pytest.raises(errors.ConfigError):
-        gcp.run_v2_client(missing)
-    with pytest.raises(errors.ConfigError):
-        aws.ecs_client(missing)
-
-
 # ---- entrypoint, reproducibility -----------------------------------------
 
 
 def test_the_entrypoint_checks_the_spec_digest_and_the_store_scheme(tmp_path):
-    store = make_store("local", tmp_path)
+    store = make_store(tmp_path)
     clock = sr.FakeClock()
     runner = local_runner(store, clock)
     spec = spec_for("entry")
@@ -637,12 +317,12 @@ def test_reproducibility_is_reported_against_declared_tolerances():
         {"auc": 0.90, "loss": 0.30},
         {"auc": 0.905, "loss": 0.31},
         tolerances,
-        place="aws",
+        place="cloud-a",
     )
     rows = {row["metric"]: row for row in report["metrics"]}
     assert rows["auc"]["within"] and not rows["loss"]["within"]
-    assert not report["within_tolerance"] and report["place"] == "aws"
-    missing = reproducibility.compare({"a": 1}, {}, tolerances, place="gcp")
+    assert not report["within_tolerance"] and report["place"] == "cloud-a"
+    missing = reproducibility.compare({"a": 1}, {}, tolerances, place="cloud-b")
     assert not missing["within_tolerance"]
     with pytest.raises(errors.ConfigError):
         reproducibility.Tolerances({"a": -1})

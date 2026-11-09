@@ -54,7 +54,7 @@ def compare(
         reference: Metrics from the local reference run.
         candidate: Metrics from the run elsewhere.
         tolerances: The tolerances declared before the runs.
-        place: Name of the place (`aws`, `gcp`).
+        place: Name of the place (for example `local`, `cluster`).
 
     Returns:
         A report with one row per metric and an overall `within_tolerance`.

@@ -1,8 +1,8 @@
 """What a container job runs: ``python -m scmle.runners.entrypoint``.
 
 Reads ``SCMLE_RUN_ID``, ``SCMLE_ATTEMPT``, ``SCMLE_STORE_URI`` and
-``SCMLE_SPEC_DIGEST`` from the environment (set by the AWS and GCP
-adapters), opens the store, loads ``runs/<id>/spec.json``, refuses a spec
+``SCMLE_SPEC_DIGEST`` from the environment (set by the runner
+adapter), opens the store, loads ``runs/<id>/spec.json``, refuses a spec
 whose digest differs from the one the runner started, and runs the workload
 named by ``SCMLE_WORKLOAD`` (default `scmle.runners.project:run_project`)
 under the training role. Exit status 0 means the workload returned; any
@@ -20,7 +20,6 @@ from urllib.request import url2pathname
 
 from scmle.contracts import errors
 from scmle.core import retry
-from scmle.data.store import cloud
 from scmle.data.store import objectstore
 from scmle.runners import base
 from scmle.runners import checkpoint
@@ -31,21 +30,19 @@ DEFAULT_WORKLOAD = "scmle.runners.project:run_project"
 
 
 def open_store(uri: str) -> objectstore.ObjectStore:
-    """Opens `file://`, `s3://bucket/prefix` or `gs://bucket/prefix`.
+    """Opens a `file://` store.
 
     Raises:
         ConfigError: If the scheme is not supported.
     """
     parts = urlsplit(uri)
-    prefix = parts.path.strip("/")
     if parts.scheme == "file":
         # url2pathname turns /C:/dir into C:\\dir on Windows
         return objectstore.LocalObjectStore(url2pathname(parts.path))
-    if parts.scheme == "s3":
-        return cloud.s3_store(parts.netloc, prefix)
-    if parts.scheme == "gs":
-        return cloud.gcs_store(parts.netloc, prefix)
-    raise errors.ConfigError(f"unsupported store URI scheme {parts.scheme!r}")
+    raise errors.ConfigError(
+        f"unsupported store URI scheme {parts.scheme!r}; only file:// is "
+        "built in, so open any other store in your own workload"
+    )
 
 
 def load_workload(name: str) -> Callable[[local.JobContext], None]:

@@ -8,9 +8,9 @@ model) and serving cannot write `runs/` (so it cannot alter a training
 record). Releasing a bundle is a third act that needs an approval, outside
 both roles.
 
-`RoleStore` enforces a role in process; in a cloud the same table is the
-policy of two distinct identities (`check_distinct` refuses to run a job with
-the serving identity).
+`RoleStore` enforces a role in process; on shared infrastructure the same
+table is the policy of two distinct identities (`check_distinct` refuses to
+run a job with the serving identity).
 """
 
 import dataclasses
