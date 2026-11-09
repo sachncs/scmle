@@ -5,6 +5,7 @@ it, while every operation that needs image decoding raises
 ``ImageDependencyError`` with an actionable, structured error envelope.
 """
 
+from collections.abc import Iterable
 from collections.abc import Mapping
 import dataclasses
 import hashlib
@@ -231,9 +232,10 @@ def validate_feature_options(
         ValueError: If ``target_size`` is not two positive integers, or
             ``mode`` is not a supported mode.
     """
+    sizes: Iterable[object] = target_size
     if len(target_size) != IMAGE_SIZE_DIMENSIONS or any(
         not isinstance(value, int) or isinstance(value, bool) or value <= 0
-        for value in target_size
+        for value in sizes
     ):
         raise ValueError("target_size must contain two positive integers")
     if mode not in SUPPORTED_FEATURE_MODES:
@@ -296,10 +298,8 @@ class Augmentation:
         tool = self.tool.strip()
         if not operation:
             raise ValueError("augmentation operation must not be empty")
-        if any(
-            not isinstance(key, str) or not key.strip()
-            for key in self.parameters
-        ):
+        keys: Iterable[object] = self.parameters
+        if any(not isinstance(key, str) or not key.strip() for key in keys):
             raise ValueError(
                 "augmentation parameter keys must be non-empty text"
             )
@@ -598,10 +598,11 @@ class Sample:
         Raises:
             ValueError: If ``hash_size`` is not an integer from 2 to 32.
         """
+        candidate: object = hash_size
         if (
-            not isinstance(hash_size, int)
-            or isinstance(hash_size, bool)
-            or not MIN_HASH_SIZE <= hash_size <= MAX_HASH_SIZE
+            not isinstance(candidate, int)
+            or isinstance(candidate, bool)
+            or not MIN_HASH_SIZE <= candidate <= MAX_HASH_SIZE
         ):
             raise ValueError("hash_size must be an integer between 2 and 32")
         pixels = self.decode("L", (hash_size, hash_size))[..., 0]
@@ -626,10 +627,11 @@ class Sample:
             ("max_bytes", max_bytes),
             ("max_pixels", max_pixels),
         ):
-            if value is not None and (
-                not isinstance(value, int)
-                or isinstance(value, bool)
-                or value <= 0
+            candidate: object = value
+            if candidate is not None and (
+                not isinstance(candidate, int)
+                or isinstance(candidate, bool)
+                or candidate <= 0
             ):
                 raise ValueError(f"{name} must be a positive integer or None")
 
@@ -893,14 +895,18 @@ class Dataset:
                 invalid ``hash_size`` also raises ValueError, from
                 `Sample.perceptual_hash`.
         """
-        if not isinstance(max_samples, int) or isinstance(max_samples, bool):
+        samples_limit: object = max_samples
+        if not isinstance(samples_limit, int) or isinstance(
+            samples_limit, bool
+        ):
             raise ValueError("max_samples must be a positive integer")
         if max_samples <= 0:
             raise ValueError("max_samples must be a positive integer")
+        distance_limit: object = max_hamming_distance
         if (
-            not isinstance(max_hamming_distance, int)
-            or isinstance(max_hamming_distance, bool)
-            or max_hamming_distance < 0
+            not isinstance(distance_limit, int)
+            or isinstance(distance_limit, bool)
+            or distance_limit < 0
         ):
             raise ValueError(
                 "max_hamming_distance must be a non-negative integer"
@@ -946,7 +952,10 @@ class Dataset:
                 ``profile_size`` that is not two positive integers also
                 raises ValueError, from `validate_feature_options`.
         """
-        if not isinstance(max_samples, int) or isinstance(max_samples, bool):
+        samples_limit: object = max_samples
+        if not isinstance(samples_limit, int) or isinstance(
+            samples_limit, bool
+        ):
             raise ValueError("max_samples must be a positive integer")
         if max_samples <= 0:
             raise ValueError("max_samples must be a positive integer")

@@ -581,8 +581,9 @@ class Sample:
                 "invalid_source_digest",
                 {"document_id": self.document_id},
             )
-        if not isinstance(self.format, Format):
-            object.__setattr__(self, "format", Format(self.format))
+        declared_format: Any = self.format  # a plain string is accepted
+        if not isinstance(declared_format, Format):
+            object.__setattr__(self, "format", Format(declared_format))
         normalized_provenance = tuple(self.provenance)
         if not normalized_provenance:
             normalized_provenance = provenance_for_content(self.content)

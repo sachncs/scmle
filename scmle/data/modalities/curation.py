@@ -157,12 +157,13 @@ def check_governance(name: str, values: Mapping[str, str]) -> None:
         ValueError: If the mapping is empty or holds a blank or non-string
             key or value.
     """
+    entries: Iterable[tuple[object, object]] = values.items()
     if not values or any(
         not isinstance(key, str)
         or not isinstance(value, str)
         or not key.strip()
         or not value.strip()
-        for key, value in values.items()
+        for key, value in entries
     ):
         raise ValueError(f"{name} must contain non-empty values")
 

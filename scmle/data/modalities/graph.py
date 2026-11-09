@@ -80,7 +80,8 @@ class Node:
                 not finite.
             TypeError: If a feature is not an int or float.
         """
-        if not isinstance(self.node_id, str) or not self.node_id.strip():
+        node_id: object = self.node_id
+        if not isinstance(node_id, str) or not node_id.strip():
             raise ValueError("node_id must be a non-empty string")
         if any(not isinstance(value, (int, float)) for value in self.features):
             raise TypeError("node features must be numeric")
@@ -121,15 +122,18 @@ class Edge:
             TypeError: If the weight is not numeric or the event time is not
                 a datetime.
         """
-        if not isinstance(self.source, str) or not self.source.strip():
+        source: object = self.source
+        target: object = self.target
+        if not isinstance(source, str) or not source.strip():
             raise ValueError("edge source must be a non-empty string")
-        if not isinstance(self.target, str) or not self.target.strip():
+        if not isinstance(target, str) or not target.strip():
             raise ValueError("edge target must be a non-empty string")
         if not isinstance(self.weight, (int, float)):
             raise TypeError("edge weight must be numeric")
         if not math.isfinite(float(self.weight)):
             raise ValueError("edge weight must be finite")
-        if not isinstance(self.relation, str) or not self.relation.strip():
+        relation: object = self.relation
+        if not isinstance(relation, str) or not relation.strip():
             raise ValueError("edge relation must be a non-empty string")
         if self.event_time is not None:
             if not isinstance(self.event_time, datetime):

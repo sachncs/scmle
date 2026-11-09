@@ -581,7 +581,6 @@ def wav_payload_from_pcm(
         encoded[..., 0] = unsigned & 0xFF
         encoded[..., 1] = (unsigned >> 8) & 0xFF
         encoded[..., 2] = (unsigned >> 16) & 0xFF
-        raw = encoded.tobytes()
     elif sample_width == WIDTH_32_BIT:
         encoded = numpy.rint(clipped * (2**31 - 1)).astype("<i4")
     else:
@@ -589,8 +588,7 @@ def wav_payload_from_pcm(
             "WAV sample width is unsupported",
             {"code": "unsupported_sample_width", "sample_width": sample_width},
         )
-    if sample_width != WIDTH_24_BIT:
-        raw = encoded.tobytes()
+    raw = encoded.tobytes()
     payload = io.BytesIO()
     with wave.open(payload, "wb") as writer:
         writer.setparams(parameters)
