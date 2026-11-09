@@ -526,7 +526,7 @@ def breach() -> slo.SLOEvaluation:
         unit="ms",
         timestamp="2026-10-20T12:00:00+00:00",
     )
-    return slo.SLOMonitor().evaluate(
+    return slo.evaluate(
         target, (sample,), observed_at="2026-10-20T12:00:00+00:00"
     )
 

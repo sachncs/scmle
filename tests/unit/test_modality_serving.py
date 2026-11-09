@@ -11,6 +11,7 @@ import pytest
 
 from scmle.contracts import errors
 from scmle.data.modalities import document
+from scmle.inference import guard
 from scmle.inference import modality_serving
 import scmle.inference.modality_serving
 from scmle.models import modality_lifecycle
@@ -384,7 +385,8 @@ def started_modality_service(tmp_path, limits=None):
     )
     service = modality_serving.ModalityHttpServing(predictor, DocumentDecoder())
     if limits:
-        service.set_limits(*limits)
+        service.admission.close()
+        service.admission = guard.AdmissionControl(*limits)
     service.start()
     return service, predictor
 

@@ -62,12 +62,11 @@ class ModalityHttpServing:
     predictor is verified when it is loaded, so the service is ready once
     constructed; the warm-up step is recorded as skipped because a caller-owned
     decoder has no synthetic sample. At most 8 requests run at once (429
-    beyond) and a scoring call past 30 seconds answers 504; ``set_limits``
-    changes both. Every response carries the schema version and the package
-    digest, which doubles as the model version because modality packages
-    carry no separate label. Authentication, TLS, transport-specific
-    decoding, and operational paging remain deployment-owner
-    responsibilities.
+    beyond) and a scoring call past 30 seconds answers 504. Every response
+    carries the schema version and the package digest, which doubles as the
+    model version because modality packages carry no separate label.
+    Authentication, TLS, transport-specific decoding, and operational paging
+    remain deployment-owner responsibilities.
     """
 
     def __init__(
@@ -153,28 +152,6 @@ class ModalityHttpServing:
         if self.httpd is None:
             raise errors.ScmleError("server is not running")
         return f"http://{self.host}:{self.httpd.server_address[1]}"
-
-    def set_limits(
-        self, max_concurrent: int, scoring_timeout_seconds: float
-    ) -> None:
-        """Replaces the concurrency and scoring-time limits before `start`.
-
-        The limits (default 8 in flight, 30 seconds) are not constructor
-        arguments, so they are set here. The previous worker pool is closed.
-
-        Args:
-            max_concurrent: Requests allowed in flight.
-            scoring_timeout_seconds: Seconds a scoring call may take.
-
-        Raises:
-            ScmleError: If the server is running.
-        """
-        if self.httpd is not None:
-            raise errors.ScmleError("limits cannot change while running")
-        self.admission.close()
-        self.admission = guard.AdmissionControl(
-            max_concurrent, scoring_timeout_seconds
-        )
 
     @property
     def artifact_digest(self) -> str:

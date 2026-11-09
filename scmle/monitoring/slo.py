@@ -225,117 +225,111 @@ class SLOEvaluation:
         }
 
 
-class SLOMonitor:
-    """Evaluate upper-bound SLOs against redacted metric samples."""
+def evaluate(
+    target: SLOTarget,
+    samples: Sequence[observability.MetricSample],
+    *,
+    observed_at: str,
+) -> SLOEvaluation:
+    """Evaluates one target over its declared time window.
 
-    def evaluate(
-        self,
-        target: SLOTarget,
-        samples: Sequence[observability.MetricSample],
-        *,
-        observed_at: str,
-    ) -> SLOEvaluation:
-        """Evaluates one target over its declared time window.
+    The maximum observed value is used deliberately: a single breach is not
+    averaged away. Missing samples are an explicit operational state, not a
+    passing result.
 
-        The maximum observed value is used deliberately: a single breach is not
-        averaged away. Missing samples are an explicit operational state, not a
-        passing result.
+    Args:
+        target: The objective.
+        samples: Metric samples; only those with the target's metric name
+            and kind count.
+        observed_at: Evaluation time, an ISO-8601 timestamp with timezone.
 
-        Args:
-            target: The objective.
-            samples: Metric samples; only those with the target's metric name
-                and kind count.
-            observed_at: Evaluation time, an ISO-8601 timestamp with timezone.
+    Returns:
+        The evaluation: `invalid` if any matching sample is later than
+        `observed_at`, `insufficient_data` if fewer than `minimum_samples`
+        fall in the window, otherwise `pass` or `breached` by comparing the
+        window maximum with the target.
 
-        Returns:
-            The evaluation: `invalid` if any matching sample is later than
-            `observed_at`, `insufficient_data` if fewer than `minimum_samples`
-            fall in the window, otherwise `pass` or `breached` by comparing the
-            window maximum with the target.
-
-        Raises:
-            TypeError: If `target` is not an `SLOTarget`.
-        """
-        if not isinstance(target, SLOTarget):
-            raise TypeError("target must be SLOTarget")
-        observed_timestamp = parse_timestamp(observed_at, "observed_at")
-        window_start = observed_timestamp - datetime.timedelta(
-            days=target.window_days
-        )
-        matching = tuple(
-            sample
-            for sample in samples
-            if sample.name == target.metric_name and sample.kind is target.kind
-        )
-        future = tuple(
-            sample
-            for sample in matching
-            if parse_timestamp(sample.timestamp, "metric.timestamp")
-            > observed_timestamp
-        )
-        in_window = tuple(
-            sample
-            for sample in matching
-            if window_start
-            <= parse_timestamp(sample.timestamp, "metric.timestamp")
-            <= observed_timestamp
-        )
-        if future:
-            return SLOEvaluation(
-                target=target,
-                observed_at=observed_at,
-                status=SLOStatus.INVALID,
-                sample_count=len(matching),
-                in_window_count=len(in_window),
-                observed_maximum=None,
-                error_budget_remaining=None,
-                reason="future metric samples cannot support an SLO decision",
-            )
-        if len(in_window) < target.minimum_samples:
-            return SLOEvaluation(
-                target=target,
-                observed_at=observed_at,
-                status=SLOStatus.INSUFFICIENT_DATA,
-                sample_count=len(matching),
-                in_window_count=len(in_window),
-                observed_maximum=None,
-                error_budget_remaining=None,
-                reason=(
-                    f"{len(in_window)} in-window samples; "
-                    f"{target.minimum_samples} required"
-                ),
-            )
-        observed_maximum = max(sample.value for sample in in_window)
-        remaining = max(
-            0.0, 1.0 - observed_maximum / max(target.maximum, 1e-12)
-        )
-        status = (
-            SLOStatus.PASS
-            if observed_maximum <= target.maximum
-            else SLOStatus.BREACHED
-        )
-        reason = (
-            f"maximum {observed_maximum:g} is within {target.maximum:g}"
-            if status is SLOStatus.PASS
-            else f"maximum {observed_maximum:g} exceeds {target.maximum:g}"
-        )
+    Raises:
+        TypeError: If `target` is not an `SLOTarget`.
+    """
+    if not isinstance(target, SLOTarget):
+        raise TypeError("target must be SLOTarget")
+    observed_timestamp = parse_timestamp(observed_at, "observed_at")
+    window_start = observed_timestamp - datetime.timedelta(
+        days=target.window_days
+    )
+    matching = tuple(
+        sample
+        for sample in samples
+        if sample.name == target.metric_name and sample.kind is target.kind
+    )
+    future = tuple(
+        sample
+        for sample in matching
+        if parse_timestamp(sample.timestamp, "metric.timestamp")
+        > observed_timestamp
+    )
+    in_window = tuple(
+        sample
+        for sample in matching
+        if window_start
+        <= parse_timestamp(sample.timestamp, "metric.timestamp")
+        <= observed_timestamp
+    )
+    if future:
         return SLOEvaluation(
             target=target,
             observed_at=observed_at,
-            status=status,
+            status=SLOStatus.INVALID,
             sample_count=len(matching),
             in_window_count=len(in_window),
-            observed_maximum=observed_maximum,
-            error_budget_remaining=remaining,
-            reason=reason,
+            observed_maximum=None,
+            error_budget_remaining=None,
+            reason="future metric samples cannot support an SLO decision",
         )
+    if len(in_window) < target.minimum_samples:
+        return SLOEvaluation(
+            target=target,
+            observed_at=observed_at,
+            status=SLOStatus.INSUFFICIENT_DATA,
+            sample_count=len(matching),
+            in_window_count=len(in_window),
+            observed_maximum=None,
+            error_budget_remaining=None,
+            reason=(
+                f"{len(in_window)} in-window samples; "
+                f"{target.minimum_samples} required"
+            ),
+        )
+    observed_maximum = max(sample.value for sample in in_window)
+    remaining = max(0.0, 1.0 - observed_maximum / max(target.maximum, 1e-12))
+    status = (
+        SLOStatus.PASS
+        if observed_maximum <= target.maximum
+        else SLOStatus.BREACHED
+    )
+    reason = (
+        f"maximum {observed_maximum:g} is within {target.maximum:g}"
+        if status is SLOStatus.PASS
+        else f"maximum {observed_maximum:g} exceeds {target.maximum:g}"
+    )
+    return SLOEvaluation(
+        target=target,
+        observed_at=observed_at,
+        status=status,
+        sample_count=len(matching),
+        in_window_count=len(in_window),
+        observed_maximum=observed_maximum,
+        error_budget_remaining=remaining,
+        reason=reason,
+    )
 
 
 __all__ = [
     "SLOEvaluation",
-    "SLOMonitor",
     "SLOStatus",
     "SLOTarget",
+    "evaluate",
     "parse_timestamp",
     "require_text",
 ]

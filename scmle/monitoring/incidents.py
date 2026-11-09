@@ -7,6 +7,7 @@ import enum
 import functools
 import hashlib
 import json
+import os
 import pathlib
 from typing import Any
 from typing import TypeVar
@@ -550,19 +551,8 @@ class IncidentWorkflow:
                 json.dumps(event, sort_keys=True, separators=(",", ":")) + "\n"
             )
             handle.flush()
-            os_fsync(handle)
+            os.fsync(handle.fileno())
         durability.sync_directory(self.path.parent)
-
-
-def os_fsync(handle: Any) -> None:
-    """Flushes a journal file descriptor without exposing platform details.
-
-    Args:
-        handle: An open file object.
-    """
-    import os
-
-    os.fsync(handle.fileno())
 
 
 __all__ = [

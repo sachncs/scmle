@@ -921,22 +921,6 @@ class HttpServing(Server):
             self.warm_up()
             self.announce()
 
-    def wait_until_settled(self, timeout: float = 60.0) -> bool:
-        """Waits for the background loader to finish.
-
-        Returns at once when there is no loader thread.
-
-        Args:
-            timeout: Seconds to wait for the loading thread.
-
-        Returns:
-            True when the service is ready, False if it is not (still
-            loading after the timeout, or failed).
-        """
-        if self.loading is not None:
-            self.loading.join(timeout)
-        return self.readiness.ready
-
     def stop(self) -> None:
         """Shuts the server down, joins its thread and closes the pool."""
         if self.httpd is not None:
