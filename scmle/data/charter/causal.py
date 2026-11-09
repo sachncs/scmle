@@ -26,6 +26,7 @@ from scmle.contracts import qualification
 
 CAUSAL_ESTIMANDS = ("ATE", "ATT", "LATE", "ATT_DID", "ATT_SC", "LATE_RD")
 UNCONFOUNDEDNESS_PREFIX = "unconfoundedness_given:"
+MAX_TRIM_EXCLUSIVE = 0.5
 FIXED_ASSUMPTIONS = (
     "positivity",
     "no_interference",
@@ -413,10 +414,7 @@ class Question:
             qualification.require_tuple(getattr(self, name), name)
         for item in self.assumptions:
             check_assumption(item)
-        if len(set(self.assumptions)) != len(self.assumptions):
-            raise ValueError("duplicate assumption")
-        if len(set(self.strategies)) != len(self.strategies):
-            raise ValueError("duplicate strategy")
+        self.check_repeats()
         self.check_attestors()
         columns = [g.column for g in self.subgroups]
         if len(set(columns)) != len(columns):
@@ -426,11 +424,22 @@ class Question:
         if self.cutoff is not None:
             qualification.finite(self.cutoff, "cutoff")
         trim = qualification.finite(self.trim, "trim")
-        if not 0.0 <= trim < 0.5:
+        if not 0.0 <= trim < MAX_TRIM_EXCLUSIVE:
             raise ValueError("trim must be within [0, 0.5)")
         share = qualification.finite(self.min_share, "min_share")
         if not 0.0 < share <= 1.0:
             raise ValueError("min_share must be within (0, 1]")
+
+    def check_repeats(self) -> None:
+        """Checks that no assumption or strategy is repeated.
+
+        Raises:
+            ValueError: If an assumption or a strategy is repeated.
+        """
+        if len(set(self.assumptions)) != len(self.assumptions):
+            raise ValueError("duplicate assumption")
+        if len(set(self.strategies)) != len(self.strategies):
+            raise ValueError("duplicate strategy")
 
     def check_attestors(self) -> None:
         """Checks the attestors against the rest of the block.

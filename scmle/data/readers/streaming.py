@@ -44,6 +44,7 @@ MIX_B = numpy.uint64(0x94D049BB133111EB)
 STREAM_STATE_SCHEMA = 2
 STREAM_ACKNOWLEDGEMENT_SCHEMA = 1
 STREAM_TRANSACTION_SCHEMA = 1
+SHA256_HEX_LENGTH = 64
 
 
 def row_hash(positions: numpy.ndarray, seed: int) -> numpy.ndarray:
@@ -364,7 +365,7 @@ def validate_digest(value: str, field_name: str) -> None:
     Raises:
         ValueError: If `value` is not 64 lower-case hexadecimal characters.
     """
-    if len(value) != 64 or any(
+    if len(value) != SHA256_HEX_LENGTH or any(
         character not in "0123456789abcdef" for character in value
     ):
         raise ValueError(f"{field_name} must be a SHA-256 hex digest")
@@ -384,7 +385,7 @@ def validate_timestamp(value: str, field_name: str) -> datetime.datetime:
         ValueError: If `value` is not ISO-8601 or carries no timezone.
     """
     try:
-        parsed = datetime.datetime.fromisoformat(value.replace("Z", "+00:00"))
+        parsed = datetime.datetime.fromisoformat(value)
     except ValueError as error:
         raise ValueError(f"{field_name} must be ISO-8601") from error
     if parsed.tzinfo is None:
@@ -1007,13 +1008,13 @@ class CommitLedger:
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
         with self.lock_path.open("a+b") as handle:
             if os.name == "nt":
-                import msvcrt
+                import msvcrt  # noqa: PLC0415 -- Windows-only module, imported only on Windows
 
                 windows_lock: Any = msvcrt
                 handle.seek(0)
                 windows_lock.locking(handle.fileno(), windows_lock.LK_LOCK, 1)
             else:
-                import fcntl
+                import fcntl  # noqa: PLC0415 -- POSIX-only module, imported only off Windows
 
                 fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
             try:

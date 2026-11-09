@@ -11,7 +11,6 @@ import hashlib
 import io
 import math
 import pathlib
-import random
 from typing import Self
 import wave
 
@@ -20,9 +19,19 @@ import numpy
 from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.data.modalities.curation import build_finding
+from scmle.data.modalities.curation import check_split_fractions
 from scmle.data.modalities.curation import conflicting_label_groups
 from scmle.data.modalities.curation import Curation
 from scmle.data.modalities.curation import label_counts
+from scmle.data.modalities.curation import partition_group_ids
+
+WIDTH_16_BIT = 2
+WIDTH_24_BIT = 3
+WIDTH_32_BIT = 4
+CLIPPING_LEVEL = 0.999
+SILENCE_LEVEL = 0.01
+MATRIX_DIMENSIONS = 2
+SHA256_HEX_LENGTH = 64
 
 
 class AudioValidationError(errors.DataError):
@@ -411,11 +420,11 @@ def wav_signal_features(
         samples = (samples - 128.0) / 128.0
         scale = 1.0
     elif sample_width in (2, 4):
-        dtype = numpy.dtype("<i2" if sample_width == 2 else "<i4")
+        dtype = numpy.dtype("<i2" if sample_width == WIDTH_16_BIT else "<i4")
         samples = numpy.frombuffer(raw, dtype=dtype).astype(numpy.float64)
         scale = float(2 ** (sample_width * 8 - 1))
         samples /= scale
-    elif sample_width == 3:
+    elif sample_width == WIDTH_24_BIT:
         packed = numpy.frombuffer(raw, dtype=numpy.uint8).reshape(-1, 3)
         unsigned = (
             packed[:, 0].astype(numpy.int64)
@@ -440,8 +449,8 @@ def wav_signal_features(
             float(absolute.mean()),
             float(numpy.sqrt(numpy.mean(numpy.square(matrix)))),
             float(absolute.max()),
-            float(numpy.mean(absolute >= 0.999)),
-            float(numpy.mean(absolute <= 0.01)),
+            float(numpy.mean(absolute >= CLIPPING_LEVEL)),
+            float(numpy.mean(absolute <= SILENCE_LEVEL)),
             float(frame_count / sample_rate),
             float(frame_count),
             float(scale),
@@ -509,10 +518,10 @@ def wav_pcm_values(
         samples = numpy.frombuffer(raw, dtype=numpy.uint8).astype(numpy.float64)
         samples = (samples - 128.0) / 128.0
     elif sample_width in (2, 4):
-        dtype = numpy.dtype("<i2" if sample_width == 2 else "<i4")
+        dtype = numpy.dtype("<i2" if sample_width == WIDTH_16_BIT else "<i4")
         samples = numpy.frombuffer(raw, dtype=dtype).astype(numpy.float64)
         samples /= float(2 ** (sample_width * 8 - 1))
-    elif sample_width == 3:
+    elif sample_width == WIDTH_24_BIT:
         packed = numpy.frombuffer(raw, dtype=numpy.uint8).reshape(-1, 3)
         unsigned = (
             packed[:, 0].astype(numpy.int64)
@@ -557,15 +566,15 @@ def wav_payload_from_pcm(
         AudioValidationError: If the sample width is not 1, 2, 3 or 4.
     """
     matrix = numpy.asarray(values, dtype=numpy.float64)
-    if matrix.ndim != 2 or not numpy.isfinite(matrix).all():
+    if matrix.ndim != MATRIX_DIMENSIONS or not numpy.isfinite(matrix).all():
         raise ValueError("PCM values must be a finite frame-by-channel matrix")
     sample_width = parameters[1]
     clipped = numpy.clip(matrix, -1.0, 1.0)
     if sample_width == 1:
         encoded = numpy.rint(clipped * 127.0 + 128.0).astype(numpy.uint8)
-    elif sample_width == 2:
+    elif sample_width == WIDTH_16_BIT:
         encoded = numpy.rint(clipped * 32767.0).astype("<i2")
-    elif sample_width == 3:
+    elif sample_width == WIDTH_24_BIT:
         integer = numpy.rint(clipped * (2**23 - 1)).astype(numpy.int32)
         unsigned = integer.astype(numpy.int64) & 0xFFFFFF
         encoded = numpy.empty((*integer.shape, 3), dtype=numpy.uint8)
@@ -573,14 +582,14 @@ def wav_payload_from_pcm(
         encoded[..., 1] = (unsigned >> 8) & 0xFF
         encoded[..., 2] = (unsigned >> 16) & 0xFF
         raw = encoded.tobytes()
-    elif sample_width == 4:
+    elif sample_width == WIDTH_32_BIT:
         encoded = numpy.rint(clipped * (2**31 - 1)).astype("<i4")
     else:
         raise AudioValidationError(
             "WAV sample width is unsupported",
             {"code": "unsupported_sample_width", "sample_width": sample_width},
         )
-    if sample_width != 3:
+    if sample_width != WIDTH_24_BIT:
         raw = encoded.tobytes()
     payload = io.BytesIO()
     with wave.open(payload, "wb") as writer:
@@ -640,7 +649,7 @@ class Sample:
             raise AudioValidationError(
                 "audio payload is empty", {"code": "empty_payload"}
             )
-        if len(self.file_hash) != 64 or any(
+        if len(self.file_hash) != SHA256_HEX_LENGTH or any(
             character not in "0123456789abcdef" for character in self.file_hash
         ):
             raise ValueError("file_hash must be a SHA-256 hex digest")
@@ -655,7 +664,7 @@ class Sample:
         source: str = "memory://",
         probe: AudioProbe | None = None,
         max_bytes: int | None = 500 * 1024 * 1024,
-        label: str | int | float | bool | None = None,
+        label: str | float | bool | None = None,
         group_id: str | None = None,
         transcript: Transcript | None = None,
     ) -> Self:
@@ -894,36 +903,14 @@ class Dataset:
             ValueError: If a fraction is outside [0, 1) or the fractions sum
                 to 1 or more.
         """
-        if not 0 <= validation_fraction < 1:
-            raise ValueError("validation_fraction must be in [0, 1)")
-        if not 0 <= test_fraction < 1:
-            raise ValueError("test_fraction must be in [0, 1)")
-        if validation_fraction + test_fraction >= 1:
-            raise ValueError("validation_fraction + test_fraction must be < 1")
+        check_split_fractions(validation_fraction, test_fraction)
         grouped: dict[str, list[Sample]] = {}
         for sample in self.samples:
             grouped.setdefault(sample.group_id or sample.source, []).append(
                 sample
             )
-        groups = sorted(grouped)
-        randomizer = random.Random(seed)  # nosec B311 - seeded data split
-        randomizer.shuffle(groups)
-        test_count = int(len(groups) * test_fraction)
-        validation_count = int(len(groups) * validation_fraction)
-        if test_fraction and test_count == 0 and len(groups) >= 3:
-            test_count = 1
-        if validation_fraction and validation_count == 0 and len(groups) >= 3:
-            validation_count = 1
-        while test_count + validation_count >= len(groups):
-            if validation_count > 0:
-                validation_count -= 1
-            elif test_count > 0:
-                test_count -= 1
-            else:
-                break
-        test_groups = set(groups[:test_count])
-        validation_groups = set(
-            groups[test_count : test_count + validation_count]
+        validation_groups, test_groups = partition_group_ids(
+            grouped, validation_fraction, test_fraction, seed
         )
 
         def samples_for(excluded: set[str]) -> tuple[Sample, ...]:
@@ -1007,7 +994,7 @@ class Dataset:
                     "Obtain confidence from the transcript provider or "
                     "record why confidence is unavailable before using "
                     "transcript-dependent claims.",
-                    False,
+                    blocking=False,
                 )
             )
         if len(formats) > 1:
@@ -1019,7 +1006,7 @@ class Dataset:
                     {"formats": formats},
                     "Select an explicit codec normalization policy before "
                     "training.",
-                    False,
+                    blocking=False,
                 )
             )
         if len(sample_rates) > 1 or len(channels) > 1:
@@ -1034,7 +1021,7 @@ class Dataset:
                     },
                     "Resample or channel-normalize with the transformation "
                     "recorded.",
-                    False,
+                    blocking=False,
                 )
             )
         risk_findings = []
@@ -1047,7 +1034,7 @@ class Dataset:
                     {"label_counts": labels},
                     "Declare whether unlabeled clips are valid for the "
                     "intended task.",
-                    False,
+                    blocking=False,
                 )
             )
         if conflicts:
@@ -1059,7 +1046,7 @@ class Dataset:
                     {"groups": list(conflicts)},
                     "Resolve the label conflict or explicitly exclude the "
                     "affected audio content.",
-                    True,
+                    blocking=True,
                 )
             )
         return Curation(

@@ -292,7 +292,9 @@ def sentinel_mask(
         A boolean frame of the shape of `frame`, True where a cell holds a
         code reported for its column.
     """
-    mask = pandas.DataFrame(False, index=frame.index, columns=frame.columns)
+    mask = pandas.DataFrame(
+        data=False, index=frame.index, columns=frame.columns
+    )
     for finding in report.findings:
         series = frame[finding.column]
         if finding.kind == "dictionary":
@@ -301,7 +303,7 @@ def sentinel_mask(
             hit &= series.notna()
         else:
             hit = series == finding.value
-        mask[finding.column] |= hit.fillna(False).to_numpy(dtype=bool)
+        mask[finding.column] |= hit.fillna(value=False).to_numpy(dtype=bool)
     return mask
 
 

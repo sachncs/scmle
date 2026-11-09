@@ -109,10 +109,11 @@ def diagnostic_rows(
         classifier and kernel shift checks that exist, then the per-column
         shift checks, restricted to those whose set is the exploration set.
     """
-    out: list[tuple[str, qualification.Check]] = []
-    for finding in found.findings:
-        if finding.check is not None:
-            out.append((stability.DETECTOR_ID, finding.check))
+    out: list[tuple[str, qualification.Check]] = [
+        (stability.DETECTOR_ID, finding.check)
+        for finding in found.findings
+        if finding.check is not None
+    ]
     for name, check in (
         (shift.C2ST_ID, found.shift.c2st),
         (shift.MMD_ID, found.shift.mmd),

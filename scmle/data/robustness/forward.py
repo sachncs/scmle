@@ -114,7 +114,9 @@ def skipped(reason: str) -> ForwardCheck:
     Returns:
         A `skipped` result with `opened` False and no findings.
     """
-    return ForwardCheck("skipped", reason, False, ())
+    return ForwardCheck(
+        status="skipped", reason=reason, opened=False, findings=()
+    )
 
 
 def label_for(effect_x: float, low: float, high: float) -> str:
@@ -255,8 +257,8 @@ def forward_check(
             )
         )
     return ForwardCheck(
-        "checked",
-        "F was opened once and nothing was fitted on it",
-        True,
-        tuple(findings),
+        status="checked",
+        reason="F was opened once and nothing was fitted on it",
+        opened=True,
+        findings=tuple(findings),
     )

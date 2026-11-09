@@ -104,7 +104,7 @@ class ReplaySampler:
         self.model_id = model_id
         self.recorded = [dict(r) for r in recorded]
 
-    def sample(self, prompt: str, index: int) -> Mapping[str, Any]:
+    def sample(self, prompt: str, index: int) -> Mapping[str, Any]:  # noqa: ARG002 -- implements the SlotSampler protocol
         """Returns the recorded proposal for `index`.
 
         Args:

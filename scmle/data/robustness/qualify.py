@@ -177,28 +177,30 @@ def run(
     if len(survivors) > MAX_FINDINGS:
         notes = (
             *notes,
-            f"only the first {MAX_FINDINGS} of {len(survivors)} findings "
-            "were assessed",
+            (
+                f"only the first {MAX_FINDINGS} of {len(survivors)} findings "
+                "were assessed"
+            ),
         )
     if not stability_note:
         share = budget_seconds / max(len(chosen), 1)
         curve = min(permutations, MAX_CURVE_PERMUTATIONS)
-        for name in chosen:
-            findings.append(
-                stability.assess_finding(
-                    name,
-                    features[name].to_numpy(dtype=float),
-                    codes.to_numpy(dtype=float),
-                    grid,
-                    seed,
-                    bootstrap=MAX_BOOTSTRAP,
-                    strata=strata,
-                    curve_permutations=curve,
-                    budget_seconds=share,
-                    gate=stability_gate,
-                    rule=rule,
-                )
+        findings.extend(
+            stability.assess_finding(
+                name,
+                features[name].to_numpy(dtype=float),
+                codes.to_numpy(dtype=float),
+                grid,
+                seed,
+                bootstrap=MAX_BOOTSTRAP,
+                strata=strata,
+                curve_permutations=curve,
+                budget_seconds=share,
+                gate=stability_gate,
+                rule=rule,
             )
+            for name in chosen
+        )
     sample = features[[c for c in candidates if c in features.columns]]
     reference_frame = (
         None if reference is None else reference.head(MAX_REFERENCE_ROWS)

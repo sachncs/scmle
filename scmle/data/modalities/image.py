@@ -11,7 +11,6 @@ import hashlib
 import io
 import json
 import pathlib
-import random
 from types import MappingProxyType
 from typing import Any
 from typing import Self
@@ -21,10 +20,18 @@ import numpy
 from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.data.modalities.curation import build_finding
+from scmle.data.modalities.curation import check_split_fractions
 from scmle.data.modalities.curation import conflicting_label_groups
 from scmle.data.modalities.curation import Curation
 from scmle.data.modalities.curation import dataset_hash
 from scmle.data.modalities.curation import label_counts
+from scmle.data.modalities.curation import partition_group_ids
+
+IMAGE_SIZE_DIMENSIONS = 2
+SHA256_HEX_LENGTH = 64
+MIN_HASH_SIZE = 2
+MAX_HASH_SIZE = 32
+MATRIX_DIMENSIONS = 2
 
 PillowModule: Any = None
 try:
@@ -131,6 +138,65 @@ def require_pillow(operation: str = "image data") -> Any:
     return PillowModule
 
 
+def check_dimensions(
+    width: int, height: int, max_pixels: int | None, source: str
+) -> None:
+    """Checks that decoded image dimensions are positive and within limits.
+
+    Args:
+        width: Decoded width in pixels.
+        height: Decoded height in pixels.
+        max_pixels: Maximum decoded pixel count, or ``None`` for no limit.
+        source: Stable source label, recorded in the error.
+
+    Raises:
+        ImageValidationError: If a dimension is not positive or the pixel
+            count exceeds ``max_pixels``.
+    """
+    if width <= 0 or height <= 0:
+        raise ImageValidationError(
+            "image dimensions must be positive",
+            code="empty_dimensions",
+            source=source,
+        )
+    pixel_count = width * height
+    if max_pixels is not None and pixel_count > max_pixels:
+        raise ImageValidationError(
+            f"image has {pixel_count} pixels; limit is {max_pixels}",
+            code="pixel_count_limit",
+            source=source,
+            details={"pixel_count": pixel_count, "max_pixels": max_pixels},
+        )
+
+
+def neighbor_components(neighbors: Mapping[int, set[int]]) -> list[set[int]]:
+    """Finds the connected groups of a neighbour graph.
+
+    Args:
+        neighbors: For each node ``0..n-1``, the nodes it neighbours.
+
+    Returns:
+        The connected components that hold at least two nodes, in order of
+        their smallest node.
+    """
+    components = []
+    visited: set[int] = set()
+    for start in range(len(neighbors)):
+        if start in visited or not neighbors[start]:
+            continue
+        pending = [start]
+        component: set[int] = set()
+        while pending:
+            current = pending.pop()
+            if current in component:
+                continue
+            component.add(current)
+            visited.add(current)
+            pending.extend(neighbors[current] - component)
+        components.append(component)
+    return components
+
+
 def canonical_source(source: str | pathlib.Path) -> str:
     """Returns a stable source identifier for a path or URI-like value.
 
@@ -165,7 +231,7 @@ def validate_feature_options(
         ValueError: If ``target_size`` is not two positive integers, or
             ``mode`` is not a supported mode.
     """
-    if len(target_size) != 2 or any(
+    if len(target_size) != IMAGE_SIZE_DIMENSIONS or any(
         not isinstance(value, int) or isinstance(value, bool) or value <= 0
         for value in target_size
     ):
@@ -348,7 +414,10 @@ class Sample:
             raise ValueError("image dimensions must be positive")
         if self.channels <= 0:
             raise ValueError("channels must be positive")
-        if len(self.file_hash) != 64 or len(self.content_hash) != 64:
+        if (
+            len(self.file_hash) != SHA256_HEX_LENGTH
+            or len(self.content_hash) != SHA256_HEX_LENGTH
+        ):
             raise ValueError("image hashes must be SHA-256 hex digests")
 
     @classmethod
@@ -358,7 +427,7 @@ class Sample:
         source: str = "memory://",
         max_bytes: int | None = DEFAULT_MAX_BYTES,
         max_pixels: int | None = DEFAULT_MAX_PIXELS,
-        label: str | int | float | bool | None = None,
+        label: str | float | bool | None = None,
         group_id: str | None = None,
         augmentation: Augmentation | None = None,
     ) -> Self:
@@ -404,24 +473,7 @@ class Sample:
                 opened.verify()
             with PillowModule.open(io.BytesIO(raw)) as opened:
                 width, height = opened.size
-                if width <= 0 or height <= 0:
-                    raise ImageValidationError(
-                        "image dimensions must be positive",
-                        code="empty_dimensions",
-                        source=stable_source,
-                    )
-                pixel_count = width * height
-                if max_pixels is not None and pixel_count > max_pixels:
-                    raise ImageValidationError(
-                        f"image has {pixel_count} pixels; "
-                        f"limit is {max_pixels}",
-                        code="pixel_count_limit",
-                        source=stable_source,
-                        details={
-                            "pixel_count": pixel_count,
-                            "max_pixels": max_pixels,
-                        },
-                    )
+                check_dimensions(width, height, max_pixels, stable_source)
                 mode = opened.mode
                 channels = len(opened.getbands())
                 format_name = opened.format or "unknown"
@@ -468,7 +520,7 @@ class Sample:
         path: str | pathlib.Path,
         max_bytes: int | None = DEFAULT_MAX_BYTES,
         max_pixels: int | None = DEFAULT_MAX_PIXELS,
-        label: str | int | float | bool | None = None,
+        label: str | float | bool | None = None,
         group_id: str | None = None,
         augmentation: Augmentation | None = None,
     ) -> Self:
@@ -549,7 +601,7 @@ class Sample:
         if (
             not isinstance(hash_size, int)
             or isinstance(hash_size, bool)
-            or not 2 <= hash_size <= 32
+            or not MIN_HASH_SIZE <= hash_size <= MAX_HASH_SIZE
         ):
             raise ValueError("hash_size must be an integer between 2 and 32")
         pixels = self.decode("L", (hash_size, hash_size))[..., 0]
@@ -623,7 +675,7 @@ class Sample:
                 source=self.source,
                 details={"exception": type(error).__name__},
             ) from error
-        if pixels.ndim == 2:
+        if pixels.ndim == MATRIX_DIMENSIONS:
             pixels = pixels[..., numpy.newaxis]
         return numpy.ascontiguousarray(pixels)
 
@@ -867,26 +919,11 @@ class Dataset:
                 ).bit_count() <= max_hamming_distance:
                     neighbors[left].add(right)
                     neighbors[right].add(left)
-        groups = []
-        visited: set[int] = set()
-        for start in range(len(candidates)):
-            if start in visited or not neighbors[start]:
-                continue
-            pending = [start]
-            component: set[int] = set()
-            while pending:
-                current = pending.pop()
-                if current in component:
-                    continue
-                component.add(current)
-                visited.add(current)
-                pending.extend(neighbors[current] - component)
-            if len({candidates[index].content_hash for index in component}) > 1:
-                groups.append(
-                    tuple(
-                        sorted(candidates[index].source for index in component)
-                    )
-                )
+        groups = [
+            tuple(sorted(candidates[index].source for index in component))
+            for component in neighbor_components(neighbors)
+            if len({candidates[index].content_hash for index in component}) > 1
+        ]
         return tuple(sorted(groups))
 
     def profile(
@@ -1053,7 +1090,7 @@ class Dataset:
                     {"dataset": "empty"},
                     {"sample_count": 0},
                     "Provide at least one validated image before training.",
-                    True,
+                    blocking=True,
                 )
             )
         if profile.duplicate_count:
@@ -1064,7 +1101,7 @@ class Dataset:
                     {"dataset": "profiled_samples"},
                     {"duplicate_count": profile.duplicate_count},
                     "Review duplicate content and prevent split contamination.",
-                    False,
+                    blocking=False,
                 )
             )
         if near_duplicate_groups:
@@ -1081,7 +1118,7 @@ class Dataset:
                     },
                     "Review visually similar images and keep related content "
                     "within one split before training.",
-                    False,
+                    blocking=False,
                 )
             )
         if conflicts:
@@ -1093,7 +1130,7 @@ class Dataset:
                     {"groups": list(conflicts)},
                     "Resolve the label conflict or explicitly exclude the "
                     "affected content.",
-                    True,
+                    blocking=True,
                 )
             )
         if sensitive_metadata:
@@ -1105,7 +1142,7 @@ class Dataset:
                     {"tags": sensitive_metadata},
                     "Review, redact, or explicitly approve image metadata "
                     "before training or distribution.",
-                    True,
+                    blocking=True,
                 )
             )
         if profile.truncated:
@@ -1120,7 +1157,7 @@ class Dataset:
                     },
                     "Run a full-content audit before release or record the "
                     "sampling policy.",
-                    False,
+                    blocking=False,
                 )
             )
         if "unlabeled" in labels and len(labels) > 1:
@@ -1132,7 +1169,7 @@ class Dataset:
                     {"label_counts": labels},
                     "Declare whether unlabeled images are valid for the "
                     "intended task before training.",
-                    False,
+                    blocking=False,
                 )
             )
         return Curation(
@@ -1209,36 +1246,14 @@ class Dataset:
         """
         if not self.samples:
             raise ValueError("cannot split an empty image dataset")
-        if not 0 <= validation_fraction < 1:
-            raise ValueError("validation_fraction must be in [0, 1)")
-        if not 0 <= test_fraction < 1:
-            raise ValueError("test_fraction must be in [0, 1)")
-        if validation_fraction + test_fraction >= 1:
-            raise ValueError("validation_fraction + test_fraction must be < 1")
+        check_split_fractions(validation_fraction, test_fraction)
         grouped: dict[str, list[Sample]] = {}
         for sample in self.samples:
             grouped.setdefault(sample.group_id or sample.source, []).append(
                 sample
             )
-        groups = sorted(grouped)
-        randomizer = random.Random(seed)  # nosec B311 - seeded data split
-        randomizer.shuffle(groups)
-        test_count = int(len(groups) * test_fraction)
-        validation_count = int(len(groups) * validation_fraction)
-        if test_fraction and test_count == 0 and len(groups) >= 3:
-            test_count = 1
-        if validation_fraction and validation_count == 0 and len(groups) >= 3:
-            validation_count = 1
-        while test_count + validation_count >= len(groups):
-            if validation_count > 0:
-                validation_count -= 1
-            elif test_count > 0:
-                test_count -= 1
-            else:
-                break
-        test_groups = set(groups[:test_count])
-        validation_groups = set(
-            groups[test_count : test_count + validation_count]
+        validation_groups, test_groups = partition_group_ids(
+            grouped, validation_fraction, test_fraction, seed
         )
 
         def samples_for(excluded: set[str]) -> tuple[Sample, ...]:

@@ -96,7 +96,7 @@ def parse_timestamp(value: str, field_name: str) -> datetime.datetime:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{field_name} must not be empty")
     try:
-        parsed = datetime.datetime.fromisoformat(value.replace("Z", "+00:00"))
+        parsed = datetime.datetime.fromisoformat(value)
     except ValueError as error:
         raise ValueError(f"{field_name} must be ISO-8601") from error
     if parsed.tzinfo is None:
@@ -952,13 +952,13 @@ class IngestionLedger:
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
         with self.lock_path.open("a+b") as handle:
             if os.name == "nt":
-                import msvcrt
+                import msvcrt  # noqa: PLC0415 -- Windows-only module, imported only on Windows
 
                 windows_lock: Any = msvcrt
                 handle.seek(0)
                 windows_lock.locking(handle.fileno(), windows_lock.LK_LOCK, 1)
             else:
-                import fcntl
+                import fcntl  # noqa: PLC0415 -- POSIX-only module, imported only off Windows
 
                 fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
             try:
@@ -1058,7 +1058,7 @@ class IngestionLedger:
                 handle.write("\n")
                 handle.flush()
                 os.fsync(handle.fileno())
-            os.replace(temporary_name, self.path)
+            pathlib.Path(temporary_name).replace(self.path)
             durability.sync_directory(self.path.parent)
         except BaseException:
             pathlib.Path(temporary_name).unlink(missing_ok=True)
@@ -1101,7 +1101,9 @@ class IngestionLedger:
                 handle.write("\n")
                 handle.flush()
                 os.fsync(handle.fileno())
-            os.replace(temporary_name, self.pending_acknowledgement_path)
+            pathlib.Path(temporary_name).replace(
+                self.pending_acknowledgement_path
+            )
             durability.sync_directory(self.pending_acknowledgement_path.parent)
         except BaseException:
             pathlib.Path(temporary_name).unlink(missing_ok=True)

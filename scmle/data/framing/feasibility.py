@@ -23,6 +23,8 @@ from scmle.data.framing import baseline
 
 INCONCLUSIVE = "inconclusive"
 CONFIDENCE = 0.95
+MIN_CLUSTERS = 2
+MIN_GAIN_ROWS = 3
 
 
 def intraclass(d: ArrayLike, clusters: ArrayLike) -> tuple[float, float]:
@@ -43,7 +45,7 @@ def intraclass(d: ArrayLike, clusters: ArrayLike) -> tuple[float, float]:
     values = baseline.vector(d, "d")
     codes, g = baseline.factorize(clusters)
     n = values.size
-    if g < 2 or n <= g:
+    if g < MIN_CLUSTERS or n <= g:
         return 0.0, n / max(g, 1)
     counts = numpy.bincount(codes, minlength=g).astype(float)
     means = numpy.bincount(codes, weights=values, minlength=g) / counts
@@ -163,7 +165,7 @@ def assess(
         raise ValueError("delta_min must be greater than 0")
     n = values.size
     s_d = float(values.std(ddof=1))
-    if n < 3 or s_d == 0.0:
+    if n < MIN_GAIN_ROWS or s_d == 0.0:
         raise ValueError("s_d cannot be estimated from these gains")
     rho, m = intraclass(values, clusters)
     deff = 1.0 + (m - 1.0) * rho

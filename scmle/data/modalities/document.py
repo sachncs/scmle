@@ -8,18 +8,23 @@ implicitly or silently changes its dependency surface.
 
 from collections import defaultdict
 from collections.abc import Callable
+from collections.abc import Mapping
 from collections.abc import Sequence
 import dataclasses
 import enum
 import hashlib
 import math
 import pathlib
-import random
 import re
 from typing import Any
 
 from scmle.contracts import data
 from scmle.contracts import errors
+from scmle.data.modalities.curation import check_split_fractions
+from scmle.data.modalities.curation import partition_group_ids
+
+DEVANAGARI_MIN_SHARE = 0.25
+ASCII_LETTER_MIN_SHARE = 0.60
 
 
 class Format(enum.StrEnum):
@@ -704,6 +709,56 @@ class Split:
         }
 
 
+def label_key(label: str | float | bool | None) -> str:
+    """Returns a stable human-readable label bucket.
+
+    Args:
+        label: A sample label, possibly None.
+
+    Returns:
+        ``unlabeled`` for None, otherwise ``<type name>:<label>``.
+    """
+    if label is None:
+        return "unlabeled"
+    return f"{type(label).__name__}:{label}"
+
+
+def document_finding(
+    finding_id: str,
+    severity: data.FindingSeverity,
+    scope: dict[str, Any],
+    evidence: dict[str, Any],
+    remediation: str,
+    blocking: bool,
+) -> data.CurationFinding:
+    """Creates a document-specific finding with one stable rule.
+
+    Args:
+        finding_id: Identifier of the finding.
+        severity: Severity of the finding.
+        scope: Description of what the finding affects.
+        evidence: Evidence supporting the finding.
+        remediation: Action that would resolve the finding.
+        blocking: Whether the finding blocks release until resolved.
+
+    Returns:
+        An open finding with confidence 1.0 and owner ``data-curation``.
+    """
+    return data.CurationFinding(
+        finding_id=finding_id,
+        rule_version="document-curation.v1",
+        severity=severity,
+        confidence=1.0,
+        affected_scope=scope,
+        evidence=evidence,
+        remediation=remediation,
+        owner="data-curation",
+        reviewer=None,
+        disposition=data.FindingDisposition.OPEN,
+        blocking=blocking,
+    )
+
+
 @dataclasses.dataclass(frozen=True, slots=True)
 class Dataset:
     """Immutable collection of documents with identity and split operations.
@@ -812,28 +867,11 @@ class Dataset:
         language_counts: dict[str, int] = defaultdict(int)
         format_counts: dict[str, int] = defaultdict(int)
         label_counts: dict[str, int] = defaultdict(int)
-        sample_by_id = {sample.document_id: sample for sample in self.samples}
-
-        def label_key(label: str | int | float | bool | None) -> str:
-            """Returns a stable human-readable label bucket.
-
-            Args:
-                label: A sample label, possibly None.
-
-            Returns:
-                ``unlabeled`` for None, otherwise ``<type name>:<label>``.
-            """
-            if label is None:
-                return "unlabeled"
-            return f"{type(label).__name__}:{label}"
-
         for sample, profile in zip(self.samples, profiles, strict=True):
             language_counts[profile.language] += 1
             format_counts[sample.format.value] += 1
             label_counts[label_key(sample.label)] += 1
 
-        quality_findings: list[data.CurationFinding] = []
-        risk_findings: list[data.CurationFinding] = []
         layouts = [
             sample.layout
             for sample in self.samples
@@ -844,196 +882,21 @@ class Dataset:
             for layout in layouts
             if layout.ocr_confidence is not None
         ]
-        missing_ocr_confidence = sum(
-            layout.ocr_confidence is None for layout in layouts
+        sensitive_counts, sensitive_document_ids = self.sensitive_summary()
+        quality_findings = self.collect_quality_findings(
+            profiles, duplicate_groups, layouts, max_characters, max_tokens
         )
-        sensitive_counts: defaultdict[str, int] = defaultdict(int)
-        sensitive_document_ids: list[str] = []
-        for sample in self.samples:
-            matches = sensitive_matches(sample.content)
-            if matches:
-                sensitive_document_ids.append(sample.document_id)
-                for name, count in matches.items():
-                    sensitive_counts[name] += count
-
-        def create_finding(
-            finding_id: str,
-            severity: data.FindingSeverity,
-            scope: dict[str, Any],
-            evidence: dict[str, Any],
-            remediation: str,
-            blocking: bool,
-        ) -> data.CurationFinding:
-            """Creates a document-specific finding with one stable rule.
-
-            Args:
-                finding_id: Identifier of the finding.
-                severity: Severity of the finding.
-                scope: Description of what the finding affects.
-                evidence: Evidence supporting the finding.
-                remediation: Action that would resolve the finding.
-                blocking: Whether the finding blocks release until resolved.
-
-            Returns:
-                An open finding with confidence 1.0 and owner
-                ``data-curation``.
-            """
-            return data.CurationFinding(
-                finding_id=finding_id,
-                rule_version="document-curation.v1",
-                severity=severity,
-                confidence=1.0,
-                affected_scope=scope,
-                evidence=evidence,
-                remediation=remediation,
-                owner="data-curation",
-                reviewer=None,
-                disposition=data.FindingDisposition.OPEN,
-                blocking=blocking,
-            )
-
-        if missing_ocr_confidence:
-            quality_findings.append(
-                create_finding(
-                    "quality.document-ocr-confidence-missing",
-                    data.FindingSeverity.WARNING,
-                    {
-                        "document_ids": [
-                            sample.document_id
-                            for sample in self.samples
-                            if sample.layout is not None
-                        ]
-                    },
-                    {"sample_count": missing_ocr_confidence},
-                    "Record OCR confidence or an explicit reason it is "
-                    "unavailable before making extraction-quality claims.",
-                    False,
-                )
-            )
-
-        if duplicate_groups:
-            quality_findings.append(
-                create_finding(
-                    "quality.duplicate-document-content",
-                    data.FindingSeverity.WARNING,
-                    {"groups": [list(group) for group in duplicate_groups]},
-                    {"group_count": len(duplicate_groups)},
-                    "Confirm duplicates are intentional or deduplicate "
-                    "before training.",
-                    False,
-                )
-            )
-
-        if sensitive_counts:
-            risk_findings.append(
-                create_finding(
-                    "risk.document-sensitive-content",
-                    data.FindingSeverity.ERROR,
-                    {"document_ids": sorted(sensitive_document_ids)},
-                    {"match_counts": dict(sorted(sensitive_counts.items()))},
-                    "Redact or explicitly govern detected sensitive content "
-                    "before training or promotion.",
-                    True,
-                )
-            )
-
-        truncated_ids = tuple(
-            profile.document_id for profile in profiles if profile.truncated
+        risk_findings = self.collect_risk_findings(
+            duplicate_groups,
+            label_counts,
+            sensitive_counts,
+            sensitive_document_ids,
         )
-        if truncated_ids:
-            quality_findings.append(
-                create_finding(
-                    "quality.profile-truncated",
-                    data.FindingSeverity.INFO,
-                    {"document_ids": list(truncated_ids)},
-                    {
-                        "max_characters": max_characters,
-                        "max_tokens": max_tokens,
-                    },
-                    "Increase profiling bounds or run a full-content audit "
-                    "before release.",
-                    False,
-                )
-            )
-
-        unknown_ids = tuple(
-            profile.document_id
-            for profile in profiles
-            if profile.language == "unknown"
-        )
-        if unknown_ids:
-            quality_findings.append(
-                create_finding(
-                    "quality.unknown-language",
-                    data.FindingSeverity.WARNING,
-                    {"document_ids": list(unknown_ids)},
-                    {"count": len(unknown_ids)},
-                    "Confirm language coverage and configure an appropriate "
-                    "tokenizer.",
-                    False,
-                )
-            )
-
-        for group in duplicate_groups:
-            labels = {
-                label_key(sample_by_id[document_id].label)
-                for document_id in group
-            }
-            if len(labels) > 1:
-                risk_findings.append(
-                    create_finding(
-                        "risk.conflicting-duplicate-labels",
-                        data.FindingSeverity.ERROR,
-                        {"document_ids": list(group)},
-                        {"labels": sorted(labels)},
-                        "Resolve the label conflict or explicitly exclude "
-                        "the affected content.",
-                        True,
-                    )
-                )
-        mixed_label_state = (
-            "unlabeled" in label_counts and len(label_counts) > 1
-        )
-        if mixed_label_state:
-            risk_findings.append(
-                create_finding(
-                    "risk.mixed-label-state",
-                    data.FindingSeverity.WARNING,
-                    {"dataset": self.content_hash},
-                    {"label_counts": dict(label_counts)},
-                    "Declare whether unlabeled samples are valid for the "
-                    "intended task.",
-                    False,
-                )
-            )
-
         traceable_samples = tuple(
             sample
             for sample in self.samples
             if sample.source_uri.strip() and sample.source_digest is not None
         )
-        partially_traceable = tuple(
-            sample
-            for sample in self.samples
-            if bool(sample.source_uri.strip())
-            != (sample.source_digest is not None)
-        )
-        if partially_traceable:
-            quality_findings.append(
-                create_finding(
-                    "quality.document-source-traceability-incomplete",
-                    data.FindingSeverity.WARNING,
-                    {
-                        "document_ids": [
-                            sample.document_id for sample in partially_traceable
-                        ]
-                    },
-                    {"sample_count": len(partially_traceable)},
-                    "Provide both the source URI and raw-source digest before "
-                    "claiming citation traceability.",
-                    False,
-                )
-            )
 
         return Curation(
             dataset_hash=self.content_hash,
@@ -1071,6 +934,210 @@ class Dataset:
             max_tokens=max_tokens,
         )
 
+    def sensitive_summary(self) -> tuple[dict[str, int], list[str]]:
+        """Counts sensitive-value matches across the corpus.
+
+        Returns:
+            The match count of each sensitive-value name, and the ids of the
+            documents that have any match, in sample order.
+        """
+        sensitive_counts: defaultdict[str, int] = defaultdict(int)
+        sensitive_document_ids: list[str] = []
+        for sample in self.samples:
+            matches = sensitive_matches(sample.content)
+            if matches:
+                sensitive_document_ids.append(sample.document_id)
+                for name, count in matches.items():
+                    sensitive_counts[name] += count
+        return sensitive_counts, sensitive_document_ids
+
+    def collect_quality_findings(
+        self,
+        profiles: tuple[Profile, ...],
+        duplicate_groups: tuple[tuple[str, ...], ...],
+        layouts: list[Layout],
+        max_characters: int,
+        max_tokens: int,
+    ) -> list[data.CurationFinding]:
+        """Builds the data-quality findings of the corpus.
+
+        Args:
+            profiles: One profile per sample.
+            duplicate_groups: Groups of document ids with identical content.
+            layouts: The layouts that samples carry.
+            max_characters: Maximum characters inspected per sample.
+            max_tokens: Maximum tokens retained per sample.
+
+        Returns:
+            The findings for missing OCR confidence, duplicate content,
+            truncated profiles, unknown language and incomplete source
+            traceability, in that order.
+        """
+        findings: list[data.CurationFinding] = []
+        missing_ocr_confidence = sum(
+            layout.ocr_confidence is None for layout in layouts
+        )
+        if missing_ocr_confidence:
+            findings.append(
+                document_finding(
+                    "quality.document-ocr-confidence-missing",
+                    data.FindingSeverity.WARNING,
+                    {
+                        "document_ids": [
+                            sample.document_id
+                            for sample in self.samples
+                            if sample.layout is not None
+                        ]
+                    },
+                    {"sample_count": missing_ocr_confidence},
+                    "Record OCR confidence or an explicit reason it is "
+                    "unavailable before making extraction-quality claims.",
+                    blocking=False,
+                )
+            )
+
+        if duplicate_groups:
+            findings.append(
+                document_finding(
+                    "quality.duplicate-document-content",
+                    data.FindingSeverity.WARNING,
+                    {"groups": [list(group) for group in duplicate_groups]},
+                    {"group_count": len(duplicate_groups)},
+                    "Confirm duplicates are intentional or deduplicate "
+                    "before training.",
+                    blocking=False,
+                )
+            )
+
+        truncated_ids = tuple(
+            profile.document_id for profile in profiles if profile.truncated
+        )
+        if truncated_ids:
+            findings.append(
+                document_finding(
+                    "quality.profile-truncated",
+                    data.FindingSeverity.INFO,
+                    {"document_ids": list(truncated_ids)},
+                    {
+                        "max_characters": max_characters,
+                        "max_tokens": max_tokens,
+                    },
+                    "Increase profiling bounds or run a full-content audit "
+                    "before release.",
+                    blocking=False,
+                )
+            )
+
+        unknown_ids = tuple(
+            profile.document_id
+            for profile in profiles
+            if profile.language == "unknown"
+        )
+        if unknown_ids:
+            findings.append(
+                document_finding(
+                    "quality.unknown-language",
+                    data.FindingSeverity.WARNING,
+                    {"document_ids": list(unknown_ids)},
+                    {"count": len(unknown_ids)},
+                    "Confirm language coverage and configure an appropriate "
+                    "tokenizer.",
+                    blocking=False,
+                )
+            )
+
+        partially_traceable = tuple(
+            sample
+            for sample in self.samples
+            if bool(sample.source_uri.strip())
+            != (sample.source_digest is not None)
+        )
+        if partially_traceable:
+            findings.append(
+                document_finding(
+                    "quality.document-source-traceability-incomplete",
+                    data.FindingSeverity.WARNING,
+                    {
+                        "document_ids": [
+                            sample.document_id for sample in partially_traceable
+                        ]
+                    },
+                    {"sample_count": len(partially_traceable)},
+                    "Provide both the source URI and raw-source digest before "
+                    "claiming citation traceability.",
+                    blocking=False,
+                )
+            )
+        return findings
+
+    def collect_risk_findings(
+        self,
+        duplicate_groups: tuple[tuple[str, ...], ...],
+        label_counts: Mapping[str, int],
+        sensitive_counts: Mapping[str, int],
+        sensitive_document_ids: list[str],
+    ) -> list[data.CurationFinding]:
+        """Builds the risk findings of the corpus.
+
+        Args:
+            duplicate_groups: Groups of document ids with identical content.
+            label_counts: Samples per label bucket.
+            sensitive_counts: Match count of each sensitive-value name.
+            sensitive_document_ids: Ids of the documents with a match.
+
+        Returns:
+            The findings for sensitive content, conflicting labels inside a
+            duplicate group and a mix of labelled and unlabelled samples, in
+            that order.
+        """
+        findings: list[data.CurationFinding] = []
+        sample_by_id = {sample.document_id: sample for sample in self.samples}
+        if sensitive_counts:
+            findings.append(
+                document_finding(
+                    "risk.document-sensitive-content",
+                    data.FindingSeverity.ERROR,
+                    {"document_ids": sorted(sensitive_document_ids)},
+                    {"match_counts": dict(sorted(sensitive_counts.items()))},
+                    "Redact or explicitly govern detected sensitive content "
+                    "before training or promotion.",
+                    blocking=True,
+                )
+            )
+        for group in duplicate_groups:
+            labels = {
+                label_key(sample_by_id[document_id].label)
+                for document_id in group
+            }
+            if len(labels) > 1:
+                findings.append(
+                    document_finding(
+                        "risk.conflicting-duplicate-labels",
+                        data.FindingSeverity.ERROR,
+                        {"document_ids": list(group)},
+                        {"labels": sorted(labels)},
+                        "Resolve the label conflict or explicitly exclude "
+                        "the affected content.",
+                        blocking=True,
+                    )
+                )
+        mixed_label_state = (
+            "unlabeled" in label_counts and len(label_counts) > 1
+        )
+        if mixed_label_state:
+            findings.append(
+                document_finding(
+                    "risk.mixed-label-state",
+                    data.FindingSeverity.WARNING,
+                    {"dataset": self.content_hash},
+                    {"label_counts": dict(label_counts)},
+                    "Declare whether unlabeled samples are valid for the "
+                    "intended task.",
+                    blocking=False,
+                )
+            )
+        return findings
+
     def split(
         self,
         validation_fraction: float = 0.2,
@@ -1099,41 +1166,13 @@ class Dataset:
             ValueError: If a fraction is outside [0, 1) or the fractions sum
                 to 1 or more.
         """
-        if not 0 <= validation_fraction < 1:
-            raise ValueError("validation_fraction must be in [0, 1)")
-        if not 0 <= test_fraction < 1:
-            raise ValueError("test_fraction must be in [0, 1)")
-        if validation_fraction + test_fraction >= 1:
-            raise ValueError("validation_fraction + test_fraction must be < 1")
+        check_split_fractions(validation_fraction, test_fraction)
 
         grouped: defaultdict[str, list[Sample]] = defaultdict(list)
         for sample in self.samples:
             grouped[sample.document_id].append(sample)
-        document_ids = sorted(grouped)
-        randomizer = random.Random(seed)  # nosec B311 - seeded data split
-        randomizer.shuffle(document_ids)
-
-        test_count = int(len(document_ids) * test_fraction)
-        validation_count = int(len(document_ids) * validation_fraction)
-        if test_fraction and test_count == 0 and len(document_ids) >= 3:
-            test_count = 1
-        if (
-            validation_fraction
-            and validation_count == 0
-            and len(document_ids) >= 3
-        ):
-            validation_count = 1
-        while test_count + validation_count >= len(document_ids):
-            if validation_count > 0:
-                validation_count -= 1
-            elif test_count > 0:
-                test_count -= 1
-            else:
-                break
-
-        test_ids = set(document_ids[:test_count])
-        validation_ids = set(
-            document_ids[test_count : test_count + validation_count]
+        validation_ids, test_ids = partition_group_ids(
+            grouped, validation_fraction, test_fraction, seed
         )
         train = tuple(
             sample
@@ -1231,7 +1270,7 @@ class Reader:
         source: DocumentSource,
         document_id: str | None = None,
         document_format: Format | str | None = None,
-        label: str | int | float | bool | None = None,
+        label: str | float | bool | None = None,
         layout: Layout | None = None,
     ) -> Sample:
         """Loads one document and validates its source bytes and content.
@@ -1468,9 +1507,9 @@ def language_heuristic(content: str) -> str:
         return "unknown"
     devanagari = sum("\u0900" <= character <= "\u097f" for character in letters)
     ascii_letters = sum(character.isascii() for character in letters)
-    if devanagari / len(letters) >= 0.25:
+    if devanagari / len(letters) >= DEVANAGARI_MIN_SHARE:
         return "hi"
-    if ascii_letters / len(letters) >= 0.60:
+    if ascii_letters / len(letters) >= ASCII_LETTER_MIN_SHARE:
         return "en"
     return "unknown"
 

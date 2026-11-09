@@ -18,6 +18,8 @@ from sklearn import model_selection
 
 from scmle.contracts import data
 
+MIN_CLASSES = 2
+MIN_FOLDS = 2
 MIN_ROWS = 50
 FOLDS = 5
 ESTIMATOR_MAX_ITER = 50
@@ -105,8 +107,10 @@ class LabelNoise:
             },
             "limitations": [
                 "Suspects are candidates for label review, not proof of error.",
-                "The classifier and confidence thresholds can miss systematic "
-                "or ambiguous label errors.",
+                (
+                    "The classifier and confidence thresholds can miss "
+                    "systematic or ambiguous label errors."
+                ),
             ],
         }
 
@@ -129,13 +133,13 @@ def find_label_noise(
     """
     values = numpy.asarray(labels)
     classes, encoded = numpy.unique(values, return_inverse=True)
-    if len(values) < MIN_ROWS or len(classes) < 2:
+    if len(values) < MIN_ROWS or len(classes) < MIN_CLASSES:
         raise ValueError(
             f"label-noise detection needs {MIN_ROWS}+ rows and two classes"
         )
     counts = list(numpy.bincount(numpy.asarray(encoded).ravel()))
     folds = min(FOLDS, int(min(counts)))
-    if folds < 2:
+    if folds < MIN_FOLDS:
         raise ValueError("every class needs at least two rows")
     probabilities = model_selection.cross_val_predict(
         ensemble.HistGradientBoostingClassifier(
@@ -237,8 +241,10 @@ def assess_label_noise(
                 "seed": seed,
                 "metrics": {"error": str(error)},
                 "limitations": [
-                    "The check was not evaluated because its data contract "
-                    "was not met.",
+                    (
+                        "The check was not evaluated because its data contract "
+                        "was not met."
+                    ),
                 ],
             },
         )

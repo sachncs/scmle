@@ -33,11 +33,14 @@ ISSUED = "issued"
 WITH_QUESTIONS = "issued_with_questions"
 REFUSED = "refused"
 MAX_TARGET_MISSING = 0.2
+MIN_DISTINCT_VALUES = 2
+MIN_SUBSTRING_CHARS = 4
 MIN_POPULATION_SHARE = 0.01
 UNIT_DUPLICATE_TOLERANCE = 0.01
 TARGET_WORDS = ("target", "label", "outcome", "y")
 CAUSAL_WORDS = re.compile(
-    r"\b(cause|causal|effect of|impact of|because of|treatment effect)\b", re.I
+    r"\b(cause|causal|effect of|impact of|because of|treatment effect)\b",
+    re.IGNORECASE,
 )
 BACKTICKED = re.compile(r"`([^`]+)`")
 UNSPECIFIED = "unspecified (open question)"
@@ -215,7 +218,7 @@ def mentioned(text: str, columns: Sequence[str]) -> list[str]:
         c
         for c in columns
         if normalise(c) in words
-        or (len(normalise(c)) > 4 and normalise(c) in flat)
+        or (len(normalise(c)) > MIN_SUBSTRING_CHARS and normalise(c) in flat)
     ]
 
 
@@ -241,7 +244,7 @@ def deterministic_slots(
     explicit = re.search(
         r"\b(?:target|label|predict(?:ing)?|outcome)\s*(?:column)?\s*[:=]?\s*`?(\w+)`?",
         request.text,
-        re.I,
+        re.IGNORECASE,
     )
     named = {normalise(c): c for c in columns}
     if explicit and normalise(explicit.group(1)) in named:
@@ -290,24 +293,34 @@ def check_draft(
     if target is not None:
         if target not in frame.columns:
             found.append(
-                DataCheck("target_exists", False, True, f"{target} missing")
+                DataCheck(
+                    "target_exists",
+                    ok=False,
+                    blocking=True,
+                    detail=f"{target} missing",
+                )
             )
         else:
             missing = float(frame[target].isna().mean())
-            constant = frame[target].nunique(dropna=True) < 2
+            constant = frame[target].nunique(dropna=True) < MIN_DISTINCT_VALUES
             found.append(
                 DataCheck(
                     "target_complete",
-                    missing <= MAX_TARGET_MISSING and not constant,
-                    False,
-                    f"missing share {missing:.3f}; constant={constant}",
+                    ok=missing <= MAX_TARGET_MISSING and not constant,
+                    blocking=False,
+                    detail=f"missing share {missing:.3f}; constant={constant}",
                 )
             )
     moment = slots.get("prediction_moment")
     if moment is not None:
         if moment not in frame.columns:
             found.append(
-                DataCheck("moment_exists", False, True, f"{moment} missing")
+                DataCheck(
+                    "moment_exists",
+                    ok=False,
+                    blocking=True,
+                    detail=f"{moment} missing",
+                )
             )
         elif source.target_time_column in frame.columns:
             start = pandas.to_datetime(frame[moment], errors="coerce")
@@ -318,9 +331,12 @@ def check_draft(
             found.append(
                 DataCheck(
                     "moment_before_target",
-                    bad <= MAX_MOMENT_VIOLATIONS,
-                    True,
-                    f"{bad} rows have the moment at or after the target time",
+                    ok=bad <= MAX_MOMENT_VIOLATIONS,
+                    blocking=True,
+                    detail=(
+                        f"{bad} rows have the moment at or after the "
+                        "target time"
+                    ),
                 )
             )
     declared = slots.get("unit")
@@ -328,16 +344,21 @@ def check_draft(
         keys = [declared] if isinstance(declared, str) else list(declared)
         if not all(k in frame.columns for k in keys):
             found.append(
-                DataCheck("unit_exists", False, True, f"{keys} missing")
+                DataCheck(
+                    "unit_exists",
+                    ok=False,
+                    blocking=True,
+                    detail=f"{keys} missing",
+                )
             )
         else:
             share = float(frame.duplicated(subset=keys).mean())
             found.append(
                 DataCheck(
                     "unit_unique",
-                    share <= UNIT_DUPLICATE_TOLERANCE,
-                    False,
-                    f"duplicate share {share:.4f}",
+                    ok=share <= UNIT_DUPLICATE_TOLERANCE,
+                    blocking=False,
+                    detail=f"duplicate share {share:.4f}",
                 )
             )
     population = slots.get("population")
@@ -348,9 +369,9 @@ def check_draft(
         found.append(
             DataCheck(
                 "population_coverage",
-                ok,
-                ids is None,
-                "predicate not understood"
+                ok=ok,
+                blocking=ids is None,
+                detail="predicate not understood"
                 if coverage is None
                 else f"selects {coverage:.3f} of the rows",
             )
@@ -449,37 +470,18 @@ def refused(
     )
 
 
-def frame(
-    request: Request,
-    data_sample: pandas.DataFrame,
-    *,
-    cost_model: costs.DecisionCostModel | None = None,
-    baseline_column: str | None = None,
-    pilot_actions: Sequence[int] | None = None,
-    human: Mapping[str, Any] | None = None,
-    sampler: refusal.SlotSampler | None = None,
-    tau: float | None = None,
-    k: int = refusal.DEFAULT_K,
-) -> Draft:
-    """Drafts a charter from a request, reading only `X` rows.
+def column_refusal(
+    request: Request, data_sample: pandas.DataFrame
+) -> Draft | None:
+    """Refuses a request whose columns do not match the source or the sample.
 
     Args:
         request: The request and the source description.
         data_sample: Exploration rows only.
-        cost_model: The costs, if a person supplied them.
-        baseline_column: Column of the current process's 0/1 decisions.
-        pilot_actions: Actions of a rule fitted on `X`, used only to test
-            whether the unknown cost threshold changes the verdict.
-        human: Slots a person fixed, which override every other source.
-        sampler: Optional LLM slot-filler (or a replay of recorded drafts).
-        tau: Calibrated ambiguity threshold; without it an LLM draft is
-            refused, because no refusal rule is on file.
-        k: Drafts to draw.
 
     Returns:
-        The draft. It is `refused` when named columns are missing, a
-        blocking check fails, a critical slot cannot be filled, or the LLM
-        drafts disagree by more than `tau`.
+        A refused draft when the request names columns the source does not
+        have or the sample lacks declared columns; otherwise None.
     """
     source = request.source
     named = [c for c in BACKTICKED.findall(request.text) if " " not in c]
@@ -495,86 +497,113 @@ def frame(
             "the data sample lacks declared columns",
             {"missing_columns": absent},
         )
-    slots = deterministic_slots(request, data_sample)
-    sources = dict.fromkeys(slots, provenance.FieldSource.TEMPLATE)
-    llm: dict[str, Any] | None = None
-    discarded: list[str] = []
-    if sampler is not None:
-        prompt = refusal.prompt_for(request.text, source.columns)
-        samples = refusal.draw(sampler, prompt, k)
-        agreed = refusal.consensus(data_sample, samples)
-        llm = {
-            "model_id": sampler.model_id,
-            "prompt": prompt,
-            "samples": samples,
-            "samples_hash": refusal.samples_hash(
-                sampler.model_id, prompt, samples
-            ),
-            "ambiguity": agreed.ambiguity,
-            "agreement": agreed.agreement,
-            "tau": tau,
-            "tier": "unverified",
-        }
-        if refusal.refuse(agreed.ambiguity, tau):
-            return refused(
-                "ambiguity above tau, or no calibrated tau on file",
-                {
-                    "ambiguity": agreed.ambiguity,
-                    "tau": tau,
-                    "conflicts": list(agreed.conflicts),
-                },
-                llm=llm,
-            )
-        proposal = {
-            k_: v for k_, v in agreed.values.items() if v not in (None, "", [])
-        }
-        trial_checks = check_draft(data_sample, proposal, source)
-        if any(not c.ok and c.blocking for c in trial_checks):
-            discarded.append("llm draft failed a blocking data-side check")
-        else:
-            for name, value in proposal.items():
-                if name not in slots:
-                    slots[name] = value
-                    sources[name] = provenance.FieldSource.LLM
-    for name, value in (human or {}).items():
-        slots[name] = value
-        sources[name] = provenance.FieldSource.HUMAN
-    checks = check_draft(data_sample, slots, source)
-    blocked = [c for c in checks if not c.ok and c.blocking]
-    if blocked:
-        return refused(
-            "a blocking data-side check failed",
-            {"failed": [c.name for c in blocked]},
-            checks,
-            llm,
-            discarded,
-        )
-    unfilled = [f for f in CRITICAL_FIELDS if not slots.get(f)]
-    if unfilled:
-        return refused(
-            "critical slots cannot be filled from the request and the schema",
+    return None
+
+
+def consult_sampler(
+    request: Request,
+    data_sample: pandas.DataFrame,
+    slots: dict[str, Any],
+    sources: dict[str, provenance.FieldSource],
+    sampler: refusal.SlotSampler | None,
+    tau: float | None,
+    k: int,
+) -> tuple[dict[str, Any] | None, list[str], Draft | None]:
+    """Asks the LLM slot-filler for slots and keeps the ones that pass.
+
+    Slots the template left empty are filled from the consensus of the
+    drafts, unless the consensus fails a blocking data-side check.
+
+    Args:
+        request: The request and the source description.
+        data_sample: Exploration rows only.
+        slots: The slots drafted so far; filled in place.
+        sources: Where each slot came from; updated in place.
+        sampler: The LLM slot-filler, or None for no LLM path.
+        tau: Calibrated ambiguity threshold.
+        k: Drafts to draw.
+
+    Returns:
+        The LLM record (None without a sampler), what was discarded, and a
+        refused draft when the ambiguity is above `tau` or no `tau` is on
+        file (otherwise None).
+    """
+    if sampler is None:
+        return None, [], None
+    source = request.source
+    prompt = refusal.prompt_for(request.text, source.columns)
+    samples = refusal.draw(sampler, prompt, k)
+    agreed = refusal.consensus(data_sample, samples)
+    llm = {
+        "model_id": sampler.model_id,
+        "prompt": prompt,
+        "samples": samples,
+        "samples_hash": refusal.samples_hash(sampler.model_id, prompt, samples),
+        "ambiguity": agreed.ambiguity,
+        "agreement": agreed.agreement,
+        "tau": tau,
+        "tier": "unverified",
+    }
+    if refusal.refuse(agreed.ambiguity, tau):
+        stopped = refused(
+            "ambiguity above tau, or no calibrated tau on file",
             {
-                "unfilled": unfilled,
-                "ask": dict.fromkeys(unfilled, "name the column"),
+                "ambiguity": agreed.ambiguity,
+                "tau": tau,
+                "conflicts": list(agreed.conflicts),
             },
-            checks,
-            llm,
-            discarded,
+            llm=llm,
         )
-    try:
-        charter, open_items = assemble(slots, request, cost_model)
-    except (ValueError, KeyError, TypeError, errors.ConfigError) as error:
-        return refused(
-            "the draft does not form a valid charter",
-            {"error": str(error)},
-            checks,
-            llm,
-            discarded,
-        )
+        return llm, [], stopped
+    discarded: list[str] = []
+    proposal = {
+        k_: v
+        for k_, v in agreed.values.items()  # noqa: PD011 -- `Consensus.values` is a dataclass field, not a pandas attribute
+        if v not in (None, "", [])
+    }
+    trial_checks = check_draft(data_sample, proposal, source)
+    if any(not c.ok and c.blocking for c in trial_checks):
+        discarded.append("llm draft failed a blocking data-side check")
+    else:
+        for name, value in proposal.items():
+            if name not in slots:
+                slots[name] = value
+                sources[name] = provenance.FieldSource.LLM
+    return llm, discarded, None
+
+
+def baseline_and_questions(
+    data_sample: pandas.DataFrame,
+    target: str,
+    baseline_column: str | None,
+    cost_model: costs.DecisionCostModel | None,
+    pilot_actions: Sequence[int] | None,
+    open_items: list[str],
+) -> tuple[
+    dict[str, Any] | None,
+    list[scmle.data.framing.questions.HumanQuestion],
+    list[dict[str, Any]],
+]:
+    """Profiles the baseline on `X` and asks for the unknown cost threshold.
+
+    Args:
+        data_sample: Exploration rows only.
+        target: The target column.
+        baseline_column: Column of the current process's 0/1 decisions.
+        cost_model: The costs, if a person supplied them.
+        pilot_actions: Actions of a rule fitted on `X`.
+        open_items: Items still open; changed in place, by adding
+            `baseline_decision_column` when there is no baseline column and
+            by removing `cost_model` when the threshold question is asked
+            and answered by the data.
+
+    Returns:
+        The baseline profile (None when it cannot be measured), the
+        questions that remain for a person, and the robust verdicts.
+    """
     profile = None
     asked: list[scmle.data.framing.questions.HumanQuestion] = []
     robust: list[dict[str, Any]] = []
-    target = slots["target"]
     if (
         baseline_column
         and baseline_column in data_sample.columns
@@ -611,6 +640,95 @@ def frame(
         )
         if not asked:
             open_items.remove("cost_model")
+    return profile, asked, robust
+
+
+def frame(
+    request: Request,
+    data_sample: pandas.DataFrame,
+    *,
+    cost_model: costs.DecisionCostModel | None = None,
+    baseline_column: str | None = None,
+    pilot_actions: Sequence[int] | None = None,
+    human: Mapping[str, Any] | None = None,
+    sampler: refusal.SlotSampler | None = None,
+    tau: float | None = None,
+    k: int = refusal.DEFAULT_K,
+) -> Draft:
+    """Drafts a charter from a request, reading only `X` rows.
+
+    Args:
+        request: The request and the source description.
+        data_sample: Exploration rows only.
+        cost_model: The costs, if a person supplied them.
+        baseline_column: Column of the current process's 0/1 decisions.
+        pilot_actions: Actions of a rule fitted on `X`, used only to test
+            whether the unknown cost threshold changes the verdict.
+        human: Slots a person fixed, which override every other source.
+        sampler: Optional LLM slot-filler (or a replay of recorded drafts).
+        tau: Calibrated ambiguity threshold; without it an LLM draft is
+            refused, because no refusal rule is on file.
+        k: Drafts to draw.
+
+    Returns:
+        The draft. It is `refused` when named columns are missing, a
+        blocking check fails, a critical slot cannot be filled, or the LLM
+        drafts disagree by more than `tau`.
+    """
+    source = request.source
+    stopped = column_refusal(request, data_sample)
+    if stopped is not None:
+        return stopped
+    slots = deterministic_slots(request, data_sample)
+    sources = dict.fromkeys(slots, provenance.FieldSource.TEMPLATE)
+    llm, discarded, stopped = consult_sampler(
+        request, data_sample, slots, sources, sampler, tau, k
+    )
+    if stopped is not None:
+        return stopped
+    for name, value in (human or {}).items():
+        slots[name] = value
+        sources[name] = provenance.FieldSource.HUMAN
+    checks = check_draft(data_sample, slots, source)
+    blocked = [c for c in checks if not c.ok and c.blocking]
+    if blocked:
+        return refused(
+            "a blocking data-side check failed",
+            {"failed": [c.name for c in blocked]},
+            checks,
+            llm,
+            discarded,
+        )
+    unfilled = [f for f in CRITICAL_FIELDS if not slots.get(f)]
+    if unfilled:
+        return refused(
+            "critical slots cannot be filled from the request and the schema",
+            {
+                "unfilled": unfilled,
+                "ask": dict.fromkeys(unfilled, "name the column"),
+            },
+            checks,
+            llm,
+            discarded,
+        )
+    try:
+        charter, open_items = assemble(slots, request, cost_model)
+    except (ValueError, KeyError, TypeError, errors.ConfigError) as error:
+        return refused(
+            "the draft does not form a valid charter",
+            {"error": str(error)},
+            checks,
+            llm,
+            discarded,
+        )
+    profile, asked, robust = baseline_and_questions(
+        data_sample,
+        slots["target"],
+        baseline_column,
+        cost_model,
+        pilot_actions,
+        open_items,
+    )
     return Draft(
         ISSUED if not open_items else WITH_QUESTIONS,
         charter,

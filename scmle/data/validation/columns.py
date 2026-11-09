@@ -23,9 +23,11 @@ from scmle.contracts import tasks
 from scmle.data.curation import embedding
 from scmle.data.curation import transformers
 
-MISSING_TOKEN = "__missing__"  # nosec B105 - category placeholder, not a secret
+MISSING_TOKEN = "__missing__"  # nosec B105  # noqa: S105 -- a category placeholder, not a secret
 ID_UNIQUE_RATIO = 0.95
 MIN_TEXT_WORDS = 4
+MIN_IQR_VALUES = 4
+MIN_DISTINCT_VALUES = 2
 MIN_TEXT_ROWS = 30
 TEXT_UNIQUE_RATIO = 0.5
 TEXT_SAMPLE = 2000
@@ -65,7 +67,7 @@ def outlier_rate(series: pandas.Series) -> float:
         or the interquartile range is zero.
     """
     values = series.dropna().to_numpy(dtype=float)
-    if len(values) < 4:
+    if len(values) < MIN_IQR_VALUES:
         return 0.0
     q1, q3 = numpy.percentile(values, [25, 75])
     spread = q3 - q1
@@ -111,7 +113,7 @@ def experimental_impute() -> Any:
         An unfitted `IterativeImputer` with five iterations, a fixed random
         state and empty features kept.
     """
-    from sklearn.experimental import enable_iterative_imputer  # noqa: F401
+    from sklearn.experimental import enable_iterative_imputer  # noqa: F401, PLC0415 -- side-effect import that enables the experimental imputer; kept lazy so it runs only when the imputer is requested
 
     return impute.IterativeImputer(
         max_iter=5,
@@ -234,7 +236,7 @@ class ColumnKind(abc.ABC):
             "n_unique": int(series.nunique(dropna=True)),
         }
 
-    def exclusion_reason(self, series: pandas.Series) -> str | None:
+    def exclusion_reason(self, series: pandas.Series) -> str | None:  # noqa: ARG002 -- ColumnKind hook; every kind shares this signature
         """Returns why the column cannot be a feature, if it cannot.
 
         Args:
@@ -245,7 +247,7 @@ class ColumnKind(abc.ABC):
         """
         return None
 
-    def transformer(self, options: data.Preprocessing) -> Any | None:
+    def transformer(self, options: data.Preprocessing) -> Any | None:  # noqa: ARG002 -- ColumnKind hook; every kind shares this signature
         """Builds the preprocessing transformer, or None for non-features.
 
         Args:
@@ -258,7 +260,10 @@ class ColumnKind(abc.ABC):
         return None
 
     def association(
-        self, series: pandas.Series, target: pandas.Series, task: tasks.Task
+        self,
+        series: pandas.Series,  # noqa: ARG002 -- ColumnKind hook; every kind shares this signature
+        target: pandas.Series,  # noqa: ARG002 -- ColumnKind hook; every kind shares this signature
+        task: tasks.Task,  # noqa: ARG002 -- ColumnKind hook; every kind shares this signature
     ) -> float:
         """Returns a [0, 1] single-feature association with the target.
 
@@ -308,8 +313,8 @@ class ColumnKind(abc.ABC):
             return float(abs(corr)) if pandas.notna(corr) else 0.0
         gain = purity_association(indicator, target)
         one_sided = (
-            target[~indicator].nunique() == 1
-            and target[indicator].nunique() > 1
+            target[~indicator].nunique() == 1  # noqa: PD101 -- counts distinct non-missing labels; an equality check would treat missing labels as different
+            and target[indicator].nunique() > 1  # noqa: PD101 -- counts distinct non-missing labels; an equality check would treat missing labels as different
         )
         return max(gain, 1.0 if one_sided else 0.0)
 
@@ -328,7 +333,10 @@ class ColumnKind(abc.ABC):
             rows remain or the feature has fewer than two distinct values.
         """
         mask = series.notna() & target.notna()
-        if mask.sum() < MIN_ASSOCIATION_ROWS or series[mask].nunique() < 2:
+        if (
+            mask.sum() < MIN_ASSOCIATION_ROWS
+            or series[mask].nunique() < MIN_DISTINCT_VALUES
+        ):
             return None
         return series[mask], target[mask]
 
@@ -484,7 +492,7 @@ class DatetimeKind(ColumnKind):
         """
         return pandas.api.types.is_datetime64_any_dtype(series)
 
-    def exclusion_reason(self, series: pandas.Series) -> str | None:
+    def exclusion_reason(self, series: pandas.Series) -> str | None:  # noqa: ARG002 -- ColumnKind hook; every kind shares this signature
         """Datetimes are kept: the profiler expands them into features.
 
         Args:
@@ -577,7 +585,7 @@ class CategoricalKind(ColumnKind):
 
     name = "categorical"
 
-    def matches(self, series: pandas.Series) -> bool:
+    def matches(self, series: pandas.Series) -> bool:  # noqa: ARG002 -- ColumnKind hook; every kind shares this signature
         """Fallback kind; matches any column.
 
         Args:

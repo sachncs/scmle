@@ -41,6 +41,9 @@ GRID = (0.1, 0.15, 0.2, 0.3, 0.4, 0.5, 0.75, 1.0)
 CV_POINTS = 40
 MIN_SIDE = 15
 SENSITIVITY_MULTIPLES = (0.5, 0.75, 1.25, 1.5)
+MIN_FAR_ROWS = 3
+MIN_NEAR_ROWS = 3
+MIN_CV_ERRORS = 5
 
 
 @dataclasses.dataclass(frozen=True)
@@ -119,15 +122,15 @@ def cv_bandwidth(x: numpy.ndarray, y: numpy.ndarray) -> float:
         errors = []
         for i in picks:
             far = numpy.arange(len(x)) > i
-            if h <= 0 or far.sum() < 3:
+            if h <= 0 or far.sum() < MIN_FAR_ROWS:
                 continue
             near = far & (x - x[i] < h)
-            if near.sum() < 3:
+            if near.sum() < MIN_NEAR_ROWS:
                 continue
             fit = local_fit(x[near] - x[i], y[near], h, 1)
             if fit is not None:
                 errors.append((y[i] - fit.intercept) ** 2)
-        if len(errors) >= 5 and numpy.mean(errors) < best_error:
+        if len(errors) >= MIN_CV_ERRORS and numpy.mean(errors) < best_error:
             best, best_error = h, float(numpy.mean(errors))
     return best
 
@@ -225,6 +228,63 @@ def discontinuity(
     }
 
 
+def chosen_bandwidth(
+    x: numpy.ndarray,
+    y: numpy.ndarray,
+    left: numpy.ndarray,
+    cutoff: float,
+    bandwidth: float | None,
+) -> float:
+    """Takes the fixed bandwidth, or cross-validates one on each side.
+
+    Args:
+        x: Running variable.
+        y: Outcomes, aligned with `x`.
+        left: Mask of the rows below the cutoff.
+        cutoff: The threshold.
+        bandwidth: A fixed bandwidth, or None to cross-validate.
+
+    Returns:
+        `bandwidth` as a float, or the larger of the two cross-validated
+        bandwidths.
+    """
+    if bandwidth is None:
+        return max(
+            cv_bandwidth(cutoff - x[left], y[left]),
+            cv_bandwidth(x[~left] - cutoff, y[~left]),
+        )
+    return float(bandwidth)
+
+
+def placebo_fits(
+    x: numpy.ndarray,
+    y: numpy.ndarray,
+    left: numpy.ndarray,
+    h: float,
+    level: float,
+) -> dict[str, dict[str, float]]:
+    """Fits the discontinuity at the median of each side.
+
+    Args:
+        x: Running variable.
+        y: Outcomes, aligned with `x`.
+        left: Mask of the rows below the cutoff.
+        h: The bandwidth.
+        level: Confidence level.
+
+    Returns:
+        The placebo fits keyed `left_median` and `right_median`, each with
+        its `cutoff`; a side whose fit was degenerate is left out.
+    """
+    placebos = {}
+    for name, mask in (("left_median", left), ("right_median", ~left)):
+        point = float(numpy.median(x[mask]))
+        found = discontinuity(x[mask], y[mask], point, h, level)
+        if found is not None:
+            placebos[name] = {"cutoff": point, **found}
+    return placebos
+
+
 def estimate(
     frame: pandas.DataFrame,
     running: str,
@@ -262,13 +322,7 @@ def estimate(
     left = x < cutoff
     if min(left.sum(), (~left).sum()) < MIN_SIDE:
         raise ValueError(f"each side needs at least {MIN_SIDE} rows")
-    if bandwidth is None:
-        h = max(
-            cv_bandwidth(cutoff - x[left], y[left]),
-            cv_bandwidth(x[~left] - cutoff, y[~left]),
-        )
-    else:
-        h = float(bandwidth)
+    h = chosen_bandwidth(x, y, left, cutoff, bandwidth)
     main = discontinuity(x, y, cutoff, h, level)
     if main is None:
         raise ValueError("too few rows inside the bandwidth to fit")
@@ -276,12 +330,7 @@ def estimate(
     inside_right = int(((x >= cutoff) & (x < cutoff + h)).sum())
     total = inside_left + inside_right
     density_p = float(stats.binomtest(inside_right, total, 0.5).pvalue)
-    placebos = {}
-    for name, mask in (("left_median", left), ("right_median", ~left)):
-        point = float(numpy.median(x[mask]))
-        found = discontinuity(x[mask], y[mask], point, h, level)
-        if found is not None:
-            placebos[name] = {"cutoff": point, **found}
+    placebos = placebo_fits(x, y, left, h, level)
     balance = {}
     for name in covariates:
         found = discontinuity(

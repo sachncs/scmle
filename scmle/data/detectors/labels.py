@@ -48,6 +48,10 @@ MAX_LEAF_NODES = 31
 MAX_ROWS = 5000
 MARGIN_LEAVES = 4
 SAMPLING_CONFIDENCE = 0.95
+MIN_CLASSES = 2
+MIN_FOLDS = 2
+MIN_AUDIT_ROWS = 2
+MIN_UNAUDITED_ROWS = 2
 
 
 @dataclasses.dataclass(frozen=True)
@@ -164,12 +168,12 @@ def out_of_fold_probabilities(
         ValueError: With too few rows, one class, or a class of one row.
     """
     counts = numpy.bincount(codes)
-    if len(codes) < MIN_ROWS or len(counts) < 2:
+    if len(codes) < MIN_ROWS or len(counts) < MIN_CLASSES:
         raise ValueError(
             f"label-noise detection needs {MIN_ROWS}+ rows and two classes"
         )
     folds = min(FOLDS, int(numpy.min(counts)))
-    if folds < 2:
+    if folds < MIN_FOLDS:
         raise ValueError("every class needs at least two rows")
     return model_selection.cross_val_predict(
         model(seed),
@@ -262,8 +266,8 @@ def mean_margins(
     total = numpy.zeros(len(codes))
     stages = 0
     rows = numpy.arange(len(codes))
-    for scores in fitted.staged_decision_function(features):
-        scores = numpy.asarray(scores)
+    for stage_scores in fitted.staged_decision_function(features):
+        scores = numpy.asarray(stage_scores)
         if scores.ndim == 1:
             scores = numpy.column_stack([-scores / 2.0, scores / 2.0])
         own = scores[rows, codes]
@@ -327,7 +331,7 @@ def ppi_mean(
     f_small = numpy.asarray(predicted_labeled, dtype=float)
     y_small = numpy.asarray(truth_labeled, dtype=float)
     n, big = len(f_small), len(f_big)
-    if n < 2 or big < 2 or len(y_small) != n:
+    if n < MIN_AUDIT_ROWS or big < MIN_UNAUDITED_ROWS or len(y_small) != n:
         raise ValueError("need 2+ audited and 2+ unaudited rows")
     if not 0.0 < confidence < 1.0:
         raise ValueError("confidence must be within (0, 1)")
@@ -363,7 +367,10 @@ def noise_rate(
     """
     flags = numpy.asarray(flags, dtype=bool)
     n = len(flags)
-    if audit is not None and 2 <= len(audit) <= n - 2:
+    if (
+        audit is not None
+        and MIN_AUDIT_ROWS <= len(audit) <= n - MIN_UNAUDITED_ROWS
+    ):
         positions = numpy.asarray(audit.index, dtype=int)
         if len(numpy.unique(positions)) != len(positions):
             raise ValueError("audit positions must be unique")

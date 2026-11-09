@@ -52,6 +52,11 @@ PERMUTATIONS = 199
 FOLDS = 5
 STRATEGIES = ("mean", "median", "knn")
 HOLDOUT_SHARE = 0.1
+MIN_DISTINCT_VALUES = 2
+MATRIX_DIMENSIONS = 2
+MIN_COLUMNS = 2
+MIN_FOLDS = 2
+MIN_STEPS = 2
 
 
 @dataclasses.dataclass(frozen=True)
@@ -161,7 +166,7 @@ def numeric_columns(frame: pandas.DataFrame) -> list[Any]:
             continue
         if pandas.api.types.is_bool_dtype(column):
             continue
-        if column.nunique(dropna=True) < 2:
+        if column.nunique(dropna=True) < MIN_DISTINCT_VALUES:
             continue
         names.append(name)
     return names
@@ -191,7 +196,7 @@ def em_normal(
     Raises:
         ValueError: If a column is entirely missing or `values` is not 2-D.
     """
-    if values.ndim != 2:
+    if values.ndim != MATRIX_DIMENSIONS:
         raise ValueError("values must be two-dimensional")
     n, p = values.shape
     seen = ~numpy.isnan(values)
@@ -375,7 +380,7 @@ def little_mcar_test(
     values = frame[names].to_numpy(dtype=float, copy=True)
     values[~numpy.isfinite(values)] = numpy.nan
     values = values[~numpy.isnan(values).all(axis=1)]
-    if len(names) < 2 or not numpy.isnan(values).any():
+    if len(names) < MIN_COLUMNS or not numpy.isnan(values).any():
         return None
     if transform == "normal_scores":
         values = normal_scores(values)
@@ -463,7 +468,7 @@ def indicator_model_test(
     Raises:
         ValueError: If `permutations` is below 1 or `folds` is below 2.
     """
-    if permutations < 1 or folds < 2:
+    if permutations < 1 or folds < MIN_FOLDS:
         raise ValueError("need permutations >= 1 and folds >= 2")
     flag = frame[column].isna().to_numpy()
     others = [c for c in numeric_columns(frame) if c != column]
@@ -619,7 +624,7 @@ def tipping_point(
     values = numpy.asarray(observed, dtype=float)
     if values.size == 0 or n_missing < 1:
         raise ValueError("need observed values and at least one missing")
-    if not low < high or steps < 2:
+    if not low < high or steps < MIN_STEPS:
         raise ValueError("need low < high and steps >= 2")
     centre = float(values.mean())
     filler = numpy.full(n_missing, centre)

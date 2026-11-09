@@ -36,6 +36,7 @@ from scmle.contracts import qualification
 FORMAT_VERSION = 1
 STATUS = "hypothesis"
 MAX_SEARCH_CANDIDATES = 16
+EDGE_LENGTH = 2
 
 Edge = tuple[str, str]
 
@@ -204,7 +205,7 @@ class Dag:
             raise ValueError("edges must be sorted and unique")
         names = set(self.nodes)
         for edge in self.edges:
-            if len(edge) != 2 or not set(edge) <= names:
+            if len(edge) != EDGE_LENGTH or not set(edge) <= names:
                 raise ValueError(f"edge {edge} names an unknown node")
             if edge[0] == edge[1]:
                 raise ValueError("self loops are not allowed")

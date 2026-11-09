@@ -60,6 +60,41 @@ def majority(values: list[int]) -> int:
     return min(value for value, count in counts.items() if count == best)
 
 
+def fold_of_held_rows(
+    dev_ids: numpy.ndarray,
+    folds: list[tuple[numpy.ndarray, numpy.ndarray]],
+    members: dict[int, list[int]],
+    side: dict[int, int],
+) -> dict[int, int]:
+    """Finds the fold that holds out each development row of a duplicate group.
+
+    Each duplicate group is held out in the single fold where most of its
+    rows were held out.
+
+    Args:
+        dev_ids: Development row ids before the move.
+        folds: Folds as positions within `dev_ids`.
+        members: Row ids of each duplicate group.
+        side: Side of each row after the move, 0 for development.
+
+    Returns:
+        The fold index for every development row that is held out.
+    """
+    held_in: dict[int, int] = {}
+    for index, fold in enumerate(folds):
+        for position in fold[1]:
+            held_in[int(dev_ids[position])] = index
+    for rows in members.values():
+        inside = [held_in[row] for row in rows if row in held_in]
+        if not inside:
+            continue
+        chosen = majority(inside)
+        for row in rows:
+            if side[row] == 0:
+                held_in[row] = chosen
+    return held_in
+
+
 def keep_together(
     dev_ids: numpy.ndarray,
     test_ids: numpy.ndarray,
@@ -95,18 +130,7 @@ def keep_together(
             side[row] = target
     new_dev = numpy.array(sorted(r for r, s in side.items() if s == 0))
     new_test = numpy.array(sorted(r for r, s in side.items() if s == 1))
-    held_in: dict[int, int] = {}
-    for index, fold in enumerate(folds):
-        for position in fold[1]:
-            held_in[int(dev_ids[position])] = index
-    for rows in members.values():
-        inside = [held_in[row] for row in rows if row in held_in]
-        if not inside:
-            continue
-        chosen = majority(inside)
-        for row in rows:
-            if side[row] == 0:
-                held_in[row] = chosen
+    held_in = fold_of_held_rows(dev_ids, folds, members, side)
     rebuilt = []
     for index in range(len(folds)):
         held_rows = {row for row, fold in held_in.items() if fold == index}

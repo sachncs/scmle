@@ -118,10 +118,14 @@ class Representativeness:
                 ],
             },
             "limitations": [
-                "Classifier distinguishability is a shift signal, not proof "
-                "of population bias.",
-                "Column gaps are univariate diagnostics and do not establish "
-                "causality.",
+                (
+                    "Classifier distinguishability is a shift signal, not "
+                    "proof of population bias."
+                ),
+                (
+                    "Column gaps are univariate diagnostics and do not "
+                    "establish causality."
+                ),
                 "Only the leading bounded rows from each side are checked.",
             ],
         }
@@ -295,8 +299,10 @@ def assess_representativeness(
                     "error": str(error),
                 },
                 "limitations": [
-                    "The comparison was not evaluated because its data "
-                    "contract was not met.",
+                    (
+                        "The comparison was not evaluated because its data "
+                        "contract was not met."
+                    ),
                 ],
             },
         )

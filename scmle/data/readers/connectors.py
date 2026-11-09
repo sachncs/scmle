@@ -35,6 +35,17 @@ from scmle.contracts import errors
 from scmle.data.readers import tabular
 
 T = TypeVar("T")
+
+SHA256_HEX_LENGTH = 64
+CSV_COMPRESSION = {".gz": "gzip", ".bz2": "bz2", ".xz": "xz"}
+JSON_TYPE_NAMES = (
+    (bool, "bool"),
+    (int, "int"),
+    (float, "float"),
+    (str, "str"),
+    (list, "array"),
+    (Mapping, "object"),
+)
 Row = tuple[Any, ...]
 RangeReader = Callable[[str, int, int], bytes]
 SizeReader = Callable[[str], int]
@@ -390,7 +401,7 @@ class SourceCheckpoint:
         if self.offset < 0:
             raise ValueError("offset must be non-negative")
         if self.content_sha256 is not None and (
-            len(self.content_sha256) != 64
+            len(self.content_sha256) != SHA256_HEX_LENGTH
             or any(
                 character not in "0123456789abcdef"
                 for character in self.content_sha256
@@ -1532,19 +1543,20 @@ def read_tabular_bytes(source_uri: str, payload: bytes) -> pandas.DataFrame:
     """
     name = pathlib.PurePosixPath(urlsplit(source_uri).path).name.lower()
     if name.endswith((".csv", ".csv.gz", ".csv.bz2", ".csv.xz")):
-        if name.endswith(".gz"):
-            return pandas.read_csv(io.BytesIO(payload), compression="gzip")
-        if name.endswith(".bz2"):
-            return pandas.read_csv(io.BytesIO(payload), compression="bz2")
-        if name.endswith(".xz"):
-            return pandas.read_csv(io.BytesIO(payload), compression="xz")
-        return pandas.read_csv(io.BytesIO(payload))
+        compression = next(
+            (
+                method
+                for suffix, method in CSV_COMPRESSION.items()
+                if name.endswith(suffix)
+            ),
+            "infer",
+        )
+        return pandas.read_csv(io.BytesIO(payload), compression=compression)
     if name.endswith((".jsonl", ".ndjson", ".jsonl.gz", ".ndjson.gz")):
-        if name.endswith(".gz"):
-            return pandas.read_json(
-                io.BytesIO(payload), lines=True, compression="gzip"
-            )
-        return pandas.read_json(io.BytesIO(payload), lines=True)
+        compression = "gzip" if name.endswith(".gz") else "infer"
+        return pandas.read_json(
+            io.BytesIO(payload), lines=True, compression=compression
+        )
     if name.endswith((".parquet", ".pq")):
         return pandas.read_parquet(io.BytesIO(payload))
     raise ConnectorError(
@@ -2116,16 +2128,7 @@ class StreamingObjectStoreConnector(SourceConnector):
         """
         if value is None:
             return "null"
-        if isinstance(value, bool):
-            return "bool"
-        if isinstance(value, int):
-            return "int"
-        if isinstance(value, float):
-            return "float"
-        if isinstance(value, str):
-            return "str"
-        if isinstance(value, list):
-            return "array"
-        if isinstance(value, Mapping):
-            return "object"
+        for kind, name in JSON_TYPE_NAMES:
+            if isinstance(value, kind):
+                return name
         return type(value).__name__

@@ -30,7 +30,7 @@ class SkewedLogTransformer(base.TransformerMixin, base.BaseEstimator):
         """
         self.threshold = threshold
 
-    def fit(self, features: Any, target: Any = None) -> Self:
+    def fit(self, features: Any, target: Any = None) -> Self:  # noqa: ARG002 -- scikit-learn fit signature
         """Selects non-negative columns whose skewness exceeds the threshold.
 
         Args:
@@ -96,7 +96,7 @@ class TextVectorizer(base.TransformerMixin, base.BaseEstimator):
         """
         self.max_terms = max_terms
 
-    def fit(self, texts: Any, target: Any = None) -> Self:
+    def fit(self, texts: Any, target: Any = None) -> Self:  # noqa: ARG002 -- scikit-learn fit signature
         """Learns the vocabulary and term weights from the training texts.
 
         Unigrams and bigrams occurring in at least two texts are used; if
@@ -137,7 +137,8 @@ class TextVectorizer(base.TransformerMixin, base.BaseEstimator):
         return self.vectorizer_.transform(numpy.asarray(texts, dtype=str))
 
     def get_feature_names_out(
-        self, input_features: Any = None
+        self,
+        input_features: Any = None,  # noqa: ARG002 -- scikit-learn get_feature_names_out signature
     ) -> numpy.ndarray:
         """Terms of the vocabulary.
 
@@ -164,7 +165,7 @@ class AsinhTarget(base.TransformerMixin, base.BaseEstimator):
 
     LIMIT = 50.0
 
-    def fit(self, target: Any, unused: Any = None) -> Self:
+    def fit(self, target: Any, unused: Any = None) -> Self:  # noqa: ARG002 -- scikit-learn fit signature
         """Learns the scale from the training target.
 
         Args:

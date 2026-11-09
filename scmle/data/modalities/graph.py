@@ -731,7 +731,7 @@ class Dataset:
                 component.add(node_id)
                 pending.extend(sorted(adjacency[node_id] & remaining))
             components.append(frozenset(component))
-        return tuple(sorted(components, key=lambda component: min(component)))
+        return tuple(sorted(components, key=min))
 
     def profile_nodes(self) -> NodeProfile:
         """Profiles node counts, labels, features, and undirected degree.
@@ -859,7 +859,7 @@ class Dataset:
                     {"temporal": profile_data["temporal"]},
                     "Supply event times for every edge or explicitly use a "
                     "non-temporal graph capability.",
-                    False,
+                    blocking=False,
                 )
             )
         if profile.edge.duplicate_edge_count:
@@ -875,7 +875,7 @@ class Dataset:
                     },
                     "Declare whether parallel edges are valid or "
                     "deduplicate them.",
-                    False,
+                    blocking=False,
                 )
             )
         if profile.node.isolated_node_count:
@@ -886,7 +886,7 @@ class Dataset:
                     {"source": self.source_uri},
                     {"isolated_node_count": profile.node.isolated_node_count},
                     "Confirm isolated nodes are valid for the intended task.",
-                    False,
+                    blocking=False,
                 )
             )
         if not self.feature_names:
@@ -898,7 +898,7 @@ class Dataset:
                     {"node_count": profile.node.node_count},
                     "Declare node features or select a topology-only model "
                     "explicitly.",
-                    False,
+                    blocking=False,
                 )
             )
         if "unlabeled" in labels and len(labels) > 1:
@@ -910,7 +910,7 @@ class Dataset:
                     {"label_counts": labels},
                     "Declare whether unlabeled nodes are valid for the "
                     "intended graph task before training.",
-                    False,
+                    blocking=False,
                 )
             )
         return Curation(
@@ -1054,7 +1054,7 @@ def read_edges(
             relation_column=relation_column,
             time_column=time_column,
         )
-    if suffix.endswith(".jsonl") or suffix.endswith(".ndjson"):
+    if suffix.endswith((".jsonl", ".ndjson")):
         records: list[dict[str, Any]] = []
         try:
             with input_path.open(encoding="utf-8") as handle:
@@ -1089,6 +1089,63 @@ def read_edges(
     raise GraphInputError(
         "graph edges must use a .csv, .jsonl, or .ndjson file"
     )
+
+
+def record_weight(
+    record: Mapping[str, Any], weight_column: str, index: int
+) -> float:
+    """Reads the weight of an edge record.
+
+    Args:
+        record: The edge record.
+        weight_column: Key of the weight; a missing key defaults to 1.0.
+        index: 1-based record number, for the message.
+
+    Returns:
+        The weight as a float.
+
+    Raises:
+        GraphInputError: If the weight is null or non-numeric.
+    """
+    weight_value = record.get(weight_column, 1.0)
+    if pandas.isna(weight_value):
+        raise GraphInputError(f"edge record {index} has an invalid weight")
+    try:
+        return float(weight_value)
+    except (TypeError, ValueError) as error:
+        raise GraphInputError(
+            f"edge record {index} has a non-numeric weight"
+        ) from error
+
+
+def record_event_time(
+    record: Mapping[str, Any], time_column: str | None, index: int
+) -> datetime | None:
+    """Reads the event time of an edge record.
+
+    Args:
+        record: The edge record.
+        time_column: Key of the event time, or None for untimed edges.
+        index: 1-based record number, for the message.
+
+    Returns:
+        The event time normalised to UTC, or None when there is no time
+        column or the value is missing or null.
+
+    Raises:
+        GraphInputError: If the event time is invalid.
+    """
+    if time_column is None:
+        return None
+    time_value = record.get(time_column)
+    if time_value is None or pandas.isna(time_value):
+        return None
+    try:
+        return canonical_event_time(time_value)
+    except GraphTemporalError as error:
+        raise GraphInputError(
+            f"edge record {index} has an invalid event time"
+        ) from error
 
 
 def edges_from_records(
@@ -1131,28 +1188,11 @@ def edges_from_records(
         target = record[target_column]
         if pandas.isna(source) or pandas.isna(target):
             raise GraphInputError(f"edge record {index} has a missing endpoint")
-        weight_value = record.get(weight_column, 1.0)
-        if pandas.isna(weight_value):
-            raise GraphInputError(f"edge record {index} has an invalid weight")
-        try:
-            weight = float(weight_value)
-        except (TypeError, ValueError) as error:
-            raise GraphInputError(
-                f"edge record {index} has a non-numeric weight"
-            ) from error
+        weight = record_weight(record, weight_column, index)
         relation_value = record.get(relation_column, "default")
         if pandas.isna(relation_value):
             relation_value = "default"
-        event_time = None
-        if time_column is not None:
-            time_value = record.get(time_column)
-            if time_value is not None and not pandas.isna(time_value):
-                try:
-                    event_time = canonical_event_time(time_value)
-                except GraphTemporalError as error:
-                    raise GraphInputError(
-                        f"edge record {index} has an invalid event time"
-                    ) from error
+        event_time = record_event_time(record, time_column, index)
         try:
             edges.append(
                 Edge(
@@ -1275,6 +1315,59 @@ def inductive_node_split(
     )
 
 
+def structural_degrees(graph: Dataset) -> dict[str, list[float]]:
+    """Computes the out-degree, in-degree and weighted degree of each node.
+
+    Args:
+        graph: The graph.
+
+    Returns:
+        For each node id, the three degrees in that order; the weighted
+        degree is the summed weight of incident edges. Edges with an
+        endpoint outside the node set are not counted at that endpoint.
+    """
+    degrees = {node_id: [0.0, 0.0, 0.0] for node_id in graph.node_ids}
+    for edge in graph.edges:
+        if edge.source in degrees:
+            degrees[edge.source][0] += 1.0
+            degrees[edge.source][2] += edge.weight
+        if edge.target in degrees:
+            degrees[edge.target][1] += 1.0
+            degrees[edge.target][2] += edge.weight
+    return degrees
+
+
+def feature_values(
+    rows: list[list[float]], width: int, *, standardize: bool
+) -> tuple[tuple[float, ...], ...]:
+    """Turns feature rows into the immutable values of a feature matrix.
+
+    Args:
+        rows: One list of features per node, already cut to ``width``.
+        width: Number of columns kept.
+        standardize: Whether to scale each column to zero mean and unit
+            variance (constant columns are only centred).
+
+    Returns:
+        The values as nested tuples; empty rows when there is no row or no
+        column.
+
+    Raises:
+        ValueError: If a feature value is not finite.
+    """
+    if not (rows and width):
+        return tuple(() for row in rows)
+    matrix = numpy.asarray(rows, dtype=numpy.float64)
+    if not numpy.isfinite(matrix).all():
+        raise ValueError("prepared features must be finite")
+    if standardize:
+        means = matrix.mean(axis=0)
+        scales = matrix.std(axis=0)
+        scales[scales == 0] = 1.0
+        matrix = (matrix - means) / scales
+    return tuple(tuple(float(value) for value in row) for row in matrix)
+
+
 def prepare_features(
     graph: Dataset,
     max_nodes: int = 100_000,
@@ -1316,36 +1409,17 @@ def prepare_features(
         names = [f"feature_{index}" for index in range(feature_dimension)]
     rows = [list(node.features) for node in nodes]
     if include_structural:
-        degrees = {node_id: [0.0, 0.0, 0.0] for node_id in graph.node_ids}
-        for edge in graph.edges:
-            if edge.source in degrees:
-                degrees[edge.source][0] += 1.0
-                degrees[edge.source][2] += edge.weight
-            if edge.target in degrees:
-                degrees[edge.target][1] += 1.0
-                degrees[edge.target][2] += edge.weight
+        degrees = structural_degrees(graph)
         for index, node in enumerate(nodes):
             rows[index].extend(degrees[node.node_id])
         names.extend(("out_degree", "in_degree", "weighted_degree"))
     width = min(max_features, max((len(row) for row in rows), default=0))
     rows = [row[:width] for row in rows]
     names = names[:width]
-    if rows and width:
-        matrix = numpy.asarray(rows, dtype=numpy.float64)
-        if not numpy.isfinite(matrix).all():
-            raise ValueError("prepared features must be finite")
-        if standardize:
-            means = matrix.mean(axis=0)
-            scales = matrix.std(axis=0)
-            scales[scales == 0] = 1.0
-            matrix = (matrix - means) / scales
-        values = tuple(tuple(float(value) for value in row) for row in matrix)
-    else:
-        values = tuple(() for row in rows)
     return PreparedFeatures(
         node_ids=tuple(node.node_id for node in nodes),
         feature_names=tuple(names),
-        values=values,
+        values=feature_values(rows, width, standardize=standardize),
         standardized=standardize,
     )
 

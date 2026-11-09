@@ -121,6 +121,38 @@ def unverified_outcome(mode: Mode) -> Admission:
     return Admission.ADMIT_FLAGGED
 
 
+def timing_failure(
+    record: provenance.FieldProvenance, declared_lag_seconds: float
+) -> str | None:
+    """Finds the reason a field fails the timing rule outright, if any.
+
+    Args:
+        record: The field's provenance.
+        declared_lag_seconds: Delay the charter declares between the
+            as-of time and the prediction moment.
+
+    Returns:
+        The reason of the first failed check, in the order: the change log
+        disagrees with the stored values, the field is unavailable at
+        serving, the lead is below the declared lag; None when none failed.
+    """
+    check = record.log_check
+    if check is not None and not check.passed:
+        return (
+            f"change log disagrees with {check.mismatched} of {check.rows} "
+            "stored values"
+        )
+    if record.available_at_serving is provenance.Availability.NO:
+        return "not available at serving"
+    lead = record.as_of.lead_seconds
+    if lead is not None and lead < declared_lag_seconds:
+        return (
+            f"known {lead:g} s before the moment, less than the declared "
+            f"{declared_lag_seconds:g} s"
+        )
+    return None
+
+
 def decide_timing(
     record: provenance.FieldProvenance,
     mode: Mode,
@@ -151,30 +183,12 @@ def decide_timing(
         one with an attested tier is admitted flagged.
     """
     tier = record.tier(today)
+    failure = timing_failure(record, declared_lag_seconds)
+    if failure is not None:
+        return FieldDecision(
+            record.name, Admission.QUARANTINE, tier, (failure,), suspect
+        )
     reasons: list[str] = []
-    check = record.log_check
-    if check is not None and not check.passed:
-        reasons.append(
-            f"change log disagrees with {check.mismatched} of {check.rows} "
-            "stored values"
-        )
-        return FieldDecision(
-            record.name, Admission.QUARANTINE, tier, tuple(reasons), suspect
-        )
-    if record.available_at_serving is provenance.Availability.NO:
-        reasons.append("not available at serving")
-        return FieldDecision(
-            record.name, Admission.QUARANTINE, tier, tuple(reasons), suspect
-        )
-    lead = record.as_of.lead_seconds
-    if lead is not None and lead < declared_lag_seconds:
-        reasons.append(
-            f"known {lead:g} s before the moment, less than the declared "
-            f"{declared_lag_seconds:g} s"
-        )
-        return FieldDecision(
-            record.name, Admission.QUARANTINE, tier, tuple(reasons), suspect
-        )
     unknown_serving = (
         record.available_at_serving is provenance.Availability.UNKNOWN
     )
@@ -237,6 +251,69 @@ def decide_predictive(
     return decide_timing(record, mode, lag, today, suspect, leakage_gate)
 
 
+def decide_graph_rule(
+    timing: FieldDecision,
+    name: str,
+    graph: dag.Dag,
+    treatment: str,
+    outcome: str,
+    mode: Mode,
+) -> FieldDecision:
+    """Applies the graph rule to a field that passed the timing rule.
+
+    Args:
+        timing: The timing decision, whose reasons are kept and extended.
+        name: The field's name; neither the treatment nor the outcome.
+        graph: The DAG hypothesis.
+        treatment: Treatment node.
+        outcome: Outcome node.
+        mode: Strict or permissive.
+
+    Returns:
+        The timing decision with the graph rule's reason added, and the
+        admission changed where the rule quarantines or flags the field.
+    """
+    if name not in graph.nodes:
+        return dataclasses.replace(
+            timing,
+            admission=(
+                Admission.QUARANTINE
+                if mode is Mode.STRICT
+                else Admission.ADMIT_FLAGGED
+            ),
+            reasons=(*timing.reasons, "field is not in the declared DAG"),
+        )
+    if name in graph.descendants(treatment):
+        return dataclasses.replace(
+            timing,
+            admission=Admission.QUARANTINE,
+            reasons=(*timing.reasons, "descendant of the treatment"),
+        )
+    base = graph.adjustment_set(treatment, outcome)
+    if base is None:
+        return dataclasses.replace(
+            timing,
+            admission=Admission.ADMIT_FLAGGED,
+            reasons=(
+                *timing.reasons,
+                "no valid adjustment set from observed variables",
+            ),
+        )
+    if graph.backdoor_valid(treatment, outcome, {*base, name}):
+        return dataclasses.replace(
+            timing,
+            reasons=(*timing.reasons, "keeps the back-door set valid"),
+        )
+    return dataclasses.replace(
+        timing,
+        admission=Admission.QUARANTINE,
+        reasons=(
+            *timing.reasons,
+            "adjusting for it opens a back-door path (collider)",
+        ),
+    )
+
+
 def decide_causal(
     record: provenance.FieldProvenance,
     graph: dag.Dag,
@@ -287,45 +364,7 @@ def decide_causal(
         return dataclasses.replace(
             timing, reasons=(*timing.reasons, "treatment or outcome node")
         )
-    if name not in graph.nodes:
-        return dataclasses.replace(
-            timing,
-            admission=(
-                Admission.QUARANTINE
-                if mode is Mode.STRICT
-                else Admission.ADMIT_FLAGGED
-            ),
-            reasons=(*timing.reasons, "field is not in the declared DAG"),
-        )
-    if name in graph.descendants(treatment):
-        return dataclasses.replace(
-            timing,
-            admission=Admission.QUARANTINE,
-            reasons=(*timing.reasons, "descendant of the treatment"),
-        )
-    base = graph.adjustment_set(treatment, outcome)
-    if base is None:
-        return dataclasses.replace(
-            timing,
-            admission=Admission.ADMIT_FLAGGED,
-            reasons=(
-                *timing.reasons,
-                "no valid adjustment set from observed variables",
-            ),
-        )
-    if graph.backdoor_valid(treatment, outcome, {*base, name}):
-        return dataclasses.replace(
-            timing,
-            reasons=(*timing.reasons, "keeps the back-door set valid"),
-        )
-    return dataclasses.replace(
-        timing,
-        admission=Admission.QUARANTINE,
-        reasons=(
-            *timing.reasons,
-            "adjusting for it opens a back-door path (collider)",
-        ),
-    )
+    return decide_graph_rule(timing, name, graph, treatment, outcome, mode)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

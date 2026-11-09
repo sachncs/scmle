@@ -37,6 +37,8 @@ NOTE = (
     "validity, and weak instruments give the tests little power"
 )
 
+MIN_INSTRUMENTS = 2
+
 
 def prepare(
     y: ArrayLike,
@@ -186,7 +188,7 @@ def sargan(
     """
     outcome, regressor, z = prepare(y, d, instruments, controls)
     count = z.shape[1]
-    if count < 2:
+    if count < MIN_INSTRUMENTS:
         return not_testable("sargan", count)
     rows = len(outcome)
     residual = outcome - two_stage(outcome, regressor, z) * regressor
@@ -220,7 +222,7 @@ def hansen_j(
     """
     outcome, regressor, z = prepare(y, d, instruments, controls)
     count = z.shape[1]
-    if count < 2:
+    if count < MIN_INSTRUMENTS:
         return not_testable("hansen_j", count)
     rows = len(outcome)
     first = outcome - two_stage(outcome, regressor, z) * regressor

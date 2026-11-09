@@ -381,7 +381,10 @@ class Tester(abc.ABC):
         """
 
     def update_spent(
-        self, state: State, level: Fraction, candidate: bool
+        self,
+        state: State,
+        level: Fraction,
+        candidate: bool,  # noqa: ARG002 -- the default charges every level; subclasses that discount candidates override it with this signature
     ) -> Fraction:
         """Computes the level spent after a test.
 
@@ -438,7 +441,7 @@ class Tester(abc.ABC):
             state=moved,
         )
 
-    def credit(self, state: State) -> Fraction:
+    def credit(self, state: State) -> Fraction:  # noqa: ARG002 -- the default earns no credit; LORD++ and SAFFRON override it with this signature
         """Computes the credit earned, used by LORD++ and SAFFRON.
 
         Args:
@@ -463,8 +466,10 @@ class ELond(Tester):
         assumptions=(
             "every true null has an e-value with E[e] <= 1",
             "hypotheses are fixed in advance, not chosen from earlier results",
-            "p-values are converted with a calibrator and must be "
-            "super-uniform: P(p <= s) <= s",
+            (
+                "p-values are converted with a calibrator and must be "
+                "super-uniform: P(p <= s) <= s"
+            ),
             "the discount sequence is fixed and sums to at most one",
         ),
         citation=(
@@ -613,8 +618,10 @@ class LordPlusPlus(PValueTester):
     guarantee = Guarantee(
         statement="FDR <= alpha at every time for independent p-values",
         assumptions=(
-            "the true-null p-values are mutually independent and independent "
-            "of the non-null p-values",
+            (
+                "the true-null p-values are mutually independent and "
+                "independent of the non-null p-values"
+            ),
             "each true-null p-value is super-uniform",
             "no guarantee under dependence",
         ),
@@ -679,8 +686,10 @@ class Saffron(PValueTester):
     guarantee = Guarantee(
         statement="FDR <= alpha at every time for independent p-values",
         assumptions=(
-            "the true-null p-values are mutually independent and independent "
-            "of the non-null p-values",
+            (
+                "the true-null p-values are mutually independent and "
+                "independent of the non-null p-values"
+            ),
             "each true-null p-value is super-uniform",
             "levels are monotone functions of past rejections and candidates",
             "no guarantee under dependence",

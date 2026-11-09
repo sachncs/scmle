@@ -112,6 +112,8 @@ STORE_PATH = Path(__file__).with_name("screen_certificates.json")
 KNOTS = 10
 MAX_ROWS = 2000
 MAX_PERMUTATIONS = 100_000
+BINARY_CLASSES = 2
+MIN_CLASSES = 2
 # Cross-fitted fits needed by the permutation test: permutations x skill
 # columns x classes (one-vs-rest when there are more than two). The screen
 # runs inside the declared time budget by a deterministic cap, never by a
@@ -407,7 +409,9 @@ def skill_statistic(problem: Problem, phi: numpy.ndarray) -> Statistic:
             pred = oof_fit(labels, phi, problem.splits)
             squares = ((labels - pred) ** 2).sum(axis=1)
             return 1.0 - squares / problem.total_squares
-        wanted = [1] if problem.classes == 2 else range(problem.classes)
+        wanted = (
+            [1] if problem.classes == BINARY_CLASSES else range(problem.classes)
+        )
         scores = []
         for k in wanted:
             positive = labels == k
@@ -436,7 +440,9 @@ def observed_predictions(
     y = problem.y
     if problem.task == "regression":
         return [oof_fit(y[None, :], phi, problem.splits)[0]]
-    wanted = [1] if problem.classes == 2 else range(problem.classes)
+    wanted = (
+        [1] if problem.classes == BINARY_CLASSES else range(problem.classes)
+    )
     return [
         oof_fit((y == k)[None, :].astype("float64"), phi, problem.splits)[0]
         for k in wanted
@@ -470,7 +476,9 @@ def sample_skill(
         return 1.0 - float(((y - predictions[0][index]) ** 2).sum()) / total
     folds = fold_of[index]
     tests = [numpy.flatnonzero(folds == f) for f in numpy.unique(folds)]
-    wanted = [1] if problem.classes == 2 else range(problem.classes)
+    wanted = (
+        [1] if problem.classes == BINARY_CLASSES else range(problem.classes)
+    )
     scores = []
     for pred, k in zip(predictions, wanted, strict=True):
         wins, pairs = fold_concordance(
@@ -1035,7 +1043,7 @@ def gate_statuses(
     descriptive = dict.fromkeys(
         MECHANISM_DEFECTS, certificates.GateStatus.DESCRIPTIVE
     )
-    if store is None or task != "classification" or n_classes != 2:
+    if store is None or task != "classification" or n_classes != BINARY_CLASSES:
         return descriptive
     if (
         dataclasses.replace(cfg, run_seed=leakage.CERTIFIED.run_seed)
@@ -1261,6 +1269,162 @@ def build_problem(
     return Problem(y, task, classes, folds, total)
 
 
+def skill_hypothesis(
+    problem: Problem, name: str, phi: numpy.ndarray
+) -> Pending:
+    """Builds the skill hypothesis of one column.
+
+    Args:
+        problem: The encoded outcome with its folds.
+        name: Column name.
+        phi: The column's basis.
+
+    Returns:
+        The pending hypothesis with the observed skill.
+    """
+    statistic = skill_statistic(problem, phi)
+    observed = float(statistic(problem.y[None, :])[0])
+    return Pending(name, SKILL, observed, statistic, uses_binned=False)
+
+
+def missingness_hypotheses(
+    name: str,
+    series: pandas.Series,
+    outcome: pandas.Series,
+    task: str,
+    cfg: leakage.Config,
+    class_codes: numpy.ndarray,
+    totals: numpy.ndarray,
+    *,
+    structured: bool,
+) -> list[Pending]:
+    """Builds the record-purity and missingness hypotheses of one column.
+
+    Args:
+        name: Column name.
+        series: The column.
+        outcome: The target column.
+        task: `classification` or `regression`.
+        cfg: Settings.
+        class_codes: Class code of the binned outcome per row.
+        totals: Rows per class.
+        structured: Whether rows are grouped or in time blocks, which
+            replaces the analytic missingness test by a permutation one.
+
+    Returns:
+        No hypotheses when the column is all missing, never missing, or
+        the outcome has a single class; otherwise the purity hypothesis
+        followed by the missingness hypothesis, when one can be formed.
+    """
+    missing = series.isna().to_numpy()
+    if missing.all() or not missing.any() or len(totals) < MIN_CLASSES:
+        return []
+    recorded = ~missing
+    pure = purity_statistic(recorded)
+    found = [
+        Pending(
+            name,
+            PURITY,
+            float(pure(class_codes[None, :])[0]),
+            pure,
+            uses_binned=True,
+        )
+    ]
+    if structured:
+        stat = missingness_statistic(missing, totals)
+        observed = float(stat(class_codes[None, :])[0])
+        found.append(Pending(name, MISSING, observed, stat, uses_binned=True))
+        return found
+    test = leakage.missingness_test(series, outcome, task, cfg)
+    if test is not None:
+        found.append(
+            Pending(
+                name,
+                MISSING,
+                test.cramers_v,
+                None,
+                uses_binned=True,
+                p_value=test.p_value,
+                active=False,
+            )
+        )
+    return found
+
+
+def limit_report(
+    cfg: leakage.Config,
+    gates: Mapping[str, certificates.GateStatus],
+    rows: int,
+    family: int,
+    note: str,
+    declined: tuple[str, ...],
+    limit: str,
+) -> Screen:
+    """Builds the report of a screen that exceeded a limit.
+
+    Args:
+        cfg: Settings (`alpha` and the ceilings are recorded).
+        gates: Gate status per mechanism.
+        rows: Rows the screen saw.
+        family: Number of hypotheses that were to be adjusted together.
+        note: Why the screen stopped.
+        declined: The candidate columns that were not checked.
+        limit: Name of the limit that was exceeded.
+
+    Returns:
+        A report with no findings, no permutations, and `note` as its only
+        note.
+    """
+    return Screen(
+        (),
+        rows,
+        family,
+        0,
+        cfg.alpha,
+        gates,
+        ceilings_of(cfg),
+        (note,),
+        declined,
+        limit,
+    )
+
+
+def finding_bound(
+    h: Pending,
+    problem: Problem,
+    columns: Mapping[str, numpy.ndarray],
+    frame: pandas.DataFrame,
+    class_codes: numpy.ndarray,
+    totals: numpy.ndarray,
+    cfg: leakage.Config,
+    groups: numpy.ndarray | None,
+) -> float:
+    """Bounds the effect of one significant hypothesis from below.
+
+    Args:
+        h: The significant hypothesis.
+        problem: The encoded outcome with its folds.
+        columns: Basis of each column with a skill hypothesis.
+        frame: The chosen rows.
+        class_codes: Class code of the binned outcome per row.
+        totals: Rows per class.
+        cfg: Settings.
+        groups: Group label per row, or None.
+
+    Returns:
+        The lower confidence bound of the statistic the mechanism measures.
+    """
+    path = f"leakage.screen.{h.mechanism}.{h.feature}"
+    rng = randomness.component_rng(cfg.run_seed, path, 0)
+    if h.mechanism == SKILL:
+        return skill_bound(problem, columns[h.feature], cfg, groups, rng)
+    if h.mechanism == PURITY:
+        recorded = frame[h.feature].notna().to_numpy()
+        return purity_bound(recorded, class_codes, cfg, groups)
+    missing = frame[h.feature].isna().to_numpy()
+    return bootstrap_v(missing, class_codes, len(totals), cfg, groups, rng)
+
+
 def scan_frame(
     frame: pandas.DataFrame,
     target: str,
@@ -1314,43 +1478,19 @@ def scan_frame(
         phi = basis(series)
         if phi.shape[1] > 1:
             columns[str(name)] = phi
-            statistic = skill_statistic(problem, phi)
-            observed = float(statistic(problem.y[None, :])[0])
-            pending.append(
-                Pending(str(name), SKILL, observed, statistic, False)
-            )
-        missing = series.isna().to_numpy()
-        if missing.all() or not missing.any() or len(totals) < 2:
-            continue
-        recorded = ~missing
-        pure = purity_statistic(recorded)
-        pending.append(
-            Pending(
+            pending.append(skill_hypothesis(problem, str(name), phi))
+        pending.extend(
+            missingness_hypotheses(
                 str(name),
-                PURITY,
-                float(pure(class_codes[None, :])[0]),
-                pure,
-                True,
+                series,
+                frame[target],
+                task,
+                cfg,
+                class_codes,
+                totals,
+                structured=structured,
             )
         )
-        if structured:
-            stat = missingness_statistic(missing, totals)
-            observed = float(stat(class_codes[None, :])[0])
-            pending.append(Pending(str(name), MISSING, observed, stat, True))
-        else:
-            test = leakage.missingness_test(series, frame[target], task, cfg)
-            if test is not None:
-                pending.append(
-                    Pending(
-                        str(name),
-                        MISSING,
-                        test.cramers_v,
-                        None,
-                        True,
-                        p_value=test.p_value,
-                        active=False,
-                    )
-                )
     family = len(pending)
     ceilings = ceilings_of(cfg)
     if family == 0:
@@ -1358,19 +1498,16 @@ def scan_frame(
     total = max(cfg.permutations, required_permutations(family, alpha))
     declined = tuple(dict.fromkeys(h.feature for h in pending))
     if total > MAX_PERMUTATIONS:
-        return Screen(
-            (),
+        return limit_report(
+            cfg,
+            gates,
             n,
             family,
-            0,
-            cfg.alpha,
-            gates,
-            ceilings,
             (
                 f"{family} hypotheses need {total} permutations to resolve "
                 f"the Benjamini-Yekutieli threshold; the limit is "
                 f"{MAX_PERMUTATIONS}. Nothing was flagged (power, not size, "
-                "is lost): screen fewer columns",
+                "is lost): screen fewer columns"
             ),
             declined,
             "permutation limit",
@@ -1379,24 +1516,23 @@ def scan_frame(
         1 for h in pending if h.mechanism == SKILL and h.statistic is not None
     )
     work = (
-        total * skill_columns * (problem.classes if problem.classes > 2 else 1)
+        total
+        * skill_columns
+        * (problem.classes if problem.classes > BINARY_CLASSES else 1)
     )
     cap = work_cap(time_budget_seconds)
     if cap is not None and work > cap:
-        return Screen(
-            (),
+        return limit_report(
+            cfg,
+            gates,
             n,
             family,
-            0,
-            cfg.alpha,
-            gates,
-            ceilings,
             (
                 f"{family} hypotheses over {max(problem.classes, 1)} classes "
                 f"need about {work} cross-fitted fits ({total} permutations "
                 f"for {skill_columns} columns); the limit is {cap}. "
                 "Nothing was flagged (power, not size, is lost): screen "
-                "fewer columns",
+                "fewer columns"
             ),
             declined,
             f"work limit for a {time_budget_seconds:g} s time budget",
@@ -1419,19 +1555,9 @@ def scan_frame(
         bound: float | None = None
         suspect = False
         if significant:
-            path = f"leakage.screen.{h.mechanism}.{h.feature}"
-            rng = randomness.component_rng(cfg.run_seed, path, 0)
-            if h.mechanism == SKILL:
-                phi = columns[h.feature]
-                bound = skill_bound(problem, phi, cfg, groups, rng)
-            elif h.mechanism == PURITY:
-                recorded = frame[h.feature].notna().to_numpy()
-                bound = purity_bound(recorded, class_codes, cfg, groups)
-            else:
-                missing = frame[h.feature].isna().to_numpy()
-                bound = bootstrap_v(
-                    missing, class_codes, len(totals), cfg, groups, rng
-                )
+            bound = finding_bound(
+                h, problem, columns, frame, class_codes, totals, cfg, groups
+            )
             suspect = bound > ceilings[h.mechanism]
         findings.append(
             Finding(

@@ -89,6 +89,8 @@ MIN_STRATUM_ROWS = 2
 SKILL = "leakage.skill"
 CONDITIONAL = "leakage.conditional"
 MISSING = "leakage.missingness"
+MIN_CLASSES = 2
+BINARY_CLASSES = 2
 
 Splits = list[tuple[numpy.ndarray, numpy.ndarray]]
 
@@ -207,7 +209,7 @@ def encode_target(y: pandas.Series, task: str) -> numpy.ndarray:
     if task == "regression":
         return y.to_numpy(dtype="float64")
     codes, uniques = pandas.factorize(y, sort=True)
-    if len(uniques) < 2:
+    if len(uniques) < MIN_CLASSES:
         raise ValueError("a classification target needs two classes")
     return codes.astype("int64")
 
@@ -376,7 +378,7 @@ def skill_of(pred: numpy.ndarray, y: numpy.ndarray, task: str) -> float:
         if total == 0.0:
             raise ValueError("a constant target has no R^2")
         return 1.0 - float(((y - pred) ** 2).sum()) / total
-    if pred.shape[1] == 2:
+    if pred.shape[1] == BINARY_CLASSES:
         return binary_auc(y, pred[:, 1])
     return float(
         roc_auc_score(
@@ -722,8 +724,7 @@ def strata_labels(
             min_samples_leaf=cfg.min_samples_leaf,
             random_state=0,
         ).fit(z, codes)
-    leaves = tree.apply(z).astype("int64")
-    return leaves
+    return tree.apply(z).astype("int64")
 
 
 def within_strata(
@@ -950,7 +951,7 @@ def missingness_test(
         return None
     classes = binned_target(target, task)
     table = pandas.crosstab(missing, classes).to_numpy()
-    if table.shape[1] < 2:
+    if table.shape[1] < MIN_CLASSES:
         return None
     if table.shape == (2, 2) and (
         stats.contingency.expected_freq(table).min() < EXPECTED_FISHER
@@ -1211,7 +1212,7 @@ def gate_status(
     Returns:
         `GATING` or `DESCRIPTIVE`.
     """
-    if task != "classification" or n_classes != 2:
+    if task != "classification" or n_classes != BINARY_CLASSES:
         return certificates.GateStatus.DESCRIPTIVE
     if dataclasses.replace(cfg, run_seed=CERTIFIED.run_seed) != CERTIFIED:
         return certificates.GateStatus.DESCRIPTIVE

@@ -13,6 +13,7 @@ the forward set tests stability), with `embargo_rows` rows dropped on each
 side of every block so serial dependence cannot cross the boundary.
 """
 
+from collections.abc import Callable
 import dataclasses
 import hashlib
 import math
@@ -26,6 +27,8 @@ from scmle.core import randomness
 MAX_FRACTION = 0.5
 BLOCKS = 20
 NO_DUPLICATE = -1
+MIN_AUTOCORRELATION_VALUES = 8
+MIN_UNITS = 2
 COMPONENT = "custody.carve"
 
 
@@ -63,6 +66,27 @@ def derived_seed(charter_hash: str, data_hash: str, seed: int) -> int:
         f"{data_hash}|{charter_hash}|{seed}".encode()
     ).digest()
     return int.from_bytes(digest[:4], "big")
+
+
+def link_equal_codes(
+    codes: numpy.ndarray, union: Callable[[int, int], None]
+) -> None:
+    """Merges every row with the first row that has the same key code.
+
+    Args:
+        codes: Integer code of the key per row; a negative code means no
+            key and is skipped.
+        union: Merges the units of two row positions.
+    """
+    first: dict[int, int] = {}
+    for index, raw in enumerate(codes):
+        code = int(raw)
+        if code < 0:
+            continue
+        if code in first:
+            union(first[code], index)
+        else:
+            first[code] = index
 
 
 def unit_labels(
@@ -116,15 +140,7 @@ def unit_labels(
         codes = pandas.factorize(numpy.asarray(keys))[0]
         if none is not None:
             codes = numpy.where(numpy.asarray(keys) == none, -1, codes)
-        first: dict[int, int] = {}
-        for index, raw in enumerate(codes):
-            code = int(raw)
-            if code < 0:
-                continue
-            if code in first:
-                union(first[code], index)
-            else:
-                first[code] = index
+        link_equal_codes(codes, union)
     return numpy.array([find(i) for i in range(size)])
 
 
@@ -287,7 +303,7 @@ def acf_embargo(values: numpy.ndarray, max_lag: int | None = None) -> int:
         examined.
     """
     size = len(values)
-    if size < 8:
+    if size < MIN_AUTOCORRELATION_VALUES:
         return 0
     limit = min(size // 4 if max_lag is None else max_lag, size // 2, 1000)
     band = 1.96 / math.sqrt(size)
@@ -435,7 +451,7 @@ def carve_confirmation(
         )
         in_c = pick_units(units, first, fraction, rng)
         embargo = numpy.zeros(size, dtype=bool)
-    if len(numpy.unique(units)) < 2 or not in_c.any():
+    if len(numpy.unique(units)) < MIN_UNITS or not in_c.any():
         notes.append("no confirmation set carved: too few units to separate")
         in_c[:] = False
         embargo[:] = False

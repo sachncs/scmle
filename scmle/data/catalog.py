@@ -25,6 +25,7 @@ from scmle import durability
 
 CATALOG_SCHEMA_VERSION = 1
 DIGEST_LENGTH = 64
+MATRIX_DIMENSIONS = 2
 
 
 def canonical_json(value: Any) -> str:
@@ -517,6 +518,69 @@ class LabelSummary:
         )
 
 
+def check_counts(sample_count: Any, schema_version: Any) -> None:
+    """Checks the two integer fields of a catalog.
+
+    Args:
+        sample_count: The sample count to check.
+        schema_version: The schema version to check.
+
+    Raises:
+        TypeError: If either is not an integer (booleans are rejected).
+        ValueError: If `sample_count` is negative or `schema_version` is
+            not the supported version.
+    """
+    if isinstance(sample_count, bool) or not isinstance(sample_count, int):
+        raise TypeError("sample_count must be an integer")
+    if sample_count < 0:
+        raise ValueError("sample_count must not be negative")
+    if isinstance(schema_version, bool) or not isinstance(schema_version, int):
+        raise TypeError("schema_version must be an integer")
+    if schema_version != CATALOG_SCHEMA_VERSION:
+        raise ValueError("unsupported catalog schema version")
+
+
+def check_summaries(missingness: Any, duplicates: Any, label: Any) -> None:
+    """Checks the classes of the three summaries of a catalog.
+
+    Args:
+        missingness: The missingness summary to check.
+        duplicates: The duplicate summary to check.
+        label: The label summary to check.
+
+    Raises:
+        TypeError: If a summary has the wrong class.
+    """
+    if not isinstance(missingness, MissingnessSummary):
+        raise TypeError("missingness must be MissingnessSummary")
+    if not isinstance(duplicates, DuplicateSummary):
+        raise TypeError("duplicates must be DuplicateSummary")
+    if not isinstance(label, LabelSummary):
+        raise TypeError("label must be LabelSummary")
+
+
+def check_notes(limitations: Any, release_blockers: Any) -> None:
+    """Checks the two lists of notes of a catalog.
+
+    Args:
+        limitations: The limitations to check.
+        release_blockers: The release blockers to check.
+
+    Raises:
+        ValueError: If `limitations` is empty or either has a blank or
+            non-string entry.
+    """
+    if not limitations or any(
+        not isinstance(item, str) or not item.strip() for item in limitations
+    ):
+        raise ValueError("limitations must contain non-empty strings")
+    if any(
+        not isinstance(item, str) or not item.strip()
+        for item in release_blockers
+    ):
+        raise ValueError("release_blockers must contain non-empty strings")
+
+
 @dataclasses.dataclass(frozen=True, slots=True)
 class Catalog:
     """Versioned, model-agnostic curation evidence for one data snapshot.
@@ -558,18 +622,7 @@ class Catalog:
             raise TypeError("source must be Source")
         if not isinstance(self.data_kind, str) or not self.data_kind.strip():
             raise ValueError("data_kind must not be empty")
-        if isinstance(self.sample_count, bool) or not isinstance(
-            self.sample_count, int
-        ):
-            raise TypeError("sample_count must be an integer")
-        if self.sample_count < 0:
-            raise ValueError("sample_count must not be negative")
-        if isinstance(self.schema_version, bool) or not isinstance(
-            self.schema_version, int
-        ):
-            raise TypeError("schema_version must be an integer")
-        if self.schema_version != CATALOG_SCHEMA_VERSION:
-            raise ValueError("unsupported catalog schema version")
+        check_counts(self.sample_count, self.schema_version)
         if any(
             isinstance(dimension, bool)
             or not isinstance(dimension, int)
@@ -580,22 +633,8 @@ class Catalog:
         fields = tuple(self.schema)
         if any(not isinstance(field, Field) for field in fields):
             raise TypeError("schema must contain Field records")
-        if not isinstance(self.missingness, MissingnessSummary):
-            raise TypeError("missingness must be MissingnessSummary")
-        if not isinstance(self.duplicates, DuplicateSummary):
-            raise TypeError("duplicates must be DuplicateSummary")
-        if not isinstance(self.label, LabelSummary):
-            raise TypeError("label must be LabelSummary")
-        if not self.limitations or any(
-            not isinstance(item, str) or not item.strip()
-            for item in self.limitations
-        ):
-            raise ValueError("limitations must contain non-empty strings")
-        if any(
-            not isinstance(item, str) or not item.strip()
-            for item in self.release_blockers
-        ):
-            raise ValueError("release_blockers must contain non-empty strings")
+        check_summaries(self.missingness, self.duplicates, self.label)
+        check_notes(self.limitations, self.release_blockers)
         object.__setattr__(self, "schema", fields)
         object.__setattr__(
             self,
@@ -914,6 +953,129 @@ def is_sequence_value(value: Any) -> bool:
     )
 
 
+def frame_shape(frame: pandas.DataFrame) -> tuple[int, ...]:
+    """Reads the dimensions of a frame as plain integers.
+
+    Args:
+        frame: The frame to measure.
+
+    Returns:
+        The frame's shape.
+    """
+    return tuple(int(value) for value in frame.shape)
+
+
+def frame_for_pandas(
+    data: pandas.DataFrame | pandas.Series,
+) -> tuple[pandas.DataFrame | None, str, tuple[int, ...]]:
+    """Converts a pandas object to an observation frame.
+
+    Args:
+        data: A DataFrame or a Series.
+
+    Returns:
+        A tuple ``(frame, data_kind, shape)``; a Series becomes a one-column
+        frame named after the Series, or ``value`` when it has no name.
+    """
+    if isinstance(data, pandas.DataFrame):
+        return data, "pandas_dataframe", frame_shape(data)
+    name = str(data.name) if data.name is not None else "value"
+    frame = data.to_frame(name=name)
+    return frame, "pandas_series", frame_shape(frame)
+
+
+def frame_for_array(
+    data: numpy.ndarray,
+) -> tuple[pandas.DataFrame | None, str, tuple[int, ...]]:
+    """Converts a NumPy array to an observation frame.
+
+    Args:
+        data: The array.
+
+    Returns:
+        A tuple ``(frame, data_kind, shape)``; the frame is None for an
+        array with more than two dimensions.
+    """
+    if data.ndim == 0:
+        frame = pandas.DataFrame({"value": [data.item()]})
+        return frame, "numpy_scalar", ()
+    shape = tuple(int(value) for value in data.shape)
+    if data.ndim == 1:
+        frame = pandas.DataFrame({"value": data})
+        return frame, "numpy_array", shape
+    if data.ndim == MATRIX_DIMENSIONS:
+        frame = pandas.DataFrame(
+            data, columns=[str(value) for value in range(data.shape[1])]
+        )
+        return frame, "numpy_array", shape
+    return None, "numpy_array", shape
+
+
+def frame_for_mapping(
+    data: Mapping[Any, Any],
+) -> tuple[pandas.DataFrame | None, str, tuple[int, ...]]:
+    """Converts a mapping to an observation frame.
+
+    Args:
+        data: A mapping of columns, or a single record.
+
+    Returns:
+        A tuple ``(frame, data_kind, shape)``; a mapping whose values are
+        all sequences is a set of columns, any other mapping is one record.
+
+    Raises:
+        ValueError: If a mapping of columns has columns of unequal length.
+    """
+    values = list(data.values())
+    if values and all(is_sequence_value(value) for value in values):
+        lengths = {len(value) for value in values}
+        if len(lengths) != 1:
+            raise ValueError("mapping columns must have equal lengths")
+        frame = pandas.DataFrame(data)
+        return frame, "column_mapping", frame_shape(frame)
+    frame = pandas.DataFrame([dict(data)])
+    return frame, "record_mapping", frame_shape(frame)
+
+
+def frame_for_sequence(
+    data: list[Any] | tuple[Any, ...],
+) -> tuple[pandas.DataFrame | None, str, tuple[int, ...]]:
+    """Converts a list or tuple to an observation frame.
+
+    Args:
+        data: A sequence of records or of values.
+
+    Returns:
+        A tuple ``(frame, data_kind, shape)``; a non-empty sequence of
+        mappings is a set of records, any other sequence is one column.
+    """
+    if data and all(isinstance(value, Mapping) for value in data):
+        frame = pandas.DataFrame.from_records(data)
+        return frame, "record_sequence", frame_shape(frame)
+    frame = pandas.DataFrame({"value": list(data)})
+    return frame, "sequence", frame_shape(frame)
+
+
+def frame_for_other(
+    data: Any,
+) -> tuple[pandas.DataFrame | None, str, tuple[int, ...]]:
+    """Describes bytes, scalars and opaque objects.
+
+    Args:
+        data: The object.
+
+    Returns:
+        A tuple ``(frame, data_kind, shape)``; the frame is None for bytes
+        and opaque objects, whose kind is the type name.
+    """
+    if isinstance(data, (bytes, bytearray, memoryview)):
+        return None, "bytes", (len(data),)
+    if isinstance(data, (str, int, float, bool, datetime.date)) or data is None:
+        frame = pandas.DataFrame({"value": [data]})
+        return frame, "scalar", ()
+    return None, type(data).__name__, ()
+
+
 def frame_for_data(
     data: Any,
 ) -> tuple[pandas.DataFrame | None, str, tuple[int, ...]]:
@@ -932,68 +1094,15 @@ def frame_for_data(
     Raises:
         ValueError: If a mapping of columns has columns of unequal length.
     """
-    if isinstance(data, pandas.DataFrame):
-        return (
-            data,
-            "pandas_dataframe",
-            tuple(int(value) for value in data.shape),
-        )
-    if isinstance(data, pandas.Series):
-        name = str(data.name) if data.name is not None else "value"
-        frame = data.to_frame(name=name)
-        return (
-            frame,
-            "pandas_series",
-            tuple(int(value) for value in frame.shape),
-        )
+    if isinstance(data, (pandas.DataFrame, pandas.Series)):
+        return frame_for_pandas(data)
     if isinstance(data, numpy.ndarray):
-        if data.ndim == 0:
-            frame = pandas.DataFrame({"value": [data.item()]})
-            return frame, "numpy_scalar", ()
-        shape = tuple(int(value) for value in data.shape)
-        if data.ndim == 1:
-            frame = pandas.DataFrame({"value": data})
-            return frame, "numpy_array", shape
-        if data.ndim == 2:
-            frame = pandas.DataFrame(
-                data, columns=[str(value) for value in range(data.shape[1])]
-            )
-            return frame, "numpy_array", shape
-        return None, "numpy_array", shape
+        return frame_for_array(data)
     if isinstance(data, Mapping):
-        values = list(data.values())
-        if values and all(is_sequence_value(value) for value in values):
-            lengths = {len(value) for value in values}
-            if len(lengths) != 1:
-                raise ValueError("mapping columns must have equal lengths")
-            frame = pandas.DataFrame(data)
-            return (
-                frame,
-                "column_mapping",
-                tuple(int(value) for value in frame.shape),
-            )
-        frame = pandas.DataFrame([dict(data)])
-        return (
-            frame,
-            "record_mapping",
-            tuple(int(value) for value in frame.shape),
-        )
-    if isinstance(data, (bytes, bytearray, memoryview)):
-        return None, "bytes", (len(data),)
+        return frame_for_mapping(data)
     if isinstance(data, (list, tuple)):
-        if data and all(isinstance(value, Mapping) for value in data):
-            frame = pandas.DataFrame.from_records(data)
-            return (
-                frame,
-                "record_sequence",
-                tuple(int(value) for value in frame.shape),
-            )
-        frame = pandas.DataFrame({"value": list(data)})
-        return frame, "sequence", tuple(int(value) for value in frame.shape)
-    if isinstance(data, (str, int, float, bool, datetime.date)) or data is None:
-        frame = pandas.DataFrame({"value": [data]})
-        return frame, "scalar", ()
-    return None, type(data).__name__, ()
+        return frame_for_sequence(data)
+    return frame_for_other(data)
 
 
 def canonical_value(value: Any) -> Any:
@@ -1026,6 +1135,24 @@ def canonical_value(value: Any) -> Any:
         return canonical_value(value.item())
     if isinstance(value, (datetime.datetime, datetime.date, datetime.time)):
         return value.isoformat()
+    if isinstance(value, (Mapping, list, tuple, set, frozenset)):
+        return canonical_collection(value)
+    return canonical_scalar(value)
+
+
+def canonical_collection(
+    value: Mapping[Any, Any] | list[Any] | tuple[Any, ...] | set[Any],
+) -> Any:
+    """Converts a mapping, sequence or set into JSON-native content.
+
+    Args:
+        value: A mapping, list, tuple, set or frozenset.
+
+    Returns:
+        A mapping with string keys sorted by key for a mapping, a list in
+        order for a list or tuple, and a list sorted by canonical JSON for a
+        set.
+    """
     if isinstance(value, Mapping):
         return {
             str(key): canonical_value(item)
@@ -1035,14 +1162,30 @@ def canonical_value(value: Any) -> Any:
         }
     if isinstance(value, (list, tuple)):
         return [canonical_value(item) for item in value]
-    if isinstance(value, set | frozenset):
-        values = [canonical_value(item) for item in value]
-        return sorted(values, key=canonical_json)
-    if isinstance(value, float):
+    values = [canonical_value(item) for item in value]
+    return sorted(values, key=canonical_json)
+
+
+def canonical_scalar(value: Any) -> Any:
+    """Converts a value that is not a container, bytes, date or NumPy scalar.
+
+    Args:
+        value: A float, string, integer, boolean, NumPy array or another
+            value pandas treats as missing.
+
+    Returns:
+        A ``{"non_finite": ...}`` mapping for NaN and infinities, None for
+        a missing value, the value itself for a string, number or boolean,
+        and a list for a NumPy array.
+
+    Raises:
+        TypeError: If the value is of a type that cannot be converted
+            deterministically.
+    """
+    if isinstance(value, float) and not math.isfinite(value):
         if math.isnan(value):
             return {"non_finite": "nan"}
-        if math.isinf(value):
-            return {"non_finite": "-inf" if value < 0 else "inf"}
+        return {"non_finite": "-inf" if value < 0 else "inf"}
     missing = pandas.isna(value)
     if isinstance(missing, (bool, numpy.bool_)) and bool(missing):
         return None

@@ -64,6 +64,7 @@ FROZEN = "frozen_rule"
 PROVENANCE = "framing_provenance.json"
 KIND = "baseline"
 RIDGE = 1.0
+MIN_OUTCOME_CLASSES = 2
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -250,7 +251,7 @@ def freeze_rule(
         )
     y = numpy.asarray(outcome, dtype=float)
     seen = ~numpy.isnan(y)
-    if len(numpy.unique(y[seen])) < 2:
+    if len(numpy.unique(y[seen])) < MIN_OUTCOME_CLASSES:
         raise errors.ConfigError(
             "the baseline claim needs both outcome classes in the exploration "
             "rows"
@@ -424,9 +425,11 @@ def build_runner(
             The status of the claim and the report document.
         """
         if selection["flagged"]:
-            document = refused(registration, selection, ceiling)
+            document = refused(registration, selection)
         else:
-            y = explore.encode_target(target, True, classes).to_numpy(float)
+            y = explore.encode_target(
+                target, classification=True, classes=classes
+            ).to_numpy(float)
             clusters = (
                 features[group_column].astype(str).to_numpy()
                 if group_column and group_column in features.columns
@@ -465,15 +468,12 @@ def build_runner(
 def refused(
     registration: baseline.Registration,
     selection: Mapping[str, Any],
-    ceiling: qualification.Tier,
 ) -> dict[str, Any]:
     """Builds the report for a claim stopped by selective labels on `X`.
 
     Args:
         registration: The registration of the claim.
         selection: The selective-label finding on `X` and the unlabeled rows.
-        ceiling: Highest tier the inputs allow (not used in the report, as
-            the claim is not evaluated).
 
     Returns:
         A report document with status `not_issued`, the reason, no

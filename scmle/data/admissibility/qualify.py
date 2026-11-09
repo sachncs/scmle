@@ -430,7 +430,7 @@ def run(
         frame, str(target.name), f5.store, seed, provenance=None
     )
     candidates = [c for c in features.columns if c not in set(structure)]
-    day = today or datetime.date.today()
+    day = today or datetime.datetime.now().astimezone().date()
     if kind != "predictive":
         if causal is None or dag is None:
             notes.append(
@@ -475,11 +475,11 @@ def run(
         for column, item in applied.valid.items()
         if column in suspect_columns and column in candidates
     }
-    for column in applied.valid:
-        if column not in used:
-            notes.append(
-                f"attestation for '{column}' unused: the screen did not flag it"
-            )
+    notes.extend(
+        f"attestation for '{column}' unused: the screen did not flag it"
+        for column in applied.valid
+        if column not in used
+    )
     attested = {i.field().name for i in used.values()}
     names = {str(c) for c in candidates}
     records = provenance.Dictionary.covering(

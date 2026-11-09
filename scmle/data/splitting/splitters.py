@@ -23,6 +23,9 @@ from scmle.data.readers import streaming
 from scmle.data.splitting import duplicates
 from scmle.data.splitting import iterative
 
+MIN_STRATUM_ROWS = 2
+MIN_FOLDS = 2
+
 Fold = tuple[numpy.ndarray, numpy.ndarray]
 MIN_ROLLING_TRAIN = 10
 DUPLICATE_AWARE = frozenset({"random", "stratified", "stratified_events"})
@@ -343,7 +346,7 @@ class RandomSplit(Partitioner):
 
     name = "random"
 
-    def stratify_labels(self, frame: pandas.DataFrame) -> pandas.Series | None:
+    def stratify_labels(self, frame: pandas.DataFrame) -> pandas.Series | None:  # noqa: ARG002 -- hook that subclasses override and read the frame in
         """Labels to stratify the holdout on; none for plain random.
 
         Args:
@@ -356,7 +359,10 @@ class RandomSplit(Partitioner):
         return None
 
     def cross_validation_folds(
-        self, frame: pandas.DataFrame, dev_ids: numpy.ndarray, notes: list[str]
+        self,
+        frame: pandas.DataFrame,  # noqa: ARG002 -- hook that subclasses override and read the frame in
+        dev_ids: numpy.ndarray,
+        notes: list[str],  # noqa: ARG002 -- hook that subclasses override and append notes to
     ) -> list[Fold]:
         """Builds shuffled K-fold splits over positions in `dev_ids`.
 
@@ -453,7 +459,7 @@ class StratifiedSplit(RandomSplit):
             BlockedError: If a class has fewer than two examples.
         """
         labels = frame[self.data.target]
-        if (labels.value_counts() < 2).any():
+        if (labels.value_counts() < MIN_STRATUM_ROWS).any():
             raise errors.BlockedError(
                 "a class has fewer than 2 examples: cannot stratify"
             )
@@ -479,7 +485,7 @@ class StratifiedSplit(RandomSplit):
         """
         labels = frame[self.data.target].iloc[dev_ids]
         rarest = int(labels.value_counts().min())
-        if rarest < 2:
+        if rarest < MIN_STRATUM_ROWS:
             raise errors.BlockedError(
                 "insufficient minority-class examples after test split"
             )
@@ -525,7 +531,7 @@ class EventStratifiedSplit(RandomSplit):
             BlockedError: If events or censored rows number fewer than two.
         """
         events = self.events(frame)
-        if (events.value_counts() < 2).any():
+        if (events.value_counts() < MIN_STRATUM_ROWS).any():
             raise errors.BlockedError(
                 "events or censored rows number fewer than 2: cannot stratify"
             )
@@ -552,7 +558,7 @@ class EventStratifiedSplit(RandomSplit):
         """
         events = self.events(frame).iloc[dev_ids]
         rarest = int(events.value_counts().min())
-        if rarest < 2:
+        if rarest < MIN_STRATUM_ROWS:
             raise errors.BlockedError(
                 "too few events (or censored rows) after the test split"
             )
@@ -681,7 +687,7 @@ class TreatmentStratifiedSplit(RandomSplit):
             BlockedError: If a cell has fewer than two rows.
         """
         cells = self.cells(frame)
-        if (cells.value_counts() < 2).any():
+        if (cells.value_counts() < MIN_STRATUM_ROWS).any():
             raise errors.BlockedError(
                 "a treatment / outcome combination has fewer than 2 rows"
             )
@@ -708,7 +714,7 @@ class TreatmentStratifiedSplit(RandomSplit):
         cells = self.cells(frame).iloc[dev_ids]
         rarest = int(cells.value_counts().min())
         folds = min(self.validation.folds, rarest)
-        if folds < 2:
+        if folds < MIN_FOLDS:
             raise errors.BlockedError(
                 "too few rows in a treatment / outcome combination"
             )
@@ -1052,6 +1058,14 @@ STRATEGIES: dict[str, type[Partitioner]] = {
 }
 
 
+TASK_STRATEGIES = {
+    tasks.Task.SURVIVAL: "stratified_events",
+    tasks.Task.RANKING: "group",
+    tasks.Task.MULTILABEL: "multilabel_stratified",
+    tasks.Task.UPLIFT: "treatment_stratified",
+}
+
+
 def resolve_strategy_name(spec: tasks.Config, task: tasks.Task) -> str:
     """Chooses the split strategy for a project.
 
@@ -1070,14 +1084,8 @@ def resolve_strategy_name(spec: tasks.Config, task: tasks.Task) -> str:
         return "temporal"
     if spec.data.group_column:
         return "group"
-    if task is tasks.Task.SURVIVAL:
-        return "stratified_events"
-    if task is tasks.Task.RANKING:
-        return "group"
-    if task is tasks.Task.MULTILABEL:
-        return "multilabel_stratified"
-    if task is tasks.Task.UPLIFT:
-        return "treatment_stratified"
+    if task in TASK_STRATEGIES:
+        return TASK_STRATEGIES[task]
     return "stratified" if task.is_classification else "random"
 
 
@@ -1154,8 +1162,10 @@ class Splitter:
         covered = int((groups != duplicates.NOT_DUPLICATED).sum())
         notes = [
             *part.notes,
-            f"{count} groups of duplicate rows ({covered} rows) kept on one "
-            "side of every split",
+            (
+                f"{count} groups of duplicate rows ({covered} rows) kept on "
+                "one side of every split"
+            ),
         ]
         return Partition(dev, test, folds, notes)
 

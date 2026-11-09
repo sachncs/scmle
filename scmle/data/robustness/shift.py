@@ -60,12 +60,14 @@ HOLDOUT = 0.5
 CHUNK = 100
 TIE_TOLERANCE = 1e-12
 LOW_EXPECTED = 5.0
+MIN_CLASS_ROWS = 2
+MIN_CATEGORIES = 2
 
 
 class Status(enum.StrEnum):
     """Outcome of a shift check against a deployment sample."""
 
-    PASS = "pass"  # nosec B105 - check outcome, not a credential
+    PASS = "pass"  # nosec B105  # noqa: S105 -- a check outcome, not a credential
     FAIL = "fail"
     UNVERIFIABLE = "unverifiable"
 
@@ -112,7 +114,7 @@ def auc_delong(
     positive = values[labels == 1]
     negative = values[labels == 0]
     m, n = len(positive), len(negative)
-    if min(m, n) < 2:
+    if min(m, n) < MIN_CLASS_ROWS:
         raise ValueError("each class needs at least two rows")
     pooled = stats.rankdata(numpy.r_[positive, negative])
     v10 = (pooled[:m] - stats.rankdata(positive)) / n
@@ -536,7 +538,7 @@ def categorical_test(
         sort=True,
     ).fillna(0.0)
     counts = table.to_numpy(dtype=float).T
-    if counts.shape[1] < 2:
+    if counts.shape[1] < MIN_CATEGORIES:
         return 0.0, 1.0, 0.0, False
     result = stats.chi2_contingency(counts, correction=False)
     total = float(counts.sum())

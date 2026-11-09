@@ -50,6 +50,7 @@ MIN_CLUSTERS = 20
 CHECK_PREFIX = "baseline"
 CLAIM_ID = "baseline_vs_current_process"
 NOT_COMPUTED = "not_computed"
+MIN_CLUSTERS = 2
 
 
 class BaselineError(errors.ArtifactError):
@@ -149,7 +150,7 @@ def cluster_test(d: ArrayLike, clusters: ArrayLike) -> ClusterTest:
     if codes.shape != values.shape:
         raise ValueError("d and clusters must have the same length")
     g = int(numpy.max(codes)) + 1
-    if g < 2:
+    if g < MIN_CLUSTERS:
         raise ValueError("at least two clusters are needed")
     n = values.size
     mean = float(values.mean())
@@ -243,7 +244,13 @@ def selective_labels(observed: ArrayLike, b: ArrayLike) -> Selectivity:
     n1, n0 = int(base.sum()), int((~base).sum())
     if min(n1, n0) < MIN_ARM_ROWS:
         return Selectivity(
-            False, numpy.nan, numpy.nan, 0.0, 1.0, LABEL_TOLERANCE, LABEL_ALPHA
+            flagged=False,
+            missing_rate_b0=numpy.nan,
+            missing_rate_b1=numpy.nan,
+            difference=0.0,
+            p_value=1.0,
+            tolerance=LABEL_TOLERANCE,
+            alpha=LABEL_ALPHA,
         )
     miss0 = int((~seen[~base]).sum())
     miss1 = int((~seen[base]).sum())
@@ -608,8 +615,10 @@ class Evaluator:
         else:
             status = "not_shown"
             reasons = [
-                "the gain is not shown to be positive at both ends of the "
-                f"cost range at level {alpha}"
+                (
+                    "the gain is not shown to be positive at both ends of the "
+                    f"cost range at level {alpha}"
+                )
             ]
         tier = input_tier if issued else qualification.Tier.UNVERIFIED
         points = (self.registration.t_lo, self.registration.t_hi)
