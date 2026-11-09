@@ -86,10 +86,11 @@ class Derived:
     """What `derive` found.
 
     Attributes:
-        steps: The ten steps in order (without chain fields).
-        findings: Every problem.
+        steps: The ten steps in the order of `KINDS` (without chain fields).
+        findings: Every problem, in the order found.
         reports: The exploratory report, the experiment comparison and the
-            outcome tracking, by file name under ``reports/``.
+            outcome tracking, by file name under ``reports/``; a report that
+            could not be rebuilt is None.
     """
 
     steps: tuple[dict[str, Any], ...]
@@ -107,10 +108,11 @@ class Tracer:
         findings: Problems found so far.
         steps: Steps derived so far, by kind.
         cache: Retained JSON records already read, by relative path.
-        charter_hash: Digest of the chartered question, once derived.
-        content_id: Digest of the model manifest, once derived.
-        run_id: Identifier of the run that produced the model, once derived.
-        inputs: The parsed ``inputs.json``.
+        charter_hash: Digest of the charter, once derived.
+        content_id: SHA-256 of the model manifest file, once derived.
+        run_id: Identifier of the run that produced the model, as named in the
+            retained evaluation, once derived.
+        inputs: The parsed ``inputs.json``; empty if it could not be read.
         derived: Derived reports by relative path or pseudo-file name.
     """
 
@@ -275,7 +277,11 @@ class Tracer:
     def check_charter_signature(
         self, wrapper: Mapping[str, Any], charter: Any, step: str
     ) -> None:
-        """Requires the charter's HMAC to verify under the analyst key.
+        """Records a finding unless the charter's HMAC verifies.
+
+        A finding of kind `unsigned_step` is recorded if the wrapper has no
+        signature, no analyst key was supplied, or the signature does not
+        match the analyst key.
 
         Args:
             wrapper: The stored charter with its signature and hash.
@@ -389,9 +395,11 @@ class Tracer:
             step: The step kind findings are recorded against.
 
         Returns:
-            One result per criterion with the observed value and whether it
-            passed. A criterion whose path cannot be resolved is recorded as a
-            finding and counts as not passed.
+            One result per criterion with its `id`, `path`, `op`, `value`,
+            `reason`, the observed value and whether it passed. A criterion
+            whose path cannot be resolved, or whose comparison cannot be made
+            (unknown operator, incomparable types), is recorded as a finding
+            and counts as not passed.
         """
         results = []
         for item in criteria:
@@ -426,6 +434,10 @@ class Tracer:
         self, name: str, relative: str, fresh: dict[str, Any], files: list[str]
     ) -> None:
         """Derives a report step: the stored copy must equal the recomputation.
+
+        A finding is recorded if the stored report is absent, or is unreadable
+        or differs from `fresh`. The recomputed report is kept for later
+        steps.
 
         Args:
             name: The step kind.
@@ -662,11 +674,13 @@ class Tracer:
             step: The step kind findings are recorded against.
 
         Returns:
-            The approval record of the latest champion promotion of this
-            version, or None if there is none or it cannot be used. Findings are
-            recorded for a missing, unsigned or unverifiable approval, for an
-            approval that is not valid for this model version and bundle, and
-            for an approval by the person who built the model.
+            The stored approval record of the last audit row promoting this
+            version to champion, or None if there is no such row, it carries
+            no approval record, or the record cannot be read. The record is
+            returned even when findings are recorded against it: an unsigned
+            or unverifiable signature, an approval that names another bundle,
+            was rejected or was not independent, and an approver who is the
+            person who built the model.
         """
         rows = [
             r
@@ -774,7 +788,12 @@ class Tracer:
     def reconcile_feed(
         self, summaries: list[dict[str, Any]], step: str
     ) -> None:
-        """Requires the outcome feed to cover the cases the ledger saw.
+        """Records a mismatch unless the feed matches the ledger's cases.
+
+        The feed's per-batch case counts (length of each `label` list) must
+        equal the ledger's per-observation `cases`, in order. Nothing is
+        checked when the feed is absent or not an object; reading it has
+        already recorded a finding.
 
         Args:
             summaries: The ledger's observation summaries.
@@ -866,7 +885,9 @@ def derive(
             unverifiable, which is reported as unsigned.
 
     Returns:
-        The steps, findings and derived reports.
+        The ten steps in order, every finding, and the derived reports (None
+        for a report that could not be rebuilt). Problems are recorded as
+        findings rather than raised.
     """
     folder = Path(directory)
     tracer = Tracer(folder, keys)

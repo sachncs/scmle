@@ -50,8 +50,11 @@ def case_costs(
 ) -> list[float]:
     """Computes the cost of each case when the rule acts at the threshold.
 
+    A `probability` and `label` of different lengths raise `ValueError`.
+
     Args:
-        costs: The cost model with ``c_00``, ``c_01``, ``c_10``, ``c_11``.
+        costs: The cost model with ``c_00``, ``c_01``, ``c_10``, ``c_11``
+            (first index the action, second the outcome).
         threshold: The rule acts when the probability is at least this.
         probability: Predicted probability of each case.
         label: Observed outcome (0 or 1) of each case.
@@ -102,7 +105,11 @@ def track(
     Returns:
         A JSON-ready record; ``status`` is ``within``, ``above``, ``below``,
         ``insufficient`` or ``absent``. ``above`` means the interval lies wholly
-        over the approved range, ``below`` wholly under it.
+        over the approved range, ``below`` wholly under it, ``within`` that it
+        overlaps the range. ``absent`` (no feed or no batches) returns only
+        ``status`` and ``cases`` (0); the other statuses also carry the
+        threshold, mean cost, interval, level, approved range, per-batch
+        means, source and uncertainty statement.
     """
     if not feed or not feed.get("batches"):
         return {"status": ABSENT, "cases": 0}

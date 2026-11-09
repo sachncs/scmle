@@ -32,7 +32,8 @@ class Report:
 
     Attributes:
         directory: The trail folder.
-        head: Hash of the last step, or the empty string.
+        head: Hash of the last step as recorded in ``trail.json``, or the
+            empty string if that file could not be read.
         steps: Number of steps in ``trail.json``.
         findings: Every problem, without duplicates.
     """
@@ -48,7 +49,7 @@ class Report:
         return not self.findings
 
     def kinds(self) -> set[str]:
-        """Lists the kinds of finding present.
+        """Collects the distinct kinds of finding present.
 
         Returns:
             The set of finding kinds.
@@ -73,7 +74,7 @@ class Report:
 
 
 def link(steps: tuple[dict[str, Any], ...]) -> list[dict[str, Any]]:
-    """Adds ``prev`` and ``hash`` to each step.
+    """Chains the steps by adding ``prev`` and ``hash`` to each.
 
     Args:
         steps: The derived steps, in order.
@@ -93,13 +94,15 @@ def link(steps: tuple[dict[str, Any], ...]) -> list[dict[str, Any]]:
 
 
 def manifest_of(directory: Path) -> dict[str, str]:
-    """Digests every retained record and ``inputs.json``.
+    """Digests every file under ``retained/`` and ``inputs.json`` if present.
 
     Args:
         directory: The trail folder.
 
     Returns:
-        A mapping from each file's path relative to the folder to its SHA-256.
+        A mapping from each file's path relative to the folder (with forward
+        slashes, so ``retained/...`` or ``inputs.json``) to its hex SHA-256,
+        with the retained paths sorted and `inputs.json` last.
     """
     held = {}
     base = directory / records.RETAINED
@@ -137,8 +140,9 @@ def seal(
 
     Args:
         directory: A trail folder with ``retained/`` and ``inputs.json``.
-        keys: Keys by role. ``analyst`` signs the file; every role's key is also
-            needed to check that role's signatures.
+        keys: Keys by role. ``analyst`` signs the file (without it
+            ``builder_signature`` is null); each role's key is also needed to
+            check that role's signature in ``inputs.json``.
 
     Returns:
         The verification of what was just written.
@@ -182,9 +186,9 @@ def check_chain(
         keys: Verification keys by role; the analyst key checks the signature.
 
     Returns:
-        A finding for each step that does not continue the chain, a head that is
-        not the last step, and a signature that is absent, cannot be checked for
-        lack of a key, or is invalid.
+        A finding for each step that does not continue the chain, one if the
+        head is not the last step's hash, and one if the signature is absent,
+        cannot be checked for lack of an analyst key, or is invalid.
     """
     found: list[trace.Finding] = []
     previous = GENESIS
@@ -275,8 +279,10 @@ def check_steps(
         derived: The steps and findings derived from the retained records.
 
     Returns:
-        A finding for each step that is absent from the trail or whose facts,
-        records, requirements or title differ from the derived ones.
+        A finding for each derived step that is absent from the trail, and a
+        finding for each of the facts, records, requirements and title of a
+        stored step that differs from the derived one. Stored steps with no
+        derived counterpart are ignored.
     """
     found: list[trace.Finding] = []
     stored = {s.get("kind"): s for s in document.get("steps", [])}
@@ -313,9 +319,11 @@ def verify(
         keys: Verification keys by role.
 
     Returns:
-        The report. A missing or unreadable ``trail.json`` is itself a finding.
-        A trail with a missing link, a broken chain, an unsigned or unapproved
-        step or an outcome outside the approved expectation reports that kind.
+        The report, with the findings of `check_chain`, `check_manifest`,
+        `check_steps` and the derivation itself, without duplicates. An absent
+        ``trail.json`` gives a single missing-link finding and a file that is
+        not JSON a single broken-chain finding, each with an empty head and
+        zero steps.
     """
     folder = Path(directory)
     path = folder / records.TRAIL_FILE

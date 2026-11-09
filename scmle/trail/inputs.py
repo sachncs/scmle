@@ -103,8 +103,10 @@ def structure_problems(record: Mapping[str, Any]) -> list[str]:
         record: The inputs.
 
     Returns:
-        One message per missing top-level field, section field, KPI field,
-        criterion field, unknown criterion operator or expectation field.
+        One message per missing top-level field (`model`, `version`,
+        `charter_hash`, `builder`), section field, KPI field, criterion field
+        (for both acceptance criteria and reviewer thresholds), criterion
+        operator not in `records.OPERATORS`, or expectation field.
     """
     found: list[str] = []
     for name in ("model", "version", "charter_hash", "builder"):

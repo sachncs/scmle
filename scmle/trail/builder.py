@@ -35,17 +35,21 @@ def build(
     inputs_file: str | Path,
     keys: Mapping[str, str | bytes | None],
 ) -> chain.Report:
-    """Copies the retained records and seals the trail.
+    """Copies the retained records and `inputs.json`, and seals the trail.
+
+    Only the files named in `records` that exist are copied; missing ones are
+    skipped, and the trial files are taken from `run_dir/trials`.
 
     Args:
-        output: Trail folder to write (created).
+        output: Trail folder to write (created if absent).
         run_dir: The charter run directory.
         framing_dir: The ``scmle frame`` output directory.
         registry_dir: The local registry root.
         deployment_dir: The loop's deployment directory, which also holds
             ``observed_outcomes.json``.
-        inputs_file: The signed ``inputs.json``.
-        keys: Keys by role (``analyst`` signs the trail).
+        inputs_file: The signed ``inputs.json``; it must exist.
+        keys: Keys by role (``analyst`` signs the trail; the others are used
+            to check the signed sections of `inputs.json`).
 
     Returns:
         The verification of the trail just written.

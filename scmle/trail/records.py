@@ -132,6 +132,9 @@ def write_json(path: Path, value: Any) -> None:
 def lookup(document: Any, dotted: str) -> Any:
     """Follows ``a.b.0.c`` through mappings and lists.
 
+    A list index that is not an integer raises `ValueError` and one out of
+    range raises `IndexError`.
+
     Args:
         document: A parsed JSON value.
         dotted: Path components separated by dots; numbers index lists.
@@ -140,7 +143,8 @@ def lookup(document: Any, dotted: str) -> Any:
         The value at the path.
 
     Raises:
-        KeyError: If a component is missing.
+        KeyError: If a mapping lacks a component, or the path continues into
+            a value that is neither a mapping nor a list.
     """
     value = document
     for part in dotted.split("."):
@@ -175,8 +179,9 @@ def compare(value: Any, op: str, bound: Any) -> bool:
 def resolve(directory: Path, spec: str, derived: Mapping[str, Any]) -> Any:
     """Reads ``file#dotted.path``.
 
-    The file is relative to ``retained/``; the pseudo-files ``outcomes`` and
-    ``exploratory`` name the derived reports.
+    The file is relative to ``retained/``; a name that is a key of `derived`
+    (the tracer uses ``exploratory``, ``experiments`` and ``outcomes``) names
+    that derived report instead.
 
     Args:
         directory: The trail folder.
@@ -185,8 +190,8 @@ def resolve(directory: Path, spec: str, derived: Mapping[str, Any]) -> Any:
 
     Returns:
         The whole document, or the value at the dotted path. A path missing in
-        the document raises `KeyError` and a missing file raises
-        `FileNotFoundError`.
+        the document raises `KeyError` (see `lookup` for the list-index
+        errors) and a missing file raises `FileNotFoundError`.
     """
     name, ignored, dotted = spec.partition("#")
     if name in derived:

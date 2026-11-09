@@ -28,8 +28,10 @@ def facts_lines(facts: dict[str, Any]) -> list[str]:
         facts: The step's facts.
 
     Returns:
-        One line per fact, sorted by name; long values are cut. A list of
-        criteria with `passed` flags gets one line per criterion.
+        One line per fact, sorted by name, each cut to the display width. A
+        fact that is a non-empty list of mappings that all have `passed`
+        gets one line per criterion (not cut, and no line for the fact
+        itself) marked `ok` or `FAIL`.
     """
     lines = []
     for key in sorted(facts):
@@ -58,8 +60,10 @@ def render(directory: str | Path) -> str:
         directory: The trail folder.
 
     Returns:
-        The model, version, charter hash and head, then each step with its facts
-        and records. A folder without ``trail.json`` raises `FileNotFoundError`.
+        The model, version, charter hash and head, then each numbered step with
+        its facts and its records, each shown with the first 12 characters of
+        its digest. A folder without ``trail.json`` raises
+        `FileNotFoundError`.
     """
     document = records.read_json(Path(directory) / records.TRAIL_FILE)
     lines = [

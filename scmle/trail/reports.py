@@ -30,15 +30,16 @@ def exploratory(directory: Path) -> dict[str, Any]:
     """Reports what the data looked like and what exploration was allowed to do.
 
     Reads the run's curation report, dataset manifest, feasibility verdict,
-    hypothesis ledger and claims. Only the exploration rows were profiled.
+    hypothesis ledger and claims. The report states that only the exploration
+    rows were profiled.
 
     Args:
         directory: The trail folder.
 
     Returns:
-        The report with its digest: dataset identity, profiled rows, columns,
-        quality findings, feasibility, ledger row counts and the confirmation
-        outcome.
+        The report with its digest: dataset identity, profiled rows, feature
+        and dropped columns, quality and risk findings, feasibility, ledger row
+        counts by kind and the confirmation outcome with its checks by tier.
     """
     base = directory / records.RETAINED / "run"
     curation = records.read_json(base / "curation_report.json")
@@ -102,19 +103,22 @@ def bar(score: float, top: float) -> str:
 
 
 def experiments(directory: Path) -> dict[str, Any]:
-    """Ranks every candidate the search tried, with its spread.
+    """Ranks the scored candidates the search tried, with their spread.
 
-    The comparison states whether the selected model's lead over the runner up
-    is larger than the spread of the cross-validation scores; when it is not,
-    the choice among them is not statistically separated.
+    The comparison states whether the selected model's lead over the best
+    other scored candidate is larger than the larger of the two candidates'
+    cross-validation score standard deviations. Candidates that are not `ok`
+    or have no score are listed separately.
 
     Args:
         directory: The trail folder.
 
     Returns:
-        The report with its digest: the ranked scored trials, the trials that
-        were not scored, the lead over the runner-up and whether it exceeds the
-        spread, the baseline score, the interval, the test metrics and a
+        The report with its digest: the scored trials ranked by descending
+        score, the trials that were not scored, the lead over the runner-up
+        and whether it exceeds the spread (both None unless the selected trial
+        and another trial are scored), the score of the best ``dummy`` model
+        or None, the cross-validation interval, the test metrics and a
         reading.
     """
     base = directory / records.RETAINED / "run"

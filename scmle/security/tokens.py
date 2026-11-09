@@ -74,7 +74,8 @@ class TokenError(errors.ScmleError):
 
         Args:
             reason: One of the failure codes in this module.
-            message: Optional detail that never contains the token.
+            message: Optional detail, such as a claim name; it never contains
+                the token. Defaults to `reason`.
         """
         super().__init__(message or reason)
         self.reason = reason
@@ -118,7 +119,8 @@ def int_from_segment(text: str) -> int:
         text: The segment.
 
     Returns:
-        The integer. A segment that is not base64url raises `TokenError`.
+        The integer. The `TokenError` that `decode_segment` raises for a
+        segment that is not base64url is not caught.
     """
     return int.from_bytes(decode_segment(text), "big")
 
@@ -146,10 +148,13 @@ class VerificationKey:
     expires: float | None = None
 
     def __post_init__(self) -> None:
-        """Validates the key material.
+        """Validates the key id, algorithm and key material.
 
         Raises:
-            ConfigError: If the key is unusable or too weak.
+            ConfigError: If the `kid` is empty or over 128 characters, the
+                algorithm is not `HS256` or `RS256`, an HS256 secret is under
+                32 bytes, an RS256 modulus is under 2048 bits, or the RSA
+                exponent is even or below 3.
         """
         if not self.kid or len(self.kid) > 128:
             raise errors.ConfigError("a key needs a kid of 1-128 characters")
@@ -185,7 +190,10 @@ class VerificationKey:
             The key.
 
         Raises:
-            ConfigError: If the entry is malformed.
+            ConfigError: If the entry lacks `kid` or `kty`, a key field is
+                missing or not base64url, the type is neither `oct` nor `RSA`,
+                or the key is too weak. A non-numeric `nbf` or `exp` raises
+                `ValueError` from `float` instead.
         """
         try:
             kid = str(entry["kid"])
@@ -321,7 +329,9 @@ class KeySet:
             The key set.
 
         Raises:
-            ConfigError: If the file is unreadable or malformed.
+            ConfigError: If the file is unreadable, is not JSON, or holds no
+                valid `keys` list. A JSON document that is not an object
+                raises `AttributeError` instead.
         """
         try:
             text = pathlib.Path(path).read_text(encoding="utf-8")
@@ -423,7 +433,8 @@ class Principal:
 
     Attributes:
         subject: The token's `sub`.
-        tenant: The token's tenant claim, or None.
+        tenant: The token's tenant claim if it is a non-empty string, else
+            None.
         scopes: Granted scopes.
         token_id: The token's `jti`, or None.
         key_id: The key that verified it.
@@ -445,7 +456,7 @@ class TokenVerifier:
         keys: Trusted keys; replace to rotate.
         issuer: Required `iss`.
         audience: Required member of `aud`.
-        revocations: A list, or a callable returning the current list.
+        revocations: A list, a callable returning the current list, or None.
         tenant_claim: Name of the tenant claim.
         leeway: Clock skew tolerated, in seconds.
         clock: Source of epoch seconds.
@@ -498,7 +509,8 @@ class TokenVerifier:
             The list, or None if no revocations are configured.
 
         Raises:
-            TokenError: `revocation_unavailable` if the list cannot be obtained.
+            TokenError: `revocation_unavailable` if the callable raises
+                `ConfigError`.
         """
         if callable(self.revocations):
             try:
@@ -569,7 +581,10 @@ class TokenVerifier:
         key: VerificationKey,
         now: float,
     ) -> Principal:
-        """Checks the registered claims of a token with a valid signature.
+        """Checks the claims of a token whose signature is valid.
+
+        The checks run in order: issuer, audience, subject, expiry, `nbf` and
+        `iat`, then revocation.
 
         Args:
             header: The token's header.
@@ -582,8 +597,9 @@ class TokenVerifier:
 
         Raises:
             TokenError: If the issuer or audience differs, `sub` or `exp` is
-                missing, the token is expired or not yet valid, or it is
-                revoked.
+                missing, `exp`, `nbf` or `iat` is not a number, the token is
+                expired or not yet valid, it is revoked, or the revocation
+                list is unavailable.
         """
         if claims.get("iss") != self.issuer:
             raise TokenError(BAD_ISSUER)
@@ -648,7 +664,8 @@ def require_number(claims: Mapping[str, Any], name: str) -> float:
         The claim as a float.
 
     Raises:
-        TokenError: `missing_claim` if absent.
+        TokenError: `missing_claim` if absent. A claim that is not a number
+            raises `malformed`, as in `number_claim`.
     """
     value = number_claim(claims, name)
     if value is None:
