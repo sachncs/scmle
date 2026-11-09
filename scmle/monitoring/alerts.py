@@ -44,7 +44,7 @@ class Alert:
     created_at: str
 
     def __post_init__(self) -> None:
-        """Validate identity, route, and timestamp fields.
+        """Validates identity, route, and timestamp fields.
 
         Raises:
             ValueError: If a text field is blank or `created_at` is not
@@ -73,7 +73,7 @@ class Alert:
         object.__setattr__(self, "details", dict(self.details))
 
     def to_dict(self) -> dict[str, object]:
-        """Return JSON-native alert evidence.
+        """Returns JSON-native alert evidence.
 
         Returns:
             A dict of all fields.
@@ -98,7 +98,7 @@ class Alert:
         evidence: Mapping[str, Any],
         created_at: str,
     ) -> "Alert":
-        """Build a deterministic ID from the complete alert evidence.
+        """Builds a deterministic ID from the complete alert evidence.
 
         Args:
             route: Name of the route the alert goes to.
@@ -161,7 +161,7 @@ class AlertDelivery:
     observed_at: str
 
     def __post_init__(self) -> None:
-        """Validate delivery state.
+        """Validates delivery state.
 
         Raises:
             ValueError: If the status is unsupported, `attempts` is negative or
@@ -175,7 +175,7 @@ class AlertDelivery:
             raise ValueError("reason must not be empty")
 
     def to_dict(self) -> dict[str, object]:
-        """Return JSON-native delivery evidence.
+        """Returns JSON-native delivery evidence.
 
         Returns:
             A dict of all fields.
@@ -266,7 +266,7 @@ class WebhookAlertSink(AlertSink):
         backoff_seconds: float = 0.1,
         allow_insecure_localhost: bool = False,
     ) -> None:
-        """Validate the bounded webhook delivery policy.
+        """Validates the bounded webhook delivery policy.
 
         Args:
             url: Webhook URL; must be HTTPS.
@@ -441,7 +441,7 @@ class AlertDispatcher:
         return delivery
 
     def successful_alerts(self) -> set[str]:
-        """Return alert IDs with a durable successful delivery record.
+        """Returns alert IDs with a durable successful delivery record.
 
         Returns:
             The IDs of alerts whose journal record has status `delivered`; empty

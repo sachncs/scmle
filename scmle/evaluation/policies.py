@@ -12,7 +12,7 @@ def release_policy_from_criteria(
     primary_greater_is_better: bool,
     success_criteria: Mapping[str, float],
 ) -> evaluation.EvaluationPolicy | None:
-    """Build a release policy when the project declares score thresholds.
+    """Builds a release policy when the project declares score thresholds.
 
     The project-level success criteria are the only source of numeric release
     gates. A project without them has no honest threshold to evaluate and

@@ -55,7 +55,7 @@ class QualityObservation:
     evidence: QualityEvidence
 
     def __post_init__(self) -> None:
-        """Validate and detach the evidence from mutable caller state.
+        """Validates and detaches the evidence from mutable caller state.
 
         Raises:
             ValueError: If the note is given but blank.
@@ -458,7 +458,7 @@ class DatasetManifest:
     findings: tuple[CurationFinding, ...] = ()
 
     def __post_init__(self) -> None:
-        """Validate dataset identity before it enters a run or artifact.
+        """Validates dataset identity before it enters a run or artifact.
 
         Raises:
             TypeError: If a count is not an integer, a metadata component has
@@ -584,7 +584,7 @@ class ModalityManifest:
     findings: tuple[CurationFinding, ...] = ()
 
     def __post_init__(self) -> None:
-        """Validate modality identity and attached governance metadata.
+        """Validates modality identity and attached governance metadata.
 
         Raises:
             TypeError: If the sample count is not an integer, a metadata
@@ -631,7 +631,7 @@ class ModalityManifest:
             raise TypeError("findings must contain CurationFinding records")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a JSON- and Arrow-compatible modality manifest."""
+        """Returns a JSON- and Arrow-compatible modality manifest."""
         return {
             "dataset_id": self.dataset_id,
             "snapshot_id": self.snapshot_id,
@@ -829,7 +829,7 @@ class DatasetProfile:
         return str(self.leakage.get("warning", ""))
 
     def __post_init__(self) -> None:
-        """Validate and detach structured quality evidence."""
+        """Validates and detaches structured quality evidence."""
         normalized = tuple(
             normalize_quality_evidence(item, f"quality_evidence[{index}]")
             for index, item in enumerate(self.quality_evidence)

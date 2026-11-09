@@ -66,7 +66,7 @@ class ReleaseFinding:
     evidence: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
-        """Validate the immutable finding shape.
+        """Validates the immutable finding shape.
 
         Numeric `observed` and `expected` values are converted to floats.
 
@@ -111,7 +111,7 @@ class ReleaseFinding:
                 raise TypeError(f"{field_name} must be numeric, text, or None")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a deterministic JSON-compatible finding.
+        """Returns a deterministic JSON-compatible finding.
 
         Returns:
             A mapping of the finding's fields. `observed` and `expected`
@@ -151,7 +151,7 @@ class FindingCounts:
     blocking_failures: int
 
     def __post_init__(self) -> None:
-        """Validate count relationships before exposing the aggregate.
+        """Validates count relationships before exposing the aggregate.
 
         Raises:
             TypeError: If a count is not an integer (bools are rejected).
@@ -181,7 +181,7 @@ class FindingCounts:
             raise ValueError("blocking_failures must not exceed blocking")
 
     def to_dict(self) -> dict[str, int]:
-        """Return deterministic JSON-compatible aggregate counts.
+        """Returns deterministic JSON-compatible aggregate counts.
 
         Returns:
             A mapping from each count's name to its value.
@@ -229,7 +229,7 @@ class ReleaseReadinessSummary:
     counts_by_kind: Mapping[str, FindingCounts]
 
     def __post_init__(self) -> None:
-        """Validate summary counts, status, and kind coverage.
+        """Validates summary counts, status, and kind coverage.
 
         Raises:
             ValueError: If `task` is blank, `policy_schema_version` is not
@@ -316,7 +316,7 @@ class ReleaseReadinessSummary:
             raise ValueError("aggregate counts do not match counts_by_kind")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return deterministic JSON-compatible readiness data.
+        """Returns deterministic JSON-compatible readiness data.
 
         Returns:
             A mapping of the summary's fields, with the status as its value
@@ -339,7 +339,7 @@ class ReleaseReadinessSummary:
         }
 
     def canonical_json(self) -> str:
-        """Return stable JSON suitable for release automation.
+        """Returns stable JSON suitable for release automation.
 
         Returns:
             The `to_dict` record as compact JSON with sorted keys and ASCII
@@ -374,7 +374,7 @@ class ReleaseEvaluation:
     blocking_reasons: tuple[str, ...]
 
     def __post_init__(self) -> None:
-        """Ensure the aggregate outcome agrees with its findings.
+        """Ensures the aggregate outcome agrees with its findings.
 
         Raises:
             ValueError: If `task` is blank, `policy_schema_version` is
@@ -412,7 +412,7 @@ class ReleaseEvaluation:
         return not self.passed
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a deterministic JSON-compatible release outcome.
+        """Returns a deterministic JSON-compatible release outcome.
 
         Returns:
             A mapping with the task, schema version, pass and blocked
@@ -430,7 +430,7 @@ class ReleaseEvaluation:
         }
 
     def canonical_json(self) -> str:
-        """Return stable JSON suitable for release evidence storage.
+        """Returns stable JSON suitable for release evidence storage.
 
         Returns:
             The `to_dict` record as compact JSON with sorted keys and ASCII
@@ -445,7 +445,7 @@ class ReleaseEvaluation:
         )
 
     def readiness_summary(self) -> ReleaseReadinessSummary:
-        """Return deterministic readiness counts derived from findings.
+        """Returns deterministic readiness counts derived from findings.
 
         Returns:
             The summary, with overall counts and counts for every finding
@@ -492,7 +492,7 @@ class ReleaseEvaluation:
 def required_evidence_references(
     policy: evaluation.EvaluationPolicy,
 ) -> tuple[str, ...]:
-    """Return every evidence reference declared by a policy in sorted order.
+    """Returns every evidence reference declared by a policy in sorted order.
 
     References are collected from the release policy, metric declarations,
     diagnostic gates, fairness gates, and explanation policy. Duplicate
@@ -517,7 +517,7 @@ def required_evidence_references(
 
 
 def fairness_metric_values(report: Any, metric: str) -> tuple[float, ...]:
-    """Find finite values for one fairness metric in a nested report.
+    """Finds finite values for one fairness metric in a nested report.
 
     Fairness reports may be keyed by sensitive column, or may be wrapped in a
     named report entry. The traversal accepts JSON-like mappings and lists and
@@ -563,7 +563,7 @@ def fairness_metric_values(report: Any, metric: str) -> tuple[float, ...]:
 
 
 def explanation_quality_value(report: Any, field_name: str) -> float | None:
-    """Return one finite quality score from an explanation report.
+    """Returns one finite quality score from an explanation report.
 
     Args:
         report: An explanation report with a `quality` mapping.
@@ -797,7 +797,7 @@ def evaluate_release(
     fairness_reports: Mapping[str, Any],
     evidence_index: evidence.EvidenceIndex | None,
 ) -> ReleaseEvaluation:
-    """Evaluate supplied release outputs against a declared policy.
+    """Evaluates supplied release outputs against a declared policy.
 
     Args:
         policy: Complete task-aware metric, diagnostic, fairness, explanation,

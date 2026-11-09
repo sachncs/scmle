@@ -14,7 +14,7 @@ from scmle.contracts.signing import SIGNATURE_ALGORITHM
 
 
 def canonical_digest(record: Mapping[str, Any]) -> str:
-    """Return the SHA-256 digest of a JSON-native governance record.
+    """Returns the SHA-256 digest of a JSON-native governance record.
 
     Args:
         record: The record; keys are sorted and the JSON is compact.
@@ -32,7 +32,7 @@ def canonical_digest(record: Mapping[str, Any]) -> str:
 
 
 def required_text(record: Mapping[str, Any], path: str) -> str:
-    """Return a required string from a nested governance record.
+    """Returns a required string from a nested governance record.
 
     Args:
         record: The record to read.
@@ -67,7 +67,7 @@ class ReleaseAttestation:
     attestation_signature: str | None = None
 
     def __post_init__(self) -> None:
-        """Reject incomplete identity or signature claims.
+        """Rejects incomplete identity or signature claims.
 
         Raises:
             TypeError: If `signature_present` is not a bool.
@@ -98,7 +98,7 @@ class ReleaseAttestation:
         sbom: Mapping[str, Any],
         signing_key: str | bytes | None = None,
     ) -> Self:
-        """Build an attestation from the records emitted by a package run.
+        """Builds an attestation from the records emitted by a package run.
 
         Args:
             provenance: The provenance record of the run.
@@ -138,7 +138,7 @@ class ReleaseAttestation:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Parse a persisted release attestation without trusting its claims.
+        """Parses a persisted release attestation without trusting its claims.
 
         Args:
             record: The persisted attestation.
@@ -179,7 +179,7 @@ class ReleaseAttestation:
         )
 
     def unsigned_dict(self) -> dict[str, Any]:
-        """Return the canonical content covered by the attestation signature."""
+        """Returns the canonical content the attestation signature covers."""
         return {
             "schema_version": 1,
             "run_id": self.run_id,
@@ -192,7 +192,7 @@ class ReleaseAttestation:
         }
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a JSON-compatible attestation record."""
+        """Returns a JSON-compatible attestation record."""
         record = self.unsigned_dict()
         if self.attestation_signature is not None:
             record["signature"] = {

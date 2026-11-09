@@ -177,7 +177,7 @@ def write_service(
     scmle_pin: str | None = None,
     signing_key: str | bytes | None = None,
 ) -> pathlib.Path:
-    """Write a deployable service folder for `bundle`.
+    """Writes a deployable service folder for `bundle`.
 
     Args:
         bundle: A `ModelBundle`.
@@ -303,7 +303,7 @@ def write_service(
 
 
 def write_text(path: pathlib.Path, text: str) -> None:
-    """Write UTF-8 text with Unix newlines.
+    """Writes UTF-8 text with Unix newlines.
 
     Args:
         path: The file to write.

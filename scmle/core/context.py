@@ -281,7 +281,7 @@ def tabular_beta_capability_registry() -> capabilities.CapabilityRegistry:
 def extension_capability(
     key: capabilities.CapabilityKey,
 ) -> capabilities.Capability:
-    """Describe an explicitly supplied adapter outside the beta guarantee.
+    """Describes an explicitly supplied adapter outside the beta guarantee.
 
     User-registered and test adapters are allowed to exercise the extension
     boundary, but they must never inherit the supported status of a built-in
@@ -511,7 +511,7 @@ class RunContext:
 
     @property
     def run_directory(self) -> str:
-        """Run directory as a string, empty for previews."""
+        """Runs directory as a string, empty for previews."""
         return str(self.store.directory) if self.store else ""
 
     def close(self) -> None:

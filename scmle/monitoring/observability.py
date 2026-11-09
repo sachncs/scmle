@@ -33,7 +33,7 @@ class ObservabilityEvaluation:
     threshold_breaches: tuple[dict[str, Any], ...]
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a deterministic JSON-compatible evaluation.
+        """Returns a deterministic JSON-compatible evaluation.
 
         Returns:
             A dict of all fields, with tuples as lists.
@@ -56,7 +56,7 @@ def evaluate(
     *,
     observed_at: str,
 ) -> ObservabilityEvaluation:
-    """Evaluate metric freshness, required signals, and upper-bound alerts.
+    """Evaluates metric freshness, required signals, and upper-bound alerts.
 
     Thresholds are intentionally interpreted as upper bounds. A service can
     define a metric such as ``latency_p95_ms`` or ``error_rate`` and make a
@@ -114,7 +114,7 @@ def evaluate(
 
 
 def parse_timestamp(value: str, field_name: str) -> datetime.datetime:
-    """Parse a timezone-aware timestamp for temporal policy checks.
+    """Parses a timezone-aware timestamp for temporal policy checks.
 
     Args:
         value: An ISO-8601 timestamp; a trailing `Z` means UTC.

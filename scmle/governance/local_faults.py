@@ -35,7 +35,7 @@ class LocalFaultExecutor:
     root: pathlib.Path
 
     def __post_init__(self) -> None:
-        """Create and validate the isolated evidence workspace."""
+        """Creates and validates the isolated evidence workspace."""
         workspace = pathlib.Path(self.root).expanduser().resolve()
         workspace.mkdir(parents=True, exist_ok=True)
         object.__setattr__(self, "root", workspace)
@@ -127,7 +127,7 @@ class LocalFaultExecutor:
         observation: str,
         details: dict[str, Any],
     ) -> reliability_harness.FaultArtifact:
-        """Build a JSON evidence artifact for an observed safe outcome.
+        """Builds a JSON evidence artifact for an observed safe outcome.
 
         Args:
             scenario: The scenario the evidence belongs to.
@@ -160,7 +160,7 @@ class LocalFaultExecutor:
         )
 
     def write_json(self, path: pathlib.Path, record: dict[str, Any]) -> None:
-        """Write JSON through the same durable atomic primitive as releases.
+        """Writes JSON through the same durable atomic primitive as releases.
 
         Args:
             path: The destination file.
@@ -246,7 +246,7 @@ class LocalFaultExecutor:
     def run_stale_checkpoint(
         self,
     ) -> tuple[reliability_harness.FaultArtifact, ...]:
-        """Reject a checkpoint bound to a different source identity.
+        """Rejects a checkpoint bound to a different source identity.
 
         Returns:
             The three evidence artifacts of the scenario, in order:
@@ -532,7 +532,7 @@ class LocalFaultExecutor:
     def run_dependency_mismatch(
         self,
     ) -> tuple[reliability_harness.FaultArtifact, ...]:
-        """Reject a package whose declared dependency identity changed.
+        """Rejects a package whose declared dependency identity changed.
 
         Returns:
             The three evidence artifacts of the scenario, in order:
@@ -612,7 +612,7 @@ class LocalFaultExecutor:
     def run_retry_exhaustion(
         self,
     ) -> tuple[reliability_harness.FaultArtifact, ...]:
-        """Stop after a bounded retry budget and record terminal failure.
+        """Stops after a bounded retry budget and record terminal failure.
 
         Returns:
             The three evidence artifacts of the scenario, in order: retry
@@ -798,7 +798,7 @@ class LocalFaultExecutor:
     def run_changed_snapshot(
         self,
     ) -> tuple[reliability_harness.FaultArtifact, ...]:
-        """Reject a snapshot whose data identity changed under one ID.
+        """Rejects a snapshot whose data identity changed under one ID.
 
         Returns:
             The three evidence artifacts of the scenario, in order: snapshot

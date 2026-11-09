@@ -80,7 +80,7 @@ class MetricSample:
     labels: Mapping[str, str] = dataclasses.field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        """Validate a metric before it is exported or persisted.
+        """Validates a metric before it is exported or persisted.
 
         Raises:
             ValueError: If the name, unit or timestamp is invalid, the value is
@@ -145,7 +145,7 @@ class InferenceEvent:
     redacted_fields: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
-        """Validate event identity and prevent unbounded sensitive payloads.
+        """Validates event identity and prevent unbounded sensitive payloads.
 
         Raises:
             ValueError: If an identity field or the timestamp is invalid, the
@@ -195,7 +195,7 @@ class ObservabilityPolicy:
     alert_thresholds: Mapping[str, float]
 
     def __post_init__(self) -> None:
-        """Reject policies that silently omit required operational signals.
+        """Rejects policies that silently omit required operational signals.
 
         Raises:
             TypeError: If a required signal is not a `SignalKind`.

@@ -51,7 +51,7 @@ class GeospatialTemporalError(GeospatialValidationError):
 
 
 def canonical_source(source: str | pathlib.Path) -> str:
-    """Return a stable source identifier for a path or URI-like value.
+    """Returns a stable source identifier for a path or URI-like value.
 
     Args:
         source: A filesystem path or a URI-like string.
@@ -70,7 +70,7 @@ def canonical_source(source: str | pathlib.Path) -> str:
 
 
 def canonical_observation_time(value: datetime | str) -> datetime:
-    """Parse and normalize a timezone-aware observation time to UTC.
+    """Parses and normalizes a timezone-aware observation time to UTC.
 
     Args:
         value: A timezone-aware datetime or an ISO 8601 string. A trailing
@@ -111,7 +111,7 @@ def canonical_observation_time(value: datetime | str) -> datetime:
 
 
 def validate_coordinates(value: Any) -> tuple[float, ...]:
-    """Validate a nested coordinate array and return its numeric leaves.
+    """Validates a nested coordinate array and return its numeric leaves.
 
     Args:
         value: A list or tuple that is either a position (at least two finite
@@ -155,7 +155,7 @@ def validate_coordinates(value: Any) -> tuple[float, ...]:
 
 
 def geometry_coordinates(geometry: Mapping[str, Any]) -> tuple[float, ...]:
-    """Validate a GeoJSON geometry and return all coordinate leaves.
+    """Validates a GeoJSON geometry and return all coordinate leaves.
 
     Args:
         geometry: A GeoJSON geometry object. Geometry collections are
@@ -326,7 +326,7 @@ class GeoFeature:
     content_hash: str = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
-        """Validate feature data and derive canonical content identities.
+        """Validates feature data and derive canonical content identities.
 
         Raises:
             ValueError: If ``feature_id`` is empty.
@@ -419,7 +419,7 @@ class GeoFeature:
         return (minimum_x + maximum_x) / 2, (minimum_y + maximum_y) / 2
 
     def masked_geometry_axis(self, axis: int, baseline: float) -> "GeoFeature":
-        """Return a copy with one source-coordinate axis replaced.
+        """Returns a copy with one source-coordinate axis replaced.
 
         Args:
             axis: The coordinate index to replace, 0 for x or 1 for y.
@@ -453,7 +453,7 @@ class SpatialJoinMatch:
     right_feature_id: str
 
     def __post_init__(self) -> None:
-        """Validate both feature identities before recording a match.
+        """Validates both feature identities before recording a match.
 
         Raises:
             ValueError: If either feature ID is empty.
@@ -464,7 +464,7 @@ class SpatialJoinMatch:
             raise ValueError("right_feature_id must not be empty")
 
     def to_dict(self) -> dict[str, str]:
-        """Return JSON-native join-match evidence.
+        """Returns JSON-native join-match evidence.
 
         Returns:
             A mapping with the left and right feature IDs.
@@ -508,7 +508,7 @@ class SpatialJoinReport:
     matches: tuple[SpatialJoinMatch, ...]
 
     def __post_init__(self) -> None:
-        """Reject incomplete or internally inconsistent join evidence.
+        """Rejects incomplete or internally inconsistent join evidence.
 
         Raises:
             ValueError: If a dataset hash is not a lowercase SHA-256 hex
@@ -560,7 +560,7 @@ class SpatialJoinReport:
             raise ValueError("join matches must be unique")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-native join evidence without raw geometry.
+        """Returns JSON-native join evidence without raw geometry.
 
         Returns:
             A mapping of every report field, with matches as a list of
@@ -605,7 +605,7 @@ class SpatialReprojectionReport:
     feature_count: int
 
     def __post_init__(self) -> None:
-        """Validate reprojection identity and scope.
+        """Validates reprojection identity and scope.
 
         Raises:
             ValueError: If a dataset hash is not a lowercase SHA-256 hex
@@ -633,7 +633,7 @@ class SpatialReprojectionReport:
             raise ValueError("feature_count must be positive")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-native reprojection evidence.
+        """Returns JSON-native reprojection evidence.
 
         Returns:
             A mapping of every report field.
@@ -666,7 +666,7 @@ class SpatialBoundaryLeakage:
     max_blocks_per_feature: int
 
     def __post_init__(self) -> None:
-        """Validate bounded and internally consistent leakage evidence.
+        """Validates bounded and internally consistent leakage evidence.
 
         Raises:
             ValueError: If ``block_size`` is not positive and finite, counts
@@ -702,7 +702,7 @@ class SpatialBoundaryLeakage:
         return "potential_leakage" if self.crossing_feature_ids else "clear"
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-native boundary-leakage evidence.
+        """Returns JSON-native boundary-leakage evidence.
 
         Returns:
             A mapping of the status and every report field, with block counts
@@ -741,7 +741,7 @@ class GeospatialProfile:
     content_hash: str
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-compatible geospatial profile data.
+        """Returns JSON-compatible geospatial profile data.
 
         Returns:
             A mapping of every profile field.
@@ -769,7 +769,7 @@ class SpatialSplit:
     blocks: Mapping[str, tuple[str, ...]]
 
     def block_ids(self) -> dict[str, tuple[str, ...]]:
-        """Return the stable spatial blocks assigned to each partition.
+        """Returns the stable spatial blocks assigned to each partition.
 
         Returns:
             A new mapping from partition name to a tuple of block IDs.
@@ -792,7 +792,7 @@ class GeospatialTemporalSplit:
     future: tuple[GeoFeature, ...]
 
     def __post_init__(self) -> None:
-        """Validate the cutoff and timestamp completeness of each partition.
+        """Validates the cutoff and timestamp completeness of each partition.
 
         Raises:
             ValueError: If the cutoff has no timezone or any feature lacks an
@@ -840,7 +840,7 @@ class SpatialAutocorrelation:
     seed: int
 
     def __post_init__(self) -> None:
-        """Validate a finite and reproducible spatial statistic.
+        """Validates a finite and reproducible spatial statistic.
 
         Raises:
             ValueError: If there are fewer than three features, the neighbor
@@ -862,7 +862,7 @@ class SpatialAutocorrelation:
             raise ValueError("p_value must be in [0, 1]")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-native autocorrelation evidence.
+        """Returns JSON-native autocorrelation evidence.
 
         Returns:
             A mapping of every field.
@@ -892,7 +892,7 @@ class GeospatialFeatures:
         return (len(self.feature_ids), len(self.feature_names))
 
     def to_numpy(self) -> np.ndarray:
-        """Return a writable copy of the numeric feature matrix.
+        """Returns a writable copy of the numeric feature matrix.
 
         Returns:
             A float64 array with one row per geometry and one column per
@@ -919,7 +919,7 @@ class GeospatialDataset:
     content_hash: str = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
-        """Reject duplicate identities and derive CRS-bound content.
+        """Rejects duplicate identities and derive CRS-bound content.
 
         Raises:
             GeospatialValidationError: If there are no features or feature
@@ -961,7 +961,7 @@ class GeospatialDataset:
         source: str = "memory://",
         crs: str = "",
     ) -> Self:
-        """Build a dataset from a GeoJSON FeatureCollection mapping.
+        """Builds a dataset from a GeoJSON FeatureCollection mapping.
 
         Feature IDs come from each feature's ``id`` member, falling back to
         its index. Feature labels and observation times are not read.
@@ -1014,7 +1014,7 @@ class GeospatialDataset:
         return cls(tuple(features), crs=crs, source=source)
 
     def profile(self) -> GeospatialProfile:
-        """Return geometry counts, bounds, CRS, and immutable identity.
+        """Returns geometry counts, bounds, CRS, and immutable identity.
 
         Returns:
             A profile with the feature count, sorted geometry types, CRS,
@@ -1039,7 +1039,7 @@ class GeospatialDataset:
         )
 
     def curate(self) -> ModalityCurationReport:
-        """Build geometry, CRS, and spatial-interpretation evidence.
+        """Builds geometry, CRS, and spatial-interpretation evidence.
 
         The profile includes label counts, temporal completeness, and global
         Moran's I when a CRS is declared, at least three features exist, and
@@ -1158,7 +1158,7 @@ class GeospatialDataset:
     def spatial_neighbors(
         self, neighbor_count: int = 4
     ) -> tuple[tuple[int, int], ...]:
-        """Build deterministic symmetric k-nearest-neighbor edges.
+        """Builds deterministic symmetric k-nearest-neighbor edges.
 
         Distances are measured between envelope centroids in the declared
         source CRS. The method exposes the exact topology used by the
@@ -1595,7 +1595,7 @@ class GeospatialDataset:
     def spatial_block_envelopes(
         self, block_size: float
     ) -> dict[str, tuple[int, int, int, int]]:
-        """Return each feature envelope in CRS-unit block coordinates.
+        """Returns each feature envelope in CRS-unit block coordinates.
 
         The envelope is conservative: a feature is considered to touch every
         block intersected by its axis-aligned bounds. It is intended for
@@ -1695,7 +1695,7 @@ class GeospatialDataset:
         test_fraction: float = 0.2,
         seed: int = 0,
     ) -> SpatialSplit:
-        """Split features by CRS-unit spatial blocks.
+        """Splits features by CRS-unit spatial blocks.
 
         ``block_size`` is expressed in the dataset CRS units. The method uses
         geometry centroids for block assignment and keeps every block in one
@@ -1786,7 +1786,7 @@ class GeospatialDataset:
         )
 
     def split_temporal(self, cutoff: datetime | str) -> GeospatialTemporalSplit:
-        """Split fully timestamped features into past and future partitions.
+        """Splits fully timestamped features into past and future partitions.
 
         Features at the cutoff belong to training. Features after the cutoff
         belong to future evaluation. Untimestamped features fail closed because
@@ -1842,7 +1842,7 @@ class GeospatialReprojection:
     report: SpatialReprojectionReport
 
     def __post_init__(self) -> None:
-        """Ensure the report describes the returned transformed dataset.
+        """Ensures the report describes the returned transformed dataset.
 
         Raises:
             ValueError: If the report's target hash or CRS differs from the
@@ -1856,7 +1856,7 @@ class GeospatialReprojection:
             raise ValueError("reprojection report CRS must match the dataset")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return the transformed identity and its reprojection evidence.
+        """Returns the transformed identity and its reprojection evidence.
 
         Returns:
             A mapping with the dataset hash, CRS, and the report as a
@@ -1904,7 +1904,7 @@ class RasterSample:
     byte_size: int = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
-        """Validate raster shape, CRS provenance, and source identity.
+        """Validates raster shape, CRS provenance, and source identity.
 
         Raises:
             ValueError: If the source, CRS, or dtype is empty, dimensions or
@@ -1966,7 +1966,7 @@ class RasterSample:
         column_start: int,
         column_end: int,
     ) -> tuple[float, float, float, float] | None:
-        """Return the CRS bounds of a validated pixel window.
+        """Returns the CRS bounds of a validated pixel window.
 
         Pixel boundaries are transformed rather than pixel centers so the
         returned envelope describes the full window. Empty transforms have no
@@ -2046,7 +2046,7 @@ class RasterSample:
         decoder: RasterDecoder,
         max_pixels: int = 4_000_000,
     ) -> np.ndarray:
-        """Decode bounded numeric pixels through a caller-owned decoder.
+        """Decodes bounded numeric pixels through a caller-owned decoder.
 
         The core package does not select a raster codec. The caller owns the
         decoder and must return a grayscale ``(height, width)`` array or a

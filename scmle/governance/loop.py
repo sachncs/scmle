@@ -346,7 +346,7 @@ class Loop:
         verification_keys: Mapping[str, str | bytes],
         today: Callable[[], datetime.date],
     ) -> None:
-        """Use `Loop.open`.
+        """Uses `Loop.open`.
 
         Args:
             directory: Directory of the ledger and loop state files.

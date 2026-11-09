@@ -79,7 +79,7 @@ class EvidenceRecord:
     decision: EvidenceDecision
 
     def __post_init__(self) -> None:
-        """Validate the release-proof boundary.
+        """Validates the release-proof boundary.
 
         Raises:
             ValueError: If a text field is blank, the scope, raw inputs,
@@ -229,14 +229,14 @@ class EvidenceIndex:
         return bool(self.records) and not self.pending()
 
     def unsigned_dict(self) -> dict[str, Any]:
-        """Return the versioned content covered by the index signature."""
+        """Returns the versioned content covered by the index signature."""
         return {
             "schema_version": 1,
             "records": [record.to_dict() for record in self.ordered()],
         }
 
     def sign(self, signing_key: str | bytes) -> str:
-        """Sign the complete index and return its HMAC value.
+        """Signs the complete index and return its HMAC value.
 
         Args:
             signing_key: The key to sign with.
@@ -248,7 +248,7 @@ class EvidenceIndex:
         return self.signature
 
     def verify(self, signing_key: str | bytes) -> bool:
-        """Verify the index signature against its current records.
+        """Verifies the index signature against its current records.
 
         Args:
             signing_key: The key to verify with.

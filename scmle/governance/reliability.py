@@ -29,7 +29,7 @@ class FaultArtifact:
     observation: str
 
     def __post_init__(self) -> None:
-        """Reject evidence that cannot be persisted and reviewed.
+        """Rejects evidence that cannot be persisted and reviewed.
 
         Raises:
             TypeError: If `observed_outcome` is not an `EvidenceOutcome`.
@@ -100,7 +100,7 @@ class FaultInjectionHarness:
             [reliability.FaultScenario], tuple[FaultArtifact, ...]
         ],
     ) -> reliability.FaultScenarioPlan:
-        """Run an injected executor and record durable evidence.
+        """Runs an injected executor and record durable evidence.
 
         The executor must return one artifact for each evidence requirement
         declared by the scenario. Missing or unexpected evidence remains
@@ -172,7 +172,7 @@ class FaultInjectionHarness:
 
     @staticmethod
     def digest(path: str | pathlib.Path) -> str:
-        """Return the SHA-256 digest of a persisted evidence artifact.
+        """Returns the SHA-256 digest of a persisted evidence artifact.
 
         Args:
             path: The artifact file.
@@ -188,7 +188,7 @@ class FaultInjectionHarness:
 
     @staticmethod
     def write_atomically(path: pathlib.Path, content: bytes) -> None:
-        """Write an evidence artifact using flush, fsync, and replace.
+        """Writes an evidence artifact using flush, fsync, and replace.
 
         Args:
             path: The destination; parent directories are created.

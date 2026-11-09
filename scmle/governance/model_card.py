@@ -35,7 +35,7 @@ class ModelCard:
     )
 
     def __post_init__(self) -> None:
-        """Validate the fields required for a useful review record.
+        """Validates the fields required for a useful review record.
 
         Raises:
             ValueError: If a required text field is blank, the schema version is
@@ -72,7 +72,7 @@ class ModelCard:
         evaluation: Mapping[str, Any],
         model_fingerprint: str,
     ) -> "ModelCard":
-        """Build a card from the exact data, model, and evaluation records.
+        """Builds a card from the exact data, model, and evaluation records.
 
         Args:
             manifest: The dataset manifest, supplying the dataset and snapshot
@@ -154,7 +154,7 @@ class ModelCard:
         )
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a JSON-compatible model card."""
+        """Returns a JSON-compatible model card."""
         return {
             "schema_version": self.schema_version,
             "model_name": self.model_name,

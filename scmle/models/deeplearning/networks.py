@@ -64,7 +64,7 @@ class TorchAdapter(models.ModelAdapter):
         )
 
     def supports_modality(self, modality: str) -> bool:
-        """Return whether this adapter has a declared modality boundary.
+        """Returns whether this adapter has a declared modality boundary.
 
         Args:
             modality: A modality name or `Modality` value.

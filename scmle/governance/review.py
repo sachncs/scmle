@@ -35,7 +35,7 @@ class ReviewClaimKind(enum.StrEnum):
 
 
 def require_text(value: str, field_name: str) -> str:
-    """Return a non-empty release-review string.
+    """Returns a non-empty release-review string.
 
     Args:
         value: The candidate text.
@@ -65,7 +65,7 @@ class ReviewClaim:
     notes: str
 
     def __post_init__(self) -> None:
-        """Validate the claim's identity and independent evidence link.
+        """Validates the claim's identity and independent evidence link.
 
         Raises:
             TypeError: If `passed` is not a bool.
@@ -84,7 +84,7 @@ class ReviewClaim:
             raise TypeError("passed must be bool")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a deterministic JSON-native claim."""
+        """Returns a deterministic JSON-native claim."""
         return {
             "criterion_id": self.criterion_id,
             "kind": self.kind.value,
@@ -134,7 +134,7 @@ class IndependentReleaseReview:
     signature: str | None = None
 
     def __post_init__(self) -> None:
-        """Reject reviews that cannot establish independence or replay.
+        """Rejects reviews that cannot establish independence or replay.
 
         Raises:
             TypeError: If a claim is not a `ReviewClaim`.
@@ -191,7 +191,7 @@ class IndependentReleaseReview:
             raise ValueError("observed_at must include timezone information")
 
     def unsigned_dict(self) -> dict[str, Any]:
-        """Return the content covered by the review signature."""
+        """Returns the content covered by the review signature."""
         return {
             "schema_version": 1,
             "release_id": self.release_id,
@@ -208,7 +208,7 @@ class IndependentReleaseReview:
         }
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a persisted review record."""
+        """Returns a persisted review record."""
         record = self.unsigned_dict()
         if self.signature is not None:
             record["signature"] = self.signature
@@ -245,7 +245,7 @@ class IndependentReleaseReview:
         )
 
     def canonical_json(self) -> str:
-        """Return canonical unsigned review content."""
+        """Returns canonical unsigned review content."""
         return json.dumps(
             self.unsigned_dict(),
             ensure_ascii=True,
@@ -254,7 +254,7 @@ class IndependentReleaseReview:
         )
 
     def sign(self, signing_key: str | bytes) -> Self:
-        """Return this review signed over its immutable content.
+        """Returns this review signed over its immutable content.
 
         Args:
             signing_key: The key to sign with.
@@ -270,7 +270,7 @@ class IndependentReleaseReview:
         )
 
     def verify_signature(self, signing_key: str | bytes) -> bool:
-        """Verify the review signature without trusting its decision.
+        """Verifies the review signature without trusting its decision.
 
         Args:
             signing_key: The key to verify with.
@@ -312,7 +312,7 @@ class IndependentReleaseReview:
 
     @classmethod
     def read(cls, path: str | Path) -> Self:
-        """Load and validate a persisted review record.
+        """Loads and validates a persisted review record.
 
         Args:
             path: The file written by `write`.
@@ -334,7 +334,7 @@ class IndependentReleaseReview:
         required_kinds: Iterable[ReviewClaimKind],
         signing_key: str | bytes,
     ) -> bool:
-        """Return whether this signed review satisfies release proof gates.
+        """Returns whether this signed review satisfies release proof gates.
 
         Args:
             source_commit: The commit the release is built from.

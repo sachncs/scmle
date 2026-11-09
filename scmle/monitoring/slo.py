@@ -27,7 +27,7 @@ class SLOStatus(enum.StrEnum):
 
 
 def require_text(value: str, field_name: str) -> str:
-    """Return a non-empty SLO field.
+    """Returns a non-empty SLO field.
 
     Args:
         value: The field value.
@@ -45,7 +45,7 @@ def require_text(value: str, field_name: str) -> str:
 
 
 def parse_timestamp(value: str, field_name: str) -> datetime.datetime:
-    """Parse a timezone-aware timestamp for SLO window checks.
+    """Parses a timezone-aware timestamp for SLO window checks.
 
     Args:
         value: An ISO-8601 timestamp; a trailing `Z` means UTC.
@@ -93,7 +93,7 @@ class SLOTarget:
     alert_route: str
 
     def __post_init__(self) -> None:
-        """Validate the measurable target and response path.
+        """Validates the measurable target and response path.
 
         Raises:
             ValueError: If a text field is blank, `maximum` is negative or not
@@ -119,7 +119,7 @@ class SLOTarget:
             raise ValueError("minimum_samples must be at least 1")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return deterministic SLO policy metadata.
+        """Returns deterministic SLO policy metadata.
 
         Returns:
             A dict of all fields, with the kind as its value.
@@ -163,7 +163,7 @@ class SLOEvaluation:
     reason: str
 
     def __post_init__(self) -> None:
-        """Validate the result and its measurable bounds.
+        """Validates the result and its measurable bounds.
 
         Raises:
             TypeError: If `target` is not an `SLOTarget`.
@@ -202,7 +202,7 @@ class SLOEvaluation:
         }
 
     def to_dict(self) -> dict[str, Any]:
-        """Return an operator-facing evaluation record.
+        """Returns an operator-facing evaluation record.
 
         Returns:
             A dict with the target, status, counts, observed maximum, error
@@ -235,7 +235,7 @@ class SLOMonitor:
         *,
         observed_at: str,
     ) -> SLOEvaluation:
-        """Evaluate one target over its declared time window.
+        """Evaluates one target over its declared time window.
 
         The maximum observed value is used deliberately: a single breach is not
         averaged away. Missing samples are an explicit operational state, not a

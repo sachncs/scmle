@@ -140,7 +140,7 @@ Statistic = Callable[[np.ndarray], np.ndarray]
 
 
 def basis(series: pd.Series, knots: int = KNOTS) -> np.ndarray:
-    """Build the design matrix of one column for the cross-fitted smoother.
+    """Builds the design matrix of one column for the cross-fitted smoother.
 
     A numeric column with more than `knots` distinct values becomes a
     continuous piecewise-linear basis (hat functions) on its distinct
@@ -305,7 +305,7 @@ def oof_fit(values: np.ndarray, phi: np.ndarray, splits: Splits) -> np.ndarray:
 def fold_concordance(
     score: np.ndarray, positive: np.ndarray, tests: Sequence[np.ndarray]
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Count concordant pairs and pairs, per row, within folds only.
+    """Counts concordant pairs and pairs, per row, within folds only.
 
     Pairs are formed inside each held-out fold, never across folds. Across
     folds a row's prediction was made without its own label but with the
@@ -339,7 +339,7 @@ def fold_concordance(
 def auc_rows(
     score: np.ndarray, positive: np.ndarray, tests: Sequence[np.ndarray]
 ) -> np.ndarray:
-    """Compute the within-fold ROC AUC of each version of the scores.
+    """Computes the within-fold ROC AUC of each version of the scores.
 
     Args:
         score: Array of shape (B, n) of out-of-fold scores.
@@ -374,7 +374,7 @@ class Problem:
 
 
 def skill_statistic(problem: Problem, phi: np.ndarray) -> Statistic:
-    """Build the skill statistic of a column for batches of permuted outcomes.
+    """Builds the skill statistic of a column for batches of permuted outcomes.
 
     Args:
         problem: The outcome, task and folds.
@@ -433,7 +433,7 @@ def sample_skill(
     index: np.ndarray,
     fold_of: np.ndarray,
 ) -> float | None:
-    """Compute the skill on a bootstrap sample of rows.
+    """Computes the skill on a bootstrap sample of rows.
 
     Args:
         problem: The outcome, task and folds.
@@ -518,7 +518,7 @@ def skill_bound(
 def chi_square_rows(
     missing: np.ndarray, labels: np.ndarray, totals: np.ndarray
 ) -> np.ndarray:
-    """Compute the Pearson chi-square of the 2 x K (missing by class) table.
+    """Computes the Pearson chi-square of the 2 x K (missing by class) table.
 
     Args:
         missing: Boolean array of length n, True where the value is missing.
@@ -544,7 +544,7 @@ def chi_square_rows(
 
 
 def missingness_statistic(missing: np.ndarray, totals: np.ndarray) -> Statistic:
-    """Build the Cramer's V statistic of missingness against the outcome.
+    """Builds the Cramer's V statistic of missingness against the outcome.
 
     Args:
         missing: Boolean array of length n, True where the value is missing.
@@ -563,7 +563,7 @@ def missingness_statistic(missing: np.ndarray, totals: np.ndarray) -> Statistic:
 
 
 def purity_statistic(recorded: np.ndarray) -> Statistic:
-    """Build the record-purity statistic.
+    """Builds the record-purity statistic.
 
     Args:
         recorded: Boolean array of length n, True where the value is
@@ -702,7 +702,7 @@ class Pending:
 
 
 def required_permutations(family: int, alpha: Fraction) -> int:
-    """Find the smallest `B` with `1 / (B + 1) <= alpha / (family * H_family)`.
+    """Finds the smallest `B` with `1 / (B + 1) <= alpha / (family * H_family)`.
 
     Args:
         family: Number of hypotheses adjusted together.
@@ -726,7 +726,7 @@ def draw_permutations(
     alpha: Fraction,
     seed: int,
 ) -> None:
-    """Draw `total` shared permutations and update every hypothesis in place.
+    """Draws `total` shared permutations and update every hypothesis in place.
 
     A hypothesis stops once its final p-value is certain to exceed the
     largest threshold of the step-up rule. The `exceed`, `drawn` and
@@ -803,7 +803,7 @@ class Finding:
         return self.suspect and self.gate is certificates.GateStatus.GATING
 
     def describe(self, ceiling: float) -> str:
-        """Write one sentence for a profile: what was found, how to read it.
+        """Writes one sentence for a profile: what was found, how to read it.
 
         Args:
             ceiling: The ceiling the lower bound exceeded.
@@ -882,7 +882,7 @@ class ScreenReport:
         return tuple(f for f in self.findings if f.blocking)
 
     def sentences(self) -> tuple[str, ...]:
-        """Write one sentence per suspect.
+        """Writes one sentence per suspect.
 
         Returns:
             The `describe` sentence of every suspect, in finding order.
@@ -892,7 +892,7 @@ class ScreenReport:
         )
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert the report to a JSON-ready document.
+        """Converts the report to a JSON-ready document.
 
         A suspicion is not a finding, and the document says so.
 
@@ -1031,7 +1031,7 @@ def gate_statuses(
 def load_store(
     path: Path | None = None,
 ) -> certificates.CertificateStore | None:
-    """Load the certificates of the screen.
+    """Loads the certificates of the screen.
 
     Args:
         path: Certificate file; defaults to the one shipped with the
@@ -1051,7 +1051,7 @@ def load_store(
 
 @functools.cache
 def shipped_store() -> certificates.CertificateStore | None:
-    """Load the certificates shipped with the package, once.
+    """Loads the certificates shipped with the package, once.
 
     Returns:
         The store, or None if it is missing or unreadable. The result is
@@ -1061,7 +1061,7 @@ def shipped_store() -> certificates.CertificateStore | None:
 
 
 def work_cap(time_budget_seconds: float | None) -> int | None:
-    """Compute the most cross-fitted fits the screen may use in a budget.
+    """Computes the most cross-fitted fits the screen may use in a budget.
 
     Deterministic: the budget alone decides, not the machine's speed.
 
@@ -1170,7 +1170,7 @@ def empty_report(
     rows: int,
     note: str,
 ) -> ScreenReport:
-    """Build a report that tested nothing, and says why.
+    """Builds a report that tested nothing, and says why.
 
     Args:
         cfg: Settings (`alpha` and the ceilings are recorded).
@@ -1201,7 +1201,7 @@ def build_problem(
     groups: np.ndarray | None,
     block_size: int | None,
 ) -> Problem:
-    """Encode the outcome and fix the folds.
+    """Encodes the outcome and fix the folds.
 
     Args:
         target: The outcome.
@@ -1238,7 +1238,7 @@ def scan_frame(
     gates: Mapping[str, certificates.GateStatus],
     time_budget_seconds: float | None = None,
 ) -> ScreenReport:
-    """Run the screen on rows that are already chosen.
+    """Runs the screen on rows that are already chosen.
 
     Args:
         frame: The chosen rows, including the target.

@@ -61,7 +61,7 @@ class IndexResampler(Resampler):
     def resample(
         self, features: pd.DataFrame, target: pd.Series, seed: int
     ) -> tuple[pd.DataFrame, pd.Series]:
-        """Select rows from the input according to ``indices``.
+        """Selects rows from the input according to ``indices``.
 
         Args:
             features: Training features.
@@ -86,7 +86,7 @@ class RandomOverSampler(IndexResampler):
     def indices(
         self, target: pd.Series, rng: np.random.Generator
     ) -> np.ndarray:
-        """Sample minority rows with replacement up to the majority count.
+        """Samples minority rows with replacement up to the majority count.
 
         Args:
             target: Training labels.
@@ -117,7 +117,7 @@ class RandomUnderSampler(IndexResampler):
     def indices(
         self, target: pd.Series, rng: np.random.Generator
     ) -> np.ndarray:
-        """Sample each class without replacement down to the smallest.
+        """Samples each class without replacement down to the smallest.
 
         Args:
             target: Training labels.
@@ -247,7 +247,7 @@ class PreprocessedResamplingClassifier(
         self.estimator = estimator
 
     def fit(self, features: Any, target: Any) -> Self:
-        """Fit the preprocessor, resample the encoded rows, fit the model.
+        """Fits the preprocessor, resample the encoded rows, fit the model.
 
         Args:
             features: Training features.
@@ -277,7 +277,7 @@ class PreprocessedResamplingClassifier(
         return self.estimator_.predict(self.preprocessor_.transform(features))
 
     def predict_proba(self, features: Any) -> np.ndarray:
-        """Predict class probabilities (no resampling).
+        """Predicts class probabilities (no resampling).
 
         Args:
             features: Rows to predict.
@@ -352,7 +352,7 @@ class ResamplingClassifier(base.ClassifierMixin, base.BaseEstimator):
         return self.estimator_.predict(features)
 
     def predict_proba(self, features: Any) -> np.ndarray:
-        """Predict class probabilities (no resampling).
+        """Predicts class probabilities (no resampling).
 
         Args:
             features: Rows to predict.
@@ -399,7 +399,7 @@ class DensityWeightedRegressor(base.RegressorMixin, base.BaseEstimator):
         self.max_weight = max_weight
 
     def weights(self, target: np.ndarray) -> np.ndarray:
-        """Compute inverse-density weights.
+        """Computes inverse-density weights.
 
         Args:
             target: Continuous target values.
@@ -417,7 +417,7 @@ class DensityWeightedRegressor(base.RegressorMixin, base.BaseEstimator):
         return raw * len(raw) / raw.sum()
 
     def fit(self, features: Any, target: Any) -> Self:
-        """Fit the pipeline with density weights on the model step.
+        """Fits the pipeline with density weights on the model step.
 
         Args:
             features: Training features.

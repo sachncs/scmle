@@ -14,7 +14,7 @@ SEQUENTIAL_ESTIMATION_ARTIFACT = "sequential_estimation.json"
 
 
 def resolve_tabular_input(data: TabularInput) -> pd.DataFrame:
-    """Resolve an in-memory frame or supported tabular file into a copy.
+    """Resolves an in-memory frame or supported tabular file into a copy.
 
     Args:
         data: A pandas DataFrame or a path accepted by the standard tabular
@@ -60,7 +60,7 @@ class SequentialEstimationProject:
         *,
         output_dir: str | pathlib.Path = "runs",
     ) -> None:
-        """Define a sequential estimation project.
+        """Defines a sequential estimation project.
 
         Args:
             data: In-memory tabular data or a supported tabular file path.

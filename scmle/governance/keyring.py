@@ -33,7 +33,7 @@ class KeyState(enum.StrEnum):
 
 
 def require_text(value: str, field_name: str) -> str:
-    """Return a non-empty string suitable for a key record.
+    """Returns a non-empty string suitable for a key record.
 
     Args:
         value: The candidate text.
@@ -51,7 +51,7 @@ def require_text(value: str, field_name: str) -> str:
 
 
 def parse_timestamp(value: str, field_name: str) -> datetime.datetime:
-    """Parse an offset-aware ISO-8601 timestamp.
+    """Parses an offset-aware ISO-8601 timestamp.
 
     Args:
         value: The timestamp; a trailing ``Z`` means UTC.
@@ -83,7 +83,7 @@ class SigningKeyRecord:
     replacement_key_id: str | None = None
 
     def __post_init__(self) -> None:
-        """Validate lifecycle transitions and time boundaries.
+        """Validates lifecycle transitions and time boundaries.
 
         Raises:
             ValueError: If the key id, owner or a timestamp is invalid, the key
@@ -115,7 +115,7 @@ class SigningKeyRecord:
                 raise ValueError("replacement_key_id must differ from key_id")
 
     def can_sign(self, observed_at: str) -> bool:
-        """Return whether this key may create a signature now.
+        """Returns whether this key may create a signature now.
 
         Args:
             observed_at: The time of signing, as an offset-aware timestamp.
@@ -143,7 +143,7 @@ class SigningKeyRecord:
         observed_at: str,
         historical: bool = False,
     ) -> bool:
-        """Return whether a signature may be accepted under this lifecycle.
+        """Returns whether a signature may be accepted under this lifecycle.
 
         Revocation is immediate and cannot be bypassed by historical mode.
         Retired or expired keys can verify an artifact signed before the
@@ -177,7 +177,7 @@ class SigningKeyRecord:
         return signed < changed
 
     def to_dict(self) -> dict[str, Any]:
-        """Return deterministic public key metadata."""
+        """Returns deterministic public key metadata."""
         return {
             "key_id": self.key_id,
             "owner": self.owner,
@@ -234,7 +234,7 @@ class SignatureEnvelope:
     algorithm: str = attestation.SIGNATURE_ALGORITHM
 
     def __post_init__(self) -> None:
-        """Validate signature identity and algorithm.
+        """Validates signature identity and algorithm.
 
         Raises:
             ValueError: If the key id or value is blank, the timestamp is
@@ -247,7 +247,7 @@ class SignatureEnvelope:
             raise ValueError("unsupported signature algorithm")
 
     def to_dict(self) -> dict[str, str]:
-        """Return a JSON-compatible signature envelope."""
+        """Returns a JSON-compatible signature envelope."""
         return {
             "algorithm": self.algorithm,
             "key_id": self.key_id,
@@ -278,7 +278,7 @@ class SigningKeyRegistry:
     """Metadata registry that enforces signing and verification policy."""
 
     def __init__(self, records: Iterable[SigningKeyRecord] = ()) -> None:
-        """Create a registry from unique key records.
+        """Creates a registry from unique key records.
 
         Args:
             records: The key records to register.
@@ -289,7 +289,7 @@ class SigningKeyRegistry:
             self.register(record)
 
     def register(self, record: SigningKeyRecord) -> None:
-        """Add a key record without replacing an existing identity.
+        """Adds a key record without replacing an existing identity.
 
         Args:
             record: The key record.
@@ -306,7 +306,7 @@ class SigningKeyRegistry:
             self.records[record.key_id] = record
 
     def get(self, key_id: str) -> SigningKeyRecord:
-        """Return metadata for a key or fail closed.
+        """Returns metadata for a key or fail closed.
 
         Args:
             key_id: Identifier of the key.
@@ -329,7 +329,7 @@ class SigningKeyRegistry:
         reason: str,
         replacement_key_id: str | None = None,
     ) -> SigningKeyRecord:
-        """Stop new signatures while retaining historical verification.
+        """Stops new signatures while retaining historical verification.
 
         Args:
             key_id: Identifier of the key.
@@ -371,7 +371,7 @@ class SigningKeyRegistry:
         reason: str,
         replacement_key_id: str | None = None,
     ) -> SigningKeyRecord:
-        """Apply one explicit lifecycle transition.
+        """Applies one explicit lifecycle transition.
 
         Args:
             key_id: Identifier of the key.
@@ -416,7 +416,7 @@ class SigningKeyRegistry:
         secret: str | bytes,
         signed_at: str,
     ) -> SignatureEnvelope:
-        """Create a signature only with an active, non-expired key.
+        """Creates a signature only with an active, non-expired key.
 
         Args:
             payload: The content to sign.
@@ -448,7 +448,7 @@ class SigningKeyRegistry:
         observed_at: str,
         historical: bool = False,
     ) -> bool:
-        """Verify a signature against lifecycle state and external custody.
+        """Verifies a signature against lifecycle state and external custody.
 
         Args:
             payload: The signed content.
@@ -477,7 +477,7 @@ class SigningKeyRegistry:
         return hmac.compare_digest(envelope.value, expected)
 
     def to_dict(self) -> dict[str, Any]:
-        """Return deterministic metadata without secret material."""
+        """Returns deterministic metadata without secret material."""
         return {
             "schema_version": 1,
             "keys": [
@@ -487,7 +487,7 @@ class SigningKeyRegistry:
         }
 
     def to_json(self) -> str:
-        """Return canonical registry JSON."""
+        """Returns canonical registry JSON."""
         return json.dumps(
             self.to_dict(),
             ensure_ascii=True,
@@ -518,7 +518,7 @@ class SigningKeyRegistry:
 
     @classmethod
     def from_json(cls, value: str) -> Self:
-        """Parse and validate registry JSON.
+        """Parses and validates registry JSON.
 
         Args:
             value: The JSON text.
@@ -561,7 +561,7 @@ class SigningKeyRegistry:
 
     @classmethod
     def read(cls, path: str | Path) -> Self:
-        """Read and validate a persisted registry.
+        """Reads and validates a persisted registry.
 
         Args:
             path: The file written by `write`.

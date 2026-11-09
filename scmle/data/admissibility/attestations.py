@@ -80,7 +80,7 @@ class LeakageAttestation:
     lead_seconds: float
 
     def __post_init__(self) -> None:
-        """Validate the record.
+        """Validates the record.
 
         Raises:
             ValueError: If `column` is empty or not a string, or
@@ -91,7 +91,7 @@ class LeakageAttestation:
         qualification.finite(self.lead_seconds, "lead_seconds")
 
     def field(self) -> provenance.FieldProvenance:
-        """Build the provenance record the admissibility rules consume.
+        """Builds the provenance record the admissibility rules consume.
 
         Returns:
             A record for the column with a `lag` as-of rule of
@@ -112,7 +112,7 @@ class LeakageAttestation:
         )
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert the record to a JSON-ready dict.
+        """Converts the record to a JSON-ready dict.
 
         Returns:
             A dict with `column`, `lead_seconds` and the fields of the
@@ -165,7 +165,7 @@ class Applied:
 
 
 def load(path: str | Path) -> tuple[LeakageAttestation, ...]:
-    """Read an attestation file.
+    """Reads an attestation file.
 
     Args:
         path: JSON file in the format of the module docstring.

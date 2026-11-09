@@ -97,7 +97,7 @@ SENSITIVE_PATTERNS: dict[str, re.Pattern[str]] = {
 
 
 def sensitive_matches(content: str) -> dict[str, int]:
-    """Count supported sensitive-value patterns without returning values.
+    """Counts supported sensitive-value patterns without returning values.
 
     Args:
         content: Text to scan for email addresses, phone numbers and social
@@ -189,7 +189,7 @@ class DocumentCitation:
     page_number: int | None = None
 
     def __post_init__(self) -> None:
-        """Validate the source identity and character locator.
+        """Validates the source identity and character locator.
 
         Raises:
             ValueError: If document_id, source_uri or locator is blank,
@@ -210,7 +210,7 @@ class DocumentCitation:
             raise ValueError("page_number must be positive")
 
     def to_dict(self) -> dict[str, object]:
-        """Return JSON-native citation evidence.
+        """Returns JSON-native citation evidence.
 
         Returns:
             A dict of the citation fields.
@@ -241,7 +241,7 @@ class DocumentElement:
     table_columns: int | None = None
 
     def __post_init__(self) -> None:
-        """Validate element type, offsets, page, confidence, and table shape.
+        """Validates element type, offsets, page, confidence, and table shape.
 
         Raises:
             ValueError: If kind is unsupported, the range is empty or starts
@@ -293,7 +293,7 @@ class DocumentLayout:
     source_digest: str | None = None
 
     def __post_init__(self) -> None:
-        """Validate the extraction identity and optional OCR confidence.
+        """Validates the extraction identity and optional OCR confidence.
 
         Raises:
             ValueError: If source, provider or provider_version is blank, the
@@ -333,7 +333,7 @@ class DocumentLayout:
         return sum(element.kind == "table" for element in self.elements)
 
     def to_dict(self) -> dict[str, object]:
-        """Return JSON-native extraction evidence.
+        """Returns JSON-native extraction evidence.
 
         Returns:
             A dict of the layout fields, with elements as nested dicts.
@@ -462,7 +462,7 @@ class DocumentCurationReport:
         return not self.unresolved_blocking_findings
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-native evidence for a dataset card or run artifact.
+        """Returns JSON-native evidence for a dataset card or run artifact.
 
         Returns:
             A dict with every report field (profiles and findings as nested
@@ -612,7 +612,7 @@ class DocumentSample:
         object.__setattr__(self, "size_bytes", len(content_bytes))
 
     def citations(self) -> tuple[DocumentCitation, ...]:
-        """Return source-backed citations for the document provenance spans.
+        """Returns source-backed citations for the document provenance spans.
 
         A citation is intentionally unavailable when the caller created an
         in-memory sample without a raw-source identity. The method never
@@ -790,7 +790,7 @@ class DocumentDataset:
         max_characters: int = 100_000,
         max_tokens: int = 20_000,
     ) -> DocumentCurationReport:
-        """Build bounded, reviewable curation evidence for the corpus.
+        """Builds bounded, reviewable curation evidence for the corpus.
 
         Duplicate content is reported separately from conflicting labels. A
         duplicate is often expected for replicated sources, while identical
@@ -820,7 +820,7 @@ class DocumentDataset:
         sample_by_id = {sample.document_id: sample for sample in self.samples}
 
         def label_key(label: str | int | float | bool | None) -> str:
-            """Return a stable human-readable label bucket.
+            """Returns a stable human-readable label bucket.
 
             Args:
                 label: A sample label, possibly None.
@@ -869,7 +869,7 @@ class DocumentDataset:
             remediation: str,
             blocking: bool,
         ) -> data_contracts.CurationFinding:
-            """Create a document-specific finding with one stable rule.
+            """Creates a document-specific finding with one stable rule.
 
             Args:
                 finding_id: Identifier of the finding.
@@ -1396,7 +1396,7 @@ class DocumentReader:
         document_id: str,
         document_format: DocumentFormat,
     ) -> DocumentLayout | None:
-        """Read optional layout, OCR, or table evidence through a callback.
+        """Reads optional layout, OCR, or table evidence through a callback.
 
         Args:
             raw_bytes: The raw source.

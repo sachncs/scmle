@@ -324,7 +324,7 @@ FAIRNESS_METRICS: Mapping[tasks.TaskType, frozenset[str]] = {
 
 
 def validate_text(value: str, field_name: str) -> str:
-    """Return non-empty canonical text for a contract field.
+    """Returns non-empty canonical text for a contract field.
 
     Args:
         value: The text to check.
@@ -350,7 +350,7 @@ def validate_text(value: str, field_name: str) -> str:
 def validate_evidence(
     values: tuple[str, ...], field_name: str
 ) -> tuple[str, ...]:
-    """Validate and return a deterministic evidence list.
+    """Validates and returns a deterministic evidence list.
 
     Args:
         values: The evidence references.
@@ -373,7 +373,7 @@ def validate_evidence(
 
 
 def validate_finite(value: float, field_name: str) -> float:
-    """Validate a finite numeric threshold.
+    """Validates a finite numeric threshold.
 
     Args:
         value: The number to check.
@@ -405,7 +405,7 @@ class MetricDeclaration:
     evidence: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
-        """Validate the declaration before it enters a task policy.
+        """Validates the declaration before it enters a task policy.
 
         Raises:
             TypeError: If the direction is not a `MetricDirection`.
@@ -419,7 +419,7 @@ class MetricDeclaration:
             raise ValueError("custom metrics require evidence")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a JSON-compatible metric declaration."""
+        """Returns a JSON-compatible metric declaration."""
         return {
             "name": self.name,
             "direction": self.direction.value,
@@ -438,7 +438,7 @@ class MetricGate:
     threshold: float
 
     def __post_init__(self) -> None:
-        """Validate the metric gate's direction and threshold shape.
+        """Validates the metric gate's direction and threshold shape.
 
         Raises:
             TypeError: If the direction is not a `MetricDirection`.
@@ -449,7 +449,7 @@ class MetricGate:
         validate_finite(self.threshold, "metric_gate.threshold")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a JSON-compatible metric gate."""
+        """Returns a JSON-compatible metric gate."""
         return {
             "metric": self.metric,
             "direction": self.direction.value,
@@ -468,7 +468,7 @@ class UncertaintyPolicy:
     minimum_rows: int | None = None
 
     def __post_init__(self) -> None:
-        """Validate confidence, coverage, and sample-size requirements.
+        """Validates confidence, coverage, and sample-size requirements.
 
         Raises:
             TypeError: If the method is not an `UncertaintyMethod`.
@@ -519,7 +519,7 @@ class UncertaintyPolicy:
                 )
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a JSON-compatible uncertainty declaration."""
+        """Returns a JSON-compatible uncertainty declaration."""
         return {
             "method": self.method.value,
             "required": self.required,
@@ -538,7 +538,7 @@ class CalibrationPolicy:
     maximum_error: float | None = None
 
     def __post_init__(self) -> None:
-        """Validate calibration requirements.
+        """Validates calibration requirements.
 
         Raises:
             TypeError: If the method is not a `CalibrationMethod`.
@@ -563,7 +563,7 @@ class CalibrationPolicy:
             raise ValueError("calibration.maximum_error must not be negative")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a JSON-compatible calibration declaration."""
+        """Returns a JSON-compatible calibration declaration."""
         return {
             "method": self.method.value,
             "required": self.required,
@@ -580,7 +580,7 @@ class FairnessPolicy:
     metrics: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
-        """Validate group columns and fairness metric names.
+        """Validates group columns and fairness metric names.
 
         Raises:
             TypeError: If the method is not a `FairnessMethod`.
@@ -604,7 +604,7 @@ class FairnessPolicy:
                 raise ValueError("fairness requires metrics")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a JSON-compatible fairness declaration."""
+        """Returns a JSON-compatible fairness declaration."""
         return {
             "method": self.method.value,
             "sensitive_columns": list(self.sensitive_columns),
@@ -645,7 +645,7 @@ class FairnessGate:
             raise ValueError("fairness gates require evidence")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a JSON-compatible fairness gate."""
+        """Returns a JSON-compatible fairness gate."""
         return {
             "metric": self.metric,
             "maximum": self.maximum,
@@ -662,7 +662,7 @@ class SmallGroupPolicy:
     blocking_threshold: int | None = None
 
     def __post_init__(self) -> None:
-        """Validate subgroup thresholds and their ordering.
+        """Validates subgroup thresholds and their ordering.
 
         Raises:
             ValueError: If the warning threshold is below one, or the blocking
@@ -680,7 +680,7 @@ class SmallGroupPolicy:
             )
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a JSON-compatible small-group policy."""
+        """Returns a JSON-compatible small-group policy."""
         return {
             "warning_threshold": self.warning_threshold,
             "blocking_threshold": self.blocking_threshold,
@@ -700,7 +700,7 @@ class ExplanationPolicy:
     fidelity_threshold: float | None = None
 
     def __post_init__(self) -> None:
-        """Validate explanation methods and evidence declarations.
+        """Validates explanation methods and evidence declarations.
 
         Raises:
             TypeError: If the availability is not an `ExplanationAvailability`.
@@ -765,7 +765,7 @@ class ExplanationPolicy:
             )
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a JSON-compatible explanation declaration."""
+        """Returns a JSON-compatible explanation declaration."""
         return {
             "availability": self.availability.value,
             "required_methods": list(self.required_methods),
@@ -786,7 +786,7 @@ class DiagnosticGate:
     required_evidence: tuple[str, ...]
 
     def __post_init__(self) -> None:
-        """Validate the diagnostic name, action, and evidence references.
+        """Validates the diagnostic name, action, and evidence references.
 
         Raises:
             TypeError: If the action is not a `DiagnosticAction`.
@@ -802,7 +802,7 @@ class DiagnosticGate:
             raise ValueError("diagnostic gates require evidence")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a JSON-compatible diagnostic gate."""
+        """Returns a JSON-compatible diagnostic gate."""
         return {
             "name": self.name,
             "action": self.action.value,
@@ -850,7 +850,7 @@ class ReleasePolicy:
             raise ValueError("release fairness gates must be unique")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a JSON-compatible release policy."""
+        """Returns a JSON-compatible release policy."""
         return {
             "metric_gates": [gate.to_dict() for gate in self.metric_gates],
             "diagnostic_gates": [
@@ -877,11 +877,11 @@ class EvaluationPolicy:
     schema_version: int = POLICY_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
-        """Reject incomplete or unsupported policy combinations."""
+        """Rejects incomplete or unsupported policy combinations."""
         self.validate()
 
     def validate(self) -> None:
-        """Validate task support and all cross-field policy references.
+        """Validates task support and all cross-field policy references.
 
         Raises:
             TypeError: If the task is not a `TaskType`.
@@ -935,7 +935,7 @@ class EvaluationPolicy:
         self.validate_release()
 
     def validate_uncertainty(self) -> None:
-        """Reject uncertainty methods not implemented for this task.
+        """Rejects uncertainty methods not implemented for this task.
 
         Raises:
             UnsupportedEvaluationPolicyError: If the method is not supported.
@@ -948,7 +948,7 @@ class EvaluationPolicy:
             )
 
     def validate_calibration(self) -> None:
-        """Reject calibration methods not implemented for this task.
+        """Rejects calibration methods not implemented for this task.
 
         Raises:
             UnsupportedEvaluationPolicyError: If the method is not supported.
@@ -961,7 +961,7 @@ class EvaluationPolicy:
             )
 
     def validate_fairness(self) -> None:
-        """Reject fairness methods and metrics outside the task boundary.
+        """Rejects fairness methods and metrics outside the task boundary.
 
         Raises:
             UnsupportedEvaluationPolicyError: If the method or a metric is not
@@ -982,7 +982,7 @@ class EvaluationPolicy:
                 )
 
     def validate_explanations(self) -> None:
-        """Reject explanation levels outside the task boundary.
+        """Rejects explanation levels outside the task boundary.
 
         Raises:
             UnsupportedEvaluationPolicyError: If the level is not supported.
@@ -995,7 +995,7 @@ class EvaluationPolicy:
             )
 
     def validate_release(self) -> None:
-        """Validate release gates against declared metrics and diagnostics.
+        """Validates release gates against declared metrics and diagnostics.
 
         Raises:
             UnsupportedEvaluationPolicyError: If a gate names a metric or
@@ -1051,7 +1051,7 @@ class EvaluationPolicy:
             )
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a deterministic JSON-compatible policy record."""
+        """Returns a deterministic JSON-compatible policy record."""
         return {
             "schema_version": self.schema_version,
             "task": self.task.value,
@@ -1066,7 +1066,7 @@ class EvaluationPolicy:
         }
 
     def canonical_json(self) -> str:
-        """Return stable JSON suitable for hashing and evidence storage."""
+        """Returns stable JSON suitable for hashing and evidence storage."""
         return json.dumps(
             self.to_dict(),
             allow_nan=False,
@@ -1080,7 +1080,7 @@ class EvaluationPolicyRegistry:
     """Explicit registry that fails closed for undeclared task policies."""
 
     def __init__(self, policies: Iterable[EvaluationPolicy] = ()) -> None:
-        """Create a registry from complete policy declarations.
+        """Creates a registry from complete policy declarations.
 
         Args:
             policies: The policies to register.
@@ -1090,7 +1090,7 @@ class EvaluationPolicyRegistry:
             self.register(policy)
 
     def register(self, policy: EvaluationPolicy) -> None:
-        """Register a policy without silently replacing another policy.
+        """Registers a policy without silently replacing another policy.
 
         Args:
             policy: The policy to register.
@@ -1106,7 +1106,7 @@ class EvaluationPolicyRegistry:
         self.records[policy.task] = policy
 
     def require(self, task: tasks.TaskType) -> EvaluationPolicy:
-        """Return a task policy or reject an undeclared task explicitly.
+        """Returns a task policy or reject an undeclared task explicitly.
 
         Args:
             task: The task.
@@ -1129,21 +1129,21 @@ class EvaluationPolicyRegistry:
         return policy
 
     def list_policies(self) -> tuple[EvaluationPolicy, ...]:
-        """Return policies in deterministic task order."""
+        """Returns policies in deterministic task order."""
         return tuple(
             self.records[task]
             for task in sorted(self.records, key=lambda item: item.value)
         )
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a deterministic JSON-compatible registry record."""
+        """Returns a deterministic JSON-compatible registry record."""
         return {
             "schema_version": POLICY_SCHEMA_VERSION,
             "policies": [policy.to_dict() for policy in self.list_policies()],
         }
 
     def canonical_json(self) -> str:
-        """Return stable JSON for the complete policy registry."""
+        """Returns stable JSON for the complete policy registry."""
         return json.dumps(
             self.to_dict(),
             allow_nan=False,

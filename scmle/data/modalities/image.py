@@ -220,7 +220,7 @@ class ImageAugmentation:
     tool: str = ""
 
     def __post_init__(self) -> None:
-        """Validate and normalize transformation provenance.
+        """Validates and normalizes transformation provenance.
 
         Raises:
             ValueError: If the operation is blank, a parameter key is not a
@@ -262,7 +262,7 @@ class ImageAugmentation:
         return json.dumps(self.to_dict(), sort_keys=True, separators=(",", ":"))
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-native transformation provenance.
+        """Returns JSON-native transformation provenance.
 
         Returns:
             A dict with `parent_source`, `operation`, `parameters` and
@@ -534,7 +534,7 @@ class ImageSample:
         )
 
     def perceptual_hash(self, hash_size: int = 8) -> str:
-        """Return a bounded luminance signature for near-duplicate review.
+        """Returns a bounded luminance signature for near-duplicate review.
 
         Args:
             hash_size: Side length of the square luminance thumbnail.
@@ -723,7 +723,7 @@ class ImageSplit:
     test: tuple[ImageSample, ...]
 
     def group_ids(self) -> dict[str, tuple[str, ...]]:
-        """Return the stable groups assigned to each partition.
+        """Returns the stable groups assigned to each partition.
 
         Returns:
             A dict from partition name (`train`, `validation`, `test`) to
@@ -846,7 +846,7 @@ class ImageDataset:
         hash_size: int = 8,
         max_hamming_distance: int = 8,
     ) -> tuple[tuple[str, ...], ...]:
-        """Return bounded groups of visually similar, distinct images.
+        """Returns bounded groups of visually similar, distinct images.
 
         The signature is a quantized, resized luminance representation. It is
         review evidence for likely near duplicates, not a semantic similarity
@@ -1011,7 +1011,7 @@ class ImageDataset:
         max_samples: int = 1024,
         profile_size: tuple[int, int] = DEFAULT_PROFILE_SIZE,
     ) -> ModalityCurationReport:
-        """Build bounded image statistics and reviewable findings.
+        """Builds bounded image statistics and reviewable findings.
 
         Args:
             max_samples: Number of leading samples profiled and checked for
@@ -1215,7 +1215,7 @@ class ImageDataset:
         test_fraction: float = 0.2,
         seed: int = 0,
     ) -> ImageSplit:
-        """Split samples by explicit group identity to prevent leakage.
+        """Splits samples by explicit group identity to prevent leakage.
 
         A caller should use a subject, capture session, or other identity as
         ``group_id``. Without one, source identity is the conservative group.

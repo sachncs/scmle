@@ -17,7 +17,7 @@ class JepaNetwork:
         hidden_size: int,
         embedding_size: int,
     ) -> None:
-        """Build the two-tower representation model.
+        """Builds the two-tower representation model.
 
         Args:
             torch: The imported torch module.
@@ -42,13 +42,13 @@ class JepaNetwork:
             parameter.requires_grad_(False)
 
     def parameters(self) -> Any:
-        """Return trainable context and predictor parameters."""
+        """Returns trainable context and predictor parameters."""
         return list(self.module.context_encoder.parameters()) + list(
             self.module.predictor.parameters()
         )
 
     def state_dict(self) -> dict[str, Any]:
-        """Return the complete network state."""
+        """Returns the complete network state."""
         return self.module.state_dict()
 
     def load_state_dict(self, state: dict[str, Any]) -> None:
@@ -78,7 +78,7 @@ class JepaEngine:
         device: str = "auto",
         random_state: int = 0,
     ) -> None:
-        """Store self-supervised training settings.
+        """Stores self-supervised training settings.
 
         Args:
             hidden_size: Width of the hidden layers.
@@ -113,7 +113,7 @@ class JepaEngine:
         target: Any = None,
         sample_weight: Any = None,
     ) -> "JepaEngine":
-        """Fit context prediction without consuming labels.
+        """Fits context prediction without consuming labels.
 
         Args:
             features: Finite numeric matrix with at least 8 rows and 1 column.
@@ -278,7 +278,7 @@ class JepaEngine:
         return self
 
     def encode(self, features: Any) -> np.ndarray:
-        """Encode rows with the learned context encoder.
+        """Encodes rows with the learned context encoder.
 
         Args:
             features: Numeric matrix with the width seen at fit.
@@ -312,7 +312,7 @@ class JepaEngine:
             ).numpy()
 
     def explain(self, features: Any) -> np.ndarray:
-        """Return embedding-energy gradient-times-input attributions.
+        """Returns embedding-energy gradient-times-input attributions.
 
         This explains local sensitivity of the learned representation. It is
         intentionally not presented as a label explanation or causal effect.

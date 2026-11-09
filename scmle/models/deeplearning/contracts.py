@@ -34,7 +34,7 @@ class CheckpointContract:
     atomic_replace: bool
 
     def __post_init__(self) -> None:
-        """Validate the checkpoint declaration.
+        """Validates the checkpoint declaration.
 
         Raises:
             ValueError: If the format is blank or the schema version is below 1.
@@ -45,7 +45,7 @@ class CheckpointContract:
             raise ValueError("checkpoint schema version must be positive")
 
     def to_dict(self) -> dict[str, object]:
-        """Return a stable JSON-compatible description."""
+        """Returns a stable JSON-compatible description."""
         return {
             "format": self.format,
             "schema_version": self.schema_version,
@@ -75,7 +75,7 @@ class InferenceContract:
     deterministic: bool
 
     def __post_init__(self) -> None:
-        """Validate the inference declaration.
+        """Validates the inference declaration.
 
         Raises:
             ValueError: If the input rank is below 1, the dtype or output is
@@ -92,7 +92,7 @@ class InferenceContract:
         object.__setattr__(self, "methods", tuple(sorted(set(self.methods))))
 
     def to_dict(self) -> dict[str, object]:
-        """Return a stable JSON-compatible description."""
+        """Returns a stable JSON-compatible description."""
         return {
             "modality": self.modality.value,
             "input_rank": self.input_rank,
@@ -120,7 +120,7 @@ class ExplanationContract:
     limitations: tuple[str, ...]
 
     def __post_init__(self) -> None:
-        """Validate the explanation declaration.
+        """Validates the explanation declaration.
 
         Raises:
             ValueError: If the method, scope or output is blank, or any
@@ -137,7 +137,7 @@ class ExplanationContract:
         )
 
     def to_dict(self) -> dict[str, object]:
-        """Return a stable JSON-compatible description."""
+        """Returns a stable JSON-compatible description."""
         return {
             "method": self.method,
             "scope": self.scope,
@@ -164,7 +164,7 @@ class FeatureExplanation:
     feature_count: int
 
     def __post_init__(self) -> None:
-        """Validate the returned attribution matrix.
+        """Validates the returned attribution matrix.
 
         Raises:
             ValueError: If `values` is not two-dimensional, its column count
@@ -185,7 +185,7 @@ class FeatureExplanation:
         object.__setattr__(self, "values", values)
 
     def to_dict(self) -> dict[str, object]:
-        """Return JSON-compatible metadata without silently losing values."""
+        """Returns JSON-compatible metadata without silently losing values."""
         return {
             "method": self.method,
             "target": self.target,
@@ -221,7 +221,7 @@ class ModelFamilyContract:
     limitations: tuple[str, ...]
 
     def __post_init__(self) -> None:
-        """Validate and canonicalize the family declaration.
+        """Validates and canonicalizes the family declaration.
 
         Raises:
             ValueError: If the family name is blank, no modality is declared, or
@@ -254,7 +254,7 @@ class ModelFamilyContract:
         )
 
     def supports_modality(self, modality: capabilities.Modality | str) -> bool:
-        """Return whether this family accepts the declared modality.
+        """Returns whether this family accepts the declared modality.
 
         Args:
             modality: A `Modality` or its string value.
@@ -285,7 +285,7 @@ class ModelFamilyContract:
     def validate_features(
         self, features: Any, expected_width: int | None = None
     ) -> np.ndarray:
-        """Convert and validate the numeric tabular inference boundary.
+        """Converts and validates the numeric tabular inference boundary.
 
         Args:
             features: Dense or sparse array-like of model inputs.
@@ -326,7 +326,7 @@ class ModelFamilyContract:
         return matrix
 
     def to_dict(self) -> dict[str, object]:
-        """Return the complete declaration for evidence and diagnostics."""
+        """Returns the complete declaration for evidence and diagnostics."""
         return {
             "model_family": self.model_family,
             "status": self.status.value,
@@ -342,7 +342,7 @@ class ModelFamilyContract:
 
     @classmethod
     def unsupported_multimodal(cls) -> Self:
-        """Return the explicit fail-closed boundary for multimodal models."""
+        """Returns the explicit fail-closed boundary for multimodal models."""
         return cls(
             model_family=capabilities.ModelFamily.MULTIMODAL_TRANSFORMER.value,
             status=capabilities.CapabilityStatus.EXTENSION_ONLY,
@@ -462,7 +462,7 @@ TABULAR_TORCH_CONTRACT = ModelFamilyContract(
 
 
 def model_family_contract(architecture: str) -> ModelFamilyContract:
-    """Resolve the explicit contract for a worker-backed architecture.
+    """Resolves the explicit contract for a worker-backed architecture.
 
     Args:
         architecture: Architecture name, for example `ft_transformer`.

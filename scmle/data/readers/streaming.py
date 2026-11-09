@@ -97,7 +97,7 @@ class ChunkSource(abc.ABC):
 
     @abc.abstractmethod
     def shape(self) -> tuple[int | None, int]:
-        """Report the row count and column count of the table.
+        """Reports the row count and column count of the table.
 
         Returns:
             A pair of the row count and the column count. The row count is None
@@ -105,7 +105,7 @@ class ChunkSource(abc.ABC):
         """
 
     def estimated_bytes(self) -> int:
-        """Estimate the in-memory size of the whole table.
+        """Estimates the in-memory size of the whole table.
 
         The estimate is rows x columns x 8 bytes when the row count is known.
         Otherwise (CSV, JSON lines) it is the file size on disk times 4.
@@ -119,7 +119,7 @@ class ChunkSource(abc.ABC):
         return rows * columns * BYTES_PER_CELL
 
     def source_identity(self) -> str:
-        """Return the stable identity of this source URI.
+        """Returns the stable identity of this source URI.
 
         Returns:
             The string "src_" followed by the SHA-256 hex digest of the
@@ -128,7 +128,7 @@ class ChunkSource(abc.ABC):
         return connectors.source_identity(self.path)
 
     def snapshot_sha256(self) -> str:
-        """Return the digest of the raw source snapshot.
+        """Returns the digest of the raw source snapshot.
 
         The digest is intentionally over the source bytes, not the decoded
         frame. A resumed stream must therefore observe the same exact file,
@@ -158,7 +158,7 @@ class ChunkSource(abc.ABC):
         rows: int = BATCH_ROWS,
         watermark_column: str | None = None,
     ) -> "StreamBatch":
-        """Read one bounded batch bound to an immutable source snapshot.
+        """Reads one bounded batch bound to an immutable source snapshot.
 
         The source is re-opened from row zero for each call because file
         readers do not share a transport cursor. The durable checkpoint makes
@@ -355,7 +355,7 @@ class StreamingError(errors.DataError):
 
 
 def validate_digest(value: str, field_name: str) -> None:
-    """Validate a SHA-256 digest used as durable source evidence.
+    """Validates a SHA-256 digest used as durable source evidence.
 
     Args:
         value: The candidate digest.
@@ -371,7 +371,7 @@ def validate_digest(value: str, field_name: str) -> None:
 
 
 def validate_timestamp(value: str, field_name: str) -> datetime.datetime:
-    """Parse a timezone-aware watermark timestamp.
+    """Parses a timezone-aware watermark timestamp.
 
     Args:
         value: ISO-8601 timestamp; a trailing "Z" means UTC.
@@ -414,7 +414,7 @@ class StreamCheckpoint:
     watermark_column: str | None = None
 
     def __post_init__(self) -> None:
-        """Validate source, snapshot, offset, and optional watermark.
+        """Validates source, snapshot, offset, and optional watermark.
 
         Raises:
             ValueError: If the source identity is blank, the snapshot is not a
@@ -436,7 +436,7 @@ class StreamCheckpoint:
             validate_timestamp(self.watermark, "watermark")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-compatible checkpoint evidence.
+        """Returns JSON-compatible checkpoint evidence.
 
         Returns:
             A dictionary with the five checkpoint fields.
@@ -478,7 +478,7 @@ def batch_identity(
     start_offset: int,
     end_offset: int,
 ) -> str:
-    """Return the stable idempotency key for one source row range.
+    """Returns the stable idempotency key for one source row range.
 
     Args:
         source_identity: Identity of the source.
@@ -502,7 +502,7 @@ def watermark_value(
     current: str,
     source_identity: str,
 ) -> str:
-    """Return the greatest timezone-aware timestamp in a batch.
+    """Returns the greatest timezone-aware timestamp in a batch.
 
     A malformed `current` value is rejected with ValueError.
 
@@ -575,7 +575,7 @@ class StreamBatch:
     batch_id: str = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
-        """Validate the batch and derive its deterministic idempotency key.
+        """Validates the batch and derive its deterministic idempotency key.
 
         Raises:
             ValueError: If the checkpoint's source or snapshot differs from the
@@ -622,7 +622,7 @@ class StreamAcknowledgement:
     checkpoint: StreamCheckpoint
 
     def __post_init__(self) -> None:
-        """Validate acknowledgement identity and checkpoint binding.
+        """Validates acknowledgement identity and checkpoint binding.
 
         Raises:
             ValueError: If the source identity or consumer group is blank, the
@@ -639,7 +639,7 @@ class StreamAcknowledgement:
             raise ValueError("acknowledgement and checkpoint sources differ")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-compatible acknowledgement evidence.
+        """Returns JSON-compatible acknowledgement evidence.
 
         Returns:
             A dictionary holding the schema version and the four fields.
@@ -692,7 +692,7 @@ class SinkCommitReceipt:
     receipt: str
 
     def __post_init__(self) -> None:
-        """Validate the receipt's basic identities and checkpoint source.
+        """Validates the receipt's basic identities and checkpoint source.
 
         Raises:
             ValueError: If the source identity or receipt text is blank, the
@@ -709,7 +709,7 @@ class SinkCommitReceipt:
             raise ValueError("receipt and checkpoint sources differ")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-compatible sink receipt evidence.
+        """Returns JSON-compatible sink receipt evidence.
 
         Returns:
             A dictionary with the four receipt fields.
@@ -780,7 +780,7 @@ class StreamCommitEvidence:
     acknowledgement: StreamAcknowledgement
 
     def __post_init__(self) -> None:
-        """Validate all identities in one durable transaction record.
+        """Validates all identities in one durable transaction record.
 
         Raises:
             ValueError: If the receipt or acknowledgement differs from the
@@ -800,7 +800,7 @@ class StreamCommitEvidence:
             )
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-compatible transaction evidence.
+        """Returns JSON-compatible transaction evidence.
 
         Returns:
             A dictionary holding the schema version and the nested records.
@@ -855,7 +855,7 @@ class StreamState:
     transaction_evidence: tuple[StreamCommitEvidence, ...] = ()
 
     def __post_init__(self) -> None:
-        """Validate deterministic committed batch identities.
+        """Validates deterministic committed batch identities.
 
         Raises:
             ValueError: If the committed identities or the evidence are not
@@ -877,7 +877,7 @@ class StreamState:
             )
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-compatible durable state.
+        """Returns JSON-compatible durable state.
 
         Returns:
             A dictionary holding the schema version, checkpoint, committed
@@ -944,7 +944,7 @@ class StreamCommitReceipt:
     acknowledgement: StreamAcknowledgement | None = None
 
     def __post_init__(self) -> None:
-        """Validate mutually exclusive commit classification.
+        """Validates mutually exclusive commit classification.
 
         Raises:
             ValueError: If `accepted` and `duplicate` are equal, or the
@@ -1028,7 +1028,7 @@ class StreamingLedger:
                     fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
     def load(self) -> StreamState:
-        """Load state and fail closed if the source snapshot changed.
+        """Loads state and fail closed if the source snapshot changed.
 
         Returns:
             The durable state, or a fresh state at offset zero when the state
@@ -1092,7 +1092,7 @@ class StreamingLedger:
         rows: int = BATCH_ROWS,
         watermark_column: str | None = None,
     ) -> StreamBatch:
-        """Read the next bounded batch from the durable checkpoint.
+        """Reads the next bounded batch from the durable checkpoint.
 
         Failures from `load` and from the source's `read_batch` propagate
         unchanged.
@@ -1179,7 +1179,7 @@ class StreamingLedger:
         )
 
     def load_pending_acknowledgement(self) -> StreamAcknowledgement | None:
-        """Load the pending acknowledgement, if one exists.
+        """Loads the pending acknowledgement, if one exists.
 
         Returns:
             The staged acknowledgement, or None if there is none.
@@ -1235,7 +1235,7 @@ class StreamingLedger:
             return
 
     def validate_batch(self, batch: StreamBatch) -> None:
-        """Validate a batch against this ledger's source snapshot.
+        """Validates a batch against this ledger's source snapshot.
 
         Args:
             batch: The batch to check.
@@ -1263,7 +1263,7 @@ class StreamingLedger:
     def validate_acknowledgement(
         self, batch: StreamBatch, acknowledgement: StreamAcknowledgement
     ) -> None:
-        """Validate the acknowledgement that will be bound to a batch.
+        """Validates the acknowledgement that will be bound to a batch.
 
         Args:
             batch: The batch being committed.
@@ -1299,7 +1299,7 @@ class StreamingLedger:
     def validate_sink_receipt(
         self, batch: StreamBatch, receipt: SinkCommitReceipt
     ) -> None:
-        """Validate a sink receipt before it enters durable state.
+        """Validates a sink receipt before it enters durable state.
 
         Args:
             batch: The batch that was committed.
@@ -1691,7 +1691,7 @@ class ParquetChunks(ChunkSource):
             yield batch.to_pandas()
 
     def shape(self) -> tuple[int | None, int]:
-        """Report both counts from the file's metadata.
+        """Reports both counts from the file's metadata.
 
         Returns:
             The row count and the column count recorded in the Parquet
@@ -1718,7 +1718,7 @@ class CsvChunks(ChunkSource):
         yield from pd.read_csv(self.path, chunksize=rows)
 
     def shape(self) -> tuple[int | None, int]:
-        """Report the column count; the row count is unknown without a pass.
+        """Reports the column count; the row count is unknown without a pass.
 
         Returns:
             None for the row count and the number of columns in the header.
@@ -1743,7 +1743,7 @@ class JsonLinesChunks(ChunkSource):
         yield from pd.read_json(self.path, lines=True, chunksize=rows)
 
     def shape(self) -> tuple[int | None, int]:
-        """Report the column count; the row count is unknown without a pass.
+        """Reports the column count; the row count is unknown without a pass.
 
         Returns:
             None for the row count, and the number of columns of the first
@@ -1761,7 +1761,7 @@ SOURCES: tuple[type[ChunkSource], ...] = (
 
 
 def source_for(uri: str | pathlib.Path) -> ChunkSource:
-    """Return the chunked reader for a file.
+    """Returns the chunked reader for a file.
 
     Args:
         uri: Path of the file to stream.
@@ -1842,7 +1842,7 @@ def sample_caps(
 def keep_smallest(
     buffer: pd.DataFrame | None, batch: pd.DataFrame, cap: int
 ) -> pd.DataFrame:
-    """Merge a batch into a buffer, keeping the `cap` lowest-priority rows.
+    """Merges a batch into a buffer, keeping the `cap` lowest-priority rows.
 
     Args:
         buffer: Rows kept so far, or None if there are none.

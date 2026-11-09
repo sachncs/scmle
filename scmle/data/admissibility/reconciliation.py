@@ -65,7 +65,7 @@ class Explanation:
     attested_by: str | None = None
 
     def __post_init__(self) -> None:
-        """Validate the record.
+        """Validates the record.
 
         Raises:
             ValueError: If `mechanism` is not a `Mechanism`, `detail` or
@@ -80,7 +80,7 @@ class Explanation:
             evidence.require_text(self.attested_by, "attested_by")
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert the explanation to a JSON-ready record.
+        """Converts the explanation to a JSON-ready record.
 
         Returns:
             A dict with the mechanism (its string value), detail, amount
@@ -132,7 +132,7 @@ class Item:
     explanations: tuple[Explanation, ...] = ()
 
     def __post_init__(self) -> None:
-        """Validate the record.
+        """Validates the record.
 
         Raises:
             ValueError: If `name` or `source_name` is empty, `extract` or
@@ -174,7 +174,7 @@ class ItemResult:
     check: qualification.Check
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert the verdict to a JSON-ready record.
+        """Converts the verdict to a JSON-ready record.
 
         Returns:
             A dict with the quantity, both values, gaps, status, tier and
@@ -282,7 +282,7 @@ class Reconciliation:
         return tuple(r.check for r in self.results)
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert the reconciliation to a JSON-ready document.
+        """Converts the reconciliation to a JSON-ready document.
 
         Returns:
             A dict with the format version, tolerance, whether it passed

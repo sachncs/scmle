@@ -65,7 +65,7 @@ class LongitudinalEstimand:
     assumptions: tuple[str, ...]
 
     def __post_init__(self) -> None:
-        """Validate the columns and required causal assumptions.
+        """Validates the columns and required causal assumptions.
 
         Raises:
             ValueError: If the name or population is empty, any column name
@@ -97,7 +97,7 @@ class LongitudinalEstimand:
             )
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-compatible estimand metadata.
+        """Returns JSON-compatible estimand metadata.
 
         Returns:
             The estimand fields keyed by field name.
@@ -142,7 +142,7 @@ class LongitudinalEstimationPolicy:
     reference_tolerance: float = 1e-6
 
     def __post_init__(self) -> None:
-        """Reject an unbounded or ambiguous estimation policy.
+        """Rejects an unbounded or ambiguous estimation policy.
 
         Raises:
             ValueError: If a field lies outside the range given in the class
@@ -194,7 +194,7 @@ class LongitudinalEstimationPolicy:
             )
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-compatible policy metadata.
+        """Returns JSON-compatible policy metadata.
 
         Returns:
             The policy fields keyed by field name.
@@ -242,7 +242,7 @@ class PeriodATE:
     iterations: int
 
     def __post_init__(self) -> None:
-        """Validate finite period-level evidence.
+        """Validates finite period-level evidence.
 
         Raises:
             ValueError: If the period label is empty, a row count is not
@@ -291,7 +291,7 @@ class PeriodATE:
             raise ValueError("propensities must lie between 0 and 1")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-compatible period evidence.
+        """Returns JSON-compatible period evidence.
 
         Returns:
             The period fields keyed by field name.
@@ -333,7 +333,7 @@ class LongitudinalEstimationResult:
     raw_input_fingerprint: str
 
     def __post_init__(self) -> None:
-        """Validate the report shape before serialization.
+        """Validates the report shape before serialization.
 
         Raises:
             ValueError: If there are no periods, period labels repeat, the
@@ -392,7 +392,7 @@ class LongitudinalEstimationResult:
             )
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a JSON-compatible longitudinal report.
+        """Returns a JSON-compatible longitudinal report.
 
         Returns:
             All report fields keyed by field name, with nested objects
@@ -413,7 +413,7 @@ class LongitudinalEstimationResult:
         }
 
     def digest(self) -> str:
-        """Return the digest of the canonical report content.
+        """Returns the digest of the canonical report content.
 
         Returns:
             The hexadecimal SHA-256 digest of the report serialized as
@@ -473,7 +473,7 @@ class LongitudinalEstimationResult:
 
     @classmethod
     def read(cls, path: str | Path) -> "LongitudinalEstimationResult":
-        """Read and verify an atomic report envelope.
+        """Reads and verifies an atomic report envelope.
 
         Args:
             path: File previously written by `write`.
@@ -578,7 +578,7 @@ class LongitudinalIPWEstimator:
         estimand: LongitudinalEstimand,
         policy: LongitudinalEstimationPolicy | None = None,
     ) -> None:
-        """Store a validated declaration and policy.
+        """Stores a validated declaration and policy.
 
         Args:
             estimand: The causal quantity to estimate.
@@ -594,7 +594,7 @@ class LongitudinalIPWEstimator:
         self.policy = policy or LongitudinalEstimationPolicy()
 
     def fit(self, frame: pd.DataFrame) -> LongitudinalEstimationResult:
-        """Fit one covariate-adjusted period-specific ATE per time value.
+        """Fits one covariate-adjusted period-specific ATE per time value.
 
         Args:
             frame: Long-format panel with one row per subject and period.
@@ -708,7 +708,7 @@ class LongitudinalIPWEstimator:
     def fit_period(
         self, period_frame: pd.DataFrame, period_value: Any
     ) -> dict[str, Any]:
-        """Fit one period and retain influence values for covariance.
+        """Fits one period and retain influence values for covariance.
 
         Args:
             period_frame: Prepared rows of a single period.
@@ -958,7 +958,7 @@ def validate_time_order(
 def validate_baseline_covariates(
     frame: pd.DataFrame, estimand: LongitudinalEstimand
 ) -> None:
-    """Check the declared no-time-varying-covariates condition in the data.
+    """Checks the declared no-time-varying-covariates condition in the data.
 
     Args:
         frame: Long-format panel.
@@ -984,7 +984,7 @@ def fit_logistic_propensity(
     treatment: np.ndarray,
     policy: LongitudinalEstimationPolicy,
 ) -> tuple[np.ndarray, int]:
-    """Fit a deterministic ridge-logistic propensity model by Newton steps.
+    """Fits a deterministic ridge-logistic propensity model by Newton steps.
 
     Args:
         covariates: Two-dimensional matrix, rows by features, without an
@@ -1030,7 +1030,7 @@ def fit_logistic_propensity(
 
 
 def effective_sample_size(weights: np.ndarray) -> float:
-    """Return the Kish effective sample size for positive arm weights.
+    """Returns the Kish effective sample size for positive arm weights.
 
     Args:
         weights: Non-negative weights of one arm.
@@ -1047,7 +1047,7 @@ def effective_sample_size(weights: np.ndarray) -> float:
 
 
 def influence_covariance(fitted: Sequence[Mapping[str, Any]]) -> np.ndarray:
-    """Estimate covariance from subject-aligned influence values.
+    """Estimates covariance from subject-aligned influence values.
 
     Args:
         fitted: One `fit_period` record per period, in period order.
@@ -1096,7 +1096,7 @@ def influence_covariance(fitted: Sequence[Mapping[str, Any]]) -> np.ndarray:
 def build_period_result(
     fitted: Mapping[str, Any], variance: float, critical_value: float
 ) -> PeriodATE:
-    """Build a serializable period result after covariance is available.
+    """Builds a serializable period result after covariance is available.
 
     Args:
         fitted: The `fit_period` record of the period.
@@ -1197,7 +1197,7 @@ def independent_reference(
 
 
 def period_label(value: Any) -> str:
-    """Convert a pandas/numpy time value to a stable JSON label.
+    """Converts a pandas/numpy time value to a stable JSON label.
 
     Args:
         value: A time value from the time column.
@@ -1216,7 +1216,7 @@ def period_label(value: Any) -> str:
 
 
 def fingerprint_frame(frame: pd.DataFrame) -> str:
-    """Return a deterministic digest of the supplied frame.
+    """Returns a deterministic digest of the supplied frame.
 
     Args:
         frame: Frame to fingerprint.

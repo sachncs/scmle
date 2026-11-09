@@ -1144,7 +1144,7 @@ class ModalityProject:
         self.report: modality_lifecycle.LifecycleReport | None = None
 
     def run(self) -> modality_lifecycle.LifecycleReport:
-        """Run the full lifecycle and persist its evidence atomically.
+        """Runs the full lifecycle and persist its evidence atomically.
 
         Returns:
             The lifecycle report, also kept as `report`.
@@ -1177,7 +1177,7 @@ class ModalityProject:
         self.cancellation.cancel()
 
     def declaration(self) -> modalities.ModalityDeclaration:
-        """Return the experimental capability declaration after a run.
+        """Returns the experimental capability declaration after a run.
 
         Returns:
             The declaration derived from the latest report.
@@ -1212,7 +1212,7 @@ class ModalityCurationProject:
         output_dir: str | pathlib.Path = "runs",
         manifest: data_contracts.ModalityManifest | None = None,
     ) -> None:
-        """Define a curation-only run over a typed modality adapter.
+        """Defines a curation-only run over a typed modality adapter.
 
         Args:
             adapter: Adapter that owns source identity and curation policy.

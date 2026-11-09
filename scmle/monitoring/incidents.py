@@ -18,7 +18,7 @@ Method = TypeVar("Method", bound=Callable[..., Any])
 
 
 def serialized(method: Method) -> Method:
-    """Run a workflow method while holding the journal's lock.
+    """Runs a workflow method while holding the journal's lock.
 
     Every transition reads the journal, decides, then appends; the lock makes
     that one step, so concurrent threads see one hash chain.
@@ -63,7 +63,7 @@ class IncidentStatus(enum.StrEnum):
 
 
 def require_text(value: str, field_name: str) -> str:
-    """Return non-empty incident metadata.
+    """Returns non-empty incident metadata.
 
     Args:
         value: The field value.
@@ -81,7 +81,7 @@ def require_text(value: str, field_name: str) -> str:
 
 
 def incident_id(target: slo.SLOTarget, observed_at: str) -> str:
-    """Return an idempotent identity for one target evaluation window.
+    """Returns an idempotent identity for one target evaluation window.
 
     Args:
         target: The objective.
@@ -145,7 +145,7 @@ class Incident:
     evidence_digest: str | None = None
 
     def __post_init__(self) -> None:
-        """Validate the state record before it enters the journal.
+        """Validates the state record before it enters the journal.
 
         Raises:
             ValueError: If a required text field is blank, a timestamp is not
@@ -188,7 +188,7 @@ class Incident:
             raise ValueError("resolved incidents require resolution")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return deterministic incident evidence.
+        """Returns deterministic incident evidence.
 
         Returns:
             A dict of all fields, with the status as its value.
@@ -245,7 +245,7 @@ class Incident:
 
 
 def event_digest(event: Mapping[str, Any]) -> str:
-    """Hash a journal event without trusting its stored digest.
+    """Hashes a journal event without trusting its stored digest.
 
     Args:
         event: A journal event.
@@ -281,7 +281,7 @@ class IncidentWorkflow:
 
     @serialized
     def read_events(self) -> tuple[dict[str, Any], ...]:
-        """Read and verify the complete journal, failing closed on tamper.
+        """Reads and verifies the complete journal, failing closed on tamper.
 
         Returns:
             The events in journal order; empty if there is no journal.
@@ -354,7 +354,7 @@ class IncidentWorkflow:
 
     @serialized
     def records(self) -> tuple[Incident, ...]:
-        """Return the latest state for every incident in journal order.
+        """Returns the latest state for every incident in journal order.
 
         Returns:
             One incident per identity, in the order first opened.
@@ -467,7 +467,7 @@ class IncidentWorkflow:
         resolution: str,
         evidence_digest: str,
     ) -> Incident:
-        """Resolve an acknowledged incident with evidence.
+        """Resolves an acknowledged incident with evidence.
 
         Args:
             identity: Identity of the incident.
@@ -508,7 +508,7 @@ class IncidentWorkflow:
         return updated
 
     def require_record(self, identity: str) -> Incident:
-        """Return one incident or fail clearly when it is unknown.
+        """Returns one incident or fail clearly when it is unknown.
 
         Args:
             identity: Identity of the incident.

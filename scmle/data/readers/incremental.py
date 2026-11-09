@@ -80,7 +80,7 @@ class LateDataPolicy(enum.StrEnum):
 
 
 def parse_timestamp(value: str, field_name: str) -> datetime.datetime:
-    """Parse a timezone-aware ISO-8601 timestamp.
+    """Parses a timezone-aware ISO-8601 timestamp.
 
     Args:
         value: ISO-8601 timestamp; a trailing "Z" means UTC.
@@ -128,7 +128,7 @@ class IncrementalEvent:
     ingest_time: str = ""
 
     def __post_init__(self) -> None:
-        """Validate event identity, ordering, time, and payload shape.
+        """Validates event identity, ordering, time, and payload shape.
 
         ``ingest_time`` is when the system recorded the event (transaction
         time). It is empty when the source does not report it; a point-in-
@@ -157,7 +157,7 @@ class IncrementalEvent:
         object.__setattr__(self, "payload", dict(self.payload))
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a JSON-compatible event record.
+        """Returns a JSON-compatible event record.
 
         Returns:
             A dictionary of the event's fields; `ingest_time` is included only
@@ -209,7 +209,7 @@ class EventCheckpoint:
     watermark: str = ""
 
     def __post_init__(self) -> None:
-        """Validate source identity, sequence, and optional watermark.
+        """Validates source identity, sequence, and optional watermark.
 
         Raises:
             ValueError: If the source identity is blank, the sequence is
@@ -245,7 +245,7 @@ class EventCheckpoint:
         return self
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a JSON-compatible checkpoint.
+        """Returns a JSON-compatible checkpoint.
 
         Returns:
             A dictionary with the three checkpoint fields.
@@ -297,7 +297,7 @@ class EventBatch:
     has_more: bool = False
 
     def __post_init__(self) -> None:
-        """Validate batch identity and deterministic event collections.
+        """Validates batch identity and deterministic event collections.
 
         Raises:
             ValueError: If the checkpoint belongs to another source, or the
@@ -343,7 +343,7 @@ class EventCommitReceipt:
     checkpoint: EventCheckpoint
 
     def __post_init__(self) -> None:
-        """Validate deterministic accepted and duplicate identities.
+        """Validates deterministic accepted and duplicate identities.
 
         Raises:
             ValueError: If the source identity is blank, the checkpoint
@@ -364,7 +364,7 @@ class EventCommitReceipt:
             )
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a JSON-compatible commit receipt.
+        """Returns a JSON-compatible commit receipt.
 
         Returns:
             A dictionary holding the schema version and the receipt fields.
@@ -401,7 +401,7 @@ class EventAcknowledgement:
     checkpoint: EventCheckpoint
 
     def __post_init__(self) -> None:
-        """Validate the acknowledgement's source and deterministic IDs.
+        """Validates the acknowledgement's source and deterministic IDs.
 
         Raises:
             ValueError: If the source identity or consumer group is blank, the
@@ -420,7 +420,7 @@ class EventAcknowledgement:
             )
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a JSON-compatible acknowledgement record.
+        """Returns a JSON-compatible acknowledgement record.
 
         Returns:
             A dictionary holding the schema version and the four fields.
@@ -474,7 +474,7 @@ class EventConsumerResult:
     acknowledged_event_ids: tuple[str, ...]
 
     def __post_init__(self) -> None:
-        """Validate the result's source, group, and acknowledgement IDs.
+        """Validates the result's source, group, and acknowledgement IDs.
 
         Raises:
             ValueError: If the receipt belongs to another source, the consumer
@@ -491,7 +491,7 @@ class EventConsumerResult:
             raise ValueError("acknowledged_event_ids must be sorted and unique")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-compatible consume evidence.
+        """Returns JSON-compatible consume evidence.
 
         Returns:
             A dictionary holding the schema version and the result fields.
@@ -535,7 +535,7 @@ class IncrementalEventSource(abc.ABC):
 
     @abc.abstractmethod
     def available_events(self) -> Iterable[IncrementalEvent]:
-        """Return available events without changing committed state.
+        """Returns available events without changing committed state.
 
         Returns:
             The events the transport currently offers.
@@ -576,7 +576,7 @@ class IncrementalEventSource(abc.ABC):
         seen_event_ids: Iterable[str] = (),
         limit: int = 1_000,
     ) -> EventBatch:
-        """Select a bounded, deduplicated batch from transport records.
+        """Selects a bounded, deduplicated batch from transport records.
 
         Records are ordered by sequence then event identity. A record whose
         identity is already committed or already selected is a duplicate. A
@@ -679,7 +679,7 @@ class IncrementalEventSource(abc.ABC):
         seen_event_ids: Iterable[str] = (),
         limit: int = 1_000,
     ) -> EventBatch:
-        """Select a bounded batch without committing its side effects.
+        """Selects a bounded batch without committing its side effects.
 
         Failures from `available_events` and from `select_events` (such as an
         IncrementalError for a late event under the REJECT policy) propagate
@@ -725,7 +725,7 @@ class SequenceEventSource(IncrementalEventSource):
             self.event_factory = lambda: values
 
     def available_events(self) -> Iterable[IncrementalEvent]:
-        """Return the current event view supplied by the transport seam.
+        """Returns the current event view supplied by the transport seam.
 
         Returns:
             The events held or produced by the factory.
@@ -793,7 +793,7 @@ class EventStreamSource(IncrementalEventSource):
         self.retry_budget = retry_budget or connectors.RetryBudget()
 
     def available_events(self) -> Iterable[IncrementalEvent]:
-        """Reject unbounded polling without a checkpoint and limit.
+        """Rejects unbounded polling without a checkpoint and limit.
 
         Raises:
             IncrementalError: Always, with code "bounded_poll_required";
@@ -880,7 +880,7 @@ class CommittedIncrementalState:
     seen_event_ids: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
-        """Validate deterministic deduplication state.
+        """Validates deterministic deduplication state.
 
         Raises:
             ValueError: If `seen_event_ids` is not sorted and unique.
@@ -889,7 +889,7 @@ class CommittedIncrementalState:
             raise ValueError("seen_event_ids must be sorted and unique")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return durable state as JSON-compatible data.
+        """Returns durable state as JSON-compatible data.
 
         Returns:
             A dictionary holding the schema version, checkpoint and seen event
@@ -977,7 +977,7 @@ class IncrementalIngestionLedger:
                     fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
     def load(self) -> CommittedIncrementalState:
-        """Load committed state or initialize an empty source state.
+        """Loads committed state or initialize an empty source state.
 
         An unreadable or malformed state file raises the parsing error
         (for example JSONDecodeError or ValueError) unchanged.
@@ -1008,7 +1008,7 @@ class IncrementalIngestionLedger:
     def read_batch(
         self, source: IncrementalEventSource, limit: int = 1_000
     ) -> EventBatch:
-        """Read an uncommitted batch using the durable deduplication state.
+        """Reads an uncommitted batch using the durable deduplication state.
 
         Args:
             source: The event source to read from.
@@ -1116,7 +1116,7 @@ class IncrementalIngestionLedger:
             raise
 
     def load_pending_acknowledgement(self) -> EventAcknowledgement | None:
-        """Load the acknowledgement that still needs transport delivery.
+        """Loads the acknowledgement that still needs transport delivery.
 
         Returns:
             The staged acknowledgement, or None if there is none.
@@ -1216,7 +1216,7 @@ class IncrementalIngestionLedger:
         writer: Callable[[tuple[IncrementalEvent, ...]], None],
         acknowledgement: EventAcknowledgement | None = None,
     ) -> EventCommitReceipt:
-        """Write unseen events and commit their IDs under one ledger lock.
+        """Writes unseen events and commit their IDs under one ledger lock.
 
         The writer receives only events not already present in the durable
         ledger. If it raises, the ledger is unchanged and the caller may

@@ -4694,7 +4694,7 @@ class ModelExplainabilityStage(ModalityLifecycleStage):
 
 
 class PackagingStage(ModalityLifecycleStage):
-    """Write and sign a digest-bound model package atomically."""
+    """Writes and signs a digest-bound model package atomically."""
 
     stage = modalities.LifecycleStage.PACKAGING
     performance_operation = performance.PerformanceOperation.PACKAGE

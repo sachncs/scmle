@@ -69,7 +69,7 @@ CODES_KEY = "label_codes"
 
 
 def inner_model(step: Any) -> tuple[Any, bool]:
-    """Find the fitted model inside the framework's model wrappers.
+    """Finds the fitted model inside the framework's model wrappers.
 
     Args:
         step: A fitted estimator, possibly wrapped.
@@ -86,7 +86,7 @@ def inner_model(step: Any) -> tuple[Any, bool]:
 
 
 def register_booster_converters() -> None:
-    """Register LightGBM and XGBoost converters when onnxmltools exists.
+    """Registers LightGBM and XGBoost converters when onnxmltools exists.
 
     Nothing is registered when any of the needed modules cannot be imported.
     """
@@ -138,7 +138,7 @@ def register_booster_converters() -> None:
 
 
 def unwrap(fitted: Any) -> pipeline.Pipeline:
-    """Find the fitted scikit-learn pipeline inside the framework's wrappers.
+    """Finds the fitted scikit-learn pipeline inside the framework's wrappers.
 
     Args:
         fitted: A fitted estimator, possibly wrapped.
@@ -162,7 +162,7 @@ def unwrap(fitted: Any) -> pipeline.Pipeline:
 
 
 def is_token_imputer(step: Any) -> bool:
-    """Check whether `step` fills missing text with a constant token.
+    """Checks whether `step` fills missing text with a constant token.
 
     Args:
         step: A pipeline step.
@@ -178,7 +178,7 @@ def is_token_imputer(step: Any) -> bool:
 
 
 def passthrough(step: Any) -> Any:
-    """Make an identity that stands in for steps done before the graph runs.
+    """Makes an identity that stands in for steps done before the graph runs.
 
     Args:
         step: The step being replaced; unused.
@@ -190,7 +190,7 @@ def passthrough(step: Any) -> Any:
 
 
 def without_casts(model: Any) -> Any:
-    """Copy a model, replacing its type casts and text imputers by identities.
+    """Copies a model, replacing its type casts and text imputers by identities.
 
     Casting columns to float or string, and filling missing text with the
     missing token, happen before the graph runs (see `feed`), because the
@@ -245,7 +245,7 @@ def input_types(bundle: Any, types: Any) -> list[tuple[str, Any]]:
 
 
 def export(bundle: Any, path: str | pathlib.Path) -> pathlib.Path:
-    """Write the bundle's pipeline as an ONNX file.
+    """Writes the bundle's pipeline as an ONNX file.
 
     Args:
         bundle: A fitted `ModelBundle`.
@@ -307,7 +307,7 @@ def export(bundle: Any, path: str | pathlib.Path) -> pathlib.Path:
 
 
 def decode(bundle: Any, session: Any, labels: np.ndarray) -> np.ndarray:
-    """Map integer class codes back to labels when the graph was trained so.
+    """Maps integer class codes back to labels when the graph was trained so.
 
     Args:
         bundle: The bundle the graph came from; supplies the class labels.
@@ -327,7 +327,7 @@ def decode(bundle: Any, session: Any, labels: np.ndarray) -> np.ndarray:
 
 
 def feed(bundle: Any, frame: pd.DataFrame) -> dict[str, np.ndarray]:
-    """Build the exported graph's inputs from a validated frame.
+    """Builds the exported graph's inputs from a validated frame.
 
     Args:
         bundle: The bundle the graph came from.
@@ -364,7 +364,7 @@ def verify(
     frame: pd.DataFrame,
     tolerance: float = DEFAULT_TOLERANCE,
 ) -> dict[str, float]:
-    """Compare the exported graph with the in-process pipeline.
+    """Compares the exported graph with the in-process pipeline.
 
     Args:
         bundle: The bundle the graph came from.
@@ -413,7 +413,7 @@ class OnnxScorer:
     """Scores frames with an exported graph, without the framework pipeline."""
 
     def __init__(self, bundle: Any, path: str | pathlib.Path) -> None:
-        """Open the graph.
+        """Opens the graph.
 
         Args:
             bundle: The bundle the graph was exported from (for its schema).
@@ -424,7 +424,7 @@ class OnnxScorer:
         self.session = runtime.InferenceSession(str(path))
 
     def predict(self, frame: pd.DataFrame) -> np.ndarray:
-        """Predict labels or values.
+        """Predicts labels or values.
 
         Args:
             frame: Incoming rows.
@@ -436,7 +436,7 @@ class OnnxScorer:
         return decode(self.bundle, self.session, outputs[0]).ravel()
 
     def predict_proba(self, frame: pd.DataFrame) -> np.ndarray:
-        """Predict class probabilities.
+        """Predicts class probabilities.
 
         Args:
             frame: Incoming rows.

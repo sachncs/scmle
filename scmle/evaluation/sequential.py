@@ -77,7 +77,7 @@ class SequentialEstimand:
     comparator_treatment: int = 0
 
     def __post_init__(self) -> None:
-        """Validate the declared columns, regimes, and assumptions.
+        """Validates the declared columns, regimes, and assumptions.
 
         Raises:
             ValueError: If the name or population is empty, any column name
@@ -118,7 +118,7 @@ class SequentialEstimand:
             raise ValueError("target and comparator treatments must differ")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-compatible estimand metadata.
+        """Returns JSON-compatible estimand metadata.
 
         Returns:
             The estimand fields keyed by field name.
@@ -165,7 +165,7 @@ class SequentialEstimationPolicy:
     reference_tolerance: float = 1e-6
 
     def __post_init__(self) -> None:
-        """Reject an unbounded or ambiguous estimation policy.
+        """Rejects an unbounded or ambiguous estimation policy.
 
         Raises:
             ValueError: If a field lies outside the range given in the class
@@ -213,7 +213,7 @@ class SequentialEstimationPolicy:
             raise ValueError("minimum_effective_sample_size must be positive")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-compatible policy metadata.
+        """Returns JSON-compatible policy metadata.
 
         Returns:
             The policy fields keyed by field name.
@@ -256,7 +256,7 @@ class SequentialPeriodDiagnostics:
     effective_sample_size: float
 
     def __post_init__(self) -> None:
-        """Validate finite, reconcilable period diagnostics.
+        """Validates finite, reconcilable period diagnostics.
 
         Raises:
             ValueError: If the period label is empty, a row count is not
@@ -301,7 +301,7 @@ class SequentialPeriodDiagnostics:
             raise ValueError("effective_sample_size must be positive")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-compatible period diagnostics.
+        """Returns JSON-compatible period diagnostics.
 
         Returns:
             The diagnostic fields keyed by field name.
@@ -334,7 +334,7 @@ class SequentialRegimeEstimate:
     effective_sample_size: float
 
     def __post_init__(self) -> None:
-        """Validate finite regime-level evidence.
+        """Validates finite regime-level evidence.
 
         Raises:
             ValueError: If the regime name is empty, the treatment is not 0
@@ -364,7 +364,7 @@ class SequentialRegimeEstimate:
             )
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-compatible regime evidence.
+        """Returns JSON-compatible regime evidence.
 
         Returns:
             The regime fields keyed by field name.
@@ -423,7 +423,7 @@ class SequentialEstimationResult:
     raw_input_fingerprint: str
 
     def __post_init__(self) -> None:
-        """Validate report shape and accounting before serialization.
+        """Validates report shape and accounting before serialization.
 
         Raises:
             ValueError: If there are fewer than two periods, there are not
@@ -503,7 +503,7 @@ class SequentialEstimationResult:
             )
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a JSON-compatible sequential report.
+        """Returns a JSON-compatible sequential report.
 
         Returns:
             All report fields keyed by field name, with nested objects
@@ -531,7 +531,7 @@ class SequentialEstimationResult:
         }
 
     def digest(self) -> str:
-        """Return the digest of canonical report content.
+        """Returns the digest of canonical report content.
 
         Returns:
             The hexadecimal SHA-256 digest of the report serialized as
@@ -591,7 +591,7 @@ class SequentialEstimationResult:
 
     @classmethod
     def read(cls, path: str | Path) -> "SequentialEstimationResult":
-        """Read and verify an atomic report envelope.
+        """Reads and verifies an atomic report envelope.
 
         Args:
             path: File previously written by `write`.
@@ -705,7 +705,7 @@ class SequentialIPWEstimator:
         estimand: SequentialEstimand,
         policy: SequentialEstimationPolicy | None = None,
     ) -> None:
-        """Store a validated estimand and bounded policy.
+        """Stores a validated estimand and bounded policy.
 
         Args:
             estimand: The contrast to estimate.
@@ -726,7 +726,7 @@ class SequentialIPWEstimator:
         self.policy = policy or SequentialEstimationPolicy()
 
     def fit(self, frame: pd.DataFrame) -> SequentialEstimationResult:
-        """Fit sequential stabilized weights and a sustained regime contrast.
+        """Fits sequential stabilized weights and a sustained regime contrast.
 
         Args:
             frame: Balanced long-format panel with one row per subject and
@@ -956,7 +956,7 @@ def prepare_sequential_frame(
     estimand: SequentialEstimand,
     policy: SequentialEstimationPolicy,
 ) -> tuple[pd.DataFrame, int, int, int]:
-    """Validate and prepare a balanced numeric long-format panel.
+    """Validates and prepares a balanced numeric long-format panel.
 
     Args:
         frame: Long-format panel to check.
@@ -1059,7 +1059,7 @@ def prepare_sequential_frame(
 def validate_time_order(
     frame: pd.DataFrame, estimand: SequentialEstimand
 ) -> None:
-    """Reject repeated consecutive time values within a subject.
+    """Rejects repeated consecutive time values within a subject.
 
     Args:
         frame: Long-format panel.
@@ -1090,7 +1090,7 @@ def validate_time_order(
 
 
 def ordered_periods(frame: pd.DataFrame, time_column: str) -> list[Any]:
-    """Return stable sorted period values.
+    """Returns stable sorted period values.
 
     Args:
         frame: Long-format panel.
@@ -1109,7 +1109,7 @@ def ordered_periods(frame: pd.DataFrame, time_column: str) -> list[Any]:
 
 
 def ordered_subjects(frame: pd.DataFrame, subject_column: str) -> list[Any]:
-    """Return subject identities in a deterministic, type-aware order.
+    """Returns subject identities in a deterministic, type-aware order.
 
     Args:
         frame: Long-format panel.
@@ -1126,7 +1126,7 @@ def ordered_subjects(frame: pd.DataFrame, subject_column: str) -> list[Any]:
 def validate_baseline_covariates(
     frame: pd.DataFrame, estimand: SequentialEstimand
 ) -> None:
-    """Ensure declared baseline covariates are stable within subjects.
+    """Ensures declared baseline covariates are stable within subjects.
 
     Args:
         frame: Long-format panel.
@@ -1150,7 +1150,7 @@ def build_matrices(
     period_values: Sequence[Any],
     subject_values: Sequence[Any],
 ) -> dict[str, np.ndarray]:
-    """Build deterministic subject-by-period arrays from the long frame.
+    """Builds deterministic subject-by-period arrays from the long frame.
 
     Args:
         frame: Prepared long-format panel.
@@ -1211,7 +1211,7 @@ def fit_propensity(
     treatment: np.ndarray,
     policy: SequentialEstimationPolicy,
 ) -> tuple[np.ndarray, int]:
-    """Fit a deterministic ridge-logistic propensity by bounded Newton steps.
+    """Fits a deterministic ridge-logistic propensity by bounded Newton steps.
 
     Args:
         covariates: Two-dimensional matrix, subjects by features, without an
@@ -1259,7 +1259,7 @@ def fit_propensity(
 def check_propensity_support(
     propensity: np.ndarray, period: Any, minimum: float
 ) -> None:
-    """Reject fitted propensities outside the declared positivity support.
+    """Rejects fitted propensities outside the declared positivity support.
 
     Args:
         propensity: Fitted probabilities for one period.
@@ -1281,7 +1281,7 @@ def check_propensity_support(
 
 
 def effective_sample_size(weights: np.ndarray) -> float:
-    """Return the Kish effective sample size for positive weights.
+    """Returns the Kish effective sample size for positive weights.
 
     Args:
         weights: Non-negative weights.
@@ -1306,7 +1306,7 @@ def build_regime_estimate(
     policy: SequentialEstimationPolicy,
     critical_value: float,
 ) -> SequentialRegimeEstimate:
-    """Build a normalized weighted regime mean and influence standard error.
+    """Builds a normalized weighted regime mean and influence standard error.
 
     Args:
         regime: Name of the regime.
@@ -1367,7 +1367,7 @@ def regime_covariance(
     target: SequentialRegimeEstimate,
     comparator: SequentialRegimeEstimate,
 ) -> np.ndarray:
-    """Estimate subject-level covariance of two normalized regime means.
+    """Estimates subject-level covariance of two normalized regime means.
 
     Args:
         target_mask: Boolean flag per subject for following the target
@@ -1475,7 +1475,7 @@ def independent_reference(
 
 
 def period_label(value: Any) -> str:
-    """Convert a period value into a stable report label.
+    """Converts a period value into a stable report label.
 
     Args:
         value: A period value from the time column.
@@ -1492,7 +1492,7 @@ def period_label(value: Any) -> str:
 
 
 def fingerprint_frame(frame: pd.DataFrame) -> str:
-    """Return a deterministic SHA-256 digest of the supplied frame.
+    """Returns a deterministic SHA-256 digest of the supplied frame.
 
     Args:
         frame: Frame to fingerprint.

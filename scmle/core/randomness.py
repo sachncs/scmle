@@ -61,7 +61,7 @@ def name_words(component: str) -> tuple[int, ...]:
 def component_seed_sequence(
     run_seed: int, component: str, index: int = 0
 ) -> np.random.SeedSequence:
-    """Seed sequence for one component of one run.
+    """Seeds sequence for one component of one run.
 
     Args:
         run_seed: The run's seed.

@@ -132,7 +132,7 @@ class ModelFamilyDeclaration:
     limitations: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
-        """Validate and canonicalize a family declaration.
+        """Validates and canonicalizes a family declaration.
 
         Raises:
             TypeError: If the family name is not a string, or the status,
@@ -177,7 +177,7 @@ class ModelFamilyDeclaration:
             object.__setattr__(self, name, tuple(sorted(set(values))))
 
     def to_dict(self) -> dict[str, object]:
-        """Return a stable JSON-compatible family declaration."""
+        """Returns a stable JSON-compatible family declaration."""
         return {
             "model_family": self.model_family,
             "status": self.status.value,
@@ -190,7 +190,7 @@ class ModelFamilyDeclaration:
         }
 
     def supports_modality(self, modality: Modality) -> bool:
-        """Return whether this family declares the requested modality.
+        """Returns whether this family declares the requested modality.
 
         Args:
             modality: The modality to check.
@@ -224,7 +224,7 @@ class CapabilityEnvironment:
     network_available: bool | None = None
 
     def __post_init__(self) -> None:
-        """Validate runtime observations before they are used for gating.
+        """Validates runtime observations before they are used for gating.
 
         Raises:
             ValueError: If an available extra is blank, the CPU count is below
@@ -260,7 +260,7 @@ class CapabilityDiagnostic:
     observed: object | None = None
 
     def to_dict(self) -> dict[str, object]:
-        """Return a stable JSON-compatible diagnostic."""
+        """Returns a stable JSON-compatible diagnostic."""
         return {
             "code": self.code,
             "message": self.message,
@@ -294,7 +294,7 @@ class CapabilityKey:
     inference: Inference
 
     def __post_init__(self) -> None:
-        """Reject non-canonical dimension values at the contract boundary.
+        """Rejects non-canonical dimension values at the contract boundary.
 
         Raises:
             TypeError: If a dimension has the wrong enumeration type or the
@@ -325,7 +325,7 @@ class CapabilityKey:
             )
 
     def to_dict(self) -> dict[str, str]:
-        """Return a stable, JSON-compatible representation of the key."""
+        """Returns a stable, JSON-compatible representation of the key."""
         return {
             "modality": self.modality.value,
             "task": self.task.value,
@@ -361,7 +361,7 @@ class ResourceAssumptions:
     notes: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
-        """Validate resource assumptions before they enter the registry.
+        """Validates resource assumptions before they enter the registry.
 
         Raises:
             TypeError: If the CPU count is not an integer.
@@ -386,7 +386,7 @@ class ResourceAssumptions:
         object.__setattr__(self, "notes", tuple(sorted(set(self.notes))))
 
     def to_dict(self) -> dict[str, object]:
-        """Return a stable, JSON-compatible representation."""
+        """Returns a stable, JSON-compatible representation."""
         return {
             "cpu_cores": self.cpu_cores,
             "memory_gb": self.memory_gb,
@@ -460,7 +460,7 @@ class Capability:
             )
 
     def to_dict(self) -> dict[str, object]:
-        """Return a stable, JSON-compatible capability declaration."""
+        """Returns a stable, JSON-compatible capability declaration."""
         return {
             "key": self.key.to_dict(),
             "status": self.status.value,
@@ -622,7 +622,7 @@ class CapabilityRegistry:
         capabilities: Iterable[Capability] = (),
         model_families: Iterable[ModelFamilyDeclaration] = (),
     ) -> None:
-        """Create a registry from complete capability declarations.
+        """Creates a registry from complete capability declarations.
 
         Args:
             capabilities: The capabilities to register.
@@ -641,7 +641,7 @@ class CapabilityRegistry:
         cls,
         capabilities: Iterable[Capability] = (),
     ) -> "CapabilityRegistry":
-        """Create a registry with the explicit transformer/JEPA catalog.
+        """Creates a registry with the explicit transformer/JEPA catalog.
 
         The catalog is metadata, not support promotion. Callers still need a
         complete capability declaration for every task and contract dimension
@@ -656,7 +656,7 @@ class CapabilityRegistry:
         return cls(capabilities, DEFAULT_MODEL_FAMILY_DECLARATIONS)
 
     def register(self, capability: Capability) -> None:
-        """Register a capability without silently replacing an existing one.
+        """Registers a capability without silently replacing an existing one.
 
         Args:
             capability: Complete capability declaration.
@@ -677,7 +677,7 @@ class CapabilityRegistry:
         self,
         declaration: ModelFamilyDeclaration,
     ) -> None:
-        """Register a model-family status without replacing another one.
+        """Registers a model-family status without replacing another one.
 
         Args:
             declaration: The family declaration.
@@ -695,7 +695,7 @@ class CapabilityRegistry:
         self.model_families[declaration.model_family] = declaration
 
     def find(self, key: CapabilityKey) -> Capability | None:
-        """Return a declaration or ``None`` when the key is unregistered.
+        """Returns a declaration or ``None`` when the key is unregistered.
 
         Args:
             key: The capability request.
@@ -709,7 +709,7 @@ class CapabilityRegistry:
         self,
         model_family: str,
     ) -> ModelFamilyDeclaration | None:
-        """Return family metadata or ``None`` when it is not catalogued.
+        """Returns family metadata or ``None`` when it is not catalogued.
 
         Args:
             model_family: The family name.
@@ -747,7 +747,7 @@ class CapabilityRegistry:
         environment: CapabilityEnvironment | None = None,
         row_count: int | None = None,
     ) -> tuple[CapabilityDiagnostic, ...]:
-        """Return every pre-training rejection for a capability request.
+        """Returns every pre-training rejection for a capability request.
 
         Diagnostics are collected rather than short-circuited so a caller can
         fix one configuration or environment and see the remaining blockers
@@ -857,7 +857,7 @@ class CapabilityRegistry:
         environment: CapabilityEnvironment | None,
         row_count: int | None = None,
     ) -> tuple[CapabilityDiagnostic, ...]:
-        """Check extras and resource assumptions without starting work.
+        """Checks extras and resource assumptions without starting work.
 
         Args:
             capability: The declared capability.
@@ -929,7 +929,7 @@ class CapabilityRegistry:
         capability: Capability,
         environment: CapabilityEnvironment,
     ) -> tuple[CapabilityDiagnostic, ...]:
-        """Check CPU, memory, disk, GPU, and network assumptions.
+        """Checks CPU, memory, disk, GPU, and network assumptions.
 
         Args:
             capability: The declared capability.
@@ -1049,7 +1049,7 @@ class CapabilityRegistry:
         return capability
 
     def list_capabilities(self) -> tuple[Capability, ...]:
-        """Return declarations in deterministic key order."""
+        """Returns declarations in deterministic key order."""
         return tuple(
             self.records[key]
             for key in sorted(
@@ -1059,13 +1059,13 @@ class CapabilityRegistry:
         )
 
     def list_model_families(self) -> tuple[ModelFamilyDeclaration, ...]:
-        """Return model-family declarations in deterministic order."""
+        """Returns model-family declarations in deterministic order."""
         return tuple(
             self.model_families[name] for name in sorted(self.model_families)
         )
 
     def to_dict(self) -> dict[str, object]:
-        """Return a deterministic JSON-compatible registry record."""
+        """Returns a deterministic JSON-compatible registry record."""
         return {
             "schema_version": CAPABILITY_SCHEMA_VERSION,
             "model_families": [
@@ -1078,7 +1078,7 @@ class CapabilityRegistry:
         }
 
     def canonical_json(self) -> str:
-        """Return stable JSON suitable for hashing and release evidence."""
+        """Returns stable JSON suitable for hashing and release evidence."""
         return json.dumps(
             self.to_dict(),
             allow_nan=False,
@@ -1088,7 +1088,7 @@ class CapabilityRegistry:
         )
 
     def to_json(self) -> str:
-        """Return the canonical serialized registry."""
+        """Returns the canonical serialized registry."""
         return self.canonical_json()
 
     def raise_unsupported(
@@ -1097,7 +1097,7 @@ class CapabilityRegistry:
         reason: str,
         diagnostics: Iterable[CapabilityDiagnostic] = (),
     ) -> NoReturn:
-        """Raise a structured pre-training rejection for ``key``.
+        """Raises a structured pre-training rejection for ``key``.
 
         Args:
             key: The capability request that was refused.

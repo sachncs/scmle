@@ -41,7 +41,7 @@ Edge = tuple[str, str]
 
 
 def children_map(edges: Iterable[Edge]) -> dict[str, set[str]]:
-    """Map each node to the set of its children.
+    """Maps each node to the set of its children.
 
     Args:
         edges: Directed edges (parent, child).
@@ -57,7 +57,7 @@ def children_map(edges: Iterable[Edge]) -> dict[str, set[str]]:
 
 
 def parents_map(edges: Iterable[Edge]) -> dict[str, set[str]]:
-    """Map each node to the set of its parents.
+    """Maps each node to the set of its parents.
 
     Args:
         edges: Directed edges (parent, child).
@@ -73,7 +73,7 @@ def parents_map(edges: Iterable[Edge]) -> dict[str, set[str]]:
 
 
 def reach(start: Collection[str], step: Mapping[str, set[str]]) -> set[str]:
-    """Find the nodes reachable by following a step relation.
+    """Finds the nodes reachable by following a step relation.
 
     Args:
         start: Nodes to start from.
@@ -95,7 +95,7 @@ def reach(start: Collection[str], step: Mapping[str, set[str]]) -> set[str]:
 
 
 def has_cycle(nodes: Collection[str], edges: Iterable[Edge]) -> bool:
-    """Test whether a directed graph contains a cycle.
+    """Tests whether a directed graph contains a cycle.
 
     Args:
         nodes: All nodes.
@@ -184,7 +184,7 @@ class Dag:
     prompt: str
 
     def __post_init__(self) -> None:
-        """Validate the graph.
+        """Validates the graph.
 
         Raises:
             ValueError: If `nodes`, `latent` or `edges` is not a sorted,
@@ -224,7 +224,7 @@ class Dag:
         latent: Iterable[str] = (),
         extra_nodes: Iterable[str] = (),
     ) -> Self:
-        """Build a graph, sorting and de-duplicating its parts.
+        """Builds a graph, sorting and de-duplicating its parts.
 
         Args:
             edges: Directed edges (parent, child).
@@ -259,7 +259,7 @@ class Dag:
         return tuple(n for n in self.nodes if n not in self.latent)
 
     def parents(self, node: str) -> set[str]:
-        """Find the direct causes of a node.
+        """Finds the direct causes of a node.
 
         Args:
             node: The node.
@@ -270,7 +270,7 @@ class Dag:
         return parents_map(self.edges).get(node, set())
 
     def children(self, node: str) -> set[str]:
-        """Find the direct effects of a node.
+        """Finds the direct effects of a node.
 
         Args:
             node: The node.
@@ -281,7 +281,7 @@ class Dag:
         return children_map(self.edges).get(node, set())
 
     def ancestors(self, node: str) -> set[str]:
-        """Find the nodes with a directed path to a node.
+        """Finds the nodes with a directed path to a node.
 
         Args:
             node: The node.
@@ -292,7 +292,7 @@ class Dag:
         return reach([node], parents_map(self.edges))
 
     def descendants(self, node: str) -> set[str]:
-        """Find the nodes reachable from a node by a directed path.
+        """Finds the nodes reachable from a node by a directed path.
 
         Args:
             node: The node.
@@ -308,7 +308,7 @@ class Dag:
         ys: Collection[str],
         zs: Collection[str] = (),
     ) -> bool:
-        """Test whether `zs` d-separates `xs` and `ys`.
+        """Tests whether `zs` d-separates `xs` and `ys`.
 
         Args:
             xs: First set of nodes.
@@ -409,7 +409,7 @@ class Dag:
         return None
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert the graph to a JSON-ready record, without the hash.
+        """Converts the graph to a JSON-ready record, without the hash.
 
         Returns:
             A dict with the format version, status, nodes, edges (as
@@ -426,7 +426,7 @@ class Dag:
         }
 
     def digest(self) -> str:
-        """Hash the graph; any edit changes the hash.
+        """Hashes the graph; any edit changes the hash.
 
         Returns:
             The hex SHA-256 of the record's JSON with sorted keys and no
@@ -436,7 +436,7 @@ class Dag:
         return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
     def artifact(self) -> dict[str, Any]:
-        """Build the `dag.json` document.
+        """Builds the `dag.json` document.
 
         Returns:
             The record from `to_dict` plus its `hash`.

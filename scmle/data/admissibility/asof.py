@@ -38,7 +38,7 @@ class RowStatus(enum.StrEnum):
 
 
 def to_seconds(values: pd.Series) -> np.ndarray:
-    """Convert times to float seconds; datetimes count from the Unix epoch.
+    """Converts times to float seconds; datetimes count from the Unix epoch.
 
     Args:
         values: A datetime series (timezone is dropped) or a numeric,
@@ -126,7 +126,7 @@ def point_in_time(
 
 
 def agrees(stored: pd.Series, reconstructed: pd.Series) -> pd.Series:
-    """Compare two series element-wise, treating two missing values as equal.
+    """Compares two series element-wise, treating two missing values as equal.
 
     Args:
         stored: The stored values.

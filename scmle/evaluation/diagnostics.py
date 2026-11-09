@@ -342,7 +342,7 @@ class ErrorAnalysis(Diagnostic):
     applies_to = CLASSIFICATION | REGRESSION_ONLY
 
     def compute(self, inputs: DiagnosticInput) -> dict[str, Any]:
-        """Return bounded row-level error evidence and its limitations.
+        """Returns bounded row-level error evidence and its limitations.
 
         Args:
             inputs: The fitted candidate and evaluation data.

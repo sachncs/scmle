@@ -47,7 +47,7 @@ class SyntheticGenerator(abc.ABC):
 
     @abc.abstractmethod
     def sample(self, rows: int, rng: np.random.Generator) -> pd.DataFrame:
-        """Draw synthetic rows with the training columns.
+        """Draws synthetic rows with the training columns.
 
         Args:
             rows: Number of rows to draw.
@@ -74,7 +74,7 @@ class GaussianCopulaGenerator(SyntheticGenerator):
     name = "gaussian_copula"
 
     def fit(self, features: pd.DataFrame) -> Self:
-        """Estimate the marginals and the normal-score correlation.
+        """Estimates the marginals and the normal-score correlation.
 
         Args:
             features: The real rows. Numeric non-boolean columns are modeled
@@ -106,7 +106,7 @@ class GaussianCopulaGenerator(SyntheticGenerator):
         return self
 
     def estimate_correlation(self, features: pd.DataFrame) -> np.ndarray:
-        """Estimate the correlation of the numeric columns' normal scores.
+        """Estimates the correlation of the numeric columns' normal scores.
 
         Args:
             features: The real rows.
@@ -136,7 +136,7 @@ class GaussianCopulaGenerator(SyntheticGenerator):
         return repaired / np.outer(scale, scale)
 
     def sample(self, rows: int, rng: np.random.Generator) -> pd.DataFrame:
-        """Draw synthetic rows through the copula.
+        """Draws synthetic rows through the copula.
 
         Args:
             rows: Number of rows to draw.
@@ -193,7 +193,7 @@ class GeneratorOverSampler(resampling.Resampler):
     def resample(
         self, features: pd.DataFrame, target: pd.Series, seed: int
     ) -> tuple[pd.DataFrame, pd.Series]:
-        """Add synthetic rows until every class matches the largest.
+        """Adds synthetic rows until every class matches the largest.
 
         Classes with fewer than `MIN_FIT_ROWS` rows are left as they are.
 
@@ -262,7 +262,7 @@ class FidelityEvaluator:
     def evaluate(
         self, real: pd.DataFrame, synthetic: pd.DataFrame
     ) -> FidelityReport:
-        """Compare marginals, dependence structure and verbatim copying.
+        """Compares marginals, dependence structure and verbatim copying.
 
         Args:
             real: Real rows.

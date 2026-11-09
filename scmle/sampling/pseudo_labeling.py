@@ -38,7 +38,7 @@ class SelfTrainingOutcome:
     accepted: bool
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert the outcome to a JSON-ready record.
+        """Converts the outcome to a JSON-ready record.
 
         Returns:
             A dictionary with one entry per attribute.
@@ -49,7 +49,7 @@ class SelfTrainingOutcome:
 def confident_rows(
     fitted: Any, unlabeled: pd.DataFrame, confidence: float
 ) -> tuple[pd.DataFrame, pd.Series]:
-    """Select the unlabeled rows the classifier labels confidently.
+    """Selects the unlabeled rows the classifier labels confidently.
 
     Args:
         fitted: Fitted classifier with `predict_proba` and `classes_`.
@@ -111,7 +111,7 @@ def judge(
     confidence: float = DEFAULT_CONFIDENCE,
     should_stop: Callable[[], bool] = lambda: False,
 ) -> SelfTrainingOutcome | None:
-    """Compare plain and self-trained fits on held-out labeled rows.
+    """Compares plain and self-trained fits on held-out labeled rows.
 
     Args:
         template: Unfitted classifier, cloned for every fit.

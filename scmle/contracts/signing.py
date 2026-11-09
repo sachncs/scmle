@@ -37,7 +37,7 @@ def key_from_environment(environ: Mapping[str, str]) -> str | None:
 
 
 def resolve_key(signing_key: str | bytes | None) -> bytes | None:
-    """Return the explicit signing key or the configured environment key.
+    """Returns the explicit signing key or the configured environment key.
 
     Args:
         signing_key: The explicit key, or None to use the configured one.
@@ -56,7 +56,7 @@ def resolve_key(signing_key: str | bytes | None) -> bytes | None:
 
 
 def canonical_payload(payload: Mapping[str, Any]) -> bytes:
-    """Return the canonical JSON bytes covered by a signature.
+    """Returns the canonical JSON bytes covered by a signature.
 
     Args:
         payload: The payload to sign.
@@ -73,7 +73,7 @@ def canonical_payload(payload: Mapping[str, Any]) -> bytes:
 
 
 def sign_payload(payload: Mapping[str, Any], key: str | bytes) -> str:
-    """Return an HMAC signature for a canonical contract payload.
+    """Returns an HMAC signature for a canonical contract payload.
 
     Args:
         payload: The payload to sign.

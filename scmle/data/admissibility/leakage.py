@@ -128,7 +128,7 @@ class LeakageConfig:
     run_seed: int = 0
 
     def __post_init__(self) -> None:
-        """Validate the settings.
+        """Validates the settings.
 
         Raises:
             ValueError: If a ceiling is outside (0, 1], `alpha` or
@@ -161,7 +161,7 @@ class LeakageConfig:
 
 
 def design(series: pd.Series) -> np.ndarray:
-    """Build the numeric design of one feature, keeping missing values as NaN.
+    """Builds the numeric design of one feature, keeping missing values as NaN.
 
     A numeric feature is one column (trees send NaN down a learned branch).
     Anything else is one-hot encoded, with a level for missing values; levels
@@ -186,7 +186,7 @@ def design(series: pd.Series) -> np.ndarray:
 
 
 def encode_target(y: pd.Series, task: str) -> np.ndarray:
-    """Encode the target as class codes or floats.
+    """Encodes the target as class codes or floats.
 
     Args:
         y: The target.
@@ -217,7 +217,7 @@ def permute_within(
     groups: np.ndarray | None,
     block_size: int | None,
 ) -> np.ndarray:
-    """Draw a row permutation, global, within groups, or within time blocks.
+    """Draws a row permutation, global, within groups, or within time blocks.
 
     Args:
         values: The values to be permuted; only their count is used.
@@ -254,7 +254,7 @@ def make_splits(
     block_size: int | None,
     seed: int,
 ) -> Splits:
-    """Make cross-fitting folds: by group, contiguous in time, or stratified.
+    """Makes cross-fitting folds: by group, contiguous in time, or stratified.
 
     Args:
         y: The encoded target.
@@ -294,7 +294,7 @@ def out_of_fold(
     cfg: LeakageConfig,
     seed: int,
 ) -> np.ndarray:
-    """Predict every row from a small tree fitted on the other folds.
+    """Predicts every row from a small tree fitted on the other folds.
 
     Args:
         x: Feature design, one row per entry of `y`.
@@ -332,7 +332,7 @@ def out_of_fold(
 
 
 def binary_auc(truth: np.ndarray, score: np.ndarray) -> float:
-    """Compute the ROC AUC by the rank-sum formula, with ties averaged.
+    """Computes the ROC AUC by the rank-sum formula, with ties averaged.
 
     Args:
         truth: Labels, 1 for the positive class and 0 otherwise.
@@ -397,7 +397,7 @@ def cross_fit_skill(
     block_size: int | None,
     seed: int,
 ) -> tuple[float, np.ndarray]:
-    """Compute the out-of-fold skill of a feature.
+    """Computes the out-of-fold skill of a feature.
 
     Args:
         x: Feature design.
@@ -424,7 +424,7 @@ def bootstrap_skill(
     members: list[np.ndarray] | None,
     rng: np.random.Generator,
 ) -> float | None:
-    """Compute the skill on one bootstrap resample.
+    """Computes the skill on one bootstrap resample.
 
     Args:
         pred: Output of `out_of_fold`.
@@ -491,7 +491,7 @@ def lower_bound(
 
 
 def permutation_p(observed: float, null: Sequence[float]) -> float:
-    """Compute `(1 + #{null >= observed}) / (B + 1)` (Phipson and Smyth, 2010).
+    """Computes `(1 + #{null >= observed}) / (B + 1)` (Phipson and Smyth, 2010).
 
     Args:
         observed: The observed statistic.
@@ -505,7 +505,7 @@ def permutation_p(observed: float, null: Sequence[float]) -> float:
 
 
 def enough_rows(y: np.ndarray, task: str, cfg: LeakageConfig) -> bool:
-    """Decide whether there are enough rows for the tests to have any power.
+    """Decides whether there are enough rows for the tests to have any power.
 
     Args:
         y: The encoded target.
@@ -584,7 +584,7 @@ def skill_test(
     gate: certificates.GateStatus = certificates.GateStatus.DESCRIPTIVE,
     set_id: qualification.SetId = qualification.SetId.EXPLORATION,
 ) -> SkillTest:
-    """Test whether one feature predicts the target beyond chance.
+    """Tests whether one feature predicts the target beyond chance.
 
     Args:
         feature: The feature, aligned to `target`.
@@ -715,7 +715,7 @@ def strata_labels(
 def within_strata(
     n: int, members: list[np.ndarray], rng: np.random.Generator
 ) -> np.ndarray:
-    """Draw a row order that permutes rows within each stratum.
+    """Draws a row order that permutes rows within each stratum.
 
     Args:
         n: Number of rows.
@@ -765,7 +765,7 @@ def conditional_test(
     block_size: int | None = None,
     set_id: qualification.SetId = qualification.SetId.EXPLORATION,
 ) -> ConditionalTest:
-    """Test whether the feature keeps predictive value given the others.
+    """Tests whether the feature keeps predictive value given the others.
 
     Args:
         feature: The feature under test.
@@ -836,7 +836,7 @@ def conditional_test(
 
 
 def cramers_v(table: np.ndarray) -> float:
-    """Compute Cramer's V of a contingency table (no bias correction).
+    """Computes Cramer's V of a contingency table (no bias correction).
 
     Args:
         table: Counts, rows by columns.
@@ -902,7 +902,7 @@ def missingness_test(
     gate: certificates.GateStatus = certificates.GateStatus.DESCRIPTIVE,
     set_id: qualification.SetId = qualification.SetId.EXPLORATION,
 ) -> MissingnessTest | None:
-    """Test whether recording a value depends on the outcome.
+    """Tests whether recording a value depends on the outcome.
 
     Args:
         feature: The feature.
@@ -1005,7 +1005,7 @@ def assess_feature(
     gate: certificates.GateStatus = certificates.GateStatus.DESCRIPTIVE,
     set_id: qualification.SetId = qualification.SetId.EXPLORATION,
 ) -> FeatureAssessment:
-    """Run the skill, missingness and (for suspects) conditional tests.
+    """Runs the skill, missingness and (for suspects) conditional tests.
 
     Args:
         feature: The feature.
@@ -1064,7 +1064,7 @@ class LeakageReport:
         return tuple(c for a in self.assessments for c in a.checks)
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert the report to a JSON-ready document.
+        """Converts the report to a JSON-ready document.
 
         A suspicion is not a finding, and the document says so.
 
@@ -1115,7 +1115,7 @@ def scan(
     gate: certificates.GateStatus = certificates.GateStatus.DESCRIPTIVE,
     set_id: qualification.SetId = qualification.SetId.EXPLORATION,
 ) -> LeakageReport:
-    """Test every feature of the exploration set for leakage suspicion.
+    """Tests every feature of the exploration set for leakage suspicion.
 
     Args:
         frame: Exploration-set data including the target.
@@ -1168,7 +1168,7 @@ def gate_status(
     task: str = "classification",
     n_classes: int = 2,
 ) -> certificates.GateStatus:
-    """Decide whether the skill test may quarantine, from the certificates.
+    """Decides whether the skill test may quarantine, from the certificates.
 
     Gating needs a current certificate whose every required leak type
     passed, and settings equal to the certified ones (`CERTIFIED`, any run
@@ -1198,7 +1198,7 @@ def gate_status(
 
 
 def code_digest() -> str:
-    """Hash this module's source, the key of its certificate.
+    """Hashes this module's source, the key of its certificate.
 
     Returns:
         The code hash of this module, as computed by

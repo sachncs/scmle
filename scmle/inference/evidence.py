@@ -35,7 +35,7 @@ class InferenceEvidenceLink:
     graph_digest: str
 
     def __post_init__(self) -> None:
-        """Validate the identity fields and the timestamp.
+        """Validates the identity fields and the timestamp.
 
         Raises:
             ValueError: If a field is not a non-blank string, the timestamp
@@ -59,7 +59,7 @@ class InferenceEvidenceLink:
             raise ValueError("timestamp must include a timezone")
 
     def to_dict(self) -> dict[str, str]:
-        """Convert the link to a JSON-native record.
+        """Converts the link to a JSON-native record.
 
         Returns:
             A dictionary with one string entry per field.
@@ -164,7 +164,7 @@ class InferenceEvidenceLinker:
 
     @staticmethod
     def load(path: str | pathlib.Path) -> lineage.EvidenceGraph:
-        """Load and validate a persisted evidence graph.
+        """Loads and validates a persisted evidence graph.
 
         Args:
             path: Path of the evidence graph JSON file.

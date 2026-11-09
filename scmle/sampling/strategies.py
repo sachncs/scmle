@@ -81,7 +81,7 @@ class DataStrategy(abc.ABC):
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
-        """Build the complete, unfitted candidate.
+        """Builds the complete, unfitted candidate.
 
         Args:
             plan: Feature columns by kind.
@@ -127,7 +127,7 @@ class DefaultStrategy(DataStrategy):
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
-        """Build the standard pipeline.
+        """Builds the standard pipeline.
 
         Args:
             plan: Feature columns by kind.
@@ -212,7 +212,7 @@ class ClassWeightStrategy(ImbalanceStrategy):
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
-        """Build the standard pipeline with `class_weight='balanced'`.
+        """Builds the standard pipeline with `class_weight='balanced'`.
 
         Args:
             plan: Feature columns by kind.
@@ -245,7 +245,7 @@ class ResamplingStrategy(ImbalanceStrategy):
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
-        """Wrap the standard pipeline so it trains on rebalanced data.
+        """Wraps the standard pipeline so it trains on rebalanced data.
 
         Args:
             plan: Feature columns by kind.
@@ -320,7 +320,7 @@ class CalibrationStrategy(DataStrategy):
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
-        """Wrap the standard pipeline in a cross-fitted calibrator.
+        """Wraps the standard pipeline in a cross-fitted calibrator.
 
         Args:
             plan: Feature columns by kind.
@@ -409,7 +409,7 @@ class SmoteStrategy(ImbalanceStrategy):
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
-        """Build preprocess -> resample -> model with the SMOTE variant.
+        """Builds preprocess -> resample -> model with the SMOTE variant.
 
         Args:
             plan: Feature columns by kind.
@@ -482,7 +482,7 @@ class FeatureStrategy(DataStrategy):
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
-        """Build the pipeline with the strategy's numeric steps.
+        """Builds the pipeline with the strategy's numeric steps.
 
         Args:
             plan: Feature columns by kind.
@@ -600,7 +600,7 @@ class RareTargetStrategy(DataStrategy):
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
-        """Wrap the standard pipeline in the density-weighted regressor.
+        """Wraps the standard pipeline in the density-weighted regressor.
 
         Args:
             plan: Feature columns by kind.
@@ -658,7 +658,7 @@ class TargetEncodingStrategy(DataStrategy):
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
-        """Build the pipeline with target-encoded high-cardinality columns.
+        """Builds the pipeline with target-encoded high-cardinality columns.
 
         Args:
             plan: Feature columns by kind.
@@ -929,7 +929,7 @@ class TargetTransformStrategy(DataStrategy):
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
-        """Wrap the standard pipeline so the target is transformed.
+        """Wraps the standard pipeline so the target is transformed.
 
         Args:
             plan: Feature columns by kind.

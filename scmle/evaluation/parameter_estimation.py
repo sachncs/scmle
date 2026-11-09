@@ -117,7 +117,7 @@ class EstimandSpec:
     description: str = ""
 
     def __post_init__(self) -> None:
-        """Reject ambiguous or incomplete scientific declarations.
+        """Rejects ambiguous or incomplete scientific declarations.
 
         Raises:
             ValueError: If name, outcome, population or likelihood is blank,
@@ -140,7 +140,7 @@ class EstimandSpec:
             raise ValueError("estimand needs explicit assumptions")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-compatible scientific metadata."""
+        """Returns JSON-compatible scientific metadata."""
         return dataclasses.asdict(self)
 
 
@@ -167,7 +167,7 @@ class BayesianPrior:
     scale: float = 1.0
 
     def __post_init__(self) -> None:
-        """Reject a prior that cannot define a proper posterior.
+        """Rejects a prior that cannot define a proper posterior.
 
         Raises:
             ValueError: If the mean is empty, not one-dimensional or not
@@ -203,7 +203,7 @@ class BayesianPrior:
             raise ValueError("Bayesian prior scale must be positive")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-compatible prior metadata."""
+        """Returns JSON-compatible prior metadata."""
         return dataclasses.asdict(self)
 
 
@@ -276,7 +276,7 @@ class EstimationPolicy:
     random_slope_position: int | None = None
 
     def __post_init__(self) -> None:
-        """Validate the policy before data is touched.
+        """Validates the policy before data is touched.
 
         Raises:
             ValueError: If a field is outside its range, or if a field is
@@ -536,7 +536,7 @@ class EstimationPolicy:
                 )
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-compatible policy metadata."""
+        """Returns JSON-compatible policy metadata."""
         values = dataclasses.asdict(self)
         if self.prior is None:
             values.pop("prior")
@@ -586,7 +586,7 @@ class ParameterEstimate:
     p_value: float
 
     def __post_init__(self) -> None:
-        """Reject coefficient evidence that cannot be interpreted safely.
+        """Rejects coefficient evidence that cannot be interpreted safely.
 
         Raises:
             ValueError: If the name is blank, any number is not finite, the
@@ -612,7 +612,7 @@ class ParameterEstimate:
             raise ValueError("parameter interval must be ordered")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-compatible coefficient evidence."""
+        """Returns JSON-compatible coefficient evidence."""
         return dataclasses.asdict(self)
 
 
@@ -648,7 +648,7 @@ class EstimationResult:
     raw_input_fingerprint: str
 
     def __post_init__(self) -> None:
-        """Validate the report shape before it can be persisted or used.
+        """Validates the report shape before it can be persisted or used.
 
         Raises:
             TypeError: If the estimand or policy has the wrong type, or if
@@ -707,7 +707,7 @@ class EstimationResult:
             )
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a JSON-compatible estimation report.
+        """Returns a JSON-compatible estimation report.
 
         Returns:
             A dictionary holding every field, with nested objects converted
@@ -728,7 +728,7 @@ class EstimationResult:
         }
 
     def digest(self) -> str:
-        """Return the content digest of the canonical estimation report."""
+        """Returns the content digest of the canonical estimation report."""
         content = json.dumps(
             self.to_dict(), sort_keys=True, separators=(",", ":")
         ).encode("utf-8")
@@ -784,7 +784,7 @@ class EstimationResult:
 
     @classmethod
     def read(cls, path: str | Path) -> "EstimationResult":
-        """Read a report and reject a modified or malformed envelope.
+        """Reads a report and reject a modified or malformed envelope.
 
         Args:
             path: File written by `write`.
@@ -888,7 +888,7 @@ def estimate_parameters(
     clusters: Sequence[Any] | None = None,
     shift_reference: Any | None = None,
 ) -> EstimationResult:
-    """Estimate declared parameters with auditable uncertainty evidence.
+    """Estimates declared parameters with auditable uncertainty evidence.
 
     Args:
         features: Numeric matrix with one column per ``estimand.feature_names``.
@@ -1349,7 +1349,7 @@ def raw_input_fingerprint(
     outcome: Any,
     clusters: Any | None = None,
 ) -> str:
-    """Return a deterministic fingerprint of the estimator's raw inputs.
+    """Returns a deterministic fingerprint of the estimator's raw inputs.
 
     Numeric values are hashed after the same float conversion used by the
     estimator. Cluster labels retain their value types and row order. The
@@ -1379,7 +1379,7 @@ def raw_input_fingerprint(
 
 
 def update_input_digest(digest: Any, name: str, values: np.ndarray) -> None:
-    """Add one shape-, dtype-, and value-bound input to a digest.
+    """Adds one shape-, dtype-, and value-bound input to a digest.
 
     Args:
         digest: Hash object updated in place.
@@ -1423,7 +1423,7 @@ def update_input_digest(digest: Any, name: str, values: np.ndarray) -> None:
 
 
 def validate_matrix(matrix: np.ndarray, columns: int, name: str) -> None:
-    """Validate a numeric two-dimensional matrix.
+    """Validates a numeric two-dimensional matrix.
 
     Args:
         matrix: Matrix to check.
@@ -1441,7 +1441,7 @@ def validate_matrix(matrix: np.ndarray, columns: int, name: str) -> None:
 
 
 def validate_vector(values: np.ndarray, name: str) -> None:
-    """Validate a numeric one-dimensional vector without dropping values.
+    """Validates a numeric one-dimensional vector without dropping values.
 
     Args:
         values: Vector to check.
@@ -1457,7 +1457,7 @@ def validate_vector(values: np.ndarray, name: str) -> None:
 def validate_clusters(
     clusters: Sequence[Any] | None, rows: int
 ) -> np.ndarray | None:
-    """Validate cluster-label shape before missingness processing.
+    """Validates cluster-label shape before missingness processing.
 
     Args:
         clusters: Cluster labels, or None when the data are not clustered.
@@ -1484,7 +1484,7 @@ def validate_clusters(
 def validate_covariance(
     covariance: np.ndarray, dimension: int
 ) -> dict[str, Any]:
-    """Validate covariance shape and report rank and numerical conditioning.
+    """Validates covariance shape and report rank and numerical conditioning.
 
     Args:
         covariance: Coefficient covariance matrix.
@@ -1546,7 +1546,7 @@ def prepare_rows(
     missing: MissingPolicy,
     clusters: Any | None,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray | None, int]:
-    """Apply the declared missingness policy and retain cluster labels.
+    """Applies the declared missingness policy and retain cluster labels.
 
     Args:
         matrix: Feature matrix.
@@ -1626,7 +1626,7 @@ def fit_continuous_ipw_effect(
     policy: EstimationPolicy,
     clusters: np.ndarray | None,
 ) -> tuple[np.ndarray, np.ndarray, dict[str, Any]]:
-    """Estimate a linear continuous-treatment effect with GPS weights.
+    """Estimates a linear continuous-treatment effect with GPS weights.
 
     The generalized propensity score is a conditional Gaussian treatment
     density estimated from the declared non-treatment features. Stabilized
@@ -1886,7 +1886,7 @@ def reference_continuous_ipw_effect(
 def cluster_uncertainty_diagnostics(
     clusters: np.ndarray | None,
 ) -> dict[str, Any]:
-    """Return explicit sampling-unit diagnostics for clustered covariance.
+    """Returns explicit sampling-unit diagnostics for clustered covariance.
 
     Args:
         clusters: Cluster label of each row, or None.
@@ -1932,7 +1932,7 @@ def fit_ipw_ate(
     policy: EstimationPolicy,
     clusters: np.ndarray | None,
 ) -> tuple[np.ndarray, np.ndarray, dict[str, Any], np.ndarray]:
-    """Estimate a binary-treatment Hájek inverse-probability ATE.
+    """Estimates a binary-treatment Hájek inverse-probability ATE.
 
     Args:
         matrix: Complete numeric feature matrix, including the treatment.
@@ -2039,7 +2039,7 @@ def fit_aipw_ate(
     policy: EstimationPolicy,
     clusters: np.ndarray | None,
 ) -> tuple[np.ndarray, np.ndarray, dict[str, Any], dict[str, np.ndarray]]:
-    """Estimate a binary-treatment ATE with an augmented IPW score.
+    """Estimates a binary-treatment ATE with an augmented IPW score.
 
     With one fold, nuisance models are fitted on the full sample, preserving
     the historical estimator behavior. With multiple folds, each nuisance
@@ -2265,7 +2265,7 @@ def fit_aipw_nuisance_models(
     np.ndarray,
     dict[str, Any],
 ]:
-    """Fit AIPW nuisance models on training rows and predict evaluation rows.
+    """Fits AIPW nuisance models on training rows and predict evaluation rows.
 
     Args:
         training_design: Design matrix of the training rows, with intercept.
@@ -2368,7 +2368,7 @@ def validate_cross_fitting_support(
     fold_assignments: np.ndarray,
     fold_count: int,
 ) -> list[dict[str, int]]:
-    """Validate treatment support in every training and validation fold.
+    """Validates treatment support in every training and validation fold.
 
     Args:
         treatment: 0/1 treatment of every row.
@@ -2414,7 +2414,7 @@ def validate_cross_fitting_support(
 
 
 def aipw_limitations(cross_fitted: bool) -> list[str]:
-    """Return limitations that apply to both bounded AIPW modes.
+    """Returns limitations that apply to both bounded AIPW modes.
 
     Args:
         cross_fitted: Whether the nuisance models were cross-fitted.
@@ -2442,7 +2442,7 @@ def influence_variance(
     covariance: CovarianceKind,
     clusters: np.ndarray | None,
 ) -> tuple[float, dict[str, Any]]:
-    """Compute IID or finite-sample clustered influence uncertainty.
+    """Computes IID or finite-sample clustered influence uncertainty.
 
     The clustered calculation treats each declared cluster as an independent
     sampling unit. It centers the observation-level influence scores before
@@ -2538,7 +2538,7 @@ def hajek_ipw_statistics(
     clusters: np.ndarray | None = None,
     covariance: CovarianceKind = "iid",
 ) -> tuple[float, float, dict[str, Any]]:
-    """Compute normalized IPW means and an influence-function variance.
+    """Computes normalized IPW means and an influence-function variance.
 
     Args:
         treatment: 0/1 treatment of every row.
@@ -2592,7 +2592,7 @@ def fit_bayesian_linear(
     values: np.ndarray,
     prior: BayesianPrior,
 ) -> tuple[np.ndarray, np.ndarray, dict[str, Any]]:
-    """Compute a conjugate Gaussian posterior from an explicit prior.
+    """Computes a conjugate Gaussian posterior from an explicit prior.
 
     Args:
         design: Design matrix including the intercept column.
@@ -2666,7 +2666,7 @@ def fit_bayesian_linear(
 
 
 def validate_bayesian_prior_shape(prior: BayesianPrior, dimension: int) -> None:
-    """Validate prior vector and matrix dimensions against a design.
+    """Validates prior vector and matrix dimensions against a design.
 
     Args:
         prior: Prior to check.
@@ -2698,7 +2698,7 @@ def fit_hierarchical_linear(
     float,
     np.ndarray,
 ]:
-    """Fit a bounded two-stage hierarchical linear model.
+    """Fits a bounded two-stage hierarchical linear model.
 
     The default estimates variance components by moments from an initial
     fixed-effect fit.  The bounded REML policy uses a deterministic profile
@@ -2844,7 +2844,7 @@ def fit_hierarchical_random_slope(
     float,
     np.ndarray,
 ]:
-    """Fit one random slope with a random intercept by moments or REML.
+    """Fits one random slope with a random intercept by moments or REML.
 
     Args:
         design: Design matrix including the intercept column.
@@ -2999,7 +2999,7 @@ def hierarchical_random_slope_gls_system(
     residual_variance: float,
     random_effect_covariance: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Build the GLS system for one random slope and intercept.
+    """Builds the GLS system for one random slope and intercept.
 
     Args:
         design: Design matrix including the intercept column.
@@ -3043,7 +3043,7 @@ def hierarchical_random_effect_precision(
     residual_variance: float,
     random_effect_covariance: np.ndarray,
 ) -> np.ndarray:
-    """Return dense precision for one random-effect covariance block.
+    """Returns dense precision for one random-effect covariance block.
 
     Args:
         random_effect_design: Intercept and slope columns for one cluster.
@@ -3079,7 +3079,7 @@ def hierarchical_random_slope_diagnostics(
     cluster_sizes: list[int],
     method: str,
 ) -> dict[str, Any]:
-    """Build auditable diagnostics for the one-random-slope model.
+    """Builds auditable diagnostics for the one-random-slope model.
 
     Args:
         labels: Distinct cluster labels.
@@ -3165,7 +3165,7 @@ def fit_hierarchical_random_slope_reml(
     float,
     np.ndarray,
 ]:
-    """Fit the one-random-slope model with bounded profile REML.
+    """Fits the one-random-slope model with bounded profile REML.
 
     Args:
         design: Design matrix including the intercept column.
@@ -3330,7 +3330,7 @@ def random_slope_reml_profile_objective(
     labels: tuple[Any, ...],
     random_slope_position: int,
 ) -> float:
-    """Return the negative profile REML objective for one random slope.
+    """Returns the negative profile REML objective for one random slope.
 
     Args:
         parameters: Four values: the logs of the residual, random-intercept
@@ -3435,7 +3435,7 @@ def fit_hierarchical_reml(
     float,
     np.ndarray,
 ]:
-    """Fit a bounded random-intercept model with profile REML.
+    """Fits a bounded random-intercept model with profile REML.
 
     Args:
         design: Design matrix including the intercept column.
@@ -3571,7 +3571,7 @@ def reml_profile_objective(
     clusters: np.ndarray,
     labels: tuple[Any, ...],
 ) -> float:
-    """Return the negative profile REML objective in log-variance space.
+    """Returns the negative profile REML objective in log-variance space.
 
     Args:
         log_variances: The logs of the residual and random-intercept
@@ -3648,7 +3648,7 @@ def validate_reml_optimizer_result(
     log_bounds: tuple[tuple[float, float], ...],
     dimension: int = 2,
 ) -> None:
-    """Reject an optimizer result that cannot support a release artifact.
+    """Rejects an optimizer result that cannot support a release artifact.
 
     Args:
         optimizer_result: Result returned by the optimizer.
@@ -3705,7 +3705,7 @@ def hierarchical_gls_system(
     residual_variance: float,
     random_intercept_variance: float,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Build the block-diagonal precision system for random intercepts.
+    """Builds the block-diagonal precision system for random intercepts.
 
     Args:
         design: Design matrix including the intercept column.
@@ -3747,7 +3747,7 @@ def fit_logistic(
     max_iterations: int,
     tolerance: float,
 ) -> tuple[np.ndarray, np.ndarray, dict[str, Any]]:
-    """Fit a Bernoulli likelihood with deterministic Newton iterations.
+    """Fits a Bernoulli likelihood with deterministic Newton iterations.
 
     Args:
         design: Design matrix including the intercept column.
@@ -3800,7 +3800,7 @@ def covariance_matrix(
     clusters: np.ndarray | None,
     probabilities: np.ndarray | None,
 ) -> np.ndarray:
-    """Compute iid, HC3, or cluster-robust sandwich covariance.
+    """Computes iid, HC3, or cluster-robust sandwich covariance.
 
     Args:
         design: Design matrix including the intercept column.
@@ -3909,7 +3909,7 @@ def reference_ipw_ate(
     """
 
     def objective(candidate: np.ndarray) -> tuple[float, np.ndarray]:
-        """Return the negative Bernoulli log-likelihood and its gradient.
+        """Returns the negative Bernoulli log-likelihood and its gradient.
 
         Args:
             candidate: Propensity-model coefficients.
@@ -3999,7 +3999,7 @@ def reference_aipw_ate(
     confounder_design = nuisance_design
 
     def objective(candidate: np.ndarray) -> tuple[float, np.ndarray]:
-        """Return the negative Bernoulli log-likelihood and its gradient.
+        """Returns the negative Bernoulli log-likelihood and its gradient.
 
         Args:
             candidate: Propensity-model coefficients.
@@ -4115,7 +4115,7 @@ def reference_cross_fitted_aipw_ate(
             design: np.ndarray = training_design,
             observed: np.ndarray = training_treatment,
         ) -> tuple[float, np.ndarray]:
-            """Return the negative Bernoulli log-likelihood and gradient.
+            """Returns the negative Bernoulli log-likelihood and gradient.
 
             Args:
                 candidate: Propensity-model coefficients.
@@ -4214,7 +4214,7 @@ def reference_hierarchical_linear(
     coefficients: np.ndarray,
     policy: EstimationPolicy,
 ) -> dict[str, Any]:
-    """Verify hierarchical GLS with explicit group covariance matrices.
+    """Verifies hierarchical GLS with explicit group covariance matrices.
 
     Args:
         design: Design matrix including the intercept column.
@@ -4270,7 +4270,7 @@ def reference_hierarchical_reml(
     objective: float,
     policy: EstimationPolicy,
 ) -> dict[str, Any]:
-    """Verify REML GLS with an independent dense covariance calculation.
+    """Verifies REML GLS with an independent dense covariance calculation.
 
     Args:
         design: Design matrix including the intercept column.
@@ -4349,7 +4349,7 @@ def reference_hierarchical_random_slope(
     coefficients: np.ndarray,
     policy: EstimationPolicy,
 ) -> dict[str, Any]:
-    """Verify one-random-slope GLS with an independent dense calculation.
+    """Verifies one-random-slope GLS with an independent dense calculation.
 
     Args:
         design: Design matrix including the intercept column.
@@ -4419,7 +4419,7 @@ def reference_hierarchical_random_slope_reml(
     objective: float,
     policy: EstimationPolicy,
 ) -> dict[str, Any]:
-    """Verify random-slope REML with independent dense block algebra.
+    """Verifies random-slope REML with independent dense block algebra.
 
     Args:
         design: Design matrix including the intercept column.
@@ -4506,7 +4506,7 @@ def reference_bayesian_linear(
     coefficients: np.ndarray,
     policy: EstimationPolicy,
 ) -> dict[str, Any]:
-    """Verify the conjugate posterior mean with an independent solver.
+    """Verifies the conjugate posterior mean with an independent solver.
 
     Args:
         design: Design matrix including the intercept column.
@@ -4608,7 +4608,7 @@ def reference_logistic(
     """
 
     def objective(candidate: np.ndarray) -> tuple[float, np.ndarray]:
-        """Return the negative Bernoulli log-likelihood and its gradient.
+        """Returns the negative Bernoulli log-likelihood and its gradient.
 
         Args:
             candidate: Logistic coefficients.
@@ -4644,7 +4644,7 @@ def reference_logistic(
 def bernoulli_log_likelihood(
     values: np.ndarray, probabilities: np.ndarray
 ) -> float:
-    """Return a numerically stable Bernoulli log likelihood.
+    """Returns a numerically stable Bernoulli log likelihood.
 
     Args:
         values: Binary outcomes (0 or 1).
@@ -4670,7 +4670,7 @@ def sensitivity_report(
     clusters: np.ndarray | None,
     prior: BayesianPrior | None = None,
 ) -> dict[str, Any]:
-    """Record declared sensitivity coverage without inventing causal claims.
+    """Records declared sensitivity coverage without inventing causal claims.
 
     Args:
         matrix: Complete feature rows used by the fit.
@@ -4833,7 +4833,7 @@ def hierarchical_bootstrap_sensitivity(
     coefficients: np.ndarray,
     clusters: np.ndarray,
 ) -> dict[str, Any]:
-    """Estimate grouped-parameter sensitivity by resampling whole clusters.
+    """Estimates grouped-parameter sensitivity by resampling whole clusters.
 
     Each bootstrap draw samples the source clusters with replacement and
     gives every selected copy a fresh identity. The declared moment-GLS or
@@ -4977,7 +4977,7 @@ def draw_hierarchical_bootstrap_sample(
     clusters: np.ndarray,
     rng: np.random.Generator,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict[str, Any]]:
-    """Draw whole clusters and assign fresh identities to selected copies.
+    """Draws whole clusters and assign fresh identities to selected copies.
 
     Args:
         matrix: Complete feature rows from the source estimate.
@@ -5035,7 +5035,7 @@ def causal_bootstrap_sensitivity(
     coefficients: np.ndarray,
     clusters: np.ndarray | None,
 ) -> dict[str, Any]:
-    """Estimate causal sampling sensitivity with nonparametric bootstrap.
+    """Estimates causal sampling sensitivity with nonparametric bootstrap.
 
     Row-level causal policies resample observations independently. Clustered
     causal policies resample complete declared clusters, preserving each
@@ -5168,7 +5168,7 @@ def draw_causal_bootstrap_sample(
     clusters: np.ndarray | None,
     rng: np.random.Generator,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray | None, dict[str, Any]]:
-    """Draw one causal bootstrap sample and its auditable unit evidence.
+    """Draws one causal bootstrap sample and its auditable unit evidence.
 
     Args:
         matrix: Complete feature rows from the source estimate.
@@ -5232,7 +5232,7 @@ def draw_causal_bootstrap_sample(
 
 
 def bootstrap_sample_digest(indices: np.ndarray) -> str:
-    """Return a digest of bootstrap draw indices without exposing raw rows.
+    """Returns a digest of bootstrap draw indices without exposing raw rows.
 
     Args:
         indices: Integer indices of the draw.

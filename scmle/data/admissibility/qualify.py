@@ -68,7 +68,7 @@ class LoadedStore:
 
 
 def load_store(name: str, directory: Path | None = None) -> LoadedStore:
-    """Read a certificate store, or say why it could not be read.
+    """Reads a certificate store, or say why it could not be read.
 
     Args:
         name: File name of the store.
@@ -156,7 +156,7 @@ class Qualification:
 def finding_check(
     finding: screen.Finding, rows: int, seed: int, index: int
 ) -> qualification.Check:
-    """Build the ledger record of one screen finding.
+    """Builds the ledger record of one screen finding.
 
     The record is a wealth-free diagnostic: it carries the permutation
     p-value, never a claim. A suspect whose mechanism is not certified is
@@ -208,7 +208,7 @@ def attestation_check(
     seed: int,
     index: int,
 ) -> qualification.Check:
-    """Build the ledger record of an attestation that overrode a block.
+    """Builds the ledger record of an attestation that overrode a block.
 
     Its p-value is the smallest p-value of the screen for the column, so the
     record shows what was overridden; its tier is `attested`.
@@ -259,7 +259,7 @@ def causal_admissibility(
     store: certificates.CertificateStore | None,
     notes: list[str],
 ) -> Qualification:
-    """Apply the graph rules to every candidate and test the graph.
+    """Applies the graph rules to every candidate and test the graph.
 
     Each candidate gets `rules.decide_causal` (descendants of the treatment
     and colliders are quarantined), the declared adjustment set is checked
@@ -373,7 +373,7 @@ def run(
     dag: dag_module.Dag | None = None,
     declared: Sequence[provenance.FieldProvenance] = (),
 ) -> Qualification:
-    """Run leakage, admissibility and the detector pipeline on `X`.
+    """Runs leakage, admissibility and the detector pipeline on `X`.
 
     Args:
         features: Exploration features.

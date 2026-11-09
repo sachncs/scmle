@@ -54,7 +54,7 @@ class PromotionApproval:
     signature: str | None = None
 
     def __post_init__(self) -> None:
-        """Validate the review record before it can authorize promotion.
+        """Validates the review record before it can authorize promotion.
 
         Raises:
             TypeError: If `independent` is not a bool.
@@ -88,7 +88,7 @@ class PromotionApproval:
             raise ValueError("signature must be non-empty text")
 
     def unsigned_dict(self) -> dict[str, Any]:
-        """Return the approval fields covered by its signature."""
+        """Returns the approval fields covered by its signature."""
         return {
             "model": self.model,
             "version": self.version,
@@ -102,7 +102,7 @@ class PromotionApproval:
         }
 
     def sign(self, signing_key: str | bytes) -> Self:
-        """Return this approval with a content-bound HMAC signature.
+        """Returns this approval with a content-bound HMAC signature.
 
         Args:
             signing_key: The key to sign with.
@@ -118,7 +118,7 @@ class PromotionApproval:
         )
 
     def verify(self, signing_key: str | bytes | None = None) -> bool:
-        """Verify the approval signature using an explicit or env key.
+        """Verifies the approval signature using an explicit or env key.
 
         Args:
             signing_key: The key to verify with, or None for the configured
@@ -173,7 +173,7 @@ class PromotionApproval:
             raise ValueError("champion promotion requires a valid signature")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return the complete approval record for durable audit evidence."""
+        """Returns the complete approval record for durable audit evidence."""
         record = self.unsigned_dict()
         if self.signature is not None:
             record["signature"] = self.signature

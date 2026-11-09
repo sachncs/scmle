@@ -24,7 +24,7 @@ class PairwiseInteraction(diagnostics.Diagnostic):
     applies_to = diagnostics.CLASSIFICATION | diagnostics.REGRESSION_ONLY
 
     def compute(self, inputs: diagnostics.DiagnosticInput) -> dict[str, Any]:
-        """Return deterministic interaction strengths for bounded pairs.
+        """Returns deterministic interaction strengths for bounded pairs.
 
         Only the first `MAX_INTERACTION_FEATURES` numeric features and the
         first `MAX_INTERACTION_ROWS` rows are used. Pairs are visited in
@@ -138,7 +138,7 @@ class PairwiseInteraction(diagnostics.Diagnostic):
     def score(
         inputs: diagnostics.DiagnosticInput, frame: pd.DataFrame
     ) -> np.ndarray:
-        """Return one comparable model-output score per row.
+        """Returns one comparable model-output score per row.
 
         Args:
             inputs: The diagnostic inputs holding the task and estimator.

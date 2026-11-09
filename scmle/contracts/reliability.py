@@ -102,7 +102,7 @@ class FaultEvidence:
     observation: str
 
     def __post_init__(self) -> None:
-        """Reject evidence records that cannot be independently reviewed.
+        """Rejects evidence records that cannot be independently reviewed.
 
         Raises:
             TypeError: If `observed_outcome` is not an `EvidenceOutcome`.
@@ -124,7 +124,7 @@ class FaultEvidence:
             raise TypeError("observed_outcome must be EvidenceOutcome")
 
     def to_dict(self) -> dict[str, str]:
-        """Return a deterministic JSON-compatible evidence record."""
+        """Returns a deterministic JSON-compatible evidence record."""
         return {
             "evidence_type": self.evidence_type,
             "execution_id": self.execution_id,
@@ -185,7 +185,7 @@ class FaultScenarioPlan:
     evidence: tuple[FaultEvidence, ...] = ()
 
     def __post_init__(self) -> None:
-        """Validate declaration completeness and evidence/status consistency.
+        """Validates declaration completeness and evidence/status consistency.
 
         Raises:
             TypeError: If an enumerated field has the wrong type or
@@ -247,7 +247,7 @@ class FaultScenarioPlan:
                 )
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a deterministic JSON-compatible scenario record."""
+        """Returns a deterministic JSON-compatible scenario record."""
         return {
             "scenario": self.scenario.value,
             "expected_safe_outcome": self.expected_safe_outcome.value,
@@ -300,7 +300,7 @@ class FaultInjectionPlanRegistry:
     )
 
     def __post_init__(self) -> None:
-        """Validate and normalize plans supplied at construction time."""
+        """Validates and normalizes plans supplied at construction time."""
         supplied = tuple(self.plans.values())
         self.plans = {}
         for plan in supplied:
@@ -308,7 +308,7 @@ class FaultInjectionPlanRegistry:
 
     @classmethod
     def production_beta(cls) -> Self:
-        """Build the complete reliability plan for the production beta.
+        """Builds the complete reliability plan for the production beta.
 
         Returns:
             A registry holding a plan for every required scenario.
@@ -320,7 +320,7 @@ class FaultInjectionPlanRegistry:
         return registry
 
     def register(self, plan: FaultScenarioPlan) -> None:
-        """Register one complete scenario declaration.
+        """Registers one complete scenario declaration.
 
         Args:
             plan: Scenario declaration to register.
@@ -340,7 +340,7 @@ class FaultInjectionPlanRegistry:
         scenario: FaultScenario,
         evidence: tuple[FaultEvidence, ...],
     ) -> FaultScenarioPlan:
-        """Record one execution and derive its verification status.
+        """Records one execution and derive its verification status.
 
         Safe evidence for every declared requirement produces ``PASSED``.
         Unsafe evidence produces ``FAILED`` even when other requirements are
@@ -399,7 +399,7 @@ class FaultInjectionPlanRegistry:
         return updated
 
     def validate_complete(self) -> None:
-        """Reject a registry that omits any required production scenario.
+        """Rejects a registry that omits any required production scenario.
 
         Raises:
             ValueError: If a scenario has no plan.
@@ -415,7 +415,7 @@ class FaultInjectionPlanRegistry:
             )
 
     def to_dict(self) -> dict[str, Any]:
-        """Return the complete plan in deterministic dictionary form."""
+        """Returns the complete plan in deterministic dictionary form."""
         self.validate_complete()
         ordered_plans = sorted(
             self.plans.values(), key=lambda plan: plan.scenario.value
@@ -486,7 +486,7 @@ class FaultInjectionPlanRegistry:
 
 
 def default_fault_injection_plans() -> tuple[FaultScenarioPlan, ...]:
-    """Return the complete, unexecuted production-beta fault plan.
+    """Returns the complete, unexecuted production-beta fault plan.
 
     These declarations describe what must be injected and what evidence a
     release needs. They intentionally remain ``PLANNED`` until an external

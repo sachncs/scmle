@@ -54,7 +54,7 @@ class FeatureOp(abc.ABC):
     defaults: ClassVar[Mapping[str, Any]] = {}
 
     def validate(self, node: tasks.FeatureNode) -> None:
-        """Check the node's input count and parameter names.
+        """Checks the node's input count and parameter names.
 
         Args:
             node: The node to check.
@@ -77,7 +77,7 @@ class FeatureOp(abc.ABC):
             )
 
     def resolved(self, node: tasks.FeatureNode) -> dict[str, Any]:
-        """Apply the defaults to a node's parameters.
+        """Applies the defaults to a node's parameters.
 
         Args:
             node: The node whose parameters are resolved.
@@ -101,7 +101,7 @@ class FeatureOp(abc.ABC):
 
     @abc.abstractmethod
     def apply(self, inputs: Inputs, params: Params, state: Any) -> pd.Series:
-        """Compute the derived column.
+        """Computes the derived column.
 
         Args:
             inputs: The input columns.
@@ -150,7 +150,7 @@ class Sqrt(FeatureOp):
     name = "sqrt"
 
     def apply(self, inputs: Inputs, params: Params, state: Any) -> pd.Series:
-        """Take the square root of the input after clipping it at zero.
+        """Takes the square root of the input after clipping it at zero.
 
         Args:
             inputs: One column.
@@ -188,7 +188,7 @@ class Absolute(FeatureOp):
     name = "abs"
 
     def apply(self, inputs: Inputs, params: Params, state: Any) -> pd.Series:
-        """Take the absolute value of the input.
+        """Takes the absolute value of the input.
 
         Args:
             inputs: One column.
@@ -228,7 +228,7 @@ class Sum(FeatureOp):
     max_inputs = MAX_ARITY
 
     def apply(self, inputs: Inputs, params: Params, state: Any) -> pd.Series:
-        """Add the inputs.
+        """Adds the inputs.
 
         Args:
             inputs: Two or more columns.
@@ -444,7 +444,7 @@ class DatePart(FeatureOp):
     )
 
     def validate(self, node: tasks.FeatureNode) -> None:
-        """Check arity, parameters and the requested datetime part.
+        """Checks arity, parameters and the requested datetime part.
 
         Args:
             node: The node to check.
@@ -462,7 +462,7 @@ class DatePart(FeatureOp):
             )
 
     def apply(self, inputs: Inputs, params: Params, state: Any) -> pd.Series:
-        """Extract the requested part of the datetime.
+        """Extracts the requested part of the datetime.
 
         Args:
             inputs: One column.
@@ -485,7 +485,7 @@ class OrderedOp(FeatureOp):
     ordered = True
 
     def apply(self, inputs: Inputs, params: Params, state: Any) -> pd.Series:
-        """Reject row-wise application of an ordered operation.
+        """Rejects row-wise application of an ordered operation.
 
         Ordered operations run through `SeriesFeatureBuilder` only.
 
@@ -501,7 +501,7 @@ class OrderedOp(FeatureOp):
 
     @abc.abstractmethod
     def compute(self, grouped: Any, params: Mapping[str, Any]) -> pd.Series:
-        """Compute the feature from values already sorted by time per group.
+        """Computes the feature from values already sorted by time per group.
 
         Args:
             grouped: The values, sorted by time and grouped by entity.
@@ -513,7 +513,7 @@ class OrderedOp(FeatureOp):
 
     @abc.abstractmethod
     def lookback(self, params: Mapping[str, Any]) -> int | None:
-        """Report how many earlier rows an entity needs.
+        """Reports how many earlier rows an entity needs.
 
         Args:
             params: The resolved parameters.
@@ -530,7 +530,7 @@ class Lag(OrderedOp):
     defaults = {"k": 1}
 
     def validate(self, node: tasks.FeatureNode) -> None:
-        """Check arity, parameters and that the lag is positive.
+        """Checks arity, parameters and that the lag is positive.
 
         A positive lag ensures no future value can leak.
 
@@ -558,7 +558,7 @@ class Lag(OrderedOp):
         return grouped.shift(int(params["k"]))
 
     def lookback(self, params: Params) -> int | None:
-        """Report the lag distance.
+        """Reports the lag distance.
 
         Args:
             params: Parameters with the lag `k`.
@@ -576,7 +576,7 @@ class Diff(OrderedOp):
     defaults = {"k": 1}
 
     def validate(self, node: tasks.FeatureNode) -> None:
-        """Check arity, parameters and that the lag is positive.
+        """Checks arity, parameters and that the lag is positive.
 
         Args:
             node: The node to check.
@@ -603,7 +603,7 @@ class Diff(OrderedOp):
         return grouped.transform(lambda s: s - s.shift(int(params["k"])))
 
     def lookback(self, params: Params) -> int | None:
-        """Report the lag distance.
+        """Reports the lag distance.
 
         Args:
             params: Parameters with the lag `k`.
@@ -621,7 +621,7 @@ class RollingMean(OrderedOp):
     defaults = {"window": 3}
 
     def compute(self, grouped: Any, params: Params) -> pd.Series:
-        """Compute the trailing mean.
+        """Computes the trailing mean.
 
         Args:
             grouped: The values, sorted by time and grouped by entity.
@@ -636,7 +636,7 @@ class RollingMean(OrderedOp):
         )
 
     def lookback(self, params: Params) -> int | None:
-        """Report the window size.
+        """Reports the window size.
 
         Args:
             params: Parameters with the `window` size.
@@ -654,7 +654,7 @@ class RollingStd(OrderedOp):
     defaults = {"window": 3}
 
     def compute(self, grouped: Any, params: Params) -> pd.Series:
-        """Compute the trailing standard deviation.
+        """Computes the trailing standard deviation.
 
         Args:
             grouped: The values, sorted by time and grouped by entity.
@@ -670,7 +670,7 @@ class RollingStd(OrderedOp):
         )
 
     def lookback(self, params: Params) -> int | None:
-        """Report the window size.
+        """Reports the window size.
 
         Args:
             params: Parameters with the `window` size.
@@ -687,7 +687,7 @@ class ExpandingMean(OrderedOp):
     name = "expanding_mean"
 
     def compute(self, grouped: Any, params: Params) -> pd.Series:
-        """Compute the running mean.
+        """Computes the running mean.
 
         Args:
             grouped: The values, sorted by time and grouped by entity.
@@ -904,7 +904,7 @@ class SeriesFeatureBuilder:
         return total
 
     def entity_keys(self, frame: pd.DataFrame) -> np.ndarray:
-        """Compute the entity key of every row.
+        """Computes the entity key of every row.
 
         Args:
             frame: The rows.
@@ -917,7 +917,7 @@ class SeriesFeatureBuilder:
         return np.zeros(len(frame), dtype=int)
 
     def build_history(self, frame: pd.DataFrame) -> pd.DataFrame:
-        """Keep the rows later predictions can still need.
+        """Keeps the rows later predictions can still need.
 
         Args:
             frame: Rows with at least the history columns.

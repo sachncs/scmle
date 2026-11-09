@@ -125,7 +125,7 @@ class ServingAdapter(abc.ABC):
         return record
 
     def warm_up(self) -> None:
-        """Score once so the first request does not pay for initialization.
+        """Scores once so the first request does not pay for initialization.
 
         Marks the warm-up step done, or the service failed. The warm-up call
         never feeds series history.
@@ -153,7 +153,7 @@ class ServingAdapter(abc.ABC):
         self.readiness.complete(guard.Phase.WARMING, note)
 
     def respond(self, records: list[dict[str, Any]]) -> dict[str, Any]:
-        """Score records and build the structured response.
+        """Scores records and build the structured response.
 
         Args:
             records: Feature dictionaries. Every record must carry every
@@ -196,7 +196,7 @@ class ServingAdapter(abc.ABC):
     def respond_frame(
         self, frame: pd.DataFrame, remember: bool = True
     ) -> dict[str, Any]:
-        """Score a frame; the one path used by online and batch serving.
+        """Scores a frame; the one path used by online and batch serving.
 
         Args:
             frame: Rows to score, with the model's feature columns.
@@ -228,7 +228,7 @@ class ServingAdapter(abc.ABC):
         return response
 
     def enforce_policy(self, rows: list[dict[str, Any]]) -> None:
-        """Apply the null and unseen-category policies to scored rows.
+        """Applies the null and unseen-category policies to scored rows.
 
         Args:
             rows: Per-row reports with `missing` and `unseen` entries.
@@ -259,7 +259,7 @@ class ServingAdapter(abc.ABC):
 
     @abc.abstractmethod
     def stop(self) -> None:
-        """Stop serving and release resources."""
+        """Stops serving and release resources."""
 
 
 class BatchServing(ServingAdapter):
@@ -277,7 +277,7 @@ class BatchServing(ServingAdapter):
         destination: str | pathlib.Path,
         chunk_rows: int = BATCH_CHUNK_ROWS,
     ) -> int:
-        """Score a file and write predictions (and probabilities).
+        """Scores a file and write predictions (and probabilities).
 
         The output CSV is accompanied by `<destination>.manifest.json`,
         which carries the model version and artifact digest the whole file
@@ -347,7 +347,7 @@ class RequestObserver(Protocol):
     def record_request(
         self, at: float, route: str, status: int, seconds: float
     ) -> None:
-        """Record one finished request.
+        """Records one finished request.
 
         Args:
             at: Unix time at which the request finished.
@@ -475,7 +475,7 @@ class HttpServing(ServingAdapter):
         return f"http://{self.host}:{self.httpd.server_address[1]}"
 
     def limits(self) -> dict[str, Any]:
-        """Report the declared limits and policies, for `/schema`.
+        """Reports the declared limits and policies, for `/schema`.
 
         Returns:
             The request, record, concurrency and timeout limits, and the
@@ -492,7 +492,7 @@ class HttpServing(ServingAdapter):
         }
 
     def identity(self) -> dict[str, Any]:
-        """Report the model version and digest.
+        """Reports the model version and digest.
 
         Returns:
             `model_version` and `artifact_digest`; an empty mapping before
@@ -506,7 +506,7 @@ class HttpServing(ServingAdapter):
         }
 
     def load_in_background(self) -> None:
-        """Run the loader, then the warm-up; failure is kept as readiness.
+        """Runs the loader, then the warm-up; failure is kept as readiness.
 
         Raises:
             ScmleError: If the adapter has no loader.
@@ -576,7 +576,7 @@ class HttpServing(ServingAdapter):
             LOGGER.exception("the signal monitor failed on features")
 
     def score(self, request: serving_contract.ScoreRequest) -> dict[str, Any]:
-        """Score a parsed request.
+        """Scores a parsed request.
 
         Args:
             request: The parsed request; its expected schema digest, when

@@ -44,7 +44,7 @@ class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):
         device: str = "auto",
         random_state: int = 0,
     ) -> None:
-        """Store the explicit JEPA contract and resource policy.
+        """Stores the explicit JEPA contract and resource policy.
 
         Args:
             hidden_size: Width of the hidden layers.
@@ -103,7 +103,7 @@ class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):
         )
 
     def transform(self, features: Any) -> np.ndarray:
-        """Return context-encoder embeddings for new rows.
+        """Returns context-encoder embeddings for new rows.
 
         Args:
             features: Numeric matrix with the width seen at fit.
@@ -114,15 +114,15 @@ class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):
         return self.call("encode", features)
 
     def model_contract(self) -> contracts.ModelFamilyContract:
-        """Return the explicit tabular JEPA family boundary."""
+        """Returns the explicit tabular JEPA family boundary."""
         return contracts.TABULAR_JEPA_CONTRACT
 
     def inference_contract(self) -> contracts.InferenceContract:
-        """Return the embedding inference contract."""
+        """Returns the embedding inference contract."""
         return self.model_contract().inference
 
     def explanation_contract(self) -> contracts.ExplanationContract:
-        """Return the embedding-sensitivity explanation contract.
+        """Returns the embedding-sensitivity explanation contract.
 
         Raises:
             ValueError: If the JEPA family declares no explanation contract.
@@ -151,7 +151,7 @@ class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):
         )
 
     def checkpoint_manifest(self) -> dict[str, object]:
-        """Return the explicit fitted-checkpoint contract metadata."""
+        """Returns the explicit fitted-checkpoint contract metadata."""
         utils.validation.check_is_fitted(self, attributes=["state_"])
         family = self.model_contract()
         return {
@@ -168,7 +168,7 @@ class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):
         }
 
     def save_checkpoint(self, path: str | pathlib.Path) -> pathlib.Path:
-        """Save a fitted JEPA representation checkpoint.
+        """Saves a fitted JEPA representation checkpoint.
 
         The checkpoint contains a versioned envelope around the estimator
         configuration, training report, and NumPy-only worker state. The
@@ -223,7 +223,7 @@ class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):
 
     @classmethod
     def load_checkpoint(cls, path: str | pathlib.Path) -> "JepaEstimator":
-        """Load a trusted fitted tabular JEPA checkpoint.
+        """Loads a trusted fitted tabular JEPA checkpoint.
 
         Args:
             path: Checkpoint produced by `save_checkpoint`.

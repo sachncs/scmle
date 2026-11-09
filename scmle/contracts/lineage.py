@@ -33,7 +33,7 @@ class EvidenceNodeKind(enum.StrEnum):
 
 
 def require_text(value: str, name: str) -> str:
-    """Return a trimmed non-empty contract string.
+    """Returns a trimmed non-empty contract string.
 
     Args:
         value: The text to check.
@@ -61,7 +61,7 @@ class EvidenceNode:
     attributes: Mapping[str, str] = dataclasses.field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        """Validate and normalize node identity metadata.
+        """Validates and normalizes node identity metadata.
 
         Raises:
             TypeError: If an attribute value is not a string.
@@ -80,7 +80,7 @@ class EvidenceNode:
         object.__setattr__(self, "attributes", normalized)
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a deterministic JSON-compatible node record."""
+        """Returns a deterministic JSON-compatible node record."""
         return {
             "node_id": self.node_id,
             "kind": self.kind.value,
@@ -115,7 +115,7 @@ class EvidenceEdge:
     relationship: str
 
     def __post_init__(self) -> None:
-        """Validate edge endpoints and relationship semantics.
+        """Validates edge endpoints and relationship semantics.
 
         Raises:
             ValueError: If an endpoint or the relationship is blank, or the edge
@@ -128,7 +128,7 @@ class EvidenceEdge:
             raise ValueError("evidence edges must not be self-loops")
 
     def to_dict(self) -> dict[str, str]:
-        """Return a JSON-compatible edge record."""
+        """Returns a JSON-compatible edge record."""
         return {
             "source_id": self.source_id,
             "target_id": self.target_id,
@@ -163,7 +163,7 @@ class EvidenceGraph:
     schema_version = 1
 
     def __init__(self, nodes: Iterable[EvidenceNode] = ()) -> None:
-        """Create a graph and register initial nodes.
+        """Creates a graph and register initial nodes.
 
         Args:
             nodes: The nodes to register.
@@ -174,7 +174,7 @@ class EvidenceGraph:
             self.add_node(node)
 
     def add_node(self, node: EvidenceNode) -> None:
-        """Register one node without silently replacing an identity.
+        """Registers one node without silently replacing an identity.
 
         Args:
             node: The node to register.
@@ -191,7 +191,7 @@ class EvidenceGraph:
         self.nodes[node.node_id] = node
 
     def add_edge(self, edge: EvidenceEdge) -> None:
-        """Register one edge and reject dangling or cyclic lineage.
+        """Registers one edge and reject dangling or cyclic lineage.
 
         An edge that is already registered is ignored.
 
@@ -214,7 +214,7 @@ class EvidenceGraph:
         self.edges.append(edge)
 
     def path_exists(self, source_id: str, target_id: str) -> bool:
-        """Return whether a directed path connects two registered nodes.
+        """Returns whether a directed path connects two registered nodes.
 
         Args:
             source_id: Id of the start node.
@@ -240,7 +240,7 @@ class EvidenceGraph:
         return False
 
     def outgoing(self) -> dict[str, tuple[str, ...]]:
-        """Return deterministic outgoing adjacency lists."""
+        """Returns deterministic outgoing adjacency lists."""
         result: dict[str, list[str]] = {node_id: [] for node_id in self.nodes}
         for edge in self.edges:
             result[edge.source_id].append(edge.target_id)
@@ -250,7 +250,7 @@ class EvidenceGraph:
         }
 
     def topological_order(self) -> tuple[str, ...]:
-        """Return a deterministic topological node order.
+        """Returns a deterministic topological node order.
 
         Returns:
             The node ids ordered so every edge goes forward; ties are broken by
@@ -282,7 +282,7 @@ class EvidenceGraph:
         return tuple(order)
 
     def validate(self) -> None:
-        """Validate endpoints, duplicates, and acyclicity.
+        """Validates endpoints, duplicates, and acyclicity.
 
         Raises:
             ValueError: If an edge has an unknown endpoint, an edge is
@@ -301,7 +301,7 @@ class EvidenceGraph:
         self.topological_order_without_validation()
 
     def topological_order_without_validation(self) -> tuple[str, ...]:
-        """Compute order without recursively invoking ``validate``.
+        """Computes order without recursively invoking ``validate``.
 
         Returns:
             The node ids ordered so every edge goes forward; ties are broken by
@@ -331,7 +331,7 @@ class EvidenceGraph:
         return tuple(order)
 
     def to_dict(self) -> dict[str, Any]:
-        """Return deterministic graph content without an external digest."""
+        """Returns deterministic graph content without an external digest."""
         self.validate()
         return {
             "schema_version": self.schema_version,
@@ -355,7 +355,7 @@ class EvidenceGraph:
         }
 
     def canonical_json(self) -> str:
-        """Return canonical graph content suitable for hashing and signing."""
+        """Returns canonical graph content suitable for hashing and signing."""
         return json.dumps(
             self.to_dict(),
             ensure_ascii=False,
@@ -364,7 +364,7 @@ class EvidenceGraph:
         )
 
     def digest(self) -> str:
-        """Return the SHA-256 digest of canonical graph content."""
+        """Returns the SHA-256 digest of canonical graph content."""
         return hashlib.sha256(self.canonical_json().encode("utf-8")).hexdigest()
 
     @classmethod

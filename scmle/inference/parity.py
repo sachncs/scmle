@@ -34,7 +34,7 @@ MISSING_CATEGORY = "__missing__"
 
 
 def read_json(path: str | pathlib.Path) -> dict[str, Any]:
-    """Read a JSON object from `path`.
+    """Reads a JSON object from `path`.
 
     Args:
         path: The JSON file.
@@ -69,7 +69,7 @@ class Tolerance:
     label: str = "exact"
 
     def __post_init__(self) -> None:
-        """Validate the tolerance.
+        """Validates the tolerance.
 
         Raises:
             ConfigError: If `label` is not "exact" or `probability_abs` is
@@ -118,7 +118,7 @@ class ParityReport:
     mismatches: tuple[str, ...]
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert the report to a JSON-compatible record.
+        """Converts the report to a JSON-compatible record.
 
         Returns:
             A dictionary with one entry per attribute; the mismatches are a
@@ -134,7 +134,7 @@ class ParityReport:
 
 
 def load_golden(directory: str | pathlib.Path) -> GoldenSet:
-    """Load the golden files from `directory`.
+    """Loads the golden files from `directory`.
 
     Args:
         directory: Folder with `tolerances.json`, `model_spec.json` and
@@ -179,7 +179,7 @@ def to_object(frame: Any) -> Any:
 
 
 def reference_bundle(spec: dict[str, Any]) -> bundle_module.ModelBundle:
-    """Build the hand-written model as a bundle.
+    """Builds the hand-written model as a bundle.
 
     The pipeline has the structure of a trained one (median imputation,
     scaling, one-hot encoding, logistic regression). It is fitted on two rows
@@ -281,7 +281,7 @@ def reference_bundle(spec: dict[str, Any]) -> bundle_module.ModelBundle:
 def expected_outputs(
     spec: dict[str, Any], records: list[dict[str, Any]]
 ) -> dict[str, Any]:
-    """Compute labels and probabilities in closed form with numpy only.
+    """Computes labels and probabilities in closed form with numpy only.
 
     Args:
         spec: The model specification.
@@ -320,7 +320,7 @@ def compare(
     probabilities: list[list[float]],
     tolerance: Tolerance,
 ) -> ParityReport:
-    """Compare a serving path's outputs with the expected ones.
+    """Compares a serving path's outputs with the expected ones.
 
     Args:
         expected: Output of `expected_outputs`.

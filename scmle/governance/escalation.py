@@ -61,7 +61,7 @@ DEFAULT_GRID = 101
 
 
 def set_size_score(set_sizes: Any, novel: Any = None) -> np.ndarray:
-    """Score ``g`` from conformal set sizes and a novelty flag.
+    """Scores ``g`` from conformal set sizes and a novelty flag.
 
     Args:
         set_sizes: Size of each case's prediction set; 0, NaN or infinity

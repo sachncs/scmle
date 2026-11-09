@@ -529,7 +529,7 @@ class TabularEngine(base.BaseEstimator, abc.ABC):
             return outputs.numpy()
 
     def explain(self, features: Any) -> np.ndarray:
-        """Return local gradient-times-input attributions.
+        """Returns local gradient-times-input attributions.
 
         Classification selects the predicted class logit for each row.
         Regression selects the ensemble-mean output. The worker returns one

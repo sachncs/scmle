@@ -36,7 +36,7 @@ class ModalitySampleDecoder(abc.ABC):
 
     @abc.abstractmethod
     def decode(self, payload: object) -> tuple[Any, ...]:
-        """Decode and validate a JSON payload into finite sample objects.
+        """Decodes and validates a JSON payload into finite sample objects.
 
         Args:
             payload: The parsed JSON request body.
@@ -47,7 +47,7 @@ class ModalitySampleDecoder(abc.ABC):
 
     @abc.abstractmethod
     def schema(self) -> dict[str, object]:
-        """Describe the decoder's input contract as JSON evidence.
+        """Describes the decoder's input contract as JSON evidence.
 
         Returns:
             A JSON-serializable description of the accepted input.
@@ -179,7 +179,7 @@ class ModalityHttpServing:
         return "sha256:" + self.predictor.package.model_sha256
 
     def response(self, payload: object) -> dict[str, object]:
-        """Decode samples and return deterministic predictions.
+        """Decodes samples and return deterministic predictions.
 
         Args:
             payload: The parsed JSON request body.
@@ -222,7 +222,7 @@ class ModalityHttpServing:
 
     @staticmethod
     def is_valid_request_id(request_id: str) -> bool:
-        """Check whether a caller request ID is safe to echo in headers.
+        """Checks whether a caller request ID is safe to echo in headers.
 
         Args:
             request_id: The ID supplied by the caller.
@@ -237,7 +237,7 @@ class ModalityHttpServing:
 
     @staticmethod
     def new_server_request_id() -> str:
-        """Make a bounded, opaque request ID that contains no request data.
+        """Makes a bounded, opaque request ID that contains no request data.
 
         Returns:
             A new random ID of the form `srv-<32 hex digits>`.
@@ -260,7 +260,7 @@ class ModalityHttpServing:
             """Handle one modality reference-server request."""
 
             def request_identity(self) -> tuple[str, str | None]:
-                """Resolve the request ID of the current request.
+                """Resolves the request ID of the current request.
 
                 Returns:
                     The caller's `X-Request-ID` when it is valid, else a new
@@ -309,7 +309,7 @@ class ModalityHttpServing:
                 self.wfile.write(body)
 
             def authorized(self, method: str, request_id: str) -> bool:
-                """Apply the gateway; answer a refusal with a safe body.
+                """Applies the gateway; answer a refusal with a safe body.
 
                 Args:
                     method: The HTTP method.
@@ -388,7 +388,7 @@ class ModalityHttpServing:
                     self.send_json(404, {"error": "not found"}, request_id)
 
             def do_POST(self) -> None:
-                """Decode and score a bounded prediction request.
+                """Decodes and scores a bounded prediction request.
 
                 Failures are answered with an error response (415, 411, 400,
                 413, 422, 429, 504 or 500 as appropriate) rather than

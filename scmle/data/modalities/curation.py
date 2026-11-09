@@ -121,7 +121,7 @@ class ModalityDatasetCard:
     schema_version: int = 1
 
     def __post_init__(self) -> None:
-        """Reject a card that is detached from its curation report.
+        """Rejects a card that is detached from its curation report.
 
         Raises:
             ValueError: If modality, dataset_hash or intended_use is blank,
@@ -189,7 +189,7 @@ class ModalityDatasetCard:
         manifest: data_contracts.ModalityManifest | None = None,
         task: str = "classification",
     ) -> Self:
-        """Build a card without inventing missing governance decisions.
+        """Builds a card without inventing missing governance decisions.
 
         When the manifest, built here if absent, carries no source owner,
         acquisition method or privacy classification, provenance and privacy
@@ -307,7 +307,7 @@ class ModalityDatasetCard:
 
 
 def dataset_hash(identities: Iterable[str]) -> str:
-    """Compute an order-independent digest of sample identities.
+    """Computes an order-independent digest of sample identities.
 
     Args:
         identities: Sample identities; each is converted with `str`.
@@ -320,7 +320,7 @@ def dataset_hash(identities: Iterable[str]) -> str:
 
 
 def label_counts(labels: Iterable[Any]) -> dict[str, int]:
-    """Count labels in stable buckets without interpreting task semantics.
+    """Counts labels in stable buckets without interpreting task semantics.
 
     Args:
         labels: Labels of any type; None counts as unlabeled.
@@ -341,7 +341,7 @@ def label_counts(labels: Iterable[Any]) -> dict[str, int]:
 def conflicting_label_groups(
     items: Iterable[tuple[str, str, Any]],
 ) -> tuple[dict[str, object], ...]:
-    """Return duplicate identities carrying more than one known label.
+    """Returns duplicate identities carrying more than one known label.
 
     Each item contains an identity, source, and optional label. Unlabeled
     samples do not create a conflict by themselves; disagreement between two
@@ -389,7 +389,7 @@ def build_finding(
     remediation: str,
     blocking: bool,
 ) -> data_contracts.CurationFinding:
-    """Build one modality curation finding with a shared rule version.
+    """Builds one modality curation finding with a shared rule version.
 
     The finding has confidence 1.0, owner `data-curation`, no reviewer and
     the open disposition.

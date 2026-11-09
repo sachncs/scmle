@@ -123,7 +123,7 @@ def replace_file(
 
 
 def write_atomically(path: str | pathlib.Path, content: bytes) -> None:
-    """Write bytes with flush, fsync, atomic replacement, and cleanup.
+    """Writes bytes with flush, fsync, atomic replacement, and cleanup.
 
     The temporary file is created beside the destination so the replacement
     remains atomic on the supported filesystems. The containing directory is

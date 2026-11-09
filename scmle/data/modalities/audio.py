@@ -57,7 +57,7 @@ class AudioMetadata:
     sample_width: int | None = None
 
     def __post_init__(self) -> None:
-        """Validate metadata before it enters a dataset contract.
+        """Validates metadata before it enters a dataset contract.
 
         Raises:
             ValueError: If format is blank, or sample_rate, channels,
@@ -97,7 +97,7 @@ class AudioTranscriptSegment:
     confidence: float | None = None
 
     def __post_init__(self) -> None:
-        """Validate time bounds, text, and optional confidence.
+        """Validates time bounds, text, and optional confidence.
 
         Raises:
             ValueError: If the bounds are not finite, start is negative or
@@ -144,7 +144,7 @@ class AudioTranscript:
     confidence: float | None = None
 
     def __post_init__(self) -> None:
-        """Validate provenance, ordering, and optional confidence.
+        """Validates provenance, ordering, and optional confidence.
 
         Raises:
             ValueError: If a text field is blank, the confidence is a bool,
@@ -186,7 +186,7 @@ class AudioTranscript:
             )
 
     def to_dict(self) -> dict[str, object]:
-        """Return JSON-native transcript provenance.
+        """Returns JSON-native transcript provenance.
 
         Returns:
             A dict of the fields, with segments as nested dicts.
@@ -246,7 +246,7 @@ class AudioFeatures:
         return (len(self.sources), len(self.feature_names))
 
     def to_numpy(self) -> np.ndarray:
-        """Return a writable copy of the feature matrix.
+        """Returns a writable copy of the feature matrix.
 
         Returns:
             A float64 array of shape ``(samples, features)``.
@@ -269,7 +269,7 @@ class AudioSplit:
     test: tuple["AudioSample", ...]
 
     def group_ids(self) -> dict[str, tuple[str, ...]]:
-        """Return the stable groups assigned to each partition.
+        """Returns the stable groups assigned to each partition.
 
         Returns:
             A dict from partition name (`train`, `validation`, `test`) to
@@ -292,7 +292,7 @@ AudioProbe = Callable[[bytes], AudioMetadata]
 
 
 def canonical_source(source: str | pathlib.Path) -> str:
-    """Return a stable source identifier for a path or URI-like value.
+    """Returns a stable source identifier for a path or URI-like value.
 
     Args:
         source: A filesystem path, a value containing ``://``, or empty.
@@ -310,7 +310,7 @@ def canonical_source(source: str | pathlib.Path) -> str:
 
 
 def wav_metadata(encoded_bytes: bytes) -> AudioMetadata:
-    """Read WAV metadata using the standard library.
+    """Reads WAV metadata using the standard library.
 
     Args:
         encoded_bytes: A complete WAV file.
@@ -343,7 +343,7 @@ def wav_signal_features(
     max_frames: int,
     start_frame: int = 0,
 ) -> tuple[tuple[float, ...], int]:
-    """Extract bounded, normalized PCM statistics from one WAV payload.
+    """Extracts bounded, normalized PCM statistics from one WAV payload.
 
     The returned statistics describe the bounded window beginning at
     'start_frame'. Callers receive the observed frame count so a truncated
@@ -460,7 +460,7 @@ def wav_signal_features(
 def wav_pcm_values(
     encoded_bytes: bytes,
 ) -> tuple[tuple[int, int, int, int, str, str], np.ndarray]:
-    """Decode WAV PCM values and retain the writer parameters.
+    """Decodes WAV PCM values and retain the writer parameters.
 
     Values are normalized to ``[-1, 1]`` and shaped as frames by channels.
     This is a bounded dependency-light primitive for caller-owned perturbation
@@ -539,7 +539,7 @@ def wav_pcm_values(
 def wav_payload_from_pcm(
     parameters: tuple[int, int, int, int, str, str], values: np.ndarray
 ) -> bytes:
-    """Encode normalized PCM values with the supplied WAV parameters.
+    """Encodes normalized PCM values with the supplied WAV parameters.
 
     Values are clipped to [-1, 1] and rounded to the sample width given in
     ``parameters``.
@@ -615,7 +615,7 @@ class AudioSample:
     byte_size: int = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
-        """Validate bytes, source identity, and hash integrity.
+        """Validates bytes, source identity, and hash integrity.
 
         Raises:
             ValueError: If source or group_id is blank, or file_hash is not
@@ -660,7 +660,7 @@ class AudioSample:
         group_id: str | None = None,
         transcript: AudioTranscript | None = None,
     ) -> Self:
-        """Create a sample from bytes and an explicit codec probe.
+        """Creates a sample from bytes and an explicit codec probe.
 
         WAV uses the standard-library probe by default. Every other format
         requires a caller-owned probe, making optional codec behavior visible
@@ -724,7 +724,7 @@ class AudioSample:
         )
 
     def profile(self) -> AudioProfile:
-        """Return bounded metadata suitable for curation and data cards.
+        """Returns bounded metadata suitable for curation and data cards.
 
         Returns:
             The profile of this sample.
@@ -758,7 +758,7 @@ class AudioDataset:
     content_hash: str = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
-        """Reject duplicate source identities and derive dataset identity.
+        """Rejects duplicate source identities and derive dataset identity.
 
         Raises:
             AudioValidationError: If there are no samples or two samples
@@ -785,7 +785,7 @@ class AudioDataset:
         object.__setattr__(self, "content_hash", digest)
 
     def profiles(self) -> tuple[AudioProfile, ...]:
-        """Return profiles in sample order for deterministic curation.
+        """Returns profiles in sample order for deterministic curation.
 
         Returns:
             One profile per sample.
@@ -875,7 +875,7 @@ class AudioDataset:
         test_fraction: float = 0.2,
         seed: int = 0,
     ) -> AudioSplit:
-        """Split clips by explicit group identity to prevent leakage.
+        """Splits clips by explicit group identity to prevent leakage.
 
         A caller should use a speaker, session, device, or other identity as
         ``group_id``. Without one, source identity is the conservative group
@@ -951,7 +951,7 @@ class AudioDataset:
         )
 
     def curate(self) -> ModalityCurationReport:
-        """Build reviewable metadata and compatibility findings.
+        """Builds reviewable metadata and compatibility findings.
 
         Returns:
             A curation report for modality ``audio`` with format, sample

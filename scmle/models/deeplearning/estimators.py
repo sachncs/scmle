@@ -147,15 +147,15 @@ class NetworkEstimator(base.BaseEstimator):
         return np.asarray(features, dtype=np.float32)
 
     def model_contract(self) -> contracts.ModelFamilyContract:
-        """Return the explicit model-family boundary for this estimator."""
+        """Returns the explicit model-family boundary for this estimator."""
         return contracts.model_family_contract(self.architecture)
 
     def inference_contract(self) -> contracts.InferenceContract:
-        """Return the input, output, and inference-method contract."""
+        """Returns the input, output, and inference-method contract."""
         return self.model_contract().inference
 
     def explanation_contract(self) -> contracts.ExplanationContract:
-        """Return the local feature-attribution contract.
+        """Returns the local feature-attribution contract.
 
         Raises:
             ValueError: If the model family declares no explanation contract.
@@ -169,7 +169,7 @@ class NetworkEstimator(base.BaseEstimator):
         return explanation
 
     def checkpoint_manifest(self) -> dict[str, object]:
-        """Return the fitted checkpoint metadata without serializing weights."""
+        """Returns the fitted checkpoint metadata, without the weights."""
         utils.validation.check_is_fitted(self, attributes=["state_"])
         family = self.model_contract()
         return {
@@ -266,7 +266,7 @@ class NetworkEstimator(base.BaseEstimator):
         raise worker.WorkerError("the worker could not load the model state")
 
     def explain(self, features: Any) -> contracts.FeatureExplanation:
-        """Return local gradient-times-input feature attributions.
+        """Returns local gradient-times-input feature attributions.
 
         The result explains the model output selected by the fitted worker:
         the predicted class logit for classification, the averaged ensemble
@@ -335,7 +335,7 @@ class NetworkEstimator(base.BaseEstimator):
 
     @classmethod
     def load_checkpoint(cls, path: str | pathlib.Path) -> "NetworkEstimator":
-        """Load a verified checkpoint for this estimator class.
+        """Loads a verified checkpoint for this estimator class.
 
         Checkpoints are trusted-local joblib payloads. The digest detects
         truncation and accidental modification; it is not a protection

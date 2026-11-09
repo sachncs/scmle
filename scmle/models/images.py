@@ -265,7 +265,7 @@ class ImageClassifier:
         return hashlib.sha256(encoded).hexdigest()
 
     def fit(self, training_data: image.ImageDataset) -> Self:
-        """Fit the baseline on labelled, deduplicated images.
+        """Fits the baseline on labelled, deduplicated images.
 
         Args:
             training_data: Curated training images with at least two labels.

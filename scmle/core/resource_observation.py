@@ -63,7 +63,7 @@ class RuntimeResourceObservation:
         self.sources = dict(sorted(sources.items()))
 
     def to_dict(self) -> dict[str, Any]:
-        """Return reviewable evidence, including unknown values as ``null``."""
+        """Returns reviewable evidence, including unknown values as ``null``."""
         environment = self.environment
         values = {
             "cpu_cores": environment.cpu_cores,
@@ -145,7 +145,7 @@ def observe_runtime_resources(
 
 
 def observe_cpu_cores() -> tuple[int | None, str]:
-    """Return CPUs available to this process, respecting affinity when able."""
+    """Returns CPUs available to this process, respecting affinity when able."""
     affinity_probe = getattr(os, "sched_getaffinity", None)
     try:
         affinity = affinity_probe(0) if affinity_probe is not None else None
@@ -161,7 +161,7 @@ def observe_cpu_cores() -> tuple[int | None, str]:
 
 
 def observe_memory_gb() -> tuple[float | None, str]:
-    """Return physical memory capacity from portable probes.
+    """Returns physical memory capacity from portable probes.
 
     POSIX hosts report it through ``sysconf``. Windows has no ``sysconf``, so
     it is read from ``psutil`` (a Windows-only core dependency).
@@ -179,7 +179,7 @@ def observe_memory_gb() -> tuple[float | None, str]:
 
 
 def observe_windows_memory_gb() -> tuple[float | None, str]:
-    """Return total physical memory on Windows from ``psutil``."""
+    """Returns total physical memory on Windows from ``psutil``."""
     try:
         import psutil  # Windows-only dependency.
 
@@ -192,7 +192,7 @@ def observe_windows_memory_gb() -> tuple[float | None, str]:
 
 
 def observe_disk_gb(path: pathlib.Path) -> tuple[float | None, str]:
-    """Return free bytes on the filesystem containing ``path``.
+    """Returns free bytes on the filesystem containing ``path``.
 
     Args:
         path: Any path on the filesystem to measure.
@@ -232,7 +232,7 @@ def observe_extras() -> tuple[
 
 
 def project_extra_requirements() -> dict[str, tuple[str, ...]]:
-    """Read the installed distribution metadata without importing extras.
+    """Reads the installed distribution metadata without importing extras.
 
     Returns:
         A mapping from extra name to the sorted, de-duplicated names of the
@@ -261,7 +261,7 @@ def project_extra_requirements() -> dict[str, tuple[str, ...]]:
 
 
 def is_installed(package: str) -> bool:
-    """Return whether distribution metadata for ``package`` is available.
+    """Returns whether distribution metadata for ``package`` is available.
 
     Args:
         package: Distribution name to look up.

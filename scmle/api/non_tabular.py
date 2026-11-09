@@ -56,7 +56,7 @@ class NonTabularModelCapability:
     limitations: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
-        """Validate the capability record before it is persisted or returned.
+        """Validates the capability record before it is persisted or returned.
 
         Raises:
             ValueError: If a text field is empty, the status is not
@@ -82,7 +82,7 @@ class NonTabularModelCapability:
         object.__setattr__(self, "limitations", tuple(self.limitations))
 
     def to_dict(self) -> dict[str, object]:
-        """Return JSON-native capability evidence.
+        """Returns JSON-native capability evidence.
 
         Returns:
             A dict of all fields, with the limitations as a list.
@@ -112,7 +112,7 @@ class NonTabularModelResult:
     capability: NonTabularModelCapability
 
     def __post_init__(self) -> None:
-        """Validate the result's package and capability identities.
+        """Validates the result's package and capability identities.
 
         Raises:
             ValueError: If the report and capability modalities differ, or the
@@ -134,7 +134,7 @@ class NonTabularModelResult:
         return self.report.dataset_hash
 
     def predict(self, samples: Sequence[Any]) -> np.ndarray:
-        """Predict labels after validating the stored representation schema.
+        """Predicts labels after validating the stored representation schema.
 
         Args:
             samples: The samples to score, in the adapter's input form.
@@ -145,7 +145,7 @@ class NonTabularModelResult:
         return self.predictor.predict(samples)
 
     def predict_proba(self, samples: Sequence[Any]) -> np.ndarray:
-        """Return probabilities after validating the stored schema.
+        """Returns probabilities after validating the stored schema.
 
         Args:
             samples: The samples to score, in the adapter's input form.
@@ -156,7 +156,7 @@ class NonTabularModelResult:
         return self.predictor.predict_proba(samples)
 
     def health(self) -> dict[str, object]:
-        """Return verified inference health and the capability boundary.
+        """Returns verified inference health and the capability boundary.
 
         Returns:
             The predictor's health record plus the support status,
@@ -175,7 +175,7 @@ class NonTabularModelResult:
 def capability_for_adapter(
     adapter: modality_lifecycle.ModalityAdapter,
 ) -> NonTabularModelCapability:
-    """Return the explicit capability for one built-in adapter.
+    """Returns the explicit capability for one built-in adapter.
 
     Exact built-in types are required. A caller-defined subclass can change
     validation, splitting, feature construction, or decoder semantics and is
@@ -359,7 +359,7 @@ class NonTabularModelProject:
         checkpoint_path: str | Path | None = None,
         resume: bool = False,
     ) -> None:
-        """Define a bounded non-tabular model run.
+        """Defines a bounded non-tabular model run.
 
         Args:
             adapter: Exact built-in adapter holding the training samples.
@@ -505,7 +505,7 @@ class NonTabularModelProject:
         return self.load_result()
 
     def load_result(self) -> NonTabularModelResult:
-        """Load and verify the signed report and package for this project.
+        """Loads and verifies the signed report and package for this project.
 
         Returns:
             The verified result, which is also kept as `result`.
@@ -542,7 +542,7 @@ class NonTabularModelProject:
     def capability_for_adapter(
         cls, adapter: modality_lifecycle.ModalityAdapter
     ) -> NonTabularModelCapability:
-        """Return the capability without opting into a model run.
+        """Returns the capability without opting into a model run.
 
         Args:
             adapter: The adapter to describe.

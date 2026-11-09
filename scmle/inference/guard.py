@@ -107,7 +107,7 @@ class Readiness:
             )
 
     def fail(self, reason: str) -> None:
-        """Record why the service will not become ready.
+        """Records why the service will not become ready.
 
         Args:
             reason: The failure description reported by `snapshot`.
@@ -123,7 +123,7 @@ class Readiness:
             return self.phase is Phase.READY
 
     def snapshot(self) -> dict[str, Any]:
-        """Report the state for `/readyz`.
+        """Reports the state for `/readyz`.
 
         Returns:
             A mapping with `ready`, the current `phase` name, the seconds
@@ -144,7 +144,7 @@ class AdmissionControl:
     """Bounds concurrent requests and the time one request may take."""
 
     def __init__(self, max_concurrent: int, timeout_seconds: float) -> None:
-        """Create the limits.
+        """Creates the limits.
 
         Args:
             max_concurrent: Requests allowed in flight; more get a 429.
@@ -166,7 +166,7 @@ class AdmissionControl:
 
     @contextlib.contextmanager
     def admit(self) -> Iterator[None]:
-        """Take a slot without waiting, or raise `OverloadedError`.
+        """Takes a slot without waiting, or raise `OverloadedError`.
 
         Yields:
             None, while the slot is held; it is released on exit.
@@ -184,7 +184,7 @@ class AdmissionControl:
             self.slots.release()
 
     def run(self, work: Callable[[], Any]) -> Any:
-        """Run `work` and wait at most the timeout for its result.
+        """Runs `work` and wait at most the timeout for its result.
 
         Args:
             work: Zero-argument callable executed on a worker thread.
@@ -210,7 +210,7 @@ class AdmissionControl:
 
 
 def is_valid_request_id(request_id: str) -> bool:
-    """Check whether a caller request id is safe to echo in a header.
+    """Checks whether a caller request id is safe to echo in a header.
 
     Args:
         request_id: The id supplied by the caller.
@@ -222,7 +222,7 @@ def is_valid_request_id(request_id: str) -> bool:
 
 
 def new_request_id() -> str:
-    """Make an opaque server-side request id that contains no request data.
+    """Makes an opaque server-side request id that contains no request data.
 
     Returns:
         A new random id of the form `srv-<32 hex digits>`.

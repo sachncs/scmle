@@ -16,7 +16,7 @@ PACKAGE_NAME = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
 
 
 def normalize_name(name: str) -> str:
-    """Return a canonical PyPI package name for an SBOM component.
+    """Returns a canonical PyPI package name for an SBOM component.
 
     Args:
         name: A distribution name.
@@ -34,7 +34,7 @@ def normalize_name(name: str) -> str:
 
 
 def component_ref(name: str, version: str) -> str:
-    """Return a stable package URL used as the component reference.
+    """Returns a stable package URL used as the component reference.
 
     Args:
         name: A distribution name.
@@ -60,7 +60,7 @@ def build(
     software_version: str,
     observed_at: str | None = None,
 ) -> dict[str, Any]:
-    """Build a CycloneDX SBOM from a pinned distribution mapping.
+    """Builds a CycloneDX SBOM from a pinned distribution mapping.
 
     The function records package identities and versions only. License and
     vulnerability claims require authoritative package metadata and scanners,
@@ -177,7 +177,7 @@ def build_service(
     software_version: str,
     observed_at: str | None = None,
 ) -> dict[str, Any]:
-    """Build the CycloneDX SBOM of a packaged service.
+    """Builds the CycloneDX SBOM of a packaged service.
 
     On top of the Python distributions it lists the model bundle (by the
     SHA-256 of its manifest) and the base image (by reference; the digest is

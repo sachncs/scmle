@@ -32,7 +32,7 @@ class WorkflowStage(Protocol):
     requires: ClassVar[tuple[type["WorkflowStage"], ...]]
 
     def describe(self, context: "context_module.RunContext") -> str:
-        """Return the reason recorded on stage entry.
+        """Returns the reason recorded on stage entry.
 
         Args:
             context: The shared run context.

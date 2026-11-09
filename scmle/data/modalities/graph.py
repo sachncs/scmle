@@ -162,7 +162,7 @@ class TemporalGraphSplit:
     future_edges: tuple[GraphEdge, ...]
 
     def __post_init__(self) -> None:
-        """Validate the cutoff and timestamp completeness of both partitions.
+        """Validates the cutoff and timestamp completeness of both partitions.
 
         Raises:
             ValueError: If the cutoff is not timezone-aware or an edge in
@@ -191,7 +191,7 @@ class TemporalGraphSplit:
 
 
 def canonical_event_time(value: datetime | str) -> datetime:
-    """Parse and normalize a timezone-aware graph event timestamp to UTC.
+    """Parses and normalizes a timezone-aware graph event timestamp to UTC.
 
     Args:
         value: A datetime, or ISO 8601 text; a trailing ``Z`` means UTC.
@@ -829,7 +829,7 @@ class GraphData:
         )
 
     def temporal_split(self, cutoff: datetime | str) -> TemporalGraphSplit:
-        """Split fully timestamped edges into past and future partitions.
+        """Splits fully timestamped edges into past and future partitions.
 
         Edges at the cutoff belong to training; edges after the cutoff belong
         to the future evaluation partition. Untimestamped edges fail closed
@@ -867,7 +867,7 @@ class GraphData:
         )
 
     def curate(self) -> ModalityCurationReport:
-        """Build graph-structure evidence before choosing a graph model.
+        """Builds graph-structure evidence before choosing a graph model.
 
         Returns:
             A curation report for modality ``graph`` whose sample count is

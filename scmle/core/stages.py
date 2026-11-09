@@ -2524,7 +2524,7 @@ class Measured:
 def pareto_report(
     rows: list[Measured], chosen: Measured, sign: float
 ) -> list[dict[str, Any]]:
-    """Score / latency / size of each measured candidate, with dominance.
+    """Scores / latency / size of each measured candidate, with dominance.
 
     Args:
         rows: The measured candidates.
@@ -3615,7 +3615,7 @@ class PackageStage(Stage):
         store: Any,
         policy: evaluation_contracts.EvaluationPolicy,
     ) -> evidence_contracts.EvidenceIndex:
-        """Collect accepted evidence for artifacts already written.
+        """Collects accepted evidence for artifacts already written.
 
         Acceptance is deliberately narrow: an automated record is accepted
         only when the referenced artifact exists and its digest is captured.
@@ -3679,7 +3679,7 @@ class PackageStage(Stage):
         store: Any,
         evaluation: dict[str, Any],
     ) -> None:
-        """Evaluate explicit success criteria against release evidence.
+        """Evaluates explicit success criteria against release evidence.
 
         Writes the release policy, evidence and evaluation files into the run
         store and records the results in `evaluation`. When no success criteria
@@ -3868,7 +3868,7 @@ class PackageStage(Stage):
         store: Any,
         bundle: bundle_module.ModelBundle,
     ) -> dict[str, Any]:
-        """Build a content-linked provenance record for the packaged run.
+        """Builds a content-linked provenance record for the packaged run.
 
         The record is also written to `provenance.json`.
 
@@ -3925,7 +3925,7 @@ class PackageStage(Stage):
         store: Any,
         bundle: bundle_module.ModelBundle,
     ) -> dict[str, Any]:
-        """Build and persist the packaged environment's SBOM.
+        """Builds and persists the packaged environment's SBOM.
 
         Args:
             context: The run context; not consulted.
@@ -4562,7 +4562,7 @@ class PackageStage(Stage):
         context: context_module.RunContext,
         store: Any,
     ) -> lineage.EvidenceGraph:
-        """Build the content-linked graph for one completed package.
+        """Builds the content-linked graph for one completed package.
 
         Args:
             context: The run context, supplying the manifest, split and trial.

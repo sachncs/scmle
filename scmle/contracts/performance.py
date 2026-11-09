@@ -21,7 +21,7 @@ class PerformanceOperation(enum.StrEnum):
 
 
 def parse_timestamp(value: str, field_name: str) -> datetime.datetime:
-    """Parse an offset-aware ISO-8601 timestamp.
+    """Parses an offset-aware ISO-8601 timestamp.
 
     Args:
         value: The timestamp; a trailing ``Z`` means UTC.
@@ -52,7 +52,7 @@ class PerformanceObservation:
     software: str
 
     def __post_init__(self) -> None:
-        """Reject measurements that cannot support a budget decision.
+        """Rejects measurements that cannot support a budget decision.
 
         Raises:
             ValueError: If the elapsed time or peak memory is not finite and
@@ -80,7 +80,7 @@ class PerformanceObservation:
         parse_timestamp(self.observed_at, "observed_at")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-native performance evidence."""
+        """Returns JSON-native performance evidence."""
         return {
             "operation": self.operation.value,
             "elapsed_seconds": self.elapsed_seconds,
@@ -124,7 +124,7 @@ class PerformanceRun:
     observations: tuple[PerformanceObservation, ...]
 
     def __post_init__(self) -> None:
-        """Reject empty or ambiguous run evidence.
+        """Rejects empty or ambiguous run evidence.
 
         Raises:
             ValueError: If the run id is blank, there are no observations, an
@@ -154,7 +154,7 @@ class PerformanceRun:
     def observation(
         self, operation: PerformanceOperation
     ) -> PerformanceObservation | None:
-        """Return the observation for an operation, when present.
+        """Returns the observation for an operation, when present.
 
         Args:
             operation: The operation to look up.
@@ -172,7 +172,7 @@ class PerformanceRun:
         )
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-native run evidence."""
+        """Returns JSON-native run evidence."""
         return {
             "run_id": self.run_id,
             "observations": [
@@ -210,7 +210,7 @@ class PerformanceComparison:
     violations: tuple[str, ...]
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-native comparison evidence."""
+        """Returns JSON-native comparison evidence."""
         return {
             "passed": self.passed,
             "baseline_run_count": self.baseline_run_count,
@@ -228,7 +228,7 @@ class PerformanceBaseline:
     max_relative_regression: float = 0.10
 
     def __post_init__(self) -> None:
-        """Validate repeated, schema-consistent reference measurements.
+        """Validates repeated, schema-consistent reference measurements.
 
         Raises:
             ValueError: If there are fewer than two reference runs, the allowed
@@ -294,7 +294,7 @@ class PerformanceBaseline:
         object.__setattr__(self, "reference_runs", runs)
 
     def evaluate(self, current: PerformanceRun) -> PerformanceComparison:
-        """Compare one run with the median of the repeated baseline.
+        """Compares one run with the median of the repeated baseline.
 
         A run from a different environment, or with different sample counts,
         does not pass and is reported without regressions.
@@ -461,7 +461,7 @@ class PerformanceBaseline:
         )
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-native baseline policy and reference evidence."""
+        """Returns JSON-native baseline policy and reference evidence."""
         return {
             "max_relative_regression": self.max_relative_regression,
             "reference_runs": [run.to_dict() for run in self.reference_runs],
@@ -469,7 +469,7 @@ class PerformanceBaseline:
 
 
 def relative_change(reference: float, current: float) -> float:
-    """Return the non-negative relative increase from reference to current.
+    """Returns the non-negative relative increase from reference to current.
 
     Args:
         reference: The reference value.
@@ -493,7 +493,7 @@ class PerformanceBudget:
     max_peak_memory_gb: float | None = None
 
     def __post_init__(self) -> None:
-        """Validate positive ceilings and normalize operation names.
+        """Validates positive ceilings and normalize operation names.
 
         Raises:
             ValueError: If a time limit or the memory limit is not positive and
@@ -523,7 +523,7 @@ class PerformanceBudget:
     def evaluate(
         self, observations: tuple[PerformanceObservation, ...]
     ) -> "PerformanceResult":
-        """Evaluate observations without treating missing data as pass.
+        """Evaluates observations without treating missing data as pass.
 
         Args:
             observations: The observations, at most one for each operation.
@@ -581,7 +581,7 @@ class PerformanceBudget:
         )
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-native budget policy."""
+        """Returns JSON-native budget policy."""
         return {
             "max_seconds": {
                 operation.value: limit
@@ -602,7 +602,7 @@ class PerformanceResult:
     violations: tuple[str, ...]
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-native performance decision evidence."""
+        """Returns JSON-native performance decision evidence."""
         return {
             "passed": self.passed,
             "observations": [

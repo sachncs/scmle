@@ -72,7 +72,7 @@ class FieldDecision:
     suspicion_kept: bool = False
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert the decision to a JSON-ready record.
+        """Converts the decision to a JSON-ready record.
 
         Returns:
             A dict of the fields; enums as strings, reasons as a list.
@@ -107,7 +107,7 @@ class FieldDecision:
 
 
 def unverified_outcome(mode: Mode) -> Admission:
-    """Decide the admission of a field whose provenance cannot be verified.
+    """Decides the admission of a field whose provenance cannot be verified.
 
     Args:
         mode: Strict or permissive.
@@ -128,7 +128,7 @@ def decide_timing(
     suspect: bool,
     leakage_gate: certificates.GateStatus,
 ) -> FieldDecision:
-    """Apply the timing rule to one field.
+    """Applies the timing rule to one field.
 
     Args:
         record: The field's provenance.
@@ -212,7 +212,7 @@ def decide_predictive(
     suspect: bool = False,
     leakage_gate: certificates.GateStatus = certificates.GateStatus.DESCRIPTIVE,
 ) -> FieldDecision:
-    """Decide the admissibility of one field for a predictive estimand.
+    """Decides the admissibility of one field for a predictive estimand.
 
     Causal roles (mediator, collider, post-treatment) are not consulted.
 
@@ -247,7 +247,7 @@ def decide_causal(
     suspect: bool = False,
     leakage_gate: certificates.GateStatus = certificates.GateStatus.DESCRIPTIVE,
 ) -> FieldDecision:
-    """Decide the admissibility of one field as a covariate.
+    """Decides the admissibility of one field as a covariate.
 
     Applies the predictive timing rule first, then the graph rule.
 
@@ -340,7 +340,7 @@ class AdmissibilityTable:
     adjustment_set: tuple[str, ...] | None
 
     def __post_init__(self) -> None:
-        """Validate the table.
+        """Validates the table.
 
         Raises:
             ValueError: If `kind` is not `predictive` or `causal`, or field
@@ -364,7 +364,7 @@ class AdmissibilityTable:
         return tuple(d.name for d in self.decisions if d.admission is admission)
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert the table to a JSON-ready document.
+        """Converts the table to a JSON-ready document.
 
         Returns:
             A dict with the format version, kind, mode, DAG hash,
@@ -396,7 +396,7 @@ def build_table(
     treatment: str | None = None,
     outcome: str | None = None,
 ) -> AdmissibilityTable:
-    """Decide every field of a provenance table.
+    """Decides every field of a provenance table.
 
     Args:
         table: Provenance of every field.

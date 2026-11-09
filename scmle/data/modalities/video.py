@@ -63,7 +63,7 @@ class VideoMetadata:
     sync_tolerance_seconds: float | None = None
 
     def __post_init__(self) -> None:
-        """Validate dimensions, timing, and track counts.
+        """Validates dimensions, timing, and track counts.
 
         Raises:
             ValueError: If format or codec is blank, a dimension is below
@@ -190,7 +190,7 @@ class VideoFeatures:
     sampled_frame_indices: tuple[tuple[int, ...], ...] = ()
 
     def __post_init__(self) -> None:
-        """Validate feature dimensions and sampled-frame metadata.
+        """Validates feature dimensions and sampled-frame metadata.
 
         Raises:
             ValueError: If rows do not match sources, columns do not match
@@ -227,7 +227,7 @@ class VideoFeatures:
         return (len(self.sources), len(self.feature_names))
 
     def to_numpy(self) -> np.ndarray:
-        """Return a writable copy of the feature matrix.
+        """Returns a writable copy of the feature matrix.
 
         Returns:
             A float64 array of shape ``(videos, features)``.
@@ -250,7 +250,7 @@ class VideoSplit:
     test: tuple["VideoSample", ...]
 
     def group_ids(self) -> dict[str, tuple[str, ...]]:
-        """Return the stable groups assigned to each partition.
+        """Returns the stable groups assigned to each partition.
 
         Returns:
             A dict from partition name (`train`, `validation`, `test`) to
@@ -284,7 +284,7 @@ class VideoTemporalSplit:
     future: tuple["VideoSample", ...]
 
     def __post_init__(self) -> None:
-        """Validate the cutoff and timestamp completeness of each partition.
+        """Validates the cutoff and timestamp completeness of each partition.
 
         Raises:
             ValueError: If the cutoff is not timezone-aware or a clip in
@@ -313,7 +313,7 @@ VideoFrameDecoder = Callable[[bytes, int], np.ndarray]
 
 
 def canonical_source(source: str | pathlib.Path) -> str:
-    """Return a stable source identifier for a path or URI-like value.
+    """Returns a stable source identifier for a path or URI-like value.
 
     Args:
         source: A filesystem path, a value containing ``://``, or empty.
@@ -331,7 +331,7 @@ def canonical_source(source: str | pathlib.Path) -> str:
 
 
 def canonical_observation_time(value: datetime | str) -> datetime:
-    """Parse and normalize a timezone-aware observation time to UTC.
+    """Parses and normalizes a timezone-aware observation time to UTC.
 
     Args:
         value: A datetime, or ISO 8601 text; a trailing ``Z`` means UTC.
@@ -394,7 +394,7 @@ class VideoSample:
     byte_size: int = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
-        """Validate the payload and its content identity.
+        """Validates the payload and its content identity.
 
         Raises:
             ValueError: If source or group_id is blank, or file_hash is not
@@ -436,7 +436,7 @@ class VideoSample:
         group_id: str | None = None,
         observation_time: datetime | str | None = None,
     ) -> Self:
-        """Create a sample from bytes and explicit probe output.
+        """Creates a sample from bytes and explicit probe output.
 
         Video codecs are intentionally not imported by core. A production
         adapter should record the probe version alongside the sample manifest.
@@ -487,7 +487,7 @@ class VideoSample:
         )
 
     def profile(self) -> VideoProfile:
-        """Return bounded metadata suitable for curation and data cards.
+        """Returns bounded metadata suitable for curation and data cards.
 
         Returns:
             The profile of this sample.
@@ -525,7 +525,7 @@ class VideoDataset:
     content_hash: str = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
-        """Reject duplicate sources and derive a stable dataset hash.
+        """Rejects duplicate sources and derive a stable dataset hash.
 
         Raises:
             VideoValidationError: If there are no samples or two samples
@@ -558,7 +558,7 @@ class VideoDataset:
         object.__setattr__(self, "content_hash", digest)
 
     def profiles(self) -> tuple[VideoProfile, ...]:
-        """Return profiles in sample order for deterministic curation.
+        """Returns profiles in sample order for deterministic curation.
 
         Returns:
             One profile per sample.
@@ -754,7 +754,7 @@ class VideoDataset:
     def frame_indices_for(
         sample: VideoSample, max_frames: int
     ) -> tuple[int, ...]:
-        """Return deterministic, evenly spaced frame indices for a sample.
+        """Returns deterministic, evenly spaced frame indices for a sample.
 
         Args:
             sample: The video sample.
@@ -786,7 +786,7 @@ class VideoDataset:
         test_fraction: float = 0.2,
         seed: int = 0,
     ) -> VideoSplit:
-        """Split clips by explicit group identity to prevent leakage.
+        """Splits clips by explicit group identity to prevent leakage.
 
         A caller should use a subject, session, camera, or other identity as
         ``group_id``. Without one, source identity is the conservative group
@@ -862,7 +862,7 @@ class VideoDataset:
         )
 
     def split_temporal(self, cutoff: datetime | str) -> VideoTemporalSplit:
-        """Split fully timestamped videos into past and future partitions.
+        """Splits fully timestamped videos into past and future partitions.
 
         Videos at the cutoff belong to training. Videos after the cutoff
         belong to future evaluation. Untimestamped videos fail closed because
@@ -904,7 +904,7 @@ class VideoDataset:
         )
 
     def curate(self) -> ModalityCurationReport:
-        """Build reviewable metadata and compatibility findings.
+        """Builds reviewable metadata and compatibility findings.
 
         Returns:
             A curation report for modality ``video`` with format, codec,

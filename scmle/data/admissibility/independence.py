@@ -75,7 +75,7 @@ class Statement:
     given: tuple[str, ...]
 
     def text(self) -> str:
-        """Write the statement in words.
+        """Writes the statement in words.
 
         Returns:
             A sentence naming `x`, `y` and, if any, the conditioning set.
@@ -112,7 +112,7 @@ class CITest:
 
 
 def residuals(values: np.ndarray, given: np.ndarray) -> np.ndarray:
-    """Compute least-squares residuals on a set of columns and an intercept.
+    """Computes least-squares residuals on a set of columns and an intercept.
 
     Args:
         values: The response, one entry per row.
@@ -129,7 +129,7 @@ def residuals(values: np.ndarray, given: np.ndarray) -> np.ndarray:
 def partial_correlation(
     frame: pd.DataFrame, x: str, y: str, given: Sequence[str]
 ) -> float:
-    """Compute the sample partial correlation of two columns given others.
+    """Computes the sample partial correlation of two columns given others.
 
     Args:
         frame: Numeric data holding all named columns.
@@ -223,7 +223,7 @@ def stratified_chi2(
 
 
 def is_discrete(series: pd.Series) -> bool:
-    """Decide whether a column is treated as categorical.
+    """Decides whether a column is treated as categorical.
 
     Args:
         series: The column.
@@ -363,7 +363,7 @@ def falsify(
     run_seed: int = 0,
     set_id: qualification.SetId = qualification.SetId.EXPLORATION,
 ) -> FalsificationReport:
-    """Test each implied independence of `graph` on the data.
+    """Tests each implied independence of `graph` on the data.
 
     The per-test level is `alpha` divided by the number of testable
     statements (Bonferroni), so the chance of falsifying a true graph in any

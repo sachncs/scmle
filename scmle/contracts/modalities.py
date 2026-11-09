@@ -45,7 +45,7 @@ class ExtensionModality:
     name: str
 
     def __post_init__(self) -> None:
-        """Validate a stable, non-built-in dataset-family name.
+        """Validates a stable, non-built-in dataset-family name.
 
         Raises:
             TypeError: If the name is not a string.
@@ -74,7 +74,7 @@ ModalityIdentity = Modality | ExtensionModality
 
 
 def modality_value(modality: ModalityIdentity) -> str:
-    """Return the stable serialized value for a modality identity.
+    """Returns the stable serialized value for a modality identity.
 
     Args:
         modality: A built-in or extension modality.
@@ -168,7 +168,7 @@ class StageEvidence:
     notes: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
-        """Validate stage identity and evidence text.
+        """Validates stage identity and evidence text.
 
         Raises:
             TypeError: If the stage is not a `LifecycleStage` or the evidence is
@@ -208,7 +208,7 @@ class StageEvidence:
         return bool(self.evidence_links)
 
     def to_dict(self) -> dict[str, object]:
-        """Return a stable JSON-compatible stage record."""
+        """Returns a stable JSON-compatible stage record."""
         return {
             "stage": self.stage.value,
             "evidence_links": list(self.evidence_links),
@@ -242,7 +242,7 @@ class ModalityDeclaration:
     limitations: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
-        """Validate declaration shape and supported-status evidence.
+        """Validates declaration shape and supported-status evidence.
 
         Raises:
             TypeError: If the modality, status, resources or stage evidence has
@@ -312,7 +312,7 @@ class ModalityDeclaration:
         return not self.missing_stages
 
     def to_dict(self) -> dict[str, object]:
-        """Return a stable JSON-compatible declaration."""
+        """Returns a stable JSON-compatible declaration."""
         stage_records = {record.stage: record for record in self.stage_evidence}
         return {
             "modality": modality_value(self.modality),
@@ -351,7 +351,7 @@ class ModalityRegistry:
     def __init__(
         self, declarations: Iterable[ModalityDeclaration] = ()
     ) -> None:
-        """Create a registry and register supplied declarations.
+        """Creates a registry and register supplied declarations.
 
         Args:
             declarations: The declarations to register.
@@ -361,7 +361,7 @@ class ModalityRegistry:
             self.register(declaration)
 
     def register(self, declaration: ModalityDeclaration) -> None:
-        """Register a declaration without replacing an existing modality.
+        """Registers a declaration without replacing an existing modality.
 
         Args:
             declaration: Modality lifecycle declaration.
@@ -380,7 +380,7 @@ class ModalityRegistry:
         self.records[declaration.modality] = declaration
 
     def find(self, modality: ModalityIdentity) -> ModalityDeclaration | None:
-        """Return a declaration or ``None`` when it is unregistered.
+        """Returns a declaration or ``None`` when it is unregistered.
 
         Args:
             modality: The modality to look up.
@@ -440,14 +440,14 @@ class ModalityRegistry:
         return declaration
 
     def list_declarations(self) -> tuple[ModalityDeclaration, ...]:
-        """Return declarations in deterministic modality order."""
+        """Returns declarations in deterministic modality order."""
         return tuple(
             self.records[modality]
             for modality in sorted(self.records, key=lambda item: item.value)
         )
 
     def to_dict(self) -> dict[str, object]:
-        """Return a deterministic registry representation."""
+        """Returns a deterministic registry representation."""
         return {
             "declarations": [
                 declaration.to_dict()
@@ -456,7 +456,7 @@ class ModalityRegistry:
         }
 
     def to_json(self) -> str:
-        """Return deterministic JSON suitable for evidence artifacts."""
+        """Returns deterministic JSON suitable for evidence artifacts."""
         return json.dumps(
             self.to_dict(),
             ensure_ascii=False,
@@ -470,7 +470,7 @@ class ModalityRegistry:
         reason: str,
         details: dict[str, object] | None = None,
     ) -> NoReturn:
-        """Raise a structured pre-execution modality rejection.
+        """Raises a structured pre-execution modality rejection.
 
         Args:
             modality: The modality that was refused.

@@ -25,7 +25,7 @@ class ColumnMapping:
     strip_whitespace: bool = False
 
     def normalize(self, name: str) -> str:
-        """Apply the matching normalizations to a column name.
+        """Applies the matching normalizations to a column name.
 
         Args:
             name: The column name.

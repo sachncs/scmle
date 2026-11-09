@@ -111,7 +111,7 @@ class AsOf:
     lead_seconds: float | None
 
     def __post_init__(self) -> None:
-        """Validate the rule.
+        """Validates the rule.
 
         Raises:
             ValueError: If `kind` is not an `AsOfKind`, if an unknown rule
@@ -129,7 +129,7 @@ class AsOf:
 
     @classmethod
     def unknown(cls) -> Self:
-        """Build the rule of a field nobody has stated or derived.
+        """Builds the rule of a field nobody has stated or derived.
 
         Returns:
             A rule of kind `unknown` with no lead.
@@ -142,7 +142,7 @@ class AsOf:
         return self.kind is not AsOfKind.UNKNOWN
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert the rule to a JSON-ready record.
+        """Converts the rule to a JSON-ready record.
 
         Returns:
             A dict with `kind` (its string value) and `lead_seconds`.
@@ -165,7 +165,7 @@ class AsOf:
 
 
 def parse_date(value: str, name: str) -> datetime.date:
-    """Parse an ISO calendar date.
+    """Parses an ISO calendar date.
 
     Args:
         value: Text in the form YYYY-MM-DD.
@@ -207,7 +207,7 @@ class Attestation:
     expires: str
 
     def __post_init__(self) -> None:
-        """Validate the record.
+        """Validates the record.
 
         Raises:
             ValueError: If a text field is empty, a date is not an ISO date,
@@ -226,7 +226,7 @@ class Attestation:
             raise ValueError("expires must not precede date")
 
     def valid_on(self, day: datetime.date) -> bool:
-        """Test whether the statement counts on a day.
+        """Tests whether the statement counts on a day.
 
         Args:
             day: The day to test.
@@ -238,7 +238,7 @@ class Attestation:
         return issued <= day <= parse_date(self.expires, "expires")
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert the record to a JSON-ready dict.
+        """Converts the record to a JSON-ready dict.
 
         Returns:
             A dict of the record's fields and their values.
@@ -275,7 +275,7 @@ class LogCheck:
     tolerance: float
 
     def __post_init__(self) -> None:
-        """Validate the record.
+        """Validates the record.
 
         Raises:
             ValueError: If `rows` is not a positive integer, `mismatched` is
@@ -299,7 +299,7 @@ class LogCheck:
         return self.rate <= self.tolerance
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert the record to a JSON-ready dict.
+        """Converts the record to a JSON-ready dict.
 
         Returns:
             A dict of the record's fields and their values.
@@ -353,7 +353,7 @@ class FieldProvenance:
     log_check: LogCheck | None = None
 
     def __post_init__(self) -> None:
-        """Validate the record.
+        """Validates the record.
 
         Raises:
             ValueError: If `name` or `writer` is empty, a definition note is
@@ -419,7 +419,7 @@ class FieldProvenance:
         return qualification.Tier.UNVERIFIED
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert the record to a JSON-ready dict.
+        """Converts the record to a JSON-ready dict.
 
         Returns:
             A dict of the fields; enums as strings, nested records as dicts
@@ -510,7 +510,7 @@ class ProvenanceTable:
     fields: tuple[FieldProvenance, ...]
 
     def __post_init__(self) -> None:
-        """Validate the table.
+        """Validates the table.
 
         Raises:
             ValueError: If `fields` is not a tuple or names repeat.
@@ -567,7 +567,7 @@ class ProvenanceTable:
     def tiers(
         self, today: datetime.date | None = None
     ) -> dict[str, qualification.Tier]:
-        """Compute the evidence tier of every field.
+        """Computes the evidence tier of every field.
 
         Args:
             today: Day on which attestations must still be valid; None
@@ -579,7 +579,7 @@ class ProvenanceTable:
         return {f.name: f.tier(today) for f in self.fields}
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert the table to a JSON-ready document.
+        """Converts the table to a JSON-ready document.
 
         Returns:
             A dict with `format_version` and the list of field records.
@@ -616,7 +616,7 @@ class ProvenanceTable:
         )
 
     def digest(self) -> str:
-        """Hash the table.
+        """Hashes the table.
 
         Returns:
             The hex SHA-256 of the table's JSON with sorted keys and no

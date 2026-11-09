@@ -8,7 +8,7 @@ from typing import Any
 
 
 def validate_score(value: float, field_name: str) -> float:
-    """Return a finite score in the inclusive unit interval.
+    """Returns a finite score in the inclusive unit interval.
 
     Args:
         value: The candidate score.
@@ -44,7 +44,7 @@ class QualityThresholds:
     fidelity_minimum: float | None = None
 
     def __post_init__(self) -> None:
-        """Validate every declared threshold.
+        """Validates every declared threshold.
 
         A declared threshold that is not a number is rejected by
         `validate_score` with a `TypeError`.
@@ -61,7 +61,7 @@ class QualityThresholds:
             validate_score(self.fidelity_minimum, "fidelity_minimum")
 
     def to_dict(self) -> dict[str, float | None]:
-        """Return JSON-compatible threshold declarations.
+        """Returns JSON-compatible threshold declarations.
 
         Returns:
             A mapping with the keys `stability_minimum` and
@@ -98,7 +98,7 @@ class QualityEvaluation:
     findings: tuple[str, ...]
 
     def __post_init__(self) -> None:
-        """Validate the evaluation record before it is persisted.
+        """Validates the evaluation record before it is persisted.
 
         Raises:
             ValueError: If `method` is blank, `sample_count` is below 1, or
@@ -118,7 +118,7 @@ class QualityEvaluation:
             raise TypeError("findings must be a tuple")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a deterministic JSON-compatible evaluation.
+        """Returns a deterministic JSON-compatible evaluation.
 
         Returns:
             A mapping of every field, with thresholds as a mapping and
@@ -160,7 +160,7 @@ class ExplanationGroundTruth:
     limitations: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
-        """Validate the independent reference declaration.
+        """Validates the independent reference declaration.
 
         A `minimum_overlap` that is not a number is rejected by
         `validate_score` with a `TypeError`.
@@ -186,7 +186,7 @@ class ExplanationGroundTruth:
             raise ValueError("limitations must not contain empty values")
 
     def to_dict(self) -> dict[str, object]:
-        """Return the reference declaration as JSON-native evidence.
+        """Returns the reference declaration as JSON-native evidence.
 
         Returns:
             A mapping of every field, with sequences as lists.
@@ -231,7 +231,7 @@ class GroundTruthEvaluation:
     limitations: tuple[str, ...]
 
     def __post_init__(self) -> None:
-        """Validate the comparison before it is persisted.
+        """Validates the comparison before it is persisted.
 
         A score that is not a number is rejected by `validate_score` with
         a `TypeError`.
@@ -253,7 +253,7 @@ class GroundTruthEvaluation:
             raise TypeError("findings must be a tuple")
 
     def to_dict(self) -> dict[str, object]:
-        """Return the comparison as deterministic JSON-native evidence.
+        """Returns the comparison as deterministic JSON-native evidence.
 
         Returns:
             A mapping of every field plus `status` set to "available", with
@@ -295,7 +295,7 @@ class GroundTruthSuiteEvaluation:
     findings: tuple[str, ...]
 
     def __post_init__(self) -> None:
-        """Validate suite cardinality and evaluation consistency.
+        """Validates suite cardinality and evaluation consistency.
 
         Raises:
             ValueError: If `sample_count` is below 1, `reference_count` is
@@ -326,7 +326,7 @@ class GroundTruthSuiteEvaluation:
         return "available"
 
     def to_dict(self) -> dict[str, object]:
-        """Return deterministic suite evidence.
+        """Returns deterministic suite evidence.
 
         Returns:
             A mapping with the status, counts, the smallest and mean overlap
@@ -353,7 +353,7 @@ class GroundTruthSuiteEvaluation:
 
 
 def explanation_ranking(report: Mapping[str, Any]) -> tuple[str, ...]:
-    """Extract a validated feature ranking from one explanation report.
+    """Extracts a validated feature ranking from one explanation report.
 
     Args:
         report: An explanation report whose `features` entry is a list of
@@ -388,7 +388,7 @@ def evaluate_ground_truth(
     report: Mapping[str, Any],
     sample_id: str,
 ) -> GroundTruthEvaluation:
-    """Compare an explanation ranking with an independent reference ranking.
+    """Compares an explanation ranking with an independent reference ranking.
 
     The score is the fraction of expected features found in the observed
     top-k ranking, where k is the number of expected features. It is a
@@ -441,7 +441,7 @@ def evaluate_ground_truth_suite(
     sample_count: int,
     references: Sequence[tuple[ExplanationGroundTruth, Mapping[str, Any], str]],
 ) -> GroundTruthSuiteEvaluation:
-    """Evaluate independent references across a bounded held-out suite.
+    """Evaluates independent references across a bounded held-out suite.
 
     A partial reference set fails closed. This prevents a caller from
     receiving a green suite result after annotating only convenient samples.
@@ -499,7 +499,7 @@ def linear_contribution_report(
     coefficients: Sequence[float],
     top_k: int = 10,
 ) -> dict[str, object]:
-    """Build a deterministic local ranking from linear contributions.
+    """Builds a deterministic local ranking from linear contributions.
 
     The returned ranking is an explanation of the supplied feature
     representation. It deliberately does not infer meaning for the features
@@ -557,7 +557,7 @@ def linear_contribution_report(
 def ranking_stability(
     reports: Sequence[Mapping[str, Any]], top_k: int | None = None
 ) -> float:
-    """Return mean pairwise top-k overlap across repeated explanations.
+    """Returns mean pairwise top-k overlap across repeated explanations.
 
     Top-k overlap is intentionally transparent: a score of ``1`` means every
     repeated explanation selected the same features, while ``0`` means no
@@ -598,7 +598,7 @@ def ranking_stability(
 def fidelity_score(
     reference: Sequence[float], reconstruction: Sequence[float]
 ) -> float:
-    """Return normalized reconstruction fidelity against reference outputs.
+    """Returns normalized reconstruction fidelity against reference outputs.
 
     The score is ``1 - RMSE / baseline_RMSE``, where the baseline predicts the
     mean reference output. A perfect reconstruction scores ``1``; a model
@@ -653,7 +653,7 @@ def evaluate(
     stability: float | None = None,
     fidelity: float | None = None,
 ) -> QualityEvaluation:
-    """Evaluate declared explanation thresholds without inventing measures.
+    """Evaluates declared explanation thresholds without inventing measures.
 
     A declared threshold whose measure is missing fails.
 

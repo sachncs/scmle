@@ -28,7 +28,7 @@ DIGEST_LENGTH = 64
 
 
 def canonical_json(value: Any) -> str:
-    """Return deterministic JSON for an already JSON-compatible value.
+    """Returns deterministic JSON for an already JSON-compatible value.
 
     Args:
         value: A JSON-compatible value (mappings, lists, strings, finite
@@ -48,7 +48,7 @@ def canonical_json(value: Any) -> str:
 
 
 def digest_value(value: Any) -> str:
-    """Return a SHA-256 identity for deterministic JSON content.
+    """Returns a SHA-256 identity for deterministic JSON content.
 
     Args:
         value: A JSON-compatible value, serialized with ``canonical_json``.
@@ -62,7 +62,7 @@ def digest_value(value: Any) -> str:
 
 
 def normalize_uri(uri: str) -> str:
-    """Normalize a source URI without resolving caller-owned remote data.
+    """Normalizes a source URI without resolving caller-owned remote data.
 
     Args:
         uri: A URI or a local filesystem path. Surrounding whitespace is
@@ -90,7 +90,7 @@ def normalize_uri(uri: str) -> str:
 
 
 def validate_digest(value: str, field_name: str) -> str:
-    """Validate and normalize a SHA-256 identity.
+    """Validates and normalizes a SHA-256 identity.
 
     Args:
         value: A 64-character hexadecimal digest, optionally prefixed with
@@ -126,7 +126,7 @@ class DatasetSource:
     privacy_classification: str = ""
 
     def __post_init__(self) -> None:
-        """Validate and normalize source identity fields.
+        """Validates and normalizes source identity fields.
 
         Raises:
             ValueError: If ``uri`` is empty or whitespace.
@@ -166,7 +166,7 @@ class DatasetSource:
         )
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-native source evidence.
+        """Returns JSON-native source evidence.
 
         Returns:
             A dictionary of the five source fields plus ``source_identity``.
@@ -219,7 +219,7 @@ class DatasetField:
     data_type: str
 
     def __post_init__(self) -> None:
-        """Validate schema field names and types.
+        """Validates schema field names and types.
 
         Raises:
             ValueError: If ``name`` or ``data_type`` is not a string or is
@@ -233,7 +233,7 @@ class DatasetField:
         object.__setattr__(self, "data_type", self.data_type.strip())
 
     def to_dict(self) -> dict[str, str]:
-        """Return JSON-native field evidence.
+        """Returns JSON-native field evidence.
 
         Returns:
             A dictionary with ``name`` and ``data_type``.
@@ -264,7 +264,7 @@ class MissingnessSummary:
     by_field: Mapping[str, int]
 
     def __post_init__(self) -> None:
-        """Validate missingness accounting.
+        """Validates missingness accounting.
 
         Raises:
             TypeError: If a count is not an integer (booleans are rejected).
@@ -312,7 +312,7 @@ class MissingnessSummary:
         return self.missing_values / self.total_values
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-native missingness evidence.
+        """Returns JSON-native missingness evidence.
 
         Returns:
             A dictionary of the counts, the per-field counts, and the computed
@@ -370,7 +370,7 @@ class DuplicateSummary:
     method: str
 
     def __post_init__(self) -> None:
-        """Validate duplicate accounting.
+        """Validates duplicate accounting.
 
         Raises:
             ValueError: If ``status`` or ``method`` is empty, ``duplicate_rows``
@@ -394,7 +394,7 @@ class DuplicateSummary:
             raise ValueError("duplicate_fraction must be between zero and one")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-native duplicate evidence.
+        """Returns JSON-native duplicate evidence.
 
         Returns:
             A dictionary of status, duplicate row count, duplicate fraction,
@@ -437,7 +437,7 @@ class LabelSummary:
     distribution: Mapping[str, int]
 
     def __post_init__(self) -> None:
-        """Validate label accounting.
+        """Validates label accounting.
 
         Raises:
             ValueError: If ``status`` is empty, ``field`` is blank, a count is
@@ -479,7 +479,7 @@ class LabelSummary:
         )
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-native label evidence.
+        """Returns JSON-native label evidence.
 
         Returns:
             A dictionary of status, field, counts, and the label distribution.
@@ -541,7 +541,7 @@ class DatasetCatalog:
     schema_version: int = CATALOG_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
-        """Validate evidence consistency before publication.
+        """Validates evidence consistency before publication.
 
         Raises:
             TypeError: If ``source``, ``missingness``, ``duplicates``,
@@ -625,7 +625,7 @@ class DatasetCatalog:
         limitations: Sequence[str],
         release_blockers: Sequence[str] = (),
     ) -> Self:
-        """Build a catalog from adapter-owned evidence for any data format.
+        """Builds a catalog from adapter-owned evidence for any data format.
 
         Args:
             source: The data source, or a URI or path that is wrapped in a
@@ -740,7 +740,7 @@ class DatasetCatalog:
         return digest_value(self.content_dict())
 
     def content_dict(self) -> dict[str, Any]:
-        """Return canonical catalog content without the external digest.
+        """Returns canonical catalog content without the external digest.
 
         Returns:
             A JSON-native dictionary of every catalog field, with nested
@@ -762,7 +762,7 @@ class DatasetCatalog:
         }
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-native catalog evidence with its integrity digest.
+        """Returns JSON-native catalog evidence with its integrity digest.
 
         Returns:
             The content dictionary plus a ``catalog_digest`` entry.
@@ -772,7 +772,7 @@ class DatasetCatalog:
         return record
 
     def canonical_json(self) -> str:
-        """Return canonical catalog content suitable for verification.
+        """Returns canonical catalog content suitable for verification.
 
         Returns:
             Canonical JSON text of ``content_dict()``.
@@ -799,7 +799,7 @@ class DatasetCatalog:
 
     @classmethod
     def read_verified(cls, path: str | pathlib.Path) -> Self:
-        """Read a catalog and fail closed if its digest or schema is invalid.
+        """Reads a catalog and fail closed if its digest or schema is invalid.
 
         Args:
             path: A file written by ``write``.
@@ -888,7 +888,7 @@ class DataObservation:
 
 
 def source_blockers(source: DatasetSource) -> tuple[str, ...]:
-    """Return governance blockers that can be proven from source metadata.
+    """Returns governance blockers that can be proven from source metadata.
 
     Args:
         source: The data source whose governance fields are checked.
@@ -908,7 +908,7 @@ def source_blockers(source: DatasetSource) -> tuple[str, ...]:
 
 
 def is_sequence_value(value: Any) -> bool:
-    """Return whether a value can represent an ordered column.
+    """Returns whether a value can represent an ordered column.
 
     Args:
         value: Any object.
@@ -925,7 +925,7 @@ def is_sequence_value(value: Any) -> bool:
 def frame_for_data(
     data: Any,
 ) -> tuple[pd.DataFrame | None, str, tuple[int, ...]]:
-    """Convert supported record-shaped data to a bounded observation frame.
+    """Converts supported record-shaped data to a bounded observation frame.
 
     Args:
         data: The object to convert.
@@ -1005,7 +1005,7 @@ def frame_for_data(
 
 
 def canonical_value(value: Any) -> Any:
-    """Convert one supported value into deterministic JSON-native content.
+    """Converts one supported value into deterministic JSON-native content.
 
     Args:
         value: A scalar, bytes, date or time, mapping, list, tuple, set, or
@@ -1064,7 +1064,7 @@ def canonical_value(value: Any) -> Any:
 
 
 def schema_for_frame(frame: pd.DataFrame) -> tuple[DatasetField, ...]:
-    """Return ordered field metadata, preserving duplicate column positions.
+    """Returns ordered field metadata, preserving duplicate column positions.
 
     Args:
         frame: The frame whose columns are described.
@@ -1205,7 +1205,7 @@ def label_for_frame(
 def frame_content(
     frame: pd.DataFrame, data_kind: str, shape: tuple[int, ...]
 ) -> dict[str, Any]:
-    """Return canonical content for a frame-backed observation.
+    """Returns canonical content for a frame-backed observation.
 
     Args:
         frame: The observed frame.
@@ -1229,7 +1229,7 @@ def frame_content(
 
 
 def bytes_content(data: bytes | bytearray | memoryview) -> str:
-    """Return direct content identity for raw byte observations.
+    """Returns direct content identity for raw byte observations.
 
     Args:
         data: The raw bytes.

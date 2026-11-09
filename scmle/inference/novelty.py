@@ -93,7 +93,7 @@ class NoveltyDetector:
     def far_out_fences(
         features: pd.DataFrame, numeric: tuple[str, ...]
     ) -> dict[str, tuple[float, float]]:
-        """Compute the Tukey far-out fences of each numeric feature.
+        """Computes the Tukey far-out fences of each numeric feature.
 
         Args:
             features: Training features.
@@ -122,7 +122,7 @@ class NoveltyDetector:
         return fences
 
     def score(self, features: pd.DataFrame) -> pd.DataFrame:
-        """Score new rows.
+        """Scores new rows.
 
         Args:
             features: Rows with the training feature columns.
