@@ -51,7 +51,16 @@ class GeospatialTemporalError(GeospatialValidationError):
 
 
 def canonical_source(source: str | pathlib.Path) -> str:
-    """Return a stable source identifier for a path or URI-like value."""
+    """Return a stable source identifier for a path or URI-like value.
+
+    Args:
+        source: A filesystem path or a URI-like string.
+
+    Returns:
+        ``"memory://"`` when the stripped value is empty, the stripped value
+        unchanged when it contains ``"://"``, and otherwise the absolute
+        ``file://`` URI of the user-expanded, resolved path.
+    """
     value = str(source).strip()
     if not value:
         return "memory://"
@@ -61,7 +70,20 @@ def canonical_source(source: str | pathlib.Path) -> str:
 
 
 def canonical_observation_time(value: datetime | str) -> datetime:
-    """Parse and normalize a timezone-aware observation time to UTC."""
+    """Parse and normalize a timezone-aware observation time to UTC.
+
+    Args:
+        value: A timezone-aware datetime or an ISO 8601 string. A trailing
+            ``Z`` or ``z`` is read as UTC.
+
+    Returns:
+        The observation time converted to UTC.
+
+    Raises:
+        GeospatialTemporalError: If the text is not a valid ISO 8601
+            timestamp, if the value is neither a datetime nor text, or if the
+            parsed time has no timezone offset.
+    """
     if isinstance(value, str):
         normalized = value.strip()
         if normalized.endswith(("Z", "z")):
@@ -89,7 +111,20 @@ def canonical_observation_time(value: datetime | str) -> datetime:
 
 
 def validate_coordinates(value: Any) -> tuple[float, ...]:
-    """Validate a nested coordinate array and return its numeric leaves."""
+    """Validate a nested coordinate array and return its numeric leaves.
+
+    Args:
+        value: A list or tuple that is either a position (at least two finite
+            non-boolean numbers) or a nested list or tuple of such arrays.
+
+    Returns:
+        Every coordinate number, as floats, flattened in document order.
+
+    Raises:
+        GeospatialValidationError: If an array is empty, a position has fewer
+            than two numbers or a non-finite number, or a value is not a
+            list, tuple, or number.
+    """
     if isinstance(value, (list, tuple)):
         if not value:
             raise GeospatialValidationError(
@@ -120,7 +155,21 @@ def validate_coordinates(value: Any) -> tuple[float, ...]:
 
 
 def geometry_coordinates(geometry: Mapping[str, Any]) -> tuple[float, ...]:
-    """Validate a GeoJSON geometry and return all coordinate leaves."""
+    """Validate a GeoJSON geometry and return all coordinate leaves.
+
+    Args:
+        geometry: A GeoJSON geometry object. Geometry collections are
+            validated recursively.
+
+    Returns:
+        Every coordinate number, as floats, flattened in document order
+        (x, y, then any further dimensions of each position).
+
+    Raises:
+        GeospatialValidationError: If the geometry type is not a supported
+            GeoJSON type, a geometry collection has no geometries or has a
+            member that is not an object, or the coordinates are invalid.
+    """
     geometry_type = geometry.get("type")
     if geometry_type not in GEOMETRY_TYPES:
         raise GeospatialValidationError(
@@ -152,14 +201,18 @@ def moran_statistic(
     """Calculate global Moran's I for an undirected binary graph.
 
     Args:
-        values: Numeric values aligned with the feature order.
-        edges: Undirected feature-neighbor pairs.
+        values: One-dimensional numeric values aligned with the feature
+            order. At least three observations are required.
+        edges: Undirected feature-neighbor pairs, given as indexes into
+            ``values``. Each pair is counted in both directions.
 
     Returns:
         The global Moran's I statistic.
 
     Raises:
-        ValueError: If values are not finite or have no variation.
+        ValueError: If values are not one-dimensional with at least three
+            observations, are not finite, have no variation, or if no edges
+            are given.
     """
     numeric = np.asarray(values, dtype=np.float64)
     if numeric.ndim != 1 or len(numeric) < 3:
@@ -188,6 +241,22 @@ def mask_geometry_axis(
     type, nesting, and non-masked coordinate dimensions intact. It is a
     bounded perturbation primitive for raw-geometry evidence; it does not
     validate domain-specific topology or spatial semantics.
+
+    Args:
+        geometry: A GeoJSON geometry object. Geometry collections are masked
+            member by member.
+        axis: The coordinate index to replace, 0 for x or 1 for y.
+        baseline: The finite value written to that axis of every position.
+
+    Returns:
+        A new geometry mapping with the same structure as ``geometry`` and
+        the chosen axis of every position set to ``baseline``. Other
+        coordinates are converted to floats. A coordinate array that is
+        empty or not a nested list or tuple, or a geometry collection with no
+        geometries, raises ``GeospatialValidationError``.
+
+    Raises:
+        ValueError: If ``axis`` is not 0 or 1 or ``baseline`` is not finite.
     """
     if axis not in (0, 1):
         raise ValueError("axis must be 0 for x or 1 for y")
@@ -232,7 +301,21 @@ def mask_geometry_axis(
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class GeoFeature:
-    """Validated GeoJSON feature with stable serialized identity."""
+    """Validated GeoJSON feature with stable serialized identity.
+
+    Attributes:
+        feature_id: Non-empty identifier of the feature.
+        geometry: GeoJSON geometry object.
+        properties: JSON-native feature properties, exposed as a read-only
+            mapping after validation.
+        label: Optional JSON-native label of the feature.
+        observation_time: Optional observation time, normalized to a UTC
+            datetime when given.
+        geometry_hash: SHA-256 hex digest of the canonical geometry JSON.
+        content_hash: SHA-256 hex digest of the canonical feature identity,
+            covering ID, geometry hash, label, observation time, and
+            properties.
+    """
 
     feature_id: str
     geometry: Mapping[str, Any]
@@ -243,7 +326,16 @@ class GeoFeature:
     content_hash: str = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
-        """Validate feature data and derive canonical content identities."""
+        """Validate feature data and derive canonical content identities.
+
+        Raises:
+            ValueError: If ``feature_id`` is empty.
+            GeospatialValidationError: If the geometry is not an object or is
+                invalid, if a property name is not a string, or if the
+                properties and label are not JSON-native. An invalid or
+                timezone-naive observation time raises
+                ``GeospatialTemporalError``.
+        """
         if not self.feature_id.strip():
             raise ValueError("feature_id must not be empty")
         if not isinstance(self.geometry, Mapping):
@@ -309,12 +401,12 @@ class GeoFeature:
 
     @property
     def geometry_type(self) -> str:
-        """Return the validated GeoJSON geometry type."""
+        """The validated GeoJSON geometry type name."""
         return str(self.geometry["type"])
 
     @property
     def bounds(self) -> tuple[float, float, float, float]:
-        """Return the axis-aligned x/y bounds of the geometry."""
+        """The x/y bounds of the geometry as (min x, min y, max x, max y)."""
         coordinates = geometry_coordinates(self.geometry)
         xs = coordinates[0::2]
         ys = coordinates[1::2]
@@ -322,12 +414,22 @@ class GeoFeature:
 
     @property
     def centroid(self) -> tuple[float, float]:
-        """Return the envelope centroid in the source CRS units."""
+        """The centre of the bounds as (x, y) in the source CRS units."""
         minimum_x, minimum_y, maximum_x, maximum_y = self.bounds
         return (minimum_x + maximum_x) / 2, (minimum_y + maximum_y) / 2
 
     def masked_geometry_axis(self, axis: int, baseline: float) -> "GeoFeature":
-        """Return a copy with one source-coordinate axis replaced."""
+        """Return a copy with one source-coordinate axis replaced.
+
+        Args:
+            axis: The coordinate index to replace, 0 for x or 1 for y.
+            baseline: The finite value written to that axis of every
+                position.
+
+        Returns:
+            A new feature with the masked geometry and the same ID,
+            properties, label, and observation time.
+        """
         return dataclasses.replace(
             self,
             geometry=mask_geometry_axis(self.geometry, axis, baseline),
@@ -340,26 +442,56 @@ CoordinateTransformer = Callable[[GeoFeature, str, str], GeoFeature]
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class SpatialJoinMatch:
-    """One deterministic pair emitted by a bounded spatial join."""
+    """One deterministic pair emitted by a bounded spatial join.
+
+    Attributes:
+        left_feature_id: ID of the matched feature in the left dataset.
+        right_feature_id: ID of the matched feature in the right dataset.
+    """
 
     left_feature_id: str
     right_feature_id: str
 
     def __post_init__(self) -> None:
-        """Validate both feature identities before recording a match."""
+        """Validate both feature identities before recording a match.
+
+        Raises:
+            ValueError: If either feature ID is empty.
+        """
         if not self.left_feature_id.strip():
             raise ValueError("left_feature_id must not be empty")
         if not self.right_feature_id.strip():
             raise ValueError("right_feature_id must not be empty")
 
     def to_dict(self) -> dict[str, str]:
-        """Return JSON-native join-match evidence."""
+        """Return JSON-native join-match evidence.
+
+        Returns:
+            A mapping with the left and right feature IDs.
+        """
         return dataclasses.asdict(self)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class SpatialJoinReport:
-    """Bounded, same-CRS evidence from a caller-owned spatial predicate."""
+    """Bounded, same-CRS evidence from a caller-owned spatial predicate.
+
+    Attributes:
+        left_dataset_hash: Content hash of the left dataset.
+        right_dataset_hash: Content hash of the right dataset.
+        crs: The shared CRS of both datasets.
+        predicate_name: Stable name and version of the predicate.
+        left_feature_count: Number of features in the left dataset.
+        right_feature_count: Number of features in the right dataset.
+        comparison_count: Number of feature pairs the predicate was applied
+            to.
+        match_count: Number of matching pairs.
+        unmatched_left_count: Number of left features with no match.
+        unmatched_right_count: Number of right features with no match.
+        comparison_limit: Maximum comparisons the join was allowed.
+        match_limit: Maximum matches the join was allowed to retain.
+        matches: The matching feature-ID pairs, in comparison order.
+    """
 
     left_dataset_hash: str
     right_dataset_hash: str
@@ -376,7 +508,14 @@ class SpatialJoinReport:
     matches: tuple[SpatialJoinMatch, ...]
 
     def __post_init__(self) -> None:
-        """Reject incomplete or internally inconsistent join evidence."""
+        """Reject incomplete or internally inconsistent join evidence.
+
+        Raises:
+            ValueError: If a dataset hash is not a lowercase SHA-256 hex
+                digest, text fields are empty, counts or limits are out of
+                range or inconsistent with each other, ``match_count`` differs
+                from the number of matches, or matches are duplicated.
+        """
         for field_name, value in (
             ("left_dataset_hash", self.left_dataset_hash),
             ("right_dataset_hash", self.right_dataset_hash),
@@ -421,7 +560,12 @@ class SpatialJoinReport:
             raise ValueError("join matches must be unique")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-native join evidence without raw geometry."""
+        """Return JSON-native join evidence without raw geometry.
+
+        Returns:
+            A mapping of every report field, with matches as a list of
+            mappings.
+        """
         return {
             "left_dataset_hash": self.left_dataset_hash,
             "right_dataset_hash": self.right_dataset_hash,
@@ -441,7 +585,17 @@ class SpatialJoinReport:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class SpatialReprojectionReport:
-    """Evidence binding a caller-owned coordinate transformation."""
+    """Evidence binding a caller-owned coordinate transformation.
+
+    Attributes:
+        source_dataset_hash: Content hash of the dataset before
+            transformation.
+        target_dataset_hash: Content hash of the transformed dataset.
+        source_crs: CRS of the source dataset.
+        target_crs: CRS of the transformed dataset.
+        transformer_name: Stable name and version of the transformer.
+        feature_count: Number of features transformed.
+    """
 
     source_dataset_hash: str
     target_dataset_hash: str
@@ -451,7 +605,13 @@ class SpatialReprojectionReport:
     feature_count: int
 
     def __post_init__(self) -> None:
-        """Validate reprojection identity and scope."""
+        """Validate reprojection identity and scope.
+
+        Raises:
+            ValueError: If a dataset hash is not a lowercase SHA-256 hex
+                digest, a CRS or the transformer name is empty, the two CRS
+                values are equal, or ``feature_count`` is not positive.
+        """
         for field_name, value in (
             ("source_dataset_hash", self.source_dataset_hash),
             ("target_dataset_hash", self.target_dataset_hash),
@@ -473,13 +633,30 @@ class SpatialReprojectionReport:
             raise ValueError("feature_count must be positive")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-native reprojection evidence."""
+        """Return JSON-native reprojection evidence.
+
+        Returns:
+            A mapping of every report field.
+        """
         return dataclasses.asdict(self)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class SpatialBoundaryLeakage:
-    """Potential envelope leakage across CRS-unit spatial blocks."""
+    """Potential envelope leakage across CRS-unit spatial blocks.
+
+    Attributes:
+        block_size: Block edge length in CRS units.
+        feature_count: Number of features examined.
+        feature_block_counts: Pairs of feature ID and the number of blocks
+            its envelope touches, one per feature.
+        crossing_feature_ids: IDs of features whose envelope touches more
+            than one block.
+        truncated_feature_ids: IDs of crossing features whose block count
+            exceeds ``max_blocks_per_feature``.
+        max_blocks_per_feature: Block count above which a feature is marked
+            truncated.
+    """
 
     block_size: float
     feature_count: int
@@ -489,7 +666,14 @@ class SpatialBoundaryLeakage:
     max_blocks_per_feature: int
 
     def __post_init__(self) -> None:
-        """Validate bounded and internally consistent leakage evidence."""
+        """Validate bounded and internally consistent leakage evidence.
+
+        Raises:
+            ValueError: If ``block_size`` is not positive and finite, counts
+                or limits are not positive, the block counts do not cover
+                each feature exactly once, or the crossing and truncated ID
+                sets are not nested within the reported features.
+        """
         if not math.isfinite(self.block_size) or self.block_size <= 0:
             raise ValueError("block_size must be a positive finite number")
         if self.feature_count < 1:
@@ -514,11 +698,16 @@ class SpatialBoundaryLeakage:
 
     @property
     def status(self) -> str:
-        """Return whether the envelope indicates potential leakage."""
+        """The leakage status, ``"potential_leakage"`` or ``"clear"``."""
         return "potential_leakage" if self.crossing_feature_ids else "clear"
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-native boundary-leakage evidence."""
+        """Return JSON-native boundary-leakage evidence.
+
+        Returns:
+            A mapping of the status and every report field, with block counts
+            as a list of ID and count mappings.
+        """
         return {
             "status": self.status,
             "block_size": self.block_size,
@@ -535,7 +724,15 @@ class SpatialBoundaryLeakage:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class GeospatialProfile:
-    """Bounded data-understanding summary for a vector dataset."""
+    """Bounded data-understanding summary for a vector dataset.
+
+    Attributes:
+        feature_count: Number of features in the dataset.
+        geometry_types: Sorted distinct GeoJSON geometry type names.
+        crs: Declared CRS of the dataset, possibly empty.
+        bounds: Dataset-wide (min x, min y, max x, max y) in CRS units.
+        content_hash: Content hash of the dataset.
+    """
 
     feature_count: int
     geometry_types: tuple[str, ...]
@@ -544,13 +741,26 @@ class GeospatialProfile:
     content_hash: str
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-compatible geospatial profile data."""
+        """Return JSON-compatible geospatial profile data.
+
+        Returns:
+            A mapping of every profile field.
+        """
         return dataclasses.asdict(self)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class SpatialSplit:
-    """Spatial-block split that keeps nearby feature blocks together."""
+    """Spatial-block split that keeps nearby feature blocks together.
+
+    Attributes:
+        train: Features assigned to training.
+        validation: Features assigned to validation.
+        test: Features assigned to testing.
+        block_size: Block edge length in CRS units.
+        blocks: Block IDs assigned to each partition, keyed by ``"train"``,
+            ``"validation"``, and ``"test"``.
+    """
 
     train: tuple[GeoFeature, ...]
     validation: tuple[GeoFeature, ...]
@@ -559,20 +769,35 @@ class SpatialSplit:
     blocks: Mapping[str, tuple[str, ...]]
 
     def block_ids(self) -> dict[str, tuple[str, ...]]:
-        """Return the stable spatial blocks assigned to each partition."""
+        """Return the stable spatial blocks assigned to each partition.
+
+        Returns:
+            A new mapping from partition name to a tuple of block IDs.
+        """
         return {name: tuple(values) for name, values in self.blocks.items()}
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class GeospatialTemporalSplit:
-    """Time-ordered geospatial features separated at a UTC cutoff."""
+    """Time-ordered geospatial features separated at a UTC cutoff.
+
+    Attributes:
+        cutoff: Timezone-aware cutoff, converted to UTC.
+        train: Features observed at or before the cutoff.
+        future: Features observed after the cutoff.
+    """
 
     cutoff: datetime
     train: tuple[GeoFeature, ...]
     future: tuple[GeoFeature, ...]
 
     def __post_init__(self) -> None:
-        """Validate the cutoff and timestamp completeness of each partition."""
+        """Validate the cutoff and timestamp completeness of each partition.
+
+        Raises:
+            ValueError: If the cutoff has no timezone or any feature lacks an
+                observation time.
+        """
         if self.cutoff.tzinfo is None or self.cutoff.utcoffset() is None:
             raise ValueError("cutoff must be timezone-aware")
         object.__setattr__(self, "cutoff", self.cutoff.astimezone(UTC))
@@ -583,7 +808,7 @@ class GeospatialTemporalSplit:
 
     @property
     def has_future_leakage(self) -> bool:
-        """Return whether a training feature occurs after the cutoff."""
+        """Whether any training feature was observed after the cutoff."""
         return any(
             isinstance(feature.observation_time, datetime)
             and feature.observation_time > self.cutoff
@@ -593,7 +818,18 @@ class GeospatialTemporalSplit:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class SpatialAutocorrelation:
-    """Bounded global Moran's I evidence for a numeric spatial variable."""
+    """Bounded global Moran's I evidence for a numeric spatial variable.
+
+    Attributes:
+        feature_count: Number of features analysed.
+        neighbor_count: Nearest neighbors used per feature.
+        edge_count: Number of undirected neighbor edges.
+        statistic: Observed global Moran's I.
+        permutation_count: Number of permutations used for the p-value.
+        p_value: Two-sided permutation p-value, or None when no permutations
+            were run.
+        seed: Seed of the permutation random generator.
+    """
 
     feature_count: int
     neighbor_count: int
@@ -604,7 +840,14 @@ class SpatialAutocorrelation:
     seed: int
 
     def __post_init__(self) -> None:
-        """Validate a finite and reproducible spatial statistic."""
+        """Validate a finite and reproducible spatial statistic.
+
+        Raises:
+            ValueError: If there are fewer than three features, the neighbor
+                count is outside ``[1, feature_count)``, there are no edges,
+                the statistic is not finite, the permutation count is
+                negative, or the p-value is outside ``[0, 1]``.
+        """
         if self.feature_count < 3:
             raise ValueError("feature_count must be at least three")
         if not 1 <= self.neighbor_count < self.feature_count:
@@ -619,13 +862,24 @@ class SpatialAutocorrelation:
             raise ValueError("p_value must be in [0, 1]")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-native autocorrelation evidence."""
+        """Return JSON-native autocorrelation evidence.
+
+        Returns:
+            A mapping of every field.
+        """
         return dataclasses.asdict(self)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class GeospatialFeatures:
-    """Numeric geometry features tied to an explicit CRS."""
+    """Numeric geometry features tied to an explicit CRS.
+
+    Attributes:
+        feature_ids: Feature IDs, one per row of ``values``.
+        feature_names: Names of the columns of ``values``.
+        values: Row-major feature matrix of floats.
+        crs: CRS in which the values are expressed.
+    """
 
     feature_ids: tuple[str, ...]
     feature_names: tuple[str, ...]
@@ -634,17 +888,30 @@ class GeospatialFeatures:
 
     @property
     def shape(self) -> tuple[int, int]:
-        """Return the number of geometries and prepared features."""
+        """The matrix shape as (number of geometries, number of features)."""
         return (len(self.feature_ids), len(self.feature_names))
 
     def to_numpy(self) -> np.ndarray:
-        """Return a writable copy of the numeric feature matrix."""
+        """Return a writable copy of the numeric feature matrix.
+
+        Returns:
+            A float64 array with one row per geometry and one column per
+            feature name.
+        """
         return np.asarray(self.values, dtype=np.float64).copy()
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class GeospatialDataset:
-    """Immutable GeoJSON-like vector collection with CRS provenance."""
+    """Immutable GeoJSON-like vector collection with CRS provenance.
+
+    Attributes:
+        features: The features of the dataset, with unique IDs.
+        crs: Declared CRS, stripped of surrounding whitespace; may be empty.
+        source: Canonical source identifier.
+        content_hash: SHA-256 hex digest over the CRS and the feature
+            identities, independent of feature order.
+    """
 
     features: tuple[GeoFeature, ...]
     crs: str = ""
@@ -652,7 +919,13 @@ class GeospatialDataset:
     content_hash: str = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
-        """Reject duplicate identities and derive CRS-bound content."""
+        """Reject duplicate identities and derive CRS-bound content.
+
+        Raises:
+            GeospatialValidationError: If there are no features or feature
+                IDs are duplicated.
+            TypeError: If ``crs`` is not a string.
+        """
         normalized = tuple(self.features)
         if not normalized:
             raise GeospatialValidationError(
@@ -688,7 +961,24 @@ class GeospatialDataset:
         source: str = "memory://",
         crs: str = "",
     ) -> Self:
-        """Build a dataset from a GeoJSON FeatureCollection mapping."""
+        """Build a dataset from a GeoJSON FeatureCollection mapping.
+
+        Feature IDs come from each feature's ``id`` member, falling back to
+        its index. Feature labels and observation times are not read.
+
+        Args:
+            document: A GeoJSON FeatureCollection.
+            source: Source identifier recorded on the dataset.
+            crs: CRS identifier declared for the dataset.
+
+        Returns:
+            A dataset with one feature per GeoJSON feature.
+
+        Raises:
+            GeospatialValidationError: If the root is not a
+                FeatureCollection, ``features`` is not a list, or a member is
+                not a Feature with object geometry and properties.
+        """
         if document.get("type") != "FeatureCollection":
             raise GeospatialValidationError(
                 "GeoJSON document must be a FeatureCollection",
@@ -724,7 +1014,12 @@ class GeospatialDataset:
         return cls(tuple(features), crs=crs, source=source)
 
     def profile(self) -> GeospatialProfile:
-        """Return geometry counts, bounds, CRS, and immutable identity."""
+        """Return geometry counts, bounds, CRS, and immutable identity.
+
+        Returns:
+            A profile with the feature count, sorted geometry types, CRS,
+            dataset-wide bounds, and content hash.
+        """
         bounds = tuple(
             value for feature in self.features for value in feature.bounds
         )
@@ -744,7 +1039,17 @@ class GeospatialDataset:
         )
 
     def curate(self) -> ModalityCurationReport:
-        """Build geometry, CRS, and spatial-interpretation evidence."""
+        """Build geometry, CRS, and spatial-interpretation evidence.
+
+        The profile includes label counts, temporal completeness, and global
+        Moran's I when a CRS is declared, at least three features exist, and
+        every label is numeric. Findings cover a missing CRS, mixed geometry
+        types, mixed temporal state, and a mix of labeled and unlabeled
+        features.
+
+        Returns:
+            A curation report for the geospatial modality.
+        """
         profile = self.profile()
         labels = label_counts(feature.label for feature in self.features)
         profile_data = profile.to_dict()
@@ -858,6 +1163,19 @@ class GeospatialDataset:
         Distances are measured between envelope centroids in the declared
         source CRS. The method exposes the exact topology used by the
         autocorrelation statistic so a reviewer can reproduce the evidence.
+
+        Args:
+            neighbor_count: Number of nearest neighbors per feature, in
+                ``[1, feature_count)``.
+
+        Returns:
+            Sorted, de-duplicated undirected edges as (lower, higher) feature
+            index pairs. Ties in distance break by feature index.
+
+        Raises:
+            GeospatialValidationError: If the dataset declares no CRS.
+            ValueError: If ``neighbor_count`` is outside
+                ``[1, feature_count)``.
         """
         if not self.crs.strip():
             raise GeospatialValidationError(
@@ -916,8 +1234,14 @@ class GeospatialDataset:
             Dataset identities, counts, and matched feature IDs.
 
         Raises:
-            GeospatialValidationError: If CRS, predicate, or resource
-                boundaries are invalid.
+            TypeError: If ``other`` is not a dataset or ``predicate`` is not
+                callable.
+            ValueError: If ``predicate_name`` is empty or a limit is not
+                positive.
+            GeospatialValidationError: If either dataset lacks a CRS, the
+                CRS values differ, the number of comparisons exceeds
+                ``comparison_limit``, the predicate raises or returns a
+                non-boolean, or the matches exceed ``match_limit``.
         """
         if not isinstance(other, GeospatialDataset):
             raise TypeError("other must be a GeospatialDataset")
@@ -1035,8 +1359,12 @@ class GeospatialDataset:
             A transformed dataset and its source/target evidence report.
 
         Raises:
-            GeospatialValidationError: If source/target CRS or transformed
-                feature identities are invalid.
+            GeospatialValidationError: If the source CRS is missing, the
+                transformer raises, returns a non-feature, or changes a
+                feature's ID, properties, label, or observation time.
+            ValueError: If ``target_crs`` is empty or equals the source CRS,
+                or ``transformer_name`` is empty.
+            TypeError: If ``transformer`` is not callable.
         """
         if not self.crs.strip():
             raise GeospatialValidationError(
@@ -1117,6 +1445,27 @@ class GeospatialDataset:
         method reports association in the observed spatial arrangement; it
         does not establish causality or replace a domain-specific spatial
         model.
+
+        Args:
+            values: Numeric values aligned with the feature order. Defaults
+                to the feature labels.
+            neighbor_count: Requested nearest neighbors per feature, reduced
+                to one less than the feature count when larger.
+            permutations: Number of random permutations for the p-value, in
+                ``[0, 10000]``. Zero skips the p-value.
+            seed: Seed of the permutation random generator.
+
+        Returns:
+            The statistic, neighbor topology size, and a two-sided
+            permutation p-value, which is None when no permutations are run.
+
+        Raises:
+            ValueError: If ``permutations`` is outside ``[0, 10000]`` or
+                ``neighbor_count`` is below one.
+            GeospatialValidationError: If there are fewer than three
+                features, the value count differs from the feature count,
+                a value is not numeric, the dataset has no CRS, or the
+                statistic is not estimable.
         """
         if permutations < 0 or permutations > 10_000:
             raise ValueError("permutations must be in [0, 10000]")
@@ -1186,6 +1535,14 @@ class GeospatialDataset:
         The output is a geometry envelope and centroid representation. It does
         not perform reprojection, spatial joins, rasterization, or distance
         calculations; those operations require an explicit, versioned policy.
+
+        Returns:
+            One row per feature with its bounds, width, height, centroid, and
+            count of coordinate values, in the dataset CRS units.
+
+        Raises:
+            GeospatialValidationError: If the dataset has no CRS or a
+                prepared value is not finite.
         """
         if not self.crs.strip():
             raise GeospatialValidationError(
@@ -1244,6 +1601,18 @@ class GeospatialDataset:
         block intersected by its axis-aligned bounds. It is intended for
         curation and leakage review, not as a replacement for a geometry
         engine's exact intersection operation.
+
+        Args:
+            block_size: Block edge length in CRS units; positive and finite.
+
+        Returns:
+            A mapping from feature ID to (min x block, min y block, max x
+            block, max y block) indexes, counted from the dataset's minimum
+            x and y.
+
+        Raises:
+            GeospatialValidationError: If the dataset has no CRS.
+            ValueError: If ``block_size`` is not positive and finite.
         """
         if not self.crs.strip():
             raise GeospatialValidationError(
@@ -1277,6 +1646,20 @@ class GeospatialDataset:
         feature for domain review before a centroid-based split is promoted.
         Large envelopes are counted arithmetically and marked truncated rather
         than expanded into an unbounded block list.
+
+        Args:
+            block_size: Block edge length in CRS units; positive and finite.
+            max_blocks_per_feature: Block count above which a feature is
+                marked truncated.
+
+        Returns:
+            Per-feature block counts and the IDs of crossing and truncated
+            features. A dataset without a CRS raises
+            ``GeospatialValidationError``.
+
+        Raises:
+            ValueError: If ``max_blocks_per_feature`` is below one or
+                ``block_size`` is not positive and finite.
         """
         if max_blocks_per_feature < 1:
             raise ValueError("max_blocks_per_feature must be positive")
@@ -1319,6 +1702,23 @@ class GeospatialDataset:
         partition. Large geometries that cross block boundaries need a
         domain-specific spatial join policy before this split is suitable for
         release.
+
+        Args:
+            block_size: Block edge length in CRS units; positive and finite.
+            validation_fraction: Fraction of blocks for validation, in
+                ``[0, 1)``.
+            test_fraction: Fraction of blocks for testing, in ``[0, 1)``.
+                The two fractions must sum to less than one.
+            seed: Seed for the block shuffle.
+
+        Returns:
+            Train, validation, and test features with the block IDs assigned
+            to each. At least one block stays in training. A nonzero fraction
+            gets at least one block when there are three or more blocks.
+
+        Raises:
+            ValueError: If ``block_size`` is not positive and finite or a
+                fraction is out of range.
         """
         if not math.isfinite(block_size) or block_size <= 0:
             raise ValueError("block_size must be a positive finite number")
@@ -1391,6 +1791,17 @@ class GeospatialDataset:
         Features at the cutoff belong to training. Features after the cutoff
         belong to future evaluation. Untimestamped features fail closed because
         assigning them a temporal position would invent ordering evidence.
+
+        Args:
+            cutoff: Timezone-aware cutoff datetime or ISO 8601 string.
+
+        Returns:
+            The features observed at or before the cutoff and those observed
+            after it, with the cutoff in UTC.
+
+        Raises:
+            GeospatialTemporalError: If the cutoff is invalid or lacks a
+                timezone, or any feature has no observation time.
         """
         cutoff_time = canonical_observation_time(cutoff)
         if any(feature.observation_time is None for feature in self.features):
@@ -1420,13 +1831,23 @@ class GeospatialDataset:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class GeospatialReprojection:
-    """A transformed dataset paired with its source-bound evidence."""
+    """A transformed dataset paired with its source-bound evidence.
+
+    Attributes:
+        dataset: The transformed dataset.
+        report: Evidence binding the source and transformed datasets.
+    """
 
     dataset: GeospatialDataset
     report: SpatialReprojectionReport
 
     def __post_init__(self) -> None:
-        """Ensure the report describes the returned transformed dataset."""
+        """Ensure the report describes the returned transformed dataset.
+
+        Raises:
+            ValueError: If the report's target hash or CRS differs from the
+                dataset's.
+        """
         if self.report.target_dataset_hash != self.dataset.content_hash:
             raise ValueError(
                 "reprojection report must match the transformed dataset"
@@ -1435,7 +1856,12 @@ class GeospatialReprojection:
             raise ValueError("reprojection report CRS must match the dataset")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return the transformed identity and its reprojection evidence."""
+        """Return the transformed identity and its reprojection evidence.
+
+        Returns:
+            A mapping with the dataset hash, CRS, and the report as a
+            mapping.
+        """
         return {
             "dataset_hash": self.dataset.content_hash,
             "crs": self.dataset.crs,
@@ -1445,7 +1871,24 @@ class GeospatialReprojection:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class RasterSample:
-    """Raster identity and metadata without assuming a raster codec."""
+    """Raster identity and metadata without assuming a raster codec.
+
+    Attributes:
+        source: Non-empty source identifier.
+        encoded_bytes: Encoded raster payload, which must not be empty.
+        file_hash: SHA-256 hex digest of ``encoded_bytes``.
+        width: Raster width in pixels.
+        height: Raster height in pixels.
+        bands: Number of bands.
+        dtype: Non-empty pixel data type name.
+        crs: Non-empty CRS identifier.
+        transform: Empty, a six-value affine transform, or a nine-value
+            row-major homogeneous matrix.
+        nodata_value: Declared nodata sentinel, stored as a float, or None.
+        nodata_fraction: Measured fraction of nodata pixels in ``[0, 1]``,
+            or None.
+        byte_size: Length of ``encoded_bytes``.
+    """
 
     source: str
     encoded_bytes: bytes = dataclasses.field(repr=False)
@@ -1461,7 +1904,15 @@ class RasterSample:
     byte_size: int = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
-        """Validate raster shape, CRS provenance, and source identity."""
+        """Validate raster shape, CRS provenance, and source identity.
+
+        Raises:
+            ValueError: If the source, CRS, or dtype is empty, dimensions or
+                bands are not positive, the transform length is not 0, 6, or
+                9, nodata values are non-numeric, non-finite, or out of
+                range, or ``file_hash`` does not match the payload.
+            GeospatialValidationError: If the payload is empty.
+        """
         raw = bytes(self.encoded_bytes)
         object.__setattr__(self, "encoded_bytes", raw)
         if (
@@ -1501,7 +1952,7 @@ class RasterSample:
 
     @property
     def nodata_status(self) -> str:
-        """Return whether nodata is unknown, declared, or measured."""
+        """``"measured"``, ``"declared"``, or ``"unknown"`` nodata state."""
         if self.nodata_fraction is not None:
             return "measured"
         if self.nodata_value is not None:
@@ -1531,12 +1982,12 @@ class RasterSample:
 
         Returns:
             Minimum x, minimum y, maximum x, and maximum y in the source CRS,
-            or ``None`` when the sample has no transform.
+            or ``None`` when the sample has no transform. A homogeneous
+            transform that is singular at a window boundary raises
+            ``GeospatialValidationError``.
 
         Raises:
             ValueError: If the window is outside the raster or empty.
-            GeospatialValidationError: If a homogeneous transform is
-                singular on a window boundary.
         """
         if not (
             0 <= row_start < row_end <= self.height
@@ -1612,8 +2063,11 @@ class RasterSample:
 
         Raises:
             TypeError: If the decoder is not callable.
-            ValueError: If the resource bound is invalid.
-            GeospatialValidationError: If decoding or validation fails.
+            ValueError: If ``max_pixels`` is not positive.
+            GeospatialValidationError: If the decoder raises, the decoded
+                array is not 2-D or 3-D, is empty or larger than
+                ``max_pixels``, does not match the declared dimensions, is
+                not real numeric, or contains non-finite values.
         """
         if not callable(decoder):
             raise TypeError("decoder must be callable")
@@ -1679,7 +2133,17 @@ class RasterSample:
         decoder: RasterDecoder,
         max_pixels: int = 4_000_000,
     ) -> float | None:
-        """Measure the declared nodata sentinel in decoded pixels."""
+        """Measure the declared nodata sentinel in decoded pixels.
+
+        Args:
+            decoder: Caller-owned function that decodes the encoded payload.
+            max_pixels: Maximum decoded array elements allowed per sample.
+
+        Returns:
+            The fraction of decoded values equal to the declared nodata
+            value, or None when no nodata value is declared. Decoding errors
+            are those of ``decode``.
+        """
         if self.nodata_value is None:
             return None
         pixels = self.decode(decoder, max_pixels=max_pixels)
