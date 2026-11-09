@@ -87,7 +87,7 @@ class FeatureOp(abc.ABC):
         """
         return {**self.defaults, **node.params}
 
-    def fit(self, inputs: Inputs, params: Params) -> Any:
+    def fit(self, inputs: Inputs, params: Params) -> Any:  # noqa: ARG002 -- FeatureOp interface
         """Learns state from training data; the default is stateless.
 
         Args:
@@ -121,7 +121,10 @@ class Log1p(FeatureOp):
     name = "log1p"
 
     def apply(
-        self, inputs: Inputs, params: Params, state: Any
+        self,
+        inputs: Inputs,
+        params: Params,  # noqa: ARG002 -- FeatureOp interface
+        state: Any,  # noqa: ARG002 -- FeatureOp interface
     ) -> pandas.Series:
         """Log-transform the input after clipping it at zero.
 
@@ -142,7 +145,10 @@ class Sqrt(FeatureOp):
     name = "sqrt"
 
     def apply(
-        self, inputs: Inputs, params: Params, state: Any
+        self,
+        inputs: Inputs,
+        params: Params,  # noqa: ARG002 -- FeatureOp interface
+        state: Any,  # noqa: ARG002 -- FeatureOp interface
     ) -> pandas.Series:
         """Takes the square root of the input after clipping it at zero.
 
@@ -163,7 +169,10 @@ class Square(FeatureOp):
     name = "square"
 
     def apply(
-        self, inputs: Inputs, params: Params, state: Any
+        self,
+        inputs: Inputs,
+        params: Params,  # noqa: ARG002 -- FeatureOp interface
+        state: Any,  # noqa: ARG002 -- FeatureOp interface
     ) -> pandas.Series:
         """Squares the input.
 
@@ -184,7 +193,10 @@ class Absolute(FeatureOp):
     name = "abs"
 
     def apply(
-        self, inputs: Inputs, params: Params, state: Any
+        self,
+        inputs: Inputs,
+        params: Params,  # noqa: ARG002 -- FeatureOp interface
+        state: Any,  # noqa: ARG002 -- FeatureOp interface
     ) -> pandas.Series:
         """Takes the absolute value of the input.
 
@@ -205,7 +217,10 @@ class IsMissing(FeatureOp):
     name = "is_missing"
 
     def apply(
-        self, inputs: Inputs, params: Params, state: Any
+        self,
+        inputs: Inputs,
+        params: Params,  # noqa: ARG002 -- FeatureOp interface
+        state: Any,  # noqa: ARG002 -- FeatureOp interface
     ) -> pandas.Series:
         """Flags missing values; works for any dtype.
 
@@ -228,7 +243,10 @@ class Sum(FeatureOp):
     max_inputs = MAX_ARITY
 
     def apply(
-        self, inputs: Inputs, params: Params, state: Any
+        self,
+        inputs: Inputs,
+        params: Params,  # noqa: ARG002 -- FeatureOp interface
+        state: Any,  # noqa: ARG002 -- FeatureOp interface
     ) -> pandas.Series:
         """Adds the inputs.
 
@@ -253,7 +271,10 @@ class Difference(FeatureOp):
     max_inputs = 2
 
     def apply(
-        self, inputs: Inputs, params: Params, state: Any
+        self,
+        inputs: Inputs,
+        params: Params,  # noqa: ARG002 -- FeatureOp interface
+        state: Any,  # noqa: ARG002 -- FeatureOp interface
     ) -> pandas.Series:
         """Subtracts the second input from the first.
 
@@ -276,7 +297,10 @@ class Product(FeatureOp):
     max_inputs = MAX_ARITY
 
     def apply(
-        self, inputs: Inputs, params: Params, state: Any
+        self,
+        inputs: Inputs,
+        params: Params,  # noqa: ARG002 -- FeatureOp interface
+        state: Any,  # noqa: ARG002 -- FeatureOp interface
     ) -> pandas.Series:
         """Multiplys the inputs.
 
@@ -302,7 +326,10 @@ class Ratio(FeatureOp):
     max_inputs = 2
 
     def apply(
-        self, inputs: Inputs, params: Params, state: Any
+        self,
+        inputs: Inputs,
+        params: Params,  # noqa: ARG002 -- FeatureOp interface
+        state: Any,  # noqa: ARG002 -- FeatureOp interface
     ) -> pandas.Series:
         """Divides the first input by the second.
 
@@ -342,7 +369,10 @@ class Clip(FeatureOp):
         return float(low), float(high)
 
     def apply(
-        self, inputs: Inputs, params: Params, state: Any
+        self,
+        inputs: Inputs,
+        params: Params,  # noqa: ARG002 -- FeatureOp interface
+        state: Any,
     ) -> pandas.Series:
         """Clips to the learned bounds.
 
@@ -362,7 +392,7 @@ class Standardize(FeatureOp):
 
     name = "standardize"
 
-    def fit(self, inputs: Inputs, params: Params) -> Any:
+    def fit(self, inputs: Inputs, params: Params) -> Any:  # noqa: ARG002 -- FeatureOp interface
         """Learns the mean and standard deviation from training data.
 
         Args:
@@ -378,7 +408,10 @@ class Standardize(FeatureOp):
         return (float(values.mean()) if len(values) else 0.0, spread or 1.0)
 
     def apply(
-        self, inputs: Inputs, params: Params, state: Any
+        self,
+        inputs: Inputs,
+        params: Params,  # noqa: ARG002 -- FeatureOp interface
+        state: Any,
     ) -> pandas.Series:
         """Standardizes with the learned statistics.
 
@@ -419,7 +452,10 @@ class Bin(FeatureOp):
         return numpy.unique(edges)
 
     def apply(
-        self, inputs: Inputs, params: Params, state: Any
+        self,
+        inputs: Inputs,
+        params: Params,  # noqa: ARG002 -- FeatureOp interface
+        state: Any,
     ) -> pandas.Series:
         """Assigns each value to its bin.
 
@@ -478,7 +514,10 @@ class DatePart(FeatureOp):
             )
 
     def apply(
-        self, inputs: Inputs, params: Params, state: Any
+        self,
+        inputs: Inputs,
+        params: Params,
+        state: Any,  # noqa: ARG002 -- FeatureOp interface
     ) -> pandas.Series:
         """Extracts the requested part of the datetime.
 
@@ -503,7 +542,10 @@ class OrderedOp(FeatureOp):
     ordered = True
 
     def apply(
-        self, inputs: Inputs, params: Params, state: Any
+        self,
+        inputs: Inputs,  # noqa: ARG002 -- FeatureOp interface
+        params: Params,  # noqa: ARG002 -- FeatureOp interface
+        state: Any,  # noqa: ARG002 -- FeatureOp interface
     ) -> pandas.Series:
         """Rejects row-wise application of an ordered operation.
 
@@ -706,7 +748,7 @@ class ExpandingMean(OrderedOp):
 
     name = "expanding_mean"
 
-    def compute(self, grouped: Any, params: Params) -> pandas.Series:
+    def compute(self, grouped: Any, params: Params) -> pandas.Series:  # noqa: ARG002 -- OrderedOp interface
         """Computes the running mean.
 
         Args:
@@ -718,7 +760,7 @@ class ExpandingMean(OrderedOp):
         """
         return grouped.transform(lambda s: s.expanding().mean())
 
-    def lookback(self, params: Params) -> int | None:
+    def lookback(self, params: Params) -> int | None:  # noqa: ARG002 -- OrderedOp interface
         """Reports that every earlier row contributes.
 
         Args:
@@ -1102,7 +1144,7 @@ class FeatureGraphTransformer(base.TransformerMixin, base.BaseEstimator):
         """
         self.nodes = nodes
 
-    def fit(self, features: Any, target: Any = None) -> Self:
+    def fit(self, features: Any, target: Any = None) -> Self:  # noqa: ARG002 -- scikit-learn fit signature
         """Learns operation state by evaluating the graph on training data.
 
         Args:
