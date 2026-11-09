@@ -62,28 +62,6 @@ class Network(models.Model):
             worker.client().request("probe", ())
         )
 
-    def supports_modality(self, modality: str) -> bool:
-        """Returns whether this adapter has a declared modality boundary.
-
-        Args:
-            modality: A modality name or `Modality` value.
-
-        Returns:
-            True if the family contract declares the modality.
-        """
-        return self.family_contract.supports_modality(modality)
-
-    def require_modality(self, modality: str) -> None:
-        """Fail closed when an adapter is asked to model another modality.
-
-        The family contract raises ValueError if it does not declare the
-        modality.
-
-        Args:
-            modality: A modality name or `Modality` value.
-        """
-        self.family_contract.require_modality(modality)
-
     def build(
         self,
         task: tasks.Task,

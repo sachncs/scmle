@@ -9,7 +9,6 @@ for the same numeric representation seen by the model.
 
 import dataclasses
 from typing import Any
-from typing import Self
 
 import numpy
 
@@ -340,33 +339,6 @@ class ModelFamilyContract:
             ),
             "limitations": list(self.limitations),
         }
-
-    @classmethod
-    def unsupported_multimodal(cls) -> Self:
-        """Returns the explicit fail-closed boundary for multimodal models."""
-        return cls(
-            model_family=capabilities.ModelFamily.MULTIMODAL_TRANSFORMER.value,
-            status=capabilities.Status.EXTENSION_ONLY,
-            modalities=(capabilities.Modality.TABULAR,),
-            required_extras=("deeplearning",),
-            checkpoint=CheckpointContract(
-                "scmle.multimodal-transformer.unsupported", 1, True, True
-            ),
-            inference=InferenceContract(
-                capabilities.Modality.TABULAR,
-                2,
-                "float32",
-                ("reject",),
-                "unsupported",
-                False,
-            ),
-            explanation=None,
-            limitations=(
-                "no text, image, audio, video, graph, or geospatial encoder",
-                "no production multimodal fusion or pretrained checkpoint",
-                "must not be selected by the project API",
-            ),
-        )
 
 
 TABULAR_TRANSFORMER_CONTRACT = ModelFamilyContract(

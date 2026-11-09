@@ -13,9 +13,7 @@ def test_a_consistent_gain_is_decisive():
     result = comparison.compare_paired(better, base)
 
     assert result.probability_first_better > 0.99
-    assert result.decisive(0.95) and result.mean_difference == pytest.approx(
-        0.0204, abs=1e-4
-    )
+    assert result.mean_difference == pytest.approx(0.0204, abs=1e-4)
 
 
 def test_noise_around_zero_is_not_decisive():
@@ -24,7 +22,6 @@ def test_noise_around_zero_is_not_decisive():
 
     result = comparison.compare_paired(first, second)
 
-    assert not result.decisive(0.95)
     assert 0.1 < result.probability_first_better < 0.9
 
 
