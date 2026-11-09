@@ -226,7 +226,7 @@ def evaluate_payload(payload: TrialPayload) -> experiments.Trial:
         result.score_mean = float(numpy.mean(scores))
         result.score_std = float(numpy.std(scores))
         result.status = experiments.TrialStatus.OK
-    except Exception as error:  # Isolation: any model failure is data.
+    except Exception as error:  # noqa: BLE001 -- isolation: any model failure is data
         result.error = f"{type(error).__name__}: {error}"
     result.fit_seconds = time.monotonic() - started
     return result
