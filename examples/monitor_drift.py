@@ -10,6 +10,8 @@ from scmle.monitoring import monitor
 
 LOGGER = logging.getLogger(__name__)
 
+LABELLED_ROWS = 100
+
 
 def make_dataset(
     rows: int, shift: float = 0.0, seed: int = 2
@@ -41,7 +43,7 @@ def main() -> None:
         ("load shifted by +6", make_dataset(300, shift=6.0, seed=4)),
     ):
         # Outcomes often arrive late; leave the rest missing (NaN).
-        outcomes = batch["fault"].where(batch.index < 100)
+        outcomes = batch["fault"].where(batch.index < LABELLED_ROWS)
         report = watcher.assess(batch.drop(columns="fault"), outcomes)
         LOGGER.info(
             "%s -> recommendation: %s", label, report.recommendation.action

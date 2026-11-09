@@ -9,6 +9,8 @@ import scmle.api.project
 
 LOGGER = logging.getLogger(__name__)
 
+CHURN_RISK_THRESHOLD = 0.5
+
 
 def make_dataset(rows: int = 800) -> pandas.DataFrame:
     """Builds a small binary-classification dataset."""
@@ -22,7 +24,8 @@ def make_dataset(rows: int = 800) -> pandas.DataFrame:
     )
     risk = -0.03 * frame.tenure + 0.02 * frame.monthly_spend
     risk += (frame.plan == "basic") * 0.8
-    frame["churn"] = (risk + rng.normal(scale=0.7, size=rows) > 0.5).astype(int)
+    noisy_risk = risk + rng.normal(scale=0.7, size=rows)
+    frame["churn"] = (noisy_risk > CHURN_RISK_THRESHOLD).astype(int)
     return frame
 
 
