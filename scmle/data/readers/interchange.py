@@ -18,7 +18,15 @@ ARROW_STREAM = "__arrow_c_stream__"
 
 
 def is_tabular(data: Any) -> bool:
-    """Whether `data` is an in-memory table (not a path)."""
+    """Reports whether `data` looks like an in-memory table (not a path).
+
+    Args:
+        data: Any object.
+
+    Returns:
+        True if `data` is a pandas DataFrame or exposes the Arrow stream
+        protocol, `to_pandas()` or `collect()`; False otherwise.
+    """
     return (
         isinstance(data, pd.DataFrame)
         or hasattr(data, ARROW_STREAM)
@@ -56,5 +64,12 @@ def to_pandas(data: Any) -> pd.DataFrame:
 
 
 def to_arrow(frame: pd.DataFrame) -> pa.Table:
-    """Exports a frame as an Arrow table (zero-copy where possible)."""
+    """Exports a frame as an Arrow table (zero-copy where possible).
+
+    Args:
+        frame: The pandas DataFrame to export.
+
+    Returns:
+        An Arrow table with the frame's columns; the index is not included.
+    """
     return pa.Table.from_pandas(frame, preserve_index=False)

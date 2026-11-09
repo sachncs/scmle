@@ -46,7 +46,14 @@ class CsvReader(TableReader):
     suffixes = (".csv", ".csv.gz", ".csv.bz2", ".csv.xz", ".csv.zip")
 
     def load(self, path: pathlib.Path) -> pd.DataFrame:
-        """Reads a CSV file."""
+        """Reads a CSV file.
+
+        Args:
+            path: Existing CSV file, optionally compressed.
+
+        Returns:
+            The parsed table.
+        """
         return pd.read_csv(path)
 
 
@@ -56,7 +63,14 @@ class TsvReader(TableReader):
     suffixes = (".tsv", ".tab", ".tsv.gz", ".tab.gz")
 
     def load(self, path: pathlib.Path) -> pd.DataFrame:
-        """Reads a tab-separated table."""
+        """Reads a tab-separated table.
+
+        Args:
+            path: Existing tab-separated file.
+
+        Returns:
+            The parsed table.
+        """
         return pd.read_csv(path, sep="\t")
 
 
@@ -66,7 +80,14 @@ class JsonReader(TableReader):
     suffixes = (".json",)
 
     def load(self, path: pathlib.Path) -> pd.DataFrame:
-        """Reads JSON records into a table."""
+        """Reads JSON records into a table.
+
+        Args:
+            path: Existing JSON file.
+
+        Returns:
+            The parsed table.
+        """
         return pd.read_json(path)
 
 
@@ -76,7 +97,14 @@ class JsonLinesReader(TableReader):
     suffixes = (".jsonl", ".ndjson", ".jsonl.gz", ".ndjson.gz")
 
     def load(self, path: pathlib.Path) -> pd.DataFrame:
-        """Reads one JSON record per line."""
+        """Reads one JSON record per line.
+
+        Args:
+            path: Existing newline-delimited JSON file.
+
+        Returns:
+            The parsed table.
+        """
         return pd.read_json(path, lines=True)
 
 
@@ -87,6 +115,12 @@ class ExcelReader(TableReader):
 
     def load(self, path: pathlib.Path) -> pd.DataFrame:
         """Reads the first worksheet from an Excel workbook.
+
+        Args:
+            path: Existing Excel workbook.
+
+        Returns:
+            The first worksheet as a table.
 
         Raises:
             DataError: If the optional spreadsheet dependency is absent.
@@ -106,7 +140,14 @@ class ParquetReader(TableReader):
     suffixes = (".parquet", ".pq")
 
     def load(self, path: pathlib.Path) -> pd.DataFrame:
-        """Reads a Parquet file."""
+        """Reads a Parquet file.
+
+        Args:
+            path: Existing Parquet file.
+
+        Returns:
+            The parsed table.
+        """
         return pd.read_parquet(path)
 
 
@@ -116,12 +157,23 @@ class FeatherReader(TableReader):
     suffixes = (".feather", ".arrow")
 
     def load(self, path: pathlib.Path) -> pd.DataFrame:
-        """Reads a Feather file."""
+        """Reads a Feather file.
+
+        Args:
+            path: Existing Feather or Arrow IPC file.
+
+        Returns:
+            The parsed table.
+        """
         return pd.read_feather(path)
 
 
 class DatasetLoader:
-    """Dispatches file reads to the matching `TableReader`."""
+    """Dispatches file reads to the matching `TableReader`.
+
+    Attributes:
+        readers: The readers consulted, in order, when choosing by suffix.
+    """
 
     def __init__(self, readers: tuple[TableReader, ...] | None = None) -> None:
         """Initializes the loader.
@@ -140,7 +192,11 @@ class DatasetLoader:
         )
 
     def supported_suffixes(self) -> list[str]:
-        """Returns every suffix some reader handles, sorted."""
+        """Lists every suffix some reader handles.
+
+        Returns:
+            All reader suffixes, sorted alphabetically.
+        """
         return sorted(s for reader in self.readers for s in reader.suffixes)
 
     def reader_for(self, path: pathlib.Path) -> TableReader:
@@ -150,7 +206,8 @@ class DatasetLoader:
             path: File whose suffix decides the reader.
 
         Returns:
-            The matching reader.
+            The first reader, in registration order, whose suffix the
+            lower-cased file name ends with.
 
         Raises:
             DataError: If no reader supports the suffix.
@@ -174,8 +231,8 @@ class DatasetLoader:
             A non-empty DataFrame with unique column names.
 
         Raises:
-            DataError: If the file is missing, unreadable, empty or has
-                duplicate column names.
+            DataError: If the file is missing, has an unsupported suffix,
+                cannot be parsed, has no rows or has duplicate column names.
         """
         path = pathlib.Path(uri)
         if not path.exists():
@@ -197,19 +254,42 @@ class DatasetLoader:
 
 
 def read_table(uri: str | pathlib.Path) -> pd.DataFrame:
-    """Reads a supported file dataset with the default loader."""
+    """Reads a supported file dataset with the default loader.
+
+    Args:
+        uri: Path to a supported file.
+
+    Returns:
+        The table, as validated by `DatasetLoader.load`.
+    """
     return DatasetLoader().load(uri)
 
 
 def schema_hash(frame: pd.DataFrame) -> str:
-    """Returns a short hash of column names and dtypes."""
+    """Hashes the column names and dtypes of a frame.
+
+    Args:
+        frame: The table whose schema is hashed.
+
+    Returns:
+        The first 16 hexadecimal characters of a SHA-256 digest over the
+        ordered ``name:dtype`` pairs.
+    """
     pairs = zip(frame.columns, frame.dtypes.astype(str), strict=True)
     payload = "|".join(f"{name}:{dtype}" for name, dtype in pairs)
     return hashlib.sha256(payload.encode()).hexdigest()[:16]
 
 
 def data_hash(frame: pd.DataFrame) -> str:
-    """Returns a short hash of the row contents (index ignored)."""
+    """Hashes the row contents of a frame, ignoring the index.
+
+    Args:
+        frame: The table whose rows are hashed.
+
+    Returns:
+        The first 16 hexadecimal characters of a SHA-256 digest over the
+        per-row pandas hashes, in row order.
+    """
     rows = pd.util.hash_pandas_object(frame, index=False).to_numpy()
     return hashlib.sha256(rows.tobytes()).hexdigest()[:16]
 
@@ -263,11 +343,19 @@ def uri_semantics(uri: str | pathlib.Path) -> str:
 
 
 def raw_source_hash(uri: str | pathlib.Path) -> str:
-    """Returns the raw-byte SHA-256 for an available local source.
+    """Hashes the raw bytes of an available local source file.
 
     Remote and in-memory sources intentionally return an empty value because
     this reader has no transport or immutable-byte snapshot authority for
     them. The parsed-frame hash remains available in ``data_hash``.
+
+    Args:
+        uri: A local path, remote URI, or in-memory marker.
+
+    Returns:
+        The SHA-256 hex digest of the file's bytes, or an empty string if
+        the source is not a local file, is not an existing regular file, or
+        cannot be read.
     """
     parsed = urlsplit(canonical_uri(uri))
     if parsed.scheme != "file":
@@ -340,7 +428,8 @@ def build_manifest(
         modality: Dataset family declared by the caller.
 
     Returns:
-        The dataset manifest.
+        The manifest holding the content and schema hashes, row and column
+        counts, snapshot identity and lineage of `frame`.
 
     Raises:
         DataError: If `target` is not a column.
@@ -385,8 +474,9 @@ def replace_infinities(
         frame: The ingested data (not modified).
 
     Returns:
-        A cleaned copy (or the same frame when clean) and the number of
-        replaced values per affected column.
+        A cleaned copy (or the same frame when clean) and a mapping from
+        column name to the number of replaced values, containing only the
+        affected columns (empty when the frame is clean).
     """
     numeric = frame.select_dtypes("number")
     infinite = np.isinf(numeric.to_numpy(dtype=float, na_value=np.nan))

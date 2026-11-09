@@ -43,7 +43,15 @@ ObjectDecoder = Callable[[str, bytes], pd.DataFrame]
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class ObjectPayload:
-    """Bounded raw object bytes with a stable content identity."""
+    """Bounded raw object bytes with a stable content identity.
+
+    Attributes:
+        source_uri: Canonical URI the bytes were read from.
+        payload: The raw object bytes.
+        content_sha256: SHA-256 hex digest of `payload`, derived on
+            construction.
+        byte_size: Length of `payload` in bytes, derived on construction.
+    """
 
     source_uri: str
     payload: bytes = dataclasses.field(repr=False)
@@ -51,7 +59,12 @@ class ObjectPayload:
     byte_size: int = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
-        """Freeze bytes and derive the digest used by checkpoints."""
+        """Derives the digest and size used by checkpoints.
+
+        Raises:
+            ValueError: If `source_uri` is blank.
+            TypeError: If `payload` is not ``bytes``.
+        """
         if not self.source_uri.strip():
             raise ValueError("source_uri must not be empty")
         if not isinstance(self.payload, bytes):
@@ -65,7 +78,14 @@ class ObjectPayload:
 
 
 class ConnectorError(errors.DataError):
-    """A connector failure with a stable code and structured details."""
+    """A connector failure with a stable code and structured details.
+
+    Attributes:
+        code: Stable machine-readable failure code.
+        source_uri: Canonical source URI associated with the failure.
+        details: Structured context; always includes ``code`` and
+            ``source_uri`` plus any caller-supplied entries.
+    """
 
     def __init__(
         self,
@@ -92,7 +112,13 @@ class ConnectorError(errors.DataError):
         super().__init__(message, self.details)
 
     def as_dict(self) -> dict[str, Any]:
-        """Returns a JSON-compatible representation of the failure."""
+        """Serializes the failure.
+
+        Returns:
+            A JSON-compatible mapping with the error ``category``,
+            ``code``, ``message``, ``source_uri`` and a copy of
+            ``details``.
+        """
         return {
             "category": self.category,
             "code": self.code,
@@ -103,12 +129,23 @@ class ConnectorError(errors.DataError):
 
 
 class UnsupportedUriSchemeError(ConnectorError):
-    """A connector was given a URI scheme it does not implement."""
+    """A connector was given a URI scheme it does not implement.
+
+    Attributes:
+        scheme: The rejected scheme (empty for a bare path).
+        supported_schemes: The schemes the connector accepts.
+    """
 
     def __init__(
         self, source_uri: str, scheme: str, supported_schemes: Sequence[str]
     ) -> None:
-        """Initializes an unsupported-scheme failure."""
+        """Initializes an unsupported-scheme failure.
+
+        Args:
+            source_uri: The URI that was rejected.
+            scheme: Its scheme (empty for a bare path).
+            supported_schemes: Schemes the connector accepts.
+        """
         supported = tuple(supported_schemes)
         super().__init__(
             "unsupported_uri_scheme",
@@ -122,7 +159,13 @@ class UnsupportedUriSchemeError(ConnectorError):
 
 
 class RetryExhaustedError(ConnectorError):
-    """All attempts for a connector operation failed."""
+    """All attempts for a connector operation failed.
+
+    Attributes:
+        operation: Name of the failed operation.
+        attempts: Number of attempts made.
+        last_error: The exception raised by the final attempt.
+    """
 
     def __init__(
         self,
@@ -131,7 +174,14 @@ class RetryExhaustedError(ConnectorError):
         attempts: int,
         last_error: Exception,
     ) -> None:
-        """Initializes a retry exhaustion failure."""
+        """Initializes a retry exhaustion failure.
+
+        Args:
+            source_uri: Canonical source URI of the operation.
+            operation: Name of the failed operation.
+            attempts: Number of attempts made.
+            last_error: The exception raised by the final attempt.
+        """
         super().__init__(
             "retry_exhausted",
             f"{operation} failed after {attempts} attempt(s): {last_error}",
@@ -158,7 +208,14 @@ class CheckpointError(ConnectorError):
         message: str,
         details: Mapping[str, Any],
     ) -> None:
-        """Initializes a checkpoint failure."""
+        """Initializes a checkpoint failure.
+
+        Args:
+            source_uri: Canonical source URI of the connector.
+            code: Stable machine-readable failure code.
+            message: Human-readable failure description.
+            details: Structured context for callers and logs.
+        """
         super().__init__(code, message, source_uri, details)
 
 
@@ -175,7 +232,12 @@ class RetryBudget:
     delay_seconds: float = 0.0
 
     def __post_init__(self) -> None:
-        """Validates retry settings before a connector uses them."""
+        """Validates retry settings before a connector uses them.
+
+        Raises:
+            ValueError: If `max_retries` is negative or `delay_seconds` is
+                negative or not finite.
+        """
         if self.max_retries < 0:
             raise ValueError("max_retries must be non-negative")
         if not math.isfinite(self.delay_seconds) or self.delay_seconds < 0:
@@ -183,7 +245,7 @@ class RetryBudget:
 
     @property
     def max_attempts(self) -> int:
-        """Returns the initial attempt plus the retry budget."""
+        """The total number of attempts: the initial attempt plus retries."""
         return self.max_retries + 1
 
 
@@ -192,6 +254,17 @@ def canonical_source_uri(source_uri: str | pathlib.Path) -> str:
 
     Bare paths are treated as local files. URI schemes are normalized to
     lower-case, while query strings and fragments remain part of identity.
+
+    Args:
+        source_uri: A URI or a local path (a single-letter drive prefix such
+            as ``C:`` is treated as a path, not a scheme).
+
+    Returns:
+        The URI with a lower-cased scheme, or, for a path, the absolute
+        ``file://`` URI after expanding ``~`` and resolving the path.
+
+    Raises:
+        ValueError: If `source_uri` is blank.
     """
     value = str(source_uri).strip()
     if not value:
@@ -211,14 +284,35 @@ def canonical_source_uri(source_uri: str | pathlib.Path) -> str:
 
 
 def source_identity(source_uri: str | pathlib.Path) -> str:
-    """Returns a stable identity for a logical source URI."""
+    """Returns a stable identity for a logical source URI.
+
+    Args:
+        source_uri: A URI or local path; an empty value is rejected by
+            `canonical_source_uri`.
+
+    Returns:
+        ``src_`` followed by the SHA-256 hex digest of the canonical URI.
+    """
     canonical = canonical_source_uri(source_uri)
     digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
     return f"src_{digest}"
 
 
 def cursor_for(source_identity_value: str, offset: int) -> str:
-    """Creates a deterministic opaque cursor for a source offset."""
+    """Creates a deterministic opaque cursor for a source offset.
+
+    Args:
+        source_identity_value: Identity of the source the offset belongs to.
+        offset: Position in the source, in the connector's unit (rows or
+            bytes).
+
+    Returns:
+        A URL-safe, unpadded base64 string encoding the identity and
+        offset.
+
+    Raises:
+        ValueError: If the identity is empty or the offset is negative.
+    """
     if not source_identity_value:
         raise ValueError("source_identity_value must not be empty")
     if offset < 0:
@@ -228,7 +322,18 @@ def cursor_for(source_identity_value: str, offset: int) -> str:
 
 
 def decode_cursor(cursor: str) -> tuple[str, int]:
-    """Decodes a cursor into its source identity and row offset."""
+    """Decodes a cursor into its source identity and offset.
+
+    Args:
+        cursor: A string produced by `cursor_for`.
+
+    Returns:
+        The source identity and the non-negative offset.
+
+    Raises:
+        ValueError: If the cursor is empty, cannot be decoded, or encodes
+            an empty identity or a negative offset.
+    """
     if not cursor:
         raise ValueError("cursor must not be empty")
     padding = "=" * (-len(cursor) % 4)
@@ -252,6 +357,17 @@ class SourceCheckpoint:
     checkpoint can be supplied by explicit ``offset`` or by the opaque
     ``cursor`` returned in a previous batch. When both are present they must
     agree. A checkpoint returned by a connector always contains both values.
+
+    Attributes:
+        offset: Position in the source, in the connector's unit. Zero is
+            treated as unset when a cursor is also given.
+        cursor: Opaque cursor encoding the source identity and offset, or
+            None if not yet bound.
+        source_identity: Identity of the source the checkpoint belongs to,
+            or an empty string if not yet bound.
+        content_sha256: SHA-256 hex digest of the source content (or of the
+            rows before the offset) the checkpoint was taken against, or
+            None if unknown.
     """
 
     offset: int = 0
@@ -260,7 +376,17 @@ class SourceCheckpoint:
     content_sha256: str | None = None
 
     def __post_init__(self) -> None:
-        """Validates and normalizes cursor-derived checkpoint fields."""
+        """Validates and normalizes cursor-derived checkpoint fields.
+
+        An empty `source_identity` or a zero `offset` is filled in from the
+        cursor when one is given.
+
+        Raises:
+            ValueError: If `offset` is negative, `content_sha256` is not a
+                64-character lower-case hex digest, the cursor is invalid,
+                or the cursor's identity or (non-zero) offset disagrees
+                with the checkpoint.
+        """
         if self.offset < 0:
             raise ValueError("offset must be non-negative")
         if self.content_sha256 is not None and (
@@ -284,7 +410,19 @@ class SourceCheckpoint:
             object.__setattr__(self, "offset", cursor_offset)
 
     def bind(self, identity: str) -> "SourceCheckpoint":
-        """Binds an unbound checkpoint to ``identity`` safely."""
+        """Binds an unbound checkpoint to ``identity`` safely.
+
+        Args:
+            identity: Identity of the source to bind to.
+
+        Returns:
+            A checkpoint with the same offset and content digest, bound to
+            `identity`, with a cursor generated if none was present.
+
+        Raises:
+            ValueError: If the checkpoint is already bound to a different
+                source.
+        """
         if self.source_identity and self.source_identity != identity:
             raise ValueError("checkpoint belongs to a different source")
         return SourceCheckpoint(
@@ -295,7 +433,18 @@ class SourceCheckpoint:
         )
 
     def bind_content(self, content_sha256: str) -> "SourceCheckpoint":
-        """Bind a checkpoint to an immutable source-content digest."""
+        """Binds a checkpoint to an immutable source-content digest.
+
+        Args:
+            content_sha256: SHA-256 hex digest of the observed content.
+
+        Returns:
+            A copy of the checkpoint carrying `content_sha256`.
+
+        Raises:
+            ValueError: If the checkpoint already carries a different
+                digest.
+        """
         if self.content_sha256 and self.content_sha256 != content_sha256:
             raise ValueError("checkpoint content digest does not match source")
         return SourceCheckpoint(
@@ -306,7 +455,19 @@ class SourceCheckpoint:
         )
 
     def advance(self, rows: int) -> "SourceCheckpoint":
-        """Returns the checkpoint after consuming ``rows`` rows."""
+        """Returns the checkpoint after consuming ``rows`` rows.
+
+        Args:
+            rows: Amount consumed, in the connector's unit (rows or bytes).
+
+        Returns:
+            A checkpoint with the offset increased by `rows` and a matching
+            cursor.
+
+        Raises:
+            ValueError: If `rows` is negative or the checkpoint is not
+                bound to a source.
+        """
         if rows < 0:
             raise ValueError("rows must be non-negative")
         identity = self.source_identity
@@ -323,13 +484,22 @@ class SourceCheckpoint:
 
 @dataclasses.dataclass(frozen=True)
 class SourceColumn:
-    """One source column and its source-reported type name."""
+    """One source column and its source-reported type name.
+
+    Attributes:
+        name: Column name.
+        type_name: Type name as reported by the source.
+    """
 
     name: str
     type_name: str
 
     def __post_init__(self) -> None:
-        """Validates column identity."""
+        """Validates column identity.
+
+        Raises:
+            ValueError: If `name` or `type_name` is empty.
+        """
         if not self.name:
             raise ValueError("column name must not be empty")
         if not self.type_name:
@@ -338,12 +508,21 @@ class SourceColumn:
 
 @dataclasses.dataclass(frozen=True)
 class SourceSchema:
-    """Ordered schema metadata returned by a source connector."""
+    """Ordered schema metadata returned by a source connector.
+
+    Attributes:
+        columns: The columns in source order.
+    """
 
     columns: tuple[SourceColumn, ...]
 
     def __post_init__(self) -> None:
-        """Rejects empty and duplicate column declarations."""
+        """Rejects empty and duplicate column declarations.
+
+        Raises:
+            ValueError: If there are no columns or two columns share a
+                name.
+        """
         names = tuple(column.name for column in self.columns)
         if not names:
             raise ValueError("source schema must contain at least one column")
@@ -351,7 +530,12 @@ class SourceSchema:
             raise ValueError("source schema contains duplicate column names")
 
     def as_dict(self) -> dict[str, Any]:
-        """Returns deterministic JSON-compatible schema metadata."""
+        """Serializes the schema.
+
+        Returns:
+            A JSON-compatible mapping with a ``columns`` list of
+            ``name``/``type_name`` entries in source order.
+        """
         return {
             "columns": [
                 {"name": column.name, "type_name": column.type_name}
@@ -361,7 +545,15 @@ class SourceSchema:
 
     @classmethod
     def from_frame(cls, frame: pd.DataFrame) -> "SourceSchema":
-        """Builds a source schema from a pandas frame."""
+        """Builds a source schema from a pandas frame.
+
+        Args:
+            frame: The table whose columns and dtypes are described.
+
+        Returns:
+            A schema with one column per frame column, using the dtype
+            string as the type name.
+        """
         return cls(
             tuple(
                 SourceColumn(str(name), str(dtype))
@@ -377,6 +569,14 @@ class RowBatch:
     ``content_sha256`` is populated when the connector can observe the raw
     source bytes without adding a second read. A resumed checkpoint can bind
     to that digest and reject a changed source snapshot.
+
+    Attributes:
+        schema: Schema of the batch.
+        rows: The rows of the batch, as tuples in schema order.
+        checkpoint: Checkpoint from which to read the next batch.
+        has_more: Whether more rows remain after this batch.
+        content_sha256: Digest of the raw source bytes observed, or None if
+            the connector did not compute one.
     """
 
     schema: SourceSchema
@@ -403,9 +603,15 @@ def execute_with_retries(
     Returns:
         The operation result.
 
+    A `ConnectorError` raised by the operation is re-raised immediately
+    without retrying.
+
     Raises:
         RetryExhaustedError: If every attempt fails.
         ConnectorError: If the operation raises a structured connector error.
+        AssertionError: If the retry loop ends without returning or
+            raising, which cannot happen because the budget allows at least
+            one attempt.
     """
     for attempt in range(1, retry_budget.max_attempts + 1):
         try:
@@ -464,6 +670,10 @@ def refuse_writes(query: str, source_uri: str) -> None:
     not a sandbox: a database role without write privilege is the real
     control and cannot be verified from here.
 
+    Args:
+        query: SQL text to check.
+        source_uri: Source URI recorded in the failure.
+
     Raises:
         ConnectorError: ``write_statement_refused`` with the reason.
     """
@@ -488,37 +698,75 @@ def refuse_writes(query: str, source_uri: str) -> None:
 
 
 def digest_rows(hasher: Any, rows: Sequence[Sequence[Any]]) -> None:
-    """Feeds rows into a hash in a canonical text form."""
+    """Feeds rows into a hash in a canonical text form.
+
+    Args:
+        hasher: A hash object with an ``update(bytes)`` method, updated in
+            place.
+        rows: Rows to digest; each is hashed as the UTF-8 ``repr`` of its
+            tuple followed by a newline.
+    """
     for row in rows:
         hasher.update(repr(tuple(row)).encode("utf-8"))
         hasher.update(b"\n")
 
 
 class SourceConnector(abc.ABC):
-    """Public polymorphic contract for bounded source retrieval."""
+    """Public polymorphic contract for bounded source retrieval.
+
+    Attributes:
+        source_uri: Canonical URI of the source.
+        source_identity: Stable identity of the source.
+        retry_budget: Retry policy applied to each operation.
+    """
 
     def __init__(
         self,
         source_uri: str | pathlib.Path,
         retry_budget: RetryBudget | None = None,
     ) -> None:
-        """Initializes a connector identity and retry policy."""
+        """Initializes a connector identity and retry policy.
+
+        Args:
+            source_uri: URI or local path of the source; it is canonicalized.
+            retry_budget: Retry policy; defaults to `RetryBudget()`.
+        """
         self.source_uri = canonical_source_uri(source_uri)
         self.source_identity = source_identity(self.source_uri)
         self.retry_budget = retry_budget or RetryBudget()
 
     @abc.abstractmethod
     def schema(self) -> SourceSchema:
-        """Returns the ordered schema without consuming a row checkpoint."""
+        """Describes the source schema without consuming a row checkpoint.
+
+        Returns:
+            The ordered schema of the source.
+        """
 
     @abc.abstractmethod
     def read_rows(
         self, checkpoint: SourceCheckpoint | None = None, limit: int = 1_000
     ) -> RowBatch:
-        """Reads at most ``limit`` rows from a checkpoint."""
+        """Reads at most ``limit`` rows from a checkpoint.
+
+        Args:
+            checkpoint: Position to resume from; None starts at the
+                beginning.
+            limit: Maximum number of rows to return; must be positive.
+
+        Returns:
+            The batch and the checkpoint from which to continue.
+        """
 
     def checkpoint(self, offset: int = 0) -> SourceCheckpoint:
-        """Creates a source-bound checkpoint for explicit offset reads."""
+        """Creates a source-bound checkpoint for explicit offset reads.
+
+        Args:
+            offset: Position to start from, in the connector's unit.
+
+        Returns:
+            A checkpoint bound to this connector's source at `offset`.
+        """
         return SourceCheckpoint(
             offset=offset,
             cursor=cursor_for(self.source_identity, offset),
@@ -528,7 +776,18 @@ class SourceConnector(abc.ABC):
     def validate_checkpoint(
         self, checkpoint: SourceCheckpoint | None
     ) -> SourceCheckpoint:
-        """Binds and validates a checkpoint before reading rows."""
+        """Binds and validates a checkpoint before reading rows.
+
+        Args:
+            checkpoint: Checkpoint to validate; None means the start.
+
+        Returns:
+            The checkpoint bound to this connector's source identity.
+
+        Raises:
+            CheckpointError: ``checkpoint_mismatch`` if the checkpoint is
+                bound to a different source.
+        """
         value = checkpoint or SourceCheckpoint()
         try:
             return value.bind(self.source_identity)
@@ -545,7 +804,14 @@ class SourceConnector(abc.ABC):
             ) from error
 
     def validate_limit(self, limit: int) -> None:
-        """Rejects unbounded or invalid batch requests."""
+        """Rejects unbounded or invalid batch requests.
+
+        Args:
+            limit: Requested maximum batch size.
+
+        Raises:
+            ValueError: If `limit` is not positive.
+        """
         if limit <= 0:
             raise ValueError("limit must be positive")
 
@@ -553,7 +819,18 @@ class SourceConnector(abc.ABC):
 def file_content_sha256(
     path: pathlib.Path, chunk_bytes: int = 1024 * 1024
 ) -> str:
-    """Hash a local source file without loading the whole file in memory."""
+    """Hashes a local source file without loading all of it into memory.
+
+    Args:
+        path: File to hash.
+        chunk_bytes: Number of bytes read at a time.
+
+    Returns:
+        The SHA-256 hex digest of the file's bytes.
+
+    Raises:
+        ValueError: If `chunk_bytes` is less than 1.
+    """
     if chunk_bytes < 1:
         raise ValueError("chunk_bytes must be positive")
     digest = hashlib.sha256()
@@ -564,7 +841,11 @@ def file_content_sha256(
 
 
 class LocalFileConnector(SourceConnector):
-    """Connector for tabular local paths and ``file://`` URIs."""
+    """Connector for tabular local paths and ``file://`` URIs.
+
+    Attributes:
+        path: Absolute resolved path of the local file.
+    """
 
     supported_schemes = ("", "file")
 
@@ -575,8 +856,14 @@ class LocalFileConnector(SourceConnector):
     ) -> None:
         """Initializes a local-file connector.
 
+        Args:
+            source_uri: A local path or ``file://`` URI.
+            retry_budget: Per-operation retry policy.
+
         Raises:
-            UnsupportedUriSchemeError: If ``source_uri`` is not local.
+            UnsupportedUriSchemeError: If the scheme is neither empty nor
+                ``file``, or a ``file`` URI names a host other than
+                ``localhost``.
         """
         value = str(source_uri).strip()
         parsed = urlsplit(value)
@@ -601,7 +888,13 @@ class LocalFileConnector(SourceConnector):
         super().__init__(self.path, retry_budget)
 
     def schema(self) -> SourceSchema:
-        """Reads and returns the local file schema."""
+        """Reads the local file and describes its schema.
+
+        Read failures are retried and then surface as `RetryExhaustedError`.
+
+        Returns:
+            The schema of the parsed file.
+        """
         frame = execute_with_retries(
             lambda: tabular.read_table(self.path),
             "schema",
@@ -611,13 +904,36 @@ class LocalFileConnector(SourceConnector):
         return SourceSchema.from_frame(frame)
 
     def content_sha256(self) -> str:
-        """Return the current raw-byte digest of the local source file."""
+        """Hashes the local source file as it is now.
+
+        Returns:
+            The SHA-256 hex digest of the file's bytes.
+        """
         return file_content_sha256(self.path)
 
     def read_rows(
         self, checkpoint: SourceCheckpoint | None = None, limit: int = 1_000
     ) -> RowBatch:
-        """Reads a bounded local-file batch from an offset checkpoint."""
+        """Reads a bounded local-file batch from an offset checkpoint.
+
+        The whole file is parsed on every call. The file is hashed before
+        and after parsing, and the checkpoint is bound to that digest.
+        A non-positive `limit` raises ``ValueError``; a checkpoint bound to
+        a different source raises ``CheckpointError``
+        (``checkpoint_mismatch``); a file that changed while being read or
+        since the checkpoint was created raises ``ConnectorError``
+        (``source_snapshot_changed``).
+
+        Args:
+            checkpoint: Row-offset checkpoint to resume from; None starts
+                at row 0.
+            limit: Maximum number of rows to return; must be positive.
+
+        Returns:
+            The rows from the checkpoint offset, the schema, a checkpoint
+            advanced by the rows returned, whether rows remain, and the
+            file's content digest.
+        """
         self.validate_limit(limit)
         value = self.validate_checkpoint(checkpoint)
 
@@ -687,6 +1003,15 @@ class DbApiConnector(SourceConnector):
     before its offset in ``SourceCheckpoint.content_sha256`` and the next
     batch refuses to continue (``source_changed``) when the rows it skips no
     longer hash to that digest. Use an ``ORDER BY`` so the order is total.
+
+    Attributes:
+        query: The read-only SQL query whose rows form the source.
+        connection_factory: Callable returning a fresh DB-API connection.
+        read_only: Whether the allow-list and read-only session are
+            enforced.
+        read_only_statement: Statement run before the query, or None.
+        snapshot_query: Query whose result identifies the source state, or
+            None.
     """
 
     supported_schemes = ("dbapi", "sqlite")
@@ -708,8 +1033,10 @@ class DbApiConnector(SourceConnector):
             query: Read-only SQL query whose rows form the source.
             connection_factory: Callable returning a fresh DB-API connection.
             retry_budget: Per-operation retry policy.
-            read_only: Enforce the read-only allow-list and session mode.
-                Only ``True`` is supported for new code.
+            read_only: Enforce the read-only allow-list (a statement that
+                fails it is refused with ``ConnectorError``) and the
+                ``sqlite3`` ``query_only`` session mode. When False,
+                neither is applied.
             read_only_statement: Optional statement run before the query to
                 start a read-only transaction on drivers that support it.
             snapshot_query: Optional cheap query whose result identifies the
@@ -717,9 +1044,10 @@ class DbApiConnector(SourceConnector):
                 it the token is a digest of the whole query result.
 
         Raises:
-            UnsupportedUriSchemeError: If the URI scheme is not supported.
-            ValueError: If the query or factory is invalid.
-            ConnectorError: If a query is not a read-only statement.
+            UnsupportedUriSchemeError: If the URI scheme is not ``dbapi``
+                or ``sqlite``.
+            ValueError: If `query` is blank.
+            TypeError: If `connection_factory` is not callable.
         """
         value = source_uri.strip()
         parsed = urlsplit(value)
@@ -748,7 +1076,17 @@ class DbApiConnector(SourceConnector):
 
     @contextlib.contextmanager
     def session(self, sql: str) -> Iterator[Any]:
-        """Yields a cursor that has executed ``sql`` in a read-only session."""
+        """Opens a connection and executes ``sql`` on a cursor.
+
+        The cursor and connection are closed on exit, ignoring errors from
+        closing. The session is read-only as configured by `read_only`.
+
+        Args:
+            sql: Statement to execute before yielding.
+
+        Yields:
+            The DB-API cursor positioned on the result of ``sql``.
+        """
         connection = self.connection_factory()
         cursor: Any | None = None
         try:
@@ -763,7 +1101,12 @@ class DbApiConnector(SourceConnector):
             self.close_resources(cursor, connection)
 
     def schema(self) -> SourceSchema:
-        """Executes the query and returns DB-API column metadata."""
+        """Executes the query and describes the result columns.
+
+        Returns:
+            The schema built from the cursor description; a missing type
+            code becomes ``unknown``.
+        """
         return execute_with_retries(
             self.retrieve_schema,
             "schema",
@@ -772,7 +1115,11 @@ class DbApiConnector(SourceConnector):
         )
 
     def retrieve_schema(self) -> SourceSchema:
-        """Performs one non-retried DB-API schema operation."""
+        """Performs one non-retried DB-API schema operation.
+
+        Returns:
+            The schema built from the cursor description.
+        """
         with self.session(self.query) as cursor:
             return self.schema_from_description(cursor.description)
 
@@ -781,6 +1128,10 @@ class DbApiConnector(SourceConnector):
 
         With ``snapshot_query`` the token digests that query's rows; without
         it, every row of the main query (a full scan).
+
+        Returns:
+            The SHA-256 hex digest over the rows of the snapshot query, or
+            of the main query when none was given.
         """
         return execute_with_retries(
             self.retrieve_token,
@@ -790,7 +1141,11 @@ class DbApiConnector(SourceConnector):
         )
 
     def retrieve_token(self) -> str:
-        """Performs one non-retried token computation."""
+        """Performs one non-retried token computation.
+
+        Returns:
+            The SHA-256 hex digest over every row the token query yields.
+        """
         hasher = hashlib.sha256()
         with self.session(self.snapshot_query or self.query) as cursor:
             while rows := cursor.fetchmany(10_000):
@@ -800,7 +1155,22 @@ class DbApiConnector(SourceConnector):
     def read_rows(
         self, checkpoint: SourceCheckpoint | None = None, limit: int = 1_000
     ) -> RowBatch:
-        """Reads DB-API rows using portable offset/cursor checkpoints."""
+        """Reads DB-API rows using portable offset/cursor checkpoints.
+
+        A non-positive `limit` raises ``ValueError``; a checkpoint bound to
+        a different source raises ``CheckpointError``
+        (``checkpoint_mismatch``).
+
+        Args:
+            checkpoint: Row-offset checkpoint to resume from; None starts
+                at row 0.
+            limit: Maximum number of rows to return; must be positive.
+
+        Returns:
+            The rows after the checkpoint offset, the schema, a checkpoint
+            advanced by the rows returned and carrying the digest of all
+            rows up to it, and whether more rows remain.
+        """
         self.validate_limit(limit)
         value = self.validate_checkpoint(checkpoint)
         return execute_with_retries(
@@ -814,6 +1184,14 @@ class DbApiConnector(SourceConnector):
         self, checkpoint: SourceCheckpoint, limit: int
     ) -> RowBatch:
         """Performs one non-retried DB-API row operation.
+
+        Args:
+            checkpoint: Bound checkpoint to resume from.
+            limit: Maximum number of rows to return.
+
+        Returns:
+            The batch after the checkpoint offset. ``has_more`` is true when
+            one more row than `limit` could be fetched.
 
         Raises:
             CheckpointError: ``source_changed`` when the rows before the
@@ -848,7 +1226,19 @@ class DbApiConnector(SourceConnector):
     def schema_from_description(
         self, description: Sequence[Sequence[Any]] | None
     ) -> SourceSchema:
-        """Converts DB-API cursor metadata into a validated schema."""
+        """Converts DB-API cursor metadata into a validated schema.
+
+        Args:
+            description: The cursor's ``description``: one sequence per
+                column whose first item is the name and second the type code.
+
+        Returns:
+            The schema; a missing or empty type code is reported as
+            ``unknown``.
+
+        Raises:
+            ValueError: If the description is None or empty.
+        """
         if not description:
             raise ValueError("query did not provide a result schema")
         return SourceSchema(
@@ -868,6 +1258,12 @@ class DbApiConnector(SourceConnector):
     ) -> None:
         """Consumes and hashes rows before a checkpoint.
 
+        Args:
+            cursor: Cursor positioned at the first row.
+            offset: Number of rows to skip.
+            batch_size: Maximum rows fetched per call.
+            hasher: Hash object updated with the skipped rows.
+
         Raises:
             CheckpointError: ``source_changed`` when fewer than ``offset``
                 rows remain, which means rows were deleted.
@@ -886,7 +1282,12 @@ class DbApiConnector(SourceConnector):
             remaining -= len(skipped)
 
     def close_resources(self, cursor: Any, connection: Any) -> None:
-        """Closes resources without masking the primary operation error."""
+        """Closes resources without masking the primary operation error.
+
+        Args:
+            cursor: Cursor to close, or None if none was opened.
+            connection: Connection to close.
+        """
         if cursor is not None:
             with contextlib.suppress(Exception):
                 cursor.close()
@@ -902,6 +1303,13 @@ class WarehouseConnector(SourceConnector):
     integration can provide the two callbacks while this contract owns
     bounded reads, retries, checkpoints, schema validation, and failure
     evidence.
+
+    Attributes:
+        query: Versioned query or table expression used by the engine.
+        schema_reader: Callback returning the schema for `query`.
+        batch_reader: Callback returning one batch for a query, offset and
+            limit.
+        snapshot_reader: Callback returning a source-state token, or None.
     """
 
     supported_schemes = ("warehouse", "lakehouse")
@@ -923,7 +1331,9 @@ class WarehouseConnector(SourceConnector):
             source_uri: Logical ``warehouse://`` or ``lakehouse://`` URI.
             query: Versioned query or table expression used by the engine.
             schema_reader: Callback returning the source schema for ``query``.
-            batch_reader: Callback accepting query, row offset, and row limit.
+            batch_reader: Callback accepting query, row offset, and row
+                limit and returning the batch schema, its rows, and whether
+                more rows remain.
             retry_budget: Per-operation retry policy.
             snapshot_reader: Optional callback returning a token for the
                 state of ``query`` (a table version, ``AS OF`` timestamp or
@@ -931,6 +1341,13 @@ class WarehouseConnector(SourceConnector):
                 differs from the one the checkpoint was bound to is refused
                 (``source_changed``). Without it the connector cannot tell
                 that the source changed between batches.
+
+        Raises:
+            UnsupportedUriSchemeError: If the scheme is neither
+                ``warehouse`` nor ``lakehouse``.
+            ValueError: If `query` is blank.
+            TypeError: If `schema_reader` or `batch_reader` is not
+                callable.
         """
         value = source_uri.strip()
         scheme = urlsplit(value).scheme.lower()
@@ -952,7 +1369,11 @@ class WarehouseConnector(SourceConnector):
         )
 
     def schema(self) -> SourceSchema:
-        """Read and validate the schema without consuming a checkpoint."""
+        """Reads and validates the schema without consuming a checkpoint.
+
+        Returns:
+            The schema returned by the schema callback.
+        """
         return execute_with_retries(
             lambda: self.validate_schema(self.schema_reader(self.query)),
             "schema",
@@ -963,7 +1384,21 @@ class WarehouseConnector(SourceConnector):
     def read_rows(
         self, checkpoint: SourceCheckpoint | None = None, limit: int = 1_000
     ) -> RowBatch:
-        """Read one bounded batch from the injected warehouse engine."""
+        """Reads one bounded batch from the injected warehouse engine.
+
+        A non-positive `limit` raises ``ValueError``; a checkpoint bound to
+        a different source raises ``CheckpointError``
+        (``checkpoint_mismatch``).
+
+        Args:
+            checkpoint: Row-offset checkpoint to resume from; None starts
+                at row 0.
+            limit: Maximum number of rows to return; must be positive.
+
+        Returns:
+            The validated batch with a checkpoint advanced by the rows
+            returned.
+        """
         self.validate_limit(limit)
         value = self.validate_checkpoint(checkpoint)
         return execute_with_retries(
@@ -974,7 +1409,26 @@ class WarehouseConnector(SourceConnector):
         )
 
     def read_batch(self, checkpoint: SourceCheckpoint, limit: int) -> RowBatch:
-        """Validate one callback result and bind its next checkpoint."""
+        """Validates one callback result and binds its next checkpoint.
+
+        When a snapshot reader is configured, its token (hashed with
+        SHA-256) is stored in the next checkpoint and compared with the one
+        in `checkpoint`.
+
+        Args:
+            checkpoint: Bound checkpoint to resume from.
+            limit: Maximum number of rows the callback may return.
+
+        Returns:
+            The batch with the next checkpoint.
+
+        Raises:
+            CheckpointError: ``source_changed`` if the snapshot token
+                differs from the one recorded in the checkpoint.
+            ConnectorError: If the callback's ``has_more`` is not a bool,
+                it returns more than `limit` rows, or a row's width differs
+                from the schema's.
+        """
         token = (
             hashlib.sha256(
                 self.snapshot_reader(self.query).encode()
@@ -1031,7 +1485,18 @@ class WarehouseConnector(SourceConnector):
         )
 
     def validate_schema(self, schema: SourceSchema) -> SourceSchema:
-        """Validate a callback schema at the connector boundary."""
+        """Validates a callback schema at the connector boundary.
+
+        Args:
+            schema: The value returned by a callback.
+
+        Returns:
+            `schema`, unchanged.
+
+        Raises:
+            ConnectorError: ``invalid_schema`` if it is not a
+                `SourceSchema`.
+        """
         if not isinstance(schema, SourceSchema):
             raise ConnectorError(
                 "invalid_schema",
@@ -1043,10 +1508,24 @@ class WarehouseConnector(SourceConnector):
 
 
 def read_tabular_bytes(source_uri: str, payload: bytes) -> pd.DataFrame:
-    """Decode one supported tabular object from bytes.
+    """Decodes one supported tabular object from bytes.
 
     The object-store connector accepts a byte-reader instead of importing a
     cloud SDK. Credentials and transport-level retries remain caller-owned.
+    The format is chosen from the lower-cased file name in the URI path:
+    ``.csv`` (also ``.gz``, ``.bz2``, ``.xz``), ``.jsonl`` or ``.ndjson``
+    (also ``.gz``), and ``.parquet`` or ``.pq``.
+
+    Args:
+        source_uri: Object URI whose path name selects the format.
+        payload: The object's bytes.
+
+    Returns:
+        The decoded table.
+
+    Raises:
+        ConnectorError: ``unsupported_object_format`` if the name has none
+            of the supported suffixes.
     """
     name = pathlib.PurePosixPath(urlsplit(source_uri).path).name.lower()
     if name.endswith((".csv", ".csv.gz", ".csv.bz2", ".csv.xz")):
@@ -1081,6 +1560,13 @@ class ObjectStoreConnector(SourceConnector):
     tabular formats; a caller-owned decoder can admit any format that can be
     represented as a bounded DataFrame. It supports deterministic small-object
     ingestion, but does not claim range reads or streaming-scale semantics.
+
+    Attributes:
+        read_bytes: Caller-owned transport returning the object bytes.
+        max_bytes: Maximum object size accepted.
+        decoder: Callable decoding the object bytes into a DataFrame.
+        decoder_name: Stable decoder name and version, part of the source
+            identity.
     """
 
     supported_schemes = ("s3", "gs", "az", "abfs", "http", "https")
@@ -1102,10 +1588,15 @@ class ObjectStoreConnector(SourceConnector):
             retry_budget: Per-operation retry policy.
             max_bytes: Maximum object size loaded into memory.
             decoder: Optional caller-owned decoder returning a DataFrame.
-            decoder_name: Stable decoder name and version for source identity.
+            decoder_name: Stable decoder name and version for source
+                identity. Required with a custom decoder and not allowed
+                without one (the default decoder is ``tabular-auto-v1``).
 
         Raises:
-            ValueError: If a custom decoder has no stable identity.
+            UnsupportedUriSchemeError: If the scheme is not one of
+                ``s3``, ``gs``, ``az``, ``abfs``, ``http`` or ``https``.
+            ValueError: If `max_bytes` is below 1, `decoder_name` is given
+                without a decoder, or a custom decoder has a blank name.
             TypeError: If a decoder or transport is not callable.
         """
         value = source_uri.strip()
@@ -1139,11 +1630,24 @@ class ObjectStoreConnector(SourceConnector):
         )
 
     def load_frame(self) -> pd.DataFrame:
-        """Download and decode the bounded object once."""
+        """Downloads and decodes the bounded object once.
+
+        Returns:
+            The decoded table.
+        """
         return self.decode_object(self.read_object())
 
     def read_object(self) -> ObjectPayload:
-        """Read bounded raw bytes and derive their content identity."""
+        """Reads bounded raw bytes and derives their content identity.
+
+        Returns:
+            The object bytes with their digest and size.
+
+        Raises:
+            ConnectorError: ``invalid_object_payload`` if the transport
+                does not return ``bytes``; ``object_too_large`` if the
+                payload exceeds `max_bytes` (checked after the read).
+        """
         payload = execute_with_retries(
             lambda: self.read_bytes(self.source_uri),
             "read_object",
@@ -1167,7 +1671,20 @@ class ObjectStoreConnector(SourceConnector):
         return ObjectPayload(self.source_uri, payload)
 
     def decode_object(self, object_payload: ObjectPayload) -> pd.DataFrame:
-        """Decode one observed object while preserving its raw identity."""
+        """Decodes one observed object while preserving its raw identity.
+
+        Args:
+            object_payload: The bytes to decode.
+
+        Returns:
+            The table returned by the decoder.
+
+        Raises:
+            ConnectorError: ``decoder_failed`` if the decoder raises
+                (a `ConnectorError` it raises propagates unchanged);
+                ``invalid_decoded_object`` if it does not return a
+                DataFrame.
+        """
         try:
             frame = self.decoder(self.source_uri, object_payload.payload)
         except ConnectorError:
@@ -1195,13 +1712,37 @@ class ObjectStoreConnector(SourceConnector):
         return frame
 
     def schema(self) -> SourceSchema:
-        """Read and return the bounded object's schema."""
+        """Reads the bounded object and describes its schema.
+
+        Returns:
+            The schema of the decoded table.
+        """
         return SourceSchema.from_frame(self.load_frame())
 
     def read_rows(
         self, checkpoint: SourceCheckpoint | None = None, limit: int = 1_000
     ) -> RowBatch:
-        """Read a bounded row batch from an object checkpoint."""
+        """Reads a bounded row batch from an object checkpoint.
+
+        The whole object is downloaded and decoded on every call, and the
+        checkpoint is bound to the object's content digest. A non-positive
+        `limit` raises ``ValueError``; a checkpoint bound to a different
+        source raises ``CheckpointError`` (``checkpoint_mismatch``).
+
+        Args:
+            checkpoint: Row-offset checkpoint to resume from; None starts
+                at row 0.
+            limit: Maximum number of rows to return; must be positive.
+
+        Returns:
+            The rows from the checkpoint offset, the schema, a checkpoint
+            advanced by the rows returned, whether rows remain, and the
+            object's content digest.
+
+        Raises:
+            ConnectorError: ``source_snapshot_changed`` if the object
+                differs from the one the checkpoint was bound to.
+        """
         self.validate_limit(limit)
         value = self.validate_checkpoint(checkpoint)
         object_payload = self.read_object()
@@ -1239,6 +1780,12 @@ class StreamingObjectStoreConnector(SourceConnector):
     read never needs to download or decode the preceding object content.
     The connector intentionally supports line-oriented formats only; quoted
     CSV records and binary containers need a format-specific streaming adapter.
+
+    Attributes:
+        read_range: Caller-owned byte-range transport.
+        size_bytes: Caller-owned object-size lookup.
+        chunk_bytes: Maximum bytes requested per range call.
+        max_record_bytes: Maximum buffered line size.
     """
 
     supported_schemes = ObjectStoreConnector.supported_schemes
@@ -1261,6 +1808,14 @@ class StreamingObjectStoreConnector(SourceConnector):
             retry_budget: Per-operation retry policy.
             chunk_bytes: Maximum bytes requested per range call.
             max_record_bytes: Maximum buffered line size.
+
+        Raises:
+            UnsupportedUriSchemeError: If the scheme is not one of the
+                object-store schemes.
+            ConnectorError: ``unsupported_stream_format`` if the name does
+                not end in ``.jsonl`` or ``.ndjson``.
+            TypeError: If `read_range` or `size_bytes` is not callable.
+            ValueError: If `chunk_bytes` or `max_record_bytes` is below 1.
         """
         value = source_uri.strip()
         scheme = urlsplit(value).scheme.lower()
@@ -1289,7 +1844,15 @@ class StreamingObjectStoreConnector(SourceConnector):
         super().__init__(value, retry_budget)
 
     def object_size(self) -> int:
-        """Return a non-negative object size through the retry policy."""
+        """Looks up the object size through the retry policy.
+
+        Returns:
+            The size in bytes.
+
+        Raises:
+            ConnectorError: ``invalid_object_size`` if the lookup does not
+                return a non-negative integer.
+        """
         size = execute_with_retries(
             lambda: self.size_bytes(self.source_uri),
             "head_object",
@@ -1306,7 +1869,21 @@ class StreamingObjectStoreConnector(SourceConnector):
         return size
 
     def read_bytes(self, start: int, end: int) -> bytes:
-        """Read one validated half-open byte range."""
+        """Reads one validated half-open byte range.
+
+        Args:
+            start: First byte offset, inclusive.
+            end: Last byte offset, exclusive.
+
+        Returns:
+            The bytes returned by the transport, which may be fewer than
+            ``end - start``.
+
+        Raises:
+            ConnectorError: ``invalid_range_payload`` if the transport does
+                not return ``bytes``; ``range_overread`` if it returns more
+                than requested.
+        """
         payload = execute_with_retries(
             lambda: self.read_range(self.source_uri, start, end),
             "read_range",
@@ -1331,7 +1908,14 @@ class StreamingObjectStoreConnector(SourceConnector):
         return payload
 
     def schema(self) -> SourceSchema:
-        """Read one bounded record to discover the source schema."""
+        """Reads one bounded record to discover the source schema.
+
+        Returns:
+            The schema derived from the first record.
+
+        Raises:
+            ConnectorError: ``empty_object`` if the object has no records.
+        """
         batch = self.read_rows(limit=1)
         if not batch.rows:
             raise ConnectorError(
@@ -1344,7 +1928,28 @@ class StreamingObjectStoreConnector(SourceConnector):
     def read_rows(
         self, checkpoint: SourceCheckpoint | None = None, limit: int = 1_000
     ) -> RowBatch:
-        """Read JSON records from a byte checkpoint without full download."""
+        """Reads JSON records from a byte checkpoint without full download.
+
+        A non-positive `limit` raises ``ValueError``; a checkpoint bound to
+        a different source raises ``CheckpointError``
+        (``checkpoint_mismatch``).
+
+        Args:
+            checkpoint: Byte-offset checkpoint at a record boundary; None
+                starts at byte 0.
+            limit: Maximum number of records to return; must be positive.
+
+        Returns:
+            The decoded records and their schema, with a checkpoint at the
+            byte position after the last record returned and ``has_more``
+            true if further records exist. When no record remains, the rows
+            are empty, the schema is a single ``record`` column and the
+            checkpoint is unchanged. The batch carries no content digest.
+
+        Raises:
+            CheckpointError: ``checkpoint_beyond_object`` if the
+                checkpoint offset exceeds the current object size.
+        """
         self.validate_limit(limit)
         value = self.validate_checkpoint(checkpoint)
         total = self.object_size()
@@ -1379,7 +1984,27 @@ class StreamingObjectStoreConnector(SourceConnector):
     def read_record_lines(
         self, start: int, total: int, required_records: int
     ) -> list[tuple[bytes, int]]:
-        """Read complete newline-delimited records from a byte position."""
+        """Reads complete newline-delimited records from a byte position.
+
+        Blank lines are skipped and a trailing carriage return is removed.
+        A final line without a newline counts as a record.
+
+        Args:
+            start: Byte offset to start reading from.
+            total: Object size in bytes.
+            required_records: Number of records after which to stop.
+
+        Returns:
+            Up to `required_records` pairs of a record's bytes and the byte
+            offset just past its line terminator (the object end for an
+            unterminated final line).
+
+        Raises:
+            ConnectorError: ``range_no_progress`` if the transport returns
+                no bytes before the object end; ``record_too_large`` if
+                buffered bytes exceed `max_record_bytes` without a
+                complete line.
+        """
         records: list[tuple[bytes, int]] = []
         buffer = b""
         buffer_origin = start
@@ -1421,7 +2046,22 @@ class StreamingObjectStoreConnector(SourceConnector):
     def decode_records(
         self, records: Sequence[tuple[bytes, int]]
     ) -> tuple[SourceSchema, tuple[Row, ...]]:
-        """Decode JSON objects and reject silent schema drift."""
+        """Decodes JSON objects and rejects silent schema drift.
+
+        Args:
+            records: Non-empty sequence of pairs of a record's UTF-8 JSON
+                bytes and its end offset.
+
+        Returns:
+            The schema taken from the first record's fields and value
+            types, and the rows as tuples in that field order.
+
+        Raises:
+            ConnectorError: ``invalid_json_record`` if a record is not
+                valid UTF-8 JSON; ``record_not_object`` if it is not a JSON
+                object; ``schema_changed`` if a record's field names or
+                order differ from the first record's.
+        """
         decoded: list[Mapping[str, Any]] = []
         lines = [record[0] for record in records]
         for line in lines:
@@ -1462,7 +2102,15 @@ class StreamingObjectStoreConnector(SourceConnector):
         return schema, tuple(rows)
 
     def json_type_name(self, value: Any) -> str:
-        """Return a stable source type name for one JSON value."""
+        """Names the source type of one JSON value.
+
+        Args:
+            value: A decoded JSON value.
+
+        Returns:
+            ``null``, ``bool``, ``int``, ``float``, ``str``, ``array`` or
+            ``object``; for any other value its Python class name.
+        """
         if value is None:
             return "null"
         if isinstance(value, bool):

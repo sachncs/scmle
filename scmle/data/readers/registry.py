@@ -16,7 +16,21 @@ from scmle.data.readers import connectors
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class SourceSnapshot:
-    """Immutable identity and source schema for one observed snapshot."""
+    """Immutable identity and source schema for one observed snapshot.
+
+    Attributes:
+        source_id: Identity of the logical source.
+        source_uri: Canonical URI of the source.
+        snapshot_id: Identity of this snapshot of the source.
+        schema_hash: Hash of the snapshot's column names and dtypes.
+        data_hash: Hash of the snapshot's row contents.
+        raw_source_hash: Hash of the raw source bytes, or an empty string
+            when they were not available.
+        row_count: Number of rows in the snapshot.
+        schema: Mapping from column name to source type name.
+        captured_at: Capture time as supplied by the caller.
+        watermark: Source watermark, or an empty string if none.
+    """
 
     source_id: str
     source_uri: str
@@ -30,7 +44,13 @@ class SourceSnapshot:
     watermark: str = ""
 
     def __post_init__(self) -> None:
-        """Validate identity, shape, and schema fields."""
+        """Validates identity, shape, and schema fields.
+
+        Raises:
+            ValueError: If a required identity or time field is blank, the
+                row count is negative, the schema is empty, or a schema
+                column name or type name is blank.
+        """
         for name in (
             "source_id",
             "source_uri",
@@ -58,7 +78,19 @@ class SourceSnapshot:
         schema: Mapping[str, str],
         captured_at: str,
     ) -> Self:
-        """Build a source snapshot from the immutable dataset manifest."""
+        """Builds a source snapshot from the immutable dataset manifest.
+
+        Args:
+            manifest: Manifest of the ingested dataset. An empty URI is
+                treated as ``memory://``.
+            schema: Mapping from column name to source type name.
+            captured_at: Capture time to record.
+
+        Returns:
+            A snapshot whose identity, hashes and row count come from the
+            manifest; the raw source hash is taken from the manifest's
+            ``raw-source`` lineage hash, or is empty when absent.
+        """
         source_uri = connectors.canonical_source_uri(
             manifest.uri or "memory://"
         )
@@ -77,7 +109,12 @@ class SourceSnapshot:
         )
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a deterministic JSON-compatible snapshot record."""
+        """Serializes the snapshot.
+
+        Returns:
+            A JSON-compatible mapping of every field, with the schema
+            sorted by column name.
+        """
         return {
             "source_id": self.source_id,
             "source_uri": self.source_uri,
@@ -93,7 +130,16 @@ class SourceSnapshot:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild a source snapshot from serialized evidence."""
+        """Rebuilds a source snapshot from serialized evidence.
+
+        Args:
+            record: Mapping as produced by `to_dict`. The keys other than
+                ``raw_source_hash`` and ``watermark`` are required; those
+                two default to an empty string.
+
+        Returns:
+            The reconstructed snapshot.
+        """
         return cls(
             source_id=str(record["source_id"]),
             source_uri=str(record["source_uri"]),
@@ -113,7 +159,18 @@ class SourceSnapshot:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class SchemaCompatibility:
-    """Decision describing how one source schema changed from another."""
+    """Decision describing how one source schema changed from another.
+
+    Attributes:
+        previous_snapshot_id: Snapshot compared against, or None for the
+            first snapshot of a source.
+        current_snapshot_id: Snapshot being judged.
+        added: Sorted names of columns present only in the current schema.
+        removed: Sorted names of columns present only in the previous
+            schema.
+        changed: Sorted names of columns in both schemas whose type name
+            differs.
+    """
 
     previous_snapshot_id: str | None
     current_snapshot_id: str
@@ -123,12 +180,17 @@ class SchemaCompatibility:
 
     @property
     def compatible(self) -> bool:
-        """Whether the change is unchanged or additive-only."""
+        """Whether no column was removed or changed (additions allowed)."""
         return not self.removed and not self.changed
 
     @property
     def status(self) -> str:
-        """Return the stable schema-evolution status."""
+        """The stable schema-evolution status.
+
+        One of ``initial`` (no previous snapshot), ``breaking`` (a column
+        was removed or changed), ``additive`` (columns only added) or
+        ``unchanged``.
+        """
         if self.previous_snapshot_id is None:
             return "initial"
         if self.removed or self.changed:
@@ -136,7 +198,13 @@ class SchemaCompatibility:
         return "additive" if self.added else "unchanged"
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a JSON-compatible compatibility decision."""
+        """Serializes the compatibility decision.
+
+        Returns:
+            A JSON-compatible mapping with both snapshot ids, ``status``,
+            ``compatible`` and the added, removed and changed column names
+            as lists.
+        """
         return {
             "previous_snapshot_id": self.previous_snapshot_id,
             "current_snapshot_id": self.current_snapshot_id,
@@ -151,7 +219,18 @@ class SchemaCompatibility:
 def compare_schemas(
     previous: SourceSnapshot | None, current: SourceSnapshot
 ) -> SchemaCompatibility:
-    """Compare two snapshots without silently accepting breaking changes."""
+    """Compares two snapshots without silently accepting breaking changes.
+
+    Args:
+        previous: The earlier snapshot of the source, or None if there is
+            none.
+        current: The snapshot being judged.
+
+    Returns:
+        The decision. With no previous snapshot all column lists are empty
+        and the status is ``initial``; otherwise the lists hold the sorted
+        names of added, removed and type-changed columns.
+    """
     if previous is None:
         return SchemaCompatibility(None, current.snapshot_id, (), (), ())
     previous_names = set(previous.schema)
@@ -176,14 +255,30 @@ def compare_schemas(
 
 @dataclasses.dataclass
 class SourceRegistry:
-    """Append-only source snapshot history for a run or source project."""
+    """Append-only source snapshot history for a run or source project.
+
+    Attributes:
+        snapshots: Mapping from source id to that source's snapshots, in
+            registration order.
+    """
 
     snapshots: dict[str, tuple[SourceSnapshot, ...]] = dataclasses.field(
         default_factory=dict
     )
 
     def register(self, snapshot: SourceSnapshot) -> None:
-        """Register a snapshot idempotently and reject conflicting repeats."""
+        """Registers a snapshot idempotently and rejects conflicting repeats.
+
+        Registering a snapshot whose id is already present with identical
+        evidence is a no-op.
+
+        Args:
+            snapshot: The snapshot to append to its source's history.
+
+        Raises:
+            ValueError: If the snapshot id is already registered for the
+                source with different evidence.
+        """
         history = self.snapshots.get(snapshot.source_id, ())
         for existing in history:
             if existing.snapshot_id == snapshot.snapshot_id:
@@ -206,16 +301,37 @@ class SourceRegistry:
         self.snapshots[snapshot.source_id] = (*history, snapshot)
 
     def latest(self, source_id: str) -> SourceSnapshot | None:
-        """Return the most recently registered snapshot for a source."""
+        """Finds the most recently registered snapshot for a source.
+
+        Args:
+            source_id: Identity of the source.
+
+        Returns:
+            The latest snapshot, or None if the source has none.
+        """
         history = self.snapshots.get(source_id, ())
         return history[-1] if history else None
 
     def compatibility(self, snapshot: SourceSnapshot) -> SchemaCompatibility:
-        """Compare a candidate snapshot with the source's latest snapshot."""
+        """Compares a candidate snapshot with the source's latest snapshot.
+
+        Args:
+            snapshot: The candidate snapshot (not registered by this call).
+
+        Returns:
+            The schema decision against the latest registered snapshot of
+            the same source; ``initial`` if there is none.
+        """
         return compare_schemas(self.latest(snapshot.source_id), snapshot)
 
     def to_dict(self) -> dict[str, Any]:
-        """Return deterministic source registry evidence."""
+        """Serializes the registry.
+
+        Returns:
+            A JSON-compatible mapping with ``schema_version`` 1 and the
+            sources sorted by id, each with its snapshots in registration
+            order.
+        """
         return {
             "schema_version": 1,
             "sources": [
@@ -228,7 +344,11 @@ class SourceRegistry:
         }
 
     def to_json(self) -> str:
-        """Serialize the registry with canonical JSON ordering."""
+        """Serializes the registry with canonical JSON ordering.
+
+        Returns:
+            Compact, ASCII-only JSON of `to_dict` with sorted keys.
+        """
         return json.dumps(
             self.to_dict(),
             ensure_ascii=True,
@@ -238,7 +358,23 @@ class SourceRegistry:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild a source registry from serialized evidence."""
+        """Rebuilds a source registry from serialized evidence.
+
+        Snapshots are re-registered, so conflicting duplicate snapshot ids
+        are rejected as by `register`.
+
+        Args:
+            record: Mapping as produced by `to_dict`.
+
+        Returns:
+            The reconstructed registry.
+
+        Raises:
+            ValueError: If the schema version is not 1, ``sources`` or a
+                source's ``snapshots`` is not a list, or a snapshot's source
+                id differs from the source it is listed under.
+            TypeError: If an entry of ``sources`` is not a mapping.
+        """
         if record.get("schema_version") != 1:
             raise ValueError("unsupported source registry schema version")
         sources = record.get("sources")
@@ -263,7 +399,17 @@ class SourceRegistry:
 
     @classmethod
     def from_json(cls, serialized: str) -> Self:
-        """Rebuild a source registry from canonical JSON."""
+        """Rebuilds a source registry from canonical JSON.
+
+        Args:
+            serialized: JSON text as produced by `to_json`.
+
+        Returns:
+            The reconstructed registry.
+
+        Raises:
+            TypeError: If the JSON document is not an object.
+        """
         record = json.loads(serialized)
         if not isinstance(record, Mapping):
             raise TypeError("serialized registry must contain an object")
@@ -272,12 +418,20 @@ class SourceRegistry:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class SourceRegistryStore:
-    """Durable, atomic file store for source history across runs."""
+    """Durable, atomic file store for source history across runs.
+
+    Attributes:
+        path: Location of the JSON file holding the registry.
+    """
 
     path: pathlib.Path
 
     def load(self) -> SourceRegistry:
-        """Load the registry or return an empty registry for a new store."""
+        """Loads the registry or returns an empty registry for a new store.
+
+        Returns:
+            The stored registry, or an empty one if the file does not exist.
+        """
         if not self.path.exists():
             return SourceRegistry()
         return SourceRegistry.from_json(self.path.read_text(encoding="utf-8"))
@@ -288,6 +442,12 @@ class SourceRegistryStore:
         A failed serialization or write leaves the previous registry intact.
         The caller owns coordination between multiple writers; this store
         guarantees that readers never observe a partial JSON document.
+
+        Args:
+            registry: The complete registry to publish.
+
+        Raises:
+            TypeError: If `registry` is not a `SourceRegistry`.
         """
         if not isinstance(registry, SourceRegistry):
             raise TypeError("registry must be SourceRegistry")
@@ -310,7 +470,15 @@ class SourceRegistryStore:
             raise
 
     def register(self, snapshot: SourceSnapshot) -> SchemaCompatibility:
-        """Compare, register, and durably publish one source snapshot."""
+        """Compares, registers, and durably publishes one source snapshot.
+
+        Args:
+            snapshot: The snapshot to record.
+
+        Returns:
+            The schema decision against the latest stored snapshot of the
+            same source, computed before the snapshot is added.
+        """
         registry = self.load()
         compatibility = registry.compatibility(snapshot)
         registry.register(snapshot)
