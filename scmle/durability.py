@@ -63,7 +63,7 @@ def sync_file(path: str | pathlib.Path) -> None:
     Args:
         path: File to flush; it must exist.
     """
-    with open(path, "r+b") as handle:
+    with pathlib.Path(path).open("r+b") as handle:
         os.fsync(handle.fileno())
 
 
@@ -113,13 +113,14 @@ def replace_file(
         attempt = 1
         while True:
             try:
-                os.replace(source, target)
-                return
+                pathlib.Path(source).replace(target)
             except PermissionError:
                 if not WINDOWS or attempt >= REPLACE_ATTEMPTS:
                     raise
                 time.sleep(REPLACE_DELAY_SECONDS * attempt)
                 attempt += 1
+            else:
+                return
 
 
 def write_atomically(path: str | pathlib.Path, content: bytes) -> None:
@@ -147,5 +148,5 @@ def write_atomically(path: str | pathlib.Path, content: bytes) -> None:
         sync_directory(target.parent)
     except BaseException:
         with contextlib.suppress(FileNotFoundError):
-            os.unlink(temporary_name)
+            pathlib.Path(temporary_name).unlink()
         raise
