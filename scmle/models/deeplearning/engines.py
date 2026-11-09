@@ -22,17 +22,20 @@ MIN_ROWS_FOR_VALIDATION = 30
 
 
 class TabularEngine(base.BaseEstimator, abc.ABC):
-    """Trains a network with Adam, early stopping and weighted losses.
+    """Trains a network with early stopping and weighted losses.
 
     The matrix is expected to be numeric, complete and scaled (the standard
     pipeline provides that); sparse input is densified.
 
     Attributes:
         architecture: Name in `architectures.ARCHITECTURES`.
-        hidden_sizes: Layer widths (residual: width, then block count).
+        hidden_sizes: Layer widths. `residual` uses the first entry as the
+            block width and adds one block per non-zero entry;
+            `ft_transformer` uses it as the embedding width and builds
+            one layer per entry.
         dropout: Dropout probability.
-        learning_rate: Adam step size.
-        weight_decay: L2 penalty.
+        learning_rate: Peak step size (not used by `lbfgs`).
+        weight_decay: L2 penalty (not used by `lbfgs`).
         epochs: Maximum epochs.
         batch_size: Rows per step, or `auto` to size it from the data.
         schedule: Learning-rate schedule, `cosine` or `constant`.
@@ -82,10 +85,13 @@ class TabularEngine(base.BaseEstimator, abc.ABC):
 
         Args:
             architecture: Name in `architectures.ARCHITECTURES`.
-            hidden_sizes: Layer widths (residual: width, then block count).
+            hidden_sizes: Layer widths. `residual` uses the first entry as the
+                block width and adds one block per non-zero entry;
+                `ft_transformer` uses it as the embedding width and builds
+                one layer per entry.
             dropout: Dropout probability.
-            learning_rate: Adam step size.
-            weight_decay: L2 penalty.
+            learning_rate: Peak step size (not used by `lbfgs`).
+            weight_decay: L2 penalty (not used by `lbfgs`).
             epochs: Maximum epochs.
             batch_size: Rows per step, or `auto` to size it from the data.
             schedule: Learning-rate schedule, `cosine` or `constant`.
@@ -407,17 +413,18 @@ class TabularEngine(base.BaseEstimator, abc.ABC):
         tensors: dict[str, Any],
         batch: Any,
     ) -> tuple[float, float]:
-        """One full-batch L-BFGS step; returns the loss and gradient norm.
+        """Runs one L-BFGS step; returns the starting loss and gradient norm.
 
         Args:
             torch: The imported torch module.
             network: The network being trained.
             optimizer: The L-BFGS optimizer.
             tensors: Device tensors `x`, `y` and `w` (inputs, targets, weights).
-            batch: Indices of the rows to use.
+            batch: Indices of the rows to use (all training rows).
 
         Returns:
-            The loss value and the unclipped gradient norm.
+            The loss at the start of the step (the first closure evaluation)
+            and the norm of the gradients left after it, without clipping.
         """
 
         def closure() -> Any:
@@ -593,10 +600,13 @@ class ClassifierEngine(base.ClassifierMixin, TabularEngine):
 
         Args:
             architecture: Name in `architectures.ARCHITECTURES`.
-            hidden_sizes: Layer widths (residual: width, then block count).
+            hidden_sizes: Layer widths. `residual` uses the first entry as the
+                block width and adds one block per non-zero entry;
+                `ft_transformer` uses it as the embedding width and builds
+                one layer per entry.
             dropout: Dropout probability.
-            learning_rate: Adam step size.
-            weight_decay: L2 penalty.
+            learning_rate: Peak step size (not used by `lbfgs`).
+            weight_decay: L2 penalty (not used by `lbfgs`).
             epochs: Maximum epochs.
             batch_size: Rows per step, or `auto` to size it from the data.
             schedule: Learning-rate schedule, `cosine` or `constant`.

@@ -349,7 +349,7 @@ class WebhookAlertSink(AlertSink):
 
 
 class AlertDispatcher:
-    """Route alerts once and persist delivery outcomes for replay safety.
+    """Routes alerts once and persists delivery outcomes for replay safety.
 
     Attributes:
         sinks: Sink by route name.
@@ -360,7 +360,7 @@ class AlertDispatcher:
     def __init__(
         self, sinks: Mapping[str, AlertSink], journal: str | Path
     ) -> None:
-        """Bind routes and an append-only delivery journal.
+        """Binds routes and an append-only delivery journal.
 
         Args:
             sinks: Sink by route name.
@@ -378,7 +378,7 @@ class AlertDispatcher:
         self.lock = durability.path_lock(self.journal)
 
     def dispatch(self, alert: Alert) -> AlertDelivery:
-        """Deliver an alert or return a prior successful delivery.
+        """Delivers an alert unless a successful delivery is already journaled.
 
         The journal check, the delivery and the journal write are one step per
         journal within this process, so concurrent threads cannot both send the
@@ -388,15 +388,16 @@ class AlertDispatcher:
             alert: The alert.
 
         Returns:
-            The delivery outcome: `deduplicated` if a delivery is already
-            recorded, `failed` if the route has no sink or the sink gave up,
-            otherwise the sink's outcome.
+            The delivery outcome: `deduplicated` if a `delivered` record for
+            the alert is already in the journal, `failed` if the route has no
+            sink or the sink raised `AlertDeliveryError`, otherwise the
+            outcome the sink returned.
         """
         with self.lock:
             return self.dispatch_locked(alert)
 
     def dispatch_locked(self, alert: Alert) -> AlertDelivery:
-        """Dispatch one alert while holding the journal lock.
+        """Dispatches one alert while the caller holds the journal lock.
 
         Args:
             alert: The alert.
@@ -457,7 +458,7 @@ class AlertDispatcher:
         return successful
 
     def append(self, alert: Alert, delivery: AlertDelivery) -> None:
-        """Persist one alert and its delivery outcome durably.
+        """Persists one alert and its delivery outcome durably.
 
         Args:
             alert: The alert.

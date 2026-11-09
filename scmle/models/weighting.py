@@ -87,7 +87,12 @@ class WeightedEstimator(base.BaseEstimator):
         return "sample_weight" in inspect.signature(model.fit).parameters
 
     def fit(self, features: Any, target: Any) -> Self:
-        """Fits the pipeline weighted by the weight column.
+        """Fits a clone of the pipeline weighted by the weight column.
+
+        When the pipeline's `model` step takes `sample_weight`, the weights are
+        passed to it. Otherwise rows are drawn with replacement, with
+        probability proportional to weight, and the pipeline is fitted on the
+        draw. The weight column stays in the features given to the pipeline.
 
         Args:
             features: Training features, convertible to a data frame, that

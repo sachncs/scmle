@@ -63,7 +63,8 @@ class QuarantineEntry:
     """Owned, time-bounded explanation for one known unstable test.
 
     Attributes:
-        test_id: The test's identifier (`classname::name`).
+        test_id: The test's identifier (`classname::name`, or the bare name
+            when the test case has no class name).
         owner: Who answers for the quarantine.
         reason: Why the test is unstable.
         expires_at: ISO-8601 date after which the quarantine is invalid.
@@ -75,7 +76,7 @@ class QuarantineEntry:
     expires_at: str
 
     def __post_init__(self) -> None:
-        """Reject unreviewable quarantine records.
+        """Rejects unreviewable quarantine records.
 
         Raises:
             ValueError: If a field is empty or not text, or `expires_at` is not
@@ -97,7 +98,7 @@ class QuarantineEntry:
         return parse_date(self.expires_at) < datetime.date.today()
 
     def to_dict(self) -> dict[str, str]:
-        """Return JSON-native quarantine evidence.
+        """Returns JSON-native quarantine evidence.
 
         Returns:
             The owner, reason and expiry date.
@@ -110,7 +111,7 @@ class QuarantineEntry:
 
     @classmethod
     def from_dict(cls, test_id: str, record: Mapping[str, Any]) -> Self:
-        """Build a quarantine entry from policy JSON.
+        """Builds a quarantine entry from policy JSON.
 
         Args:
             test_id: The test's identifier.
@@ -213,7 +214,7 @@ class StabilityReport:
         return not self.unquarantined_failures and not self.expired_quarantines
 
     def to_dict(self) -> dict[str, Any]:
-        """Return deterministic JSON-native stability evidence.
+        """Returns deterministic JSON-native stability evidence.
 
         Returns:
             The schema version, status, `passed` and the contents of the report.

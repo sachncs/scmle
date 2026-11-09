@@ -376,11 +376,13 @@ class ImageClassifier:
             dataset: Labelled images to score.
 
         Returns:
-            Accuracy, macro-averaged precision/recall balance and log loss
-            over the images.
+            Evidence with the sample count, accuracy, macro-averaged F-score,
+            log loss and the class labels.
 
         Raises:
-            ValueError: If the dataset is empty or any image has no label.
+            ValueError: If the dataset is empty, any image has no label, or a
+                label is not one of the classifier's classes.
+            RuntimeError: If the classifier has not been fitted.
         """
         if not dataset.samples:
             raise ValueError("evaluation images must not be empty")

@@ -63,7 +63,7 @@ class LastValueForecaster(wrapper.MultiOutputEstimator):
         self.value_column = value_column
 
     def fit(self, features: Any, target: Any) -> Self:
-        """Nothing to learn.
+        """Accepts the data and learns nothing (the forecast is the last value).
 
         Args:
             features: Ignored.

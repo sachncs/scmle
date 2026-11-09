@@ -259,8 +259,11 @@ class CoxRegressor(SurvivalEstimator):
     def predict_survival(self, features: Any, times: Any) -> np.ndarray:
         """Survival `exp(-B(t) * exp(eta))` for each row and time.
 
-        Here `B` is the cumulative baseline hazard and `eta` the linear
-        predictor.
+        Here `B` is the cumulative baseline hazard (Breslow, a step function
+        that is 0 before the first event time) and `eta` the linear predictor.
+        Internally the stored baseline is multiplied by `exp(scale_)` and
+        `exp(eta)` divided by it (`scale_` is the largest training `eta`), so
+        the product is unchanged.
 
         Args:
             features: Covariate matrix.

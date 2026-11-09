@@ -135,7 +135,8 @@ class LocalRunner(base.Runner):
 
         An interruption becomes `INTERRUPTED`, a supervisor stop `CANCELLED`, a
         transient error a retryable `FAILED`, and any other exception a
-        non-retryable `FAILED` carrying its type and message.
+        non-retryable `FAILED` carrying its type and message (cut to 300
+        characters).
 
         Args:
             spec: The job.

@@ -279,7 +279,7 @@ def parse_arguments(arguments: list[str] | None = None) -> argparse.Namespace:
 
 
 def main(arguments: list[str] | None = None) -> int:
-    """Run public release checks and return a release-safe exit status.
+    """Runs public release checks and returns a release-safe exit status.
 
     Prints the evidence and writes it to `--output` when given.
 

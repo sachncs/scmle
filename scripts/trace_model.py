@@ -131,7 +131,8 @@ def dotted(document: Any, path: str) -> Any:
     Args:
         document: The mapping or list to start from.
         path: Dot-separated keys; a part is an index when the current
-            value is a list.
+            value is a list. A missing key or index raises the usual KeyError,
+            IndexError or ValueError.
 
     Returns:
         The value at the end of the path.
@@ -330,7 +331,9 @@ class Walk:
     def outcomes(
         self, costs: dict[str, Any], cut: float
     ) -> tuple[dict[str, Any], dict[str, Any]]:
-        """Costs the observed outcomes and compares them with the range.
+        """Costs the observed outcomes and summarizes the mean cost.
+
+        Checks that the feed's threshold equals `cut`.
 
         Args:
             costs: The chartered cost model.

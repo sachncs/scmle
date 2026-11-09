@@ -204,6 +204,9 @@ class RoleStore(objectstore.ObjectStore):
     def list_objects(self, prefix: str = "") -> list[objectstore.ObjectMeta]:
         """Lists objects if the role may read the prefix (see `ObjectStore`).
 
+        A prefix the role may not read raises RoleDeniedError from
+        `need_read`.
+
         Args:
             prefix: Key prefix to list.
 

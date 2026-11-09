@@ -264,7 +264,11 @@ class MixtureTest:
         terms: int = 64,
         cap: float = DEFAULT_CAP,
     ) -> None:
-        """Creates the test; arguments as for `BettingTest`.
+        """Creates the test and starts its first term.
+
+        `null_mean`, `direction`, `alpha` and `cap` are validated by the
+        `BettingTest` built for that term, which raises ValueError for a value
+        outside the range given for it there.
 
         Args:
             null_mean: Mean under the null, strictly inside ``(0, 1)``.
@@ -272,7 +276,7 @@ class MixtureTest:
             alpha: Level, in ``(0, 1)``.
             stride: Observations between starts.
             terms: Newest starts kept.
-            cap: Share of the positivity bound a bet may use.
+            cap: Share of the positivity bound a bet may use, in ``(0, 1)``.
 
         Raises:
             ValueError: If `stride` or `terms` is not positive.

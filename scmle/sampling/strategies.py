@@ -570,13 +570,19 @@ class RareTargetStrategy(DataStrategy):
     ) -> str | None:
         """Needs a skewed regression target and a model taking weights.
 
+        Checked in order: the baseline model is refused, then classification
+        tasks, then a target whose absolute skew is below
+        `TARGET_SKEW_THRESHOLD`, then a model whose estimator has no
+        `sample_weight` fit parameter.
+
         Args:
             profile: Dataset profile.
             task: Resolved task type.
             adapter: Model the strategy would be combined with.
 
         Returns:
-            A reason the strategy does not apply, or None when it applies.
+            The first reason the strategy does not apply, or None when it
+            applies.
         """
         reason = super().applicability(profile, task, adapter)
         if reason is not None:
@@ -901,7 +907,11 @@ class TargetTransformStrategy(DataStrategy):
         task: tasks.TaskType,
         adapter: models.ModelAdapter,
     ) -> str | None:
-        """Needs a skewed continuous target.
+        """Needs a skewed regression target.
+
+        Checked in order: the baseline model is refused, then any task other
+        than plain regression, then a target whose absolute skew is below
+        `TARGET_SKEW_THRESHOLD`.
 
         Args:
             profile: Dataset profile.
@@ -909,7 +919,8 @@ class TargetTransformStrategy(DataStrategy):
             adapter: Model the strategy would be combined with.
 
         Returns:
-            A reason the strategy does not apply, or None when it applies.
+            The first reason the strategy does not apply, or None when it
+            applies.
         """
         reason = super().applicability(profile, task, adapter)
         if reason is not None:

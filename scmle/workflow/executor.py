@@ -280,8 +280,8 @@ class LocalExecutor:
             approver_keys: Approver identity to the HMAC key their decisions
                 are signed with (held by the approver, not by the system
                 under approval).
-            clock: Epoch seconds.
-            sleep: Waits between retries.
+            clock: Callable returning the current time in epoch seconds.
+            sleep: Callable taking a delay in seconds, called between retries.
             lease_seconds: Validity of a run lease.
             owner: Name written into the lease.
 
@@ -448,7 +448,10 @@ class LocalExecutor:
 
         Invoking the same trigger again returns the finished record without
         running anything, or continues an unfinished run after its lease
-        expired.
+        expired. Driving a run can raise `ConcurrencyLimitError` (the workflow
+        has its maximum of runs in flight), `RunInFlightError` (another
+        executor holds the run's lease) and ConfigError (the run was started
+        with a different workflow definition).
 
         Args:
             trigger_key: Identifies the trigger (a schedule slot, a request).
@@ -904,7 +907,8 @@ class LocalExecutor:
             at: Decision time in epoch seconds; the current time if None.
 
         Returns:
-            The decision payload with its signature.
+            The decision payload (run, workflow digest, step, approver,
+            decision and time) with an added `signature` entry.
         """
         moment = self.clock() if at is None else at
         payload = self.approval_payload(

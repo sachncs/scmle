@@ -33,10 +33,13 @@ class NetworkEstimator(base.BaseEstimator):
 
     Attributes:
         architecture: Name in `architectures.ARCHITECTURES`.
-        hidden_sizes: Layer widths (residual: width, then block count).
+        hidden_sizes: Layer widths. `residual` uses the first entry as the
+            block width and adds one block per non-zero entry;
+            `ft_transformer` uses it as the embedding width and builds
+            one layer per entry.
         dropout: Dropout probability.
-        learning_rate: Adam step size.
-        weight_decay: L2 penalty.
+        learning_rate: Peak step size (not used by `lbfgs`).
+        weight_decay: L2 penalty (not used by `lbfgs`).
         epochs: Maximum epochs.
         batch_size: Rows per step, or `auto` to size it from the data.
         schedule: Learning-rate schedule, `cosine` or `constant`.
@@ -86,10 +89,13 @@ class NetworkEstimator(base.BaseEstimator):
 
         Args:
             architecture: Name in `architectures.ARCHITECTURES`.
-            hidden_sizes: Layer widths (residual: width, then block count).
+            hidden_sizes: Layer widths. `residual` uses the first entry as the
+                block width and adds one block per non-zero entry;
+                `ft_transformer` uses it as the embedding width and builds
+                one layer per entry.
             dropout: Dropout probability.
-            learning_rate: Adam step size.
-            weight_decay: L2 penalty.
+            learning_rate: Peak step size (not used by `lbfgs`).
+            weight_decay: L2 penalty (not used by `lbfgs`).
             epochs: Maximum epochs.
             batch_size: Rows per step, or `auto` to size it from the data.
             schedule: Learning-rate schedule, `cosine` or `constant`.
@@ -453,10 +459,13 @@ class TorchClassifier(base.ClassifierMixin, NetworkEstimator):
 
         Args:
             architecture: Name in `architectures.ARCHITECTURES`.
-            hidden_sizes: Layer widths (residual: width, then block count).
+            hidden_sizes: Layer widths. `residual` uses the first entry as the
+                block width and adds one block per non-zero entry;
+                `ft_transformer` uses it as the embedding width and builds
+                one layer per entry.
             dropout: Dropout probability.
-            learning_rate: Adam step size.
-            weight_decay: L2 penalty.
+            learning_rate: Peak step size (not used by `lbfgs`).
+            weight_decay: L2 penalty (not used by `lbfgs`).
             epochs: Maximum epochs.
             batch_size: Rows per step, or `auto` to size it from the data.
             schedule: Learning-rate schedule, `cosine` or `constant`.

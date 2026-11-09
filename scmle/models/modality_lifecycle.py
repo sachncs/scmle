@@ -444,6 +444,12 @@ class LifecycleReport:
     def __post_init__(self) -> None:
         """Validates the report identity and optional signature.
 
+        The six evidence mappings (`evaluation`, `performance`, `inference`,
+        `monitoring`, `documentation`, `recovery`) are also normalized to
+        sorted JSON-native dictionaries; a value that is not a mapping raises
+        TypeError and one that is not finite JSON raises ValueError, both from
+        `normalize_json_object`.
+
         Raises:
             ValueError: If the modality or dataset hash is blank, the stage
                 evidence is not every required stage once in order or lacks
@@ -815,7 +821,8 @@ class LifecycleCheckpoint:
         """Builds the exact checkpoint content covered by its signature.
 
         Returns:
-            JSON-native mapping of every field except the signature.
+            JSON-native mapping of every field except the signature, plus a
+            fixed `record_type` entry.
         """
         return {
             "schema_version": self.schema_version,
@@ -1070,6 +1077,8 @@ class ModalityCurationResult:
 
     def verify_signature(self, signing_key: str | bytes) -> bool:
         """Checks the persisted curation signature.
+
+        An empty string key raises ValueError from the signing helper.
 
         Args:
             signing_key: Key the signature should have been made with.
@@ -3241,6 +3250,10 @@ class GeospatialAdapter(ModalityAdapter):
     ) -> FeatureBatch:
         """Prepares bounded geometry envelope and centroid features.
 
+        The dataset is rebuilt with the adapter's CRS and source; a missing
+        CRS or a non-finite prepared value raises GeospatialValidationError
+        from the dataset.
+
         Args:
             samples: Features to convert.
 
@@ -3701,7 +3714,8 @@ class RasterAdapter(ModalityAdapter):
 
         Raises:
             GeospatialValidationError: If decoding is on and the rasters do not
-                share one band count.
+                share one band count (an empty sequence counts as not sharing
+                one).
         """
         if self.decoder is not None:
             band_counts = {sample.bands for sample in samples}
@@ -4091,7 +4105,11 @@ class LifecycleContext:
         elapsed_seconds: float,
         sample_count: int,
     ) -> None:
-        """Records one measured operation with machine and timestamp context.
+        """Stores one measured operation with machine and timestamp context.
+
+        The observation also carries the process's peak memory, the platform
+        and Python version, and a UTC timestamp. It replaces any earlier
+        observation of the same operation.
 
         Args:
             operation: Operation that was measured.
@@ -4355,6 +4373,10 @@ class EvaluationStage(ModalityLifecycleStage):
 
     def execute(self, context: LifecycleContext) -> None:
         """Computes deterministic classification metrics and predictions.
+
+        The metrics are computed on the test partition's feature batch and
+        stored as `context.evaluation`, which is also recorded as the stage
+        evidence.
 
         Args:
             context: Shared lifecycle state, updated in place.
@@ -5075,6 +5097,10 @@ class ModalityLifecycle:
 
         def ensure_not_cancelled() -> None:
             """Stops before publication and removes this run's artifacts.
+
+            Does nothing when no check was given or it reports no
+            cancellation. On cancellation it deletes the package directory and
+            the report file unless they existed before the run.
 
             Raises:
                 LifecycleCancelledError: If `cancellation_check` reports

@@ -457,7 +457,7 @@ def differences(
 
 
 def parse_arguments(arguments: list[str] | None = None) -> argparse.Namespace:
-    """Parse compatibility-check arguments.
+    """Parses compatibility-check arguments.
 
     Args:
         arguments: Command-line arguments; `None` reads `sys.argv`.

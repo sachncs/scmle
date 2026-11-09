@@ -203,7 +203,8 @@ class CrossLearner(base.BaseEstimator):
     Outcome models per arm predict what each row would have had under the
     other arm; the imputed individual effects are regressed on the features
     separately in each arm, and the two effect models are blended by the
-    propensity of treatment. It does well when the arms are unbalanced.
+    treated share of the training rows. It does well when the arms are
+    unbalanced.
 
     Attributes:
         classify: Whether the outcome is a 0/1 label.
@@ -221,10 +222,11 @@ class CrossLearner(base.BaseEstimator):
         self.random_state = random_state
 
     def fit(self, features: Any, outcome: Any, treatment: Any = None) -> Self:
-        """Fits outcome, effect and propensity models.
+        """Fits the per-arm outcome models, then one effect model per arm.
 
-        If only one arm is present no effect can be estimated and `predict`
-        returns zeros.
+        The treated share of the training rows is kept as the blending weight
+        (no propensity model is fitted). If only one arm is present no effect
+        can be estimated and `predict` returns zeros.
 
         Args:
             features: Training matrix.
@@ -263,7 +265,10 @@ class CrossLearner(base.BaseEstimator):
         return self
 
     def predict(self, features: Any) -> np.ndarray:
-        """Blend of the two effect models, weighted by treatment share.
+        """Blends the two effect models by the treated share.
+
+        The treated-arm effect model is weighted by one minus the share and the
+        control-arm effect model by the share.
 
         Args:
             features: Matrix to predict for.

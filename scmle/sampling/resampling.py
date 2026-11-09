@@ -247,7 +247,7 @@ class PreprocessedResamplingClassifier(
         self.estimator = estimator
 
     def fit(self, features: Any, target: Any) -> Self:
-        """Fits the preprocessor, resample the encoded rows, fit the model.
+        """Fits the preprocessor, resamples the encoded rows and fits the model.
 
         Args:
             features: Training features.
@@ -266,7 +266,7 @@ class PreprocessedResamplingClassifier(
         return self
 
     def predict(self, features: Any) -> np.ndarray:
-        """Predict from the preprocessed rows (no resampling).
+        """Predicts from the preprocessed rows (no resampling).
 
         Args:
             features: Rows to predict.

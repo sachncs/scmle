@@ -126,7 +126,8 @@ class Resources:
         """Validates the request.
 
         Raises:
-            ConfigError: If a size is not positive or a GPU has no reason.
+            ConfigError: If `cpu` or `memory_mb` is not positive, `gpu` is
+                negative, or a GPU is requested with a blank `gpu_reason`.
         """
         if self.cpu <= 0 or self.memory_mb <= 0 or self.gpu < 0:
             raise errors.ConfigError("resources must be positive")
@@ -292,7 +293,8 @@ class JobHandle:
     """A started attempt.
 
     Attributes:
-        job_id: The platform's id (task ARN, execution name, thread id).
+        job_id: The runner's identifier of the attempt; the local runner
+            uses `local-<run_id>-<attempt>`.
         attempt: Attempt number, from 1.
     """
 

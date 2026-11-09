@@ -134,7 +134,7 @@ class LibraryRanker(base.RegressorMixin, base.BaseEstimator):
         self.random_state = random_state
 
     def build(self) -> Any:
-        """The underlying ranker.
+        """Creates the underlying library ranker from the settings.
 
         Returns:
             An unfitted LightGBM LambdaRank model, or an unfitted XGBoost NDCG

@@ -54,6 +54,9 @@ def open_store(uri: str) -> objectstore.ObjectStore:
 def load_workload(name: str) -> Callable[[local.JobContext], None]:
     """Imports ``module:function``.
 
+    An unimportable module raises ImportError and a missing function raises
+    AttributeError.
+
     Args:
         name: The workload as `module:function`.
 

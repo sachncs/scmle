@@ -529,21 +529,27 @@ class DocumentClassifier:
     ) -> DocumentExplanation:
         """Measures predicted-class score changes when terms are removed.
 
-        Candidate terms are selected by absolute local linear contribution,
-        then removed from the original text one at a time. The returned value
-        is the original score minus the ablated score; positive values mean
+        Candidate terms are the terms present in the document, ranked by
+        absolute local linear contribution and cut to `max_terms`. Each is
+        removed from the original text on its own (every whole-word,
+        case-insensitive match). The score reported for a term is the original
+        predicted-class score minus the ablated score; positive values mean
         that the term supported the predicted class relative to its absence.
+        The `top_k` terms with the largest absolute score change are returned,
+        ties broken alphabetically.
 
         Args:
             sample: Document to explain.
-            top_k: Maximum number of ablations to return.
-            max_terms: Maximum number of candidate terms to evaluate.
+            top_k: Maximum number of ablations to return; at least 1.
+            max_terms: Maximum number of candidate terms to evaluate; at least
+                1.
 
         Returns:
-            Deterministic raw-text perturbation evidence.
+            Deterministic raw-text perturbation evidence whose `terms` hold
+            the selected (term, score change) pairs.
 
         Raises:
-            ValueError: If an output or candidate bound is invalid.
+            ValueError: If `top_k` or `max_terms` is below 1.
             RuntimeError: If the classifier has not been fitted.
         """
         if top_k < 1:

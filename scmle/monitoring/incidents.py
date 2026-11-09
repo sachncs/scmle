@@ -508,7 +508,9 @@ class IncidentWorkflow:
         return updated
 
     def require_record(self, identity: str) -> Incident:
-        """Returns one incident or fail clearly when it is unknown.
+        """Returns the incident with the given identity.
+
+        A blank or non-string identity raises ValueError from `require_text`.
 
         Args:
             identity: Identity of the incident.
