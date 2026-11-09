@@ -100,7 +100,7 @@ def test_deep_learning_paths_declare_their_optional_extra():
 
 def test_ft_transformer_uses_an_experimental_tabular_boundary():
     """FT-Transformer must not inherit supported deep-learning status."""
-    adapter = networks.FtTransformer()
+    adapter = networks.FT_TRANSFORMER
     assert adapter.family == "deep_learning"
     assert adapter.architecture == "ft_transformer"
     assert adapter.capability_family == "transformer"
@@ -127,7 +127,7 @@ def test_experimental_transformer_requires_explicit_model_opt_in():
         "torch",
         reason="the optional deeplearning extra is not installed",
     )
-    adapter = networks.FtTransformer()
+    adapter = networks.FT_TRANSFORMER
     registry = scmle.models.registry.Catalog((classical.Dummy(), adapter))
     default_context = make_context(model_registry=registry)
     default_plan = stages.build_plan(default_context)
