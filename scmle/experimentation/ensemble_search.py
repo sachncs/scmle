@@ -7,7 +7,7 @@ beats its best member.
 """
 
 from scmle.contracts import experiments
-from scmle.core import context as context_module
+import scmle.core.context
 from scmle.experimentation import trials
 from scmle.models import ensembles
 
@@ -28,7 +28,7 @@ class EnsembleSearch:
     """
 
     def __init__(
-        self, context: context_module.RunContext, runner: trials.TrialRunner
+        self, context: scmle.core.context.RunContext, runner: trials.TrialRunner
     ) -> None:
         """Initializes the search.
 
@@ -38,7 +38,7 @@ class EnsembleSearch:
         """
         self.context = context
         self.runner = runner
-        self.metric = context_module.require(context.metric, "metric")
+        self.metric = scmle.core.context.require(context.metric, "metric")
 
     def members(
         self, evaluated: list[experiments.TrialResult], size: int

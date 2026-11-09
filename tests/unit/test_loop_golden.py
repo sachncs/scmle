@@ -16,8 +16,8 @@ import pytest
 
 from benchmarks.qualification import streams
 from scmle.governance import deployment_ledger
-from scmle.governance import loop as loop_module
 from scmle.governance import never_list
+import scmle.governance.loop
 from tests.unit import golden
 from tests.unit import test_loop
 
@@ -28,14 +28,14 @@ def record(loop, extra=None):
     directory = loop.directory
     files = {}
     for name in (
-        loop_module.STATE_FILE,
-        loop_module.RISK_COVERAGE_FILE,
-        loop_module.LABEL_MECHANISM_FILE,
+        scmle.governance.loop.STATE_FILE,
+        scmle.governance.loop.RISK_COVERAGE_FILE,
+        scmle.governance.loop.LABEL_MECHANISM_FILE,
     ):
         path = directory / name
         if path.exists():
             files[name] = json.loads(path.read_text(encoding="utf-8"))
-    state = files.get(loop_module.STATE_FILE, {})
+    state = files.get(scmle.governance.loop.STATE_FILE, {})
     state.pop("ledger_head", None)
     return {
         "rows": [
@@ -60,7 +60,8 @@ def scenario_stable(tmp_path):
 
 def scenario_abrupt(tmp_path):
     loop = test_loop.open_loop(
-        tmp_path, hooks=loop_module.Hooks(retrain=lambda: "challenger-1")
+        tmp_path,
+        hooks=scmle.governance.loop.Hooks(retrain=lambda: "challenger-1"),
     )
     stream = streams.simulate(
         test_loop.spec(kind="abrupt", batches=60, change=25, delta=0.25, seed=4)
@@ -168,7 +169,7 @@ def scenario_routing(tmp_path):
 
 def scenario_mnar(tmp_path):
     loop = test_loop.open_loop(
-        tmp_path, hooks=loop_module.Hooks(retrain=lambda: "x")
+        tmp_path, hooks=scmle.governance.loop.Hooks(retrain=lambda: "x")
     )
     config = test_loop.spec(
         kind="abrupt",

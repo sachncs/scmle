@@ -20,7 +20,7 @@ import pytest
 import support
 
 import scmle
-from scmle.artifacts import bundle as bundle_module
+import scmle.artifacts.bundle
 from scmle.contracts import errors
 from scmle.contracts import events
 from scmle.contracts import experiments
@@ -30,13 +30,13 @@ from scmle.core import scheduler
 from scmle.core import stages
 from scmle.core import state
 from scmle.data.validation import columns
-from scmle.data.validation import target as target_module
+import scmle.data.validation.target
 from scmle.governance import lifecycle
-from scmle.inference import mapping as mapping_module
+import scmle.inference.mapping
 from scmle.integrations import ray_backend
 from scmle.models import conformance
-from scmle.models import registry as registry_module
-from scmle.sampling import strategies as strategies_module
+import scmle.models.registry
+import scmle.sampling.strategies
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 PACKAGE = ROOT / "scmle"
@@ -396,7 +396,7 @@ def test_l198_l206_foundational_and_production_contracts(run):
         )
     } == {"config", "data", "schema", "blocked", "leakage", "artifact"}
     assert (
-        result.bundle.info.format == bundle_module.BUNDLE_FORMAT
+        result.bundle.info.format == scmle.artifacts.bundle.BUNDLE_FORMAT
     )  # serialization format
     assert isinstance(
         result.bundle.info.compatibility_problems(), list
@@ -418,7 +418,7 @@ def test_l210_l224_module_io_matrix_invariants(run, tmp_path):
     )  # ingestion: input immutable
     spec = project.spec
     manifest = tabular.build_manifest(frame, "y")
-    task = target_module.TaskResolver(spec).resolve(frame["y"])
+    task = scmle.data.validation.target.TaskResolver(spec).resolve(frame["y"])
     profiler.DatasetProfiler(spec).profile(frame, manifest, task)
     pandas.testing.assert_frame_equal(
         frame, before
@@ -432,7 +432,7 @@ def test_l210_l224_module_io_matrix_invariants(run, tmp_path):
     assert (
         result.run_dir / "model" / "model_manifest.json"
     ).exists()  # artifact builder
-    bundle = bundle_module.ModelBundle.load(
+    bundle = scmle.artifacts.bundle.ModelBundle.load(
         result.save(tmp_path / "b"), trusted=True
     )
     features = frame.drop(columns="y")
@@ -493,7 +493,8 @@ def test_l234_to_l264_flow_with_locked_test_and_single_final_evaluation(run):
     planned = {
         d.technique
         for d in result.plan.decisions
-        if d.action == "include" and d.technique in strategies_module.STRATEGIES
+        if d.action == "include"
+        and d.technique in scmle.sampling.strategies.STRATEGIES
     }
     attempted = {t.strategy for t in result.trials} - {"default"}
     assert attempted <= planned  # nothing outside the execution plan was tried
@@ -669,7 +670,7 @@ def test_l327_l345_stages_a_to_e(run):
 
 def test_l347_l356_model_family_registry():
     """The initial model families."""
-    names = set(registry_module.ModelRegistry.with_builtins().adapters)
+    names = set(scmle.models.registry.ModelRegistry.with_builtins().adapters)
     assert {
         "dummy",
         "logistic_regression",
@@ -705,13 +706,13 @@ def test_l358_adapter_capability_declarations():
     } <= declared
     for (
         adapter
-    ) in registry_module.ModelRegistry.with_builtins().adapters.values():
+    ) in scmle.models.registry.ModelRegistry.with_builtins().adapters.values():
         assert adapter.capabilities.memory_factor >= 1.0
 
 
 def test_l360_planner_reads_capabilities_not_library_names():
     """Planning uses declared capabilities (here: size limits and tasks)."""
-    registry = registry_module.ModelRegistry.with_builtins()
+    registry = scmle.models.registry.ModelRegistry.with_builtins()
     rejected = registry.candidates(tasks.TaskType.REGRESSION, 1_000_000)[1]
     assert (
         "svm" in rejected and "logistic_regression" in rejected
@@ -747,7 +748,7 @@ def test_l374_l393_balancing_and_augmentation(frame):
         "jitter_augment" in strategies.OPT_IN
         and "copula_augment" in strategies.OPT_IN
     )  # research plugins
-    from scmle.contracts import data as data_contracts
+    import scmle.contracts.data
     from scmle.data.profiling import profiler
     from scmle.data.readers import tabular
     from scmle.sampling import resampling
@@ -762,12 +763,12 @@ def test_l374_l393_balancing_and_augmentation(frame):
     profile = profiler.DatasetProfiler(spec).profile(
         reg, tabular.build_manifest(reg, "y"), tasks.TaskType.REGRESSION
     )
-    adapter = registry_module.ModelRegistry.with_builtins().get("ridge")
+    adapter = scmle.models.registry.ModelRegistry.with_builtins().get("ridge")
     reason = strategies.STRATEGIES["random_oversample"].applicability(
         profile, tasks.TaskType.REGRESSION, adapter
     )
     assert reason is not None and "classification" in reason
-    assert isinstance(profile, data_contracts.DatasetProfile)
+    assert isinstance(profile, scmle.contracts.data.DatasetProfile)
 
 
 def test_l385_l387_calibration_and_threshold_use_validation_evidence(run):
@@ -941,16 +942,17 @@ def test_l470_l474_artifact_format_and_untrusted_artifacts(run, tmp_path):
     directory = result.save(tmp_path / "m")
     manifest = json.loads((directory / "model_manifest.json").read_text())
     assert (
-        manifest["format"] == bundle_module.BUNDLE_FORMAT and manifest["files"]
+        manifest["format"] == scmle.artifacts.bundle.BUNDLE_FORMAT
+        and manifest["files"]
     )  # checksums
     with pytest.raises(errors.ArtifactError, match="unauthenticated"):
-        bundle_module.ModelBundle.load(
+        scmle.artifacts.bundle.ModelBundle.load(
             directory
         )  # untrusted artifacts not loaded
     with (directory / "pipeline.joblib").open("ab") as handle:
         handle.write(b"x")
     with pytest.raises(errors.ArtifactError, match="checksum"):
-        bundle_module.ModelBundle.load(directory, trusted=True)
+        scmle.artifacts.bundle.ModelBundle.load(directory, trusted=True)
     assert (
         manifest["python"] and manifest["sklearn"]
     )  # dependency compatibility
@@ -986,7 +988,7 @@ def test_l480_l496_inference_contract(run, frame, tmp_path):
         == 3
     )
     renamed = features.rename(columns={"a": "alpha"})
-    mapping = mapping_module.ColumnMapping({"alpha": "a"})
+    mapping = scmle.inference.mapping.ColumnMapping({"alpha": "a"})
     numpy.testing.assert_array_equal(
         result.bundle.predict(renamed, mapping),
         result.predict(features),
@@ -1228,12 +1230,12 @@ def test_l765_l778_future_expansion_commitments(frame, tmp_path):
     from scmle.experimentation import trials
     from scmle.features import feature_graph
     from scmle.intelligence import knowledge
-    from scmle.models import registry as models_registry
-    from scmle.monitoring import events as monitor_events
+    import scmle.models.registry
+    import scmle.monitoring.events
     from scmle.sampling import resampling
     from scmle.sampling import synthesis
 
-    registry = models_registry.ModelRegistry.with_builtins()
+    registry = scmle.models.registry.ModelRegistry.with_builtins()
     neural = registry.get("neural_network")  # deep learning: a plugin family
     conformance.check_conformance(neural)
 
@@ -1295,10 +1297,12 @@ def test_l765_l778_future_expansion_commitments(frame, tmp_path):
     with pytest.raises(errors.BlockedError):
         gated.run()  # human approval: a rejection stops the run
 
-    prediction = monitor_events.PredictionEvent(
+    prediction = scmle.monitoring.events.PredictionEvent(
         "e1", "v1", "2026-01-01T00:00:00Z", {"a": 1.0}, 1, 0.8
     )
-    outcome = monitor_events.OutcomeEvent("e1", "2026-01-02T00:00:00Z", 1)
+    outcome = scmle.monitoring.events.OutcomeEvent(
+        "e1", "2026-01-02T00:00:00Z", 1
+    )
     assert prediction.event_id == outcome.event_id  # label schema joins
 
     job = trials.TrialJob("trial_001", "dummy", {"strategy": "x"})
@@ -1325,7 +1329,7 @@ def test_l786_l801_risks_have_mitigations_and_candidates_are_whole_pipelines(
     """A candidate is a complete, independently evaluable pipeline."""
     from scmle.sampling import strategies
 
-    registry = registry_module.ModelRegistry.with_builtins()
+    registry = scmle.models.registry.ModelRegistry.with_builtins()
     plan = scmle.MLProject(frame, "y").plan()
     profile = scmle.MLProject(frame, "y")
     profile.plan()
@@ -1348,24 +1352,26 @@ def test_l786_l801_risks_have_mitigations_and_candidates_are_whole_pipelines(
         resampled, "resampler"
     )  # sampling policy part of the candidate
     assert plan.metric and plan.validation_strategy  # evaluation configuration
-    bundle = bundle_module.BundleInfo("m", "v1", "roc_auc")
+    bundle = scmle.artifacts.bundle.BundleInfo("m", "v1", "roc_auc")
     assert bundle.python and bundle.sklearn  # runtime requirements
 
 
 def test_l805_l829_five_abstractions_and_the_core_path(run):
     """Dataset, Plan, Experiment, Model Bundle, Lifecycle; Dataset->Plan->Experiment->Bundle."""
-    from scmle.contracts import data as data_contracts
+    import scmle.contracts.data
     from scmle.governance import registry
 
     result = run[1]
     assert isinstance(
-        result.profile.manifest, data_contracts.DatasetManifest
+        result.profile.manifest, scmle.contracts.data.DatasetManifest
     )  # Dataset
     assert isinstance(result.plan, experiments.ExperimentPlan)  # Plan
     assert all(
         isinstance(t, experiments.TrialResult) for t in result.trials
     )  # Experiment
-    assert isinstance(result.bundle, bundle_module.ModelBundle)  # Model Bundle
+    assert isinstance(
+        result.bundle, scmle.artifacts.bundle.ModelBundle
+    )  # Model Bundle
     assert (
         registry.ModelRegistryStore and lifecycle.LifecycleManager
     )  # Lifecycle

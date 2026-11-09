@@ -10,7 +10,7 @@ import pytest
 import support
 
 from scmle.integrations import ray_backend
-from scmle.models import registry as registry_module
+import scmle.models.registry
 
 if importlib.util.find_spec("ray") is not None:
     import ray.cloudpickle
@@ -143,7 +143,7 @@ def test_a_trial_past_the_memory_limit_is_killed_on_a_ray_worker(
         memory_limit_gb=1.0,
         enforcement="hard",
     )
-    registry = registry_module.ModelRegistry.with_builtins()
+    registry = scmle.models.registry.ModelRegistry.with_builtins()
     registry.register(support.HungryAdapter())
     project.orchestrator.registry = registry
     plan = dataclasses.replace(

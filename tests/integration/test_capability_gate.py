@@ -8,11 +8,11 @@ import pytest
 
 from scmle.contracts import capabilities
 from scmle.contracts import tasks
-from scmle.core import context as context_module
 from scmle.core import orchestrator
 from scmle.core import stages
-from scmle.models import registry as registry_module
+import scmle.core.context
 from scmle.models.deeplearning import networks
+import scmle.models.registry
 from scmle.models.sklearn import classical
 
 
@@ -28,9 +28,9 @@ def binary_frame() -> pandas.DataFrame:
 
 
 def make_context(
-    model_registry: registry_module.ModelRegistry | None = None,
+    model_registry: scmle.models.registry.ModelRegistry | None = None,
     spec: tasks.ProjectSpec | None = None,
-) -> context_module.RunContext:
+) -> scmle.core.context.RunContext:
     """Builds a profiled context without entering model fitting."""
     project_spec = spec or tasks.ProjectSpec(
         data=tasks.DataSpec(uri="<in-memory>", target="y"),
@@ -38,7 +38,7 @@ def make_context(
         strategies=tasks.StrategySpec(top_models=0),
         ensemble=tasks.EnsembleSpec(size=0),
     )
-    models = model_registry or registry_module.ModelRegistry(
+    models = model_registry or scmle.models.registry.ModelRegistry(
         (
             classical.DummyAdapter(),
             classical.LogisticRegressionAdapter(),
@@ -78,7 +78,7 @@ def test_tabular_beta_plan_has_an_explicit_library_capability_path():
 
 def test_deep_learning_paths_declare_their_optional_extra():
     """Deep-learning capability declarations identify their installation gate."""
-    registry = context_module.tabular_beta_capability_registry()
+    registry = scmle.core.context.tabular_beta_capability_registry()
 
     for task in (
         tasks.TaskType.BINARY,
@@ -105,7 +105,7 @@ def test_ft_transformer_uses_an_experimental_tabular_boundary():
     assert adapter.architecture == "ft_transformer"
     assert adapter.capability_family == "transformer"
 
-    registry = context_module.tabular_beta_capability_registry()
+    registry = scmle.core.context.tabular_beta_capability_registry()
     declaration = registry.find_model_family("transformer")
     assert declaration is not None
     assert declaration.status is capabilities.CapabilityStatus.EXPERIMENTAL
@@ -128,7 +128,7 @@ def test_experimental_transformer_requires_explicit_model_opt_in():
         reason="the optional deeplearning extra is not installed",
     )
     adapter = networks.TorchTransformerAdapter()
-    registry = registry_module.ModelRegistry(
+    registry = scmle.models.registry.ModelRegistry(
         (classical.DummyAdapter(), adapter)
     )
     default_context = make_context(model_registry=registry)
@@ -154,7 +154,7 @@ def test_capability_family_is_used_before_training():
         capability_family = "transformer"
 
     context = make_context(
-        model_registry=registry_module.ModelRegistry(
+        model_registry=scmle.models.registry.ModelRegistry(
             (ExperimentalTransformerAdapter(),)
         )
     )
@@ -167,7 +167,7 @@ def test_extension_only_foundation_adapter_cannot_break_auto_planning(
     monkeypatch,
 ):
     """An installed extension-only model must not enter the beta plan."""
-    registry = registry_module.ModelRegistry.with_builtins()
+    registry = scmle.models.registry.ModelRegistry.with_builtins()
     adapter = registry.get("tabpfn")
     monkeypatch.setattr(adapter, "is_available", lambda: True)
 
@@ -178,7 +178,7 @@ def test_extension_only_foundation_adapter_cannot_break_auto_planning(
 
 def test_unimplemented_contract_dimensions_are_not_promoted():
     """Missing modality, uncertainty, and explanation paths fail closed."""
-    registry = context_module.tabular_beta_capability_registry()
+    registry = scmle.core.context.tabular_beta_capability_registry()
     key = capabilities.CapabilityKey(
         modality=capabilities.Modality.TABULAR,
         task=tasks.TaskType.BINARY,
@@ -277,7 +277,7 @@ def test_unlisted_model_family_fails_before_model_fitting():
         name = "unlisted_model"
         family = "unlisted"
 
-    model_registry = registry_module.ModelRegistry((UnlistedAdapter(),))
+    model_registry = scmle.models.registry.ModelRegistry((UnlistedAdapter(),))
     context = make_context(model_registry=model_registry)
 
     with pytest.raises(capabilities.UnsupportedCapabilityError):
@@ -304,7 +304,9 @@ def test_group_thresholds_reject_non_binary_tasks_before_fitting():
     project = orchestrator.Orchestrator(
         spec,
         frame,
-        registry=registry_module.ModelRegistry((classical.DummyAdapter(),)),
+        registry=scmle.models.registry.ModelRegistry(
+            (classical.DummyAdapter(),)
+        ),
     )
     context = project.new_context()
     stages.IngestStage().execute(context)

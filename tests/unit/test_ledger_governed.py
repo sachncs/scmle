@@ -10,8 +10,8 @@ from scmle.data.custody import sealed
 from scmle.data.ledger import confirm
 from scmle.data.ledger import explore
 from scmle.data.ledger import governed
-from scmle.data.ledger import ledger as ledger_module
 from scmle.data.ledger import online_fdr
+import scmle.data.ledger.ledger
 from scmle.data.splitting import splitters
 from tests.unit.test_charter_contracts import make_charter
 
@@ -43,7 +43,7 @@ def test_count_discoveries_matches_the_ledger_on_the_same_data():
     config = online_fdr.RuleConfig(
         online_fdr.ELOND, charter.error_budget.exploration.initial
     )
-    ledger = ledger_module.Ledger.create(
+    ledger = scmle.data.ledger.ledger.Ledger.create(
         None,
         charter_hash=charter.charter_hash,
         config=config,
@@ -78,15 +78,16 @@ def test_a_planted_signal_is_found_controlled_and_confirmed(tmp_path):
     }
     assert columns == {"f0", "f1"}
     for name in (
-        ledger_module.FILE_NAME,
+        scmle.data.ledger.ledger.FILE_NAME,
         governed.CONTROL_FILE,
         confirm.CLAIMS_FILE,
     ):
         assert (tmp_path / name).exists()
     control = json.loads((tmp_path / governed.CONTROL_FILE).read_text())
     assert control["permuted"] == list(run.control.permuted)
-    reloaded = ledger_module.Ledger.load(
-        tmp_path / ledger_module.FILE_NAME, expected_head=run.ledger.head
+    reloaded = scmle.data.ledger.ledger.Ledger.load(
+        tmp_path / scmle.data.ledger.ledger.FILE_NAME,
+        expected_head=run.ledger.head,
     )
     assert reloaded.confirmation["outcome"] == confirm.CONFIRMED
     summary = run.summary()

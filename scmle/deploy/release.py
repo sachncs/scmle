@@ -20,8 +20,8 @@ from scmle.deploy import gate
 from scmle.deploy import livetests
 from scmle.deploy import observation
 from scmle.deploy import provenance
-from scmle.deploy import record as record_module
 from scmle.deploy import vuln_gate
+import scmle.deploy.record
 from scmle.governance import registry
 
 REQUIRED = (
@@ -210,6 +210,6 @@ def load_candidate(manifest_path: str | pathlib.Path) -> gate.Candidate:
         staging_record=(
             None
             if staging_path is None
-            else record_module.read_record(staging_path)
+            else scmle.deploy.record.read_record(staging_path)
         ),
     )

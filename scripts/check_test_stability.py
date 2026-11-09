@@ -24,7 +24,7 @@ import sys
 import tempfile
 from typing import Any
 from typing import Self
-import xml.etree.ElementTree as ElementTree
+import xml.etree.ElementTree
 
 
 class TestStatus(enum.StrEnum):
@@ -354,7 +354,7 @@ def parse_junit(path: Path) -> dict[str, TestStatus]:
         ValueError: If a test case has no identifier or the report has no
             test cases.
     """
-    root = ElementTree.parse(path).getroot()
+    root = xml.etree.ElementTree.parse(path).getroot()
     results: dict[str, TestStatus] = {}
     for case in root.iter("testcase"):
         classname = case.attrib.get("classname", "")

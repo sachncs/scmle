@@ -43,7 +43,7 @@ from typing import Any
 import pandas
 
 from scmle.contracts import errors
-from scmle.data.admissibility import dag as dag_module
+import scmle.data.admissibility.dag
 from scmle.data.charter import causal
 from scmle.data.identification import attest
 from scmle.data.identification import run
@@ -58,7 +58,7 @@ CLAIM_FILE = "causal_claims.json"
 DOCUMENTS = run.DOCUMENTS
 
 
-def load_dag(path: str | None) -> dag_module.Dag | None:
+def load_dag(path: str | None) -> scmle.data.admissibility.dag.Dag | None:
     """Loads the DAG hypothesis a causal block declares, verifying its hash.
 
     Args:
@@ -76,7 +76,7 @@ def load_dag(path: str | None) -> dag_module.Dag | None:
         return None
     try:
         document = json.loads(Path(path).read_text(encoding="utf-8"))
-        return dag_module.Dag.from_artifact(document)
+        return scmle.data.admissibility.dag.Dag.from_artifact(document)
     except (OSError, ValueError, TypeError) as error:
         raise errors.ConfigError(
             f"cannot load the declared DAG {path}: {error}"
@@ -86,7 +86,7 @@ def load_dag(path: str | None) -> dag_module.Dag | None:
 def registration(
     spec: causal.CausalSpec,
     plan: select.Plan,
-    dag: dag_module.Dag | None,
+    dag: scmle.data.admissibility.dag.Dag | None,
     error_budget: budget.ErrorBudget,
     exploration_rows: int,
 ) -> confirm.RegisteredClaim:
@@ -188,7 +188,7 @@ def build_runner(
     target_name: str,
     error_budget: budget.ErrorBudget,
     *,
-    dag: dag_module.Dag | None = None,
+    dag: scmle.data.admissibility.dag.Dag | None = None,
     attestors: Mapping[str, str] | None = None,
     seed: int = 0,
     dag_report: Mapping[str, Any] | None = None,

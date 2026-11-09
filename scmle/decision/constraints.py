@@ -23,7 +23,7 @@ import dataclasses
 import itertools
 from typing import Any
 
-import numpy as np
+import numpy
 from numpy.typing import ArrayLike
 from numpy.typing import NDArray
 from scipy import stats
@@ -51,7 +51,7 @@ class InfeasibleConstraintsError(ValueError):
 
 def prepared(
     y: ArrayLike, acts: ArrayLike, groups: ArrayLike
-) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[Any]]:
+) -> tuple[NDArray[numpy.float64], NDArray[numpy.float64], NDArray[Any]]:
     """Validates and returns outcomes, actions and group labels.
 
     Args:
@@ -68,7 +68,7 @@ def prepared(
             `costs.pair`.
     """
     outcomes, actions = costs.pair(y, acts)
-    labels = np.asarray(groups)
+    labels = numpy.asarray(groups)
     if labels.shape != outcomes.shape:
         raise ValueError("groups must have the length of y")
     return outcomes, actions, labels
@@ -88,7 +88,7 @@ def wilson(count: float, total: float, z: float) -> tuple[float, float]:
     p = count / total
     denom = 1.0 + z * z / total
     centre = (p + z * z / (2 * total)) / denom
-    half = z * np.sqrt(p * (1 - p) / total + z * z / (4 * total * total))
+    half = z * numpy.sqrt(p * (1 - p) / total + z * z / (4 * total * total))
     return float(centre - half / denom), float(centre + half / denom)
 
 
@@ -116,14 +116,14 @@ def newcombe(
     la, ua = wilson(count_a, total_a, z)
     lb, ub = wilson(count_b, total_b, z)
     d = pa - pb
-    lower = d - float(np.sqrt((pa - la) ** 2 + (ub - pb) ** 2))
-    upper = d + float(np.sqrt((ua - pa) ** 2 + (pb - lb) ** 2))
+    lower = d - float(numpy.sqrt((pa - la) ** 2 + (ub - pb) ** 2))
+    upper = d + float(numpy.sqrt((ua - pa) ** 2 + (pb - lb) ** 2))
     return lower, upper
 
 
 def rate_tables(
-    y: NDArray[np.float64],
-    acts: NDArray[np.float64],
+    y: NDArray[numpy.float64],
+    acts: NDArray[numpy.float64],
     groups: NDArray[Any],
     criterion: str,
 ) -> dict[str, dict[Any, tuple[float, float]]]:
@@ -153,7 +153,7 @@ def rate_tables(
     }[criterion]
     for rate in wanted:
         table: dict[Any, tuple[float, float]] = {}
-        for g in np.unique(groups):
+        for g in numpy.unique(groups):
             m = groups == g
             if rate == "selection":
                 table[g] = (float(acts[m].sum()), float(m.sum()))
@@ -235,7 +235,7 @@ def satisfaction_test(
     if not 0.0 < alpha < 1.0:
         raise ValueError("alpha must be strictly between 0 and 1")
     tables = rate_tables(outcomes, actions, labels, constraint.criterion)
-    names = sorted(str(g) for g in np.unique(labels))
+    names = sorted(str(g) for g in numpy.unique(labels))
     small = sorted(
         {
             str(g)
@@ -279,7 +279,7 @@ def satisfaction_test(
 
 
 RATE_PARTS = {
-    "selection": lambda y, a: (a, np.ones_like(a)),
+    "selection": lambda y, a: (a, numpy.ones_like(a)),
     "tpr": lambda y, a: (a * y, y),
     "fpr": lambda y, a: (a * (1.0 - y), 1.0 - y),
     "ppv": lambda y, a: (a * y, a),
@@ -342,7 +342,7 @@ def cluster_satisfaction_test(
             inputs are also rejected with a `ValueError` by `prepared`.
     """
     outcomes, actions, labels = prepared(y, acts, groups)
-    keys = np.asarray(clusters)
+    keys = numpy.asarray(clusters)
     if keys.shape != outcomes.shape:
         raise ValueError("clusters must have the length of y")
     if not 0.0 < alpha < 1.0:
@@ -350,7 +350,7 @@ def cluster_satisfaction_test(
     if draws < 1:
         raise ValueError("draws must be positive")
     tables = rate_tables(outcomes, actions, labels, constraint.criterion)
-    names = sorted(np.unique(labels).tolist())
+    names = sorted(numpy.unique(labels).tolist())
     small = sorted(
         {
             str(g)
@@ -359,7 +359,7 @@ def cluster_satisfaction_test(
             if total < constraint.min_group
         }
     )
-    cluster_ids, inverse = np.unique(keys, return_inverse=True)
+    cluster_ids, inverse = numpy.unique(keys, return_inverse=True)
     if small or len(names) < 2 or len(cluster_ids) < MIN_CLUSTERS:
         return SatisfactionTest(
             NOT_ASSESSABLE,
@@ -376,14 +376,14 @@ def cluster_satisfaction_test(
         for name in names:
             inside = (labels == name).astype(float)
             for part in (numerator, denominator):
-                sums = np.zeros(len(cluster_ids))
-                np.add.at(sums, inverse, part * inside)
+                sums = numpy.zeros(len(cluster_ids))
+                numpy.add.at(sums, inverse, part * inside)
                 columns.append(sums)
-    matrix = np.column_stack(columns).reshape(
+    matrix = numpy.column_stack(columns).reshape(
         len(cluster_ids), -1, len(names), 2
     )
 
-    def largest_gap(totals: NDArray[np.float64]) -> NDArray[np.float64]:
+    def largest_gap(totals: NDArray[numpy.float64]) -> NDArray[numpy.float64]:
         """Computes the largest gap in any rate between groups.
 
         Args:
@@ -395,20 +395,20 @@ def cluster_satisfaction_test(
             rate, over the rates, ignoring undefined rates; one value per
             leading index.
         """
-        with np.errstate(divide="ignore", invalid="ignore"):
+        with numpy.errstate(divide="ignore", invalid="ignore"):
             rates = totals[..., 0] / totals[..., 1]
-        spread = np.nanmax(rates, axis=-1) - np.nanmin(rates, axis=-1)
-        return np.asarray(np.nanmax(spread, axis=-1))
+        spread = numpy.nanmax(rates, axis=-1) - numpy.nanmin(rates, axis=-1)
+        return numpy.asarray(numpy.nanmax(spread, axis=-1))
 
     point = float(largest_gap(matrix.sum(axis=0)))
     rng = randomness.component_rng(seed, "decision.constraints.cluster", 0)
     weights = rng.multinomial(
         len(cluster_ids),
-        np.full(len(cluster_ids), 1.0 / len(cluster_ids)),
+        numpy.full(len(cluster_ids), 1.0 / len(cluster_ids)),
         size=draws,
     ).astype(float)
-    resampled = largest_gap(np.einsum("dk,krgp->drgp", weights, matrix))
-    upper = max(point, float(np.quantile(resampled, 1.0 - alpha)))
+    resampled = largest_gap(numpy.einsum("dk,krgp->drgp", weights, matrix))
+    upper = max(point, float(numpy.quantile(resampled, 1.0 - alpha)))
     status = SATISFIED if upper <= constraint.max_gap else NOT_SATISFIED
     return SatisfactionTest(
         status,
@@ -438,7 +438,7 @@ def base_rates(
         ValueError: If `groups` and `y` differ in length.
     """
     outcomes = costs.binary_vector(y, "y")
-    labels = np.asarray(groups)
+    labels = numpy.asarray(groups)
     if labels.shape != outcomes.shape:
         raise ValueError("groups and y must have the same length")
     return {
@@ -446,7 +446,7 @@ def base_rates(
             float(outcomes[labels == g].sum()),
             float((labels == g).sum()),
         )
-        for g in np.unique(labels)
+        for g in numpy.unique(labels)
     }
 
 
@@ -529,7 +529,9 @@ class GroupThresholds:
     development_gap: float
     constrained: bool
 
-    def act(self, scores: ArrayLike, groups: ArrayLike) -> NDArray[np.float64]:
+    def act(
+        self, scores: ArrayLike, groups: ArrayLike
+    ) -> NDArray[numpy.float64]:
         """Applies each group's cut.
 
         Args:
@@ -540,15 +542,15 @@ class GroupThresholds:
         Returns:
             1.0 where the score reaches its group's cut, otherwise 0.0.
         """
-        s = np.asarray(scores, dtype=float)
-        g = np.asarray(groups)
-        cut = np.array([self.cuts[str(x)] for x in g])
+        s = numpy.asarray(scores, dtype=float)
+        g = numpy.asarray(groups)
+        cut = numpy.array([self.cuts[str(x)] for x in g])
         return (s >= cut).astype(float)
 
 
 def development_gap(
-    y: NDArray[np.float64],
-    acts: NDArray[np.float64],
+    y: NDArray[numpy.float64],
+    acts: NDArray[numpy.float64],
     labels: NDArray[Any],
     criterion: str,
 ) -> float:
@@ -611,13 +613,13 @@ def fit_group_thresholds(
             thresholds cannot move. Invalid inputs are also rejected with a
             `ValueError` by `prepared`.
     """
-    s = np.asarray(scores, dtype=float)
-    outcomes, ignored, labels = prepared(y, np.zeros_like(s), groups)
+    s = numpy.asarray(scores, dtype=float)
+    outcomes, ignored, labels = prepared(y, numpy.zeros_like(s), groups)
     if constraint.criterion == "predictive_parity":
         raise ValueError("group thresholds cannot target predictive parity")
     bound = margin * constraint.max_gap
     common = (s >= t).astype(float)
-    names = sorted(str(g) for g in np.unique(labels))
+    names = sorted(str(g) for g in numpy.unique(labels))
     gap = development_gap(outcomes, common, labels, constraint.criterion)
     if gap <= bound:
         return GroupThresholds(
@@ -632,14 +634,14 @@ def fit_group_thresholds(
         "equalized_odds",
     )
     best: GroupThresholds | None = None
-    for rate in np.linspace(0.01, 0.99, GRID):
+    for rate in numpy.linspace(0.01, 0.99, GRID):
         cuts: dict[str, float] = {}
         for name in names:
             m = labels.astype(str) == name
             pool = s[m & (outcomes == 1)] if positive_only else s[m]
             if pool.size == 0:
                 break
-            cuts[name] = float(np.quantile(pool, 1.0 - rate))
+            cuts[name] = float(numpy.quantile(pool, 1.0 - rate))
         else:
             acts = GroupThresholds(cuts, rate, 0.0, 0.0, True).act(s, labels)
             achieved = development_gap(
@@ -735,7 +737,7 @@ def price_of_constraint(
     outcomes, free = costs.pair(y, unconstrained)
     ignored, bound = costs.pair(y, constrained)
     w = costs.odds(t)
-    stats_matrix = np.column_stack(
+    stats_matrix = numpy.column_stack(
         [
             free * outcomes,
             free * (1 - outcomes),
@@ -744,7 +746,7 @@ def price_of_constraint(
         ]
     )
 
-    def price(m: NDArray[np.float64]) -> NDArray[np.float64]:
+    def price(m: NDArray[numpy.float64]) -> NDArray[numpy.float64]:
         """Net benefit of the free rule minus that of the constrained rule.
 
         Args:
@@ -764,6 +766,6 @@ def price_of_constraint(
     )
     return {
         "price": float(price(stats_matrix.mean(axis=0))),
-        "lower": float(np.quantile(boot, 0.025)),
-        "upper": float(np.quantile(boot, 0.975)),
+        "lower": float(numpy.quantile(boot, 0.025)),
+        "upper": float(numpy.quantile(boot, 0.975)),
     }

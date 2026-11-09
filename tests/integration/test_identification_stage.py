@@ -13,11 +13,11 @@ from scmle import cli
 from scmle.artifacts import claims_audit
 from scmle.contracts import errors
 from scmle.core import causal_claim
-from scmle.data.admissibility import dag as dag_module
+import scmle.data.admissibility.dag
 from scmle.data.charter import causal
 from scmle.data.charter import sealing
 from scmle.data.identification import attest
-from scmle.data.ledger import ledger as ledger_module
+import scmle.data.ledger.ledger
 from tests.unit.test_charter_contracts import make_charter
 
 KEY = "identification-key"
@@ -108,13 +108,15 @@ def test_an_identified_charter_estimates_on_the_single_opening_of_c(tmp_path):
     folder = pathlib.Path(result.run_dir)
     log = (folder / "custody_log.jsonl").read_text()
     assert log.count('"event":"open"') + log.count('"event": "open"') == 1
-    ledger = ledger_module.Ledger.load(folder / ledger_module.FILE_NAME)
+    ledger = scmle.data.ledger.ledger.Ledger.load(
+        folder / scmle.data.ledger.ledger.FILE_NAME
+    )
     registered = ledger.claims["causal_primary_theta_zero"]
     assert registered["kind"] == "causal_primary"
     sealed = ledger.confirmation["attachments"]
     assert set(sealed) == set(causal_claim.DOCUMENTS)
     for name, expected in sealed.items():
-        assert ledger_module.digest(read(result, name)) == expected
+        assert scmle.data.ledger.ledger.digest(read(result, name)) == expected
     assert ledger.confirmation["claims"] == {
         "causal_primary_theta_zero": {
             "kind": "causal_primary",
@@ -146,7 +148,7 @@ def test_claims_prints_the_identification_status_and_verifies(tmp_path, capsys):
 def test_a_declared_dag_is_loaded_checked_and_lifts_the_adjustment_cap(
     tmp_path,
 ):
-    graph = dag_module.Dag(
+    graph = scmle.data.admissibility.dag.Dag(
         ("t", "x1", "x2", "y"),
         (("t", "y"), ("x1", "t"), ("x1", "y"), ("x2", "y")),
         (),
@@ -175,7 +177,7 @@ def test_a_declared_dag_is_loaded_checked_and_lifts_the_adjustment_cap(
 def test_an_adjustment_member_that_is_a_descendant_makes_backdoor_ineligible(
     tmp_path,
 ):
-    graph = dag_module.Dag(
+    graph = scmle.data.admissibility.dag.Dag(
         ("t", "x1", "x2", "y"),
         (("t", "x2"), ("t", "y"), ("x1", "t"), ("x1", "y")),
         (),
@@ -232,7 +234,9 @@ def test_subgroup_hypotheses_are_registered_and_reported_in_the_causal_files(
     registered = {}
     for name, result in (("plain", plain), ("split", split)):
         folder = pathlib.Path(result.run_dir)
-        ledger = ledger_module.Ledger.load(folder / ledger_module.FILE_NAME)
+        ledger = scmle.data.ledger.ledger.Ledger.load(
+            folder / scmle.data.ledger.ledger.FILE_NAME
+        )
         registered[name] = ledger.claims["causal_primary_theta_zero"]["sha256"]
     assert registered["plain"] != registered["split"]
     assert claims_audit.verify(split.run_dir).ok

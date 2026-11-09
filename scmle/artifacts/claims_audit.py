@@ -54,8 +54,8 @@ from scmle.data.custody import sealed
 from scmle.data.identification import attest
 from scmle.data.ledger import budget
 from scmle.data.ledger import confirm
-from scmle.data.ledger import ledger as ledger_module
 from scmle.data.ledger import multiplicity
+import scmle.data.ledger.ledger
 from scmle.evaluation import coverage_confirm
 from scmle.evaluation import coverage_run
 
@@ -153,7 +153,7 @@ def read_claims(run_dir: str | Path) -> dict[str, Any]:
     return document
 
 
-def read_ledger(run_dir: str | Path) -> ledger_module.Ledger:
+def read_ledger(run_dir: str | Path) -> scmle.data.ledger.ledger.Ledger:
     """Loads the run's ledger (verifying its chain and replaying it).
 
     Args:
@@ -166,14 +166,16 @@ def read_ledger(run_dir: str | Path) -> ledger_module.Ledger:
         ArtifactError: If the ledger is missing or fails verification.
     """
     try:
-        return ledger_module.Ledger.load(
-            Path(run_dir) / ledger_module.FILE_NAME
+        return scmle.data.ledger.ledger.Ledger.load(
+            Path(run_dir) / scmle.data.ledger.ledger.FILE_NAME
         )
-    except ledger_module.LedgerError as error:
+    except scmle.data.ledger.ledger.LedgerError as error:
         raise errors.ArtifactError(str(error)) from error
 
 
-def column_of(ledger: ledger_module.Ledger, claim_id: str) -> str | None:
+def column_of(
+    ledger: scmle.data.ledger.ledger.Ledger, claim_id: str
+) -> str | None:
     """Finds the feature a claim's hypothesis tests.
 
     Args:
@@ -216,7 +218,7 @@ def list_claims(run_dir: str | Path) -> list[dict[str, Any]]:
 
 
 def registered_rows(
-    run_dir: str | Path, ledger: ledger_module.Ledger
+    run_dir: str | Path, ledger: scmle.data.ledger.ledger.Ledger
 ) -> list[dict[str, Any]]:
     """Lists one row per claim registered by hash (baseline, causal primary).
 
@@ -352,7 +354,7 @@ def step(name: str, status: str, detail: str) -> Finding:
 
 
 def check_ledger_head(
-    document: dict[str, Any], ledger: ledger_module.Ledger
+    document: dict[str, Any], ledger: scmle.data.ledger.ledger.Ledger
 ) -> Finding:
     """Checks that the claims file names the ledger's current head.
 
@@ -373,7 +375,7 @@ def check_ledger_head(
 
 def check_charter(
     run_dir: Path,
-    ledger: ledger_module.Ledger,
+    ledger: scmle.data.ledger.ledger.Ledger,
     signing_key: str | bytes | None,
 ) -> list[Finding]:
     """Checks that the charter file verifies and is the ledger's charter.
@@ -430,7 +432,7 @@ def check_charter(
 
 
 def check_claims_against_ledger(
-    document: dict[str, Any], ledger: ledger_module.Ledger
+    document: dict[str, Any], ledger: scmle.data.ledger.ledger.Ledger
 ) -> Finding:
     """Checks that survivors, outcome and confirmed set agree with the ledger.
 
@@ -536,7 +538,7 @@ def check_replay(document: dict[str, Any]) -> Finding:
 
 
 def check_stage_two(
-    document: dict[str, Any], ledger: ledger_module.Ledger
+    document: dict[str, Any], ledger: scmle.data.ledger.ledger.Ledger
 ) -> Finding:
     """Checks the withdrawal accounting and that withdrawn ids were not tested.
 
@@ -559,7 +561,7 @@ def check_stage_two(
         return step(name, FAIL, "the ledger has no frozen survivors")
     withdrawn = set(record["withdrawn"])
     family = [i for i in survivors.hypothesis_ids if i not in withdrawn]
-    expected = ledger_module.digest(
+    expected = scmle.data.ledger.ledger.digest(
         {"survivors_sha256": survivors.sha256, "family": family}
     )
     problems = []
@@ -765,7 +767,7 @@ def check_coverage_claim(
 
 
 def check_coverage_confirmation(
-    run_dir: Path, ledger: ledger_module.Ledger
+    run_dir: Path, ledger: scmle.data.ledger.ledger.Ledger
 ) -> Finding | None:
     """Checks the coverage claim on `C`: registered, recomputed and consistent.
 
@@ -803,7 +805,7 @@ def check_coverage_confirmation(
         body = coverage_confirm.registration_body(claim_hash, choice)
         if document.get("coverage_claim_sha256") != claim_hash:
             problems.append("the document names another coverage claim")
-        if ledger_module.digest(body) != registered["sha256"]:
+        if scmle.data.ledger.ledger.digest(body) != registered["sha256"]:
             problems.append("the registration hash differs from the ledger's")
         redone = coverage_confirm.decide(
             int(document["covered"]), int(document["rows"]), choice
@@ -833,7 +835,9 @@ def check_coverage_confirmation(
 
 
 def check_registered(
-    run_dir: Path, document: dict[str, Any], ledger: ledger_module.Ledger
+    run_dir: Path,
+    document: dict[str, Any],
+    ledger: scmle.data.ledger.ledger.Ledger,
 ) -> Finding:
     """Checks that registered claims are stated at the seal and match.
 
@@ -861,7 +865,7 @@ def check_registered(
         found = read_optional(run_dir / file_name)
         if found is None:
             problems.append(f"{file_name}: missing")
-        elif ledger_module.digest(found) != expected:
+        elif scmle.data.ledger.ledger.digest(found) != expected:
             problems.append(f"{file_name}: differs from the sealed hash")
     if document.get("attachments") != attachments:
         problems.append("attachment hashes differ from the claims file")
@@ -882,7 +886,9 @@ def check_registered(
     )
 
 
-def check_control(run_dir: Path, ledger: ledger_module.Ledger) -> Finding:
+def check_control(
+    run_dir: Path, ledger: scmle.data.ledger.ledger.Ledger
+) -> Finding:
     """Checks that the negative-control file is the one the ledger recorded.
 
     Args:
@@ -901,7 +907,7 @@ def check_control(run_dir: Path, ledger: ledger_module.Ledger) -> Finding:
         body = json.loads(path.read_text(encoding="utf-8"))
     except ValueError:
         return step(name, FAIL, f"{CONTROL_FILE} is not JSON")
-    if ledger_module.digest(body) == ledger.control.get("sha256"):
+    if scmle.data.ledger.ledger.digest(body) == ledger.control.get("sha256"):
         return step(name, PASS, "hash equal")
     return step(name, FAIL, "the file differs from the ledger's control row")
 
@@ -1011,8 +1017,10 @@ def verify(
     chain = "ledger chain verifies and decisions replay"
     findings: list[Finding] = []
     try:
-        ledger = ledger_module.Ledger.load(folder / ledger_module.FILE_NAME)
-    except ledger_module.LedgerError as error:
+        ledger = scmle.data.ledger.ledger.Ledger.load(
+            folder / scmle.data.ledger.ledger.FILE_NAME
+        )
+    except scmle.data.ledger.ledger.LedgerError as error:
         return Verification(str(folder), (step(chain, FAIL, str(error)),))
     findings.append(
         step(chain, PASS, f"{len(ledger.rows)} rows, head {ledger.head[:12]}")

@@ -5,8 +5,8 @@ import dataclasses
 import numpy
 import pandas
 
-from scmle.contracts import data as data_contracts
 from scmle.contracts import tasks
+import scmle.contracts.data
 from scmle.data.curation import preprocessing
 from scmle.evaluation import diagnostics
 from scmle.evaluation import metrics
@@ -14,7 +14,7 @@ from scmle.evaluation import slices
 from scmle.models import registry
 
 REGISTRY = registry.ModelRegistry.with_builtins()
-PLAN = data_contracts.FeaturePlan(("signal",), ("region",))
+PLAN = scmle.contracts.data.FeaturePlan(("signal",), ("region",))
 
 
 def make_inputs(rows=1200):

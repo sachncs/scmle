@@ -15,7 +15,7 @@ from scmle.contracts import models
 from scmle.contracts import tasks
 from scmle.core import limits
 from scmle.core import orchestrator
-from scmle.models import registry as registry_module
+import scmle.models.registry
 
 
 def run_with(frame, tmp_path, **resources):
@@ -105,7 +105,7 @@ class SleepyAdapter(models.ModelAdapter):
 def test_a_trial_past_the_hard_ceiling_is_killed_and_the_run_continues(
     binary_frame, tmp_path
 ):
-    registry = registry_module.ModelRegistry.with_builtins()
+    registry = scmle.models.registry.ModelRegistry.with_builtins()
     registry.register(SleepyAdapter())
     project = support.make_project(
         binary_frame,

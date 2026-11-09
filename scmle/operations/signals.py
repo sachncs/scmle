@@ -29,7 +29,7 @@ import pandas
 
 from scmle.contracts import observability
 from scmle.monitoring import monitor
-from scmle.monitoring import reference as reference_module
+import scmle.monitoring.reference
 
 INVALID_STATUSES = frozenset({400, 409, 413, 415, 422})
 
@@ -225,7 +225,7 @@ class SignalMonitor:
         self,
         policy: WindowPolicy = WindowPolicy(),  # noqa: B008
         thresholds: SignalThresholds = SignalThresholds(),  # noqa: B008
-        profile: reference_module.ReferenceProfile | None = None,
+        profile: scmle.monitoring.reference.ReferenceProfile | None = None,
     ) -> None:
         """Creates a monitor.
 

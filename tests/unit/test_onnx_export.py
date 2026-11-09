@@ -7,7 +7,7 @@ import numpy
 import pandas
 import pytest
 
-from scmle.artifacts import bundle as bundle_module
+import scmle.artifacts.bundle
 from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.contracts import tasks
@@ -51,7 +51,7 @@ def make_bundle(name, task, features=None):
     fitted = preprocessing.build_pipeline(
         PLAN, REGISTRY.get(name), task, 0
     ).fit(features, target)
-    return bundle_module.ModelBundle.create(
+    return scmle.artifacts.bundle.ModelBundle.create(
         fitted, PLAN, features, "y", task.value, "roc_auc", name
     ), features
 

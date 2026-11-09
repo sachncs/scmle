@@ -25,8 +25,8 @@ from typing import Any
 from typing import NoReturn
 
 from scmle.contracts import errors
-from scmle.security import audit as audit_module
 from scmle.security import tokens
+import scmle.security.audit
 
 PUBLIC_PATHS = frozenset({"/livez", "/readyz"})
 SCOPE_READ = "model:read"
@@ -273,7 +273,7 @@ class Gateway:
         routes: Mapping[tuple[str, str], str] = DEFAULT_ROUTES,
         limiter: RateLimiter | None = None,
         failure_limiter: RateLimiter | None = None,
-        audit: audit_module.AuditLog | None = None,
+        audit: scmle.security.audit.AuditLog | None = None,
     ) -> None:
         """Initializes the gateway.
 
@@ -330,7 +330,7 @@ class Gateway:
                 self.audit.access(
                     denied.principal,
                     route,
-                    audit_module.DENIED,
+                    scmle.security.audit.DENIED,
                     denied.status,
                     denied.reason,
                     request_id,
@@ -338,7 +338,12 @@ class Gateway:
             raise
         if self.audit is not None:
             self.audit.access(
-                principal, route, audit_module.ALLOWED, 200, "ok", request_id
+                principal,
+                route,
+                scmle.security.audit.ALLOWED,
+                200,
+                "ok",
+                request_id,
             )
         return principal
 
@@ -537,5 +542,5 @@ def gateway_from_environment(environ: Mapping[str, str]) -> Gateway | None:
     verifier = tokens.TokenVerifier(
         keys, settings.issuer, settings.audience, revocations=revocation_source
     )
-    log = audit_module.AuditLog.open(settings.audit_file or None)
+    log = scmle.security.audit.AuditLog.open(settings.audit_file or None)
     return Gateway(verifier, tenant=settings.tenant or None, audit=log)

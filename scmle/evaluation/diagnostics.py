@@ -19,8 +19,8 @@ from sklearn import metrics as sk_metrics
 
 from scmle.contracts import data
 from scmle.contracts import errors
-from scmle.contracts import metrics as metric_contracts
 from scmle.contracts import tasks
+import scmle.contracts.metrics
 from scmle.evaluation import reliability
 
 CALIBRATION_BINS = 10
@@ -62,7 +62,7 @@ class DiagnosticInput:
     features: pandas.DataFrame
     target: pandas.Series
     task: tasks.TaskType
-    metric: metric_contracts.Metric
+    metric: scmle.contracts.metrics.Metric
     feature_plan: data.FeaturePlan
     seed: int
     groups: pandas.Series | None = None

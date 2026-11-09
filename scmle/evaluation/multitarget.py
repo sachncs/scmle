@@ -7,7 +7,7 @@ import numpy
 import pandas
 from sklearn import metrics as sk_metrics
 
-from scmle.contracts import metrics as metric_contracts
+import scmle.contracts.metrics
 
 
 def f1_macro_labels(truth: numpy.ndarray, guess: numpy.ndarray) -> float:
@@ -111,7 +111,7 @@ FUNCTIONS = {
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class MultiTargetMetric(metric_contracts.Metric):
+class MultiTargetMetric(scmle.contracts.metrics.Metric):
     """A metric over all target columns.
 
     Attributes:

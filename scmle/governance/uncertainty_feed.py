@@ -26,7 +26,7 @@ import pandas
 
 from scmle.contracts import errors
 from scmle.governance import deployment_ledger
-from scmle.governance import loop as loop_module
+import scmle.governance.loop
 
 SOURCE = "uncertainty_feed"
 
@@ -42,7 +42,10 @@ class UncertaintyFeed:
     """
 
     def __init__(
-        self, loop: loop_module.Loop, bundle: Any, nominal: float = 0.9
+        self,
+        loop: scmle.governance.loop.Loop,
+        bundle: Any,
+        nominal: float = 0.9,
     ) -> None:
         """Binds the loop and the bundle.
 

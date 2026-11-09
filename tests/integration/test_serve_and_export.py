@@ -13,7 +13,7 @@ import pytest
 import support
 
 from scmle import cli
-from scmle.artifacts import bundle as bundle_module
+import scmle.artifacts.bundle
 from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.contracts import tasks
@@ -53,7 +53,9 @@ def post(url, body):
 
 def test_the_server_rejects_schema_violations_with_422_and_a_reason(saved):
     root = saved[0]
-    model = bundle_module.ModelBundle.load(root / "bundle", trusted=True)
+    model = scmle.artifacts.bundle.ModelBundle.load(
+        root / "bundle", trusted=True
+    )
     adapter = serving.HttpServing(model)
     adapter.start()
     try:
@@ -67,7 +69,9 @@ def test_the_server_rejects_schema_violations_with_422_and_a_reason(saved):
 
 
 def test_the_server_rejects_empty_prediction_requests(saved):
-    model = bundle_module.ModelBundle.load(saved[0] / "bundle", trusted=True)
+    model = scmle.artifacts.bundle.ModelBundle.load(
+        saved[0] / "bundle", trusted=True
+    )
     adapter = serving.HttpServing(model)
     adapter.start()
     try:
@@ -82,7 +86,9 @@ def test_the_server_rejects_empty_prediction_requests(saved):
 
 
 def test_the_server_refuses_oversized_bodies_with_413(saved):
-    model = bundle_module.ModelBundle.load(saved[0] / "bundle", trusted=True)
+    model = scmle.artifacts.bundle.ModelBundle.load(
+        saved[0] / "bundle", trusted=True
+    )
     adapter = serving.HttpServing(model, max_request_bytes=10)
     adapter.start()
     try:
@@ -96,7 +102,9 @@ def test_the_server_refuses_oversized_bodies_with_413(saved):
 
 
 def test_the_server_accepts_instance_request_bounds(saved):
-    model = bundle_module.ModelBundle.load(saved[0] / "bundle", trusted=True)
+    model = scmle.artifacts.bundle.ModelBundle.load(
+        saved[0] / "bundle", trusted=True
+    )
     adapter = serving.HttpServing(
         model, max_request_bytes=10_000, max_records=1
     )
@@ -113,7 +121,9 @@ def test_the_server_accepts_instance_request_bounds(saved):
 
 
 def test_the_server_refuses_too_many_records_with_413(saved):
-    model = bundle_module.ModelBundle.load(saved[0] / "bundle", trusted=True)
+    model = scmle.artifacts.bundle.ModelBundle.load(
+        saved[0] / "bundle", trusted=True
+    )
     adapter = serving.HttpServing(model, max_records=1)
     adapter.start()
     try:
@@ -128,7 +138,9 @@ def test_the_server_refuses_too_many_records_with_413(saved):
 
 
 def test_the_server_rejects_invalid_request_bounds(saved):
-    model = bundle_module.ModelBundle.load(saved[0] / "bundle", trusted=True)
+    model = scmle.artifacts.bundle.ModelBundle.load(
+        saved[0] / "bundle", trusted=True
+    )
 
     with pytest.raises(ValueError, match="request bounds"):
         serving.HttpServing(model, max_request_bytes=0)
@@ -144,7 +156,9 @@ def test_the_server_classifies_malformed_and_internal_requests(
     saved, monkeypatch
 ):
     """The HTTP boundary emits stable classes for malformed failures."""
-    model = bundle_module.ModelBundle.load(saved[0] / "bundle", trusted=True)
+    model = scmle.artifacts.bundle.ModelBundle.load(
+        saved[0] / "bundle", trusted=True
+    )
     adapter = serving.HttpServing(model)
     adapter.start()
 
@@ -176,7 +190,9 @@ def test_the_server_classifies_malformed_and_internal_requests(
 
 def test_health_reports_the_model_version_and_checksum(saved):
     root = saved[0]
-    model = bundle_module.ModelBundle.load(root / "bundle", trusted=True)
+    model = scmle.artifacts.bundle.ModelBundle.load(
+        root / "bundle", trusted=True
+    )
     adapter = serving.HttpServing(model)
     adapter.start()
     try:
@@ -187,7 +203,10 @@ def test_health_reports_the_model_version_and_checksum(saved):
         adapter.stop()
 
     assert health["model_version"] == model.info.model_version
-    assert health["model_sha256"] == model.info.files[bundle_module.MODEL_FILE]
+    assert (
+        health["model_sha256"]
+        == model.info.files[scmle.artifacts.bundle.MODEL_FILE]
+    )
     assert len(health["model_sha256"]) == 64
     assert headers["Cache-Control"] == "no-store"
     assert headers["X-Content-Type-Options"] == "nosniff"
@@ -196,7 +215,9 @@ def test_health_reports_the_model_version_and_checksum(saved):
 
 def test_the_server_rejects_starting_twice(saved):
     """The serving lifecycle cannot replace a running socket silently."""
-    model = bundle_module.ModelBundle.load(saved[0] / "bundle", trusted=True)
+    model = scmle.artifacts.bundle.ModelBundle.load(
+        saved[0] / "bundle", trusted=True
+    )
     adapter = serving.HttpServing(model)
     adapter.start()
     try:
@@ -259,7 +280,7 @@ def exportable(tmp_path_factory):
         tasks.TaskType.BINARY,
         0,
     ).fit(frame, target)
-    bundle = bundle_module.ModelBundle.create(
+    bundle = scmle.artifacts.bundle.ModelBundle.create(
         fitted, plan, frame, "y", "binary_classification", "roc_auc", "lr"
     )
     root = tmp_path_factory.mktemp("exportable")
@@ -301,7 +322,9 @@ def test_export_onnx_command_fails_cleanly_for_an_unsupported_model(
     saved, tmp_path, caplog
 ):
     root = saved[0]
-    unsupported = bundle_module.ModelBundle.load(root / "bundle", trusted=True)
+    unsupported = scmle.artifacts.bundle.ModelBundle.load(
+        root / "bundle", trusted=True
+    )
     unsupported.pipeline = object()
     unsupported.save(tmp_path / "bundle")
 

@@ -14,7 +14,7 @@ from collections.abc import Sequence
 import dataclasses
 from typing import Any
 
-import numpy as np
+import numpy
 from numpy.typing import ArrayLike
 
 from scmle.data.framing import baseline
@@ -87,7 +87,7 @@ def tipping_point(unknown: Unknown) -> HumanQuestion | None:
         The question, carrying the tipping value, or None if the verdict
         never changes over the range.
     """
-    grid = np.linspace(unknown.low, unknown.high, GRID_POINTS)
+    grid = numpy.linspace(unknown.low, unknown.high, GRID_POINTS)
     labels = [unknown.verdict(float(v)) for v in grid]
     if len(set(labels)) == 1:
         return None
@@ -167,7 +167,7 @@ def gain_sign_verdict(
         Returns:
             `model_better` or `baseline_better`.
         """
-        gain = float(np.mean(baseline.paired_difference(y, a, b, t)))
+        gain = float(numpy.mean(baseline.paired_difference(y, a, b, t)))
         return "model_better" if gain > 0 else "baseline_better"
 
     return verdict

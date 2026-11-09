@@ -11,19 +11,19 @@ import scmle
 from scmle.contracts import capabilities
 from scmle.contracts import errors
 from scmle.contracts import tasks
-from scmle.core import context as context_module
 from scmle.core import orchestrator
 from scmle.core import stages
-from scmle.models import registry as registry_module
+import scmle.core.context
 from scmle.models.deeplearning import estimators
 from scmle.models.deeplearning import jepa
 from scmle.models.deeplearning import networks
+import scmle.models.registry
 from scmle.models.sklearn import classical
 
 
 def test_unknown_experimental_model_fails_closed():
     """A typo in the public opt-in list cannot silently change the candidate set."""
-    registry = registry_module.ModelRegistry((classical.DummyAdapter(),))
+    registry = scmle.models.registry.ModelRegistry((classical.DummyAdapter(),))
 
     with pytest.raises(
         errors.ConfigError,
@@ -40,7 +40,7 @@ def test_unavailable_explicit_experimental_model_fails_closed(monkeypatch):
     """An explicit model cannot silently fall back when its extra is absent."""
     representation = networks.TorchJepaAdapter()
     monkeypatch.setattr(representation, "is_available", lambda: False)
-    registry = registry_module.ModelRegistry(
+    registry = scmle.models.registry.ModelRegistry(
         (classical.DummyAdapter(), representation)
     )
 
@@ -61,7 +61,7 @@ def test_transformer_and_jepa_are_explicit_opt_in_candidates(monkeypatch):
     representation = networks.TorchJepaAdapter()
     monkeypatch.setattr(transformer, "is_available", lambda: True)
     monkeypatch.setattr(representation, "is_available", lambda: True)
-    registry = registry_module.ModelRegistry(
+    registry = scmle.models.registry.ModelRegistry(
         (classical.DummyAdapter(), transformer, representation)
     )
     spec = tasks.ProjectSpec(
@@ -107,7 +107,7 @@ def test_transformer_and_jepa_are_explicit_opt_in_candidates(monkeypatch):
 
 def test_jepa_has_a_complete_experimental_tabular_capability():
     """The public JEPA path has a task-level capability declaration."""
-    registry = context_module.tabular_beta_capability_registry()
+    registry = scmle.core.context.tabular_beta_capability_registry()
 
     key = capabilities.CapabilityKey(
         modality=capabilities.Modality.TABULAR,

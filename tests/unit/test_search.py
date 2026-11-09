@@ -8,7 +8,7 @@ from scmle.contracts import errors
 from scmle.contracts import search
 from scmle.contracts import tasks
 from scmle.models import conformance
-from scmle.models import registry as registry_module
+import scmle.models.registry
 
 
 def test_parameters_sample_inside_their_domains():
@@ -49,7 +49,7 @@ def test_parameters_are_immutable_and_comparable():
 
 
 def test_adapters_apply_sampled_params():
-    registry = registry_module.ModelRegistry.with_builtins()
+    registry = scmle.models.registry.ModelRegistry.with_builtins()
     forest = registry.get("random_forest")
     sampled = forest.search_space.sample(random.Random(0))
     estimator = forest.build(tasks.TaskType.BINARY, 0, sampled)
@@ -59,7 +59,7 @@ def test_adapters_apply_sampled_params():
 
 
 def test_every_tunable_builtin_samples_valid_configurations():
-    registry = registry_module.ModelRegistry.with_builtins()
+    registry = scmle.models.registry.ModelRegistry.with_builtins()
     for adapter in registry.adapters.values():
         if not adapter.is_available():
             continue  # Optional library not installed in this environment.

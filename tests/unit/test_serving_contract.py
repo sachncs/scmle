@@ -10,9 +10,9 @@ import pandas
 import pytest
 
 from scmle import cli
-from scmle.artifacts import bundle as bundle_module
+import scmle.artifacts.bundle
 from scmle.contracts import errors
-from scmle.contracts import serving as serving_contract
+import scmle.contracts.serving
 from scmle.deploy import provenance
 from scmle.inference import guard
 from scmle.inference import parity
@@ -37,7 +37,9 @@ def expected():
 def bundle(golden, tmp_path_factory):
     folder = tmp_path_factory.mktemp("golden")
     parity.reference_bundle(golden.spec).save(folder / "bundle")
-    return bundle_module.ModelBundle.load(folder / "bundle", trusted=True)
+    return scmle.artifacts.bundle.ModelBundle.load(
+        folder / "bundle", trusted=True
+    )
 
 
 def call_full(url, payload=None, raw=None, headers=None):
@@ -148,7 +150,7 @@ def test_every_response_carries_version_and_artifact_digest(
         f"{running.address}/predict", {"records": golden.records[:2]}
     )
     assert status == 200
-    for key in serving_contract.RESPONSE_KEYS:
+    for key in scmle.contracts.serving.RESPONSE_KEYS:
         assert key in body, key
     assert body["schema_version"] == "1"
     assert body["model_version"] == "golden-1"
@@ -165,7 +167,7 @@ def test_every_response_carries_version_and_artifact_digest(
 
 def test_the_artifact_digest_names_the_saved_manifest(bundle, tmp_path):
     folder = bundle.save(tmp_path / "saved")
-    loaded = bundle_module.ModelBundle.load(folder, trusted=True)
+    loaded = scmle.artifacts.bundle.ModelBundle.load(folder, trusted=True)
     assert provenance.bundle_digest(folder) == provenance.manifest_digest(
         loaded.info.to_dict()
     )

@@ -30,14 +30,14 @@ to at most `alpha_promote` by the union bound over experiments.
 
 from typing import Any
 
-import numpy as np
+import numpy
 from numpy.typing import ArrayLike
 from numpy.typing import NDArray
 import pandas
 
 from scmle.contracts import errors
-from scmle.data.charter import decision as charter_decision
-from scmle.data.ledger import budget as budget_module
+import scmle.data.charter.decision
+import scmle.data.ledger.budget
 from scmle.decision import design
 from scmle.decision import rollout
 from scmle.governance import deployment_ledger
@@ -51,10 +51,10 @@ class RolloutHook:
     def __init__(
         self,
         manager: lifecycle.LifecycleManager,
-        plan: charter_decision.RolloutPlan,
+        plan: scmle.data.charter.decision.RolloutPlan,
         ledger: deployment_ledger.DeploymentLedger,
         *,
-        budget: budget_module.DecisionBudget | None = None,
+        budget: scmle.data.ledger.budget.DecisionBudget | None = None,
         log: rollout.DecisionLog | None = None,
     ) -> None:
         """Binds the hook to a manager, a plan and a deployment ledger.
@@ -199,7 +199,7 @@ class RolloutHook:
         challenger = self.manager.registry.resolve(
             self.manager.model, registry.CHALLENGER
         )
-        budget, level = budget_module.assign_experiment(
+        budget, level = scmle.data.ledger.budget.assign_experiment(
             self.budget, experiment_id
         )
         self.budget = budget
@@ -230,7 +230,7 @@ class RolloutHook:
         )
         return float(level)
 
-    def assign(self, unit_ids: ArrayLike) -> NDArray[np.float64]:
+    def assign(self, unit_ids: ArrayLike) -> NDArray[numpy.float64]:
         """Assigns units and writes the propensity-logged batch.
 
         Writes one assignment row to the deployment ledger with the arm of
@@ -244,7 +244,7 @@ class RolloutHook:
             1.0 for the challenger and 0.0 for the champion, per unit.
         """
         self.started()
-        names = [str(u) for u in np.asarray(unit_ids).ravel()]
+        names = [str(u) for u in numpy.asarray(unit_ids).ravel()]
         arms = design.assign(names, self.plan.salt, self.plan.assignment_prob)
         q = self.plan.assignment_prob
         odds = [q if a else 1.0 - q for a in arms]
@@ -336,7 +336,7 @@ class RolloutHook:
             )
         record = self.manager.promote_challenger(approval, signing_key)
         self.champion_id = f"{self.manager.model}:v{record.version}"
-        budget, level = budget_module.start_rollback_monitor(
+        budget, level = scmle.data.ledger.budget.start_rollback_monitor(
             self.budget, self.champion_id
         )
         self.budget = budget

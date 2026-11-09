@@ -21,11 +21,11 @@ import threadpoolctl
 
 from scmle.contracts import data
 from scmle.contracts import experiments
-from scmle.contracts import metrics as metric_contracts
 from scmle.contracts import models
 from scmle.contracts import tasks
-from scmle.core import context as context_module
+import scmle.contracts.metrics
 from scmle.core import limits
+import scmle.core.context
 from scmle.evaluation import metrics
 from scmle.sampling import strategies
 
@@ -78,7 +78,7 @@ class TrialPayload:
     feature_plan: data.FeaturePlan
     task: tasks.TaskType
     seed: int
-    metric: metric_contracts.Metric
+    metric: scmle.contracts.metrics.Metric
     positive_label: Any
     features: pandas.DataFrame
     target: pandas.Series
@@ -299,17 +299,17 @@ class TrialRunner:
         folds: Cross-validation folds as lists of positions.
     """
 
-    def __init__(self, context: context_module.RunContext) -> None:
+    def __init__(self, context: scmle.core.context.RunContext) -> None:
         """Initializes the runner from a context holding a split and plan.
 
         Args:
             context: Run context with `split`, `profile`, `task` and `metric`.
         """
         self.context = context
-        self.split = context_module.require(context.split, "split")
-        self.task = context_module.require(context.task, "task")
-        self.metric = context_module.require(context.metric, "metric")
-        self.feature_plan = context_module.require(
+        self.split = scmle.core.context.require(context.split, "split")
+        self.task = scmle.core.context.require(context.task, "task")
+        self.metric = scmle.core.context.require(context.metric, "metric")
+        self.feature_plan = scmle.core.context.require(
             context.profile, "profile"
         ).feature_plan
         self.folds = [

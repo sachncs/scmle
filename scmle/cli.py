@@ -35,26 +35,26 @@ from scmle.data.framing import draft
 from scmle.data.framing import refusal
 from scmle.data.ingest import budget
 from scmle.data.ingest import grain
-from scmle.data.ingest import plan as ingest_plan
+import scmle.data.ingest.plan
 from scmle.data.readers import tabular
 from scmle.deploy import gate
 from scmle.deploy import livetests
-from scmle.deploy import record as deploy_record
 from scmle.deploy import release
+import scmle.deploy.record
 from scmle.governance import deployment_ledger
-from scmle.governance import envelope as envelope_module
-from scmle.governance import loop as loop_module
 from scmle.governance import registry
 from scmle.governance import release_state
-from scmle.inference import mapping as mapping_module
+import scmle.governance.envelope
+import scmle.governance.loop
 from scmle.inference import parity
 from scmle.inference import serving
-from scmle.operations import controller as controller_module
+import scmle.inference.mapping
+import scmle.operations.controller
 from scmle.optimization import optimizers
 from scmle.security import access
 from scmle.trail import builder
 from scmle.trail import chain
-from scmle.trail import show as trail_show
+import scmle.trail.show
 
 LOGGER = logging.getLogger(__name__)
 EXIT_OK = 0
@@ -593,7 +593,7 @@ class PredictCommand(Command):
             The exit status, EXIT_OK (0).
         """
         model = bundle.ModelBundle.load(args.bundle, trusted=args.trusted)
-        mapping = mapping_module.ColumnMapping(
+        mapping = scmle.inference.mapping.ColumnMapping(
             dict(pair.split("=", 1) for pair in args.rename),
             args.case_insensitive,
             args.strip_whitespace,
@@ -821,12 +821,12 @@ class IngestCommand(Command):
         Raises:
             BlockedError: If the unit verdict is one that blocks the run.
         """
-        declared: tuple[ingest_plan.joins.DeclaredKey, ...] = ()
+        declared: tuple[scmle.data.ingest.plan.joins.DeclaredKey, ...] = ()
         if args.foreign_keys:
-            declared = ingest_plan.declared_from_json(
+            declared = scmle.data.ingest.plan.declared_from_json(
                 json.loads(pathlib.Path(args.foreign_keys).read_text())
             )
-        settings = ingest_plan.IngestSettings(
+        settings = scmle.data.ingest.plan.IngestSettings(
             tables=tuple(t for t in args.tables.split(",") if t),
             unit=args.unit,
             target_table=args.target_table,
@@ -836,9 +836,9 @@ class IngestCommand(Command):
             max_key_size=args.max_key_size,
             declared=declared,
         )
-        plan = ingest_plan.IngestPlan(
+        plan = scmle.data.ingest.plan.IngestPlan(
             pathlib.Path(args.output),
-            ingest_plan.sqlite_factory(args.sqlite),
+            scmle.data.ingest.plan.sqlite_factory(args.sqlite),
             settings,
             budget.IngestBudget(
                 args.max_queries, args.max_rows_scanned, args.max_seconds
@@ -1049,11 +1049,11 @@ class LoopCommand(Command):
         Returns:
             The exit status, EXIT_OK (0).
         """
-        policy = loop_module.LoopPolicy.from_dict(
+        policy = scmle.governance.loop.LoopPolicy.from_dict(
             json.loads(pathlib.Path(args.policy).read_text())
         )
         charter = types.SimpleNamespace(charter_hash=args.charter_hash)
-        loop_module.Loop.open(args.deploy_dir, charter, policy)
+        scmle.governance.loop.Loop.open(args.deploy_dir, charter, policy)
         LOGGER.info("opened deployment ledger in %s", args.deploy_dir)
         return EXIT_OK
 
@@ -1067,7 +1067,7 @@ class LoopCommand(Command):
         Returns:
             The exit status, EXIT_OK (0).
         """
-        loop = loop_module.Loop.resume(args.deploy_dir)
+        loop = scmle.governance.loop.Loop.resume(args.deploy_dir)
         frame = pandas.read_csv(args.batch)
         outcome = loop.observe(
             frame,
@@ -1088,7 +1088,7 @@ class LoopCommand(Command):
         Returns:
             The exit status, EXIT_OK (0).
         """
-        loop = loop_module.Loop.resume(args.deploy_dir)
+        loop = scmle.governance.loop.Loop.resume(args.deploy_dir)
         frame = pandas.read_csv(args.labels)
         matched = loop.mature(
             dict(zip(frame["case_id"].astype(str), frame["loss"], strict=True))
@@ -1106,7 +1106,7 @@ class LoopCommand(Command):
         Returns:
             The exit status, EXIT_OK (0).
         """
-        loop = loop_module.Loop.resume(args.deploy_dir)
+        loop = scmle.governance.loop.Loop.resume(args.deploy_dir)
         result = loop.step()
         print(
             json.dumps(
@@ -1134,7 +1134,7 @@ class LoopCommand(Command):
         Returns:
             The exit status, EXIT_OK (0).
         """
-        loop = loop_module.Loop.resume(args.deploy_dir)
+        loop = scmle.governance.loop.Loop.resume(args.deploy_dir)
         print(
             json.dumps(
                 [
@@ -1165,14 +1165,14 @@ class LoopCommand(Command):
         Raises:
             ConfigError: If the reply is refused.
         """
-        loop = loop_module.Loop.resume(args.deploy_dir)
+        loop = scmle.governance.loop.Loop.resume(args.deploy_dir)
         reply = deployment_ledger.Attestation.from_dict(
             json.loads(pathlib.Path(args.attestation).read_text())
         )
         key = pathlib.Path(args.key_file).read_text().strip()
         try:
             outcome = loop.reply(args.escalation_id, reply, key)
-        except loop_module.ReplyRefused as error:
+        except scmle.governance.loop.ReplyRefused as error:
             raise errors.ConfigError(f"reply refused: {error}") from error
         print(
             json.dumps(
@@ -1278,7 +1278,7 @@ class OperateCommand(Command):
     @staticmethod
     def open(
         deploy_dir: str, keys: dict[str, str] | None = None
-    ) -> controller_module.Controller:
+    ) -> scmle.operations.controller.Controller:
         """Opens the controller of a deployment, mapping ledger faults.
 
         Args:
@@ -1292,7 +1292,7 @@ class OperateCommand(Command):
             ArtifactError: If the deployment ledger cannot be opened.
         """
         try:
-            return controller_module.Controller(
+            return scmle.operations.controller.Controller(
                 deploy_dir, verification_keys=keys
             )
         except deployment_ledger.DeploymentLedgerError as error:
@@ -1357,7 +1357,7 @@ class OperateCommand(Command):
         try:
             controller.envelopes.grant(envelope)
         except (
-            envelope_module.EnvelopeRefused,
+            scmle.governance.envelope.EnvelopeRefused,
             deployment_ledger.DeploymentLedgerError,
         ) as error:
             raise errors.ConfigError(f"envelope refused: {error}") from error
@@ -1566,7 +1566,7 @@ class DeployCommand(Command):
         if not decision.allowed:
             return EXIT_BLOCKED
         if decision.record is not None and args.output:
-            deploy_record.write_record(args.output, decision.record)
+            scmle.deploy.record.write_record(args.output, decision.record)
         return EXIT_OK
 
     @staticmethod
@@ -1626,7 +1626,7 @@ class DeployCommand(Command):
         Returns:
             EXIT_OK (0) if the signature verifies, else EXIT_FAILED (1).
         """
-        record = deploy_record.read_record(args.record)
+        record = scmle.deploy.record.read_record(args.record)
         valid = record.verify(DeployCommand.read_key(args.key_file))
         print(json.dumps({"valid": valid, "digest": record.digest()}))
         return EXIT_OK if valid else EXIT_FAILED
@@ -1909,7 +1909,7 @@ class TrailCommand(Command):
             ArtifactError: If the built or verified trail does not verify.
         """
         if args.trail_action == "show":
-            print(trail_show.render(args.trail_dir))
+            print(scmle.trail.show.render(args.trail_dir))
             return EXIT_OK
         keys = self.keys(args.keys)
         if args.trail_action == "build":

@@ -20,7 +20,7 @@ final evaluation set.
 import dataclasses
 from typing import Any
 
-import numpy as np
+import numpy
 from numpy.typing import ArrayLike
 from numpy.typing import NDArray
 from scipy import optimize
@@ -82,7 +82,7 @@ class CalibrationCheck:
 
 def probabilities_and_labels(
     p: ArrayLike, y: ArrayLike
-) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+) -> tuple[NDArray[numpy.float64], NDArray[numpy.float64]]:
     """Validated probabilities and 0/1 labels of equal length.
 
     Args:
@@ -98,11 +98,11 @@ def probabilities_and_labels(
             one-dimensional array of 0 and 1 are rejected by
             `costs.binary_vector` with a `ValueError`.
     """
-    risk = np.asarray(p, dtype=float)
+    risk = numpy.asarray(p, dtype=float)
     labels = costs.binary_vector(y, "y")
     if risk.shape != labels.shape:
         raise ValueError("p and y must have the same length")
-    if not np.isfinite(risk).all() or (risk < 0).any() or (risk > 1).any():
+    if not numpy.isfinite(risk).all() or (risk < 0).any() or (risk > 1).any():
         raise ValueError("p must lie in [0, 1]")
     return risk, labels
 
@@ -135,9 +135,9 @@ def calibration_check(
     qualification.count(bins, "bins", minimum=2)
     if len(risk) < 5 * bins:
         raise ValueError("too few rows for the calibration check")
-    order = np.argsort(risk, kind="stable")
+    order = numpy.argsort(risk, kind="stable")
     statistic = 0.0
-    for part in np.array_split(order, bins):
+    for part in numpy.array_split(order, bins):
         expected = float(risk[part].sum())
         variance = float((risk[part] * (1.0 - risk[part])).sum())
         observed = float(labels[part].sum())
@@ -164,7 +164,7 @@ class Recalibrator:
     intercept: float
     slope: float
 
-    def apply(self, p: ArrayLike) -> NDArray[np.float64]:
+    def apply(self, p: ArrayLike) -> NDArray[numpy.float64]:
         """Recalibrates probabilities.
 
         Args:
@@ -173,9 +173,9 @@ class Recalibrator:
         Returns:
             The recalibrated probabilities, same shape as `p`.
         """
-        risk = np.clip(np.asarray(p, dtype=float), CLIP, 1.0 - CLIP)
-        score = self.intercept + self.slope * np.log(risk / (1.0 - risk))
-        result: NDArray[np.float64] = 1.0 / (1.0 + np.exp(-score))
+        risk = numpy.clip(numpy.asarray(p, dtype=float), CLIP, 1.0 - CLIP)
+        score = self.intercept + self.slope * numpy.log(risk / (1.0 - risk))
+        result: NDArray[numpy.float64] = 1.0 / (1.0 + numpy.exp(-score))
         return result
 
 
@@ -193,25 +193,27 @@ def fit_recalibrator(p: ArrayLike, y: ArrayLike) -> Recalibrator:
     `probabilities_and_labels`.
     """
     risk, labels = probabilities_and_labels(p, y)
-    clipped = np.clip(risk, CLIP, 1.0 - CLIP)
-    feature = np.log(clipped / (1.0 - clipped))
+    clipped = numpy.clip(risk, CLIP, 1.0 - CLIP)
+    feature = numpy.log(clipped / (1.0 - clipped))
 
-    def loss(theta: NDArray[np.float64]) -> float:
+    def loss(theta: NDArray[numpy.float64]) -> float:
         score = theta[0] + theta[1] * feature
-        return float(np.sum(np.logaddexp(0.0, score) - labels * score))
+        return float(numpy.sum(numpy.logaddexp(0.0, score) - labels * score))
 
-    def gradient(theta: NDArray[np.float64]) -> NDArray[np.float64]:
+    def gradient(theta: NDArray[numpy.float64]) -> NDArray[numpy.float64]:
         score = theta[0] + theta[1] * feature
-        residual = 1.0 / (1.0 + np.exp(-score)) - labels
-        return np.array([residual.sum(), (residual * feature).sum()])
+        residual = 1.0 / (1.0 + numpy.exp(-score)) - labels
+        return numpy.array([residual.sum(), (residual * feature).sum()])
 
     fitted = optimize.minimize(
-        loss, np.array([0.0, 1.0]), jac=gradient, method="BFGS"
+        loss, numpy.array([0.0, 1.0]), jac=gradient, method="BFGS"
     )
     return Recalibrator(float(fitted.x[0]), float(fitted.x[1]))
 
 
-def cross_fitted(p: ArrayLike, y: ArrayLike, seed: int) -> NDArray[np.float64]:
+def cross_fitted(
+    p: ArrayLike, y: ArrayLike, seed: int
+) -> NDArray[numpy.float64]:
     """Recalibrated probabilities where each row's map never saw its label.
 
     Rows are split at random into `FOLDS` folds; the map applied to a fold is
@@ -231,7 +233,7 @@ def cross_fitted(p: ArrayLike, y: ArrayLike, seed: int) -> NDArray[np.float64]:
     risk, labels = probabilities_and_labels(p, y)
     rng = randomness.component_rng(seed, "decision.threshold.folds", 0)
     fold = rng.permutation(len(risk)) % FOLDS
-    out = np.empty_like(risk)
+    out = numpy.empty_like(risk)
     for k in range(FOLDS):
         held = fold == k
         out[held] = fit_recalibrator(risk[~held], labels[~held]).apply(
@@ -254,7 +256,7 @@ class ThresholdRule:
     path: str
     recalibrator: Recalibrator | None = None
 
-    def act(self, p: ArrayLike) -> NDArray[np.float64]:
+    def act(self, p: ArrayLike) -> NDArray[numpy.float64]:
         """Applies the rule.
 
         Args:
@@ -264,7 +266,7 @@ class ThresholdRule:
             1.0 where the (recalibrated) probability reaches the threshold,
             otherwise 0.0, one per input.
         """
-        risk = np.asarray(p, dtype=float)
+        risk = numpy.asarray(p, dtype=float)
         if self.recalibrator is not None:
             risk = self.recalibrator.apply(risk)
         return (risk >= self.threshold).astype(float)
@@ -282,8 +284,8 @@ class ThresholdRule:
             return self.threshold
         if r.slope <= 0:
             return None
-        score = np.log(self.threshold / (1.0 - self.threshold))
-        return float(1.0 / (1.0 + np.exp(-(score - r.intercept) / r.slope)))
+        score = numpy.log(self.threshold / (1.0 - self.threshold))
+        return float(1.0 / (1.0 + numpy.exp(-(score - r.intercept) / r.slope)))
 
     @property
     def digest(self) -> str:
@@ -347,8 +349,8 @@ class ThresholdDecision:
 
 
 def cost_interval(
-    y: NDArray[np.float64],
-    acts: NDArray[np.float64],
+    y: NDArray[numpy.float64],
+    acts: NDArray[numpy.float64],
     model: costs.DecisionCostModel,
     clusters: ArrayLike | None,
     replicates: int,
@@ -370,10 +372,10 @@ def cost_interval(
         one-dimensional are rejected with a `ValueError` by
         `netbenefit.factorize`.
     """
-    cell = np.where(
+    cell = numpy.where(
         acts == 1.0,
-        np.where(y == 1.0, model.c_11, model.c_10),
-        np.where(y == 1.0, model.c_01, model.c_00),
+        numpy.where(y == 1.0, model.c_11, model.c_10),
+        numpy.where(y == 1.0, model.c_01, model.c_00),
     )
     groups = netbenefit.factorize(clusters)
     rng = randomness.component_rng(seed, "decision.threshold.cost", 0)
@@ -381,17 +383,19 @@ def cost_interval(
         draws = rng.integers(0, len(cell), size=(replicates, len(cell)))
         means = cell[draws].mean(axis=1)
     else:
-        size = int(np.max(groups)) + 1
-        sums = np.bincount(groups, weights=cell, minlength=size)
-        rows = np.bincount(groups, minlength=size).astype(float)
+        size = int(numpy.max(groups)) + 1
+        sums = numpy.bincount(groups, weights=cell, minlength=size)
+        rows = numpy.bincount(groups, minlength=size).astype(float)
         picks = rng.integers(0, size, size=(replicates, size))
         means = sums[picks].sum(axis=1) / rows[picks].sum(axis=1)
-    return float(np.quantile(means, 0.025)), float(np.quantile(means, 0.975))
+    return float(numpy.quantile(means, 0.025)), float(
+        numpy.quantile(means, 0.975)
+    )
 
 
 def stable_span(
-    p: NDArray[np.float64],
-    y: NDArray[np.float64],
+    p: NDArray[numpy.float64],
+    y: NDArray[numpy.float64],
     rule: ThresholdRule,
     model: costs.DecisionCostModel,
     points: int = 41,
@@ -411,8 +415,8 @@ def stable_span(
         treating no one, or None if there is none.
     """
     acts = rule.act(p)
-    grid = np.linspace(model.t_lo, model.t_hi, points)
-    good = np.array(
+    grid = numpy.linspace(model.t_lo, model.t_hi, points)
+    good = numpy.array(
         [
             costs.net_benefit(y, acts, t)
             > max(costs.net_benefit_all(y, t), 0.0)

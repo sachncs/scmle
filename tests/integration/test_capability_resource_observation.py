@@ -12,7 +12,7 @@ from scmle.contracts import tasks
 from scmle.core import orchestrator
 from scmle.core import resource_observation
 from scmle.core import stages
-from scmle.models import registry as registry_module
+import scmle.models.registry
 from scmle.models.sklearn import classical
 
 
@@ -150,7 +150,9 @@ def test_bound_observation_is_used_by_the_capability_gate(monkeypatch):
     project = orchestrator.Orchestrator(
         make_spec(),
         binary_frame(),
-        registry=registry_module.ModelRegistry((classical.DummyAdapter(),)),
+        registry=scmle.models.registry.ModelRegistry(
+            (classical.DummyAdapter(),)
+        ),
         capability_registry=registry,
     )
     context = project.new_context()
@@ -186,7 +188,9 @@ def test_unknown_declared_facts_fail_closed_and_are_persisted(
     project = orchestrator.Orchestrator(
         make_spec(),
         binary_frame(),
-        registry=registry_module.ModelRegistry((classical.DummyAdapter(),)),
+        registry=scmle.models.registry.ModelRegistry(
+            (classical.DummyAdapter(),)
+        ),
         capability_registry=registry,
     )
 

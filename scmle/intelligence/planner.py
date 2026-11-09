@@ -18,7 +18,7 @@ from scmle.contracts import tasks
 from scmle.data.splitting import splitters
 from scmle.evaluation import metrics
 from scmle.intelligence import knowledge
-from scmle.models import registry as registry_module
+import scmle.models.registry
 from scmle.sampling import strategies
 
 FAST_BUDGET_SECONDS = tasks.FAST_BUDGET_SECONDS
@@ -755,7 +755,7 @@ class Planner:
 
     def __init__(
         self,
-        registry: registry_module.ModelRegistry,
+        registry: scmle.models.registry.ModelRegistry,
         catalog: metrics.MetricCatalog = metrics.CATALOG,
         rules: tuple[PlanningRule, ...] | None = None,
     ) -> None:

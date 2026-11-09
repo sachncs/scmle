@@ -9,8 +9,8 @@ import pytest
 
 from scmle.contracts import tasks
 from scmle.models import conformance
-from scmle.models import registry as registry_module
 from scmle.models.deeplearning import estimators
+import scmle.models.registry
 
 pytestmark = pytest.mark.skipif(
     importlib.util.find_spec("torch") is None
@@ -83,7 +83,9 @@ def test_a_pickled_model_predicts_the_same_in_a_new_session():
 
 
 def test_the_adapter_passes_conformance_for_every_standard_task():
-    adapter = registry_module.ModelRegistry.with_builtins().get("keras_mlp")
+    adapter = scmle.models.registry.ModelRegistry.with_builtins().get(
+        "keras_mlp"
+    )
 
     conformance.check_conformance(adapter)
 
@@ -91,7 +93,7 @@ def test_the_adapter_passes_conformance_for_every_standard_task():
 
 
 def test_no_standard_adapter_claims_survival_except_the_baseline_and_survival_models():
-    registry = registry_module.ModelRegistry.with_builtins()
+    registry = scmle.models.registry.ModelRegistry.with_builtins()
 
     claiming = {
         name

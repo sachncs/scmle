@@ -9,9 +9,9 @@ import numpy
 import pandas
 import pyarrow
 
-from scmle.artifacts import bundle as bundle_module
-from scmle.contracts import data as data_contracts
+import scmle.artifacts.bundle
 from scmle.contracts import experiments
+import scmle.contracts.data
 from scmle.data.readers import interchange
 from scmle.evaluation import fit_health
 from scmle.evaluation import parameter_estimation
@@ -48,11 +48,11 @@ class RunResult:
     run_dir: pathlib.Path
     state: str
     plan: experiments.ExperimentPlan
-    profile: data_contracts.DatasetProfile
+    profile: scmle.contracts.data.DatasetProfile
     trials: list[experiments.TrialResult]
     selected_model: str
     evaluation: dict[str, Any]
-    bundle: bundle_module.ModelBundle
+    bundle: scmle.artifacts.bundle.ModelBundle
     diagnostics: dict[str, dict[str, Any]] = dataclasses.field(
         default_factory=dict
     )
@@ -121,7 +121,7 @@ class RunResult:
         """
         return interchange.to_arrow(self.leaderboard())
 
-    def load_best_model(self) -> bundle_module.ModelBundle:
+    def load_best_model(self) -> scmle.artifacts.bundle.ModelBundle:
         """Returns the packaged best model.
 
         Returns:

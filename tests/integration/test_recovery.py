@@ -11,8 +11,8 @@ from scmle.contracts import errors
 from scmle.contracts import models
 from scmle.contracts import tasks
 from scmle.core import orchestrator
-from scmle.core import stages as stages_module
-from scmle.models import registry as registry_module
+import scmle.core.stages
+import scmle.models.registry
 
 BINARY = frozenset({tasks.TaskType.BINARY})
 
@@ -37,7 +37,7 @@ def read_events(run_dir):
 
 
 def project_with(adapter, frame, tmp_path, **kwargs):
-    registry = registry_module.ModelRegistry.with_builtins()
+    registry = scmle.models.registry.ModelRegistry.with_builtins()
     registry.register(adapter)
     project = support.make_project(frame, "y", output_dir=tmp_path, **kwargs)
     project.orchestrator.registry = registry
@@ -54,7 +54,7 @@ def test_failed_trial_is_isolated(binary_frame, tmp_path):
 
 
 def test_all_trials_failing_ends_in_failed_state(binary_frame, tmp_path):
-    registry = registry_module.ModelRegistry((ExplodingAdapter(),))
+    registry = scmle.models.registry.ModelRegistry((ExplodingAdapter(),))
     project = support.make_project(binary_frame, "y", output_dir=tmp_path)
     project.orchestrator.registry = registry
     with pytest.raises(errors.ScmleError, match="all trials failed") as caught:
@@ -100,14 +100,14 @@ def test_budget_exhaustion_skips_later_trials(binary_frame, tmp_path):
 
 
 def test_custom_stage_sequence_is_polymorphic(binary_frame, tmp_path):
-    class Recording(stages_module.PackageStage):
+    class Recording(scmle.core.stages.PackageStage):
         calls = []
 
         def execute(self, context):
             Recording.calls.append(context.selected.model_name)
             super().execute(context)
 
-    stages = (*stages_module.default_stages()[:-1], Recording())
+    stages = (*scmle.core.stages.default_stages()[:-1], Recording())
     spec = support.make_project(binary_frame, "y").spec
     result = orchestrator.Orchestrator(spec, binary_frame, stages=stages).run(
         tmp_path

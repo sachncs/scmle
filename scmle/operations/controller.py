@@ -46,7 +46,7 @@ import pandas
 
 from scmle.governance import deployment_ledger
 from scmle.governance import envelope
-from scmle.governance import loop as loop_module
+import scmle.governance.loop
 
 BATCHES = "batches"
 LABELS = "labels"
@@ -165,9 +165,9 @@ class Controller:
         self.retrain = retrain
         self.policy = policy or ControllerPolicy()
         self.checkpoint = checkpoint
-        self.loop = loop_module.Loop.resume(
+        self.loop = scmle.governance.loop.Loop.resume(
             deploy_dir,
-            hooks=loop_module.Hooks(retrain=self.authorized_retrain),
+            hooks=scmle.governance.loop.Hooks(retrain=self.authorized_retrain),
             verification_keys=verification_keys,
             system_keys=system_keys,
             today=today,
@@ -543,7 +543,9 @@ class Controller:
                 "controller_no_new_data", {"ticks": self.policy.max_idle_ticks}
             )
         starved = self.trailing(
-            lambda body: body["status"] == loop_module.INSUFFICIENT_LABELS
+            lambda body: (
+                body["status"] == scmle.governance.loop.INSUFFICIENT_LABELS
+            )
         )
         if starved >= self.policy.max_unlabelled_ticks:
             self.loop.escalate(

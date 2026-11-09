@@ -9,8 +9,8 @@ import support
 from scmle.contracts import errors
 from scmle.data.charter import contracts as c
 from scmle.data.charter import sealing
-from scmle.data.custody import manifest as manifest_module
 from scmle.data.custody import sealed
+import scmle.data.custody.manifest
 from tests.unit.test_charter_contracts import make_charter
 
 KEY = "integration-key"
@@ -72,7 +72,7 @@ def test_the_charter_artifacts_are_written_and_verifiable(
         "custody_log.jsonl",
     ):
         assert (folder / name).exists(), name
-    loaded = manifest_module.load_manifest(
+    loaded = scmle.data.custody.manifest.load_manifest(
         json.loads((folder / "split_manifest.json").read_text())
     )
     assert len(loaded.sha256) == 64
@@ -169,9 +169,9 @@ def test_a_charter_run_writes_the_ledger_control_and_claims(
     done = event(result.run_dir, "ledger.completed")["data"]
     claims = json.loads((folder / "confirmed_claims.json").read_text())
     assert done["ledger_head"] == claims["ledger_head"]
-    from scmle.data.ledger import ledger as ledger_module
+    import scmle.data.ledger.ledger
 
-    ledger = ledger_module.Ledger.load(
+    ledger = scmle.data.ledger.ledger.Ledger.load(
         folder / "hypothesis_ledger.jsonl", expected_head=done["ledger_head"]
     )
     # Only numeric features are candidates; the categorical one is skipped.
@@ -369,15 +369,15 @@ RICH_MULTIVERSE = (
 def test_a_charter_run_writes_valid_stability_and_shift_reports(
     binary_frame, tmp_path
 ):
-    from scmle.data.robustness import report as robustness_report
+    import scmle.data.robustness.report
 
     result = run(binary_frame, tmp_path, write_charter(tmp_path))
     folder = pathlib.Path(result.run_dir)
 
     stability = json.loads((folder / "stability_report.json").read_text())
     shifted = json.loads((folder / "shift_report.json").read_text())
-    robustness_report.validate_stability(stability)
-    robustness_report.validate_shift(shifted)
+    scmle.data.robustness.report.validate_stability(stability)
+    scmle.data.robustness.report.validate_shift(shifted)
     # The default charter declares one implemented choice with one usable
     # option, so no finding can be called stable.
     assert stability["status"] == "not_evaluated"
@@ -392,7 +392,7 @@ def test_a_charter_run_writes_valid_stability_and_shift_reports(
 def test_survivors_are_rerun_over_the_declared_multiverse(
     binary_frame, tmp_path
 ):
-    from scmle.data.ledger import ledger as ledger_module
+    import scmle.data.ledger.ledger
 
     path = write_charter(tmp_path, multiverse=RICH_MULTIVERSE)
     result = run(binary_frame, tmp_path, path)
@@ -400,7 +400,7 @@ def test_survivors_are_rerun_over_the_declared_multiverse(
 
     report = json.loads((folder / "stability_report.json").read_text())
     done = event(result.run_dir, "ledger.completed")["data"]
-    ledger = ledger_module.Ledger.load(
+    ledger = scmle.data.ledger.ledger.Ledger.load(
         folder / "hypothesis_ledger.jsonl", expected_head=done["ledger_head"]
     )
     survivors = {h.spec.column for h in ledger.survivors()}
@@ -452,10 +452,10 @@ def test_a_run_without_a_charter_has_no_robustness_reports(
 def test_chartered_rules_drive_the_ledger_and_the_second_stage(
     binary_frame, tmp_path
 ):
-    from scmle.data.charter import rules as rules_module
-    from scmle.data.ledger import ledger as ledger_module
+    import scmle.data.charter.rules
+    import scmle.data.ledger.ledger
 
-    rules = rules_module.RunRules(
+    rules = scmle.data.charter.rules.RunRules(
         ledger_rule="lord++", confirmation_rule="bh", stability_filter=True
     )
     path = write_charter(tmp_path, multiverse=RICH_MULTIVERSE, rules=rules)
@@ -465,7 +465,7 @@ def test_chartered_rules_drive_the_ledger_and_the_second_stage(
     done = event(result.run_dir, "ledger.completed")["data"]
     assert done["rules"] == "chartered"
     assert done["rule"] == "lord++" and done["withdrawn"] is not None
-    ledger = ledger_module.Ledger.load(
+    ledger = scmle.data.ledger.ledger.Ledger.load(
         folder / "hypothesis_ledger.jsonl", expected_head=done["ledger_head"]
     )
     assert ledger.confirmation["rule"] == "bh"

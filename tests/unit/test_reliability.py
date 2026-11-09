@@ -8,7 +8,7 @@ import pytest
 from sklearn import base
 from sklearn import linear_model
 
-from scmle.artifacts import bundle as bundle_module
+import scmle.artifacts.bundle
 from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.contracts import tasks
@@ -76,7 +76,7 @@ def test_calibrating_a_multiclass_bundle_lowers_its_calibration_error():
     )
     pipe.steps[-1] = ("model", Overconfident())
     pipe.fit(features, target)
-    bundle = bundle_module.ModelBundle.create(
+    bundle = scmle.artifacts.bundle.ModelBundle.create(
         pipe, plan, features, "y", "multiclass_classification", "log_loss", "x"
     )
 
@@ -106,7 +106,7 @@ def overconfident_bundle():
     )
     pipe.steps[-1] = ("model", Overconfident())
     pipe.fit(features, target)
-    bundle = bundle_module.ModelBundle.create(
+    bundle = scmle.artifacts.bundle.ModelBundle.create(
         pipe, plan, features, "y", "multiclass_classification", "log_loss", "x"
     )
     return bundle, features, target
@@ -121,7 +121,7 @@ def test_dirichlet_calibration_lowers_error_and_survives_a_round_trip(tmp_path):
     assert report["brier_after"] < report["brier_before"]
     probabilities = bundle.predict_proba(features)
     numpy.testing.assert_allclose(probabilities.sum(axis=1), 1.0, atol=1e-9)
-    loaded = bundle_module.ModelBundle.load(
+    loaded = scmle.artifacts.bundle.ModelBundle.load(
         bundle.save(tmp_path / "b"), trusted=True
     )
     numpy.testing.assert_allclose(loaded.predict_proba(features), probabilities)

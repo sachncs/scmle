@@ -4,7 +4,7 @@ import pytest
 
 from scmle.contracts import observability
 from scmle.monitoring import events
-from scmle.monitoring import observability as evaluation
+import scmle.monitoring.observability
 
 
 def make_policy() -> observability.ObservabilityPolicy:
@@ -34,7 +34,7 @@ def make_metric(
 
 
 def test_evaluation_passes_fresh_metrics_under_threshold():
-    result = evaluation.evaluate(
+    result = scmle.monitoring.observability.evaluate(
         [make_metric()],
         make_policy(),
         observed_at="2026-10-20T10:01:00+00:00",
@@ -66,7 +66,7 @@ def test_evaluation_fails_closed_for_missing_stale_future_and_breached_metrics()
         ),
     ]
 
-    result = evaluation.evaluate(
+    result = scmle.monitoring.observability.evaluate(
         metrics,
         policy,
         observed_at="2026-10-20T10:00:00+00:00",

@@ -12,9 +12,9 @@ import pandas
 from sklearn import metrics as sk_metrics
 
 from scmle.contracts import errors
-from scmle.contracts import metrics as metric_contracts
 from scmle.contracts import models
 from scmle.contracts import tasks
+import scmle.contracts.metrics
 from scmle.evaluation import concordance
 from scmle.evaluation import forecast
 from scmle.evaluation import multitarget
@@ -65,11 +65,13 @@ def positive_label(target: pandas.Series, task: tasks.TaskType) -> Any:
 
 
 DEFAULT_METRICS = (
-    metric_contracts.Metric("roc_auc", "roc_auc", True, frozenset({BINARY})),
-    metric_contracts.Metric(
+    scmle.contracts.metrics.Metric(
+        "roc_auc", "roc_auc", True, frozenset({BINARY})
+    ),
+    scmle.contracts.metrics.Metric(
         "roc_auc_ovr", "roc_auc_ovr", True, frozenset({MULTICLASS})
     ),
-    metric_contracts.PositiveLabelMetric(
+    scmle.contracts.metrics.PositiveLabelMetric(
         "pr_auc",
         "average_precision",
         True,
@@ -77,8 +79,10 @@ DEFAULT_METRICS = (
         sk_metrics.average_precision_score,
         ("decision_function", "predict_proba"),
     ),
-    metric_contracts.Metric("log_loss", "neg_log_loss", False, CLASSIFICATION),
-    metric_contracts.PositiveLabelMetric(
+    scmle.contracts.metrics.Metric(
+        "log_loss", "neg_log_loss", False, CLASSIFICATION
+    ),
+    scmle.contracts.metrics.PositiveLabelMetric(
         "f1",
         "f1",
         True,
@@ -86,19 +90,23 @@ DEFAULT_METRICS = (
         sk_metrics.f1_score,
         ("predict",),
     ),
-    metric_contracts.Metric("f1_macro", "f1_macro", True, CLASSIFICATION),
-    metric_contracts.Metric(
+    scmle.contracts.metrics.Metric(
+        "f1_macro", "f1_macro", True, CLASSIFICATION
+    ),
+    scmle.contracts.metrics.Metric(
         "balanced_accuracy", "balanced_accuracy", True, CLASSIFICATION
     ),
-    metric_contracts.Metric("accuracy", "accuracy", True, CLASSIFICATION),
-    metric_contracts.Metric(
+    scmle.contracts.metrics.Metric(
+        "accuracy", "accuracy", True, CLASSIFICATION
+    ),
+    scmle.contracts.metrics.Metric(
         "mae", "neg_mean_absolute_error", False, frozenset({REGRESSION})
     ),
-    metric_contracts.Metric(
+    scmle.contracts.metrics.Metric(
         "rmse", "neg_root_mean_squared_error", False, frozenset({REGRESSION})
     ),
-    metric_contracts.Metric("r2", "r2", True, frozenset({REGRESSION})),
-    metric_contracts.FunctionMetric(
+    scmle.contracts.metrics.Metric("r2", "r2", True, frozenset({REGRESSION})),
+    scmle.contracts.metrics.FunctionMetric(
         "qwk",
         "",
         True,
@@ -106,7 +114,7 @@ DEFAULT_METRICS = (
         ordinal.quadratic_weighted_kappa,
         "predict",
     ),
-    metric_contracts.FunctionMetric(
+    scmle.contracts.metrics.FunctionMetric(
         "mace",
         "",
         False,
@@ -114,7 +122,7 @@ DEFAULT_METRICS = (
         ordinal.mean_absolute_class_error,
         "predict",
     ),
-    metric_contracts.Metric(
+    scmle.contracts.metrics.Metric(
         "accuracy_levels", "accuracy", True, frozenset({ORDINAL})
     ),
     multitarget.MultiTargetMetric(
@@ -208,7 +216,8 @@ class MetricCatalog:
     }
 
     def __init__(
-        self, metrics: tuple[metric_contracts.Metric, ...] = DEFAULT_METRICS
+        self,
+        metrics: tuple[scmle.contracts.metrics.Metric, ...] = DEFAULT_METRICS,
     ) -> None:
         """Initializes the catalog with a metric table and report names.
 
@@ -227,7 +236,7 @@ class MetricCatalog:
         }
 
     def register(
-        self, metric: metric_contracts.Metric, replace: bool = False
+        self, metric: scmle.contracts.metrics.Metric, replace: bool = False
     ) -> None:
         """Adds a user-defined metric, reported alongside the standard ones.
 
@@ -277,7 +286,7 @@ class MetricCatalog:
 
     def resolve(
         self, name: str | None, task: tasks.TaskType
-    ) -> metric_contracts.Metric:
+    ) -> scmle.contracts.metrics.Metric:
         """Finds the metric to optimize.
 
         Args:
@@ -360,7 +369,7 @@ def register_metric(
     task_types: tuple[tasks.TaskType, ...] = tuple(tasks.STANDARD_TASKS),
     response_method: str = "predict",
     replace: bool = False,
-) -> metric_contracts.FunctionMetric:
+) -> scmle.contracts.metrics.FunctionMetric:
     """Registers a user-defined metric with the default catalog.
 
     Args:
@@ -377,7 +386,7 @@ def register_metric(
         The registered metric. `MetricCatalog.register` raises `ConfigError`
         when the name is taken and `replace` is False.
     """
-    metric = metric_contracts.FunctionMetric(
+    metric = scmle.contracts.metrics.FunctionMetric(
         name,
         "",
         greater_is_better,

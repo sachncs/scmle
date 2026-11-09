@@ -9,7 +9,7 @@ from scmle.contracts import experiments
 from scmle.contracts import tasks
 from scmle.data.profiling import profiler
 from scmle.data.readers import tabular
-from scmle.intelligence import planner as planner_module
+import scmle.intelligence.planner
 from scmle.models import registry
 
 BINARY = tasks.TaskType.BINARY
@@ -17,7 +17,9 @@ BINARY = tasks.TaskType.BINARY
 
 @pytest.fixture(scope="module")
 def planner():
-    return planner_module.Planner(registry.ModelRegistry.with_builtins())
+    return scmle.intelligence.planner.Planner(
+        registry.ModelRegistry.with_builtins()
+    )
 
 
 def make_plan(planner, frame, budget=1800, approved=None, task=BINARY, **extra):
@@ -32,7 +34,9 @@ def make_plan(planner, frame, budget=1800, approved=None, task=BINARY, **extra):
     manifest = tabular.build_manifest(frame, "y")
     profile = profiler.DatasetProfiler(spec).profile(frame, manifest, task)
     return planner.plan(
-        planner_module.PlanningContext(spec, profile, task, approved)
+        scmle.intelligence.planner.PlanningContext(
+            spec, profile, task, approved
+        )
     )
 
 
@@ -104,7 +108,9 @@ def test_strategy_search_can_be_disabled_in_the_plan(planner, frame):
     )
     manifest = tabular.build_manifest(frame, "y")
     profile = profiler.DatasetProfiler(spec).profile(frame, manifest, BINARY)
-    plan = planner.plan(planner_module.PlanningContext(spec, profile, BINARY))
+    plan = planner.plan(
+        scmle.intelligence.planner.PlanningContext(spec, profile, BINARY)
+    )
     assert not any(
         d.technique == "random_oversample"
         and d.action is experiments.DecisionAction.INCLUDE
@@ -120,7 +126,9 @@ def test_unknown_strategy_name_is_a_config_error(planner, frame):
     manifest = tabular.build_manifest(frame, "y")
     profile = profiler.DatasetProfiler(spec).profile(frame, manifest, BINARY)
     with pytest.raises(errors.ConfigError, match="unknown strategy"):
-        planner.plan(planner_module.PlanningContext(spec, profile, BINARY))
+        planner.plan(
+            scmle.intelligence.planner.PlanningContext(spec, profile, BINARY)
+        )
 
 
 def test_approved_subset_and_invalid_approval(planner, frame):
@@ -131,22 +139,22 @@ def test_approved_subset_and_invalid_approval(planner, frame):
 
 
 def test_custom_rule_chain_is_honoured(frame):
-    class KeepOnlyDummy(planner_module.PlanningRule):
+    class KeepOnlyDummy(scmle.intelligence.planner.PlanningRule):
         def apply(self, context, candidates, decisions):
             return [a for a in candidates if a.name == "dummy"]
 
-    custom = planner_module.Planner(
+    custom = scmle.intelligence.planner.Planner(
         registry.ModelRegistry.with_builtins(), rules=(KeepOnlyDummy(),)
     )
     assert make_plan(custom, frame).candidate_models == ("dummy",)
 
 
 def test_no_candidates_is_an_error(frame):
-    class DropAll(planner_module.PlanningRule):
+    class DropAll(scmle.intelligence.planner.PlanningRule):
         def apply(self, context, candidates, decisions):
             return []
 
-    empty = planner_module.Planner(
+    empty = scmle.intelligence.planner.Planner(
         registry.ModelRegistry.with_builtins(), rules=(DropAll(),)
     )
     with pytest.raises(errors.ConfigError, match="no candidate"):
@@ -167,7 +175,9 @@ def test_memory_characteristics_drive_rejection_under_a_tight_limit(planner):
     )
     manifest = tabular.build_manifest(frame, "y")
     profile = profiler.DatasetProfiler(spec).profile(frame, manifest, BINARY)
-    plan = planner.plan(planner_module.PlanningContext(spec, profile, BINARY))
+    plan = planner.plan(
+        scmle.intelligence.planner.PlanningContext(spec, profile, BINARY)
+    )
     assert "random_forest" not in plan.candidate_models
     assert "svm" not in plan.candidate_models
     assert "logistic_regression" in plan.candidate_models

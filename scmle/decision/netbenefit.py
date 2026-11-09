@@ -23,7 +23,7 @@ import dataclasses
 import hashlib
 from typing import Any
 
-import numpy as np
+import numpy
 from numpy.typing import ArrayLike
 from numpy.typing import NDArray
 
@@ -63,10 +63,10 @@ def rule_hash(label: str, threshold: float) -> str:
 
 
 def columns(
-    y: NDArray[np.float64],
-    acts: NDArray[np.float64],
-    incumbent: NDArray[np.float64] | None,
-) -> NDArray[np.float64]:
+    y: NDArray[numpy.float64],
+    acts: NDArray[numpy.float64],
+    incumbent: NDArray[numpy.float64] | None,
+) -> NDArray[numpy.float64]:
     """Row statistics `[a y, a (1-y), y, 1-y, b y, b (1-y)]`.
 
     Args:
@@ -79,17 +79,17 @@ def columns(
         An array with one row per observation and the six statistics as
         columns.
     """
-    base = incumbent if incumbent is not None else np.zeros_like(y)
-    return np.column_stack(
+    base = incumbent if incumbent is not None else numpy.zeros_like(y)
+    return numpy.column_stack(
         [acts * y, acts * (1 - y), y, 1 - y, base * y, base * (1 - y)]
     )
 
 
 def diffs(
-    means: NDArray[np.float64],
-    weights: NDArray[np.float64],
+    means: NDArray[numpy.float64],
+    weights: NDArray[numpy.float64],
     with_incumbent: bool,
-) -> NDArray[np.float64]:
+) -> NDArray[numpy.float64]:
     """Differences against each baseline; shape `(R, baselines, grid)`.
 
     Args:
@@ -107,15 +107,15 @@ def diffs(
     rows = [rule, rule - everyone]
     if with_incumbent:
         rows.append(rule - (means[:, [4]] - means[:, [5]] * weights))
-    return np.stack(rows, axis=1)
+    return numpy.stack(rows, axis=1)
 
 
 def resample_means(
-    stats: NDArray[np.float64],
-    groups: NDArray[np.intp] | None,
+    stats: NDArray[numpy.float64],
+    groups: NDArray[numpy.intp] | None,
     replicates: int,
-    rng: np.random.Generator,
-) -> NDArray[np.float64]:
+    rng: numpy.random.Generator,
+) -> NDArray[numpy.float64]:
     """Bootstrap row means, resampling clusters or rows; shape `(B, 6)`.
 
     Args:
@@ -129,24 +129,26 @@ def resample_means(
     """
     n = stats.shape[0]
     if groups is None:
-        types, inverse, counts = np.unique(
+        types, inverse, counts = numpy.unique(
             stats, axis=0, return_inverse=True, return_counts=True
         )
         del inverse
         draws = rng.multinomial(n, counts / n, size=replicates)
         sums = draws @ types
-        result: NDArray[np.float64] = sums / n
+        result: NDArray[numpy.float64] = sums / n
         return result
-    size = int(np.max(groups)) + 1
-    sums_by = np.zeros((size, stats.shape[1]))
-    np.add.at(sums_by, groups, stats)
-    rows_by = np.bincount(groups, minlength=size).astype(float)
-    draws = rng.multinomial(size, np.full(size, 1.0 / size), size=replicates)
-    totals: NDArray[np.float64] = (draws @ sums_by) / (draws @ rows_by)[:, None]
+    size = int(numpy.max(groups)) + 1
+    sums_by = numpy.zeros((size, stats.shape[1]))
+    numpy.add.at(sums_by, groups, stats)
+    rows_by = numpy.bincount(groups, minlength=size).astype(float)
+    draws = rng.multinomial(size, numpy.full(size, 1.0 / size), size=replicates)
+    totals: NDArray[numpy.float64] = (draws @ sums_by) / (draws @ rows_by)[
+        :, None
+    ]
     return totals
 
 
-def factorize(clusters: ArrayLike | None) -> NDArray[np.intp] | None:
+def factorize(clusters: ArrayLike | None) -> NDArray[numpy.intp] | None:
     """Cluster labels as integers `0 .. G-1`, or None.
 
     Args:
@@ -161,10 +163,10 @@ def factorize(clusters: ArrayLike | None) -> NDArray[np.intp] | None:
     """
     if clusters is None:
         return None
-    labels = np.asarray(clusters)
+    labels = numpy.asarray(clusters)
     if labels.ndim != 1:
         raise ValueError("clusters must be one-dimensional")
-    return np.unique(labels, return_inverse=True)[1].astype(np.intp)
+    return numpy.unique(labels, return_inverse=True)[1].astype(numpy.intp)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -216,7 +218,7 @@ class NetBenefitReport:
 
 
 def useful_span(
-    grid: NDArray[np.float64], positive: NDArray[np.bool_]
+    grid: NDArray[numpy.float64], positive: NDArray[numpy.bool_]
 ) -> tuple[float, float] | None:
     """The longest run of grid points where every lower bound is positive.
 
@@ -290,7 +292,7 @@ def net_benefit_band(
     if not 0.0 < alpha < 1.0:
         raise ValueError("alpha must be strictly between 0 and 1")
     qualification.count(replicates, "replicates", minimum=20)
-    grid = np.linspace(low, high, 1 if low == high else points)
+    grid = numpy.linspace(low, high, 1 if low == high else points)
     weights = grid / (1.0 - grid)
     stats = columns(outcomes, actions, base)
     groups = factorize(clusters)
@@ -305,15 +307,15 @@ def net_benefit_band(
         weights,
         base is not None,
     )
-    sd = np.maximum(boot.std(axis=0, ddof=1), MIN_SD)
+    sd = numpy.maximum(boot.std(axis=0, ddof=1), MIN_SD)
     sup = ((boot - point) / sd).reshape(replicates, -1).max(axis=1)
-    critical = float(np.quantile(sup, 1.0 - alpha))
+    critical = float(numpy.quantile(sup, 1.0 - alpha))
     lower = point - critical * sd
     positive = (lower > 0.0).all(axis=0)
     mean_row = stats.mean(axis=0)
     names = BASELINE_NAMES if base is not None else BASELINE_NAMES[:2]
     n_clusters = (
-        int(np.max(groups)) + 1 if groups is not None else len(outcomes)
+        int(numpy.max(groups)) + 1 if groups is not None else len(outcomes)
     )
     claim = USEFUL if bool(positive.all()) else NOT_USEFUL
     return NetBenefitReport(

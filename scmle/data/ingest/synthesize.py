@@ -28,7 +28,7 @@ from scmle.contracts import errors
 from scmle.contracts import qualification
 from scmle.data.admissibility import provenance
 from scmle.data.ingest import asof_view
-from scmle.data.ledger import ledger as ledger_module
+import scmle.data.ledger.ledger
 
 COUNT = "count"
 SUM = "sum"
@@ -704,8 +704,8 @@ def feature_provenance(
 
 
 def register_family(
-    ledger: ledger_module.Ledger, features: FeatureSet
-) -> list[ledger_module.Hypothesis]:
+    ledger: scmle.data.ledger.ledger.Ledger, features: FeatureSet
+) -> list[scmle.data.ledger.ledger.Hypothesis]:
     """Registers every kept feature as a `synthesized` hypothesis.
 
     If the number registered then differs from the declared size,
@@ -722,7 +722,7 @@ def register_family(
     for entry in features.kept():
         registered.append(
             ledger.register(
-                ledger_module.HypothesisSpec.create(
+                scmle.data.ledger.ledger.HypothesisSpec.create(
                     name=f"{entry['name']}~target",
                     family=FAMILY,
                     statistic=STATISTIC,
@@ -738,7 +738,9 @@ def register_family(
     return registered
 
 
-def check_multiplicity(declared: int, ledger: ledger_module.Ledger) -> int:
+def check_multiplicity(
+    declared: int, ledger: scmle.data.ledger.ledger.Ledger
+) -> int:
     """Requires the registered `synthesized` count to equal the declared one.
 
     Args:

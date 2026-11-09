@@ -60,9 +60,9 @@ from typing import Any
 import pandas
 
 from scmle.contracts import errors
-from scmle.contracts import evidence as evidence_module
 from scmle.contracts import qualification
 from scmle.contracts import signing
+import scmle.contracts.evidence
 from scmle.core import randomness
 from scmle.data.ledger import bivariate
 from scmle.data.ledger import online_fdr
@@ -138,7 +138,7 @@ class HypothesisSpec:
             ("null", self.null),
             ("code_hash", self.code_hash),
         ):
-            evidence_module.require_text(value, field)
+            scmle.contracts.evidence.require_text(value, field)
         if self.direction not in bivariate.DIRECTIONS:
             raise ValueError(f"direction must be one of {bivariate.DIRECTIONS}")
         if not isinstance(self.set_id, qualification.SetId):
@@ -803,18 +803,20 @@ class Ledger:
                 already used by a claim or a hypothesis.
         """
         self.require_unfrozen()
-        claim_id = evidence_module.require_text(
+        claim_id = scmle.contracts.evidence.require_text(
             str(body["claim_id"]), "claim_id"
         )
         if claim_id in self.claims or claim_id in self.hypotheses:
             raise LedgerError(f"claim {claim_id!r} is already registered")
         self.claims[claim_id] = {
             "claim_id": claim_id,
-            "kind": evidence_module.require_text(str(body["kind"]), "kind"),
-            "statement": evidence_module.require_text(
+            "kind": scmle.contracts.evidence.require_text(
+                str(body["kind"]), "kind"
+            ),
+            "statement": scmle.contracts.evidence.require_text(
                 str(body["statement"]), "statement"
             ),
-            "sha256": evidence_module.require_text(
+            "sha256": scmle.contracts.evidence.require_text(
                 str(body["sha256"]), "sha256"
             ),
         }

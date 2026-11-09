@@ -6,13 +6,15 @@ import pytest
 
 from scmle import cli
 from scmle.governance import deployment_ledger
-from scmle.operations import controller as controller_module
-from tests.simulation import world as worlds
+import scmle.operations.controller
+import tests.simulation.world
 
 
 @pytest.fixture
 def world(tmp_path):
-    return worlds.World(tmp_path, worlds.make_stream(batches=20, size=20))
+    return tests.simulation.world.World(
+        tmp_path, tests.simulation.world.make_stream(batches=20, size=20)
+    )
 
 
 def test_a_file_is_applied_once_whatever_it_is_called(world):
@@ -73,7 +75,7 @@ def test_an_unreadable_labels_file_is_rejected(world):
 
 
 def test_no_new_data_opens_one_escalation(world):
-    policy = controller_module.ControllerPolicy(max_idle_ticks=2)
+    policy = scmle.operations.controller.ControllerPolicy(max_idle_ticks=2)
     controller = world.controller(policy=policy)
     controller.tick(world.inbox)
     assert not controller.loop.pending_escalations()
@@ -86,7 +88,9 @@ def test_no_new_data_opens_one_escalation(world):
 
 
 def test_labels_that_never_arrive_open_one_escalation(world):
-    policy = controller_module.ControllerPolicy(max_unlabelled_ticks=2)
+    policy = scmle.operations.controller.ControllerPolicy(
+        max_unlabelled_ticks=2
+    )
     controller = world.controller(policy=policy)
     for index in range(4):
         world.deliver(index, labels=False)
@@ -103,7 +107,7 @@ def test_a_halted_loop_is_left_alone(world):
     controller.loop.enter_halt("operator_halt", {"reason": "test"})
     controller.loop.save_state()
     result = world.controller().tick(world.inbox)
-    assert result.status == controller_module.HALTED
+    assert result.status == scmle.operations.controller.HALTED
     assert result.observed == 0
     assert world.controller().loop.batch == 0
 
@@ -117,16 +121,16 @@ def test_a_state_that_trails_the_ledger_halts_instead_of_guessing(world):
     )
     world.deliver(1)
     result = world.controller().tick(world.inbox)
-    assert result.status == controller_module.HALTED
+    assert result.status == scmle.operations.controller.HALTED
     assert result.observed == 0
     assert len(world.controller().loop.ledger.consumed) == 2
 
 
 def test_the_policy_needs_positive_limits():
     with pytest.raises(ValueError):
-        controller_module.ControllerPolicy(max_idle_ticks=0)
+        scmle.operations.controller.ControllerPolicy(max_idle_ticks=0)
     with pytest.raises(ValueError):
-        controller_module.ControllerPolicy(max_unlabelled_ticks=0)
+        scmle.operations.controller.ControllerPolicy(max_unlabelled_ticks=0)
 
 
 def test_the_tick_report_is_json_ready(world):
@@ -148,7 +152,7 @@ def test_the_operate_command_ticks_grants_revokes_and_halts(
 ):
     world.deliver(0)
     keys = tmp_path / "keys.json"
-    keys.write_text(json.dumps(worlds.KEYS))
+    keys.write_text(json.dumps(tests.simulation.world.KEYS))
     assert (
         run(
             "operate",
@@ -165,9 +169,11 @@ def test_the_operate_command_ticks_grants_revokes_and_halts(
     assert tick["observed"] == 1
 
     envelope = tmp_path / "envelope.json"
-    envelope.write_text(json.dumps(worlds.envelope(limit=2).to_dict()))
+    envelope.write_text(
+        json.dumps(tests.simulation.world.envelope(limit=2).to_dict())
+    )
     key = tmp_path / "person.key"
-    key.write_text(worlds.PERSON_KEY)
+    key.write_text(tests.simulation.world.PERSON_KEY)
     assert (
         run(
             "operate",

@@ -30,7 +30,7 @@ import hashlib
 from typing import Any
 from typing import Self
 
-import numpy as np
+import numpy
 from numpy.typing import ArrayLike
 from numpy.typing import NDArray
 
@@ -226,7 +226,7 @@ def odds(t: float) -> float:
     return threshold / (1.0 - threshold)
 
 
-def binary_vector(values: ArrayLike, name: str) -> NDArray[np.float64]:
+def binary_vector(values: ArrayLike, name: str) -> NDArray[numpy.float64]:
     """Checks that `values` is a non-empty 1-d array of zeros and ones.
 
     Args:
@@ -240,17 +240,17 @@ def binary_vector(values: ArrayLike, name: str) -> NDArray[np.float64]:
         ValueError: If the array is not 1-d, is empty, or holds anything
             other than 0 and 1.
     """
-    array = np.asarray(values, dtype=float)
+    array = numpy.asarray(values, dtype=float)
     if array.ndim != 1 or array.size == 0:
         raise ValueError(f"{name} must be a non-empty 1-d array")
-    if not np.isin(array, (0.0, 1.0)).all():
+    if not numpy.isin(array, (0.0, 1.0)).all():
         raise ValueError(f"{name} must hold only 0 and 1")
     return array
 
 
 def pair(
     y: ArrayLike, a: ArrayLike
-) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+) -> tuple[NDArray[numpy.float64], NDArray[numpy.float64]]:
     """Checks and aligns outcomes and actions.
 
     Args:
@@ -285,8 +285,8 @@ def net_benefit(y: ArrayLike, a: ArrayLike, t: float) -> float:
         Net benefit per row.
     """
     outcomes, actions = pair(y, a)
-    tp = float(np.mean(actions * outcomes))
-    fp = float(np.mean(actions * (1.0 - outcomes)))
+    tp = float(numpy.mean(actions * outcomes))
+    fp = float(numpy.mean(actions * (1.0 - outcomes)))
     return tp - odds(t) * fp
 
 
@@ -304,7 +304,7 @@ def net_benefit_all(y: ArrayLike, t: float) -> float:
         Net benefit per row.
     """
     outcomes = binary_vector(y, "y")
-    prevalence = float(np.mean(outcomes))
+    prevalence = float(numpy.mean(outcomes))
     return prevalence - (1.0 - prevalence) * odds(t)
 
 
@@ -333,12 +333,12 @@ def expected_cost(
         The mean of the cost of each row.
     """
     outcomes, actions = pair(y, a)
-    cost = np.where(
+    cost = numpy.where(
         actions == 1.0,
-        np.where(outcomes == 1.0, model.c_11, model.c_10),
-        np.where(outcomes == 1.0, model.c_01, model.c_00),
+        numpy.where(outcomes == 1.0, model.c_11, model.c_10),
+        numpy.where(outcomes == 1.0, model.c_01, model.c_00),
     )
-    return float(np.mean(cost))
+    return float(numpy.mean(cost))
 
 
 def cost_constant(y: ArrayLike, model: DecisionCostModel) -> float:
@@ -353,7 +353,7 @@ def cost_constant(y: ArrayLike, model: DecisionCostModel) -> float:
     Returns:
         The cost of never acting, given the prevalence of `y`.
     """
-    prevalence = float(np.mean(binary_vector(y, "y")))
+    prevalence = float(numpy.mean(binary_vector(y, "y")))
     return model.c_00 * (1.0 - prevalence) + model.c_01 * prevalence
 
 
@@ -373,7 +373,7 @@ def net_benefit_curve(
         A mapping with `threshold` (the grid, flattened) and, for each
         threshold in the same order, `model`, `all` and `none` net benefit.
     """
-    grid = [float(t) for t in np.asarray(thresholds, dtype=float).ravel()]
+    grid = [float(t) for t in numpy.asarray(thresholds, dtype=float).ravel()]
     return {
         "threshold": grid,
         "model": [net_benefit(y, a, t) for t in grid],
@@ -401,8 +401,8 @@ def decision_curve(
         A mapping with `threshold` (the grid, flattened) and, for each
         threshold in the same order, `model`, `all` and `none` net benefit.
     """
-    risk = np.asarray(scores, dtype=float)
-    grid = [float(t) for t in np.asarray(thresholds, dtype=float).ravel()]
+    risk = numpy.asarray(scores, dtype=float)
+    grid = [float(t) for t in numpy.asarray(thresholds, dtype=float).ravel()]
     return {
         "threshold": grid,
         "model": [net_benefit(y, (risk >= t).astype(float), t) for t in grid],

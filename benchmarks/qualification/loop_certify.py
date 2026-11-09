@@ -79,11 +79,11 @@ from benchmarks.qualification import streams
 from scmle.data.detectors import certificates
 from scmle.evaluation import coverage
 from scmle.governance import escalation
-from scmle.governance import loop as loop_module
+import scmle.governance.loop
 from scmle.monitoring import labels
-from scmle.monitoring import monitor as monitor_module
 from scmle.monitoring import reference
 from scmle.monitoring import sequential_tests
+import scmle.monitoring.monitor
 
 STORE_PATH = Path(__file__).with_name("loop_certificates.json")
 DEV_SEED_BASE = 10_000
@@ -164,7 +164,9 @@ def fixed_rule(batch_mean: numpy.ndarray) -> numpy.ndarray:
         A boolean array, True where the mean exceeds
         `R_REF * (1 + performance_tolerance)`.
     """
-    tolerance = monitor_module.MonitoringThresholds().performance_tolerance
+    tolerance = (
+        scmle.monitoring.monitor.MonitoringThresholds().performance_tolerance
+    )
     return batch_mean > R_REF * (1.0 + tolerance)
 
 
@@ -320,7 +322,9 @@ def gate_h3(replicates: int, base: int = 0) -> dict[str, Any]:
         psi = reference.population_stability_index(
             expected / expected.sum(), actual / actual.sum()
         )
-        psi_flag += int(psi >= monitor_module.MonitoringThresholds().psi_high)
+        psi_flag += int(
+            psi >= scmle.monitoring.monitor.MonitoringThresholds().psi_high
+        )
     rate = trigger / replicates
     bound = rate_floor(rate, ALPHA_ALARM, replicates)
     return {
@@ -600,7 +604,7 @@ def run_mnar_loop(seed: int) -> dict[str, Any]:
         )
     )
     charter = types.SimpleNamespace(charter_hash="c" * 64)
-    policy = loop_module.LoopPolicy(
+    policy = scmle.governance.loop.LoopPolicy(
         reference_risk=R_REF,
         tolerance=DELTA,
         r_star=0.6,
@@ -609,11 +613,11 @@ def run_mnar_loop(seed: int) -> dict[str, Any]:
         outcome_window=0,
     )
     with tempfile.TemporaryDirectory() as directory:
-        loop = loop_module.Loop.open(
+        loop = scmle.governance.loop.Loop.open(
             directory,
             charter,
             policy,
-            hooks=loop_module.Hooks(retrain=lambda: "x"),
+            hooks=scmle.governance.loop.Hooks(retrain=lambda: "x"),
         )
         for step in range(stream.spec.batches):
             frame = pandas.DataFrame(
@@ -947,8 +951,8 @@ def sources() -> dict[str, list[Any]]:
             sequential_tests.ConfidenceSequence,
             streams.simulate,
             run_mnar_loop,
-            loop_module.Loop.step,
-            loop_module.Loop.decide,
+            scmle.governance.loop.Loop.step,
+            scmle.governance.loop.Loop.decide,
             gate_h6,
         ],
         "H7": [labels.is_matured, streams.simulate, gate_h7],

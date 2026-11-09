@@ -5,8 +5,8 @@ import pathlib
 
 import support
 
-from scmle.data.charter import decision as decision_module
 from scmle.data.charter import sealing
+import scmle.data.charter.decision
 from scmle.data.framing import costs
 from tests.unit.test_charter_contracts import make_charter
 
@@ -18,8 +18,8 @@ def charter_with_costs(tmp_path, c_fp=1.0, c_fn=2.0):
     model = costs.DecisionCostModel(
         0.0, c_fn, c_fp, 0.0, 0.05, 0.9, human, costs.CostSource.HUMAN
     )
-    layer = decision_module.DecisionLayer(
-        decision_module.DecisionModel("EUR per case")
+    layer = scmle.data.charter.decision.DecisionLayer(
+        scmle.data.charter.decision.DecisionModel("EUR per case")
     )
     path = tmp_path / "charter.json"
     sealing.write_charter(

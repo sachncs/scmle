@@ -9,16 +9,16 @@ from typing import TypeVar
 import pandas
 
 from scmle.api import results
-from scmle.artifacts import bundle as bundle_module
-from scmle.artifacts import store as store_module
+import scmle.artifacts.bundle
+import scmle.artifacts.store
 from scmle.contracts import capabilities
-from scmle.contracts import data as data_contracts
 from scmle.contracts import errors
 from scmle.contracts import events
 from scmle.contracts import experiments
 from scmle.contracts import lineage
-from scmle.contracts import metrics as metric_contracts
 from scmle.contracts import tasks
+import scmle.contracts.data
+import scmle.contracts.metrics
 from scmle.core import limits
 from scmle.core import resource_observation
 from scmle.core import scheduler
@@ -29,8 +29,8 @@ from scmle.data.splitting import splitters
 from scmle.evaluation import metrics
 from scmle.evaluation import selection
 from scmle.experimentation import stores
-from scmle.intelligence import recommendations as recommendations_module
-from scmle.models import registry as registry_module
+import scmle.intelligence.recommendations
+import scmle.models.registry
 
 T = TypeVar("T")
 
@@ -417,7 +417,7 @@ class RunContext:
     """
 
     spec: tasks.ProjectSpec
-    registry: registry_module.ModelRegistry
+    registry: scmle.models.registry.ModelRegistry
     catalog: metrics.MetricCatalog
     policy: selection.SelectionPolicy
     capability_registry: capabilities.CapabilityRegistry = dataclasses.field(
@@ -426,7 +426,7 @@ class RunContext:
     capability_observation: (
         resource_observation.RuntimeResourceObservation | None
     ) = None
-    store: store_module.RunStore | None = None
+    store: scmle.artifacts.store.RunStore | None = None
     log: events.EventLog | None = None
     tracker: stores.ExperimentStore = dataclasses.field(
         default_factory=stores.NullExperimentStore
@@ -446,20 +446,22 @@ class RunContext:
     frame: pandas.DataFrame | None = None
     read_seconds: float = 0.0
     cleaning_notes: list[str] = dataclasses.field(default_factory=list)
-    manifest: data_contracts.DatasetManifest | None = None
+    manifest: scmle.contracts.data.DatasetManifest | None = None
     evidence_graph: lineage.EvidenceGraph = dataclasses.field(
         default_factory=lineage.EvidenceGraph
     )
     task: tasks.TaskType | None = None
-    profile: data_contracts.DatasetProfile | None = None
-    curation: data_contracts.CurationReport | None = None
+    profile: scmle.contracts.data.DatasetProfile | None = None
+    curation: scmle.contracts.data.CurationReport | None = None
     cluster_column: str | None = None
     split: splitters.SplitResult | None = None
     custody: pipeline.CustodyOutcome | None = None
     custody_vault: sealed.CustodyVault | None = None
     plan: experiments.ExperimentPlan | None = None
-    recommendations: tuple[recommendations_module.Recommendation, ...] = ()
-    metric: metric_contracts.Metric | None = None
+    recommendations: tuple[
+        scmle.intelligence.recommendations.Recommendation, ...
+    ] = ()
+    metric: scmle.contracts.metrics.Metric | None = None
     trials: list[experiments.TrialResult] = dataclasses.field(
         default_factory=list
     )
@@ -488,7 +490,7 @@ class RunContext:
     ingest: Any = None
     semi_supervised: dict[str, Any] | None = None
     evaluation: dict[str, Any] | None = None
-    bundle: bundle_module.ModelBundle | None = None
+    bundle: scmle.artifacts.bundle.ModelBundle | None = None
     result: results.RunResult | None = None
     started_at: float = dataclasses.field(default_factory=time.monotonic)
 
@@ -514,7 +516,7 @@ class RunContext:
         return self.started_at + self.spec.resources.time_budget_seconds
 
     @property
-    def run_store(self) -> store_module.RunStore:
+    def run_store(self) -> scmle.artifacts.store.RunStore:
         """The run store; raises for previews that have none."""
         return require(self.store, "store")
 

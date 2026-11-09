@@ -47,11 +47,11 @@ import math
 from pathlib import Path
 from typing import Any
 
-import numpy as np
+import numpy
 from numpy.typing import ArrayLike
 from numpy.typing import NDArray
 
-from scmle.data.charter import decision as charter_decision
+import scmle.data.charter.decision
 from scmle.decision import anytime
 from scmle.decision import design
 
@@ -105,8 +105,8 @@ class Decision:
 
 
 def metric_stream(
-    plan: charter_decision.RolloutPlan,
-    guard: charter_decision.Guardrail | None,
+    plan: scmle.data.charter.decision.RolloutPlan,
+    guard: scmle.data.charter.decision.Guardrail | None,
 ) -> anytime.Stream:
     """The centred pseudo-outcome stream and null of the primary or a guardrail.
 
@@ -132,12 +132,12 @@ def metric_stream(
 
 
 def metric_values(
-    plan: charter_decision.RolloutPlan,
-    guard: charter_decision.Guardrail | None,
-    arm: NDArray[np.float64],
+    plan: scmle.data.charter.decision.RolloutPlan,
+    guard: scmle.data.charter.decision.Guardrail | None,
+    arm: NDArray[numpy.float64],
     outcome: ArrayLike,
     carry: tuple[float, int] = (0.0, 0),
-) -> tuple[NDArray[np.float64], tuple[float, int]]:
+) -> tuple[NDArray[numpy.float64], tuple[float, int]]:
     """Centred pseudo-outcomes of one metric and the updated centre state.
 
     The centre of each unit is the shrunken mean of the outcomes seen before
@@ -159,7 +159,7 @@ def metric_values(
     low, high = (
         (plan.low, plan.high) if guard is None else (guard.low, guard.high)
     )
-    y = (np.asarray(outcome, dtype=float) - low) / (high - low)
+    y = (numpy.asarray(outcome, dtype=float) - low) / (high - low)
     z = anytime.pseudo_outcomes(
         arm, y, plan.assignment_prob, anytime.running_center(y, carry=carry)
     )
@@ -187,7 +187,7 @@ class Rollout:
 
     def __init__(
         self,
-        plan: charter_decision.RolloutPlan,
+        plan: scmle.data.charter.decision.RolloutPlan,
         experiment_id: str,
         level: float,
     ) -> None:
@@ -210,7 +210,7 @@ class Rollout:
         self.target = -math.log(level)
         names = [plan.primary, *(g.name for g in plan.guardrails)]
         self.names = names
-        self.guards: list[charter_decision.Guardrail | None] = [
+        self.guards: list[scmle.data.charter.decision.Guardrail | None] = [
             None,
             *plan.guardrails,
         ]
@@ -221,7 +221,7 @@ class Rollout:
         self.carry: dict[str, tuple[float, int]] = dict.fromkeys(
             names, (0.0, 0)
         )
-        self.primary_z: list[NDArray[np.float64]] = []
+        self.primary_z: list[NDArray[numpy.float64]] = []
         self.units = 0
         self.challenger_units = 0
         self.status = HOLD
@@ -256,7 +256,7 @@ class Rollout:
         """
         if self.status != HOLD:
             return self.decision()
-        a = np.asarray(arm, dtype=float)
+        a = numpy.asarray(arm, dtype=float)
         room = self.plan.n_max - self.units
         a = a[:room]
         supplied = dict(guardrails or {})
@@ -272,21 +272,21 @@ class Rollout:
                 self.plan,
                 guard,
                 a,
-                np.asarray(raw, dtype=float)[:room],
+                numpy.asarray(raw, dtype=float)[:room],
                 self.carry[name],
             )
             self.processes[name].update(values)
             paths.append(self.processes[name].path)
             if guard is None:
                 self.primary_z.append(values)
-        counts = self.challenger_units + np.cumsum(a)
-        totals = self.units + np.arange(1, len(a) + 1)
+        counts = self.challenger_units + numpy.cumsum(a)
+        totals = self.units + numpy.arange(1, len(a) + 1)
         invalid = design.srm_log_bayes_factor(
             counts, totals, self.plan.assignment_prob
         ) >= -math.log(self.plan.srm_level)
-        crossed = (np.vstack(paths) >= self.target).all(axis=0)
-        first_bad = int(np.argmax(invalid)) if invalid.any() else None
-        first_win = int(np.argmax(crossed)) if crossed.any() else None
+        crossed = (numpy.vstack(paths) >= self.target).all(axis=0)
+        first_bad = int(numpy.argmax(invalid)) if invalid.any() else None
+        first_win = int(numpy.argmax(crossed)) if crossed.any() else None
         if first_bad is not None and (
             first_win is None or first_bad <= first_win
         ):
@@ -310,7 +310,11 @@ class Rollout:
         """
         scale = self.plan.high - self.plan.low
         stream = metric_stream(self.plan, None)
-        z = np.concatenate(self.primary_z) if self.primary_z else np.zeros(0)
+        z = (
+            numpy.concatenate(self.primary_z)
+            if self.primary_z
+            else numpy.zeros(0)
+        )
         if self.done_at and self.status in (PROMOTE, HOLD_INVALID):
             z = z[: self.done_at]
         bound = (
@@ -391,11 +395,11 @@ class RollbackMonitor:
         """
         if self.status != HOLD:
             return self.status
-        y = (np.asarray(outcome, dtype=float) - self.low) / (
+        y = (numpy.asarray(outcome, dtype=float) - self.low) / (
             self.high - self.low
         )
         z = anytime.pseudo_outcomes(
-            np.asarray(arm, dtype=float),
+            numpy.asarray(arm, dtype=float),
             y,
             self.new_prob,
             anytime.running_center(y, carry=self.carry),
@@ -405,7 +409,7 @@ class RollbackMonitor:
         hit = self.process.path >= self.target
         if hit.any():
             self.status = ROLLBACK
-            self.done_at = self.units + int(np.argmax(hit)) + 1
+            self.done_at = self.units + int(numpy.argmax(hit)) + 1
         self.units += len(z)
         return self.status
 

@@ -11,8 +11,8 @@ import pytest
 from benchmarks.qualification import streams
 from scmle.contracts import qualification
 from scmle.governance import deployment_ledger
-from scmle.governance import loop as loop_module
 from scmle.governance import never_list
+import scmle.governance.loop
 
 HUMAN_KEY = "human-key"
 SYSTEM_KEY = "system-key"
@@ -37,11 +37,11 @@ def make_policy(**changes):
         "outcome_window": 0,
     }
     values.update(changes)
-    return loop_module.LoopPolicy(**values)
+    return scmle.governance.loop.LoopPolicy(**values)
 
 
 def open_loop(tmp_path, policy=None, hooks=None, **kwargs):
-    return loop_module.Loop.open(
+    return scmle.governance.loop.Loop.open(
         tmp_path / "deploy",
         CHARTER,
         policy or make_policy(),
@@ -135,7 +135,9 @@ def test_a_different_charter_or_policy_is_refused(tmp_path):
     with pytest.raises(
         deployment_ledger.DeploymentLedgerError, match="charter"
     ):
-        loop_module.Loop.open(tmp_path / "deploy", other, make_policy())
+        scmle.governance.loop.Loop.open(
+            tmp_path / "deploy", other, make_policy()
+        )
     with pytest.raises(deployment_ledger.DeploymentLedgerError, match="policy"):
         open_loop(tmp_path, make_policy(r_star=0.04))
 
@@ -153,13 +155,13 @@ def test_state_that_does_not_match_the_ledger_starts_halted(tmp_path):
     loop = open_loop(tmp_path)
     stream = streams.simulate(spec(batches=3, seed=1))
     feed(loop, stream, 0, 2)
-    state = tmp_path / "deploy" / loop_module.STATE_FILE
+    state = tmp_path / "deploy" / scmle.governance.loop.STATE_FILE
     saved = state.read_text()
     feed(loop, stream, 2, 3)
     state.write_text(saved)
     again = open_loop(tmp_path)
     assert again.halted
-    assert again.halt_reason == loop_module.HALT_STATE
+    assert again.halt_reason == scmle.governance.loop.HALT_STATE
     routed = again.observe(
         batch_frame(stream, 0), numpy.zeros(50), ["approve"] * 50
     )
@@ -196,7 +198,9 @@ def test_everything_escalates_until_the_first_calibration(tmp_path):
     data = streams.draw_calibration(3000, 0.05, seed=1)
     result = loop.calibrate(data["score"], data["loss"])
     assert not result.everything_escalates
-    assert (tmp_path / "deploy" / loop_module.RISK_COVERAGE_FILE).exists()
+    assert (
+        tmp_path / "deploy" / scmle.governance.loop.RISK_COVERAGE_FILE
+    ).exists()
     assert loop.tau == result.tau
 
 
@@ -235,7 +239,7 @@ def test_a_stable_stream_raises_no_alarm_and_no_retrain(tmp_path):
     loop = open_loop(tmp_path)
     stream = streams.simulate(spec(batches=60, seed=3, base=0.10))
     result = feed(loop, stream)
-    assert result.status != loop_module.HALTED
+    assert result.status != scmle.governance.loop.HALTED
     assert loop.mechanism.value == "complete"
     assert not rows(loop, deployment_ledger.ALARM) and not rows(
         loop, deployment_ledger.RETRAIN
@@ -249,7 +253,9 @@ def test_an_abrupt_rise_alarms_retrains_and_registers_the_challenger(tmp_path):
         calls.append(1)
         return "challenger-1"
 
-    loop = open_loop(tmp_path, hooks=loop_module.Hooks(retrain=retrain))
+    loop = open_loop(
+        tmp_path, hooks=scmle.governance.loop.Hooks(retrain=retrain)
+    )
     stream = streams.simulate(
         spec(kind="abrupt", batches=80, change=30, delta=0.25, seed=4)
     )
@@ -285,7 +291,9 @@ def test_covariate_drift_alone_does_not_retrain(tmp_path):
 def test_mnar_without_an_audit_slice_never_retrains_and_halts_on_an_alarm(
     tmp_path,
 ):
-    loop = open_loop(tmp_path, hooks=loop_module.Hooks(retrain=lambda: "x"))
+    loop = open_loop(
+        tmp_path, hooks=scmle.governance.loop.Hooks(retrain=lambda: "x")
+    )
     config = spec(
         kind="abrupt",
         labels="mnar",
@@ -319,7 +327,9 @@ def test_mnar_without_an_audit_slice_never_retrains_and_halts_on_an_alarm(
         for e in loop.pending_escalations()
     )
     label_file = json.loads(
-        (tmp_path / "deploy" / loop_module.LABEL_MECHANISM_FILE).read_text()
+        (
+            tmp_path / "deploy" / scmle.governance.loop.LABEL_MECHANISM_FILE
+        ).read_text()
     )
     assert label_file["actions_permitted"] is False
 
@@ -328,7 +338,7 @@ def test_mar_with_logged_propensity_still_acts(tmp_path):
     loop = open_loop(
         tmp_path,
         make_policy(epsilon=0.1),
-        hooks=loop_module.Hooks(retrain=lambda: "c"),
+        hooks=scmle.governance.loop.Hooks(retrain=lambda: "c"),
     )
     config = spec(
         kind="abrupt",
@@ -449,7 +459,7 @@ def test_selective_risk_above_target_halts_and_coverage_goes_to_zero(tmp_path):
     stream = streams.simulate(spec(base=0.3, batches=60, seed=8))
     feed(loop, stream)
     assert loop.ledger.halted
-    assert loop.halt_reason == loop_module.HALT_SELECTIVE
+    assert loop.halt_reason == scmle.governance.loop.HALT_SELECTIVE
     after = loop.observe(batch_frame(stream, 0), numpy.zeros(50), ["a"] * 50)
     assert after.routing.coverage == 0.0
     assert any(
@@ -548,22 +558,28 @@ def test_rejecting_or_undecided_replies_apply_the_safe_default(tmp_path):
 )
 def test_replies_that_do_not_fit_are_refused(tmp_path, changes, message):
     loop, esc = pending_one(tmp_path)
-    with pytest.raises(loop_module.ReplyRefused, match=message):
+    with pytest.raises(scmle.governance.loop.ReplyRefused, match=message):
         loop.reply(esc.id, reply_to(esc, **changes))
     assert len(loop.pending_escalations()) == 1
 
 
 def test_signature_key_and_system_key_checks(tmp_path):
     loop, esc = pending_one(tmp_path)
-    with pytest.raises(loop_module.ReplyRefused, match="system holds"):
+    with pytest.raises(
+        scmle.governance.loop.ReplyRefused, match="system holds"
+    ):
         loop.reply(esc.id, reply_to(esc, key=SYSTEM_KEY))
-    with pytest.raises(loop_module.ReplyRefused, match="no verification key"):
+    with pytest.raises(
+        scmle.governance.loop.ReplyRefused, match="no verification key"
+    ):
         loop.reply(esc.id, reply_to(esc, key="unknown-person-key"))
     forged = reply_to(esc).to_dict()
     forged["statement"] = "changed after signing"
-    with pytest.raises(loop_module.ReplyRefused, match="signature"):
+    with pytest.raises(scmle.governance.loop.ReplyRefused, match="signature"):
         loop.reply(esc.id, deployment_ledger.Attestation.from_dict(forged))
-    with pytest.raises(loop_module.ReplyRefused, match="not a pending"):
+    with pytest.raises(
+        scmle.governance.loop.ReplyRefused, match="not a pending"
+    ):
         loop.reply("esc-0", reply_to(esc))
 
 
@@ -590,8 +606,8 @@ def test_a_tampered_ledger_halts_the_loop(tmp_path):
     lines = path.read_text().splitlines()
     path.write_text("\n".join([lines[0], *lines[2:]]) + "\n")
     result = loop.step()
-    assert result.status == loop_module.HALTED
-    assert loop.halt_reason == loop_module.HALT_LEDGER
+    assert result.status == scmle.governance.loop.HALTED
+    assert loop.halt_reason == scmle.governance.loop.HALT_LEDGER
     assert (
         loop.observe(
             batch_frame(stream, 0), numpy.zeros(50), ["a"] * 50
@@ -675,7 +691,7 @@ def test_high_impact_answer_is_blocked_in_routing_and_guarded_as_an_action(
 def test_the_system_cannot_attest_for_itself(tmp_path):
     loop, esc = pending_one(tmp_path)
     assert not hasattr(loop, "sign") and not hasattr(loop, "attest")
-    with pytest.raises(loop_module.ReplyRefused):
+    with pytest.raises(scmle.governance.loop.ReplyRefused):
         loop.reply(esc.id, reply_to(esc, key=SYSTEM_KEY))
     environment_key = "env-key"
     os.environ["SCMLE_SIGNING_KEY"] = environment_key
@@ -686,7 +702,7 @@ def test_the_system_cannot_attest_for_itself(tmp_path):
                 types.SimpleNamespace(promote=lambda *a, **k: 1), "m", 3, None
             )
         esc2 = other.pending_escalations()[0]
-        with pytest.raises(loop_module.ReplyRefused):
+        with pytest.raises(scmle.governance.loop.ReplyRefused):
             other.reply(
                 esc2.id,
                 reply_to(esc2, key=environment_key),
@@ -722,7 +738,7 @@ def test_attestation_is_specific_to_its_exact_request(tmp_path):
 
 def test_an_expired_attestation_no_longer_allows(tmp_path):
     clock = {"today": TODAY}
-    loop = loop_module.Loop.open(
+    loop = scmle.governance.loop.Loop.open(
         tmp_path / "d",
         CHARTER,
         make_policy(),
@@ -744,7 +760,7 @@ def test_an_expired_attestation_no_longer_allows(tmp_path):
 
 
 def single_use_loop(tmp_path):
-    return loop_module.Loop.open(
+    return scmle.governance.loop.Loop.open(
         tmp_path / "d",
         CHARTER,
         make_policy(),
@@ -809,7 +825,7 @@ def test_an_uncertified_alarm_escalates_instead_of_retraining(tmp_path):
     loop = open_loop(
         tmp_path,
         make_policy(alarm_gates_retrain=False),
-        hooks=loop_module.Hooks(retrain=lambda: calls.append(1)),
+        hooks=scmle.governance.loop.Hooks(retrain=lambda: calls.append(1)),
     )
     stream = streams.simulate(
         spec(kind="abrupt", batches=80, change=30, delta=0.25, seed=4)

@@ -11,11 +11,11 @@ from scmle import cli
 from scmle.contracts import qualification
 from scmle.data.admissibility import provenance
 from scmle.data.ingest import asof_view
-from scmle.data.ingest import budget as budgets
-from scmle.data.ingest import plan as ingest_plan
 from scmle.data.ingest import profile
 from scmle.data.ingest import reconcile
 from scmle.data.ingest import synthesize
+import scmle.data.ingest.budget
+import scmle.data.ingest.plan
 from scmle.data.readers import connectors
 
 SEED = 20240601
@@ -78,15 +78,15 @@ def frame_of(db, table, order):
 
 
 def run_pipeline(db, tmp_path):
-    plan = ingest_plan.IngestPlan(
+    plan = scmle.data.ingest.plan.IngestPlan(
         tmp_path / "ingest",
         db.factory,
-        ingest_plan.IngestSettings(
+        scmle.data.ingest.plan.IngestSettings(
             tables=("customers", "orders", "events"),
             unit="customer",
             target_table="customers",
         ),
-        budgets.IngestBudget(),
+        scmle.data.ingest.budget.IngestBudget(),
     )
     summary = plan.run_all()
     note = provenance.Attestation(
@@ -257,7 +257,7 @@ def test_cli_source_is_read_only(tmp_path):
     keeper.execute("INSERT INTO t VALUES (1)")
     keeper.commit()
     keeper.close()
-    connection = ingest_plan.sqlite_factory(path)()
+    connection = scmle.data.ingest.plan.sqlite_factory(path)()
     try:
         connection.execute("INSERT INTO t VALUES (2)")
     except sqlite3.OperationalError:

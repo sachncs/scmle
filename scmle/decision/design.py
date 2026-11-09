@@ -15,7 +15,7 @@ import hashlib
 import math
 from typing import Any
 
-import numpy as np
+import numpy
 from numpy.typing import ArrayLike
 from numpy.typing import NDArray
 from scipy import special
@@ -32,7 +32,7 @@ HASH_BYTES = 8
 
 def assign(
     unit_ids: ArrayLike, salt: str, assignment_prob: float
-) -> NDArray[np.float64]:
+) -> NDArray[numpy.float64]:
     """1 for the challenger, 0 for the champion, by a salted hash of the id.
 
     The hash is SHA-256 over ``salt|id``; its first eight bytes, read as an
@@ -58,13 +58,13 @@ def assign(
     if not salt.strip():
         raise ValueError("salt must not be blank")
     out = []
-    for unit in np.asarray(unit_ids).ravel():
+    for unit in numpy.asarray(unit_ids).ravel():
         digest = hashlib.sha256(f"{salt}|{unit}".encode()).digest()
         value = int.from_bytes(digest[:HASH_BYTES], "big") / 2.0 ** (
             8 * HASH_BYTES
         )
         out.append(1.0 if value < q else 0.0)
-    return np.array(out)
+    return numpy.array(out)
 
 
 def fixed_horizon_rows(
@@ -130,7 +130,7 @@ def srm_p_value(challenger: int, total: int, assignment_prob: float) -> float:
 
 def srm_log_bayes_factor(
     challenger: ArrayLike, total: ArrayLike, assignment_prob: float
-) -> NDArray[np.float64]:
+) -> NDArray[numpy.float64]:
     """Log Bayes factor of a uniform-prior allocation against a fixed rate.
 
     The numerator is the likelihood of the observed assignments averaged
@@ -151,10 +151,10 @@ def srm_log_bayes_factor(
         The log Bayes factor, one value per element of the broadcast
         counts.
     """
-    k = np.asarray(challenger, dtype=float)
-    n = np.asarray(total, dtype=float)
+    k = numpy.asarray(challenger, dtype=float)
+    n = numpy.asarray(total, dtype=float)
     q = assignment_prob
-    result: NDArray[np.float64] = (
+    result: NDArray[numpy.float64] = (
         special.betaln(k + 1.0, n - k + 1.0)
         - k * math.log(q)
         - (n - k) * math.log1p(-q)
@@ -225,12 +225,12 @@ def simulate_stopping(
     paths = anytime.centered_paths(arm, y, q, scaled)
     hit = paths >= -math.log(chosen)
     crossed = hit.any(axis=1)
-    when = np.where(crossed, hit.argmax(axis=1) + 1, plan.n_max)
+    when = numpy.where(crossed, hit.argmax(axis=1) + 1, plan.n_max)
     return {
         "crossed_share": float(crossed.mean()),
         "mean_units": float(when[crossed].mean()) if crossed.any() else None,
         "median_units": (
-            float(np.median(when[crossed])) if crossed.any() else None
+            float(numpy.median(when[crossed])) if crossed.any() else None
         ),
         "n_max": plan.n_max,
         "runs": runs,

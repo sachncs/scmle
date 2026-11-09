@@ -7,7 +7,7 @@ from typing import Any
 import numpy
 import pandas
 
-from scmle.artifacts import bundle as bundle_module
+import scmle.artifacts.bundle
 from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.evaluation import metrics
@@ -372,7 +372,7 @@ class ModelMonitor:
 
     def __init__(
         self,
-        bundle: bundle_module.ModelBundle,
+        bundle: scmle.artifacts.bundle.ModelBundle,
         thresholds: MonitoringThresholds | None = None,
     ) -> None:
         """Initializes the monitor.

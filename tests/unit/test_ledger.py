@@ -10,11 +10,11 @@ import pytest
 from scmle.contracts import errors
 from scmle.contracts import qualification
 from scmle.data.ledger import bivariate
-from scmle.data.ledger import ledger as ledger_module
 from scmle.data.ledger import online_fdr
+import scmle.data.ledger.ledger
 from tests.unit.test_charter_contracts import make_charter
 
-L = ledger_module
+L = scmle.data.ledger.ledger
 F = Fraction
 
 

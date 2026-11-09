@@ -31,7 +31,7 @@ import dataclasses
 import hashlib
 from typing import Any
 
-import numpy as np
+import numpy
 from numpy.typing import ArrayLike
 from numpy.typing import NDArray
 from scipy import stats
@@ -79,7 +79,7 @@ class ClusterTest:
     clusters: int
 
 
-def vector(values: ArrayLike, name: str) -> NDArray[np.float64]:
+def vector(values: ArrayLike, name: str) -> NDArray[numpy.float64]:
     """Converts `values` to a non-empty 1-d float array.
 
     Args:
@@ -92,7 +92,7 @@ def vector(values: ArrayLike, name: str) -> NDArray[np.float64]:
     Raises:
         ValueError: If the array is not 1-d or is empty.
     """
-    array = np.asarray(values, dtype=float)
+    array = numpy.asarray(values, dtype=float)
     if array.ndim != 1 or array.size == 0:
         raise ValueError(f"{name} must be a non-empty 1-d array")
     return array
@@ -100,7 +100,7 @@ def vector(values: ArrayLike, name: str) -> NDArray[np.float64]:
 
 def paired_difference(
     y: ArrayLike, a: ArrayLike, b: ArrayLike, t: float
-) -> NDArray[np.float64]:
+) -> NDArray[numpy.float64]:
     """Computes the per-row gain `d_i(t)` of the model rule over the baseline.
 
     Args:
@@ -142,16 +142,18 @@ def cluster_test(d: ArrayLike, clusters: ArrayLike) -> ClusterTest:
     codes = factorize(clusters)[0]
     if codes.shape != values.shape:
         raise ValueError("d and clusters must have the same length")
-    g = int(np.max(codes)) + 1
+    g = int(numpy.max(codes)) + 1
     if g < 2:
         raise ValueError("at least two clusters are needed")
     n = values.size
     mean = float(values.mean())
-    sums = np.bincount(codes, weights=values - mean, minlength=g)
-    variance = g / (g - 1) * float(np.sum(sums**2)) / n**2
-    se = float(np.sqrt(variance))
+    sums = numpy.bincount(codes, weights=values - mean, minlength=g)
+    variance = g / (g - 1) * float(numpy.sum(sums**2)) / n**2
+    se = float(numpy.sqrt(variance))
     if se == 0.0:
-        statistic = 0.0 if mean == 0.0 else float(np.copysign(np.inf, mean))
+        statistic = (
+            0.0 if mean == 0.0 else float(numpy.copysign(numpy.inf, mean))
+        )
         p_value = 0.5 if mean == 0.0 else float(mean < 0)
     else:
         statistic = mean / se
@@ -159,7 +161,7 @@ def cluster_test(d: ArrayLike, clusters: ArrayLike) -> ClusterTest:
     return ClusterTest(mean, se, g - 1, statistic, p_value, n, g)
 
 
-def factorize(clusters: ArrayLike) -> tuple[NDArray[np.intp], int]:
+def factorize(clusters: ArrayLike) -> tuple[NDArray[numpy.intp], int]:
     """Codes the cluster labels as consecutive integers.
 
     Args:
@@ -172,11 +174,13 @@ def factorize(clusters: ArrayLike) -> tuple[NDArray[np.intp], int]:
     Raises:
         ValueError: If `clusters` is not 1-d.
     """
-    labels = np.asarray(clusters)
+    labels = numpy.asarray(clusters)
     if labels.ndim != 1:
         raise ValueError("clusters must be 1-d")
-    codes = np.unique(labels, return_inverse=True)[1]
-    return codes.astype(np.intp), int(np.max(codes)) + 1 if codes.size else 0
+    codes = numpy.unique(labels, return_inverse=True)[1]
+    return codes.astype(numpy.intp), int(
+        numpy.max(codes)
+    ) + 1 if codes.size else 0
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -226,14 +230,14 @@ def selective_labels(observed: ArrayLike, b: ArrayLike) -> Selectivity:
         ValueError: If `observed` and `b` differ in length. A `b` that is
             not a non-empty 1-d array of zeros and ones also raises it.
     """
-    seen = np.asarray(observed).astype(bool)
+    seen = numpy.asarray(observed).astype(bool)
     base = costs.binary_vector(b, "b").astype(bool)
     if seen.shape != base.shape:
         raise ValueError("observed and b must have the same length")
     n1, n0 = int(base.sum()), int((~base).sum())
     if min(n1, n0) < MIN_ARM_ROWS:
         return Selectivity(
-            False, np.nan, np.nan, 0.0, 1.0, LABEL_TOLERANCE, LABEL_ALPHA
+            False, numpy.nan, numpy.nan, 0.0, 1.0, LABEL_TOLERANCE, LABEL_ALPHA
         )
     miss0 = int((~seen[~base]).sum())
     miss1 = int((~seen[base]).sum())
@@ -274,16 +278,18 @@ def profile_on_exploration(
         labels are selective or no outcome is observed, because the observed
         rows are then a biased sample of the ones it acted on.
     """
-    outcomes = np.asarray(y, dtype=float)
-    mask = ~np.isnan(outcomes) if observed is None else np.asarray(observed)
+    outcomes = numpy.asarray(y, dtype=float)
+    mask = (
+        ~numpy.isnan(outcomes) if observed is None else numpy.asarray(observed)
+    )
     selectivity = selective_labels(mask, b)
-    grid = np.linspace(model.t_lo, model.t_hi, 5)
+    grid = numpy.linspace(model.t_lo, model.t_hi, 5)
     profile: dict[str, Any] = {
         "selective_labels": selectivity.to_dict(),
         "thresholds": [float(t) for t in grid],
         "net_benefit_none": [costs.net_benefit_none()] * len(grid),
     }
-    base = np.asarray(b, dtype=float)[mask.astype(bool)]
+    base = numpy.asarray(b, dtype=float)[mask.astype(bool)]
     seen = outcomes[mask.astype(bool)]
     if seen.size:
         profile["net_benefit_all"] = [
@@ -522,21 +528,21 @@ class BaselineGuard:
             issued, when outcomes are selective or the observed rows span
             fewer than `MIN_CLUSTERS` clusters.
         """
-        outcomes = np.asarray(y, dtype=float)
+        outcomes = numpy.asarray(y, dtype=float)
         mask = (
-            ~np.isnan(outcomes)
+            ~numpy.isnan(outcomes)
             if observed is None
-            else np.asarray(observed).astype(bool)
+            else numpy.asarray(observed).astype(bool)
         )
         selectivity = selective_labels(mask, b)
-        labels = np.asarray(clusters)
+        labels = numpy.asarray(clusters)
         reasons: list[str] = []
         if selectivity.flagged:
             reasons.append(
                 "outcomes are observed depending on the baseline decision "
                 "(selective labels); the naive comparison is biased"
             )
-        n_clusters = int(np.unique(labels[mask]).size) if mask.any() else 0
+        n_clusters = int(numpy.unique(labels[mask]).size) if mask.any() else 0
         if n_clusters < MIN_CLUSTERS:
             reasons.append(
                 f"{n_clusters} clusters is below the measured minimum of "
@@ -548,8 +554,8 @@ class BaselineGuard:
                 cluster_test(
                     paired_difference(
                         outcomes[mask],
-                        np.asarray(a)[mask],
-                        np.asarray(b)[mask],
+                        numpy.asarray(a)[mask],
+                        numpy.asarray(b)[mask],
                         t,
                     ),
                     labels[mask],
@@ -605,7 +611,7 @@ class BaselineGuard:
             qualification.Check(
                 check_id=f"{CHECK_PREFIX}:delta@t={t:.4f}",
                 null_hypothesis=f"Delta(t) <= 0 at t = {t:.4f}",
-                statistic=e.statistic if np.isfinite(e.statistic) else 0.0,
+                statistic=e.statistic if numpy.isfinite(e.statistic) else 0.0,
                 p_value=e.p_value,
                 interval=None,
                 effect=e.mean,

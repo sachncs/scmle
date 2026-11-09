@@ -15,8 +15,8 @@ from typing import TypeVar
 from scmle.contracts import errors
 
 if TYPE_CHECKING:
-    from scmle.core import context as context_module
-    from scmle.core import state as run_state
+    import scmle.core.context
+    import scmle.core.state
 
 
 class WorkflowStage(Protocol):
@@ -28,10 +28,10 @@ class WorkflowStage(Protocol):
     without introducing an inheritance requirement into the extension point.
     """
 
-    state: ClassVar["run_state.RunState"]
+    state: ClassVar["scmle.core.state.RunState"]
     requires: ClassVar[tuple[type["WorkflowStage"], ...]]
 
-    def describe(self, context: "context_module.RunContext") -> str:
+    def describe(self, context: "scmle.core.context.RunContext") -> str:
         """Returns the reason recorded on stage entry.
 
         Args:
@@ -41,7 +41,7 @@ class WorkflowStage(Protocol):
             The reason text attached to the stage's state transition.
         """
 
-    def execute(self, context: "context_module.RunContext") -> None:
+    def execute(self, context: "scmle.core.context.RunContext") -> None:
         """Executes the stage against the shared run context.
 
         Args:

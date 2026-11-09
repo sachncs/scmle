@@ -12,7 +12,7 @@ from scmle.contracts import tasks
 from scmle.data.admissibility import screen
 from scmle.data.profiling import profiler
 from scmle.data.readers import tabular
-from scmle.data.validation import target as target_module
+import scmle.data.validation.target
 
 SMALL_BUDGET = 2
 LARGE_BUDGET = 900
@@ -78,7 +78,9 @@ def profile_of(frame, budget):
         data=tasks.DataSpec(uri="m", target="y"),
         resources=tasks.ResourceSpec(time_budget_seconds=budget),
     )
-    resolved = target_module.TaskResolver(spec).resolve(frame["y"])
+    resolved = scmle.data.validation.target.TaskResolver(spec).resolve(
+        frame["y"]
+    )
     manifest = tabular.build_manifest(frame, "y")
     return profiler.DatasetProfiler(spec).profile(frame, manifest, resolved)
 

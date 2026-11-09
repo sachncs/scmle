@@ -16,7 +16,7 @@ from sklearn import linear_model
 from sklearn import metrics as sk_metrics
 from sklearn import model_selection
 
-from scmle.contracts import metrics as metric_contracts
+import scmle.contracts.metrics
 from scmle.evaluation import balance
 
 TOP_SHARE = 0.3
@@ -224,7 +224,7 @@ def check_propensity(
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class UpliftMetric(metric_contracts.Metric):
+class UpliftMetric(scmle.contracts.metrics.Metric):
     """A metric of how well predicted uplift ranks real incremental response.
 
     Attributes:

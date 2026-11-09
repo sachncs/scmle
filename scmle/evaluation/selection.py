@@ -8,7 +8,7 @@ from scmle.contracts import experiments
 from scmle.contracts import metrics
 from scmle.contracts import tasks
 from scmle.evaluation import comparison
-from scmle.models import registry as registry_module
+import scmle.models.registry
 
 SCORE_PRECISION = 12
 BASELINE = "dummy"
@@ -28,7 +28,7 @@ class SelectionPolicy(abc.ABC):
         self,
         trials: list[experiments.TrialResult],
         metric: metrics.Metric,
-        registry: registry_module.ModelRegistry,
+        registry: scmle.models.registry.ModelRegistry,
     ) -> list[experiments.TrialResult]:
         """Orders the eligible trials best first.
 
@@ -48,7 +48,7 @@ class SelectionPolicy(abc.ABC):
         self,
         trials: list[experiments.TrialResult],
         metric: metrics.Metric,
-        registry: registry_module.ModelRegistry,
+        registry: scmle.models.registry.ModelRegistry,
     ) -> experiments.TrialResult:
         """Returns the best-ranked trial.
 
@@ -152,7 +152,7 @@ class BestMeanPolicy(SelectionPolicy):
         self,
         trials: list[experiments.TrialResult],
         metric: metrics.Metric,
-        registry: registry_module.ModelRegistry,
+        registry: scmle.models.registry.ModelRegistry,
     ) -> list[experiments.TrialResult]:
         """Sorts by score, resolving ties with the configured tie-breaker.
 

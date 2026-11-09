@@ -13,15 +13,15 @@ from scmle.contracts import tasks
 from scmle.data.curation import preprocessing
 from scmle.governance import deployment_ledger
 from scmle.governance import lifecycle
-from scmle.governance import loop as loop_module
 from scmle.governance import never_list
-from scmle.governance import registry as registry_module
-from scmle.models import registry as models_module
+import scmle.governance.loop
+import scmle.governance.registry
+import scmle.models.registry
 from tests.unit import test_loop
 
 APPROVAL_KEY = "promotion-review-key"
 PLAN = data.FeaturePlan(("a", "b"), ())
-MODELS = models_module.ModelRegistry.with_builtins()
+MODELS = scmle.models.registry.ModelRegistry.with_builtins()
 
 
 def halted_loop(tmp_path, hooks=None):
@@ -42,7 +42,9 @@ def test_a_halt_writes_one_open_incident_row(tmp_path):
     incidents = test_loop.rows(loop, deployment_ledger.INCIDENT)
     assert len(incidents) == 1
     assert incidents[0]["body"]["status"] == "open"
-    assert incidents[0]["body"]["reason"] == loop_module.HALT_SELECTIVE
+    assert (
+        incidents[0]["body"]["reason"] == scmle.governance.loop.HALT_SELECTIVE
+    )
     loop.ledger.verify()
 
 
@@ -53,8 +55,8 @@ def test_the_open_incident_hook_runs_after_the_ledger_row(tmp_path):
         text = (tmp_path / "deploy" / deployment_ledger.FILE_NAME).read_text()
         seen.append((reason, text.count('"kind": "incident"')))
 
-    halted_loop(tmp_path, loop_module.Hooks(open_incident=hook))
-    assert seen == [(loop_module.HALT_SELECTIVE, 1)]
+    halted_loop(tmp_path, scmle.governance.loop.Hooks(open_incident=hook))
+    assert seen == [(scmle.governance.loop.HALT_SELECTIVE, 1)]
 
 
 def feedback_groups(gamma):
@@ -66,7 +68,9 @@ def feedback_groups(gamma):
 
 def read_mechanism(loop):
     return json.loads(
-        (loop.directory / loop_module.LABEL_MECHANISM_FILE).read_text()
+        (
+            loop.directory / scmle.governance.loop.LABEL_MECHANISM_FILE
+        ).read_text()
     )
 
 
@@ -140,12 +144,12 @@ def bundle_of(frame):
 
 
 def approval_for(record):
-    return registry_module.PromotionApproval(
+    return scmle.governance.registry.PromotionApproval(
         model=record.model,
         version=record.version,
         content_id=record.content_id,
         reviewer="unit-reviewer",
-        decision=registry_module.PromotionDecision.APPROVED,
+        decision=scmle.governance.registry.PromotionDecision.APPROVED,
         reason="verified unit fixture",
         evidence=("unit-evidence.json",),
         approved_at="2026-10-20T00:00:00+00:00",
@@ -163,7 +167,7 @@ def exported(tmp_path_factory):
 
 def guarded(tmp_path, exported):
     loop = test_loop.open_loop(tmp_path)
-    store = registry_module.ModelRegistryStore(tmp_path / "registry")
+    store = scmle.governance.registry.ModelRegistryStore(tmp_path / "registry")
     loop.guard_registry(store)
     first = store.register("m", exported[0], trusted=True)
     second = store.register("m", exported[1], trusted=True)
@@ -196,8 +200,8 @@ def test_an_unattested_champion_move_is_refused_and_escalated(
 
 def test_staging_aliases_stay_free(tmp_path, exported):
     store = guarded(tmp_path, exported)[1]
-    store.promote("m", 2, alias=registry_module.CHALLENGER)
-    assert store.aliases("m") == {registry_module.CHALLENGER: 2}
+    store.promote("m", 2, alias=scmle.governance.registry.CHALLENGER)
+    assert store.aliases("m") == {scmle.governance.registry.CHALLENGER: 2}
 
 
 def test_promote_challenger_needs_the_attestation_and_the_approval(
@@ -205,7 +209,7 @@ def test_promote_challenger_needs_the_attestation_and_the_approval(
 ):
     loop, store, *records = guarded(tmp_path, exported)
     second = records[1]
-    store.promote("m", 2, alias=registry_module.CHALLENGER)
+    store.promote("m", 2, alias=scmle.governance.registry.CHALLENGER)
     manager = lifecycle.LifecycleManager(store, "m", str(tmp_path / "work"))
     approval = approval_for(second)
     with pytest.raises(never_list.AttestationRequired):
@@ -252,7 +256,7 @@ def test_a_guarded_loop_move_spends_a_single_use_attestation_once(
     tmp_path, exported
 ):
     loop = test_loop.open_loop(tmp_path, single_use_attestations=True)
-    store = registry_module.ModelRegistryStore(tmp_path / "registry")
+    store = scmle.governance.registry.ModelRegistryStore(tmp_path / "registry")
     loop.guard_registry(store)
     record = store.register("m", exported[0], trusted=True)
     approval = approval_for(record)
@@ -268,14 +272,14 @@ def test_a_refused_approval_does_not_spend_a_single_use_attestation(
     tmp_path, exported
 ):
     loop = test_loop.open_loop(tmp_path, single_use_attestations=True)
-    store = registry_module.ModelRegistryStore(tmp_path / "registry")
+    store = scmle.governance.registry.ModelRegistryStore(tmp_path / "registry")
     loop.guard_registry(store)
     record = store.register("m", exported[0], trusted=True)
     approval = approval_for(record)
     with pytest.raises(never_list.AttestationRequired):
         store.promote("m", 1, approval=approval, signing_key=APPROVAL_KEY)
     approve_pending(loop)
-    with pytest.raises(registry_module.errors.ArtifactError):
+    with pytest.raises(scmle.governance.registry.errors.ArtifactError):
         store.promote("m", 1, approval=None, signing_key=APPROVAL_KEY)
     assert test_loop.rows(loop, deployment_ledger.ATTESTATION_USED) == []
     store.promote("m", 1, approval=approval, signing_key=APPROVAL_KEY)

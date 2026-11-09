@@ -7,7 +7,7 @@ import numpy
 import pandas
 import pytest
 
-from scmle.artifacts import bundle as bundle_module
+import scmle.artifacts.bundle
 from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.contracts import tasks
@@ -44,7 +44,7 @@ def classifier():
         tasks.TaskType.BINARY,
         0,
     ).fit(features, frame.approved)
-    bundle = bundle_module.ModelBundle.create(
+    bundle = scmle.artifacts.bundle.ModelBundle.create(
         fitted,
         PLAN,
         features,
@@ -144,7 +144,7 @@ def test_regression_aims_for_a_range():
         tasks.TaskType.REGRESSION,
         0,
     ).fit(features, target)
-    bundle = bundle_module.ModelBundle.create(
+    bundle = scmle.artifacts.bundle.ModelBundle.create(
         fitted, PLAN, features, "y", "regression", "rmse", "linear"
     )
     row = features.iloc[0].to_dict()

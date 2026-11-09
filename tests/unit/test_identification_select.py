@@ -6,7 +6,7 @@ import inspect
 import numpy
 import pytest
 
-from scmle.data.admissibility import dag as dag_module
+import scmle.data.admissibility.dag
 from scmle.data.charter import causal
 from scmle.data.identification import select
 
@@ -88,7 +88,7 @@ def test_no_chartered_order_uses_the_registry_order_and_says_so():
 
 
 def test_a_declared_dag_checks_the_adjustment_set():
-    confounded = dag_module.Dag.build(
+    confounded = scmle.data.admissibility.dag.Dag.build(
         source="test",
         edges=(("age", "t"), ("age", "y"), ("t", "y"), ("u", "t"), ("u", "y")),
         latent=("u",),
@@ -104,7 +104,7 @@ def test_a_declared_dag_checks_the_adjustment_set():
     assert plan.status == select.NOT_IDENTIFIED
     reason = plan.verdict("backdoor_aipw").reasons[0]
     assert "not a valid back-door set" in reason
-    open_graph = dag_module.Dag.build(
+    open_graph = scmle.data.admissibility.dag.Dag.build(
         source="test",
         edges=(("age", "t"), ("age", "y"), ("t", "y")),
     )

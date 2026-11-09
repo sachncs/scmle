@@ -14,7 +14,7 @@ from scmle.data.detectors import labels
 from scmle.data.detectors import missingness
 from scmle.data.detectors import outliers
 from scmle.data.detectors import sentinels
-from scmle.data.splitting import duplicates as split_duplicates
+import scmle.data.splitting.duplicates
 
 
 @dataclasses.dataclass(frozen=True)
@@ -47,7 +47,7 @@ SPECS: dict[str, DetectorSpec] = {
         DetectorSpec("f5-sentinel", (sentinels,), ("sentinel",)),
         DetectorSpec(
             "f5-duplicates",
-            (duplicates, split_duplicates),
+            (duplicates, scmle.data.splitting.duplicates),
             ("duplicate_exact", "duplicate_near"),
         ),
         DetectorSpec(

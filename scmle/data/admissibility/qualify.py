@@ -34,13 +34,13 @@ from pathlib import Path
 import pandas
 
 from scmle.contracts import qualification
-from scmle.data.admissibility import attestations as attestations_module
-from scmle.data.admissibility import dag as dag_module
 from scmle.data.admissibility import independence
 from scmle.data.admissibility import provenance
 from scmle.data.admissibility import rules
 from scmle.data.admissibility import screen
-from scmle.data.charter import causal as causal_module
+import scmle.data.admissibility.attestations
+import scmle.data.admissibility.dag
+import scmle.data.charter.causal
 from scmle.data.detectors import certificates
 from scmle.data.detectors import pipeline
 
@@ -204,7 +204,7 @@ def finding_check(
 
 
 def attestation_check(
-    item: attestations_module.LeakageAttestation,
+    item: scmle.data.admissibility.attestations.LeakageAttestation,
     findings: Sequence[screen.Finding],
     rows: int,
     seed: int,
@@ -257,8 +257,8 @@ def attestation_check(
 def causal_admissibility(
     frame: pandas.DataFrame,
     candidates: Sequence[str],
-    spec: causal_module.CausalSpec,
-    graph: dag_module.Dag,
+    spec: scmle.data.charter.causal.CausalSpec,
+    graph: scmle.data.admissibility.dag.Dag,
     seed: int,
     day: datetime.date,
     result: pipeline.PipelineResult,
@@ -296,7 +296,7 @@ def causal_admissibility(
         falsification, if it ran.
     """
     records = provenance.ProvenanceTable.covering([str(c) for c in candidates])
-    members = causal_module.covariates_of(spec.assumptions) or ()
+    members = scmle.data.charter.causal.covariates_of(spec.assumptions) or ()
     try:
         table: rules.AdmissibilityTable | None = rules.build_table(
             records,
@@ -320,9 +320,13 @@ def causal_admissibility(
             "backdoor_aipw is ineligible: the declared adjustment set holds "
             + ", ".join(sorted(refused))
         )
-    if not members and len(candidates) > dag_module.MAX_SEARCH_CANDIDATES:
+    if (
+        not members
+        and len(candidates) > scmle.data.admissibility.dag.MAX_SEARCH_CANDIDATES
+    ):
         notes.append(
-            f"more than {dag_module.MAX_SEARCH_CANDIDATES} candidate "
+            "more than "
+            f"{scmle.data.admissibility.dag.MAX_SEARCH_CANDIDATES} candidate "
             "covariates and no declared adjustment set: the charter must "
             "supply the set, and the claim is attested at best"
         )
@@ -373,11 +377,13 @@ def run(
     group_column: str | None = None,
     time_column: str | None = None,
     directory: Path | None = None,
-    attestations: Sequence[attestations_module.LeakageAttestation] = (),
+    attestations: Sequence[
+        scmle.data.admissibility.attestations.LeakageAttestation
+    ] = (),
     scope: str = "",
     today: datetime.date | None = None,
-    causal: causal_module.CausalSpec | None = None,
-    dag: dag_module.Dag | None = None,
+    causal: scmle.data.charter.causal.CausalSpec | None = None,
+    dag: scmle.data.admissibility.dag.Dag | None = None,
     declared: Sequence[provenance.FieldProvenance] = (),
 ) -> Qualification:
     """Runs leakage, admissibility and the detector pipeline on `X`.
@@ -458,7 +464,9 @@ def run(
     ):
         notes.append("leakage suspicion is descriptive: no certificate gates")
     notes.extend(report.notes)
-    applied = attestations_module.apply(attestations, scope, day.isoformat())
+    applied = scmle.data.admissibility.attestations.apply(
+        attestations, scope, day.isoformat()
+    )
     for column, why in applied.rejected.items():
         notes.append(f"attestation for '{column}' ignored: {why}")
     suspect_columns = {f.feature for f in report.suspects}

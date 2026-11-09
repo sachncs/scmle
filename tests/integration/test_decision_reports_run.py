@@ -8,8 +8,8 @@ import numpy
 import pandas
 import support
 
-from scmle.data.charter import decision as decision_module
 from scmle.data.charter import sealing
+import scmle.data.charter.decision
 from scmle.data.framing import costs
 from scmle.decision import rollout
 from tests.unit.test_charter_contracts import make_charter
@@ -39,7 +39,7 @@ def charter_file(tmp_path, plan=True, uncertainty=None):
     model = costs.DecisionCostModel(
         0.0, 2.0, 1.0, 0.0, 0.05, 0.9, human, costs.CostSource.HUMAN
     )
-    rollout_plan = decision_module.RolloutPlan(
+    rollout_plan = scmle.data.charter.decision.RolloutPlan(
         unit="user",
         primary="conv",
         assignment_prob=0.5,
@@ -49,10 +49,10 @@ def charter_file(tmp_path, plan=True, uncertainty=None):
         alpha_promote=Fraction(1, 20),
         alpha_rollback=Fraction(1, 20),
     )
-    layer = decision_module.DecisionLayer(
-        decision_module.DecisionModel("EUR per case"),
+    layer = scmle.data.charter.decision.DecisionLayer(
+        scmle.data.charter.decision.DecisionModel("EUR per case"),
         (
-            decision_module.FairnessConstraint(
+            scmle.data.charter.decision.FairnessConstraint(
                 "grp", "demographic_parity", 0.4, "reweighing", min_group=20
             ),
         ),

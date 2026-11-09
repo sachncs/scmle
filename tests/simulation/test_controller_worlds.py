@@ -19,8 +19,8 @@ import numpy
 import pytest
 
 from scmle.governance import deployment_ledger
-from scmle.operations import controller as controller_module
-from tests.simulation import world as worlds
+import scmle.operations.controller
+import tests.simulation.world
 
 
 class CrashError(Exception):
@@ -52,9 +52,11 @@ def check_properties(world, trainer=None, limit=0):
     ledger = deployment_ledger.DeploymentLedger.load(
         world.deploy / deployment_ledger.FILE_NAME
     )  # on disk
-    assert {row["kind"] for row in ledger.rows} <= worlds.ALLOWED_KINDS
+    assert {
+        row["kind"] for row in ledger.rows
+    } <= tests.simulation.world.ALLOWED_KINDS
     assert not ledger.attestations and not ledger.used  # no person needed
-    uses = worlds.kinds(ledger, deployment_ledger.ENVELOPE_USED)
+    uses = tests.simulation.world.kinds(ledger, deployment_ledger.ENVELOPE_USED)
     assert len(uses) <= limit  # within the envelope
     if trainer is not None:
         assert trainer.calls == len(uses)  # trainings equal uses
@@ -63,7 +65,7 @@ def check_properties(world, trainer=None, limit=0):
 
 
 def abrupt(**changes):
-    return worlds.make_stream(
+    return tests.simulation.world.make_stream(
         **{
             "kind": "abrupt",
             "batches": 80,
@@ -79,51 +81,53 @@ def abrupt(**changes):
 
 
 def test_a_stable_world_raises_nothing(tmp_path):
-    world = worlds.World(tmp_path, worlds.make_stream(batches=40, seed=3))
+    world = tests.simulation.world.World(
+        tmp_path, tests.simulation.world.make_stream(batches=40, seed=3)
+    )
     trainer = Trainer()
     controller = world.controller(retrain=trainer)
-    controller.envelopes.grant(worlds.envelope(limit=2))
+    controller.envelopes.grant(tests.simulation.world.envelope(limit=2))
     run(world, 40, controller)
     ledger = check_properties(world, trainer, limit=2)
-    assert not worlds.kinds(ledger, deployment_ledger.ALARM)
+    assert not tests.simulation.world.kinds(ledger, deployment_ledger.ALARM)
     assert trainer.calls == 0
     assert not controller.loop.pending_escalations()
 
 
 def test_an_abrupt_rise_trains_one_challenger_inside_the_envelope(tmp_path):
-    world = worlds.World(tmp_path, abrupt())
+    world = tests.simulation.world.World(tmp_path, abrupt())
     trainer = Trainer()
     controller = world.controller(retrain=trainer)
-    controller.envelopes.grant(worlds.envelope(limit=1))
+    controller.envelopes.grant(tests.simulation.world.envelope(limit=1))
     run(world, 80, controller)
     ledger = check_properties(world, trainer, limit=1)
     assert trainer.calls == 1
-    assert worlds.kinds(ledger, deployment_ledger.RETRAIN)[0]["body"][
-        "challenger"
-    ] == ("challenger-1")
+    assert tests.simulation.world.kinds(ledger, deployment_ledger.RETRAIN)[0][
+        "body"
+    ]["challenger"] == ("challenger-1")
     assert controller.envelopes.remaining("e1") == {"train_challenger": 0}
     alarms = [
         r
-        for r in worlds.kinds(ledger, deployment_ledger.ALARM)
+        for r in tests.simulation.world.kinds(ledger, deployment_ledger.ALARM)
         if r["body"]["rule"] == "L1"
     ]
     assert alarms and alarms[0]["body"]["batch"] >= 30
 
 
 def test_a_gradual_rise_is_handled_the_same_way(tmp_path):
-    world = worlds.World(
+    world = tests.simulation.world.World(
         tmp_path, abrupt(kind="gradual", ramp=20, delta=0.3, seed=5)
     )
     trainer = Trainer()
     controller = world.controller(retrain=trainer)
-    controller.envelopes.grant(worlds.envelope(limit=1))
+    controller.envelopes.grant(tests.simulation.world.envelope(limit=1))
     run(world, 80, controller)
     check_properties(world, trainer, limit=1)
     assert trainer.calls == 1
 
 
 def test_without_an_envelope_the_alarm_trains_nothing_and_asks(tmp_path):
-    world = worlds.World(tmp_path, abrupt())
+    world = tests.simulation.world.World(tmp_path, abrupt())
     trainer = Trainer()
     controller = world.controller(retrain=trainer)
     run(world, 80, controller)
@@ -136,12 +140,14 @@ def test_without_an_envelope_the_alarm_trains_nothing_and_asks(tmp_path):
 
 
 def test_an_uncertified_alarm_never_reaches_the_envelope(tmp_path):
-    world = worlds.World(
-        tmp_path, abrupt(), policy=worlds.make_policy(alarm_gates_retrain=False)
+    world = tests.simulation.world.World(
+        tmp_path,
+        abrupt(),
+        policy=tests.simulation.world.make_policy(alarm_gates_retrain=False),
     )
     trainer = Trainer()
     controller = world.controller(retrain=trainer)
-    controller.envelopes.grant(worlds.envelope(limit=3))
+    controller.envelopes.grant(tests.simulation.world.envelope(limit=3))
     run(world, 80, controller)
     check_properties(world, trainer, limit=3)
     assert trainer.calls == 0
@@ -153,13 +159,13 @@ def test_an_uncertified_alarm_never_reaches_the_envelope(tmp_path):
 
 
 def test_a_failing_training_is_escalated_and_the_loop_goes_on(tmp_path):
-    world = worlds.World(tmp_path, abrupt())
+    world = tests.simulation.world.World(tmp_path, abrupt())
 
     def broken():
         raise RuntimeError("out of memory")
 
     controller = world.controller(retrain=broken)
-    controller.envelopes.grant(worlds.envelope(limit=1))
+    controller.envelopes.grant(tests.simulation.world.envelope(limit=1))
     result = run(world, 80, controller)
     assert result.status != "halted"
     actions = {
@@ -170,9 +176,9 @@ def test_a_failing_training_is_escalated_and_the_loop_goes_on(tmp_path):
 
 
 def test_an_envelope_without_a_trainer_asks_instead(tmp_path):
-    world = worlds.World(tmp_path, abrupt())
+    world = tests.simulation.world.World(tmp_path, abrupt())
     controller = world.controller()
-    controller.envelopes.grant(worlds.envelope(limit=1))
+    controller.envelopes.grant(tests.simulation.world.envelope(limit=1))
     run(world, 80, controller)
     actions = {
         e.question["action"] for e in controller.loop.pending_escalations()
@@ -182,30 +188,34 @@ def test_an_envelope_without_a_trainer_asks_instead(tmp_path):
 
 def test_delayed_labels_alarm_only_after_they_arrive(tmp_path):
     stream = abrupt(window=3, batches=100, seed=6)
-    world = worlds.World(
-        tmp_path, stream, policy=worlds.make_policy(outcome_window=3)
+    world = tests.simulation.world.World(
+        tmp_path,
+        stream,
+        policy=tests.simulation.world.make_policy(outcome_window=3),
     )
     trainer = Trainer()
     controller = world.controller(retrain=trainer)
-    controller.envelopes.grant(worlds.envelope(limit=1))
+    controller.envelopes.grant(tests.simulation.world.envelope(limit=1))
     run(world, 85, controller)
     ledger = check_properties(world, trainer, limit=1)
     alarms = [
         r
-        for r in worlds.kinds(ledger, deployment_ledger.ALARM)
+        for r in tests.simulation.world.kinds(ledger, deployment_ledger.ALARM)
         if r["body"]["rule"] == "L1"
     ]
     assert alarms and alarms[0]["body"]["batch"] >= 30
 
 
 def test_a_label_outage_carries_on_and_asks(tmp_path):
-    world = worlds.World(tmp_path, abrupt())
+    world = tests.simulation.world.World(tmp_path, abrupt())
     trainer = Trainer()
     controller = world.controller(
         retrain=trainer,
-        policy=controller_module.ControllerPolicy(max_unlabelled_ticks=3),
+        policy=scmle.operations.controller.ControllerPolicy(
+            max_unlabelled_ticks=3
+        ),
     )
-    controller.envelopes.grant(worlds.envelope(limit=1))
+    controller.envelopes.grant(tests.simulation.world.envelope(limit=1))
     for index in range(20):
         world.deliver(index)
         controller.tick(world.inbox)
@@ -223,7 +233,9 @@ def test_a_label_outage_carries_on_and_asks(tmp_path):
 
 
 def test_a_corrupted_batch_is_set_aside_and_the_rest_applied(tmp_path):
-    world = worlds.World(tmp_path, worlds.make_stream(batches=20, size=20))
+    world = tests.simulation.world.World(
+        tmp_path, tests.simulation.world.make_stream(batches=20, size=20)
+    )
     controller = world.controller()
     for index in range(10):
         world.deliver(index, corrupt=index == 4)
@@ -253,22 +265,26 @@ def challenger_losses(stream, kind):
 @pytest.mark.parametrize("kind", ["better", "poisoned"])
 def test_a_challenger_may_earn_a_proposal_but_never_a_promotion(tmp_path, kind):
     stream = abrupt(batches=120, size=100, change=20, delta=0.3, seed=8)
-    world = worlds.World(tmp_path, stream)
+    world = tests.simulation.world.World(tmp_path, stream)
     trainer = Trainer(name="candidate")
     controller = world.controller(retrain=trainer)
-    controller.envelopes.grant(worlds.envelope(limit=1))
+    controller.envelopes.grant(tests.simulation.world.envelope(limit=1))
     matrix = challenger_losses(stream, kind)
     for index in range(120):
         world.deliver(index, challenger=("candidate", matrix))
         controller.tick(world.inbox)
     ledger = check_properties(world, trainer, limit=1)
-    proposals = worlds.kinds(ledger, deployment_ledger.PROMOTION_PROPOSAL)
+    proposals = tests.simulation.world.kinds(
+        ledger, deployment_ledger.PROMOTION_PROPOSAL
+    )
     if kind == "poisoned":
         assert not proposals
     else:
         assert proposals
     assert not ledger.attestations and not ledger.used
-    assert not worlds.kinds(ledger, deployment_ledger.DEPLOYMENT)
+    assert not tests.simulation.world.kinds(
+        ledger, deployment_ledger.DEPLOYMENT
+    )
 
 
 # ------------------------------------------------------ kill and start again
@@ -284,11 +300,14 @@ def run_ticks(world, ticks, **kwargs):
 
 def counted_checkpoints(tmp_path, ticks):
     seen = []
-    world = worlds.World(
-        tmp_path / "count", worlds.make_stream(batches=ticks, size=20)
+    world = tests.simulation.world.World(
+        tmp_path / "count",
+        tests.simulation.world.make_stream(batches=ticks, size=20),
     )
     run_ticks(world, ticks, checkpoint=seen.append)
-    return seen, worlds.projection(world.controller().loop.ledger)
+    return seen, tests.simulation.world.projection(
+        world.controller().loop.ledger
+    )
 
 
 def test_killed_at_any_checkpoint_it_ends_where_an_uninterrupted_run_ends(
@@ -299,9 +318,9 @@ def test_killed_at_any_checkpoint_it_ends_where_an_uninterrupted_run_ends(
     # per tick: batch intent, loop, applied; labels the same; then the step
     assert len(seen) == 7 * ticks
     for kill in range(len(seen)):
-        world = worlds.World(
+        world = tests.simulation.world.World(
             tmp_path / f"kill-{kill}",
-            worlds.make_stream(batches=ticks, size=20),
+            tests.simulation.world.make_stream(batches=ticks, size=20),
         )
         count = [0]
 
@@ -322,7 +341,10 @@ def test_killed_at_any_checkpoint_it_ends_where_an_uninterrupted_run_ends(
                 controller = world.controller()  # a new process
                 controller.tick(world.inbox)
         assert interrupted_at is not None, kill
-        assert worlds.projection(controller.loop.ledger) == expected, (
+        assert (
+            tests.simulation.world.projection(controller.loop.ledger)
+            == expected
+        ), (
             kill,
             seen[kill],
         )

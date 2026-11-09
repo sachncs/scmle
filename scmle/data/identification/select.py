@@ -12,7 +12,7 @@ from collections.abc import Mapping
 import dataclasses
 from typing import Any
 
-from scmle.data.admissibility import dag as dag_module
+import scmle.data.admissibility.dag
 from scmle.data.charter import causal
 
 IDENTIFIED = "identified"
@@ -198,7 +198,7 @@ class Plan:
 def judge(
     strategy: Strategy,
     spec: causal.CausalSpec,
-    dag: dag_module.Dag | None,
+    dag: scmle.data.admissibility.dag.Dag | None,
 ) -> Verdict:
     """Decides whether one strategy may run on this charter.
 
@@ -244,7 +244,7 @@ def judge(
 
 
 def check_adjustment(
-    spec: causal.CausalSpec, dag: dag_module.Dag | None
+    spec: causal.CausalSpec, dag: scmle.data.admissibility.dag.Dag | None
 ) -> tuple[list[str], bool]:
     """Verifies the declared adjustment set against a declared DAG.
 
@@ -277,7 +277,9 @@ def check_adjustment(
     return ([], True)
 
 
-def select(spec: causal.CausalSpec, dag: dag_module.Dag | None = None) -> Plan:
+def select(
+    spec: causal.CausalSpec, dag: scmle.data.admissibility.dag.Dag | None = None
+) -> Plan:
     """Chooses the primary strategy and the declared multiverse.
 
     Args:

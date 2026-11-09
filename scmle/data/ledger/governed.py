@@ -33,9 +33,9 @@ from scmle.data.ledger import budget
 from scmle.data.ledger import confirm
 from scmle.data.ledger import controls
 from scmle.data.ledger import explore
-from scmle.data.ledger import ledger as ledger_module
 from scmle.data.ledger import multiplicity
 from scmle.data.ledger import online_fdr
+import scmle.data.ledger.ledger
 
 CONTROL_FILE = "negative_control.json"
 DEFAULT_BLOCKS = 20
@@ -53,7 +53,7 @@ class GovernedRun:
         scope: `strata` or `global`, how the control permuted the target.
     """
 
-    ledger: ledger_module.Ledger
+    ledger: scmle.data.ledger.ledger.Ledger
     plan: explore.Plan
     control: controls.ControlResult
     confirmation: confirm.Confirmation
@@ -151,7 +151,7 @@ class Explored:
         run_dir: Directory for the artifacts, or None.
     """
 
-    ledger: ledger_module.Ledger
+    ledger: scmle.data.ledger.ledger.Ledger
     plan: explore.Plan
     control: controls.ControlResult
     withdrawal: confirm.Withdrawal | None
@@ -177,7 +177,7 @@ def run_governed(
     policy: str = confirm.UNCONFIRMED,
     diagnostics: Sequence[tuple[str, qualification.Check]] = (),
     second_stage: Callable[
-        [Sequence[ledger_module.Hypothesis]], confirm.Withdrawal
+        [Sequence[scmle.data.ledger.ledger.Hypothesis]], confirm.Withdrawal
     ]
     | None = None,
     claim_runner: confirm.ClaimRunner | None = None,
@@ -249,7 +249,7 @@ def explore_governed(
     policy: str = confirm.UNCONFIRMED,
     diagnostics: Sequence[tuple[str, qualification.Check]] = (),
     second_stage: Callable[
-        [Sequence[ledger_module.Hypothesis]], confirm.Withdrawal
+        [Sequence[scmle.data.ledger.ledger.Hypothesis]], confirm.Withdrawal
     ]
     | None = None,
 ) -> Explored:
@@ -298,7 +298,7 @@ def explore_governed(
     )
     plan = explore.plan_exploration(features, kind, exclude)
     if run_dir is None:
-        ledger = ledger_module.Ledger.create(
+        ledger = scmle.data.ledger.ledger.Ledger.create(
             None,
             charter_hash=charter.charter_hash,
             config=online_fdr.RuleConfig(
@@ -308,10 +308,12 @@ def explore_governed(
             seed=charter.seed,
         )
     else:
-        ledger = ledger_module.Ledger.open(run_dir, charter, rule=rule)
+        ledger = scmle.data.ledger.ledger.Ledger.open(
+            run_dir, charter, rule=rule
+        )
     config = ledger.config
     if config is None:  # pragma: no cover - open() always sets it
-        raise ledger_module.LedgerError("ledger has no rule")
+        raise scmle.data.ledger.ledger.LedgerError("ledger has no rule")
     if diagnostics and not ledger.diagnostics:
         for source_name, found in diagnostics:
             ledger.record_diagnostic(found, source_name)

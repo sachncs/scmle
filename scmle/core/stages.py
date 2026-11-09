@@ -22,26 +22,26 @@ from sklearn import base
 
 import scmle
 from scmle.api import results
-from scmle.artifacts import bundle as bundle_module
 from scmle.artifacts import explanation_report
 from scmle.artifacts import report
+import scmle.artifacts.bundle
 from scmle.contracts import capabilities
-from scmle.contracts import data as data_contracts
 from scmle.contracts import errors
-from scmle.contracts import evaluation as evaluation_contracts
-from scmle.contracts import evidence as evidence_contracts
 from scmle.contracts import experiments
 from scmle.contracts import explanations
 from scmle.contracts import lineage
 from scmle.contracts import reliability
 from scmle.contracts import tasks
+import scmle.contracts.data
+import scmle.contracts.evaluation
+import scmle.contracts.evidence
 from scmle.core import causal_claim
 from scmle.core import compiler
-from scmle.core import context as context_module
 from scmle.core import decision_reports
 from scmle.core import ingest_stage
 from scmle.core import randomness
-from scmle.core import state as run_state
+import scmle.core.context
+import scmle.core.state
 from scmle.data.admissibility import attestations
 from scmle.data.admissibility import qualify
 from scmle.data.charter import contracts
@@ -49,31 +49,31 @@ from scmle.data.charter import ingest
 from scmle.data.charter import sealing
 from scmle.data.curation import forecasting
 from scmle.data.curation import preprocessing
-from scmle.data.custody import pipeline as custody_pipeline
-from scmle.data.custody import sealed as custody_sealed
-from scmle.data.framing import baseline as framing_baseline
-from scmle.data.framing import claim as framing_claim
+import scmle.data.custody.pipeline
+import scmle.data.custody.sealed
 from scmle.data.framing import draft
-from scmle.data.identification import run as identification_run
-from scmle.data.ledger import budget as ledger_budget
+import scmle.data.framing.baseline
+import scmle.data.framing.claim
+import scmle.data.identification.run
 from scmle.data.ledger import confirm
 from scmle.data.ledger import explore
 from scmle.data.ledger import governed
+import scmle.data.ledger.budget
 from scmle.data.profiling import label_noise
 from scmle.data.profiling import profiler
 from scmle.data.profiling import representativeness
-from scmle.data.readers import registry as source_registry
 from scmle.data.readers import streaming
 from scmle.data.readers import tabular
+import scmle.data.readers.registry
 from scmle.data.robustness import html_report
 from scmle.data.robustness import prefilter
-from scmle.data.robustness import qualify as robustness_qualify
-from scmle.data.robustness import report as robustness_report
-from scmle.data.robustness import stability as robustness_stability
+import scmle.data.robustness.qualify
+import scmle.data.robustness.report
+import scmle.data.robustness.stability
 from scmle.data.splitting import splitters
-from scmle.data.validation import target as target_module
+import scmle.data.validation.target
 from scmle.decision import netbenefit
-from scmle.decision import threshold as decision_threshold
+import scmle.decision.threshold
 from scmle.evaluation import backtest
 from scmle.evaluation import bias_variance
 from scmle.evaluation import confidence
@@ -87,7 +87,6 @@ from scmle.evaluation import cv_plus
 from scmle.evaluation import diagnostics
 from scmle.evaluation import fit_health
 from scmle.evaluation import learning_curve
-from scmle.evaluation import metrics as metric_catalog
 from scmle.evaluation import mitigation
 from scmle.evaluation import nested
 from scmle.evaluation import policies
@@ -99,11 +98,12 @@ from scmle.evaluation import reweighing
 from scmle.evaluation import sensitivity
 from scmle.evaluation import suite
 from scmle.evaluation import uplift
+import scmle.evaluation.metrics
 from scmle.experimentation import ensemble_search
 from scmle.experimentation import strategy_search
 from scmle.experimentation import trials
 from scmle.experimentation import tuning
-from scmle.explainability import suite as explanation_suite
+import scmle.explainability.suite
 from scmle.features import feature_graph
 from scmle.governance import attestation
 from scmle.governance import ledger
@@ -112,10 +112,10 @@ from scmle.governance import sbom
 from scmle.governance import vault
 from scmle.inference import novelty
 from scmle.intelligence import knowledge
-from scmle.intelligence import planner as planner_module
 from scmle.intelligence import recommendations
+import scmle.intelligence.planner
 from scmle.models import thresholds
-from scmle.monitoring import reference as reference_module
+import scmle.monitoring.reference
 from scmle.sampling import pseudo_labeling
 from scmle.sampling import strategies
 
@@ -123,7 +123,7 @@ COVERAGE_LEVELS = (0.5, 0.8, 0.9, 0.95)
 DIAGNOSTIC_BUDGET_SHARE = 0.25
 DIAGNOSTIC_MIN_SECONDS = 30.0
 BASELINE = "dummy"
-require = context_module.require
+require = scmle.core.context.require
 
 
 LOGGER = logging.getLogger(__name__)
@@ -138,11 +138,11 @@ class Stage(abc.ABC):
             ordered by `compiler.compile_workflow`).
     """
 
-    state: ClassVar[run_state.RunState]
+    state: ClassVar[scmle.core.state.RunState]
     requires: ClassVar[tuple[type, ...]] = ()
 
     @abc.abstractmethod
-    def describe(self, context: context_module.RunContext) -> str:
+    def describe(self, context: scmle.core.context.RunContext) -> str:
         """Returns the reason recorded on entering the stage.
 
         Args:
@@ -153,7 +153,7 @@ class Stage(abc.ABC):
         """
 
     @abc.abstractmethod
-    def execute(self, context: context_module.RunContext) -> None:
+    def execute(self, context: scmle.core.context.RunContext) -> None:
         """Performs the stage, reading and writing the context.
 
         Args:
@@ -168,9 +168,9 @@ PARITY_ROWS = 200
 class IngestStage(Stage):
     """Reads the dataset and fingerprints it."""
 
-    state = run_state.RunState.VALIDATING
+    state = scmle.core.state.RunState.VALIDATING
 
-    def describe(self, context: context_module.RunContext) -> str:
+    def describe(self, context: scmle.core.context.RunContext) -> str:
         """Names the stage.
 
         Args:
@@ -199,7 +199,7 @@ class IngestStage(Stage):
         return size > data.memory_budget_gb * 1e9
 
     def read_stream(
-        self, context: context_module.RunContext, data: tasks.DataSpec
+        self, context: scmle.core.context.RunContext, data: tasks.DataSpec
     ) -> pandas.DataFrame:
         """Reads the file in one pass, keeping a sample of both sides.
 
@@ -232,7 +232,7 @@ class IngestStage(Stage):
         context.stream = (source, totals)
         return frame
 
-    def execute(self, context: context_module.RunContext) -> None:
+    def execute(self, context: scmle.core.context.RunContext) -> None:
         """Loads the data, records its manifest and applies the feature graph.
 
         An in-memory input frame is copied; otherwise the file is read whole,
@@ -313,7 +313,7 @@ class IngestStage(Stage):
         )
 
     def persist_source_snapshot(
-        self, context: context_module.RunContext, frame: pandas.DataFrame
+        self, context: scmle.core.context.RunContext, frame: pandas.DataFrame
     ) -> None:
         """Records the source identity and refuses incompatible schema changes.
 
@@ -329,7 +329,7 @@ class IngestStage(Stage):
                 of the source whose schema is incompatible with the new one.
         """
         manifest = require(context.manifest, "manifest")
-        snapshot = source_registry.SourceSnapshot.from_manifest(
+        snapshot = scmle.data.readers.registry.SourceSnapshot.from_manifest(
             manifest,
             {
                 str(name): str(dtype)
@@ -337,11 +337,11 @@ class IngestStage(Stage):
             },
             datetime.datetime.now(datetime.UTC).isoformat(),
         )
-        registry = source_registry.SourceRegistry()
+        registry = scmle.data.readers.registry.SourceRegistry()
         if context.store is not None:
             saved = context.store.path("source_registry.json")
             if saved.exists():
-                registry = source_registry.SourceRegistry.from_json(
+                registry = scmle.data.readers.registry.SourceRegistry.from_json(
                     saved.read_text(encoding="utf-8")
                 )
         compatibility = registry.compatibility(snapshot)
@@ -369,7 +369,9 @@ class IngestStage(Stage):
             },
         )
 
-    def refuse_stale_resume(self, context: context_module.RunContext) -> None:
+    def refuse_stale_resume(
+        self, context: scmle.core.context.RunContext
+    ) -> None:
         """Rejects resuming trials computed on different data.
 
         Args:
@@ -445,9 +447,9 @@ class ProfileStage(Stage):
     """
 
     requires = (IngestStage,)
-    state = run_state.RunState.PROFILING
+    state = scmle.core.state.RunState.PROFILING
 
-    def describe(self, context: context_module.RunContext) -> str:
+    def describe(self, context: scmle.core.context.RunContext) -> str:
         """Names the stage.
 
         Args:
@@ -459,7 +461,7 @@ class ProfileStage(Stage):
         return "profile dataset"
 
     def set_aside_unlabeled(
-        self, context: context_module.RunContext, frame: pandas.DataFrame
+        self, context: scmle.core.context.RunContext, frame: pandas.DataFrame
     ) -> pandas.DataFrame:
         """Applies the `unlabeled` policy to rows with a missing target.
 
@@ -494,7 +496,7 @@ class ProfileStage(Stage):
         context.frame = frame[~missing].reset_index(drop=True)
         return context.frame
 
-    def execute(self, context: context_module.RunContext) -> None:
+    def execute(self, context: scmle.core.context.RunContext) -> None:
         """Resolves the task, splits the data and profiles the development set.
 
         Writes the profile, curation report and dataset card, enforces the
@@ -523,7 +525,7 @@ class ProfileStage(Stage):
         if target.isna().any():
             frame = self.set_aside_unlabeled(context, frame)
             target = frame[spec.data.target]
-        task = target_module.TaskResolver(spec).resolve(target)
+        task = scmle.data.validation.target.TaskResolver(spec).resolve(target)
         if (
             context.unlabeled is not None
             and spec.data.unlabeled == "pseudo_label"
@@ -539,17 +541,23 @@ class ProfileStage(Stage):
                 f"resolves to {task.value}"
             )
         if task is tasks.TaskType.SURVIVAL:
-            target_module.check_events(frame, spec.data.event_column)
+            scmle.data.validation.target.check_events(
+                frame, spec.data.event_column
+            )
         if task is tasks.TaskType.UPLIFT:
-            target_module.check_treatment(frame, spec.data.treatment_column)
+            scmle.data.validation.target.check_treatment(
+                frame, spec.data.treatment_column
+            )
         if task in (
             tasks.TaskType.MULTILABEL,
             tasks.TaskType.MULTIOUTPUT,
             tasks.TaskType.FORECAST,
         ):
-            target_module.check_targets(frame, spec.data.targets, task)
+            scmle.data.validation.target.check_targets(
+                frame, spec.data.targets, task
+            )
         if task is tasks.TaskType.ORDINAL:
-            frame = target_module.encode_ordinal(
+            frame = scmle.data.validation.target.encode_ordinal(
                 frame, spec.data.target, spec.data.ordinal_order
             )
             context.frame = frame
@@ -613,7 +621,7 @@ class ProfileStage(Stage):
         source_rows = (
             context.stream[1].rows if context.stream is not None else len(frame)
         )
-        curation = data_contracts.CurationReport(
+        curation = scmle.contracts.data.CurationReport(
             manifest=require(context.manifest, "manifest"),
             source_rows=source_rows,
             profiled_rows=len(development),
@@ -621,13 +629,15 @@ class ProfileStage(Stage):
             streamed=context.stream is not None,
             cleaning_notes=tuple(context.cleaning_notes),
             quality_findings=tuple(
-                data_contracts.CurationFinding.from_observation(
+                scmle.contracts.data.CurationFinding.from_observation(
                     finding, "quality"
                 )
                 for finding in profile.quality_findings
             ),
             risk_findings=tuple(
-                data_contracts.CurationFinding.from_observation(finding, "risk")
+                scmle.contracts.data.CurationFinding.from_observation(
+                    finding, "risk"
+                )
                 for finding in profile.risk_findings
             ),
             feature_columns={
@@ -637,7 +647,7 @@ class ProfileStage(Stage):
             },
             dropped_columns=profile.feature_plan.dropped,
         )
-        card = data_contracts.DatasetCard.from_curation(curation)
+        card = scmle.contracts.data.DatasetCard.from_curation(curation)
         context.profile = profile
         context.curation = curation
         context.write_json("dataset_profile.json", profile.to_dict())
@@ -711,7 +721,7 @@ class ProfileStage(Stage):
         self.run_claim_ledger(context, task)
 
     def synthesize_features(
-        self, context: context_module.RunContext, frame: pandas.DataFrame
+        self, context: scmle.core.context.RunContext, frame: pandas.DataFrame
     ) -> pandas.DataFrame:
         """Adds the synthesized features before the data are split.
 
@@ -780,7 +790,7 @@ class ProfileStage(Stage):
 
     def assign_entity_groups(
         self,
-        context: context_module.RunContext,
+        context: scmle.core.context.RunContext,
         entity: ingest.EntitySpec,
         frame: pandas.DataFrame,
     ) -> pandas.DataFrame:
@@ -828,7 +838,7 @@ class ProfileStage(Stage):
         return frame
 
     def run_claim_ledger(
-        self, context: context_module.RunContext, task: tasks.TaskType
+        self, context: scmle.core.context.RunContext, task: tasks.TaskType
     ) -> None:
         """Explores `X` under the ledger and confirms on `C`, now or later.
 
@@ -946,9 +956,9 @@ class ProfileStage(Stage):
 
     def complete_claim_ledger(
         self,
-        context: context_module.RunContext,
+        context: scmle.core.context.RunContext,
         pending: "PendingLedger",
-        subject: framing_claim.Rule | None = None,
+        subject: scmle.data.framing.claim.Rule | None = None,
         extra: confirm.ClaimRunner | None = None,
     ) -> None:
         """Registers the claims, opens `C` once and writes the reports.
@@ -981,7 +991,7 @@ class ProfileStage(Stage):
         run = governed.confirm_explored(
             pending.explored,
             source=vault.sets.get("C"),
-            confirmation_rule=ledger_budget.MultiplicityRule(
+            confirmation_rule=scmle.data.ledger.budget.MultiplicityRule(
                 chartered_rule(
                     "confirmation_rule",
                     context.spec.confirmation_rule,
@@ -1020,14 +1030,14 @@ class ProfileStage(Stage):
 
     def baseline_runner(
         self,
-        context: context_module.RunContext,
+        context: scmle.core.context.RunContext,
         task: tasks.TaskType,
         charter: contracts.AnalysisCharter,
         view: Any,
         structure: tuple[str, ...],
         *,
         signed: bool,
-        subject: framing_claim.Rule | None = None,
+        subject: scmle.data.framing.claim.Rule | None = None,
     ) -> confirm.ClaimRunner | None:
         """Freezes the baseline rule on `X` and registers the claim.
 
@@ -1083,7 +1093,7 @@ class ProfileStage(Stage):
             for c in plan.numeric
             if c in view.features.columns and c not in structure
         ]
-        rule = framing_claim.freeze_rule(
+        rule = scmle.data.framing.claim.freeze_rule(
             view.features,
             list(outcome.to_numpy(float)),
             numeric,
@@ -1098,12 +1108,14 @@ class ProfileStage(Stage):
             seen = numpy.concatenate(
                 [seen, numpy.zeros(len(extra), dtype=bool)]
             )
-        selection = framing_baseline.selective_labels(seen, decisions)
-        ceiling, why = framing_claim.source_ceiling(
+        selection = scmle.data.framing.baseline.selective_labels(
+            seen, decisions
+        )
+        ceiling, why = scmle.data.framing.claim.source_ceiling(
             data.framing_draft, charter.charter_hash, model, signed=signed
         )
-        context.write_json(framing_claim.PROVENANCE, why)
-        return framing_claim.build_runner(
+        context.write_json(scmle.data.framing.claim.PROVENANCE, why)
+        return scmle.data.framing.claim.build_runner(
             rule=rule if subject is None else subject,
             reference=None if subject is None else rule,
             model=model,
@@ -1118,7 +1130,7 @@ class ProfileStage(Stage):
 
     def check_ingest_family(
         self,
-        context: context_module.RunContext,
+        context: scmle.core.context.RunContext,
         run: governed.GovernedRun,
         found: qualify.Qualification,
     ) -> None:
@@ -1153,7 +1165,7 @@ class ProfileStage(Stage):
 
     def write_registered_claims(
         self,
-        context: context_module.RunContext,
+        context: scmle.core.context.RunContext,
         run: governed.GovernedRun,
         runner: confirm.ClaimRunner | None,
     ) -> None:
@@ -1176,10 +1188,10 @@ class ProfileStage(Stage):
             claim_id: record["status"]
             for claim_id, record in (run.confirmation.registered or {}).items()
         }
-        if framing_claim.DOCUMENT not in documents and any(
-            i.kind == framing_claim.KIND for i in runner.registered
+        if scmle.data.framing.claim.DOCUMENT not in documents and any(
+            i.kind == scmle.data.framing.claim.KIND for i in runner.registered
         ):
-            documents[framing_claim.DOCUMENT] = {
+            documents[scmle.data.framing.claim.DOCUMENT] = {
                 "schema_version": 1,
                 "status": confirm.NOT_EVALUATED,
                 "issued": False,
@@ -1198,13 +1210,13 @@ class ProfileStage(Stage):
 
     def run_robustness(
         self,
-        context: context_module.RunContext,
+        context: scmle.core.context.RunContext,
         task: tasks.TaskType,
         charter: contracts.AnalysisCharter,
         view: Any,
         survivors: tuple[str, ...],
         structure: tuple[str, ...],
-    ) -> robustness_qualify.Robustness:
+    ) -> scmle.data.robustness.qualify.Robustness:
         """Assesses the stability of the survivors and shift from a reference.
 
         Reads the exploration view and the data spec's reference sample, if
@@ -1235,7 +1247,7 @@ class ProfileStage(Stage):
             else None
         )
         rules = charter.rules
-        return robustness_qualify.run(
+        return scmle.data.robustness.qualify.run(
             view.features,
             codes,
             survivors=list(survivors),
@@ -1251,9 +1263,9 @@ class ProfileStage(Stage):
             sensitive=tuple(data.sensitive_columns),
             temporal=bool(data.time_column),
             rule=(
-                robustness_stability.DEFAULT_RULE
+                scmle.data.robustness.stability.DEFAULT_RULE
                 if rules is None
-                else robustness_stability.Rule(
+                else scmle.data.robustness.stability.Rule(
                     rules.s_min, rules.band, rules.q_min
                 )
             ),
@@ -1261,7 +1273,7 @@ class ProfileStage(Stage):
 
     def assess_robustness(
         self,
-        context: context_module.RunContext,
+        context: scmle.core.context.RunContext,
         charter: contracts.AnalysisCharter,
         run: governed.GovernedRun,
         stage: prefilter.StabilityStage,
@@ -1291,12 +1303,12 @@ class ProfileStage(Stage):
         found = stage.found
         if found is None:  # pragma: no cover - run_governed always calls it
             raise errors.BlockedError("the second stage did not run")
-        stability_document = robustness_report.stability_report(
+        stability_document = scmle.data.robustness.report.stability_report(
             found, stage.note if stage.requested else None
         )
-        shift_document = robustness_report.shift_report(found)
-        robustness_report.validate_stability(stability_document)
-        robustness_report.validate_shift(shift_document)
+        shift_document = scmle.data.robustness.report.shift_report(found)
+        scmle.data.robustness.report.validate_stability(stability_document)
+        scmle.data.robustness.report.validate_shift(shift_document)
         context.write_json("stability_report.json", stability_document)
         context.write_json("shift_report.json", shift_document)
         context.write_text(
@@ -1321,7 +1333,7 @@ class ProfileStage(Stage):
 
     def assess_framing(
         self,
-        context: context_module.RunContext,
+        context: scmle.core.context.RunContext,
         charter: contracts.AnalysisCharter,
         view: Any,
     ) -> None:
@@ -1351,7 +1363,7 @@ class ProfileStage(Stage):
 
     def causal_runner(
         self,
-        context: context_module.RunContext,
+        context: scmle.core.context.RunContext,
         charter: contracts.AnalysisCharter,
         view: Any,
         graph: Any,
@@ -1395,7 +1407,7 @@ class ProfileStage(Stage):
 
     def assess_identification(
         self,
-        context: context_module.RunContext,
+        context: scmle.core.context.RunContext,
         charter: contracts.AnalysisCharter,
         view: Any,
         run: governed.GovernedRun,
@@ -1441,7 +1453,7 @@ class ProfileStage(Stage):
             return
         frame = view.features.copy()
         frame[context.spec.data.target] = view.target
-        outcome = identification_run.design_only(
+        outcome = scmle.data.identification.run.design_only(
             block,
             frame,
             charter.error_budget,
@@ -1465,7 +1477,7 @@ class ProfileStage(Stage):
 
     def qualify_exploration(
         self,
-        context: context_module.RunContext,
+        context: scmle.core.context.RunContext,
         task: tasks.TaskType,
         charter: contracts.AnalysisCharter,
         view: Any,
@@ -1588,7 +1600,9 @@ class ProfileStage(Stage):
                 context.write_json("curation_report.json", amended.to_dict())
                 context.write_json(
                     "dataset_card.json",
-                    data_contracts.DatasetCard.from_curation(amended).to_dict(),
+                    scmle.contracts.data.DatasetCard.from_curation(
+                        amended
+                    ).to_dict(),
                 )
                 written.extend(["curation_report.json", "dataset_card.json"])
         context.emit(
@@ -1614,8 +1628,8 @@ class ProfileStage(Stage):
         spec: tasks.ProjectSpec,
         task: tasks.TaskType,
         development: pandas.DataFrame,
-        profile: data_contracts.DatasetProfile,
-    ) -> data_contracts.DatasetProfile:
+        profile: scmle.contracts.data.DatasetProfile,
+    ) -> scmle.contracts.data.DatasetProfile:
         """Appends label-noise and representativeness findings.
 
         Representativeness is assessed only when the data specification names a
@@ -1638,7 +1652,7 @@ class ProfileStage(Stage):
             c for c in profile.feature_plan.categorical if c in present
         ]
         notes: list[str] = []
-        evidence: list[data_contracts.QualityEvidence] = []
+        evidence: list[scmle.contracts.data.QualityEvidence] = []
         if columns and task in (
             tasks.TaskType.BINARY,
             tasks.TaskType.MULTICLASS,
@@ -1688,7 +1702,7 @@ class ProfileStage(Stage):
 
     def apply_reweighing(
         self,
-        context: context_module.RunContext,
+        context: scmle.core.context.RunContext,
         task: tasks.TaskType,
         split: splitters.SplitResult,
     ) -> None:
@@ -1738,7 +1752,7 @@ class ProfileStage(Stage):
 
     def apply_charter_custody(
         self,
-        context: context_module.RunContext,
+        context: scmle.core.context.RunContext,
         task: tasks.TaskType,
         frame: pandas.DataFrame,
         split: splitters.SplitResult,
@@ -1782,12 +1796,12 @@ class ProfileStage(Stage):
                 "as units"
             )
         self.check_known_entity(context, charter, split)
-        log = custody_sealed.OpenLog(
+        log = scmle.data.custody.sealed.OpenLog(
             context.store.directory / "custody_log.jsonl"
             if context.store is not None
             else None
         )
-        vault_set = custody_sealed.CustodyVault(log)
+        vault_set = scmle.data.custody.sealed.CustodyVault(log)
         data_hash = (
             context.manifest.data_hash
             if context.manifest is not None
@@ -1795,7 +1809,7 @@ class ProfileStage(Stage):
                 pandas.util.hash_pandas_object(frame).to_numpy().tobytes()
             ).hexdigest()
         )
-        outcome = custody_pipeline.apply_custody(
+        outcome = scmle.data.custody.pipeline.apply_custody(
             charter=charter,
             split=split,
             frame=frame,
@@ -1834,7 +1848,7 @@ class ProfileStage(Stage):
 
     def check_known_entity(
         self,
-        context: context_module.RunContext,
+        context: scmle.core.context.RunContext,
         charter: contracts.AnalysisCharter,
         split: splitters.SplitResult,
     ) -> None:
@@ -1868,7 +1882,7 @@ class ProfileStage(Stage):
                     "the charter's unit_of_prediction is known_entity_future, "
                     f"which needs data.{role} (the entity and the time order)"
                 )
-        if split.manifest.strategy not in custody_pipeline.TEMPORAL:
+        if split.manifest.strategy not in scmle.data.custody.pipeline.TEMPORAL:
             raise errors.ConfigError(
                 "known_entity_future needs time-ordered validation "
                 "(temporal or rolling), not "
@@ -1886,7 +1900,7 @@ class ProfileStage(Stage):
 
     def make_split(
         self,
-        context: context_module.RunContext,
+        context: scmle.core.context.RunContext,
         task: tasks.TaskType,
         frame: pandas.DataFrame,
     ) -> splitters.SplitResult:
@@ -1982,8 +1996,8 @@ def chartered_rule(
 
 
 def attach_feature_graph(
-    spec: tasks.ProjectSpec, profile: data_contracts.DatasetProfile
-) -> data_contracts.DatasetProfile:
+    spec: tasks.ProjectSpec, profile: scmle.contracts.data.DatasetProfile
+) -> scmle.contracts.data.DatasetProfile:
     """Adds the feature graph to the profile's feature plan.
 
     Row-wise nodes become numeric model features computed inside the
@@ -2029,7 +2043,7 @@ def attach_feature_graph(
 
 
 def build_plan(
-    context: context_module.RunContext,
+    context: scmle.core.context.RunContext,
 ) -> experiments.ExperimentPlan:
     """Creates and validates the experiment plan from a profiled context.
 
@@ -2053,9 +2067,11 @@ def build_plan(
             mitigation is not implemented for the task.
     """
     approved = context.approved_plan
-    planner = planner_module.Planner(context.registry, context.catalog)
+    planner = scmle.intelligence.planner.Planner(
+        context.registry, context.catalog
+    )
     plan = planner.plan(
-        planner_module.PlanningContext(
+        scmle.intelligence.planner.PlanningContext(
             context.spec,
             require(context.profile, "profile"),
             require(context.task, "task"),
@@ -2088,7 +2104,7 @@ def build_plan(
                 raise
             if context.capability_registry.find(key) is None:
                 context.capability_registry.register(
-                    context_module.extension_capability(key)
+                    scmle.core.context.extension_capability(key)
                 )
             context.capability_registry.require(
                 key,
@@ -2099,7 +2115,7 @@ def build_plan(
 
 
 def capability_key(
-    context: context_module.RunContext,
+    context: scmle.core.context.RunContext,
     task: tasks.TaskType,
     model_family: str,
 ) -> capabilities.CapabilityKey:
@@ -2149,7 +2165,7 @@ def capability_key(
         modality=modality,
         task=task,
         model_family=model_family,
-        evaluation=context_module.TABULAR_BETA_EVALUATIONS[task],
+        evaluation=scmle.core.context.TABULAR_BETA_EVALUATIONS[task],
         uncertainty=capabilities.Uncertainty.NONE,
         fairness=fairness,
         explainability=capabilities.Explainability.NONE,
@@ -2166,7 +2182,7 @@ def capability_key(
     return key
 
 
-def advise(context: context_module.RunContext) -> tuple[Any, ...]:
+def advise(context: scmle.core.context.RunContext) -> tuple[Any, ...]:
     """Derives and stores the recommendations for the user.
 
     Args:
@@ -2186,9 +2202,9 @@ class PlanStage(Stage):
     """Builds the experiment plan from the development-set profile."""
 
     requires = (ProfileStage,)
-    state = run_state.RunState.PLANNING
+    state = scmle.core.state.RunState.PLANNING
 
-    def describe(self, context: context_module.RunContext) -> str:
+    def describe(self, context: scmle.core.context.RunContext) -> str:
         """Names the stage.
 
         Args:
@@ -2199,7 +2215,7 @@ class PlanStage(Stage):
         """
         return "build execution plan"
 
-    def execute(self, context: context_module.RunContext) -> None:
+    def execute(self, context: scmle.core.context.RunContext) -> None:
         """Builds the execution plan and the recommendations.
 
         Writes the execution plan, the capability registry, the decision log and
@@ -2237,9 +2253,9 @@ class TrainStage(Stage):
     """Cross-validates every candidate within the time budget."""
 
     requires = (PlanStage,)
-    state = run_state.RunState.TRAINING
+    state = scmle.core.state.RunState.TRAINING
 
-    def describe(self, context: context_module.RunContext) -> str:
+    def describe(self, context: scmle.core.context.RunContext) -> str:
         """Reports the number of candidates.
 
         Args:
@@ -2251,7 +2267,7 @@ class TrainStage(Stage):
         plan = require(context.plan, "plan")
         return f"{len(plan.candidate_models)} candidates"
 
-    def execute(self, context: context_module.RunContext) -> None:
+    def execute(self, context: scmle.core.context.RunContext) -> None:
         """Runs every candidate, then searches strategies, tunes and ensembles.
 
         Candidates run in chunks of `backend.workers`. The time and memory
@@ -2297,9 +2313,9 @@ class SelectStage(Stage):
     """Applies the selection policy and the serving constraints."""
 
     requires = (TrainStage,)
-    state = run_state.RunState.SELECTING
+    state = scmle.core.state.RunState.SELECTING
 
-    def describe(self, context: context_module.RunContext) -> str:
+    def describe(self, context: scmle.core.context.RunContext) -> str:
         """Names the policy.
 
         Args:
@@ -2310,7 +2326,7 @@ class SelectStage(Stage):
         """
         return context.policy.description
 
-    def announce(self, context: context_module.RunContext) -> None:
+    def announce(self, context: scmle.core.context.RunContext) -> None:
         """Emits the `selection.frozen` event for the selected trial.
 
         Args:
@@ -2329,7 +2345,7 @@ class SelectStage(Stage):
         )
 
     def limits(
-        self, context: context_module.RunContext
+        self, context: scmle.core.context.RunContext
     ) -> resources.ResourceLimits:
         """Builds the serving limits from the specification.
 
@@ -2348,7 +2364,7 @@ class SelectStage(Stage):
 
     def select_on_front(
         self,
-        context: context_module.RunContext,
+        context: scmle.core.context.RunContext,
         checked: list[experiments.TrialResult],
         limits: resources.ResourceLimits,
     ) -> None:
@@ -2414,7 +2430,7 @@ class SelectStage(Stage):
         context.selected = trial
         self.announce(context)
 
-    def execute(self, context: context_module.RunContext) -> None:
+    def execute(self, context: scmle.core.context.RunContext) -> None:
         """Chooses the model, then opens a deferred confirmation.
 
         If the confirmation was deferred, it is completed here once the model
@@ -2445,11 +2461,11 @@ class SelectStage(Stage):
 
     def selected_rule(
         self,
-        context: context_module.RunContext,
+        context: scmle.core.context.RunContext,
         pending: "PendingLedger",
         selected: experiments.TrialResult,
         split: Any,
-    ) -> framing_claim.SelectedModelRule:
+    ) -> scmle.data.framing.claim.SelectedModelRule:
         """Returns the selected model as the rule the baseline claim is about.
 
         Args:
@@ -2477,7 +2493,7 @@ class SelectStage(Stage):
             context.refits[selected.trial_id] = pipeline
         model = require(pending.charter.cost_model, "cost_model")
         classes = sorted(pending.view.target.dropna().unique(), key=str)
-        return framing_claim.SelectedModelRule(
+        return scmle.data.framing.claim.SelectedModelRule(
             pipeline,
             classes[-1],
             float(model.threshold),
@@ -2491,7 +2507,7 @@ class SelectStage(Stage):
             },
         )
 
-    def choose(self, context: context_module.RunContext) -> None:
+    def choose(self, context: scmle.core.context.RunContext) -> None:
         """Chooses the best trial that satisfies the serving constraints.
 
         Without serving limits and without the Pareto option the top-ranked
@@ -2669,7 +2685,7 @@ def coverage_on_confirmation(
 
 
 def declared_slice_columns(
-    context: context_module.RunContext,
+    context: scmle.core.context.RunContext,
 ) -> tuple[str, ...]:
     """Returns the slice columns the charter's uncertainty block declares.
 
@@ -2688,7 +2704,7 @@ def declared_slice_columns(
 
 
 def slice_labels(
-    context: context_module.RunContext, features: pandas.DataFrame
+    context: scmle.core.context.RunContext, features: pandas.DataFrame
 ) -> dict[str, Any]:
     """Returns each final test row's slice label for every declared column.
 
@@ -2719,7 +2735,7 @@ def slice_labels(
 
 
 def chartered_decision_model(
-    context: context_module.RunContext,
+    context: scmle.core.context.RunContext,
 ) -> contracts.AnalysisCharter | None:
     """Returns the charter when it declares a decision layer, else None.
 
@@ -2777,7 +2793,7 @@ def chartered_threshold(
     model = charter.cost_model
     if layer is None or model is None:
         raise errors.ScmleError("the charter has no decision layer")
-    chosen = decision_threshold.choose_threshold(
+    chosen = scmle.decision.threshold.choose_threshold(
         probabilities,
         actual.astype(float),
         model,
@@ -2801,7 +2817,7 @@ def chartered_threshold(
 
 
 def chartered_net_benefit(
-    context: context_module.RunContext,
+    context: scmle.core.context.RunContext,
     pipeline: Any,
     features: pandas.DataFrame,
     target: pandas.Series,
@@ -2869,7 +2885,7 @@ def chartered_net_benefit(
 
 
 def choose_decision_threshold(
-    context: context_module.RunContext, fitted: Any
+    context: scmle.core.context.RunContext, fitted: Any
 ) -> tuple[Any, dict[str, Any] | None]:
     """Optimizes the binary decision threshold on out-of-fold predictions.
 
@@ -2936,9 +2952,9 @@ class FinalEvaluationStage(Stage):
     """Refits the frozen candidate and opens the locked test set once."""
 
     requires = (SelectStage,)
-    state = run_state.RunState.TESTING
+    state = scmle.core.state.RunState.TESTING
 
-    def describe(self, context: context_module.RunContext) -> str:
+    def describe(self, context: scmle.core.context.RunContext) -> str:
         """Names the selected model.
 
         Args:
@@ -2951,7 +2967,7 @@ class FinalEvaluationStage(Stage):
         return f"final one-time test evaluation of {selected.model_name}"
 
     @staticmethod
-    def diagnostic_seconds(context: context_module.RunContext) -> float:
+    def diagnostic_seconds(context: scmle.core.context.RunContext) -> float:
         """Returns the time the post-selection diagnostics may use in total.
 
         A share (`DIAGNOSTIC_BUDGET_SHARE`) of the time budget, never less than
@@ -2970,7 +2986,7 @@ class FinalEvaluationStage(Stage):
 
     def selected_health(
         self,
-        context: context_module.RunContext,
+        context: scmle.core.context.RunContext,
         selected: experiments.TrialResult,
     ) -> dict[str, Any] | None:
         """Returns the fit-health record of the selected trial, if judgeable.
@@ -2993,7 +3009,7 @@ class FinalEvaluationStage(Stage):
 
     def mitigate_fairness(
         self,
-        context: context_module.RunContext,
+        context: scmle.core.context.RunContext,
         selected: experiments.TrialResult,
         pipeline: Any,
         decision: dict[str, Any] | None,
@@ -3075,7 +3091,7 @@ class FinalEvaluationStage(Stage):
 
     def stream_refit(
         self,
-        context: context_module.RunContext,
+        context: scmle.core.context.RunContext,
         pipeline: Any,
     ) -> Any:
         """Passes the whole development partition through an incremental model.
@@ -3123,7 +3139,7 @@ class FinalEvaluationStage(Stage):
 
     def streamed_locked_metrics(
         self,
-        context: context_module.RunContext,
+        context: scmle.core.context.RunContext,
         pipeline: Any,
     ) -> dict[str, Any] | None:
         """Scores every locked row of a streamed file, batch by batch.
@@ -3178,7 +3194,7 @@ class FinalEvaluationStage(Stage):
 
     def uplift_report(
         self,
-        context: context_module.RunContext,
+        context: scmle.core.context.RunContext,
         fitted: Any,
         features: pandas.DataFrame,
         outcome: pandas.Series,
@@ -3218,7 +3234,7 @@ class FinalEvaluationStage(Stage):
 
     def mitigation_on_locked_rows(
         self,
-        context: context_module.RunContext,
+        context: scmle.core.context.RunContext,
         before: Any,
         after: Any,
         features: pandas.DataFrame,
@@ -3264,7 +3280,7 @@ class FinalEvaluationStage(Stage):
 
     def self_train(
         self,
-        context: context_module.RunContext,
+        context: scmle.core.context.RunContext,
         selected: experiments.TrialResult,
         pipeline: Any,
     ) -> Any:
@@ -3307,7 +3323,7 @@ class FinalEvaluationStage(Stage):
             split.manifest.folds,
             unlabeled,
             metric.scorer(
-                metric_catalog.positive_label(split.dev_target, task)
+                scmle.evaluation.metrics.positive_label(split.dev_target, task)
             ),
             data.pseudo_label_confidence,
             lambda: bool(context.resource_governor.skip_reason(first=False)),
@@ -3333,7 +3349,7 @@ class FinalEvaluationStage(Stage):
         return augmented
 
     def register_coverage_claim(
-        self, context: context_module.RunContext
+        self, context: scmle.core.context.RunContext
     ) -> None:
         """Fixes and hashes the coverage claim before the final rows open.
 
@@ -3379,7 +3395,7 @@ class FinalEvaluationStage(Stage):
         )
 
     def register_decision_files(
-        self, context: context_module.RunContext
+        self, context: scmle.core.context.RunContext
     ) -> None:
         """Appends the hashes of the four decision files to the custody log.
 
@@ -3401,7 +3417,7 @@ class FinalEvaluationStage(Stage):
 
     def write_decision_reports(
         self,
-        context: context_module.RunContext,
+        context: scmle.core.context.RunContext,
         pipeline: Any,
         features: pandas.DataFrame,
         target: pandas.Series,
@@ -3496,7 +3512,7 @@ class FinalEvaluationStage(Stage):
             },
         )
 
-    def execute(self, context: context_module.RunContext) -> None:
+    def execute(self, context: scmle.core.context.RunContext) -> None:
         """Refits on all development data and evaluates on the test set.
 
         Reuses the refit made during selection if there is one. Applies
@@ -3690,14 +3706,14 @@ class PackageStage(Stage):
     """Writes the model bundle, leaderboard and report."""
 
     requires = (FinalEvaluationStage,)
-    state = run_state.RunState.PACKAGING
+    state = scmle.core.state.RunState.PACKAGING
 
     def evidence_index(
         self,
-        context: context_module.RunContext,
+        context: scmle.core.context.RunContext,
         store: Any,
-        policy: evaluation_contracts.EvaluationPolicy,
-    ) -> evidence_contracts.EvidenceIndex:
+        policy: scmle.contracts.evaluation.EvaluationPolicy,
+    ) -> scmle.contracts.evidence.EvidenceIndex:
         """Collects accepted evidence for artifacts already written.
 
         Acceptance is deliberately narrow: an automated record is accepted
@@ -3721,13 +3737,13 @@ class PackageStage(Stage):
             "snapshot_id": manifest.snapshot_id or manifest.data_hash,
             "config_hash": context.spec.config_hash(),
         }
-        records: list[evidence_contracts.EvidenceRecord] = []
+        records: list[scmle.contracts.evidence.EvidenceRecord] = []
         for reference in release.required_evidence_references(policy):
             path = store.path(reference)
             if not path.exists():
                 continue
             records.append(
-                evidence_contracts.EvidenceRecord(
+                scmle.contracts.evidence.EvidenceRecord(
                     criterion_id=reference,
                     claim=(
                         f"artifact exists and matches run output: {reference}"
@@ -3742,23 +3758,23 @@ class PackageStage(Stage):
                     ),
                     artifact={
                         "path": reference,
-                        "sha256": bundle_module.file_sha256(path),
+                        "sha256": scmle.artifacts.bundle.file_sha256(path),
                     },
-                    result=evidence_contracts.EvidenceResult.PASS,
+                    result=scmle.contracts.evidence.EvidenceResult.PASS,
                     reviewer="scmle.automation",
                     observed_at=datetime.datetime.now(datetime.UTC).isoformat(),
                     limitations=(
                         "automated artifact-presence and digest check; "
                         "independent human review is not represented",
                     ),
-                    decision=evidence_contracts.EvidenceDecision.ACCEPTED,
+                    decision=scmle.contracts.evidence.EvidenceDecision.ACCEPTED,
                 )
             )
-        return evidence_contracts.EvidenceIndex(records)
+        return scmle.contracts.evidence.EvidenceIndex(records)
 
     def release_evaluation(
         self,
-        context: context_module.RunContext,
+        context: scmle.core.context.RunContext,
         store: Any,
         evaluation: dict[str, Any],
     ) -> None:
@@ -3855,7 +3871,7 @@ class PackageStage(Stage):
 
     def explanation_evidence(
         self,
-        context: context_module.RunContext,
+        context: scmle.core.context.RunContext,
         store: Any,
     ) -> dict[str, dict[str, Any]]:
         """Persists portable evidence for explanations produced by the run.
@@ -3874,8 +3890,10 @@ class PackageStage(Stage):
         """
         manifest = require(context.manifest, "manifest")
         split = require(context.split, "split")
-        model_manifest = store.path(f"model/{bundle_module.MANIFEST_FILE}")
-        bundle_digest = bundle_module.file_sha256(model_manifest)
+        model_manifest = store.path(
+            f"model/{scmle.artifacts.bundle.MANIFEST_FILE}"
+        )
+        bundle_digest = scmle.artifacts.bundle.file_sha256(model_manifest)
         snapshot = explanations.DatasetSnapshot(
             identifier=manifest.dataset_id,
             version=manifest.snapshot_id or manifest.data_hash,
@@ -3887,7 +3905,7 @@ class PackageStage(Stage):
         )
         diagnostics_by_name = {
             diagnostic.name: diagnostic
-            for diagnostic in explanation_suite.default_suite()
+            for diagnostic in scmle.explainability.suite.default_suite()
         }
         evidence: dict[str, dict[str, Any]] = {}
         for name, diagnostic in diagnostics_by_name.items():
@@ -3903,7 +3921,8 @@ class PackageStage(Stage):
             ]
             if result.get("truncated"):
                 limitations.append("feature coverage was truncated by budget")
-            record = explanation_suite.ExplanationEvidenceBuilder().build(
+            builder = scmle.explainability.suite.ExplanationEvidenceBuilder()
+            record = builder.build(
                 diagnostic,
                 result,
                 model_fingerprint=bundle_digest,
@@ -3938,7 +3957,7 @@ class PackageStage(Stage):
                     explanations.EvidenceLink(
                         relation="diagnostic-report",
                         uri=f"diagnostics/{name}.json",
-                        digest=bundle_module.file_sha256(report_path),
+                        digest=scmle.artifacts.bundle.file_sha256(report_path),
                     ),
                 ),
             )
@@ -3954,9 +3973,9 @@ class PackageStage(Stage):
 
     def provenance_record(
         self,
-        context: context_module.RunContext,
+        context: scmle.core.context.RunContext,
         store: Any,
-        bundle: bundle_module.ModelBundle,
+        bundle: scmle.artifacts.bundle.ModelBundle,
     ) -> dict[str, Any]:
         """Builds a content-linked provenance record for the packaged run.
 
@@ -3974,7 +3993,9 @@ class PackageStage(Stage):
             presence.
         """
         manifest = require(context.manifest, "manifest")
-        model_manifest = store.path(f"model/{bundle_module.MANIFEST_FILE}")
+        model_manifest = store.path(
+            f"model/{scmle.artifacts.bundle.MANIFEST_FILE}"
+        )
         record = {
             "schema_version": 1,
             "run_id": store.run_id,
@@ -3989,8 +4010,12 @@ class PackageStage(Stage):
                 ),
             },
             "model": {
-                "manifest_path": f"model/{bundle_module.MANIFEST_FILE}",
-                "manifest_sha256": bundle_module.file_sha256(model_manifest),
+                "manifest_path": (
+                    f"model/{scmle.artifacts.bundle.MANIFEST_FILE}"
+                ),
+                "manifest_sha256": scmle.artifacts.bundle.file_sha256(
+                    model_manifest
+                ),
                 "model_name": bundle.info.model_name,
                 "model_version": bundle.info.model_version,
             },
@@ -4001,9 +4026,9 @@ class PackageStage(Stage):
                 "lock": bundle.info.environment_lock(),
             },
             "signature": {
-                "path": f"model/{bundle_module.SIGNATURE_FILE}",
+                "path": f"model/{scmle.artifacts.bundle.SIGNATURE_FILE}",
                 "present": store.path(
-                    f"model/{bundle_module.SIGNATURE_FILE}"
+                    f"model/{scmle.artifacts.bundle.SIGNATURE_FILE}"
                 ).exists(),
             },
         }
@@ -4012,9 +4037,9 @@ class PackageStage(Stage):
 
     def sbom_record(
         self,
-        context: context_module.RunContext,
+        context: scmle.core.context.RunContext,
         store: Any,
-        bundle: bundle_module.ModelBundle,
+        bundle: scmle.artifacts.bundle.ModelBundle,
     ) -> dict[str, Any]:
         """Builds and persists the packaged environment's SBOM.
 
@@ -4036,7 +4061,7 @@ class PackageStage(Stage):
 
     def reliability_plan_record(
         self,
-        context: context_module.RunContext,
+        context: scmle.core.context.RunContext,
         store: Any,
     ) -> dict[str, Any]:
         """Persists the production fault-injection plan, marked as not run.
@@ -4063,7 +4088,7 @@ class PackageStage(Stage):
         store.write_json("fault_injection_plan.json", record)
         return record
 
-    def describe(self, context: context_module.RunContext) -> str:
+    def describe(self, context: scmle.core.context.RunContext) -> str:
         """Names the stage.
 
         Args:
@@ -4076,7 +4101,7 @@ class PackageStage(Stage):
 
     def learning_curve(
         self,
-        context: context_module.RunContext,
+        context: scmle.core.context.RunContext,
         selected: experiments.TrialResult,
     ) -> dict[str, Any] | None:
         """Returns the selected candidate's learning curve on its first fold.
@@ -4108,7 +4133,7 @@ class PackageStage(Stage):
             fit_positions,
             evaluate_positions,
             metric.scorer(
-                metric_catalog.positive_label(
+                scmle.evaluation.metrics.positive_label(
                     split.dev_target, require(context.task, "task")
                 )
             ),
@@ -4118,7 +4143,7 @@ class PackageStage(Stage):
         return None if curve is None else curve.to_dict()
 
     def note_conformal_skipped(
-        self, context: context_module.RunContext, reason: str
+        self, context: scmle.core.context.RunContext, reason: str
     ) -> None:
         """Records why the bundle will have no prediction intervals or sets.
 
@@ -4134,9 +4159,9 @@ class PackageStage(Stage):
 
     def conformal_calibration(
         self,
-        context: context_module.RunContext,
+        context: scmle.core.context.RunContext,
         selected: experiments.TrialResult,
-        bundle: bundle_module.ModelBundle,
+        bundle: scmle.artifacts.bundle.ModelBundle,
     ) -> conformal.ConformalCalibrator | None:
         """Calibrates intervals or sets from out-of-fold predictions.
 
@@ -4252,7 +4277,7 @@ class PackageStage(Stage):
         )
 
     def entity_calibration_column(
-        self, context: context_module.RunContext
+        self, context: scmle.core.context.RunContext
     ) -> str | None:
         """Returns the group column when the charter's unit is a new entity.
 
@@ -4277,8 +4302,8 @@ class PackageStage(Stage):
 
     def keep_cv_plus(
         self,
-        context: context_module.RunContext,
-        bundle: bundle_module.ModelBundle,
+        context: scmle.core.context.RunContext,
+        bundle: scmle.artifacts.bundle.ModelBundle,
         models: list[Any],
         observed: numpy.ndarray,
         predicted: numpy.ndarray,
@@ -4325,8 +4350,8 @@ class PackageStage(Stage):
 
     def complete_held_ledger(
         self,
-        context: context_module.RunContext,
-        bundle: bundle_module.ModelBundle,
+        context: scmle.core.context.RunContext,
+        bundle: scmle.artifacts.bundle.ModelBundle,
     ) -> None:
         """Opens `C` once the bundle and its calibration are frozen.
 
@@ -4364,7 +4389,7 @@ class PackageStage(Stage):
             context, pending, pending.subject, runner
         )
 
-    def cv_plus_cap(self, context: context_module.RunContext) -> int:
+    def cv_plus_cap(self, context: scmle.core.context.RunContext) -> int:
         """Returns the byte cap for kept fold models (charter's, else default).
 
         Args:
@@ -4382,7 +4407,7 @@ class PackageStage(Stage):
         return cv_plus.MAX_BYTES
 
     def quantile_intervals(
-        self, context: context_module.RunContext
+        self, context: scmle.core.context.RunContext
     ) -> quantile.QuantileIntervals | None:
         """Fits and calibrates the low and high quantile models (regression).
 
@@ -4449,7 +4474,7 @@ class PackageStage(Stage):
 
     def bias_variance(
         self,
-        context: context_module.RunContext,
+        context: scmle.core.context.RunContext,
         selected: experiments.TrialResult,
     ) -> dict[str, Any] | None:
         """Splits the selected model's error into bias and variance.
@@ -4493,7 +4518,7 @@ class PackageStage(Stage):
 
     def sensitivity(
         self,
-        context: context_module.RunContext,
+        context: scmle.core.context.RunContext,
         selected: experiments.TrialResult,
     ) -> dict[str, Any] | None:
         """Measures how the selected model's score varies with its inputs.
@@ -4532,7 +4557,7 @@ class PackageStage(Stage):
         seed = context.spec.validation.seed
         metric = require(context.metric, "metric")
         scorer = metric.scorer(
-            metric_catalog.positive_label(split.dev_target, task)
+            scmle.evaluation.metrics.positive_label(split.dev_target, task)
         )
         report = sensitivity.analyze(
             lambda: strategy.build(plan, adapter, task, seed, selected.params),
@@ -4546,7 +4571,7 @@ class PackageStage(Stage):
 
     def nested_validation(
         self,
-        context: context_module.RunContext,
+        context: scmle.core.context.RunContext,
         selected: experiments.TrialResult,
     ) -> dict[str, Any] | None:
         """Estimates the optimism of the winning score by nested validation.
@@ -4578,7 +4603,9 @@ class PackageStage(Stage):
         plan = require(context.profile, "profile").feature_plan
         seed = context.spec.validation.seed
         metric = require(context.metric, "metric")
-        positive = metric_catalog.positive_label(split.dev_target, task)
+        positive = scmle.evaluation.metrics.positive_label(
+            split.dev_target, task
+        )
         result = nested.nested_score(
             lambda params: strategy.build(plan, adapter, task, seed, params),
             adapter.search_space,
@@ -4602,7 +4629,7 @@ class PackageStage(Stage):
 
     def forecast_backtest(
         self,
-        context: context_module.RunContext,
+        context: scmle.core.context.RunContext,
         selected: experiments.TrialResult,
     ) -> dict[str, Any] | None:
         """Per-step errors against baselines, and one row per rolling origin.
@@ -4664,7 +4691,7 @@ class PackageStage(Stage):
 
     def build_evidence_graph(
         self,
-        context: context_module.RunContext,
+        context: scmle.core.context.RunContext,
         store: Any,
     ) -> lineage.EvidenceGraph:
         """Builds the content-linked graph for one completed package.
@@ -4713,7 +4740,9 @@ class PackageStage(Stage):
             lineage.EvidenceNode(
                 "curation",
                 lineage.EvidenceNodeKind.CURATION,
-                bundle_module.file_sha256(store.path("curation_report.json")),
+                scmle.artifacts.bundle.file_sha256(
+                    store.path("curation_report.json")
+                ),
                 {"artifact": "curation_report.json"},
             )
         )
@@ -4748,12 +4777,14 @@ class PackageStage(Stage):
         )
 
         pipeline_path = store.path("model/pipeline.joblib")
-        model_manifest_path = store.path(f"model/{bundle_module.MANIFEST_FILE}")
+        model_manifest_path = store.path(
+            f"model/{scmle.artifacts.bundle.MANIFEST_FILE}"
+        )
         graph.add_node(
             lineage.EvidenceNode(
                 "model",
                 lineage.EvidenceNodeKind.MODEL,
-                bundle_module.file_sha256(pipeline_path),
+                scmle.artifacts.bundle.file_sha256(pipeline_path),
                 {"model_family": selected.model_name},
             )
         )
@@ -4762,7 +4793,9 @@ class PackageStage(Stage):
             lineage.EvidenceNode(
                 "evaluation",
                 lineage.EvidenceNodeKind.EVALUATION,
-                bundle_module.file_sha256(store.path("evaluation.json")),
+                scmle.artifacts.bundle.file_sha256(
+                    store.path("evaluation.json")
+                ),
                 {"artifact": "evaluation.json"},
             )
         )
@@ -4776,7 +4809,7 @@ class PackageStage(Stage):
         if explanation_paths:
             explanation_identity = hashlib.sha256(
                 "\n".join(
-                    f"{path.name}:{bundle_module.file_sha256(path)}"
+                    f"{path.name}:{scmle.artifacts.bundle.file_sha256(path)}"
                     for path in explanation_paths
                 ).encode("utf-8")
             ).hexdigest()
@@ -4801,8 +4834,8 @@ class PackageStage(Stage):
             lineage.EvidenceNode(
                 "bundle",
                 lineage.EvidenceNodeKind.BUNDLE,
-                bundle_module.file_sha256(model_manifest_path),
-                {"artifact": "model/" + bundle_module.MANIFEST_FILE},
+                scmle.artifacts.bundle.file_sha256(model_manifest_path),
+                {"artifact": "model/" + scmle.artifacts.bundle.MANIFEST_FILE},
             )
         )
         graph.add_edge(lineage.EvidenceEdge("model", "bundle", "packages"))
@@ -4815,7 +4848,7 @@ class PackageStage(Stage):
         context.evidence_graph = graph
         return graph
 
-    def execute(self, context: context_module.RunContext) -> None:
+    def execute(self, context: scmle.core.context.RunContext) -> None:
         """Packages artifacts and assembles the `RunResult`.
 
         Builds the model bundle with its conformal, quantile and coverage
@@ -4830,7 +4863,7 @@ class PackageStage(Stage):
         selected = require(context.selected, "selected")
         evaluation = require(context.evaluation, "evaluation")
         profile = require(context.profile, "profile")
-        bundle = bundle_module.ModelBundle.create(
+        bundle = scmle.artifacts.bundle.ModelBundle.create(
             context.final_pipeline,
             profile.feature_plan,
             split.dev_features,
@@ -4848,7 +4881,7 @@ class PackageStage(Stage):
             time_column=context.spec.data.time_column,
             history_source=context.frame,
             class_labels=context.ordinal_labels,
-            reference=reference_module.ReferenceProfile.build(
+            reference=scmle.monitoring.reference.ReferenceProfile.build(
                 split.dev_features,
                 profile.feature_plan,
                 require(context.reference_scores, "reference_scores"),
@@ -4905,8 +4938,8 @@ class PackageStage(Stage):
             profile,
             bundle,
             evaluation,
-            bundle_module.file_sha256(
-                store.path(f"model/{bundle_module.MANIFEST_FILE}")
+            scmle.artifacts.bundle.file_sha256(
+                store.path(f"model/{scmle.artifacts.bundle.MANIFEST_FILE}")
             ),
         )
         evaluation["model_card"] = card.to_dict()
@@ -4964,7 +4997,7 @@ class PackageStage(Stage):
         result = results.RunResult(
             run_id=store.run_id,
             run_dir=store.directory,
-            state=run_state.RunState.COMPLETED.value,
+            state=scmle.core.state.RunState.COMPLETED.value,
             plan=require(context.plan, "plan"),
             profile=profile,
             trials=context.trials,
@@ -5006,14 +5039,14 @@ class PackageStage(Stage):
             "parameter_estimation.json",
             "evidence_graph.json",
             "evaluation.json",
-            f"model/{bundle_module.MANIFEST_FILE}",
-            f"model/{bundle_module.MODEL_FILE}",
+            f"model/{scmle.artifacts.bundle.MANIFEST_FILE}",
+            f"model/{scmle.artifacts.bundle.MODEL_FILE}",
             "explanations/permutation_importance.html",
             "explanations/partial_dependence.html",
             "explanations/pairwise_interaction.html",
         )
         return {
-            name: bundle_module.file_sha256(store.path(name))
+            name: scmle.artifacts.bundle.file_sha256(store.path(name))
             for name in names
             if store.path(name).exists()
         }

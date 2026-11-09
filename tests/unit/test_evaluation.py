@@ -10,7 +10,7 @@ from scmle.contracts import experiments
 from scmle.contracts import tasks
 from scmle.evaluation import metrics
 from scmle.evaluation import selection
-from scmle.models import registry as registry_module
+import scmle.models.registry
 
 CATALOG = metrics.CATALOG
 TrialResult = experiments.TrialResult
@@ -72,7 +72,7 @@ def make_trial(name, score, status=Status.OK):
 
 @pytest.fixture(scope="module")
 def registry():
-    return registry_module.ModelRegistry.with_builtins()
+    return scmle.models.registry.ModelRegistry.with_builtins()
 
 
 def test_best_mean_respects_orientation(registry):
@@ -304,9 +304,9 @@ def test_a_rope_makes_negligible_gains_ties(registry):
 def test_a_lower_is_better_positive_label_metric_scores_sign_adjusted():
     from sklearn import metrics as sk_metrics
 
-    from scmle.contracts import metrics as metric_contracts
+    import scmle.contracts.metrics
 
-    metric = metric_contracts.PositiveLabelMetric(
+    metric = scmle.contracts.metrics.PositiveLabelMetric(
         "false_f1",
         "f1",
         False,

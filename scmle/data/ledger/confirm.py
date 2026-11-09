@@ -92,8 +92,8 @@ from scmle.contracts import qualification
 from scmle.core import randomness
 from scmle.data.ledger import bivariate
 from scmle.data.ledger import budget
-from scmle.data.ledger import ledger as ledger_module
 from scmle.data.ledger import multiplicity
+import scmle.data.ledger.ledger
 
 UNCONFIRMED = "unconfirmed"
 THRESHOLDOUT = "thresholdout"
@@ -397,7 +397,7 @@ class Confirmation:
             record["registered_claims"] = self.registered
         if self.documents:
             record["attachments"] = {
-                name: ledger_module.digest(dict(content))
+                name: scmle.data.ledger.ledger.digest(dict(content))
                 for name, content in sorted(self.documents.items())
             }
         return record
@@ -453,7 +453,7 @@ def assumptions(
     return tuple(lines)
 
 
-def statement(spec: ledger_module.HypothesisSpec) -> str:
+def statement(spec: scmle.data.ledger.ledger.HypothesisSpec) -> str:
     """Writes the sentence of a claim.
 
     Args:
@@ -466,7 +466,7 @@ def statement(spec: ledger_module.HypothesisSpec) -> str:
 
 
 def unverified_claims(
-    ledger: ledger_module.Ledger, why: str
+    ledger: scmle.data.ledger.ledger.Ledger, why: str
 ) -> tuple[qualification.Claim, ...]:
     """Builds claims for survivors that were not (or could not be) confirmed.
 
@@ -482,7 +482,7 @@ def unverified_claims(
     """
     survivors = ledger.survivor_set
     if survivors is None:
-        raise ledger_module.LedgerError("freeze the survivors first")
+        raise scmle.data.ledger.ledger.LedgerError("freeze the survivors first")
     claims = []
     for hypothesis_id in survivors.hypothesis_ids:
         result = ledger.results[hypothesis_id]
@@ -506,7 +506,7 @@ def unverified_claims(
 
 
 def finish(
-    ledger: ledger_module.Ledger,
+    ledger: scmle.data.ledger.ledger.Ledger,
     *,
     outcome: str,
     reason: str,
@@ -545,7 +545,7 @@ def finish(
     """
     survivors = ledger.survivor_set
     if survivors is None:
-        raise ledger_module.LedgerError("freeze the survivors first")
+        raise scmle.data.ledger.ledger.LedgerError("freeze the survivors first")
     body: dict[str, Any] = {
         "outcome": outcome,
         "reason": reason,
@@ -573,7 +573,7 @@ def finish(
         }
         body["claims"] = registered
         body["attachments"] = {
-            name: ledger_module.digest(dict(content))
+            name: scmle.data.ledger.ledger.digest(dict(content))
             for name, content in sorted(documents.items())
         }
     ledger.seal(body)
@@ -614,7 +614,7 @@ def check_policy(policy: str) -> None:
 
 
 def withdrawn_claims(
-    ledger: ledger_module.Ledger, reasons: Mapping[str, str]
+    ledger: scmle.data.ledger.ledger.Ledger, reasons: Mapping[str, str]
 ) -> dict[str, qualification.Claim]:
     """Builds unverified claims for survivors withdrawn before `C` opened.
 
@@ -646,7 +646,7 @@ def withdrawn_claims(
 
 
 def stage_two_record(
-    ledger: ledger_module.Ledger, withdrawal: Withdrawal
+    ledger: scmle.data.ledger.ledger.Ledger, withdrawal: Withdrawal
 ) -> dict[str, Any]:
     """Builds the accounting of a withdrawal, hashed over the surviving family.
 
@@ -665,7 +665,7 @@ def stage_two_record(
     survivors = ledger.freeze()
     unknown = sorted(set(withdrawal.reasons) - set(survivors.hypothesis_ids))
     if unknown:
-        raise ledger_module.LedgerError(
+        raise scmle.data.ledger.ledger.LedgerError(
             f"withdrawn ids {unknown} are not frozen survivors"
         )
     family = [
@@ -676,7 +676,7 @@ def stage_two_record(
         "survivors": list(survivors.hypothesis_ids),
         "withdrawn": dict(sorted(withdrawal.reasons.items())),
         "family": family,
-        "family_sha256": ledger_module.digest(
+        "family_sha256": scmle.data.ledger.ledger.digest(
             {"survivors_sha256": survivors.sha256, "family": family}
         ),
         "rule": dict(withdrawal.rule),
@@ -685,7 +685,7 @@ def stage_two_record(
 
 
 def run_confirmation(
-    ledger: ledger_module.Ledger,
+    ledger: scmle.data.ledger.ledger.Ledger,
     rows: tuple[pandas.DataFrame, pandas.Series],
     rule: budget.MultiplicityRule,
     alpha: Fraction,
@@ -714,7 +714,7 @@ def run_confirmation(
     """
     survivors = ledger.survivor_set
     if survivors is None:
-        raise ledger_module.LedgerError("freeze the survivors first")
+        raise scmle.data.ledger.ledger.LedgerError("freeze the survivors first")
     features, target = rows
     withdrawn = {} if stage_two is None else dict(stage_two["withdrawn"])
     ids = tuple(i for i in survivors.hypothesis_ids if i not in withdrawn)
@@ -800,7 +800,7 @@ def default_encoding(target: pandas.Series) -> Any:
 
 
 def confirm(
-    ledger: ledger_module.Ledger,
+    ledger: scmle.data.ledger.ledger.Ledger,
     source: ConfirmationSource | None,
     *,
     alpha_confirm: Fraction,
@@ -950,7 +950,7 @@ def confirm(
         survivors.sha256 if record is None else record["family_sha256"]
     )
     if registered:
-        claims_hash = ledger_module.digest(
+        claims_hash = scmle.data.ledger.ledger.digest(
             {
                 "family": claims_hash,
                 "registered": [[i.claim_id, i.sha256] for i in registered],
@@ -1045,7 +1045,7 @@ def confirm(
 
 
 def family_block(
-    ledger: ledger_module.Ledger,
+    ledger: scmle.data.ledger.ledger.Ledger,
     record: Mapping[str, Any] | None,
     alpha_confirm: Fraction,
     require_control: bool,

@@ -22,10 +22,10 @@ from scmle.features import feature_graph
 from scmle.models import weighting
 from scmle.models import wrappers
 from scmle.models.forecasting import estimators
-from scmle.models.multitarget import wrapper as multitarget_wrapper
-from scmle.models.ranking import wrapper as ranking_wrapper
-from scmle.models.survival import wrapper as survival_wrapper
-from scmle.models.uplift import wrapper as uplift_wrapper
+import scmle.models.multitarget.wrapper
+import scmle.models.ranking.wrapper
+import scmle.models.survival.wrapper
+import scmle.models.uplift.wrapper
 
 SPARSE_THRESHOLD = 0.3
 
@@ -315,24 +315,28 @@ def build_pipeline(
     steps.append(("model", estimator))
     built: Any = pipeline.Pipeline(steps)
     if plan.event_column:
-        built = survival_wrapper.EventAwareEstimator(built, plan.event_column)
+        built = scmle.models.survival.wrapper.EventAwareEstimator(
+            built, plan.event_column
+        )
     if task is tasks.TaskType.FORECAST:
         built = estimators.ForecastEstimator(
             built, plan.target_columns, plan.value_column or ""
         )
     elif plan.target_columns:
         kind = (
-            multitarget_wrapper.MultiLabelEstimator
+            scmle.models.multitarget.wrapper.MultiLabelEstimator
             if task is tasks.TaskType.MULTILABEL
-            else multitarget_wrapper.MultiOutputEstimator
+            else scmle.models.multitarget.wrapper.MultiOutputEstimator
         )
         built = kind(built, plan.target_columns)
     if plan.treatment_column:
-        built = uplift_wrapper.TreatmentAwareEstimator(
+        built = scmle.models.uplift.wrapper.TreatmentAwareEstimator(
             built, plan.treatment_column
         )
     if plan.query_column:
-        built = ranking_wrapper.QueryAwareEstimator(built, plan.query_column)
+        built = scmle.models.ranking.wrapper.QueryAwareEstimator(
+            built, plan.query_column
+        )
     if plan.weight_column:
         return weighting.weighted(built, plan.weight_column, seed)
     return built

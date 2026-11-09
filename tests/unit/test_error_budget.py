@@ -5,13 +5,13 @@ import json
 
 import pytest
 
-from scmle.data.ledger import budget as b
+import scmle.data.ledger.budget
 
 
 def make_budget(**overrides):
     values = {"alpha_confirm": 0.05, "wealth_exploration": 0.1}
     values.update(overrides)
-    return b.ErrorBudget.create(**values)
+    return scmle.data.ledger.budget.ErrorBudget.create(**values)
 
 
 def test_create_reads_decimals_exactly_as_written():
@@ -19,7 +19,7 @@ def test_create_reads_decimals_exactly_as_written():
     assert budget.confirmation.alpha_confirm == Fraction(1, 20)
     assert budget.exploration.wealth == Fraction(1, 10)
     assert budget.exploration.initial == Fraction(1, 10)
-    assert budget.permutations_b == b.MIN_PERMUTATIONS
+    assert budget.permutations_b == scmle.data.ledger.budget.MIN_PERMUTATIONS
 
 
 @pytest.mark.parametrize("alpha", [0.0, 1.0, -0.1, float("nan"), True])
@@ -36,20 +36,22 @@ def test_wealth_must_lie_in_the_unit_interval(wealth):
 
 def test_zero_wealth_means_no_exploration_budget():
     budget = make_budget(wealth_exploration=0.0)
-    assert b.remaining(budget) == 0.0
+    assert scmle.data.ledger.budget.remaining(budget) == 0.0
 
 
 def test_permutation_count_has_a_floor():
     with pytest.raises(ValueError, match="permutations_b"):
-        make_budget(permutations_b=b.MIN_PERMUTATIONS - 1)
+        make_budget(
+            permutations_b=scmle.data.ledger.budget.MIN_PERMUTATIONS - 1
+        )
     assert make_budget(permutations_b=100).permutations_b == 100
 
 
 def test_spending_returns_a_new_budget_and_never_mutates():
     budget = make_budget()
-    spent = b.spend(budget, 0.04)
-    assert b.remaining(budget) == pytest.approx(0.1)
-    assert b.remaining(spent) == pytest.approx(0.06)
+    spent = scmle.data.ledger.budget.spend(budget, 0.04)
+    assert scmle.data.ledger.budget.remaining(budget) == pytest.approx(0.1)
+    assert scmle.data.ledger.budget.remaining(spent) == pytest.approx(0.06)
     assert spent.confirmation is budget.confirmation
     with pytest.raises(AttributeError):
         budget.permutations_b = 5  # type: ignore[misc]
@@ -57,20 +59,22 @@ def test_spending_returns_a_new_budget_and_never_mutates():
 
 def test_overspending_is_refused_and_leaves_the_budget_intact():
     budget = make_budget()
-    with pytest.raises(b.BudgetExhaustedError, match="exceeds"):
-        b.spend(budget, 0.11)
-    assert b.remaining(budget) == pytest.approx(0.1)
+    with pytest.raises(
+        scmle.data.ledger.budget.BudgetExhaustedError, match="exceeds"
+    ):
+        scmle.data.ledger.budget.spend(budget, 0.11)
+    assert scmle.data.ledger.budget.remaining(budget) == pytest.approx(0.1)
 
 
 def test_spending_everything_is_allowed_and_leaves_exactly_zero():
-    spent = b.spend(make_budget(), 0.1)
+    spent = scmle.data.ledger.budget.spend(make_budget(), 0.1)
     assert spent.exploration.wealth == 0
 
 
 @pytest.mark.parametrize("amount", [-0.01, float("nan"), True])
 def test_spend_rejects_invalid_amounts(amount):
     with pytest.raises(ValueError, match="amount"):
-        b.spend(make_budget(), amount)
+        scmle.data.ledger.budget.spend(make_budget(), amount)
 
 
 def test_exploration_and_confirmation_budgets_are_separate_types():
@@ -84,14 +88,20 @@ def test_exploration_and_confirmation_budgets_are_separate_types():
 
 def test_exploration_budget_rejects_inconsistent_state():
     with pytest.raises(ValueError, match="wealth"):
-        b.ExplorationBudget(initial=Fraction(1, 10), wealth=Fraction(1, 5))
+        scmle.data.ledger.budget.ExplorationBudget(
+            initial=Fraction(1, 10), wealth=Fraction(1, 5)
+        )
     with pytest.raises(ValueError, match="initial"):
-        b.ExplorationBudget(initial=Fraction(3, 2), wealth=Fraction(1, 2))
+        scmle.data.ledger.budget.ExplorationBudget(
+            initial=Fraction(3, 2), wealth=Fraction(1, 2)
+        )
 
 
 def test_split_budget_shares_sum_exactly_to_the_totals():
-    budget = b.spend(make_budget(), 0.03)
-    parts = b.split_budget(budget, {"x": 1, "y": 2, "z": 0.5})
+    budget = scmle.data.ledger.budget.spend(make_budget(), 0.03)
+    parts = scmle.data.ledger.budget.split_budget(
+        budget, {"x": 1, "y": 2, "z": 0.5}
+    )
     assert set(parts) == {"x", "y", "z"}
     assert sum(p.confirmation.alpha_confirm for p in parts.values()) == (
         budget.confirmation.alpha_confirm
@@ -112,63 +122,69 @@ def test_split_budget_shares_sum_exactly_to_the_totals():
 )
 def test_split_budget_rejects_bad_weights(weights):
     with pytest.raises(ValueError):
-        b.split_budget(make_budget(), weights)
+        scmle.data.ledger.budget.split_budget(make_budget(), weights)
 
 
 def test_confirmation_alpha_for_each_rule():
     budget = make_budget()
-    assert b.confirmation_alpha(budget, 10, b.MultiplicityRule.BONFERRONI) == (
-        pytest.approx(0.005)
-    )
-    assert b.confirmation_alpha(budget, 10, b.MultiplicityRule.HOLM) == (
-        pytest.approx(0.005)
-    )
-    assert b.confirmation_alpha(budget, 10, b.MultiplicityRule.BH) == (
-        pytest.approx(0.005)
-    )
+    assert scmle.data.ledger.budget.confirmation_alpha(
+        budget, 10, scmle.data.ledger.budget.MultiplicityRule.BONFERRONI
+    ) == (pytest.approx(0.005))
+    assert scmle.data.ledger.budget.confirmation_alpha(
+        budget, 10, scmle.data.ledger.budget.MultiplicityRule.HOLM
+    ) == (pytest.approx(0.005))
+    assert scmle.data.ledger.budget.confirmation_alpha(
+        budget, 10, scmle.data.ledger.budget.MultiplicityRule.BH
+    ) == (pytest.approx(0.005))
     harmonic = sum(1 / k for k in range(1, 11))
-    assert b.confirmation_alpha(budget, 10, b.MultiplicityRule.BY) == (
-        pytest.approx(0.05 / (10 * harmonic))
-    )
+    assert scmle.data.ledger.budget.confirmation_alpha(
+        budget, 10, scmle.data.ledger.budget.MultiplicityRule.BY
+    ) == (pytest.approx(0.05 / (10 * harmonic)))
 
 
 def test_confirmation_alpha_with_no_survivors_is_the_full_alpha():
-    assert b.confirmation_alpha(
-        make_budget(), 0, b.MultiplicityRule.BH
+    assert scmle.data.ledger.budget.confirmation_alpha(
+        make_budget(), 0, scmle.data.ledger.budget.MultiplicityRule.BH
     ) == pytest.approx(0.05)
 
 
 def test_confirmation_alpha_rejects_negative_counts():
     with pytest.raises(ValueError, match="n_survivors"):
-        b.confirmation_alpha(make_budget(), -1, b.MultiplicityRule.BH)
+        scmle.data.ledger.budget.confirmation_alpha(
+            make_budget(), -1, scmle.data.ledger.budget.MultiplicityRule.BH
+        )
 
 
 def test_detector_tolerances_validate_and_round_trip():
-    tolerance = b.DetectorTolerance("label_noise", 0.05, 0.8)
+    tolerance = scmle.data.ledger.budget.DetectorTolerance(
+        "label_noise", 0.05, 0.8
+    )
     budget = make_budget(detector_tolerances=(tolerance,))
     assert budget.detector_tolerances == (tolerance,)
     with pytest.raises(ValueError, match="max_false_alarm_rate"):
-        b.DetectorTolerance("x", 1.5, 0.8)
+        scmle.data.ledger.budget.DetectorTolerance("x", 1.5, 0.8)
     with pytest.raises(ValueError, match="duplicate"):
         make_budget(detector_tolerances=(tolerance, tolerance))
 
 
 def test_json_round_trip_is_exact():
-    budget = b.spend(
+    budget = scmle.data.ledger.budget.spend(
         make_budget(
-            detector_tolerances=(b.DetectorTolerance("d", 0.05, 0.8),),
+            detector_tolerances=(
+                scmle.data.ledger.budget.DetectorTolerance("d", 0.05, 0.8),
+            ),
             permutations_b=50,
         ),
         0.0123,
     )
     record = json.loads(json.dumps(budget.to_dict()))
-    assert b.ErrorBudget.from_dict(record) == budget
+    assert scmle.data.ledger.budget.ErrorBudget.from_dict(record) == budget
 
 
 def test_loading_rejects_unknown_fields_and_bad_fractions():
     record = make_budget().to_dict()
     with pytest.raises(ValueError, match="unexpected"):
-        b.ErrorBudget.from_dict({**record, "extra": 1})
+        scmle.data.ledger.budget.ErrorBudget.from_dict({**record, "extra": 1})
     record["confirmation"]["alpha_confirm"] = "not-a-fraction"
     with pytest.raises(ValueError, match="alpha_confirm"):
-        b.ErrorBudget.from_dict(record)
+        scmle.data.ledger.budget.ErrorBudget.from_dict(record)

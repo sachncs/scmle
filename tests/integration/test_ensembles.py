@@ -8,7 +8,7 @@ import scmle
 from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.models import ensembles
-from scmle.models import registry as registry_module
+import scmle.models.registry
 
 ENSEMBLE = tasks.EnsembleSpec(size=3)
 
@@ -41,7 +41,7 @@ def test_stack_is_evaluated_against_its_members(binary_frame, tmp_path):
 
 
 def test_stack_is_cross_fitted_inside_each_training_fold(binary_frame):
-    registry = registry_module.ModelRegistry.with_builtins()
+    registry = scmle.models.registry.ModelRegistry.with_builtins()
     adapter = registry.get("stacking")
     params = {
         "members": [
@@ -86,7 +86,7 @@ def test_a_winning_stack_is_selected_refit_and_packaged(
 
 
 def test_stacking_is_never_a_screening_candidate(binary_frame):
-    registry = registry_module.ModelRegistry.with_builtins()
+    registry = scmle.models.registry.ModelRegistry.with_builtins()
     names = {a.name for a in registry.candidates(tasks.TaskType.BINARY)[0]}
     assert "stacking" not in names
     rejected = registry.candidates(tasks.TaskType.BINARY)[1]
@@ -94,7 +94,7 @@ def test_stacking_is_never_a_screening_candidate(binary_frame):
 
 
 def test_stacking_needs_two_members():
-    registry = registry_module.ModelRegistry.with_builtins()
+    registry = scmle.models.registry.ModelRegistry.with_builtins()
     with pytest.raises(errors.ConfigError, match="at least two"):
         registry.get("stacking").build(
             tasks.TaskType.BINARY, 0, {"members": [{"model": "ridge"}]}

@@ -14,7 +14,7 @@ import dataclasses
 import math
 from typing import Any
 
-import numpy as np
+import numpy
 from numpy.typing import ArrayLike
 from scipy import stats
 
@@ -45,13 +45,13 @@ def intraclass(d: ArrayLike, clusters: ArrayLike) -> tuple[float, float]:
     n = values.size
     if g < 2 or n <= g:
         return 0.0, n / max(g, 1)
-    counts = np.bincount(codes, minlength=g).astype(float)
-    means = np.bincount(codes, weights=values, minlength=g) / counts
+    counts = numpy.bincount(codes, minlength=g).astype(float)
+    means = numpy.bincount(codes, weights=values, minlength=g) / counts
     grand = float(values.mean())
-    ssb = float(np.sum(counts * (means - grand) ** 2))
-    ssw = float(np.sum((values - means[codes]) ** 2))
+    ssb = float(numpy.sum(counts * (means - grand) ** 2))
+    ssw = float(numpy.sum((values - means[codes]) ** 2))
     msb, msw = ssb / (g - 1), ssw / (n - g)
-    m0 = (n - float(np.sum(counts**2)) / n) / (g - 1)
+    m0 = (n - float(numpy.sum(counts**2)) / n) / (g - 1)
     denominator = msb + (m0 - 1) * msw
     rho = (msb - msw) / denominator if denominator > 0 else 0.0
     return min(max(rho, 0.0), 1.0), n / g

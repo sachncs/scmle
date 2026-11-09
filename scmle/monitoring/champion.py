@@ -5,7 +5,7 @@ import dataclasses
 import numpy
 import pandas
 
-from scmle.artifacts import bundle as bundle_module
+import scmle.artifacts.bundle
 from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.evaluation import diagnostics
@@ -53,8 +53,8 @@ class ChampionChallenger:
 
     def __init__(
         self,
-        champion: bundle_module.ModelBundle,
-        challenger: bundle_module.ModelBundle,
+        champion: scmle.artifacts.bundle.ModelBundle,
+        challenger: scmle.artifacts.bundle.ModelBundle,
         bootstraps: int = BOOTSTRAPS,
         seed: int = 0,
     ) -> None:
@@ -137,7 +137,7 @@ class ChampionChallenger:
         sign = 1.0 if metric.greater_is_better else -1.0
 
         def score(
-            bundle: bundle_module.ModelBundle,
+            bundle: scmle.artifacts.bundle.ModelBundle,
             view: pandas.DataFrame,
             rows: numpy.ndarray,
         ) -> float:

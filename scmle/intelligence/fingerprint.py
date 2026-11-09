@@ -17,8 +17,8 @@ from sklearn import linear_model
 from sklearn import model_selection
 from sklearn import pipeline
 
-from scmle.contracts import data as data_contracts
 from scmle.contracts import tasks
+import scmle.contracts.data
 from scmle.data.curation import preprocessing
 from scmle.data.validation import columns
 from scmle.monitoring import reference
@@ -129,7 +129,7 @@ def missingness_patterns(features: pandas.DataFrame) -> dict[str, Any]:
 
 
 def text_like_columns(
-    frame: pandas.DataFrame, plan: data_contracts.FeaturePlan
+    frame: pandas.DataFrame, plan: scmle.contracts.data.FeaturePlan
 ) -> list[str]:
     """Finds categorical columns holding free text rather than short labels.
 
@@ -178,7 +178,7 @@ def ml_difficulty(
     frame: pandas.DataFrame,
     spec: tasks.ProjectSpec,
     task: tasks.TaskType,
-    plan: data_contracts.FeaturePlan,
+    plan: scmle.contracts.data.FeaturePlan,
 ) -> dict[str, Any]:
     """Runs cheap baselines that show how hard the problem looks.
 
@@ -228,7 +228,7 @@ def ml_difficulty(
                 max_iter=60, random_state=0
             ),
         }
-    options = data_contracts.PreprocessingOptions(scale=True)
+    options = scmle.contracts.data.PreprocessingOptions(scale=True)
     scores: dict[str, float] = {}
     started = time.monotonic()
     try:
@@ -308,7 +308,7 @@ def build_fingerprint(
     frame: pandas.DataFrame,
     spec: tasks.ProjectSpec,
     task: tasks.TaskType,
-    plan: data_contracts.FeaturePlan,
+    plan: scmle.contracts.data.FeaturePlan,
     column_statistics: dict[str, dict[str, Any]],
     duplicate_rows: int,
     read_seconds: float,

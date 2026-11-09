@@ -29,7 +29,7 @@ from typing import Any
 from scmle.contracts import errors
 from scmle.data.store import objectstore
 from scmle.workflow import definition
-from scmle.workflow import executor as executor_module
+import scmle.workflow.executor
 
 GRACE_FRACTION = 0.1
 
@@ -139,7 +139,9 @@ class Scheduler:
             last + schedule.interval_seconds * n for n in range(1, count + 1)
         ]
 
-    def tick(self, executor: executor_module.LocalExecutor) -> TickReport:
+    def tick(
+        self, executor: scmle.workflow.executor.LocalExecutor
+    ) -> TickReport:
         """Runs what is due under the catch-up policy.
 
         A slot that cannot start because a run is in flight or the workflow is
@@ -169,8 +171,8 @@ class Scheduler:
             try:
                 record = executor.start(f"slot-{int(slot)}", "scheduler")
             except (
-                executor_module.RunInFlightError,
-                executor_module.ConcurrencyLimitError,
+                scmle.workflow.executor.RunInFlightError,
+                scmle.workflow.executor.ConcurrencyLimitError,
             ):
                 deferred.append(slot)
                 break

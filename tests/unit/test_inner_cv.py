@@ -8,7 +8,7 @@ import pandas
 from scmle.contracts import data
 from scmle.contracts import tasks
 from scmle.data.splitting import inner_cv
-from scmle.models import registry as registry_module
+import scmle.models.registry
 from scmle.sampling import strategies
 
 BINARY = tasks.TaskType.BINARY
@@ -70,7 +70,7 @@ def plan(**kwargs):
 
 
 def test_calibration_strategy_uses_the_structured_splitter():
-    registry = registry_module.ModelRegistry.with_builtins()
+    registry = scmle.models.registry.ModelRegistry.with_builtins()
     strategy = strategies.get_strategy("calibrated")
     candidate = strategy.build(
         plan(group_column="unit"), registry.get("random_forest"), BINARY, 0
@@ -83,7 +83,7 @@ def test_calibration_strategy_uses_the_structured_splitter():
 
 
 def test_stack_members_are_full_pipelines_cross_fitted_by_group():
-    registry = registry_module.ModelRegistry.with_builtins()
+    registry = scmle.models.registry.ModelRegistry.with_builtins()
     params = {"members": [{"model": "decision_tree"}, {"model": "extra_trees"}]}
     from scmle.data.curation import preprocessing
 

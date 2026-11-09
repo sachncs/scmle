@@ -21,7 +21,7 @@ from typing import Protocol
 import pandas
 
 from scmle import durability
-from scmle.artifacts import bundle as bundle_module
+import scmle.artifacts.bundle
 from scmle.contracts import errors
 from scmle.contracts import serving
 from scmle.deploy import provenance
@@ -37,7 +37,7 @@ MAX_REQUEST_RECORDS = 10_000
 MAX_CONCURRENT_REQUESTS = 8
 SCORING_TIMEOUT_SECONDS = 30.0
 BATCH_CHUNK_ROWS = 10_000
-Loader = Callable[[guard.Readiness], bundle_module.ModelBundle]
+Loader = Callable[[guard.Readiness], scmle.artifacts.bundle.ModelBundle]
 
 
 class ServingAdapter(abc.ABC):
@@ -45,7 +45,7 @@ class ServingAdapter(abc.ABC):
 
     def __init__(
         self,
-        bundle: bundle_module.ModelBundle | None,
+        bundle: scmle.artifacts.bundle.ModelBundle | None,
         on_null: str = "impute",
         on_unseen: str = "report",
         warmup_records: list[dict[str, Any]] | None = None,
@@ -90,7 +90,7 @@ class ServingAdapter(abc.ABC):
             self.readiness.complete(guard.Phase.LOADING, note)
 
     @property
-    def bundle(self) -> bundle_module.ModelBundle:
+    def bundle(self) -> scmle.artifacts.bundle.ModelBundle:
         """The loaded bundle.
 
         Raises:
@@ -406,7 +406,7 @@ class HttpServing(ServingAdapter):
 
     def __init__(
         self,
-        bundle: bundle_module.ModelBundle | None = None,
+        bundle: scmle.artifacts.bundle.ModelBundle | None = None,
         host: str = "127.0.0.1",
         port: int = 0,
         max_request_bytes: int = MAX_REQUEST_BYTES,
@@ -773,7 +773,7 @@ class HttpServing(ServingAdapter):
                             "status": "ok",
                             "model_version": info.model_version,
                             "model_sha256": info.files.get(
-                                bundle_module.MODEL_FILE, ""
+                                scmle.artifacts.bundle.MODEL_FILE, ""
                             ),
                             "artifact_digest": adapter.artifact_digest,
                             "task": adapter.bundle.schema.task,

@@ -9,7 +9,7 @@ cross-validation; the rest are recorded as pruned.
 import math
 
 from scmle.contracts import experiments
-from scmle.core import context as context_module
+import scmle.core.context
 from scmle.experimentation import trials
 from scmle.optimization import optimizers
 
@@ -28,7 +28,7 @@ class Tuner:
     """
 
     def __init__(
-        self, context: context_module.RunContext, runner: trials.TrialRunner
+        self, context: scmle.core.context.RunContext, runner: trials.TrialRunner
     ) -> None:
         """Initializes the tuner.
 
@@ -39,7 +39,7 @@ class Tuner:
         self.context = context
         self.runner = runner
         self.search = context.spec.effective_search()
-        self.metric = context_module.require(context.metric, "metric")
+        self.metric = scmle.core.context.require(context.metric, "metric")
 
     def promising_candidates(
         self, screened: list[experiments.TrialResult]
@@ -89,7 +89,7 @@ class Tuner:
                 optimizer seed.
         """
         context, search = self.context, self.search
-        space = context_module.require(
+        space = scmle.core.context.require(
             context.registry.get(name).search_space, f"{name}.search_space"
         )
         optimizer = optimizers.create_optimizer(

@@ -24,7 +24,7 @@ from typing import Self
 
 import numpy
 import pandas
-import pyarrow.parquet as pq
+import pyarrow.parquet
 
 from scmle import durability
 from scmle.contracts import errors
@@ -1686,7 +1686,7 @@ class ParquetChunks(ChunkSource):
         Yields:
             One frame per Arrow record batch, in file order.
         """
-        reader = pq.ParquetFile(self.path, pre_buffer=False)
+        reader = pyarrow.parquet.ParquetFile(self.path, pre_buffer=False)
         for batch in reader.iter_batches(batch_size=rows, use_threads=False):
             yield batch.to_pandas()
 
@@ -1697,7 +1697,7 @@ class ParquetChunks(ChunkSource):
             The row count and the column count recorded in the Parquet
             metadata.
         """
-        meta = pq.ParquetFile(self.path).metadata
+        meta = pyarrow.parquet.ParquetFile(self.path).metadata
         return meta.num_rows, meta.num_columns
 
 

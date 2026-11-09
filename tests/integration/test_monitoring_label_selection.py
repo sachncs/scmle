@@ -6,7 +6,7 @@ import pytest
 import support
 from test_monitoring import make_frame
 
-from scmle.monitoring import monitor as monitor_module
+import scmle.monitoring.monitor
 
 
 @pytest.fixture(scope="module")
@@ -15,7 +15,7 @@ def monitor(tmp_path_factory):
     run = support.make_project(
         make_frame(800, 0), "y", time_budget=300, output_dir=directory
     ).run()
-    return monitor_module.ModelMonitor(run.bundle)
+    return scmle.monitoring.monitor.ModelMonitor(run.bundle)
 
 
 def test_defaults_are_unchanged_and_maturity_drops_rows(monitor):

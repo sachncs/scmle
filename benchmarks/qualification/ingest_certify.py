@@ -70,10 +70,10 @@ from scmle.data.ingest import budget
 from scmle.data.ingest import entities
 from scmle.data.ingest import grain
 from scmle.data.ingest import joins
-from scmle.data.ingest import plan as ingest_plan
 from scmle.data.ingest import profile
 from scmle.data.ingest import reconcile
 from scmle.data.ingest import synthesize
+import scmle.data.ingest.plan
 from scmle.data.readers import connectors
 
 STORE_PATH = Path(__file__).with_name("ingest_certificates.json")
@@ -662,10 +662,10 @@ def budget_run(seed: int, directory: Path) -> tuple[bool, list[dict[str, str]]]:
         max_rows_scanned=int(rng.integers(0, 150_000)),
     )
     world = ingest_worlds.surrogate_world(0)
-    plan = ingest_plan.IngestPlan(
+    plan = scmle.data.ingest.plan.IngestPlan(
         directory / f"b{seed}",
         world.db.factory,
-        ingest_plan.IngestSettings(tables=tuple(world.tables)),
+        scmle.data.ingest.plan.IngestSettings(tables=tuple(world.tables)),
         limit,
     )
     plan.run_all()
@@ -718,8 +718,8 @@ def multiplicity(offset: int) -> dict[str, Any]:
     """
     import fractions
 
-    from scmle.data.ledger import ledger as ledger_module
     from scmle.data.ledger import online_fdr
+    import scmle.data.ledger.ledger
 
     equal = 0
     mismatch_caught = 0
@@ -733,7 +733,7 @@ def multiplicity(offset: int) -> dict[str, Any]:
             [synthesize.Nest(source, items, "oid")],
             schema.lag,
         )
-        ledger = ledger_module.Ledger.create(
+        ledger = scmle.data.ledger.ledger.Ledger.create(
             None,
             charter_hash="0" * 64,
             config=online_fdr.RuleConfig("lord++", fractions.Fraction(1, 20)),
@@ -773,7 +773,7 @@ def code_hashes() -> dict[str, str]:
         "grain": certificates.code_hash(grain),
         "joins": certificates.code_hash(joins),
         "entities": certificates.code_hash(entities),
-        "budget": certificates.code_hash(budget, ingest_plan),
+        "budget": certificates.code_hash(budget, scmle.data.ingest.plan),
     }
 
 

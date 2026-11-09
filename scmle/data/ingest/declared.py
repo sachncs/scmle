@@ -30,7 +30,7 @@ import pandas
 from scmle.contracts import errors
 from scmle.data.charter import ingest
 from scmle.data.ingest import profile
-from scmle.data.ingest import reconcile as source_reconcile
+import scmle.data.ingest.reconcile
 
 FILE = "extract_reconciliation.json"
 
@@ -236,7 +236,7 @@ def source_totals(
     )
     found: dict[str, tuple[float, float]] = {}
     try:
-        outcome = source_reconcile.reconcile_extract(
+        outcome = scmle.data.ingest.reconcile.reconcile_extract(
             source, numeric, table, measures, tolerance=tolerance
         )
     except ValueError:

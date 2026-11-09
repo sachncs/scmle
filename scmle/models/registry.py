@@ -15,13 +15,13 @@ from scmle.models import conformance
 from scmle.models import ensembles
 from scmle.models.boosting import boosters
 from scmle.models.deeplearning import networks
-from scmle.models.multitarget import adapters as multitarget_adapters
-from scmle.models.ordinal import adapters as ordinal_adapters
-from scmle.models.ranking import adapters as ranking_adapters
+import scmle.models.multitarget.adapters
+import scmle.models.ordinal.adapters
+import scmle.models.ranking.adapters
 from scmle.models.sklearn import bagging
 from scmle.models.sklearn import classical
-from scmle.models.survival import adapters as survival_adapters
-from scmle.models.uplift import adapters as uplift_adapters
+import scmle.models.survival.adapters
+import scmle.models.uplift.adapters
 
 ENTRY_POINT_GROUP = "scmle.models"
 USER_ADAPTERS: dict[str, models.ModelAdapter] = {}
@@ -120,11 +120,11 @@ class ModelRegistry:
             *boosters.BOOSTING_ADAPTERS,
             *networks.DEEP_LEARNING_ADAPTERS,
             *bagging.BAGGING_ADAPTERS,
-            *survival_adapters.SURVIVAL_ADAPTERS,
-            *ordinal_adapters.ORDINAL_ADAPTERS,
-            *ranking_adapters.RANKING_ADAPTERS,
-            *multitarget_adapters.MULTITARGET_ADAPTERS,
-            *uplift_adapters.UPLIFT_ADAPTERS,
+            *scmle.models.survival.adapters.SURVIVAL_ADAPTERS,
+            *scmle.models.ordinal.adapters.ORDINAL_ADAPTERS,
+            *scmle.models.ranking.adapters.RANKING_ADAPTERS,
+            *scmle.models.multitarget.adapters.MULTITARGET_ADAPTERS,
+            *scmle.models.uplift.adapters.UPLIFT_ADAPTERS,
         )
         registry = cls(tuple(adapter() for adapter in classes))
         registry.register(ensembles.StackingAdapter(registry))

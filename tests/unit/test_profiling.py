@@ -8,7 +8,7 @@ from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.data.profiling import profiler
 from scmle.data.readers import tabular
-from scmle.data.validation import target as target_module
+import scmle.data.validation.target
 
 
 def make_spec(task="auto", **data_overrides):
@@ -18,7 +18,9 @@ def make_spec(task="auto", **data_overrides):
 
 def profile(frame, task="auto", **data_overrides):
     spec = make_spec(task, **data_overrides)
-    resolved = target_module.TaskResolver(spec).resolve(frame["y"])
+    resolved = scmle.data.validation.target.TaskResolver(spec).resolve(
+        frame["y"]
+    )
     manifest = tabular.build_manifest(frame, "y")
     result = profiler.DatasetProfiler(spec).profile(frame, manifest, resolved)
     return resolved, result
@@ -40,7 +42,9 @@ def classification_frame():
 
 
 def resolve(frame, task="auto"):
-    return target_module.TaskResolver(make_spec(task)).resolve(frame["y"])
+    return scmle.data.validation.target.TaskResolver(make_spec(task)).resolve(
+        frame["y"]
+    )
 
 
 def test_task_resolution(classification_frame):

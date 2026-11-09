@@ -7,7 +7,7 @@ import pytest
 
 from scmle.contracts import data
 from scmle.contracts import tasks
-from scmle.models import registry as registry_module
+import scmle.models.registry
 from scmle.sampling import resampling
 from scmle.sampling import strategies
 
@@ -16,7 +16,7 @@ REGRESSION = tasks.TaskType.REGRESSION
 
 @pytest.fixture
 def registry():
-    return registry_module.ModelRegistry.with_builtins()
+    return scmle.models.registry.ModelRegistry.with_builtins()
 
 
 def long_tailed(rows=800, seed=0):

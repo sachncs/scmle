@@ -19,10 +19,10 @@ from typing import Any
 
 from scmle import durability
 from scmle.contracts import errors
-from scmle.data.ingest import budget as budgets
 from scmle.data.ingest import grain
 from scmle.data.ingest import joins
 from scmle.data.ingest import profile
+import scmle.data.ingest.budget
 
 CATALOG = "ingest_catalog.json"
 GRAIN = "grain_report.json"
@@ -97,7 +97,7 @@ class IngestPlan:
         run_dir: pathlib.Path,
         connection_factory: Callable[[], Any],
         settings: IngestSettings,
-        budget: budgets.IngestBudget | None = None,
+        budget: scmle.data.ingest.budget.IngestBudget | None = None,
         clock: Callable[[], float] | None = None,
     ) -> None:
         """Opens the ingestion; nothing is read yet.
@@ -113,11 +113,11 @@ class IngestPlan:
         """
         self.run_dir = pathlib.Path(run_dir)
         self.settings = settings
-        limits = budget or budgets.IngestBudget()
+        limits = budget or scmle.data.ingest.budget.IngestBudget()
         self.meter = (
-            budgets.BudgetMeter(limits)
+            scmle.data.ingest.budget.BudgetMeter(limits)
             if clock is None
-            else budgets.BudgetMeter(limits, clock)
+            else scmle.data.ingest.budget.BudgetMeter(limits, clock)
         )
         self.source = profile.SqlSource(connection_factory, self.meter)
         self.catalog: profile.Catalog | None = None

@@ -45,7 +45,7 @@ from scmle.contracts import tasks
 from scmle.deploy import mocks
 from scmle.deploy import provenance
 from scmle.governance import lifecycle
-from scmle.governance import registry as registry_module
+import scmle.governance.registry
 from scmle.inference import parity
 from scmle.inference import serving
 from scmle.monitoring import monitor
@@ -167,8 +167,8 @@ def train(name: str, data: pathlib.Path) -> scmle.RunResult:
 
 
 def approval_for(
-    record: registry_module.VersionRecord, reason: str, evidence: str
-) -> registry_module.PromotionApproval:
+    record: scmle.governance.registry.VersionRecord, reason: str, evidence: str
+) -> scmle.governance.registry.PromotionApproval:
     """Builds an approval bound to one registered version.
 
     Args:
@@ -179,12 +179,12 @@ def approval_for(
     Returns:
         An approved promotion by the demo reviewer, signed with the demo key.
     """
-    return registry_module.PromotionApproval(
+    return scmle.governance.registry.PromotionApproval(
         model=record.model,
         version=record.version,
         content_id=record.content_id,
         reviewer=REVIEWER,
-        decision=registry_module.PromotionDecision.APPROVED,
+        decision=scmle.governance.registry.PromotionDecision.APPROVED,
         reason=reason,
         evidence=(evidence,),
         approved_at=now(),
@@ -492,7 +492,9 @@ def prepare(
     )
 
     started = time.monotonic()
-    registry = registry_module.ModelRegistryStore(workdir / "registry")
+    registry = scmle.governance.registry.ModelRegistryStore(
+        workdir / "registry"
+    )
     records = []
     for label, result in (("v1 good", good), ("v2 bad release", bad)):
         exported = result.bundle.save(
@@ -687,7 +689,9 @@ def drill_steps(workdir: pathlib.Path, data: pathlib.Path) -> dict[str, Any]:
         predictions as the original, whether the audit log has the rollback
         check, and the bad release's metrics on the fresh data.
     """
-    registry = registry_module.ModelRegistryStore(workdir / "registry")
+    registry = scmle.governance.registry.ModelRegistryStore(
+        workdir / "registry"
+    )
     manager = lifecycle.LifecycleManager(registry, MODEL, str(workdir / "work"))
     fresh = pandas.read_csv(data / "fresh.csv")
     good_record = registry.versions(MODEL)[0]
@@ -724,7 +728,7 @@ def drill_steps(workdir: pathlib.Path, data: pathlib.Path) -> dict[str, Any]:
         adapter.stop()
     audit = [
         json.loads(line)["action"]
-        for line in (registry.root / registry_module.AUDIT_FILE)
+        for line in (registry.root / scmle.governance.registry.AUDIT_FILE)
         .read_text(encoding="utf-8")
         .splitlines()
     ]

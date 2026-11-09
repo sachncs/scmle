@@ -10,7 +10,7 @@ orchestrator.
 import ast
 import pathlib
 
-import scmle.data.ledger as package
+import scmle.data.ledger
 
 FORBIDDEN = (
     "scmle.data.custody",
@@ -18,7 +18,7 @@ FORBIDDEN = (
     "scmle.data.splitting",
     "scmle.core.stages",
 )
-ROOT = pathlib.Path(package.__file__).parent
+ROOT = pathlib.Path(scmle.data.ledger.__file__).parent
 
 
 def imported_modules(path):

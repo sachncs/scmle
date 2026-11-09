@@ -30,9 +30,9 @@ from scmle.contracts import errors
 from scmle.contracts import events
 from scmle.deploy import contract
 from scmle.deploy import livetests
-from scmle.deploy import observation as observation_module
 from scmle.deploy import provenance
-from scmle.deploy import record as record_module
+import scmle.deploy.observation
+import scmle.deploy.record
 from scmle.governance import registry
 
 PRODUCTION = "production"
@@ -90,8 +90,8 @@ class Candidate:
     approved_at: str
     scan: ImageScan | None = None
     checks: Sequence[livetests.CheckResult] = ()
-    observation: observation_module.Observation | None = None
-    staging_record: record_module.DeploymentRecord | None = None
+    observation: scmle.deploy.observation.Observation | None = None
+    staging_record: scmle.deploy.record.DeploymentRecord | None = None
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -107,7 +107,7 @@ class GateDecision:
 
     allowed: bool
     reasons: tuple[str, ...]
-    record: record_module.DeploymentRecord | None = None
+    record: scmle.deploy.record.DeploymentRecord | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Builds a JSON-ready record.
@@ -181,9 +181,12 @@ def admit_problems(candidate: Candidate, key: str | bytes) -> list[str]:
         One message per problem; empty if the build may be deployed.
     """
     problems = model_problems(candidate, key)
-    if candidate.environment not in record_module.ENVIRONMENTS:
+    if candidate.environment not in scmle.deploy.record.ENVIRONMENTS:
         problems.append(f"unknown environment {candidate.environment!r}")
-    if record_module.COMMIT_PATTERN.fullmatch(candidate.source_commit) is None:
+    if (
+        scmle.deploy.record.COMMIT_PATTERN.fullmatch(candidate.source_commit)
+        is None
+    ):
         problems.append("the source commit is not a full commit hash")
     scan = candidate.scan
     if scan is None:
@@ -328,7 +331,7 @@ def certify(
     if problems or seen is None:
         return GateDecision(False, tuple(problems))
     results = {item.name: item.evidence_digest for item in candidate.checks}
-    unsigned = record_module.DeploymentRecord(
+    unsigned = scmle.deploy.record.DeploymentRecord(
         source_commit=candidate.source_commit,
         model=candidate.model.model,
         model_version=candidate.model.version,

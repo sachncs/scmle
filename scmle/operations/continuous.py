@@ -43,10 +43,10 @@ from scmle import durability
 from scmle.deploy import control
 from scmle.deploy import gate
 from scmle.governance import deployment_ledger
-from scmle.governance import loop as loop_module
 from scmle.governance import never_list
 from scmle.governance import release_state
-from scmle.monitoring import champion as champion_module
+import scmle.governance.loop
+import scmle.monitoring.champion
 from scmle.operations import signals
 
 RECOMMEND = "recommend"
@@ -687,7 +687,7 @@ class ContinuousEvaluation:
 
     def __init__(
         self,
-        loop: loop_module.Loop,
+        loop: scmle.governance.loop.Loop,
         directory: str | pathlib.Path,
         policy: RetrainPolicy = RetrainPolicy(),  # noqa: B008
         retrain: Callable[[], str | None] | None = None,
@@ -805,7 +805,7 @@ class ContinuousEvaluation:
         self.retain("business_outcomes", outcomes)
         return self.loop.mature(losses, challengers=paired or None)
 
-    def advance(self) -> loop_module.StepResult:
+    def advance(self) -> scmle.governance.loop.StepResult:
         """Steps the loop and writes new proposals to the history.
 
         Returns:
@@ -1028,7 +1028,7 @@ class ContinuousEvaluation:
         outcomes: pandas.Series,
         metric_name: str | None = None,
         seed: int = 0,
-    ) -> champion_module.Comparison:
+    ) -> scmle.monitoring.champion.Comparison:
         """Compares two bundles on rows with known outcomes and records it.
 
         This is the offline check (`ChampionChallenger`). The sequential
@@ -1046,7 +1046,7 @@ class ContinuousEvaluation:
         Returns:
             The comparison.
         """
-        result = champion_module.ChampionChallenger(
+        result = scmle.monitoring.champion.ChampionChallenger(
             champion, challenger, seed=seed
         ).compare(data, outcomes, metric_name)
         self.history.record(
@@ -1068,7 +1068,7 @@ class ContinuousEvaluation:
         *,
         health: release_state.Health | None = None,
         steps: tuple[int, ...] = (100,),
-        comparison: champion_module.Comparison | None = None,
+        comparison: scmle.monitoring.champion.Comparison | None = None,
     ) -> Replacement:
         """Puts a challenger into an environment, or says why not.
 

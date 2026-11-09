@@ -20,10 +20,10 @@ import numpy
 import pandas
 
 from scmle import durability
-from scmle.artifacts import bundle as bundle_module
+import scmle.artifacts.bundle
 from scmle.contracts import events
 from scmle.contracts import observability
-from scmle.monitoring import observability as observability_monitor
+import scmle.monitoring.observability
 
 
 @dataclasses.dataclass(frozen=True)
@@ -108,7 +108,7 @@ class PredictionLog:
 
     def log_predictions(
         self,
-        bundle: bundle_module.ModelBundle,
+        bundle: scmle.artifacts.bundle.ModelBundle,
         data: pandas.DataFrame,
         event_ids: list[str] | None = None,
     ) -> list[PredictionEvent]:
@@ -189,7 +189,7 @@ class PredictionLog:
 
     def log_observability(
         self,
-        bundle: bundle_module.ModelBundle,
+        bundle: scmle.artifacts.bundle.ModelBundle,
         request_id: str,
         started: float,
         outcome: str,
@@ -210,7 +210,7 @@ class PredictionLog:
         if self.observability_policy is None:
             return
         model_fingerprint = bundle.info.files.get(
-            bundle_module.MODEL_FILE, bundle.info.model_version
+            scmle.artifacts.bundle.MODEL_FILE, bundle.info.model_version
         )
         event = observability.InferenceEvent(
             request_id=request_id,
@@ -277,7 +277,7 @@ class PredictionLog:
                 "retention enforcement requires an observability policy"
             )
         observed_text = observed_at or events.utc_timestamp()
-        observed_timestamp = observability_monitor.parse_timestamp(
+        observed_timestamp = scmle.monitoring.observability.parse_timestamp(
             observed_text, "observed_at"
         )
         cutoff = observed_timestamp - datetime.timedelta(
@@ -311,8 +311,10 @@ class PredictionLog:
                             raise ValueError(
                                 "observability records must have type inference"
                             )
-                        timestamp = observability_monitor.parse_timestamp(
-                            str(record["timestamp"]), "event.timestamp"
+                        timestamp = (
+                            scmle.monitoring.observability.parse_timestamp(
+                                str(record["timestamp"]), "event.timestamp"
+                            )
                         )
                         if timestamp < cutoff:
                             removed += 1

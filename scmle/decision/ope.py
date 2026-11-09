@@ -27,7 +27,7 @@ identification strategy and `unverified` without one.
 import dataclasses
 from typing import Any
 
-import numpy as np
+import numpy
 from numpy.typing import ArrayLike
 from numpy.typing import NDArray
 from scipy import stats
@@ -58,11 +58,11 @@ class LoggedBandit:
             (True) or estimated from observational data (False).
     """
 
-    actions: NDArray[np.intp]
-    rewards: NDArray[np.float64]
-    behaviour: NDArray[np.float64]
-    target: NDArray[np.float64]
-    outcome_model: NDArray[np.float64] | None = None
+    actions: NDArray[numpy.intp]
+    rewards: NDArray[numpy.float64]
+    behaviour: NDArray[numpy.float64]
+    target: NDArray[numpy.float64]
+    outcome_model: NDArray[numpy.float64] | None = None
     clusters: NDArray[Any] | None = None
     randomized: bool = True
 
@@ -84,7 +84,9 @@ class LoggedBandit:
             matrix = getattr(self, name)
             if matrix.ndim != 2 or matrix.shape[0] != n:
                 raise ValueError(f"{name} must have shape (n, K)")
-            if (matrix < 0).any() or not np.allclose(matrix.sum(axis=1), 1.0):
+            if (matrix < 0).any() or not numpy.allclose(
+                matrix.sum(axis=1), 1.0
+            ):
                 raise ValueError(f"{name} rows must be probabilities")
         k = self.behaviour.shape[1]
         if self.target.shape[1] != k:
@@ -104,7 +106,7 @@ class LoggedBandit:
         """The number of logged rows."""
         return len(self.actions)
 
-    def taken(self, matrix: NDArray[np.float64]) -> NDArray[np.float64]:
+    def taken(self, matrix: NDArray[numpy.float64]) -> NDArray[numpy.float64]:
         """The entry of `matrix` at each row's logged action.
 
         Args:
@@ -114,7 +116,9 @@ class LoggedBandit:
             A vector of length `n` holding, for each row, the entry in the
             column of the action logged for that row.
         """
-        result: NDArray[np.float64] = matrix[np.arange(self.rows), self.actions]
+        result: NDArray[numpy.float64] = matrix[
+            numpy.arange(self.rows), self.actions
+        ]
         return result
 
 
@@ -157,7 +161,7 @@ class ValueEstimate:
 
 def weights(
     log: LoggedBandit, clip: float | None
-) -> tuple[NDArray[np.float64], float]:
+) -> tuple[NDArray[numpy.float64], float]:
     """Importance weights at the logged actions and the clipped share.
 
     Args:
@@ -172,7 +176,7 @@ def weights(
     ratio = log.taken(log.target) / log.taken(log.behaviour)
     if clip is None:
         return ratio, 0.0
-    return np.minimum(ratio, clip), float(np.mean(ratio > clip))
+    return numpy.minimum(ratio, clip), float(numpy.mean(ratio > clip))
 
 
 def support_violations(log: LoggedBandit, min_propensity: float) -> int:
@@ -192,7 +196,7 @@ def support_violations(log: LoggedBandit, min_propensity: float) -> int:
 
 def terms(
     log: LoggedBandit, estimator: str, clip: float | None
-) -> tuple[NDArray[np.float64], float]:
+) -> tuple[NDArray[numpy.float64], float]:
     """Per-row influence terms whose mean is the estimate.
 
     Args:
@@ -212,8 +216,8 @@ def terms(
     if estimator == "ipw":
         return w * log.rewards, share
     if estimator == "snips":
-        value = float(np.sum(w * log.rewards) / np.sum(w))
-        return w * (log.rewards - value) / float(np.mean(w)) + value, share
+        value = float(numpy.sum(w * log.rewards) / numpy.sum(w))
+        return w * (log.rewards - value) / float(numpy.mean(w)) + value, share
     if log.outcome_model is None:
         raise ValueError("dr needs an outcome model")
     direct = (log.target * log.outcome_model).sum(axis=1)
@@ -222,7 +226,7 @@ def terms(
 
 
 def mean_interval(
-    values: NDArray[np.float64],
+    values: NDArray[numpy.float64],
     clusters: NDArray[Any] | None,
     level: float,
 ) -> tuple[float, tuple[float, float]]:
@@ -244,12 +248,12 @@ def mean_interval(
     n = len(values)
     centre = float(values.mean())
     if clusters is None:
-        se = float(values.std(ddof=1) / np.sqrt(n))
+        se = float(values.std(ddof=1) / numpy.sqrt(n))
     else:
-        labels = np.unique(clusters, return_inverse=True)[1]
-        g = int(np.max(labels)) + 1
-        sums = np.bincount(labels, weights=values - centre, minlength=g)
-        se = float(np.sqrt(g / (g - 1) * np.sum(sums**2)) / n)
+        labels = numpy.unique(clusters, return_inverse=True)[1]
+        g = int(numpy.max(labels)) + 1
+        sums = numpy.bincount(labels, weights=values - centre, minlength=g)
+        se = float(numpy.sqrt(g / (g - 1) * numpy.sum(sums**2)) / n)
     z = float(stats.norm.ppf(1 - (1 - level) / 2))
     return centre, (centre - z * se, centre + z * se)
 
@@ -381,7 +385,9 @@ def difference_value(
         a `ValueError` by `estimate_value`, and a `baseline` that is not an
         `(n, K)` matrix of probabilities by `LoggedBandit`.
     """
-    other = dataclasses.replace(log, target=np.asarray(baseline, dtype=float))
+    other = dataclasses.replace(
+        log, target=numpy.asarray(baseline, dtype=float)
+    )
     main = estimate_value(
         log,
         estimator,
@@ -444,11 +450,11 @@ def fit_outcome_model(
     Raises:
         ValueError: If some action never appears in the fitting log.
     """
-    x = np.asarray(features, dtype=float)
-    a = np.asarray(actions)
-    r = np.asarray(rewards, dtype=float)
-    design = np.column_stack([np.ones(len(x)), x])
-    penalty = ridge * np.eye(design.shape[1])
+    x = numpy.asarray(features, dtype=float)
+    a = numpy.asarray(actions)
+    r = numpy.asarray(rewards, dtype=float)
+    design = numpy.column_stack([numpy.ones(len(x)), x])
+    penalty = ridge * numpy.eye(design.shape[1])
     penalty[0, 0] = 0.0
     coefficients = []
     for k in range(n_actions):
@@ -456,10 +462,12 @@ def fit_outcome_model(
         if not rows.any():
             raise ValueError(f"action {k} never appears in the fitting log")
         d = design[rows]
-        coefficients.append(np.linalg.solve(d.T @ d + penalty, d.T @ r[rows]))
-    fitted = np.stack(coefficients, axis=1)
+        coefficients.append(
+            numpy.linalg.solve(d.T @ d + penalty, d.T @ r[rows])
+        )
+    fitted = numpy.stack(coefficients, axis=1)
 
-    def predict(new: ArrayLike) -> NDArray[np.float64]:
+    def predict(new: ArrayLike) -> NDArray[numpy.float64]:
         """Predicts the reward of every action.
 
         Args:
@@ -468,9 +476,9 @@ def fit_outcome_model(
         Returns:
             Predicted rewards, shape `(n, K)`.
         """
-        z = np.asarray(new, dtype=float)
-        result: NDArray[np.float64] = (
-            np.column_stack([np.ones(len(z)), z]) @ fitted
+        z = numpy.asarray(new, dtype=float)
+        result: NDArray[numpy.float64] = (
+            numpy.column_stack([numpy.ones(len(z)), z]) @ fitted
         )
         return result
 
@@ -492,7 +500,7 @@ class ThresholdPolicy:
     objective: float
     penalty: float
 
-    def probabilities(self, tau: ArrayLike) -> NDArray[np.float64]:
+    def probabilities(self, tau: ArrayLike) -> NDArray[numpy.float64]:
         """`pi(a | x)` for actions (0, 1) as an `(n, 2)` matrix.
 
         Args:
@@ -502,8 +510,8 @@ class ThresholdPolicy:
             For each row, probability 1 on action 1 when the effect exceeds
             `cut` and on action 0 otherwise.
         """
-        treat = (np.asarray(tau, dtype=float) > self.cut).astype(float)
-        return np.column_stack([1.0 - treat, treat])
+        treat = (numpy.asarray(tau, dtype=float) > self.cut).astype(float)
+        return numpy.column_stack([1.0 - treat, treat])
 
 
 def fit_threshold_policy(
@@ -535,23 +543,23 @@ def fit_threshold_policy(
             two actions.
         ScmleError: If there is no candidate cut.
     """
-    effect = np.asarray(tau, dtype=float)
+    effect = numpy.asarray(tau, dtype=float)
     if log.outcome_model is None or log.behaviour.shape[1] != 2:
         raise ValueError("policy fitting needs a binary action and a q model")
     ratio = 1.0 / log.taken(log.behaviour)
     if clip is not None:
-        ratio = np.minimum(ratio, clip)
+        ratio = numpy.minimum(ratio, clip)
     resid = log.rewards - log.taken(log.outcome_model)
     gain = (
         log.outcome_model[:, 1] - log.outcome_model[:, 0]
     ) + ratio * resid * (2.0 * (log.actions == 1) - 1.0)
     best: ThresholdPolicy | None = None
-    for cut in np.unique(np.quantile(effect, np.linspace(0, 1, 101))):
+    for cut in numpy.unique(numpy.quantile(effect, numpy.linspace(0, 1, 101))):
         treat = effect > cut
-        objective = float(np.mean(np.where(treat, gain - penalty, 0.0)))
+        objective = float(numpy.mean(numpy.where(treat, gain - penalty, 0.0)))
         if best is None or objective > best.objective:
             best = ThresholdPolicy(float(cut), objective, penalty)
     if best is None:
         raise errors.ScmleError("no candidate threshold")
-    none = ThresholdPolicy(float(np.max(effect)), 0.0, penalty)
+    none = ThresholdPolicy(float(numpy.max(effect)), 0.0, penalty)
     return best if best.objective > none.objective else none

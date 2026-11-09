@@ -6,7 +6,7 @@ from collections import Counter
 import json
 from pathlib import Path
 import re
-import xml.etree.ElementTree as ElementTree
+import xml.etree.ElementTree
 
 DEFAULT_MANIFEST = Path(__file__).with_name("pytest_skip_manifest.json")
 
@@ -78,7 +78,7 @@ def parse_skips(path: Path) -> tuple[tuple[str, str], ...]:
         One (`classname::name`, reason) pair per skipped test, with any
         `Skipped:` prefix removed from the reason.
     """
-    root = ElementTree.parse(path).getroot()
+    root = xml.etree.ElementTree.parse(path).getroot()
     records: list[tuple[str, str]] = []
     for case in root.iter("testcase"):
         skipped = case.find("skipped")
@@ -103,7 +103,7 @@ def parse_xfails(path: Path) -> tuple[tuple[str, str], ...]:
         One (`classname::name`, reason) pair per test with an xfail or xpass
         outcome; the reason is the outcome's message or its text.
     """
-    root = ElementTree.parse(path).getroot()
+    root = xml.etree.ElementTree.parse(path).getroot()
     records: list[tuple[str, str]] = []
     for case in root.iter("testcase"):
         classname = case.attrib.get("classname", "")

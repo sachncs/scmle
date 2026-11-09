@@ -30,9 +30,9 @@ import dataclasses
 import enum
 from typing import Any
 
-from scmle.operations import signals as signals_module
+import scmle.operations.signals
 
-Category = signals_module.Category
+Category = scmle.operations.signals.Category
 
 
 class Verdict(enum.StrEnum):
@@ -112,7 +112,7 @@ class Classification:
 
 def caveats_for(
     verdict: Verdict,
-    breached: Mapping[str, signals_module.Signal],
+    breached: Mapping[str, scmle.operations.signals.Signal],
     unobserved: Sequence[str],
 ) -> list[str]:
     """Lists what a verdict leaves open.
@@ -164,7 +164,9 @@ def caveats_for(
     return found
 
 
-def classify(signals: Sequence[signals_module.Signal]) -> Classification:
+def classify(
+    signals: Sequence[scmle.operations.signals.Signal],
+) -> Classification:
     """Classifies a set of signals (see the module docstring).
 
     Args:
@@ -180,7 +182,7 @@ def classify(signals: Sequence[signals_module.Signal]) -> Classification:
         sorted(
             s.name
             for s in signals
-            if s.status is signals_module.Status.INSUFFICIENT_DATA
+            if s.status is scmle.operations.signals.Status.INSUFFICIENT_DATA
         )
     )
     categories = tuple(

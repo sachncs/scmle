@@ -4,8 +4,8 @@ import json
 
 import numpy
 import pandas
-import pyarrow as pa
-import pyarrow.parquet as pq
+import pyarrow
+import pyarrow.parquet
 import pytest
 import support
 
@@ -21,8 +21,8 @@ def big_file(tmp_path_factory):
         size = ROWS // 4
         x = rng.normal(size=(size, 5))
         y = (x[:, 0] + 0.7 * x[:, 1] + rng.normal(0, 0.5, size) > 0).astype(int)
-        table = pa.table({**{f"x{i}": x[:, i] for i in range(5)}, "y": y})
-        writer = writer or pq.ParquetWriter(path, table.schema)
+        table = pyarrow.table({**{f"x{i}": x[:, i] for i in range(5)}, "y": y})
+        writer = writer or pyarrow.parquet.ParquetWriter(path, table.schema)
         writer.write_table(table)
     writer.close()
     return path

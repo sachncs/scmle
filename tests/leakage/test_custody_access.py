@@ -17,7 +17,7 @@ from scmle.contracts import tasks
 from scmle.data.custody import pipeline
 from scmle.data.custody import sealed
 from scmle.data.splitting import splitters
-from scmle.governance import vault as vault_module
+import scmle.governance.vault
 from tests.unit.test_charter_contracts import make_charter
 
 BINARY = tasks.TaskType.BINARY
@@ -96,7 +96,7 @@ def test_the_view_reaches_no_sealed_object_or_token():
             sealed.SealedSet
             | sealed.CustodyVault
             | sealed.OpenLog
-            | vault_module.SealedTestSet
+            | scmle.governance.vault.SealedTestSet
             | splitters.LockedTestSet,
         )
         for o in objects
@@ -141,7 +141,7 @@ def test_the_orchestrator_process_keeps_only_the_ids():
     built = build()
     outcome, vault = built.outcome, built.vault
     held = vault.sets["C"]
-    assert isinstance(held.locked, vault_module.SealedTestSet)
+    assert isinstance(held.locked, scmle.governance.vault.SealedTestSet)
     assert not hasattr(held.locked, "features")
     assert not hasattr(held.locked, "target")
     assert held.ids == outcome.manifest.confirmation_ids

@@ -3,10 +3,10 @@
 import numpy
 import pandas
 
-from scmle.contracts import data as data_contracts
 from scmle.contracts import tasks
+import scmle.contracts.data
 from scmle.data.profiling import profiler
-from scmle.data.validation import target as target_module
+import scmle.data.validation.target
 from scmle.intelligence import recommendations
 
 
@@ -14,8 +14,8 @@ def profile_of(frame, **spec_fields):
     spec = tasks.ProjectSpec(
         data=tasks.DataSpec(uri="<in-memory>", target="y"), **spec_fields
     )
-    task = target_module.TaskResolver(spec).resolve(frame["y"])
-    manifest = data_contracts.DatasetManifest(
+    task = scmle.data.validation.target.TaskResolver(spec).resolve(frame["y"])
+    manifest = scmle.contracts.data.DatasetManifest(
         "d", "s", "h", len(frame), frame.shape[1], "y"
     )
     return spec, profiler.DatasetProfiler(spec).profile(

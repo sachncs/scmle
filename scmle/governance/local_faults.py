@@ -22,10 +22,10 @@ from typing import Any
 from scmle.contracts import lineage
 from scmle.contracts import reliability
 from scmle.data.readers import incremental
-from scmle.data.readers import registry as source_registry
+import scmle.data.readers.registry
 from scmle.governance import attestation
-from scmle.governance import registry as model_registry
-from scmle.governance import reliability as reliability_harness
+import scmle.governance.registry
+import scmle.governance.reliability
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -42,7 +42,7 @@ class LocalFaultExecutor:
 
     def execute(
         self, scenario: reliability.FaultScenario
-    ) -> tuple[reliability_harness.FaultArtifact, ...]:
+    ) -> tuple[scmle.governance.reliability.FaultArtifact, ...]:
         """Executes one scenario and checks its evidence against its plan.
 
         Args:
@@ -63,7 +63,9 @@ class LocalFaultExecutor:
             raise TypeError("scenario must be FaultScenario")
         handlers: dict[
             reliability.FaultScenario,
-            Callable[[], tuple[reliability_harness.FaultArtifact, ...]],
+            Callable[
+                [], tuple[scmle.governance.reliability.FaultArtifact, ...]
+            ],
         ] = {
             reliability.FaultScenario.PROCESS_DEATH: self.run_process_death,
             reliability.FaultScenario.STALE_CHECKPOINT: (
@@ -126,7 +128,7 @@ class LocalFaultExecutor:
         evidence_type: str,
         observation: str,
         details: dict[str, Any],
-    ) -> reliability_harness.FaultArtifact:
+    ) -> scmle.governance.reliability.FaultArtifact:
         """Builds an evidence artifact that records a safe outcome as observed.
 
         The outcome is always marked as observed; nothing here checks that
@@ -155,7 +157,7 @@ class LocalFaultExecutor:
             separators=(",", ":"),
             sort_keys=True,
         ).encode("utf-8")
-        return reliability_harness.FaultArtifact(
+        return scmle.governance.reliability.FaultArtifact(
             evidence_type=evidence_type,
             content=content,
             observed_outcome=reliability.EvidenceOutcome.SAFE_OUTCOME_OBSERVED,
@@ -169,7 +171,7 @@ class LocalFaultExecutor:
             path: The destination file.
             record: The content, written as compact sorted JSON.
         """
-        reliability_harness.FaultInjectionHarness.write_atomically(
+        scmle.governance.reliability.FaultInjectionHarness.write_atomically(
             path,
             json.dumps(
                 record,
@@ -212,7 +214,7 @@ class LocalFaultExecutor:
 
     def run_process_death(
         self,
-    ) -> tuple[reliability_harness.FaultArtifact, ...]:
+    ) -> tuple[scmle.governance.reliability.FaultArtifact, ...]:
         """Writes a checkpoint, terminates a child and reads it back.
 
         The child is unrelated to the checkpoint. The checkpoint
@@ -255,7 +257,7 @@ class LocalFaultExecutor:
 
     def run_stale_checkpoint(
         self,
-    ) -> tuple[reliability_harness.FaultArtifact, ...]:
+    ) -> tuple[scmle.governance.reliability.FaultArtifact, ...]:
         """Checks that a checkpoint cannot be bound to a different source.
 
         Binds a checkpoint of one source to another source identity and
@@ -300,7 +302,7 @@ class LocalFaultExecutor:
 
     def run_disk_full(
         self,
-    ) -> tuple[reliability_harness.FaultArtifact, ...]:
+    ) -> tuple[scmle.governance.reliability.FaultArtifact, ...]:
         """Simulates a full disk without filling one.
 
         A 32-byte payload exceeds a fixed 8-byte budget, so `OSError` with
@@ -348,7 +350,7 @@ class LocalFaultExecutor:
 
     def run_corrupt_artifact(
         self,
-    ) -> tuple[reliability_harness.FaultArtifact, ...]:
+    ) -> tuple[scmle.governance.reliability.FaultArtifact, ...]:
         """Corrupts a written artifact, detects it by digest and quarantines it.
 
         Writes ``artifact.bin`` under the root, records its SHA-256,
@@ -363,7 +365,7 @@ class LocalFaultExecutor:
         scenario = reliability.FaultScenario.CORRUPT_ARTIFACT
         artifact_path = self.root / "artifact.bin"
         quarantine_path = self.root / "quarantine-artifact.bin"
-        reliability_harness.FaultInjectionHarness.write_atomically(
+        scmle.governance.reliability.FaultInjectionHarness.write_atomically(
             artifact_path, b"valid-artifact"
         )
         expected = hashlib.sha256(artifact_path.read_bytes()).hexdigest()
@@ -395,7 +397,7 @@ class LocalFaultExecutor:
 
     def run_worker_loss(
         self,
-    ) -> tuple[reliability_harness.FaultArtifact, ...]:
+    ) -> tuple[scmle.governance.reliability.FaultArtifact, ...]:
         """Terminates a child as a stand-in worker and writes one event output.
 
         No retry or replay is performed: a single output file
@@ -434,7 +436,7 @@ class LocalFaultExecutor:
 
     def run_timeout(
         self,
-    ) -> tuple[reliability_harness.FaultArtifact, ...]:
+    ) -> tuple[scmle.governance.reliability.FaultArtifact, ...]:
         """Terminates a child that outlives a short wait and records it.
 
         The wait is the 0.05 seconds of `stop_child`; the cancellation is
@@ -474,7 +476,7 @@ class LocalFaultExecutor:
 
     def run_memory_exhaustion(
         self,
-    ) -> tuple[reliability_harness.FaultArtifact, ...]:
+    ) -> tuple[scmle.governance.reliability.FaultArtifact, ...]:
         """Simulates memory exhaustion with a tiny allocation budget.
 
         A bytearray grows by 256 bytes at a time until it passes 1024 bytes,
@@ -523,7 +525,7 @@ class LocalFaultExecutor:
 
     def run_partial_write(
         self,
-    ) -> tuple[reliability_harness.FaultArtifact, ...]:
+    ) -> tuple[scmle.governance.reliability.FaultArtifact, ...]:
         """Writes a temporary file and never replaces the public path.
 
         A temporary file in the root receives and syncs a few bytes; the
@@ -570,7 +572,7 @@ class LocalFaultExecutor:
 
     def run_dependency_mismatch(
         self,
-    ) -> tuple[reliability_harness.FaultArtifact, ...]:
+    ) -> tuple[scmle.governance.reliability.FaultArtifact, ...]:
         """Compares two fixed dependency identities and records the mismatch.
 
         The identities are the constants ``numpy==2.3.0`` and
@@ -607,7 +609,7 @@ class LocalFaultExecutor:
 
     def run_invalid_signature(
         self,
-    ) -> tuple[reliability_harness.FaultArtifact, ...]:
+    ) -> tuple[scmle.governance.reliability.FaultArtifact, ...]:
         """Tampers with an attestation signature and records the failed check.
 
         Builds a signed release attestation, replaces its signature with
@@ -656,7 +658,7 @@ class LocalFaultExecutor:
 
     def run_retry_exhaustion(
         self,
-    ) -> tuple[reliability_harness.FaultArtifact, ...]:
+    ) -> tuple[scmle.governance.reliability.FaultArtifact, ...]:
         """Simulates three failing attempts and records the terminal state.
 
         Each of three attempts raises `OSError` by itself and is counted;
@@ -706,7 +708,7 @@ class LocalFaultExecutor:
 
     def run_duplicate_event(
         self,
-    ) -> tuple[reliability_harness.FaultArtifact, ...]:
+    ) -> tuple[scmle.governance.reliability.FaultArtifact, ...]:
         """Commits one event twice to an ingestion ledger and records both.
 
         Uses an incremental ingestion ledger stored in
@@ -759,7 +761,7 @@ class LocalFaultExecutor:
 
     def run_incomplete_lineage(
         self,
-    ) -> tuple[reliability_harness.FaultArtifact, ...]:
+    ) -> tuple[scmle.governance.reliability.FaultArtifact, ...]:
         """Adds a lineage edge to a missing node and records the rejection.
 
         The graph holds one raw-source node; an edge to an absent node is
@@ -806,7 +808,7 @@ class LocalFaultExecutor:
 
     def run_rejected_approval(
         self,
-    ) -> tuple[reliability_harness.FaultArtifact, ...]:
+    ) -> tuple[scmle.governance.reliability.FaultArtifact, ...]:
         """Validates a signed rejected approval and records the refusal.
 
         Builds and signs a reviewer approval whose decision is rejected and
@@ -818,12 +820,12 @@ class LocalFaultExecutor:
             release block and audit record.
         """
         scenario = reliability.FaultScenario.REJECTED_APPROVAL
-        approval = model_registry.PromotionApproval(
+        approval = scmle.governance.registry.PromotionApproval(
             model="local-model",
             version=1,
             content_id="bundle-digest",
             reviewer="independent-reviewer",
-            decision=model_registry.PromotionDecision.REJECTED,
+            decision=scmle.governance.registry.PromotionDecision.REJECTED,
             reason="controlled rejection",
             evidence=("artifact://review",),
             approved_at="2026-10-20T10:00:00+00:00",
@@ -858,7 +860,7 @@ class LocalFaultExecutor:
 
     def run_changed_snapshot(
         self,
-    ) -> tuple[reliability_harness.FaultArtifact, ...]:
+    ) -> tuple[scmle.governance.reliability.FaultArtifact, ...]:
         """Registers a snapshot, then one with the same id and other data.
 
         The second registration in an in-memory source registry is expected
@@ -870,7 +872,7 @@ class LocalFaultExecutor:
             run invalidation and lineage record.
         """
         scenario = reliability.FaultScenario.CHANGED_SNAPSHOT
-        previous = source_registry.SourceSnapshot(
+        previous = scmle.data.readers.registry.SourceSnapshot(
             source_id="source",
             source_uri="file:///source.csv",
             snapshot_id="snapshot-1",
@@ -881,7 +883,7 @@ class LocalFaultExecutor:
             schema={"value": "int"},
             captured_at="2026-10-20T10:00:00+00:00",
         )
-        registry = source_registry.SourceRegistry()
+        registry = scmle.data.readers.registry.SourceRegistry()
         registry.register(previous)
         changed = dataclasses.replace(previous, data_hash="data-2")
         rejected = False

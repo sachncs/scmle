@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from scmle.data.ledger import ledger as ledger_module
+import scmle.data.ledger.ledger
 from scmle.governance import deployment_ledger
 from scmle.governance import envelope
 from scmle.governance import never_list
@@ -323,7 +323,7 @@ def chained_copy(ledger, row):
         "body": row["body"],
         "prev": ledger.head,
     }
-    chained = {**content, "hash": ledger_module.digest(content)}
+    chained = {**content, "hash": scmle.data.ledger.ledger.digest(content)}
     return json.dumps(chained, sort_keys=True) + "\n"
 
 

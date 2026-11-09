@@ -160,15 +160,15 @@ from scipy import stats
 
 from benchmarks.qualification import f11_generators
 from scmle.artifacts import bundle
-from scmle.contracts import data as data_contracts
 from scmle.contracts import tasks
+import scmle.contracts.data
 from scmle.core import randomness
-from scmle.data.charter import decision as charter_decision
 from scmle.data.charter import feasibility
+import scmle.data.charter.decision
 from scmle.data.curation import preprocessing
 from scmle.data.detectors import certificates
 from scmle.data.framing import costs
-from scmle.data.ledger import budget as budget_module
+import scmle.data.ledger.budget
 from scmle.decision import anytime
 from scmle.decision import constraints
 from scmle.decision import design
@@ -178,9 +178,9 @@ from scmle.decision import rollout
 from scmle.decision import threshold
 from scmle.governance import deployment_ledger
 from scmle.governance import lifecycle
-from scmle.governance import registry as registry_module
 from scmle.governance import rollout_hook
-from scmle.models import registry as models_module
+import scmle.governance.registry
+import scmle.models.registry
 from scmle.monitoring import abtest
 
 STORE_PATH = Path(__file__).with_name("f11_certificates.json")
@@ -1010,7 +1010,9 @@ def gate_b8(runs: int, base: int = 0) -> dict[str, Any]:
 # --- fairness: verdicts, group thresholds, infeasible sets -------------------
 
 
-def fair_constraint(gap: float = 0.05) -> charter_decision.FairnessConstraint:
+def fair_constraint(
+    gap: float = 0.05,
+) -> scmle.data.charter.decision.FairnessConstraint:
     """The constraint of the fairness worlds.
 
     Args:
@@ -1019,7 +1021,7 @@ def fair_constraint(gap: float = 0.05) -> charter_decision.FairnessConstraint:
     Returns:
         An equal-opportunity constraint on `group` with that gap.
     """
-    return charter_decision.FairnessConstraint(
+    return scmle.data.charter.decision.FairnessConstraint(
         "group", "equal_opportunity", gap, "group_thresholds", "certify"
     )
 
@@ -1133,7 +1135,9 @@ def gate_a8(runs: int, base: int = 0) -> dict[str, Any]:
     refused = {}
     for pair in pairs:
         declared = tuple(
-            charter_decision.FairnessConstraint("group", c, 0.05, "reweighing")
+            scmle.data.charter.decision.FairnessConstraint(
+                "group", c, 0.05, "reweighing"
+            )
             for c in pair
         )
         count = 0
@@ -1149,7 +1153,9 @@ def gate_a8(runs: int, base: int = 0) -> dict[str, Any]:
                 count += 1
         refused["/".join(pair)] = count
     declared = tuple(
-        charter_decision.FairnessConstraint("group", c, 0.05, "reweighing")
+        scmle.data.charter.decision.FairnessConstraint(
+            "group", c, 0.05, "reweighing"
+        )
         for c in pairs[0]
     )
     false_refusals = 0
@@ -1182,9 +1188,9 @@ def gate_a8(runs: int, base: int = 0) -> dict[str, Any]:
 def plan_for(
     delta_min: float = 0.02,
     n_max: int = 3000,
-    guardrails: tuple[charter_decision.Guardrail, ...] = (),
+    guardrails: tuple[scmle.data.charter.decision.Guardrail, ...] = (),
     tolerance: float = 0.02,
-) -> charter_decision.RolloutPlan:
+) -> scmle.data.charter.decision.RolloutPlan:
     """The rollout plan the online worlds use.
 
     Args:
@@ -1197,15 +1203,15 @@ def plan_for(
         A plan for a conversion experiment with assignment probability 0.5
         and the module's promotion and rollback levels.
     """
-    return charter_decision.RolloutPlan(
+    return scmle.data.charter.decision.RolloutPlan(
         unit="user",
         primary="conversion",
         assignment_prob=0.5,
         delta_min=delta_min,
         tolerance=tolerance,
         n_max=n_max,
-        alpha_promote=budget_module.exact(ALPHA_PROMOTE, "a"),
-        alpha_rollback=budget_module.exact(ALPHA_ROLLBACK, "a"),
+        alpha_promote=scmle.data.ledger.budget.exact(ALPHA_PROMOTE, "a"),
+        alpha_rollback=scmle.data.ledger.budget.exact(ALPHA_ROLLBACK, "a"),
         guardrails=guardrails,
     )
 
@@ -1336,7 +1342,7 @@ def gate_b2(runs: int, base: int = 0) -> dict[str, Any]:
         The promotions (primary and guardrail both crossing), rate,
         interval, bound and `passed`.
     """
-    guard = charter_decision.Guardrail("bounce", margin=0.05)
+    guard = scmle.data.charter.decision.Guardrail("bounce", margin=0.05)
     plan = plan_for(n_max=6000, guardrails=(guard,))
     hits = 0
     chunk = 250
@@ -1558,30 +1564,32 @@ def gate_b5(runs: int, base: int = 0) -> dict[str, Any]:
     rng = rng_for(base, "b5", 0)
     violations = 0
     for _ in range(runs):
-        alpha = budget_module.exact(float(rng.integers(1, 100)) / 1000, "a")
+        alpha = scmle.data.ledger.budget.exact(
+            float(rng.integers(1, 100)) / 1000, "a"
+        )
         horizon = None if rng.random() < 0.5 else int(rng.integers(1, 30))
-        budget = budget_module.DecisionBudget(
-            alpha, budget_module.exact(0.01, "b"), horizon
+        budget = scmle.data.ledger.budget.DecisionBudget(
+            alpha, scmle.data.ledger.budget.exact(0.01, "b"), horizon
         )
         total = Fraction(0)
         for index in range(int(rng.integers(0, 40))):
             try:
-                budget, level = budget_module.assign_experiment(
+                budget, level = scmle.data.ledger.budget.assign_experiment(
                     budget, f"e{index}"
                 )
-            except budget_module.BudgetExhaustedError:
+            except scmle.data.ledger.budget.BudgetExhaustedError:
                 break
             total += level
         if budget.spent != total or total > alpha:
             violations += 1
         try:
-            budget_module.assign_experiment(
+            scmle.data.ledger.budget.assign_experiment(
                 budget, "overspend", alpha - budget.spent + 1
             )
             violations += 1
-        except budget_module.BudgetExhaustedError:
+        except scmle.data.ledger.budget.BudgetExhaustedError:
             pass
-        rebuilt = budget_module.DecisionBudget.from_dict(
+        rebuilt = scmle.data.ledger.budget.DecisionBudget.from_dict(
             json.loads(json.dumps(budget.to_dict()))
         )
         if rebuilt != budget:
@@ -1665,8 +1673,8 @@ def hook_bundle(seed: int) -> bundle.ModelBundle:
     frame["y"] = (frame.a + 0.3 * frame.b + rng.normal(0, 0.5, 300) > 0).astype(
         int
     )
-    plan = data_contracts.FeaturePlan(("a", "b"), ())
-    models = models_module.ModelRegistry.with_builtins()
+    plan = scmle.contracts.data.FeaturePlan(("a", "b"), ())
+    models = scmle.models.registry.ModelRegistry.with_builtins()
     features = frame.drop(columns="y")
     fitted = preprocessing.build_pipeline(
         plan, models.get("logistic_regression"), tasks.TaskType.BINARY, 0
@@ -1682,7 +1690,7 @@ def hook_bundle(seed: int) -> bundle.ModelBundle:
     )
 
 
-def hook_approval(record: Any) -> registry_module.PromotionApproval:
+def hook_approval(record: Any) -> scmle.governance.registry.PromotionApproval:
     """A signed independent approval for one registered version.
 
     Args:
@@ -1691,12 +1699,12 @@ def hook_approval(record: Any) -> registry_module.PromotionApproval:
     Returns:
         An approved, signed promotion approval for that version.
     """
-    return registry_module.PromotionApproval(
+    return scmle.governance.registry.PromotionApproval(
         model=record.model,
         version=record.version,
         content_id=record.content_id,
         reviewer="f11-b9-reviewer",
-        decision=registry_module.PromotionDecision.APPROVED,
+        decision=scmle.governance.registry.PromotionDecision.APPROVED,
         reason="benchmark fixture",
         evidence=("f11_certify.py",),
         approved_at="2026-11-06T00:00:00+00:00",
@@ -1713,7 +1721,7 @@ def hook_registry(root: Path) -> tuple[Any, Any, Any]:
         The registry store, the lifecycle manager and the challenger's
         record.
     """
-    store = registry_module.ModelRegistryStore(root / "registry")
+    store = scmle.governance.registry.ModelRegistryStore(root / "registry")
     manager = lifecycle.LifecycleManager(store, "m", str(root / "work"))
     first = store.register(
         "m", hook_bundle(0).save(root / "export1"), trusted=True
@@ -1724,7 +1732,7 @@ def hook_registry(root: Path) -> tuple[Any, Any, Any]:
     second = store.register(
         "m", hook_bundle(1).save(root / "export2"), trusted=True
     )
-    store.promote("m", second.version, registry_module.CHALLENGER)
+    store.promote("m", second.version, scmle.governance.registry.CHALLENGER)
     return store, manager, second
 
 
@@ -1841,7 +1849,9 @@ def hook_path(base: int = 0) -> dict[str, Any]:
                         signing_key=HOOK_KEY,
                     )
                     store.promote(
-                        "m", challenger.version, registry_module.CHALLENGER
+                        "m",
+                        challenger.version,
+                        scmle.governance.registry.CHALLENGER,
                     )
                 if status == rollout.HOLD_INVALID:
                     invalid += 1
@@ -2178,8 +2188,8 @@ def sources() -> dict[str, list[Any]]:
             gate_b4,
         ],
         "B5": [
-            budget_module.assign_experiment,
-            budget_module.DecisionBudget,
+            scmle.data.ledger.budget.assign_experiment,
+            scmle.data.ledger.budget.DecisionBudget,
             gate_b5,
         ],
         "B6": [design.srm_log_bayes_factor, design.srm_p_value, gate_b6],

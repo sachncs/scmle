@@ -47,7 +47,7 @@ import pandas
 
 from scmle.contracts import signing
 from scmle.data.charter import contracts
-from scmle.data.charter import decision as charter_decision
+import scmle.data.charter.decision
 from scmle.data.ledger import ledger
 from scmle.decision import constraints
 from scmle.decision import design
@@ -100,7 +100,7 @@ def file_digests(folder: str | Path) -> dict[str, str | None]:
 
 
 def policy_value(
-    layer: charter_decision.DecisionLayer,
+    layer: scmle.data.charter.decision.DecisionLayer,
     actions: numpy.ndarray,
     outcome: numpy.ndarray,
     logged: numpy.ndarray | None,
@@ -171,7 +171,7 @@ def policy_value(
 
 
 def fairness(
-    layer: charter_decision.DecisionLayer,
+    layer: scmle.data.charter.decision.DecisionLayer,
     features: pandas.DataFrame,
     outcome: numpy.ndarray,
     actions: numpy.ndarray,

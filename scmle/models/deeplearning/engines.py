@@ -16,7 +16,7 @@ from sklearn import base
 
 from scmle.contracts import errors
 from scmle.models.deeplearning import architectures
-from scmle.models.deeplearning import training as training_helpers
+import scmle.models.deeplearning.training
 
 MIN_ROWS_FOR_VALIDATION = 30
 
@@ -260,7 +260,7 @@ class TabularEngine(base.BaseEstimator, abc.ABC):
         batch_rows = (
             len(training)
             if second_order
-            else training_helpers.resolve_batch_size(
+            else scmle.models.deeplearning.training.resolve_batch_size(
                 self.batch_size, len(training)
             )
         )
@@ -269,7 +269,7 @@ class TabularEngine(base.BaseEstimator, abc.ABC):
         updates_per_epoch = max(math.ceil(batches_per_epoch / accumulate), 1)
         total_steps = updates_per_epoch * self.epochs
         warmup_steps = updates_per_epoch * self.warmup_epochs
-        monitor = training_helpers.TrainingMonitor()
+        monitor = scmle.models.deeplearning.training.TrainingMonitor()
         generator = numpy.random.default_rng(self.random_state + 1)
         best, best_state, stale, step = numpy.inf, None, 0, 0
         self.n_iter_ = 0
@@ -294,12 +294,14 @@ class TabularEngine(base.BaseEstimator, abc.ABC):
                     continue
                 if pending == 0:
                     for group in optimizer.param_groups:
-                        group["lr"] = training_helpers.learning_rate_at(
-                            step,
-                            total_steps,
-                            self.learning_rate,
-                            warmup_steps,
-                            self.schedule,
+                        group["lr"] = (
+                            scmle.models.deeplearning.training.learning_rate_at(
+                                step,
+                                total_steps,
+                                self.learning_rate,
+                                warmup_steps,
+                                self.schedule,
+                            )
                         )
                     optimizer.zero_grad()
                 loss = self.weighted_loss(torch, network, tensors, batch)

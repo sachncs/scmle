@@ -16,7 +16,7 @@ import pandas
 from benchmarks.qualification import streams
 from scmle.governance import deployment_ledger
 from scmle.governance import loop
-from scmle.operations import controller as controller_module
+import scmle.operations.controller
 
 PERSON_KEY = "person-key"
 SYSTEM_KEY = "system-key"
@@ -102,7 +102,7 @@ class World:
 
     def controller(self, **kwargs):
         """A fresh controller, as a new process would open it."""
-        return controller_module.Controller(
+        return scmle.operations.controller.Controller(
             self.deploy,
             verification_keys=KEYS,
             system_keys=(SYSTEM_KEY,),

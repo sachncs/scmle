@@ -11,7 +11,7 @@ from scmle.contracts import errors
 from scmle.contracts import observability
 from scmle.monitoring import champion
 from scmle.monitoring import events
-from scmle.monitoring import monitor as monitor_module
+import scmle.monitoring.monitor
 
 
 def make_frame(rows, seed, shift=0.0, relabel=False):
@@ -40,7 +40,7 @@ def trained(tmp_path_factory):
 
 
 def test_stable_data_is_stable(trained):
-    monitor = monitor_module.ModelMonitor(trained.bundle)
+    monitor = scmle.monitoring.monitor.ModelMonitor(trained.bundle)
     report = monitor.assess(make_frame(600, 1).drop(columns="y"))
     assert report.drift.output_status == "stable"
     assert all(f.status == "stable" for f in report.drift.features)
@@ -49,7 +49,9 @@ def test_stable_data_is_stable(trained):
 
 def test_a_shifted_feature_is_found_and_ranked_first(trained):
     shifted = make_frame(600, 2, shift=2.5).drop(columns="y")
-    report = monitor_module.ModelMonitor(trained.bundle).assess(shifted)
+    report = scmle.monitoring.monitor.ModelMonitor(trained.bundle).assess(
+        shifted
+    )
     worst = report.drift.features[0]
     assert worst.feature == "a" and worst.status == "high" and worst.psi > 0.25
     assert report.recommendation.action in {"investigate", "retrain"}
@@ -59,7 +61,7 @@ def test_a_shifted_feature_is_found_and_ranked_first(trained):
 def test_unseen_categories_trigger_investigation(trained):
     data = make_frame(500, 3).drop(columns="y")
     data["c"] = numpy.where(numpy.arange(500) % 3 == 0, "brand_new", data["c"])
-    report = monitor_module.ModelMonitor(trained.bundle).assess(data)
+    report = scmle.monitoring.monitor.ModelMonitor(trained.bundle).assess(data)
     category = next(f for f in report.drift.features if f.feature == "c")
     assert category.unseen_rate > 0.2
     assert any("unseen" in r for r in report.recommendation.reasons)
@@ -69,7 +71,7 @@ def test_delayed_labels_are_handled_explicitly(trained):
     data = make_frame(600, 4)
     outcomes = data["y"].astype(float).copy()
     outcomes.iloc[100:] = numpy.nan  # labels still pending
-    monitor = monitor_module.ModelMonitor(trained.bundle)
+    monitor = scmle.monitoring.monitor.ModelMonitor(trained.bundle)
     report = monitor.assess(data.drop(columns="y"), outcomes)
     performance = report.performance
     assert (
@@ -85,7 +87,7 @@ def test_delayed_labels_are_handled_explicitly(trained):
 
 def test_concept_drift_is_caught_by_performance_not_features(trained):
     flipped = make_frame(800, 5, relabel=True)
-    monitor = monitor_module.ModelMonitor(trained.bundle)
+    monitor = scmle.monitoring.monitor.ModelMonitor(trained.bundle)
     report = monitor.assess(flipped.drop(columns="y"), flipped["y"])
     assert all(f.status == "stable" for f in report.drift.features)
     assert report.performance.status == "degraded"
@@ -110,7 +112,7 @@ def test_prediction_log_joins_late_outcomes(trained, tmp_path):
     features, predictions, outcomes = log.load()
     assert len(features) == len(predictions) == len(outcomes) == 60
     assert outcomes.notna().sum() == 40 and outcomes.isna().sum() == 20
-    report = monitor_module.ModelMonitor(trained.bundle).assess(
+    report = scmle.monitoring.monitor.ModelMonitor(trained.bundle).assess(
         features, outcomes
     )
     assert report.performance.labeled_rows == 40
@@ -160,22 +162,22 @@ def test_bundles_without_reference_cannot_be_monitored(trained):
     bare = copy.copy(trained.bundle)
     bare.reference = None
     with pytest.raises(errors.ArtifactError, match="reference"):
-        monitor_module.ModelMonitor(bare)
+        scmle.monitoring.monitor.ModelMonitor(bare)
 
 
 def test_advisor_combines_rules_and_keeps_all_reasons():
-    drift = monitor_module.DriftReport(100, [], 0.4, "high")
-    performance = monitor_module.PerformanceReport(
+    drift = scmle.monitoring.monitor.DriftReport(100, [], 0.4, "high")
+    performance = scmle.monitoring.monitor.PerformanceReport(
         100, 100, 1.0, {}, {}, {"roc_auc": -0.3}, "degraded"
     )
-    verdict = monitor_module.advise(
-        drift, performance, monitor_module.MonitoringThresholds()
+    verdict = scmle.monitoring.monitor.advise(
+        drift, performance, scmle.monitoring.monitor.MonitoringThresholds()
     )
     assert verdict.action == "retrain" and len(verdict.reasons) == 2
-    calm = monitor_module.advise(
-        monitor_module.DriftReport(10, [], 0.01, "stable"),
+    calm = scmle.monitoring.monitor.advise(
+        scmle.monitoring.monitor.DriftReport(10, [], 0.01, "stable"),
         None,
-        monitor_module.MonitoringThresholds(),
+        scmle.monitoring.monitor.MonitoringThresholds(),
     )
     assert calm.action == "none" and calm.reasons == []
 

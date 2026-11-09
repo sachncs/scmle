@@ -6,20 +6,20 @@ import numpy
 import pandas
 
 from scmle.core import decision_reports
-from scmle.data.charter import decision as decision_module
+import scmle.data.charter.decision
 from scmle.data.framing import costs
 from scmle.decision import rollout
 from tests.unit.test_charter_contracts import make_charter
 
 
 def layer(fairness=(), plan=None):
-    return decision_module.DecisionLayer(
-        decision_module.DecisionModel("EUR"), fairness, plan
+    return scmle.data.charter.decision.DecisionLayer(
+        scmle.data.charter.decision.DecisionModel("EUR"), fairness, plan
     )
 
 
 def plan():
-    return decision_module.RolloutPlan(
+    return scmle.data.charter.decision.RolloutPlan(
         unit="user",
         primary="conv",
         assignment_prob=0.5,
@@ -79,10 +79,10 @@ def test_fairness_reports_each_constraint_and_missing_columns():
     outcome = (rng.random(n) < 0.5).astype(float)
     acts = (rng.random(n) < 0.5).astype(float)
     items = (
-        decision_module.FairnessConstraint(
+        scmle.data.charter.decision.FairnessConstraint(
             "g", "demographic_parity", 0.3, "reweighing"
         ),
-        decision_module.FairnessConstraint(
+        scmle.data.charter.decision.FairnessConstraint(
             "absent", "demographic_parity", 0.3, "reweighing"
         ),
     )

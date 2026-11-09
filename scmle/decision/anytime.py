@@ -50,7 +50,7 @@ lies in `[-M, M]`, `M = max(1/q, 1/(1 - q))`. `running_center` and
 import dataclasses
 import math
 
-import numpy as np
+import numpy
 from numpy.typing import ArrayLike
 from numpy.typing import NDArray
 from scipy import special
@@ -112,7 +112,7 @@ class Stream:
         position = (self.null - self.low) / (self.high - self.low)
         return position if self.direction == "greater" else 1.0 - position
 
-    def rescale(self, values: ArrayLike) -> NDArray[np.float64]:
+    def rescale(self, values: ArrayLike) -> NDArray[numpy.float64]:
         """Rescales values so that larger values are evidence.
 
         Args:
@@ -127,21 +127,21 @@ class Stream:
             ValueError: If `values` is not one-dimensional, is not finite,
                 or has a value outside `[low, high]` beyond the tolerance.
         """
-        array = np.asarray(values, dtype=float)
+        array = numpy.asarray(values, dtype=float)
         if array.ndim != 1:
             raise ValueError("values must be one-dimensional")
-        if not np.isfinite(array).all():
+        if not numpy.isfinite(array).all():
             raise ValueError("values must be finite")
         tolerance = 1e-9 * (self.high - self.low)
         if (array < self.low - tolerance).any() or (
             array > self.high + tolerance
         ).any():
             raise ValueError("a value lies outside [low, high]")
-        unit = np.clip((array - self.low) / (self.high - self.low), 0.0, 1.0)
+        unit = numpy.clip((array - self.low) / (self.high - self.low), 0.0, 1.0)
         return unit if self.direction == "greater" else 1.0 - unit
 
 
-def bet_grid(null_unit: float, size: int = GRID_SIZE) -> NDArray[np.float64]:
+def bet_grid(null_unit: float, size: int = GRID_SIZE) -> NDArray[numpy.float64]:
     """Builds the fixed bet sizes `GRID_TOP / null_unit * 2 ** -k`, `k < size`.
 
     Args:
@@ -159,15 +159,15 @@ def bet_grid(null_unit: float, size: int = GRID_SIZE) -> NDArray[np.float64]:
     if not 0.0 < null_unit < 1.0:
         raise ValueError("null_unit must be strictly between 0 and 1")
     qualification.count(size, "size", minimum=1)
-    grid: NDArray[np.float64] = (GRID_TOP / null_unit) * 0.5 ** np.arange(
+    grid: NDArray[numpy.float64] = (GRID_TOP / null_unit) * 0.5 ** numpy.arange(
         size, dtype=float
     )
     return grid
 
 
 def log_wealth(
-    unit: NDArray[np.float64], null_unit: float, size: int = GRID_SIZE
-) -> NDArray[np.float64]:
+    unit: NDArray[numpy.float64], null_unit: float, size: int = GRID_SIZE
+) -> NDArray[numpy.float64]:
     """Computes the log of the mixture e-process after every observation.
 
     Args:
@@ -186,19 +186,19 @@ def log_wealth(
     """
     grid = bet_grid(null_unit, size)
     centred = unit - null_unit
-    total: NDArray[np.float64] | None = None
+    total: NDArray[numpy.float64] | None = None
     for lam in grid:
-        path = np.cumsum(np.log1p(lam * centred), axis=-1)
-        total = path if total is None else np.logaddexp(total, path)
+        path = numpy.cumsum(numpy.log1p(lam * centred), axis=-1)
+        total = path if total is None else numpy.logaddexp(total, path)
     if total is None:
         raise errors.ScmleError("the bet grid is empty")
-    result: NDArray[np.float64] = total - math.log(len(grid))
+    result: NDArray[numpy.float64] = total - math.log(len(grid))
     return result
 
 
 def log_wealth_paths(
     values: ArrayLike, stream: Stream, size: int = GRID_SIZE
-) -> NDArray[np.float64]:
+) -> NDArray[numpy.float64]:
     """Computes log e-process paths for raw values, `(T,)` or `(R, T)`.
 
     Args:
@@ -212,7 +212,7 @@ def log_wealth_paths(
         that are not finite or lie outside the stream's range are refused
         with a `ValueError` by `Stream.rescale`.
     """
-    array = np.asarray(values, dtype=float)
+    array = numpy.asarray(values, dtype=float)
     flat = stream.rescale(array.reshape(-1)).reshape(array.shape)
     return log_wealth(flat, stream.rescaled_null(), size)
 
@@ -237,9 +237,9 @@ class EProcess:
     count: int = 0
     log_e: float = 0.0
     max_log_e: float = 0.0
-    totals: NDArray[np.float64] | None = None
-    path: NDArray[np.float64] = dataclasses.field(
-        default_factory=lambda: np.zeros(0)
+    totals: NDArray[numpy.float64] | None = None
+    path: NDArray[numpy.float64] = dataclasses.field(
+        default_factory=lambda: numpy.zeros(0)
     )
 
     def __post_init__(self) -> None:
@@ -251,7 +251,7 @@ class EProcess:
         """
         grid = bet_grid(self.stream.rescaled_null(), self.size)
         if self.totals is None:
-            self.totals = np.zeros(len(grid))
+            self.totals = numpy.zeros(len(grid))
 
     def update(self, values: ArrayLike) -> float:
         """Adds observations in order and returns the current log e-value.
@@ -273,15 +273,15 @@ class EProcess:
                 range are refused with a `ValueError` by `Stream.rescale`.
         """
         unit = self.stream.rescale(values)
-        self.path = np.zeros(0)
+        self.path = numpy.zeros(0)
         if unit.size == 0:
             return self.log_e
         null_unit = self.stream.rescaled_null()
         grid = bet_grid(null_unit, self.size)
         if self.totals is None:
             raise errors.ScmleError("bet totals are not initialised")
-        steps = np.log1p(np.outer(unit - null_unit, grid))
-        paths = self.totals + np.cumsum(steps, axis=0)
+        steps = numpy.log1p(numpy.outer(unit - null_unit, grid))
+        paths = self.totals + numpy.cumsum(steps, axis=0)
         mixed = special.logsumexp(paths, axis=1) - math.log(len(grid))
         self.totals = paths[-1].copy()
         self.path = mixed
@@ -350,7 +350,7 @@ def pseudo_outcomes(
     outcome: ArrayLike,
     assignment_prob: float,
     center: ArrayLike | None = None,
-) -> NDArray[np.float64]:
+) -> NDArray[numpy.float64]:
     """Computes `z = a (y - c) / q - (1 - a) (y - c) / (1 - q)`.
 
     The mean of `z` is the mean difference between the arms.
@@ -377,21 +377,25 @@ def pseudo_outcomes(
     q = qualification.finite(assignment_prob, "assignment_prob")
     if not 0.0 < q < 1.0:
         raise ValueError("assignment_prob must be strictly between 0 and 1")
-    a = np.asarray(arm, dtype=float)
-    y = np.asarray(outcome, dtype=float)
+    a = numpy.asarray(arm, dtype=float)
+    y = numpy.asarray(outcome, dtype=float)
     if a.shape != y.shape or a.ndim not in (1, 2):
         raise ValueError(
             "arm and outcome must be arrays of equal shape (1-d or 2-d)"
         )
-    if not np.isin(a, (0.0, 1.0)).all():
+    if not numpy.isin(a, (0.0, 1.0)).all():
         raise ValueError("arm must hold only 0 and 1")
-    if (y < 0).any() or (y > 1).any() or not np.isfinite(y).all():
+    if (y < 0).any() or (y > 1).any() or not numpy.isfinite(y).all():
         raise ValueError("outcome must lie in [0, 1]")
-    c = np.zeros_like(y) if center is None else np.asarray(center, dtype=float)
+    c = (
+        numpy.zeros_like(y)
+        if center is None
+        else numpy.asarray(center, dtype=float)
+    )
     if c.shape != y.shape or (c < 0).any() or (c > 1).any():
         raise ValueError("center must lie in [0, 1] and match the outcome")
     shifted = y - c
-    result: NDArray[np.float64] = a * shifted / q - (1.0 - a) * shifted / (
+    result: NDArray[numpy.float64] = a * shifted / q - (1.0 - a) * shifted / (
         1.0 - q
     )
     return result
@@ -402,7 +406,7 @@ def running_center(
     prior: float = 0.5,
     strength: float = 2.0,
     carry: tuple[float, int] = (0.0, 0),
-) -> NDArray[np.float64]:
+) -> NDArray[numpy.float64]:
     """Computes centres from earlier outcomes only: a shrunken running mean.
 
     `c_i = (prior * strength + sum_{j < i} y_j) / (strength + (i - 1))`, along
@@ -421,11 +425,11 @@ def running_center(
     Returns:
         The centre for each outcome, same shape as `outcome`.
     """
-    y = np.asarray(outcome, dtype=float)
+    y = numpy.asarray(outcome, dtype=float)
     total, seen = carry
-    before = np.cumsum(y, axis=-1) - y + total
-    count = np.arange(y.shape[-1], dtype=float) + seen
-    result: NDArray[np.float64] = (prior * strength + before) / (
+    before = numpy.cumsum(y, axis=-1) - y + total
+    count = numpy.arange(y.shape[-1], dtype=float) + seen
+    result: NDArray[numpy.float64] = (prior * strength + before) / (
         strength + count
     )
     return result
@@ -459,7 +463,7 @@ def centered_paths(
     null: float,
     direction: str = "greater",
     sign: float = 1.0,
-) -> NDArray[np.float64]:
+) -> NDArray[numpy.float64]:
     """Computes log e-process paths of the centred pseudo-outcomes.
 
     The result has shape `(T,)` or `(R, T)`, like `outcome`; the centre of
@@ -477,7 +481,7 @@ def centered_paths(
         The log e-value after each observation, with the shape of
         `outcome`.
     """
-    y = np.asarray(outcome, dtype=float)
+    y = numpy.asarray(outcome, dtype=float)
     z = sign * pseudo_outcomes(arm, y, assignment_prob, running_center(y))
     return log_wealth_paths(
         z, centered_stream(assignment_prob, null, direction)
@@ -563,7 +567,7 @@ def confidence_bound(
         stream's range by `Stream.rescale`, both with a `ValueError`.
     """
     level = positive_level(alpha)
-    array = np.asarray(values, dtype=float)
+    array = numpy.asarray(values, dtype=float)
     target = -math.log(level)
     inside = (stream.low, stream.high)
 

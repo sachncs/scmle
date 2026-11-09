@@ -5,13 +5,13 @@ import pandas
 import pytest
 
 from scmle.contracts import qualification
-from scmle.data.admissibility import dag as dag_module
 from scmle.data.admissibility import qualify
 from scmle.data.admissibility import screen
-from scmle.data.charter import causal as causal_module
+import scmle.data.admissibility.dag
+import scmle.data.charter.causal
 from scmle.data.detectors import certificates
-from scmle.data.ledger import ledger as ledger_module
 from scmle.data.ledger import online_fdr
+import scmle.data.ledger.ledger
 from tests.unit.test_charter_contracts import make_charter
 
 
@@ -172,7 +172,7 @@ def causal_world(rows=500, seed=0):
 
 
 def spec(assumptions):
-    return causal_module.CausalSpec(
+    return scmle.data.charter.causal.CausalSpec(
         treatment="t",
         outcome="y",
         estimand="ATE",
@@ -182,7 +182,7 @@ def spec(assumptions):
 
 
 def graph():
-    return dag_module.Dag(
+    return scmle.data.admissibility.dag.Dag(
         ("after", "t", "x1", "y"),
         (("t", "after"), ("t", "y"), ("x1", "t"), ("x1", "y")),
         (),
@@ -232,7 +232,7 @@ def test_a_refused_adjustment_member_is_reported_and_called_ineligible():
 
 def test_a_graph_that_names_missing_columns_cannot_be_tested_but_runs():
     features, target = causal_world()
-    wide = dag_module.Dag(
+    wide = scmle.data.admissibility.dag.Dag(
         ("t", "u", "x1", "y"),
         (("t", "y"), ("u", "y"), ("x1", "t")),
         (),
@@ -270,7 +270,7 @@ def test_many_candidates_without_a_declared_set_say_the_claim_is_attested_at_bes
         classification=False,
         seed=0,
         causal=spec(("positivity",)),
-        dag=dag_module.Dag(nodes, edges, (), "test", "none"),
+        dag=scmle.data.admissibility.dag.Dag(nodes, edges, (), "test", "none"),
     )
 
     assert any("attested at best" in n for n in found.notes)
@@ -296,7 +296,7 @@ def test_structure_columns_are_not_candidates():
 
 def make_ledger(path=None):
     charter = make_charter()
-    return ledger_module.Ledger.create(
+    return scmle.data.ledger.ledger.Ledger.create(
         path,
         charter_hash=charter.charter_hash,
         config=online_fdr.RuleConfig(
@@ -333,7 +333,7 @@ def test_a_diagnostic_spends_no_wealth_and_survives_reload(tmp_path):
 
     assert ledger.wealth == before
     assert not ledger.hypotheses
-    reloaded = ledger_module.Ledger.load(path)
+    reloaded = scmle.data.ledger.ledger.Ledger.load(path)
     assert reloaded.diagnostics == [sample_check()]
     assert reloaded.head == ledger.head
 
@@ -342,7 +342,7 @@ def test_a_diagnostic_cannot_follow_the_freeze():
     ledger = make_ledger()
     ledger.freeze()
 
-    with pytest.raises(ledger_module.LedgerError, match="frozen"):
+    with pytest.raises(scmle.data.ledger.ledger.LedgerError, match="frozen"):
         ledger.record_diagnostic(sample_check(), "f4-leakage-skill")
 
 
@@ -350,5 +350,7 @@ def test_a_diagnostic_that_read_c_is_refused():
     ledger = make_ledger()
     check = sample_check(qualification.SetId.CONFIRMATION)
 
-    with pytest.raises(ledger_module.LedgerError, match="exploration"):
+    with pytest.raises(
+        scmle.data.ledger.ledger.LedgerError, match="exploration"
+    ):
         ledger.record_diagnostic(check, "f4-leakage-skill")

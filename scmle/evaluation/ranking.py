@@ -7,7 +7,7 @@ import numpy
 import pandas
 from sklearn import metrics as sk_metrics
 
-from scmle.contracts import metrics as metric_contracts
+import scmle.contracts.metrics
 
 CUTOFF = 10
 MIN_DOCUMENTS = 2
@@ -299,7 +299,7 @@ FUNCTIONS = {
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class RankingMetric(metric_contracts.Metric):
+class RankingMetric(scmle.contracts.metrics.Metric):
     """A ranking metric read off a ranking estimator.
 
     Attributes:

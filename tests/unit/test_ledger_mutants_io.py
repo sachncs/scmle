@@ -22,8 +22,8 @@ from scmle.data.ledger import confirm
 from scmle.data.ledger import controls
 from scmle.data.ledger import explore
 from scmle.data.ledger import governed
-from scmle.data.ledger import ledger as ledger_module
 from scmle.data.ledger import online_fdr
+import scmle.data.ledger.ledger
 from scmle.data.splitting import splitters
 from tests.unit.test_charter_contracts import make_charter
 
@@ -36,7 +36,7 @@ def raises(error, message):
 
 
 def fresh(path=None, alpha=TEN_PERCENT, rule=online_fdr.ELOND):
-    return ledger_module.Ledger.create(
+    return scmle.data.ledger.ledger.Ledger.create(
         path,
         charter_hash="c" * 64,
         config=online_fdr.RuleConfig(rule, alpha),
@@ -54,7 +54,7 @@ def signal_data(rows=300, seed=0):
 
 
 def spec(column, name=None, direction=bivariate.TWO_SIDED):
-    return ledger_module.HypothesisSpec.create(
+    return scmle.data.ledger.ledger.HypothesisSpec.create(
         name=name or f"{column}~y",
         family="f",
         statistic="spearman",
@@ -68,7 +68,7 @@ def spec(column, name=None, direction=bivariate.TWO_SIDED):
 
 
 def test_files_are_written_with_sorted_keys_and_nested_folders(tmp_path):
-    path = tmp_path / "deep" / "er" / ledger_module.FILE_NAME
+    path = tmp_path / "deep" / "er" / scmle.data.ledger.ledger.FILE_NAME
     ledger = fresh(path)
     features, target = signal_data()
     ledger.test(ledger.register(spec("s")), features, target)
@@ -80,37 +80,45 @@ def test_files_are_written_with_sorted_keys_and_nested_folders(tmp_path):
 
 def test_open_creates_missing_folders_and_passes_the_horizon(tmp_path):
     charter = make_charter()
-    ledger = ledger_module.Ledger.open(tmp_path / "a" / "b", charter, horizon=4)
+    ledger = scmle.data.ledger.ledger.Ledger.open(
+        tmp_path / "a" / "b", charter, horizon=4
+    )
     assert ledger.config.horizon == 4
-    again = ledger_module.Ledger.open(tmp_path / "a" / "b", charter, horizon=4)
+    again = scmle.data.ledger.ledger.Ledger.open(
+        tmp_path / "a" / "b", charter, horizon=4
+    )
     assert again.head == ledger.head
     with raises(
-        ledger_module.LedgerError, "ledger was created with a different rule"
+        scmle.data.ledger.ledger.LedgerError,
+        "ledger was created with a different rule",
     ):
-        ledger_module.Ledger.open(tmp_path / "a" / "b", charter, horizon=5)
+        scmle.data.ledger.ledger.Ledger.open(
+            tmp_path / "a" / "b", charter, horizon=5
+        )
 
 
 def test_verify_file_checks_the_recorded_head(tmp_path):
-    path = tmp_path / ledger_module.FILE_NAME
+    path = tmp_path / scmle.data.ledger.ledger.FILE_NAME
     ledger = fresh(path)
     assert (
-        ledger_module.Ledger.verify_file(path, ledger.head).head == ledger.head
+        scmle.data.ledger.ledger.Ledger.verify_file(path, ledger.head).head
+        == ledger.head
     )
     with raises(
-        ledger_module.LedgerError,
+        scmle.data.ledger.ledger.LedgerError,
         "ledger head does not match the recorded head: rows were removed "
         "from the end or the file was replaced",
     ):
-        ledger_module.Ledger.verify_file(path, "0" * 64)
+        scmle.data.ledger.ledger.Ledger.verify_file(path, "0" * 64)
 
 
 def rechained(rows):
-    previous = ledger_module.GENESIS
+    previous = scmle.data.ledger.ledger.GENESIS
     out = []
     for index, row in enumerate(rows):
         row["seq"] = index
         row["prev"] = previous
-        row["hash"] = ledger_module.digest(
+        row["hash"] = scmle.data.ledger.ledger.digest(
             {k: row[k] for k in ("seq", "kind", "body", "prev")}
         )
         previous = row["hash"]
@@ -126,7 +134,7 @@ def write_rows(path, rows):
 
 
 def explored_file(tmp_path, p_value=1e-6):
-    path = tmp_path / ledger_module.FILE_NAME
+    path = tmp_path / scmle.data.ledger.ledger.FILE_NAME
     ledger = fresh(path)
     handle = ledger.register(spec("n"))
     ledger.record(handle, bivariate.Outcome(p_value, 0.1, 0.1, 100))
@@ -137,12 +145,14 @@ def test_a_wrong_sequence_number_alone_breaks_the_chain(tmp_path):
     path = explored_file(tmp_path)
     rows = [json.loads(line) for line in path.read_text().splitlines()]
     rows[1]["seq"] = 5
-    rows[1]["hash"] = ledger_module.digest(
+    rows[1]["hash"] = scmle.data.ledger.ledger.digest(
         {k: rows[1][k] for k in ("seq", "kind", "body", "prev")}
     )
     write_rows(path, rows)
-    with raises(ledger_module.LedgerError, "ledger chain broken at row 1"):
-        ledger_module.Ledger.load(path)
+    with raises(
+        scmle.data.ledger.ledger.LedgerError, "ledger chain broken at row 1"
+    ):
+        scmle.data.ledger.ledger.Ledger.load(path)
 
 
 def stored_e_with_error(tmp_path, p_value, relative_error):
@@ -160,12 +170,13 @@ def stored_e_with_error(tmp_path, p_value, relative_error):
 @pytest.mark.parametrize("p_value", [1e-6, 0.5])
 def test_the_calibration_tolerance_is_one_part_in_a_trillion(tmp_path, p_value):
     inside = stored_e_with_error(tmp_path / "in", p_value, 0.5e-12)
-    ledger_module.Ledger.load(inside)
+    scmle.data.ledger.ledger.Ledger.load(inside)
     outside = stored_e_with_error(tmp_path / "out", p_value, 1.5e-12)
     with raises(
-        ledger_module.LedgerError, "stored e-value is not the calibrated p"
+        scmle.data.ledger.ledger.LedgerError,
+        "stored e-value is not the calibrated p",
     ):
-        ledger_module.Ledger.load(outside)
+        scmle.data.ledger.ledger.Ledger.load(outside)
 
 
 def test_a_result_row_without_a_reason_loads_with_an_empty_one(tmp_path):
@@ -173,14 +184,14 @@ def test_a_result_row_without_a_reason_loads_with_an_empty_one(tmp_path):
     rows = [json.loads(line) for line in path.read_text().splitlines()]
     del next(r for r in rows if r["kind"] == "result")["body"]["reason"]
     write_rows(path, rechained(rows))
-    loaded = ledger_module.Ledger.load(path)
+    loaded = scmle.data.ledger.ledger.Ledger.load(path)
     assert next(iter(loaded.results.values())).reason == ""
 
 
 def test_a_hypothesis_without_a_column_reads_the_first_one():
     features, target = signal_data()
     ledger = fresh()
-    plain = ledger_module.HypothesisSpec.create(
+    plain = scmle.data.ledger.ledger.HypothesisSpec.create(
         name="first", family="f", statistic="spearman", null="x"
     )
     result = ledger.test(ledger.register(plain), features, target)
@@ -399,7 +410,7 @@ def test_a_custody_log_without_entries_gives_no_head():
 def test_hypotheses_without_a_column_or_with_a_direction_run_on_c():
     features, target = signal_data(600, 1)
     ledger = fresh(None, F(1, 10))
-    plain = ledger_module.HypothesisSpec.create(
+    plain = scmle.data.ledger.ledger.HypothesisSpec.create(
         name="first", family="f", statistic="spearman", null="x"
     )
     up = spec("s", "up", bivariate.GREATER)
@@ -631,9 +642,11 @@ def test_every_check_on_c_has_its_own_seed_index():
 def test_a_known_id_with_another_specification_is_not_registered():
     ledger = fresh()
     ledger.register(spec("s"))
-    impostor = ledger_module.Hypothesis("h000001", spec("n", "other"))
+    impostor = scmle.data.ledger.ledger.Hypothesis(
+        "h000001", spec("n", "other")
+    )
     with raises(
-        ledger_module.LedgerError,
+        scmle.data.ledger.ledger.LedgerError,
         "hypothesis h000001 is not registered: registration must precede "
         "evaluation",
     ):
@@ -641,14 +654,14 @@ def test_a_known_id_with_another_specification_is_not_registered():
 
 
 def test_notes_reach_the_stored_reason_and_survive_a_reload(tmp_path):
-    path = tmp_path / ledger_module.FILE_NAME
+    path = tmp_path / scmle.data.ledger.ledger.FILE_NAME
     ledger = fresh(path)
     features, target = signal_data()
     features["flat"] = 1.0
     result = ledger.test(ledger.register(spec("flat")), features, target)
     assert result.reason == "a variable is constant"
     assert result.check.p_value == 1.0
-    again = ledger_module.Ledger.load(path)
+    again = scmle.data.ledger.ledger.Ledger.load(path)
     assert next(iter(again.results.values())).reason == "a variable is constant"
 
 

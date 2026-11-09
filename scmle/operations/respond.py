@@ -29,7 +29,7 @@ from scmle.operations import classify
 from scmle.operations import logs
 from scmle.operations import notify
 from scmle.operations import signals
-from scmle.security import audit as audit_module
+import scmle.security.audit
 
 DESK = "operations-desk"
 TELEMETRY_FILE = "telemetry.jsonl"
@@ -77,7 +77,7 @@ class ResponseDesk:
     def __init__(
         self,
         directory: str | pathlib.Path,
-        audit: audit_module.AuditLog,
+        audit: scmle.security.audit.AuditLog,
         notifier: notify.Notifier,
         model_version: str,
         artifact_digest: str,
@@ -257,7 +257,7 @@ class ResponseDesk:
             raise ValueError("unknown operator action")
         opened = [
             row
-            for row in self.audit.rows(audit_module.ADMIN)
+            for row in self.audit.rows(scmle.security.audit.ADMIN)
             if row["body"].get("incident_id") == incident_id
             and row["body"].get("action") == "incident_opened"
         ]

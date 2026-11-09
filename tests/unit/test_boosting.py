@@ -5,20 +5,20 @@ import pytest
 from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.models import conformance
-from scmle.models import registry as registry_module
 from scmle.models.boosting import boosters
 from scmle.models.boosting import early_stopping
+import scmle.models.registry
 
 
 @pytest.mark.parametrize("library", ["lightgbm", "xgboost"])
 def test_adapters_pass_conformance_when_installed(library):
     pytest.importorskip(library)
-    adapter = registry_module.ModelRegistry.with_builtins().get(library)
+    adapter = scmle.models.registry.ModelRegistry.with_builtins().get(library)
     conformance.check_conformance(adapter)
 
 
 def test_adapters_are_rejected_not_failing_when_library_missing(monkeypatch):
-    registry = registry_module.ModelRegistry.with_builtins()
+    registry = scmle.models.registry.ModelRegistry.with_builtins()
     monkeypatch.setattr(
         boosters.XgboostAdapter, "requires", ("not_installed_pkg",)
     )
@@ -103,7 +103,9 @@ def test_wrapper_survives_pickling_and_cloning():
 
 def test_catboost_passes_conformance_when_installed():
     pytest.importorskip("catboost")
-    adapter = registry_module.ModelRegistry.with_builtins().get("catboost")
+    adapter = scmle.models.registry.ModelRegistry.with_builtins().get(
+        "catboost"
+    )
     conformance.check_conformance(adapter)
 
 
@@ -163,7 +165,9 @@ def test_catboost_multiclass_predictions_are_one_dimensional(multiclass_frame):
     pytest.importorskip("catboost")
     from scmle.contracts import tasks
 
-    adapter = registry_module.ModelRegistry.with_builtins().get("catboost")
+    adapter = scmle.models.registry.ModelRegistry.with_builtins().get(
+        "catboost"
+    )
     estimator = adapter.build(tasks.TaskType.MULTICLASS, 0, {"iterations": 20})
     features = multiclass_frame.drop(columns="y")
     estimator.fit(features, multiclass_frame["y"])

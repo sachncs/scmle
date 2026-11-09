@@ -13,7 +13,7 @@ from scmle.contracts import errors
 from scmle.data.charter import ingest
 from scmle.data.charter import sealing
 from scmle.data.ingest import declared
-from scmle.data.ledger import ledger as ledger_module
+import scmle.data.ledger.ledger
 from tests.unit.test_charter_contracts import make_charter
 
 KEY = "ingest-key"
@@ -156,7 +156,9 @@ def test_features_come_from_the_database_and_reach_the_ledger(tmp_path):
         assert (folder / name).exists()
     profile = read(result, "dataset_profile.json")["feature_plan"]
     assert set(kept) & set(profile["numeric"])
-    ledger = ledger_module.Ledger.load(folder / ledger_module.FILE_NAME)
+    ledger = scmle.data.ledger.ledger.Ledger.load(
+        folder / scmle.data.ledger.ledger.FILE_NAME
+    )
     registered = {h.spec.column for h in ledger.hypotheses.values()}
     assert set(kept) <= registered
     table_ = read(result, "ingest_field_provenance.json")

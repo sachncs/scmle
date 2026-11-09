@@ -7,7 +7,7 @@ import numpy
 import pandas
 
 from scmle.artifacts import bundle
-from scmle.inference import mapping as mapping_module
+import scmle.inference.mapping
 
 
 def load_model(
@@ -41,7 +41,7 @@ def predict(
     data: str | pathlib.Path | pandas.DataFrame,
     trusted: bool = False,
     signing_key: str | bytes | None = None,
-    mapping: mapping_module.ColumnMapping | None = None,
+    mapping: scmle.inference.mapping.ColumnMapping | None = None,
 ) -> numpy.ndarray:
     """Loads a bundle and predicts labels or values.
 
@@ -65,7 +65,7 @@ def score(
     data: str | pathlib.Path | pandas.DataFrame,
     trusted: bool = False,
     signing_key: str | bytes | None = None,
-    mapping: mapping_module.ColumnMapping | None = None,
+    mapping: scmle.inference.mapping.ColumnMapping | None = None,
 ) -> dict[str, Any]:
     """Loads a bundle and returns predictions with schema diagnostics.
 

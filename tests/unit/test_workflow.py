@@ -12,9 +12,9 @@ from scmle.data.store import objectstore
 from scmle.runners import base
 from scmle.runners import local
 from scmle.workflow import definition
-from scmle.workflow import executor as ex
 from scmle.workflow import handlers
-from scmle.workflow import schedule as sched
+import scmle.workflow.executor
+import scmle.workflow.schedule
 from tests import support_runners
 
 KEYS = {"ml-owner": "owner-signing-key-0001", "second": "second-key-0002"}
@@ -96,7 +96,7 @@ class Recorder:
 
 
 def executor_for(store, workflow, recorder, clock, **options):
-    return ex.LocalExecutor(
+    return scmle.workflow.executor.LocalExecutor(
         workflow,
         store,
         recorder.handlers(workflow),
@@ -231,10 +231,10 @@ def test_a_second_executor_cannot_work_on_a_run_in_flight(store):
     seen = []
 
     def during(context):
-        run_id = ex.run_id_for(flow, "req-1")
+        run_id = scmle.workflow.executor.run_id_for(flow, "req-1")
         try:
             second.start("req-1", "alice")
-        except ex.RunInFlightError as error:
+        except scmle.workflow.executor.RunInFlightError as error:
             seen.append(str(error))
         return {"run": run_id}
 
@@ -253,7 +253,7 @@ def test_max_concurrent_runs_is_enforced(store):
     def during(context):
         try:
             other.start("req-2", "alice")
-        except ex.ConcurrencyLimitError as error:
+        except scmle.workflow.executor.ConcurrencyLimitError as error:
             outcome.append(type(error).__name__)
         return {}
 
@@ -300,7 +300,7 @@ def test_interrupted_steps_retry_with_backoff_and_the_same_key(store):
     def flaky(context):
         keys.append(context.idempotency_key)
         if context.attempt < 3:
-            raise ex.StepInterruptedError("preempted")
+            raise scmle.workflow.executor.StepInterruptedError("preempted")
         return {"ok": True}
 
     recorder.behaviour["train"] = flaky
@@ -322,7 +322,7 @@ def test_retries_are_bounded(store):
     recorder = Recorder(clock)
 
     def always(context):
-        raise ex.StepInterruptedError("preempted")
+        raise scmle.workflow.executor.StepInterruptedError("preempted")
 
     recorder.behaviour["train"] = always
     record = executor_for(store, pipeline(), recorder, clock).start("r", "a")
@@ -342,7 +342,7 @@ def test_a_crashed_executor_is_taken_over_after_its_lease(store):
     recorder.behaviour["train"] = dies
     with pytest.raises(support_runners.Killed):
         executor.start("req-1", "alice")
-    run_id = ex.run_id_for(flow, "req-1")
+    run_id = scmle.workflow.executor.run_id_for(flow, "req-1")
     # A killed process cannot release its lease.
     store.put(
         f"workflows/{flow.name}/runs/{run_id}/lock",
@@ -350,7 +350,7 @@ def test_a_crashed_executor_is_taken_over_after_its_lease(store):
     )
     successor = executor_for(store, flow, recorder, clock, owner="b")
     recorder.behaviour.pop("train")
-    with pytest.raises(ex.RunInFlightError):
+    with pytest.raises(scmle.workflow.executor.RunInFlightError):
         successor.resume(run_id)
     clock.now += 301
     record = successor.resume(run_id)
@@ -453,7 +453,7 @@ def test_independent_steps_run_in_parallel_and_a_group_limit_holds(store):
         return {}
 
     handlers_ = {"a": meet, "b": meet, "c": grouped, "d": grouped}
-    record = ex.LocalExecutor(
+    record = scmle.workflow.executor.LocalExecutor(
         flow, store, handlers_, clock=clock, sleep=clock.sleep
     ).start("p", "a")
     assert record["state"] == "succeeded"
@@ -469,26 +469,34 @@ def test_approval_rules_are_enforced(store):
         record["run_id"], "approve", "second", "approve", KEYS["second"]
     )
     forged = {**good, "signature": "0" * 64}
-    with pytest.raises(ex.ApprovalError, match="signature"):
+    with pytest.raises(
+        scmle.workflow.executor.ApprovalError, match="signature"
+    ):
         executor.submit_approval(forged)
     tampered = {**good, "decision": "reject"}
-    with pytest.raises(ex.ApprovalError, match="signature"):
+    with pytest.raises(
+        scmle.workflow.executor.ApprovalError, match="signature"
+    ):
         executor.submit_approval(tampered)
     own = executor.sign_approval(
         record["run_id"], "approve", "ml-owner", "approve", KEYS["ml-owner"]
     )
-    with pytest.raises(ex.ApprovalError, match="requester"):
+    with pytest.raises(
+        scmle.workflow.executor.ApprovalError, match="requester"
+    ):
         executor.submit_approval(own)
     stranger = executor.sign_approval(
         record["run_id"], "approve", "mallory", "approve", "any-key-at-all"
     )
-    with pytest.raises(ex.ApprovalError, match="not listed"):
+    with pytest.raises(
+        scmle.workflow.executor.ApprovalError, match="not listed"
+    ):
         executor.submit_approval(stranger)
     wrong_step = {**good, "step": "monitor"}
-    with pytest.raises(ex.ApprovalError):
+    with pytest.raises(scmle.workflow.executor.ApprovalError):
         executor.submit_approval(wrong_step)
     executor.submit_approval(good)
-    with pytest.raises(ex.ApprovalError, match="already"):
+    with pytest.raises(scmle.workflow.executor.ApprovalError, match="already"):
         executor.submit_approval(good)
     assert executor.resume(record["run_id"])["state"] == "succeeded"
 
@@ -519,7 +527,9 @@ def test_a_changed_definition_cannot_continue_an_old_run(store):
     changed = definition.Workflow(
         changed.name, "2", changed.steps, changed.schedule
     )
-    assert ex.run_id_for(changed, "req-1") != record["run_id"]
+    assert (
+        scmle.workflow.executor.run_id_for(changed, "req-1") != record["run_id"]
+    )
     other = executor_for(store, changed, recorder, clock)
     with pytest.raises(errors.ConfigError, match="different workflow"):
         other.resume(record["run_id"])
@@ -527,7 +537,9 @@ def test_a_changed_definition_cannot_continue_an_old_run(store):
 
 def test_every_non_approval_step_needs_a_handler(store):
     with pytest.raises(errors.ConfigError, match="no handler"):
-        ex.LocalExecutor(definition.standard_workflow(), store, {})
+        scmle.workflow.executor.LocalExecutor(
+            definition.standard_workflow(), store, {}
+        )
 
 
 # ---- schedule -------------------------------------------------------------
@@ -550,7 +562,7 @@ def test_missed_slots_follow_the_declared_policy(store):
         flow = scheduled(policy, f"wf-{policy.value}")
         clock = Clock(5 * 3600.0 + 2000.0)
         executor = executor_for(store, flow, Recorder(clock), clock)
-        scheduler = sched.Scheduler(flow, store)
+        scheduler = scmle.workflow.schedule.Scheduler(flow, store)
         scheduler.save(0.0, {})
         report = scheduler.tick(executor)
         assert len(report.ran) == expected_runs, policy
@@ -560,7 +572,7 @@ def test_missed_slots_follow_the_declared_policy(store):
     current = scheduled(definition.CatchUp.SKIP, "wf-current")
     clock = Clock(5 * 3600.0 + 10.0)
     executor = executor_for(store, current, Recorder(clock), clock)
-    scheduler = sched.Scheduler(current, store)
+    scheduler = scmle.workflow.schedule.Scheduler(current, store)
     scheduler.save(0.0, {})
     report = scheduler.tick(executor)
     assert [slot for slot, ignored in report.ran] == [5 * 3600.0]
@@ -572,7 +584,7 @@ def test_the_first_tick_does_not_backfill_and_a_second_tick_is_quiet(store):
     clock = Clock(10 * 3600.0 + 1.0)
     recorder = Recorder(clock)
     executor = executor_for(store, flow, recorder, clock)
-    scheduler = sched.Scheduler(flow, store)
+    scheduler = scmle.workflow.schedule.Scheduler(flow, store)
     first = scheduler.tick(executor)
     assert [s for s, ignored in first.ran] == [10 * 3600.0]
     calls = list(recorder.calls)
@@ -588,10 +600,10 @@ def test_a_scheduler_that_lost_its_state_does_not_repeat_finished_slots(store):
     clock = Clock(3600.0 + 1.0)
     recorder = Recorder(clock)
     executor = executor_for(store, flow, recorder, clock)
-    sched.Scheduler(flow, store).tick(executor)
+    scmle.workflow.schedule.Scheduler(flow, store).tick(executor)
     store.delete(f"workflows/{flow.name}/schedule/state.json")
     calls = list(recorder.calls)
-    again = sched.Scheduler(flow, store).tick(executor)
+    again = scmle.workflow.schedule.Scheduler(flow, store).tick(executor)
     assert len(again.ran) == 1 and recorder.calls == calls
 
 
@@ -601,7 +613,7 @@ def test_a_slot_that_cannot_start_is_deferred_and_stays_due(store):
     recorder = Recorder(clock)
     executor = executor_for(store, flow, recorder, clock)
     rival = executor_for(store, flow, Recorder(clock), clock, owner="rival")
-    scheduler = sched.Scheduler(flow, store)
+    scheduler = scmle.workflow.schedule.Scheduler(flow, store)
     outcome = []
 
     def during(context):
@@ -615,7 +627,7 @@ def test_a_slot_that_cannot_start_is_deferred_and_stays_due(store):
 
 def test_a_schedule_is_required():
     with pytest.raises(errors.ConfigError):
-        sched.Scheduler(
+        scmle.workflow.schedule.Scheduler(
             pipeline(), objectstore.LocalObjectStore("/tmp/x-sched")
         )
 
@@ -649,7 +661,7 @@ def test_a_training_step_runs_through_a_runner_and_resumes_inside_it(tmp_path):
     flow = pipeline()
     handlers_ = recorder.handlers(flow)
     handlers_["train"] = handlers.runner_handler(runner, spec_for)
-    executor = ex.LocalExecutor(
+    executor = scmle.workflow.executor.LocalExecutor(
         flow,
         objectstore.LocalObjectStore(tmp_path / "state"),
         handlers_,

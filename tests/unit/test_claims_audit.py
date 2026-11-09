@@ -7,8 +7,8 @@ import pytest
 from scmle import cli
 from scmle.artifacts import claims_audit
 from scmle.contracts import errors
-from scmle.data.charter import rules as rules_module
 from scmle.data.charter import sealing
+import scmle.data.charter.rules
 from scmle.data.custody import sealed
 from scmle.data.ledger import confirm
 from scmle.data.ledger import governed
@@ -92,7 +92,9 @@ def test_without_a_key_the_charter_is_hash_checked_only(tmp_path):
 
 
 def test_chartered_rules_are_checked_against_the_ledger(tmp_path):
-    rules = rules_module.RunRules(ledger_rule="lord++", confirmation_rule="bh")
+    rules = scmle.data.charter.rules.RunRules(
+        ledger_rule="lord++", confirmation_rule="bh"
+    )
     make_run(tmp_path, rules=rules)
     result = claims_audit.verify(tmp_path, KEY)
     assert result.ok
@@ -102,7 +104,7 @@ def test_chartered_rules_are_checked_against_the_ledger(tmp_path):
     other.mkdir()
     make_run(other)
     changed = json.loads((other / "analysis_charter.json").read_text())
-    changed["charter"]["rules"] = rules_module.RunRules(
+    changed["charter"]["rules"] = scmle.data.charter.rules.RunRules(
         confirmation_rule="holm"
     ).to_dict()
     changed["format"] = 3

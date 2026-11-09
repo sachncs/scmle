@@ -23,11 +23,11 @@ from scmle.contracts import errors
 from scmle.contracts import models
 from scmle.contracts import search
 from scmle.contracts import tasks
-from scmle.models.multitarget import estimators as multitarget_estimators
-from scmle.models.ordinal import estimators as ordinal_estimators
-from scmle.models.ranking import estimators as ranking_estimators
-from scmle.models.survival import estimators as survival_estimators
-from scmle.models.uplift import estimators as uplift_estimators
+import scmle.models.multitarget.estimators
+import scmle.models.ordinal.estimators
+import scmle.models.ranking.estimators
+import scmle.models.survival.estimators
+import scmle.models.uplift.estimators
 
 BINARY = tasks.TaskType.BINARY
 MULTICLASS = tasks.TaskType.MULTICLASS
@@ -127,25 +127,25 @@ class DummyAdapter(models.ModelAdapter):
             An unfitted baseline estimator for the task.
         """
         if task is tasks.TaskType.SURVIVAL:
-            return survival_estimators.MarginalSurvival()
+            return scmle.models.survival.estimators.MarginalSurvival()
         if task is tasks.TaskType.UPLIFT:
-            return uplift_estimators.ZeroEffect()
+            return scmle.models.uplift.estimators.ZeroEffect()
         if task in (
             tasks.TaskType.MULTILABEL,
             tasks.TaskType.MULTIOUTPUT,
             tasks.TaskType.FORECAST,
         ):
             classify = task is tasks.TaskType.MULTILABEL
-            return multitarget_estimators.PerTarget(
+            return scmle.models.multitarget.estimators.PerTarget(
                 dummy.DummyClassifier(strategy="prior")
                 if classify
                 else dummy.DummyRegressor(strategy="mean"),
                 classify,
             )
         if task is tasks.TaskType.RANKING:
-            return ranking_estimators.ConstantRanker()
+            return scmle.models.ranking.estimators.ConstantRanker()
         if task is tasks.TaskType.ORDINAL:
-            return ordinal_estimators.CumulativeThresholdRegressor(
+            return scmle.models.ordinal.estimators.CumulativeThresholdRegressor(
                 dummy.DummyRegressor(strategy="median"),
                 (params or {}).get("levels"),
                 seed,

@@ -6,7 +6,7 @@ import pytest
 from scmle.contracts import tasks
 from scmle.models import conformance
 from scmle.models import ensembles
-from scmle.models import registry as registry_module
+import scmle.models.registry
 
 
 def test_the_blender_puts_its_weight_on_the_member_that_predicts_best():
@@ -54,7 +54,7 @@ def test_multiclass_members_contribute_one_column_per_class():
 
 
 def test_the_blending_adapter_builds_working_ensembles_and_passes_conformance():
-    registry = registry_module.ModelRegistry.with_builtins()
+    registry = scmle.models.registry.ModelRegistry.with_builtins()
     adapter = registry.get("blending")
 
     conformance.check_conformance(adapter)

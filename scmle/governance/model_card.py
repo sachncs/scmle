@@ -5,7 +5,7 @@ import dataclasses
 import datetime
 from typing import Any
 
-from scmle.artifacts import bundle as bundle_module
+import scmle.artifacts.bundle
 from scmle.contracts import data
 
 
@@ -68,7 +68,7 @@ class ModelCard:
         cls,
         manifest: data.DatasetManifest,
         profile: data.DatasetProfile,
-        bundle: bundle_module.ModelBundle,
+        bundle: scmle.artifacts.bundle.ModelBundle,
         evaluation: Mapping[str, Any],
         model_fingerprint: str,
     ) -> "ModelCard":

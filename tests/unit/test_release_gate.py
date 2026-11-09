@@ -11,7 +11,7 @@ import pytest
 from scmle.contracts import errors
 from scmle.deploy import gate
 from scmle.deploy import livetests
-from scmle.deploy import record as record_module
+import scmle.deploy.record
 from tests import support_release
 
 
@@ -196,8 +196,8 @@ def test_a_complete_staging_release_is_admitted_and_certified_with_a_record():
 def test_a_record_round_trips_and_detects_tampering(tmp_path):
     record = support_release.staging_record()
     path = tmp_path / "staging.json"
-    record_module.write_record(path, record)
-    again = record_module.read_record(path)
+    scmle.deploy.record.write_record(path, record)
+    again = scmle.deploy.record.read_record(path)
     assert again == record and again.verify(support_release.KEY)
     assert not again.verify("another-key")
     forged = dataclasses.replace(again, approver="someone-else")
@@ -214,7 +214,7 @@ def test_a_record_refuses_malformed_fields():
     with pytest.raises(errors.ConfigError):
         dataclasses.replace(record, environment="local")
     with pytest.raises(errors.ConfigError):
-        record_module.DeploymentRecord.from_dict(
+        scmle.deploy.record.DeploymentRecord.from_dict(
             {**record.to_dict(), "format": 9}
         )
 

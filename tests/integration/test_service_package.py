@@ -15,7 +15,7 @@ import pandas
 import pytest
 
 from scmle import cli
-from scmle.artifacts import bundle as bundle_module
+import scmle.artifacts.bundle
 from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.contracts import tasks
@@ -40,7 +40,7 @@ def boosted(tmp_path_factory):
         tasks.TaskType.BINARY,
         0,
     ).fit(frame, target)
-    bundle = bundle_module.ModelBundle.create(
+    bundle = scmle.artifacts.bundle.ModelBundle.create(
         fitted, plan, frame, "y", "binary_classification", "roc_auc", "boost"
     )
     return bundle, frame, tmp_path_factory.mktemp("service")

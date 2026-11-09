@@ -10,13 +10,13 @@ from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.data.curation import preprocessing
 from scmle.governance import lifecycle
-from scmle.governance import registry as registry_module
-from scmle.models import registry as models_module
+import scmle.governance.registry
+import scmle.models.registry
 from scmle.monitoring import abtest
 from scmle.monitoring import shadow
 
 PLAN = data.FeaturePlan(("a", "b"), ())
-MODELS = models_module.ModelRegistry.with_builtins()
+MODELS = scmle.models.registry.ModelRegistry.with_builtins()
 APPROVAL_KEY = "promotion-review-key"
 
 
@@ -41,12 +41,12 @@ def bundle_of(name, frame):
 
 
 def approval_for(record):
-    return registry_module.PromotionApproval(
+    return scmle.governance.registry.PromotionApproval(
         model=record.model,
         version=record.version,
         content_id=record.content_id,
         reviewer="unit-reviewer",
-        decision=registry_module.PromotionDecision.APPROVED,
+        decision=scmle.governance.registry.PromotionDecision.APPROVED,
         reason="verified unit fixture",
         evidence=("unit-evidence.json",),
         approved_at="2026-10-20T00:00:00+00:00",
@@ -146,7 +146,7 @@ def test_too_few_requests_never_decide(good, weak):
 
 
 def registry_with(tmp_path, first, second):
-    store = registry_module.ModelRegistryStore(tmp_path / "registry")
+    store = scmle.governance.registry.ModelRegistryStore(tmp_path / "registry")
     manager = lifecycle.LifecycleManager(store, "m", str(tmp_path / "work"))
     for index, model in enumerate((first, second), start=1):
         directory = model.save(tmp_path / f"export{index}")
@@ -176,7 +176,7 @@ def test_a_clearly_worse_new_champion_is_rolled_back(good, tmp_path):
     assert store.resolve("m").version == 1
     actions = [
         line
-        for line in (store.root / registry_module.AUDIT_FILE)
+        for line in (store.root / scmle.governance.registry.AUDIT_FILE)
         .read_text()
         .splitlines()
         if "rollback_check" in line
@@ -210,7 +210,7 @@ def test_a_new_champion_that_holds_up_stays(good, tmp_path):
 
 
 def test_nothing_to_roll_back_to_or_too_little_evidence(good, tmp_path):
-    store = registry_module.ModelRegistryStore(tmp_path / "registry")
+    store = scmle.governance.registry.ModelRegistryStore(tmp_path / "registry")
     manager = lifecycle.LifecycleManager(store, "m", str(tmp_path / "work"))
     record = store.register("m", good.save(tmp_path / "e"), trusted=True)
     store.promote(
@@ -250,7 +250,7 @@ def test_a_rollback_that_is_refused_is_not_audited_as_rolled_back(
     assert store.resolve("m").version == 2
     lines = [
         line
-        for line in (store.root / registry_module.AUDIT_FILE)
+        for line in (store.root / scmle.governance.registry.AUDIT_FILE)
         .read_text()
         .splitlines()
         if "rollback_check" in line

@@ -28,7 +28,7 @@ import numpy
 import pandas
 
 from scmle.contracts import qualification
-from scmle.data.admissibility import dag as dag_module
+import scmle.data.admissibility.dag
 from scmle.data.charter import causal
 from scmle.data.identification import aipw
 from scmle.data.identification import battery
@@ -1489,20 +1489,22 @@ def label_subgroups(
             from the shipped certificate (None when it is absent, so every
             estimated subgroup then counts as certified size).
     """
-    from scmle.data.identification import certified as loader
+    import scmle.data.identification.certified
 
-    gate = loader.subgroup_gate(subgroup_report)
+    gate = scmle.data.identification.certified.subgroup_gate(subgroup_report)
     if named is not None:
-        listed = loader.SUBGROUP_GATE in named
-        gate = loader.SubgroupGate(
-            loader.GATING if listed else loader.DESCRIPTIVE,
+        listed = scmle.data.identification.certified.SUBGROUP_GATE in named
+        gate = scmle.data.identification.certified.SubgroupGate(
+            scmle.data.identification.certified.GATING
+            if listed
+            else scmle.data.identification.certified.DESCRIPTIVE,
             "named among the certified gates"
             if listed
             else "the caller named the certified gates and this is not one",
             gate.min_rows,
         )
     found["gate"] = gate.to_dict()
-    gating = gate.status == loader.GATING
+    gating = gate.status == scmle.data.identification.certified.GATING
     for row in found["hypotheses"]:
         size = row.get("n")
         row["certified_size"] = bool(
@@ -1527,7 +1529,7 @@ def identify(
     c: pandas.DataFrame,
     error_budget: budget.ErrorBudget,
     attestors: Mapping[str, str] | None = None,
-    dag: dag_module.Dag | None = None,
+    dag: scmle.data.admissibility.dag.Dag | None = None,
     seed: int = 0,
     learner: str = "linear",
     certified: tuple[str, ...] | None = None,
@@ -1568,9 +1570,11 @@ def identify(
         return refusal_outcome(plan, spec, dag_checks=dag_checks)
     named = certified
     if certified is None:
-        from scmle.data.identification import certified as loader
+        import scmle.data.identification.certified
 
-        certified = tuple(sorted(loader.certified_gates()))
+        certified = tuple(
+            sorted(scmle.data.identification.certified.certified_gates())
+        )
     primary_alpha, alpha_falsify = alphas(error_budget)
     level = 1.0 - primary_alpha
     strategy = plan.primary
@@ -1713,7 +1717,7 @@ def design_only(
     spec: causal.CausalSpec,
     x: pandas.DataFrame,
     error_budget: budget.ErrorBudget,
-    dag: dag_module.Dag | None = None,
+    dag: scmle.data.admissibility.dag.Dag | None = None,
     seed: int = 0,
     learner: str = "linear",
     dag_checks: Mapping[str, Any] | None = None,

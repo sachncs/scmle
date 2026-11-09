@@ -15,8 +15,8 @@ from scmle.data.ledger import budget
 from scmle.data.ledger import confirm
 from scmle.data.ledger import controls
 from scmle.data.ledger import explore
-from scmle.data.ledger import ledger as ledger_module
 from scmle.data.ledger import online_fdr
+import scmle.data.ledger.ledger
 from scmle.data.splitting import splitters
 
 F = Fraction
@@ -44,7 +44,7 @@ def explored(tmp_path=None, effect=0.6, control=True, rule=online_fdr.ELOND):
     x, y = world(600, 1, effect)
     config = online_fdr.RuleConfig(rule, F(1, 10))
     path = None if tmp_path is None else tmp_path / "hypothesis_ledger.jsonl"
-    ledger = ledger_module.Ledger.create(
+    ledger = scmle.data.ledger.ledger.Ledger.create(
         path,
         charter_hash="c" * 64,
         config=config,
@@ -178,7 +178,7 @@ def test_unrejected_survivors_stay_unverified_with_their_adjusted_p():
 
 def test_no_survivors_means_c_is_never_opened():
     x, y = world(300, 1, effect=0.0)
-    ledger = ledger_module.Ledger.create(
+    ledger = scmle.data.ledger.ledger.Ledger.create(
         None,
         charter_hash="c" * 64,
         config=online_fdr.RuleConfig(online_fdr.ELOND, F(1, 100)),
@@ -322,11 +322,15 @@ def test_claims_file_round_trips_and_carries_the_hashes(tmp_path):
         result.checks
     )
     # Tail truncation is caught against the head recorded in the claims file.
-    rows = (tmp_path / ledger_module.FILE_NAME).read_text().splitlines()
-    (tmp_path / ledger_module.FILE_NAME).write_text("\n".join(rows[:-1]) + "\n")
-    with pytest.raises(ledger_module.LedgerError, match="head"):
-        ledger_module.Ledger.load(
-            tmp_path / ledger_module.FILE_NAME,
+    rows = (
+        (tmp_path / scmle.data.ledger.ledger.FILE_NAME).read_text().splitlines()
+    )
+    (tmp_path / scmle.data.ledger.ledger.FILE_NAME).write_text(
+        "\n".join(rows[:-1]) + "\n"
+    )
+    with pytest.raises(scmle.data.ledger.ledger.LedgerError, match="head"):
+        scmle.data.ledger.ledger.Ledger.load(
+            tmp_path / scmle.data.ledger.ledger.FILE_NAME,
             expected_head=record["ledger_head"],
         )
 

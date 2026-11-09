@@ -31,27 +31,27 @@ from sklearn import frozen
 import scmle
 from scmle import durability
 from scmle.contracts import artifacts
-from scmle.contracts import data as data_contracts
 from scmle.contracts import errors
 from scmle.contracts import tasks
+import scmle.contracts.data
 from scmle.data.readers import interchange
 from scmle.data.readers import tabular
-from scmle.evaluation import conformal as conformal_module
 from scmle.evaluation import cv_plus
 from scmle.evaluation import dirichlet
-from scmle.evaluation import quantile as quantile_module
 from scmle.evaluation import reliability
 from scmle.evaluation import shift_weights
-from scmle.explainability import counterfactual as counterfactual_module
+import scmle.evaluation.conformal
+import scmle.evaluation.quantile
 from scmle.explainability import local
+import scmle.explainability.counterfactual
 from scmle.features import feature_graph
-from scmle.inference import mapping as mapping_module
-from scmle.inference import novelty as novelty_module
 from scmle.inference import onnx_export
 from scmle.inference import packaging
 from scmle.inference import validation
+import scmle.inference.mapping
+import scmle.inference.novelty
 from scmle.models import thresholds
-from scmle.monitoring import reference as reference_module
+import scmle.monitoring.reference
 
 # Format 2 signs and checksums the schema alongside every serialized model
 # component. Format 1 bundles did not authenticate schema.json and are refused
@@ -388,12 +388,12 @@ class ModelBundle:
         pipeline: Any,
         schema: artifacts.BundleSchema,
         info: BundleInfo,
-        reference: reference_module.ReferenceProfile | None = None,
+        reference: scmle.monitoring.reference.ReferenceProfile | None = None,
         history: pd.DataFrame | None = None,
         calibrator: Any = None,
-        conformal: conformal_module.ConformalCalibrator | None = None,
-        novelty: novelty_module.NoveltyDetector | None = None,
-        quantile: quantile_module.QuantileIntervals | None = None,
+        conformal: scmle.evaluation.conformal.ConformalCalibrator | None = None,
+        novelty: scmle.inference.novelty.NoveltyDetector | None = None,
+        quantile: scmle.evaluation.quantile.QuantileIntervals | None = None,
     ) -> None:
         """Initializes the bundle.
 
@@ -437,7 +437,7 @@ class ModelBundle:
     def create(
         cls,
         pipeline: Any,
-        plan: data_contracts.FeaturePlan,
+        plan: scmle.contracts.data.FeaturePlan,
         dev_features: pd.DataFrame,
         target: str,
         task: str,
@@ -447,7 +447,7 @@ class ModelBundle:
         model_params: dict[str, Any] | None = None,
         strategy: str = "default",
         decision_threshold: float | None = None,
-        reference: reference_module.ReferenceProfile | None = None,
+        reference: scmle.monitoring.reference.ReferenceProfile | None = None,
         graph_fingerprint: str = "",
         group_column: str | None = None,
         time_column: str | None = None,
@@ -602,7 +602,7 @@ class ModelBundle:
     def score(
         self,
         data: str | pathlib.Path | pd.DataFrame,
-        mapping: mapping_module.ColumnMapping | None = None,
+        mapping: scmle.inference.mapping.ColumnMapping | None = None,
     ) -> dict[str, Any]:
         """Predicts and reports the schema diagnostics in one structured result.
 
@@ -645,7 +645,7 @@ class ModelBundle:
     def novelty_of(
         self,
         data: str | pathlib.Path | pd.DataFrame,
-        mapping: mapping_module.ColumnMapping | None = None,
+        mapping: scmle.inference.mapping.ColumnMapping | None = None,
     ) -> pd.DataFrame:
         """Flags rows that look unlike the training data.
 
@@ -1075,7 +1075,7 @@ class ModelBundle:
                 raise errors.ArtifactError(
                     "checksum mismatch: reference profile was modified"
                 )
-            reference = reference_module.ReferenceProfile.from_dict(
+            reference = scmle.monitoring.reference.ReferenceProfile.from_dict(
                 json.loads(reference_path.read_text(encoding="utf-8"))
             )
         history = None
@@ -1110,8 +1110,10 @@ class ModelBundle:
                 raise errors.ArtifactError(
                     "checksum mismatch: conformal scores were modified"
                 )
-            calibrated = conformal_module.ConformalCalibrator.from_dict(
-                json.loads(conformal_path.read_text(encoding="utf-8"))
+            calibrated = (
+                scmle.evaluation.conformal.ConformalCalibrator.from_dict(
+                    json.loads(conformal_path.read_text(encoding="utf-8"))
+                )
             )
         detector = None
         if NOVELTY_FILE in info.files:
@@ -1215,7 +1217,7 @@ class ModelBundle:
     def validate(
         self,
         data: str | pathlib.Path | pd.DataFrame,
-        mapping: mapping_module.ColumnMapping | None = None,
+        mapping: scmle.inference.mapping.ColumnMapping | None = None,
     ) -> artifacts.SchemaReport:
         """Checks input against the schema without predicting.
 
@@ -1235,7 +1237,7 @@ class ModelBundle:
     def prepare_frame(
         self,
         data: str | pathlib.Path | pd.DataFrame,
-        mapping: mapping_module.ColumnMapping | None = None,
+        mapping: scmle.inference.mapping.ColumnMapping | None = None,
     ) -> pd.DataFrame:
         """Validates input and returns the feature columns.
 
@@ -1269,7 +1271,7 @@ class ModelBundle:
     def predict(
         self,
         data: str | pathlib.Path | pd.DataFrame,
-        mapping: mapping_module.ColumnMapping | None = None,
+        mapping: scmle.inference.mapping.ColumnMapping | None = None,
     ) -> numpy.ndarray:
         """Predicts labels or values through the full fitted pipeline.
 
@@ -1293,7 +1295,7 @@ class ModelBundle:
     def predict_frame(
         self,
         data: str | pathlib.Path | pd.DataFrame,
-        mapping: mapping_module.ColumnMapping | None = None,
+        mapping: scmle.inference.mapping.ColumnMapping | None = None,
     ) -> pd.DataFrame:
         """Predicts a multi-target model, one named column per target.
 
@@ -1316,7 +1318,7 @@ class ModelBundle:
     def predict_proba(
         self,
         data: str | pathlib.Path | pd.DataFrame,
-        mapping: mapping_module.ColumnMapping | None = None,
+        mapping: scmle.inference.mapping.ColumnMapping | None = None,
     ) -> numpy.ndarray:
         """Predicts class probabilities.
 
@@ -1348,7 +1350,7 @@ class ModelBundle:
         self,
         data: str | pathlib.Path | pd.DataFrame,
         background: str | pathlib.Path | pd.DataFrame,
-        mapping: mapping_module.ColumnMapping | None = None,
+        mapping: scmle.inference.mapping.ColumnMapping | None = None,
         class_label: Any = None,
     ) -> pd.DataFrame:
         """Explains individual predictions against a background sample.
@@ -1407,8 +1409,8 @@ class ModelBundle:
     def predict_interval(
         self,
         data: str | pathlib.Path | pd.DataFrame,
-        coverage: float = conformal_module.DEFAULT_COVERAGE,
-        mapping: mapping_module.ColumnMapping | None = None,
+        coverage: float = scmle.evaluation.conformal.DEFAULT_COVERAGE,
+        mapping: scmle.inference.mapping.ColumnMapping | None = None,
         method: str = "residual",
         shift: bool = False,
     ) -> pd.DataFrame:
@@ -1554,10 +1556,10 @@ class ModelBundle:
 
     def shifted_interval(
         self,
-        calibrator: conformal_module.ConformalCalibrator,
+        calibrator: scmle.evaluation.conformal.ConformalCalibrator,
         data: str | pathlib.Path | pd.DataFrame,
         coverage: float,
-        mapping: mapping_module.ColumnMapping | None,
+        mapping: scmle.inference.mapping.ColumnMapping | None,
     ) -> pd.DataFrame:
         """Computes weighted conformal intervals with the stored shift weights.
 
@@ -1596,7 +1598,7 @@ class ModelBundle:
         actionable: list[str],
         background: str | pathlib.Path | pd.DataFrame,
         max_changes: int = 3,
-    ) -> counterfactual_module.Counterfactual:
+    ) -> scmle.explainability.counterfactual.Counterfactual:
         """Searches greedily for a small change that reaches the wanted outcome.
 
         Only the columns in `actionable` are ever changed, and only to
@@ -1693,7 +1695,7 @@ class ModelBundle:
                 values = numpy.asarray(self.predict(rows), dtype=float)
                 return (values >= low) & (values <= high)
 
-        search = counterfactual_module.CounterfactualSearch(
+        search = scmle.explainability.counterfactual.CounterfactualSearch(
             progress,
             reached,
             self.predict,
@@ -1774,7 +1776,7 @@ class ModelBundle:
         self,
         data: str | pathlib.Path | pd.DataFrame,
         times: Any,
-        mapping: mapping_module.ColumnMapping | None = None,
+        mapping: scmle.inference.mapping.ColumnMapping | None = None,
     ) -> numpy.ndarray:
         """Returns the probability of no event yet at each time (survival).
 
@@ -1802,7 +1804,7 @@ class ModelBundle:
         self,
         history: str | pathlib.Path | pd.DataFrame,
         steps: int | None = None,
-        mapping: mapping_module.ColumnMapping | None = None,
+        mapping: scmle.inference.mapping.ColumnMapping | None = None,
     ) -> pd.DataFrame:
         """Forecasts the next values of every series in `history`.
 
@@ -1886,7 +1888,7 @@ class ModelBundle:
         self,
         data: str | pathlib.Path | pd.DataFrame,
         query_column: str,
-        mapping: mapping_module.ColumnMapping | None = None,
+        mapping: scmle.inference.mapping.ColumnMapping | None = None,
     ) -> pd.DataFrame:
         """Scores rows and orders them within each query (ranking tasks).
 
@@ -1925,7 +1927,7 @@ class ModelBundle:
         self,
         data: str | pathlib.Path | pd.DataFrame,
         count: int = 10,
-        mapping: mapping_module.ColumnMapping | None = None,
+        mapping: scmle.inference.mapping.ColumnMapping | None = None,
     ) -> pd.DataFrame:
         """Picks the unlabeled rows a person should label next.
 
@@ -1970,8 +1972,8 @@ class ModelBundle:
     def predict_set(
         self,
         data: str | pathlib.Path | pd.DataFrame,
-        coverage: float = conformal_module.DEFAULT_COVERAGE,
-        mapping: mapping_module.ColumnMapping | None = None,
+        coverage: float = scmle.evaluation.conformal.DEFAULT_COVERAGE,
+        mapping: scmle.inference.mapping.ColumnMapping | None = None,
         conditional: str | None = None,
     ) -> list[list[Any]]:
         """Returns prediction sets with a stated coverage (classification).
@@ -1999,7 +2001,7 @@ class ModelBundle:
 
     def require_conformal(
         self, kind: str
-    ) -> conformal_module.ConformalCalibrator:
+    ) -> scmle.evaluation.conformal.ConformalCalibrator:
         """Returns the calibrator of the right kind or explains its absence.
 
         Args:

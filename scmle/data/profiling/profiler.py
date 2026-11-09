@@ -12,9 +12,9 @@ import dataclasses
 import numpy
 import pandas
 
-from scmle.contracts import data as data_contracts
 from scmle.contracts import errors
 from scmle.contracts import tasks
+import scmle.contracts.data
 from scmle.data.admissibility import screen
 from scmle.data.profiling import missingness
 from scmle.data.readers import streaming
@@ -442,11 +442,11 @@ class DatasetProfiler:
     def profile(
         self,
         frame: pandas.DataFrame,
-        manifest: data_contracts.DatasetManifest,
+        manifest: scmle.contracts.data.DatasetManifest,
         task: tasks.TaskType,
         read_seconds: float = 0.0,
         total_rows: int | None = None,
-    ) -> data_contracts.DatasetProfile:
+    ) -> scmle.contracts.data.DatasetProfile:
         """Profiles the dataset.
 
         A configured column that is absent from the data raises DataError
@@ -503,7 +503,7 @@ class DatasetProfiler:
         if report is not None:
             quality += [f"leakage screen: {note}" for note in report.notes]
         target_summary, target_risks = summarize_target(target, task)
-        base_plan = data_contracts.FeaturePlan(
+        base_plan = scmle.contracts.data.FeaturePlan(
             numeric=tuple(features["numeric"]),
             categorical=tuple(features["categorical"]),
             text=tuple(features["text"]),
@@ -525,7 +525,7 @@ class DatasetProfiler:
                 c
                 for c in features["categorical"]
                 if statistics[c]["n_unique"]
-                >= data_contracts.HIGH_CARDINALITY_LEVELS
+                >= scmle.contracts.data.HIGH_CARDINALITY_LEVELS
             ),
         )
         dataset_statistics = fingerprint.build_fingerprint(
@@ -546,7 +546,7 @@ class DatasetProfiler:
             extra_inputs=tuple(c for c in stamps if derived) + base_plan.text,
             informative_missing=informative,
         )
-        return data_contracts.DatasetProfile(
+        return scmle.contracts.data.DatasetProfile(
             manifest=manifest,
             column_statistics=statistics,
             quality_findings=tuple(quality),

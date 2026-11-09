@@ -4,7 +4,7 @@ from fractions import Fraction
 
 import pytest
 
-from scmle.data.charter import decision as d
+import scmle.data.charter.decision
 
 
 def plan(**overrides):
@@ -17,63 +17,97 @@ def plan(**overrides):
         "n_max": 1000,
         "alpha_promote": Fraction(1, 50),
         "alpha_rollback": Fraction(1, 100),
-        "guardrails": (d.Guardrail("latency", margin=20.0, low=0, high=500),),
+        "guardrails": (
+            scmle.data.charter.decision.Guardrail(
+                "latency", margin=20.0, low=0, high=500
+            ),
+        ),
     }
     values.update(overrides)
-    return d.RolloutPlan(**values)
+    return scmle.data.charter.decision.RolloutPlan(**values)
 
 
 def test_the_full_block_round_trips_through_its_record():
-    layer = d.DecisionLayer(
-        model=d.DecisionModel(
+    layer = scmle.data.charter.decision.DecisionLayer(
+        model=scmle.data.charter.decision.DecisionModel(
             unit="EUR per case",
             treatment_cost=2.0,
-            off_policy=d.OffPolicyRules(clip=20.0, penalty=0.01),
+            off_policy=scmle.data.charter.decision.OffPolicyRules(
+                clip=20.0, penalty=0.01
+            ),
         ),
         fairness=(
-            d.FairnessConstraint(
+            scmle.data.charter.decision.FairnessConstraint(
                 "sex", "equal_opportunity", 0.05, "group_thresholds", "legal"
             ),
         ),
         rollout=plan(),
     )
-    assert d.DecisionLayer.from_dict(layer.to_dict()) == layer
+    assert (
+        scmle.data.charter.decision.DecisionLayer.from_dict(layer.to_dict())
+        == layer
+    )
     assert "rollout" in layer.to_dict()
-    bare = d.DecisionLayer(d.DecisionModel("EUR"))
+    bare = scmle.data.charter.decision.DecisionLayer(
+        scmle.data.charter.decision.DecisionModel("EUR")
+    )
     assert "rollout" not in bare.to_dict()
-    assert d.DecisionLayer.from_dict(bare.to_dict()) == bare
+    assert (
+        scmle.data.charter.decision.DecisionLayer.from_dict(bare.to_dict())
+        == bare
+    )
 
 
 def test_group_thresholds_need_an_attestation():
     with pytest.raises(ValueError, match="attestation"):
-        d.FairnessConstraint(
+        scmle.data.charter.decision.FairnessConstraint(
             "sex", "equal_opportunity", 0.05, "group_thresholds"
         )
-    d.FairnessConstraint("sex", "equal_opportunity", 0.05, "reweighing")
+    scmle.data.charter.decision.FairnessConstraint(
+        "sex", "equal_opportunity", 0.05, "reweighing"
+    )
 
 
 @pytest.mark.parametrize(
     "build",
     [
-        lambda: d.FairnessConstraint("s", "unknown", 0.1, "reweighing"),
-        lambda: d.FairnessConstraint("s", "equalized_odds", 0.0, "reweighing"),
-        lambda: d.FairnessConstraint("s", "equalized_odds", 0.1, "magic"),
-        lambda: d.FairnessConstraint(
+        lambda: scmle.data.charter.decision.FairnessConstraint(
+            "s", "unknown", 0.1, "reweighing"
+        ),
+        lambda: scmle.data.charter.decision.FairnessConstraint(
+            "s", "equalized_odds", 0.0, "reweighing"
+        ),
+        lambda: scmle.data.charter.decision.FairnessConstraint(
+            "s", "equalized_odds", 0.1, "magic"
+        ),
+        lambda: scmle.data.charter.decision.FairnessConstraint(
             "s", "equalized_odds", 0.1, "reweighing", min_group=1
         ),
-        lambda: d.DecisionModel("u", baselines=("treat_all", "treat_all")),
-        lambda: d.DecisionModel("u", baselines=("best",)),
-        lambda: d.DecisionModel("u", calibration_level=1.0),
-        lambda: d.OffPolicyRules(clip=0.5),
-        lambda: d.OffPolicyRules(min_propensity=0.0),
-        lambda: d.OffPolicyRules(penalty=-1.0),
-        lambda: d.Guardrail("g", margin=0.0),
-        lambda: d.Guardrail("g", margin=1.0, low=1.0, high=1.0),
+        lambda: scmle.data.charter.decision.DecisionModel(
+            "u", baselines=("treat_all", "treat_all")
+        ),
+        lambda: scmle.data.charter.decision.DecisionModel(
+            "u", baselines=("best",)
+        ),
+        lambda: scmle.data.charter.decision.DecisionModel(
+            "u", calibration_level=1.0
+        ),
+        lambda: scmle.data.charter.decision.OffPolicyRules(clip=0.5),
+        lambda: scmle.data.charter.decision.OffPolicyRules(min_propensity=0.0),
+        lambda: scmle.data.charter.decision.OffPolicyRules(penalty=-1.0),
+        lambda: scmle.data.charter.decision.Guardrail("g", margin=0.0),
+        lambda: scmle.data.charter.decision.Guardrail(
+            "g", margin=1.0, low=1.0, high=1.0
+        ),
         lambda: plan(assignment_prob=1.0),
         lambda: plan(delta_min=2.0),
         lambda: plan(alpha_promote=Fraction(1, 1)),
         lambda: plan(n_max=1),
-        lambda: plan(guardrails=(d.Guardrail("conversion", margin=0.1),)),
+        lambda: plan(
+            guardrails=(
+                scmle.data.charter.decision.Guardrail("conversion", margin=0.1),
+            )
+        ),
         lambda: plan(srm_level=0.0),
     ],
 )
@@ -88,9 +122,9 @@ def test_the_plan_builds_its_budget_and_rejects_unknown_fields():
     assert budget.alpha_promote == Fraction(1, 50) and budget.horizon == 5
     record = rollout.to_dict()
     with pytest.raises(ValueError, match="unexpected"):
-        d.RolloutPlan.from_dict({**record, "x": 1})
+        scmle.data.charter.decision.RolloutPlan.from_dict({**record, "x": 1})
     with pytest.raises(ValueError, match="missing"):
-        d.RolloutPlan.from_dict(
+        scmle.data.charter.decision.RolloutPlan.from_dict(
             {k: v for k, v in record.items() if k != "salt"}
         )
 
@@ -114,8 +148,8 @@ def with_cost_model():
 
 
 def layer():
-    return d.DecisionLayer(
-        d.DecisionModel("EUR per case"),
+    return scmle.data.charter.decision.DecisionLayer(
+        scmle.data.charter.decision.DecisionModel("EUR per case"),
         rollout=plan(),
     )
 
@@ -145,8 +179,10 @@ def test_the_layer_changes_the_hash_round_trips_and_needs_format_five():
     assert contracts.AnalysisCharter.from_dict(record) == charter
     other = make_charter(
         cost_model=with_cost_model(),
-        decision=d.DecisionLayer(
-            d.DecisionModel("EUR per case", calibration_level=0.05),
+        decision=scmle.data.charter.decision.DecisionLayer(
+            scmle.data.charter.decision.DecisionModel(
+                "EUR per case", calibration_level=0.05
+            ),
             rollout=plan(),
         ),
     )

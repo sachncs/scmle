@@ -8,7 +8,7 @@ import pytest
 
 from scmle.contracts import reliability
 from scmle.governance import local_faults
-from scmle.governance import reliability as reliability_harness
+import scmle.governance.reliability
 
 
 def test_local_executor_passes_every_declared_scenario(tmp_path):
@@ -16,7 +16,7 @@ def test_local_executor_passes_every_declared_scenario(tmp_path):
     root = tmp_path / "local-faults"
     executor = local_faults.LocalFaultExecutor(root)
     registry = reliability.FaultInjectionPlanRegistry.production_beta()
-    harness = reliability_harness.FaultInjectionHarness(
+    harness = scmle.governance.reliability.FaultInjectionHarness(
         registry,
         root / "evidence",
         execution_id="local-fault-run",

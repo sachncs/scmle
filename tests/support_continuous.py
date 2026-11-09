@@ -7,8 +7,8 @@ import numpy
 import pandas
 
 from scmle.governance import deployment_ledger
-from scmle.governance import loop as loop_module
 from scmle.governance import release_state
+import scmle.governance.loop
 from scmle.operations import continuous
 from scmle.operations import signals
 from tests import support_release
@@ -37,10 +37,10 @@ def make_loop(tmp_path, **changes):
         "delta_promo": 0.0,
     }
     values.update(changes)
-    return loop_module.Loop.open(
+    return scmle.governance.loop.Loop.open(
         tmp_path / "deploy",
         CHARTER,
-        loop_module.LoopPolicy(**values),
+        scmle.governance.loop.LoopPolicy(**values),
         verification_keys={
             deployment_ledger.key_fingerprint(HUMAN_KEY): HUMAN_KEY
         },

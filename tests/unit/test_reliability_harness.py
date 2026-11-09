@@ -6,12 +6,12 @@ import pytest
 
 from scmle.contracts import errors
 from scmle.contracts import reliability
-from scmle.governance import reliability as harness_module
+import scmle.governance.reliability
 
 
-def artifact(evidence_type: str) -> harness_module.FaultArtifact:
+def artifact(evidence_type: str) -> scmle.governance.reliability.FaultArtifact:
     """Build a safe fixture artifact for one requirement."""
-    return harness_module.FaultArtifact(
+    return scmle.governance.reliability.FaultArtifact(
         evidence_type=evidence_type,
         content=f"observed:{evidence_type}".encode(),
         observed_outcome=reliability.EvidenceOutcome.SAFE_OUTCOME_OBSERVED,
@@ -21,7 +21,7 @@ def artifact(evidence_type: str) -> harness_module.FaultArtifact:
 
 def harness(tmp_path):
     """Build a complete plan and deterministic evidence writer."""
-    return harness_module.FaultInjectionHarness(
+    return scmle.governance.reliability.FaultInjectionHarness(
         reliability.FaultInjectionPlanRegistry.production_beta(),
         tmp_path,
         execution_id="fault-run-001",
@@ -113,7 +113,7 @@ def test_harness_wraps_executor_failure_without_claiming_evidence(tmp_path):
 
 def test_harness_rejects_path_injection_in_evidence_name(tmp_path):
     with pytest.raises(ValueError, match="path-safe"):
-        harness_module.FaultArtifact(
+        scmle.governance.reliability.FaultArtifact(
             evidence_type="../escape",
             content=b"evidence",
             observed_outcome=reliability.EvidenceOutcome.INCONCLUSIVE,

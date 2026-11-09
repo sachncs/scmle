@@ -6,8 +6,8 @@ import pytest
 from sklearn import metrics as sk_metrics
 
 from scmle.contracts import data
-from scmle.contracts import metrics as metric_contracts
 from scmle.contracts import tasks
+import scmle.contracts.metrics
 from scmle.experimentation import trials
 
 
@@ -62,8 +62,10 @@ def weighted_error(truth, guess, sample_weight=None):
 
 def test_metrics_report_whether_their_function_takes_weights():
     every = frozenset(tasks.STANDARD_TASKS)
-    plain = metric_contracts.FunctionMetric("a", "", False, every, plain_error)
-    weighted = metric_contracts.FunctionMetric(
+    plain = scmle.contracts.metrics.FunctionMetric(
+        "a", "", False, every, plain_error
+    )
+    weighted = scmle.contracts.metrics.FunctionMetric(
         "b", "", False, every, weighted_error
     )
 

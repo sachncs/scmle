@@ -7,7 +7,7 @@ from scmle.contracts import errors
 from scmle.contracts import models
 from scmle.contracts import tasks
 from scmle.models import conformance
-from scmle.models import registry as registry_module
+import scmle.models.registry
 from scmle.models.sklearn import classical
 
 BINARY = tasks.TaskType.BINARY
@@ -16,7 +16,7 @@ REGRESSION = tasks.TaskType.REGRESSION
 
 @pytest.fixture
 def registry():
-    return registry_module.ModelRegistry.with_builtins()
+    return scmle.models.registry.ModelRegistry.with_builtins()
 
 
 def test_candidates_depend_on_task(registry):
@@ -136,7 +136,7 @@ def test_plugin_loading_isolates_failures(registry, monkeypatch):
             return lambda: [ThirdPartyAdapter()]
 
     monkeypatch.setattr(
-        registry_module.metadata,
+        scmle.models.registry.metadata,
         "entry_points",
         lambda group: [BrokenEntry(), GoodEntry()],
     )
@@ -231,7 +231,7 @@ def test_a_default_orchestrator_discovers_conforming_plugins_only(
             return lambda: self.adapters
 
     monkeypatch.setattr(
-        registry_module.metadata,
+        scmle.models.registry.metadata,
         "entry_points",
         lambda group: [
             Entry("good", [ThirdPartyAdapter()]),

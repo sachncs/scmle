@@ -15,7 +15,7 @@ from scmle.data.modalities import document
 from scmle.data.profiling import profiler
 from scmle.data.readers import tabular
 from scmle.data.splitting import splitters
-from scmle.data.validation import target as target_module
+import scmle.data.validation.target
 from scmle.governance import attestation
 from scmle.models import registry
 from scmle.models import thresholds
@@ -114,7 +114,9 @@ def test_profiling_yields_a_consistent_plan_or_a_clear_refusal(frame):
     spec = spec_for()
     manifest = tabular.build_manifest(frame, "y")
     try:
-        task = target_module.TaskResolver(spec).resolve(frame["y"])
+        task = scmle.data.validation.target.TaskResolver(spec).resolve(
+            frame["y"]
+        )
         profile = profiler.DatasetProfiler(spec).profile(frame, manifest, task)
     except errors.ScmleError:
         return
@@ -135,7 +137,9 @@ def test_pipelines_fit_and_predict_on_arbitrary_clean_frames(frame, seed):
     spec = spec_for()
     manifest = tabular.build_manifest(frame, "y")
     try:
-        task = target_module.TaskResolver(spec).resolve(frame["y"])
+        task = scmle.data.validation.target.TaskResolver(spec).resolve(
+            frame["y"]
+        )
         plan = (
             profiler.DatasetProfiler(spec)
             .profile(frame, manifest, task)

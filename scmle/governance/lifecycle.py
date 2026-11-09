@@ -12,7 +12,7 @@ import scmle
 from scmle import durability
 from scmle.api import results
 from scmle.contracts import errors
-from scmle.governance import registry as registry_module
+import scmle.governance.registry
 from scmle.monitoring import champion
 from scmle.monitoring import monitor
 
@@ -161,7 +161,7 @@ class LifecycleManager:
 
     def __init__(
         self,
-        registry: registry_module.ModelRegistryStore,
+        registry: scmle.governance.registry.ModelRegistryStore,
         model: str,
         work_dir: str,
         policy: RetrainPolicy | None = None,
@@ -251,9 +251,9 @@ class LifecycleManager:
         self,
         result: results.RunResult,
         promote: bool = False,
-        approval: registry_module.PromotionApproval | None = None,
+        approval: scmle.governance.registry.PromotionApproval | None = None,
         signing_key: str | bytes | None = None,
-    ) -> registry_module.VersionRecord:
+    ) -> scmle.governance.registry.VersionRecord:
         """Registers a finished run and optionally makes it the champion.
 
         The run's bundle is first exported to ``export`` in its run
@@ -290,9 +290,9 @@ class LifecycleManager:
 
     def promote_challenger(
         self,
-        approval: registry_module.PromotionApproval,
+        approval: scmle.governance.registry.PromotionApproval,
         signing_key: str | bytes | None = None,
-    ) -> registry_module.VersionRecord:
+    ) -> scmle.governance.registry.VersionRecord:
         """Promotes the staged challenger after independent review.
 
         With a guarded registry (`ModelRegistryStore.attach_guard`, e.g. via
@@ -308,7 +308,9 @@ class LifecycleManager:
         Returns:
             The record of the version now champion.
         """
-        record = self.registry.resolve(self.model, registry_module.CHALLENGER)
+        record = self.registry.resolve(
+            self.model, scmle.governance.registry.CHALLENGER
+        )
         self.registry.promote(
             self.model,
             record.version,
@@ -446,7 +448,7 @@ class LifecycleManager:
             return LifecycleOutcome(report, True, comparison, None, notes)
         record = self.register_run(challenger_run)
         self.registry.promote(
-            self.model, record.version, registry_module.CHALLENGER
+            self.model, record.version, scmle.governance.registry.CHALLENGER
         )
         self.registry.audit(
             "lifecycle.challenger_staged",
@@ -470,7 +472,7 @@ class LifecycleManager:
         fresh: pandas.DataFrame,
         target: str,
         policy: RollbackPolicy | None = None,
-        approval: registry_module.PromotionApproval | None = None,
+        approval: scmle.governance.registry.PromotionApproval | None = None,
         signing_key: str | bytes | None = None,
     ) -> RollbackOutcome:
         """Takes the previous champion back if the new one is clearly worse.
@@ -506,7 +508,7 @@ class LifecycleManager:
         """
         rule = policy or RollbackPolicy()
         aliases = self.registry.aliases(self.model)
-        previous = aliases.get(registry_module.PREVIOUS)
+        previous = aliases.get(scmle.governance.registry.PREVIOUS)
         if previous is None:
             return RollbackOutcome(False, None, None, "no previous version")
         if len(fresh) < rule.min_rows:
@@ -523,7 +525,7 @@ class LifecycleManager:
             self.registry.audit(
                 "lifecycle.rollback_check",
                 model=self.model,
-                current=aliases[registry_module.CHAMPION],
+                current=aliases[scmle.governance.registry.CHAMPION],
                 previous=previous,
                 rollback_required=worse,
                 rolled_back=False,
@@ -547,7 +549,7 @@ class LifecycleManager:
                 self.restore_previous(
                     approval,
                     signing_key,
-                    aliases[registry_module.CHAMPION],
+                    aliases[scmle.governance.registry.CHAMPION],
                     previous,
                 )
                 restored = True
@@ -555,7 +557,7 @@ class LifecycleManager:
             self.registry.audit(
                 "lifecycle.rollback_check",
                 model=self.model,
-                current=aliases[registry_module.CHAMPION],
+                current=aliases[scmle.governance.registry.CHAMPION],
                 previous=previous,
                 rollback_required=worse,
                 rolled_back=restored,
@@ -589,7 +591,7 @@ class LifecycleManager:
 
     def restore_previous(
         self,
-        approval: registry_module.PromotionApproval,
+        approval: scmle.governance.registry.PromotionApproval,
         signing_key: str | bytes | None = None,
         current: int | None = None,
         previous: int | None = None,
@@ -619,14 +621,14 @@ class LifecycleManager:
         target = (
             previous
             if previous is not None
-            else aliases.get(registry_module.PREVIOUS)
+            else aliases.get(scmle.governance.registry.PREVIOUS)
         )
         if target is None:
             raise errors.ArtifactError("no previous version to restore")
         replaced = (
             current
             if current is not None
-            else aliases.get(registry_module.CHAMPION)
+            else aliases.get(scmle.governance.registry.CHAMPION)
         )
         self.registry.promote(
             self.model,

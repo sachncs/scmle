@@ -20,7 +20,7 @@ unobserved ones.
 
 from typing import Any
 
-import numpy as np
+import numpy
 from numpy.typing import ArrayLike
 import pandas
 
@@ -64,7 +64,7 @@ def balance_test(
         ValueError: On unequal lengths, no permutations, or a level outside
             (0, 1).
     """
-    arm = np.asarray(treatment).astype(int)
+    arm = numpy.asarray(treatment).astype(int)
     if len(features) != len(arm):
         raise ValueError("features and treatment must have the same length")
     if permutations < 1:
@@ -74,10 +74,12 @@ def balance_test(
     numeric = features.select_dtypes("number")
     matrix = numeric.to_numpy(dtype=float)
     if matrix.size:
-        medians = np.nanmedian(np.where(np.isfinite(matrix), matrix, np.nan), 0)
-        medians = np.where(np.isfinite(medians), medians, 0.0)
-        matrix = np.where(np.isfinite(matrix), matrix, medians)
-    spread = matrix.std(axis=0) if matrix.size else np.zeros(0)
+        medians = numpy.nanmedian(
+            numpy.where(numpy.isfinite(matrix), matrix, numpy.nan), 0
+        )
+        medians = numpy.where(numpy.isfinite(medians), medians, 0.0)
+        matrix = numpy.where(numpy.isfinite(matrix), matrix, medians)
+    spread = matrix.std(axis=0) if matrix.size else numpy.zeros(0)
     keep = spread > 0.0
     base = {
         "level": level,
@@ -96,17 +98,19 @@ def balance_test(
     standard = (matrix[:, keep] - matrix[:, keep].mean(0)) / spread[keep]
     rng = randomness.component_rng(seed, COMPONENT, 0)
 
-    def statistic(labels: np.ndarray) -> np.ndarray:
+    def statistic(labels: numpy.ndarray) -> numpy.ndarray:
         ones = labels.sum(axis=-1, keepdims=True)
         zeros = labels.shape[-1] - ones
         up = labels @ standard / ones
         down = (1.0 - labels) @ standard / zeros
-        return np.asarray(((up - down) ** 2).sum(axis=-1))
+        return numpy.asarray(((up - down) ** 2).sum(axis=-1))
 
     observed = float(statistic(arm.astype(float)[None, :])[0])
-    draws = np.stack([rng.permutation(arm) for ignored in range(permutations)])
+    draws = numpy.stack(
+        [rng.permutation(arm) for ignored in range(permutations)]
+    )
     null = statistic(draws.astype(float))
-    p_value = float((1 + np.sum(null >= observed)) / (permutations + 1))
+    p_value = float((1 + numpy.sum(null >= observed)) / (permutations + 1))
     return {
         **base,
         "statistic": observed,

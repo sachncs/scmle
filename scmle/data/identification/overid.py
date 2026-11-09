@@ -26,7 +26,7 @@ first run; there is no certificate in `f10_certificates.json`.
 
 from typing import Any
 
-import numpy as np
+import numpy
 from numpy.typing import ArrayLike
 from numpy.typing import NDArray
 from scipy import stats
@@ -44,9 +44,9 @@ def prepare(
     instruments: ArrayLike,
     controls: ArrayLike | None,
 ) -> tuple[
-    NDArray[np.float64],
-    NDArray[np.float64],
-    NDArray[np.float64],
+    NDArray[numpy.float64],
+    NDArray[numpy.float64],
+    NDArray[numpy.float64],
 ]:
     """Partials the controls (and an intercept) out of every variable.
 
@@ -64,31 +64,31 @@ def prepare(
         ValueError: If the outcome, regressor and instruments differ in
             length, or the controls differ in length from the outcome.
     """
-    outcome = np.asarray(y, dtype=float)
-    regressor = np.asarray(d, dtype=float)
-    z = np.asarray(instruments, dtype=float)
+    outcome = numpy.asarray(y, dtype=float)
+    regressor = numpy.asarray(d, dtype=float)
+    z = numpy.asarray(instruments, dtype=float)
     if z.ndim == 1:
         z = z[:, None]
     if not len(outcome) == len(regressor) == len(z):
         raise ValueError("y, d and the instruments must have the same length")
     rows = len(outcome)
-    base = np.ones((rows, 1))
+    base = numpy.ones((rows, 1))
     if controls is not None:
-        extra = np.asarray(controls, dtype=float)
+        extra = numpy.asarray(controls, dtype=float)
         if extra.ndim == 1:
             extra = extra[:, None]
         if len(extra) != rows:
             raise ValueError("controls must have the length of y")
-        base = np.column_stack([base, extra])
+        base = numpy.column_stack([base, extra])
 
-    def residual(values: NDArray[np.float64]) -> NDArray[np.float64]:
-        fit = np.linalg.lstsq(base, values, rcond=None)[0]
-        return np.asarray(values - base @ fit)
+    def residual(values: NDArray[numpy.float64]) -> NDArray[numpy.float64]:
+        fit = numpy.linalg.lstsq(base, values, rcond=None)[0]
+        return numpy.asarray(values - base @ fit)
 
     return (
         residual(outcome),
         residual(regressor),
-        np.column_stack([residual(z[:, k]) for k in range(z.shape[1])]),
+        numpy.column_stack([residual(z[:, k]) for k in range(z.shape[1])]),
     )
 
 
@@ -145,7 +145,9 @@ def result(
 
 
 def two_stage(
-    y: NDArray[np.float64], d: NDArray[np.float64], z: NDArray[np.float64]
+    y: NDArray[numpy.float64],
+    d: NDArray[numpy.float64],
+    z: NDArray[numpy.float64],
 ) -> float:
     """Computes the 2SLS coefficient of `d`.
 
@@ -157,7 +159,7 @@ def two_stage(
     Returns:
         The coefficient of `d` in the 2SLS fit.
     """
-    projected = z @ np.linalg.lstsq(z, d, rcond=None)[0]
+    projected = z @ numpy.linalg.lstsq(z, d, rcond=None)[0]
     return float(projected @ y / (projected @ d))
 
 
@@ -188,7 +190,7 @@ def sargan(
         return not_testable("sargan", count)
     rows = len(outcome)
     residual = outcome - two_stage(outcome, regressor, z) * regressor
-    fit = z @ np.linalg.lstsq(z, residual, rcond=None)[0]
+    fit = z @ numpy.linalg.lstsq(z, residual, rcond=None)[0]
     total = float(residual @ residual)
     r_squared = float(fit @ fit) / total if total > 0 else 0.0
     return result("sargan", rows * r_squared, count, rows)
@@ -223,7 +225,7 @@ def hansen_j(
     rows = len(outcome)
     first = outcome - two_stage(outcome, regressor, z) * regressor
     moments = z * first[:, None]
-    weight = np.linalg.pinv(moments.T @ moments / rows)
+    weight = numpy.linalg.pinv(moments.T @ moments / rows)
     left = z.T @ regressor / rows
     right = z.T @ outcome / rows
     beta = float(left @ weight @ right / (left @ weight @ left))

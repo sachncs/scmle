@@ -13,10 +13,10 @@ import scmle
 from scmle.contracts import errors
 from scmle.contracts import models
 from scmle.contracts import tasks
-from scmle.core import orchestrator as orchestrator_module
+import scmle.core.orchestrator
 from scmle.experimentation import stores
 from scmle.experimentation import trials
-from scmle.models import registry as registry_module
+import scmle.models.registry
 
 BINARY = frozenset({tasks.TaskType.BINARY})
 
@@ -67,7 +67,7 @@ def test_cancelled_run_resumes_and_reuses_completed_trials(
     counting, canceller = Counting, Canceller
     counting.fits = canceller.fits = 0
     canceller.armed = True
-    registry = registry_module.ModelRegistry.with_builtins()
+    registry = scmle.models.registry.ModelRegistry.with_builtins()
     registry.register(CountedAdapter())
     registry.register(CancellerAdapter())
     project = support.make_project(binary_frame, "y", output_dir=tmp_path)
@@ -85,7 +85,7 @@ def test_cancelled_run_resumes_and_reuses_completed_trials(
     assert saved == ["trial_001.json", "trial_002.json"]
 
     canceller.armed = False
-    resumed = orchestrator_module.Orchestrator.for_run_directory(
+    resumed = scmle.core.orchestrator.Orchestrator.for_run_directory(
         run_dir, frame=binary_frame, registry=registry
     ).resume(run_dir)
     assert resumed.state == "COMPLETED"
@@ -197,7 +197,7 @@ def test_custom_tracker_is_honoured(binary_frame, tmp_path):
 
     recorder = Recording()
     spec = support.make_project(binary_frame, "y").spec
-    orchestrator = orchestrator_module.Orchestrator(
+    orchestrator = scmle.core.orchestrator.Orchestrator(
         spec, binary_frame, tracker=recorder
     )
     result = orchestrator.run(tmp_path)
@@ -211,7 +211,7 @@ def test_resume_refuses_checkpoints_computed_on_different_data(
     counting, canceller = Counting, Canceller
     counting.fits = canceller.fits = 0
     canceller.armed = True
-    registry = registry_module.ModelRegistry.with_builtins()
+    registry = scmle.models.registry.ModelRegistry.with_builtins()
     registry.register(CancellerAdapter())
     project = support.make_project(binary_frame, "y", output_dir=tmp_path)
     project.orchestrator.registry = registry
@@ -225,7 +225,7 @@ def test_resume_refuses_checkpoints_computed_on_different_data(
     canceller.armed = False
     changed = binary_frame.copy()
     changed.iloc[1, 1] = changed.iloc[1, 1] + 1000.0
-    orchestrator = orchestrator_module.Orchestrator.for_run_directory(
+    orchestrator = scmle.core.orchestrator.Orchestrator.for_run_directory(
         run_dir, frame=changed, registry=registry
     )
     with pytest.raises(errors.ConfigError, match="data changed"):

@@ -16,23 +16,23 @@ from scmle import durability
 from scmle.api import results
 from scmle.artifacts import bundle
 from scmle.artifacts import reproducibility
-from scmle.contracts import data as data_contracts
 from scmle.contracts import errors
 from scmle.contracts import experiments
 from scmle.contracts import lineage
 from scmle.contracts import modalities
 from scmle.contracts import performance
 from scmle.contracts import tasks
-from scmle.core import context as context_module
-from scmle.core import orchestrator as orchestrator_module
+import scmle.contracts.data
 from scmle.core import policies
+import scmle.core.context
+import scmle.core.orchestrator
 from scmle.data.readers import connectors
 from scmle.data.readers import interchange
 from scmle.data.readers import tabular
 from scmle.evaluation import parameter_estimation
 from scmle.governance import attestation
 from scmle.inference import evidence
-from scmle.intelligence import recommendations as recommendations_module
+import scmle.intelligence.recommendations
 from scmle.models import modality_lifecycle
 
 ValidationStrategy = Literal[
@@ -414,7 +414,7 @@ def persist_parameter_estimation_evidence(
 
 
 def estimate_parameters_for_project(
-    orchestrator: orchestrator_module.Orchestrator,
+    orchestrator: scmle.core.orchestrator.Orchestrator,
     estimand: parameter_estimation.EstimandSpec,
     policy: parameter_estimation.EstimationPolicy,
     artifact_directory: str | pathlib.Path | None = None,
@@ -858,11 +858,11 @@ class MLProject:
             )
         self.estimand = estimand
         self.estimation_policy = estimation_policy
-        self.orchestrator = orchestrator_module.Orchestrator(
+        self.orchestrator = scmle.core.orchestrator.Orchestrator(
             self.spec, frame, checkpoints=checkpoints
         )
         self.orchestrator.tracking_path = self.output_dir / "experiments.sqlite"
-        self.profile: data_contracts.DatasetProfile | None = None
+        self.profile: scmle.contracts.data.DatasetProfile | None = None
 
     def plan(self) -> experiments.ExperimentPlan:
         """Analyzes the data and proposes a workflow; trains nothing.
@@ -874,13 +874,13 @@ class MLProject:
         context = self.orchestrator.prepare()
         try:
             self.profile = context.profile
-            return context_module.require(context.plan, "plan")
+            return scmle.core.context.require(context.plan, "plan")
         finally:
             context.close()
 
     def recommendations(
         self,
-    ) -> tuple[recommendations_module.Recommendation, ...]:
+    ) -> tuple[scmle.intelligence.recommendations.Recommendation, ...]:
         """Advice about the data and specification, from the profile.
 
         Returns:
@@ -977,7 +977,7 @@ class MLProject:
             The completed run.
         """
         run_path = pathlib.Path(run_directory)
-        orchestrator = orchestrator_module.Orchestrator.for_run_directory(
+        orchestrator = scmle.core.orchestrator.Orchestrator.for_run_directory(
             run_path, frame=data
         )
         estimand, policy = restore_parameter_estimation_declaration(
@@ -1013,7 +1013,7 @@ class MLProject:
             A verdict whose level is `exact`, `comparable` or `different`.
         """
         original = pathlib.Path(run_directory)
-        orchestrator = orchestrator_module.Orchestrator.for_run_directory(
+        orchestrator = scmle.core.orchestrator.Orchestrator.for_run_directory(
             original, frame=data
         )
         estimand, policy = restore_parameter_estimation_declaration(
@@ -1080,7 +1080,7 @@ class ModalityProject:
         observed_adapter: modality_lifecycle.ModalityAdapter | None = None,
         performance_budget: performance.PerformanceBudget | None = None,
         performance_baseline: performance.PerformanceBaseline | None = None,
-        manifest: data_contracts.ModalityManifest | None = None,
+        manifest: scmle.contracts.data.ModalityManifest | None = None,
         require_independent_ground_truth: bool = False,
         cancellation: modality_lifecycle.LifecycleCancellation | None = None,
         checkpoint_path: str | pathlib.Path | None = None,
@@ -1225,7 +1225,7 @@ class ModalityCurationProject:
         signing_key: str | bytes,
         *,
         output_dir: str | pathlib.Path = "runs",
-        manifest: data_contracts.ModalityManifest | None = None,
+        manifest: scmle.contracts.data.ModalityManifest | None = None,
     ) -> None:
         """Defines a curation-only run over a typed modality adapter.
 
@@ -1244,7 +1244,7 @@ class ModalityCurationProject:
         if not signing_key:
             raise ValueError("signing_key must not be empty")
         if manifest is not None and not isinstance(
-            manifest, data_contracts.ModalityManifest
+            manifest, scmle.contracts.data.ModalityManifest
         ):
             raise TypeError("manifest must be ModalityManifest")
         self.adapter = adapter

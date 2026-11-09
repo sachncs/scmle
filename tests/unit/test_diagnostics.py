@@ -9,7 +9,7 @@ from scmle.contracts import tasks
 from scmle.data.curation import preprocessing
 from scmle.evaluation import diagnostics
 from scmle.evaluation import metrics
-from scmle.evaluation import suite as full_suite
+import scmle.evaluation.suite
 from scmle.explainability import importance
 from scmle.models import registry
 
@@ -129,7 +129,7 @@ def test_error_analysis_ranks_regression_residuals():
 
 
 def test_suite_selects_by_task_and_isolates_failures():
-    suite = full_suite.full_suite()
+    suite = scmle.evaluation.suite.full_suite()
     binary = diagnostics.run_suite(make_inputs(tasks.TaskType.BINARY), suite)
     assert set(binary) == {
         "classification_report",

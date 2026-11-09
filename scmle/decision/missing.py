@@ -23,7 +23,7 @@ so it carries no decision.
 
 from typing import Any
 
-import numpy as np
+import numpy
 from numpy.typing import ArrayLike
 
 from scmle.decision import design
@@ -62,25 +62,25 @@ def differential_missingness(
             equal length, if `arm` holds values other than 0 and 1, or if
             `assignment_prob` or `level` lies outside (0, 1).
     """
-    a = np.asarray(arm, dtype=float)
-    seen = np.asarray(observed, dtype=bool)
+    a = numpy.asarray(arm, dtype=float)
+    seen = numpy.asarray(observed, dtype=bool)
     if a.shape != seen.shape or a.ndim != 1:
         raise ValueError("arm and observed must be one-dimensional and equal")
-    if np.any((a != 0.0) & (a != 1.0)):
+    if numpy.any((a != 0.0) & (a != 1.0)):
         raise ValueError("arm must be 0 or 1")
     if not 0.0 < assignment_prob < 1.0 or not 0.0 < level < 1.0:
         raise ValueError("assignment_prob and level must lie in (0, 1)")
     gone = ~seen
-    totals = np.cumsum(gone)
-    challenger = np.cumsum(a * gone)
+    totals = numpy.cumsum(gone)
+    challenger = numpy.cumsum(a * gone)
     positive = totals > 0
-    log_bf = np.full(a.shape, -np.inf)
+    log_bf = numpy.full(a.shape, -numpy.inf)
     if positive.any():
         log_bf[positive] = design.srm_log_bayes_factor(
             challenger[positive], totals[positive], assignment_prob
         )
-    crossed = log_bf >= -np.log(level)
-    first = int(np.argmax(crossed)) + 1 if crossed.any() else None
+    crossed = log_bf >= -numpy.log(level)
+    first = int(numpy.argmax(crossed)) + 1 if crossed.any() else None
     return {
         "status": "described",
         "label": LABEL,

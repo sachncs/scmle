@@ -9,8 +9,8 @@ import textwrap
 
 import numpy
 import pandas
-import pyarrow as pa
-import pyarrow.parquet as pq
+import pyarrow
+import pyarrow.parquet
 import pytest
 
 from scmle.contracts import errors
@@ -24,13 +24,13 @@ def write_parquet(path, rows, columns=6, chunk=100_000, seed=0):
     writer = None
     for start in range(0, rows, chunk):
         size = min(chunk, rows - start)
-        table = pa.table(
+        table = pyarrow.table(
             {
                 **{f"x{i}": rng.normal(size=size) for i in range(columns)},
                 "y": rng.integers(0, 2, size),
             }
         )
-        writer = writer or pq.ParquetWriter(path, table.schema)
+        writer = writer or pyarrow.parquet.ParquetWriter(path, table.schema)
         writer.write_table(table)
     writer.close()
 

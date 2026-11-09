@@ -26,8 +26,8 @@ from scmle.data.charter import contracts
 from scmle.data.framing import baseline
 from scmle.data.framing import costs
 from scmle.data.framing import provenance
-from scmle.data.framing import questions as questions_module
 from scmle.data.framing import refusal
+import scmle.data.framing.questions
 
 ISSUED = "issued"
 WITH_QUESTIONS = "issued_with_questions"
@@ -141,7 +141,7 @@ class FramingDraft:
     charter: contracts.AnalysisCharter | None
     fields: dict[str, provenance.FieldSource]
     checks: tuple[DataCheck, ...]
-    questions: tuple[questions_module.HumanQuestion, ...]
+    questions: tuple[scmle.data.framing.questions.HumanQuestion, ...]
     robust: tuple[dict[str, Any], ...]
     open_items: tuple[str, ...]
     baseline: dict[str, Any] | None
@@ -572,7 +572,7 @@ def frame(
             discarded,
         )
     profile = None
-    asked: list[questions_module.HumanQuestion] = []
+    asked: list[scmle.data.framing.questions.HumanQuestion] = []
     robust: list[dict[str, Any]] = []
     target = slots["target"]
     if (
@@ -594,14 +594,14 @@ def frame(
     ):
         outcome = pandas.to_numeric(data_sample[target], errors="coerce")
         seen = outcome.notna().to_numpy()
-        asked, robust = questions_module.ask(
+        asked, robust = scmle.data.framing.questions.ask(
             [
-                questions_module.Unknown(
+                scmle.data.framing.questions.Unknown(
                     "cost_threshold",
                     COST_RANGE[0],
                     COST_RANGE[1],
                     "a threshold t = c_FP / (c_FP + c_FN) in (0, 1)",
-                    questions_module.gain_sign_verdict(
+                    scmle.data.framing.questions.gain_sign_verdict(
                         outcome.to_numpy()[seen],
                         numpy.asarray(pilot_actions)[seen],
                         data_sample[baseline_column].to_numpy()[seen],

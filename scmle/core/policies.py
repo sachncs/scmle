@@ -11,8 +11,8 @@ from collections.abc import Callable
 import dataclasses
 from typing import Any
 
-from scmle.core import context as context_module
 from scmle.core import state
+import scmle.core.context
 
 PLAN_GATE = state.RunState.PLANNING
 SELECTION_GATE = state.RunState.SELECTING
@@ -120,7 +120,7 @@ class CallbackCheckpoint(PolicyCheckpoint):
 
 
 def describe(
-    gate: state.RunState, context: context_module.RunContext
+    gate: state.RunState, context: scmle.core.context.RunContext
 ) -> GateReview:
     """Builds the review shown at `gate`.
 
@@ -136,9 +136,9 @@ def describe(
         unavailable-product error.
     """
     if gate is PLAN_GATE:
-        plan = context_module.require(context.plan, "plan")
+        plan = scmle.core.context.require(context.plan, "plan")
         return GateReview(gate, plan.summary(), plan.to_dict())
-    selected = context_module.require(context.selected, "selected")
+    selected = scmle.core.context.require(context.selected, "selected")
     return GateReview(
         gate,
         f"selected {selected.model_name}/{selected.strategy} "

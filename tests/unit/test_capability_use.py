@@ -4,11 +4,11 @@ import numpy
 import pandas
 import pytest
 
-from scmle.contracts import data as data_contracts
 from scmle.contracts import tasks
+import scmle.contracts.data
 from scmle.data.curation import preprocessing
 from scmle.intelligence import planner
-from scmle.models import registry as registry_module
+import scmle.models.registry
 from scmle.sampling import strategies
 
 BINARY = tasks.TaskType.BINARY
@@ -16,7 +16,7 @@ BINARY = tasks.TaskType.BINARY
 
 @pytest.fixture
 def registry():
-    return registry_module.ModelRegistry.with_builtins()
+    return scmle.models.registry.ModelRegistry.with_builtins()
 
 
 def high_cardinality_frame(rows=900, levels=40, seed=0):
@@ -31,7 +31,7 @@ def high_cardinality_frame(rows=900, levels=40, seed=0):
     )
 
 
-PLAN = data_contracts.FeaturePlan(
+PLAN = scmle.contracts.data.FeaturePlan(
     numeric=("x",), categorical=("cat",), high_cardinality=("cat",)
 )
 
@@ -101,21 +101,21 @@ def test_target_encoding_strategy_is_cross_fitted_and_conditional(registry):
     encoder = step_names(pipeline_)["high_cardinality"].named_steps["encode"]
     assert type(encoder).__name__ == "TargetEncoder"
     assert pipeline_.predict_proba(features).shape == (len(features), 2)
-    profile = data_contracts.DatasetProfile(
+    profile = scmle.contracts.data.DatasetProfile(
         manifest=None,
         column_statistics={},
         quality_findings=(),
         risk_findings=(),
         target_summary={},
-        feature_plan=data_contracts.FeaturePlan(("x",), ("cat",)),
+        feature_plan=scmle.contracts.data.FeaturePlan(("x",), ("cat",)),
     )
     reason = strategy.applicability(profile, BINARY, adapter)
     assert reason == "no high-cardinality categorical feature"
 
 
 def planning_context(spec, plan):
-    profile = data_contracts.DatasetProfile(
-        manifest=data_contracts.DatasetManifest(
+    profile = scmle.contracts.data.DatasetProfile(
+        manifest=scmle.contracts.data.DatasetManifest(
             "ds", "s", "h", 900, 3, "y", "<in-memory>"
         ),
         column_statistics={},
@@ -151,7 +151,9 @@ def test_planner_prefers_native_categorical_models_for_high_cardinality(
 
 
 def test_no_high_cardinality_decisions_without_such_features(registry):
-    plain = data_contracts.FeaturePlan(numeric=("x",), categorical=("cat",))
+    plain = scmle.contracts.data.FeaturePlan(
+        numeric=("x",), categorical=("cat",)
+    )
     plan = planner.Planner(registry).plan(
         planning_context(make_spec(time_budget_seconds=900), plain)
     )

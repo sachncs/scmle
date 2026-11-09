@@ -8,7 +8,7 @@ from sklearn import base
 from scmle.contracts import data
 from scmle.contracts import tasks
 from scmle.data.curation import preprocessing
-from scmle.models import registry as registry_module
+import scmle.models.registry
 
 PLAN = data.FeaturePlan(("num", "flag"), ("cat",))
 BINARY = tasks.TaskType.BINARY
@@ -16,7 +16,7 @@ BINARY = tasks.TaskType.BINARY
 
 @pytest.fixture(scope="module")
 def registry():
-    return registry_module.ModelRegistry.with_builtins()
+    return scmle.models.registry.ModelRegistry.with_builtins()
 
 
 def make_frame(rows=200, seed=0):

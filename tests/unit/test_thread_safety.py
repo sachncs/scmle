@@ -25,7 +25,7 @@ from sklearn import naive_bayes
 import support
 
 import scmle
-from scmle.artifacts import bundle as bundle_module
+import scmle.artifacts.bundle
 from scmle.contracts import errors
 from scmle.contracts import experiments
 from scmle.contracts import observability
@@ -35,9 +35,9 @@ from scmle.evaluation import metrics
 from scmle.experimentation import stores
 from scmle.governance import keyring
 from scmle.governance import lifecycle
-from scmle.governance import registry as registry_module
-from scmle.models import registry as model_registry
+import scmle.governance.registry
 from scmle.models.deeplearning import worker
+import scmle.models.registry
 from scmle.monitoring import alerts
 from scmle.monitoring import events
 from scmle.monitoring import incidents
@@ -99,7 +99,7 @@ def frame(rows: int = 200, seed: int = 0) -> pandas.DataFrame:
 def clean_registries():
     """Removes whatever these tests register."""
     yield
-    for name in list(model_registry.USER_ADAPTERS):
+    for name in list(scmle.models.registry.USER_ADAPTERS):
         if name.startswith("ts_"):
             scmle.unregister_estimator(name)
     for name in list(metrics.CATALOG.metrics):
@@ -119,7 +119,7 @@ def test_concurrent_register_estimator_keeps_every_registration():
     names, failures = run_together(THREADS, work)
 
     assert not failures
-    built = model_registry.ModelRegistry.with_builtins()
+    built = scmle.models.registry.ModelRegistry.with_builtins()
     assert set(names) <= set(built.adapters)
 
 
@@ -142,12 +142,14 @@ def test_builtin_name_check_does_not_hide_registered_estimators():
     def churn(index):
         if index == 0:
             for round_number in range(40):  # noqa: B007
-                model_registry.builtin_names()
+                scmle.models.registry.builtin_names()
             stop.set()
             return True
         missing = 0
         while not stop.is_set():
-            adapters = model_registry.ModelRegistry.with_builtins().adapters
+            adapters = (
+                scmle.models.registry.ModelRegistry.with_builtins().adapters
+            )
             missing += "ts_persist" not in adapters
         return missing
 
@@ -164,7 +166,7 @@ def test_register_unregister_and_lookup_never_raise():
             scmle.register_estimator(
                 name, classifier=naive_bayes.GaussianNB, replace=True
             )
-            model_registry.ModelRegistry.with_builtins().get(name)
+            scmle.models.registry.ModelRegistry.with_builtins().get(name)
             scmle.unregister_estimator(name)
 
     failures = failures_of(4, work)
@@ -420,7 +422,7 @@ def two_bundles(trained, tmp_path_factory):
 def test_concurrent_registry_register_assigns_distinct_versions(
     two_bundles, tmp_path
 ):
-    store = registry_module.ModelRegistryStore(tmp_path / "registry")
+    store = scmle.governance.registry.ModelRegistryStore(tmp_path / "registry")
 
     def work(index):
         return store.register(
@@ -433,12 +435,14 @@ def test_concurrent_registry_register_assigns_distinct_versions(
     assert sorted(record.version for record in records) == [1, 2, 3, 4]
     listed = store.versions("churn")
     assert [record.version for record in listed] == [1, 2, 3, 4]
-    audit = (tmp_path / "registry" / registry_module.AUDIT_FILE).read_text()
+    audit = (
+        tmp_path / "registry" / scmle.governance.registry.AUDIT_FILE
+    ).read_text()
     assert len(audit.splitlines()) == 4
 
 
 def test_concurrent_registry_same_bundle_registers_once(two_bundles, tmp_path):
-    store = registry_module.ModelRegistryStore(tmp_path / "registry")
+    store = scmle.governance.registry.ModelRegistryStore(tmp_path / "registry")
 
     def work(index):
         return store.register("churn", two_bundles[0], trusted=True)
@@ -451,7 +455,7 @@ def test_concurrent_registry_same_bundle_registers_once(two_bundles, tmp_path):
 
 
 def test_concurrent_alias_moves_do_not_corrupt_the_index(two_bundles, tmp_path):
-    store = registry_module.ModelRegistryStore(tmp_path / "registry")
+    store = scmle.governance.registry.ModelRegistryStore(tmp_path / "registry")
     for index in range(len(two_bundles)):
         store.register("churn", two_bundles[index], trusted=True)
 
@@ -469,7 +473,7 @@ def test_concurrent_alias_moves_do_not_corrupt_the_index(two_bundles, tmp_path):
 
 
 def test_concurrent_lifecycle_state_writes(tmp_path):
-    store = registry_module.ModelRegistryStore(tmp_path / "registry")
+    store = scmle.governance.registry.ModelRegistryStore(tmp_path / "registry")
     manager = lifecycle.LifecycleManager(store, "churn", str(tmp_path / "w"))
 
     def work(index):
@@ -679,7 +683,7 @@ def test_worker_client_is_a_singleton_per_process(monkeypatch):
 
 
 def test_bundle_remember_does_not_lose_rows():
-    bundle = object.__new__(bundle_module.ModelBundle)
+    bundle = object.__new__(scmle.artifacts.bundle.ModelBundle)
     bundle.schema = type(
         "Schema", (), {"series": [1], "group_column": "g", "time_column": "t"}
     )()

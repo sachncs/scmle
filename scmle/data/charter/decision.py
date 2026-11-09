@@ -19,7 +19,7 @@ from typing import Self
 
 from scmle.contracts import evidence
 from scmle.contracts import qualification
-from scmle.data.ledger import budget as budget_module
+import scmle.data.ledger.budget
 
 BASELINES = ("treat_none", "treat_all", "incumbent")
 CRITERIA = (
@@ -416,14 +416,14 @@ class RolloutPlan:
         if len(set(names)) != len(names) or self.primary in names:
             raise ValueError("guardrail names must be distinct from each other")
 
-    def budget(self) -> budget_module.DecisionBudget:
+    def budget(self) -> scmle.data.ledger.budget.DecisionBudget:
         """Builds a decision budget from the rollout's levels.
 
         Returns:
             A new `DecisionBudget` with this rollout's `alpha_promote`,
             `alpha_rollback` and `horizon`.
         """
-        return budget_module.DecisionBudget(
+        return scmle.data.ledger.budget.DecisionBudget(
             alpha_promote=self.alpha_promote,
             alpha_rollback=self.alpha_rollback,
             horizon=self.horizon,
@@ -477,10 +477,10 @@ class RolloutPlan:
             delta_min=record["delta_min"],
             tolerance=record["tolerance"],
             n_max=record["n_max"],
-            alpha_promote=budget_module.parse_fraction(
+            alpha_promote=scmle.data.ledger.budget.parse_fraction(
                 record["alpha_promote"], "alpha_promote"
             ),
-            alpha_rollback=budget_module.parse_fraction(
+            alpha_rollback=scmle.data.ledger.budget.parse_fraction(
                 record["alpha_rollback"], "alpha_rollback"
             ),
             low=record["low"],

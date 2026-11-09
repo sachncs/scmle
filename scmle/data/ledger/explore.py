@@ -19,8 +19,8 @@ import numpy
 import pandas
 
 from scmle.data.ledger import bivariate
-from scmle.data.ledger import ledger as ledger_module
 from scmle.data.ledger import online_fdr
+import scmle.data.ledger.ledger
 
 NUMERIC = "numeric"
 BINARY = "binary"
@@ -38,7 +38,7 @@ class Plan:
         target_kind: `numeric`, `binary` or `multiclass`.
     """
 
-    specs: tuple[ledger_module.HypothesisSpec, ...]
+    specs: tuple[scmle.data.ledger.ledger.HypothesisSpec, ...]
     skipped: tuple[tuple[str, str], ...]
     target_kind: str
 
@@ -133,7 +133,7 @@ def plan_exploration(
             skipped.append((str(name), "constant or entirely missing"))
             continue
         specs.append(
-            ledger_module.HypothesisSpec.create(
+            scmle.data.ledger.ledger.HypothesisSpec.create(
                 name=f"{name}~target",
                 family=FAMILY,
                 statistic=statistic,
@@ -149,11 +149,11 @@ def plan_exploration(
 
 
 def run_exploration(
-    ledger: ledger_module.Ledger,
+    ledger: scmle.data.ledger.ledger.Ledger,
     features: pandas.DataFrame,
     codes: pandas.Series,
     plan: Plan,
-) -> tuple[ledger_module.Result, ...]:
+) -> tuple[scmle.data.ledger.ledger.Result, ...]:
     """Registers every planned hypothesis, then tests them in order.
 
     Args:

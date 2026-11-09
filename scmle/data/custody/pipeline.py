@@ -16,9 +16,9 @@ from scmle.contracts import tasks
 from scmle.data.charter import contracts
 from scmle.data.charter import feasibility
 from scmle.data.custody import carve
-from scmle.data.custody import manifest as manifest_module
 from scmle.data.custody import merkle
 from scmle.data.custody import sealed
+import scmle.data.custody.manifest
 from scmle.data.splitting import duplicates
 from scmle.data.splitting import splitters
 
@@ -38,7 +38,7 @@ class CustodyOutcome:
 
     split: splitters.SplitResult
     view: sealed.ExplorationView
-    manifest: manifest_module.CustodyManifest
+    manifest: scmle.data.custody.manifest.CustodyManifest
     feasibility: feasibility.Feasibility
 
 
@@ -356,7 +356,7 @@ def finish(
         folds=folds,
         notes=notes,
     )
-    manifest = manifest_module.CustodyManifest(
+    manifest = scmle.data.custody.manifest.CustodyManifest(
         strategy=old.strategy,
         seed=charter.seed,
         embargo_rows=embargo_rows,

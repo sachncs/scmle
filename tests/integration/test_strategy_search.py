@@ -245,10 +245,10 @@ def test_smote_variants_are_evaluated_on_the_original_folds_when_installed(
 
 
 def test_missing_sampling_extra_is_explained_in_the_plan(monkeypatch):
-    from scmle.sampling import strategies as strategy_module
+    import scmle.sampling.strategies
 
     monkeypatch.setattr(
-        strategy_module.importlib.util, "find_spec", lambda name: None
+        scmle.sampling.strategies.importlib.util, "find_spec", lambda name: None
     )
     plan = scmle.MLProject(
         numeric_imbalanced(),

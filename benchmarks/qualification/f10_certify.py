@@ -69,7 +69,7 @@ import numpy
 import pandas
 
 from benchmarks.qualification import f10_generators
-from scmle.data.admissibility import dag as dag_module
+import scmle.data.admissibility.dag
 from scmle.data.charter import causal
 from scmle.data.detectors import certificates
 from scmle.data.identification import aipw
@@ -911,7 +911,7 @@ def confirm_world(kind: str, runs: int, base: int) -> dict[str, Any]:
         },
         "clean": {},
     }[kind]
-    graph = dag_module.Dag.build(
+    graph = scmle.data.admissibility.dag.Dag.build(
         source="certificate",
         edges=(
             *(
