@@ -6,7 +6,10 @@ import numpy
 import pandas
 import pytest
 
+from scmle.contracts import models
+from scmle.contracts import tasks
 from scmle.evaluation import uplift
+from scmle.models.uplift import adapters
 from scmle.models.uplift import estimators
 
 
@@ -106,3 +109,29 @@ def test_average_effect_is_nan_without_warning_when_an_arm_is_empty():
         warnings.simplefilter("error")
         assert numpy.isnan(uplift.average_effect(numpy.ones(4), numpy.ones(4)))
         assert numpy.isnan(uplift.average_effect(numpy.ones(4), numpy.zeros(4)))
+
+
+class ClassStyleUplift(adapters.Uplift):
+    """A subclass declaring its data as class attributes (the old style)."""
+
+    name = "class_style_uplift"
+    capabilities = models.Capabilities(adapters.UPLIFT)
+    learner = estimators.SingleModelLearner
+
+
+def test_configured_instances_and_class_style_subclasses_build_learners():
+    built = [
+        (adapter.name, type(adapter.build(tasks.Task.UPLIFT, 0)))
+        for adapter in adapters.UPLIFT_ADAPTERS
+    ]
+    assert built == [
+        ("uplift_t_learner", estimators.TwoModelLearner),
+        ("uplift_s_learner", estimators.SingleModelLearner),
+        ("uplift_x_learner", estimators.CrossLearner),
+    ]
+    legacy = ClassStyleUplift()
+    assert (legacy.name, legacy.family) == ("class_style_uplift", "causal")
+    assert isinstance(
+        legacy.build(tasks.Task.UPLIFT, 0), estimators.SingleModelLearner
+    )
+    assert adapters.Uplift.learner is estimators.TwoModelLearner
