@@ -25,6 +25,20 @@
 | `multimodal` | Pillow | image modality |
 | `benchmarks` | huggingface_hub | Hugging Face benchmark suite |
 
+* **Do not import `torch` into a process that also fits LightGBM or
+  XGBoost.** PyTorch, scikit-learn and the boosting wheels each bundle their
+  own OpenMP runtime (`libomp`). Measured on macOS 26 arm64, Python 3.13,
+  torch 2.14.1, lightgbm 4.7.0, xgboost 3.4.1, scikit-learn 1.9.1: after
+  `import torch`, the first `LGBMClassifier.fit` segfaults (exit 139, in
+  `__kmp_suspend_initialize_thread`) or hangs, with or without
+  `OMP_NUM_THREADS=1`; the same fits without torch in the process succeed. The
+  cause is the multiple runtimes in one process, which neither scmle nor
+  those libraries can fix. scmle avoids it by running every PyTorch
+  computation in a worker process, so the framework process never imports
+  torch. Code you write against scmle should do the same: reach torch through
+  the `deeplearning` model families, or run your own torch code in a separate
+  process. Setting `KMP_DUPLICATE_LIB_OK=TRUE` is an unsupported workaround
+  that scmle neither sets nor tests.
 * **Lower bounds are tested**, not guessed: CI resolves
   `--resolution lowest-direct` and runs the unit, property and leakage suites
   on those versions (pandas 3.0, scikit-learn 1.8, numpy 2.3, ...).

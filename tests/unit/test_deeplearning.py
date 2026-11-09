@@ -3,6 +3,7 @@
 import dataclasses
 import importlib.util
 import io
+import pathlib
 import subprocess
 import sys
 import textwrap
@@ -218,6 +219,39 @@ def test_the_framework_process_never_imports_torch():
     )
 
     assert completed.returncode == 0, completed.stderr[-800:]
+
+
+def test_the_test_process_never_loads_torch_beside_the_boosters():
+    """Torch loaded into a process that fits LightGBM crashes or hangs.
+
+    Torch, scikit-learn and LightGBM each bundle their own libomp. On macOS
+    a process holding torch's copy next to LightGBM's segfaults in
+    `__kmp_suspend_initialize_thread`, or hangs, on the first fit. Test
+    files that need torch's presence only to decide whether to skip must
+    ask `importlib.util.find_spec`, never import it.
+    """
+    program = textwrap.dedent(
+        """
+        import sys
+        import pytest
+        code = pytest.main(
+            ["-q", "-p", "no:cacheprovider", "tests/integration/test_capability_gate.py"]
+        )
+        assert code == 0, code
+        assert "torch" not in sys.modules
+        """
+    )
+    completed = subprocess.run(
+        [sys.executable, "-c", program],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=pathlib.Path(__file__).resolve().parents[2],
+    )
+
+    assert completed.returncode == 0, (completed.stdout + completed.stderr)[
+        -800:
+    ]
 
 
 def test_torch_shares_a_process_with_xgboost_and_lightgbm():
