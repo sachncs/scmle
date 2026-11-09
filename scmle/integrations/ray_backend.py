@@ -67,7 +67,18 @@ class RayBackend(scheduler.ExecutionBackend):
         items: Sequence[Any],
         on_failure: Callable[[Any, Exception], Any] | None = None,
     ) -> list[Any]:
-        """Submits one Ray task per item and gathers results in order."""
+        """Submits one Ray task per item and gathers results in order.
+
+        Args:
+            function: Picklable function of one argument.
+            items: Independent work items.
+            on_failure: Called with the item and the Ray error when its task
+                still fails after the retries; its return value replaces the
+                item's result. If None, the Ray error is re-raised.
+
+        Returns:
+            Results in the order of `items`; empty if `items` is empty.
+        """
         if not items:
             return []
         remote = self.ray.remote(max_retries=self.retries)(function)

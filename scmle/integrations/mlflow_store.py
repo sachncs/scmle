@@ -82,7 +82,17 @@ class MlflowExperimentStore(stores.ExperimentStore):
         )
 
     def find_parent(self, run_id: str) -> str | None:
-        """Finds the MLflow run of a scmle run, across processes."""
+        """Finds the MLflow run of a scmle run, across processes.
+
+        The answer is cached after the first lookup; otherwise MLflow is
+        searched for a run tagged with the scmle run id and kind `run`.
+
+        Args:
+            run_id: Identifier of the scmle run.
+
+        Returns:
+            The MLflow run id of the parent run, or None if no such run exists.
+        """
         if run_id in self.parents:
             return self.parents[run_id]
         found = self.client.search_runs(
@@ -97,7 +107,16 @@ class MlflowExperimentStore(stores.ExperimentStore):
     def start_run(
         self, run_id: str, config_hash: str, run_dir: str, started_at: str
     ) -> None:
-        """Creates the parent run, or reuses it when resuming."""
+        """Creates the parent run, or reuses it when resuming.
+
+        The parent run's `scmle.state` tag is set to `CREATED` in either case.
+
+        Args:
+            run_id: Identifier of the scmle run.
+            config_hash: Hash of the run configuration, stored as a tag.
+            run_dir: Run directory, stored as a tag.
+            started_at: Start timestamp, stored as a tag.
+        """
         parent = self.find_parent(run_id)
         if parent is None:
             created = self.client.create_run(
@@ -116,7 +135,19 @@ class MlflowExperimentStore(stores.ExperimentStore):
         self.client.set_tag(parent, "scmle.state", "CREATED")
 
     def update_run(self, run_id: str, **fields: Any) -> None:
-        """Maps fields to tags, metrics and run status."""
+        """Maps fields to tags, metrics and run status.
+
+        `cv_score` and each `test_metrics` entry (non-NaN) become metrics; the
+        fields in `LINEAGE_ARTIFACTS` are logged as JSON text artifacts; any
+        other field becomes a `scmle.<name>` tag. A `state` field in `TERMINAL`
+        also ends the MLflow run with the mapped status. Nothing happens if the
+        run is unknown.
+
+        Args:
+            run_id: Identifier of the scmle run.
+            **fields: Run fields to record. `test_metrics` may be a dict or a
+                JSON string.
+        """
         parent = self.find_parent(run_id)
         if parent is None:
             return
@@ -147,7 +178,16 @@ class MlflowExperimentStore(stores.ExperimentStore):
             self.client.set_terminated(parent, TERMINAL[state])
 
     def record_trial(self, run_id: str, trial: experiments.TrialResult) -> None:
-        """Logs a trial as a child run."""
+        """Logs a trial as a child run of the parent run.
+
+        Does nothing if the parent run is unknown. The child run is ended as
+        `FINISHED` when the trial status is `ok` or `pruned`, otherwise
+        `FAILED`.
+
+        Args:
+            run_id: Identifier of the scmle run the trial belongs to.
+            trial: The trial result to log.
+        """
         parent = self.find_parent(run_id)
         if parent is None:
             return
@@ -182,7 +222,12 @@ class MlflowExperimentStore(stores.ExperimentStore):
         )
 
     def runs(self) -> list[dict[str, Any]]:
-        """Lists scmle parent runs, newest first."""
+        """Lists scmle parent runs, newest first.
+
+        Returns:
+            One dict per run with `run_id`, `state`, `mlflow_run_id` and the
+            run's logged metrics.
+        """
         found = self.client.search_runs(
             [self.experiment_id],
             "tags.`scmle.kind` = 'run'",
@@ -199,7 +244,15 @@ class MlflowExperimentStore(stores.ExperimentStore):
         ]
 
     def trials(self, run_id: str) -> list[dict[str, Any]]:
-        """Lists the trials of a run in trial-id order."""
+        """Lists the trials of a run in trial-id order.
+
+        Args:
+            run_id: Identifier of the scmle run.
+
+        Returns:
+            One dict per trial with `trial_id`, `model_name`, `strategy`,
+            `status` and the trial's logged metrics, sorted by `trial_id`.
+        """
         found = self.client.search_runs(
             [self.experiment_id],
             f"tags.`{RUN_TAG}` = '{run_id}' and tags.`scmle.kind` = 'trial'",
@@ -217,7 +270,12 @@ class MlflowExperimentStore(stores.ExperimentStore):
         return sorted(rows, key=lambda row: row["trial_id"])
 
     def history(self) -> list[experiments.HistoricalRun]:
-        """Returns completed, fingerprinted runs for meta-learning."""
+        """Returns completed, fingerprinted runs for meta-learning.
+
+        Returns:
+            One record per run whose state is `COMPLETED` and which carries both
+            a dataset fingerprint and a selected model. A missing score is NaN.
+        """
         history = []
         for run in self.client.search_runs(
             [self.experiment_id],
