@@ -1,9 +1,15 @@
-"""PyTorch model-family adapters (`deeplearning` extra)."""
+"""PyTorch model-family adapters (`deeplearning` extra).
+
+`Network` holds the construction logic once; a network that only differs in
+its data (architecture, search space, capabilities) is a configured instance,
+such as `MLP`, not a subclass. `Jepa` and `KerasMlp` stay classes because
+they override `build` (and `Jepa` also `rejection_reason` and `assemble`),
+and `TabPfn` builds different estimators.
+"""
 
 from collections.abc import Mapping
 import dataclasses
 from typing import Any
-from typing import ClassVar
 
 from sklearn import pipeline
 
@@ -30,14 +36,19 @@ COMMON_SPACE = (
 class Network(models.Model):
     """A PyTorch tabular network family.
 
+    Configure it with keyword arguments, or subclass it and declare the same
+    names as class attributes. An argument left out keeps the class-level
+    value, so both styles work.
+
     Attributes:
         architecture: Name in `architectures.ARCHITECTURES`.
+        family_contract: Modalities the family accepts.
     """
 
     family = "deep_learning"
     requires: tuple[str, ...] = ("torch",)
-    architecture: ClassVar[str]
-    family_contract: ClassVar[contracts.ModelFamilyContract] = (
+    architecture: str
+    family_contract: contracts.ModelFamilyContract = (
         contracts.TABULAR_TORCH_CONTRACT
     )
     capabilities = models.Capabilities(
@@ -50,6 +61,42 @@ class Network(models.Model):
         cost=4,
         memory_factor=4.0,
     )
+
+    def __init__(
+        self,
+        *,
+        name: str | None = None,
+        architecture: str | None = None,
+        search_space: search.SearchSpace | None = None,
+        capabilities: models.Capabilities | None = None,
+        capability_family: str | None = None,
+        family_contract: contracts.ModelFamilyContract | None = None,
+        auto_candidate: bool | None = None,
+    ) -> None:
+        """Sets the declared data on this instance.
+
+        Args:
+            name: Unique registry name.
+            architecture: Name in `architectures.ARCHITECTURES`.
+            search_space: Tunable hyperparameters.
+            capabilities: Declared capabilities.
+            capability_family: Release-boundary identity, if stricter than
+                the family.
+            family_contract: Modalities the family accepts.
+            auto_candidate: Whether the adapter enters automatic search.
+        """
+        given: dict[str, Any] = {
+            "name": name,
+            "architecture": architecture,
+            "search_space": search_space,
+            "capabilities": capabilities,
+            "capability_family": capability_family,
+            "family_contract": family_contract,
+            "auto_candidate": auto_candidate,
+        }
+        for attribute, value in given.items():
+            if value is not None:
+                setattr(self, attribute, value)
 
     def gpu_usable(self) -> bool:
         """Whether PyTorch can see a CUDA device (asked of the worker).
@@ -95,75 +142,88 @@ class Network(models.Model):
         return estimators.TorchRegressor(**settings)
 
 
-class Mlp(Network):
-    """Fully connected network."""
-
-    name = "torch_mlp"
-    architecture = "mlp"
-    search_space = search.SearchSpace(
+# Fully connected network.
+MLP = Network(
+    name="torch_mlp",
+    architecture="mlp",
+    search_space=search.SearchSpace(
         (
             search.ChoiceParameter(
                 "hidden_sizes", ((64,), (128,), (128, 64), (256, 128))
             ),
             *COMMON_SPACE,
         )
-    )
+    ),
+)
 
 
-class ResidualMlp(Network):
-    """Residual network with layer normalization."""
-
-    name = "torch_residual"
-    architecture = "residual"
-    search_space = search.SearchSpace(
+# Residual network with layer normalization.
+RESIDUAL_MLP = Network(
+    name="torch_residual",
+    architecture="residual",
+    search_space=search.SearchSpace(
         (
             search.ChoiceParameter(
                 "hidden_sizes", ((64,), (64, 64), (128, 128), (128, 128, 128))
             ),
             *COMMON_SPACE,
         )
-    )
+    ),
+)
 
 
-class Tabm(Network):
-    """BatchEnsemble MLP (TabM-style): many cheap members, averaged."""
-
-    name = "torch_tabm"
-    architecture = "tabm"
-    search_space = search.SearchSpace(
+# BatchEnsemble MLP (TabM-style): many cheap members, averaged.
+TABM = Network(
+    name="torch_tabm",
+    architecture="tabm",
+    search_space=search.SearchSpace(
         (
             search.ChoiceParameter(
                 "hidden_sizes", ((64,), (128, 64), (256, 128))
             ),
             *COMMON_SPACE,
         )
-    )
+    ),
+)
 
 
-class FtTransformer(Network):
-    """Experimental tabular FT-Transformer over numeric feature tokens.
-
-    ``family`` stays ``deep_learning`` for existing reporting and strategy
-    behavior. ``capability_family`` is the stricter release-boundary identity:
-    it resolves to the experimental, tabular-only transformer declaration and
-    must not inherit the supported generic deep-learning capability.
-    """
-
-    name = "torch_ft_transformer"
-    architecture = "ft_transformer"
-    capability_family = "transformer"
-    family_contract = contracts.TABULAR_TRANSFORMER_CONTRACT
-    auto_candidate = False
-    capabilities = dataclasses.replace(
+# Experimental tabular FT-Transformer over numeric feature tokens.
+#
+# `family` stays `deep_learning` for existing reporting and strategy
+# behavior. `capability_family` is the stricter release-boundary identity: it
+# resolves to the experimental, tabular-only transformer declaration and must
+# not inherit the supported generic deep-learning capability.
+FT_TRANSFORMER = Network(
+    name="torch_ft_transformer",
+    architecture="ft_transformer",
+    capability_family="transformer",
+    family_contract=contracts.TABULAR_TRANSFORMER_CONTRACT,
+    auto_candidate=False,
+    capabilities=dataclasses.replace(
         Network.capabilities, max_rows=100_000, cost=5, memory_factor=8.0
-    )
-
-    search_space = search.SearchSpace(
+    ),
+    search_space=search.SearchSpace(
         (
             search.ChoiceParameter("hidden_sizes", ((32,), (64,), (64, 64))),
             *COMMON_SPACE,
         )
-    )
+    ),
+)
+
+
+# MLP with learned scaling, smooth clipping and PReLU (RealMLP-style).
+ROBUST_MLP = Network(
+    name="torch_realmlp",
+    architecture="robust_mlp",
+    search_space=search.SearchSpace(
+        (
+            search.ChoiceParameter(
+                "hidden_sizes", ((128,), (256, 128), (256, 256))
+            ),
+            *COMMON_SPACE,
+        )
+    ),
+)
 
 
 class Jepa(Network):
@@ -327,21 +387,6 @@ class Jepa(Network):
         )
 
 
-class RobustMlp(Network):
-    """MLP with learned scaling, smooth clipping and PReLU (RealMLP-style)."""
-
-    name = "torch_realmlp"
-    architecture = "robust_mlp"
-    search_space = search.SearchSpace(
-        (
-            search.ChoiceParameter(
-                "hidden_sizes", ((128,), (256, 128), (256, 256))
-            ),
-            *COMMON_SPACE,
-        )
-    )
-
-
 class KerasMlp(Network):
     """Keras dense network, run on the PyTorch backend in the same worker."""
 
@@ -475,13 +520,13 @@ class TabPfn(models.Model):
         return estimators.TabPfnRegressor(**settings)
 
 
-DEEP_LEARNING_ADAPTERS: tuple[type[models.Model], ...] = (
-    TabPfn,
-    Mlp,
-    ResidualMlp,
-    Tabm,
-    FtTransformer,
-    Jepa,
-    RobustMlp,
-    KerasMlp,
+DEEP_LEARNING_ADAPTERS: tuple[models.Model, ...] = (
+    TabPfn(),
+    MLP,
+    RESIDUAL_MLP,
+    TABM,
+    FT_TRANSFORMER,
+    Jepa(),
+    ROBUST_MLP,
+    KerasMlp(),
 )

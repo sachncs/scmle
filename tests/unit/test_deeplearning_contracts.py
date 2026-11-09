@@ -139,7 +139,7 @@ def test_transformer_checkpoint_metadata_tampering_is_rejected(tmp_path):
 
 def test_torch_adapters_expose_the_same_fail_closed_modality_contract():
     """Adapter-level declarations match the estimator-level boundary."""
-    transformer = networks.FtTransformer()
+    transformer = networks.FT_TRANSFORMER
     jepa_adapter = networks.Jepa()
 
     assert transformer.family_contract.supports_modality("tabular")
