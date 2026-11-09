@@ -43,21 +43,21 @@ class LocalFaultExecutor:
     def execute(
         self, scenario: reliability.FaultScenario
     ) -> tuple[reliability_harness.FaultArtifact, ...]:
-        """Execute one scenario and return exactly its declared evidence.
+        """Executes one scenario and checks its evidence against its plan.
 
         Args:
             scenario: The fault scenario to rehearse.
 
         Returns:
-            The evidence artifacts of the scenario, one for each evidence
-                type
-            its plan requires.
+            The artifacts the scenario's handler produced, in its order;
+            their evidence types are exactly those its default plan requires,
+            each once.
 
         Raises:
-            RuntimeError: If the scenario's handler fails.
+            RuntimeError: If the scenario's handler raises any exception.
             TypeError: If `scenario` is not a `FaultScenario`.
-            ValueError: If the evidence returned does not match the evidence
-                types its plan requires exactly.
+            ValueError: If the evidence types produced differ from those the
+                plan requires or repeat.
         """
         if not isinstance(scenario, reliability.FaultScenario):
             raise TypeError("scenario must be FaultScenario")
@@ -127,7 +127,10 @@ class LocalFaultExecutor:
         observation: str,
         details: dict[str, Any],
     ) -> reliability_harness.FaultArtifact:
-        """Builds a JSON evidence artifact for an observed safe outcome.
+        """Builds an evidence artifact that records a safe outcome as observed.
+
+        The outcome is always marked as observed; nothing here checks that
+        `details` supports it.
 
         Args:
             scenario: The scenario the evidence belongs to.
@@ -137,9 +140,9 @@ class LocalFaultExecutor:
                 serializable.
 
         Returns:
-            The artifact, with canonical JSON content and a safe outcome
-                marked
-            as observed.
+            The artifact: compact, key-sorted ASCII JSON bytes holding the
+            scenario value, evidence type, observation and details, with the
+            safe-outcome-observed outcome and the observation text.
         """
         content = json.dumps(
             {
@@ -160,7 +163,7 @@ class LocalFaultExecutor:
         )
 
     def write_json(self, path: pathlib.Path, record: dict[str, Any]) -> None:
-        """Writes JSON through the same durable atomic primitive as releases.
+        """Writes JSON with the evidence harness's atomic, synced write.
 
         Args:
             path: The destination file.
@@ -177,14 +180,16 @@ class LocalFaultExecutor:
         )
 
     def stop_child(self) -> tuple[bool, int | None]:
-        """Terminate a real child process and return its terminal state.
+        """Starts a sleeping child process, terminates it and reports how.
+
+        The child is a Python interpreter that sleeps for 60 seconds. It is
+        given 0.05 seconds to exit on its own, then terminated and waited for
+        up to 2 seconds. A child that outlives that is killed and
+        `subprocess.TimeoutExpired` propagates.
 
         Returns:
-            A pair: whether the child had to be terminated, and its exit code.
-
-        Returns:
-            A pair: whether the child had to be terminated, and its exit
-                code.
+            A pair: whether the child had to be terminated, and its exit code
+            (negative signal number on POSIX after a termination).
         """
         child = subprocess.Popen(  # nosec B603 - constant local rehearsal command.
             [sys.executable, "-c", "import time; time.sleep(60)"],
@@ -208,11 +213,16 @@ class LocalFaultExecutor:
     def run_process_death(
         self,
     ) -> tuple[reliability_harness.FaultArtifact, ...]:
-        """Kill a child after a durable checkpoint and resume from it.
+        """Writes a checkpoint, terminates a child and reads it back.
+
+        The child is unrelated to the checkpoint. The checkpoint
+        ``process-death-checkpoint.json`` is written under the root before
+        the child is stopped and read back afterwards.
 
         Returns:
-            The three evidence artifacts of the scenario, in order: process
-                termination, checkpoint resume and artifact integrity.
+            The three evidence artifacts, in order: process termination,
+            checkpoint resume (the step read back) and artifact integrity
+            (the checkpoint's SHA-256).
         """
         scenario = reliability.FaultScenario.PROCESS_DEATH
         checkpoint = self.root / "process-death-checkpoint.json"
@@ -246,12 +256,16 @@ class LocalFaultExecutor:
     def run_stale_checkpoint(
         self,
     ) -> tuple[reliability_harness.FaultArtifact, ...]:
-        """Rejects a checkpoint bound to a different source identity.
+        """Checks that a checkpoint cannot be bound to a different source.
+
+        Binds a checkpoint of one source to another source identity and
+        records whether `ValueError` was raised; the checkpoint is also
+        written to ``stale-checkpoint.json`` under the root. The run-state
+        artifact is a fixed statement.
 
         Returns:
-            The three evidence artifacts of the scenario, in order:
-                checkpoint identity, stale-checkpoint rejection and run
-                state.
+            The three evidence artifacts, in order: checkpoint identity,
+            stale-checkpoint rejection and run state.
         """
         scenario = reliability.FaultScenario.STALE_CHECKPOINT
         checkpoint = incremental.EventCheckpoint("source-old", sequence=4)
@@ -287,15 +301,19 @@ class LocalFaultExecutor:
     def run_disk_full(
         self,
     ) -> tuple[reliability_harness.FaultArtifact, ...]:
-        """Exercise a deterministic capacity boundary without filling a disk.
+        """Simulates a full disk without filling one.
+
+        A 32-byte payload exceeds a fixed 8-byte budget, so `OSError` with
+        ENOSPC is raised before anything is written, and the method records
+        that no file exists at the destination.
 
         Returns:
-            The three evidence artifacts of the scenario, in order: disk
-                capacity exhaustion, artifact integrity and resource error.
+            The three evidence artifacts, in order: disk capacity
+            exhaustion, artifact integrity and resource error.
 
         Raises:
-            OSError: Raised deliberately to simulate a full disk (ENOSPC);
-                it is caught and recorded, so it does not reach the caller.
+            OSError: The simulated ENOSPC; it is caught inside and never
+                reaches the caller.
         """
         scenario = reliability.FaultScenario.DISK_FULL
         destination = self.root / "disk-full-public.json"
@@ -331,11 +349,16 @@ class LocalFaultExecutor:
     def run_corrupt_artifact(
         self,
     ) -> tuple[reliability_harness.FaultArtifact, ...]:
-        """Detect and quarantine an artifact whose bytes changed.
+        """Corrupts a written artifact, detects it by digest and quarantines it.
+
+        Writes ``artifact.bin`` under the root, records its SHA-256,
+        overwrites it with other bytes, compares the digests and, on a
+        mismatch, renames it to ``quarantine-artifact.bin``.
 
         Returns:
-            The three evidence artifacts of the scenario, in order:
-                corruption injection, digest mismatch and quarantine record.
+            The three evidence artifacts, in order: corruption injection,
+            digest mismatch (expected and actual digests) and quarantine
+            record.
         """
         scenario = reliability.FaultScenario.CORRUPT_ARTIFACT
         artifact_path = self.root / "artifact.bin"
@@ -373,11 +396,15 @@ class LocalFaultExecutor:
     def run_worker_loss(
         self,
     ) -> tuple[reliability_harness.FaultArtifact, ...]:
-        """Kill a worker and retry its idempotent output once.
+        """Terminates a child as a stand-in worker and writes one event output.
+
+        No retry or replay is performed: a single output file
+        ``worker-output.json`` with one event id is written under the root,
+        and the evidence reports that one event.
 
         Returns:
-            The three evidence artifacts of the scenario, in order: worker
-                termination, idempotent retry and event deduplication.
+            The three evidence artifacts, in order: worker termination,
+            idempotent retry and event deduplication.
         """
         scenario = reliability.FaultScenario.WORKER_LOSS
         terminated, returncode = self.stop_child()
@@ -408,11 +435,15 @@ class LocalFaultExecutor:
     def run_timeout(
         self,
     ) -> tuple[reliability_harness.FaultArtifact, ...]:
-        """Terminate a child that exceeds a bounded execution timeout.
+        """Terminates a child that outlives a short wait and records it.
+
+        The wait is the 0.05 seconds of `stop_child`; the cancellation is
+        written to ``timeout-terminal.json`` under the root. The resource
+        error artifact is a fixed statement that nothing was published.
 
         Returns:
-            The three evidence artifacts of the scenario, in order: timeout
-                injection, cancellation record and resource error.
+            The three evidence artifacts, in order: timeout injection,
+            cancellation record and resource error.
         """
         scenario = reliability.FaultScenario.TIMEOUT
         terminated, returncode = self.stop_child()
@@ -444,16 +475,19 @@ class LocalFaultExecutor:
     def run_memory_exhaustion(
         self,
     ) -> tuple[reliability_harness.FaultArtifact, ...]:
-        """Exercise a bounded allocator guard without risking host memory.
+        """Simulates memory exhaustion with a tiny allocation budget.
+
+        A bytearray grows by 256 bytes at a time until it passes 1024 bytes,
+        at which point `MemoryError` is raised by the method itself.
 
         Returns:
-            The three evidence artifacts of the scenario, in order: memory
-                pressure, publication absence and resource error.
+            The three evidence artifacts, in order: memory pressure (whether
+            it was rejected and the bytes held), publication absence and
+            resource error.
 
         Raises:
-            MemoryError: Raised deliberately when the controlled allocation
-                passes its budget; it is caught and recorded, so it does not
-                reach the caller.
+            MemoryError: The simulated exhaustion; it is caught inside and
+                never reaches the caller.
         """
         scenario = reliability.FaultScenario.MEMORY_EXHAUSTION
         allocation = bytearray()
@@ -490,11 +524,16 @@ class LocalFaultExecutor:
     def run_partial_write(
         self,
     ) -> tuple[reliability_harness.FaultArtifact, ...]:
-        """Interrupt a temporary write before atomic replacement.
+        """Writes a temporary file and never replaces the public path.
+
+        A temporary file in the root receives and syncs a few bytes; the
+        public destination is checked to be absent, and the temporary file is
+        then deleted. Nothing is interrupted and no replacement is attempted.
 
         Returns:
-            The three evidence artifacts of the scenario, in order: write
-                interruption, atomicity check and artifact integrity.
+            The three evidence artifacts, in order: write interruption
+            (whether the temporary file existed), atomicity check (whether
+            the public path existed) and artifact integrity.
         """
         scenario = reliability.FaultScenario.PARTIAL_WRITE
         public_path = self.root / "partial-public.json"
@@ -532,11 +571,14 @@ class LocalFaultExecutor:
     def run_dependency_mismatch(
         self,
     ) -> tuple[reliability_harness.FaultArtifact, ...]:
-        """Rejects a package whose declared dependency identity changed.
+        """Compares two fixed dependency identities and records the mismatch.
+
+        The identities are the constants ``numpy==2.3.0`` and
+        ``numpy==2.4.0``; no installed package is inspected.
 
         Returns:
-            The three evidence artifacts of the scenario, in order:
-                environment identity, dependency rejection and run state.
+            The three evidence artifacts, in order: environment identity,
+            dependency rejection and run state.
         """
         scenario = reliability.FaultScenario.DEPENDENCY_MISMATCH
         required = "numpy==2.3.0"
@@ -566,12 +608,15 @@ class LocalFaultExecutor:
     def run_invalid_signature(
         self,
     ) -> tuple[reliability_harness.FaultArtifact, ...]:
-        """Reject and quarantine an attestation with a changed signature.
+        """Tampers with an attestation signature and records the failed check.
+
+        Builds a signed release attestation, replaces its signature with
+        zeros, verifies it with the same key, and writes a quarantine record
+        ``quarantine-signature.json`` under the root.
 
         Returns:
-            The three evidence artifacts of the scenario, in order:
-                signature tampering, verification failure and quarantine
-                record.
+            The three evidence artifacts, in order: signature tampering,
+            verification failure and quarantine record.
         """
         scenario = reliability.FaultScenario.INVALID_SIGNATURE
         provenance = {
@@ -612,16 +657,19 @@ class LocalFaultExecutor:
     def run_retry_exhaustion(
         self,
     ) -> tuple[reliability_harness.FaultArtifact, ...]:
-        """Stops after a bounded retry budget and record terminal failure.
+        """Simulates three failing attempts and records the terminal state.
+
+        Each of three attempts raises `OSError` by itself and is counted;
+        the terminal state is then written to ``retry-terminal.json`` under
+        the root.
 
         Returns:
-            The three evidence artifacts of the scenario, in order: retry
-                history, terminal event and partial-publication check.
+            The three evidence artifacts, in order: retry history (the
+            attempt count), terminal event and partial-publication check.
 
         Raises:
-            OSError: Raised deliberately on every attempt to simulate a
-                failing connector; each is caught and counted, so it does
-                not reach the caller.
+            OSError: The simulated connector failure of each attempt; it is
+                caught inside and never reaches the caller.
         """
         scenario = reliability.FaultScenario.RETRY_EXHAUSTION
         attempts = 0
@@ -659,11 +707,16 @@ class LocalFaultExecutor:
     def run_duplicate_event(
         self,
     ) -> tuple[reliability_harness.FaultArtifact, ...]:
-        """Prove duplicate event IDs are ignored by a durable ledger.
+        """Commits one event twice to an ingestion ledger and records both.
+
+        Uses an incremental ingestion ledger stored in
+        ``duplicate-events.json`` under the root. The evidence reports the
+        accepted and duplicate identities of the two commits, the events the
+        writer received, and the identities the ledger holds afterwards.
 
         Returns:
-            The three evidence artifacts of the scenario, in order:
-                duplicate event, idempotency key and state transition.
+            The three evidence artifacts, in order: duplicate event,
+            idempotency key and state transition.
         """
         scenario = reliability.FaultScenario.DUPLICATE_EVENT
         path = self.root / "duplicate-events.json"
@@ -707,11 +760,15 @@ class LocalFaultExecutor:
     def run_incomplete_lineage(
         self,
     ) -> tuple[reliability_harness.FaultArtifact, ...]:
-        """Block a graph edge whose required lifecycle node is absent.
+        """Adds a lineage edge to a missing node and records the rejection.
+
+        The graph holds one raw-source node; an edge to an absent node is
+        added and `ValueError` is expected. The release-block and audit
+        artifacts are fixed statements.
 
         Returns:
-            The three evidence artifacts of the scenario, in order: lineage
-                gap, release block and audit record.
+            The three evidence artifacts, in order: lineage gap, release
+            block and audit record.
         """
         scenario = reliability.FaultScenario.INCOMPLETE_LINEAGE
         graph = lineage.EvidenceGraph(
@@ -750,11 +807,15 @@ class LocalFaultExecutor:
     def run_rejected_approval(
         self,
     ) -> tuple[reliability_harness.FaultArtifact, ...]:
-        """Block a rejected promotion approval before alias movement.
+        """Validates a signed rejected approval and records the refusal.
+
+        Builds and signs a reviewer approval whose decision is rejected and
+        checks it against its own target; `ValueError` is expected. No
+        registry or alias is involved.
 
         Returns:
-            The three evidence artifacts of the scenario, in order: approval
-                rejection, release block and audit record.
+            The three evidence artifacts, in order: approval rejection,
+            release block and audit record.
         """
         scenario = reliability.FaultScenario.REJECTED_APPROVAL
         approval = model_registry.PromotionApproval(
@@ -798,11 +859,15 @@ class LocalFaultExecutor:
     def run_changed_snapshot(
         self,
     ) -> tuple[reliability_harness.FaultArtifact, ...]:
-        """Rejects a snapshot whose data identity changed under one ID.
+        """Registers a snapshot, then one with the same id and other data.
+
+        The second registration in an in-memory source registry is expected
+        to raise `ValueError`; the outcome is recorded. The lineage artifact
+        is a fixed statement.
 
         Returns:
-            The three evidence artifacts of the scenario, in order: snapshot
-                digest change, run invalidation and lineage record.
+            The three evidence artifacts, in order: snapshot digest change,
+            run invalidation and lineage record.
         """
         scenario = reliability.FaultScenario.CHANGED_SNAPSHOT
         previous = source_registry.SourceSnapshot(

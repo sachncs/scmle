@@ -175,17 +175,19 @@ def key_fingerprint(key: str | bytes) -> str:
 
 
 def parse_date(value: str, name: str) -> datetime.date:
-    """A ``YYYY-MM-DD`` date.
+    """Parses an ISO 8601 calendar date, normally ``YYYY-MM-DD``.
 
     Args:
-        value: The text to parse.
+        value: The text to parse; whatever `datetime.date.fromisoformat`
+            accepts, which is wider than ``YYYY-MM-DD``.
         name: The field name, for the error message.
 
     Returns:
         The date.
 
     Raises:
-        DeploymentLedgerError: If `value` is not such a date.
+        DeploymentLedgerError: If `value` is not a string that
+            `datetime.date.fromisoformat` accepts.
     """
     try:
         return datetime.date.fromisoformat(value)
@@ -296,10 +298,13 @@ class Attestation:
 
         Args:
             key: Signing key; its fingerprint becomes `key_id`.
-            **fields: The other fields (`decision` may be a string).
+            **fields: The other fields, all of them required except
+                `signature`; `decision` may be given as its text value.
 
         Returns:
-            The signed reply.
+            The signed reply. A `decision` that is not a `ReplyDecision`
+            value fails with `ValueError`, a missing one with `KeyError`; the
+            fields are otherwise validated as in construction.
         """
         fields["decision"] = ReplyDecision(fields["decision"])
         unsigned = cls(key_id=key_fingerprint(key), **fields)
@@ -317,7 +322,9 @@ class Attestation:
             The reply.
 
         Raises:
-            DeploymentLedgerError: If the fields differ from the reply's fields.
+            DeploymentLedgerError: If the fields differ from the reply's fields
+                or fail the checks of construction. A `decision` that is not
+                a `ReplyDecision` value fails with `ValueError`.
         """
         names = {f.name for f in dataclasses.fields(cls)}
         if set(record) != names:
@@ -444,7 +451,8 @@ class Envelope:
 
         Args:
             key: Signing key; its fingerprint becomes `key_id`.
-            **fields: The other envelope fields.
+            **fields: The other envelope fields, all of them required except
+                `signature`; they are validated as in construction.
 
         Returns:
             The signed envelope.
@@ -465,7 +473,7 @@ class Envelope:
 
         Raises:
             DeploymentLedgerError: If the fields differ from the envelope's
-                fields.
+                fields or fail the checks of construction.
         """
         names = {f.name for f in dataclasses.fields(cls)}
         if set(record) != names:
@@ -574,8 +582,10 @@ class DeploymentLedger:
             The ledger with every row applied.
 
         Raises:
-            DeploymentLedgerError: On a missing file, a broken chain, an
-                invalid row or a replay mismatch.
+            DeploymentLedgerError: On a missing file, a line that is not
+                JSON, a broken chain, an invalid row, a replay mismatch, a
+                file without rows, or a head that differs from
+                `expected_head`.
         """
         source = Path(path)
         if not source.exists():
@@ -610,12 +620,17 @@ class DeploymentLedger:
     def commit(self, kind: str, body: Mapping[str, Any]) -> dict[str, Any]:
         """Chains a row, ingests it and persists it.
 
+        A row that `ingest` refuses is neither kept nor written. A file
+        ledger gets the row appended as one JSON line, creating the parent
+        directory if needed; an in-memory ledger only keeps it.
+
         Args:
             kind: The row kind.
             body: The row content.
 
         Returns:
-            The row, with its sequence number, previous hash and own hash.
+            The row: its sequence number (the count of earlier rows), kind,
+            body, previous hash and own hash.
         """
         content = {
             "seq": len(self.rows),
@@ -638,10 +653,14 @@ class DeploymentLedger:
             row: A row with `seq`, `kind`, `body`, `prev` and `hash`.
 
         Raises:
-            DeploymentLedgerError: On a broken link, wrong order, an invalid
-                body or a replay mismatch.
-            TypeError: Raised for a body that is not an object; it is caught
-                and re-raised as `DeploymentLedgerError`.
+            DeploymentLedgerError: If the row has the wrong fields, a wrong
+                sequence number, previous hash or hash, an unknown kind, an
+                `open` kind that is not first (or a second one), or a body
+                that is malformed or fails the kind's rules, including a
+                replay mismatch.
+            TypeError: Raised internally for a body that is not an object; it
+                is turned into `DeploymentLedgerError` and never reaches the
+                caller.
         """
         if set(row) != {"seq", "kind", "body", "prev", "hash"}:
             raise DeploymentLedgerError(
@@ -737,8 +756,10 @@ class DeploymentLedger:
         Raises:
             DeploymentLedgerError: If the challenger is registered twice, the
                 phase is neither registered nor decided, a decision names an
-                unregistered challenger or an invalid e-value, or the replay of
-                the e-LOND step differs from what was recorded.
+                unregistered challenger, one already decided or one that is
+                not next in registration order, or the e-value is invalid, or
+                the replay of the e-LOND step differs from what was
+                recorded.
         """
         name = str(body["name"])
         sequence = self.require_promotion()
@@ -775,9 +796,10 @@ class DeploymentLedger:
 
         Raises:
             DeploymentLedgerError: If an opening row's question does not match
-                its hash, its id is not its row number or it lacks evidence or a
-                proposed default, the phase is neither open nor timeout, or a
-                timeout names an escalation that is not pending.
+                its hash, its id is not ``esc-`` followed by its row number
+                or it lacks evidence or a proposed default, the phase is
+                neither open nor timeout, or a timeout names an escalation
+                that is not pending.
         """
         number = len(self.rows)
         if body["phase"] == PHASE_OPEN:
@@ -807,9 +829,10 @@ class DeploymentLedger:
             body: The attestation row content.
 
         Raises:
-            DeploymentLedgerError: If the reply answers no escalation, the
-                escalation is already closed, the reply is bound to a different
-                question, or it is signed with a key the system holds.
+            DeploymentLedgerError: If the row is not a valid reply, it answers
+                no escalation, the escalation is already closed, the reply is
+                bound to a different question, or it is signed with a key
+                the system holds. The signature and expiry are not checked.
         """
         reply = Attestation.from_dict(body)
         escalation = self.escalations.get(reply.escalation_id)
@@ -854,8 +877,9 @@ class DeploymentLedger:
             body: The envelope row content.
 
         Raises:
-            DeploymentLedgerError: If the envelope was already granted or is
-                signed with a key the system holds.
+            DeploymentLedgerError: If the row is not a valid envelope, the
+                envelope was already granted, or it is signed with a key the
+                system holds. The signature and expiry are not checked.
         """
         grant = Envelope.from_dict(body)
         if grant.envelope_id in self.envelopes:
@@ -871,6 +895,8 @@ class DeploymentLedger:
 
     def apply_envelope_used(self, body: Mapping[str, Any]) -> None:
         """Counts one use, refusing what the envelope does not allow.
+
+        The envelope's expiry is not checked here.
 
         Args:
             body: The envelope-use row content.
@@ -921,6 +947,8 @@ class DeploymentLedger:
     def apply_controller(self, body: Mapping[str, Any]) -> None:
         """Keeps the controller's journal: each input digest is applied once.
 
+        A `tick` row is accepted without any check and changes nothing.
+
         Args:
             body: The controller row content.
 
@@ -959,7 +987,7 @@ class DeploymentLedger:
             self.rejected[digest] = dict(body)
 
     def apply_experiment(self, body: Mapping[str, Any]) -> None:
-        """Starts an experiment once, at a positive level.
+        """Starts an experiment once, at a level strictly between 0 and 1.
 
         Args:
             body: The experiment row content.
@@ -1002,7 +1030,9 @@ class DeploymentLedger:
             )
 
     def apply_rollout_decision(self, body: Mapping[str, Any]) -> None:
-        """A decision names a started experiment or a monitored champion.
+        """Requires the experiment a rollout decision names to have started.
+
+        Nothing is recorded; a rollback decision also names its experiment.
 
         Args:
             body: The decision row content.
@@ -1024,8 +1054,8 @@ class DeploymentLedger:
 
         Raises:
             DeploymentLedgerError: If a release occurs without a halt or
-                without a passing recalibration, or the phase is neither enter
-                nor release.
+                without a recalibration entry in the row (its content is
+                not examined), or the phase is neither enter nor release.
         """
         if body["phase"] == ENTER:
             self.halted = True
@@ -1041,11 +1071,11 @@ class DeploymentLedger:
             raise DeploymentLedgerError("phase must be enter or release")
 
     def pending(self) -> list[dict[str, Any]]:
-        """Escalations with no reply and no timeout, oldest first.
+        """Lists the escalations with no reply and no timeout, oldest first.
 
         Returns:
-            The open escalation rows that have no reply and no timeout, oldest
-            first.
+            The bodies of the escalation rows that opened them (not the whole
+            chained rows) and have no reply and no timeout, oldest first.
         """
         return [
             row
@@ -1056,8 +1086,11 @@ class DeploymentLedger:
     def verify(self) -> None:
         """Re-reads the file (or the rows) and checks it against memory.
 
+        An in-memory ledger replays its rows into a fresh ledger instead.
+
         Raises:
-            DeploymentLedgerError: If the file differs from this ledger.
+            DeploymentLedgerError: If the file cannot be loaded or differs
+                from this ledger, or the rows fail to replay.
         """
         if self.path is None:
             again = DeploymentLedger(None)

@@ -25,15 +25,20 @@ def split_fresh(
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Splits fresh rows into training and holdout rows.
 
-    Temporal data are split out of time (the newest `HOLDOUT_FRACTION` of the
-    rows, by the schema's time column, are the holdout), grouped data by whole
-    groups (a group is never on both sides), and other data by a seeded
-    shuffle. A random shuffle of temporal or grouped rows would leak the
+    Data with a time column (named by the schema and present in `fresh`) are
+    split out of time: the rows are ordered by that column and the newest
+    ones after the first ``int(n * (1 - HOLDOUT_FRACTION))`` are the holdout.
+    Otherwise data with a group column are split by whole groups (about
+    `HOLDOUT_FRACTION` of the groups, chosen by a seeded shuffle, form the
+    holdout), unless that would leave one side empty, as with a single
+    group. All other data, and that case, are split by a seeded shuffle of
+    the rows. A random shuffle of temporal or grouped rows would leak the
     holdout into training and overstate the challenger.
 
     Args:
         fresh: The labelled fresh rows.
-        schema: The champion's schema (`time_column`, `group_column`).
+        schema: The champion's schema; only its `time_column` and
+            `group_column` attributes are read, and either may be absent.
 
     Returns:
         The training and holdout frames.
@@ -67,9 +72,9 @@ class RetrainPolicy:
 
     Attributes:
         min_rows: Labeled rows needed to train a challenger and compare it.
-        cooldown_rows: After an attempt, fresh rows that must arrive before
-            the next one (a rejected challenger is not retried on every
-            check).
+        cooldown_rows: After an attempt, fresh rows that must have arrived
+            since (counting those offered now) before the next one (a
+            rejected challenger is not retried on every check).
     """
 
     min_rows: int = 200
@@ -101,7 +106,9 @@ class RollbackOutcome:
 
     Attributes:
         rolled_back: Whether the previous version is champion again.
-        comparison: New champion (as challenger) against the previous one.
+        comparison: New champion (as challenger) against the previous one;
+            None when no comparison was made (no previous version or too few
+            rows).
         restored_version: The version now serving, if rolled back.
         reason: Human-readable explanation.
     """
@@ -116,7 +123,7 @@ def fingerprint(frame: pd.DataFrame) -> str:
     """Short digest of the rows, to recognise data already acted on.
 
     Args:
-        frame: The rows to digest; the index is ignored.
+        frame: The rows to digest; the index is ignored, row order is not.
 
     Returns:
         The first 16 hex characters of a SHA-256 over the row hashes.
@@ -133,7 +140,9 @@ class LifecycleOutcome:
         monitoring: Monitoring report for the current champion.
         retrained: Whether a challenger was trained.
         comparison: Champion-challenger comparison, if a challenger exists.
-        promoted_version: New champion version, if promotion happened.
+        promoted_version: Always None as `LifecycleManager.review` returns
+            it, since `review` only stages a challenger; promotion is a
+            separate call.
         notes: Human-readable explanation.
         skipped: Why a recommended retrain did not run (`already_handled`,
             `cooldown` or `too_few_rows`), if it did not.
@@ -190,11 +199,12 @@ class LifecycleManager:
         return self.registry.root / f"{self.model}{STATE_SUFFIX}"
 
     def read_state(self) -> dict[str, Any]:
-        """The last attempt's data digest and the rows seen since.
+        """Reads the last attempt's data digest and the rows seen since.
 
         Returns:
             A dict with `last_digest`, the digest of the data of the last
-            retraining attempt (None if none), and `rows_since_attempt`.
+            retraining attempt (None if none), and `rows_since_attempt`;
+            the saved content as it is when the state file exists.
         """
         with durability.path_lock(self.state_path):
             if not self.state_path.exists():
@@ -222,8 +232,10 @@ class LifecycleManager:
 
         Returns:
             `already_handled` if these rows were already acted on,
-            `too_few_rows` if they are fewer than the minimum, `cooldown` if
-            too few rows arrived since the last attempt, else None.
+            `too_few_rows` if they are fewer than the policy's `min_rows`,
+            `cooldown` if there was an attempt and the rows since it plus
+            these are fewer than `cooldown_rows`, else None; the checks run
+            in that order.
         """
         if fingerprint(fresh) == state["last_digest"]:
             return "already_handled"
@@ -244,9 +256,14 @@ class LifecycleManager:
     ) -> registry_module.VersionRecord:
         """Registers a finished run and optionally makes it the champion.
 
+        The run's bundle is first exported to ``export`` in its run
+        directory. With `promote` the registry refuses (with an
+        `ArtifactError`) a missing or invalid approval.
+
         Args:
             result: A completed run.
-            promote: Point the champion alias at it. Defaults to staging only.
+            promote: Whether to also point the champion alias at it. By
+                default the version is only registered and no alias moves.
             approval: Independent approval for champion promotion.
             signing_key: HMAC key for the approval signature.
 
@@ -281,7 +298,8 @@ class LifecycleManager:
         With a guarded registry (`ModelRegistryStore.attach_guard`, e.g. via
         `Loop.guard_registry`) it also needs a human attestation for the exact
         model and version, else `AttestationRequired` is raised and nothing
-        moves.
+        moves. An `ArtifactError` is raised if there is no staged challenger
+        or the approval is invalid.
 
         Args:
             approval: The independent approval of the challenger bundle.
@@ -317,13 +335,20 @@ class LifecycleManager:
 
         If monitoring recommends retraining, a challenger is trained on part
         of the fresh data and compared with the champion on the held-out
-        remainder. A clearly better challenger is staged, but champion
-        promotion requires a separate call to `promote_challenger`.
+        remainder. A challenger whose bootstrap comparison says `promote` is
+        staged (the `challenger` alias), but champion promotion requires a
+        separate call to `promote_challenger`. A recommended retrain is
+        skipped, and noted in the outcome, when the rows were already acted
+        on, are too few or arrive within the cooldown. When a charter
+        rollout is bound (`defer_to_rollout`) the challenger is staged
+        whatever the comparison says. The attempt is recorded in the state
+        file and the audit trail.
 
         Args:
             fresh: Recent served rows including the true target column.
             target: Name of the target column.
-            retrain: Allow training and promotion.
+            retrain: Whether a recommended retrain may run; when False the
+                champion is only monitored.
             project_options: Extra `MLProject` options for the challenger.
 
         Returns:
@@ -339,7 +364,7 @@ class LifecycleManager:
         retrain: bool,
         project_options: dict[str, Any] | None,
     ) -> LifecycleOutcome:
-        """Runs `review` while holding the manager's state lock.
+        """Does the work of `review`; the caller holds the state lock.
 
         Args:
             fresh: Fresh labelled rows, including the target.
@@ -457,14 +482,16 @@ class LifecycleManager:
         alias or asks for approval.
 
         Both versions score the same fresh labeled rows. The previous version
-        returns only when the new champion's advantage over it is negative
-        with its whole interval below the policy's tolerance; anything less
-        clear leaves the new champion in place. Either way the evidence goes
-        to the audit trail.
+        returns only when the whole 95% interval of the new champion's
+        advantage over it lies below minus the policy's tolerance; anything
+        less clear leaves the new champion in place. Once there is a previous
+        version and enough rows, the evidence goes to the audit trail either
+        way.
 
         With a guarded registry the rollback also needs a human attestation
         naming this rollback; without one `AttestationRequired` is raised
-        after the evidence is audited and the champion stays.
+        after the evidence is audited and the champion stays. An invalid
+        approval raises `ArtifactError` the same way.
 
         Args:
             fresh: Recent served rows including the true target.
@@ -616,7 +643,7 @@ class LifecycleManager:
         acted on.
 
         Args:
-            state: The saved state, updated and written.
+            state: The saved state, updated in place and written.
             fresh: The fresh rows seen.
         """
         if (

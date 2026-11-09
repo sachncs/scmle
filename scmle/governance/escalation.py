@@ -64,8 +64,9 @@ def set_size_score(set_sizes: Any, novel: Any = None) -> np.ndarray:
     """Scores ``g`` from conformal set sizes and a novelty flag.
 
     Args:
-        set_sizes: Size of each case's prediction set; 0, NaN or infinity
-            (an unbounded regression margin) mean "no usable set".
+        set_sizes: Size of each case's prediction set; a value below 1 (such
+            as 0), NaN or infinity (an unbounded regression margin) means
+            "no usable set".
         novel: Optional boolean per case, True for out-of-support cases.
 
     Returns:
@@ -110,9 +111,11 @@ class Step:
     Attributes:
         tau: Threshold.
         cases: Answered cases at `tau` (effective size when weighted).
-        errors: Error count used by the test.
-        p_value: Exact binomial p-value of ``H: R(tau) > r*``.
-        rejected: Whether `p_value <= delta`.
+        errors: Error count used by the test (rounded up when weighted); 0
+            for a threshold skipped as too small to test.
+        p_value: Exact binomial p-value of ``H: R(tau) > r*``; 1.0 for a
+            skipped threshold.
+        rejected: Whether `p_value <= delta`; False for a skipped threshold.
     """
 
     tau: float
@@ -128,12 +131,15 @@ class ThresholdResult:
 
     Attributes:
         tau: Selected threshold; ``+inf`` when none was rejected.
-        coverage: Share of calibration cases answered at `tau`.
-        risk: Observed selective risk at `tau` (NaN when nothing is answered).
+        coverage: Unweighted share of calibration cases answered at `tau`; 0
+            when none was rejected.
+        risk: Observed unweighted mean loss of the cases answered at `tau`
+            (NaN when none was rejected, since nothing is answered).
         r_star: Target risk.
         delta: Level of the guarantee.
         weighted: Whether Kish effective sizes were used (approximate).
-        steps: The tested sequence.
+        steps: The sequence in the order visited, including thresholds
+            skipped for a too small sample and the first one not rejected.
     """
 
     tau: float
@@ -150,10 +156,11 @@ class ThresholdResult:
         return math.isinf(self.tau)
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record (``+inf`` is written as ``null``).
+        """JSON-ready record (``+inf`` and NaN are written as ``null``).
 
         Returns:
-            The result's fields, with an infinite threshold written as None.
+            The result's fields, with an infinite threshold and a NaN risk
+            written as None and each step as a dict.
         """
         return {
             "tau": None if self.everything_escalates else self.tau,
@@ -214,28 +221,34 @@ def select_threshold(
 
     Args:
         score: Score ``g`` of each matured calibration case, in ``[0, 1]``.
-        loss: Loss of each case; the test is exact for losses in {0, 1}.
+        loss: Loss of each case; the test is exact for losses in {0, 1}
+            (an error count is the total loss rounded up).
         r_star: Target selective risk, in ``(0, 1)``.
         delta: Level, in ``(0, 1)``: the chance that the selected threshold
             has true risk above `r_star` is at most `delta`.
-        weights: Optional Horvitz-Thompson weights ``1 / pi``.
+        weights: Optional positive weights (Horvitz-Thompson weights
+            ``1 / pi``); their effect is described in the module docstring.
         grid: Thresholds in the order from most to least conservative,
             fixed before looking at the data (default: 101 points from 1 to
             0). It must not depend on the calibration losses.
         minimum: Smallest answered sample worth testing. Thresholds whose
             answered (effective) size is below the larger of `minimum` and
             the size at which a zero-error sample could reject
-            (``ceil(log(delta) / log(1 - r*))``) are skipped: they can never
-            be rejected, and skipping them depends on the scores and weights
+            (``ceil(log(delta) / log(1 - r*))``) are skipped without a test
+            and recorded as not rejected; the sequence goes on to the next
+            threshold. Below the zero-error size a threshold could not be
+            rejected anyway, and skipping depends on the scores and weights
             only, not on the losses.
 
     Returns:
-        The result. ``tau = +inf`` when even the most conservative threshold
-        is not rejected (for example too few calibration cases for `r_star`
-        at `delta`).
+        The result. ``tau = +inf`` when every threshold is skipped (for
+        example too few calibration cases for `r_star` at `delta`) or the
+        first threshold actually tested is not rejected.
 
     Raises:
-        ValueError: On invalid inputs or a grid that is not decreasing.
+        ValueError: If `r_star` or `delta` is not strictly between 0 and 1,
+            the calibration inputs are invalid (see `validate_calibration`),
+            or the grid is empty or not strictly decreasing.
     """
     if not 0.0 < r_star < 1.0 or not 0.0 < delta < 1.0:
         raise ValueError("r_star and delta must be strictly between 0 and 1")
@@ -300,10 +313,13 @@ class RiskCoverage:
     """The empirical risk-coverage curve and its area.
 
     Attributes:
-        tau: Thresholds, from the highest score down.
-        coverage: Share answered at each threshold.
-        risk: Selective risk at each threshold.
-        aurc: Area under the risk-coverage curve (lower is better).
+        tau: Thresholds, from 1 down to 0.
+        coverage: Weighted share answered at each threshold.
+        risk: Weighted selective risk at each threshold; NaN where nothing
+            is answered.
+        aurc: Trapezoidal area under risk against coverage over the
+            thresholds with a defined risk (lower is better); NaN with fewer
+            than two such thresholds.
     """
 
     tau: np.ndarray
@@ -312,11 +328,11 @@ class RiskCoverage:
     aurc: float
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record.
+        """Converts the curve to plain lists and a float.
 
         Returns:
             The grid, coverage and risk as lists and the area under the
-            risk-coverage curve.
+            risk-coverage curve. NaN values are kept as NaN, not as None.
         """
         return {
             "tau": self.tau.tolist(),
@@ -330,6 +346,9 @@ def risk_coverage(
     score: Any, loss: Any, weights: Any = None, points: int = DEFAULT_GRID
 ) -> RiskCoverage:
     """Risk-coverage curve on a fixed grid, optionally weighted.
+
+    Inputs are validated as in `validate_calibration`, which raises
+    `ValueError` for invalid ones.
 
     Args:
         score: The score of each case, in [0, 1].
@@ -439,7 +458,8 @@ class Routing:
 
     Attributes:
         status: Per case, `answered`, `escalated` or `safe_default`.
-        backlog: Number of cases that beat capacity and got the safe default.
+        backlog: Number of cases that exceeded the human capacity and got the
+            safe default.
     """
 
     status: np.ndarray
@@ -469,14 +489,16 @@ def route(
         score: Score ``g`` of each case.
         tau: Threshold; cases below it are escalated.
         c_max: Largest share of the batch the humans can take.
-        halted: When True every case is escalated (coverage 0).
+        halted: When True no case is answered (coverage 0); every case
+            counts as an escalation and is subject to the capacity limit.
         blocked: Optional boolean per case that must not be answered by the
             model (for example out-of-support cases with a high-impact
             action); they are escalated like low-score cases.
 
     Returns:
-        The routing. Escalations beyond ``floor(c_max * n)`` go to the safe
-        default, lowest scores first to the humans; `tau` is never changed.
+        The routing. Of the escalations, the ``floor(c_max * n)`` with the
+        lowest scores (ties by position) go to the humans and the rest get
+        the safe default; `tau` is never changed.
 
     Raises:
         ValueError: If `c_max` is outside [0, 1].

@@ -42,7 +42,10 @@ def observed_access(
         trials: The trials, each with the row digests it recorded per fold.
 
     Returns:
-        Counts of checked folds and the verdicts.
+        A dict with `folds_checked`, the number of recorded folds seen,
+        `folds_mismatched`, how many of them differ from the manifest's
+        digests (or have no manifest fold), and `test_rows_seen`, True when
+        the development and test partitions overlap or any fold mismatches.
     """
     manifest = split.manifest
     expected = [
@@ -81,12 +84,16 @@ def build_ledger(
 
     Args:
         split: The split result (manifest and locked test).
-        trials: All executed trials.
+        trials: All executed trials; only those with status OK are counted
+            as candidates and checked.
         test_opens: How many times the locked test set was opened.
         threshold_used: Whether a decision threshold was optimized.
 
     Returns:
-        A JSON-serializable ledger with a `verified` section.
+        A JSON-serializable dict with `partitions`, `operations` (cross
+        validation, final refit, threshold optimization and final
+        evaluation), `observed` (the result of `observed_access`) and a
+        `verified` section of booleans.
     """
     manifest = split.manifest
     development = set(manifest.train_ids)

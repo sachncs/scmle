@@ -54,7 +54,7 @@ class EnvelopeRefused(errors.ArtifactError):
     """No envelope allows the requested action."""
 
     def __init__(self, action: str, reason: str) -> None:
-        """Records the action and why every envelope was refused.
+        """Builds the error from the refused action and the reason.
 
         Args:
             action: The refused action.
@@ -124,7 +124,9 @@ class EnvelopeGuard:
             The ledger row that was written.
 
         Raises:
-            EnvelopeRefused: If the signature does not verify.
+            EnvelopeRefused: If verification keys were supplied and the
+                envelope's key id is not among them or its signature does not
+                verify.
         """
         if not self.signature_ok(envelope):
             raise EnvelopeRefused(
@@ -136,6 +138,9 @@ class EnvelopeGuard:
 
     def revoke(self, envelope_id: str, reason: str) -> dict[str, Any]:
         """Removes an envelope's authority.
+
+        The ledger refuses an unknown or already revoked envelope (with a
+        `DeploymentLedgerError`); no signature is required.
 
         Args:
             envelope_id: Identifier of the envelope.
@@ -223,7 +228,8 @@ class EnvelopeGuard:
             The id of the envelope that was used.
 
         Raises:
-            EnvelopeRefused: If no envelope allows it; nothing is written.
+            EnvelopeRefused: If the action is on the never list or no
+                envelope allows it; nothing is written.
         """
         if action.value in {item.value for item in never_list.NeverAction}:
             raise EnvelopeRefused(action.value, "it is on the never list")
