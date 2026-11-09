@@ -123,7 +123,7 @@ class RunStore:
                 handle.write(text)
                 handle.flush()
                 os.fsync(handle.fileno())
-            os.replace(temporary, target)
+            temporary.replace(target)
             durability.sync_directory(target.parent)
         except BaseException:
             temporary.unlink(missing_ok=True)

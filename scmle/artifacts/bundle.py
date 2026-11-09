@@ -74,6 +74,7 @@ SIGNING_KEY_ENV = "SCMLE_SIGNING_KEY"
 SIGNATURE_ALGORITHM = "hmac-sha256"
 MANIFEST_FILE = "model_manifest.json"
 BINARY_CLASSES = 2
+DIRICHLET_MIN_CLASSES = 3
 MAX_KNOWN_CATEGORIES = 200
 
 
@@ -303,7 +304,7 @@ class Manifest:
     strategy: str = "default"
     decision_threshold: float | None = None
     libraries: dict[str, str] = dataclasses.field(
-        default_factory=lambda: installed_versions()
+        default_factory=installed_versions
     )
     calibration: str = ""
     environment: dict[str, str] = dataclasses.field(default_factory=dict)
@@ -361,6 +362,233 @@ class Manifest:
             if now is not None and minor_version(built) != minor_version(now):
                 problems.append(f"{library} {built} (installed {now})")
         return problems
+
+
+def read_manifest_and_schema(
+    root: pathlib.Path,
+) -> tuple[dict[str, Any], artifacts.BundleSchema]:
+    """Reads the manifest and the schema of a bundle directory.
+
+    Args:
+        root: The bundle directory.
+
+    Returns:
+        The manifest as a dict and the parsed schema.
+
+    Raises:
+        ArtifactError: If a file is missing or the metadata is invalid.
+    """
+    try:
+        manifest = json.loads(
+            (root / MANIFEST_FILE).read_text(encoding="utf-8")
+        )
+        schema = artifacts.BundleSchema.from_dict(
+            json.loads((root / SCHEMA_FILE).read_text(encoding="utf-8"))
+        )
+    except FileNotFoundError as error:
+        raise errors.ArtifactError(
+            f"not a model bundle (missing {error.filename})"
+        ) from error
+    except (
+        OSError,
+        UnicodeError,
+        json.JSONDecodeError,
+        KeyError,
+        TypeError,
+        ValueError,
+    ) as error:
+        raise errors.ArtifactError("invalid model bundle metadata") from error
+    return manifest, schema
+
+
+def check_bundle_format(
+    manifest: dict[str, Any], *, legacy_allowed: bool
+) -> None:
+    """Checks that this build can read the manifest's bundle format.
+
+    Args:
+        manifest: The manifest as a dict.
+        legacy_allowed: Whether a format 1 bundle may be read.
+
+    Raises:
+        ArtifactError: If the format is not the current one and not an allowed
+            legacy one.
+    """
+    if manifest.get("format") != BUNDLE_FORMAT and not (
+        manifest.get("format") == 1 and legacy_allowed
+    ):
+        raise errors.ArtifactError(
+            f"unsupported bundle format {manifest.get('format')}: this "
+            f"build reads format {BUNDLE_FORMAT}. A bundle stores the "
+            "module path and class name of the objects inside it, and "
+            "those names changed, so a bundle written by an earlier "
+            "build cannot be loaded; retrain and save it again"
+        )
+
+
+def verify_core_files(
+    root: pathlib.Path,
+    info: Manifest,
+    legacy: bool,
+    trusted: bool,
+    signing_key: str | bytes | None,
+) -> None:
+    """Authenticates a bundle and checks its model and schema checksums.
+
+    Nothing is unpickled here.
+
+    Args:
+        root: The bundle directory.
+        info: The bundle's manifest.
+        legacy: Whether the bundle is format 1, which has no schema checksum.
+        trusted: Whether the caller vouches for an unsigned bundle.
+        signing_key: HMAC key; defaults to `$SCMLE_SIGNING_KEY`.
+
+    Raises:
+        ArtifactError: If the bundle is unauthenticated, lacks its model file,
+            or a checksum differs.
+    """
+    authentic = verify_signature(root, signing_key)
+    if not authentic and not trusted:
+        raise errors.ArtifactError(
+            "refusing to load an unauthenticated bundle: it is pickle-"
+            "based and loading executes code. Sign bundles with "
+            f"${SIGNING_KEY_ENV}, or pass trusted=True if you trust its "
+            "source."
+        )
+    model_path = root / MODEL_FILE
+    if not model_path.exists():
+        raise errors.ArtifactError(f"missing {MODEL_FILE}")
+    if file_sha256(model_path) != info.files.get(MODEL_FILE):
+        raise errors.ArtifactError(
+            "checksum mismatch: model file was modified or corrupted"
+        )
+    schema_path = root / SCHEMA_FILE
+    if not legacy and file_sha256(schema_path) != info.files.get(SCHEMA_FILE):
+        raise errors.ArtifactError(
+            "checksum mismatch: schema file was modified or corrupted"
+        )
+
+
+def verified_member_path(
+    root: pathlib.Path, info: Manifest, name: str, modified: str
+) -> pathlib.Path | None:
+    """Returns the path of a listed bundle member whose checksum matches.
+
+    Args:
+        root: The bundle directory.
+        info: The bundle's manifest.
+        name: File name of the member.
+        modified: Words that finish "checksum mismatch: " in the error.
+
+    Returns:
+        The member's path, or None if the manifest does not list it.
+
+    Raises:
+        ArtifactError: If the member is missing or its checksum differs.
+    """
+    if name not in info.files:
+        return None
+    path = root / name
+    if not path.exists() or file_sha256(path) != info.files[name]:
+        raise errors.ArtifactError(f"checksum mismatch: {modified}")
+    return path
+
+
+def load_monitoring_members(
+    root: pathlib.Path, info: Manifest
+) -> tuple[Any, Any, Any, Any, Any]:
+    """Loads the verified reference, history, calibrator, conformal, novelty.
+
+    Args:
+        root: The bundle directory.
+        info: The bundle's manifest.
+
+    Returns:
+        The reference profile, series history, calibrator, conformal
+        calibrator and novelty detector, each None when the bundle lacks it.
+
+    Raises:
+        ArtifactError: If a listed member is missing or its checksum differs.
+    """
+    reference = None
+    path = verified_member_path(
+        root, info, REFERENCE_FILE, "reference profile was modified"
+    )
+    if path is not None:
+        reference = scmle.monitoring.reference.ReferenceProfile.from_dict(
+            json.loads(path.read_text(encoding="utf-8"))
+        )
+    history = None
+    path = verified_member_path(
+        root, info, HISTORY_FILE, "series history was modified"
+    )
+    if path is not None:
+        history = pandas.read_parquet(path)
+    calibrator = None
+    path = verified_member_path(
+        root, info, CALIBRATOR_FILE, "calibrator was modified"
+    )
+    if path is not None:
+        calibrator = joblib.load(path)
+    calibrated = None
+    path = verified_member_path(
+        root, info, CONFORMAL_FILE, "conformal scores were modified"
+    )
+    if path is not None:
+        calibrated = scmle.evaluation.conformal.ConformalCalibrator.from_dict(
+            json.loads(path.read_text(encoding="utf-8"))
+        )
+    detector = None
+    path = verified_member_path(
+        root, info, NOVELTY_FILE, "novelty detector was modified"
+    )
+    if path is not None:
+        detector = joblib.load(path)
+    return reference, history, calibrator, calibrated, detector
+
+
+def load_interval_members(
+    root: pathlib.Path, info: Manifest
+) -> tuple[Any, Any, Any, Any]:
+    """Loads the verified quantile, CV+, coverage and shift-weight members.
+
+    Args:
+        root: The bundle directory.
+        info: The bundle's manifest.
+
+    Returns:
+        The quantile models, CV+ fold models, coverage report and shift
+        weights, each None when the bundle lacks it.
+
+    Raises:
+        ArtifactError: If a listed member is missing or its checksum differs.
+    """
+    intervals = None
+    path = verified_member_path(
+        root, info, QUANTILE_FILE, "quantile models were modified"
+    )
+    if path is not None:
+        intervals = joblib.load(path)
+    cv_plus_models = None
+    path = verified_member_path(
+        root, info, CV_PLUS_FILE, "CV+ fold models were modified"
+    )
+    if path is not None:
+        cv_plus_models = joblib.load(path)
+    stored_coverage = None
+    path = verified_member_path(
+        root, info, COVERAGE_FILE, "coverage report was modified"
+    )
+    if path is not None:
+        stored_coverage = json.loads(path.read_text(encoding="utf-8"))
+    stored_weights = None
+    path = verified_member_path(
+        root, info, SHIFT_WEIGHTS_FILE, "shift weights were modified"
+    )
+    if path is not None:
+        stored_weights = joblib.load(path)
+    return intervals, cv_plus_models, stored_coverage, stored_weights
 
 
 class Bundle:
@@ -705,7 +933,10 @@ class Bundle:
                 f"unknown calibration method '{method}'; use sigmoid, "
                 "isotonic or dirichlet"
             )
-        if method == "dirichlet" and len(self.schema.classes) < 3:
+        if (
+            method == "dirichlet"
+            and len(self.schema.classes) < DIRICHLET_MIN_CLASSES
+        ):
             raise errors.ConfigError(
                 "dirichlet calibration needs three or more classes"
             )
@@ -778,6 +1009,84 @@ class Bundle:
             combined = combined.drop_duplicates(subset=key, keep="last")
             self.history = builder.build_history(combined)
 
+    def write_monitoring_members(
+        self, root: pathlib.Path, files: dict[str, str]
+    ) -> None:
+        """Writes the reference, calibrator, conformal and novelty members.
+
+        A stale calibrator file is deleted when the bundle has no calibrator.
+
+        Args:
+            root: The bundle directory.
+            files: The checksum table of the written files; extended in place
+                in the order the members are written.
+        """
+        if self.reference is not None:
+            reference_path = root / REFERENCE_FILE
+            reference_path.write_text(
+                json.dumps(self.reference.to_dict()),
+                encoding="utf-8",
+                newline="\n",
+            )
+            files[REFERENCE_FILE] = file_sha256(reference_path)
+        if self.calibrator is not None:
+            calibrator_path = root / CALIBRATOR_FILE
+            joblib.dump(self.calibrator, calibrator_path)
+            files[CALIBRATOR_FILE] = file_sha256(calibrator_path)
+        elif (root / CALIBRATOR_FILE).exists():
+            (root / CALIBRATOR_FILE).unlink()
+        if self.conformal is not None:
+            conformal_path = root / CONFORMAL_FILE
+            conformal_path.write_text(
+                json.dumps(self.conformal.to_dict()),
+                encoding="utf-8",
+                newline="\n",
+            )
+            files[CONFORMAL_FILE] = file_sha256(conformal_path)
+        if self.novelty is not None:
+            novelty_path = root / NOVELTY_FILE
+            joblib.dump(self.novelty, novelty_path)
+            files[NOVELTY_FILE] = file_sha256(novelty_path)
+
+    def write_interval_members(
+        self, root: pathlib.Path, files: dict[str, str]
+    ) -> None:
+        """Writes the quantile, CV+, coverage, shift-weight and history members.
+
+        A stale history file is deleted when the bundle has no history.
+
+        Args:
+            root: The bundle directory.
+            files: The checksum table of the written files; extended in place
+                in the order the members are written.
+        """
+        if self.quantile is not None:
+            quantile_path = root / QUANTILE_FILE
+            joblib.dump(self.quantile, quantile_path)
+            files[QUANTILE_FILE] = file_sha256(quantile_path)
+        if self.cv_plus is not None:
+            cv_plus_path = root / CV_PLUS_FILE
+            joblib.dump(self.cv_plus, cv_plus_path)
+            files[CV_PLUS_FILE] = file_sha256(cv_plus_path)
+        if self.coverage_report is not None:
+            coverage_path = root / COVERAGE_FILE
+            coverage_path.write_text(
+                json.dumps(self.coverage_report, sort_keys=True),
+                encoding="utf-8",
+                newline="\n",
+            )
+            files[COVERAGE_FILE] = file_sha256(coverage_path)
+        if self.shift_weights is not None:
+            shift_path = root / SHIFT_WEIGHTS_FILE
+            joblib.dump(self.shift_weights, shift_path)
+            files[SHIFT_WEIGHTS_FILE] = file_sha256(shift_path)
+        if self.history is not None:
+            history_path = root / HISTORY_FILE
+            self.history.to_parquet(history_path, index=False)
+            files[HISTORY_FILE] = file_sha256(history_path)
+        elif (root / HISTORY_FILE).exists():
+            (root / HISTORY_FILE).unlink()
+
     def save(
         self,
         directory: str | pathlib.Path,
@@ -808,58 +1117,8 @@ class Bundle:
             MODEL_FILE: file_sha256(model_path),
             SCHEMA_FILE: file_sha256(schema_path),
         }
-        if self.reference is not None:
-            reference_path = root / REFERENCE_FILE
-            reference_path.write_text(
-                json.dumps(self.reference.to_dict()),
-                encoding="utf-8",
-                newline="\n",
-            )
-            files[REFERENCE_FILE] = file_sha256(reference_path)
-        if self.calibrator is not None:
-            calibrator_path = root / CALIBRATOR_FILE
-            joblib.dump(self.calibrator, calibrator_path)
-            files[CALIBRATOR_FILE] = file_sha256(calibrator_path)
-        elif (root / CALIBRATOR_FILE).exists():
-            (root / CALIBRATOR_FILE).unlink()
-        if self.conformal is not None:
-            conformal_path = root / CONFORMAL_FILE
-            conformal_path.write_text(
-                json.dumps(self.conformal.to_dict()),
-                encoding="utf-8",
-                newline="\n",
-            )
-            files[CONFORMAL_FILE] = file_sha256(conformal_path)
-        if self.novelty is not None:
-            novelty_path = root / NOVELTY_FILE
-            joblib.dump(self.novelty, novelty_path)
-            files[NOVELTY_FILE] = file_sha256(novelty_path)
-        if self.quantile is not None:
-            quantile_path = root / QUANTILE_FILE
-            joblib.dump(self.quantile, quantile_path)
-            files[QUANTILE_FILE] = file_sha256(quantile_path)
-        if self.cv_plus is not None:
-            cv_plus_path = root / CV_PLUS_FILE
-            joblib.dump(self.cv_plus, cv_plus_path)
-            files[CV_PLUS_FILE] = file_sha256(cv_plus_path)
-        if self.coverage_report is not None:
-            coverage_path = root / COVERAGE_FILE
-            coverage_path.write_text(
-                json.dumps(self.coverage_report, sort_keys=True),
-                encoding="utf-8",
-                newline="\n",
-            )
-            files[COVERAGE_FILE] = file_sha256(coverage_path)
-        if self.shift_weights is not None:
-            shift_path = root / SHIFT_WEIGHTS_FILE
-            joblib.dump(self.shift_weights, shift_path)
-            files[SHIFT_WEIGHTS_FILE] = file_sha256(shift_path)
-        if self.history is not None:
-            history_path = root / HISTORY_FILE
-            self.history.to_parquet(history_path, index=False)
-            files[HISTORY_FILE] = file_sha256(history_path)
-        elif (root / HISTORY_FILE).exists():
-            (root / HISTORY_FILE).unlink()
+        self.write_monitoring_members(root, files)
+        self.write_interval_members(root, files)
         info = dataclasses.replace(self.info, format=BUNDLE_FORMAT, files=files)
         manifest_text = json.dumps(info.to_dict(), indent=2)
         (root / MANIFEST_FILE).write_text(
@@ -945,11 +1204,11 @@ class Bundle:
                 )
                 handle.flush()
                 os.fsync(handle.fileno())
-            os.replace(temporary_name, signature_path)
+            pathlib.Path(temporary_name).replace(signature_path)
             durability.sync_directory(signature_path.parent)
         except Exception:
             with contextlib.suppress(FileNotFoundError):
-                os.unlink(temporary_name)
+                pathlib.Path(temporary_name).unlink()
             raise
         return root
 
@@ -998,67 +1257,18 @@ class Bundle:
                 "the bundle and verify it with the signing key"
             )
         root = pathlib.Path(directory)
-        try:
-            manifest = json.loads(
-                (root / MANIFEST_FILE).read_text(encoding="utf-8")
-            )
-            schema = artifacts.BundleSchema.from_dict(
-                json.loads((root / SCHEMA_FILE).read_text(encoding="utf-8"))
-            )
-        except FileNotFoundError as error:
-            raise errors.ArtifactError(
-                f"not a model bundle (missing {error.filename})"
-            ) from error
-        except (
-            OSError,
-            UnicodeError,
-            json.JSONDecodeError,
-            KeyError,
-            TypeError,
-            ValueError,
-        ) as error:
-            raise errors.ArtifactError(
-                "invalid model bundle metadata"
-            ) from error
+        manifest, schema = read_manifest_and_schema(root)
         legacy = manifest.get("format") == 1
-        if manifest.get("format") != BUNDLE_FORMAT and not (
-            legacy and allow_legacy_format and trusted
-        ):
-            raise errors.ArtifactError(
-                f"unsupported bundle format {manifest.get('format')}: this "
-                f"build reads format {BUNDLE_FORMAT}. A bundle stores the "
-                "module path and class name of the objects inside it, and "
-                "those names changed, so a bundle written by an earlier "
-                "build cannot be loaded; retrain and save it again"
-            )
+        check_bundle_format(
+            manifest, legacy_allowed=legacy and allow_legacy_format and trusted
+        )
         info = Manifest(**manifest)
         if SCHEMA_FILE not in info.files and not legacy:
             raise errors.ArtifactError(
                 "bundle is missing a schema checksum; re-export it with "
                 f"bundle format {BUNDLE_FORMAT}"
             )
-        authentic = verify_signature(root, signing_key)
-        if not authentic and not trusted:
-            raise errors.ArtifactError(
-                "refusing to load an unauthenticated bundle: it is pickle-"
-                "based and loading executes code. Sign bundles with "
-                f"${SIGNING_KEY_ENV}, or pass trusted=True if you trust its "
-                "source."
-            )
-        model_path = root / MODEL_FILE
-        if not model_path.exists():
-            raise errors.ArtifactError(f"missing {MODEL_FILE}")
-        if file_sha256(model_path) != info.files.get(MODEL_FILE):
-            raise errors.ArtifactError(
-                "checksum mismatch: model file was modified or corrupted"
-            )
-        schema_path = root / SCHEMA_FILE
-        if not legacy and file_sha256(schema_path) != info.files.get(
-            SCHEMA_FILE
-        ):
-            raise errors.ArtifactError(
-                "checksum mismatch: schema file was modified or corrupted"
-            )
+        verify_core_files(root, info, legacy, trusted, signing_key)
         problems = info.compatibility_problems()
         if problems and not allow_version_mismatch:
             raise errors.ArtifactError(
@@ -1069,115 +1279,14 @@ class Bundle:
                     "environment_lock": info.environment_lock(),
                 },
             )
-        reference = None
-        reference_path = root / REFERENCE_FILE
-        if REFERENCE_FILE in info.files:
-            if (
-                not reference_path.exists()
-                or file_sha256(reference_path) != info.files[REFERENCE_FILE]
-            ):
-                raise errors.ArtifactError(
-                    "checksum mismatch: reference profile was modified"
-                )
-            reference = scmle.monitoring.reference.ReferenceProfile.from_dict(
-                json.loads(reference_path.read_text(encoding="utf-8"))
-            )
-        history = None
-        if HISTORY_FILE in info.files:
-            history_path = root / HISTORY_FILE
-            if (
-                not history_path.exists()
-                or file_sha256(history_path) != info.files[HISTORY_FILE]
-            ):
-                raise errors.ArtifactError(
-                    "checksum mismatch: series history was modified"
-                )
-            history = pandas.read_parquet(history_path)
-        calibrator = None
-        if CALIBRATOR_FILE in info.files:
-            calibrator_path = root / CALIBRATOR_FILE
-            if (
-                not calibrator_path.exists()
-                or file_sha256(calibrator_path) != info.files[CALIBRATOR_FILE]
-            ):
-                raise errors.ArtifactError(
-                    "checksum mismatch: calibrator was modified"
-                )
-            calibrator = joblib.load(calibrator_path)
-        calibrated = None
-        if CONFORMAL_FILE in info.files:
-            conformal_path = root / CONFORMAL_FILE
-            if (
-                not conformal_path.exists()
-                or file_sha256(conformal_path) != info.files[CONFORMAL_FILE]
-            ):
-                raise errors.ArtifactError(
-                    "checksum mismatch: conformal scores were modified"
-                )
-            calibrated = (
-                scmle.evaluation.conformal.ConformalCalibrator.from_dict(
-                    json.loads(conformal_path.read_text(encoding="utf-8"))
-                )
-            )
-        detector = None
-        if NOVELTY_FILE in info.files:
-            novelty_path = root / NOVELTY_FILE
-            if (
-                not novelty_path.exists()
-                or file_sha256(novelty_path) != info.files[NOVELTY_FILE]
-            ):
-                raise errors.ArtifactError(
-                    "checksum mismatch: novelty detector was modified"
-                )
-            detector = joblib.load(novelty_path)
-        intervals = None
-        if QUANTILE_FILE in info.files:
-            quantile_path = root / QUANTILE_FILE
-            if (
-                not quantile_path.exists()
-                or file_sha256(quantile_path) != info.files[QUANTILE_FILE]
-            ):
-                raise errors.ArtifactError(
-                    "checksum mismatch: quantile models were modified"
-                )
-            intervals = joblib.load(quantile_path)
-        cv_plus_models = None
-        if CV_PLUS_FILE in info.files:
-            cv_plus_path = root / CV_PLUS_FILE
-            if (
-                not cv_plus_path.exists()
-                or file_sha256(cv_plus_path) != info.files[CV_PLUS_FILE]
-            ):
-                raise errors.ArtifactError(
-                    "checksum mismatch: CV+ fold models were modified"
-                )
-            cv_plus_models = joblib.load(cv_plus_path)
-        stored_coverage = None
-        if COVERAGE_FILE in info.files:
-            coverage_path = root / COVERAGE_FILE
-            if (
-                not coverage_path.exists()
-                or file_sha256(coverage_path) != info.files[COVERAGE_FILE]
-            ):
-                raise errors.ArtifactError(
-                    "checksum mismatch: coverage report was modified"
-                )
-            stored_coverage = json.loads(
-                coverage_path.read_text(encoding="utf-8")
-            )
-        stored_weights = None
-        if SHIFT_WEIGHTS_FILE in info.files:
-            shift_path = root / SHIFT_WEIGHTS_FILE
-            if (
-                not shift_path.exists()
-                or file_sha256(shift_path) != info.files[SHIFT_WEIGHTS_FILE]
-            ):
-                raise errors.ArtifactError(
-                    "checksum mismatch: shift weights were modified"
-                )
-            stored_weights = joblib.load(shift_path)
+        reference, history, calibrator, calibrated, detector = (
+            load_monitoring_members(root, info)
+        )
+        intervals, cv_plus_models, stored_coverage, stored_weights = (
+            load_interval_members(root, info)
+        )
         loaded = cls(
-            joblib.load(model_path),
+            joblib.load(root / MODEL_FILE),
             schema,
             info,
             reference,

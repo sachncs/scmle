@@ -35,7 +35,7 @@ class Renderer:
             reason.
         """
         record = evidence.to_dict()
-        privacy = cast(dict[str, Any], record["privacy_decision"])
+        privacy = cast("dict[str, Any]", record["privacy_decision"])
         output: Any = record["output"]
         if privacy["decision"] == "denied":
             output = {
@@ -49,10 +49,10 @@ class Renderer:
             evidence.method.name,
             evidence.method.parameters,
             output,
-            cast(list[str], record["limitations"]),
+            cast("list[str]", record["limitations"]),
             privacy,
-            cast(list[dict[str, Any]], record["evidence_links"]),
-            cast(dict[str, Any], rendered_record),
+            cast("list[dict[str, Any]]", record["evidence_links"]),
+            cast("dict[str, Any]", rendered_record),
         )
 
     @staticmethod
