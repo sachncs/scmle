@@ -116,6 +116,11 @@ def group_cuts(
 ) -> dict[str, float]:
     """Threshold per group that matches the overall rate at `base`.
 
+    The rate is the selection rate under `demographic_parity` and the
+    true-positive rate otherwise. Each group's threshold is the quantile of
+    its probabilities (of its positives, for the true-positive rate) that
+    selects the same share as `base` does overall.
+
     Args:
         probabilities: Positive-class probabilities.
         groups: Group name per row.
@@ -124,8 +129,10 @@ def group_cuts(
         base: The single threshold whose overall rate is matched.
 
     Returns:
-        Group name to threshold, clipped to [0, 1]. Groups too small for the
-        criterion are left out.
+        Group name to threshold, clipped to [0, 1]. Under
+        `demographic_parity` groups with fewer than
+        `thresholds.MIN_GROUP_ROWS` rows are left out; otherwise groups with
+        fewer than `MIN_POSITIVES` positives are.
     """
     flagged = probabilities >= base
     if criterion == "demographic_parity":
@@ -169,12 +176,18 @@ def judge(
         column: Sensitive column name.
         criterion: `demographic_parity` or `equal_opportunity`.
         base: The single threshold in use.
-        trigger_gap: Smallest gap worth acting on.
+        trigger_gap: Gap at or below which nothing is applied.
         min_reduction: Share of the gap the thresholds must remove.
         max_accuracy_cost: Most accuracy that may be given up.
 
     Returns:
-        The judged mitigation with its evidence.
+        The mitigation with the group thresholds, the gap and accuracy
+        before and after, and the reason. The thresholds are reported
+        whether or not they are applied. `applied` is True only when the gap
+        exceeds `trigger_gap`, the thresholds leave at most
+        `(1 - min_reduction)` of it, and the accuracy loss does not exceed
+        `max_accuracy_cost`; the reason names the first check that failed.
+        Rows of groups without a threshold use `base`.
     """
     cuts = group_cuts(probabilities, groups, actual, criterion, base)
     assigned = groups.map(cuts).fillna(base).to_numpy(float)

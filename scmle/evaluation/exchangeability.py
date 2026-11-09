@@ -43,7 +43,7 @@ def compare(
 
     Args:
         calibration: Nonconformity scores of the calibration rows.
-        released: Scores of the released rows of `C`.
+        released: Nonconformity scores of the released rows.
 
     Returns:
         The two p-values, the doubled minimum compared with `ALPHA`, and

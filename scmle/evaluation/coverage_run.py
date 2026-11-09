@@ -152,8 +152,10 @@ def regression_reports(
         slices: Slice labels by declared column, or None.
 
     Returns:
-        By method and level, a `coverage.coverage_report`. A method the
-        bundle does not hold, or a level it cannot serve, is omitted.
+        By method and level, a `coverage.coverage_report`. For each method
+        the levels are tried in order and the first level the bundle cannot
+        serve (`ArtifactError`) ends that method, so it and the later
+        levels are omitted; a method with no served level is omitted.
     """
     values = np.asarray(target, dtype=float)
     reports: dict[str, Any] = {}

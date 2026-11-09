@@ -43,10 +43,11 @@ class FitHealth:
     note: str
 
     def to_dict(self) -> dict[str, Any]:
-        """Returns a JSON-serializable mapping.
+        """Returns the assessment as a plain dictionary.
 
         Returns:
-            A mapping of every field of the assessment.
+            A mapping of every field of the assessment. `noise_share` is
+            infinity when the validation gain is about zero.
         """
         return dataclasses.asdict(self)
 
@@ -59,8 +60,10 @@ def assess(
     """Judges a candidate from its per-fold scores.
 
     Args:
-        train_scores: Fold scores on the rows each model was fitted on.
-        validation_scores: Fold scores on the held-out rows.
+        train_scores: Fold scores on the rows each model was fitted on,
+            oriented so larger is better.
+        validation_scores: Fold scores on the held-out rows, same
+            orientation.
         baseline_score: Score of the trivial constant model on the same
             folds, same orientation.
 
@@ -114,8 +117,10 @@ def assess_trial(
         greater_is_better: The metric's orientation.
 
     Returns:
-        The assessment, or None when the trial has no training scores or the
-        run has no baseline trial to compare with.
+        The assessment, comparing the trial's mean fold scores with the mean
+        validation fold score of the first `dummy` trial with strategy
+        `default` that has fold scores. None when the trial has no training
+        or validation fold scores or the run has no such baseline trial.
     """
     baseline = next(
         (

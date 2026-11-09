@@ -425,10 +425,13 @@ class LongitudinalEstimationResult:
         return hashlib.sha256(content).hexdigest()
 
     def write(self, path: str | Path) -> str:
-        """Atomically write a digest-bound report.
+        """Atomically writes a digest-bound report.
 
-        The report is written to a temporary file in the destination
-        directory, flushed, and renamed over the destination.
+        The report envelope (schema version, report, digest) is written as
+        sorted-key JSON to a temporary file in the destination directory,
+        flushed and synced to disk, renamed over the destination, and the
+        directory is synced. On any failure the temporary file is removed
+        and the error propagates.
 
         Args:
             path: Destination file; missing parent directories are created.
@@ -437,7 +440,8 @@ class LongitudinalEstimationResult:
             The report digest stored in the envelope.
 
         Raises:
-            RuntimeError: If the temporary file path was not recorded.
+            RuntimeError: Defensive check that is never true in practice: the
+                temporary path is recorded as soon as the file is created.
         """
         destination = Path(path)
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -484,7 +488,10 @@ class LongitudinalEstimationResult:
         Raises:
             ValueError: If the schema version is not 1, the report is not a
                 mapping, the stored digest does not match the report, or the
-                rebuilt result serializes to a different digest.
+                rebuilt result serializes to a different digest. Malformed
+                JSON also raises (a subclass); a missing key raises
+                `KeyError`, and invalid fields raise the validation errors
+                of the result classes.
         """
         envelope = json.loads(Path(path).read_text(encoding="utf-8"))
         if envelope.get("schema_version") != 1:
@@ -514,7 +521,7 @@ class LongitudinalEstimationResult:
 
         Returns:
             The result built from the record; field validation runs on
-            construction.
+            construction. A missing key raises `KeyError`.
         """
         estimand_values = dict(record["estimand"])
         estimand_values["covariates"] = tuple(estimand_values["covariates"])
@@ -565,7 +572,7 @@ class LongitudinalEstimationResult:
 
 
 class LongitudinalIPWEstimator:
-    """Estimate period-specific binary-treatment ATEs with Hájek IPW.
+    """Estimates period-specific binary-treatment ATEs with Hájek IPW.
 
     Attributes:
         estimand: The declared estimand.
@@ -708,7 +715,7 @@ class LongitudinalIPWEstimator:
     def fit_period(
         self, period_frame: pd.DataFrame, period_value: Any
     ) -> dict[str, Any]:
-        """Fits one period and retain influence values for covariance.
+        """Fits one period and retains influence values for covariance.
 
         Args:
             period_frame: Prepared rows of a single period.
@@ -830,7 +837,7 @@ def prepare_longitudinal_frame(
     estimand: LongitudinalEstimand,
     policy: LongitudinalEstimationPolicy,
 ) -> tuple[pd.DataFrame, int]:
-    """Validates and numerically prepare a long-format input frame.
+    """Validates and numerically prepares a long-format input frame.
 
     Args:
         frame: Long-format panel to check.
@@ -838,8 +845,10 @@ def prepare_longitudinal_frame(
         policy: Supplies the missingness rule and the minimum row count.
 
     Returns:
-        A tuple of the prepared frame (declared columns only, numeric, rows
-        with missing values removed) and the number of rows removed.
+        A tuple of the prepared frame (declared columns only; treatment,
+        outcome and covariates converted to numbers; rows with a missing
+        treatment, outcome or covariate removed under `complete_case`) and
+        the number of rows removed.
 
     Raises:
         TypeError: If `frame` is not a pandas DataFrame.
@@ -919,7 +928,7 @@ def prepare_longitudinal_frame(
 def validate_time_order(
     frame: pd.DataFrame, estimand: LongitudinalEstimand
 ) -> None:
-    """Require strictly increasing time values within each subject.
+    """Requires strictly increasing time values within each subject.
 
     Args:
         frame: Long-format panel.
@@ -928,10 +937,9 @@ def validate_time_order(
     Raises:
         ValueError: If a subject's time values, in row order, are not
             strictly increasing or cannot be compared.
-        TypeError: Only if a `TypeError` raised while examining the values
-            has a message containing "strictly increasing", which the
-            comparisons used do not produce; every other `TypeError` is
-            converted to `ValueError`.
+        TypeError: Re-raised only if its message contains "strictly
+            increasing", which comparison errors do not; any other
+            `TypeError` becomes `ValueError`.
     """
     subject_name = estimand.subject_identity
     time_name = estimand.time_column
@@ -985,6 +993,9 @@ def fit_logistic_propensity(
     policy: LongitudinalEstimationPolicy,
 ) -> tuple[np.ndarray, int]:
     """Fits a deterministic ridge-logistic propensity model by Newton steps.
+
+    The ridge penalty is fixed at 1e-8 and the starting coefficients are
+    zero.
 
     Args:
         covariates: Two-dimensional matrix, rows by features, without an
@@ -1055,9 +1066,10 @@ def influence_covariance(fitted: Sequence[Mapping[str, Any]]) -> np.ndarray:
     Returns:
         A symmetric matrix with one row and column per period.  Each entry
         sums, over subjects present in both periods, the product of their
-        centred influence values divided by the period row counts; a
-        diagonal entry with more than one subject is scaled by
-        `n / (n - 1)`.  Entries are 0.0 when no subject is shared.
+        influence values, each divided by its period's row count and
+        centred on the period mean; a diagonal entry with more than one
+        subject is scaled by `n / (n - 1)`.  Entries are 0.0 when no subject
+        is shared.
     """
     periods = len(fitted)
     covariance = np.zeros((periods, periods), dtype=float)

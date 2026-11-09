@@ -36,7 +36,7 @@ MIN_ROWS_FOR_SPLIT = 1000
 def partition_folds(
     held_out: Sequence[Sequence[int]], rows: int
 ) -> np.ndarray | None:
-    """Fold index of every row when the held-out sets partition the rows.
+    """Fold index of each held-out row when no row is held out twice.
 
     Args:
         held_out: Positions held out by each fold, in fold order.
@@ -45,7 +45,8 @@ def partition_folds(
     Returns:
         An array with the fold of each held-out row, ordered by fold and then
         by position within the fold (the order calibration scores are
-        stored), or None when a row is held out twice.
+        stored), or None when a position is held out twice or lies outside
+        `0..rows-1`. Rows held out by no fold are not detected.
     """
     seen: set[int] = set()
     order: list[int] = []
@@ -104,7 +105,10 @@ def plan_scores(
     Returns:
         A plan with mode `cv_plus`, the fold of each calibration row and no
         reason when the fold models are kept; otherwise mode
-        `pooled_out_of_fold`, no folds and the reason they are not kept.
+        `pooled_out_of_fold`, no folds and the reason they are not kept
+        (overlapping or out-of-range folds, or folds that do not match
+        `observed`; `observed` at or above `MIN_ROWS_FOR_SPLIT`; models
+        larger than `max_bytes`, checked in that order).
     """
     folds = partition_folds(held_out, rows)
     reason = None
@@ -151,7 +155,7 @@ class CvPlusEnsemble:
     residuals: np.ndarray
 
     def __post_init__(self) -> None:
-        """Checks that every calibration row names a model.
+        """Checks the array lengths, the row count and the fold references.
 
         Raises:
             ValueError: If `fold_of_row` and `residuals` differ in length,
@@ -188,8 +192,9 @@ class CvPlusEnsemble:
 
         Returns:
             The lower and the upper limit, each with one value per row of
-            `features`. Invalid input is rejected by
-            `conformal.cv_plus_bounds`.
+            `features`. A side is infinite where its rank falls outside
+            the calibration rows. A coverage outside (0, 1) makes
+            `conformal.cv_plus_bounds` raise ValueError.
         """
         predictions = np.column_stack(
             [np.asarray(m.predict(features), dtype=float) for m in self.models]

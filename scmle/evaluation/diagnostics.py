@@ -249,8 +249,9 @@ class ThresholdReport(Diagnostic):
             inputs: The fitted candidate and evaluation data.
 
         Returns:
-            The precision, recall and F-measure at each threshold in
-            `THRESHOLDS`.
+            A mapping with key `thresholds`: one entry per value in
+            `THRESHOLDS` with the precision, recall and F-measure there
+            (a zero where nothing is flagged or the denominator is zero).
         """
         probability = inputs.estimator.predict_proba(inputs.features)[:, 1]
         actual = (inputs.target == inputs.positive_label).to_numpy()
@@ -286,10 +287,12 @@ class ResidualReport(Diagnostic):
 
         Returns:
             The residual bias and standard deviation, the mean absolute
-            error, quantiles of the absolute error and, for the first
-            categorical and numeric features, the mean absolute error and
-            row count by level (numeric features with many distinct values
-            are cut into quartile bands).
+            error, quantiles (0.5, 0.9, 0.99) of the absolute error and,
+            for each of the first `MAX_SEGMENT_FEATURES` categorical and
+            numeric features, the mean absolute error and row count by
+            level. Categorical features with more than `MAX_SEGMENT_LEVELS`
+            levels are skipped; numeric features with more than that many
+            distinct values are cut into quartile bands.
         """
         residual = inputs.target.to_numpy(dtype=float) - np.asarray(
             inputs.estimator.predict(inputs.features), dtype=float
@@ -336,7 +339,7 @@ class ResidualReport(Diagnostic):
 
 
 class ErrorAnalysis(Diagnostic):
-    """Identify the highest-risk held-out rows without exposing features."""
+    """Identifies the highest-risk held-out rows without exposing features."""
 
     name = "error_analysis"
     applies_to = CLASSIFICATION | REGRESSION_ONLY
@@ -509,11 +512,15 @@ def resample_rows(
     Args:
         rows: Number of evaluation rows.
         groups: Entity labels, if rows are clustered by entity.
-        temporal: Whether to draw contiguous blocks.
+        temporal: Whether to draw contiguous blocks; ignored when `groups`
+            is given.
         rng: Source of randomness.
 
     Returns:
-        Row positions of the resample.
+        Row positions of the resample: whole groups drawn with replacement
+        (its length varies with the group sizes), or blocks of
+        `max(5, int(sqrt(rows)))` positions truncated to `rows`, or `rows`
+        positions drawn with replacement.
     """
     if groups is not None:
         members = (
@@ -555,7 +562,8 @@ class MetricUncertainty(Diagnostic):
             (key `ci_` plus the confidence), the resampling unit, the number
             of successful resamples (resamples that fail with a
             `ValueError`, such as one missing a class, are skipped), the
-            number of evaluation rows and the number of independent units.
+            number of evaluation rows and the number of independent units
+            (groups, else rows).
         """
         features = inputs.features[list(inputs.feature_plan.input_columns)]
         features = features.reset_index(drop=True)
@@ -643,10 +651,13 @@ def run_suite(
         inputs: Fitted candidate and evaluation data.
         suite: Diagnostics to run; defaults to `default_suite()`.
         total_seconds: Time allowance for the whole suite, shared evenly by
-            the diagnostics still to run (None = unlimited).
+            the diagnostics still to run (None = unlimited). It sets
+            `DiagnosticInput.deadline`; only diagnostics that check
+            `out_of_time` stop early, and none defined in this module do.
 
     Returns:
-        Report per diagnostic name; failures appear as `{"error": ...}`.
+        Report per name for the diagnostics whose `applies_to` contains the
+        task; a failure appears as `{"error": "<ErrorType>: <message>"}`.
     """
     reports: dict[str, dict[str, Any]] = {}
     chosen = [

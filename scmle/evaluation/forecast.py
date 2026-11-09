@@ -99,8 +99,9 @@ def smape(truth: np.ndarray, guess: np.ndarray) -> float:
         guess: Forecast values, same shape.
 
     Returns:
-        The mean of the absolute error over the mean absolute size of the
-        two values (floored at `SCALE_FLOOR`).
+        The mean, over all entries, of `|truth - guess|` divided by
+        `(|truth| + |guess|) / 2`, with the divisor floored at
+        `SCALE_FLOOR`. The result is a fraction, not a percentage.
     """
     gap = np.abs(truth - guess)
     size = (np.abs(truth) + np.abs(guess)) / 2

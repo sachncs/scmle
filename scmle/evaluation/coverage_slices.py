@@ -142,9 +142,10 @@ def labels_for(
 
     Returns:
         A series of labels aligned with `values`: `band k` (or `missing`)
-        for a numeric column with more than `MAX_LEVELS` distinct values,
-        otherwise the values as text; None if a column has more than
-        `MAX_LEVELS` levels and is not numeric-banded.
+        for a numeric (non-boolean) column with more than `MAX_LEVELS`
+        distinct values (counted in `reference` when given), otherwise the
+        values as text; None if a column has more than `MAX_LEVELS` levels
+        and is not numeric-banded.
     """
     seen = reference if reference is not None else values
     if pd.api.types.is_numeric_dtype(seen) and not pd.api.types.is_bool_dtype(

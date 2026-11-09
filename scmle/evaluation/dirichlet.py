@@ -31,7 +31,8 @@ class DirichletCalibrator(base.BaseEstimator, base.ClassifierMixin):
 
         Args:
             estimator: A fitted classifier with `predict_proba`.
-            regularization: Strength of the L2 penalty on the map.
+            regularization: Strength of the L2 penalty on the map; the
+                logistic regression uses `C = 1 / max(regularization, 1e-9)`.
         """
         self.estimator = estimator
         self.regularization = regularization
@@ -50,7 +51,10 @@ class DirichletCalibrator(base.BaseEstimator, base.ClassifierMixin):
         return np.log(np.clip(probabilities, FLOOR, 1.0))
 
     def fit(self, features: Any, labels: Any) -> Self:
-        """Learns the map on labeled rows the model was not trained on.
+        """Fits a multinomial logistic map on the wrapped log-probabilities.
+
+        The rows should be ones the wrapped model was not trained on; this is
+        not checked. `classes_` is set to the classes present in `labels`.
 
         Args:
             features: Calibration rows.

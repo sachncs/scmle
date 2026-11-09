@@ -39,8 +39,9 @@ CLASSIFICATION = frozenset({BINARY, MULTICLASS})
 def positive_label(target: pd.Series, task: tasks.TaskType) -> Any:
     """Returns the positive class of a binary target (None otherwise).
 
-    Follows scikit-learn's convention: the second class in sorted order,
-    which is `classes_[1]` of every fitted classifier.
+    Follows scikit-learn's convention: the second class in sorted order
+    among the non-missing labels, which is `classes_[1]` of every fitted
+    classifier. Fewer than two distinct labels raise `IndexError`.
 
     Args:
         target: Labels.
@@ -200,10 +201,14 @@ class MetricCatalog:
     def __init__(
         self, metrics: tuple[metric_contracts.Metric, ...] = DEFAULT_METRICS
     ) -> None:
-        """Initializes the catalog.
+        """Initializes the catalog with a metric table and report names.
+
+        The report names per task start as a copy of the class-level
+        defaults, whatever `metrics` holds; a name missing from `metrics`
+        is skipped by `evaluate`.
 
         Args:
-            metrics: Available metrics.
+            metrics: Available metrics, keyed by their names.
         """
         self.lock = threading.RLock()
         self.metrics = {metric.name: metric for metric in metrics}
@@ -242,7 +247,9 @@ class MetricCatalog:
             self.report_names = report_names
 
     def unregister(self, name: str) -> None:
-        """Removes a user-defined metric (no-op if it is not registered).
+        """Removes a metric by name (no-op if it is not registered).
+
+        Standard metrics are removed the same way as user-defined ones.
 
         The reported names shrink first, so no reader is told to score a
         metric that is already gone.
@@ -304,11 +311,16 @@ class MetricCatalog:
             features: Evaluation features.
             target: Evaluation labels.
             task: Resolved task type.
-            sample_weight: Optional per-row weights applied to every score.
+            sample_weight: Optional per-row weights passed to every metric's
+                scorer. A metric that ignores weights scores unweighted; one
+                that cannot take them (a user function without a
+                `sample_weight` parameter) scores NaN.
 
         Returns:
-            Metric name to natural-unit score; NaN when a metric cannot be
-            computed (for example a class absent from the labels).
+            Metric name to natural-unit score, in the report order of the
+            task; NaN when scoring raises `ValueError` or `TypeError` (for
+            example a class absent from the labels). A report name that was
+            unregistered meanwhile is omitted.
         """
         results: dict[str, float] = {}
         classes = getattr(estimator, "classes_", None)
@@ -344,16 +356,17 @@ def register_metric(
 
     Args:
         name: Public metric name, usable as `MLProject(metric=name)`.
-        score_function: Module-level function `(y_true, y_pred) -> float`.
+        score_function: Module-level function `(y_true, y_pred) -> float`;
+            `y_pred` is what `response_method` supplies. Add a
+            `sample_weight` parameter for it to be scored with weights.
         greater_is_better: Orientation of the score.
         task_types: Tasks the metric is defined for.
         response_method: `predict`, `predict_proba` or `decision_function`.
         replace: Allow overriding an existing metric of the same name.
 
     Returns:
-        The registered metric. A name that is already taken while `replace`
-        is False is rejected with a `ConfigError` by
-        `MetricCatalog.register`.
+        The registered metric. `MetricCatalog.register` raises `ConfigError`
+        when the name is taken and `replace` is False.
     """
     metric = metric_contracts.FunctionMetric(
         name,

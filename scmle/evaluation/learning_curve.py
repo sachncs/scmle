@@ -29,10 +29,13 @@ class LearningCurve:
 
     Attributes:
         sizes: Training rows used at each point.
-        scores: Held-out score at each point, larger is better.
+        scores: Held-out score at each point, in the metric's own units
+            (so lower is better when the metric is).
         verdict: `more data likely helps`, `plateau` or `unclear`.
-        last_gain: Score gained over the last step.
-        total_gain: Score gained from the first point to the last.
+        last_gain: Change in score over the last step, in the metric's own
+            units (negative when a lower-is-better metric improved).
+        total_gain: Change in score from the first point to the last, in the
+            same units.
     """
 
     sizes: tuple[int, ...]
@@ -57,9 +60,10 @@ def judge(scores: Sequence[float]) -> tuple[str, float, float]:
     """Classifies a curve from its scores (larger is better).
 
     The curve is climbing when the last step still earns a meaningful share
-    of what the whole curve earned per step; it is flat when the whole curve
-    moves by less than a tiny tolerance, and unclear when more data made the
-    score worse.
+    of what the whole curve earned per step (and is positive). The verdict is
+    unclear when the whole curve lost more than `FLAT_TOLERANCE`, and a
+    plateau when it moved by no more than that or when the last step earned
+    too little.
 
     Args:
         scores: Held-out scores at increasing training sizes, at least two,
@@ -104,7 +108,10 @@ def compute(
         should_stop: Called before each fit; True abandons the curve.
 
     Returns:
-        The curve, or None when there are too few rows or time ran out.
+        The curve, with scores in the metric's own units; None when fewer
+        than `MIN_TRAIN_ROWS` training rows are given, `should_stop` returned
+        True, or fewer than `MIN_POINTS` fractions yielded a fit (a prefix
+        that misses classes is skipped).
     """
     fit = np.asarray(fit_positions)
     if len(fit) < MIN_TRAIN_ROWS:

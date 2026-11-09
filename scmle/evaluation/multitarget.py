@@ -82,7 +82,7 @@ def r2_mean(truth: np.ndarray, guess: np.ndarray) -> float:
 
 
 def mae_mean_scaled(truth: np.ndarray, guess: np.ndarray) -> float:
-    """Mean absolute error per column, in units of that column's spread.
+    """Mean absolute error with each column scaled by its spread.
 
     Args:
         truth: Observed values.
@@ -90,7 +90,8 @@ def mae_mean_scaled(truth: np.ndarray, guess: np.ndarray) -> float:
 
     Returns:
         The mean over all entries of the absolute error divided by the
-        standard deviation of the observed column (1 if it is constant).
+        (population) standard deviation of the observed column, which is
+        taken as 1 if the column is constant.
     """
     truth = np.asarray(truth, dtype=float)
     spread = np.where(truth.std(axis=0) > 0, truth.std(axis=0), 1.0)

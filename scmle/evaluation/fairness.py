@@ -37,8 +37,12 @@ class FairnessReport(diagnostics.Diagnostic):
                 `sensitive_columns` naming the columns to compare across.
 
         Returns:
-            Per sensitive column: group statistics, disparity measures and
-            flags; or an explanation when no column was named.
+            `{"available": False, "reason": ...}` when no sensitive column
+            is named. Otherwise `available` True, `columns` (the result of
+            `binary` or `numeric` for each sensitive column, plus
+            `intersectional` when at least two columns are named and the
+            joined groups exist) and `flagged`, the sorted names in
+            `columns` whose `flags` list is not empty.
         """
         if not inputs.sensitive_columns:
             return {"available": False, "reason": "no sensitive columns"}
@@ -137,8 +141,9 @@ class FairnessReport(diagnostics.Diagnostic):
 
         Returns:
             The `binary_summary` of those per-group statistics, with the
-            groups below `MIN_GROUP_ROWS` rows reported as excluded. A rate
-            whose denominator is zero is None.
+            groups below `MIN_GROUP_ROWS` rows reported as excluded. A
+            true-positive or false-positive rate with no actual positives or
+            negatives in the group is None.
         """
         actual = truth == positive
         chosen = predicted == positive
@@ -198,7 +203,9 @@ class FairnessReport(diagnostics.Diagnostic):
         Returns:
             The groups, the demographic parity, equal opportunity and
             equalized odds differences, the disparate-impact ratio, the
-            flags and the exclusion metadata. With fewer than two groups,
+            flags and the exclusion metadata (`excluded_groups`,
+            `power_warning`). Equal opportunity and equalized odds count a
+            side with no defined rate as 0.0. With fewer than two groups,
             only the groups, empty flags, a note and the metadata.
         """
         excluded = excluded or {}
