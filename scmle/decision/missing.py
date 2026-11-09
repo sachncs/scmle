@@ -1,4 +1,4 @@
-"""Differential missingness of outcomes in a randomized rollout (F11).
+"""Differential missingness of outcomes in a randomized rollout.
 
 A rollout whose outcomes go missing more often in one arm cannot be read
 from the observed units alone: the observed arms are no longer comparable.
@@ -14,7 +14,7 @@ What this does and does not do. It detects missingness that depends on the
 arm. It does not remove the bias of missingness that is balanced across arms
 but depends on the outcome, and it does not correct an estimate: the rollout
 rule still analyses the observed units only. A flag is a description with the
-label `missingness_not_handled` (the label the F11 plan names); the rollout's
+label `missingness_not_handled`; the rollout's
 promote rule is unchanged, so a user who sees the flag decides. Its false
 alarm rate is the Ville bound, checked by simulation in
 `tests/unit/test_decision_missing.py`; no certificate for its power exists,

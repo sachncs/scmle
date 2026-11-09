@@ -1,4 +1,4 @@
-"""Cost-sensitive thresholding with a calibration gate (feature F11, A).
+"""Cost-sensitive thresholding with a calibration gate.
 
 For a calibrated probability `p = P(y = 1 | x)` the expected cost of acting
 is `(1 - p) c_FP` and of not acting `p c_FN`, so acting is optimal iff
@@ -39,7 +39,21 @@ PATHS = ("bayes", "recalibrated", "grid")
 
 
 def bayes_threshold(c_fp: float, c_fn: float) -> float:
-    """`t* = c_FP / (c_FP + c_FN)` for positive costs."""
+    """Returns the Bayes threshold `t* = c_FP / (c_FP + c_FN)`.
+
+    Args:
+        c_fp: Cost of a false positive; positive.
+        c_fn: Cost of a false negative; positive.
+
+    Returns:
+        The probability above which acting has the lower expected cost, in
+        (0, 1).
+
+    Raises:
+        ValueError: If either cost is not positive. A cost that is not a
+            finite number is rejected by `qualification.finite` with a
+            `ValueError`.
+    """
     fp = qualification.finite(c_fp, "c_fp")
     fn = qualification.finite(c_fn, "c_fn")
     if fp <= 0 or fn <= 0:
@@ -69,7 +83,21 @@ class CalibrationCheck:
 def probabilities_and_labels(
     p: ArrayLike, y: ArrayLike
 ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
-    """Validated probabilities and 0/1 labels of equal length."""
+    """Validated probabilities and 0/1 labels of equal length.
+
+    Args:
+        p: Predicted probabilities.
+        y: Labels, 0 or 1.
+
+    Returns:
+        The probabilities and the labels as float arrays.
+
+    Raises:
+        ValueError: If the shapes differ, or a probability is not finite or
+            lies outside [0, 1]. Labels that are not a non-empty
+            one-dimensional array of 0 and 1 are rejected by
+            `costs.binary_vector` with a `ValueError`.
+    """
     risk = np.asarray(p, dtype=float)
     labels = costs.binary_vector(y, "y")
     if risk.shape != labels.shape:
@@ -92,6 +120,12 @@ def calibration_check(
 
     Returns:
         The statistic, p-value and whether the probabilities were accepted.
+
+    Raises:
+        ValueError: If `level` is not strictly between 0 and 1, or there
+            are fewer than `5 * bins` rows. Invalid `p` or `y`, or `bins`
+            below 2, are also rejected with a `ValueError` by the helpers
+            `probabilities_and_labels` and `qualification.count`.
     """
     risk, labels = probabilities_and_labels(p, y)
     if not 0.0 < level < 1.0:
@@ -118,13 +152,25 @@ def calibration_check(
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Recalibrator:
-    """Platt scaling `sigmoid(a + b logit(p))`, fitted on development data."""
+    """Platt scaling `sigmoid(a + b logit(p))`, fitted on development data.
+
+    Attributes:
+        intercept: The intercept `a`.
+        slope: The slope `b` on the logit of the probability.
+    """
 
     intercept: float
     slope: float
 
     def apply(self, p: ArrayLike) -> NDArray[np.float64]:
-        """Recalibrated probabilities."""
+        """Recalibrates probabilities.
+
+        Args:
+            p: Probabilities; clipped to `[CLIP, 1 - CLIP]` first.
+
+        Returns:
+            The recalibrated probabilities, same shape as `p`.
+        """
         risk = np.clip(np.asarray(p, dtype=float), CLIP, 1.0 - CLIP)
         score = self.intercept + self.slope * np.log(risk / (1.0 - risk))
         result: NDArray[np.float64] = 1.0 / (1.0 + np.exp(-score))
@@ -132,7 +178,18 @@ class Recalibrator:
 
 
 def fit_recalibrator(p: ArrayLike, y: ArrayLike) -> Recalibrator:
-    """Maximum-likelihood Platt scaling (two parameters, no penalty)."""
+    """Maximum-likelihood Platt scaling (two parameters, no penalty).
+
+    Args:
+        p: Probabilities to recalibrate; clipped to `[CLIP, 1 - CLIP]`.
+        y: Labels, 0 or 1.
+
+    Returns:
+        The fitted intercept and slope.
+
+    Invalid `p` or `y` are rejected with a `ValueError` by
+    `probabilities_and_labels`.
+    """
     risk, labels = probabilities_and_labels(p, y)
     clipped = np.clip(risk, CLIP, 1.0 - CLIP)
     feature = np.log(clipped / (1.0 - clipped))
@@ -153,7 +210,22 @@ def fit_recalibrator(p: ArrayLike, y: ArrayLike) -> Recalibrator:
 
 
 def cross_fitted(p: ArrayLike, y: ArrayLike, seed: int) -> NDArray[np.float64]:
-    """Recalibrated probabilities where each row's map never saw its label."""
+    """Recalibrated probabilities where each row's map never saw its label.
+
+    Rows are split at random into `FOLDS` folds; the map applied to a fold is
+    fitted on the other folds.
+
+    Args:
+        p: Probabilities to recalibrate.
+        y: Labels, 0 or 1.
+        seed: Seed of the fold assignment.
+
+    Returns:
+        The cross-fitted probabilities, one per row, in input order.
+
+    Invalid `p` or `y` are rejected with a `ValueError` by
+    `probabilities_and_labels`.
+    """
     risk, labels = probabilities_and_labels(p, y)
     rng = randomness.component_rng(seed, "decision.threshold.folds", 0)
     fold = rng.permutation(len(risk)) % FOLDS
@@ -181,7 +253,15 @@ class ThresholdRule:
     recalibrator: Recalibrator | None = None
 
     def act(self, p: ArrayLike) -> NDArray[np.float64]:
-        """The rule's 0/1 actions."""
+        """Applies the rule.
+
+        Args:
+            p: Raw probabilities.
+
+        Returns:
+            1.0 where the (recalibrated) probability reaches the threshold,
+            otherwise 0.0, one per input.
+        """
         risk = np.asarray(p, dtype=float)
         if self.recalibrator is not None:
             risk = self.recalibrator.apply(risk)
@@ -205,7 +285,7 @@ class ThresholdRule:
 
     @property
     def digest(self) -> str:
-        """Hash identifying the frozen rule (not its actions anywhere)."""
+        """The hash identifying the frozen rule (not its actions)."""
         r = self.recalibrator
         label = f"{self.path}|{r.intercept!r}|{r.slope!r}" if r else self.path
         return netbenefit.rule_hash(label, self.threshold)
@@ -239,7 +319,12 @@ class ThresholdDecision:
     stable_range: tuple[float, float] | None
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Returns the JSON-ready record.
+
+        Returns:
+            The threshold, path, rule hash, tier, both checks, expected
+            cost, cost interval and stable range, with tuples as lists.
+        """
         return {
             "threshold": self.rule.threshold,
             "path": self.rule.path,
@@ -267,7 +352,22 @@ def cost_interval(
     replicates: int,
     seed: int,
 ) -> tuple[float, float]:
-    """95% percentile interval of the mean cost per row."""
+    """95% percentile interval of the mean cost per row.
+
+    Args:
+        y: Labels, 0 or 1.
+        acts: Actions of the rule, 0 or 1, aligned with `y`.
+        model: The cost model giving the cost of each (action, outcome).
+        clusters: Cluster label per row, or None to resample rows.
+        replicates: Number of bootstrap replicates.
+        seed: Seed of the bootstrap stream.
+
+    Returns:
+        The 2.5% and 97.5% quantiles of the bootstrapped mean cost per row.
+        With clusters, whole clusters are resampled. Clusters that are not
+        one-dimensional are rejected with a `ValueError` by
+        `netbenefit.factorize`.
+    """
     cell = np.where(
         acts == 1.0,
         np.where(y == 1.0, model.c_11, model.c_10),
@@ -294,7 +394,20 @@ def stable_span(
     model: costs.DecisionCostModel,
     points: int = 41,
 ) -> tuple[float, float] | None:
-    """Span of `t` in the chartered range where the frozen rule beats both."""
+    """Span of `t` in the chartered range where the frozen rule beats both.
+
+    Args:
+        p: Raw probabilities.
+        y: Labels, 0 or 1.
+        rule: The frozen rule.
+        model: The cost model giving the chartered range of `t`.
+        points: Number of grid points across the range.
+
+    Returns:
+        The first and last grid value of the longest run of thresholds at
+        which the rule's net benefit exceeds both treating everyone and
+        treating no one, or None if there is none.
+    """
     acts = rule.act(p)
     grid = np.linspace(model.t_lo, model.t_hi, points)
     good = np.array(

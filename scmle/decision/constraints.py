@@ -1,4 +1,4 @@
-"""Fairness as explicit constraints on a frozen rule (feature F11, F).
+"""Fairness as explicit constraints on a frozen rule.
 
 Default: no constraint. A `FairnessConstraint` in the charter bounds the gap
 between the groups of one attribute in the declared criterion for the frozen
@@ -52,7 +52,21 @@ class InfeasibleConstraintsError(ValueError):
 def prepared(
     y: ArrayLike, acts: ArrayLike, groups: ArrayLike
 ) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[Any]]:
-    """Validated outcomes, actions and group labels."""
+    """Validated outcomes, actions and group labels.
+
+    Args:
+        y: Outcomes, 0 or 1.
+        acts: Actions, 0 or 1, aligned with `y`.
+        groups: Group label per row.
+
+    Returns:
+        The outcomes and actions as float arrays, and the group labels.
+
+    Raises:
+        ValueError: If `groups` does not have the length of `y`. Invalid
+            outcomes or actions are rejected with a `ValueError` by
+            `costs.pair`.
+    """
     outcomes, actions = costs.pair(y, acts)
     labels = np.asarray(groups)
     if labels.shape != outcomes.shape:
@@ -61,7 +75,16 @@ def prepared(
 
 
 def wilson(count: float, total: float, z: float) -> tuple[float, float]:
-    """Wilson score interval for a proportion."""
+    """Wilson score interval for a proportion.
+
+    Args:
+        count: Number of successes.
+        total: Number of trials; positive.
+        z: Normal quantile of the interval.
+
+    Returns:
+        The lower and upper ends of the interval.
+    """
     p = count / total
     denom = 1.0 + z * z / total
     centre = (p + z * z / (2 * total)) / denom
@@ -76,7 +99,18 @@ def newcombe(
     total_b: float,
     confidence: float,
 ) -> tuple[float, float]:
-    """Newcombe's hybrid score interval for `p_a - p_b`."""
+    """Newcombe's hybrid score interval for `p_a - p_b`.
+
+    Args:
+        count_a: Successes in group a.
+        total_a: Trials in group a; positive.
+        count_b: Successes in group b.
+        total_b: Trials in group b; positive.
+        confidence: Two-sided confidence level of the interval.
+
+    Returns:
+        The lower and upper ends of the interval for the difference.
+    """
     z = float(stats.norm.ppf(1 - (1 - confidence) / 2))
     pa, pb = count_a / total_a, count_b / total_b
     la, ua = wilson(count_a, total_a, z)
@@ -93,7 +127,21 @@ def rate_tables(
     groups: NDArray[Any],
     criterion: str,
 ) -> dict[str, dict[Any, tuple[float, float]]]:
-    """Per group `(count, total)` for each rate the criterion compares."""
+    """Per group `(count, total)` for each rate the criterion compares.
+
+    Args:
+        y: Outcomes, 0 or 1.
+        acts: Actions, 0 or 1, aligned with `y`.
+        groups: Group label per row.
+        criterion: One of `demographic_parity`, `equal_opportunity`,
+            `equalized_odds` and `predictive_parity`.
+
+    Returns:
+        For each rate the criterion compares (`selection`, `tpr`, `fpr` or
+        `ppv`), a mapping from group label to the numerator and denominator
+        of that rate. A `criterion` other than those listed fails with a
+        `KeyError`.
+    """
     tables: dict[str, dict[Any, tuple[float, float]]] = {}
     wanted = {
         "demographic_parity": ("selection",),
@@ -143,7 +191,11 @@ class SatisfactionTest:
     alpha: float
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Returns the JSON-ready record.
+
+        Returns:
+            Every field of the test as a mapping.
+        """
         return dataclasses.asdict(self)
 
 
@@ -158,6 +210,23 @@ def satisfaction_test(
 
     The claim is `satisfied` only if the upper bound of every compared gap is
     at most `constraint.max_gap`.
+
+    Args:
+        y: Outcomes on the final table, 0 or 1.
+        acts: The frozen rule's actions, 0 or 1, aligned with `y`.
+        groups: Group label per row.
+        constraint: The declared criterion, gap bound and smallest group.
+        alpha: Total level, split over group pairs and rates.
+
+    Returns:
+        The test outcome. The status is `not_assessable` when a group is
+        smaller than `constraint.min_group` for a rate's denominator or
+        there are fewer than two groups; otherwise `satisfied` or
+        `not_satisfied`, with the largest observed gap and its upper bound.
+
+    Raises:
+        ValueError: If `alpha` is not strictly between 0 and 1. Invalid
+            inputs are also rejected with a `ValueError` by `prepared`.
     """
     outcomes, actions, labels = prepared(y, acts, groups)
     if not 0.0 < alpha < 1.0:
@@ -247,6 +316,27 @@ def cluster_satisfaction_test(
     in `tests/unit/test_decision_constraints.py`, and it makes no claim about
     a handful of clusters (fewer than 20 clusters are reported
     `not_assessable`).
+
+    Args:
+        y: Outcomes on the final table, 0 or 1.
+        acts: The frozen rule's actions, 0 or 1, aligned with `y`.
+        groups: Group label per row.
+        clusters: Cluster label per row.
+        constraint: The declared criterion, gap bound and smallest group.
+        alpha: Level of the bound.
+        draws: Number of cluster resamples.
+        seed: Seed of the resampling stream.
+
+    Returns:
+        The test outcome, `not_assessable` when a group is too small, there
+        are fewer than two groups or fewer than `MIN_CLUSTERS` clusters;
+        otherwise `satisfied` or `not_satisfied` with the observed largest
+        gap and its bootstrap upper bound.
+
+    Raises:
+        ValueError: If `clusters` does not have the length of `y`, `alpha`
+            is not strictly between 0 and 1, or `draws` is below 1. Invalid
+            inputs are also rejected with a `ValueError` by `prepared`.
     """
     outcomes, actions, labels = prepared(y, acts, groups)
     keys = np.asarray(clusters)
@@ -291,6 +381,16 @@ def cluster_satisfaction_test(
     )
 
     def largest_gap(totals: NDArray[np.float64]) -> NDArray[np.float64]:
+        """Largest gap in any rate between groups.
+
+        Args:
+            totals: Numerators and denominators with last axes
+                `(group, 2)`.
+
+        Returns:
+            The largest difference between the highest and lowest group
+            rate, over the rates, ignoring undefined rates.
+        """
         with np.errstate(divide="ignore", invalid="ignore"):
             rates = totals[..., 0] / totals[..., 1]
         spread = np.nanmax(rates, axis=-1) - np.nanmin(rates, axis=-1)
@@ -320,7 +420,16 @@ def cluster_satisfaction_test(
 def base_rates(
     y: ArrayLike, groups: ArrayLike
 ) -> dict[str, tuple[float, float]]:
-    """Per group `(positives, rows)`."""
+    """Per group `(positives, rows)`.
+
+    Args:
+        y: Outcomes, 0 or 1.
+        groups: Group label per row.
+
+    Returns:
+        For each group label (as text), the number of positive outcomes and
+        the number of rows.
+    """
     outcomes = costs.binary_vector(y, "y")
     labels = np.asarray(groups)
     return {
@@ -339,6 +448,19 @@ def check_feasibility(
     alpha: float = 0.05,
 ) -> dict[str, Any]:
     """Refuses criteria that cannot hold together at the measured base rates.
+
+    Args:
+        constraints: The declared fairness constraints.
+        y: Outcomes, 0 or 1.
+        groups: Group label per row.
+        alpha: Total level of the base-rate comparison, split over group
+            pairs.
+
+    Returns:
+        The base rate of each group, whether any pair of groups has base
+        rates that differ (the interval for the difference excludes zero),
+        the incompatible pairs of declared criteria, and `refused` set to
+        False.
 
     Raises:
         InfeasibleConstraintsError: Naming the conflicting pair, when two
@@ -395,7 +517,16 @@ class GroupThresholds:
     constrained: bool
 
     def act(self, scores: ArrayLike, groups: ArrayLike) -> NDArray[np.float64]:
-        """The rule's 0/1 actions."""
+        """Applies each group's cut.
+
+        Args:
+            scores: Score per row.
+            groups: Group label per row; each must be a key of `cuts` once
+                converted to text.
+
+        Returns:
+            1.0 where the score reaches its group's cut, otherwise 0.0.
+        """
         s = np.asarray(scores, dtype=float)
         g = np.asarray(groups)
         cut = np.array([self.cuts[str(x)] for x in g])
@@ -408,7 +539,19 @@ def development_gap(
     labels: NDArray[Any],
     criterion: str,
 ) -> float:
-    """Largest gap between groups in the criterion's rates (point values)."""
+    """Largest gap between groups in the criterion's rates (point values).
+
+    Args:
+        y: Outcomes, 0 or 1.
+        acts: Actions, 0 or 1, aligned with `y`.
+        labels: Group label per row.
+        criterion: The fairness criterion.
+
+    Returns:
+        The largest difference between the highest and lowest group rate
+        over the criterion's rates; a group with an empty denominator counts
+        as rate 0.
+    """
     worst = 0.0
     for table in rate_tables(y, acts, labels, criterion).values():
         rates = [c / t if t > 0 else 0.0 for c, t in table.values()]
@@ -433,6 +576,18 @@ def fit_group_thresholds(
     whose rate is closest to it; the best net benefit within the bound wins.
     Criteria that group thresholds cannot move (predictive parity) and
     unreachable bounds raise.
+
+    Args:
+        scores: Development scores.
+        y: Development outcomes, 0 or 1.
+        groups: Group label per row.
+        constraint: The declared criterion and gap bound.
+        t: The Bayes threshold, also the weight point of the net benefit.
+        margin: Fraction of `max_gap` that the development gap may use.
+
+    Returns:
+        The group cuts. When the common cut at `t` already meets the bound,
+        every group gets `t` and `constrained` is False.
 
     Raises:
         InfeasibleConstraintsError: If no sweep point meets the bound.
@@ -493,7 +648,23 @@ def frontier(
     t: float,
     gaps: Sequence[float],
 ) -> list[dict[str, Any]]:
-    """Net benefit along a sweep of `max_gap`; infeasible points say so."""
+    """Net benefit along a sweep of `max_gap`; infeasible points say so.
+
+    Args:
+        scores: Development scores.
+        y: Development outcomes, 0 or 1.
+        groups: Group label per row.
+        constraint: The declared criterion; its `max_gap` is replaced by
+            each value of `gaps`.
+        t: The Bayes threshold.
+        gaps: The gap bounds to sweep.
+
+    Returns:
+        One record per bound with `max_gap` and `feasible`; a feasible point
+        also carries its development net benefit and development gap. Errors
+        other than infeasibility, including the refusal of predictive
+        parity, propagate from `fit_group_thresholds`.
+    """
     rows = []
     for gap in gaps:
         trial = dataclasses.replace(constraint, max_gap=gap)
@@ -523,7 +694,21 @@ def price_of_constraint(
     replicates: int = 500,
     seed: int = 0,
 ) -> dict[str, float]:
-    """`NB(unconstrained) - NB(constrained)` with a 95% bootstrap interval."""
+    """`NB(unconstrained) - NB(constrained)` with a 95% bootstrap interval.
+
+    Args:
+        y: Outcomes, 0 or 1.
+        unconstrained: Actions of the rule without the constraint.
+        constrained: Actions of the constrained rule.
+        t: Threshold probability of the net benefit.
+        clusters: Cluster label per row, or None for independent rows.
+        replicates: Number of bootstrap replicates.
+        seed: Seed of the bootstrap stream.
+
+    Returns:
+        The `price` (net benefit given up) and the `lower` and `upper` ends
+        of its 95% percentile interval.
+    """
     outcomes, free = costs.pair(y, unconstrained)
     ignored, bound = costs.pair(y, constrained)
     w = costs.odds(t)
@@ -537,6 +722,15 @@ def price_of_constraint(
     )
 
     def price(m: NDArray[np.float64]) -> NDArray[np.float64]:
+        """Net benefit of the free rule minus that of the constrained rule.
+
+        Args:
+            m: Row means of the four statistics (free and constrained
+                true and false positives) on the last axis.
+
+        Returns:
+            The difference, one value per leading index.
+        """
         return (m[..., 0] - w * m[..., 1]) - (m[..., 2] - w * m[..., 3])
 
     rng = randomness.component_rng(seed, "decision.constraints.price", 0)

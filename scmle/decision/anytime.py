@@ -1,13 +1,13 @@
-"""Anytime-valid evidence for a bounded mean (feature F11, part D and E).
+"""Anytime-valid evidence for a bounded mean.
 
 For a stream `z_1, z_2, ...` with values in `[low, high]` and conditional mean
 `m`, rescale to `u = (z - low) / (high - low)` in `[0, 1]` and let `m0` be the
-rescaled null. To reject `H0: m <= m0` bet on the mean being larger: for a
+rescaled null. To reject `H_0: m <= m0` bet on the mean being larger: for a
 `lam` in `(0, 1 / m0)` the wealth
 
     K_t(lam) = prod_{i <= t} (1 + lam (u_i - m0))
 
-is a nonnegative martingale under `H0` with `K_0 = 1` (each factor is
+is a nonnegative martingale under `H_0` with `K_0 = 1` (each factor is
 positive and has conditional mean at most one). A convex combination of such
 martingales is again a nonnegative supermartingale, so the equal-weight
 mixture over a fixed grid of `lam` values,
@@ -15,18 +15,18 @@ mixture over a fixed grid of `lam` values,
     E_t = mean_k K_t(lam_k),
 
 is an e-process, and by Ville's inequality `P(sup_t E_t >= 1 / alpha) <=
-alpha` under `H0` for every stopping rule, including peeking after every
+alpha` under `H_0` for every stopping rule, including peeking after every
 unit. The grid is fixed in advance and does not depend on the data, so the
 guarantee needs no appeal to a result about plug-in betting. The idea of
 testing a bounded mean by betting is the one in Waudby-Smith and Ramdas
 (2024, arXiv:2010.09686); the mixture over a fixed grid below is the
-construction used here and its error rate is measured by the certificates
-(`benchmarks/qualification/f11_certify.py`), not taken from that paper. The
+construction used here and its error rate is measured by the certificates,
+not taken from that paper. The
 price of fixing the grid is that the e-process is slower than the best single
 `lam` for the true effect; the price against a fixed-horizon test is
-measured (B3).
+measured.
 
-To reject `H0: m >= m0` the stream is reflected (`u -> 1 - u`).
+To reject `H_0: m >= m0` the stream is reflected (`u -> 1 - u`).
 
 For a randomized experiment with challenger probability `q` and outcome `y`
 in `[0, 1]`, the pseudo-outcome
@@ -83,7 +83,15 @@ class Stream:
     direction: str = "greater"
 
     def __post_init__(self) -> None:
-        """Validates the stream."""
+        """Validates the stream.
+
+        Raises:
+            ValueError: If `low` is not below `high`, `null` does not lie
+                strictly inside `(low, high)`, or `direction` is not
+                `greater` or `less`. A bound or null that is not a finite
+                number is rejected with a `ValueError` by
+                `qualification.finite`.
+        """
         low = qualification.finite(self.low, "low")
         high = qualification.finite(self.high, "high")
         null = qualification.finite(self.null, "null")
@@ -95,12 +103,30 @@ class Stream:
             raise ValueError("direction must be 'greater' or 'less'")
 
     def rescaled_null(self) -> float:
-        """The null in the orientation where larger values are evidence."""
+        """The null in the orientation where larger values are evidence.
+
+        Returns:
+            The null as a position in `(0, 1)` after rescaling to the unit
+            interval, reflected when `direction` is `less`.
+        """
         position = (self.null - self.low) / (self.high - self.low)
         return position if self.direction == "greater" else 1.0 - position
 
     def rescale(self, values: ArrayLike) -> NDArray[np.float64]:
-        """Values in the orientation where larger values are evidence."""
+        """Values in the orientation where larger values are evidence.
+
+        Args:
+            values: Observations of the stream, one-dimensional.
+
+        Returns:
+            The values rescaled to `[0, 1]` and reflected when `direction`
+            is `less`. Values outside `[low, high]` by no more than a
+            relative tolerance of 1e-9 are clipped.
+
+        Raises:
+            ValueError: If `values` is not one-dimensional, is not finite,
+                or has a value outside `[low, high]` beyond the tolerance.
+        """
         array = np.asarray(values, dtype=float)
         if array.ndim != 1:
             raise ValueError("values must be one-dimensional")
@@ -116,7 +142,20 @@ class Stream:
 
 
 def bet_grid(null_unit: float, size: int = GRID_SIZE) -> NDArray[np.float64]:
-    """Fixed bet sizes `GRID_TOP / null_unit * 2 ** -k` for `k < size`."""
+    """Fixed bet sizes `GRID_TOP / null_unit * 2 ** -k` for `k < size`.
+
+    Args:
+        null_unit: The rescaled null, strictly between 0 and 1.
+        size: Number of bet sizes; at least 1.
+
+    Returns:
+        The bet sizes, largest first.
+
+    Raises:
+        ValueError: If `null_unit` is not strictly between 0 and 1. A
+            `size` below 1 is rejected with a `ValueError` by
+            `qualification.count`.
+    """
     if not 0.0 < null_unit < 1.0:
         raise ValueError("null_unit must be strictly between 0 and 1")
     qualification.count(size, "size", minimum=1)
@@ -139,6 +178,9 @@ def log_wealth(
 
     Returns:
         An array of the same shape as `unit`.
+
+    Raises:
+        ScmleError: If the bet grid is empty.
     """
     grid = bet_grid(null_unit, size)
     centred = unit - null_unit
@@ -155,7 +197,17 @@ def log_wealth(
 def log_wealth_paths(
     values: ArrayLike, stream: Stream, size: int = GRID_SIZE
 ) -> NDArray[np.float64]:
-    """Log e-process paths for raw values, shape `(T,)` or `(R, T)`."""
+    """Log e-process paths for raw values, shape `(T,)` or `(R, T)`.
+
+    Args:
+        values: Raw observations of the stream; `rescale` is applied to the
+            flattened values, so they must lie in the stream's range.
+        stream: The bounded stream and its null.
+        size: Number of bet sizes in the mixture.
+
+    Returns:
+        The log e-value after each observation, same shape as `values`.
+    """
     array = np.asarray(values, dtype=float)
     flat = stream.rescale(array.reshape(-1)).reshape(array.shape)
     return log_wealth(flat, stream.rescaled_null(), size)
@@ -186,7 +238,11 @@ class EProcess:
     )
 
     def __post_init__(self) -> None:
-        """Starts every bet at wealth one."""
+        """Starts every bet at wealth one.
+
+        When no totals were supplied, the log wealth of each bet size is set
+        to zero.
+        """
         grid = bet_grid(self.stream.rescaled_null(), self.size)
         if self.totals is None:
             self.totals = np.zeros(len(grid))
@@ -196,6 +252,17 @@ class EProcess:
 
         The running maximum is taken at every single observation, so peeking
         after each unit is covered even when values arrive in batches.
+
+        Args:
+            values: New observations of the stream, one-dimensional and in
+                the stream's range.
+
+        Returns:
+            The log e-value after the last observation, or the unchanged
+            current value if `values` is empty.
+
+        Raises:
+            ScmleError: If the bet totals are not initialised.
         """
         unit = self.stream.rescale(values)
         self.path = np.zeros(0)
@@ -216,11 +283,25 @@ class EProcess:
         return self.log_e
 
     def crossed(self, level: float) -> bool:
-        """Whether the e-value is at least `1 / level` now."""
+        """Whether the e-value is at least `1 / level` now.
+
+        Args:
+            level: Level of the test, strictly between 0 and 1.
+
+        Returns:
+            True if the current e-value has reached `1 / level`.
+        """
         return self.log_e >= -math.log(positive_level(level))
 
     def ever_crossed(self, level: float) -> bool:
-        """Whether it was at least `1 / level` at any observation."""
+        """Whether it was at least `1 / level` at any observation.
+
+        Args:
+            level: Level of the test, strictly between 0 and 1.
+
+        Returns:
+            True if the e-value reached `1 / level` at some observation.
+        """
         return self.max_log_e >= -math.log(positive_level(level))
 
     def evidence(self) -> online_fdr.Evidence:
@@ -228,12 +309,27 @@ class EProcess:
 
         An e-process evaluated at a stopping time is an e-value, so the
         value may enter an online FDR rule once the experiment has stopped.
+
+        Returns:
+            The e-value (capped at `exp(MAX_LOG)`) as ledger evidence.
         """
         return online_fdr.Evidence(e=math.exp(min(self.log_e, MAX_LOG)))
 
 
 def positive_level(level: float) -> float:
-    """A level strictly between 0 and 1."""
+    """A level strictly between 0 and 1.
+
+    Args:
+        level: The candidate level.
+
+    Returns:
+        `level` as a float.
+
+    Raises:
+        ValueError: If `level` is not strictly between 0 and 1. A `level`
+            that is not a finite number is rejected with a `ValueError` by
+            `qualification.finite`.
+    """
     value = qualification.finite(level, "level")
     if not 0.0 < value < 1.0:
         raise ValueError("level must be strictly between 0 and 1")
@@ -258,6 +354,13 @@ def pseudo_outcomes(
     Returns:
         Pseudo-outcomes with the mean difference as their mean; without a
         centre they lie in `[-1 / (1 - q), 1 / q]`.
+
+    Raises:
+        ValueError: If `assignment_prob` is not strictly between 0 and 1,
+            `arm` and `outcome` differ in shape or are not 1-d or 2-d, `arm`
+            holds a value other than 0 and 1, `outcome` is not finite or
+            lies outside `[0, 1]`, or `center` differs in shape from
+            `outcome` or lies outside `[0, 1]`.
     """
     q = qualification.finite(assignment_prob, "assignment_prob")
     if not 0.0 < q < 1.0:
@@ -294,6 +397,15 @@ def running_center(
     the last axis; `carry` is the `(sum, count)` of outcomes seen in earlier
     batches. Each centre is fixed before its own unit is observed, which is
     all the validity argument needs.
+
+    Args:
+        outcome: The metric rescaled to `[0, 1]`.
+        prior: Value the centre shrinks toward.
+        strength: Weight of `prior`, in pseudo-observations.
+        carry: The `(sum, count)` of outcomes seen in earlier batches.
+
+    Returns:
+        The centre for each outcome, same shape as `outcome`.
     """
     y = np.asarray(outcome, dtype=float)
     total, seen = carry
@@ -308,7 +420,17 @@ def running_center(
 def centered_stream(
     assignment_prob: float, null: float, direction: str = "greater"
 ) -> Stream:
-    """The stream of centred pseudo-outcomes, bounded in `[-M, M]`."""
+    """The stream of centred pseudo-outcomes, bounded in `[-M, M]`.
+
+    Args:
+        assignment_prob: The recorded probability `q` of the challenger,
+            strictly between 0 and 1.
+        null: The null mean of the centred difference.
+        direction: `greater` or `less`.
+
+    Returns:
+        The stream on `[-M, M]` with `M = max(1/q, 1/(1 - q))`.
+    """
     q = assignment_prob
     bound = max(1.0 / q, 1.0 / (1.0 - q))
     return Stream(-bound, bound, null, direction)
@@ -331,6 +453,10 @@ def centered_paths(
         null: The null mean of the (signed) difference in rescaled units.
         direction: `greater` or `less`.
         sign: `-1` to test the negated difference (a lower-is-worse metric).
+
+    Returns:
+        The log e-value after each observation, with the shape of
+        `outcome`.
     """
     y = np.asarray(outcome, dtype=float)
     z = sign * pseudo_outcomes(arm, y, assignment_prob, running_center(y))
@@ -342,7 +468,17 @@ def centered_paths(
 def difference_stream(
     assignment_prob: float, null: float, direction: str = "greater"
 ) -> Stream:
-    """The stream of pseudo-outcomes for an effect on a `[0, 1]` metric."""
+    """The stream of pseudo-outcomes for an effect on a `[0, 1]` metric.
+
+    Args:
+        assignment_prob: The recorded probability `q` of the challenger,
+            strictly between 0 and 1.
+        null: The null mean difference.
+        direction: `greater` or `less`.
+
+    Returns:
+        The stream on `[-1/(1 - q), 1/q]`.
+    """
     q = assignment_prob
     return Stream(-1.0 / (1.0 - q), 1.0 / q, null, direction)
 
@@ -350,7 +486,21 @@ def difference_stream(
 def bound_stream(
     bound: float, null: float = 0.0, direction: str = "greater"
 ) -> Stream:
-    """The stream of paired differences bounded in `[-bound, bound]`."""
+    """The stream of paired differences bounded in `[-bound, bound]`.
+
+    Args:
+        bound: Largest absolute difference; positive.
+        null: The null mean difference.
+        direction: `greater` or `less`.
+
+    Returns:
+        The stream on `[-bound, bound]`.
+
+    Raises:
+        ValueError: If `bound` is not positive. A `bound` that is not a
+            finite number is rejected with a `ValueError` by
+            `qualification.finite`.
+    """
     b = qualification.finite(bound, "bound")
     if b <= 0:
         raise ValueError("bound must be positive")
@@ -370,6 +520,18 @@ def confidence_bound(
     `P(exists t: mean < L_t) <= alpha`; for `'less'` an upper bound. It is
     the boundary null at which the e-process at time `t` equals `1 / alpha`,
     found by bisection (the e-value is monotone in the null).
+
+    Args:
+        values: Observations of the stream in its range; may be empty.
+        stream: The bounded stream; its null is ignored.
+        alpha: Error level, strictly between 0 and 1.
+        size: Number of bet sizes in the mixture.
+        steps: Bisection steps.
+
+    Returns:
+        The bound. When the e-process never reaches `1 / alpha`, even for a
+        null at the edge of the range (and for empty `values`), the edge
+        itself: `stream.low` for `greater`, `stream.high` for `less`.
     """
     level = positive_level(alpha)
     array = np.asarray(values, dtype=float)

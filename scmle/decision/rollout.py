@@ -1,4 +1,4 @@
-"""The promote, hold and rollback rule (feature F11, E).
+"""The promote, hold and rollback rule.
 
 For a challenger against the champion, with `Delta` the challenger's
 advantage on the primary metric (in the metric's favourable direction):
@@ -96,7 +96,11 @@ class Decision:
     assumptions: tuple[str, ...] = ASSUMPTIONS
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Returns the JSON-ready record.
+
+        Returns:
+            Every field of the decision as a mapping.
+        """
         return dataclasses.asdict(self)
 
 
@@ -108,6 +112,15 @@ def metric_stream(
 
     A higher-is-worse guardrail tests whether the harm reaches its margin (a
     `less` test); a lower-is-worse one negates its values and does the same.
+
+    Args:
+        plan: The rollout plan giving the assignment probability, the
+            primary metric range and the smallest worthwhile improvement.
+        guard: The guardrail, or None for the primary metric.
+
+    Returns:
+        The stream on which the e-process for that metric is run, with its
+        null in rescaled units.
     """
     q = plan.assignment_prob
     if guard is None:
@@ -129,6 +142,19 @@ def metric_values(
 
     The centre of each unit is the shrunken mean of the outcomes seen before
     it, so the values stay a valid stream however the batches are cut.
+
+    Args:
+        plan: The rollout plan giving the assignment probability and the
+            primary metric range.
+        guard: The guardrail, or None for the primary metric.
+        arm: 1 for the challenger, 0 for the champion, per unit.
+        outcome: Raw metric value per unit, aligned with `arm`.
+        carry: The `(sum, count)` of rescaled outcomes seen in earlier
+            batches.
+
+    Returns:
+        The pseudo-outcomes (negated for a lower-is-worse guardrail), and
+        the updated `(sum, count)` that includes this batch.
     """
     low, high = (
         (plan.low, plan.high) if guard is None else (guard.low, guard.high)
@@ -147,6 +173,16 @@ class Rollout:
 
     The level is assigned from the `DecisionBudget` before any traffic and is
     spent whether or not the experiment ends in a promotion.
+
+    Attributes:
+        plan: The rollout plan.
+        experiment_id: Identity of the experiment.
+        level: The level assigned to this experiment.
+        status: One of `hold`, `promote`, `hold_final`, `hold_invalid`.
+        units: Units observed so far.
+        challenger_units: Units assigned to the challenger so far.
+        done_at: The unit at which the status stopped being `hold`, or 0
+            while the experiment is still running.
     """
 
     def __init__(
@@ -155,7 +191,17 @@ class Rollout:
         experiment_id: str,
         level: float,
     ) -> None:
-        """Starts an experiment at the level the budget assigned."""
+        """Starts an experiment at the level the budget assigned.
+
+        Args:
+            plan: The rollout plan.
+            experiment_id: Identity of the experiment.
+            level: The level the decision budget assigned, strictly between
+                0 and 1.
+
+        Raises:
+            ValueError: If `level` is not strictly between 0 and 1.
+        """
         if not 0.0 < level < 1.0:
             raise ValueError("level must be strictly between 0 and 1")
         self.plan = plan
@@ -193,6 +239,20 @@ class Rollout:
         evaluated at each observation in the batch, so batch size does not
         change the error guarantee. After a decision, later units are
         ignored.
+
+        Args:
+            arm: 1 for the challenger, 0 for the champion, per unit.
+            primary: Raw primary metric value per unit, aligned with `arm`.
+            guardrails: Raw value per unit for each guardrail, keyed by
+                guardrail name.
+
+        Returns:
+            The decision after this batch. Units beyond `n_max` are dropped.
+
+        Raises:
+            ValueError: If a guardrail of the rollout plan has no values in
+                `guardrails`. Invalid arms or outcomes are rejected with a
+                `ValueError` by `anytime.pseudo_outcomes`.
         """
         if self.status != HOLD:
             return self.decision()
@@ -240,7 +300,14 @@ class Rollout:
         return self.decision()
 
     def decision(self) -> Decision:
-        """The decision record for the current state."""
+        """The decision record for the current state.
+
+        Returns:
+            The status, units, level, log e-values and lower confidence
+            bound on the primary advantage (in metric units; the negative
+            metric range when there are no units). After a promotion or an
+            invalid hold, the bound uses only the units up to the decision.
+        """
         scale = self.plan.high - self.plan.low
         stream = metric_stream(self.plan, None)
         z = np.concatenate(self.primary_z) if self.primary_z else np.zeros(0)
@@ -267,7 +334,12 @@ class RollbackMonitor:
 
     The previous champion is held out at probability `1 - new_prob`. The
     monitor rolls back at the first observation where the e-process of
-    `H0: Delta_new_vs_old >= -tolerance` reaches `1 / alpha_rollback`.
+    `H_0: Delta_new_vs_old >= -tolerance` reaches `1 / alpha_rollback`.
+
+    Attributes:
+        status: `hold` or `rollback`.
+        units: Units observed so far.
+        done_at: The unit at which the monitor rolled back, or 0.
     """
 
     def __init__(
@@ -278,7 +350,16 @@ class RollbackMonitor:
         low: float = 0.0,
         high: float = 1.0,
     ) -> None:
-        """Starts the monitor with the champion's own rollback level."""
+        """Starts the monitor with the champion's own rollback level.
+
+        Args:
+            tolerance: Largest drop of the new champion against the old one
+                that is accepted, in metric units.
+            alpha_rollback: Level at which a rollback is triggered.
+            new_prob: Probability that a unit is served the new champion.
+            low: Smallest value of the metric.
+            high: Largest value of the metric.
+        """
         scale = high - low
         self.low, self.high = low, high
         self.new_prob = new_prob
@@ -294,7 +375,17 @@ class RollbackMonitor:
         self.done_at = 0
 
     def observe(self, arm: ArrayLike, outcome: ArrayLike) -> str:
-        """Adds a batch (arm 1 is the new champion); returns the status."""
+        """Adds a batch (arm 1 is the new champion); returns the status.
+
+        Args:
+            arm: 1 for the new champion, 0 for the previous one, per unit.
+            outcome: Raw metric value per unit, aligned with `arm`.
+
+        Returns:
+            `hold`, or `rollback` once the e-process has reached
+            `1 / alpha_rollback`; a rolled-back monitor ignores further
+            batches.
+        """
         if self.status != HOLD:
             return self.status
         y = (np.asarray(outcome, dtype=float) - self.low) / (
@@ -321,6 +412,10 @@ class DecisionLog:
 
     Each row carries the SHA-256 of the previous row, so a replay reproduces
     the chain bit for bit and any edit is detected.
+
+    Attributes:
+        rows: The records in order, each with `seq`, `kind`, `body`,
+            `previous` and `hash`.
     """
 
     def __init__(self) -> None:
@@ -328,7 +423,16 @@ class DecisionLog:
         self.rows: list[dict[str, Any]] = []
 
     def append(self, kind: str, body: Mapping[str, Any]) -> dict[str, Any]:
-        """Adds a row linked to the previous one."""
+        """Adds a row linked to the previous one.
+
+        Args:
+            kind: Label of the record.
+            body: The record's content; must be JSON-serialisable.
+
+        Returns:
+            The new row, including its sequence number, the previous hash
+            and its own hash.
+        """
         previous = self.rows[-1]["hash"] if self.rows else "0" * 64
         record = {
             "seq": len(self.rows),
@@ -341,7 +445,12 @@ class DecisionLog:
         return record
 
     def verify(self) -> bool:
-        """Whether every row links to the one before and hashes correctly."""
+        """Whether every row links to the one before and hashes correctly.
+
+        Returns:
+            True if sequence numbers, links and hashes are all consistent
+            (also for an empty chain), otherwise False.
+        """
         previous = "0" * 64
         for index, row in enumerate(self.rows):
             if row["seq"] != index or row["previous"] != previous:
@@ -352,7 +461,11 @@ class DecisionLog:
         return True
 
     def write(self, path: str | Path) -> None:
-        """Writes the rows as JSON lines."""
+        """Writes the rows as JSON lines.
+
+        Args:
+            path: File to write, replacing any existing content.
+        """
         text = "".join(
             json.dumps(r, sort_keys=True, separators=(",", ":")) + "\n"
             for r in self.rows
@@ -361,7 +474,14 @@ class DecisionLog:
 
     @classmethod
     def read(cls, path: str | Path) -> "DecisionLog":
-        """Reads rows back; the chain is verified by `verify`."""
+        """Reads rows back; the chain is verified by `verify`.
+
+        Args:
+            path: A file of JSON lines written by `write`.
+
+        Returns:
+            A log holding the rows as read, without checking them.
+        """
         log = cls()
         for line in Path(path).read_text(encoding="utf-8").splitlines():
             log.rows.append(json.loads(line))
@@ -369,7 +489,14 @@ class DecisionLog:
 
 
 def row_hash(record: Mapping[str, Any]) -> str:
-    """SHA-256 of a row without its own hash."""
+    """SHA-256 of a row without its own hash.
+
+    Args:
+        record: A row; its `hash` entry, if any, is left out.
+
+    Returns:
+        The hexadecimal digest of the canonical JSON of the rest of the row.
+    """
     body = {k: v for k, v in record.items() if k != "hash"}
     text = json.dumps(body, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(text.encode("utf-8")).hexdigest()

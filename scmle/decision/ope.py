@@ -1,4 +1,4 @@
-"""Off-policy evaluation of a target policy from a randomized log (F11, C).
+"""Off-policy evaluation of a target policy from a randomized log.
 
 Setting: rows `(x_i, a_i, y_i)` logged under a behaviour policy `mu(a | x)`
 with recorded probabilities, and a target policy `pi(a | x)` fixed before the
@@ -19,8 +19,8 @@ Three gates decide whether a value is issued, all declared in the charter:
 support (the target may put mass only where `mu >= eps`), the Kish effective
 sample size over `n`, and the presence of recorded propensities. A refusal
 returns no value. Observational logs, whose propensities are estimated, are
-accepted only with a statement from an eligible identification strategy
-(F10); otherwise the result is labelled `unverified`.
+accepted only with a statement from an eligible identification strategy;
+otherwise the result is labelled `unverified`.
 """
 
 import dataclasses
@@ -66,7 +66,16 @@ class LoggedBandit:
     randomized: bool = True
 
     def __post_init__(self) -> None:
-        """Validates shapes and probabilities."""
+        """Validates shapes and probabilities.
+
+        Raises:
+            ValueError: If there are no rows or `rewards` does not align with
+                `actions`; if `behaviour` or `target` does not have shape
+                `(n, K)`, has a negative entry or has a row that does not sum
+                to one; if they differ in `K`; if an action index lies
+                outside `0 .. K-1`; or if `outcome_model` or `clusters` does
+                not align with the rows.
+        """
         n = len(self.actions)
         if self.rewards.shape != (n,) or n == 0:
             raise ValueError("rewards must align with actions")
@@ -91,11 +100,19 @@ class LoggedBandit:
 
     @property
     def rows(self) -> int:
-        """Number of logged rows."""
+        """The number of logged rows."""
         return len(self.actions)
 
     def taken(self, matrix: NDArray[np.float64]) -> NDArray[np.float64]:
-        """The entry of `matrix` at each row's logged action."""
+        """The entry of `matrix` at each row's logged action.
+
+        Args:
+            matrix: A matrix of shape `(n, K)`.
+
+        Returns:
+            A vector of length `n` holding, for each row, the entry in the
+            column of the action logged for that row.
+        """
         result: NDArray[np.float64] = matrix[np.arange(self.rows), self.actions]
         return result
 
@@ -127,14 +144,28 @@ class ValueEstimate:
     clipped: bool
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Returns the JSON-ready record.
+
+        Returns:
+            Every field of the estimate as a mapping.
+        """
         return dataclasses.asdict(self)
 
 
 def weights(
     log: LoggedBandit, clip: float | None
 ) -> tuple[NDArray[np.float64], float]:
-    """Importance weights at the logged actions and the clipped share."""
+    """Importance weights at the logged actions and the clipped share.
+
+    Args:
+        log: The logged data and target policy.
+        clip: Largest weight allowed, or None for no clipping.
+
+    Returns:
+        The weights `pi / mu` at the logged action of each row, clipped at
+        `clip` when given, and the share of rows whose raw weight exceeded
+        `clip` (0.0 when `clip` is None).
+    """
     ratio = log.taken(log.target) / log.taken(log.behaviour)
     if clip is None:
         return ratio, 0.0
@@ -142,7 +173,16 @@ def weights(
 
 
 def support_violations(log: LoggedBandit, min_propensity: float) -> int:
-    """Rows where the target puts mass on an action with `mu < eps`."""
+    """Rows where the target puts mass on an action with `mu < eps`.
+
+    Args:
+        log: The logged data and target policy.
+        min_propensity: The support floor `eps`.
+
+    Returns:
+        The number of rows with at least one action that has positive target
+        probability and behaviour probability below `min_propensity`.
+    """
     bad = (log.target > 0) & (log.behaviour < min_propensity)
     return int(bad.any(axis=1).sum())
 
@@ -150,7 +190,20 @@ def support_violations(log: LoggedBandit, min_propensity: float) -> int:
 def terms(
     log: LoggedBandit, estimator: str, clip: float | None
 ) -> tuple[NDArray[np.float64], float]:
-    """Per-row influence terms whose mean is the estimate."""
+    """Per-row influence terms whose mean is the estimate.
+
+    Args:
+        log: The logged data, target policy and, for `dr`, the outcome model.
+        estimator: `ipw`, `snips` or `dr`.
+        clip: Largest importance weight allowed, or None.
+
+    Returns:
+        The term for each row, and the share of rows whose weight was
+        clipped.
+
+    Raises:
+        ValueError: If `estimator` is `dr` and the log has no outcome model.
+    """
     w, share = weights(log, clip)
     if estimator == "ipw":
         return w * log.rewards, share
@@ -169,7 +222,18 @@ def mean_interval(
     clusters: NDArray[Any] | None,
     level: float,
 ) -> tuple[float, tuple[float, float]]:
-    """Mean and normal interval from the (cluster-)influence variance."""
+    """Mean and normal interval from the (cluster-)influence variance.
+
+    Args:
+        values: Per-row influence terms.
+        clusters: Cluster label per row, or None to treat rows as
+            independent.
+        level: Two-sided confidence level of the interval.
+
+    Returns:
+        The mean of `values` and the lower and upper ends of the normal
+        interval around it.
+    """
     n = len(values)
     centre = float(values.mean())
     if clusters is None:
@@ -202,11 +266,20 @@ def estimate_value(
         min_propensity: Declared support floor.
         ess_floor: Declared floor for the effective sample size ratio.
         level: Confidence level of the interval.
-        eligible_strategy: For a non-randomized log, whether an eligible F10
+        eligible_strategy: For a non-randomized log, whether an eligible
             identification strategy supports the propensities.
 
     Returns:
-        The estimate; refused when the support or ESS gate fails.
+        The estimate; refused (no value or interval, tier `unverified`)
+        when the support or ESS gate fails. A randomized log has tier
+        `confirmed`; otherwise `attested` with an eligible strategy and
+        `unverified` without.
+
+    Raises:
+        ValueError: If `estimator` is not one of `ESTIMATORS` or `level` is
+            not strictly between 0 and 1. A `min_propensity` that is not a
+            finite number, or `dr` without an outcome model, is also
+            rejected with a `ValueError`.
     """
     if estimator not in ESTIMATORS:
         raise ValueError(f"estimator must be one of {ESTIMATORS}")
@@ -279,6 +352,25 @@ def difference_value(
 
     The two policies are evaluated on the same rows, so the interval comes
     from the influence function of the paired difference.
+
+    Args:
+        log: The logged data and the target policy `pi`.
+        baseline: Probabilities `pi0(a | x)` of the baseline policy, shape
+            `(n, K)`.
+        estimator: `ipw`, `snips` or `dr`.
+        clip: Declared weight clip, or None.
+        min_propensity: Declared support floor.
+        ess_floor: Declared floor for the effective sample size ratio.
+        level: Confidence level of the interval.
+        eligible_strategy: For a non-randomized log, whether an eligible
+            identification strategy supports the propensities.
+
+    Returns:
+        The refused estimate of the target or of the baseline if either is
+        refused; otherwise the target's estimate with the value and interval
+        of the difference and the smaller of the two effective sample size
+        ratios. Invalid arguments are rejected with a `ValueError` by
+        `estimate_value`.
     """
     other = dataclasses.replace(log, target=np.asarray(baseline, dtype=float))
     main = estimate_value(
@@ -326,6 +418,21 @@ def fit_outcome_model(
     Returns a function mapping a feature matrix to `q(x, a)` of shape
     `(n, K)`. Fit it on development rows only and freeze it before the
     evaluation log is read.
+
+    Args:
+        features: Feature matrix of the development rows.
+        actions: Logged action index of each row, in `0 .. n_actions-1`.
+        rewards: Logged reward of each row.
+        n_actions: Number of actions `K`.
+        ridge: Ridge penalty on the feature coefficients (the intercept is
+            not penalised).
+
+    Returns:
+        The fitted function, mapping a feature matrix to an `(n, K)` matrix
+        of predicted rewards.
+
+    Raises:
+        ValueError: If some action never appears in the fitting log.
     """
     x = np.asarray(features, dtype=float)
     a = np.asarray(actions)
@@ -343,6 +450,14 @@ def fit_outcome_model(
     fitted = np.stack(coefficients, axis=1)
 
     def predict(new: ArrayLike) -> NDArray[np.float64]:
+        """Predicts the reward of every action.
+
+        Args:
+            new: Feature matrix of the rows to predict.
+
+        Returns:
+            Predicted rewards, shape `(n, K)`.
+        """
         z = np.asarray(new, dtype=float)
         result: NDArray[np.float64] = (
             np.column_stack([np.ones(len(z)), z]) @ fitted
@@ -367,7 +482,15 @@ class ThresholdPolicy:
     penalty: float
 
     def probabilities(self, tau: ArrayLike) -> NDArray[np.float64]:
-        """`pi(a | x)` for actions (0, 1) as an `(n, 2)` matrix."""
+        """`pi(a | x)` for actions (0, 1) as an `(n, 2)` matrix.
+
+        Args:
+            tau: Estimated effect for each row.
+
+        Returns:
+            For each row, probability 1 on action 1 when the effect exceeds
+            `cut` and on action 0 otherwise.
+        """
         treat = (np.asarray(tau, dtype=float) > self.cut).astype(float)
         return np.column_stack([1.0 - treat, treat])
 
@@ -384,6 +507,22 @@ def fit_threshold_policy(
     The class has one parameter, so the complexity penalty is the declared
     per-treated-row cost `penalty` (treatment cost plus any charter
     penalty). The held-out value, not this objective, is the evidence.
+
+    Args:
+        log: Development log with a binary action and an outcome model.
+        tau: Estimated effect `tau_hat(x)` for each row.
+        penalty: Cost charged for each treated row.
+        clip: Largest inverse-propensity weight allowed, or None.
+
+    Returns:
+        The policy with the cut that maximises the mean penalised gain over
+        the quantile grid of `tau`, or a policy that treats no row (its cut
+        is the largest effect) when no cut has a positive objective.
+
+    Raises:
+        ValueError: If the log has no outcome model or does not have exactly
+            two actions.
+        ScmleError: If there is no candidate cut.
     """
     effect = np.asarray(tau, dtype=float)
     if log.outcome_model is None or log.behaviour.shape[1] != 2:

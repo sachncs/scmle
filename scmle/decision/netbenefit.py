@@ -1,4 +1,4 @@
-"""Net benefit of a frozen rule with simultaneous intervals (feature F11, B).
+"""Net benefit of a frozen rule with simultaneous intervals.
 
 For a rule that acts on row `i` with `a_i`, an outcome `y_i` and a threshold
 probability `t` with weight `w = t / (1 - t)`,
@@ -47,6 +47,16 @@ def rule_hash(label: str, threshold: float) -> str:
 
     The rule is identified by what fixed it on development data, never by
     its actions on the final table.
+
+    Args:
+        label: Text identifying how the rule was fixed.
+        threshold: The rule's threshold; must be a finite number.
+
+    Returns:
+        The hexadecimal SHA-256 digest of the label and threshold.
+
+    A threshold that is not a finite number is rejected with a `ValueError`
+    by `qualification.finite`.
     """
     payload = f"{label}|{qualification.finite(threshold, 'threshold')!r}"
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
@@ -57,7 +67,18 @@ def columns(
     acts: NDArray[np.float64],
     incumbent: NDArray[np.float64] | None,
 ) -> NDArray[np.float64]:
-    """Row statistics `[a y, a (1-y), y, 1-y, b y, b (1-y)]`."""
+    """Row statistics `[a y, a (1-y), y, 1-y, b y, b (1-y)]`.
+
+    Args:
+        y: Outcomes, 0 or 1.
+        acts: The rule's actions `a`, aligned with `y`.
+        incumbent: The incumbent's decisions `b`, or None, in which case
+            the incumbent is taken to never act.
+
+    Returns:
+        An array with one row per observation and the six statistics as
+        columns.
+    """
     base = incumbent if incumbent is not None else np.zeros_like(y)
     return np.column_stack(
         [acts * y, acts * (1 - y), y, 1 - y, base * y, base * (1 - y)]
@@ -75,6 +96,11 @@ def diffs(
         means: Row-mean statistics, shape `(R, 6)`.
         weights: The odds `t / (1 - t)` on the grid.
         with_incumbent: Whether the incumbent is a baseline.
+
+    Returns:
+        The differences of the rule from treat none, treat all and, when
+        `with_incumbent`, the incumbent, in that order; for the treat-none
+        baseline this is the rule's own net benefit.
     """
     rule = means[:, [0]] - means[:, [1]] * weights
     everyone = means[:, [2]] - means[:, [3]] * weights
@@ -90,7 +116,17 @@ def resample_means(
     replicates: int,
     rng: np.random.Generator,
 ) -> NDArray[np.float64]:
-    """Bootstrap row means, resampling clusters or rows; shape `(B, 6)`."""
+    """Bootstrap row means, resampling clusters or rows; shape `(B, 6)`.
+
+    Args:
+        stats: Row statistics, shape `(rows, 6)`.
+        groups: Cluster index per row, or None to resample rows.
+        replicates: Number of bootstrap replicates `B`.
+        rng: Random generator drawing the resampling counts.
+
+    Returns:
+        The mean of each statistic in each replicate, shape `(B, 6)`.
+    """
     n = stats.shape[0]
     if groups is None:
         types, inverse, counts = np.unique(
@@ -111,7 +147,18 @@ def resample_means(
 
 
 def factorize(clusters: ArrayLike | None) -> NDArray[np.intp] | None:
-    """Cluster labels as integers `0 .. G-1`, or None."""
+    """Cluster labels as integers `0 .. G-1`, or None.
+
+    Args:
+        clusters: Cluster label per row, or None.
+
+    Returns:
+        The integer code of each row's cluster, or None when `clusters` is
+        None.
+
+    Raises:
+        ValueError: If `clusters` is not one-dimensional.
+    """
     if clusters is None:
         return None
     labels = np.asarray(clusters)
@@ -159,14 +206,27 @@ class NetBenefitReport:
     useful_range: tuple[float, float] | None
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Returns the JSON-ready record.
+
+        Returns:
+            Every field of the report as a mapping.
+        """
         return dataclasses.asdict(self)
 
 
 def useful_span(
     grid: NDArray[np.float64], positive: NDArray[np.bool_]
 ) -> tuple[float, float] | None:
-    """The longest run of grid points where every lower bound is positive."""
+    """The longest run of grid points where every lower bound is positive.
+
+    Args:
+        grid: The grid of thresholds, in order.
+        positive: Whether the bound is positive at each grid point.
+
+    Returns:
+        The first and last grid value of the longest run (the earliest if
+        several are as long), or None if no point is positive.
+    """
     best: tuple[int, int] | None = None
     start: int | None = None
     for index in range(len(grid) + 1):
@@ -209,6 +269,14 @@ def net_benefit_band(
 
     Returns:
         The report, including the claim `useful` or `not_useful_in_range`.
+
+    Raises:
+        ValueError: If `incumbent` or `clusters` does not have the length of
+            `y`, `t_range` does not satisfy `0 < t_lo <= t_hi < 1`, or
+            `alpha` is not strictly between 0 and 1. Invalid outcomes,
+            actions, incumbent or `replicates` below 20 are also rejected
+            with a `ValueError` by `costs.pair`, `costs.binary_vector`,
+            `qualification.count` and `factorize`.
     """
     outcomes, actions = costs.pair(y, acts)
     base = None if incumbent is None else costs.binary_vector(incumbent, "b")
@@ -273,11 +341,19 @@ class FinalNetBenefit:
 
     The rule is registered by its hash before the final table is read; the
     second call raises, so the interval is valid for the frozen rule and one
-    look (canon P2).
+    look.
+
+    Attributes:
+        frozen: The registered hash of the frozen rule.
+        used: Whether the final table has already been evaluated.
     """
 
     def __init__(self, frozen: str) -> None:
-        """Registers the hash of the frozen rule."""
+        """Registers the hash of the frozen rule.
+
+        Args:
+            frozen: Hash of the frozen rule; a non-blank string.
+        """
         self.frozen = qualification_text(frozen)
         self.used = False
 
@@ -289,7 +365,23 @@ class FinalNetBenefit:
         t_range: tuple[float, float],
         **options: Any,
     ) -> NetBenefitReport:
-        """Runs the band once; a changed rule or a second call is refused."""
+        """Runs the band once; a changed rule or a second call is refused.
+
+        Args:
+            frozen: Hash of the rule being evaluated; must equal the
+                registered hash.
+            y: Outcomes on the final table, 0 or 1.
+            acts: The frozen rule's actions on the final table.
+            t_range: Chartered range of threshold probabilities.
+            **options: Further keyword arguments of `net_benefit_band`.
+
+        Returns:
+            The net benefit report of the one permitted evaluation.
+
+        Raises:
+            SecondEvaluationError: If `frozen` differs from the registered
+                hash, or the final table was already evaluated.
+        """
         if frozen != self.frozen:
             raise SecondEvaluationError(
                 "the rule differs from the one registered before the final "
@@ -304,7 +396,17 @@ class FinalNetBenefit:
 
 
 def qualification_text(value: str) -> str:
-    """A non-blank string."""
+    """A non-blank string.
+
+    Args:
+        value: The candidate string.
+
+    Returns:
+        `value` unchanged.
+
+    Raises:
+        ValueError: If `value` is not a string or is blank.
+    """
     if not isinstance(value, str) or not value.strip():
         raise ValueError("the rule hash must be a non-blank string")
     return value

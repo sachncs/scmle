@@ -1,4 +1,4 @@
-"""The decision layer (feature F11).
+"""The decision layer.
 
 Thresholds from a chartered cost model, net benefit with simultaneous
 intervals, off-policy evaluation, fairness constraints, rollout design and an
