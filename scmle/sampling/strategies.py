@@ -58,7 +58,7 @@ class DataStrategy(abc.ABC):
         task: tasks.TaskType,
         adapter: models.ModelAdapter,
     ) -> str | None:
-        """Explains why the strategy does not apply, if it does not.
+        """Explain why the strategy does not apply, if it does not.
 
         Args:
             profile: Dataset profile.
@@ -81,7 +81,7 @@ class DataStrategy(abc.ABC):
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
-        """Builds the complete, unfitted candidate.
+        """Build the complete, unfitted candidate.
 
         Args:
             plan: Feature columns by kind.
@@ -107,7 +107,16 @@ class DefaultStrategy(DataStrategy):
         task: tasks.TaskType,
         adapter: models.ModelAdapter,
     ) -> str | None:
-        """Always applicable."""
+        """Always applicable.
+
+        Args:
+            profile: Dataset profile.
+            task: Resolved task type.
+            adapter: Model the strategy would be combined with.
+
+        Returns:
+            A reason the strategy does not apply, or None when it applies.
+        """
         return None
 
     def build(
@@ -118,7 +127,18 @@ class DefaultStrategy(DataStrategy):
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
-        """Builds the standard pipeline."""
+        """Build the standard pipeline.
+
+        Args:
+            plan: Feature columns by kind.
+            adapter: Model family.
+            task: Resolved task type.
+            seed: Random seed.
+            params: Hyperparameter overrides.
+
+        Returns:
+            The unfitted candidate estimator, preprocessing included.
+        """
         return preprocessing.build_pipeline(plan, adapter, task, seed, params)
 
 
@@ -131,7 +151,16 @@ class ImbalanceStrategy(DataStrategy):
         task: tasks.TaskType,
         adapter: models.ModelAdapter,
     ) -> str | None:
-        """Requires a classification task with noticeably skewed classes."""
+        """Requires a classification task with noticeably skewed classes.
+
+        Args:
+            profile: Dataset profile.
+            task: Resolved task type.
+            adapter: Model the strategy would be combined with.
+
+        Returns:
+            A reason the strategy does not apply, or None when it applies.
+        """
         reason = super().applicability(profile, task, adapter)
         if reason is not None:
             return reason
@@ -158,7 +187,16 @@ class ClassWeightStrategy(ImbalanceStrategy):
         task: tasks.TaskType,
         adapter: models.ModelAdapter,
     ) -> str | None:
-        """Also requires an estimator with a `class_weight` parameter."""
+        """Also requires an estimator with a `class_weight` parameter.
+
+        Args:
+            profile: Dataset profile.
+            task: Resolved task type.
+            adapter: Model the strategy would be combined with.
+
+        Returns:
+            A reason the strategy does not apply, or None when it applies.
+        """
         reason = super().applicability(profile, task, adapter)
         if reason is not None:
             return reason
@@ -174,7 +212,18 @@ class ClassWeightStrategy(ImbalanceStrategy):
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
-        """Builds the standard pipeline with `class_weight='balanced'`."""
+        """Build the standard pipeline with `class_weight='balanced'`.
+
+        Args:
+            plan: Feature columns by kind.
+            adapter: Model family.
+            task: Resolved task type.
+            seed: Random seed.
+            params: Hyperparameter overrides.
+
+        Returns:
+            The unfitted candidate estimator, preprocessing included.
+        """
         weighted = {**(params or {}), "class_weight": "balanced"}
         return preprocessing.build_pipeline(plan, adapter, task, seed, weighted)
 
@@ -196,7 +245,18 @@ class ResamplingStrategy(ImbalanceStrategy):
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
-        """Wraps the standard pipeline so it trains on rebalanced data."""
+        """Wrap the standard pipeline so it trains on rebalanced data.
+
+        Args:
+            plan: Feature columns by kind.
+            adapter: Model family.
+            task: Resolved task type.
+            seed: Random seed.
+            params: Hyperparameter overrides.
+
+        Returns:
+            The unfitted candidate estimator, preprocessing included.
+        """
         inner = preprocessing.build_pipeline(plan, adapter, task, seed, params)
         return resampling.ResamplingClassifier(
             inner, self.resampler_class(), seed
@@ -231,7 +291,16 @@ class CalibrationStrategy(DataStrategy):
         task: tasks.TaskType,
         adapter: models.ModelAdapter,
     ) -> str | None:
-        """Needs a probabilistic classifier worth calibrating."""
+        """Needs a probabilistic classifier worth calibrating.
+
+        Args:
+            profile: Dataset profile.
+            task: Resolved task type.
+            adapter: Model the strategy would be combined with.
+
+        Returns:
+            A reason the strategy does not apply, or None when it applies.
+        """
         reason = super().applicability(profile, task, adapter)
         if reason is not None:
             return reason
@@ -251,7 +320,18 @@ class CalibrationStrategy(DataStrategy):
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
-        """Wraps the standard pipeline in a cross-fitted calibrator."""
+        """Wrap the standard pipeline in a cross-fitted calibrator.
+
+        Args:
+            plan: Feature columns by kind.
+            adapter: Model family.
+            task: Resolved task type.
+            seed: Random seed.
+            params: Hyperparameter overrides.
+
+        Returns:
+            The unfitted candidate estimator, preprocessing included.
+        """
         inner = preprocessing.build_pipeline(plan, adapter, task, seed, params)
         return calibration.CalibratedClassifierCV(
             inner,
@@ -300,7 +380,16 @@ class SmoteStrategy(ImbalanceStrategy):
         task: tasks.TaskType,
         adapter: models.ModelAdapter,
     ) -> str | None:
-        """Needs imbalanced-learn and a purely numeric feature space."""
+        """Needs imbalanced-learn and a purely numeric feature space.
+
+        Args:
+            profile: Dataset profile.
+            task: Resolved task type.
+            adapter: Model the strategy would be combined with.
+
+        Returns:
+            A reason the strategy does not apply, or None when it applies.
+        """
         reason = super().applicability(profile, task, adapter)
         if reason is not None:
             return reason
@@ -320,7 +409,18 @@ class SmoteStrategy(ImbalanceStrategy):
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
-        """Builds preprocess -> resample -> model with the SMOTE variant."""
+        """Build preprocess -> resample -> model with the SMOTE variant.
+
+        Args:
+            plan: Feature columns by kind.
+            adapter: Model family.
+            task: Resolved task type.
+            seed: Random seed.
+            params: Hyperparameter overrides.
+
+        Returns:
+            The unfitted candidate estimator, preprocessing included.
+        """
         over_sampling = importlib.import_module("imblearn.over_sampling")
         sampler = getattr(over_sampling, self.sampler_name)(random_state=seed)
         options = data_contracts.PreprocessingOptions(
@@ -382,7 +482,18 @@ class FeatureStrategy(DataStrategy):
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
-        """Builds the pipeline with the strategy's numeric steps."""
+        """Build the pipeline with the strategy's numeric steps.
+
+        Args:
+            plan: Feature columns by kind.
+            adapter: Model family.
+            task: Resolved task type.
+            seed: Random seed.
+            params: Hyperparameter overrides.
+
+        Returns:
+            The unfitted candidate estimator, preprocessing included.
+        """
         options = dataclasses.replace(
             preprocessing.default_options(plan, adapter),
             log_skewed=self.log_skewed,
@@ -411,7 +522,16 @@ class LogSkewedStrategy(FeatureStrategy):
         task: tasks.TaskType,
         adapter: models.ModelAdapter,
     ) -> str | None:
-        """Needs a skewed feature and a model sensitive to monotone shifts."""
+        """Needs a skewed feature and a model sensitive to monotone shifts.
+
+        Args:
+            profile: Dataset profile.
+            task: Resolved task type.
+            adapter: Model the strategy would be combined with.
+
+        Returns:
+            A reason the strategy does not apply, or None when it applies.
+        """
         reason = super().applicability(profile, task, adapter)
         if reason is not None:
             return reason
@@ -448,7 +568,16 @@ class RareTargetStrategy(DataStrategy):
         task: tasks.TaskType,
         adapter: models.ModelAdapter,
     ) -> str | None:
-        """Needs a skewed regression target and a model taking weights."""
+        """Needs a skewed regression target and a model taking weights.
+
+        Args:
+            profile: Dataset profile.
+            task: Resolved task type.
+            adapter: Model the strategy would be combined with.
+
+        Returns:
+            A reason the strategy does not apply, or None when it applies.
+        """
         reason = super().applicability(profile, task, adapter)
         if reason is not None:
             return reason
@@ -471,7 +600,18 @@ class RareTargetStrategy(DataStrategy):
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
-        """Wraps the standard pipeline in the density-weighted regressor."""
+        """Wrap the standard pipeline in the density-weighted regressor.
+
+        Args:
+            plan: Feature columns by kind.
+            adapter: Model family.
+            task: Resolved task type.
+            seed: Random seed.
+            params: Hyperparameter overrides.
+
+        Returns:
+            The unfitted candidate estimator, preprocessing included.
+        """
         inner = preprocessing.build_pipeline(plan, adapter, task, seed, params)
         return resampling.DensityWeightedRegressor(inner)
 
@@ -493,7 +633,16 @@ class TargetEncodingStrategy(DataStrategy):
         task: tasks.TaskType,
         adapter: models.ModelAdapter,
     ) -> str | None:
-        """Needs at least one high-cardinality categorical feature."""
+        """Needs at least one high-cardinality categorical feature.
+
+        Args:
+            profile: Dataset profile.
+            task: Resolved task type.
+            adapter: Model the strategy would be combined with.
+
+        Returns:
+            A reason the strategy does not apply, or None when it applies.
+        """
         reason = super().applicability(profile, task, adapter)
         if reason is not None:
             return reason
@@ -509,7 +658,18 @@ class TargetEncodingStrategy(DataStrategy):
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
-        """Builds the pipeline with target-encoded high-cardinality columns."""
+        """Build the pipeline with target-encoded high-cardinality columns.
+
+        Args:
+            plan: Feature columns by kind.
+            adapter: Model family.
+            task: Resolved task type.
+            seed: Random seed.
+            params: Hyperparameter overrides.
+
+        Returns:
+            The unfitted candidate estimator, preprocessing included.
+        """
         options = dataclasses.replace(
             preprocessing.default_options(plan, adapter),
             high_cardinality="target",
@@ -533,7 +693,16 @@ class InteractionStrategy(FeatureStrategy):
         task: tasks.TaskType,
         adapter: models.ModelAdapter,
     ) -> str | None:
-        """Linear models with a moderate number of numeric features."""
+        """Linear models with a moderate number of numeric features.
+
+        Args:
+            profile: Dataset profile.
+            task: Resolved task type.
+            adapter: Model the strategy would be combined with.
+
+        Returns:
+            A reason the strategy does not apply, or None when it applies.
+        """
         reason = super().applicability(profile, task, adapter)
         if reason is not None:
             return reason
@@ -558,7 +727,16 @@ class ConstructFeaturesStrategy(FeatureStrategy):
         task: tasks.TaskType,
         adapter: models.ModelAdapter,
     ) -> str | None:
-        """Needs at least two numeric features to combine."""
+        """Needs at least two numeric features to combine.
+
+        Args:
+            profile: Dataset profile.
+            task: Resolved task type.
+            adapter: Model the strategy would be combined with.
+
+        Returns:
+            A reason the strategy does not apply, or None when it applies.
+        """
         reason = super().applicability(profile, task, adapter)
         if reason is not None:
             return reason
@@ -580,7 +758,16 @@ class SelectFeaturesStrategy(FeatureStrategy):
         task: tasks.TaskType,
         adapter: models.ModelAdapter,
     ) -> str | None:
-        """Needs enough features for removal to be meaningful."""
+        """Needs enough features for removal to be meaningful.
+
+        Args:
+            profile: Dataset profile.
+            task: Resolved task type.
+            adapter: Model the strategy would be combined with.
+
+        Returns:
+            A reason the strategy does not apply, or None when it applies.
+        """
         reason = super().applicability(profile, task, adapter)
         if reason is not None:
             return reason
@@ -601,7 +788,16 @@ class MissingValueStrategy(FeatureStrategy):
         task: tasks.TaskType,
         adapter: models.ModelAdapter,
     ) -> str | None:
-        """Needs numeric gaps and a model that does not handle them itself."""
+        """Needs numeric gaps and a model that does not handle them itself.
+
+        Args:
+            profile: Dataset profile.
+            task: Resolved task type.
+            adapter: Model the strategy would be combined with.
+
+        Returns:
+            A reason the strategy does not apply, or None when it applies.
+        """
         reason = super().applicability(profile, task, adapter)
         if reason is not None:
             return reason
@@ -634,7 +830,16 @@ class MissingIndicatorStrategy(MissingValueStrategy):
         task: tasks.TaskType,
         adapter: models.ModelAdapter,
     ) -> str | None:
-        """Needs numeric gaps that the missingness report calls informative."""
+        """Needs numeric gaps that the missingness report calls informative.
+
+        Args:
+            profile: Dataset profile.
+            task: Resolved task type.
+            adapter: Model the strategy would be combined with.
+
+        Returns:
+            A reason the strategy does not apply, or None when it applies.
+        """
         reason = super().applicability(profile, task, adapter)
         if reason is not None:
             return reason
@@ -660,7 +865,16 @@ class IterativeImputationStrategy(MissingValueStrategy):
         task: tasks.TaskType,
         adapter: models.ModelAdapter,
     ) -> str | None:
-        """Also bounded in width, because it fits a model per feature."""
+        """Also bounded in width, because it fits a model per feature.
+
+        Args:
+            profile: Dataset profile.
+            task: Resolved task type.
+            adapter: Model the strategy would be combined with.
+
+        Returns:
+            A reason the strategy does not apply, or None when it applies.
+        """
         reason = super().applicability(profile, task, adapter)
         if reason is not None:
             return reason
@@ -687,7 +901,16 @@ class TargetTransformStrategy(DataStrategy):
         task: tasks.TaskType,
         adapter: models.ModelAdapter,
     ) -> str | None:
-        """Needs a skewed continuous target."""
+        """Needs a skewed continuous target.
+
+        Args:
+            profile: Dataset profile.
+            task: Resolved task type.
+            adapter: Model the strategy would be combined with.
+
+        Returns:
+            A reason the strategy does not apply, or None when it applies.
+        """
         reason = super().applicability(profile, task, adapter)
         if reason is not None:
             return reason
@@ -706,7 +929,18 @@ class TargetTransformStrategy(DataStrategy):
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
-        """Wraps the standard pipeline so the target is transformed."""
+        """Wrap the standard pipeline so the target is transformed.
+
+        Args:
+            plan: Feature columns by kind.
+            adapter: Model family.
+            task: Resolved task type.
+            seed: Random seed.
+            params: Hyperparameter overrides.
+
+        Returns:
+            The unfitted candidate estimator, preprocessing included.
+        """
         return compose.TransformedTargetRegressor(
             regressor=preprocessing.build_pipeline(
                 plan, adapter, task, seed, params
@@ -745,7 +979,13 @@ DEFAULT_NAMES = tuple(n for n in EXPERIMENTAL if n not in OPT_IN)
 
 
 def get_strategy(name: str) -> DataStrategy:
-    """Returns the registered strategy.
+    """Look up a registered data strategy.
+
+    Args:
+        name: The strategy name, as recorded on trials.
+
+    Returns:
+        The registered strategy.
 
     Raises:
         ConfigError: If the name is unknown.

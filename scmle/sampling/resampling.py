@@ -61,7 +61,16 @@ class IndexResampler(Resampler):
     def resample(
         self, features: pd.DataFrame, target: pd.Series, seed: int
     ) -> tuple[pd.DataFrame, pd.Series]:
-        """Select rows from the input according to ``indices``."""
+        """Select rows from the input according to ``indices``.
+
+        Args:
+            features: Training features.
+            target: Training labels.
+            seed: Seed of the random generator passed to ``indices``.
+
+        Returns:
+            The selected features and labels, with a fresh index.
+        """
         chosen = self.indices(target, np.random.default_rng(seed))
         return (
             features.iloc[chosen].reset_index(drop=True),
@@ -77,7 +86,16 @@ class RandomOverSampler(IndexResampler):
     def indices(
         self, target: pd.Series, rng: np.random.Generator
     ) -> np.ndarray:
-        """Samples minority rows with replacement up to the majority count."""
+        """Sample minority rows with replacement up to the majority count.
+
+        Args:
+            target: Training labels.
+            rng: Source of randomness.
+
+        Returns:
+            Every original position plus the extra sampled positions, in
+            random order.
+        """
         positions = np.arange(len(target))
         counts = target.value_counts()
         goal = int(counts.max())
@@ -99,7 +117,16 @@ class RandomUnderSampler(IndexResampler):
     def indices(
         self, target: pd.Series, rng: np.random.Generator
     ) -> np.ndarray:
-        """Samples each class without replacement down to the smallest."""
+        """Sample each class without replacement down to the smallest.
+
+        Args:
+            target: Training labels.
+            rng: Source of randomness.
+
+        Returns:
+            The sampled positions, in random order; every class contributes
+            as many positions as the smallest class has rows.
+        """
         positions = np.arange(len(target))
         goal = int(target.value_counts().min())
         chosen = [
@@ -126,7 +153,7 @@ class JitterOverSampler(IndexResampler):
     name = "jitter_oversample"
 
     def __init__(self, scale: float = 0.05) -> None:
-        """Initializes the sampler.
+        """Initialize the sampler.
 
         Args:
             scale: Noise level relative to each numeric column's std.
@@ -136,13 +163,32 @@ class JitterOverSampler(IndexResampler):
     def indices(
         self, target: pd.Series, rng: np.random.Generator
     ) -> np.ndarray:
-        """Chooses source rows exactly like plain oversampling."""
+        """Choose source rows exactly like plain oversampling.
+
+        Args:
+            target: Training labels.
+            rng: Source of randomness.
+
+        Returns:
+            Positions as `RandomOverSampler.indices` returns them.
+        """
         return RandomOverSampler().indices(target, rng)
 
     def resample(
         self, features: pd.DataFrame, target: pd.Series, seed: int
     ) -> tuple[pd.DataFrame, pd.Series]:
-        """Oversamples, then jitters every repeated (synthetic) copy."""
+        """Oversample, then jitter every repeated (synthetic) copy.
+
+        Args:
+            features: Training features.
+            target: Training labels.
+            seed: Seed for the row choice and the noise.
+
+        Returns:
+            The oversampled features, with noise added to the numeric
+            (non-boolean) columns of repeated rows, and the matching labels,
+            both with a fresh index.
+        """
         rng = np.random.default_rng(seed)
         chosen = self.indices(target, rng)
         sampled = features.iloc[chosen].reset_index(drop=True)
@@ -189,7 +235,7 @@ class PreprocessedResamplingClassifier(
         sampler: Any,
         estimator: base.BaseEstimator,
     ) -> None:
-        """Initializes the wrapper.
+        """Initialize the wrapper.
 
         Args:
             preprocessor: Preprocessing transformer.
@@ -201,7 +247,15 @@ class PreprocessedResamplingClassifier(
         self.estimator = estimator
 
     def fit(self, features: Any, target: Any) -> Self:
-        """Fits the preprocessor, resamples the encoded rows, fits the model."""
+        """Fit the preprocessor, resample the encoded rows, fit the model.
+
+        Args:
+            features: Training features.
+            target: Training labels.
+
+        Returns:
+            The fitted wrapper.
+        """
         self.preprocessor_ = base.clone(self.preprocessor).fit(features, target)
         encoded = self.preprocessor_.transform(features)
         resampled, labels = base.clone(self.sampler).fit_resample(
@@ -212,11 +266,26 @@ class PreprocessedResamplingClassifier(
         return self
 
     def predict(self, features: Any) -> np.ndarray:
-        """Predicts from the preprocessed rows (no resampling)."""
+        """Predict from the preprocessed rows (no resampling).
+
+        Args:
+            features: Rows to predict.
+
+        Returns:
+            The predicted labels.
+        """
         return self.estimator_.predict(self.preprocessor_.transform(features))
 
     def predict_proba(self, features: Any) -> np.ndarray:
-        """Returns class probabilities (no resampling)."""
+        """Predict class probabilities (no resampling).
+
+        Args:
+            features: Rows to predict.
+
+        Returns:
+            Class probabilities, one row per input row, columns in the
+            order of `classes_`.
+        """
         return self.estimator_.predict_proba(
             self.preprocessor_.transform(features)
         )
@@ -239,7 +308,7 @@ class ResamplingClassifier(base.ClassifierMixin, base.BaseEstimator):
         resampler: Resampler,
         random_state: int = 0,
     ) -> None:
-        """Initializes the wrapper.
+        """Initialize the wrapper.
 
         Args:
             estimator: Classifier to fit on resampled data.
@@ -251,7 +320,15 @@ class ResamplingClassifier(base.ClassifierMixin, base.BaseEstimator):
         self.random_state = random_state
 
     def fit(self, features: Any, target: Any) -> Self:
-        """Rebalances the training data and fits the wrapped classifier."""
+        """Rebalance the training data and fit the wrapped classifier.
+
+        Args:
+            features: Training features.
+            target: Training labels.
+
+        Returns:
+            The fitted wrapper.
+        """
         labels = pd.Series(np.asarray(target))
         frame = pd.DataFrame(features).reset_index(drop=True)
         resampled, resampled_target = self.resampler.resample(
@@ -264,11 +341,26 @@ class ResamplingClassifier(base.ClassifierMixin, base.BaseEstimator):
         return self
 
     def predict(self, features: Any) -> np.ndarray:
-        """Predicts with the fitted classifier (no resampling)."""
+        """Predict with the fitted classifier (no resampling).
+
+        Args:
+            features: Rows to predict.
+
+        Returns:
+            The predicted labels.
+        """
         return self.estimator_.predict(features)
 
     def predict_proba(self, features: Any) -> np.ndarray:
-        """Returns class probabilities (no resampling)."""
+        """Predict class probabilities (no resampling).
+
+        Args:
+            features: Rows to predict.
+
+        Returns:
+            Class probabilities, one row per input row, columns in the
+            order of `classes_`.
+        """
         return self.estimator_.predict_proba(features)
 
 
@@ -295,7 +387,7 @@ class DensityWeightedRegressor(base.RegressorMixin, base.BaseEstimator):
         bins: int = 10,
         max_weight: float = 10.0,
     ) -> None:
-        """Initializes the wrapper.
+        """Initialize the wrapper.
 
         Args:
             estimator: Pipeline to fit with sample weights.
@@ -307,7 +399,16 @@ class DensityWeightedRegressor(base.RegressorMixin, base.BaseEstimator):
         self.max_weight = max_weight
 
     def weights(self, target: np.ndarray) -> np.ndarray:
-        """Inverse-density weights, normalized to mean 1."""
+        """Compute inverse-density weights.
+
+        Args:
+            target: Continuous target values.
+
+        Returns:
+            One weight per value, inversely proportional to the number of
+            targets in its equal-width bin, capped at `max_weight` times the
+            smallest weight, and scaled to a mean of 1.
+        """
         edges = np.histogram_bin_edges(target, bins=self.bins)
         index = np.clip(np.digitize(target, edges[1:-1]), 0, len(edges) - 2)
         counts = np.bincount(index, minlength=len(edges) - 1).astype(float)
@@ -316,7 +417,15 @@ class DensityWeightedRegressor(base.RegressorMixin, base.BaseEstimator):
         return raw * len(raw) / raw.sum()
 
     def fit(self, features: Any, target: Any) -> Self:
-        """Fits the pipeline with density weights on the model step."""
+        """Fit the pipeline with density weights on the model step.
+
+        Args:
+            features: Training features.
+            target: Continuous training target.
+
+        Returns:
+            The fitted wrapper.
+        """
         values = np.asarray(target, dtype=float)
         self.estimator_ = base.clone(self.estimator).fit(
             features, values, model__sample_weight=self.weights(values)
@@ -324,5 +433,12 @@ class DensityWeightedRegressor(base.RegressorMixin, base.BaseEstimator):
         return self
 
     def predict(self, features: Any) -> np.ndarray:
-        """Predicts with the fitted pipeline."""
+        """Predict with the fitted pipeline.
+
+        Args:
+            features: Rows to predict.
+
+        Returns:
+            The predicted target values.
+        """
         return self.estimator_.predict(features)

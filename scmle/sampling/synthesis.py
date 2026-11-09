@@ -36,11 +36,26 @@ class SyntheticGenerator(abc.ABC):
 
     @abc.abstractmethod
     def fit(self, features: pd.DataFrame) -> Self:
-        """Learns from real rows (training data only)."""
+        """Learn the distribution from real rows (training data only).
+
+        Args:
+            features: The real rows.
+
+        Returns:
+            The fitted generator.
+        """
 
     @abc.abstractmethod
     def sample(self, rows: int, rng: np.random.Generator) -> pd.DataFrame:
-        """Draws `rows` synthetic rows with the training columns."""
+        """Draw synthetic rows with the training columns.
+
+        Args:
+            rows: Number of rows to draw.
+            rng: Source of randomness.
+
+        Returns:
+            A frame of `rows` synthetic rows.
+        """
 
 
 class GaussianCopulaGenerator(SyntheticGenerator):
@@ -59,7 +74,15 @@ class GaussianCopulaGenerator(SyntheticGenerator):
     name = "gaussian_copula"
 
     def fit(self, features: pd.DataFrame) -> Self:
-        """Estimates marginals and the normal-score correlation."""
+        """Estimate the marginals and the normal-score correlation.
+
+        Args:
+            features: The real rows. Numeric non-boolean columns are modeled
+                with the copula; all other columns by their frequencies.
+
+        Returns:
+            The fitted generator.
+        """
         self.numeric = [
             c
             for c in features.columns
@@ -83,7 +106,17 @@ class GaussianCopulaGenerator(SyntheticGenerator):
         return self
 
     def estimate_correlation(self, features: pd.DataFrame) -> np.ndarray:
-        """Correlation of normal scores, repaired to be positive definite."""
+        """Estimate the correlation of the numeric columns' normal scores.
+
+        Args:
+            features: The real rows.
+
+        Returns:
+            The correlation matrix of the numeric columns in `numeric`
+            order, with eigenvalues floored so it is positive definite and
+            rescaled to a unit diagonal; a 0 by 0 matrix without numeric
+            columns.
+        """
         if not self.numeric:
             return np.zeros((0, 0))
         scores = pd.DataFrame(index=features.index)
@@ -103,7 +136,17 @@ class GaussianCopulaGenerator(SyntheticGenerator):
         return repaired / np.outer(scale, scale)
 
     def sample(self, rows: int, rng: np.random.Generator) -> pd.DataFrame:
-        """Draws synthetic rows through the copula."""
+        """Draw synthetic rows through the copula.
+
+        Args:
+            rows: Number of rows to draw.
+            rng: Source of randomness.
+
+        Returns:
+            A frame of `rows` rows in the training column order. Missing
+            values are reinserted at each column's training rate, and
+            integer columns are rounded and stored as `Float64`.
+        """
         output: dict[str, Any] = {}
         if self.numeric:
             normal = rng.multivariate_normal(
@@ -150,7 +193,19 @@ class GeneratorOverSampler(resampling.Resampler):
     def resample(
         self, features: pd.DataFrame, target: pd.Series, seed: int
     ) -> tuple[pd.DataFrame, pd.Series]:
-        """Adds synthetic rows until every class matches the largest."""
+        """Add synthetic rows until every class matches the largest.
+
+        Classes with fewer than `MIN_FIT_ROWS` rows are left as they are.
+
+        Args:
+            features: Training features.
+            target: Training labels.
+            seed: Seed for the generator sampling and the final shuffle.
+
+        Returns:
+            The original plus synthetic features and labels, shuffled, with
+            a fresh index.
+        """
         rng = np.random.default_rng(seed)
         counts = target.value_counts()
         goal = int(counts.max())
@@ -207,11 +262,14 @@ class FidelityEvaluator:
     def evaluate(
         self, real: pd.DataFrame, synthetic: pd.DataFrame
     ) -> FidelityReport:
-        """Compares marginals, dependence structure and verbatim copying.
+        """Compare marginals, dependence structure and verbatim copying.
 
         Args:
             real: Real rows.
             synthetic: Synthetic rows with the same columns.
+
+        Returns:
+            The fidelity measures; see `FidelityReport` for their meaning.
         """
         numeric = [
             str(c)

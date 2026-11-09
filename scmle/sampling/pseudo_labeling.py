@@ -38,14 +38,18 @@ class SelfTrainingOutcome:
     accepted: bool
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Convert the outcome to a JSON-ready record.
+
+        Returns:
+            A dictionary with one entry per attribute.
+        """
         return dataclasses.asdict(self)
 
 
 def confident_rows(
     fitted: Any, unlabeled: pd.DataFrame, confidence: float
 ) -> tuple[pd.DataFrame, pd.Series]:
-    """Unlabeled rows the fitted classifier labels with enough confidence.
+    """Select the unlabeled rows the classifier labels confidently.
 
     Args:
         fitted: Fitted classifier with `predict_proba` and `classes_`.
@@ -73,7 +77,7 @@ def augmented_fit(
     unlabeled: pd.DataFrame,
     confidence: float,
 ) -> tuple[Any, int]:
-    """Labels confident rows with a fitted model, then refits on both.
+    """Label confident rows with a fitted model, then refit on both.
 
     Args:
         plain: Classifier already fitted on `features` and `target`.
@@ -107,7 +111,18 @@ def judge(
     confidence: float = DEFAULT_CONFIDENCE,
     should_stop: Callable[[], bool] = lambda: False,
 ) -> SelfTrainingOutcome | None:
-    """Compares plain and self-trained fits on held-out labeled rows.
+    """Compare plain and self-trained fits on held-out labeled rows.
+
+    Args:
+        template: Unfitted classifier, cloned for every fit.
+        features: Labeled features.
+        target: Labels of `features`.
+        folds: (fit positions, held-out positions) pairs into `features`.
+        unlabeled: Rows without a label.
+        scorer: Called as `scorer(fitted, features, target)`; larger is
+            better.
+        confidence: Smallest top-class probability that is trusted.
+        should_stop: Polled before each fold; True abandons the judgement.
 
     Returns:
         The outcome, or None when time ran out or no fold had enough
