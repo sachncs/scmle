@@ -6,19 +6,29 @@ import pytest
 
 from benchmarks.qualification import f4_certify
 from benchmarks.qualification import screen_certify
+import benchmarks.qualification.f4_certify
 from scmle.data.admissibility import leakage
 from scmle.data.admissibility import screen
+import scmle.data.admissibility.screen
 from scmle.data.detectors import certificates
 
 
 def stored():
-    return certificates.CertificateStore.load(screen_certify.STORE_PATH)
+    return certificates.CertificateStore.load(
+        scmle.data.admissibility.screen.STORE_PATH
+    )
 
 
 def test_the_shipped_store_is_inside_the_package():
-    assert screen_certify.STORE_PATH == screen.STORE_PATH
-    assert screen_certify.STORE_PATH.parent.name == "admissibility"
-    assert screen_certify.STORE_PATH.parent.parent.parent.name == "scmle"
+    assert scmle.data.admissibility.screen.STORE_PATH == screen.STORE_PATH
+    assert (
+        scmle.data.admissibility.screen.STORE_PATH.parent.name
+        == "admissibility"
+    )
+    assert (
+        scmle.data.admissibility.screen.STORE_PATH.parent.parent.parent.name
+        == "scmle"
+    )
 
 
 def test_the_stored_certificate_is_for_the_current_code():
@@ -45,9 +55,15 @@ def test_stale_and_missing_certificates_are_reported():
 def test_planned_sizes_follow_the_phase_floors():
     assert screen_certify.NULL_REPLICATES >= 1000
     assert screen_certify.PLANT_REPLICATES >= 200
-    assert screen_certify.POLICY is f4_certify.LEAK_POLICY
-    assert screen_certify.POLICY.recall_floor == 0.9
-    assert screen_certify.POLICY.false_alarm_ceiling == 0.05
+    assert (
+        benchmarks.qualification.f4_certify.LEAK_POLICY
+        is f4_certify.LEAK_POLICY
+    )
+    assert benchmarks.qualification.f4_certify.LEAK_POLICY.recall_floor == 0.9
+    assert (
+        benchmarks.qualification.f4_certify.LEAK_POLICY.false_alarm_ceiling
+        == 0.05
+    )
 
 
 def test_measurements_agree_with_the_certificate():

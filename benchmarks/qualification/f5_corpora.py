@@ -57,7 +57,6 @@ from scmle.data.detectors import certificates
 from scmle.data.detectors import registry
 
 OUTPUT_PATH = Path(__file__).with_name("f5_corpora_measurements.json")
-TARGET = standins.TARGET
 CORPORA: dict[str, Callable[..., Any]] = {
     "wine": datasets.load_wine,
     "iris": datasets.load_iris,
@@ -79,7 +78,7 @@ def corpus_frame(name: str) -> pandas.DataFrame:
         The table with constant columns dropped and a fresh 0..n-1 index.
     """
     frame = CORPORA[name](as_frame=True).frame
-    frame = frame.rename(columns={"target": TARGET})
+    frame = frame.rename(columns={"target": standins.TARGET})
     constant = [c for c in frame.columns if frame[c].nunique() < 2]
     return frame.drop(columns=constant).reset_index(drop=True)
 
@@ -93,7 +92,7 @@ def feature_names(frame: pandas.DataFrame) -> list[str]:
     Returns:
         The feature column names.
     """
-    return [name for name in frame.columns if name != TARGET]
+    return [name for name in frame.columns if name != standins.TARGET]
 
 
 def class_rates(frame: pandas.DataFrame) -> dict[int, float]:
@@ -105,7 +104,7 @@ def class_rates(frame: pandas.DataFrame) -> dict[int, float]:
     Returns:
         Mapping of each class label, in sorted order, to its flip rate.
     """
-    classes = sorted(frame[TARGET].unique())
+    classes = sorted(frame[standins.TARGET].unique())
     return {
         int(c): FIRST_CLASS_RATE if i == 0 else OTHER_CLASS_RATE
         for i, c in enumerate(classes)
@@ -150,7 +149,9 @@ def plans(frame: pandas.DataFrame) -> dict[str, list[certify.DefectPlan]]:
             f5.renamed(
                 certify.DefectPlan(
                     "label_flip",
-                    lambda f, s: inject.flip_labels(f, TARGET, 0.10, s),
+                    lambda f, s: inject.flip_labels(
+                        f, standins.TARGET, 0.10, s
+                    ),
                 ),
                 "label_flip_symmetric",
             ),
@@ -159,7 +160,7 @@ def plans(frame: pandas.DataFrame) -> dict[str, list[certify.DefectPlan]]:
                     "label_flip",
                     lambda f, s: inject.flip_labels(
                         f,
-                        TARGET,
+                        standins.TARGET,
                         0.0,
                         s,
                         mode="class_conditional",

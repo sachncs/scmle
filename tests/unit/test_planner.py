@@ -12,8 +12,6 @@ from scmle.data.readers import tabular
 import scmle.intelligence.planner
 from scmle.models import registry
 
-BINARY = tasks.TaskType.BINARY
-
 
 @pytest.fixture(scope="module")
 def planner():
@@ -22,7 +20,14 @@ def planner():
     )
 
 
-def make_plan(planner, frame, budget=1800, approved=None, task=BINARY, **extra):
+def make_plan(
+    planner,
+    frame,
+    budget=1800,
+    approved=None,
+    task=tasks.TaskType.BINARY,
+    **extra,
+):
     resources = extra.pop(
         "resources", tasks.ResourceSpec(time_budget_seconds=budget)
     )
@@ -107,9 +112,13 @@ def test_strategy_search_can_be_disabled_in_the_plan(planner, frame):
         strategies=tasks.StrategySpec(top_models=0),
     )
     manifest = tabular.build_manifest(frame, "y")
-    profile = profiler.DatasetProfiler(spec).profile(frame, manifest, BINARY)
+    profile = profiler.DatasetProfiler(spec).profile(
+        frame, manifest, tasks.TaskType.BINARY
+    )
     plan = planner.plan(
-        scmle.intelligence.planner.PlanningContext(spec, profile, BINARY)
+        scmle.intelligence.planner.PlanningContext(
+            spec, profile, tasks.TaskType.BINARY
+        )
     )
     assert not any(
         d.technique == "random_oversample"
@@ -124,10 +133,14 @@ def test_unknown_strategy_name_is_a_config_error(planner, frame):
         strategies=tasks.StrategySpec(names=["bogus"]),
     )
     manifest = tabular.build_manifest(frame, "y")
-    profile = profiler.DatasetProfiler(spec).profile(frame, manifest, BINARY)
+    profile = profiler.DatasetProfiler(spec).profile(
+        frame, manifest, tasks.TaskType.BINARY
+    )
     with pytest.raises(errors.ConfigError, match="unknown strategy"):
         planner.plan(
-            scmle.intelligence.planner.PlanningContext(spec, profile, BINARY)
+            scmle.intelligence.planner.PlanningContext(
+                spec, profile, tasks.TaskType.BINARY
+            )
         )
 
 
@@ -174,9 +187,13 @@ def test_memory_characteristics_drive_rejection_under_a_tight_limit(planner):
         resources=tasks.ResourceSpec(memory_limit_gb=limit),
     )
     manifest = tabular.build_manifest(frame, "y")
-    profile = profiler.DatasetProfiler(spec).profile(frame, manifest, BINARY)
+    profile = profiler.DatasetProfiler(spec).profile(
+        frame, manifest, tasks.TaskType.BINARY
+    )
     plan = planner.plan(
-        scmle.intelligence.planner.PlanningContext(spec, profile, BINARY)
+        scmle.intelligence.planner.PlanningContext(
+            spec, profile, tasks.TaskType.BINARY
+        )
     )
     assert "random_forest" not in plan.candidate_models
     assert "svm" not in plan.candidate_models

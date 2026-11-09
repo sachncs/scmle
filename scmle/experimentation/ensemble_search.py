@@ -11,11 +11,7 @@ import scmle.core.context
 from scmle.experimentation import trials
 from scmle.models import ensembles
 
-Status = experiments.TrialStatus
-Action = experiments.DecisionAction
-STACK = ensembles.StackingAdapter.name
-BLEND = ensembles.BlendingAdapter.name
-COMBINERS = (STACK, BLEND)
+COMBINERS = (ensembles.StackingAdapter.name, ensembles.BlendingAdapter.name)
 
 
 class EnsembleSearch:
@@ -57,7 +53,7 @@ class EnsembleSearch:
         eligible = [
             t
             for t in evaluated
-            if t.status is Status.OK
+            if t.status is experiments.TrialStatus.OK
             and t.strategy == experiments.DEFAULT_STRATEGY
             and t.model_name not in COMBINERS
             and self.context.registry.get(t.model_name).family != "baseline"
@@ -89,7 +85,7 @@ class EnsembleSearch:
             for combiner in COMBINERS:
                 self.context.add_outcome(
                     combiner,
-                    Action.REJECT,
+                    experiments.DecisionAction.REJECT,
                     "fewer than two eligible distinct models",
                 )
             return
@@ -131,10 +127,10 @@ class EnsembleSearch:
             outcome: The ensemble's trial result.
             names: Model names of the members, for the explanation.
         """
-        if outcome.status is not Status.OK:
+        if outcome.status is not experiments.TrialStatus.OK:
             self.context.add_outcome(
                 combiner,
-                Action.REJECT,
+                experiments.DecisionAction.REJECT,
                 f"trial {outcome.status}: {outcome.error}",
             )
             return
@@ -142,7 +138,9 @@ class EnsembleSearch:
         gain = sign * (outcome.score_mean - leader.score_mean)
         self.context.add_outcome(
             combiner,
-            Action.INCLUDE if gain > 0 else Action.REJECT,
+            experiments.DecisionAction.INCLUDE
+            if gain > 0
+            else experiments.DecisionAction.REJECT,
             f"{combiner} of {', '.join(names)}: cv {self.metric.name} "
             f"{outcome.score_mean:.4f} vs best member {leader.score_mean:.4f} "
             f"({gain:+.4f} in the metric's favour)",

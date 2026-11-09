@@ -32,8 +32,6 @@ from typing import Any
 
 import scmle.operations.signals
 
-Category = scmle.operations.signals.Category
-
 
 class Verdict(enum.StrEnum):
     """What the breached signals add up to."""
@@ -85,7 +83,7 @@ class Classification:
     """
 
     verdict: Verdict
-    categories: tuple[Category, ...]
+    categories: tuple[scmle.operations.signals.Category, ...]
     breached: tuple[str, ...]
     unobserved: tuple[str, ...]
     caveats: tuple[str, ...]
@@ -200,7 +198,8 @@ def classify(
     if verdict is not Verdict.NONE:
         severity = "warning"
     if "availability" in breached or (
-        verdict is Verdict.MIXED and Category.INFRASTRUCTURE in categories
+        verdict is Verdict.MIXED
+        and scmle.operations.signals.Category.INFRASTRUCTURE in categories
     ):
         severity = "critical"
     if verdict is Verdict.INDETERMINATE:

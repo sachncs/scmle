@@ -18,7 +18,6 @@ from scmle.contracts import tasks
 from scmle.models import wrappers
 from scmle.models.boosting import early_stopping
 
-ALL_TASKS = tasks.STANDARD_TASKS
 NO_PARAMS: types.MappingProxyType = types.MappingProxyType({})
 
 
@@ -116,7 +115,7 @@ class LightGbmAdapter(LazyLibraryAdapter):
     monotonic_param = "monotone_constraints"
     fit_param_names = ("categorical_feature",)
     capabilities = models.Capabilities(
-        ALL_TASKS,
+        tasks.STANDARD_TASKS,
         sparse_input=True,
         handles_missing=True,
         native_categorical=True,
@@ -164,7 +163,7 @@ class XgboostAdapter(LazyLibraryAdapter):
     regressor_name = "XGBRegressor"
     monotonic_param = "monotone_constraints"
     capabilities = models.Capabilities(
-        ALL_TASKS,
+        tasks.STANDARD_TASKS,
         sparse_input=True,
         handles_missing=True,
         native_categorical=False,
@@ -197,7 +196,7 @@ class CatBoostAdapter(LazyLibraryAdapter):
     classifier_name = "CatBoostClassifier"
     regressor_name = "CatBoostRegressor"
     capabilities = models.Capabilities(
-        ALL_TASKS,
+        tasks.STANDARD_TASKS,
         sparse_input=True,
         handles_missing=True,
         native_categorical=False,

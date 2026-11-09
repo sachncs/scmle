@@ -97,6 +97,7 @@ from scmle.data.admissibility import leakage
 from scmle.data.detectors import certificates
 from scmle.data.ledger import budget
 from scmle.data.ledger import multiplicity
+import scmle.data.ledger.budget
 
 DETECTOR_ID = "f4-leakage-screen"
 SKILL = "skill"
@@ -127,15 +128,12 @@ BATCH = 200
 TIME_BLOCKS = 20
 RIDGE = 1e-3
 TOLERANCE = 1e-12
-CERTIFIED = leakage.CERTIFIED
 
 WORDS = {
     SKILL: "cross-fitted skill",
     MISSING: "association of being recorded with the target (Cramer's V)",
     PURITY: "share of one target class among the recorded values",
 }
-
-Splits = leakage.Splits
 Statistic = Callable[[numpy.ndarray], numpy.ndarray]
 
 
@@ -251,7 +249,7 @@ def fold_splits(
     groups: numpy.ndarray | None,
     block_size: int | None,
     seed: int,
-) -> Splits:
+) -> leakage.Splits:
     """Cross-fitting folds that do not depend on the outcome.
 
     Folds fixed before permuting keep the observed statistic and the permuted
@@ -273,7 +271,7 @@ def fold_splits(
 
 
 def oof_fit(
-    values: numpy.ndarray, phi: numpy.ndarray, splits: Splits
+    values: numpy.ndarray, phi: numpy.ndarray, splits: leakage.Splits
 ) -> numpy.ndarray:
     """Out-of-fold ridge fits of each row of `values` on the design `phi`.
 
@@ -385,7 +383,7 @@ class Problem:
     y: numpy.ndarray
     task: str
     classes: int
-    splits: Splits
+    splits: leakage.Splits
     total_squares: float
 
 
@@ -1039,7 +1037,10 @@ def gate_statuses(
     )
     if store is None or task != "classification" or n_classes != 2:
         return descriptive
-    if dataclasses.replace(cfg, run_seed=CERTIFIED.run_seed) != CERTIFIED:
+    if (
+        dataclasses.replace(cfg, run_seed=leakage.CERTIFIED.run_seed)
+        != leakage.CERTIFIED
+    ):
         return descriptive
     digest = code_digest()
     return {
@@ -1143,7 +1144,7 @@ def screen_table(
         that is not a candidate column, or a missing `target`, raises as in
         `screen`.
     """
-    cfg = dataclasses.replace(CERTIFIED, run_seed=seed)
+    cfg = dataclasses.replace(leakage.CERTIFIED, run_seed=seed)
     chosen = store if store is not None else shipped_store()
     groups = (
         frame[group_column].astype(str)
@@ -1409,7 +1410,9 @@ def scan_frame(
     ]
     complete = [h.statistic is None or h.drawn == total for h in pending]
     used = [p if done else 1.0 for p, done in zip(ps, complete, strict=True)]
-    adjustment = multiplicity.adjust(used, multiplicity.Rule.BY, alpha)
+    adjustment = multiplicity.adjust(
+        used, scmle.data.ledger.budget.MultiplicityRule.BY, alpha
+    )
     findings = []
     for k, h in enumerate(pending):
         significant = adjustment.rejected[k]

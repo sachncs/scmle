@@ -66,6 +66,7 @@ import scmle.contracts.evidence
 from scmle.core import randomness
 from scmle.data.ledger import bivariate
 from scmle.data.ledger import online_fdr
+import scmle.data.ledger.online_fdr
 
 GENESIS = "0" * 64
 LEDGER_VERSION = 1
@@ -458,7 +459,7 @@ class Ledger:
         cls,
         run_dir: str | Path,
         charter: Any,
-        rule: str = online_fdr.DEFAULT_RULE,
+        rule: str = scmle.data.ledger.online_fdr.ELOND,
         horizon: int | None = None,
     ) -> "Ledger":
         """Opens the run's ledger, creating it on first use.

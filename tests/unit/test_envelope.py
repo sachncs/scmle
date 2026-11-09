@@ -15,7 +15,6 @@ PERSON_KEY = "person-key"
 SYSTEM_KEY = "system-key"
 SCOPE = "model-v1:stream-a"
 TODAY = datetime.date(2026, 11, 4)
-ACTION = envelope.EnvelopeAction.TRAIN_CHALLENGER
 
 
 def make_ledger(path=None):
@@ -44,7 +43,7 @@ def make_guard(ledger=None, today=TODAY, keys=True):
 def signed(key=PERSON_KEY, **changes):
     fields = {
         "envelope_id": "e1",
-        "limits": {ACTION.value: 2},
+        "limits": {envelope.EnvelopeAction.TRAIN_CHALLENGER.value: 2},
         "statement": "retrain a challenger when the alarm gates it",
         "role": "owner",
         "name_or_id": "P. Owner",
@@ -84,7 +83,7 @@ def test_a_limit_is_a_positive_integer(limit):
     with pytest.raises(
         deployment_ledger.DeploymentLedgerError, match="positive integer"
     ):
-        signed(limits={ACTION.value: limit})
+        signed(limits={envelope.EnvelopeAction.TRAIN_CHALLENGER.value: limit})
 
 
 def test_an_envelope_needs_an_action_a_name_and_ordered_dates():
@@ -111,7 +110,7 @@ def test_the_signature_covers_every_field():
     assert grant.verify(PERSON_KEY)
     assert not grant.verify("another-key")
     for change in (
-        {"limits": {ACTION.value: 99}},
+        {"limits": {envelope.EnvelopeAction.TRAIN_CHALLENGER.value: 99}},
         {"scope": "model-v2:stream-a"},
         {"expires": "2027-01-01"},
         {"statement": "anything"},
@@ -137,7 +136,9 @@ def test_a_grant_is_chained_and_shows_what_is_left():
     guard = make_guard()
     guard.grant(signed())
     assert kinds(guard) == [deployment_ledger.OPEN, deployment_ledger.ENVELOPE]
-    assert guard.remaining("e1") == {ACTION.value: 2}
+    assert guard.remaining("e1") == {
+        envelope.EnvelopeAction.TRAIN_CHALLENGER.value: 2
+    }
 
 
 def test_a_signature_that_does_not_verify_is_not_granted():
@@ -173,26 +174,37 @@ def test_an_id_is_granted_once():
 def test_a_use_is_chained_before_it_returns_and_spends_the_budget():
     guard = make_guard()
     guard.grant(signed())
-    assert guard.authorize(ACTION, SCOPE, {"batch": 3}) == "e1"
+    assert (
+        guard.authorize(
+            envelope.EnvelopeAction.TRAIN_CHALLENGER, SCOPE, {"batch": 3}
+        )
+        == "e1"
+    )
     used = guard.ledger.rows[-1]
     assert used["kind"] == deployment_ledger.ENVELOPE_USED
     assert used["body"]["detail"] == {"batch": 3}
     assert used["body"]["date"] == "2026-11-04"
-    assert guard.remaining("e1") == {ACTION.value: 1}
-    guard.authorize(ACTION, SCOPE)
-    assert guard.remaining("e1") == {ACTION.value: 0}
+    assert guard.remaining("e1") == {
+        envelope.EnvelopeAction.TRAIN_CHALLENGER.value: 1
+    }
+    guard.authorize(envelope.EnvelopeAction.TRAIN_CHALLENGER, SCOPE)
+    assert guard.remaining("e1") == {
+        envelope.EnvelopeAction.TRAIN_CHALLENGER.value: 0
+    }
     with pytest.raises(envelope.EnvelopeRefused, match="spent"):
-        guard.authorize(ACTION, SCOPE)
+        guard.authorize(envelope.EnvelopeAction.TRAIN_CHALLENGER, SCOPE)
 
 
 def test_a_refusal_writes_nothing():
     guard = make_guard()
     with pytest.raises(envelope.EnvelopeRefused, match="no envelope was"):
-        guard.authorize(ACTION, SCOPE)
+        guard.authorize(envelope.EnvelopeAction.TRAIN_CHALLENGER, SCOPE)
     guard.grant(signed())
     before = len(guard.ledger.rows)
     with pytest.raises(envelope.EnvelopeRefused, match="different scope"):
-        guard.authorize(ACTION, "model-v2:stream-a")
+        guard.authorize(
+            envelope.EnvelopeAction.TRAIN_CHALLENGER, "model-v2:stream-a"
+        )
     assert len(guard.ledger.rows) == before
 
 
@@ -200,20 +212,31 @@ def test_the_dates_bound_the_authority():
     guard = make_guard(today=datetime.date(2026, 10, 31))
     guard.grant(signed())
     with pytest.raises(envelope.EnvelopeRefused, match="not valid today"):
-        guard.authorize(ACTION, SCOPE)
+        guard.authorize(envelope.EnvelopeAction.TRAIN_CHALLENGER, SCOPE)
     guard.today = lambda: datetime.date(2026, 12, 1)
-    guard.authorize(ACTION, SCOPE)
+    guard.authorize(envelope.EnvelopeAction.TRAIN_CHALLENGER, SCOPE)
     guard.today = lambda: datetime.date(2026, 12, 2)
     with pytest.raises(envelope.EnvelopeRefused, match="not valid today"):
-        guard.authorize(ACTION, SCOPE)
+        guard.authorize(envelope.EnvelopeAction.TRAIN_CHALLENGER, SCOPE)
 
 
 def test_the_next_envelope_serves_when_the_first_is_spent():
     guard = make_guard()
-    guard.grant(signed(limits={ACTION.value: 1}))
-    guard.grant(signed(envelope_id="e2", limits={ACTION.value: 1}))
-    assert guard.authorize(ACTION, SCOPE) == "e1"
-    assert guard.authorize(ACTION, SCOPE) == "e2"
+    guard.grant(
+        signed(limits={envelope.EnvelopeAction.TRAIN_CHALLENGER.value: 1})
+    )
+    guard.grant(
+        signed(
+            envelope_id="e2",
+            limits={envelope.EnvelopeAction.TRAIN_CHALLENGER.value: 1},
+        )
+    )
+    assert (
+        guard.authorize(envelope.EnvelopeAction.TRAIN_CHALLENGER, SCOPE) == "e1"
+    )
+    assert (
+        guard.authorize(envelope.EnvelopeAction.TRAIN_CHALLENGER, SCOPE) == "e2"
+    )
 
 
 def test_a_revoked_envelope_authorises_nothing_and_anyone_may_revoke():
@@ -222,7 +245,7 @@ def test_a_revoked_envelope_authorises_nothing_and_anyone_may_revoke():
     guard.revoke("e1", "model retired")
     assert guard.remaining("e1") == {}
     with pytest.raises(envelope.EnvelopeRefused, match="revoked"):
-        guard.authorize(ACTION, SCOPE)
+        guard.authorize(envelope.EnvelopeAction.TRAIN_CHALLENGER, SCOPE)
     with pytest.raises(
         deployment_ledger.DeploymentLedgerError, match="is revoked"
     ):
@@ -238,7 +261,7 @@ def test_a_key_that_is_no_longer_trusted_stops_the_authority():
     guard.grant(signed())
     guard.verification_keys = {}
     with pytest.raises(envelope.EnvelopeRefused, match="signature"):
-        guard.authorize(ACTION, SCOPE)
+        guard.authorize(envelope.EnvelopeAction.TRAIN_CHALLENGER, SCOPE)
 
 
 def test_a_never_list_action_is_refused_even_if_it_were_passed_in():
@@ -258,8 +281,14 @@ def test_a_never_list_action_is_refused_even_if_it_were_passed_in():
 def test_the_ledger_refuses_a_use_the_guard_would_have_refused():
     ledger = make_ledger()
     guard = make_guard(ledger)
-    guard.grant(signed(limits={ACTION.value: 1}))
-    use = {"envelope_id": "e1", "action": ACTION.value, "scope": SCOPE}
+    guard.grant(
+        signed(limits={envelope.EnvelopeAction.TRAIN_CHALLENGER.value: 1})
+    )
+    use = {
+        "envelope_id": "e1",
+        "action": envelope.EnvelopeAction.TRAIN_CHALLENGER.value,
+        "scope": SCOPE,
+    }
     ledger.commit(deployment_ledger.ENVELOPE_USED, use)
     with pytest.raises(deployment_ledger.DeploymentLedgerError, match="spent"):
         ledger.commit(deployment_ledger.ENVELOPE_USED, use)
@@ -293,10 +322,14 @@ def test_a_reloaded_ledger_replays_the_same_budget(tmp_path):
     ledger = make_ledger(path)
     guard = make_guard(ledger)
     guard.grant(signed())
-    guard.authorize(ACTION, SCOPE)
+    guard.authorize(envelope.EnvelopeAction.TRAIN_CHALLENGER, SCOPE)
     again = deployment_ledger.DeploymentLedger.load(path)
-    assert again.envelope_uses == {"e1": {ACTION.value: 1}}
-    assert make_guard(again).remaining("e1") == {ACTION.value: 1}
+    assert again.envelope_uses == {
+        "e1": {envelope.EnvelopeAction.TRAIN_CHALLENGER.value: 1}
+    }
+    assert make_guard(again).remaining("e1") == {
+        envelope.EnvelopeAction.TRAIN_CHALLENGER.value: 1
+    }
     again.verify()
 
 
@@ -304,8 +337,10 @@ def test_a_forged_use_row_does_not_survive_a_reload(tmp_path):
     path = tmp_path / deployment_ledger.FILE_NAME
     ledger = make_ledger(path)
     guard = make_guard(ledger)
-    guard.grant(signed(limits={ACTION.value: 1}))
-    guard.authorize(ACTION, SCOPE)
+    guard.grant(
+        signed(limits={envelope.EnvelopeAction.TRAIN_CHALLENGER.value: 1})
+    )
+    guard.authorize(envelope.EnvelopeAction.TRAIN_CHALLENGER, SCOPE)
     row = ledger.rows[-1]
     path.write_text(
         path.read_text(encoding="utf-8") + chained_copy(ledger, row),

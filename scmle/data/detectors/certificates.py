@@ -36,7 +36,6 @@ from scmle.contracts import evidence
 from scmle.contracts import qualification
 
 SCHEMA_VERSION = 1
-DEFAULT_CONFIDENCE = qualification.DEFAULT_CONFIDENCE
 SHA256_HEX = re.compile(r"[0-9a-f]{64}")
 INTERVAL_TOLERANCE = 1e-9
 DOCSTRING_OWNERS = (
@@ -71,7 +70,7 @@ class CertificateState(enum.StrEnum):
 
 
 def wilson_interval(
-    successes: int, n: int, confidence: float = DEFAULT_CONFIDENCE
+    successes: int, n: int, confidence: float = qualification.DEFAULT_CONFIDENCE
 ) -> tuple[float, float]:
     """Two-sided Wilson score interval for a binomial proportion.
 
@@ -235,7 +234,7 @@ class CertificationPolicy:
 
     recall_floor: float
     false_alarm_ceiling: float
-    confidence: float = DEFAULT_CONFIDENCE
+    confidence: float = qualification.DEFAULT_CONFIDENCE
 
     def __post_init__(self) -> None:
         """Validates the thresholds.

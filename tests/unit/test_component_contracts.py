@@ -9,6 +9,7 @@ import textwrap
 import pytest
 
 from scmle.contracts import models
+import scmle.contracts.experiments
 from scmle.core import policies
 from scmle.core import scheduler
 from scmle.core import stages
@@ -101,7 +102,7 @@ def test_strategy_registry_entries_are_self_describing():
     for name, strategy in strategies.STRATEGIES.items():
         assert strategy.name == name and strategy.description
     assert set(strategies.DEFAULT_NAMES) | strategies.OPT_IN | {
-        strategies.DEFAULT
+        scmle.contracts.experiments.DEFAULT_STRATEGY
     } == set(strategies.STRATEGIES)
 
 

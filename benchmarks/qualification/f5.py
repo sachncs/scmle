@@ -51,7 +51,6 @@ from scmle.data.detectors import registry
 from scmle.data.detectors import sentinels
 
 CERT_PATH = Path(__file__).with_name("detector_certificates.json")
-TARGET = standins.TARGET
 POLICY = certificates.CertificationPolicy(
     recall_floor=0.80, false_alarm_ceiling=0.05, confidence=0.95
 )
@@ -75,7 +74,9 @@ def label_detector(frame: pandas.DataFrame) -> pandas.Series:
         A boolean Series with the index of `frame`; True for the rows in the
         label-noise report's suspects.
     """
-    report = labels.detect(frame.drop(columns=[TARGET]), frame[TARGET], 0)
+    report = labels.detect(
+        frame.drop(columns=[standins.TARGET]), frame[standins.TARGET], 0
+    )
     flags = pandas.Series(False, index=frame.index)
     flags.iloc[list(report.suspects)] = True
     return flags
@@ -163,7 +164,9 @@ def row_plans() -> dict[str, list[certify.DefectPlan]]:
             renamed(
                 certify.DefectPlan(
                     "label_flip",
-                    lambda f, s: inject.flip_labels(f, TARGET, 0.10, s),
+                    lambda f, s: inject.flip_labels(
+                        f, standins.TARGET, 0.10, s
+                    ),
                 ),
                 "label_flip_symmetric",
             ),
@@ -172,7 +175,7 @@ def row_plans() -> dict[str, list[certify.DefectPlan]]:
                     "label_flip",
                     lambda f, s: inject.flip_labels(
                         f,
-                        TARGET,
+                        standins.TARGET,
                         0.0,
                         s,
                         mode="class_conditional",

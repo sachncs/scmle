@@ -12,6 +12,7 @@ import pytest
 
 from scmle.contracts import errors
 from scmle.contracts import tasks
+import scmle.contracts.tasks
 from scmle.data.custody import carve
 from scmle.data.custody import pipeline
 from scmle.data.custody import sealed
@@ -19,7 +20,6 @@ import scmle.data.custody.manifest
 from scmle.data.splitting import splitters
 from tests.unit.test_charter_contracts import make_charter
 from tests.unit.test_custody_manifest import make
-from tests.unit.test_custody_pipeline import BINARY
 from tests.unit.test_custody_pipeline import DATA_HASH
 from tests.unit.test_custody_pipeline import make_frame
 from tests.unit.test_custody_pipeline import make_spec
@@ -420,14 +420,16 @@ def test_a_missing_class_in_c_means_no_confirmation_set():
     frame["y"] = 0
     frame.loc[frame["g"] == 3, "y"] = 1
     spec = make_spec(group_column="g")
-    split = splitters.SplitManager(spec, BINARY).split(frame)
+    split = splitters.SplitManager(
+        spec, scmle.contracts.tasks.TaskType.BINARY
+    ).split(frame)
     vault = sealed.CustodyVault(sealed.OpenLog(), process=False)
     outcome = pipeline.apply_custody(
         charter=make_charter(min_effect=0.3, k_max=5),
         split=split,
         frame=frame,
         spec=spec,
-        task=BINARY,
+        task=scmle.contracts.tasks.TaskType.BINARY,
         data_hash=DATA_HASH,
         vault=vault,
     )
@@ -451,11 +453,20 @@ def test_a_classification_target_is_measured_through_its_codes():
     data = tasks.DataSpec(uri="m", target="y", time_column="t")
     assert (
         pipeline.measured_embargo(
-            frame, dev, data, frame["t"].to_numpy(), BINARY
+            frame,
+            dev,
+            data,
+            frame["t"].to_numpy(),
+            scmle.contracts.tasks.TaskType.BINARY,
         )
         > 5
     )
-    assert pipeline.measured_embargo(frame, dev, data, None, BINARY) == 0
+    assert (
+        pipeline.measured_embargo(
+            frame, dev, data, None, scmle.contracts.tasks.TaskType.BINARY
+        )
+        == 0
+    )
 
 
 def test_a_text_target_in_a_regression_gives_no_measured_embargo():

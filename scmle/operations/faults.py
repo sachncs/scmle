@@ -51,7 +51,6 @@ from scmle.operations import signals
 from scmle.operations import spool
 from scmle.security import audit
 
-KEY = demo.DEMO_SIGNING_KEY
 ROTATED_KEY = "scmle-rotated-signing-key-local-recovery-run"
 WRONG_KEY = "scmle-wrong-signing-key-local-recovery-run"
 MODEL = "recovery-model"
@@ -98,7 +97,7 @@ def inverted_spec() -> dict[str, Any]:
 
 
 def export_service(
-    folder: pathlib.Path, spec: dict[str, Any], key: str = KEY
+    folder: pathlib.Path, spec: dict[str, Any], key: str = demo.DEMO_SIGNING_KEY
 ) -> pathlib.Path:
     """Writes a signed service folder for a specification.
 
@@ -146,7 +145,10 @@ class Fleet:
         self.children: list[subprocess.Popen[str]] = []
 
     def start(
-        self, folder: pathlib.Path, key: str = KEY, port: int | None = None
+        self,
+        folder: pathlib.Path,
+        key: str = demo.DEMO_SIGNING_KEY,
+        port: int | None = None,
     ) -> Instance:
         """Starts ``serve.py`` of a folder in a subprocess, in production mode.
 
@@ -696,7 +698,7 @@ def invalid_credentials() -> recovery.Result:
         detected = time.monotonic()
         wrong.process.kill()
         wrong.process.wait(timeout=15)
-        right = fleet.start(service, key=KEY)
+        right = fleet.start(service, key=demo.DEMO_SIGNING_KEY)
         seconds = ready_after(right)
         elapsed = time.monotonic() - detected
         served = predict(right.base)[0] == 200 if seconds is not None else False
@@ -744,13 +746,15 @@ def secret_rotation() -> recovery.Result:
         "secret_rotation_recovery", environment="local subprocess"
     )
     try:
-        old_service = export_service(base / "old", golden_spec(), KEY)
-        first = fleet.start(old_service, key=KEY)
+        old_service = export_service(
+            base / "old", golden_spec(), demo.DEMO_SIGNING_KEY
+        )
+        first = fleet.start(old_service, key=demo.DEMO_SIGNING_KEY)
         before = ready_after(first)
         first.process.kill()
         first.process.wait(timeout=15)
         new_service = export_service(base / "new", golden_spec(), ROTATED_KEY)
-        stale = fleet.start(new_service, key=KEY)
+        stale = fleet.start(new_service, key=demo.DEMO_SIGNING_KEY)
         verdict = await_unready(stale)
         detected = time.monotonic()
         stale.process.kill()
@@ -1276,15 +1280,21 @@ def register(
     Returns:
         The record of the registered version.
     """
-    exported = parity.reference_bundle(spec).save(work / label, KEY)
+    exported = parity.reference_bundle(spec).save(
+        work / label, demo.DEMO_SIGNING_KEY
+    )
     record = store.register(
-        MODEL, exported, metrics={}, run_id=label, signing_key=KEY
+        MODEL,
+        exported,
+        metrics={},
+        run_id=label,
+        signing_key=demo.DEMO_SIGNING_KEY,
     )
     release.approve(
         MODEL,
         record.version,
         demo.approval_for(record, f"recovery run {label}", "recovery-run"),
-        KEY,
+        demo.DEMO_SIGNING_KEY,
     )
     return record
 
@@ -1328,11 +1338,21 @@ def bad_release() -> recovery.Result:
         )
         d3 = plane.register_image(export_service(base / "img3", third_spec))
         first = release.promote(
-            MODEL, v1.version, plane, ENVIRONMENT, d1, signing_key=KEY
+            MODEL,
+            v1.version,
+            plane,
+            ENVIRONMENT,
+            d1,
+            signing_key=demo.DEMO_SIGNING_KEY,
         )
         known_good = predict(plane.base())[1].get("predictions")
         promoted = release.promote(
-            MODEL, v2.version, plane, ENVIRONMENT, d2, signing_key=KEY
+            MODEL,
+            v2.version,
+            plane,
+            ENVIRONMENT,
+            d2,
+            signing_key=demo.DEMO_SIGNING_KEY,
         )
         wrong = predict(plane.base())[1].get("predictions")
         # delayed labels: the truth is what the good model says, with 5% noise
@@ -1358,7 +1378,9 @@ def bad_release() -> recovery.Result:
                 detected_after = (step + 1) * 3
                 detected_at = time.monotonic()
                 break
-        rolled = release.rollback(MODEL, ENVIRONMENT, plane, signing_key=KEY)
+        rolled = release.rollback(
+            MODEL, ENVIRONMENT, plane, signing_key=demo.DEMO_SIGNING_KEY
+        )
         elapsed = time.monotonic() - detected_at if detected_at else None
         restored = predict(plane.base())[1].get("predictions")
         consistent = release.reconcile(
@@ -1367,7 +1389,12 @@ def bad_release() -> recovery.Result:
         plane.images[d3] = corrupt_copy(plane.images[d3], base / "img3-broken")
         before = json.dumps(release.read(), sort_keys=True)
         unready = release.promote(
-            MODEL, v3.version, plane, ENVIRONMENT, d3, signing_key=KEY
+            MODEL,
+            v3.version,
+            plane,
+            ENVIRONMENT,
+            d3,
+            signing_key=demo.DEMO_SIGNING_KEY,
         )
         after = json.dumps(release.read(), sort_keys=True)
         still = predict(plane.base())[1].get("predictions")

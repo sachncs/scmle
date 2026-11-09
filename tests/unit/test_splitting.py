@@ -8,8 +8,6 @@ from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.data.splitting import splitters
 
-BINARY = tasks.TaskType.BINARY
-
 
 def make_spec(strategy="auto", **data_overrides):
     return tasks.ProjectSpec(
@@ -18,7 +16,7 @@ def make_spec(strategy="auto", **data_overrides):
     )
 
 
-def split(frame, spec=None, task=BINARY):
+def split(frame, spec=None, task=tasks.TaskType.BINARY):
     return splitters.SplitManager(spec or make_spec(), task).split(frame)
 
 
@@ -157,7 +155,9 @@ def temporal_spec(embargo):
 
 def test_embargo_keeps_a_gap_between_training_and_validation_windows(frame):
     manifest = (
-        splitters.SplitManager(temporal_spec(10), BINARY).split(frame).manifest
+        splitters.SplitManager(temporal_spec(10), tasks.TaskType.BINARY)
+        .split(frame)
+        .manifest
     )
     dev_times = frame.t.iloc[list(manifest.train_ids)].to_numpy()
     for fit, validate in manifest.folds:
@@ -168,10 +168,14 @@ def test_embargo_keeps_a_gap_between_training_and_validation_windows(frame):
 
 def test_embargo_rows_before_the_test_set_belong_to_neither_partition(frame):
     plain = (
-        splitters.SplitManager(temporal_spec(0), BINARY).split(frame).manifest
+        splitters.SplitManager(temporal_spec(0), tasks.TaskType.BINARY)
+        .split(frame)
+        .manifest
     )
     embargoed = (
-        splitters.SplitManager(temporal_spec(10), BINARY).split(frame).manifest
+        splitters.SplitManager(temporal_spec(10), tasks.TaskType.BINARY)
+        .split(frame)
+        .manifest
     )
     assert embargoed.test_ids == plain.test_ids
     assert len(embargoed.train_ids) == len(plain.train_ids) - 10
@@ -200,7 +204,9 @@ def test_embargo_requires_a_time_column_and_enough_rows(frame):
             validation=tasks.ValidationSpec(embargo_rows=5),
         )
     with pytest.raises(errors.BlockedError, match="too few"):
-        splitters.SplitManager(temporal_spec(400), BINARY).split(frame)
+        splitters.SplitManager(temporal_spec(400), tasks.TaskType.BINARY).split(
+            frame
+        )
 
 
 def group_classification_frame(groups=30, per_group=10, seed=0):

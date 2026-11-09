@@ -1,6 +1,7 @@
 import json
 
 import pytest
+import scipy.stats
 
 from benchmarks.qualification import f11_certify
 from benchmarks.qualification import f11_generators
@@ -78,8 +79,8 @@ def test_generators_have_the_stated_truth():
     assert f11_generators.target_value() == pytest.approx(0.425)
     ts = numpy.array([0.1, 0.3])
     nb = f11_generators.binormal_nb(0.2, 1.5, 0.8, ts)
-    tpr = 1 - f11_generators.Z.cdf(0.8 - 1.5)
-    fpr = 1 - f11_generators.Z.cdf(0.8)
+    tpr = 1 - scipy.stats.norm.cdf(0.8 - 1.5)
+    fpr = 1 - scipy.stats.norm.cdf(0.8)
     expected = 0.2 * tpr - 0.8 * fpr * (ts / (1 - ts))
     assert nb == pytest.approx(expected)
     rng = numpy.random.default_rng(0)

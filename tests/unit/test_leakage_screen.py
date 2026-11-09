@@ -15,10 +15,9 @@ from scmle.data.admissibility import leakage
 from scmle.data.admissibility import screen
 from scmle.data.detectors import certificates
 from scmle.data.ledger import multiplicity
+import scmle.data.ledger.budget
 
 CLS = "classification"
-GATING = certificates.GateStatus.GATING
-DESCRIPTIVE = certificates.GateStatus.DESCRIPTIVE
 FAST = leakage.LeakageConfig(
     skill_ceiling=0.95,
     association_ceiling=0.9,
@@ -237,7 +236,9 @@ def test_by_decisions_equal_the_exact_adjustment_of_the_reported_p_values():
     frame = world(3).assign(leak=lambda f: f.y + 0.0)
     report = run(frame)
     ps = [f.p_value if f.complete else 1.0 for f in report.findings]
-    adjustment = multiplicity.adjust(ps, multiplicity.Rule.BY, Fraction(1, 20))
+    adjustment = multiplicity.adjust(
+        ps, scmle.data.ledger.budget.MultiplicityRule.BY, Fraction(1, 20)
+    )
     assert [f.significant for f in report.findings] == list(adjustment.rejected)
 
 
@@ -449,29 +450,29 @@ def test_the_shipped_certificate_is_current_for_the_screen_code():
     assert state is certificates.CertificateState.CURRENT
     gates = screen.gate_statuses(store, leakage.CERTIFIED, CLS, 2)
     assert set(gates) == set(screen.MECHANISM_DEFECTS)
-    assert set(gates.values()) == {GATING}
+    assert set(gates.values()) == {certificates.GateStatus.GATING}
 
 
 def test_only_the_certified_target_and_settings_may_gate():
     store = passing_store()
     for task, classes in ((CLS, 3), ("regression", 0)):
         gates = screen.gate_statuses(store, leakage.CERTIFIED, task, classes)
-        assert set(gates.values()) == {DESCRIPTIVE}
+        assert set(gates.values()) == {certificates.GateStatus.DESCRIPTIVE}
     other = dataclasses.replace(leakage.CERTIFIED, skill_ceiling=0.5)
     gates = screen.gate_statuses(store, other, CLS, 2)
-    assert set(gates.values()) == {DESCRIPTIVE}
+    assert set(gates.values()) == {certificates.GateStatus.DESCRIPTIVE}
     seeded = dataclasses.replace(leakage.CERTIFIED, run_seed=11)
     gates = screen.gate_statuses(store, seeded, CLS, 2)
-    assert set(gates.values()) == {GATING}
+    assert set(gates.values()) == {certificates.GateStatus.GATING}
     gates = screen.gate_statuses(None, leakage.CERTIFIED, CLS, 2)
-    assert set(gates.values()) == {DESCRIPTIVE}
+    assert set(gates.values()) == {certificates.GateStatus.DESCRIPTIVE}
 
 
 def test_a_stale_certificate_does_not_gate(monkeypatch):
     store = passing_store()
     monkeypatch.setattr(screen, "code_digest", lambda: "0" * 64)
     gates = screen.gate_statuses(store, leakage.CERTIFIED, CLS, 2)
-    assert set(gates.values()) == {DESCRIPTIVE}
+    assert set(gates.values()) == {certificates.GateStatus.DESCRIPTIVE}
 
 
 def test_a_mechanism_without_a_passing_type_stays_descriptive(monkeypatch):
@@ -482,15 +483,17 @@ def test_a_mechanism_without_a_passing_type_stays_descriptive(monkeypatch):
         {**screen.MECHANISM_DEFECTS, screen.PURITY: ("not_certified",)},
     )
     gates = screen.gate_statuses(store, leakage.CERTIFIED, CLS, 2)
-    assert gates[screen.PURITY] is DESCRIPTIVE
-    assert gates[screen.SKILL] is GATING
+    assert gates[screen.PURITY] is certificates.GateStatus.DESCRIPTIVE
+    assert gates[screen.SKILL] is certificates.GateStatus.GATING
 
 
 def test_without_a_store_a_suspect_warns_and_cannot_block():
     frame = world(19).assign(leak=lambda f: f.y + 0.0)
     report = run(frame)
     (found,) = report.suspects
-    assert found.gate is DESCRIPTIVE and not found.blocking
+    assert (
+        found.gate is certificates.GateStatus.DESCRIPTIVE and not found.blocking
+    )
     assert report.blocking == ()
     assert "warning only" in report.sentences()[0]
 

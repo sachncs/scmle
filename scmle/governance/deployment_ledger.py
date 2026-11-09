@@ -87,7 +87,6 @@ from scmle.monitoring import sequential_tests
 
 FILE_NAME = "deployment_ledger.jsonl"
 LEDGER_VERSION = 1
-GENESIS = ledger.GENESIS
 OPEN = "open"
 OBSERVE_SUMMARY = "observe_summary"
 ALARM = "alarm"
@@ -615,7 +614,7 @@ class DeploymentLedger:
     @property
     def head(self) -> str:
         """Hash of the last row (genesis for an empty ledger)."""
-        return str(self.rows[-1]["hash"]) if self.rows else GENESIS
+        return str(self.rows[-1]["hash"]) if self.rows else ledger.GENESIS
 
     def commit(self, kind: str, body: Mapping[str, Any]) -> dict[str, Any]:
         """Chains a row, ingests it and persists it.

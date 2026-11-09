@@ -29,11 +29,8 @@ import scmle.models.ranking.estimators
 import scmle.models.survival.estimators
 import scmle.models.uplift.estimators
 
-BINARY = tasks.TaskType.BINARY
-MULTICLASS = tasks.TaskType.MULTICLASS
-REGRESSION = tasks.TaskType.REGRESSION
-CLASSIFICATION = frozenset({BINARY, MULTICLASS})
-REGRESSION_ONLY = frozenset({REGRESSION})
+CLASSIFICATION = frozenset({tasks.TaskType.BINARY, tasks.TaskType.MULTICLASS})
+REGRESSION_ONLY = frozenset({tasks.TaskType.REGRESSION})
 ALL_TASKS = CLASSIFICATION | REGRESSION_ONLY
 CALIBRATION_FOLDS = 3
 NO_PARAMS: types.MappingProxyType = types.MappingProxyType({})

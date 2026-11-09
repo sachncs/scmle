@@ -18,7 +18,6 @@ from scmle.models.deeplearning import foundation
 from scmle.models.deeplearning import jepa
 from scmle.models.deeplearning import worker
 
-ALL_TASKS = tasks.STANDARD_TASKS
 COMMON_SPACE = (
     search.FloatParameter("dropout", 0.0, 0.4),
     search.FloatParameter("learning_rate", 1e-4, 1e-2, log=True),
@@ -42,7 +41,7 @@ class TorchAdapter(models.ModelAdapter):
         contracts.TABULAR_TORCH_CONTRACT
     )
     capabilities = models.Capabilities(
-        ALL_TASKS,
+        tasks.STANDARD_TASKS,
         probabilities=True,
         early_stopping=True,
         needs_scaling=True,
@@ -423,7 +422,7 @@ class TabPfnAdapter(models.ModelAdapter):
     family = "foundation"
     requires = ("tabpfn",)
     capabilities = models.Capabilities(
-        ALL_TASKS,
+        tasks.STANDARD_TASKS,
         probabilities=True,
         gpu=True,
         max_rows=foundation.MAX_ROWS,

@@ -108,7 +108,6 @@ ELOND = "e-lond"
 LORD_PLUS_PLUS = "lord++"
 SAFFRON = "saffron"
 RULE_NAMES = (ELOND, LORD_PLUS_PLUS, SAFFRON)
-DEFAULT_RULE = ELOND
 
 
 class RuleInvariantError(RuntimeError):

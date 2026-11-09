@@ -11,9 +11,6 @@ from scmle.data.robustness import coverage
 from scmle.data.robustness import forward
 from scmle.data.robustness import shift
 
-PASS = shift.Status.PASS
-FAIL = shift.Status.FAIL
-
 
 def test_without_a_reference_every_level_is_unverifiable_never_pass():
     sample = pandas.Series(["a"] * 30 + ["b"] * 70, name="g")
@@ -30,12 +27,15 @@ def test_the_interval_is_the_exact_one_and_decides_pass_or_fail():
     }
     exact = stats.binomtest(30, 100).proportion_ci(0.95, method="exact")
     assert rows["a"].interval == pytest.approx((exact.low, exact.high))
-    assert rows["a"].status is PASS and rows["a"].share == 0.3
+    assert rows["a"].status is shift.Status.PASS and rows["a"].share == 0.3
     gap = {
         r.level: r
         for r in coverage.subgroup_coverage(sample, {"a": 0.6, "b": 0.4})
     }
-    assert gap["a"].status is FAIL and gap["b"].status is FAIL
+    assert (
+        gap["a"].status is shift.Status.FAIL
+        and gap["b"].status is shift.Status.FAIL
+    )
 
 
 def test_a_level_missing_from_the_sample_or_the_deployment_is_listed():
@@ -44,11 +44,11 @@ def test_a_level_missing_from_the_sample_or_the_deployment_is_listed():
         r.level: r
         for r in coverage.subgroup_coverage(sample, {"a": 0.5, "z": 0.5})
     }
-    assert rows["z"].count == 0 and rows["z"].status is FAIL
+    assert rows["z"].count == 0 and rows["z"].status is shift.Status.FAIL
     only_sample = {
         r.level: r for r in coverage.subgroup_coverage(sample, {"a": 1.0})
     }
-    assert only_sample["a"].status is PASS
+    assert only_sample["a"].status is shift.Status.PASS
 
 
 def test_missing_values_are_their_own_level_and_input_is_validated():

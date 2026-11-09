@@ -7,15 +7,15 @@ from scipy import stats
 
 import scmle.data.charter.feasibility
 
-Z = stats.norm.ppf
-
 
 def two_sided_z(alpha, k):
-    return Z(1 - alpha / (2 * k))
+    return stats.norm.ppf(1 - alpha / (2 * k))
 
 
 def test_mean_effect_sample_size_matches_the_closed_form():
-    expected = math.ceil(((Z(0.975) + Z(0.8)) / 0.5) ** 2)
+    expected = math.ceil(
+        ((stats.norm.ppf(0.975) + stats.norm.ppf(0.8)) / 0.5) ** 2
+    )
     assert (
         scmle.data.charter.feasibility.n_required_mean(
             0.5, alpha=0.05, k_max=1, power=0.8
@@ -40,7 +40,7 @@ def test_mde_inverts_the_mean_sample_size_to_1e_9(k_max, delta):
     n = scmle.data.charter.feasibility.n_required_mean(
         delta, alpha=0.05, k_max=k_max, power=0.8
     )
-    zsum = two_sided_z(0.05, k_max) + Z(0.8)
+    zsum = two_sided_z(0.05, k_max) + stats.norm.ppf(0.8)
     assert scmle.data.charter.feasibility.mde_mean(
         n, alpha=0.05, k_max=k_max, power=0.8
     ) == pytest.approx(zsum / math.sqrt(n), abs=1e-12)
@@ -83,8 +83,8 @@ def test_two_proportion_sample_size_matches_the_textbook_formula():
     p1, p2, alpha, power = 0.5, 0.6, 0.05, 0.8
     pbar = (p1 + p2) / 2
     numerator = (
-        Z(1 - alpha / 2) * math.sqrt(2 * pbar * (1 - pbar))
-        + Z(power) * math.sqrt(p1 * (1 - p1) + p2 * (1 - p2))
+        stats.norm.ppf(1 - alpha / 2) * math.sqrt(2 * pbar * (1 - pbar))
+        + stats.norm.ppf(power) * math.sqrt(p1 * (1 - p1) + p2 * (1 - p2))
     ) ** 2
     expected = math.ceil(numerator / (p1 - p2) ** 2)
     assert (

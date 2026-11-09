@@ -14,9 +14,6 @@ from typing import Any
 from scmle.core import state
 import scmle.core.context
 
-PLAN_GATE = state.RunState.PLANNING
-SELECTION_GATE = state.RunState.SELECTING
-
 
 @dataclasses.dataclass(frozen=True)
 class GateReview:
@@ -55,7 +52,9 @@ class PolicyCheckpoint(abc.ABC):
         gates: Stages after which the checkpoint is consulted.
     """
 
-    gates: frozenset[state.RunState] = frozenset({PLAN_GATE, SELECTION_GATE})
+    gates: frozenset[state.RunState] = frozenset(
+        {state.RunState.PLANNING, state.RunState.SELECTING}
+    )
 
     @abc.abstractmethod
     def review(self, review: GateReview) -> Approval:
@@ -135,7 +134,7 @@ def describe(
         selected trial in the context) fails with the context's
         unavailable-product error.
     """
-    if gate is PLAN_GATE:
+    if gate is state.RunState.PLANNING:
         plan = scmle.core.context.require(context.plan, "plan")
         return GateReview(gate, plan.summary(), plan.to_dict())
     selected = scmle.core.context.require(context.selected, "selected")

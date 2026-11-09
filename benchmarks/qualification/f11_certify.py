@@ -157,6 +157,7 @@ from typing import Any
 import numpy
 import pandas
 from scipy import stats
+import scipy.stats
 
 from benchmarks.qualification import f11_generators
 from scmle.artifacts import bundle
@@ -1103,8 +1104,8 @@ def gate_a7b(runs: int, base: int = 0) -> dict[str, Any]:
             cut = float(
                 numpy.log(fitted.cuts[str(g)] / (1 - fitted.cuts[str(g)]))
             )
-            tpr = 1.0 - f11_generators.Z.cdf(cut - (1.5 - shift * g))
-            fpr = 1.0 - f11_generators.Z.cdf(cut + 0.5)
+            tpr = 1.0 - scipy.stats.norm.cdf(cut - (1.5 - shift * g))
+            fpr = 1.0 - scipy.stats.norm.cdf(cut + 0.5)
             value += 0.5 * (0.3 * tpr - 0.7 * w * fpr)
         losses.append((oracle - value) / abs(oracle))
     worst = float(max(losses))

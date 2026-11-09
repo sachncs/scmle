@@ -12,13 +12,13 @@ from scmle.data.profiling import profiler
 from scmle.data.readers import tabular
 from scmle.intelligence import knowledge
 
-BINARY = tasks.TaskType.BINARY
-
 
 def profile_of(frame):
     spec = tasks.ProjectSpec(data=tasks.DataSpec(uri="m", target="y"))
     manifest = tabular.build_manifest(frame, "y")
-    return profiler.DatasetProfiler(spec).profile(frame, manifest, BINARY)
+    return profiler.DatasetProfiler(spec).profile(
+        frame, manifest, tasks.TaskType.BINARY
+    )
 
 
 def run_record(
@@ -52,7 +52,7 @@ def test_fingerprint_describes_shape_types_and_balance():
         }
     )
     frame["y"] = (rng.random(1000) < 0.1).astype(int)
-    result = knowledge.fingerprint(profile_of(frame), BINARY)
+    result = knowledge.fingerprint(profile_of(frame), tasks.TaskType.BINARY)
     assert set(result) == set(knowledge.FIELDS)
     assert result["log_rows"] == pytest.approx(3.0)
     assert result["categorical_share"] == pytest.approx(1 / 3)
@@ -69,7 +69,7 @@ def test_fingerprint_has_a_defined_missing_rate_without_features():
     )
     profile = dataclasses.replace(profile, feature_plan=empty_plan)
 
-    result = knowledge.fingerprint(profile, BINARY)
+    result = knowledge.fingerprint(profile, tasks.TaskType.BINARY)
 
     assert result["missing_rate"] == 0.0
 
@@ -81,10 +81,12 @@ def test_nearest_datasets_vote_for_their_winners():
         run_record("ridge", fp(log_rows=1.0), "small", "h3"),
     ]
     learner = knowledge.MetaLearner(history, neighbors=2)
-    near_big = learner.recommend(fp(log_rows=5.0), BINARY, "new", "hn")
+    near_big = learner.recommend(
+        fp(log_rows=5.0), tasks.TaskType.BINARY, "new", "hn"
+    )
     assert [pair[0] for pair in near_big] == ["random_forest", "lightgbm"]
     near_small = knowledge.MetaLearner(history, neighbors=1).recommend(
-        fp(log_rows=1.1), BINARY, "new", "hn"
+        fp(log_rows=1.1), tasks.TaskType.BINARY, "new", "hn"
     )
     assert near_small[0][0] == "ridge"
 
@@ -95,16 +97,24 @@ def test_same_dataset_and_other_tasks_are_excluded():
         run_record("ridge", fp(), "other", "o", task="regression"),
     ]
     learner = knowledge.MetaLearner(history)
-    assert learner.recommend(fp(), BINARY, "self", "different-hash") == []
-    assert learner.recommend(fp(), BINARY, "new", "same") == []
-    others = learner.recommend(fp(), BINARY, "new", "hn")
+    assert (
+        learner.recommend(fp(), tasks.TaskType.BINARY, "self", "different-hash")
+        == []
+    )
+    assert learner.recommend(fp(), tasks.TaskType.BINARY, "new", "same") == []
+    others = learner.recommend(fp(), tasks.TaskType.BINARY, "new", "hn")
     assert [model for model, weight in others] == ["random_forest"]  # not ridge
 
 
 def test_weights_accumulate_and_empty_history_is_safe():
     history = [run_record("lightgbm", fp(), f"d{i}", f"h{i}") for i in range(3)]
     ((model, weight),) = knowledge.MetaLearner(history).recommend(
-        fp(), BINARY, "n", "x"
+        fp(), tasks.TaskType.BINARY, "n", "x"
     )
     assert model == "lightgbm" and weight == pytest.approx(3.0)
-    assert knowledge.MetaLearner([]).recommend(fp(), BINARY, "n", "x") == []
+    assert (
+        knowledge.MetaLearner([]).recommend(
+            fp(), tasks.TaskType.BINARY, "n", "x"
+        )
+        == []
+    )

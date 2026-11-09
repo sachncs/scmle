@@ -11,8 +11,6 @@ import scmle.models.registry
 from scmle.sampling import resampling
 from scmle.sampling import strategies
 
-REGRESSION = tasks.TaskType.REGRESSION
-
 
 @pytest.fixture
 def registry():
@@ -50,16 +48,21 @@ def test_weights_favour_sparse_regions_of_the_target_range():
 def test_strategy_applies_only_to_long_tailed_regression(registry):
     strategy = strategies.get_strategy("rare_target_weighting")
     forest = registry.get("random_forest")
-    assert strategy.applicability(profile_with(3.0), REGRESSION, forest) is None
+    assert (
+        strategy.applicability(
+            profile_with(3.0), tasks.TaskType.REGRESSION, forest
+        )
+        is None
+    )
     assert "not long-tailed" in strategy.applicability(
-        profile_with(0.2), REGRESSION, forest
+        profile_with(0.2), tasks.TaskType.REGRESSION, forest
     )
     assert "regression only" in strategy.applicability(
         profile_with(3.0), tasks.TaskType.BINARY, forest
     )
     knn = registry.get("knn")
     assert "sample weights" in strategy.applicability(
-        profile_with(3.0), REGRESSION, knn
+        profile_with(3.0), tasks.TaskType.REGRESSION, knn
     )
 
 
@@ -67,7 +70,7 @@ def test_classification_resampling_strategies_never_touch_regression(registry):
     forest = registry.get("random_forest")
     for name in ("random_oversample", "smote", "class_weight"):
         reason = strategies.get_strategy(name).applicability(
-            profile_with(3.0), REGRESSION, forest
+            profile_with(3.0), tasks.TaskType.REGRESSION, forest
         )
         assert reason is not None
 
@@ -76,7 +79,7 @@ def test_weighted_pipeline_fits_and_predicts(registry):
     features, target = long_tailed()
     plan = data.FeaturePlan(("x",), ())
     candidate = strategies.get_strategy("rare_target_weighting").build(
-        plan, registry.get("random_forest"), REGRESSION, 0
+        plan, registry.get("random_forest"), tasks.TaskType.REGRESSION, 0
     )
     candidate.fit(features, target)
     predictions = candidate.predict(features)

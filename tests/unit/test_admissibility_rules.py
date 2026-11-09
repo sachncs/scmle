@@ -13,7 +13,6 @@ from tests.unit.test_admissibility_provenance import attestation
 from tests.unit.test_admissibility_provenance import make_field
 
 DAY = datetime.date(2026, 6, 15)
-GATING = certificates.GateStatus.GATING
 A, Q, F = (
     rules.Admission.ADMIT,
     rules.Admission.QUARANTINE,
@@ -112,7 +111,10 @@ def test_suspicion_without_as_of_evidence_quarantines_only_when_gating():
     record = unverified()
     off = rules.decide_predictive(record, rules.Mode.PERMISSIVE, suspect=True)
     on = rules.decide_predictive(
-        record, rules.Mode.PERMISSIVE, suspect=True, leakage_gate=GATING
+        record,
+        rules.Mode.PERMISSIVE,
+        suspect=True,
+        leakage_gate=certificates.GateStatus.GATING,
     )
     assert off.admission is F and on.admission is Q
     assert off.suspicion_kept and on.suspicion_kept
@@ -122,7 +124,9 @@ def test_a_suspect_with_log_evidence_is_admitted_and_the_suspicion_kept():
     record = make_field(
         source=provenance.AsOfSource.LOG, kind=provenance.AsOfKind.TIMESTAMP
     )
-    d = rules.decide_predictive(record, suspect=True, leakage_gate=GATING)
+    d = rules.decide_predictive(
+        record, suspect=True, leakage_gate=certificates.GateStatus.GATING
+    )
     assert d.admission is A and d.suspicion_kept and d.tier is Tier.CONFIRMED
     assert any("suspicion kept" in x for x in d.reasons)
 
@@ -248,7 +252,7 @@ def test_a_gate_per_field_blocks_only_the_field_it_names():
         "predictive",
         rules.Mode.PERMISSIVE,
         suspects={"a": True, "b": True},
-        leakage_gate={"a": GATING},
+        leakage_gate={"a": certificates.GateStatus.GATING},
     )
     assert out.names(Q) == ("a",)
     assert out.names(F) == ("b",)

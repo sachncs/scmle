@@ -12,11 +12,11 @@ import support
 from scmle import cli
 from scmle.artifacts import claims_audit
 from scmle.contracts import errors
-from scmle.core import causal_claim
 import scmle.data.admissibility.dag
 from scmle.data.charter import causal
 from scmle.data.charter import sealing
 from scmle.data.identification import attest
+import scmle.data.identification.run
 import scmle.data.ledger.ledger
 from tests.unit.test_charter_contracts import make_charter
 
@@ -114,7 +114,7 @@ def test_an_identified_charter_estimates_on_the_single_opening_of_c(tmp_path):
     registered = ledger.claims["causal_primary_theta_zero"]
     assert registered["kind"] == "causal_primary"
     sealed = ledger.confirmation["attachments"]
-    assert set(sealed) == set(causal_claim.DOCUMENTS)
+    assert set(sealed) == set(scmle.data.identification.run.DOCUMENTS)
     for name, expected in sealed.items():
         assert scmle.data.ledger.ledger.digest(read(result, name)) == expected
     assert ledger.confirmation["claims"] == {

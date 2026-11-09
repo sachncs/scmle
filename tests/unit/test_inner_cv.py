@@ -11,8 +11,6 @@ from scmle.data.splitting import inner_cv
 import scmle.models.registry
 from scmle.sampling import strategies
 
-BINARY = tasks.TaskType.BINARY
-
 
 def grouped_frame(groups=12, per_group=15, seed=0):
     rng = numpy.random.default_rng(seed)
@@ -73,7 +71,10 @@ def test_calibration_strategy_uses_the_structured_splitter():
     registry = scmle.models.registry.ModelRegistry.with_builtins()
     strategy = strategies.get_strategy("calibrated")
     candidate = strategy.build(
-        plan(group_column="unit"), registry.get("random_forest"), BINARY, 0
+        plan(group_column="unit"),
+        registry.get("random_forest"),
+        tasks.TaskType.BINARY,
+        0,
     )
     assert isinstance(candidate.cv, inner_cv.StructuredKFold)
     assert candidate.cv.group_column == "unit"
@@ -88,7 +89,11 @@ def test_stack_members_are_full_pipelines_cross_fitted_by_group():
     from scmle.data.curation import preprocessing
 
     stack = preprocessing.build_pipeline(
-        plan(group_column="unit"), registry.get("stacking"), BINARY, 0, params
+        plan(group_column="unit"),
+        registry.get("stacking"),
+        tasks.TaskType.BINARY,
+        0,
+        params,
     )
     assert isinstance(stack.cv, inner_cv.StructuredKFold)
     frame, target = grouped_frame()

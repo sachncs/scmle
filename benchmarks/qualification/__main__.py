@@ -74,6 +74,7 @@ from benchmarks.qualification import smoke
 from benchmarks.qualification import standins
 from benchmarks.qualification import subgroup_certify
 from benchmarks.qualification import uncertainty_certify
+import scmle.data.admissibility.screen
 from scmle.data.detectors import certificates
 
 # Detector id -> (current code hash, defect type it gates on).
@@ -96,7 +97,9 @@ def check_certificates() -> int:
     f5_problems = f5.problems(f5_store) + f5.audit_problems(f5_store)
     f6_store = certificates.CertificateStore.load(f6_certify.STORE_PATH)
     f6_problems = f6_certify.problems(f6_store)
-    screen_store = certificates.CertificateStore.load(screen_certify.STORE_PATH)
+    screen_store = certificates.CertificateStore.load(
+        scmle.data.admissibility.screen.STORE_PATH
+    )
     screen_problems = screen_certify.problems(screen_store)
     ingest_store = certificates.CertificateStore.load(ingest_certify.STORE_PATH)
     ingest_problems = ingest_certify.problems(ingest_store)

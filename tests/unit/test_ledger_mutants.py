@@ -20,9 +20,7 @@ from scmle.data.ledger import controls
 from scmle.data.ledger import multiplicity
 from scmle.data.ledger import online_fdr
 
-F = Fraction
-ALPHA = F(1, 10)
-R = b.MultiplicityRule
+ALPHA = Fraction(1, 10)
 
 
 def raises(error, message):
@@ -63,7 +61,7 @@ def test_validation_messages_are_exact():
     with raises(ValueError, "w0 must be within [0, 1]"):
         online_fdr.LordPlusPlus(ALPHA, w0=2)
     with raises(ValueError, "w0 must be within [0, alpha]"):
-        online_fdr.LordPlusPlus(ALPHA, w0=F(1, 5))
+        online_fdr.LordPlusPlus(ALPHA, w0=Fraction(1, 5))
     with raises(ValueError, "lambda must be a finite number"):
         online_fdr.Saffron(ALPHA, lam=float("nan"))
     with raises(ValueError, "lambda must be strictly between 0 and 1"):
@@ -82,7 +80,7 @@ def test_validation_messages_are_exact():
 
 def test_config_parse_errors_name_the_field():
     good = online_fdr.RuleConfig(
-        online_fdr.SAFFRON, ALPHA, w0=F(1, 25)
+        online_fdr.SAFFRON, ALPHA, w0=Fraction(1, 25)
     ).to_dict()
     for field, label in (
         ("alpha", "alpha"),
@@ -97,7 +95,7 @@ def test_config_parse_errors_name_the_field():
 def test_alpha_one_is_a_valid_level():
     rule = online_fdr.ELond(1)
     assert rule.alpha == 1
-    assert online_fdr.LordPlusPlus(1).w0 == F(1, 2)
+    assert online_fdr.LordPlusPlus(1).w0 == Fraction(1, 2)
 
 
 def test_only_saffron_reports_candidates():
@@ -115,10 +113,10 @@ def test_only_saffron_reports_candidates():
 
 def test_saffron_boundary_and_wealth_by_hand():
     rule = online_fdr.Saffron(
-        F(1, 4)
+        Fraction(1, 4)
     )  # W_0 = 1/8; first level = (1/2)(1/8)(1/2)
     level = rule.level(rule.initial())
-    assert level == F(1, 32)
+    assert level == Fraction(1, 32)
     assert (
         rule.step(rule.initial(), online_fdr.Evidence(p=1 / 32)).rejected
         is True
@@ -130,10 +128,10 @@ def test_saffron_boundary_and_wealth_by_hand():
         is False
     )
     # One rejected candidate at lambda = 2/5: credit = W_0 + (alpha - W_0).
-    custom = online_fdr.Saffron(ALPHA, lam=F(2, 5))
+    custom = online_fdr.Saffron(ALPHA, lam=Fraction(2, 5))
     step = custom.step(custom.initial(), online_fdr.Evidence(p=0.0))
-    assert step.wealth_after == F(3, 5) * ALPHA - 0
-    assert step.wealth_before == F(3, 5) * F(1, 20)
+    assert step.wealth_after == Fraction(3, 5) * ALPHA - 0
+    assert step.wealth_before == Fraction(3, 5) * Fraction(1, 20)
     # A non-candidate spends its level: wealth falls by exactly that level.
     plain = online_fdr.Saffron(ALPHA)
     miss = plain.step(plain.initial(), online_fdr.Evidence(p=0.9))
@@ -147,16 +145,23 @@ def test_config_parameters_reach_the_rule():
     assert elond.kappa == 0.25 and elond.discount.horizon == 4
     assert elond.level(elond.initial()) == ALPHA / 4
     lord = online_fdr.RuleConfig(
-        online_fdr.LORD_PLUS_PLUS, ALPHA, horizon=4, w0=F(1, 100)
+        online_fdr.LORD_PLUS_PLUS, ALPHA, horizon=4, w0=Fraction(1, 100)
     ).build()
-    assert lord.w0 == F(1, 100) and lord.discount.horizon == 4
-    assert lord.level(lord.initial()) == F(1, 100) / 4
+    assert lord.w0 == Fraction(1, 100) and lord.discount.horizon == 4
+    assert lord.level(lord.initial()) == Fraction(1, 100) / 4
     saffron = online_fdr.RuleConfig(
-        online_fdr.SAFFRON, ALPHA, horizon=4, w0=F(1, 100), lam=F(1, 5)
+        online_fdr.SAFFRON,
+        ALPHA,
+        horizon=4,
+        w0=Fraction(1, 100),
+        lam=Fraction(1, 5),
     ).build()
-    assert saffron.lam == F(1, 5) and saffron.w0 == F(1, 100)
+    assert saffron.lam == Fraction(1, 5) and saffron.w0 == Fraction(1, 100)
     assert saffron.discount.horizon == 4
-    assert saffron.level(saffron.initial()) == F(4, 5) * F(1, 100) / 4
+    assert (
+        saffron.level(saffron.initial())
+        == Fraction(4, 5) * Fraction(1, 100) / 4
+    )
 
 
 def test_calibrator_exact_and_general_forms():
@@ -171,25 +176,35 @@ def test_calibrator_exact_and_general_forms():
 
 
 def test_adjustment_carries_its_rule_and_level():
-    full = multiplicity.adjust([0.001, 0.2], R.BH, F(1, 20))
-    assert full.rule is R.BH and full.alpha == F(1, 20)
-    empty = multiplicity.adjust([], R.HOLM, F(1, 10))
-    assert empty.rule is R.HOLM and empty.alpha == F(1, 10)
+    full = multiplicity.adjust(
+        [0.001, 0.2], b.MultiplicityRule.BH, Fraction(1, 20)
+    )
+    assert full.rule is b.MultiplicityRule.BH and full.alpha == Fraction(1, 20)
+    empty = multiplicity.adjust([], b.MultiplicityRule.HOLM, Fraction(1, 10))
+    assert empty.rule is b.MultiplicityRule.HOLM and empty.alpha == Fraction(
+        1, 10
+    )
     assert empty.adjusted == ()
 
 
 def test_a_single_hypothesis_family():
-    for rule in R:
-        out = multiplicity.adjust([0.04], rule, F(1, 20))
+    for rule in b.MultiplicityRule:
+        out = multiplicity.adjust([0.04], rule, Fraction(1, 20))
         assert out.rejected == (True,)
         assert out.adjusted == (0.04,)
-        assert multiplicity.adjust([0.06], rule, F(1, 20)).rejected == (False,)
+        assert multiplicity.adjust([0.06], rule, Fraction(1, 20)).rejected == (
+            False,
+        )
 
 
 def test_holm_adjusted_values_are_monotone_in_the_rank():
-    out = multiplicity.adjust([0.02, 0.021], R.HOLM, F(1, 20))
+    out = multiplicity.adjust(
+        [0.02, 0.021], b.MultiplicityRule.HOLM, Fraction(1, 20)
+    )
     assert out.adjusted == (0.04, 0.04)
-    assert multiplicity.adjust([0.021, 0.02], R.HOLM, F(1, 20)).adjusted == (
+    assert multiplicity.adjust(
+        [0.021, 0.02], b.MultiplicityRule.HOLM, Fraction(1, 20)
+    ).adjusted == (
         0.04,
         0.04,
     )
@@ -197,11 +212,11 @@ def test_holm_adjusted_values_are_monotone_in_the_rank():
 
 def test_multiplicity_messages_are_exact():
     with raises(ValueError, "rule must be a MultiplicityRule"):
-        multiplicity.adjust([0.1], "bh", F(1, 20))  # type: ignore[arg-type]
+        multiplicity.adjust([0.1], "bh", Fraction(1, 20))  # type: ignore[arg-type]
     with raises(ValueError, "alpha must be strictly between 0 and 1"):
-        multiplicity.adjust([0.1], R.BH, F(1))
+        multiplicity.adjust([0.1], b.MultiplicityRule.BH, Fraction(1))
     with raises(ValueError, "p-value must be within [0, 1]"):
-        multiplicity.adjust([1.5], R.BH, F(1, 20))
+        multiplicity.adjust([1.5], b.MultiplicityRule.BH, Fraction(1, 20))
     assert (
         multiplicity.harmonic_exact(0) == 0
         and multiplicity.harmonic_exact(1) == 1
@@ -568,7 +583,7 @@ def test_p_values_are_calibrated_with_the_rules_own_kappa():
 
 def test_harmonic_numbers_are_exact_fractions():
     assert isinstance(multiplicity.harmonic_exact(0), Fraction)
-    assert multiplicity.harmonic_exact(4) == F(25, 12)
+    assert multiplicity.harmonic_exact(4) == Fraction(25, 12)
 
 
 def test_percentile_takes_the_requested_quantile():

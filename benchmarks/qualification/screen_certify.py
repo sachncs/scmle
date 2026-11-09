@@ -51,9 +51,7 @@ from scmle.data.admissibility import screen
 from scmle.data.detectors import certificates
 from scmle.data.validation import columns
 
-STORE_PATH = screen.STORE_PATH
 MEASUREMENTS_PATH = Path(__file__).with_name("screen_measurements.json")
-TARGET = f4_certify.TARGET
 NULL_REPLICATES = 1000
 PLANT_REPLICATES = 200
 GROUPED_REPLICATES = 200
@@ -65,8 +63,6 @@ RARE_SHARE = 0.25
 OLD_ASSOCIATION = 0.98
 OLD_MISSINGNESS = 0.9
 DEFECTS = tuple(d for ds in screen.MECHANISM_DEFECTS.values() for d in ds)
-POLICY = f4_certify.LEAK_POLICY
-Z_99 = f4_certify.Z_99
 
 
 def plant_column(
@@ -88,7 +84,7 @@ def plant_column(
         return f4_certify.plant_leak(frame, defect, seed)
     rng = randomness.component_rng(seed, "screen.rare", 0)
     values = pandas.Series(rng.normal(size=len(frame)), index=frame.index)
-    first = frame[TARGET] == frame[TARGET].iloc[0]
+    first = frame[f4_certify.TARGET] == frame[f4_certify.TARGET].iloc[0]
     kept = first & pandas.Series(
         rng.random(len(frame)) < RARE_SHARE, frame.index
     )
@@ -107,7 +103,7 @@ def real_columns(frame: pandas.DataFrame, count: int, seed: int) -> list[str]:
         The chosen column names, in table order.
     """
     rng = randomness.component_rng(seed, "screen.columns", 0)
-    names = [c for c in frame.columns if c != TARGET]
+    names = [c for c in frame.columns if c != f4_certify.TARGET]
     return [names[i] for i in sorted(rng.choice(len(names), count, False))]
 
 
@@ -141,7 +137,7 @@ def old_rule(frame: pandas.DataFrame, names: Sequence[str]) -> dict[str, bool]:
         is at least `OLD_ASSOCIATION` or its missingness association at
         least `OLD_MISSINGNESS`.
     """
-    target = frame[TARGET]
+    target = frame[f4_certify.TARGET]
     flagged = {}
     for name in names:
         kind = columns.kind_of(frame[name])
@@ -166,7 +162,9 @@ def run_screen(frame: pandas.DataFrame, seed: int, groups: Any = None) -> Any:
         The screen report.
     """
     cfg = dataclasses.replace(leakage.CERTIFIED, run_seed=seed)
-    return screen.screen(frame, TARGET, "classification", cfg, groups=groups)
+    return screen.screen(
+        frame, f4_certify.TARGET, "classification", cfg, groups=groups
+    )
 
 
 def null_replicate(seed: int, grouped: bool = False) -> dict[str, Any]:
@@ -190,10 +188,10 @@ def null_replicate(seed: int, grouped: bool = False) -> dict[str, Any]:
         else None
     )
     world = simulate.null_world(
-        frame[names], frame[TARGET], seed, groups=groups
+        frame[names], frame[f4_certify.TARGET], seed, groups=groups
     )
     features = with_gaps(world.features, seed)
-    table = features.assign(**{TARGET: world.outcome})
+    table = features.assign(**{f4_certify.TARGET: world.outcome})
     report = run_screen(table, seed, groups)
     old = old_rule(table, list(features.columns))
     return {
@@ -218,7 +216,7 @@ def plant_replicate(defect: str, seed: int) -> dict[str, Any]:
     """
     frame = f4_certify.breast_cancer()
     names = real_columns(frame, TABLE_COLUMNS - 1, seed)
-    table = frame[[*names, TARGET]].assign(
+    table = frame[[*names, f4_certify.TARGET]].assign(
         **{defect: plant_column(frame, defect, seed)}
     )
     report = run_screen(table, seed)
@@ -357,7 +355,7 @@ def certify_screen(workers: int = 1) -> tuple[Any, dict[str, Any]]:
         certificates.corpus_hash([certify.frame_digest(frame)]),
         [0],
         results,
-        POLICY,
+        f4_certify.LEAK_POLICY,
     )
     alpha = leakage.CERTIFIED.alpha
     significant = sum(item["significant"] for item in nulls)
@@ -451,7 +449,7 @@ def main(arguments: list[str] | None = None) -> int:
     parser.add_argument("--workers", type=int, default=1)
     options = parser.parse_args(arguments)
     if options.check:
-        store = certificates.CertificateStore.load(STORE_PATH)
+        store = certificates.CertificateStore.load(screen.STORE_PATH)
         found = problems(store)
         print(
             json.dumps(
@@ -465,7 +463,7 @@ def main(arguments: list[str] | None = None) -> int:
         )
         return 1 if found else 0
     cert, measurements = certify_screen(options.workers)
-    certificates.CertificateStore([cert]).save(STORE_PATH)
+    certificates.CertificateStore([cert]).save(screen.STORE_PATH)
     MEASUREMENTS_PATH.write_text(
         json.dumps(measurements, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",

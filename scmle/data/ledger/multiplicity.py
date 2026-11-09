@@ -40,16 +40,18 @@ from fractions import Fraction
 from scmle.contracts import qualification
 from scmle.data.ledger import budget
 
-Rule = budget.MultiplicityRule
-DEFAULT_RULE = Rule.BY
 STATEMENTS = {
-    Rule.BH: (
+    budget.MultiplicityRule.BH: (
         "FDR <= alpha * m0 / m if the p-values on C are independent or "
         "positively regression dependent"
     ),
-    Rule.BY: "FDR <= alpha * m0 / m under arbitrary dependence",
-    Rule.HOLM: "FWER <= alpha under arbitrary dependence",
-    Rule.BONFERRONI: "FWER <= alpha under arbitrary dependence",
+    budget.MultiplicityRule.BY: (
+        "FDR <= alpha * m0 / m under arbitrary dependence"
+    ),
+    budget.MultiplicityRule.HOLM: "FWER <= alpha under arbitrary dependence",
+    budget.MultiplicityRule.BONFERRONI: (
+        "FWER <= alpha under arbitrary dependence"
+    ),
 }
 
 
@@ -64,7 +66,7 @@ class Adjustment:
         rejected: Exact decision per hypothesis.
     """
 
-    rule: Rule
+    rule: budget.MultiplicityRule
     alpha: Fraction
     adjusted: tuple[float, ...]
     rejected: tuple[bool, ...]
@@ -82,7 +84,9 @@ def harmonic_exact(m: int) -> Fraction:
     return sum((Fraction(1, i) for i in range(1, m + 1)), Fraction(0))
 
 
-def adjust(pvalues: Sequence[float], rule: Rule, alpha: Fraction) -> Adjustment:
+def adjust(
+    pvalues: Sequence[float], rule: budget.MultiplicityRule, alpha: Fraction
+) -> Adjustment:
     """Adjusts a family of p-values and decides at level `alpha`.
 
     Args:
@@ -98,7 +102,7 @@ def adjust(pvalues: Sequence[float], rule: Rule, alpha: Fraction) -> Adjustment:
         ValueError: On an unknown rule, a level outside (0, 1) or a p-value
             outside [0, 1].
     """
-    if not isinstance(rule, Rule):
+    if not isinstance(rule, budget.MultiplicityRule):
         raise ValueError("rule must be a MultiplicityRule")
     if not 0 < alpha < 1:
         raise ValueError("alpha must be strictly between 0 and 1")
@@ -108,8 +112,12 @@ def adjust(pvalues: Sequence[float], rule: Rule, alpha: Fraction) -> Adjustment:
         return Adjustment(rule, alpha, (), ())
     order = sorted(range(m), key=lambda i: (values[i], i))
     exact = [Fraction(values[i]) for i in order]
-    if rule in (Rule.BH, Rule.BY):
-        factor = harmonic_exact(m) if rule is Rule.BY else Fraction(1)
+    if rule in (budget.MultiplicityRule.BH, budget.MultiplicityRule.BY):
+        factor = (
+            harmonic_exact(m)
+            if rule is budget.MultiplicityRule.BY
+            else Fraction(1)
+        )
         count = max(
             (
                 k
@@ -122,7 +130,7 @@ def adjust(pvalues: Sequence[float], rule: Rule, alpha: Fraction) -> Adjustment:
         adjusted_sorted = step_up(
             [min(1.0, values[order[k]] * scale / (k + 1)) for k in range(m)]
         )
-    elif rule is Rule.HOLM:
+    elif rule is budget.MultiplicityRule.HOLM:
         count = 0
         while count < m and exact[count] <= alpha / (m - count):
             count += 1

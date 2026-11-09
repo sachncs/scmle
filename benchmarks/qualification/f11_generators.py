@@ -14,9 +14,6 @@ import numpy
 from numpy.typing import NDArray
 from scipy import stats
 
-Z = stats.norm
-
-
 # --- thresholds ------------------------------------------------------------
 
 
@@ -114,8 +111,8 @@ def binormal_nb(
     Returns:
         The net benefit at each threshold.
     """
-    tpr = 1.0 - Z.cdf((cut - delta) / total_sd)
-    fpr = 1.0 - Z.cdf(cut / total_sd)
+    tpr = 1.0 - stats.norm.cdf((cut - delta) / total_sd)
+    fpr = 1.0 - stats.norm.cdf(cut / total_sd)
     w = ts / (1.0 - ts)
     result: NDArray[numpy.float64] = (
         prevalence * tpr - (1.0 - prevalence) * fpr * w
@@ -267,7 +264,7 @@ def fairness_world(
     groups = rng.integers(0, 2, n)
     y = (rng.random(n) < prevalence).astype(float)
     rate = numpy.where(groups == 0, tpr, tpr - gap)
-    centre = numpy.where(y == 1, cut + Z.ppf(rate), cut - 1.0)
+    centre = numpy.where(y == 1, cut + stats.norm.ppf(rate), cut - 1.0)
     return rng.normal(centre, 1.0), y, groups
 
 
@@ -315,8 +312,8 @@ def threshold_oracle(shift: float, t: float, prevalence: float = 0.3) -> float:
         value = 0.0
         for g in (0, 1):
             mu1 = 1.5 - shift * g
-            cut = mu1 + Z.ppf(1.0 - r)
-            fpr = 1.0 - Z.cdf(cut + 0.5)
+            cut = mu1 + stats.norm.ppf(1.0 - r)
+            fpr = 1.0 - stats.norm.cdf(cut + 0.5)
             value += 0.5 * (prevalence * r - (1 - prevalence) * w * fpr)
         best = max(best, value)
     return best

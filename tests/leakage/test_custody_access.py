@@ -20,7 +20,6 @@ from scmle.data.splitting import splitters
 import scmle.governance.vault
 from tests.unit.test_charter_contracts import make_charter
 
-BINARY = tasks.TaskType.BINARY
 SENTINEL = "sentinel"
 
 
@@ -45,7 +44,7 @@ def build():
         data=tasks.DataSpec(uri="m", target="y"),
         validation=tasks.ValidationSpec(strategy="stratified", seed=3),
     )
-    split = splitters.SplitManager(spec, BINARY).split(frame)
+    split = splitters.SplitManager(spec, tasks.TaskType.BINARY).split(frame)
     log = sealed.OpenLog()
     vault = sealed.CustodyVault(log, process=True)
     outcome = pipeline.apply_custody(
@@ -53,7 +52,7 @@ def build():
         split=split,
         frame=frame,
         spec=spec,
-        task=BINARY,
+        task=tasks.TaskType.BINARY,
         data_hash="8" * 64,
         vault=vault,
     )

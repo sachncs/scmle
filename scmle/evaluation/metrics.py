@@ -23,17 +23,7 @@ from scmle.evaluation import ranking
 from scmle.evaluation import survival
 from scmle.evaluation import uplift
 
-BINARY = tasks.TaskType.BINARY
-MULTICLASS = tasks.TaskType.MULTICLASS
-REGRESSION = tasks.TaskType.REGRESSION
-SURVIVAL = tasks.TaskType.SURVIVAL
-ORDINAL = tasks.TaskType.ORDINAL
-RANKING = tasks.TaskType.RANKING
-MULTILABEL = tasks.TaskType.MULTILABEL
-MULTIOUTPUT = tasks.TaskType.MULTIOUTPUT
-FORECAST = tasks.TaskType.FORECAST
-UPLIFT = tasks.TaskType.UPLIFT
-CLASSIFICATION = frozenset({BINARY, MULTICLASS})
+CLASSIFICATION = frozenset({tasks.TaskType.BINARY, tasks.TaskType.MULTICLASS})
 
 
 def positive_label(target: pandas.Series, task: tasks.TaskType) -> Any:
@@ -53,7 +43,7 @@ def positive_label(target: pandas.Series, task: tasks.TaskType) -> Any:
     Raises:
         ValueError: If a binary target has fewer than two distinct labels.
     """
-    if task is not BINARY:
+    if task is not tasks.TaskType.BINARY:
         return None
     labels = sorted(target.dropna().unique())
     if len(labels) < 2:
@@ -66,16 +56,19 @@ def positive_label(target: pandas.Series, task: tasks.TaskType) -> Any:
 
 DEFAULT_METRICS = (
     scmle.contracts.metrics.Metric(
-        "roc_auc", "roc_auc", True, frozenset({BINARY})
+        "roc_auc", "roc_auc", True, frozenset({tasks.TaskType.BINARY})
     ),
     scmle.contracts.metrics.Metric(
-        "roc_auc_ovr", "roc_auc_ovr", True, frozenset({MULTICLASS})
+        "roc_auc_ovr",
+        "roc_auc_ovr",
+        True,
+        frozenset({tasks.TaskType.MULTICLASS}),
     ),
     scmle.contracts.metrics.PositiveLabelMetric(
         "pr_auc",
         "average_precision",
         True,
-        frozenset({BINARY}),
+        frozenset({tasks.TaskType.BINARY}),
         sk_metrics.average_precision_score,
         ("decision_function", "predict_proba"),
     ),
@@ -86,7 +79,7 @@ DEFAULT_METRICS = (
         "f1",
         "f1",
         True,
-        frozenset({BINARY}),
+        frozenset({tasks.TaskType.BINARY}),
         sk_metrics.f1_score,
         ("predict",),
     ),
@@ -100,17 +93,25 @@ DEFAULT_METRICS = (
         "accuracy", "accuracy", True, CLASSIFICATION
     ),
     scmle.contracts.metrics.Metric(
-        "mae", "neg_mean_absolute_error", False, frozenset({REGRESSION})
+        "mae",
+        "neg_mean_absolute_error",
+        False,
+        frozenset({tasks.TaskType.REGRESSION}),
     ),
     scmle.contracts.metrics.Metric(
-        "rmse", "neg_root_mean_squared_error", False, frozenset({REGRESSION})
+        "rmse",
+        "neg_root_mean_squared_error",
+        False,
+        frozenset({tasks.TaskType.REGRESSION}),
     ),
-    scmle.contracts.metrics.Metric("r2", "r2", True, frozenset({REGRESSION})),
+    scmle.contracts.metrics.Metric(
+        "r2", "r2", True, frozenset({tasks.TaskType.REGRESSION})
+    ),
     scmle.contracts.metrics.FunctionMetric(
         "qwk",
         "",
         True,
-        frozenset({ORDINAL}),
+        frozenset({tasks.TaskType.ORDINAL}),
         ordinal.quadratic_weighted_kappa,
         "predict",
     ),
@@ -118,59 +119,101 @@ DEFAULT_METRICS = (
         "mace",
         "",
         False,
-        frozenset({ORDINAL}),
+        frozenset({tasks.TaskType.ORDINAL}),
         ordinal.mean_absolute_class_error,
         "predict",
     ),
     scmle.contracts.metrics.Metric(
-        "accuracy_levels", "accuracy", True, frozenset({ORDINAL})
+        "accuracy_levels", "accuracy", True, frozenset({tasks.TaskType.ORDINAL})
     ),
     multitarget.MultiTargetMetric(
-        "f1_macro_labels", "", True, frozenset({MULTILABEL}), "f1_macro_labels"
+        "f1_macro_labels",
+        "",
+        True,
+        frozenset({tasks.TaskType.MULTILABEL}),
+        "f1_macro_labels",
     ),
     multitarget.MultiTargetMetric(
-        "f1_micro_labels", "", True, frozenset({MULTILABEL}), "f1_micro_labels"
+        "f1_micro_labels",
+        "",
+        True,
+        frozenset({tasks.TaskType.MULTILABEL}),
+        "f1_micro_labels",
     ),
     multitarget.MultiTargetMetric(
-        "hamming", "", False, frozenset({MULTILABEL}), "hamming"
+        "hamming", "", False, frozenset({tasks.TaskType.MULTILABEL}), "hamming"
     ),
     multitarget.MultiTargetMetric(
-        "subset_accuracy", "", True, frozenset({MULTILABEL}), "subset_accuracy"
+        "subset_accuracy",
+        "",
+        True,
+        frozenset({tasks.TaskType.MULTILABEL}),
+        "subset_accuracy",
     ),
     multitarget.MultiTargetMetric(
-        "r2_mean", "", True, frozenset({MULTIOUTPUT}), "r2_mean"
+        "r2_mean", "", True, frozenset({tasks.TaskType.MULTIOUTPUT}), "r2_mean"
     ),
     multitarget.MultiTargetMetric(
-        "mae_scaled", "", False, frozenset({MULTIOUTPUT}), "mae_scaled"
+        "mae_scaled",
+        "",
+        False,
+        frozenset({tasks.TaskType.MULTIOUTPUT}),
+        "mae_scaled",
     ),
-    forecast.ForecastMetric("mase", "", False, frozenset({FORECAST}), "mase"),
     forecast.ForecastMetric(
-        "forecast_mae", "", False, frozenset({FORECAST}), "mae"
+        "mase", "", False, frozenset({tasks.TaskType.FORECAST}), "mase"
     ),
     forecast.ForecastMetric(
-        "forecast_smape", "", False, frozenset({FORECAST}), "smape"
+        "forecast_mae", "", False, frozenset({tasks.TaskType.FORECAST}), "mae"
     ),
-    uplift.UpliftMetric("qini", "", True, frozenset({UPLIFT}), "qini"),
+    forecast.ForecastMetric(
+        "forecast_smape",
+        "",
+        False,
+        frozenset({tasks.TaskType.FORECAST}),
+        "smape",
+    ),
     uplift.UpliftMetric(
-        "uplift_at_30", "", True, frozenset({UPLIFT}), "uplift_at_30"
+        "qini", "", True, frozenset({tasks.TaskType.UPLIFT}), "qini"
     ),
-    ranking.RankingMetric("ndcg", "", True, frozenset({RANKING}), "ndcg"),
-    ranking.RankingMetric("map", "", True, frozenset({RANKING}), "map"),
-    ranking.RankingMetric("mrr", "", True, frozenset({RANKING}), "mrr"),
+    uplift.UpliftMetric(
+        "uplift_at_30",
+        "",
+        True,
+        frozenset({tasks.TaskType.UPLIFT}),
+        "uplift_at_30",
+    ),
+    ranking.RankingMetric(
+        "ndcg", "", True, frozenset({tasks.TaskType.RANKING}), "ndcg"
+    ),
+    ranking.RankingMetric(
+        "map", "", True, frozenset({tasks.TaskType.RANKING}), "map"
+    ),
+    ranking.RankingMetric(
+        "mrr", "", True, frozenset({tasks.TaskType.RANKING}), "mrr"
+    ),
     ranking.RankingMetric(
         "precision_at_10",
         "",
         True,
-        frozenset({RANKING}),
+        frozenset({tasks.TaskType.RANKING}),
         "precision_at_10",
     ),
     ranking.RankingMetric(
-        "recall_at_10", "", True, frozenset({RANKING}), "recall_at_10"
+        "recall_at_10",
+        "",
+        True,
+        frozenset({tasks.TaskType.RANKING}),
+        "recall_at_10",
     ),
-    concordance.ConcordanceMetric("c_index", "", True, frozenset({SURVIVAL})),
-    survival.SurvivalMetric("ibs", "", False, frozenset({SURVIVAL}), "ibs"),
+    concordance.ConcordanceMetric(
+        "c_index", "", True, frozenset({tasks.TaskType.SURVIVAL})
+    ),
     survival.SurvivalMetric(
-        "td_auc", "", True, frozenset({SURVIVAL}), "td_auc"
+        "ibs", "", False, frozenset({tasks.TaskType.SURVIVAL}), "ibs"
+    ),
+    survival.SurvivalMetric(
+        "td_auc", "", True, frozenset({tasks.TaskType.SURVIVAL}), "td_auc"
     ),
 )
 
@@ -179,19 +222,19 @@ class MetricCatalog:
     """Resolves metric names and applies the report protocol."""
 
     default_metric = {
-        BINARY: "roc_auc",
-        MULTICLASS: "log_loss",
-        REGRESSION: "rmse",
-        SURVIVAL: "c_index",
-        ORDINAL: "qwk",
-        RANKING: "ndcg",
-        MULTILABEL: "f1_macro_labels",
-        MULTIOUTPUT: "r2_mean",
-        FORECAST: "mase",
-        UPLIFT: "qini",
+        tasks.TaskType.BINARY: "roc_auc",
+        tasks.TaskType.MULTICLASS: "log_loss",
+        tasks.TaskType.REGRESSION: "rmse",
+        tasks.TaskType.SURVIVAL: "c_index",
+        tasks.TaskType.ORDINAL: "qwk",
+        tasks.TaskType.RANKING: "ndcg",
+        tasks.TaskType.MULTILABEL: "f1_macro_labels",
+        tasks.TaskType.MULTIOUTPUT: "r2_mean",
+        tasks.TaskType.FORECAST: "mase",
+        tasks.TaskType.UPLIFT: "qini",
     }
     report_names = {
-        BINARY: (
+        tasks.TaskType.BINARY: (
             "roc_auc",
             "pr_auc",
             "log_loss",
@@ -199,20 +242,31 @@ class MetricCatalog:
             "balanced_accuracy",
             "accuracy",
         ),
-        MULTICLASS: ("log_loss", "f1_macro", "balanced_accuracy", "accuracy"),
-        REGRESSION: ("mae", "rmse", "r2"),
-        SURVIVAL: ("c_index", "ibs", "td_auc"),
-        ORDINAL: ("qwk", "mace", "accuracy_levels"),
-        RANKING: ("ndcg", "map", "mrr", "precision_at_10", "recall_at_10"),
-        MULTILABEL: (
+        tasks.TaskType.MULTICLASS: (
+            "log_loss",
+            "f1_macro",
+            "balanced_accuracy",
+            "accuracy",
+        ),
+        tasks.TaskType.REGRESSION: ("mae", "rmse", "r2"),
+        tasks.TaskType.SURVIVAL: ("c_index", "ibs", "td_auc"),
+        tasks.TaskType.ORDINAL: ("qwk", "mace", "accuracy_levels"),
+        tasks.TaskType.RANKING: (
+            "ndcg",
+            "map",
+            "mrr",
+            "precision_at_10",
+            "recall_at_10",
+        ),
+        tasks.TaskType.MULTILABEL: (
             "f1_macro_labels",
             "f1_micro_labels",
             "hamming",
             "subset_accuracy",
         ),
-        MULTIOUTPUT: ("r2_mean", "mae_scaled"),
-        FORECAST: ("mase", "forecast_mae", "forecast_smape"),
-        UPLIFT: ("qini", "uplift_at_30"),
+        tasks.TaskType.MULTIOUTPUT: ("r2_mean", "mae_scaled"),
+        tasks.TaskType.FORECAST: ("mase", "forecast_mae", "forecast_smape"),
+        tasks.TaskType.UPLIFT: ("qini", "uplift_at_30"),
     }
 
     def __init__(
@@ -301,7 +355,7 @@ class MetricCatalog:
             ConfigError: If the name is unknown or invalid for the task.
         """
         name = name or self.default_metric[task]
-        if name == "roc_auc" and task is MULTICLASS:
+        if name == "roc_auc" and task is tasks.TaskType.MULTICLASS:
             name = "roc_auc_ovr"
         metric = self.metrics.get(name)
         if metric is None:
@@ -343,7 +397,9 @@ class MetricCatalog:
         results: dict[str, float] = {}
         classes = getattr(estimator, "classes_", None)
         positive = (
-            classes[1] if task is BINARY and classes is not None else None
+            classes[1]
+            if task is tasks.TaskType.BINARY and classes is not None
+            else None
         )
         names = self.report_names[task]
         table = self.metrics  # One snapshot, immune to concurrent changes.

@@ -18,9 +18,6 @@ from scmle.contracts import tasks
 from scmle.models import conformance
 from scmle.models.sklearn import classical
 
-CLASSIFICATION = classical.CLASSIFICATION
-REGRESSION_ONLY = classical.REGRESSION_ONLY
-
 
 @dataclasses.dataclass(frozen=True)
 class EstimatorSpec:
@@ -62,9 +59,9 @@ def rebuild(spec: EstimatorSpec) -> models.ModelAdapter:
     """
     supported: frozenset[tasks.TaskType] = frozenset()
     if spec.classifier is not None:
-        supported |= CLASSIFICATION
+        supported |= classical.CLASSIFICATION
     if spec.regressor is not None:
-        supported |= REGRESSION_ONLY
+        supported |= classical.REGRESSION_ONLY
     probabilities = spec.classifier is not None and hasattr(
         spec.classifier, "predict_proba"
     )

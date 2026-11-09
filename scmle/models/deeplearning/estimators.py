@@ -25,8 +25,6 @@ from scmle import durability
 from scmle.models.deeplearning import contracts
 from scmle.models.deeplearning import worker
 
-NEED_STATE = worker.NEED_STATE
-
 
 class NetworkEstimator(base.BaseEstimator):
     """Common behaviour of the worker-backed estimators.
@@ -267,7 +265,7 @@ class NetworkEstimator(base.BaseEstimator):
                 "call",
                 (self.engine_path, self.state_id_, state, method, matrix),
             )
-            if not (isinstance(reply, str) and reply == NEED_STATE):
+            if not (isinstance(reply, str) and reply == worker.NEED_STATE):
                 return numpy.asarray(reply)
         raise worker.WorkerError("the worker could not load the model state")
 
@@ -645,7 +643,7 @@ class TabPfnEstimator(base.BaseEstimator):
                 "call",
                 (self.engine_path, self.state_id_, state, method, matrix),
             )
-            if not (isinstance(reply, str) and reply == NEED_STATE):
+            if not (isinstance(reply, str) and reply == worker.NEED_STATE):
                 return numpy.asarray(reply)
         raise worker.WorkerError("the worker could not load the model state")
 

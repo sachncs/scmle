@@ -14,7 +14,6 @@ KEYS = json.loads(
 ISSUER = "https://idp.test"
 AUDIENCE = "scmle-service"
 HS_SECRET = b"mock-idp-hs256-secret-0123456789abcdef"
-DIGEST_INFO = tokens.SHA256_DIGEST_INFO
 
 
 def rsa_signature(name, signing_input):
@@ -22,8 +21,8 @@ def rsa_signature(name, signing_input):
     modulus = int(private["n"], 16)
     width = (modulus.bit_length() + 7) // 8
     digest = hashlib.sha256(signing_input).digest()
-    pad = b"\xff" * (width - len(DIGEST_INFO) - 32 - 3)
-    encoded = b"\x00\x01" + pad + b"\x00" + DIGEST_INFO + digest
+    pad = b"\xff" * (width - len(tokens.SHA256_DIGEST_INFO) - 32 - 3)
+    encoded = b"\x00\x01" + pad + b"\x00" + tokens.SHA256_DIGEST_INFO + digest
     value = pow(int.from_bytes(encoded, "big"), int(private["d"], 16), modulus)
     return value.to_bytes(width, "big")
 

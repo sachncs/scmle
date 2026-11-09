@@ -41,6 +41,7 @@ from scmle.data.identification import synth
 from scmle.data.identification import tier
 from scmle.data.ledger import budget
 from scmle.data.ledger import multiplicity
+import scmle.data.ledger.budget
 
 DOCUMENTS = (
     "identification_plan.json",
@@ -1449,7 +1450,9 @@ def subgroup_report(
     adapter.design = saved
     alpha = Fraction(1.0 - level).limit_denominator(10**9)
     adjusted = multiplicity.adjust(
-        [r["p_value"] for r in rows], multiplicity.Rule.HOLM, alpha
+        [r["p_value"] for r in rows],
+        scmle.data.ledger.budget.MultiplicityRule.HOLM,
+        alpha,
     )
     for row, p_adj, flag in zip(
         rows, adjusted.adjusted, adjusted.rejected, strict=True
@@ -1457,10 +1460,12 @@ def subgroup_report(
         row["adjusted_p"] = p_adj
         row["rejected"] = bool(flag)
     return {
-        "rule": multiplicity.Rule.HOLM.value,
+        "rule": scmle.data.ledger.budget.MultiplicityRule.HOLM.value,
         "alpha": float(alpha),
         "family_size": len(rows),
-        "statement": multiplicity.STATEMENTS[multiplicity.Rule.HOLM],
+        "statement": multiplicity.STATEMENTS[
+            scmle.data.ledger.budget.MultiplicityRule.HOLM
+        ],
         "hypotheses": rows,
         "rejected": [
             f"{r['column']}={r['value']}" for r in rows if r["rejected"]

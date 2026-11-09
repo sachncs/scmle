@@ -55,7 +55,6 @@ from scmle.data.ledger import ledger
 KIND = "causal_primary"
 CLAIM_ID = "causal_primary_theta_zero"
 CLAIM_FILE = "causal_claims.json"
-DOCUMENTS = run.DOCUMENTS
 
 
 def load_dag(path: str | None) -> scmle.data.admissibility.dag.Dag | None:

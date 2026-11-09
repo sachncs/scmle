@@ -11,8 +11,6 @@ from scmle.contracts import qualification
 from scmle.data.detectors import certificates
 from scmle.data.robustness import shift
 
-GATING = certificates.GateStatus.GATING
-
 
 def frames(rows=120, shift_by=0.0, seed=0, columns=4):
     rng = numpy.random.default_rng(seed)
@@ -152,14 +150,18 @@ def test_a_clear_shift_is_found_by_both_tests_and_no_shift_is_not():
 
 def test_the_checks_are_exploration_checks_with_the_documented_fields():
     left, right = frames(rows=100, shift_by=1.5)
-    check = shift.c2st(left, right, 3, permutations=49, gate=GATING)
+    check = shift.c2st(
+        left, right, 3, permutations=49, gate=certificates.GateStatus.GATING
+    )
     assert check.set_id is qualification.SetId.EXPLORATION
     assert check.tier is qualification.Tier.UNVERIFIED
     assert check.check_id == shift.C2ST_ID
     assert check.effect == pytest.approx(check.statistic - 0.5)
     assert check.interval[0] <= check.statistic <= check.interval[1]
     assert check.seed_path[0] == 3
-    again = shift.c2st(left, right, 3, permutations=49, gate=GATING)
+    again = shift.c2st(
+        left, right, 3, permutations=49, gate=certificates.GateStatus.GATING
+    )
     assert again == check
 
 
@@ -168,7 +170,12 @@ def test_a_descriptive_test_never_blocks_and_a_gating_one_does_what_asked():
     block = qualification.Decision.BLOCK
     quiet = shift.c2st(left, right, 0, permutations=49, on_shift=block)
     loud = shift.c2st(
-        left, right, 0, permutations=49, on_shift=block, gate=GATING
+        left,
+        right,
+        0,
+        permutations=49,
+        on_shift=block,
+        gate=certificates.GateStatus.GATING,
     )
     assert quiet.decision is qualification.Decision.WARN
     assert loud.decision is block

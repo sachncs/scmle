@@ -1,6 +1,7 @@
 """The single confirmation of the exploration survivors on `C`.
 
 Order of events. The guarantee ``FDR <= alpha_confirm`` comes only
+import scmle.data.ledger.budget
 from this stage:
 
 1. The survivors, selected on `X` only, are frozen in the ledger with a hash.
@@ -804,7 +805,7 @@ def confirm(
     source: ConfirmationSource | None,
     *,
     alpha_confirm: Fraction,
-    rule: budget.MultiplicityRule = multiplicity.DEFAULT_RULE,
+    rule: budget.MultiplicityRule = budget.MultiplicityRule.BY,
     policy: str = UNCONFIRMED,
     require_control: bool = True,
     custody_log: EventLog | None = None,

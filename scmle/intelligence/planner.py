@@ -21,7 +21,6 @@ from scmle.intelligence import knowledge
 import scmle.models.registry
 from scmle.sampling import strategies
 
-FAST_BUDGET_SECONDS = tasks.FAST_BUDGET_SECONDS
 FAST_EXCEPTIONS = frozenset(
     {
         "hist_gradient_boosting",
@@ -32,8 +31,6 @@ FAST_EXCEPTIONS = frozenset(
     }
 )
 """Boosted learners cheap enough to keep on a tight budget, one per task."""
-
-Action = experiments.DecisionAction
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -116,7 +113,7 @@ class MemoryRule(PlanningRule):
                 decisions.append(
                     experiments.Decision(
                         adapter.name,
-                        Action.REJECT,
+                        experiments.DecisionAction.REJECT,
                         f"estimated training memory {estimate:.2f} GB exceeds "
                         f"the {limit:g} GB limit",
                     )
@@ -162,7 +159,9 @@ class GpuRule(PlanningRule):
             if adapter not in capable:
                 decisions.append(
                     experiments.Decision(
-                        adapter.name, Action.REJECT, "gpu required"
+                        adapter.name,
+                        experiments.DecisionAction.REJECT,
+                        "gpu required",
                     )
                 )
         return capable
@@ -195,8 +194,8 @@ class FastBudgetRule(PlanningRule):
         decisions.append(
             experiments.Decision(
                 "reduce_search_complexity",
-                Action.INCLUDE,
-                f"time budget < {FAST_BUDGET_SECONDS}s: tune at most "
+                experiments.DecisionAction.INCLUDE,
+                f"time budget < {tasks.FAST_BUDGET_SECONDS}s: tune at most "
                 f"{search.top_models} model(s) with "
                 f"{search.configs_per_model} config(s) each and try strategies "
                 f"on at most {context.spec.effective_strategies().top_models} "
@@ -210,8 +209,8 @@ class FastBudgetRule(PlanningRule):
                 decisions.append(
                     experiments.Decision(
                         adapter.name,
-                        Action.REJECT,
-                        f"time budget < {FAST_BUDGET_SECONDS}s: "
+                        experiments.DecisionAction.REJECT,
+                        f"time budget < {tasks.FAST_BUDGET_SECONDS}s: "
                         "fast models only",
                     )
                 )
@@ -250,7 +249,7 @@ class IncrementalRule(PlanningRule):
                     decisions.append(
                         experiments.Decision(
                             adapter.name,
-                            Action.REJECT,
+                            experiments.DecisionAction.REJECT,
                             "built for data larger than memory; set "
                             "memory_budget_gb with training='stream'",
                         )
@@ -266,7 +265,7 @@ class IncrementalRule(PlanningRule):
                 decisions.append(
                     experiments.Decision(
                         adapter.name,
-                        Action.REJECT,
+                        experiments.DecisionAction.REJECT,
                         "cannot learn incrementally, so it cannot train on "
                         "a stream larger than memory",
                     )
@@ -302,7 +301,7 @@ class SerializableRule(PlanningRule):
                 decisions.append(
                     experiments.Decision(
                         adapter.name,
-                        Action.REJECT,
+                        experiments.DecisionAction.REJECT,
                         "model cannot be serialized into a bundle",
                     )
                 )
@@ -349,7 +348,7 @@ class HighCardinalityRule(PlanningRule):
             decisions.append(
                 experiments.Decision(
                     "native_categorical_boosting",
-                    Action.INCLUDE,
+                    experiments.DecisionAction.INCLUDE,
                     f"{len(wide)} high-cardinality categorical feature(s) "
                     f"({', '.join(wide)}); searched first: "
                     + ", ".join(a.name for a in native),
@@ -359,7 +358,7 @@ class HighCardinalityRule(PlanningRule):
             decisions.append(
                 experiments.Decision(
                     "native_categorical_boosting",
-                    Action.DEFER,
+                    experiments.DecisionAction.DEFER,
                     "no compatible model handles categoricals natively",
                 )
             )
@@ -371,7 +370,9 @@ class HighCardinalityRule(PlanningRule):
         decisions.append(
             experiments.Decision(
                 "regularized_target_encoding",
-                Action.INCLUDE if enabled else Action.DEFER,
+                experiments.DecisionAction.INCLUDE
+                if enabled
+                else experiments.DecisionAction.DEFER,
                 "evaluated as the 'target_encoding' strategy on the original "
                 "validation folds"
                 if enabled
@@ -414,7 +415,9 @@ class ExcludedModelsRule(PlanningRule):
                 kept.append(adapter)
                 continue
             decisions.append(
-                experiments.Decision(adapter.name, Action.REJECT, reason)
+                experiments.Decision(
+                    adapter.name, experiments.DecisionAction.REJECT, reason
+                )
             )
         return kept
 
@@ -459,7 +462,7 @@ class MonotonicRule(PlanningRule):
                 decisions.append(
                     experiments.Decision(
                         adapter.name,
-                        Action.REJECT,
+                        experiments.DecisionAction.REJECT,
                         "cannot enforce monotonic constraints",
                     )
                 )
@@ -508,7 +511,9 @@ class ApprovedModelsRule(PlanningRule):
             if adapter.name not in approved:
                 decisions.append(
                     experiments.Decision(
-                        adapter.name, Action.REJECT, "not in approved plan"
+                        adapter.name,
+                        experiments.DecisionAction.REJECT,
+                        "not in approved plan",
                     )
                 )
         return [a for a in candidates if a.name in approved]
@@ -557,7 +562,7 @@ class HistoryRule(PlanningRule):
             decisions.append(
                 experiments.Decision(
                     "meta_learning",
-                    Action.DEFER,
+                    experiments.DecisionAction.DEFER,
                     "no comparable history on other datasets",
                 )
             )
@@ -566,7 +571,7 @@ class HistoryRule(PlanningRule):
         decisions.append(
             experiments.Decision(
                 "meta_learning",
-                Action.INCLUDE,
+                experiments.DecisionAction.INCLUDE,
                 "searched first, from similar past datasets: "
                 + ", ".join(
                     f"{a.name} ({weights[a.name]:.2f})" for a in preferred
@@ -607,7 +612,7 @@ class StrategyRule(PlanningRule):
                 decisions.append(
                     experiments.Decision(
                         name,
-                        Action.INCLUDE,
+                        experiments.DecisionAction.INCLUDE,
                         f"{strategy.description}; evaluated on the top "
                         f"{spec.top_models} screened models where applicable "
                         f"(applies to: {', '.join(applicable)})",
@@ -630,7 +635,9 @@ class StrategyRule(PlanningRule):
                 )
                 decisions.append(
                     experiments.Decision(
-                        name, Action.REJECT, f"not applicable: {why}"
+                        name,
+                        experiments.DecisionAction.REJECT,
+                        f"not applicable: {why}",
                     )
                 )
         return candidates
@@ -661,7 +668,7 @@ class TuningRule(PlanningRule):
             decisions.append(
                 experiments.Decision(
                     "hyperparameter_tuning",
-                    Action.DEFER,
+                    experiments.DecisionAction.DEFER,
                     "disabled (search.top_models=0) or no tunable candidate",
                 )
             )
@@ -669,7 +676,7 @@ class TuningRule(PlanningRule):
             decisions.append(
                 experiments.Decision(
                     "hyperparameter_tuning",
-                    Action.INCLUDE,
+                    experiments.DecisionAction.INCLUDE,
                     f"{search.optimizer} search on the top "
                     f"{search.top_models} of {len(tunable)} tunable models, "
                     f"{search.configs_per_model} configs each, "
@@ -708,13 +715,13 @@ class EnsembleRule(PlanningRule):
                 if size < 2
                 else "fewer than two eligible distinct models"
             )
-            action = Action.DEFER
+            action = experiments.DecisionAction.DEFER
         else:
             reason = (
                 f"stack the best of up to {size} distinct models; adopted "
                 "only if it beats its best member in cross-validation"
             )
-            action = Action.INCLUDE
+            action = experiments.DecisionAction.INCLUDE
         reason_blend = reason.replace("stack the best", "blend the best")
         decisions.append(experiments.Decision("stacking", action, reason))
         decisions.append(experiments.Decision("blending", action, reason_blend))
@@ -794,7 +801,9 @@ class Planner:
             tuple(spec.models.experimental_models),
         )
         decisions = [
-            experiments.Decision(name, Action.REJECT, reason)
+            experiments.Decision(
+                name, experiments.DecisionAction.REJECT, reason
+            )
             for name, reason in sorted(rejected.items())
         ]
         candidates = compatible
@@ -805,7 +814,7 @@ class Planner:
         decisions += [
             experiments.Decision(
                 a.name,
-                Action.INCLUDE,
+                experiments.DecisionAction.INCLUDE,
                 (
                     f"{'experimental-only ' if not a.auto_candidate else ''}"
                     f"{a.family} candidate (cost {a.capabilities.cost})"
@@ -816,7 +825,9 @@ class Planner:
         if profile.screen_warning:
             decisions.append(
                 experiments.Decision(
-                    "leakage_screen", Action.DEFER, profile.screen_warning
+                    "leakage_screen",
+                    experiments.DecisionAction.DEFER,
+                    profile.screen_warning,
                 )
             )
         names = tuple(a.name for a in candidates)

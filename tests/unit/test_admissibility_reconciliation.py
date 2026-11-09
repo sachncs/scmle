@@ -7,9 +7,6 @@ from scmle.contracts.qualification import Tier
 from scmle.data.admissibility import reconciliation
 from scmle.data.detectors import certificates
 
-GATING = certificates.GateStatus.GATING
-FILTER = reconciliation.Mechanism.FILTER
-
 
 def item(extract, source=1000.0, explanations=(), name="rows"):
     return reconciliation.Item(
@@ -36,13 +33,17 @@ def test_a_gap_exactly_at_the_tolerance_matches_and_above_it_does_not():
         reconciliation.reconcile_item(item(950.0), 0.05).status
         is reconciliation.Status.MATCHED
     )
-    over = reconciliation.reconcile_item(item(949.9), 0.05, GATING)
+    over = reconciliation.reconcile_item(
+        item(949.9), 0.05, certificates.GateStatus.GATING
+    )
     assert over.status is reconciliation.Status.UNEXPLAINED
     assert over.check.decision is Decision.BLOCK
 
 
 def test_an_unexplained_gap_fails_the_gate_and_blocks_when_certified():
-    result = reconciliation.reconcile_item(item(900.0), gate=GATING)
+    result = reconciliation.reconcile_item(
+        item(900.0), gate=certificates.GateStatus.GATING
+    )
     assert result.status is reconciliation.Status.UNEXPLAINED
     assert result.check.decision is Decision.BLOCK
     assert result.tier is Tier.UNVERIFIED
@@ -53,10 +54,13 @@ def test_an_unexplained_gap_fails_the_gate_and_blocks_when_certified():
 
 def test_an_explained_gap_passes_with_the_explanation_recorded():
     why = reconciliation.Explanation(
-        FILTER, "test accounts removed", -100.0, "j.doe"
+        reconciliation.Mechanism.FILTER,
+        "test accounts removed",
+        -100.0,
+        "j.doe",
     )
     result = reconciliation.reconcile_item(
-        item(900.0, explanations=(why,)), gate=GATING
+        item(900.0, explanations=(why,)), gate=certificates.GateStatus.GATING
     )
     assert result.status is reconciliation.Status.EXPLAINED
     assert result.residual_gap == pytest.approx(0.0)
@@ -70,7 +74,8 @@ def test_an_explanation_must_cover_the_gap_within_the_tolerance():
         reconciliation.Mechanism.DEDUPE, "duplicate orders", -60.0
     )
     result = reconciliation.reconcile_item(
-        item(900.0, explanations=(partial,)), gate=GATING
+        item(900.0, explanations=(partial,)),
+        gate=certificates.GateStatus.GATING,
     )
     assert result.status is reconciliation.Status.UNEXPLAINED
     assert result.residual_gap == pytest.approx(0.04)
@@ -89,7 +94,9 @@ def test_several_mechanisms_add_up_with_their_signs():
     dup = reconciliation.Explanation(
         reconciliation.Mechanism.DEDUPE, "double posted", 20.0
     )
-    filt = reconciliation.Explanation(FILTER, "voided", -50.0)
+    filt = reconciliation.Explanation(
+        reconciliation.Mechanism.FILTER, "voided", -50.0
+    )
     result = reconciliation.reconcile_item(
         item(900.0, explanations=(late, dup, filt))
     )
@@ -100,7 +107,9 @@ def test_several_mechanisms_add_up_with_their_signs():
 
 
 def test_an_explanation_that_overshoots_is_not_accepted():
-    big = reconciliation.Explanation(FILTER, "everything", -400.0)
+    big = reconciliation.Explanation(
+        reconciliation.Mechanism.FILTER, "everything", -400.0
+    )
     assert (
         reconciliation.reconcile_item(item(900.0, explanations=(big,))).status
         is reconciliation.Status.UNEXPLAINED
@@ -108,7 +117,9 @@ def test_an_explanation_that_overshoots_is_not_accepted():
 
 
 def test_unattested_explanations_leave_the_tier_unverified():
-    why = reconciliation.Explanation(FILTER, "voided", -100.0)
+    why = reconciliation.Explanation(
+        reconciliation.Mechanism.FILTER, "voided", -100.0
+    )
     result = reconciliation.reconcile_item(item(900.0, explanations=(why,)))
     assert result.status is reconciliation.Status.EXPLAINED
     assert result.tier is Tier.UNVERIFIED
@@ -122,7 +133,7 @@ def test_inputs_are_validated():
     with pytest.raises(ValueError):
         reconciliation.Item("n", float("nan"), 1.0, "s")
     with pytest.raises(ValueError, match="detail"):
-        reconciliation.Explanation(FILTER, " ", 1.0)
+        reconciliation.Explanation(reconciliation.Mechanism.FILTER, " ", 1.0)
     with pytest.raises(ValueError, match="Mechanism"):
         reconciliation.Explanation("filter", "x", 1.0)  # type: ignore[arg-type]
     with pytest.raises(ValueError):
@@ -134,7 +145,9 @@ def test_inputs_are_validated():
 
 
 def test_the_dataset_gate_fails_on_any_unexplained_item():
-    why = reconciliation.Explanation(FILTER, "voided", -100.0, "j.doe")
+    why = reconciliation.Explanation(
+        reconciliation.Mechanism.FILTER, "voided", -100.0, "j.doe"
+    )
     good = reconciliation.reconcile(
         [item(1000.0, name="a"), item(900.0, explanations=(why,), name="b")]
     )

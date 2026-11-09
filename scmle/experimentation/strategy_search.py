@@ -11,9 +11,6 @@ import scmle.core.context
 from scmle.experimentation import trials
 from scmle.sampling import strategies
 
-Status = experiments.TrialStatus
-Action = experiments.DecisionAction
-
 
 def best_default_trials(
     screened: list[experiments.TrialResult],
@@ -36,7 +33,7 @@ def best_default_trials(
     ok = [
         t
         for t in screened
-        if t.status is Status.OK
+        if t.status is experiments.TrialStatus.OK
         and not t.params
         and t.strategy == experiments.DEFAULT_STRATEGY
         and t.model_name not in baseline_family_names
@@ -117,7 +114,7 @@ class StrategySearch:
             else:
                 self.context.add_outcome(
                     f"{name}@{leader.model_name}",
-                    Action.REJECT,
+                    experiments.DecisionAction.REJECT,
                     f"not applicable: {reason}",
                 )
         ids = self.context.allocate_trial_ids(len(chosen))
@@ -142,16 +139,20 @@ class StrategySearch:
             outcome: The strategy trial's result.
         """
         technique = f"{outcome.strategy}@{outcome.model_name}"
-        if outcome.status is not Status.OK:
+        if outcome.status is not experiments.TrialStatus.OK:
             self.context.add_outcome(
                 technique,
-                Action.REJECT,
+                experiments.DecisionAction.REJECT,
                 f"trial {outcome.status}: {outcome.error}",
             )
             return
         sign = 1 if self.metric.greater_is_better else -1
         gain = sign * (outcome.score_mean - leader.score_mean)
-        verdict = Action.INCLUDE if gain > 0 else Action.REJECT
+        verdict = (
+            experiments.DecisionAction.INCLUDE
+            if gain > 0
+            else experiments.DecisionAction.REJECT
+        )
         self.context.add_outcome(
             technique,
             verdict,

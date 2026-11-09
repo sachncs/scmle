@@ -4,21 +4,34 @@ from scmle.contracts import qualification
 from scmle.data.framing import provenance
 from scmle.data.framing import questions
 
-CONFIRMED = qualification.Tier.CONFIRMED
-UNVERIFIED = qualification.Tier.UNVERIFIED
-
 
 def test_unsigned_llm_field_caps_the_claim_and_a_signature_lifts_it():
     sources = [provenance.FieldSource.TEMPLATE, provenance.FieldSource.LLM]
-    assert provenance.claim_tier(CONFIRMED, sources, signed=False) is UNVERIFIED
-    assert provenance.claim_tier(CONFIRMED, sources, signed=True) is CONFIRMED
-    human = [provenance.FieldSource.HUMAN]
-    assert provenance.claim_tier(CONFIRMED, human, signed=False) is CONFIRMED
     assert (
         provenance.claim_tier(
-            CONFIRMED, human, signed=True, cost_from_data=True
+            qualification.Tier.CONFIRMED, sources, signed=False
         )
-        is UNVERIFIED
+        is qualification.Tier.UNVERIFIED
+    )
+    assert (
+        provenance.claim_tier(
+            qualification.Tier.CONFIRMED, sources, signed=True
+        )
+        is qualification.Tier.CONFIRMED
+    )
+    human = [provenance.FieldSource.HUMAN]
+    assert (
+        provenance.claim_tier(qualification.Tier.CONFIRMED, human, signed=False)
+        is qualification.Tier.CONFIRMED
+    )
+    assert (
+        provenance.claim_tier(
+            qualification.Tier.CONFIRMED,
+            human,
+            signed=True,
+            cost_from_data=True,
+        )
+        is qualification.Tier.UNVERIFIED
     )
 
 

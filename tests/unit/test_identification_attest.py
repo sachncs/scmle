@@ -16,10 +16,9 @@ from tests.unit.test_identification_run import observational
 KEY = "attestor-key"
 SCOPE = "ab" * 32
 TODAY = "2026-11-06"
-NEEDED = ASSUMPTIONS
 ATTESTORS = (
-    causal.Attestor("Dr. A. Rivera", "study statistician", NEEDED[:2]),
-    causal.Attestor("J. Okafor", "domain lead", NEEDED[2:]),
+    causal.Attestor("Dr. A. Rivera", "study statistician", ASSUMPTIONS[:2]),
+    causal.Attestor("J. Okafor", "domain lead", ASSUMPTIONS[2:]),
 )
 
 
@@ -39,23 +38,23 @@ def record(assumption, attestor="Dr. A. Rivera", **changes):
 
 def everything():
     return (
-        record(NEEDED[0]),
-        record(NEEDED[1]),
-        record(NEEDED[2], "J. Okafor"),
+        record(ASSUMPTIONS[0]),
+        record(ASSUMPTIONS[1]),
+        record(ASSUMPTIONS[2], "J. Okafor"),
     )
 
 
 def apply(records, key=KEY, today=TODAY, attestors=ATTESTORS):
-    return attest.apply(attestors, records, NEEDED, SCOPE, today, key)
+    return attest.apply(attestors, records, ASSUMPTIONS, SCOPE, today, key)
 
 
 def test_valid_signed_attestations_name_every_assumption():
     found = apply(everything())
     assert found.rejected == {}
     assert found.accepted == {
-        NEEDED[0]: "Dr. A. Rivera",
-        NEEDED[1]: "Dr. A. Rivera",
-        NEEDED[2]: "J. Okafor",
+        ASSUMPTIONS[0]: "Dr. A. Rivera",
+        ASSUMPTIONS[1]: "Dr. A. Rivera",
+        ASSUMPTIONS[2]: "J. Okafor",
     }
 
 
@@ -78,20 +77,20 @@ def test_an_attestation_that_does_not_count_is_rejected_with_a_reason(
 ):
     first = everything()[0]
     found = apply((mutate(first), *everything()[1:]))
-    assert NEEDED[0] not in found.accepted
-    assert reason in found.rejected[NEEDED[0]]
+    assert ASSUMPTIONS[0] not in found.accepted
+    assert reason in found.rejected[ASSUMPTIONS[0]]
     assert len(found.accepted) == 2
 
 
 def test_a_wrong_or_missing_key_accepts_nothing():
     assert apply(everything(), key="other").accepted == {}
     missing = apply(everything(), key=None)
-    assert missing.accepted == {} and "key" in missing.rejected[NEEDED[0]]
+    assert missing.accepted == {} and "key" in missing.rejected[ASSUMPTIONS[0]]
 
 
 def test_no_attestation_for_an_assumption_is_reported():
     found = apply(everything()[:2])
-    assert "no signed attestation" in found.rejected[NEEDED[2]]
+    assert "no signed attestation" in found.rejected[ASSUMPTIONS[2]]
 
 
 def test_the_file_round_trips_and_refuses_duplicates(tmp_path):
@@ -150,4 +149,4 @@ def test_the_tier_rises_above_unverified_only_with_verified_attestations():
     assert claims["attestations"]["accepted"] == []
     assert claims["attestations"]["rejected"]
     accepted = up.documents["causal_claims.json"]["attestations"]["accepted"]
-    assert {a["assumption"] for a in accepted} == set(NEEDED)
+    assert {a["assumption"] for a in accepted} == set(ASSUMPTIONS)

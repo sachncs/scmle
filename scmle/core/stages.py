@@ -123,7 +123,6 @@ COVERAGE_LEVELS = (0.5, 0.8, 0.9, 0.95)
 DIAGNOSTIC_BUDGET_SHARE = 0.25
 DIAGNOSTIC_MIN_SECONDS = 30.0
 BASELINE = "dummy"
-require = scmle.core.context.require
 
 
 LOGGER = logging.getLogger(__name__)
@@ -328,7 +327,7 @@ class IngestStage(Stage):
             ConfigError: If the stored source registry holds an earlier snapshot
                 of the source whose schema is incompatible with the new one.
         """
-        manifest = require(context.manifest, "manifest")
+        manifest = scmle.core.context.require(context.manifest, "manifest")
         snapshot = scmle.data.readers.registry.SourceSnapshot.from_manifest(
             manifest,
             {
@@ -389,7 +388,9 @@ class IngestStage(Stage):
         previous = json.loads(saved.read_text(encoding="utf-8")).get(
             "data_hash"
         )
-        current = require(context.manifest, "manifest").data_hash
+        current = scmle.core.context.require(
+            context.manifest, "manifest"
+        ).data_hash
         if previous != current:
             raise errors.ConfigError(
                 "cannot resume: the data changed since the checkpointed "
@@ -520,7 +521,7 @@ class ProfileStage(Stage):
                 from the data.
         """
         spec = context.spec
-        frame = require(context.frame, "frame")
+        frame = scmle.core.context.require(context.frame, "frame")
         target = frame[spec.data.target]
         if target.isna().any():
             frame = self.set_aside_unlabeled(context, frame)
@@ -591,7 +592,7 @@ class ProfileStage(Stage):
         )
         profile = profiler.DatasetProfiler(spec).profile(
             development,
-            require(context.manifest, "manifest"),
+            scmle.core.context.require(context.manifest, "manifest"),
             task,
             context.read_seconds,
             total_rows=len(frame),
@@ -622,7 +623,7 @@ class ProfileStage(Stage):
             context.stream[1].rows if context.stream is not None else len(frame)
         )
         curation = scmle.contracts.data.CurationReport(
-            manifest=require(context.manifest, "manifest"),
+            manifest=scmle.core.context.require(context.manifest, "manifest"),
             source_rows=source_rows,
             profiled_rows=len(development),
             read_seconds=context.read_seconds,
@@ -987,7 +988,9 @@ class ProfileStage(Stage):
                 subject=subject,
             )
         runner = confirm.merge_runners(baseline, pending.causal, extra)
-        vault = require(context.custody_vault, "custody vault")
+        vault = scmle.core.context.require(
+            context.custody_vault, "custody vault"
+        )
         run = governed.confirm_explored(
             pending.explored,
             source=vault.sets.get("C"),
@@ -1087,7 +1090,9 @@ class ProfileStage(Stage):
             )
         classes = sorted(view.target.dropna().unique(), key=str)
         outcome = explore.encode_target(view.target, True, classes)
-        plan = require(context.profile, "profile").feature_plan
+        plan = scmle.core.context.require(
+            context.profile, "profile"
+        ).feature_plan
         numeric = [
             c
             for c in plan.numeric
@@ -1236,7 +1241,7 @@ class ProfileStage(Stage):
             The stability and shift assessment of the survivors.
         """
         data = context.spec.data
-        profile = require(context.profile, "profile")
+        profile = scmle.core.context.require(context.profile, "profile")
         plan = profile.feature_plan
         candidates = [*plan.numeric, *plan.categorical]
         codes = explore.encode_target(view.target, task.is_classification)
@@ -1443,7 +1448,7 @@ class ProfileStage(Stage):
                 "identification.completed",
                 f"causal claim status {claims['status']}, tier {claims['tier']}"
                 " (estimated on the single opening of C)",
-                tuple(causal_claim.DOCUMENTS),
+                tuple(scmle.data.identification.run.DOCUMENTS),
                 {
                     "status": claims["status"],
                     "tier": claims["tier"],
@@ -1552,7 +1557,7 @@ class ProfileStage(Stage):
             )
             written.append("detector_certificates.json")
         quarantined = found.quarantined
-        profile = require(context.profile, "profile")
+        profile = scmle.core.context.require(context.profile, "profile")
         plan = profile.feature_plan
         if quarantined:
             kept = [f for f in plan.features if f not in quarantined]
@@ -2073,14 +2078,14 @@ def build_plan(
     plan = planner.plan(
         scmle.intelligence.planner.PlanningContext(
             context.spec,
-            require(context.profile, "profile"),
-            require(context.task, "task"),
+            scmle.core.context.require(context.profile, "profile"),
+            scmle.core.context.require(context.task, "task"),
             approved.candidate_models if approved is not None else None,
             context.history,
         )
     )
-    task = require(context.task, "task")
-    manifest = require(context.manifest, "manifest")
+    task = scmle.core.context.require(context.task, "task")
+    manifest = scmle.core.context.require(context.manifest, "manifest")
     for model_name in plan.candidate_models:
         adapter = context.registry.get(model_name)
         model_family = adapter.capability_family or adapter.family
@@ -2139,7 +2144,7 @@ def capability_key(
             other than binary.
         ConfigError: If the manifest's modality differs from the data spec's.
     """
-    manifest = require(context.manifest, "manifest")
+    manifest = scmle.core.context.require(context.manifest, "manifest")
     try:
         modality = capabilities.Modality(manifest.modality)
     except ValueError as error:
@@ -2192,7 +2197,7 @@ def advise(context: scmle.core.context.RunContext) -> tuple[Any, ...]:
         The recommendations, also kept on the context.
     """
     advice = recommendations.recommend(
-        require(context.profile, "profile"), context.spec
+        scmle.core.context.require(context.profile, "profile"), context.spec
     )
     context.recommendations = advice
     return advice
@@ -2264,7 +2269,7 @@ class TrainStage(Stage):
         Returns:
             The candidate count as text.
         """
-        plan = require(context.plan, "plan")
+        plan = scmle.core.context.require(context.plan, "plan")
         return f"{len(plan.candidate_models)} candidates"
 
     def execute(self, context: scmle.core.context.RunContext) -> None:
@@ -2280,7 +2285,7 @@ class TrainStage(Stage):
                 trials.
         """
         runner = trials.TrialRunner(context)
-        plan = require(context.plan, "plan")
+        plan = scmle.core.context.require(context.plan, "plan")
         names = plan.candidate_models
         for start in range(0, len(names), runner.workers):
             context.check_cancelled()
@@ -2332,7 +2337,7 @@ class SelectStage(Stage):
         Args:
             context: The run context, holding the selected trial.
         """
-        selected = require(context.selected, "selected")
+        selected = scmle.core.context.require(context.selected, "selected")
         context.emit(
             "selection.frozen",
             f"{selected.model_name}/{selected.strategy}",
@@ -2382,10 +2387,12 @@ class SelectStage(Stage):
         Raises:
             BlockedError: If no checked candidate satisfies the limits.
         """
-        split = require(context.split, "split")
-        task = require(context.task, "task")
-        plan = require(context.profile, "profile").feature_plan
-        metric = require(context.metric, "metric")
+        split = scmle.core.context.require(context.split, "split")
+        task = scmle.core.context.require(context.task, "task")
+        plan = scmle.core.context.require(
+            context.profile, "profile"
+        ).feature_plan
+        metric = scmle.core.context.require(context.metric, "metric")
         sign = 1.0 if metric.greater_is_better else -1.0
         rows = []
         for trial in checked:
@@ -2445,8 +2452,8 @@ class SelectStage(Stage):
         pending = context.pending_ledger
         if pending is None:
             return
-        selected = require(context.selected, "selected")
-        split = require(context.split, "split")
+        selected = scmle.core.context.require(context.selected, "selected")
+        split = scmle.core.context.require(context.split, "split")
         data = context.spec.data
         subject = None
         if data.baseline_column and data.baseline_subject == "selected_model":
@@ -2483,15 +2490,19 @@ class SelectStage(Stage):
         pipeline = context.refits.get(selected.trial_id)
         if pipeline is None:
             pipeline = strategies.get_strategy(selected.strategy).build(
-                require(context.profile, "profile").feature_plan,
+                scmle.core.context.require(
+                    context.profile, "profile"
+                ).feature_plan,
                 context.registry.get(selected.model_name),
-                require(context.task, "task"),
+                scmle.core.context.require(context.task, "task"),
                 context.spec.validation.seed,
                 selected.params,
             )
             pipeline.fit(split.dev_features, split.dev_target)
             context.refits[selected.trial_id] = pipeline
-        model = require(pending.charter.cost_model, "cost_model")
+        model = scmle.core.context.require(
+            pending.charter.cost_model, "cost_model"
+        )
         classes = sorted(pending.view.target.dropna().unique(), key=str)
         return scmle.data.framing.claim.SelectedModelRule(
             pipeline,
@@ -2523,7 +2534,9 @@ class SelectStage(Stage):
             BlockedError: If no checked candidate satisfies the constraints.
         """
         ranked = context.policy.rank(
-            context.trials, require(context.metric, "metric"), context.registry
+            context.trials,
+            scmle.core.context.require(context.metric, "metric"),
+            context.registry,
         )
         limits = self.limits(context)
         spec = context.spec.selection
@@ -2531,9 +2544,11 @@ class SelectStage(Stage):
             context.selected = ranked[0]
             self.announce(context)
             return
-        split = require(context.split, "split")
-        task = require(context.task, "task")
-        plan = require(context.profile, "profile").feature_plan
+        split = scmle.core.context.require(context.split, "split")
+        task = scmle.core.context.require(context.task, "task")
+        plan = scmle.core.context.require(
+            context.profile, "profile"
+        ).feature_plan
         checked = ranked[: context.spec.selection.max_candidates_checked]
         if spec.pareto:
             self.select_on_front(context, checked, limits)
@@ -2721,7 +2736,7 @@ def slice_labels(
         A mapping from each declared slice column to a series of labels
         aligned with `features`, or to None.
     """
-    split = require(context.split, "split")
+    split = scmle.core.context.require(context.split, "split")
     found: dict[str, Any] = {}
     for column in declared_slice_columns(context):
         found[column] = (
@@ -2856,7 +2871,7 @@ def chartered_net_benefit(
     if model is None:
         raise errors.ScmleError("the charter has no cost model")
     positive = pipeline.classes_[1]
-    split = require(context.split, "split")
+    split = scmle.core.context.require(context.split, "split")
     clusters = (
         features[context.spec.data.group_column]
         if split.manifest.strategy == "group" and context.spec.data.group_column
@@ -2904,17 +2919,17 @@ def choose_decision_threshold(
         precedence over the specification's objective.
     """
     decision = context.spec.decision
-    task = require(context.task, "task")
+    task = scmle.core.context.require(context.task, "task")
     chartered = chartered_decision_model(context)
     if task is not tasks.TaskType.BINARY or (
         decision.threshold_objective == "none" and chartered is None
     ):
         return fitted, None
-    split = require(context.split, "split")
-    selected = require(context.selected, "selected")
+    split = scmle.core.context.require(context.split, "split")
+    selected = scmle.core.context.require(context.selected, "selected")
     strategy = strategies.get_strategy(selected.strategy)
     adapter = context.registry.get(selected.model_name)
-    plan = require(context.profile, "profile").feature_plan
+    plan = scmle.core.context.require(context.profile, "profile").feature_plan
     seed = context.spec.validation.seed
     probabilities, positions = thresholds.out_of_fold_probabilities(
         lambda: strategy.build(plan, adapter, task, seed, selected.params),
@@ -2963,7 +2978,7 @@ class FinalEvaluationStage(Stage):
         Returns:
             The text "final one-time test evaluation of" and the model name.
         """
-        selected = require(context.selected, "selected")
+        selected = scmle.core.context.require(context.selected, "selected")
         return f"final one-time test evaluation of {selected.model_name}"
 
     @staticmethod
@@ -3003,7 +3018,9 @@ class FinalEvaluationStage(Stage):
         health = fit_health.assess_trial(
             selected,
             context.trials,
-            require(context.metric, "metric").greater_is_better,
+            scmle.core.context.require(
+                context.metric, "metric"
+            ).greater_is_better,
         )
         return None if health is None else health.to_dict()
 
@@ -3033,7 +3050,7 @@ class FinalEvaluationStage(Stage):
             A group-threshold classifier when applied, else `pipeline`.
         """
         fairness = context.spec.fairness
-        task = require(context.task, "task")
+        task = scmle.core.context.require(context.task, "task")
         if fairness.mitigation != "group_thresholds":
             return pipeline
         column = fairness.column or context.spec.data.sensitive_columns[0]
@@ -3045,10 +3062,12 @@ class FinalEvaluationStage(Stage):
                 "group thresholds apply to binary classification only",
             )
             return pipeline
-        split = require(context.split, "split")
+        split = scmle.core.context.require(context.split, "split")
         strategy = strategies.get_strategy(selected.strategy)
         adapter = context.registry.get(selected.model_name)
-        plan = require(context.profile, "profile").feature_plan
+        plan = scmle.core.context.require(
+            context.profile, "profile"
+        ).feature_plan
         seed = context.spec.validation.seed
         probabilities, positions = thresholds.out_of_fold_probabilities(
             lambda: strategy.build(plan, adapter, task, seed, selected.params),
@@ -3157,7 +3176,7 @@ class FinalEvaluationStage(Stage):
         source, totals = context.stream
         data, seed = context.spec.data, context.spec.validation.seed
         fraction = context.spec.validation.test_fraction
-        task = require(context.task, "task")
+        task = scmle.core.context.require(context.task, "task")
         labels, guesses, scores = [], [], []
         offset = 0
         for batch in source.batches():
@@ -3213,7 +3232,10 @@ class FinalEvaluationStage(Stage):
             predicted effect and a Qini curve sampled at up to 50 points, or
             None if the task is not uplift.
         """
-        if require(context.task, "task") is not tasks.TaskType.UPLIFT:
+        if (
+            scmle.core.context.require(context.task, "task")
+            is not tasks.TaskType.UPLIFT
+        ):
             return None
         arm = features[context.spec.data.treatment_column].to_numpy(dtype=int)
         predicted = numpy.asarray(fitted.predict(features), dtype=float)
@@ -3306,11 +3328,11 @@ class FinalEvaluationStage(Stage):
         unlabeled = context.unlabeled
         if data.unlabeled != "pseudo_label" or unlabeled is None:
             return pipeline
-        split = require(context.split, "split")
-        task = require(context.task, "task")
-        metric = require(context.metric, "metric")
+        split = scmle.core.context.require(context.split, "split")
+        task = scmle.core.context.require(context.task, "task")
+        metric = scmle.core.context.require(context.metric, "metric")
         template = strategies.get_strategy(selected.strategy).build(
-            require(context.profile, "profile").feature_plan,
+            scmle.core.context.require(context.profile, "profile").feature_plan,
             context.registry.get(selected.model_name),
             task,
             context.spec.validation.seed,
@@ -3360,14 +3382,14 @@ class FinalEvaluationStage(Stage):
         Args:
             context: The run context that stores the claim and its hash.
         """
-        split = require(context.split, "split")
+        split = scmle.core.context.require(context.split, "split")
         charter_hash = None
         if context.spec.charter_path:
             charter_hash = sealing.read_verified(
                 str(context.spec.charter_path)
             ).charter_hash
         claim = coverage_run.claim_document(
-            task=require(context.task, "task").value,
+            task=scmle.core.context.require(context.task, "task").value,
             levels=COVERAGE_LEVELS,
             tolerance=coverage.DEFAULT_TOLERANCE,
             split_fingerprint=split.manifest.fingerprint,
@@ -3444,7 +3466,10 @@ class FinalEvaluationStage(Stage):
         charter = chartered_decision_model(context)
         if charter is None or charter.decision is None:
             return
-        if require(context.task, "task") is not tasks.TaskType.BINARY:
+        if (
+            scmle.core.context.require(context.task, "task")
+            is not tasks.TaskType.BINARY
+        ):
             return
         layer = charter.decision
         data = context.spec.data
@@ -3526,14 +3551,16 @@ class FinalEvaluationStage(Stage):
                 and the evaluation.
         """
         context.check_cancelled()
-        split = require(context.split, "split")
-        selected = require(context.selected, "selected")
-        task = require(context.task, "task")
-        metric = require(context.metric, "metric")
+        split = scmle.core.context.require(context.split, "split")
+        selected = scmle.core.context.require(context.selected, "selected")
+        task = scmle.core.context.require(context.task, "task")
+        metric = scmle.core.context.require(context.metric, "metric")
         pipeline = context.refits.get(selected.trial_id)
         if pipeline is None:
             pipeline = strategies.get_strategy(selected.strategy).build(
-                require(context.profile, "profile").feature_plan,
+                scmle.core.context.require(
+                    context.profile, "profile"
+                ).feature_plan,
                 context.registry.get(selected.model_name),
                 task,
                 context.spec.validation.seed,
@@ -3610,7 +3637,9 @@ class FinalEvaluationStage(Stage):
                 test_target,
                 task,
                 metric,
-                require(context.profile, "profile").feature_plan,
+                scmle.core.context.require(
+                    context.profile, "profile"
+                ).feature_plan,
                 context.spec.validation.seed,
                 groups=(
                     test_features[context.spec.data.group_column]
@@ -3732,7 +3761,7 @@ class PackageStage(Stage):
             An index with one accepted record for each required reference whose
             artifact exists; missing artifacts are omitted.
         """
-        manifest = require(context.manifest, "manifest")
+        manifest = scmle.core.context.require(context.manifest, "manifest")
         raw_inputs = {
             "snapshot_id": manifest.snapshot_id or manifest.data_hash,
             "config_hash": context.spec.config_hash(),
@@ -3749,7 +3778,9 @@ class PackageStage(Stage):
                         f"artifact exists and matches run output: {reference}"
                     ),
                     scope={
-                        "task": require(context.task, "task").value,
+                        "task": scmle.core.context.require(
+                            context.task, "task"
+                        ).value,
                         "modality": manifest.modality,
                     },
                     raw_inputs=raw_inputs,
@@ -3796,8 +3827,8 @@ class PackageStage(Stage):
                 test metrics; the release policy, evaluation and evidence
                 entries are added to it.
         """
-        task = require(context.task, "task")
-        metric = require(context.metric, "metric")
+        task = scmle.core.context.require(context.task, "task")
+        metric = scmle.core.context.require(context.metric, "metric")
         policy = policies.release_policy_from_criteria(
             task,
             metric.name,
@@ -3888,8 +3919,8 @@ class PackageStage(Stage):
             A mapping from diagnostic name to its evidence record, for each
             explanation diagnostic that ran without error and has a report.
         """
-        manifest = require(context.manifest, "manifest")
-        split = require(context.split, "split")
+        manifest = scmle.core.context.require(context.manifest, "manifest")
+        split = scmle.core.context.require(context.split, "split")
         model_manifest = store.path(
             f"model/{scmle.artifacts.bundle.MANIFEST_FILE}"
         )
@@ -3992,7 +4023,7 @@ class PackageStage(Stage):
             hash, dataset, model manifest digest, environment and signature
             presence.
         """
-        manifest = require(context.manifest, "manifest")
+        manifest = scmle.core.context.require(context.manifest, "manifest")
         model_manifest = store.path(
             f"model/{scmle.artifacts.bundle.MANIFEST_FILE}"
         )
@@ -4116,15 +4147,15 @@ class PackageStage(Stage):
         """
         if context.resource_governor.skip_reason(first=False):
             return None
-        split = require(context.split, "split")
+        split = scmle.core.context.require(context.split, "split")
         template = strategies.get_strategy(selected.strategy).build(
-            require(context.profile, "profile").feature_plan,
+            scmle.core.context.require(context.profile, "profile").feature_plan,
             context.registry.get(selected.model_name),
-            require(context.task, "task"),
+            scmle.core.context.require(context.task, "task"),
             context.spec.validation.seed,
             selected.params,
         )
-        metric = require(context.metric, "metric")
+        metric = scmle.core.context.require(context.metric, "metric")
         fit_positions, evaluate_positions = split.manifest.folds[0]
         curve = learning_curve.compute(
             template,
@@ -4134,7 +4165,8 @@ class PackageStage(Stage):
             evaluate_positions,
             metric.scorer(
                 scmle.evaluation.metrics.positive_label(
-                    split.dev_target, require(context.task, "task")
+                    split.dev_target,
+                    scmle.core.context.require(context.task, "task"),
                 )
             ),
             metric.greater_is_better,
@@ -4181,7 +4213,7 @@ class PackageStage(Stage):
             The calibrator, or None when the task has no conformal margin, the
             time budget is spent or too few held-out rows exist.
         """
-        task = require(context.task, "task")
+        task = scmle.core.context.require(context.task, "task")
         if task in (
             tasks.TaskType.SURVIVAL,
             tasks.TaskType.ORDINAL,
@@ -4196,9 +4228,9 @@ class PackageStage(Stage):
         if reason:
             self.note_conformal_skipped(context, reason)
             return None
-        split = require(context.split, "split")
+        split = scmle.core.context.require(context.split, "split")
         template = strategies.get_strategy(selected.strategy).build(
-            require(context.profile, "profile").feature_plan,
+            scmle.core.context.require(context.profile, "profile").feature_plan,
             context.registry.get(selected.model_name),
             task,
             context.spec.validation.seed,
@@ -4323,7 +4355,7 @@ class PackageStage(Stage):
             observed: The held-out labels.
             predicted: The held-out predictions.
         """
-        split = require(context.split, "split")
+        split = scmle.core.context.require(context.split, "split")
         held = [fold[1] for fold in split.manifest.folds]
         plan = cv_plus.plan_scores(
             held,
@@ -4371,7 +4403,7 @@ class PackageStage(Stage):
         if pending is None:
             return
         context.pending_ledger = None
-        task = require(context.task, "task")
+        task = scmle.core.context.require(context.task, "task")
         runner = None
         if context.coverage_claim_sha256 is not None:
             runner = coverage_confirm.build_runner(
@@ -4423,13 +4455,15 @@ class PackageStage(Stage):
             The intervals, or None for classification, when the time budget
             is spent or too few held-out rows exist.
         """
-        task = require(context.task, "task")
+        task = scmle.core.context.require(context.task, "task")
         if task is not tasks.TaskType.REGRESSION:
             return None
         if context.resource_governor.skip_reason(first=False):
             return None
-        split = require(context.split, "split")
-        plan = require(context.profile, "profile").feature_plan
+        split = scmle.core.context.require(context.split, "split")
+        plan = scmle.core.context.require(
+            context.profile, "profile"
+        ).feature_plan
         adapter = context.registry.get("hist_gradient_boosting")
         seed = context.spec.validation.seed
 
@@ -4489,7 +4523,7 @@ class PackageStage(Stage):
             when no replicates are configured.
         """
         replicates = context.spec.selection.bias_variance_replicates
-        task = require(context.task, "task")
+        task = scmle.core.context.require(context.task, "task")
         if not replicates:
             return None
         if task not in (
@@ -4498,10 +4532,12 @@ class PackageStage(Stage):
             tasks.TaskType.REGRESSION,
         ):
             return {"skipped": f"not defined for {task.value}"}
-        split = require(context.split, "split")
+        split = scmle.core.context.require(context.split, "split")
         adapter = context.registry.get(selected.model_name)
         strategy = strategies.get_strategy(selected.strategy)
-        plan = require(context.profile, "profile").feature_plan
+        plan = scmle.core.context.require(
+            context.profile, "profile"
+        ).feature_plan
         seed = context.spec.validation.seed
         found = bias_variance.decompose(
             lambda: strategy.build(plan, adapter, task, seed, selected.params),
@@ -4537,7 +4573,7 @@ class PackageStage(Stage):
             when no repeats are configured.
         """
         repeats = context.spec.selection.sensitivity_repeats
-        task = require(context.task, "task")
+        task = scmle.core.context.require(context.task, "task")
         if not repeats:
             return None
         if task not in (
@@ -4548,14 +4584,16 @@ class PackageStage(Stage):
             return {"skipped": f"not defined for {task.value}"}
         if context.resource_governor.skip_reason(first=False):
             return {"skipped": "time budget spent"}
-        split = require(context.split, "split")
+        split = scmle.core.context.require(context.split, "split")
         if len(split.dev_target) < sensitivity.MIN_ROWS:
             return {"skipped": "too few rows"}
         adapter = context.registry.get(selected.model_name)
         strategy = strategies.get_strategy(selected.strategy)
-        plan = require(context.profile, "profile").feature_plan
+        plan = scmle.core.context.require(
+            context.profile, "profile"
+        ).feature_plan
         seed = context.spec.validation.seed
-        metric = require(context.metric, "metric")
+        metric = scmle.core.context.require(context.metric, "metric")
         scorer = metric.scorer(
             scmle.evaluation.metrics.positive_label(split.dev_target, task)
         )
@@ -4589,7 +4627,7 @@ class PackageStage(Stage):
         """
         if not context.spec.selection.nested_cv:
             return None
-        split = require(context.split, "split")
+        split = scmle.core.context.require(context.split, "split")
         if split.manifest.strategy not in {"random", "stratified"}:
             return {
                 "skipped": f"not defined for {split.manifest.strategy} "
@@ -4597,12 +4635,14 @@ class PackageStage(Stage):
             }
         if context.resource_governor.skip_reason(first=False):
             return {"skipped": "time budget spent"}
-        task = require(context.task, "task")
+        task = scmle.core.context.require(context.task, "task")
         adapter = context.registry.get(selected.model_name)
         strategy = strategies.get_strategy(selected.strategy)
-        plan = require(context.profile, "profile").feature_plan
+        plan = scmle.core.context.require(
+            context.profile, "profile"
+        ).feature_plan
         seed = context.spec.validation.seed
-        metric = require(context.metric, "metric")
+        metric = scmle.core.context.require(context.metric, "metric")
         positive = scmle.evaluation.metrics.positive_label(
             split.dev_target, task
         )
@@ -4649,12 +4689,12 @@ class PackageStage(Stage):
         """
         if context.resource_governor.skip_reason(first=False):
             return None
-        split = require(context.split, "split")
+        split = scmle.core.context.require(context.split, "split")
         data = context.spec.data
         template = strategies.get_strategy(selected.strategy).build(
-            require(context.profile, "profile").feature_plan,
+            scmle.core.context.require(context.profile, "profile").feature_plan,
             context.registry.get(selected.model_name),
-            require(context.task, "task"),
+            scmle.core.context.require(context.task, "task"),
             context.spec.validation.seed,
             selected.params,
         )
@@ -4709,9 +4749,9 @@ class PackageStage(Stage):
             optional feature graph, split, model and evaluation to the bundle,
             with an explanations node when explanation files exist.
         """
-        manifest = require(context.manifest, "manifest")
-        split = require(context.split, "split")
-        selected = require(context.selected, "selected")
+        manifest = scmle.core.context.require(context.manifest, "manifest")
+        split = scmle.core.context.require(context.split, "split")
+        selected = scmle.core.context.require(context.selected, "selected")
         graph = lineage.EvidenceGraph()
 
         raw_digest = manifest.lineage.object_hashes.get(
@@ -4859,17 +4899,19 @@ class PackageStage(Stage):
             context: The run context; receives the bundle and the result.
         """
         store = context.run_store
-        split = require(context.split, "split")
-        selected = require(context.selected, "selected")
-        evaluation = require(context.evaluation, "evaluation")
-        profile = require(context.profile, "profile")
+        split = scmle.core.context.require(context.split, "split")
+        selected = scmle.core.context.require(context.selected, "selected")
+        evaluation = scmle.core.context.require(
+            context.evaluation, "evaluation"
+        )
+        profile = scmle.core.context.require(context.profile, "profile")
         bundle = scmle.artifacts.bundle.ModelBundle.create(
             context.final_pipeline,
             profile.feature_plan,
             split.dev_features,
             context.spec.data.target,
-            require(context.task, "task").value,
-            require(context.metric, "metric").name,
+            scmle.core.context.require(context.task, "task").value,
+            scmle.core.context.require(context.metric, "metric").name,
             selected.model_name,
             model_params=selected.params,
             strategy=selected.strategy,
@@ -4884,8 +4926,14 @@ class PackageStage(Stage):
             reference=scmle.monitoring.reference.ReferenceProfile.build(
                 split.dev_features,
                 profile.feature_plan,
-                require(context.reference_scores, "reference_scores"),
-                str(require(context.reference_scores, "reference_scores").name),
+                scmle.core.context.require(
+                    context.reference_scores, "reference_scores"
+                ),
+                str(
+                    scmle.core.context.require(
+                        context.reference_scores, "reference_scores"
+                    ).name
+                ),
                 evaluation["test_metrics"],
             ),
         )
@@ -4896,7 +4944,10 @@ class PackageStage(Stage):
         bundle.conformal = self.conformal_calibration(context, selected, bundle)
         bundle.quantile = self.quantile_intervals(context)
         self.complete_held_ledger(context, bundle)
-        if require(context.task, "task") is tasks.TaskType.FORECAST:
+        if (
+            scmle.core.context.require(context.task, "task")
+            is tasks.TaskType.FORECAST
+        ):
             evaluation["forecast_backtest"] = self.forecast_backtest(
                 context, selected
             )
@@ -4934,7 +4985,7 @@ class PackageStage(Stage):
         )
         bundle.save(store.path("model"))
         card = model_card.ModelCard.from_run(
-            require(context.manifest, "manifest"),
+            scmle.core.context.require(context.manifest, "manifest"),
             profile,
             bundle,
             evaluation,
@@ -4977,7 +5028,10 @@ class PackageStage(Stage):
             "diagnostics/decision_log.json",
             {
                 "plan": [
-                    d.to_dict() for d in require(context.plan, "plan").decisions
+                    d.to_dict()
+                    for d in scmle.core.context.require(
+                        context.plan, "plan"
+                    ).decisions
                 ],
                 "outcomes": [d.to_dict() for d in context.outcomes],
                 "selection": {
@@ -4998,7 +5052,7 @@ class PackageStage(Stage):
             run_id=store.run_id,
             run_dir=store.directory,
             state=scmle.core.state.RunState.COMPLETED.value,
-            plan=require(context.plan, "plan"),
+            plan=scmle.core.context.require(context.plan, "plan"),
             profile=profile,
             trials=context.trials,
             selected_model=selected.model_name,

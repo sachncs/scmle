@@ -27,8 +27,7 @@ import scmle.data.ledger.ledger
 from scmle.data.splitting import splitters
 from tests.unit.test_charter_contracts import make_charter
 
-F = Fraction
-TEN_PERCENT = F(1, 10)
+TEN_PERCENT = Fraction(1, 10)
 
 
 def raises(error, message):
@@ -40,7 +39,7 @@ def fresh(path=None, alpha=TEN_PERCENT, rule=online_fdr.ELOND):
         path,
         charter_hash="c" * 64,
         config=online_fdr.RuleConfig(rule, alpha),
-        alpha_confirm=F(1, 20),
+        alpha_confirm=Fraction(1, 20),
         seed=7,
     )
 
@@ -253,7 +252,7 @@ def test_the_claims_file_is_indented_sorted_json_in_a_new_folder(tmp_path):
     ledger = explored_ledger()
     features, target = signal_data(400, 2)
     result = confirm.confirm(
-        ledger, source_for(features, target), alpha_confirm=F(1, 20)
+        ledger, source_for(features, target), alpha_confirm=Fraction(1, 20)
     )
     path = tmp_path / "new" / "folder" / confirm.CLAIMS_FILE
     result.write(path)
@@ -293,7 +292,7 @@ def test_policy_messages_are_exact():
 
 def test_unconfirmed_claims_keep_the_exploration_effect_and_say_why():
     ledger = explored_ledger(control_observed=0)
-    result = confirm.confirm(ledger, None, alpha_confirm=F(1, 20))
+    result = confirm.confirm(ledger, None, alpha_confirm=Fraction(1, 20))
     assert result.outcome == confirm.FLOOR_NOT_EXCEEDED
     claim = result.claims[0]
     expected = ledger.results[claim.claim_id].check.effect
@@ -308,7 +307,7 @@ def test_reasons_and_event_names_are_exact():
     ledger = explored_ledger()
     features, target = signal_data(400, 2)
     source = source_for(features, target)
-    result = confirm.confirm(ledger, source, alpha_confirm=F(1, 20))
+    result = confirm.confirm(ledger, source, alpha_confirm=Fraction(1, 20))
     assert result.reason == "1 of 1 survivors confirmed on C by by at 0.05"
     frozen = source.log.entries[1]
     assert (frozen["set"], frozen["event"], frozen["actor"]) == (
@@ -324,7 +323,7 @@ def test_reasons_and_event_names_are_exact():
     assert check.seed_path == randomness.seed_path(7, "confirm.spearman", 0)
     # A repeat is denied on set C with a reason.
     with pytest.raises(errors.LeakageError):
-        confirm.confirm(ledger, source, alpha_confirm=F(1, 20))
+        confirm.confirm(ledger, source, alpha_confirm=Fraction(1, 20))
     denied = source.log.entries[-1]
     assert (denied["set"], denied["event"]) == ("C", "denied")
     assert denied["detail"] == {"reason": "confirmation was already performed"}
@@ -337,7 +336,7 @@ def test_non_rejected_survivors_pass_and_stay_unverified():
         size=400
     )  # no effect on C
     result = confirm.confirm(
-        ledger, source_for(features, target), alpha_confirm=F(1, 20)
+        ledger, source_for(features, target), alpha_confirm=Fraction(1, 20)
     )
     check = result.checks[0]
     assert check.decision is qualification.Decision.PASS
@@ -347,7 +346,7 @@ def test_non_rejected_survivors_pass_and_stay_unverified():
 
 def test_no_survivors_reason_and_crash_reasons():
     features, target = signal_data(300, 3)
-    quiet = fresh(None, F(1, 100))
+    quiet = fresh(None, Fraction(1, 100))
     explore.run_exploration(
         quiet,
         features.assign(s=numpy.random.default_rng(0).normal(size=300)),
@@ -357,7 +356,7 @@ def test_no_survivors_reason_and_crash_reasons():
     result = confirm.confirm(
         quiet,
         source_for(*signal_data(300, 4)),
-        alpha_confirm=F(1, 20),
+        alpha_confirm=Fraction(1, 20),
         require_control=False,
     )
     assert result.reason == (
@@ -367,7 +366,7 @@ def test_no_survivors_reason_and_crash_reasons():
     result = confirm.confirm(
         ledger,
         source_for(*signal_data(300, 4)),
-        alpha_confirm=F(1, 20),
+        alpha_confirm=Fraction(1, 20),
         encode=lambda y: 1 / 0,
     )
     assert result.reason.startswith(
@@ -384,7 +383,9 @@ def test_no_survivors_reason_and_crash_reasons():
         def open(self, token, actor="x", claims_hash=None, ledger_hash=None):
             raise OSError("gone")
 
-    result = confirm.confirm(explored_ledger(), Dies(), alpha_confirm=F(1, 20))
+    result = confirm.confirm(
+        explored_ledger(), Dies(), alpha_confirm=Fraction(1, 20)
+    )
     assert result.reason.startswith(
         "the confirmation failed while opening C (OSError: gone)"
     )
@@ -400,7 +401,7 @@ def test_a_custody_log_without_entries_gives_no_head():
     result = confirm.confirm(
         ledger,
         source_for(features, target),
-        alpha_confirm=F(1, 20),
+        alpha_confirm=Fraction(1, 20),
         custody_log=Appender(),
     )
     assert result.custody_head is None
@@ -409,7 +410,7 @@ def test_a_custody_log_without_entries_gives_no_head():
 
 def test_hypotheses_without_a_column_or_with_a_direction_run_on_c():
     features, target = signal_data(600, 1)
-    ledger = fresh(None, F(1, 10))
+    ledger = fresh(None, Fraction(1, 10))
     plain = scmle.data.ledger.ledger.HypothesisSpec.create(
         name="first", family="f", statistic="spearman", null="x"
     )
@@ -421,7 +422,7 @@ def test_hypotheses_without_a_column_or_with_a_direction_run_on_c():
     )
     cfeatures, ctarget = signal_data(400, 2)
     result = confirm.confirm(
-        ledger, source_for(cfeatures, ctarget), alpha_confirm=F(1, 20)
+        ledger, source_for(cfeatures, ctarget), alpha_confirm=Fraction(1, 20)
     )
     expected = bivariate.spearman(cfeatures["s"].to_numpy(), ctarget.to_numpy())
     expected_up = bivariate.spearman(
@@ -548,7 +549,7 @@ def two_signal_ledger():
         {"a": rng.normal(size=600), "b": rng.normal(size=600)}
     )
     target = pandas.Series(features["a"] + features["b"] + rng.normal(size=600))
-    ledger = fresh(None, F(1, 10))
+    ledger = fresh(None, Fraction(1, 10))
     explore.run_exploration(
         ledger,
         features,
@@ -570,11 +571,13 @@ def test_unconfirmed_outcomes_carry_empty_checks_the_level_and_reasons():
         ),
     ):
         ledger = two_signal_ledger()
-        result = confirm.confirm(ledger, None, alpha_confirm=F(1, 20), **kwargs)
+        result = confirm.confirm(
+            ledger, None, alpha_confirm=Fraction(1, 20), **kwargs
+        )
         assert result.outcome == outcome and result.reason == reason
-        assert result.checks == () and result.alpha_confirm == F(1, 20)
+        assert result.checks == () and result.alpha_confirm == Fraction(1, 20)
         assert result.custody_head is None
-    bare = fresh(None, F(1, 10))
+    bare = fresh(None, Fraction(1, 10))
     features, target = signal_data()
     explore.run_exploration(
         bare,
@@ -582,16 +585,16 @@ def test_unconfirmed_outcomes_carry_empty_checks_the_level_and_reasons():
         target,
         explore.plan_exploration(features, explore.NUMERIC),
     )
-    result = confirm.confirm(bare, None, alpha_confirm=F(1, 20))
+    result = confirm.confirm(bare, None, alpha_confirm=Fraction(1, 20))
     assert result.outcome == confirm.NO_CONTROL
     assert (
         result.reason
         == "no negative control was recorded; no claim is promoted"
     )
-    assert result.checks == () and result.alpha_confirm == F(1, 20)
+    assert result.checks == () and result.alpha_confirm == Fraction(1, 20)
     failed = explored_ledger(control_observed=0)
-    result = confirm.confirm(failed, None, alpha_confirm=F(1, 20))
-    assert result.checks == () and result.alpha_confirm == F(1, 20)
+    result = confirm.confirm(failed, None, alpha_confirm=Fraction(1, 20))
+    assert result.checks == () and result.alpha_confirm == Fraction(1, 20)
     assert result.custody_head is None
 
 
@@ -600,10 +603,10 @@ def test_a_crash_records_the_custody_head_and_the_level():
     features, target = signal_data(300, 4)
     source = source_for(features, target)
     result = confirm.confirm(
-        ledger, source, alpha_confirm=F(1, 20), encode=lambda y: 1 / 0
+        ledger, source, alpha_confirm=Fraction(1, 20), encode=lambda y: 1 / 0
     )
     assert result.custody_head == source.log.entries[-1]["hash"]
-    assert result.checks == () and result.alpha_confirm == F(1, 20)
+    assert result.checks == () and result.alpha_confirm == Fraction(1, 20)
 
     class Dies:
         log = sealed.OpenLog()
@@ -616,9 +619,11 @@ def test_a_crash_records_the_custody_head_and_the_level():
             raise OSError("gone")
 
     dying = Dies()
-    result = confirm.confirm(two_signal_ledger(), dying, alpha_confirm=F(1, 20))
+    result = confirm.confirm(
+        two_signal_ledger(), dying, alpha_confirm=Fraction(1, 20)
+    )
     assert result.custody_head == dying.log.entries[-1]["hash"]
-    assert result.checks == () and result.alpha_confirm == F(1, 20)
+    assert result.checks == () and result.alpha_confirm == Fraction(1, 20)
 
 
 def test_every_check_on_c_has_its_own_seed_index():
@@ -631,7 +636,7 @@ def test_every_check_on_c_has_its_own_seed_index():
         cfeatures["a"] + cfeatures["b"] + rng.normal(size=400)
     )
     result = confirm.confirm(
-        ledger, source_for(cfeatures, ctarget), alpha_confirm=F(1, 20)
+        ledger, source_for(cfeatures, ctarget), alpha_confirm=Fraction(1, 20)
     )
     assert [c.seed_path for c in result.checks] == [
         randomness.seed_path(7, "confirm.spearman", 0),

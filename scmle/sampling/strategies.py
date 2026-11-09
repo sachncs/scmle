@@ -37,7 +37,6 @@ MAX_INTERACTION_FEATURES = 12
 MIN_SELECTION_FEATURES = 6
 MIN_MISSING_RATE = 0.01
 MAX_ITERATIVE_FEATURES = 50
-DEFAULT = experiments.DEFAULT_STRATEGY
 CALIBRATION_FOLDS = 3
 
 
@@ -98,7 +97,7 @@ class DataStrategy(abc.ABC):
 class DefaultStrategy(DataStrategy):
     """Standard preprocessing; the reference every other strategy must beat."""
 
-    name = DEFAULT
+    name = experiments.DEFAULT_STRATEGY
     description = "standard preprocessing"
 
     def applicability(
@@ -989,7 +988,9 @@ STRATEGIES: dict[str, DataStrategy] = {
         RareTargetStrategy(),
     )
 }
-EXPERIMENTAL = tuple(name for name in STRATEGIES if name != DEFAULT)
+EXPERIMENTAL = tuple(
+    name for name in STRATEGIES if name != experiments.DEFAULT_STRATEGY
+)
 OPT_IN = frozenset({"jitter_augment", "copula_augment"})
 DEFAULT_NAMES = tuple(n for n in EXPERIMENTAL if n not in OPT_IN)
 

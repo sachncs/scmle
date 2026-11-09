@@ -10,6 +10,7 @@ import sys
 
 import pytest
 
+import scmle.deploy.demo
 from scmle.operations import faults
 from scmle.operations import recovery
 
@@ -51,4 +52,7 @@ def test_the_wrong_key_is_never_printed_by_the_scenario_report():
     result = faults.invalid_credentials()
     result.judge()
     text = str(result.to_dict())
-    assert faults.WRONG_KEY not in text and faults.KEY not in text
+    assert (
+        faults.WRONG_KEY not in text
+        and scmle.deploy.demo.DEMO_SIGNING_KEY not in text
+    )

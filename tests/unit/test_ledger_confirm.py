@@ -19,8 +19,7 @@ from scmle.data.ledger import online_fdr
 import scmle.data.ledger.ledger
 from scmle.data.splitting import splitters
 
-F = Fraction
-ALPHA = F(1, 20)
+ALPHA = Fraction(1, 20)
 SIGNAL = ("s1", "s2", "s3")
 
 
@@ -42,7 +41,7 @@ def passing_control(observed=6):
 
 def explored(tmp_path=None, effect=0.6, control=True, rule=online_fdr.ELOND):
     x, y = world(600, 1, effect)
-    config = online_fdr.RuleConfig(rule, F(1, 10))
+    config = online_fdr.RuleConfig(rule, Fraction(1, 10))
     path = None if tmp_path is None else tmp_path / "hypothesis_ledger.jsonl"
     ledger = scmle.data.ledger.ledger.Ledger.create(
         path,
@@ -181,7 +180,7 @@ def test_no_survivors_means_c_is_never_opened():
     ledger = scmle.data.ledger.ledger.Ledger.create(
         None,
         charter_hash="c" * 64,
-        config=online_fdr.RuleConfig(online_fdr.ELOND, F(1, 100)),
+        config=online_fdr.RuleConfig(online_fdr.ELOND, Fraction(1, 100)),
         alpha_confirm=ALPHA,
         seed=0,
     )

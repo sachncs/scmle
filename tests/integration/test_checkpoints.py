@@ -10,6 +10,7 @@ import scmle
 from scmle.contracts import errors
 from scmle.core import policies
 from scmle.core import state
+import scmle.core.state
 
 
 def project(frame, tmp_path, *gates):
@@ -55,7 +56,7 @@ def test_reviewers_see_the_plan_and_the_selection(binary_frame, tmp_path):
 def test_rejecting_the_plan_stops_before_any_training(binary_frame, tmp_path):
     reject = policies.CallbackCheckpoint(
         lambda review: policies.Approval(False, "alice", "too many models"),
-        gates=frozenset({policies.PLAN_GATE}),
+        gates=frozenset({scmle.core.state.RunState.PLANNING}),
     )
     with pytest.raises(
         errors.BlockedError, match="alice: too many models"
@@ -75,7 +76,7 @@ def test_rejecting_the_selection_keeps_the_test_set_locked(
     binary_frame, tmp_path
 ):
     reject = policies.CallbackCheckpoint(
-        lambda review: review.gate is not policies.SELECTION_GATE
+        lambda review: review.gate is not scmle.core.state.RunState.SELECTING
     )
     with pytest.raises(
         errors.BlockedError, match="SELECTING not approved"
@@ -92,7 +93,7 @@ def test_every_checkpoint_must_approve(binary_frame, tmp_path):
     yes = policies.CallbackCheckpoint(lambda review: True)
     no = policies.CallbackCheckpoint(
         lambda review: policies.Approval(False, "bob", "veto"),
-        gates=frozenset({policies.SELECTION_GATE}),
+        gates=frozenset({scmle.core.state.RunState.SELECTING}),
     )
     with pytest.raises(errors.BlockedError, match="bob"):
         project(binary_frame, tmp_path, yes, no).run()

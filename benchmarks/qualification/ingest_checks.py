@@ -25,7 +25,6 @@ from scmle.core import randomness
 from scmle.data.ingest import asof_view
 from scmle.data.ingest import synthesize
 
-PRIMITIVES = synthesize.PRIMITIVES
 RTOL = 1e-9
 
 
@@ -125,7 +124,7 @@ def random_schema(seed: int, name: str = "ingest.check.schema") -> Schema:
         delta=float(rng.choice([0.0, 1.0, 2.5])),
         lag=float(rng.choice([0.0, 1.5, 3.0])),
         window=(None, 7.0, 30.0)[int(rng.integers(0, 3))],
-        primitive=str(rng.choice(PRIMITIVES)),
+        primitive=str(rng.choice(synthesize.PRIMITIVES)),
         inner=str(rng.choice(synthesize.NESTED_INNER)),
         outer=str(rng.choice(["mean", "max", "sum", "count", "last", "std"])),
         nested=bool(rng.random() < 0.3),

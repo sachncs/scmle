@@ -18,7 +18,6 @@ from scmle.data.admissibility import leakage
 from scmle.data.detectors import certificates
 
 CLS = "classification"
-GATING = certificates.GateStatus.GATING
 FAST = leakage.LeakageConfig(
     skill_ceiling=0.95,
     association_ceiling=0.9,
@@ -254,12 +253,14 @@ def test_a_rare_class_is_low_power():
 def test_the_decision_is_demoted_until_the_detector_is_certified():
     x, y = planted("copy", 0)
     soft = leakage.skill_test(x, y, CLS, FAST)
-    hard = leakage.skill_test(x, y, CLS, FAST, gate=GATING)
+    hard = leakage.skill_test(
+        x, y, CLS, FAST, gate=certificates.GateStatus.GATING
+    )
     assert soft.check.decision is Decision.WARN
     assert hard.check.decision is Decision.QUARANTINE
     yy, clean = binary_world(0)
     assert leakage.skill_test(
-        clean, yy, CLS, FAST, gate=GATING
+        clean, yy, CLS, FAST, gate=certificates.GateStatus.GATING
     ).check.decision is (Decision.PASS)
 
 
@@ -503,7 +504,10 @@ def store_for(digest, defects=leakage.LEAK_DEFECTS, passed=True):
 def test_gate_requires_current_passing_certificates_for_every_leak_type():
     digest = leakage.code_digest()
     good = store_for(digest)
-    assert leakage.gate_status(good, leakage.CERTIFIED) is GATING
+    assert (
+        leakage.gate_status(good, leakage.CERTIFIED)
+        is certificates.GateStatus.GATING
+    )
     descriptive = certificates.GateStatus.DESCRIPTIVE
     assert (
         leakage.gate_status(certificates.CertificateStore(), leakage.CERTIFIED)
@@ -528,7 +532,7 @@ def test_gate_requires_the_certified_settings_and_a_binary_target():
         leakage.gate_status(
             good, dataclasses.replace(leakage.CERTIFIED, run_seed=9)
         )
-        is GATING
+        is certificates.GateStatus.GATING
     )
     for change in (
         {"skill_ceiling": 0.96},

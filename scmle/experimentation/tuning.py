@@ -14,7 +14,6 @@ from scmle.experimentation import trials
 from scmle.optimization import optimizers
 
 MIN_BATCH = 2
-Status = experiments.TrialStatus
 
 
 class Tuner:
@@ -56,7 +55,11 @@ class Tuner:
             Up to `search.top_models` distinct (model, strategy) pairs.
         """
         sign = 1 if self.metric.greater_is_better else -1
-        ok = [t for t in screened if t.status is Status.OK and not t.params]
+        ok = [
+            t
+            for t in screened
+            if t.status is experiments.TrialStatus.OK and not t.params
+        ]
         ranked = sorted(ok, key=lambda t: -sign * t.score_mean)
         registry = self.context.registry
         chosen: dict[str, str] = {}
@@ -198,7 +201,9 @@ class Tuner:
         )
         sign = 1 if self.metric.greater_is_better else -1
         for rung in rungs[1:]:
-            alive = [t for t in current if t.status is Status.OK]
+            alive = [
+                t for t in current if t.status is experiments.TrialStatus.OK
+            ]
             keep = max(1, math.ceil(len(alive) / self.search.eta))
             winners = sorted(alive, key=lambda t: -sign * t.score_mean)[:keep]
             finished = {
@@ -213,15 +218,18 @@ class Tuner:
                 )
             }
             for trial in current:
-                if trial.status is Status.OK and trial.trial_id not in finished:
-                    trial.status = Status.PRUNED
+                if (
+                    trial.status is experiments.TrialStatus.OK
+                    and trial.trial_id not in finished
+                ):
+                    trial.status = experiments.TrialStatus.PRUNED
                     trial.error = f"pruned before the {rung or 'full'} rung"
                     self.complete(trial, optimizer)
             current = [
                 finished[t.trial_id] for t in winners if t.trial_id in finished
             ]
         for trial in current:
-            if trial.status is Status.OK:
+            if trial.status is experiments.TrialStatus.OK:
                 self.complete(trial, optimizer)
             else:
                 self.context.record_trial(trial)
@@ -270,14 +278,14 @@ class Tuner:
                 )
             }
         for trial in first_rung:
-            if trial.status is not Status.OK:
+            if trial.status is not experiments.TrialStatus.OK:
                 self.context.record_trial(trial)
             elif survivors is None:
                 self.complete(trial, optimizer)
             elif trial.trial_id in finished:
                 self.complete(finished[trial.trial_id], optimizer)
             else:
-                trial.status = Status.PRUNED
+                trial.status = experiments.TrialStatus.PRUNED
                 trial.error = "pruned after the first rung"
                 self.complete(trial, optimizer)
 
@@ -293,7 +301,7 @@ class Tuner:
             The ids of the best successful trials, keeping at least one and
             dropping the configured prune fraction.
         """
-        ok = [t for t in first_rung if t.status is Status.OK]
+        ok = [t for t in first_rung if t.status is experiments.TrialStatus.OK]
         keep = max(1, math.ceil(len(ok) * (1 - self.search.prune_fraction)))
         sign = 1 if self.metric.greater_is_better else -1
         ranked = sorted(ok, key=lambda t: -sign * t.score_mean)
@@ -310,6 +318,9 @@ class Tuner:
             trial: The trial result.
             optimizer: The optimizer that proposed the configuration.
         """
-        if trial.status in (Status.OK, Status.PRUNED):
+        if trial.status in (
+            experiments.TrialStatus.OK,
+            experiments.TrialStatus.PRUNED,
+        ):
             optimizer.tell(trial.params, trial.score_mean)
         self.context.record_trial(trial)

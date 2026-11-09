@@ -11,8 +11,6 @@ from scmle.intelligence import planner
 import scmle.models.registry
 from scmle.sampling import strategies
 
-BINARY = tasks.TaskType.BINARY
-
 
 @pytest.fixture
 def registry():
@@ -44,10 +42,10 @@ def step_names(pipeline_):
 def test_models_that_handle_missing_values_skip_imputation(registry):
     plain = PLAN.__class__(numeric=("x",), categorical=("cat",))
     native = preprocessing.build_pipeline(
-        plain, registry.get("hist_gradient_boosting"), BINARY, 0
+        plain, registry.get("hist_gradient_boosting"), tasks.TaskType.BINARY, 0
     )
     linear = preprocessing.build_pipeline(
-        plain, registry.get("logistic_regression"), BINARY, 0
+        plain, registry.get("logistic_regression"), tasks.TaskType.BINARY, 0
     )
     assert "impute" not in step_names(native)["numeric"].named_steps
     assert "impute" in step_names(linear)["numeric"].named_steps
@@ -58,7 +56,7 @@ def test_native_categorical_models_get_integer_codes_and_column_marks(
 ):
     features, target = high_cardinality_frame()
     pipeline_ = preprocessing.build_pipeline(
-        PLAN, registry.get("hist_gradient_boosting"), BINARY, 0
+        PLAN, registry.get("hist_gradient_boosting"), tasks.TaskType.BINARY, 0
     )
     assert "high_cardinality" in step_names(pipeline_)
     model = pipeline_.named_steps["model"]
@@ -69,7 +67,7 @@ def test_native_categorical_models_get_integer_codes_and_column_marks(
 
 def test_non_native_models_keep_one_hot_for_high_cardinality(registry):
     pipeline_ = preprocessing.build_pipeline(
-        PLAN, registry.get("logistic_regression"), BINARY, 0
+        PLAN, registry.get("logistic_regression"), tasks.TaskType.BINARY, 0
     )
     assert "high_cardinality" not in step_names(pipeline_)
     assert "categorical" in step_names(pipeline_)
@@ -80,13 +78,13 @@ def test_sparse_capable_models_get_sparse_one_hot_on_high_cardinality(
 ):
     features, target = high_cardinality_frame()
     pipeline_ = preprocessing.build_pipeline(
-        PLAN, registry.get("logistic_regression"), BINARY, 0
+        PLAN, registry.get("logistic_regression"), tasks.TaskType.BINARY, 0
     )
     pipeline_.fit(features, target)
     encoded = pipeline_.named_steps["prep"].transform(features)
     assert hasattr(encoded, "tocsr")  # scipy sparse
     dense = preprocessing.build_pipeline(
-        PLAN, registry.get("random_forest"), BINARY, 0
+        PLAN, registry.get("random_forest"), tasks.TaskType.BINARY, 0
     )
     dense.fit(features, target)
     assert not hasattr(dense.named_steps["prep"].transform(features), "tocsr")
@@ -96,7 +94,7 @@ def test_target_encoding_strategy_is_cross_fitted_and_conditional(registry):
     features, target = high_cardinality_frame()
     strategy = strategies.get_strategy("target_encoding")
     adapter = registry.get("logistic_regression")
-    pipeline_ = strategy.build(PLAN, adapter, BINARY, 0)
+    pipeline_ = strategy.build(PLAN, adapter, tasks.TaskType.BINARY, 0)
     pipeline_.fit(features, target)
     encoder = step_names(pipeline_)["high_cardinality"].named_steps["encode"]
     assert type(encoder).__name__ == "TargetEncoder"
@@ -109,7 +107,7 @@ def test_target_encoding_strategy_is_cross_fitted_and_conditional(registry):
         target_summary={},
         feature_plan=scmle.contracts.data.FeaturePlan(("x",), ("cat",)),
     )
-    reason = strategy.applicability(profile, BINARY, adapter)
+    reason = strategy.applicability(profile, tasks.TaskType.BINARY, adapter)
     assert reason == "no high-cardinality categorical feature"
 
 
@@ -124,7 +122,7 @@ def planning_context(spec, plan):
         target_summary={"imbalance_ratio": 1.0},
         feature_plan=plan,
     )
-    return planner.PlanningContext(spec, profile, BINARY)
+    return planner.PlanningContext(spec, profile, tasks.TaskType.BINARY)
 
 
 def make_spec(**resources):

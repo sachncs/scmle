@@ -33,9 +33,10 @@ from scmle.data.ledger import budget
 from scmle.data.ledger import confirm
 from scmle.data.ledger import controls
 from scmle.data.ledger import explore
-from scmle.data.ledger import multiplicity
 from scmle.data.ledger import online_fdr
+import scmle.data.ledger.budget
 import scmle.data.ledger.ledger
+import scmle.data.ledger.online_fdr
 
 CONTROL_FILE = "negative_control.json"
 DEFAULT_BLOCKS = 20
@@ -172,8 +173,10 @@ def run_governed(
     run_dir: str | Path | None,
     exclude: tuple[str, ...] = (),
     strata: numpy.ndarray | None = None,
-    rule: str = online_fdr.DEFAULT_RULE,
-    confirmation_rule: budget.MultiplicityRule = (multiplicity.DEFAULT_RULE),
+    rule: str = scmle.data.ledger.online_fdr.ELOND,
+    confirmation_rule: budget.MultiplicityRule = (
+        scmle.data.ledger.budget.MultiplicityRule.BY
+    ),
     policy: str = confirm.UNCONFIRMED,
     diagnostics: Sequence[tuple[str, qualification.Check]] = (),
     second_stage: Callable[
@@ -245,7 +248,7 @@ def explore_governed(
     run_dir: str | Path | None,
     exclude: tuple[str, ...] = (),
     strata: numpy.ndarray | None = None,
-    rule: str = online_fdr.DEFAULT_RULE,
+    rule: str = scmle.data.ledger.online_fdr.ELOND,
     policy: str = confirm.UNCONFIRMED,
     diagnostics: Sequence[tuple[str, qualification.Check]] = (),
     second_stage: Callable[
@@ -355,7 +358,9 @@ def confirm_explored(
     explored: Explored,
     *,
     source: confirm.ConfirmationSource | None,
-    confirmation_rule: budget.MultiplicityRule = (multiplicity.DEFAULT_RULE),
+    confirmation_rule: budget.MultiplicityRule = (
+        scmle.data.ledger.budget.MultiplicityRule.BY
+    ),
     policy: str = confirm.UNCONFIRMED,
     claim_runner: confirm.ClaimRunner | None = None,
 ) -> GovernedRun:

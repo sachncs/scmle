@@ -15,7 +15,6 @@ from scmle.data.custody import sealed
 from scmle.data.splitting import splitters
 from tests.unit.test_charter_contracts import make_charter
 
-BINARY = tasks.TaskType.BINARY
 DATA_HASH = "9" * 64
 
 
@@ -45,7 +44,7 @@ class Ran(typing.NamedTuple):
 
 def run(frame, charter=None, spec=None):
     spec = spec or make_spec()
-    split = splitters.SplitManager(spec, BINARY).split(frame)
+    split = splitters.SplitManager(spec, tasks.TaskType.BINARY).split(frame)
     log = sealed.OpenLog()
     vault = sealed.CustodyVault(log)
     outcome = pipeline.apply_custody(
@@ -53,7 +52,7 @@ def run(frame, charter=None, spec=None):
         split=split,
         frame=frame,
         spec=spec,
-        task=BINARY,
+        task=tasks.TaskType.BINARY,
         data_hash=DATA_HASH,
         vault=vault,
     )
@@ -137,7 +136,7 @@ def test_the_group_column_keeps_groups_out_of_both_sets():
     frame = make_frame()
     frame["g"] = numpy.arange(len(frame)) // 5
     spec = make_spec(group_column="g")
-    split = splitters.SplitManager(spec, BINARY).split(frame)
+    split = splitters.SplitManager(spec, tasks.TaskType.BINARY).split(frame)
     log = sealed.OpenLog()
     vault = sealed.CustodyVault(log)
     outcome = pipeline.apply_custody(
@@ -145,7 +144,7 @@ def test_the_group_column_keeps_groups_out_of_both_sets():
         split=split,
         frame=frame,
         spec=spec,
-        task=BINARY,
+        task=tasks.TaskType.BINARY,
         data_hash=DATA_HASH,
         vault=vault,
     )

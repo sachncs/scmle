@@ -80,7 +80,6 @@ EFFECT = 0.5
 POWER_FLOOR = 0.80
 POWER_SIZES = (100, 200, 400)
 FILED_EFFECTS = (0.3, 0.8)
-GATE = certified.SUBGROUP_GATE
 NOT_MEASURED = (
     "unequal subgroup sizes",
     "strategies other than the randomized difference in means",
@@ -304,12 +303,12 @@ def certify_all(base: int = 0, scale: float = 1.0) -> dict[str, Any]:
     )
     measured["seeds"] = [base, base + count]
     measured["seconds"] = round(time.monotonic() - started, 1)
-    print(GATE, measured["passed"], file=sys.stderr)
+    print(certified.SUBGROUP_GATE, measured["passed"], file=sys.stderr)
     return {
         "version": 1,
         "dev_seed_base": DEV_SEED_BASE,
         "not_measured": list(NOT_MEASURED),
-        "gates": {GATE: measured},
+        "gates": {certified.SUBGROUP_GATE: measured},
     }
 
 
@@ -328,17 +327,23 @@ def problems(document: dict[str, Any] | None = None) -> list[str]:
         if not STORE_PATH.exists():
             return ["subgroup_certificates.json is missing"]
         document = json.loads(STORE_PATH.read_text(encoding="utf-8"))
-    entry = document.get("gates", {}).get(GATE)
+    entry = document.get("gates", {}).get(certified.SUBGROUP_GATE)
     if entry is None:
-        return [f"{GATE}: no certificate"]
+        return [f"{certified.SUBGROUP_GATE}: no certificate"]
     found = []
     if entry.get("method_hash") != current_method_hash():
-        found.append(f"{GATE}: stale (method code changed since measurement)")
+        found.append(
+            f"{certified.SUBGROUP_GATE}: "
+            "stale (method code changed since measurement)"
+        )
     gate_hash = certificates.code_hash(
         gate_subgroup_holm, world, rejected_levels, adapter_for
     )
     if entry.get("code_hash") != gate_hash:
-        found.append(f"{GATE}: stale (gate code changed since measurement)")
+        found.append(
+            f"{certified.SUBGROUP_GATE}: "
+            "stale (gate code changed since measurement)"
+        )
     return found
 
 
@@ -355,7 +360,7 @@ def descriptive_only(document: dict[str, Any] | None = None) -> list[str]:
     """
     if document is None:
         if not STORE_PATH.exists():
-            return [GATE]
+            return [certified.SUBGROUP_GATE]
         document = json.loads(STORE_PATH.read_text(encoding="utf-8"))
     return [k for k, v in document["gates"].items() if not v["passed"]]
 
