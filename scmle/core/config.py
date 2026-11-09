@@ -1,4 +1,4 @@
-"""Reading and writing project configuration files."""
+"""Reading project configuration files."""
 
 import json
 import pathlib
@@ -40,37 +40,3 @@ def load_sections(path: str | pathlib.Path | None) -> dict[str, Any]:
             f"{sorted(SECTIONS)}"
         )
     return {name: SECTIONS[name](**body) for name, body in record.items()}
-
-
-def load_spec(path: str | pathlib.Path) -> tasks.Config:
-    """Reads a complete project specification (for example `config.json`).
-
-    Args:
-        path: JSON file written by `save_spec` or found in a run directory.
-
-    Returns:
-        The validated specification.
-
-    Raises:
-        ConfigError: If the file is not a valid specification.
-    """
-    try:
-        return tasks.Config.model_validate_json(
-            pathlib.Path(path).read_text(encoding="utf-8")
-        )
-    except ValueError as error:
-        raise errors.ConfigError(
-            f"invalid project specification: {error}"
-        ) from error
-
-
-def save_spec(spec: tasks.Config, path: str | pathlib.Path) -> None:
-    """Writes a specification as canonical, key-sorted JSON.
-
-    Args:
-        spec: The specification.
-        path: Destination file.
-    """
-    pathlib.Path(path).write_text(
-        spec.canonical_json(), encoding="utf-8", newline="\n"
-    )

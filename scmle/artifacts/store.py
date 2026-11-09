@@ -84,19 +84,6 @@ class RunStore:
         """
         return self.directory / relative
 
-    def make_directory(self, relative: str) -> pathlib.Path:
-        """Creates (if needed) and returns a subdirectory.
-
-        Args:
-            relative: Directory path relative to the run directory.
-
-        Returns:
-            The directory path.
-        """
-        target = self.path(relative)
-        target.mkdir(parents=True, exist_ok=True)
-        return target
-
     def write_json(self, relative: str, payload: Any) -> None:
         """Writes `payload` as indented JSON, creating parent directories.
 

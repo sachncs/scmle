@@ -199,17 +199,6 @@ class Index:
             )
         self.records[record.criterion_id] = record
 
-    def find(self, criterion_id: str) -> Record | None:
-        """Returns a criterion record, or ``None`` when it is absent.
-
-        Args:
-            criterion_id: The criterion to look up.
-
-        Returns:
-            The record, or None.
-        """
-        return self.records.get(criterion_id)
-
     def pending(self) -> tuple[Record, ...]:
         """Returns records that cannot yet support an accepted release."""
         return tuple(

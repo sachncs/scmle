@@ -15,8 +15,6 @@ import pathlib
 import re
 import sys
 
-from scmle.contracts import errors
-
 SECRET_FILE_PATTERNS = (
     ".env",
     ".env.*",
@@ -172,26 +170,6 @@ def scan(
                         "value that looks secret"
                     )
     return findings
-
-
-def require_clean(
-    root: str | pathlib.Path, secret_values: Iterable[str] = ()
-) -> None:
-    """Raises if `scan` finds anything.
-
-    Args:
-        root: The folder to be built.
-        secret_values: Secret strings that must not appear in it.
-
-    Raises:
-        ArtifactError: Listing every finding.
-    """
-    findings = scan(root, secret_values)
-    if findings:
-        raise errors.ArtifactError(
-            "the build context may hold secrets: " + "; ".join(findings),
-            {"findings": findings},
-        )
 
 
 def main(arguments: list[str] | None = None) -> int:
