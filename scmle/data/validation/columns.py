@@ -15,7 +15,7 @@ import pandas
 from sklearn import impute
 from sklearn import pipeline
 from sklearn import preprocessing
-from sklearn import tree as sk_tree
+import sklearn.tree
 
 from scmle.contracts import data
 from scmle.contracts import errors
@@ -188,7 +188,7 @@ def threshold_association(
     majority = labels.value_counts(normalize=True).iloc[0]
     if majority >= 1.0:
         return 0.0
-    tree = sk_tree.DecisionTreeClassifier(
+    tree = sklearn.tree.DecisionTreeClassifier(
         max_leaf_nodes=TREE_LEAVES,
         min_samples_leaf=max(3, len(values) // 100),
         random_state=0,

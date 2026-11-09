@@ -9,7 +9,7 @@ import threading
 from typing import Any
 
 import pandas
-from sklearn import metrics as sk_metrics
+import sklearn.metrics
 
 from scmle.contracts import errors
 from scmle.contracts import models
@@ -69,7 +69,7 @@ DEFAULT_METRICS = (
         "average_precision",
         True,
         frozenset({tasks.TaskType.BINARY}),
-        sk_metrics.average_precision_score,
+        sklearn.metrics.average_precision_score,
         ("decision_function", "predict_proba"),
     ),
     scmle.contracts.metrics.Metric(
@@ -80,7 +80,7 @@ DEFAULT_METRICS = (
         "f1",
         True,
         frozenset({tasks.TaskType.BINARY}),
-        sk_metrics.f1_score,
+        sklearn.metrics.f1_score,
         ("predict",),
     ),
     scmle.contracts.metrics.Metric(

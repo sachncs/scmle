@@ -309,7 +309,7 @@ def test_a_rope_makes_negligible_gains_ties(registry):
 
 
 def test_a_lower_is_better_positive_label_metric_scores_sign_adjusted():
-    from sklearn import metrics as sk_metrics
+    import sklearn.metrics
 
     import scmle.contracts.metrics
 
@@ -318,7 +318,7 @@ def test_a_lower_is_better_positive_label_metric_scores_sign_adjusted():
         "f1",
         False,
         frozenset({tasks.TaskType.BINARY}),
-        sk_metrics.f1_score,
+        sklearn.metrics.f1_score,
         ("predict",),
     )
     target = pandas.Series(["a", "b", "a", "b"])

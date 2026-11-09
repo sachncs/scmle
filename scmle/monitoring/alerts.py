@@ -10,9 +10,9 @@ import os
 from pathlib import Path
 import time
 from typing import Any
-from urllib import error as url_error
 from urllib import parse
-from urllib import request as url_request
+import urllib.error
+import urllib.request
 
 from scmle import durability
 
@@ -315,11 +315,11 @@ class WebhookAlertSink(AlertSink):
             headers["Authorization"] = f"Bearer {self.token}"
         last_reason = "webhook did not respond"
         for attempt in range(1, self.max_attempts + 1):
-            request = url_request.Request(
+            request = urllib.request.Request(
                 self.url, data=body, headers=headers, method="POST"
             )
             try:
-                with url_request.urlopen(
+                with urllib.request.urlopen(
                     request,
                     timeout=self.timeout_seconds,  # nosec B310 - URL scheme is validated in the constructor.
                 ) as response:
@@ -335,8 +335,8 @@ class WebhookAlertSink(AlertSink):
                         )
                     last_reason = f"webhook returned HTTP {status}"
             except (
-                url_error.HTTPError,
-                url_error.URLError,
+                urllib.error.HTTPError,
+                urllib.error.URLError,
                 TimeoutError,
             ) as error:
                 last_reason = f"webhook delivery failed: {type(error).__name__}"
