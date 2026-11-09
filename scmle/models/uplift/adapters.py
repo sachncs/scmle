@@ -11,7 +11,11 @@ UPLIFT = frozenset({tasks.Task.UPLIFT})
 
 
 class Uplift(models.Model):
-    """Base: a meta-learner built from boosted outcome models.
+    """A meta-learner built from boosted outcome models.
+
+    Configure it with keyword arguments, or subclass it and declare the same
+    names as class attributes. An argument left out keeps the class-level
+    value, so both styles work.
 
     Attributes:
         learner: The estimator class.
@@ -19,6 +23,32 @@ class Uplift(models.Model):
 
     learner: type = estimators.TwoModelLearner
     family = "causal"
+
+    def __init__(
+        self,
+        *,
+        name: str | None = None,
+        family: str | None = None,
+        capabilities: models.Capabilities | None = None,
+        learner: type | None = None,
+    ) -> None:
+        """Sets the declared data on this instance.
+
+        Args:
+            name: Unique registry name.
+            family: Coarse family used for reporting.
+            capabilities: Declared capabilities.
+            learner: Estimator class the adapter builds.
+        """
+        given: dict[str, Any] = {
+            "name": name,
+            "family": family,
+            "capabilities": capabilities,
+            "learner": learner,
+        }
+        for attribute, value in given.items():
+            if value is not None:
+                setattr(self, attribute, value)
 
     def build(
         self,
@@ -43,38 +73,32 @@ class Uplift(models.Model):
         )
 
 
-class TLearner(Uplift):
-    """T-learner."""
-
-    name = "uplift_t_learner"
-    capabilities = models.Capabilities(
+T_LEARNER = Uplift(
+    name="uplift_t_learner",
+    capabilities=models.Capabilities(
         UPLIFT, handles_missing=True, cost=3, memory_factor=4.0
-    )
-    learner = estimators.TwoModelLearner
+    ),
+    learner=estimators.TwoModelLearner,
+)
 
-
-class SLearner(Uplift):
-    """S-learner."""
-
-    name = "uplift_s_learner"
-    capabilities = models.Capabilities(
+S_LEARNER = Uplift(
+    name="uplift_s_learner",
+    capabilities=models.Capabilities(
         UPLIFT, handles_missing=True, cost=3, memory_factor=3.0
-    )
-    learner = estimators.SingleModelLearner
+    ),
+    learner=estimators.SingleModelLearner,
+)
 
-
-class XLearner(Uplift):
-    """X-learner."""
-
-    name = "uplift_x_learner"
-    capabilities = models.Capabilities(
+X_LEARNER = Uplift(
+    name="uplift_x_learner",
+    capabilities=models.Capabilities(
         UPLIFT, handles_missing=True, cost=4, memory_factor=5.0
-    )
-    learner = estimators.CrossLearner
+    ),
+    learner=estimators.CrossLearner,
+)
 
-
-UPLIFT_ADAPTERS: tuple[type[models.Model], ...] = (
-    TLearner,
-    SLearner,
-    XLearner,
+UPLIFT_ADAPTERS: tuple[models.Model, ...] = (
+    T_LEARNER,
+    S_LEARNER,
+    X_LEARNER,
 )

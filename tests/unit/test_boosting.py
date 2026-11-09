@@ -3,6 +3,7 @@
 import pytest
 
 from scmle.contracts import errors
+from scmle.contracts import models
 from scmle.contracts import tasks
 from scmle.models import conformance
 from scmle.models.boosting import boosters
@@ -19,21 +20,51 @@ def test_adapters_pass_conformance_when_installed(library):
 
 def test_adapters_are_rejected_not_failing_when_library_missing(monkeypatch):
     registry = scmle.models.registry.Catalog.with_builtins()
-    monkeypatch.setattr(boosters.Xgboost, "requires", ("not_installed_pkg",))
+    monkeypatch.setattr(boosters.XGBOOST, "requires", ("not_installed_pkg",))
     compatible, rejected = registry.candidates(tasks.Task.BINARY)
     assert "missing dependency" in rejected["xgboost"]
     assert "xgboost" not in {a.name for a in compatible}
 
 
 def test_build_without_library_raises_config_error(monkeypatch):
-    monkeypatch.setattr(boosters.Xgboost, "requires", ("not_installed_pkg",))
+    monkeypatch.setattr(boosters.XGBOOST, "requires", ("not_installed_pkg",))
     with pytest.raises(errors.ConfigError, match="boosting"):
-        boosters.Xgboost().build(tasks.Task.BINARY, 0)
+        boosters.XGBOOST.build(tasks.Task.BINARY, 0)
+
+
+class ClassStyleBooster(boosters.Booster):
+    """A subclass declaring its data as class attributes (the old style)."""
+
+    name = "class_style_booster"
+    family = "boosting"
+    library = "not_installed_pkg"
+    requires = ("not_installed_pkg",)
+    classifier_name = "Classifier"
+    regressor_name = "Regressor"
+    capabilities = models.Capabilities(tasks.STANDARD_TASKS)
+
+
+def test_class_style_subclass_keeps_class_level_data():
+    legacy = ClassStyleBooster()
+    assert not legacy.is_available()
+    assert legacy.fixed_params == {} and not legacy.needs_integer_labels
+    assert legacy.stopping_rounds == early_stopping.DEFAULT_ROUNDS
+    assert boosters.CATBOOST.flatten_predictions
+    assert not boosters.XGBOOST.flatten_predictions
+    assert boosters.XGBOOST.needs_integer_labels
+    assert boosters.Booster.fixed_params == {}
+
+
+def test_only_lightgbm_overrides_categorical_params():
+    assert boosters.LIGHTGBM.categorical_params([2]) == {
+        "categorical_feature": [2]
+    }
+    assert boosters.XGBOOST.categorical_params([2]) == {}
 
 
 def test_params_override_fixed_params_and_seed_is_applied():
     pytest.importorskip("lightgbm")
-    estimator = boosters.LightGbm().build(
+    estimator = boosters.LIGHTGBM.build(
         tasks.Task.REGRESSION, 5, {"num_leaves": 9}
     )
     params = estimator.get_params()

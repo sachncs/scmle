@@ -9,7 +9,6 @@ from collections.abc import Mapping
 import importlib
 import types
 from typing import Any
-from typing import ClassVar
 
 from scmle.contracts import errors
 from scmle.contracts import models
@@ -24,6 +23,10 @@ NO_PARAMS: types.MappingProxyType = types.MappingProxyType({})
 class Booster(models.Model):
     """Adapter whose estimator classes live in an optional library.
 
+    Configure it with keyword arguments, or subclass it and declare the same
+    names as class attributes. An argument left out keeps the class-level
+    value, so both styles work.
+
     Attributes:
         library: Importable top-level module name.
         classifier_name: Classifier class name inside the library.
@@ -33,16 +36,79 @@ class Booster(models.Model):
         flatten_predictions: Wrap classifiers whose `predict` returns column
             vectors so predictions are 1-D.
         fixed_params: Constructor parameters applied to every build.
+        fit_param_names: Search-space entries passed to `fit`, not to the
+            constructor.
+        stopping_rounds: Early-stopping patience, or None to disable.
     """
 
-    library: ClassVar[str]
-    needs_integer_labels: ClassVar[bool] = False
-    flatten_predictions: ClassVar[bool] = False
-    classifier_name: ClassVar[str]
-    regressor_name: ClassVar[str]
-    fixed_params: ClassVar[types.MappingProxyType] = NO_PARAMS
-    fit_param_names: ClassVar[tuple[str, ...]] = ()
-    stopping_rounds: ClassVar[int | None] = early_stopping.DEFAULT_ROUNDS
+    library: str
+    needs_integer_labels: bool = False
+    flatten_predictions: bool = False
+    classifier_name: str
+    regressor_name: str
+    fixed_params: types.MappingProxyType = NO_PARAMS
+    fit_param_names: tuple[str, ...] = ()
+    stopping_rounds: int | None = early_stopping.DEFAULT_ROUNDS
+
+    def __init__(
+        self,
+        *,
+        name: str | None = None,
+        family: str | None = None,
+        capabilities: models.Capabilities | None = None,
+        requires: tuple[str, ...] | None = None,
+        library: str | None = None,
+        classifier_name: str | None = None,
+        regressor_name: str | None = None,
+        needs_integer_labels: bool | None = None,
+        flatten_predictions: bool | None = None,
+        fixed_params: types.MappingProxyType | None = None,
+        fit_param_names: tuple[str, ...] | None = None,
+        stopping_rounds: int | None = None,
+        search_space: search.SearchSpace | None = None,
+        monotonic_param: str | None = None,
+    ) -> None:
+        """Sets the declared data on this instance.
+
+        Args:
+            name: Unique registry name.
+            family: Coarse family used for reporting.
+            capabilities: Declared capabilities.
+            requires: Importable modules the adapter needs.
+            library: Importable top-level module name.
+            classifier_name: Classifier class name inside the library.
+            regressor_name: Regressor class name inside the library.
+            needs_integer_labels: Wrap classifiers so arbitrary class labels
+                work even though the library only accepts 0..K-1.
+            flatten_predictions: Wrap classifiers whose `predict` returns
+                column vectors so predictions are 1-D.
+            fixed_params: Constructor parameters applied to every build.
+            fit_param_names: Search-space entries passed to `fit`.
+            stopping_rounds: Early-stopping patience; left out keeps the
+                default, which a subclass can replace at class level.
+            search_space: Tunable hyperparameters.
+            monotonic_param: Name of the estimator parameter that takes one
+                monotonic sign per input column.
+        """
+        given: dict[str, Any] = {
+            "name": name,
+            "family": family,
+            "capabilities": capabilities,
+            "requires": requires,
+            "library": library,
+            "classifier_name": classifier_name,
+            "regressor_name": regressor_name,
+            "needs_integer_labels": needs_integer_labels,
+            "flatten_predictions": flatten_predictions,
+            "fixed_params": fixed_params,
+            "fit_param_names": fit_param_names,
+            "stopping_rounds": stopping_rounds,
+            "search_space": search_space,
+            "monotonic_param": monotonic_param,
+        }
+        for attribute, value in given.items():
+            if value is not None:
+                setattr(self, attribute, value)
 
     def build(
         self,
@@ -104,39 +170,7 @@ class Booster(models.Model):
 
 
 class LightGbm(Booster):
-    """LightGBM gradient boosting."""
-
-    name = "lightgbm"
-    family = "boosting"
-    library = "lightgbm"
-    requires = ("lightgbm",)
-    classifier_name = "LGBMClassifier"
-    regressor_name = "LGBMRegressor"
-    monotonic_param = "monotone_constraints"
-    fit_param_names = ("categorical_feature",)
-    capabilities = models.Capabilities(
-        tasks.STANDARD_TASKS,
-        sparse_input=True,
-        handles_missing=True,
-        native_categorical=True,
-        early_stopping=True,
-        cost=3,
-        memory_factor=2.0,
-    )
-    fixed_params = types.MappingProxyType(
-        {"verbose": -1, "subsample_freq": 1, "n_jobs": 1}
-    )
-    search_space = search.SearchSpace(
-        (
-            search.IntParameter("n_estimators", 50, 400),
-            search.FloatParameter("learning_rate", 0.01, 0.3, log=True),
-            search.IntParameter("num_leaves", 8, 64),
-            search.IntParameter("min_child_samples", 5, 60),
-            search.FloatParameter("subsample", 0.6, 1.0),
-            search.FloatParameter("colsample_bytree", 0.5, 1.0),
-            search.FloatParameter("reg_lambda", 1e-3, 10.0, log=True),
-        )
-    )
+    """LightGBM, which takes native categoricals at fit time."""
 
     def categorical_params(self, indices: list[int]) -> dict[str, Any]:
         """Marks the integer-coded columns as categorical.
@@ -151,18 +185,50 @@ class LightGbm(Booster):
         return {"categorical_feature": list(indices)}
 
 
-class Xgboost(Booster):
-    """XGBoost gradient boosting."""
+LIGHTGBM = LightGbm(
+    name="lightgbm",
+    family="boosting",
+    library="lightgbm",
+    requires=("lightgbm",),
+    classifier_name="LGBMClassifier",
+    regressor_name="LGBMRegressor",
+    monotonic_param="monotone_constraints",
+    fit_param_names=("categorical_feature",),
+    capabilities=models.Capabilities(
+        tasks.STANDARD_TASKS,
+        sparse_input=True,
+        handles_missing=True,
+        native_categorical=True,
+        early_stopping=True,
+        cost=3,
+        memory_factor=2.0,
+    ),
+    fixed_params=types.MappingProxyType(
+        {"verbose": -1, "subsample_freq": 1, "n_jobs": 1}
+    ),
+    search_space=search.SearchSpace(
+        (
+            search.IntParameter("n_estimators", 50, 400),
+            search.FloatParameter("learning_rate", 0.01, 0.3, log=True),
+            search.IntParameter("num_leaves", 8, 64),
+            search.IntParameter("min_child_samples", 5, 60),
+            search.FloatParameter("subsample", 0.6, 1.0),
+            search.FloatParameter("colsample_bytree", 0.5, 1.0),
+            search.FloatParameter("reg_lambda", 1e-3, 10.0, log=True),
+        )
+    ),
+)
 
-    name = "xgboost"
-    family = "boosting"
-    library = "xgboost"
-    requires = ("xgboost",)
-    needs_integer_labels = True
-    classifier_name = "XGBClassifier"
-    regressor_name = "XGBRegressor"
-    monotonic_param = "monotone_constraints"
-    capabilities = models.Capabilities(
+XGBOOST = Booster(
+    name="xgboost",
+    family="boosting",
+    library="xgboost",
+    requires=("xgboost",),
+    needs_integer_labels=True,
+    classifier_name="XGBClassifier",
+    regressor_name="XGBRegressor",
+    monotonic_param="monotone_constraints",
+    capabilities=models.Capabilities(
         tasks.STANDARD_TASKS,
         sparse_input=True,
         handles_missing=True,
@@ -170,9 +236,9 @@ class Xgboost(Booster):
         early_stopping=True,
         cost=3,
         memory_factor=2.5,
-    )
-    fixed_params = types.MappingProxyType({"verbosity": 0, "n_jobs": 1})
-    search_space = search.SearchSpace(
+    ),
+    fixed_params=types.MappingProxyType({"verbosity": 0, "n_jobs": 1}),
+    search_space=search.SearchSpace(
         (
             search.IntParameter("n_estimators", 50, 400),
             search.FloatParameter("learning_rate", 0.01, 0.3, log=True),
@@ -182,20 +248,18 @@ class Xgboost(Booster):
             search.FloatParameter("colsample_bytree", 0.5, 1.0),
             search.FloatParameter("reg_lambda", 1e-3, 10.0, log=True),
         )
-    )
+    ),
+)
 
-
-class CatBoost(Booster):
-    """CatBoost gradient boosting (`catboost` extra)."""
-
-    name = "catboost"
-    family = "boosting"
-    flatten_predictions = True
-    library = "catboost"
-    requires = ("catboost",)
-    classifier_name = "CatBoostClassifier"
-    regressor_name = "CatBoostRegressor"
-    capabilities = models.Capabilities(
+CATBOOST = Booster(
+    name="catboost",
+    family="boosting",
+    flatten_predictions=True,
+    library="catboost",
+    requires=("catboost",),
+    classifier_name="CatBoostClassifier",
+    regressor_name="CatBoostRegressor",
+    capabilities=models.Capabilities(
         tasks.STANDARD_TASKS,
         sparse_input=True,
         handles_missing=True,
@@ -204,22 +268,18 @@ class CatBoost(Booster):
         gpu=False,
         cost=4,
         memory_factor=3.0,
-    )
-    fixed_params = types.MappingProxyType(
+    ),
+    fixed_params=types.MappingProxyType(
         {"verbose": 0, "allow_writing_files": False, "thread_count": 1}
-    )
-    search_space = search.SearchSpace(
+    ),
+    search_space=search.SearchSpace(
         (
             search.IntParameter("iterations", 100, 500),
             search.IntParameter("depth", 3, 8),
             search.FloatParameter("learning_rate", 0.02, 0.3, log=True),
             search.FloatParameter("l2_leaf_reg", 1.0, 10.0, log=True),
         )
-    )
-
-
-BOOSTING_ADAPTERS: tuple[type[models.Model], ...] = (
-    LightGbm,
-    Xgboost,
-    CatBoost,
+    ),
 )
+
+BOOSTING_ADAPTERS: tuple[models.Model, ...] = (LIGHTGBM, XGBOOST, CATBOOST)
