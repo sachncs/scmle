@@ -797,7 +797,7 @@ class AudioDataset:
         max_frames: int = 100_000,
         start_frame: int = 0,
     ) -> AudioFeatures:
-        """Prepare bounded PCM and metadata features for an audio baseline.
+        """Prepares bounded PCM and metadata features for an audio baseline.
 
         Core decoding is intentionally limited to WAV. Samples ingested with
         a caller-owned probe remain valid data contracts, but require a codec

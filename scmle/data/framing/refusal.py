@@ -263,9 +263,11 @@ def consensus(
         samples: The proposals drawn for one request.
 
     Returns:
-        The modal raw value of each slot, the agreement `m_s` of each
-        critical slot, the ambiguity score, and the critical slots whose
-        agreement is below 1.
+        The raw value of each slot (the most common canonical value's first
+        raw form; for `population`, the first proposal that parses), the
+        agreement `m_s` of each critical slot, the ambiguity score (the
+        largest `1 - m_s`), and the critical slots whose agreement is below
+        1.
 
     Raises:
         ValueError: If there are no samples.

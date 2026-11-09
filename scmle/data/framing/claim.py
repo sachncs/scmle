@@ -241,7 +241,8 @@ def freeze_rule(
         exploration rows and the regression fitted on the observed ones.
 
     Raises:
-        ConfigError: With no numeric feature, or one outcome class only.
+        ConfigError: If none of `columns` is present in `features`, or the
+            observed outcomes contain fewer than two classes.
     """
     names = tuple(c for c in columns if c in features.columns)
     if not names:

@@ -307,7 +307,9 @@ class BackdoorAdapter(Adapter):
     name = "backdoor_aipw"
 
     def __init__(self, *args: Any) -> None:
-        """Stores the settings of the strategy.
+        """Stores the settings, then reads the covariates from the charter.
+
+        The nuisance models start unset.
 
         Args:
             *args: The `Adapter` constructor arguments.
@@ -881,7 +883,7 @@ class RdAdapter(Adapter):
     name = "rd"
 
     def __init__(self, *args: Any) -> None:
-        """Stores the settings of the strategy.
+        """Stores the settings, with the bandwidth unset until it is fixed.
 
         Args:
             *args: The `Adapter` constructor arguments.

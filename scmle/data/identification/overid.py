@@ -213,7 +213,7 @@ def hansen_j(
     Returns:
         A result record; with fewer than two instruments the status is
         `not_testable`, otherwise `described` with the statistic and its
-        p-value on `k - 1` degrees of freedom.
+        p-value on one fewer degrees of freedom than instruments.
     """
     outcome, regressor, z = prepare(y, d, instruments, controls)
     count = z.shape[1]

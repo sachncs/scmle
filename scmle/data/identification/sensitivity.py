@@ -308,8 +308,9 @@ def benchmark_strength(
         outcome and with the treatment.
 
     Raises:
-        ValueError: If a multiple is so large that the implied strength
-            reaches 1 or more.
+        ValueError: If a multiple is so large that an implied strength
+            (`R2dz`, `R2yz` or the intermediate covariate-to-confounder
+            share) reaches 1 or more.
     """
     r2dz = kd * r2dxj / (1 - r2dxj)
     if r2dz >= 1:

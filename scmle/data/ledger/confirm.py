@@ -364,8 +364,9 @@ class Confirmation:
         """Builds the JSON-ready record (``confirmed_claims.json``).
 
         Returns:
-            A mapping with the outcome, rule and its guarantee statement,
-            level, hashes, negative control, claims, checks and a note;
+            A mapping with the outcome and its reason, rule and its
+            guarantee statement, level, hashes, negative control, claims,
+            checks and a note;
             ``stage_two``, ``registered_claims`` and ``attachments`` (a hash
             per document) are present only when they apply.
         """
@@ -784,7 +785,7 @@ def default_encoding(target: pd.Series) -> Any:
 
     Returns:
         A float array: the values of a numeric target, or the code of each
-        label (by sorted order of the labels) otherwise, NaN where missing.
+        label otherwise (labels sorted as text), NaN where missing.
     """
     if pd.api.types.is_numeric_dtype(target):
         return target.to_numpy(dtype=float)

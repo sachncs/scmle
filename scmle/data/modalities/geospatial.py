@@ -198,7 +198,7 @@ def geometry_coordinates(geometry: Mapping[str, Any]) -> tuple[float, ...]:
 def moran_statistic(
     values: np.ndarray, edges: Sequence[tuple[int, int]]
 ) -> float:
-    """Calculate global Moran's I for an undirected binary graph.
+    """Calculates global Moran's I for an undirected binary graph.
 
     Args:
         values: One-dimensional numeric values aligned with the feature
@@ -235,7 +235,7 @@ def moran_statistic(
 def mask_geometry_axis(
     geometry: Mapping[str, Any], axis: int, baseline: float
 ) -> dict[str, Any]:
-    """Replace one coordinate axis while preserving geometry structure.
+    """Replaces one coordinate axis while preserving geometry structure.
 
     The replacement is performed in the source CRS and keeps the geometry
     type, nesting, and non-masked coordinate dimensions intact. It is a
@@ -963,8 +963,9 @@ class GeospatialDataset:
     ) -> Self:
         """Builds a dataset from a GeoJSON FeatureCollection mapping.
 
-        Feature IDs come from each feature's ``id`` member, falling back to
-        its index. Feature labels and observation times are not read.
+        Feature IDs come from each feature's ``id`` member (as text), falling
+        back to its index. Feature labels and observation times are not read.
+        Errors raised by the feature and dataset constructors propagate.
 
         Args:
             document: A GeoJSON FeatureCollection.
@@ -1214,7 +1215,7 @@ class GeospatialDataset:
         comparison_limit: int = 100_000,
         match_limit: int = 100_000,
     ) -> SpatialJoinReport:
-        """Join two same-CRS datasets through a bounded caller predicate.
+        """Joins two same-CRS datasets through a bounded caller predicate.
 
         The core package does not choose a geometry engine, infer CRS
         transformations, or silently compare coordinates in different units.
@@ -1342,7 +1343,7 @@ class GeospatialDataset:
         transformer: CoordinateTransformer,
         transformer_name: str,
     ) -> "GeospatialReprojection":
-        """Transform coordinates through an explicit caller-owned policy.
+        """Transforms coordinates through an explicit caller-owned policy.
 
         The core package does not select a CRS database or geometry engine.
         The caller supplies a versioned transformer that changes geometry only;
@@ -1439,7 +1440,7 @@ class GeospatialDataset:
         permutations: int = 99,
         seed: int = 0,
     ) -> SpatialAutocorrelation:
-        """Measure global Moran's I with optional deterministic permutations.
+        """Measures global Moran's I with optional deterministic permutations.
 
         When ``values`` is omitted, numeric feature labels are used. This
         method reports association in the observed spatial arrangement; it
@@ -1530,7 +1531,7 @@ class GeospatialDataset:
         )
 
     def prepare_features(self) -> GeospatialFeatures:
-        """Prepare bounded geometry features without changing CRS units.
+        """Prepares bounded geometry features without changing CRS units.
 
         The output is a geometry envelope and centroid representation. It does
         not perform reprojection, spatial joins, rasterization, or distance
@@ -1639,7 +1640,7 @@ class GeospatialDataset:
         block_size: float,
         max_blocks_per_feature: int = 10_000,
     ) -> SpatialBoundaryLeakage:
-        """Measure conservative envelope crossings for a spatial split.
+        """Measures conservative envelope crossings for a spatial split.
 
         A crossing feature is not automatically leaking: the geometry may not
         occupy every block in its envelope. The evidence identifies the
@@ -1713,12 +1714,16 @@ class GeospatialDataset:
 
         Returns:
             Train, validation, and test features with the block IDs assigned
-            to each. At least one block stays in training. A nonzero fraction
-            gets at least one block when there are three or more blocks.
+            to each. At least one block stays in training. With three or
+            more blocks a nonzero fraction is first raised to one block, but
+            if the counts then leave no block for training, validation
+            gives blocks back before testing does, so a small validation
+            fraction can end with none.
 
         Raises:
-            ValueError: If ``block_size`` is not positive and finite or a
-                fraction is out of range.
+            ValueError: If ``block_size`` is not positive and finite, a
+                fraction is outside ``[0, 1)``, or the two fractions sum to
+                one or more.
         """
         if not math.isfinite(block_size) or block_size <= 0:
             raise ValueError("block_size must be a positive finite number")
@@ -2133,7 +2138,7 @@ class RasterSample:
         decoder: RasterDecoder,
         max_pixels: int = 4_000_000,
     ) -> float | None:
-        """Measure the declared nodata sentinel in decoded pixels.
+        """Measures the declared nodata sentinel in decoded pixels.
 
         Args:
             decoder: Caller-owned function that decodes the encoded payload.

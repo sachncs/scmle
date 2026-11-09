@@ -215,9 +215,10 @@ class AsOfView:
         """Prepares the rows once and returns a closure over them.
 
         Rows with a missing key are dropped, and the event and known times
-        are added as `EVENT_COLUMN` and `KNOWN_COLUMN`. In a transaction
+        are added as `EVENT_COLUMN` and `KNOWN_COLUMN`, both in days. A
+        non-versioned table is known from minus infinity. In a transaction
         table a missing recorded time falls back to the event time plus
-        `delta_rec_days`.
+        `delta_rec_days`, which is infinite when that delay is None.
 
         Args:
             frame: The table.

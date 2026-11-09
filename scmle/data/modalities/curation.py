@@ -59,7 +59,7 @@ class ModalityCurationReport:
         return not self.unresolved_blocking_findings
 
     def to_dict(self) -> dict[str, Any]:
-        """Serialise the report to a stable JSON-compatible mapping.
+        """Serialises the report to a stable JSON-compatible mapping.
 
         Returns:
             A dict with the report fields, each finding as its own dict, the
@@ -284,7 +284,7 @@ class ModalityDatasetCard:
         )
 
     def to_dict(self) -> dict[str, Any]:
-        """Serialise the card to a deterministic JSON-native mapping.
+        """Serialises the card to a deterministic JSON-native mapping.
 
         Returns:
             A dict of the card fields. Provenance and privacy are sorted by

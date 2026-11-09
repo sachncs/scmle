@@ -52,7 +52,7 @@ class LabelNoiseReport:
 
         Returns:
             A dict with the suspects, suggested labels, confidences and the
-            flagged rate.
+            flagged rate. `class_thresholds` and `folds` are not included.
         """
         return {
             "suspects": self.suspects,

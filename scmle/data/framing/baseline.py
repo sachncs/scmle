@@ -268,7 +268,8 @@ def profile_on_exploration(
     Returns:
         A JSON-ready profile with the selective-label finding, five
         thresholds spread evenly over the cost range, and the net benefit of
-        acting on no row and of acting on every observed row. The baseline's
+        acting on no row. The net benefit of acting on every observed row is
+        added only when some outcome is observed. The baseline's
         own net benefit is the string `not_computed` (with a `note`) when
         labels are selective or no outcome is observed, because the observed
         rows are then a biased sample of the ones it acted on.

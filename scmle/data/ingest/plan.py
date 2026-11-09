@@ -146,8 +146,9 @@ class IngestPlan:
             The key scan of each profiled table, by table name.
 
         Raises:
-            ScmleError: If a unit is set and the target table was scanned
-                but `target_table` is None.
+            ScmleError: Only as a guard that cannot trigger: a unit is set,
+                `target_table` is None and yet `None` is among the scanned
+                table names.
         """
         catalog = self.catalog or self.run_profile()
         self.scans = {}

@@ -65,9 +65,10 @@ def encode_target(
     classification: bool,
     classes: Sequence[Any] | None = None,
 ) -> pd.Series:
-    """The target as floats: class codes for classification.
+    """Encodes the target as floats: class codes for classification.
 
-    Codes follow the sorted order of the classes (or `classes` when given, so
+    Codes follow the sorted order of the classes, compared as text (or
+    `classes` when given, so
     the confirmation set is coded exactly as exploration was), so they do not
     depend on the order in which rows appear. Missing labels stay missing.
 

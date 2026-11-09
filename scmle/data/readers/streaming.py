@@ -77,7 +77,7 @@ class ChunkSource(abc.ABC):
     suffixes: ClassVar[tuple[str, ...]]
 
     def __init__(self, path: pathlib.Path) -> None:
-        """Bind the source to a file.
+        """Binds the source to a file.
 
         Args:
             path: The file to read.
@@ -86,7 +86,7 @@ class ChunkSource(abc.ABC):
 
     @abc.abstractmethod
     def batches(self, rows: int = BATCH_ROWS) -> Iterator[pd.DataFrame]:
-        """Yield the table in consecutive frames of about `rows` rows.
+        """Yields the table in consecutive frames of about `rows` rows.
 
         Args:
             rows: Target number of rows per frame.
@@ -281,7 +281,7 @@ class ChunkSource(abc.ABC):
     def validate_checkpoint(
         self, checkpoint: "StreamCheckpoint | None", snapshot: str
     ) -> "StreamCheckpoint":
-        """Bind a checkpoint to this source and current raw snapshot.
+        """Binds a checkpoint to this source and current raw snapshot.
 
         Args:
             checkpoint: The checkpoint to check, or None for a new run.
@@ -335,7 +335,7 @@ class StreamingError(errors.DataError):
         source_identity: str,
         details: Mapping[str, Any] | None = None,
     ) -> None:
-        """Initialize a structured, transport-neutral streaming failure.
+        """Initializes a structured, transport-neutral streaming failure.
 
         Args:
             code: Short machine-readable failure code.
@@ -451,7 +451,7 @@ class StreamCheckpoint:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild a checkpoint from durable JSON.
+        """Rebuilds a checkpoint from durable JSON.
 
         Args:
             record: Mapping in the form produced by `to_dict`.
@@ -575,7 +575,7 @@ class StreamBatch:
     batch_id: str = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
-        """Validates the batch and derive its deterministic idempotency key.
+        """Validates the batch and derives its deterministic idempotency key.
 
         Raises:
             ValueError: If the checkpoint's source or snapshot differs from the
@@ -654,7 +654,7 @@ class StreamAcknowledgement:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild a pending acknowledgement from durable JSON.
+        """Rebuilds a pending acknowledgement from durable JSON.
 
         Args:
             record: Mapping in the form produced by `to_dict`.
@@ -723,7 +723,7 @@ class SinkCommitReceipt:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild a sink receipt from durable JSON.
+        """Rebuilds a sink receipt from durable JSON.
 
         Args:
             record: Mapping in the form produced by `to_dict`.
@@ -751,7 +751,7 @@ class TransactionalSink(abc.ABC):
 
     @abc.abstractmethod
     def commit(self, batch: StreamBatch) -> SinkCommitReceipt:
-        """Commit one batch and return its transport-owned receipt.
+        """Commits one batch and returns its transport-owned receipt.
 
         Args:
             batch: The batch to commit; implementations deduplicate on
@@ -815,7 +815,7 @@ class StreamCommitEvidence:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild transaction evidence from durable JSON.
+        """Rebuilds transaction evidence from durable JSON.
 
         Args:
             record: Mapping in the form produced by `to_dict`.
@@ -894,7 +894,7 @@ class StreamState:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild state from durable JSON.
+        """Rebuilds state from durable JSON.
 
         Args:
             record: Mapping in the form produced by `to_dict`. Schema
@@ -999,7 +999,7 @@ class StreamingLedger:
 
     @contextlib.contextmanager
     def lock(self) -> Iterator[None]:
-        """Serialize state transitions with an advisory file lock.
+        """Serializes state transitions with an advisory file lock.
 
         Yields:
             None, while the exclusive lock on the sidecar file is held.
@@ -1028,7 +1028,7 @@ class StreamingLedger:
                     fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
     def load(self) -> StreamState:
-        """Loads state and fail closed if the source snapshot changed.
+        """Loads state, failing closed if the source snapshot changed.
 
         Returns:
             The durable state, or a fresh state at offset zero when the state
@@ -1338,7 +1338,7 @@ class StreamingLedger:
         sink: TransactionalSink,
         acknowledgement: StreamAcknowledgement,
     ) -> StreamCommitReceipt:
-        """Commit a batch and atomically persist receipt/checkpoint evidence.
+        """Commits a batch and atomically persists its receipt evidence.
 
         The sink is caller-owned and must deduplicate ``batch.batch_id`` when
         a process fails after the sink commit but before this local JSON state
@@ -1462,7 +1462,7 @@ class StreamingLedger:
         writer: Callable[[pd.DataFrame, str], None],
         acknowledgement: StreamAcknowledgement | None = None,
     ) -> StreamCommitReceipt:
-        """Commit a batch once and stage its external acknowledgement.
+        """Commits a batch once and stages its external acknowledgement.
 
         The writer receives the stable batch idempotency key. If it succeeds
         and the process fails before the local state replacement, a retry can
@@ -1579,7 +1579,7 @@ class StreamingConsumer:
         writer: Callable[[pd.DataFrame, str], None],
         acknowledge: Callable[[StreamAcknowledgement], None],
     ) -> None:
-        """Initialize a transport-neutral consumer boundary.
+        """Initializes a transport-neutral consumer boundary.
 
         Args:
             ledger: The ledger holding the durable state.
@@ -1640,7 +1640,7 @@ class StreamingConsumer:
         rows: int = BATCH_ROWS,
         watermark_column: str | None = None,
     ) -> StreamCommitReceipt:
-        """Commit one batch and acknowledge it only after durable state.
+        """Commits one batch and acknowledges it only after durable state.
 
         A previously staged acknowledgement is delivered first. Failures from
         reading, committing and delivering propagate unchanged.
@@ -1674,7 +1674,7 @@ class ParquetChunks(ChunkSource):
     suffixes = (".parquet", ".pq")
 
     def batches(self, rows: int = BATCH_ROWS) -> Iterator[pd.DataFrame]:
-        """Yield Arrow record batches as frames.
+        """Yields Arrow record batches as frames.
 
         Pre-buffering and threads are off: with them Arrow keeps decoded
         pages of many row groups alive and the reader's memory grows with
@@ -1707,7 +1707,7 @@ class CsvChunks(ChunkSource):
     suffixes = (".csv", ".csv.gz", ".csv.bz2", ".csv.xz", ".csv.zip")
 
     def batches(self, rows: int = BATCH_ROWS) -> Iterator[pd.DataFrame]:
-        """Yield consecutive chunks.
+        """Yields consecutive chunks.
 
         Args:
             rows: Rows per chunk.
@@ -1732,7 +1732,7 @@ class JsonLinesChunks(ChunkSource):
     suffixes = (".jsonl", ".ndjson", ".jsonl.gz", ".ndjson.gz")
 
     def batches(self, rows: int = BATCH_ROWS) -> Iterator[pd.DataFrame]:
-        """Yield JSON records in bounded batches.
+        """Yields JSON records in bounded batches.
 
         Args:
             rows: Records per chunk.

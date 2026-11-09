@@ -525,7 +525,7 @@ class VideoDataset:
     content_hash: str = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
-        """Rejects duplicate sources and derive a stable dataset hash.
+        """Rejects an empty or duplicate-source dataset and derives its hash.
 
         Raises:
             VideoValidationError: If there are no samples or two samples
@@ -566,7 +566,7 @@ class VideoDataset:
         return tuple(sample.profile() for sample in self.samples)
 
     def prepare_metadata_features(self) -> VideoFeatures:
-        """Prepare deterministic numeric features from probed metadata.
+        """Prepares deterministic numeric features from probed metadata.
 
         This method never decodes or samples frames. Frame-based features
         need an explicit decoder, sampling policy and resource budget; see
@@ -629,7 +629,7 @@ class VideoDataset:
         max_frames: int = 8,
         max_frame_pixels: int = 1_000_000,
     ) -> VideoFeatures:
-        """Prepare bounded temporal statistics through an explicit decoder.
+        """Prepares bounded temporal statistics through an explicit decoder.
 
         The core package does not select or import a video codec. The caller
         supplies a decoder that accepts encoded bytes and an absolute frame

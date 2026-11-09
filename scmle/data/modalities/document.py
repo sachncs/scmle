@@ -115,7 +115,7 @@ def sensitive_matches(content: str) -> dict[str, int]:
 
 
 def redact_sensitive_text(content: str) -> str:
-    """Replace supported sensitive values with type-only placeholders.
+    """Replaces supported sensitive values with type-only placeholders.
 
     Args:
         content: Text to redact.
@@ -1316,7 +1316,7 @@ class DocumentReader:
         )
 
     def decode_utf8(self, raw_bytes: bytes, document_id: str) -> str:
-        """Decodes strict UTF-8 and reports malformed byte offsets.
+        """Decodes strict UTF-8 and reports the first malformed byte range.
 
         Args:
             raw_bytes: The encoded source.
@@ -1327,7 +1327,8 @@ class DocumentReader:
 
         Raises:
             DocumentValidationError: If the bytes are not valid UTF-8; the
-                context holds the offsets of the malformed bytes.
+                context holds the start and end offsets of the first
+                malformed byte run.
         """
         try:
             content = raw_bytes.decode("utf-8")

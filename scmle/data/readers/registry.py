@@ -437,7 +437,7 @@ class SourceRegistryStore:
         return SourceRegistry.from_json(self.path.read_text(encoding="utf-8"))
 
     def save(self, registry: SourceRegistry) -> None:
-        """Atomically publish a complete registry snapshot.
+        """Atomically publishes a complete registry snapshot.
 
         A failed serialization or write leaves the previous registry intact.
         The caller owns coordination between multiple writers; this store

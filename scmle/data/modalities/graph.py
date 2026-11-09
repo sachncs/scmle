@@ -411,9 +411,9 @@ class InductiveNodeSplit:
         """Returns whether any retained edge crosses node partitions.
 
         Returns:
-            True if a retained edge has endpoints in different partitions
-            (an endpoint in no partition differs from any partition); False
-            otherwise.
+            True if a retained edge has endpoints in different partitions,
+            where an endpoint in no partition differs from one in a
+            partition; False otherwise.
         """
         partitions = {
             node_id: index

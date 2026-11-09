@@ -117,15 +117,16 @@ class BudgetMeter:
         return bool(self.stops)
 
     def shortfall(self, rows: int, queries: int = 1) -> str | None:
-        """Finds the limit that more spending would break.
+        """Finds the limit that more spending would break or has reached.
 
         Args:
             rows: Rows the next step would scan.
             queries: Queries the next step would run.
 
         Returns:
-            `queries`, `rows` or `seconds` for the first limit exceeded, in
-            that order of checking, or None when the step fits.
+            `queries` or `rows` for the first limit the step would exceed,
+            or `seconds` when the elapsed time has already reached its
+            limit, checked in that order; None when the step fits.
         """
         limit = self.budget
         if (

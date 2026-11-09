@@ -106,7 +106,7 @@ def run(
     budget_seconds: float = BUDGET_SECONDS,
     rule: stability.Rule = stability.DEFAULT_RULE,
 ) -> Robustness:
-    """Stability of the survivors and shift against a deployment sample.
+    """Assesses survivor stability and the shift to a deployment sample.
 
     Args:
         features: Exploration features.
@@ -117,14 +117,18 @@ def run(
             not evaluated.
         choices: The charter's multiverse.
         seed: Charter seed.
-        permutations: Charter permutation count, scaled to the tests.
+        permutations: Charter permutation count. The specification-curve
+            test uses at most `MAX_CURVE_PERMUTATIONS` of them; the shift
+            tests use it clamped to `MIN_PERMUTATIONS`..`MAX_PERMUTATIONS`.
         strata: Group or block labels for resampling and permuting.
         reference: Deployment sample, or None.
         candidates: Feature columns compared with the reference.
         sensitive: Columns whose subgroup coverage is reported.
-        temporal: Whether the data have a time column.
+        temporal: Whether the data have a time column; only the wording of
+            the skipped forward check depends on it.
         directory: Folder of the certificate store, for tests.
-        budget_seconds: Time allowed for the whole multiverse.
+        budget_seconds: Time allowed for the whole multiverse, divided
+            equally among the assessed findings.
         rule: Survival thresholds. The certificate was measured for
             `stability.DEFAULT_RULE` only, so any other rule is descriptive:
             its verdicts are reported and never gate.

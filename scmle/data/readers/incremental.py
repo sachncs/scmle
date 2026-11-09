@@ -46,7 +46,7 @@ class IncrementalError(errors.DataError):
         source_uri: str,
         details: Mapping[str, Any] | None = None,
     ) -> None:
-        """Initialize a structured incremental-ingestion failure.
+        """Initializes a structured incremental-ingestion failure.
 
         Args:
             code: Short machine-readable failure code.
@@ -175,7 +175,7 @@ class IncrementalEvent:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild an event from a persisted record.
+        """Rebuilds an event from a persisted record.
 
         Args:
             record: Mapping in the form produced by `to_dict`.
@@ -228,7 +228,7 @@ class EventCheckpoint:
             parse_timestamp(self.watermark, "watermark")
 
     def bind(self, source_identity: str) -> "EventCheckpoint":
-        """Bind an uninitialized checkpoint to exactly one source.
+        """Binds an uninitialized checkpoint to exactly one source.
 
         Args:
             source_identity: Identity of the source the checkpoint must belong
@@ -258,7 +258,7 @@ class EventCheckpoint:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild a checkpoint from durable state.
+        """Rebuilds a checkpoint from durable state.
 
         Args:
             record: Mapping in the form produced by `to_dict`.
@@ -435,7 +435,7 @@ class EventAcknowledgement:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild a staged acknowledgement from durable JSON.
+        """Rebuilds a staged acknowledgement from durable JSON.
 
         Args:
             record: Mapping in the form produced by `to_dict`.
@@ -520,7 +520,7 @@ class IncrementalEventSource(abc.ABC):
         source_uri: str,
         late_data_policy: LateDataPolicy = LateDataPolicy.REJECT,
     ) -> None:
-        """Initialize source identity and late-data policy.
+        """Initializes source identity and late-data policy.
 
         Args:
             source_uri: URI of the source; canonicalized on binding.
@@ -544,7 +544,7 @@ class IncrementalEventSource(abc.ABC):
     def validate_checkpoint(
         self, checkpoint: EventCheckpoint | None
     ) -> EventCheckpoint:
-        """Bind a checkpoint to this source or fail before polling.
+        """Binds a checkpoint to this source, failing before any polling.
 
         Args:
             checkpoint: The checkpoint to check, or None for a new run.
@@ -593,12 +593,14 @@ class IncrementalEventSource(abc.ABC):
         Returns:
             A batch of at most `limit` events in sequence order, the sorted
             duplicate and late identities, a next checkpoint at the highest
-            selected sequence and latest event time (or the unchanged
-            checkpoint values when nothing was selected), and `has_more` set
+            selected sequence and the latest of the selected event times and
+            the checkpoint's watermark (the unchanged checkpoint values when
+            nothing was selected), and `has_more` set
             when more eligible events remained than were selected.
 
         Raises:
-            ValueError: If `limit` is not positive.
+            ValueError: If `limit` is not positive, or a selected event's
+                time is not a timezone-aware ISO-8601 string.
             TypeError: If `records` holds something other than IncrementalEvent
                 values.
             IncrementalError: With code "late_event" if a late event is found
@@ -708,7 +710,7 @@ class SequenceEventSource(IncrementalEventSource):
         | Callable[[], Iterable[IncrementalEvent]],
         late_data_policy: LateDataPolicy = LateDataPolicy.REJECT,
     ) -> None:
-        """Initialize a source from a fixed sequence or event factory.
+        """Initializes a source from a fixed sequence or event factory.
 
         Args:
             source_uri: URI identifying the source.
@@ -766,7 +768,7 @@ class EventStreamSource(IncrementalEventSource):
         late_data_policy: LateDataPolicy = LateDataPolicy.REJECT,
         retry_budget: connectors.RetryBudget | None = None,
     ) -> None:
-        """Initialize a source around an injected broker poll callback.
+        """Initializes a source around an injected broker poll callback.
 
         Args:
             source_uri: Broker URI identifying topic, stream, or subscription.
@@ -903,7 +905,7 @@ class CommittedIncrementalState:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild committed state from durable JSON.
+        """Rebuilds committed state from durable JSON.
 
         Args:
             record: Mapping in the form produced by `to_dict`.
@@ -948,7 +950,7 @@ class IncrementalIngestionLedger:
 
     @contextlib.contextmanager
     def lock(self) -> Iterator[None]:
-        """Serialize ledger writers with the platform's advisory file lock.
+        """Serializes ledger writers with the platform's advisory file lock.
 
         Yields:
             None, while the exclusive lock on the sidecar file is held.
@@ -1158,7 +1160,7 @@ class IncrementalIngestionLedger:
         durability.sync_directory(self.pending_acknowledgement_path.parent)
 
     def commit(self, batch: EventBatch) -> CommittedIncrementalState:
-        """Atomically publish a processed batch's IDs and checkpoint.
+        """Atomically publishes a processed batch's IDs and checkpoint.
 
         Args:
             batch: The processed batch.
@@ -1343,7 +1345,7 @@ class EventConsumer:
         writer: Callable[[tuple[IncrementalEvent, ...]], None],
         acknowledge: Callable[[EventAcknowledgement], None],
     ) -> None:
-        """Initialize a consumer around explicit transport and sink seams.
+        """Initializes a consumer around explicit transport and sink seams.
 
         Args:
             source: The event source.

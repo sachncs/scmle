@@ -491,8 +491,8 @@ class CurveTest:
         permutations: Number of permuted curves.
         median_abs_effect: Observed median absolute effect.
         share_significant: Observed share of specifications with p <= 0.05.
-        p_median: Share of permuted curves, plus one, whose median absolute
-            effect is at least the observed one.
+        p_median: Permutation p-value of the median absolute effect:
+            ``(1 + #{permuted >= observed}) / (permutations + 1)``.
         p_share: The same for the share significant.
     """
 

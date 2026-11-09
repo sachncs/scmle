@@ -576,8 +576,8 @@ def synthesize(
 
     Returns:
         The feature set. Every dropped proposal is in the manifest with its
-        reason: `cap`, `no as-of rule`, `unverified (strict)`, `constant`,
-        `mostly missing` or `duplicate of <name>`.
+        reason: `cap`, `no as-of rule: <tables>`, `unverified (strict)`,
+        `mostly missing`, `constant` or `duplicate of <name>`.
 
     Raises:
         ValueError: If `lag_days` is negative.

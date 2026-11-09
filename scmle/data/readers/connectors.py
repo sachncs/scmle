@@ -594,6 +594,10 @@ def execute_with_retries(
 ) -> T:
     """Executes an operation until it succeeds or its retry budget is spent.
 
+    Any exception other than a `ConnectorError` triggers a retry, after a
+    pause of `delay_seconds` when that is nonzero. A `ConnectorError` raised
+    by the operation is re-raised immediately without retrying.
+
     Args:
         operation: Zero-argument operation to execute.
         operation_name: Stable operation name for failure evidence.
@@ -603,12 +607,9 @@ def execute_with_retries(
     Returns:
         The operation result.
 
-    A `ConnectorError` raised by the operation is re-raised immediately
-    without retrying.
-
     Raises:
         RetryExhaustedError: If every attempt fails.
-        ConnectorError: If the operation raises a structured connector error.
+        ConnectorError: If the operation raises one; it is not retried.
         AssertionError: If the retry loop ends without returning or
             raising, which cannot happen because the budget allows at least
             one attempt.
@@ -1325,7 +1326,7 @@ class WarehouseConnector(SourceConnector):
         retry_budget: RetryBudget | None = None,
         snapshot_reader: Callable[[str], str] | None = None,
     ) -> None:
-        """Initialize a warehouse connector around injected query callbacks.
+        """Initializes a warehouse connector around injected query callbacks.
 
         Args:
             source_uri: Logical ``warehouse://`` or ``lakehouse://`` URI.
@@ -1371,8 +1372,10 @@ class WarehouseConnector(SourceConnector):
     def schema(self) -> SourceSchema:
         """Reads and validates the schema without consuming a checkpoint.
 
+        The read is retried under the connector's retry budget.
+
         Returns:
-            The schema returned by the schema callback.
+            The schema returned by the schema callback, once validated.
         """
         return execute_with_retries(
             lambda: self.validate_schema(self.schema_reader(self.query)),
@@ -1580,7 +1583,7 @@ class ObjectStoreConnector(SourceConnector):
         decoder: ObjectDecoder | None = None,
         decoder_name: str | None = None,
     ) -> None:
-        """Initialize an object connector with explicit boundaries.
+        """Initializes an object connector with explicit boundaries.
 
         Args:
             source_uri: Object-store URI.
@@ -1799,7 +1802,7 @@ class StreamingObjectStoreConnector(SourceConnector):
         chunk_bytes: int = 1024 * 1024,
         max_record_bytes: int = 64 * 1024 * 1024,
     ) -> None:
-        """Initialize a range-backed object connector.
+        """Initializes a range-backed object connector.
 
         Args:
             source_uri: Object URI ending in ``.jsonl`` or ``.ndjson``.

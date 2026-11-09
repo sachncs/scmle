@@ -518,7 +518,9 @@ def many_to_many(
     scans: Mapping[str, grain.KeyScan],
     eps_fk: float = 0.0,
 ) -> list[Link]:
-    """Same-named non-key column pairs that overlap: reported, never joined.
+    """Finds same-named non-key column pairs that overlap.
+
+    The pairs are reported, never joined.
 
     Each column pair is charged to the budget (the rows of both tables and two
     queries) under the stage `many_to_many` before it is measured. When the
