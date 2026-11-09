@@ -11,7 +11,6 @@ import json
 import math
 from numbers import Real
 import pathlib
-import random
 from types import MappingProxyType
 from typing import Any
 from typing import cast
@@ -22,8 +21,10 @@ import numpy
 from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.data.modalities.curation import build_finding
+from scmle.data.modalities.curation import check_split_fractions
 from scmle.data.modalities.curation import Curation
 from scmle.data.modalities.curation import label_counts
+from scmle.data.modalities.curation import partition_group_ids
 
 GEOMETRY_TYPES = frozenset(
     {
@@ -37,6 +38,12 @@ GEOMETRY_TYPES = frozenset(
     }
 )
 
+SHA256_HEX_LENGTH = 64
+MIN_COORDINATE_VALUES = 2
+MIN_OBSERVATIONS = 3
+MAX_PERMUTATIONS = 10_000
+AFFINE_TRANSFORM_LENGTH = 6
+
 RasterDecoder = Callable[[bytes], numpy.ndarray]
 
 
@@ -44,6 +51,22 @@ class GeospatialValidationError(errors.DataError):
     """A vector or raster sample violates a geospatial invariant."""
 
     category = "geospatial_validation"
+
+
+def check_digest(field_name: str, value: str) -> None:
+    """Checks that a value is a lowercase SHA-256 hex digest.
+
+    Args:
+        field_name: Field name, for the message.
+        value: The text to check.
+
+    Raises:
+        ValueError: If the value is not 64 lowercase hexadecimal characters.
+    """
+    if len(value) != SHA256_HEX_LENGTH or any(
+        character not in "0123456789abcdef" for character in value
+    ):
+        raise ValueError(f"{field_name} must be a SHA-256 hex digest")
 
 
 class GeospatialTemporalError(GeospatialValidationError):
@@ -136,7 +159,7 @@ def validate_coordinates(value: Any) -> tuple[float, ...]:
             for item in value
         ):
             numbers = tuple(float(item) for item in value)
-            if len(numbers) < 2 or not all(
+            if len(numbers) < MIN_COORDINATE_VALUES or not all(
                 math.isfinite(item) for item in numbers
             ):
                 raise GeospatialValidationError(
@@ -215,7 +238,7 @@ def moran_statistic(
             are given.
     """
     numeric = numpy.asarray(values, dtype=numpy.float64)
-    if numeric.ndim != 1 or len(numeric) < 3:
+    if numeric.ndim != 1 or len(numeric) < MIN_OBSERVATIONS:
         raise ValueError("values must contain at least three observations")
     if not numpy.isfinite(numeric).all():
         raise ValueError("values must be finite")
@@ -520,14 +543,29 @@ class SpatialJoin:
             ("left_dataset_hash", self.left_dataset_hash),
             ("right_dataset_hash", self.right_dataset_hash),
         ):
-            if len(value) != 64 or any(
-                character not in "0123456789abcdef" for character in value
-            ):
-                raise ValueError(f"{field_name} must be a SHA-256 hex digest")
+            check_digest(field_name, value)
         if not self.crs.strip():
             raise ValueError("crs must not be empty")
         if not self.predicate_name.strip():
             raise ValueError("predicate_name must not be empty")
+        self.check_counts()
+        if self.comparison_limit < 1 or self.match_limit < 1:
+            raise ValueError("join limits must be positive")
+        identities = tuple(
+            (match.left_feature_id, match.right_feature_id)
+            for match in self.matches
+        )
+        if len(identities) != len(set(identities)):
+            raise ValueError("join matches must be unique")
+
+    def check_counts(self) -> None:
+        """Checks that the join counts are positive and consistent.
+
+        Raises:
+            ValueError: If feature counts are not positive, a count is
+                negative, a count exceeds the one it is bounded by, or
+                ``match_count`` differs from the number of matches.
+        """
         if min(self.left_feature_count, self.right_feature_count) < 1:
             raise ValueError("join feature counts must be positive")
         if (
@@ -550,14 +588,6 @@ class SpatialJoin:
             )
         if self.match_count != len(self.matches):
             raise ValueError("match_count must match the recorded matches")
-        if self.comparison_limit < 1 or self.match_limit < 1:
-            raise ValueError("join limits must be positive")
-        identities = tuple(
-            (match.left_feature_id, match.right_feature_id)
-            for match in self.matches
-        )
-        if len(identities) != len(set(identities)):
-            raise ValueError("join matches must be unique")
 
     def to_dict(self) -> dict[str, Any]:
         """Returns JSON-native join evidence without raw geometry.
@@ -616,10 +646,7 @@ class Provenance:
             ("source_dataset_hash", self.source_dataset_hash),
             ("target_dataset_hash", self.target_dataset_hash),
         ):
-            if len(value) != 64 or any(
-                character not in "0123456789abcdef" for character in value
-            ):
-                raise ValueError(f"{field_name} must be a SHA-256 hex digest")
+            check_digest(field_name, value)
         for field_name, value in (
             ("source_crs", self.source_crs),
             ("target_crs", self.target_crs),
@@ -848,7 +875,7 @@ class SpatialAutocorrelation:
                 the statistic is not finite, the permutation count is
                 negative, or the p-value is outside ``[0, 1]``.
         """
-        if self.feature_count < 3:
+        if self.feature_count < MIN_OBSERVATIONS:
             raise ValueError("feature_count must be at least three")
         if not 1 <= self.neighbor_count < self.feature_count:
             raise ValueError("neighbor_count must be in [1, feature_count)")
@@ -899,6 +926,85 @@ class Features:
             feature name.
         """
         return numpy.asarray(self.values, dtype=numpy.float64).copy()
+
+
+def evaluate_predicate(
+    predicate: SpatialJoinPredicate,
+    left: GeoFeature,
+    right: GeoFeature,
+    predicate_name: str,
+) -> bool | numpy.bool_:
+    """Runs a caller-owned spatial join predicate on one pair of features.
+
+    Args:
+        predicate: The predicate.
+        left: The left feature.
+        right: The right feature.
+        predicate_name: Stable name of the predicate, recorded in errors.
+
+    Returns:
+        The predicate's boolean result.
+
+    Raises:
+        GeospatialValidationError: If the predicate raises or returns a
+            value that is not a boolean.
+    """
+    try:
+        result = predicate(left, right)
+    except Exception as error:
+        raise GeospatialValidationError(
+            "caller-owned spatial join predicate failed",
+            {
+                "code": "predicate_failure",
+                "predicate_name": predicate_name,
+                "exception": type(error).__name__,
+            },
+        ) from error
+    if not isinstance(result, (bool, numpy.bool_)):
+        raise GeospatialValidationError(
+            "spatial join predicate must return a boolean",
+            {
+                "code": "invalid_predicate_result",
+                "predicate_name": predicate_name,
+                "result_type": type(result).__name__,
+            },
+        )
+    return result
+
+
+def permutation_p_value(
+    numeric: numpy.ndarray,
+    edges: Sequence[tuple[int, int]],
+    statistic: float,
+    permutations: int,
+    seed: int,
+) -> float | None:
+    """Computes a two-sided permutation p-value for Moran's I.
+
+    Args:
+        numeric: The observed values.
+        edges: The neighbour edges.
+        statistic: The observed statistic.
+        permutations: Number of random permutations; zero skips the test.
+        seed: Seed of the permutation random generator.
+
+    Returns:
+        ``(exceedances + 1) / (permutations + 1)``, where an exceedance is a
+        permuted statistic at least as large in absolute value as the
+        observed one; None when ``permutations`` is zero.
+    """
+    if not permutations:
+        return None
+    randomizer = numpy.random.default_rng(seed)
+    exceedances = 0
+    permutation_index = 0
+    while permutation_index < permutations:
+        shuffled = randomizer.permutation(numeric)
+        permuted_statistic = moran_statistic(shuffled, edges)
+        if abs(permuted_statistic) >= abs(statistic):
+            exceedances += 1
+        permutation_index += 1
+    return (exceedances + 1) / (permutations + 1)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -1056,7 +1162,7 @@ class Dataset:
         profile_data = profile.to_dict()
         profile_data["label_counts"] = labels
         observation_times = tuple(
-            cast(datetime, feature.observation_time)
+            cast("datetime", feature.observation_time)
             for feature in self.features
             if feature.observation_time is not None
         )
@@ -1086,7 +1192,7 @@ class Dataset:
                     {"temporal": profile_data["temporal"]},
                     "Supply observation times for every feature or explicitly "
                     "use a non-temporal geospatial capability.",
-                    False,
+                    blocking=False,
                 )
             )
         numeric_labels = [feature.label for feature in self.features]
@@ -1094,7 +1200,7 @@ class Dataset:
             profile_data["spatial_autocorrelation"] = {
                 "status": "blocked_missing_crs"
             }
-        elif len(self.features) < 3:
+        elif len(self.features) < MIN_OBSERVATIONS:
             profile_data["spatial_autocorrelation"] = {
                 "status": "not_estimable",
                 "reason": "at least three features are required",
@@ -1120,7 +1226,7 @@ class Dataset:
                     {"feature_count": len(self.features)},
                     "Declare the source CRS before spatial transforms or "
                     "modelling.",
-                    True,
+                    blocking=True,
                 )
             )
         if len(profile.geometry_types) > 1:
@@ -1132,7 +1238,7 @@ class Dataset:
                     {"geometry_types": list(profile.geometry_types)},
                     "Choose a geometry normalization or task-specific "
                     "handling policy.",
-                    False,
+                    blocking=False,
                 )
             )
         if "unlabeled" in labels and len(labels) > 1:
@@ -1144,7 +1250,7 @@ class Dataset:
                     {"label_counts": labels},
                     "Declare whether unlabeled features are valid for the "
                     "intended spatial task before training.",
-                    False,
+                    blocking=False,
                 )
             )
         return Curation(
@@ -1209,6 +1315,55 @@ class Dataset:
                 )
         return tuple(sorted(edges))
 
+    def check_join_request(
+        self,
+        other: "Dataset",
+        predicate: SpatialJoinPredicate,
+        predicate_name: str,
+        comparison_limit: int,
+        match_limit: int,
+    ) -> None:
+        """Checks the arguments of a spatial join before any comparison.
+
+        Args:
+            other: Right-hand dataset.
+            predicate: Caller-owned predicate.
+            predicate_name: Stable name and version of the predicate.
+            comparison_limit: Maximum Cartesian comparisons allowed.
+            match_limit: Maximum matches retained in the evidence report.
+
+        Raises:
+            TypeError: If ``other`` is not a dataset or ``predicate`` is not
+                callable.
+            ValueError: If ``predicate_name`` is empty or a limit is not
+                positive.
+            GeospatialValidationError: If either dataset lacks a CRS or the
+                CRS values differ.
+        """
+        if not isinstance(other, Dataset):
+            raise TypeError("other must be a Dataset")
+        if not callable(predicate):
+            raise TypeError("predicate must be callable")
+        if not predicate_name.strip():
+            raise ValueError("predicate_name must not be empty")
+        if comparison_limit < 1 or match_limit < 1:
+            raise ValueError("join limits must be positive")
+        if not self.crs.strip() or not other.crs.strip():
+            raise GeospatialValidationError(
+                "spatial joins require a declared CRS on both datasets",
+                {"code": "missing_crs"},
+            )
+        if self.crs.strip() != other.crs.strip():
+            raise GeospatialValidationError(
+                "spatial joins require matching CRS declarations; reproject "
+                "through an explicit caller-owned policy first",
+                {
+                    "code": "crs_mismatch",
+                    "left_crs": self.crs,
+                    "right_crs": other.crs,
+                },
+            )
+
     def spatial_join(
         self,
         other: "Dataset",
@@ -1246,29 +1401,9 @@ class Dataset:
                 ``comparison_limit``, the predicate raises or returns a
                 non-boolean, or the matches exceed ``match_limit``.
         """
-        if not isinstance(other, Dataset):
-            raise TypeError("other must be a Dataset")
-        if not callable(predicate):
-            raise TypeError("predicate must be callable")
-        if not predicate_name.strip():
-            raise ValueError("predicate_name must not be empty")
-        if comparison_limit < 1 or match_limit < 1:
-            raise ValueError("join limits must be positive")
-        if not self.crs.strip() or not other.crs.strip():
-            raise GeospatialValidationError(
-                "spatial joins require a declared CRS on both datasets",
-                {"code": "missing_crs"},
-            )
-        if self.crs.strip() != other.crs.strip():
-            raise GeospatialValidationError(
-                "spatial joins require matching CRS declarations; reproject "
-                "through an explicit caller-owned policy first",
-                {
-                    "code": "crs_mismatch",
-                    "left_crs": self.crs,
-                    "right_crs": other.crs,
-                },
-            )
+        self.check_join_request(
+            other, predicate, predicate_name, comparison_limit, match_limit
+        )
         total_comparisons = len(self.features) * len(other.features)
         if total_comparisons > comparison_limit:
             raise GeospatialValidationError(
@@ -1283,26 +1418,9 @@ class Dataset:
         matches: list[SpatialJoinMatch] = []
         for left in self.features:
             for right in other.features:
-                try:
-                    result = predicate(left, right)
-                except Exception as error:
-                    raise GeospatialValidationError(
-                        "caller-owned spatial join predicate failed",
-                        {
-                            "code": "predicate_failure",
-                            "predicate_name": predicate_name,
-                            "exception": type(error).__name__,
-                        },
-                    ) from error
-                if not isinstance(result, (bool, numpy.bool_)):
-                    raise GeospatialValidationError(
-                        "spatial join predicate must return a boolean",
-                        {
-                            "code": "invalid_predicate_result",
-                            "predicate_name": predicate_name,
-                            "result_type": type(result).__name__,
-                        },
-                    )
+                result = evaluate_predicate(
+                    predicate, left, right, predicate_name
+                )
                 if bool(result):
                     matches.append(
                         SpatialJoinMatch(left.feature_id, right.feature_id)
@@ -1435,6 +1553,43 @@ class Dataset:
         )
         return Reprojection(dataset=dataset, report=report)
 
+    def moran_values(self, values: Sequence[Real] | None) -> numpy.ndarray:
+        """Collects and checks the values that Moran's I is computed on.
+
+        Args:
+            values: Numeric values aligned with the feature order, or None
+                to use the feature labels.
+
+        Returns:
+            The values as a float array.
+
+        Raises:
+            GeospatialValidationError: If the value count differs from the
+                feature count or a value is not numeric.
+        """
+        if values is None:
+            raw_values: list[Any] = [feature.label for feature in self.features]
+        else:
+            raw_values = list(values)
+        if len(raw_values) != len(self.features):
+            raise GeospatialValidationError(
+                "spatial values must match feature count",
+                {
+                    "code": "value_count_mismatch",
+                    "feature_count": len(self.features),
+                    "value_count": len(raw_values),
+                },
+            )
+        if any(
+            isinstance(value, bool) or not isinstance(value, Real)
+            for value in raw_values
+        ):
+            raise GeospatialValidationError(
+                "spatial autocorrelation requires numeric values",
+                {"code": "numeric_values_required"},
+            )
+        return numpy.asarray(raw_values, dtype=numpy.float64)
+
     def spatial_autocorrelation(
         self,
         values: Sequence[Real] | None = None,
@@ -1470,9 +1625,9 @@ class Dataset:
                 a value is not numeric, the dataset has no CRS, or the
                 statistic is not estimable.
         """
-        if permutations < 0 or permutations > 10_000:
+        if permutations < 0 or permutations > MAX_PERMUTATIONS:
             raise ValueError("permutations must be in [0, 10000]")
-        if len(self.features) < 3:
+        if len(self.features) < MIN_OBSERVATIONS:
             raise GeospatialValidationError(
                 "spatial autocorrelation requires at least three features",
                 {"code": "insufficient_features"},
@@ -1480,28 +1635,7 @@ class Dataset:
         if neighbor_count < 1:
             raise ValueError("neighbor_count must be positive")
         effective_neighbor_count = min(neighbor_count, len(self.features) - 1)
-        if values is None:
-            raw_values: list[Any] = [feature.label for feature in self.features]
-        else:
-            raw_values = list(values)
-        if len(raw_values) != len(self.features):
-            raise GeospatialValidationError(
-                "spatial values must match feature count",
-                {
-                    "code": "value_count_mismatch",
-                    "feature_count": len(self.features),
-                    "value_count": len(raw_values),
-                },
-            )
-        if any(
-            isinstance(value, bool) or not isinstance(value, Real)
-            for value in raw_values
-        ):
-            raise GeospatialValidationError(
-                "spatial autocorrelation requires numeric values",
-                {"code": "numeric_values_required"},
-            )
-        numeric = numpy.asarray(raw_values, dtype=numpy.float64)
+        numeric = self.moran_values(values)
         edges = self.spatial_neighbors(effective_neighbor_count)
         try:
             statistic = moran_statistic(numeric, edges)
@@ -1510,18 +1644,9 @@ class Dataset:
                 str(error), {"code": "statistic_not_estimable"}
             ) from error
 
-        p_value: float | None = None
-        if permutations:
-            randomizer = numpy.random.default_rng(seed)
-            exceedances = 0
-            permutation_index = 0
-            while permutation_index < permutations:
-                shuffled = randomizer.permutation(numeric)
-                permuted_statistic = moran_statistic(shuffled, edges)
-                if abs(permuted_statistic) >= abs(statistic):
-                    exceedances += 1
-                permutation_index += 1
-            p_value = (exceedances + 1) / (permutations + 1)
+        p_value = permutation_p_value(
+            numeric, edges, statistic, permutations, seed
+        )
         return SpatialAutocorrelation(
             feature_count=len(self.features),
             neighbor_count=effective_neighbor_count,
@@ -1729,12 +1854,7 @@ class Dataset:
         """
         if not math.isfinite(block_size) or block_size <= 0:
             raise ValueError("block_size must be a positive finite number")
-        if not 0 <= validation_fraction < 1:
-            raise ValueError("validation_fraction must be in [0, 1)")
-        if not 0 <= test_fraction < 1:
-            raise ValueError("test_fraction must be in [0, 1)")
-        if validation_fraction + test_fraction >= 1:
-            raise ValueError("validation_fraction + test_fraction must be < 1")
+        check_split_fractions(validation_fraction, test_fraction)
         dataset_bounds = self.profile().bounds
         origin_x = dataset_bounds[0]
         origin_y = dataset_bounds[1]
@@ -1751,24 +1871,8 @@ class Dataset:
         for feature in self.features:
             grouped.setdefault(block_for(feature), []).append(feature)
         blocks = sorted(grouped)
-        randomizer = random.Random(seed)  # nosec B311 - seeded data split
-        randomizer.shuffle(blocks)
-        test_count = int(len(blocks) * test_fraction)
-        validation_count = int(len(blocks) * validation_fraction)
-        if test_fraction and test_count == 0 and len(blocks) >= 3:
-            test_count = 1
-        if validation_fraction and validation_count == 0 and len(blocks) >= 3:
-            validation_count = 1
-        while test_count + validation_count >= len(blocks):
-            if validation_count > 0:
-                validation_count -= 1
-            elif test_count > 0:
-                test_count -= 1
-            else:
-                break
-        test_blocks = set(blocks[:test_count])
-        validation_blocks = set(
-            blocks[test_count : test_count + validation_count]
+        validation_blocks, test_blocks = partition_group_ids(
+            grouped, validation_fraction, test_fraction, seed
         )
 
         def features_for(selected: set[str]) -> tuple[GeoFeature, ...]:
@@ -1932,6 +2036,22 @@ class RasterSample:
             raise ValueError("raster dimensions and bands must be positive")
         if len(self.transform) not in {0, 6, 9}:
             raise ValueError("transform must be empty or an affine transform")
+        self.check_nodata()
+        if not raw:
+            raise GeospatialValidationError(
+                "raster payload is empty", {"code": "empty_payload"}
+            )
+        if hashlib.sha256(raw).hexdigest() != self.file_hash:
+            raise ValueError("file_hash does not match encoded_bytes")
+        object.__setattr__(self, "byte_size", len(raw))
+
+    def check_nodata(self) -> None:
+        """Validates the nodata value and fraction, normalising the value.
+
+        Raises:
+            ValueError: If the nodata value is non-numeric or non-finite, or
+                the nodata fraction is non-finite or outside [0, 1].
+        """
         if self.nodata_value is not None:
             if isinstance(self.nodata_value, bool) or not isinstance(
                 self.nodata_value, Real
@@ -1949,13 +2069,6 @@ class RasterSample:
             float(self.nodata_fraction)
         ):
             raise ValueError("nodata_fraction must be finite")
-        if not raw:
-            raise GeospatialValidationError(
-                "raster payload is empty", {"code": "empty_payload"}
-            )
-        if hashlib.sha256(raw).hexdigest() != self.file_hash:
-            raise ValueError("file_hash does not match encoded_bytes")
-        object.__setattr__(self, "byte_size", len(raw))
 
     @property
     def nodata_status(self) -> str:
@@ -2009,7 +2122,7 @@ class RasterSample:
             (column_end, row_start),
             (column_end, row_end),
         )
-        if len(self.transform) == 6:
+        if len(self.transform) == AFFINE_TRANSFORM_LENGTH:
             first, second, third, fourth, fifth, sixth = self.transform
 
             def project(column: int, row: int) -> tuple[float, float]:

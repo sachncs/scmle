@@ -5,10 +5,13 @@ from collections.abc import Mapping
 import dataclasses
 import hashlib
 import json
+import random
 from typing import Any
 from typing import Self
 
 from scmle.contracts import data
+
+MIN_HOLDOUT_GROUPS = 3
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -86,6 +89,180 @@ class Curation:
         }
 
 
+def check_card_text(
+    modality: str,
+    dataset_hash: str,
+    sample_count: int,
+    intended_use: str,
+    limitations: tuple[str, ...],
+) -> None:
+    """Checks the text and count fields of a dataset card.
+
+    Args:
+        modality: Name of the modality.
+        dataset_hash: Hash of the dataset content.
+        sample_count: Number of samples.
+        intended_use: Statement of the intended use.
+        limitations: Known limitations of the dataset.
+
+    Raises:
+        ValueError: If `modality`, `dataset_hash` or `intended_use` is
+            blank, `sample_count` is negative or a bool, or `limitations` is
+            empty or holds a blank item.
+    """
+    if not modality.strip():
+        raise ValueError("modality must not be empty")
+    if not dataset_hash.strip():
+        raise ValueError("dataset_hash must not be empty")
+    if isinstance(sample_count, bool) or sample_count < 0:
+        raise ValueError("sample_count must not be negative")
+    if not intended_use.strip():
+        raise ValueError("intended_use must not be empty")
+    if not limitations or any(not item.strip() for item in limitations):
+        raise ValueError("limitations must contain non-empty values")
+
+
+def normalized_curation(curation: Mapping[str, Any]) -> dict[str, Any]:
+    """Round-trips a curation report through strict JSON.
+
+    Args:
+        curation: The curation report.
+
+    Returns:
+        The report as plain JSON-native objects with sorted keys.
+
+    Raises:
+        ValueError: If the report is not JSON-native or does not serialise
+            to an object.
+    """
+    try:
+        normalized = json.loads(
+            json.dumps(dict(curation), allow_nan=False, sort_keys=True)
+        )
+    except (TypeError, ValueError) as error:
+        raise ValueError("curation must be JSON-native") from error
+    if not isinstance(normalized, dict):
+        raise ValueError("curation must serialize to an object")
+    return normalized
+
+
+def check_governance(name: str, values: Mapping[str, str]) -> None:
+    """Checks that a governance mapping holds only non-empty text.
+
+    Args:
+        name: Field name, for the message.
+        values: The mapping to check.
+
+    Raises:
+        ValueError: If the mapping is empty or holds a blank or non-string
+            key or value.
+    """
+    if not values or any(
+        not isinstance(key, str)
+        or not isinstance(value, str)
+        or not key.strip()
+        or not value.strip()
+        for key, value in values.items()
+    ):
+        raise ValueError(f"{name} must contain non-empty values")
+
+
+def check_manifest(
+    manifest: data.ModalityManifest,
+    dataset_hash: str,
+    sample_count: int,
+    modality: str,
+) -> None:
+    """Checks that a manifest agrees with its card.
+
+    Args:
+        manifest: The manifest.
+        dataset_hash: The card's dataset hash.
+        sample_count: The card's sample count.
+        modality: The card's modality.
+
+    Raises:
+        TypeError: If `manifest` is not a ModalityManifest.
+        ValueError: If the manifest disagrees with the card on content hash,
+            sample count or modality.
+    """
+    if not isinstance(manifest, data.ModalityManifest):
+        raise TypeError("manifest must be ModalityManifest")
+    if manifest.content_hash != dataset_hash:
+        raise ValueError("manifest does not match dataset_hash")
+    if manifest.sample_count != sample_count:
+        raise ValueError("manifest does not match sample_count")
+    if manifest.modality != modality:
+        raise ValueError("manifest does not match modality")
+
+
+def check_split_fractions(
+    validation_fraction: float, test_fraction: float
+) -> None:
+    """Checks the fractions of a group split.
+
+    Args:
+        validation_fraction: Share of groups for validation.
+        test_fraction: Share of groups for testing.
+
+    Raises:
+        ValueError: If a fraction is outside [0, 1) or the fractions sum to
+            1 or more.
+    """
+    if not 0 <= validation_fraction < 1:
+        raise ValueError("validation_fraction must be in [0, 1)")
+    if not 0 <= test_fraction < 1:
+        raise ValueError("test_fraction must be in [0, 1)")
+    if validation_fraction + test_fraction >= 1:
+        raise ValueError("validation_fraction + test_fraction must be < 1")
+
+
+def partition_group_ids(
+    group_ids: Iterable[str],
+    validation_fraction: float,
+    test_fraction: float,
+    seed: int,
+) -> tuple[set[str], set[str]]:
+    """Shuffles group ids and assigns whole groups to validation and test.
+
+    With at least three groups a non-zero fraction gets at least one group;
+    at least one group is always left for training when any exists.
+
+    Args:
+        group_ids: The unique group ids; sorted before the shuffle.
+        validation_fraction: Share of groups for validation, in [0, 1).
+        test_fraction: Share of groups for testing, in [0, 1).
+        seed: Seed of the shuffle.
+
+    Returns:
+        The validation group ids and the test group ids.
+    """
+    groups = sorted(group_ids)
+    randomizer = random.Random(seed)  # nosec B311  # noqa: S311 -- a seeded, reproducible data split, not a security use
+    randomizer.shuffle(groups)
+    test_count = int(len(groups) * test_fraction)
+    validation_count = int(len(groups) * validation_fraction)
+    if test_fraction and test_count == 0 and len(groups) >= MIN_HOLDOUT_GROUPS:
+        test_count = 1
+    if (
+        validation_fraction
+        and validation_count == 0
+        and len(groups) >= MIN_HOLDOUT_GROUPS
+    ):
+        validation_count = 1
+    while test_count + validation_count >= len(groups):
+        if validation_count > 0:
+            validation_count -= 1
+        elif test_count > 0:
+            test_count -= 1
+        else:
+            break
+    return (
+        set(groups[test_count : test_count + validation_count]),
+        set(groups[:test_count]),
+    )
+
+
 @dataclasses.dataclass(frozen=True, slots=True)
 class DatasetCard:
     """Human-reviewable card generated from modality curation evidence.
@@ -133,52 +310,27 @@ class DatasetCard:
                 with the card on dataset_hash, sample_count or modality.
             TypeError: If manifest is not a ModalityManifest.
         """
-        if not self.modality.strip():
-            raise ValueError("modality must not be empty")
-        if not self.dataset_hash.strip():
-            raise ValueError("dataset_hash must not be empty")
-        if isinstance(self.sample_count, bool) or self.sample_count < 0:
-            raise ValueError("sample_count must not be negative")
-        if not self.intended_use.strip():
-            raise ValueError("intended_use must not be empty")
-        if not self.limitations or any(
-            not item.strip() for item in self.limitations
-        ):
-            raise ValueError("limitations must contain non-empty values")
-        try:
-            normalized = json.loads(
-                json.dumps(dict(self.curation), allow_nan=False, sort_keys=True)
-            )
-        except (TypeError, ValueError) as error:
-            raise ValueError("curation must be JSON-native") from error
-        if not isinstance(normalized, dict):
-            raise ValueError("curation must serialize to an object")
-        object.__setattr__(self, "curation", normalized)
+        check_card_text(
+            self.modality,
+            self.dataset_hash,
+            self.sample_count,
+            self.intended_use,
+            self.limitations,
+        )
+        object.__setattr__(self, "curation", normalized_curation(self.curation))
         if self.curation.get("dataset_hash") != self.dataset_hash:
             raise ValueError("curation report does not match dataset_hash")
         if self.curation.get("sample_count") != self.sample_count:
             raise ValueError("curation report does not match sample_count")
-        for name, values in (
-            ("provenance", self.provenance),
-            ("privacy", self.privacy),
-        ):
-            if not values or any(
-                not isinstance(key, str)
-                or not isinstance(value, str)
-                or not key.strip()
-                or not value.strip()
-                for key, value in values.items()
-            ):
-                raise ValueError(f"{name} must contain non-empty values")
+        check_governance("provenance", self.provenance)
+        check_governance("privacy", self.privacy)
         if self.manifest is not None:
-            if not isinstance(self.manifest, data.ModalityManifest):
-                raise TypeError("manifest must be ModalityManifest")
-            if self.manifest.content_hash != self.dataset_hash:
-                raise ValueError("manifest does not match dataset_hash")
-            if self.manifest.sample_count != self.sample_count:
-                raise ValueError("manifest does not match sample_count")
-            if self.manifest.modality != self.modality:
-                raise ValueError("manifest does not match modality")
+            check_manifest(
+                self.manifest,
+                self.dataset_hash,
+                self.sample_count,
+                self.modality,
+            )
 
     @classmethod
     def from_report(

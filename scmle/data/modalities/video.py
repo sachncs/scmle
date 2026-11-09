@@ -7,7 +7,6 @@ from datetime import UTC
 import hashlib
 import math
 import pathlib
-import random
 from typing import Any
 from typing import Self
 
@@ -16,9 +15,13 @@ import numpy
 from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.data.modalities.curation import build_finding
+from scmle.data.modalities.curation import check_split_fractions
 from scmle.data.modalities.curation import conflicting_label_groups
 from scmle.data.modalities.curation import Curation
 from scmle.data.modalities.curation import label_counts
+from scmle.data.modalities.curation import partition_group_ids
+
+SHA256_HEX_LENGTH = 64
 
 
 class VideoValidationError(errors.DataError):
@@ -419,7 +422,7 @@ class Sample:
             raise VideoValidationError(
                 "video payload is empty", {"code": "empty_payload"}
             )
-        if len(self.file_hash) != 64 or any(
+        if len(self.file_hash) != SHA256_HEX_LENGTH or any(
             character not in "0123456789abcdef" for character in self.file_hash
         ):
             raise ValueError("file_hash must be a SHA-256 hex digest")
@@ -434,7 +437,7 @@ class Sample:
         metadata: Metadata,
         source: str = "memory://",
         max_bytes: int | None = 2 * 1024 * 1024 * 1024,
-        label: str | int | float | bool | None = None,
+        label: str | float | bool | None = None,
         group_id: str | None = None,
         observation_time: datetime | str | None = None,
     ) -> Self:
@@ -808,36 +811,14 @@ class Dataset:
             ValueError: If a fraction is outside [0, 1) or the fractions sum
                 to 1 or more.
         """
-        if not 0 <= validation_fraction < 1:
-            raise ValueError("validation_fraction must be in [0, 1)")
-        if not 0 <= test_fraction < 1:
-            raise ValueError("test_fraction must be in [0, 1)")
-        if validation_fraction + test_fraction >= 1:
-            raise ValueError("validation_fraction + test_fraction must be < 1")
+        check_split_fractions(validation_fraction, test_fraction)
         grouped: dict[str, list[Sample]] = {}
         for sample in self.samples:
             grouped.setdefault(sample.group_id or sample.source, []).append(
                 sample
             )
-        groups = sorted(grouped)
-        randomizer = random.Random(seed)  # nosec B311 - seeded data split
-        randomizer.shuffle(groups)
-        test_count = int(len(groups) * test_fraction)
-        validation_count = int(len(groups) * validation_fraction)
-        if test_fraction and test_count == 0 and len(groups) >= 3:
-            test_count = 1
-        if validation_fraction and validation_count == 0 and len(groups) >= 3:
-            validation_count = 1
-        while test_count + validation_count >= len(groups):
-            if validation_count > 0:
-                validation_count -= 1
-            elif test_count > 0:
-                test_count -= 1
-            else:
-                break
-        test_groups = set(groups[:test_count])
-        validation_groups = set(
-            groups[test_count : test_count + validation_count]
+        validation_groups, test_groups = partition_group_ids(
+            grouped, validation_fraction, test_fraction, seed
         )
 
         def samples_for(excluded: set[str]) -> tuple[Sample, ...]:
@@ -950,7 +931,7 @@ class Dataset:
                     {"count": len(out_of_tolerance)},
                     "Align audio and video or exclude synchronization-"
                     "dependent tasks from the capability declaration.",
-                    True,
+                    blocking=True,
                 )
             )
         if unknown_synchronization:
@@ -962,7 +943,7 @@ class Dataset:
                     {"count": len(unknown_synchronization)},
                     "Supply measured audio duration, offset, and tolerance "
                     "before making audio-video timing claims.",
-                    False,
+                    blocking=False,
                 )
             )
         if len(formats) > 1 or len(codecs) > 1:
@@ -974,7 +955,7 @@ class Dataset:
                     {"formats": formats, "codecs": codecs},
                     "Choose an explicit decoder and normalization policy "
                     "before training.",
-                    False,
+                    blocking=False,
                 )
             )
         if len(dimensions) > 1:
@@ -986,7 +967,7 @@ class Dataset:
                     {"dimensions": [list(value) for value in dimensions]},
                     "Record frame resizing or bucketing as a versioned "
                     "transformation.",
-                    False,
+                    blocking=False,
                 )
             )
         risk_findings = []
@@ -1033,7 +1014,7 @@ class Dataset:
                     temporal_evidence,
                     "Supply observation times for every clip before using "
                     "temporal evaluation or declare the untimed subset.",
-                    False,
+                    blocking=False,
                 )
             )
         if "unlabeled" in labels and len(labels) > 1:
@@ -1045,7 +1026,7 @@ class Dataset:
                     {"label_counts": labels},
                     "Declare whether unlabeled clips are valid for the "
                     "intended task.",
-                    False,
+                    blocking=False,
                 )
             )
         if conflicts:
@@ -1057,7 +1038,7 @@ class Dataset:
                     {"groups": list(conflicts)},
                     "Resolve the label conflict or explicitly exclude the "
                     "affected video content.",
-                    True,
+                    blocking=True,
                 )
             )
         return Curation(
