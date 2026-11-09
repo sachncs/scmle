@@ -47,7 +47,12 @@ class RunRecord:
     machine: str = dataclasses.field(default_factory=platform.platform)
 
     def __post_init__(self) -> None:
-        """Rejects an unknown status so a typo cannot hide a failure."""
+        """Rejects an unknown status so a typo cannot hide a failure.
+
+        Raises:
+            ValueError: If `status` is not one of `STATUSES`, or an `ok` record
+                has no score.
+        """
         if self.status not in STATUSES:
             raise ValueError(f"unknown status {self.status!r}")
         if self.status == "ok" and self.score is None:
@@ -55,13 +60,25 @@ class RunRecord:
 
 
 def append(path: pathlib.Path, record: RunRecord) -> None:
-    """Appends one record to a JSON-lines results file."""
+    """Appends one record to a JSON-lines results file.
+
+    Args:
+        path: The results file; created if missing.
+        record: The record to write as one line.
+    """
     with path.open("a", encoding="utf-8", newline="\n") as handle:
         handle.write(json.dumps(dataclasses.asdict(record)) + "\n")
 
 
 def read(path: pathlib.Path) -> list[RunRecord]:
-    """Reads every record of a results file."""
+    """Reads every record of a results file.
+
+    Args:
+        path: The JSON-lines results file.
+
+    Returns:
+        The records in file order; blank lines are skipped.
+    """
     records: list[RunRecord] = []
     with path.open(encoding="utf-8") as handle:
         for line in handle:
@@ -72,7 +89,14 @@ def read(path: pathlib.Path) -> list[RunRecord]:
 
 
 def key(record: RunRecord) -> tuple[str, int, int, int, int]:
-    """Identifies one run: system, budget, task, fold and repeat."""
+    """Identifies one run: system, budget, task, fold and repeat.
+
+    Args:
+        record: The record to identify.
+
+    Returns:
+        The tuple (system, budget_s, task_id, fold, repeat).
+    """
     return (
         record.system,
         record.budget_s,
@@ -86,6 +110,12 @@ def completed(path: pathlib.Path) -> set[tuple[str, int, int, int, int]]:
     """Keys of the runs that finished `ok`, so a restart skips them.
 
     A failed or timed-out run is not complete and will be tried again.
+
+    Args:
+        path: The JSON-lines results file; it may not exist yet.
+
+    Returns:
+        The `key` of every `ok` record; empty when the file is missing.
     """
     if not path.exists():
         return set()

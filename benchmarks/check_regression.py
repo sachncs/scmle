@@ -84,7 +84,15 @@ LOGGER = logging.getLogger(__name__)
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Checks a results file against the baseline."""
+    """Checks a results file against the baseline.
+
+    Args:
+        argv: Command-line arguments (the results path, optionally
+            `--baseline PATH`); `None` reads `sys.argv`.
+
+    Returns:
+        Process exit status: 1 when any regression is reported, otherwise 0.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("results")
     parser.add_argument("--baseline", default=str(BASELINE))

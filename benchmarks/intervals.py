@@ -34,7 +34,17 @@ def mean_interval(
 
 
 def advantage(metric: str, score: float, reference: float) -> float:
-    """How much better the score is than the reference (positive = better)."""
+    """How much better the score is than the reference (positive = better).
+
+    Args:
+        metric: Metric name; names in `LOWER_IS_BETTER` are minimised.
+        score: Score of the model being judged.
+        reference: Score of the reference it is compared with.
+
+    Returns:
+        The signed advantage, `reference - score` for a lower-is-better metric
+        and `score - reference` otherwise.
+    """
     if metric in LOWER_IS_BETTER:
         return reference - score
     return score - reference
@@ -44,6 +54,16 @@ def verdict(low: float, high: float, seeds: int) -> str:
     """`ahead`, `behind` or `tie` from the interval of the advantage.
 
     One seed has no interval, so the sign alone decides and the label says so.
+
+    Args:
+        low: Lower bound of the advantage interval.
+        high: Upper bound of the advantage interval.
+        seeds: Number of seeds behind the interval.
+
+    Returns:
+        `ahead` when the whole interval is positive, `behind` when it is all
+        negative, otherwise `tie`. With fewer than two seeds the label is
+        chosen by the sign of the midpoint and suffixed ` (1 seed)`.
     """
     if seeds < 2:
         mean = (low + high) / 2

@@ -43,7 +43,11 @@ METRICS = {
 
 
 def load_split() -> dict[str, Any]:
-    """Reads the committed development / hold-out assignment."""
+    """Reads the committed development / hold-out assignment.
+
+    Returns:
+        The parsed `split.json`.
+    """
     return json.loads(split.OUTPUT.read_text(encoding="utf-8"))
 
 
@@ -73,7 +77,17 @@ def check_task_ids(task_ids: list[int], open_holdout: bool = False) -> None:
 
 
 def problem_type_of(task_id: int) -> str:
-    """The task's problem type, from the pinned task table."""
+    """The task's problem type, from the pinned task table.
+
+    Args:
+        task_id: OpenML task id.
+
+    Returns:
+        The problem type: `binary`, `multiclass` or `regression`.
+
+    Raises:
+        ValueError: If the task is not in the table.
+    """
     for row in split.load_tasks():
         if int(row["task_id"]) == task_id:
             return row["problem_type"]
@@ -81,7 +95,16 @@ def problem_type_of(task_id: int) -> str:
 
 
 def seed_for(task_id: int, fold: int, repeat: int) -> int:
-    """A deterministic 31-bit SCMLE seed for one task split."""
+    """A deterministic 31-bit SCMLE seed for one task split.
+
+    Args:
+        task_id: OpenML task id.
+        fold: Fold index.
+        repeat: Repeat index.
+
+    Returns:
+        An integer in [0, 2**31) derived from a SHA-256 of the three values.
+    """
     key = f"scmle-sota:{task_id}:{fold}:{repeat}".encode()
     return int(hashlib.sha256(key).hexdigest(), 16) % 2**31
 
@@ -120,7 +143,18 @@ def load_task(
 
 
 def score(result: Any, test: pd.DataFrame, target: str, kind: str) -> float:
-    """Scores the fitted project on the held-out test rows."""
+    """Scores the fitted project on the held-out test rows.
+
+    Args:
+        result: The finished run, able to `predict` and `predict_proba`.
+        test: Test frame including the target column.
+        target: Name of the target column.
+        kind: `binary` (ROC AUC), `multiclass` (log loss) or `regression`
+            (RMSE).
+
+    Returns:
+        The metric value in its natural units.
+    """
     truth = test[target]
     rows = test.drop(columns=[target])
     if kind == "regression":
@@ -206,7 +240,18 @@ def run_frames(
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Runs the requested tasks and appends records to a JSON-lines file."""
+    """Runs the requested tasks and appends records to a JSON-lines file.
+
+    Tasks that cannot be loaded are recorded as failed. Requesting a task
+    outside the protocol or a sealed hold-out task stops the run before any
+    work (see `check_task_ids`).
+
+    Args:
+        argv: Command-line arguments; `None` reads `sys.argv`.
+
+    Returns:
+        1 if any record written in this call is not `ok`, otherwise 0.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--tasks", type=int, nargs="+", required=True)
     parser.add_argument("--budgets", type=int, nargs="+", default=[60])

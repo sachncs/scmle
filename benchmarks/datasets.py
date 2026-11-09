@@ -46,10 +46,22 @@ class BenchmarkDataset(abc.ABC):
 
     @abc.abstractmethod
     def fetch(self) -> pd.DataFrame:
-        """Downloads/loads the raw table, including the target column."""
+        """Downloads/loads the raw table, including the target column.
+
+        Returns:
+            The full table before any dropping or subsampling.
+        """
 
     def load(self) -> pd.DataFrame:
-        """Loads the table, subsampling deterministically if capped."""
+        """Loads the table, subsampling deterministically if capped.
+
+        Drops the `drop` columns, converts the target to numbers when
+        `numeric_target` is set, and samples `max_rows` rows with a fixed seed
+        when the table is longer than that.
+
+        Returns:
+            The table with a fresh 0..n-1 index.
+        """
         frame = self.fetch().drop(columns=list(self.drop))
         if self.numeric_target:
             frame[self.target] = pd.to_numeric(frame[self.target])
@@ -69,7 +81,12 @@ class SklearnDataset(BenchmarkDataset):
     loader: str = ""
 
     def fetch(self) -> pd.DataFrame:
-        """Loads the bundled dataset as a DataFrame."""
+        """Loads the bundled dataset as a DataFrame.
+
+        Returns:
+            The scikit-learn frame; when it has no target column, the bunch's
+            target is added under `target`.
+        """
         bunch = getattr(datasets, self.loader)(as_frame=True)
         frame = bunch.frame.copy()
         if self.target not in frame.columns:
@@ -91,7 +108,11 @@ class OpenMlDataset(BenchmarkDataset):
     online: ClassVar[bool] = True
 
     def fetch(self) -> pd.DataFrame:
-        """Downloads the dataset (cached after the first call)."""
+        """Downloads the dataset (cached after the first call).
+
+        Returns:
+            The OpenML frame with categorical columns converted to object dtype.
+        """
         bunch = datasets.fetch_openml(
             self.openml_name, version=self.version, as_frame=True, parser="auto"
         )
@@ -115,7 +136,12 @@ class HuggingFaceDataset(BenchmarkDataset):
     online: ClassVar[bool] = True
 
     def fetch(self) -> pd.DataFrame:
-        """Downloads the file (cached by `huggingface_hub`) and reads it."""
+        """Downloads the file (cached by `huggingface_hub`) and reads it.
+
+        Returns:
+            The table, read as Parquet when the file name ends in `.parquet` and
+            as CSV otherwise.
+        """
         from huggingface_hub import hf_hub_download
 
         path = hf_hub_download(self.repo, self.filename, repo_type="dataset")
@@ -193,7 +219,24 @@ def open_ml(
     time_as_feature: bool = False,
     numeric_target: bool = False,
 ) -> OpenMlDataset:
-    """Describes an OpenML dataset (shorthand for the extended suite)."""
+    """Describes an OpenML dataset (shorthand for the extended suite).
+
+    Args:
+        name: Display name.
+        openml_name: Dataset name on OpenML.
+        target: Target column name.
+        task: Task request passed to `MLProject`.
+        metric: Primary metric.
+        version: OpenML dataset version.
+        max_rows: Row cap applied when loading (None = all rows).
+        drop: Columns that are identifiers or free text, never features.
+        time_column: Column ordering the rows, for chronological validation.
+        time_as_feature: Whether the model may also use that column.
+        numeric_target: The target is stored as text but is a number.
+
+    Returns:
+        The dataset description; nothing is downloaded until `fetch`.
+    """
     return OpenMlDataset(
         name,
         target,
@@ -338,7 +381,21 @@ def hugging_face(
     max_rows: int | None = None,
     drop: tuple[str, ...] = (),
 ) -> HuggingFaceDataset:
-    """Describes a Hugging Face table (shorthand for the suite below)."""
+    """Describes a Hugging Face table (shorthand for the suite below).
+
+    Args:
+        name: Display name.
+        filename: CSV or Parquet file inside the repository.
+        target: Target column name.
+        task: Task request passed to `MLProject`.
+        metric: Primary metric.
+        repo: Repository id of the dataset repository.
+        max_rows: Row cap applied when loading (None = all rows).
+        drop: Columns that are identifiers or free text, never features.
+
+    Returns:
+        The dataset description; nothing is downloaded until `fetch`.
+    """
     return HuggingFaceDataset(
         name,
         target,
@@ -358,7 +415,18 @@ def classification(
     repo: str = HUB_REPO,
     max_rows: int | None = None,
 ) -> HuggingFaceDataset:
-    """A binary classification table of the curated benchmark."""
+    """A binary classification table of the curated benchmark.
+
+    Args:
+        name: Display name.
+        filename: CSV or Parquet file inside the repository.
+        target: Target column name.
+        repo: Repository id of the dataset repository.
+        max_rows: Row cap applied when loading (None = all rows).
+
+    Returns:
+        The dataset description, scored by ROC AUC.
+    """
     return hugging_face(
         name,
         filename,
@@ -378,7 +446,19 @@ def regression(
     max_rows: int | None = None,
     drop: tuple[str, ...] = (),
 ) -> HuggingFaceDataset:
-    """A regression table of the curated benchmark."""
+    """A regression table of the curated benchmark.
+
+    Args:
+        name: Display name.
+        filename: CSV or Parquet file inside the repository.
+        target: Target column name.
+        repo: Repository id of the dataset repository.
+        max_rows: Row cap applied when loading (None = all rows).
+        drop: Columns that are identifiers or free text, never features.
+
+    Returns:
+        The dataset description, scored by RMSE.
+    """
     return hugging_face(
         name, filename, target, "regression", "rmse", repo, max_rows, drop
     )

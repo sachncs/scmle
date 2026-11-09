@@ -86,7 +86,15 @@ class Row:
 
 
 def cached(name: str, make: Callable[[], pd.DataFrame]) -> pd.DataFrame:
-    """Downloads a table once and keeps it as Parquet."""
+    """Downloads a table once and keeps it as Parquet.
+
+    Args:
+        name: Cache file stem under `CACHE`.
+        make: Builds the table; called only when the cache file is missing.
+
+    Returns:
+        The table read back from the cached Parquet file.
+    """
     CACHE.mkdir(exist_ok=True)
     path = CACHE / f"{name}.parquet"
     if not path.exists():
@@ -95,7 +103,15 @@ def cached(name: str, make: Callable[[], pd.DataFrame]) -> pd.DataFrame:
 
 
 def rdataset(path: str) -> pd.DataFrame:
-    """A table from the Rdatasets collection."""
+    """A table from the Rdatasets collection.
+
+    Args:
+        path: Location of the CSV below the Rdatasets root, for example
+            `datasets/nottem.csv`.
+
+    Returns:
+        The table, without its `rownames` column if it has one.
+    """
     return cached(
         path.replace("/", "_"),
         lambda: pd.read_csv(RDATASETS + path).drop(
@@ -105,7 +121,15 @@ def rdataset(path: str) -> pd.DataFrame:
 
 
 def openml(name: str, version: int | str = "active") -> pd.DataFrame:
-    """A table from OpenML."""
+    """A table from OpenML.
+
+    Args:
+        name: OpenML dataset name.
+        version: OpenML dataset version, or `"active"` for the active one.
+
+    Returns:
+        The dataset's frame, including the target column.
+    """
     from sklearn.datasets import fetch_openml
 
     return cached(
@@ -115,7 +139,15 @@ def openml(name: str, version: int | str = "active") -> pd.DataFrame:
 
 
 def split_ids(result: scmle.RunResult) -> tuple[np.ndarray, np.ndarray]:
-    """Development and locked row positions of a finished run."""
+    """Development and locked row positions of a finished run.
+
+    Args:
+        result: A finished run whose directory holds its validation manifest.
+
+    Returns:
+        The development (train) and locked (test) row positions, as two
+        integer arrays.
+    """
     manifest = json.loads(
         (result.run_dir / "validation_manifest.json").read_text()
     )
@@ -123,7 +155,15 @@ def split_ids(result: scmle.RunResult) -> tuple[np.ndarray, np.ndarray]:
 
 
 def encode(frame: pd.DataFrame) -> pd.DataFrame:
-    """Numeric matrix for baselines: dummies, missing filled with medians."""
+    """Numeric matrix for baselines: dummies, missing filled with medians.
+
+    Args:
+        frame: Feature table.
+
+    Returns:
+        The frame with categorical columns one-hot encoded as floats and each
+        missing value replaced by its column median.
+    """
     coded = pd.get_dummies(frame, dtype=float)
     return coded.fillna(coded.median())
 
@@ -131,7 +171,18 @@ def encode(frame: pd.DataFrame) -> pd.DataFrame:
 def project(
     frame: pd.DataFrame, target: Any, root: pathlib.Path, **kw: Any
 ) -> scmle.MLProject:
-    """A project with the suite's shared settings."""
+    """A project with the suite's shared settings.
+
+    Args:
+        frame: The dataset.
+        target: Target column name, or a list of names for multi-target tasks.
+        root: Output directory of the run.
+        **kw: Further `MLProject` arguments; `time_budget` defaults to
+            `BUDGET`, `workers` to 2 and `leakage_policy` to `"warn"`.
+
+    Returns:
+        The configured, not yet run, project.
+    """
     kw.setdefault("time_budget", BUDGET)
     kw.setdefault("workers", 2)
     kw.setdefault("leakage_policy", "warn")  # public tables, see run_benchmarks
@@ -150,7 +201,21 @@ def forecast_case(
     horizon: int,
     root: pathlib.Path,
 ) -> Row:
-    """Forecasts a real series against last-value and seasonal-naive."""
+    """Forecasts a real series against last-value and seasonal-naive.
+
+    Args:
+        name: Display name of the dataset.
+        frame: The series as a table.
+        value: Name of the value column.
+        clock: Name of the time column.
+        period: Seasonal period, in steps.
+        horizon: Forecast horizon, in steps.
+        root: Output directory of the run.
+
+    Returns:
+        The row; the baseline is the better (lower mean MAE) of the
+        last-value and seasonal-naive forecasts.
+    """
     result = project(
         frame,
         value,
@@ -193,7 +258,19 @@ def survival_case(
     root: pathlib.Path,
     note: str = "",
 ) -> Row:
-    """Survival against an untuned Cox model on the same rows."""
+    """Survival against an untuned Cox model on the same rows.
+
+    Args:
+        name: Display name of the dataset.
+        frame: The dataset.
+        duration: Name of the follow-up time column.
+        event: Name of the event indicator column.
+        root: Output directory of the run.
+        note: Text placed at the start of the row's note.
+
+    Returns:
+        The row, scored by concordance index on the run's locked rows.
+    """
     result = project(
         frame, duration, root, task="survival", event_column=event
     ).run()
@@ -230,7 +307,17 @@ def survival_case(
 def ordinal_case(
     name: str, frame: pd.DataFrame, target: str, root: pathlib.Path
 ) -> Row:
-    """Ordered labels against a plain multiclass boosted classifier."""
+    """Ordered labels against a plain multiclass boosted classifier.
+
+    Args:
+        name: Display name of the dataset.
+        frame: The dataset.
+        target: Name of the ordered label column.
+        root: Output directory of the run.
+
+    Returns:
+        The row, scored by quadratic weighted kappa on the locked rows.
+    """
     order = sorted(frame[target].unique(), key=lambda v: float(v))
     result = project(
         frame, target, root, task="ordinal", ordinal_order=order
@@ -262,7 +349,19 @@ def ordinal_case(
 def multilabel_case(
     name: str, frame: pd.DataFrame, labels: list[str], root: pathlib.Path
 ) -> Row:
-    """Several labels against one boosted classifier per label."""
+    """Several labels against one boosted classifier per label.
+
+    Args:
+        name: Display name of the dataset.
+        frame: The dataset.
+        labels: Names of the label columns; values are read as true when
+            they are 1 or the text `true` in any case.
+        root: Output directory of the run.
+
+    Returns:
+        The row, scored by the macro-averaged F-score across labels on the
+        locked rows.
+    """
     frame = frame.copy()
     for label in labels:
         frame[label] = (
@@ -296,7 +395,17 @@ def multilabel_case(
 def multioutput_case(
     name: str, frame: pd.DataFrame, targets: list[str], root: pathlib.Path
 ) -> Row:
-    """Several numbers against one boosted regressor per target."""
+    """Several numbers against one boosted regressor per target.
+
+    Args:
+        name: Display name of the dataset.
+        frame: The dataset.
+        targets: Names of the numeric target columns.
+        root: Output directory of the run.
+
+    Returns:
+        The row, scored by mean R2 across targets on the locked rows.
+    """
     frame = frame.assign(**{t: frame[t].astype(float) for t in targets})
     result = project(frame, targets, root, task="multioutput").run()
     train, test = split_ids(result)
@@ -328,7 +437,20 @@ def uplift_case(
     root: pathlib.Path,
     note: str = "",
 ) -> Row:
-    """Uplift against random ranking, with the randomization verdict."""
+    """Uplift against random ranking, with the randomization verdict.
+
+    Args:
+        name: Display name of the dataset.
+        frame: The dataset.
+        outcome: Name of the outcome column.
+        treatment: Name of the treatment indicator column.
+        root: Output directory of the run.
+        note: Text placed at the start of the row's note.
+
+    Returns:
+        The row, scored by the Qini coefficient on the locked rows; the
+        baseline is the mean Qini of 50 random rankings.
+    """
     result = project(
         frame, outcome, root, task="uplift", treatment_column=treatment
     ).run()
@@ -361,10 +483,22 @@ def uplift_case(
 
 
 def ranking_case(root: pathlib.Path) -> Row:
-    """Web-search ranking against pointwise boosting."""
+    """Web-search ranking against pointwise boosting.
+
+    Args:
+        root: Output directory of the run.
+
+    Returns:
+        The row, scored by NDCG on the locked queries.
+    """
     from huggingface_hub import hf_hub_download
 
     def load() -> pd.DataFrame:
+        """Downloads the first 700 queries of the MSLR-WEB10k validation file.
+
+        Returns:
+            One row per document with `query`, `relevance` and features `f0`...
+        """
         path = hf_hub_download(
             "philipphager/MSLR-WEB10k",
             "validation.parquet",
@@ -411,7 +545,15 @@ def ranking_case(root: pathlib.Path) -> Row:
 
 
 def streaming_case(root: pathlib.Path) -> Row:
-    """A real 581k-row table streamed under a tiny memory budget."""
+    """A real 581k-row table streamed under a tiny memory budget.
+
+    Args:
+        root: Output directory of the run.
+
+    Returns:
+        The row, scored by accuracy on all locked rows; the baseline is
+        boosting fitted on every development row.
+    """
     from sklearn.datasets import fetch_covtype
 
     CACHE.mkdir(exist_ok=True)
@@ -461,9 +603,22 @@ def streaming_case(root: pathlib.Path) -> Row:
 
 
 def text_case(root: pathlib.Path) -> Row:
-    """SMS spam: sentence embeddings against TF-IDF terms."""
+    """SMS spam: sentence embeddings against TF-IDF terms.
+
+    Args:
+        root: Output directory of the two runs.
+
+    Returns:
+        The row, scored by ROC AUC; the baseline is the same pipeline with
+        the TF-IDF text encoder.
+    """
 
     def load() -> pd.DataFrame:
+        """Downloads the SMS spam table.
+
+        Returns:
+            The table with its original `sms` and `label` columns.
+        """
         from huggingface_hub import hf_hub_download
 
         path = hf_hub_download(
@@ -501,12 +656,33 @@ def text_case(root: pathlib.Path) -> Row:
 
 
 def build_cases(root: pathlib.Path) -> dict[str, Callable[[], Row]]:
-    """Every case by name."""
+    """Every case by name.
+
+    Args:
+        root: Directory under which each case gets its own output folder.
+
+    Returns:
+        Mapping of case name to a callable that runs the case and returns
+        its row.
+    """
 
     def r(name: str) -> pathlib.Path:
+        """The output directory of one case.
+
+        Args:
+            name: Case folder name.
+
+        Returns:
+            The folder below `root`.
+        """
         return root / name
 
     def air() -> pd.DataFrame:
+        """The AirPassengers series.
+
+        Returns:
+            The monthly series from the Rdatasets collection.
+        """
         return rdataset("datasets/AirPassengers.csv")
 
     cases: dict[str, Callable[[], Row]] = {
@@ -624,9 +800,19 @@ def build_cases(root: pathlib.Path) -> dict[str, Callable[[], Row]]:
 
 
 def criteo() -> pd.DataFrame:
-    """A 3% random sample of the Criteo uplift table."""
+    """A 3% random sample of the Criteo uplift table.
+
+    Returns:
+        The sampled table without the `conversion` and `exposure` columns.
+    """
 
     def load() -> pd.DataFrame:
+        """Streams the compressed Criteo file and samples each chunk.
+
+        Returns:
+            A 3% random sample (seed 0) of each million-row chunk, without the
+            `conversion` and `exposure` columns.
+        """
         url = (
             "https://huggingface.co/datasets/criteo/criteo-uplift/resolve/"
             "main/criteo-research-uplift-v2.1.csv.gz"
@@ -642,7 +828,14 @@ def criteo() -> pd.DataFrame:
 
 
 def format_table(rows: list[Row]) -> str:
-    """Markdown table of the results."""
+    """Markdown table of the results.
+
+    Args:
+        rows: The case outcomes.
+
+    Returns:
+        The table text; a failed row shows only its name, task and `ERROR`.
+    """
     lines = [
         "| dataset | task | rows | metric | framework | baseline | "
         "baseline is | verdict | selected |",
@@ -661,7 +854,14 @@ def format_table(rows: list[Row]) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Runs the selected real-data cases."""
+    """Runs the selected real-data cases.
+
+    Args:
+        argv: Command-line arguments; `None` reads `sys.argv`.
+
+    Returns:
+        Process exit status: 0 when no case failed, otherwise 1.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--only", nargs="*", default=[])
     parser.add_argument("--budget", type=int, default=150)

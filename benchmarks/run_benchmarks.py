@@ -102,6 +102,9 @@ def run_one(
 
     Returns:
         The record, averaged over seeds; failures are captured, not raised.
+
+    Raises:
+        ValueError: If `seeds` is less than 1.
     """
     if seeds < 1:
         raise ValueError("seeds must be at least 1")
@@ -206,12 +209,27 @@ COLUMNS = (
 
 
 def format_number(value: float | None) -> str:
-    """Formats a score, leaving missing values blank."""
+    """Formats a score, leaving missing values blank.
+
+    Args:
+        value: The score, or None when it is missing.
+
+    Returns:
+        The score with four decimals, or an empty string for None.
+    """
     return "" if value is None else f"{value:.4f}"
 
 
 def describe_advantage(record: BenchmarkRecord) -> str:
-    """The advantage over the reference with its interval, if there is one."""
+    """The advantage over the reference with its interval, if there is one.
+
+    Args:
+        record: A completed benchmark record with `advantage` filled in.
+
+    Returns:
+        The signed mean advantage; for two or more seeds it is followed by
+        the interval as `[low, high]`.
+    """
     found = record.advantage
     if record.seeds < 2:
         return f"{found['mean']:+.4f}"
@@ -219,7 +237,15 @@ def describe_advantage(record: BenchmarkRecord) -> str:
 
 
 def to_markdown(records: list[BenchmarkRecord]) -> str:
-    """Renders records as a Markdown table."""
+    """Renders records as a Markdown table.
+
+    Args:
+        records: The benchmark records, one row each.
+
+    Returns:
+        The table text with the header `COLUMNS`; a failed record shows its
+        name, `ERROR` and its seconds only.
+    """
     lines = [
         "| " + " | ".join(COLUMNS) + " |",
         "|" + "|".join(" --- " for column in COLUMNS) + "|",
@@ -251,7 +277,15 @@ def to_markdown(records: list[BenchmarkRecord]) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Runs the selected benchmarks and writes the results."""
+    """Runs the selected benchmarks and writes the results.
+
+    Args:
+        argv: Command-line arguments; `None` reads `sys.argv`.
+
+    Returns:
+        Process exit status: 0 when every selected dataset succeeded,
+        otherwise 1.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--offline", action="store_true", help="skip downloads")
     parser.add_argument(

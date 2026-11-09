@@ -38,7 +38,14 @@ ALPHA = 0.05
 
 
 def load(directory: pathlib.Path) -> list[records.RunRecord]:
-    """Reads every results file in a directory."""
+    """Reads every results file in a directory.
+
+    Args:
+        directory: Directory holding `*.jsonl` results files.
+
+    Returns:
+        The records of all files, in file-name order.
+    """
     found: list[records.RunRecord] = []
     for path in sorted(directory.glob("*.jsonl")):
         found.extend(records.read(path))
@@ -46,7 +53,15 @@ def load(directory: pathlib.Path) -> list[records.RunRecord]:
 
 
 def oriented(record: records.RunRecord) -> float | None:
-    """The score, signed so that higher is always better."""
+    """The score, signed so that higher is always better.
+
+    Args:
+        record: The run record.
+
+    Returns:
+        The score, negated for lower-is-better metrics; None when the run
+        did not finish `ok` or has no score.
+    """
     if record.status != "ok" or record.score is None:
         return None
     sign = -1.0 if record.metric in LOWER_IS_BETTER else 1.0
@@ -56,7 +71,16 @@ def oriented(record: records.RunRecord) -> float | None:
 def task_scores(
     found: list[records.RunRecord], budget: int
 ) -> dict[int, dict[str, float | None]]:
-    """Per task and system, the mean oriented score over the splits run."""
+    """Per task and system, the mean oriented score over the splits run.
+
+    Args:
+        found: All run records.
+        budget: Only records with this budget, in seconds, are used.
+
+    Returns:
+        Mapping of task id to system name to the mean oriented score of its
+        `ok` runs; None when the system has no `ok` run on that task.
+    """
     cells: dict[tuple[int, str], list[float | None]] = collections.defaultdict(
         list
     )
@@ -73,7 +97,19 @@ def task_scores(
 def normalize(
     table: dict[int, dict[str, float | None]], systems: list[str]
 ) -> dict[int, dict[str, float]]:
-    """Min-max normalization per task; a failure scores the worst (0)."""
+    """Min-max normalization per task; a failure scores the worst (0).
+
+    Tasks with no scored system, or on which some compared system has no
+    record at all, are left out.
+
+    Args:
+        table: Output of `task_scores`.
+        systems: The systems to compare.
+
+    Returns:
+        Mapping of task id to system name to a score in [0, 1]; on a task
+        where all scored systems tie they score 1.0, and a failed system 0.0.
+    """
     normalized: dict[int, dict[str, float]] = {}
     for task, row in table.items():
         values = [row[s] for s in systems if row.get(s) is not None]
@@ -96,7 +132,19 @@ def normalize(
 def bootstrap_gap(
     reference: list[float], ours: list[float]
 ) -> tuple[float, float, float]:
-    """Median gap (reference - ours) and its 95% bootstrap interval."""
+    """Median gap (reference - ours) and its 95% bootstrap interval.
+
+    The tasks are resampled with replacement 10000 times from a fixed seed
+    derived from `BOOTSTRAP_SEED`, so the interval is reproducible.
+
+    Args:
+        reference: Normalized scores of the reference system, one per task.
+        ours: Normalized scores of SCMLE on the same tasks, in the same order.
+
+    Returns:
+        The observed gap between the medians, and the 2.5th and 97.5th
+        percentiles of the bootstrap gap.
+    """
     seed = int(hashlib.sha256(BOOTSTRAP_SEED.encode()).hexdigest()[:8], 16)
     rng = np.random.default_rng(seed)
     a, b = np.asarray(reference), np.asarray(ours)
@@ -107,7 +155,15 @@ def bootstrap_gap(
 
 
 def holm(pvalues: dict[tuple[str, str], float]) -> dict[tuple[str, str], bool]:
-    """Holm step-down: which pairwise differences are significant."""
+    """Holm step-down: which pairwise differences are significant.
+
+    Args:
+        pvalues: Raw p-value of each system pair.
+
+    Returns:
+        Mapping of each pair to True when its null hypothesis is rejected at
+        level `ALPHA` after the Holm correction.
+    """
     order = sorted(pvalues.items(), key=lambda item: item[1])
     verdict: dict[tuple[str, str], bool] = {}
     rejecting = True
@@ -120,7 +176,18 @@ def holm(pvalues: dict[tuple[str, str], float]) -> dict[tuple[str, str], bool]:
 def comparison_tests(
     normalized: dict[int, dict[str, float]], systems: list[str]
 ) -> dict[str, Any]:
-    """Friedman across all systems, Wilcoxon with Holm for each pair."""
+    """Friedman across all systems, Wilcoxon with Holm for each pair.
+
+    Args:
+        normalized: Output of `normalize`.
+        systems: The compared systems.
+
+    Returns:
+        A dict with `friedman` (statistic and p-value; present only with at
+        least three systems and three tasks) and `pairs`, a list with the
+        Wilcoxon p-value and the Holm verdict of each pair. A pair with
+        identical scores on every task gets p = 1.
+    """
     columns = {
         s: [normalized[t][s] for t in sorted(normalized)] for s in systems
     }
@@ -151,12 +218,34 @@ def comparison_tests(
 
 
 def claim(median_gap: float, upper: float) -> bool:
-    """The protocol's two-part claim test (section 1)."""
+    """The protocol's two-part claim test (section 1).
+
+    Args:
+        median_gap: Observed median gap between the best reference and SCMLE.
+        upper: Upper end of the gap's bootstrap interval.
+
+    Returns:
+        True when the median gap is at most `MEDIAN_GAP` and the upper bound
+        at most `UPPER_GAP`.
+    """
     return median_gap <= MEDIAN_GAP and upper <= UPPER_GAP
 
 
 def summarize(found: list[records.RunRecord], budget: int) -> dict[str, Any]:
-    """Everything the protocol reports for one budget."""
+    """Everything the protocol reports for one budget.
+
+    Args:
+        found: All run records.
+        budget: The budget in seconds to summarize.
+
+    Returns:
+        The systems, task count and failure count per system. When there are
+        normalized tasks and SCMLE is among the systems it also holds the
+        median normalized score per system and the comparison tests; with at
+        least one reference system, the best reference, the gap and its
+        interval, whether the claim is met, and SCMLE's wins, losses and ties
+        against the best reference.
+    """
     systems = sorted({r.system for r in found if r.budget_s == budget})
     table = task_scores(found, budget)
     normalized = normalize(table, systems)
@@ -207,7 +296,14 @@ def summarize(found: list[records.RunRecord], budget: int) -> dict[str, Any]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Prints and optionally saves the summary for every budget present."""
+    """Prints and optionally saves the summary for every budget present.
+
+    Args:
+        argv: Command-line arguments; `None` reads `sys.argv`.
+
+    Returns:
+        Process exit status, always 0.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("directory", type=pathlib.Path)
     parser.add_argument("--output", type=pathlib.Path)

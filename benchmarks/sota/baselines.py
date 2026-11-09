@@ -75,7 +75,15 @@ class HoldoutRefusedError(ValueError):
 
 @dataclasses.dataclass(frozen=True)
 class Job:
-    """One (system, budget, task, split) unit of work."""
+    """One (system, budget, task, split) unit of work.
+
+    Attributes:
+        system: System name, one of `SYSTEMS`.
+        budget_s: Wall-clock budget in seconds.
+        task_id: OpenML task id.
+        fold: Fold index of the task's split.
+        repeat: Repeat index of the task's split.
+    """
 
     system: str
     budget_s: int
@@ -86,7 +94,15 @@ class Job:
 
 @dataclasses.dataclass
 class Outcome:
-    """What a worker reports back through its result file."""
+    """What a worker reports back through its result file.
+
+    Attributes:
+        status: `ok`, `failed` or `timeout`.
+        score: Test score in the metric's natural units; None unless `ok`.
+        seconds: Wall-clock time the worker used for fitting.
+        error: Failure text, empty on success.
+        versions: Versions of the system and its main dependencies.
+    """
 
     status: str
     score: float | None = None
@@ -96,7 +112,11 @@ class Outcome:
 
 
 def sets() -> dict[str, list[int]]:
-    """Reads the committed development / hold-out assignment."""
+    """Reads the committed development / hold-out assignment.
+
+    Returns:
+        The task ids under `development` and `holdout`, as integers.
+    """
     document = json.loads(split.OUTPUT.read_text(encoding="utf-8"))
     return {
         "development": [int(i) for i in document["development"]],
@@ -133,14 +153,25 @@ def check_tasks(task_ids: list[int], open_holdout: bool = False) -> None:
 
 
 def problem_types() -> dict[int, str]:
-    """Maps each protocol task id to its problem type."""
+    """Maps each protocol task id to its problem type.
+
+    Returns:
+        Mapping of task id to `binary`, `multiclass` or `regression`.
+    """
     return {
         int(row["task_id"]): row["problem_type"] for row in split.load_tasks()
     }
 
 
 def splits(lite: bool) -> list[tuple[int, int]]:
-    """The (fold, repeat) pairs to run: the first split only when lite."""
+    """The (fold, repeat) pairs to run: the first split only when lite.
+
+    Args:
+        lite: Whether to run only the first split.
+
+    Returns:
+        Pairs ordered by repeat, then fold; a single pair when `lite`.
+    """
     repeats = LITE_REPEATS if lite else FULL_REPEATS
     pairs = [(f, r) for r in range(repeats) for f in range(FOLDS)]
     return pairs[:1] if lite else pairs
@@ -152,7 +183,18 @@ def plan(
     task_ids: list[int],
     lite: bool,
 ) -> list[Job]:
-    """Expands the request into jobs, ordered task by task."""
+    """Expands the request into jobs, ordered task by task.
+
+    Args:
+        systems: System names to run.
+        budgets: Time budgets in seconds.
+        task_ids: OpenML task ids.
+        lite: Whether to use only the first split of each task.
+
+    Returns:
+        One job per task, budget, system and split, with the task as the
+        outermost loop.
+    """
     return [
         Job(system, budget, task_id, fold, repeat)
         for task_id in task_ids
@@ -163,7 +205,15 @@ def plan(
 
 
 def done(path: pathlib.Path) -> set[tuple[str, int, int, int, int]]:
-    """Keys of the records already in a results file, for resuming."""
+    """Keys of the records already in a results file, for resuming.
+
+    Args:
+        path: The JSON-lines results file; it may not exist yet.
+
+    Returns:
+        The (system, budget, task, fold, repeat) key of every record of any
+        status; empty when the file is missing.
+    """
     if not path.exists():
         return set()
     return {
@@ -184,7 +234,18 @@ def worker_command(
     result: pathlib.Path,
     open_holdout: bool = False,
 ) -> list[str]:
-    """The command line that runs one job in the baseline environment."""
+    """The command line that runs one job in the baseline environment.
+
+    Args:
+        python: Interpreter of the baseline environment.
+        job: The job to run.
+        cpus: Number of CPUs the worker may use.
+        result: File the worker writes its outcome to.
+        open_holdout: Whether to pass `--open-holdout` to the worker.
+
+    Returns:
+        The argument vector to execute.
+    """
     command = [
         str(python),
         "-m",
@@ -211,7 +272,14 @@ def worker_command(
 
 
 def kill_group(process: "subprocess.Popen[str]") -> None:
-    """Kills the worker and every process it spawned (Ray, joblib)."""
+    """Kills the worker and every process it spawned (Ray, joblib).
+
+    Falls back to killing only the worker when its process group cannot be
+    signalled.
+
+    Args:
+        process: The worker, started in its own session.
+    """
     try:
         os.killpg(process.pid, signal.SIGKILL)
     except (ProcessLookupError, PermissionError):
@@ -222,6 +290,16 @@ def execute(
     python: pathlib.Path, job: Job, cpus: int, open_holdout: bool = False
 ) -> tuple[Outcome, float]:
     """Runs one job in a subprocess under a hard wall-clock limit.
+
+    The limit is the budget plus a grace period of a quarter of the budget,
+    at least `MIN_GRACE_S` seconds. A job that exceeds it is killed and
+    reported as a timeout.
+
+    Args:
+        python: Interpreter of the baseline environment.
+        job: The job to run.
+        cpus: Number of CPUs the worker may use.
+        open_holdout: Whether the hold-out tasks are opened.
 
     Returns:
         The outcome and the elapsed wall-clock seconds of the subprocess.
@@ -258,7 +336,18 @@ def execute(
 
 
 def read_outcome(path: pathlib.Path, returncode: int, output: str) -> Outcome:
-    """Turns a worker's result file and exit status into an outcome."""
+    """Turns a worker's result file and exit status into an outcome.
+
+    Args:
+        path: The result file the worker should have written.
+        returncode: The worker's exit status.
+        output: The worker's captured output; its last `TAIL_CHARS`
+            characters go into the error text when there is no result.
+
+    Returns:
+        The outcome read from the file; a `failed` outcome describing the
+        problem when the file is missing or unreadable.
+    """
     tail = output[-TAIL_CHARS:]
     if path.exists():
         try:
@@ -274,7 +363,21 @@ def read_outcome(path: pathlib.Path, returncode: int, output: str) -> Outcome:
 def to_record(
     job: Job, metric: str, outcome: Outcome, elapsed: float
 ) -> records.RunRecord:
-    """Builds the record for a job, whatever its outcome."""
+    """Builds the record for a job, whatever its outcome.
+
+    An `ok` outcome without a score is turned into a failure, and a score
+    is kept only for `ok` outcomes.
+
+    Args:
+        job: The job that was run.
+        metric: Name of the task's metric.
+        outcome: What the worker reported.
+        elapsed: Wall-clock seconds measured by the driver, used when the
+            outcome carries no time.
+
+    Returns:
+        The run record.
+    """
     status = outcome.status
     score = outcome.score
     if status == "ok" and score is None:
@@ -298,7 +401,21 @@ def to_record(
 
 
 def run_all(args: argparse.Namespace) -> int:
-    """Runs the requested jobs sequentially and appends their records."""
+    """Runs the requested jobs sequentially and appends their records.
+
+    Jobs whose key is already in the output file are skipped, so a rerun
+    resumes.
+
+    Args:
+        args: Parsed `run` arguments (tasks, systems, budgets, lite, output,
+            python, cpus, open_holdout).
+
+    Returns:
+        1 if any job in this call did not finish `ok`, otherwise 0.
+
+    Raises:
+        ValueError: If `cpus` is outside 1..`MAX_CPUS`.
+    """
     if not 1 <= args.cpus <= MAX_CPUS:
         raise ValueError(f"--cpus must be in 1..{MAX_CPUS}")
     task_ids = [int(i) for i in args.tasks]
@@ -334,7 +451,17 @@ def run_all(args: argparse.Namespace) -> int:
 
 
 def load_split(task_id: int, fold: int, repeat: int) -> Any:
-    """Loads a task's rows and its stored OpenML split through TabArena."""
+    """Loads a task's rows and its stored OpenML split through TabArena.
+
+    Args:
+        task_id: OpenML task id.
+        fold: Fold index.
+        repeat: Repeat index.
+
+    Returns:
+        The OpenML task, the feature table, the target series, and the train
+        and test row positions of the stored split.
+    """
     utils = importlib.import_module("tabarena.benchmark.task.openml.task_utils")
     task = utils.get_task_with_retry(task_id=task_id, download_splits=True)
     # Not `utils.get_task_data`: its cached-pickle shortcut fails to load
@@ -372,7 +499,20 @@ def score_predictions(
 def autogluon_fit(
     system: str, frame: Any, target: str, problem_type: str, run: Job, cpus: int
 ) -> Any:
-    """Fits AutoGluon with the preset of `system` inside the budget."""
+    """Fits AutoGluon with the preset of `system` inside the budget.
+
+    Args:
+        system: System name selecting the preset in `PRESETS`.
+        frame: Training frame including the target column.
+        target: Name of the target column.
+        problem_type: `binary`, `multiclass` or `regression`.
+        run: The job; its budget is the AutoGluon time limit.
+        cpus: Number of CPUs to use.
+
+    Returns:
+        The fitted predictor and the temporary directory holding its files,
+        which the caller removes.
+    """
     tabular = importlib.import_module("autogluon.tabular")
     path = tempfile.mkdtemp(prefix="sota_ag_")
     predictor = tabular.TabularPredictor(
@@ -402,6 +542,16 @@ def lightgbm_fit(
 
     The search uses at most 70% of the budget; the refit on all training rows
     uses the best iteration count found on the holdout.
+
+    Args:
+        train_x: Training features.
+        train_y: Training targets.
+        problem_type: `binary`, `multiclass` or `regression`.
+        budget_s: Wall-clock budget in seconds.
+        cpus: Number of threads for LightGBM.
+
+    Returns:
+        The LightGBM model refit on all training rows.
     """
     lgb = importlib.import_module("lightgbm")
     numpy = importlib.import_module("numpy")
@@ -429,6 +579,14 @@ def lightgbm_fit(
     }[problem_type]
 
     def stop_at_deadline(env: Any) -> None:
+        """Stops LightGBM training once the search deadline has passed.
+
+        Past the deadline it raises LightGBM's `EarlyStopException`, which
+        ends the current fit.
+
+        Args:
+            env: LightGBM callback environment.
+        """
         if time.monotonic() > search_until:
             raise lgb.callback.EarlyStopException(
                 env.iteration, env.evaluation_result_list
@@ -479,7 +637,16 @@ def lightgbm_fit(
 
 
 def lightgbm_params(generator: Any, trial: int) -> dict[str, Any]:
-    """Draws a LightGBM configuration; trial 0 is the usual default-like one."""
+    """Draws a LightGBM configuration; trial 0 is the usual default-like one.
+
+    Args:
+        generator: NumPy random generator.
+        trial: Trial number; 0 returns the fixed default-like configuration
+            without using the generator.
+
+    Returns:
+        The LightGBM keyword arguments for the trial.
+    """
     if trial == 0:
         return {"learning_rate": 0.05, "num_leaves": 31}
     return {
@@ -495,7 +662,14 @@ def lightgbm_params(generator: Any, trial: int) -> dict[str, Any]:
 
 
 def prepare_frame(features: Any) -> Any:
-    """Gives object columns the category dtype that LightGBM and FLAML use."""
+    """Gives object columns the category dtype that LightGBM and FLAML use.
+
+    Args:
+        features: Feature table.
+
+    Returns:
+        A copy of the table with object columns converted to category.
+    """
     frame = features.copy()
     for column in frame.columns:
         if frame[column].dtype == object:
@@ -506,7 +680,18 @@ def prepare_frame(features: Any) -> Any:
 def flaml_fit(
     train_x: Any, train_y: Any, problem_type: str, budget_s: float, cpus: int
 ) -> Any:
-    """Fits FLAML's AutoML inside the budget."""
+    """Fits FLAML's AutoML inside the budget.
+
+    Args:
+        train_x: Training features.
+        train_y: Training targets.
+        problem_type: `binary`, `multiclass` or `regression`.
+        budget_s: Wall-clock budget in seconds.
+        cpus: Number of parallel jobs.
+
+    Returns:
+        The fitted FLAML AutoML object.
+    """
     flaml = importlib.import_module("flaml")
     automl = flaml.AutoML()
     automl.fit(
@@ -523,7 +708,15 @@ def flaml_fit(
 
 
 def versions_of(system: str) -> dict[str, str]:
-    """Versions of the system and its main dependencies."""
+    """Versions of the system and its main dependencies.
+
+    Args:
+        system: System name, one of `SYSTEMS`.
+
+    Returns:
+        The Python version and the version of each package the system uses
+        (`unknown` when a package reports none).
+    """
     names = {
         "autogluon-best": ("autogluon.tabular", "lightgbm"),
         "autogluon-high": ("autogluon.tabular", "lightgbm"),
@@ -538,7 +731,16 @@ def versions_of(system: str) -> dict[str, str]:
 
 
 def work(job: Job, cpus: int) -> Outcome:
-    """Fits one system on one stored split and scores the test rows."""
+    """Fits one system on one stored split and scores the test rows.
+
+    Args:
+        job: The job to run.
+        cpus: Number of CPUs to use.
+
+    Returns:
+        An `ok` outcome with the test score, the fitting time and the
+        package versions.
+    """
     task, features, target, train, test = load_split(
         job.task_id, job.fold, job.repeat
     )
@@ -587,7 +789,16 @@ def work(job: Job, cpus: int) -> Outcome:
 
 
 def run_worker(args: argparse.Namespace) -> int:
-    """Worker entry point: always writes a result file, even on failure."""
+    """Worker entry point: always writes a result file, even on failure.
+
+    Args:
+        args: Parsed `worker` arguments (system, budget, task, fold, repeat,
+            cpus, result, open_holdout).
+
+    Returns:
+        Always 0; failures are recorded in the result file. A hold-out task
+        requested without `open_holdout` is refused before any work.
+    """
     check_tasks([int(args.task)], open_holdout=args.open_holdout)
     job = Job(args.system, args.budget, args.task, args.fold, args.repeat)
     started = time.monotonic()
@@ -606,7 +817,11 @@ def run_worker(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """Builds the command-line parser for `run` and `worker`."""
+    """Builds the command-line parser for `run` and `worker`.
+
+    Returns:
+        The parser with the two subcommands.
+    """
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     commands = parser.add_subparsers(dest="command", required=True)
 
@@ -633,7 +848,15 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Command-line entry point."""
+    """Command-line entry point.
+
+    Args:
+        argv: Command-line arguments; `None` reads `sys.argv`.
+
+    Returns:
+        The status of `run_worker` or `run_all`; 2 when a hold-out task is
+        refused.
+    """
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
     args = build_parser().parse_args(argv)
     try:

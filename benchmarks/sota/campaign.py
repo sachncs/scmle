@@ -29,7 +29,19 @@ DEFAULT_BUDGETS = (60, 600)
 
 
 def phase_tasks(phase: str, open_holdout: bool) -> list[int]:
-    """Task ids of a phase; the hold-out needs an explicit opt-in."""
+    """Task ids of a phase; the hold-out needs an explicit opt-in.
+
+    Args:
+        phase: `development` or `holdout`, a key of the committed split.
+        open_holdout: Whether the sealed hold-out may be read.
+
+    Returns:
+        The task ids of the phase, from the committed split file.
+
+    Raises:
+        PermissionError: If the phase is `holdout` and `open_holdout` is
+            false.
+    """
     if phase == "holdout" and not open_holdout:
         raise PermissionError(
             "the hold-out is sealed until the protocol's final evaluation; "
@@ -47,7 +59,20 @@ def command(
     baseline_python: str,
     open_holdout: bool,
 ) -> list[str]:
-    """The runner invocation for one system on one task."""
+    """The runner invocation for one system on one task.
+
+    Args:
+        system: System name; `scmle` uses the SCMLE runner, any other name
+            goes to the baseline runner.
+        task: OpenML task id.
+        budgets: Time budgets in seconds.
+        out_dir: Directory for the system's results file (and SCMLE's runs).
+        baseline_python: Interpreter of the baseline environment.
+        open_holdout: Whether to pass `--open-holdout` to the runner.
+
+    Returns:
+        The argument vector to execute.
+    """
     output = str(out_dir / f"{system}.jsonl")
     budget_args = [str(budget) for budget in budgets]
     if system == SCMLE:
@@ -88,7 +113,16 @@ def command(
 
 
 def acquire(lock: pathlib.Path) -> None:
-    """Takes the campaign lock, or fails if a live campaign holds it."""
+    """Takes the campaign lock, or fails if a live campaign holds it.
+
+    A lock left by a process that no longer exists is replaced.
+
+    Args:
+        lock: Path of the lock file; on success it holds this process id.
+
+    Raises:
+        RuntimeError: If the lock names a process that is still alive.
+    """
     if lock.exists():
         text = lock.read_text(encoding="utf-8").strip()
         holder = int(text) if text.isdigit() else 0
@@ -99,7 +133,15 @@ def acquire(lock: pathlib.Path) -> None:
 
 
 def process_alive(pid: int) -> bool:
-    """Whether a process with this id exists."""
+    """Whether a process with this id exists.
+
+    Args:
+        pid: The process id.
+
+    Returns:
+        True if signal 0 reaches the process or is denied for lack of
+        permission; False if there is no such process.
+    """
     try:
         os.kill(pid, 0)
     except ProcessLookupError:
@@ -110,7 +152,14 @@ def process_alive(pid: int) -> bool:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Runs the campaign; the exit code is the number of failed commands."""
+    """Runs the campaign; the exit code is the number of failed commands.
+
+    Args:
+        argv: Command-line arguments; `None` reads `sys.argv`.
+
+    Returns:
+        The number of runner commands that exited with a non-zero status.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--phase", choices=("development", "holdout"), required=True

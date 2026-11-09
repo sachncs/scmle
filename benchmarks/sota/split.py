@@ -29,13 +29,28 @@ DEVELOPMENT_SHARE = 0.6
 
 
 def load_tasks(path: pathlib.Path = TASKS) -> list[dict[str, str]]:
-    """Reads the pinned task table."""
+    """Reads the pinned task table.
+
+    Args:
+        path: The CSV task table.
+
+    Returns:
+        One dict per row, keyed by column name, with text values.
+    """
     with path.open(encoding="utf-8", newline="") as handle:
         return list(csv.DictReader(handle))
 
 
 def rank(seed: str, task_id: str) -> str:
-    """The sort key that decides a task's place within its group."""
+    """The sort key that decides a task's place within its group.
+
+    Args:
+        seed: The recorded split seed.
+        task_id: OpenML task id, as text.
+
+    Returns:
+        The hex SHA-256 digest of `seed:task_id`.
+    """
     return hashlib.sha256(f"{seed}:{task_id}".encode()).hexdigest()
 
 
@@ -44,7 +59,19 @@ def assign(
     seed: str = SEED,
     share: float = DEVELOPMENT_SHARE,
 ) -> dict[str, list[int]]:
-    """Splits task ids into `development` and `holdout`, per problem type."""
+    """Splits task ids into `development` and `holdout`, per problem type.
+
+    Within each problem type the tasks are ordered by `rank` and the first
+    `ceil(share * n)` go to development, the rest to the hold-out.
+
+    Args:
+        tasks: Rows of the task table, with `problem_type` and `task_id`.
+        seed: The recorded split seed.
+        share: Fraction of each problem type assigned to development.
+
+    Returns:
+        The keys `development` and `holdout`, each a sorted list of task ids.
+    """
     groups: dict[str, list[str]] = {}
     for task in tasks:
         groups.setdefault(task["problem_type"], []).append(task["task_id"])
@@ -59,7 +86,15 @@ def assign(
 
 
 def document(tasks: list[dict[str, str]]) -> dict[str, object]:
-    """The committed split, with the rule that produced it."""
+    """The committed split, with the rule that produced it.
+
+    Args:
+        tasks: Rows of the task table.
+
+    Returns:
+        The seed, a text statement of the rule, the task table name and the
+        assignment from `assign`.
+    """
     return {
         "seed": SEED,
         "rule": (
@@ -72,7 +107,15 @@ def document(tasks: list[dict[str, str]]) -> dict[str, object]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Writes `split.json`, or with `--check` verifies the committed file."""
+    """Writes `split.json`, or with `--check` verifies the committed file.
+
+    Args:
+        argv: Command-line arguments; `None` reads `sys.argv`.
+
+    Returns:
+        0 after a write or a matching check; 1 when the check finds that the
+        committed file differs from the recorded seed's split.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args(argv)

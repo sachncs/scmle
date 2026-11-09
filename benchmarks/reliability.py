@@ -60,7 +60,19 @@ class CrashingClassifier(base.ClassifierMixin, base.BaseEstimator):
     """
 
     def fit(self, features: Any, target: Any) -> "CrashingClassifier":
-        """Fits a majority-class rule, or raises on real-sized data."""
+        """Fits a majority-class rule, or raises on real-sized data.
+
+        Args:
+            features: Training features; only their length is used.
+            target: Training labels.
+
+        Returns:
+            The fitted estimator, with the classes and the most frequent one
+            recorded.
+
+        Raises:
+            RuntimeError: If there are `CRASH_ROWS` or more rows.
+        """
         if len(features) >= CRASH_ROWS:
             raise RuntimeError("deliberate failure from the reliability check")
         self.classes_, counts = np.unique(
@@ -70,11 +82,26 @@ class CrashingClassifier(base.ClassifierMixin, base.BaseEstimator):
         return self
 
     def predict(self, features: Any) -> np.ndarray:
-        """Predicts the majority class."""
+        """Predicts the majority class.
+
+        Args:
+            features: Rows to predict; only their number is used.
+
+        Returns:
+            An array holding the majority class once per row.
+        """
         return np.full(len(features), self.majority_)
 
     def predict_proba(self, features: Any) -> np.ndarray:
-        """One-hot probabilities of the majority class."""
+        """One-hot probabilities of the majority class.
+
+        Args:
+            features: Rows to predict; only their number is used.
+
+        Returns:
+            An array of shape (rows, classes) with 1.0 in the majority-class
+            column and 0.0 elsewhere.
+        """
         proba = np.zeros((len(features), len(self.classes_)))
         proba[:, int(np.where(self.classes_ == self.majority_)[0][0])] = 1.0
         return proba
@@ -106,7 +133,20 @@ class CheckRecord:
 def fast_project(
     data: pd.DataFrame, target: str, directory: pathlib.Path, **kwargs: Any
 ) -> scmle.MLProject:
-    """Builds a small in-process project so checks stay quick."""
+    """Builds a small in-process project so checks stay quick.
+
+    Args:
+        data: The dataset.
+        target: Target column name.
+        directory: Output directory of the run.
+        **kwargs: `MLProject` arguments overriding the quick defaults
+            (no top-model, strategy or ensemble search, bagging, deep
+            learning and foundation families excluded, cooperative
+            enforcement, a 120 second budget and a `warn` leakage policy).
+
+    Returns:
+        The configured, not yet run, project.
+    """
     kwargs.setdefault("search", tasks.SearchSpec(top_models=0))
     kwargs.setdefault("strategies", tasks.StrategySpec(top_models=0))
     kwargs.setdefault("ensemble", tasks.EnsembleSpec(size=0))
@@ -123,7 +163,16 @@ def fast_project(
 
 
 def binary_data(rows: int = 600, seed: int = 0) -> pd.DataFrame:
-    """A binary problem with a real, learnable signal."""
+    """A binary problem with a real, learnable signal.
+
+    Args:
+        rows: Number of rows.
+        seed: Seed of the random generator.
+
+    Returns:
+        A frame with numeric `a` and `b`, categorical `c` and the 0/1 label
+        `y`, which depends on all three.
+    """
     rng = np.random.default_rng(seed)
     frame = pd.DataFrame(
         {
@@ -138,7 +187,16 @@ def binary_data(rows: int = 600, seed: int = 0) -> pd.DataFrame:
 
 
 def regression_data(rows: int, seed: int) -> pd.DataFrame:
-    """A linear regression problem with unit-variance noise."""
+    """A linear regression problem with unit-variance noise.
+
+    Args:
+        rows: Number of rows.
+        seed: Seed of the random generator.
+
+    Returns:
+        A frame with numeric `a` and `b` and the target `y`
+        (3a - 2b plus noise).
+    """
     rng = np.random.default_rng(seed)
     frame = pd.DataFrame(
         {"a": rng.normal(size=rows), "b": rng.normal(size=rows)}
@@ -148,7 +206,15 @@ def regression_data(rows: int, seed: int) -> pd.DataFrame:
 
 
 def check_determinism(directory: pathlib.Path) -> CheckRecord:
-    """Two runs with one seed select the same model with the same score."""
+    """Two runs with one seed select the same model with the same score.
+
+    Args:
+        directory: Scratch directory for the two runs.
+
+    Returns:
+        The record; it passes when both runs select the same model and their
+        ROC AUC differs by at most 1e-9.
+    """
     record = CheckRecord(
         "determinism",
         "Same data and seed give the same selection and test score.",
@@ -172,7 +238,14 @@ def check_determinism(directory: pathlib.Path) -> CheckRecord:
 
 
 def check_replay(directory: pathlib.Path) -> CheckRecord:
-    """The replay verifier agrees that an unchanged rerun is exact."""
+    """The replay verifier agrees that an unchanged rerun is exact.
+
+    Args:
+        directory: Scratch directory for the original run and the rerun.
+
+    Returns:
+        The record; it passes when `verify_replay` reports level `exact`.
+    """
     record = CheckRecord(
         "replay",
         "verify_replay classifies a rerun of the same configuration as exact.",
@@ -192,7 +265,16 @@ def check_replay(directory: pathlib.Path) -> CheckRecord:
 
 
 def check_no_false_skill(directory: pathlib.Path) -> CheckRecord:
-    """Labels with no signal never yield a convincing score."""
+    """Labels with no signal never yield a convincing score.
+
+    Args:
+        directory: Scratch directory for the runs, one per seed in
+            `NOISE_SEEDS`.
+
+    Returns:
+        The record; it passes when the mean distance of the locked-test ROC
+        AUC from 0.5 is at most 0.08 and the worst is at most 0.15.
+    """
     record = CheckRecord(
         "no_false_skill",
         "On pure-noise labels the locked-test ROC-AUC stays near 0.5.",
@@ -219,6 +301,14 @@ def check_leak_detection(directory: pathlib.Path) -> CheckRecord:
     column must be a suspect (adjusted p-value below alpha and effect-size
     lower bound above the ceiling) whose mechanism is certified, and a clean
     column must not be.
+
+    Args:
+        directory: Scratch directory for the warn and block runs.
+
+    Returns:
+        The record; it passes when the planted column is the only suspect,
+        is the only blocking leak and is reported among the risk findings,
+        and a run with `leakage_policy="block"` raises `BlockedError`.
     """
     record = CheckRecord(
         "leak_detection",
@@ -252,7 +342,15 @@ def check_leak_detection(directory: pathlib.Path) -> CheckRecord:
 
 
 def check_bundle_roundtrip(directory: pathlib.Path) -> CheckRecord:
-    """A saved, signed bundle predicts identically after loading."""
+    """A saved, signed bundle predicts identically after loading.
+
+    Args:
+        directory: Scratch directory for the run and the saved bundle.
+
+    Returns:
+        The record; it passes when the predictions of the run and of the
+        reloaded bundle are exactly equal.
+    """
     record = CheckRecord(
         "bundle_roundtrip",
         "Predictions are identical before saving and after a verified load.",
@@ -276,7 +374,15 @@ def check_bundle_roundtrip(directory: pathlib.Path) -> CheckRecord:
 
 
 def check_tamper_detection(directory: pathlib.Path) -> CheckRecord:
-    """A modified model file and a wrong key are both refused."""
+    """A modified model file and a wrong key are both refused.
+
+    Args:
+        directory: Scratch directory for the run and the saved bundle.
+
+    Returns:
+        The record; it passes when loading with a wrong key and loading after
+        a byte is appended to the pipeline file both raise `ArtifactError`.
+    """
     record = CheckRecord(
         "tamper_detection",
         "Loading refuses a wrong key and a modified model file.",
@@ -288,6 +394,14 @@ def check_tamper_detection(directory: pathlib.Path) -> CheckRecord:
     result.save(bundle_directory, signing_key=SIGNING_KEY)
 
     def refused(key: str) -> bool:
+        """Whether loading the bundle with a key is refused.
+
+        Args:
+            key: Signing key to load with.
+
+        Returns:
+            True if loading raises `ArtifactError`, otherwise False.
+        """
         try:
             scmle.load_model(bundle_directory, signing_key=key)
         except errors.ArtifactError:
@@ -304,7 +418,15 @@ def check_tamper_detection(directory: pathlib.Path) -> CheckRecord:
 
 
 def check_interval_coverage(directory: pathlib.Path) -> CheckRecord:
-    """Prediction intervals contain at least the stated share of new rows."""
+    """Prediction intervals contain at least the stated share of new rows.
+
+    Args:
+        directory: Scratch directory for the run.
+
+    Returns:
+        The record; it passes when the 90% conformal interval covers at
+        least 0.9 minus the default coverage tolerance of 2000 fresh rows.
+    """
     record = CheckRecord(
         "interval_coverage",
         "A 90% conformal interval covers at least 88% of fresh rows "
@@ -331,7 +453,15 @@ def check_interval_coverage(directory: pathlib.Path) -> CheckRecord:
 
 
 def check_drift_detection(directory: pathlib.Path) -> CheckRecord:
-    """A shifted batch is flagged; a same-distribution batch is not."""
+    """A shifted batch is flagged; a same-distribution batch is not.
+
+    Args:
+        directory: Scratch directory for the run.
+
+    Returns:
+        The record; it passes when monitoring recommends no action for a
+        clean batch and some action for a batch shifted by 3 on feature `a`.
+    """
     record = CheckRecord(
         "drift_detection",
         "Monitoring flags a +3 sigma shift and stays quiet on clean data.",
@@ -354,7 +484,16 @@ def check_drift_detection(directory: pathlib.Path) -> CheckRecord:
 
 
 def check_failure_isolation(directory: pathlib.Path) -> CheckRecord:
-    """A candidate that always crashes does not fail the run."""
+    """A candidate that always crashes does not fail the run.
+
+    Args:
+        directory: Scratch directory for the run.
+
+    Returns:
+        The record; it passes when the run completes, the crashing probe
+        appears in the leaderboard without an `ok` status and another trial
+        is `ok`.
+    """
     record = CheckRecord(
         "failure_isolation",
         "A crashing candidate is recorded as failed; the run still completes.",
@@ -399,7 +538,15 @@ CHECKS: dict[str, Callable[[pathlib.Path], CheckRecord]] = {
 
 
 def run_check(name: str) -> CheckRecord:
-    """Runs one check in a scratch directory; a crash is a failed record."""
+    """Runs one check in a scratch directory; a crash is a failed record.
+
+    Args:
+        name: Key of the check in `CHECKS`.
+
+    Returns:
+        The check's record with its duration; when the check itself raises,
+        a failed record holding the traceback in `error`.
+    """
     started = time.perf_counter()
     with tempfile.TemporaryDirectory() as scratch:
         try:
@@ -412,7 +559,14 @@ def run_check(name: str) -> CheckRecord:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Runs the selected checks, writes results, returns 1 on any failure."""
+    """Runs the selected checks, writes results, returns 1 on any failure.
+
+    Args:
+        argv: Command-line arguments; `None` reads `sys.argv`.
+
+    Returns:
+        Process exit status: 1 if any check failed, otherwise 0.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--only", nargs="*", default=[], choices=list(CHECKS))
     parser.add_argument(

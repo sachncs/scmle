@@ -49,12 +49,28 @@ TARGET = "target"
 
 
 def sklearn_table(loader: Any) -> pd.DataFrame:
-    """A shipped scikit-learn table with its target column."""
+    """A shipped scikit-learn table with its target column.
+
+    Args:
+        loader: A `sklearn.datasets.load_*` function accepting `as_frame`.
+
+    Returns:
+        The frame (features and target) with a fresh 0..n-1 index.
+    """
     return loader(as_frame=True).frame.reset_index(drop=True)
 
 
 def screened(frame: pd.DataFrame, target: str) -> screen.ScreenReport:
-    """Runs the certified screen with the shipped certificates."""
+    """Runs the certified screen with the shipped certificates.
+
+    Args:
+        frame: Table to screen, including the target column.
+        target: Name of the target column.
+
+    Returns:
+        The screen report, computed with `leakage.CERTIFIED` at run seed 0
+        for a classification task.
+    """
     cfg = dataclasses.replace(leakage.CERTIFIED, run_seed=0)
     return screen.screen(
         frame, target, "classification", cfg, store=screen.shipped_store()
@@ -62,7 +78,14 @@ def screened(frame: pd.DataFrame, target: str) -> screen.ScreenReport:
 
 
 def flagged_names(report: screen.ScreenReport) -> list[str]:
-    """Distinct suspect columns, in column order of first appearance."""
+    """Distinct suspect columns, in column order of first appearance.
+
+    Args:
+        report: Screen report to read the suspects from.
+
+    Returns:
+        Column names, each once, in the order the suspects are listed.
+    """
     names: list[str] = []
     for finding in report.suspects:
         if str(finding.feature) not in names:
@@ -71,7 +94,14 @@ def flagged_names(report: screen.ScreenReport) -> list[str]:
 
 
 def blocking_names(report: screen.ScreenReport) -> list[str]:
-    """Distinct columns that would stop a run under the block policy."""
+    """Distinct columns that would stop a run under the block policy.
+
+    Args:
+        report: Screen report to read the blocking findings from.
+
+    Returns:
+        Column names, each once, in the order the findings are listed.
+    """
     names: list[str] = []
     for finding in report.blocking:
         if str(finding.feature) not in names:
@@ -82,7 +112,20 @@ def blocking_names(report: screen.ScreenReport) -> list[str]:
 def measure_table(
     name: str, frame: pd.DataFrame, target: str, leaks: Sequence[str]
 ) -> dict[str, Any]:
-    """Screens one table and scores the flags against the provenance."""
+    """Screens one table and scores the flags against the provenance.
+
+    Args:
+        name: Label of the table in the output.
+        frame: The table, including the target column.
+        target: Name of the target column.
+        leaks: Feature columns known to be recorded after the outcome.
+
+    Returns:
+        Row, class and column counts, the screen's family and gate values,
+        the flagged and would-block columns, the false flags (flagged
+        legitimate columns), the leaks found, and the false-flag rate (None
+        when there is no legitimate column).
+    """
     report = screened(frame, target)
     features = [c for c in frame.columns if c != target]
     legitimate = [c for c in features if c not in leaks]
@@ -109,7 +152,12 @@ def measure_table(
 
 
 def titanic_tables() -> list[dict[str, Any]]:
-    """Titanic with and without the columns recorded after the outcome."""
+    """Titanic with and without the columns recorded after the outcome.
+
+    Returns:
+        Two measurements: the full table, where `boat` and `body` are the
+        true leaks, and the table without them, which has none.
+    """
     frame = pd.read_csv(TITANIC)
     clean = frame.drop(columns=list(LEAKED_TITANIC))
     return [
@@ -119,7 +167,13 @@ def titanic_tables() -> list[dict[str, Any]]:
 
 
 def planted() -> dict[str, Any]:
-    """Plants each leak type among real breast-cancer columns."""
+    """Plants each leak type among real breast-cancer columns.
+
+    Returns:
+        For every defect type, the number of tables screened, how many had
+        the planted column flagged, and how many real columns were screened
+        and flagged, over the seeds in `PLANT_SEEDS`.
+    """
     frame = f4_certify.breast_cancer()
     rows: dict[str, Any] = {}
     for defect in screen_certify.DEFECTS:
@@ -145,7 +199,14 @@ def planted() -> dict[str, Any]:
 
 
 def certified_rates() -> dict[str, Any]:
-    """The certified false-alarm and detection rates, from the repository."""
+    """The certified false-alarm and detection rates, from the repository.
+
+    Returns:
+        The values copied from `screen_measurements.json`: the level, null
+        replicates and false alarms with their Wilson interval, plant
+        replicates per type, detections with their intervals, and the
+        certified ceilings.
+    """
     record = json.loads(CERTIFIED.read_text(encoding="utf-8"))
     return {
         "source": "benchmarks/qualification/screen_measurements.json",
@@ -164,7 +225,13 @@ def certified_rates() -> dict[str, Any]:
 
 
 def build() -> dict[str, Any]:
-    """Runs every measurement."""
+    """Runs every measurement.
+
+    Returns:
+        The record written to the output file: the screen settings, the
+        certified rates, the per-table measurements and the planted-leak
+        results.
+    """
     tables = [
         measure_table(
             "breast_cancer",
@@ -194,7 +261,16 @@ def build() -> dict[str, Any]:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Writes or checks the measurements file."""
+    """Writes or checks the measurements file.
+
+    Args:
+        argv: Command-line arguments (`--write` or `--check`); `None` reads
+            `sys.argv`.
+
+    Returns:
+        0 after a write, or after a check that finds the file equal to a
+        fresh measurement; 1 when the check finds a difference.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--write", action="store_true")

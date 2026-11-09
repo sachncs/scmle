@@ -1,4 +1,4 @@
-"""Step 2 facts about one SCMLE run, read from the files it wrote.
+"""Facts about one SCMLE run, read from the files it wrote.
 
 The facts answer where the budget went: how long the run took against its
 budget, how many trials ended in each status, which stages the budget cut
@@ -22,14 +22,29 @@ STATUSES = ("ok", "failed", "pruned", "skipped")
 
 
 def read_events(run_dir: pathlib.Path) -> list[dict[str, Any]]:
-    """Reads the run's event log."""
+    """Reads the run's event log.
+
+    Args:
+        run_dir: A run directory holding `events.jsonl`.
+
+    Returns:
+        The events in file order, one dict per non-blank line.
+    """
     path = run_dir / "events.jsonl"
     with path.open(encoding="utf-8") as handle:
         return [json.loads(line) for line in handle if line.strip()]
 
 
 def seconds_between(first: str, last: str) -> float:
-    """Seconds between two ISO timestamps."""
+    """Seconds between two ISO timestamps.
+
+    Args:
+        first: The earlier ISO 8601 timestamp.
+        last: The later ISO 8601 timestamp.
+
+    Returns:
+        The elapsed time in seconds (negative if `last` is earlier).
+    """
     start = datetime.datetime.fromisoformat(first)
     return (datetime.datetime.fromisoformat(last) - start).total_seconds()
 
@@ -86,7 +101,14 @@ def summarize_run(run_dir: pathlib.Path) -> dict[str, Any]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Prints the summary of each run directory as JSON."""
+    """Prints the summary of each run directory as JSON.
+
+    Args:
+        argv: Command-line arguments; `None` reads `sys.argv`.
+
+    Returns:
+        Process exit status, always 0.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("run_dirs", nargs="+", type=pathlib.Path)
     args = parser.parse_args(argv)

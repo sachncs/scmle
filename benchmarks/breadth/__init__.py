@@ -1,4 +1,4 @@
-"""Benchmark definitions for the breadth slices of Phase 18 (F15 item 15).
+"""Benchmark definitions for the breadth slices.
 
 Each file in this folder defines, before the slice is built, how its
 robustness, drift, explanation and monitoring will be measured: the damage or
@@ -67,7 +67,14 @@ TOP_FIELDS = (
 
 
 def load(name: str) -> dict[str, Any]:
-    """Reads one slice definition."""
+    """Reads one slice definition.
+
+    Args:
+        name: Slice name, the stem of the JSON file in this folder.
+
+    Returns:
+        The parsed definition.
+    """
     found: dict[str, Any] = json.loads(
         (FOLDER / f"{name}.json").read_text(encoding="utf-8")
     )
@@ -75,12 +82,25 @@ def load(name: str) -> dict[str, Any]:
 
 
 def load_all() -> dict[str, dict[str, Any]]:
-    """Reads every slice definition, by slice name."""
+    """Reads every slice definition, by slice name.
+
+    Returns:
+        Mapping of each name in `SLICES` to its parsed definition.
+    """
     return {name: load(name) for name in SLICES}
 
 
 def section_problems(name: str, kind: str, section: Any) -> list[str]:
-    """What is wrong with one benchmark section."""
+    """What is wrong with one benchmark section.
+
+    Args:
+        name: Slice name, used to label each problem.
+        kind: Section name (one of `SECTIONS`).
+        section: The parsed section value.
+
+    Returns:
+        Problem descriptions; empty when the section is well formed.
+    """
     where = f"{name}.{kind}"
     if not isinstance(section, dict):
         return [f"{where} is not an object"]
@@ -109,7 +129,16 @@ def section_problems(name: str, kind: str, section: Any) -> list[str]:
 
 
 def problems(name: str, definition: dict[str, Any]) -> list[str]:
-    """What is wrong with one slice definition (empty when well formed)."""
+    """What is wrong with one slice definition (empty when well formed).
+
+    Args:
+        name: Slice name the definition is expected to carry.
+        definition: The parsed slice definition.
+
+    Returns:
+        Problem descriptions. When top-level fields are missing only those
+        are returned; otherwise all further problems are collected.
+    """
     found = [
         f"{name} lacks {field}"
         for field in TOP_FIELDS
