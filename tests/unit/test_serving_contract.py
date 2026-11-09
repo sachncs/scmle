@@ -569,3 +569,36 @@ def test_the_demo_override_is_explicit_and_named():
 
     demo = next(iter(verify.PUBLISHED_KEYS))
     verify.refuse_published_key(demo, True, allowed=True)
+
+
+def serve_json(answer):
+    import http.server
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_POST(self):
+            self.rfile.read(int(self.headers["Content-Length"]))
+            data = json.dumps(answer).encode()
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+
+        def log_message(self, *args):
+            pass
+
+    server = http.server.HTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server
+
+
+def test_a_remote_answer_without_predictions_is_reported_as_failed():
+    server = serve_json({"model_version": "v1"})
+    try:
+        report = parity.check_remote(
+            f"http://127.0.0.1:{server.server_port}", GOLDEN
+        )
+    finally:
+        server.shutdown()
+        server.server_close()
+    assert report["passed"] is False
+    assert any("predictions" in m for m in report["mismatches"])

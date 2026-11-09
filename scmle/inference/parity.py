@@ -389,10 +389,10 @@ def check_remote(
         The parity report as a dictionary, plus the model version, artifact
         digest and level. The report is marked failed when the response
         lacks any key in `serving_contract.RESPONSE_KEYS`. On an HTTP error
-        status only `passed` (False) and `mismatches` are returned. An
-        unreadable golden file raises `ArtifactError` from `read_json`; other
-        network errors and a response without `predictions` or
-        `probabilities` propagate (`KeyError`) instead of being reported.
+        status, or a response that is not an object with `predictions` and
+        `probabilities`, only `passed` (False) and `mismatches` are returned
+        (with `level` for the latter). An unreadable golden file raises
+        `ArtifactError` from `read_json`; other network errors propagate.
     """
     root = pathlib.Path(directory)
     golden = load_golden(root)
@@ -412,6 +412,16 @@ def check_remote(
         if level == "same_process"
         else golden.cross_environment
     )
+    if (
+        not isinstance(body, dict)
+        or "predictions" not in body
+        or "probabilities" not in body
+    ):
+        return {
+            "passed": False,
+            "mismatches": ["response lacks predictions or probabilities"],
+            "level": level,
+        }
     report = compare(
         expected, body["predictions"], body["probabilities"], tolerance
     ).to_dict()
