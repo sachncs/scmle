@@ -1,4 +1,4 @@
-"""Metrics, logs, windowed signals, exporters, webhooks, classifier, cost."""
+"""Metrics, logs, windowed signals, webhooks, classifier, cost."""
 
 import json
 import pathlib
@@ -8,7 +8,6 @@ import pytest
 from scmle.contracts import observability
 from scmle.operations import classify
 from scmle.operations import cost
-from scmle.operations import exporters
 from scmle.operations import logs
 from scmle.operations import metrics
 from scmle.operations import notify
@@ -261,7 +260,7 @@ def test_signals_become_metric_samples_for_export():
     )
 
 
-# ---- exporters ---------------------------------------------------------
+# ---- samples -----------------------------------------------------------
 
 
 def samples():
@@ -283,105 +282,6 @@ def samples():
             {"model_version": "v1"},
         ),
     ]
-
-
-def test_put_metric_data_matches_the_recorded_shape():
-    built = exporters.put_metric_data("Scmle/Serving", samples())
-    assert built == [fixture("cloudwatch-put-metric-data.json")["request"]]
-    assert not exporters.put_metric_data_problems(built[0])
-
-
-def test_embedded_metric_format_matches_the_recorded_shape():
-    built = exporters.embedded_metric_format("Scmle/Serving", samples())
-    assert built == [fixture("cloudwatch-emf.json")["record"]]
-    assert not exporters.embedded_metric_problems(built[0])
-
-
-def test_cloud_monitoring_time_series_matches_the_recorded_shape():
-    recorded = fixture("cloud-monitoring-time-series.json")["request"]
-    resource = recorded["timeSeries"][0]["resource"]
-    built = exporters.time_series(resource, samples())
-    assert built == [recorded]
-    assert not exporters.time_series_problems(built[0])
-
-
-def test_the_validators_catch_malformed_payloads():
-    good = fixture("cloudwatch-put-metric-data.json")["request"]
-    bad = json.loads(json.dumps(good))
-    bad["MetricData"][0]["Unit"] = "Furlongs"
-    bad["MetricData"][1]["Value"] = "high"
-    bad["MetricData"][0]["Dimensions"] = [{"Name": "a", "Value": ""}]
-    assert len(exporters.put_metric_data_problems(bad)) == 3
-    assert exporters.put_metric_data_problems({"Namespace": "x"})
-    emf = fixture("cloudwatch-emf.json")["record"]
-    del emf["server_error_rate"]
-    assert exporters.embedded_metric_problems(emf)
-    assert exporters.embedded_metric_problems({})
-    series = fixture("cloud-monitoring-time-series.json")["request"]
-    broken = json.loads(json.dumps(series))
-    broken["timeSeries"][0]["metric"]["type"] = "compute.googleapis.com/x"
-    broken["timeSeries"][1]["points"][0]["interval"]["endTime"] = "yesterday"
-    broken["timeSeries"][1]["points"].append(
-        broken["timeSeries"][1]["points"][0]
-    )
-    assert len(exporters.time_series_problems(broken)) >= 3
-    assert exporters.time_series_problems({})
-
-
-def test_batches_are_split_at_the_documented_limits():
-    many = [samples()[1]] * 1001
-    assert [
-        len(r["MetricData"]) for r in exporters.put_metric_data("N", many)
-    ] == [
-        1000,
-        1,
-    ]
-    resource = {"type": "generic_task", "labels": {"job": "x"}}
-    assert len(exporters.time_series(resource, [samples()[1]] * 201)) == 2
-    with pytest.raises(ValueError):
-        exporters.time_series({"type": "generic_task"}, samples())
-    with pytest.raises(ValueError):
-        exporters.put_metric_data("bad namespace!", samples())
-
-
-class Recorder:
-    def __init__(self):
-        self.calls = []
-
-    def put_metric_data(self, **payload):
-        self.calls.append(("cw", payload))
-
-    def create_time_series(self, name, body):
-        self.calls.append((name, body))
-
-
-def test_the_exporters_call_the_injected_client_with_the_checked_payload():
-    client = Recorder()
-    assert (
-        exporters.CloudWatchExporter(client, "Scmle/Serving").export(samples())
-        == 2
-    )
-    resource = {"type": "generic_task", "labels": {"project_id": "p"}}
-    sent = exporters.CloudMonitoringExporter(client, "p", resource).export(
-        samples()
-    )
-    assert sent == 2
-    assert client.calls[0][0] == "cw" and client.calls[1][0] == "projects/p"
-    bad = observability.MetricSample(
-        "x",
-        observability.SignalKind.ERROR,
-        1.0,
-        "s",
-        STAMP,
-        {f"d{i}": "v" for i in range(31)},
-    )
-    with pytest.raises(ValueError):
-        exporters.CloudWatchExporter(client, "N").export([bad])
-    assert len(client.calls) == 2
-    lines = []
-    assert exporters.write_embedded(
-        [{"a": 1}], lines.append
-    ) == 1 and lines == ['{"a": 1}']
 
 
 # ---- webhooks ----------------------------------------------------------

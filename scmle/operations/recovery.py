@@ -33,7 +33,6 @@ from typing import Any
 PASSED = "passed"
 FAILED = "failed"
 NOT_RUN = "not_run"
-PROVIDERS = ("aws", "gcp")
 TIME_SCALE_ENV = "SCMLE_RECOVERY_TIME_SCALE"
 
 
@@ -504,15 +503,6 @@ class Runner:
                 for f in self.catalogue
             ],
             "results": [r.to_dict() for r in results],
-            "cloud": {
-                provider: {
-                    "status": NOT_RUN,
-                    "faults": [f.id for f in self.catalogue],
-                    "reason": "no AWS or GCP account, staging environment "
-                    "or reviewer was available",
-                }
-                for provider in PROVIDERS
-            },
             "summary": {
                 "faults": len(results),
                 "ran_locally": len(ran),

@@ -86,8 +86,6 @@ def test_a_fault_with_no_scenario_is_not_run_never_passed():
     assert "real cloud" in managed["problems"][0]
     assert report["summary"]["passed"] == 1
     assert report["summary"]["not_run"] == len(recovery.CATALOGUE) - 1
-    for provider in recovery.PROVIDERS:
-        assert report["cloud"][provider]["status"] == recovery.NOT_RUN
 
 
 def test_the_runner_refuses_scenarios_it_cannot_honestly_run():

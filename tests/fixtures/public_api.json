@@ -192,24 +192,6 @@
         "signature_sha256": "05bc825706d49f0edaae5e1434b1ca391ef663a520884c395f4c19652d7b48a2"
       }
     },
-    "scmle.data.store.cloud": {
-      "GcsObjectStore": {
-        "kind": "class",
-        "signature_sha256": "e40456132772b3469f2fc362ea281076b5e93c4a512e851ee40dccdb5534f079"
-      },
-      "S3ObjectStore": {
-        "kind": "class",
-        "signature_sha256": "bece79b25634f8fd967e6976ddd20c65d3cff4c681887186164304ffbfa43796"
-      },
-      "gcs_store": {
-        "kind": "callable",
-        "signature_sha256": "dcfb7706126de1ac8301dde3b501076c6a4076faf3ce505da195dd852ab4087e"
-      },
-      "s3_store": {
-        "kind": "callable",
-        "signature_sha256": "3c24da81f14837f7c63cc2b864fbeeefdb90aa56ad9b55de3604f8d1c0760fe6"
-      }
-    },
     "scmle.data.store.objectstore": {
       "LocalObjectStore": {
         "kind": "class",
@@ -290,16 +272,6 @@
         "signature_sha256": "1620e29433a782d8294f364b5051c530f2d0b10a6cd6fcd53e55115a583cd05d"
       }
     },
-    "scmle.deploy.cloudrun": {
-      "CloudRunControlPlane": {
-        "kind": "class",
-        "signature_sha256": "89659922137e87db606f16e5ae2036e4f00efe65f318a62b45671e383c18c41d"
-      },
-      "observe_service": {
-        "kind": "callable",
-        "signature_sha256": "4335551856e69d7caf82f25c35657a64053d74a27f37584f8111d64be26018e2"
-      }
-    },
     "scmle.deploy.contract": {
       "Architecture": {
         "kind": "class",
@@ -376,16 +348,6 @@
         "signature_sha256": "a8da28dce82b1a8a663be476c9a0699b99cba317755884aab70e75175b6130e7"
       }
     },
-    "scmle.deploy.ecs": {
-      "EcsControlPlane": {
-        "kind": "class",
-        "signature_sha256": "7cb2cc72c9ca633c17f57e23a5b1e152e3bcdbf871095a02e66118f21e8c5590"
-      },
-      "observe_services": {
-        "kind": "callable",
-        "signature_sha256": "c2f0ce822e70b70d8b1b047147e534dd97c05dfcc8b73deeed227c60bee6fe84"
-      }
-    },
     "scmle.deploy.gate": {
       "Candidate": {
         "kind": "class",
@@ -410,16 +372,6 @@
       "model_digest_of": {
         "kind": "callable",
         "signature_sha256": "89fca9f414e9ca0fbde3ec22acbd8514acf2bfcb80aefee14db3dd877f12b331"
-      }
-    },
-    "scmle.deploy.iac_policy": {
-      "Violation": {
-        "kind": "class",
-        "signature_sha256": "a68772373bdd191226fc9cbbeaeb4881d6db7b7e3005810f96c696a7897ec330"
-      },
-      "check_tree": {
-        "kind": "callable",
-        "signature_sha256": "cf15f1c456297fcc84567bc98a0c0516e22d397dd87a85bf2d3f0d545cda628f"
       }
     },
     "scmle.deploy.livetests": {
@@ -452,20 +404,6 @@
       "Traffic": {
         "kind": "class",
         "signature_sha256": "f97ba6bed09e7c181aa0d6985a4ef5c7c751e34bf7acee15ee683c19aa75104d"
-      }
-    },
-    "scmle.deploy.orphans": {
-      "Leftover": {
-        "kind": "class",
-        "signature_sha256": "e3a176e0826d9026fdad9df7fe383d833818c0b2dd4143cdbda8036b894f7b28"
-      },
-      "OrphanReport": {
-        "kind": "class",
-        "signature_sha256": "133c6cace0d5742ffb2f43d323ffca4432301c76c211152e3834aba9a81c7722"
-      },
-      "find_orphans": {
-        "kind": "callable",
-        "signature_sha256": "9fab9239f9ab51c4ba91d4aa646b49e599d327302a797e938eb4a19612260ffa"
       }
     },
     "scmle.deploy.record": {
@@ -506,20 +444,6 @@
       "RuntimeDisagrees": {
         "kind": "class",
         "signature_sha256": "ac48ce8e419a9558b2d5a642ab88618a1e3c2e24d2e203a5aabe0c868a664234"
-      }
-    },
-    "scmle.operations.claim": {
-      "ClaimVerdict": {
-        "kind": "class",
-        "signature_sha256": "1e58b8f10261259f421d4117fb948809dd41d43bd83f2f9ad3a5f21598c6c097"
-      },
-      "check_claim": {
-        "kind": "callable",
-        "signature_sha256": "05c5ad308b9f7fad5e4470b402a5e18c59b9a1bcf5722495039ccee5676fbee2"
-      },
-      "claim_text_problems": {
-        "kind": "callable",
-        "signature_sha256": "2b3cf61786ce541addeec140acbd3121ff92588a211ddac0f2935f380e2af3fe"
       }
     },
     "scmle.operations.classify": {
@@ -564,24 +488,6 @@
       "post_promotion_check": {
         "kind": "callable",
         "signature_sha256": "7400f5f8d251b88c1130cf280c41cff4791086106c4752cbe709ea114f19a6eb"
-      }
-    },
-    "scmle.operations.exporters": {
-      "CloudMonitoringClient": {
-        "kind": "class",
-        "signature_sha256": "1c303ca2030af1773341a1776f5ff77dbd505c9d0bc58cf8f62af8fc41e3f2e8"
-      },
-      "CloudMonitoringExporter": {
-        "kind": "class",
-        "signature_sha256": "1b1970aff1d9d219ce959d97c8a0fc8cd2133c37496ef6dafeac11bc62ace6ac"
-      },
-      "CloudWatchClient": {
-        "kind": "class",
-        "signature_sha256": "1c303ca2030af1773341a1776f5ff77dbd505c9d0bc58cf8f62af8fc41e3f2e8"
-      },
-      "CloudWatchExporter": {
-        "kind": "class",
-        "signature_sha256": "2cdce17c472da43d376162e6dd0061d0ef2ab1842d5c3f1c7524e539bcbdfb3b"
       }
     },
     "scmle.operations.notify": {
@@ -668,12 +574,6 @@
         "signature_sha256": "d940b79a4ce3286b98be6c94b7d98fc823819b6971dda22692912d7f1baee9c4"
       }
     },
-    "scmle.runners.aws": {
-      "AwsContainerJobRunner": {
-        "kind": "class",
-        "signature_sha256": "dd20f2691a973a9831d3880bf29ca0b9e91f8f0ca090c2ba1a4b8937e60d90cd"
-      }
-    },
     "scmle.runners.base": {
       "CostBudget": {
         "kind": "class",
@@ -708,12 +608,6 @@
       "CheckpointStore": {
         "kind": "class",
         "signature_sha256": "8de07e40ef1e2f1e0ccdb5ff1fc2deb4e016b21a376509c956e6c09aba3864a7"
-      }
-    },
-    "scmle.runners.gcp": {
-      "GcpJobRunner": {
-        "kind": "class",
-        "signature_sha256": "7c69d095752f29ce9839f0826d4fd5e746045af33a8a2fe0410241a0ae02adb1"
       }
     },
     "scmle.runners.local": {
@@ -858,32 +752,6 @@
       "standard_workflow": {
         "kind": "callable",
         "signature_sha256": "280fc87ae13a35e92d6f63df75278d5a20204fc6a2ea928f02c72bec37746551"
-      }
-    },
-    "scmle.workflow.emit": {
-      "cron_for": {
-        "kind": "callable",
-        "signature_sha256": "e5bc1f1986207ea56a0eb605b436d92a0945b2eb2c1989af06bca5efe4aa7b2a"
-      },
-      "eventbridge_rate": {
-        "kind": "callable",
-        "signature_sha256": "e5bc1f1986207ea56a0eb605b436d92a0945b2eb2c1989af06bca5efe4aa7b2a"
-      },
-      "to_cloud_workflows": {
-        "kind": "callable",
-        "signature_sha256": "17128aef41dd58f75a95ac6654e491636fb47099ea9a7b830189427ddaf1c5e7"
-      },
-      "to_step_functions": {
-        "kind": "callable",
-        "signature_sha256": "17128aef41dd58f75a95ac6654e491636fb47099ea9a7b830189427ddaf1c5e7"
-      },
-      "validate_cloud_workflows": {
-        "kind": "callable",
-        "signature_sha256": "4f42cadc690b20fce1b4bacaf29a2659b2294dbc43fbf8846082afe6a4751c8c"
-      },
-      "validate_step_functions": {
-        "kind": "callable",
-        "signature_sha256": "c3e5322d7994d640448c701feb8da0e425db646b650c94d88ad8fd1bca94082a"
       }
     },
     "scmle.workflow.executor": {

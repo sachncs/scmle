@@ -11,34 +11,25 @@ from typing import Any
 
 import scmle
 from scmle.core import retry as core_retry
-from scmle.data.store import cloud as store_cloud
 from scmle.data.store import objectstore as store_objectstore
 from scmle.data.store import processing as store_processing
 from scmle.data.store import quality as store_quality
 from scmle.data.store import snapshot as store_snapshot
-from scmle.deploy import cloudrun as deploy_cloudrun
 from scmle.deploy import contract as deploy_contract
 from scmle.deploy import control as deploy_control
-from scmle.deploy import ecs as deploy_ecs
 from scmle.deploy import gate as deploy_gate
-from scmle.deploy import iac_policy as deploy_iac_policy
 from scmle.deploy import livetests as deploy_livetests
 from scmle.deploy import observation as deploy_observation
-from scmle.deploy import orphans as deploy_orphans
 from scmle.deploy import record as deploy_record
 from scmle.governance import release_state as governance_release_state
-from scmle.operations import claim as operations_claim
 from scmle.operations import classify as operations_classify
 from scmle.operations import continuous as operations_continuous
-from scmle.operations import exporters as operations_exporters
 from scmle.operations import notify as operations_notify
 from scmle.operations import recovery as operations_recovery
 from scmle.operations import signals as operations_signals
 from scmle.operations import spool as operations_spool
-from scmle.runners import aws as runners_aws
 from scmle.runners import base as runners_base
 from scmle.runners import checkpoint as runners_checkpoint
-from scmle.runners import gcp as runners_gcp
 from scmle.runners import local as runners_local
 from scmle.runners import reproducibility as runners_reproducibility
 from scmle.runners import roles as runners_roles
@@ -47,7 +38,6 @@ from scmle.security import audit as security_audit
 from scmle.security import tokens as security_tokens
 import scmle.trail as trail
 from scmle.workflow import definition as workflow_definition
-from scmle.workflow import emit as workflow_emit
 from scmle.workflow import executor as workflow_executor
 from scmle.workflow import schedule as workflow_schedule
 
@@ -82,14 +72,6 @@ EXTENSION_SURFACES = {
             "expecting",
         ),
     ),
-    "scmle.deploy.ecs": (
-        deploy_ecs,
-        ("EcsControlPlane", "observe_services"),
-    ),
-    "scmle.deploy.cloudrun": (
-        deploy_cloudrun,
-        ("CloudRunControlPlane", "observe_service"),
-    ),
     "scmle.governance.release_state": (
         governance_release_state,
         (
@@ -123,14 +105,6 @@ EXTENSION_SURFACES = {
     "scmle.deploy.observation": (
         deploy_observation,
         ("Observation", "Traffic"),
-    ),
-    "scmle.deploy.iac_policy": (
-        deploy_iac_policy,
-        ("Violation", "check_tree"),
-    ),
-    "scmle.deploy.orphans": (
-        deploy_orphans,
-        ("Leftover", "OrphanReport", "find_orphans"),
     ),
     "scmle.security.tokens": (
         security_tokens,
@@ -174,10 +148,6 @@ EXTENSION_SURFACES = {
             "StoreError",
         ),
     ),
-    "scmle.data.store.cloud": (
-        store_cloud,
-        ("GcsObjectStore", "S3ObjectStore", "gcs_store", "s3_store"),
-    ),
     "scmle.data.store.snapshot": (
         store_snapshot,
         ("DataContract", "ReadLog", "SnapshotReader", "SnapshotRecord"),
@@ -206,8 +176,6 @@ EXTENSION_SURFACES = {
         ),
     ),
     "scmle.runners.local": (runners_local, ("LocalRunner",)),
-    "scmle.runners.aws": (runners_aws, ("AwsContainerJobRunner",)),
-    "scmle.runners.gcp": (runners_gcp, ("GcpJobRunner",)),
     "scmle.runners.roles": (
         runners_roles,
         ("Role", "RoleStore", "check_distinct", "check_separation"),
@@ -233,17 +201,6 @@ EXTENSION_SURFACES = {
         ("ApprovalError", "LocalExecutor", "RunState", "StepContext"),
     ),
     "scmle.workflow.schedule": (workflow_schedule, ("Scheduler", "TickReport")),
-    "scmle.workflow.emit": (
-        workflow_emit,
-        (
-            "cron_for",
-            "eventbridge_rate",
-            "to_cloud_workflows",
-            "to_step_functions",
-            "validate_cloud_workflows",
-            "validate_step_functions",
-        ),
-    ),
     "scmle.data.store.processing": (
         store_processing,
         ("Checkpoint", "IncrementalProcessor", "RunResult"),
@@ -287,10 +244,6 @@ EXTENSION_SURFACES = {
         trail,
         ("Finding", "Report", "build", "render", "seal", "verify"),
     ),
-    "scmle.operations.claim": (
-        operations_claim,
-        ("ClaimVerdict", "check_claim", "claim_text_problems"),
-    ),
     "scmle.operations.notify": (
         operations_notify,
         (
@@ -300,15 +253,6 @@ EXTENSION_SURFACES = {
             "WebhookSender",
             "sign",
             "verify_signature",
-        ),
-    ),
-    "scmle.operations.exporters": (
-        operations_exporters,
-        (
-            "CloudMonitoringClient",
-            "CloudMonitoringExporter",
-            "CloudWatchClient",
-            "CloudWatchExporter",
         ),
     ),
 }
