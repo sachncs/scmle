@@ -126,6 +126,7 @@ def build(
             "timestamp": timestamp,
             "component": {
                 "type": "application",
+                "bom-ref": COMPONENT_NAME,
                 "name": COMPONENT_NAME,
                 "version": software_version,
             },

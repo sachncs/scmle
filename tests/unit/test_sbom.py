@@ -35,3 +35,20 @@ def test_sbom_rejects_empty_inventory_and_invalid_names():
         sbom.build(
             {"bad name": "1.0"}, run_id="run-1", software_version="0.1.0b1"
         )
+
+
+def test_every_dependency_ref_names_a_component_in_the_document():
+    document = sbom.build_service(
+        {"pandas": "2.2.0"},
+        model_name="m",
+        model_version="1",
+        bundle_digest="sha256:" + "a" * 64,
+        base_image="python:3.12",
+        software_version="0.1.0b1",
+        observed_at="2026-10-20T00:00:00+00:00",
+    )
+    known = {item["bom-ref"] for item in document["components"]}
+    known.add(document["metadata"]["component"]["bom-ref"])
+    for entry in document["dependencies"]:
+        assert entry["ref"] in known
+        assert set(entry["dependsOn"]) <= known
