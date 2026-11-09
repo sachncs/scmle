@@ -936,7 +936,7 @@ class HttpServing(ServingAdapter):
         return self.readiness.ready
 
     def stop(self) -> None:
-        """Shuts the server down, joins its thread and closes the worker pool."""
+        """Shuts the server down, joins its thread and closes the pool."""
         if self.httpd is not None:
             self.httpd.shutdown()
             self.httpd.server_close()

@@ -555,7 +555,7 @@ class ModalityHttpServing:
         self.thread.start()
 
     def stop(self) -> None:
-        """Shuts down the server, joins its thread and closes the worker pool."""
+        """Shuts down the server, joins its thread and closes the pool."""
         if self.httpd is not None:
             self.httpd.shutdown()
             self.httpd.server_close()
