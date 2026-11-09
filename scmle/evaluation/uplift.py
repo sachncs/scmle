@@ -115,10 +115,12 @@ def average_effect(outcome: np.ndarray, treatment: np.ndarray) -> float:
 
     Returns:
         The mean outcome of the treated minus that of the controls; NaN
-        (with a NumPy warning) if either arm is empty.
+        if either arm is empty.
     """
     y = np.asarray(outcome, dtype=float)
     t = np.asarray(treatment).astype(int)
+    if not (t == 1).any() or not (t == 0).any():
+        return float("nan")
     return float(y[t == 1].mean() - y[t == 0].mean())
 
 

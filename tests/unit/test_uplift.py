@@ -97,3 +97,12 @@ def test_a_tiny_arm_is_reported_not_modelled():
 
     assert not found.randomized and np.isnan(found.auc)
     assert found.balance_p_value is None
+
+
+def test_average_effect_is_nan_without_warning_when_an_arm_is_empty():
+    import warnings
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        assert np.isnan(uplift.average_effect(np.ones(4), np.ones(4)))
+        assert np.isnan(uplift.average_effect(np.ones(4), np.zeros(4)))
