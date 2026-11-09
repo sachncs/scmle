@@ -288,7 +288,7 @@ class CrossLearner(base.BaseEstimator):
 class ZeroEffect(base.BaseEstimator):
     """The baseline: no row is expected to respond differently."""
 
-    def fit(self, features: Any, outcome: Any, treatment: Any = None) -> Self:
+    def fit(self, features: Any, outcome: Any, treatment: Any = None) -> Self:  # noqa: ARG002 -- fit signature of the uplift estimators
         """Nothing to learn.
 
         Args:

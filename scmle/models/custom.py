@@ -121,7 +121,7 @@ def register_estimator(
             built-in model or an earlier registration, or the adapter fails
             the conformance suite (the message names the failed check).
     """
-    from scmle.models import registry  # Deferred: registry imports this module.
+    from scmle.models import registry  # noqa: PLC0415 -- circular: registry imports this module
 
     if classifier is None and regressor is None:
         raise errors.ConfigError(
@@ -155,6 +155,6 @@ def unregister_estimator(name: str) -> None:
     Args:
         name: Public model name given to `register_estimator`.
     """
-    from scmle.models import registry  # Deferred: registry imports this module.
+    from scmle.models import registry  # noqa: PLC0415 -- circular: registry imports this module
 
     registry.remove_user_adapter(name)

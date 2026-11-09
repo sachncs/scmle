@@ -180,7 +180,7 @@ class Catalog:
                 for adapter in items:
                     conformance.check_conformance(adapter)
                     self.register(adapter, overwrite=True)
-            except Exception as error:  # Isolate faulty third-party code.
+            except Exception as error:  # noqa: BLE001 -- isolate faulty plugins
                 failed.append(entry.name)
                 self.plugin_failures[entry.name] = (
                     f"{type(error).__name__}: {error}"

@@ -62,7 +62,7 @@ class LastValueForecaster(wrapper.MultiOutputEstimator):
         super().__init__(estimator, target_columns)
         self.value_column = value_column
 
-    def fit(self, features: Any, target: Any) -> Self:
+    def fit(self, features: Any, target: Any) -> Self:  # noqa: ARG002 -- fit signature of the multi-output wrapper
         """Accepts the data and learns nothing (the forecast is the last value).
 
         Args:

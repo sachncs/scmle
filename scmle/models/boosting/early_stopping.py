@@ -19,6 +19,7 @@ from sklearn import preprocessing
 DEFAULT_ROUNDS = 25
 DEFAULT_FRACTION = 0.15
 MIN_ROWS = 60
+MIN_CLASS_COUNT_TO_STRATIFY = 2
 
 
 class HoldoutEarlyStopping(base.BaseEstimator):
@@ -81,7 +82,8 @@ class HoldoutEarlyStopping(base.BaseEstimator):
         stratify = (
             target
             if base.is_classifier(self.estimator)
-            and numpy.min(numpy.unique(target, return_counts=True)[1]) >= 2
+            and numpy.min(numpy.unique(target, return_counts=True)[1])
+            >= MIN_CLASS_COUNT_TO_STRATIFY
             else None
         )
         train, held = model_selection.train_test_split(
@@ -143,7 +145,7 @@ class HoldoutEarlyStopping(base.BaseEstimator):
             numpy.asarray(target)[held],
         )
         if self.library == "lightgbm":
-            import lightgbm
+            import lightgbm  # noqa: PLC0415 -- optional dependency
 
             stopper = [lightgbm.early_stopping(self.rounds, verbose=False)]
             if "eval_X" in inspect.signature(self.estimator_.fit).parameters:

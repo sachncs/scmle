@@ -8,6 +8,8 @@ from sklearn import base
 from sklearn import dummy
 from sklearn import ensemble
 
+MIN_DISTINCT_VALUES = 2
+
 
 class PerTarget(base.BaseEstimator):
     """Fits one clone of an estimator for each target column.
@@ -46,7 +48,8 @@ class PerTarget(base.BaseEstimator):
             values = matrix[:, column]
             model = (
                 dummy.DummyClassifier(strategy="prior")
-                if self.classify and len(numpy.unique(values)) < 2
+                if self.classify
+                and len(numpy.unique(values)) < MIN_DISTINCT_VALUES
                 else base.clone(self.estimator)
             )
             self.estimators_.append(model.fit(features, values))

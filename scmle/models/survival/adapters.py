@@ -23,8 +23,8 @@ class Cox(models.Model):
 
     def build(
         self,
-        task: tasks.Task,
-        seed: int,
+        task: tasks.Task,  # noqa: ARG002 -- required by Model.build
+        seed: int,  # noqa: ARG002 -- required by Model.build
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
         """Returns an unfitted Cox model.
@@ -57,7 +57,7 @@ class DiscreteTime(models.Model):
 
     def build(
         self,
-        task: tasks.Task,
+        task: tasks.Task,  # noqa: ARG002 -- required by Model.build
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:

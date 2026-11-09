@@ -17,7 +17,7 @@ from sklearn import ensemble
 class ConstantRanker(base.RegressorMixin, base.BaseEstimator):
     """Gives every row the same score: the order carries no information."""
 
-    def fit(self, features: Any, target: Any, group: Any = None) -> Self:
+    def fit(self, features: Any, target: Any, group: Any = None) -> Self:  # noqa: ARG002 -- fit signature of the ranking estimators
         """Nothing to learn.
 
         Args:
@@ -59,7 +59,7 @@ class PointwiseRanker(base.RegressorMixin, base.BaseEstimator):
         """
         self.regressor = regressor
 
-    def fit(self, features: Any, target: Any, group: Any = None) -> Self:
+    def fit(self, features: Any, target: Any, group: Any = None) -> Self:  # noqa: ARG002 -- fit signature of the ranking estimators
         """Fits the regressor on relevance grades.
 
         The query groups are not used.
@@ -129,7 +129,7 @@ class LibraryRanker(base.RegressorMixin, base.BaseEstimator):
             ranker for any other `library` value.
         """
         if self.library == "lightgbm":
-            import lightgbm
+            import lightgbm  # noqa: PLC0415 -- optional dependency
 
             return lightgbm.LGBMRanker(
                 objective="lambdarank",
@@ -139,7 +139,7 @@ class LibraryRanker(base.RegressorMixin, base.BaseEstimator):
                 n_jobs=1,
                 verbose=-1,
             )
-        import xgboost
+        import xgboost  # noqa: PLC0415 -- optional dependency
 
         return xgboost.XGBRanker(
             objective="rank:ndcg",
