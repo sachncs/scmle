@@ -179,7 +179,7 @@ def triage(
             z = robust_z(frame[name])
             permitted |= z >= cutoff
     for check in (contracts or {}).values():
-        violated = check(frame)
+        violated: object = check(frame)
         if not isinstance(violated, pandas.Series) or violated.dtype != bool:
             raise ValueError("a contract must return a boolean Series")
         error |= violated.reindex(frame.index, fill_value=False)

@@ -175,7 +175,7 @@ def out_of_fold_probabilities(
     folds = min(FOLDS, int(numpy.min(counts)))
     if folds < MIN_FOLDS:
         raise ValueError("every class needs at least two rows")
-    return model_selection.cross_val_predict(
+    probabilities: numpy.ndarray = model_selection.cross_val_predict(
         model(seed),
         features,
         codes,
@@ -186,6 +186,7 @@ def out_of_fold_probabilities(
         ),
         method="predict_proba",
     )
+    return probabilities
 
 
 def class_thresholds(
