@@ -130,8 +130,8 @@ class LeakageAttestation:
         """Rebuilds the record, rejecting unknown or missing fields.
 
         Args:
-            record: A mapping with `column`, `lead_seconds` and the fields
-                of an attestation.
+            record: A mapping with `column`, `lead_seconds` (converted with
+                `float`) and the fields of an attestation.
 
         Returns:
             The record.

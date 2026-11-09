@@ -103,7 +103,8 @@ class LeakageConfig:
         association_ceiling: Cramer's V of missingness against the target
             above which missingness is suspect. Set by the charter.
         alpha: Level of the permutation tests.
-        permutations: `B`, at least `1 / alpha - 1` so the level is reachable.
+        permutations: `B`; at least `budget.MIN_PERMUTATIONS` and at least
+            `1 / alpha - 1`, so the level is reachable.
         folds: Cross-fitting folds.
         confidence: Level of the one-sided lower bound.
         bootstrap: Bootstrap draws for the lower bound.
@@ -458,10 +459,11 @@ def lower_bound(
     groups: np.ndarray | None,
     rng: np.random.Generator,
 ) -> float:
-    """One-sided lower confidence bound on the skill by bootstrap.
+    """Computes a one-sided lower confidence bound on the skill by bootstrap.
 
-    Rows are resampled, or whole groups when `groups` is given. Draws that
-    lack a class are skipped; if every draw is skipped the bound is -inf.
+    Rows are resampled, or whole groups when `groups` is given. Draws whose
+    skill cannot be computed (a class is missing, or a regression target is
+    constant) are skipped; if every draw is skipped the bound is -inf.
 
     Args:
         pred: Output of `out_of_fold`.
@@ -536,7 +538,8 @@ class SkillTest:
         p_value: Permutation p-value.
         n: Rows.
         low_power: Too few rows; the feature is never a suspect.
-        suspect: p <= alpha and lower bound above the ceiling.
+        suspect: There are enough rows, p <= alpha and the lower bound is
+            above the ceiling.
         check: Ledger record.
     """
 
@@ -595,10 +598,14 @@ def skill_test(
         block_size: Consecutive rows per time block (permute within blocks
             and use contiguous folds); exclusive with `groups`.
         gate: Whether the detector has a current certificate.
-        set_id: Set the rows belong to (X for anything touching the target).
+        set_id: Set the rows belong to (the exploration set for anything
+            touching the target).
 
     Returns:
-        The test, with a ledger `Check`.
+        The test, with a ledger `Check`. The feature is a suspect only when
+        there are enough rows (see `enough_rows`); with too few it is
+        `low_power` and never a suspect. The check's interval is None when
+        the lower bound is -inf.
 
     Raises:
         ValueError: If both `groups` and `block_size` are given, `feature`
@@ -859,7 +866,7 @@ def cramers_v(table: np.ndarray) -> float:
 
 
 def binned_target(target: pd.Series, task: str) -> pd.Series:
-    """Bin the target for the missingness test.
+    """Bins the target for the missingness test.
 
     Args:
         target: The outcome.
@@ -876,7 +883,7 @@ def binned_target(target: pd.Series, task: str) -> pd.Series:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class MissingnessTest:
-    """Is a feature's missingness associated with the target?
+    """Result of testing whether a feature's missingness depends on the target.
 
     Attributes:
         feature: Feature name.
@@ -885,7 +892,8 @@ class MissingnessTest:
         cramers_v: Strength of association.
         n_missing: Rows with the feature missing.
         n: Rows.
-        suspect: p <= alpha and V >= the association ceiling.
+        suspect: There are at least `min_rows` rows, p <= alpha and V is at
+            least the association ceiling.
         check: Ledger record.
     """
 
@@ -912,14 +920,17 @@ def missingness_test(
     Args:
         feature: The feature.
         target: The outcome.
-        task: `classification` or `regression` (binned to quartiles).
+        task: `classification` or `regression` (a regression target is
+            binned to quartiles).
         cfg: Settings.
         gate: Whether the detector has a current certificate.
         set_id: Set the rows belong to.
 
     Returns:
         The test, or None when the feature is never or always missing, or
-        the target has a single level.
+        the target has a single level (after binning). Fisher's exact test
+        is used for a 2x2 table with an expected count below 5, otherwise
+        the chi-square without continuity correction.
 
     Raises:
         ValueError: If `feature` and `target` differ in length.
@@ -1075,8 +1086,10 @@ class LeakageReport:
 
         Returns:
             A dict with a note, the gate value and, per feature, the
-            suspicion flags, skill, its lower bound (None when infinite)
-            and the p-values of the tests that ran.
+            suspect, escalated and low-power flags, the skill, its lower
+            bound (None when not finite) and p-value, the conditional and
+            missingness p-values and the missingness Cramer's V (each None
+            when that test did not run).
         """
         return {
             "note": "statistical suspicion only; not proof of leakage",
@@ -1135,7 +1148,8 @@ def scan(
 
     Returns:
         The report, with one assessment per tested feature in the order
-        given; use `gate_status` to obtain `gate`.
+        given, recording `gate` as passed (see `gate_status` for deriving
+        it from the certificates).
 
     Raises:
         ValueError: If `features` names a column that is missing or is the

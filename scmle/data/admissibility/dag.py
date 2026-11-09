@@ -115,7 +115,7 @@ def separated(
     ys: Collection[str],
     zs: Collection[str],
 ) -> bool:
-    """d-separation of `xs` and `ys` given `zs` in a DAG.
+    """Tests d-separation of `xs` and `ys` given `zs` in a DAG.
 
     Moralises the subgraph induced by the ancestors of the three sets, deletes
     `zs`, and asks whether `xs` still reaches `ys`.
@@ -235,7 +235,9 @@ class Dag:
 
         Returns:
             The graph. Its nodes are those of the edges, `latent` and
-            `extra_nodes`, converted to strings.
+            `extra_nodes`, converted to strings. A graph the constructor
+            rejects (self loop, cycle, empty name, `source` or `prompt`)
+            raises its `ValueError` here.
         """
         pairs = sorted({(str(a), str(b)) for a, b in edges})
         names = {n for pair in pairs for n in pair}
@@ -325,7 +327,7 @@ class Dag:
     def backdoor_valid(
         self, treatment: str, outcome: str, adjustment: Collection[str]
     ) -> bool:
-        """Whether `adjustment` satisfies the back-door criterion.
+        """Tests whether `adjustment` satisfies the back-door criterion.
 
         Args:
             treatment: The treatment node.
@@ -379,7 +381,7 @@ class Dag:
     def adjustment_set(
         self, treatment: str, outcome: str
     ) -> tuple[str, ...] | None:
-        """Smallest valid back-door set of observed nodes, if one exists.
+        """Finds the smallest valid back-door set of observed nodes, if any.
 
         Sets are tried by size, then in sorted order, so the answer is
         deterministic.
@@ -394,7 +396,8 @@ class Dag:
 
         Raises:
             ValueError: If more than `MAX_SEARCH_CANDIDATES` candidates make
-                the search too large, or a node is unknown.
+                the search too large, a node is unknown, or `treatment`
+                equals `outcome`.
         """
         self.require_nodes([treatment, outcome])
         pool = self.candidates(treatment, outcome)
@@ -436,7 +439,7 @@ class Dag:
         return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
     def artifact(self) -> dict[str, Any]:
-        """Builds the `dag.json` document.
+        """Builds the stored DAG document.
 
         Returns:
             The record from `to_dict` plus its `hash`.
@@ -454,8 +457,9 @@ class Dag:
             The graph.
 
         Raises:
-            ValueError: On another status, version or field set, or a hash
-                that does not match the content.
+            ValueError: On another status, version or field set, a hash
+                that does not match the content, or content that is not a
+                valid graph.
         """
         names = {
             "format_version",

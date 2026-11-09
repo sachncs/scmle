@@ -82,7 +82,7 @@ class Availability(enum.StrEnum):
 
 
 def number(value: Any, name: str) -> float:
-    """Checks that a value is a finite number.
+    """Checks that a value is a finite number and returns it as a float.
 
     Args:
         value: The value to check.
@@ -168,7 +168,8 @@ def parse_date(value: str, name: str) -> datetime.date:
     """Parses an ISO calendar date.
 
     Args:
-        value: Text in the form YYYY-MM-DD.
+        value: ISO 8601 date text, normally YYYY-MM-DD (any form that
+            `datetime.date.fromisoformat` accepts).
         name: Field name used in the error message.
 
     Returns:
@@ -253,8 +254,8 @@ class Attestation:
             record: A mapping holding exactly the record's fields.
 
         Returns:
-            The record. Unexpected or missing fields and invalid values are
-            rejected with a `ValueError`.
+            The record. Unexpected or missing fields, empty text and invalid
+            dates are rejected with a `ValueError`.
         """
         qualification.require_fields(cls, record)
         return cls(**record)
@@ -392,7 +393,7 @@ class FieldProvenance:
             raise ValueError("a log-derived as-of rule needs a log_check")
 
     def tier(self, today: datetime.date | None = None) -> qualification.Tier:
-        """Evidence tier of the field's as-of rule.
+        """Returns the evidence tier of the field's as-of rule.
 
         Args:
             today: Day on which an attestation must still be valid; None
@@ -400,8 +401,9 @@ class FieldProvenance:
 
         Returns:
             `confirmed` for a log-derived rule whose log check passed;
-            `attested` for an unexpired attestation, or for a log-derived
-            rule that also carries one; `unverified` otherwise.
+            `attested` when the rule's source is `attested`, or is `log`
+            with a failed check, and an unexpired attestation is present;
+            `unverified` otherwise.
         """
         attested = self.attestation is not None and (
             today is None or self.attestation.valid_on(today)
@@ -478,7 +480,7 @@ class FieldProvenance:
 
 
 def undeclared(name: str) -> FieldProvenance:
-    """The record of a field nobody described: everything unknown.
+    """Returns the record of a field nobody described: everything unknown.
 
     Args:
         name: Column name.
@@ -501,7 +503,7 @@ def undeclared(name: str) -> FieldProvenance:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class ProvenanceTable:
-    """The data dictionary written as `field_provenance.json`.
+    """The data dictionary of every field, which ingest writes as JSON.
 
     Attributes:
         fields: One record per field, in a fixed order, names unique.
@@ -526,7 +528,7 @@ class ProvenanceTable:
         columns: Sequence[str],
         declared: Sequence[FieldProvenance] = (),
     ) -> Self:
-        """A table with a record for every column.
+        """Builds a table with a record for every column.
 
         Args:
             columns: Every column of the data.
@@ -537,7 +539,8 @@ class ProvenanceTable:
             column order.
 
         Raises:
-            ValueError: If a declared record names no column or repeats.
+            ValueError: If a declared record names no column or repeats, or
+                `columns` repeats a name.
         """
         by_name = {f.name: f for f in declared}
         if len(by_name) != len(declared):

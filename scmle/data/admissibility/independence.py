@@ -93,10 +93,13 @@ class CITest:
 
     Attributes:
         kind: Test used.
-        statistic: z (Fisher) or the summed chi-square.
+        statistic: z (Fisher; infinite when the partial correlation is +-1)
+            or the chi-square summed over strata.
         p_value: Two-sided (Fisher) or upper-tail (chi-square) p-value.
-        effect: Partial correlation (Fisher) or Cramer's V of the pooled
-            table (chi-square).
+        effect: Partial correlation (Fisher) or, for the chi-square, the
+            square root of the summed statistic over `n` times one less than
+            the smaller number of levels of `x` and `y` in the pooled table
+            (zero if that is not positive).
         n: Rows used.
         df: Degrees of freedom of the chi-square, 0 for Fisher.
         skipped_strata: Strata dropped as degenerate (chi-square only).
@@ -167,8 +170,8 @@ def fisher_z(
         given: Conditioning variables.
 
     Returns:
-        The test. When the partial correlation is exactly +-1 the p-value is
-        0.
+        The test. When the partial correlation is +-1 (after clipping) the
+        statistic is infinite and the p-value is 0.
 
     Raises:
         ValueError: If `n - len(given) - 3` is not positive, or a variable
@@ -241,7 +244,7 @@ def is_discrete(series: pd.Series) -> bool:
 def run_test(
     frame: pd.DataFrame, x: str, y: str, given: Sequence[str]
 ) -> CITest:
-    """Chooses Fisher's z for numeric data and chi-square for categories.
+    """Runs Fisher's z on numeric data or the chi-square on categories.
 
     Args:
         frame: Data holding the named columns.
@@ -282,7 +285,8 @@ def implied_statements(
 
     Returns:
         (statements, skipped): statements to test, and the nodes skipped
-        because a parent is latent.
+        because a parent is latent. A pair with the same conditioning set
+        is listed once, in the order the nodes are visited.
     """
     statements: list[Statement] = []
     skipped: list[str] = []
@@ -365,9 +369,10 @@ def falsify(
 ) -> FalsificationReport:
     """Tests each implied independence of `graph` on the data.
 
-    The per-test level is `alpha` divided by the number of testable
-    statements (Bonferroni), so the chance of falsifying a true graph in any
-    test is at most `alpha` under the test's assumptions. Pass `X` only.
+    The per-test level is `alpha` divided by the number of implied
+    statements (Bonferroni; at least 1), including any later skipped, so the
+    chance of falsifying a true graph in any test is at most `alpha` under
+    the test's assumptions. Pass exploration-set data only.
 
     Args:
         graph: The DAG hypothesis.
@@ -377,8 +382,10 @@ def falsify(
         set_id: Set the frame belongs to.
 
     Returns:
-        The report. A statement that cannot be tested is `skipped` with a
-        reason; it is never counted as passed.
+        The report. A statement is falsified when its p-value is at most the
+        per-test level. A statement whose test raises a `ValueError` is
+        `skipped` with that message as the reason; it is never counted as
+        passed.
 
     Raises:
         ValueError: If `alpha` is not a finite number in (0, 1) or an
@@ -435,7 +442,7 @@ def falsify(
 
 
 def describe(report: FalsificationReport) -> dict[str, Any]:
-    """Summarise a report without claiming confirmation.
+    """Summarises a report without claiming confirmation.
 
     Args:
         report: The falsification report.

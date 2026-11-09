@@ -68,7 +68,7 @@ class LoadedStore:
 
 
 def load_store(name: str, directory: Path | None = None) -> LoadedStore:
-    """Reads a certificate store, or say why it could not be read.
+    """Reads a certificate store, or says why it could not be read.
 
     Args:
         name: File name of the store.
@@ -103,8 +103,10 @@ class Qualification:
         detectors: Detector pipeline result.
         f5_store: The detector certificates used, or None.
         notes: Plain statements of what was not run or not certified.
-        diagnostics: Ledger records (source, check) of the screen and of
-            every attestation that overrode a block.
+        diagnostics: Ledger records (source, check). For a predictive
+            estimand: one per screen finding and one per attestation that
+            overrode a block. For a causal estimand: the checks of the DAG
+            falsification, if it ran.
         dag: For a causal estimand with a declared DAG: its hash, the
             conditional-independence falsification on `X`, and the members of
             the declared adjustment set the graph rules refused. None
@@ -158,9 +160,9 @@ def finding_check(
 ) -> qualification.Check:
     """Builds the ledger record of one screen finding.
 
-    The record is a wealth-free diagnostic: it carries the permutation
-    p-value, never a claim. A suspect whose mechanism is not certified is
-    demoted to a warning.
+    The record is a diagnostic: it carries the finding's p-value, never a
+    claim. A suspect whose mechanism is not certified is demoted to a
+    warning.
 
     Args:
         finding: The screen finding.
@@ -379,7 +381,8 @@ def run(
     Args:
         features: Exploration features.
         target: Exploration target.
-        kind: Estimand kind from the charter, `predictive` or `causal`.
+        kind: Estimand kind from the charter, `predictive` or `causal`; any
+            value other than `predictive` takes the causal path.
         classification: Whether the target holds classes.
         seed: Charter seed.
         structure: Group and time columns, which are not candidates.
@@ -396,14 +399,18 @@ def run(
         causal: The charter's causal block, for a causal estimand.
         dag: The DAG hypothesis the causal block declares, already loaded.
         declared: Provenance records for columns the run derived (for
-            example synthesized features); a column not among the
-            candidates is ignored. The others stay undeclared.
+            example synthesized features); a record for a column that is
+            not a candidate, or that is covered by an applied attestation,
+            is ignored. The other columns stay undeclared. Used for a
+            predictive estimand only.
 
     Returns:
-        The results. A causal estimand with a causal block and a declared
-        graph gets the graph rules (`rules.decide_causal`) on every candidate
-        and the falsification of the graph on `X`; without both, its
-        admissibility table is skipped and said so in `notes`.
+        The results. A predictive estimand gets the leakage screen, the
+        admissibility table and the ledger diagnostics. A causal estimand
+        with a causal block and a declared graph gets the graph rules
+        (`rules.decide_causal`) on every candidate and the falsification of
+        the graph on `X`; without both, its admissibility table and leakage
+        report are None and `notes` says so.
     """
     notes: list[str] = []
     f5 = load_store(F5_STORE, directory)

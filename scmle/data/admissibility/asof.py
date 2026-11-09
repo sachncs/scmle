@@ -71,21 +71,23 @@ def point_in_time(
     written_at: str,
     value: str,
 ) -> pd.DataFrame:
-    """Latest logged value at or before each row's moment.
+    """Finds the latest logged value at or before each row's moment.
 
     Args:
         rows: One row per case, with `key` and `moment` columns.
         log: Change log with `key`, `written_at` and `value` columns, in
             the order the changes were applied.
         key: Join key present in both tables.
-        moment: Column of `rows` holding the prediction moment.
+        moment: Column of `rows` holding the prediction moment (datetimes
+            or numbers; see `to_seconds`).
         written_at: Column of `log` holding the write time.
         value: Column of `log` holding the written value.
 
     Returns:
         A frame indexed like `rows` with `reconstructed` (missing when no
         entry precedes the moment), `known_at` (write time in seconds, NaN
-        when none) and `has_entry`.
+        when none) and `has_entry`. Among entries for one key with the same
+        write time, the one later in `log` wins.
     """
     left = pd.DataFrame(
         {
@@ -146,7 +148,7 @@ def agrees(stored: pd.Series, reconstructed: pd.Series) -> pd.Series:
 
 
 def classify_rows(stored: pd.Series, joined: pd.DataFrame) -> pd.Series:
-    """Classify every row against the reconstruction.
+    """Classifies every row against the reconstruction.
 
     Args:
         stored: The stored value of each row.
@@ -175,7 +177,7 @@ def reconstruction_mismatch(
     written_at: str,
     value: str,
 ) -> pd.Series:
-    """True for rows whose stored value is not the log value at the moment.
+    """Flags rows whose stored value is not the log value at the moment.
 
     Args:
         rows: Cases with `key`, `moment` and the stored column.
@@ -187,7 +189,8 @@ def reconstruction_mismatch(
         value: Value column of `log`.
 
     Returns:
-        A boolean series aligned to `rows`.
+        A boolean series aligned to `rows`; True for every row that is not
+        a `match` (overwritten or not yet written).
     """
     joined = point_in_time(rows, log, key, moment, written_at, value)
     status = classify_rows(rows[stored], joined)
@@ -311,7 +314,7 @@ def audit_field(
 def log_provenance(
     base: provenance.FieldProvenance, audit: AsOfAudit
 ) -> provenance.FieldProvenance:
-    """Copy of `base` whose as-of rule comes from a log audit.
+    """Copies `base` with its as-of rule taken from a log audit.
 
     Args:
         base: The record to update.
