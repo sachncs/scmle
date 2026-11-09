@@ -310,8 +310,10 @@ def decision_report(
         else {"plan_hash": design_record["plan_hash"], "ran": False},
         "limits": [
             "costs, margins and propensities are inputs, not findings",
-            "the rule and the fairness bounds were fixed before these rows "
-            "were read; each test ran once",
+            (
+                "the rule and the fairness bounds were fixed before these "
+                "rows were read; each test ran once"
+            ),
             "legal admissibility of group thresholds is an attestation",
         ],
     }

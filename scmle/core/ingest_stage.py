@@ -187,7 +187,7 @@ def read_frame(entry: dict[str, Any], factory: Any) -> pandas.DataFrame:
     order = str(entry["order_by"])
     if not ORDER.match(order):
         raise errors.ConfigError(f"ingest plan order_by {order!r} is invalid")
-    query = f"SELECT * FROM {table} ORDER BY {order}"  # nosec B608
+    query = f"SELECT * FROM {table} ORDER BY {order}"  # noqa: S608 -- identifier and ORDER-matched clause only # nosec B608
     connector = connectors.DbApiConnector("sqlite://ingest", query, factory)
     return profile.consistent_read(connector, BATCH_ROWS).frame
 
