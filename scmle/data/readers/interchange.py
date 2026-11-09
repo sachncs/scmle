@@ -52,12 +52,16 @@ def to_pandas(data: Any) -> pandas.DataFrame:
         return data.copy()
     if hasattr(data, "collect"):  # Polars LazyFrame and similar.
         data = data.collect()
+    frame: pandas.DataFrame
     if isinstance(data, pyarrow.Table):
-        return data.to_pandas()
+        frame = data.to_pandas()
+        return frame
     if hasattr(data, ARROW_STREAM):
-        return pyarrow.table(data).to_pandas()
+        frame = pyarrow.table(data).to_pandas()
+        return frame
     if hasattr(data, "to_pandas"):
-        return data.to_pandas()
+        frame = data.to_pandas()
+        return frame
     if isinstance(data, (str, pathlib.Path)):
         raise errors.DataError("paths are read with the dataset loader")
     raise errors.DataError(f"unsupported table type {type(data).__name__}")

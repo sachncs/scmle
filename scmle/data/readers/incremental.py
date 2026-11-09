@@ -93,7 +93,8 @@ def parse_timestamp(value: str, field_name: str) -> datetime.datetime:
         ValueError: If `value` is not a non-blank string, is not ISO-8601,
             or carries no timezone.
     """
-    if not isinstance(value, str) or not value.strip():
+    candidate: object = value
+    if not isinstance(candidate, str) or not candidate.strip():
         raise ValueError(f"{field_name} must not be empty")
     try:
         parsed = datetime.datetime.fromisoformat(value)
@@ -141,7 +142,8 @@ class Event:
             TypeError: If the sequence is not an integer or the payload is not
                 a mapping.
         """
-        if not isinstance(self.event_id, str) or not self.event_id.strip():
+        event_id: object = self.event_id
+        if not isinstance(event_id, str) or not event_id.strip():
             raise ValueError("event_id must not be empty")
         if isinstance(self.sequence, bool) or not isinstance(
             self.sequence, int
@@ -516,7 +518,7 @@ class EventSource(abc.ABC):
     def __init__(
         self,
         source_uri: str,
-        late_data_policy: LateData = LateData.REJECT,
+        late_data_policy: LateData | str = LateData.REJECT,
     ) -> None:
         """Initializes source identity and late-data policy.
 
@@ -950,11 +952,12 @@ class IngestionLedger:
             None, while the exclusive lock on the sidecar file is held.
         """
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+        windows_lock: Any = None
         with self.lock_path.open("a+b") as handle:
             if os.name == "nt":
                 import msvcrt  # noqa: PLC0415 -- Windows-only module, imported only on Windows
 
-                windows_lock: Any = msvcrt
+                windows_lock = msvcrt
                 handle.seek(0)
                 windows_lock.locking(handle.fileno(), windows_lock.LK_LOCK, 1)
             else:
@@ -970,6 +973,8 @@ class IngestionLedger:
                         handle.fileno(), windows_lock.LK_UNLCK, 1
                     )
                 else:
+                    import fcntl  # noqa: PLC0415 -- POSIX-only module, imported only off Windows
+
                     fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
     def load(self) -> CommittedState:
