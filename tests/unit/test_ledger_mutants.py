@@ -351,6 +351,7 @@ def test_result_dictionary_keys_and_round_trip_with_exceeds_true():
         "p95",
         "p95_interval",
         "p95_interval_confidence",
+        "p95_interval_achieved_confidence",
         "exceedance_p",
         "exceeds",
         "message",

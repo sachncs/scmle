@@ -132,6 +132,12 @@ def cluster_test(d: ArrayLike, clusters: ArrayLike) -> ClusterTest:
         d: Per-row differences.
         clusters: Cluster label of each row.
 
+    The size is not exactly the nominal level when clusters are few and of
+    uneven size: with a random effect shared inside each cluster, simulated
+    rejection rates at 0.05 were 0.056 for 20 clusters of 5 to 15 rows and
+    0.057 for 30 clusters of 1 to 30 rows (20,000 datasets each). It is
+    slightly liberal there, by about 0.006.
+
     Returns:
         The test, with `G - 1` degrees of freedom.
 

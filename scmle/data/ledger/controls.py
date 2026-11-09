@@ -134,6 +134,44 @@ def percentile_interval(
     ]
 
 
+def interval_coverage(
+    b: int,
+    q: float = QUANTILE,
+    confidence: float = INTERVAL_CONFIDENCE,
+) -> float:
+    """Returns the exact coverage of `percentile_interval` for `b` draws.
+
+    For continuous draws the number of them below the true q-quantile is
+    binomial, and the interval from the k-th to the h-th smallest draw covers
+    the quantile exactly when that number is at least k and at most h - 1. So
+    the coverage is a binomial probability, not an approximation. With few
+    draws it is below the nominal `confidence`, because the upper bound cannot
+    pass the largest draw, which lies above the quantile with probability
+    only `1 - q ** b`.
+
+    Args:
+        b: Number of re-runs.
+        q: Quantile level in (0, 1).
+        confidence: Nominal coverage the interval was built for.
+
+    Returns:
+        The probability that the interval contains the true q-quantile.
+
+    Raises:
+        ValueError: If `b` is not positive.
+    """
+    if b <= 0:
+        raise ValueError("b must be positive")
+    tail = (1.0 - confidence) / 2.0
+    low = int(stats.binom.ppf(tail, b, q))
+    high = int(stats.binom.ppf(1.0 - tail, b, q)) + 1
+    smallest = min(max(low - 1, 0), b - 1) + 1
+    largest = min(max(high - 1, 0), b - 1) + 1
+    return float(stats.binom.cdf(largest - 1, b, q)) - float(
+        stats.binom.cdf(smallest - 1, b, q)
+    )
+
+
 def permute_within(
     values: numpy.ndarray,
     strata: numpy.ndarray | None,
@@ -197,7 +235,8 @@ class Control:
         observed: Discoveries on the real data.
         permuted: Discovery counts of the B re-runs.
         p95: The 95th percentile of the permuted counts (see `percentile`).
-        p95_interval: Approximate interval for that percentile.
+        p95_interval: Distribution-free interval for that percentile; its
+            exact coverage is `interval_coverage(b)`.
         exceedance_p: ``(1 + #{permuted >= observed}) / (B + 1)``.
         exceeds: Whether ``observed > p95``.
     """
@@ -247,13 +286,15 @@ class Control:
             "p95": self.p95,
             "p95_interval": list(self.p95_interval),
             "p95_interval_confidence": INTERVAL_CONFIDENCE,
+            "p95_interval_achieved_confidence": interval_coverage(self.b),
             "exceedance_p": self.exceedance_p,
             "exceeds": self.exceeds,
             "message": self.message,
             "note": (
                 "The 95th percentile is estimated from B re-runs and has "
-                "Monte Carlo error; the interval is approximate and "
-                "distribution-free."
+                "Monte Carlo error; the interval is distribution-free "
+                "and its confidence is the achieved value, which is "
+                "below the nominal one when B is small."
             ),
         }
 
