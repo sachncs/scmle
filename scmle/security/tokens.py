@@ -41,6 +41,9 @@ ALGORITHMS = (HS256, RS256)
 MAX_TOKEN_BYTES = 8192
 MIN_RSA_BITS = 2048
 MIN_HMAC_BYTES = 32
+MAX_KID_LENGTH = 128
+MIN_RSA_EXPONENT = 3
+TOKEN_PARTS = 3  # header, payload and signature
 DEFAULT_LEEWAY_SECONDS = 30.0
 SHA256_DIGEST_INFO = bytes.fromhex("3031300d060960864801650304020105000420")
 
@@ -156,7 +159,7 @@ class Key:
                 32 bytes, an RS256 modulus is under 2048 bits, or the RSA
                 exponent is even or below 3.
         """
-        if not self.kid or len(self.kid) > 128:
+        if not self.kid or len(self.kid) > MAX_KID_LENGTH:
             raise errors.ConfigError("a key needs a kid of 1-128 characters")
         if self.algorithm == HS256:
             if len(self.secret) < MIN_HMAC_BYTES:
@@ -168,7 +171,7 @@ class Key:
                 raise errors.ConfigError(
                     f"an RS256 modulus needs at least {MIN_RSA_BITS} bits"
                 )
-            if self.exponent < 3 or self.exponent % 2 == 0:
+            if self.exponent < MIN_RSA_EXPONENT or self.exponent % 2 == 0:
                 raise errors.ConfigError("the RSA exponent must be odd, >= 3")
         else:
             raise errors.ConfigError(
@@ -535,7 +538,7 @@ class Verifier:
         if not token or len(token) > MAX_TOKEN_BYTES:
             raise TokenError(MALFORMED)
         parts = token.split(".")
-        if len(parts) != 3 or not all(parts):
+        if len(parts) != TOKEN_PARTS or not all(parts):
             raise TokenError(MALFORMED)
         header = self.parse_object(parts[0])
         algorithm = header.get("alg")
