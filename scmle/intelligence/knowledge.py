@@ -25,7 +25,8 @@ NEIGHBORS = 5
 
 
 def fingerprint(
-    profile: data.DatasetProfile, task: tasks.Task
+    profile: data.DatasetProfile,
+    task: tasks.Task,  # noqa: ARG001 -- public signature used by callers
 ) -> dict[str, float]:
     """Summarizes a dataset as a small numeric vector.
 

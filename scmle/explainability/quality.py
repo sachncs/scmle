@@ -6,6 +6,8 @@ import dataclasses
 import math
 from typing import Any
 
+MIN_REPORTS = 2
+
 
 def validate_score(value: float, field_name: str) -> float:
     """Returns a finite score in the inclusive unit interval.
@@ -578,7 +580,7 @@ def ranking_stability(
             valid explanation report, `top_k` is negative, or `top_k`
             exceeds the feature count of any report.
     """
-    if len(reports) < 2:
+    if len(reports) < MIN_REPORTS:
         raise ValueError("at least two explanation reports are required")
     rankings = [explanation_ranking(report) for report in reports]
     limit = top_k or min(len(ranking) for ranking in rankings)

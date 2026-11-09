@@ -94,7 +94,7 @@ class RandomOptimizer(Optimizer):
             greater_is_better: Orientation of the scores passed to `tell`.
         """
         super().__init__(space, seed, greater_is_better)
-        self.rng = random.Random(seed)  # nosec B311 - seeded search, not security
+        self.rng = random.Random(seed)  # nosec B311  # noqa: S311 -- seeded search, not security
         self.history: list[tuple[dict[str, Any], float]] = []
 
     def ask(self) -> dict[str, Any]:
@@ -116,7 +116,10 @@ class RandomOptimizer(Optimizer):
 
 
 @functools.singledispatch
-def suggest(parameter: search.Parameter, trial: Any) -> Any:
+def suggest(
+    parameter: search.Parameter,
+    trial: Any,  # noqa: ARG001 -- dispatch signature shared by every type
+) -> Any:
     """Asks an Optuna trial for a value of `parameter` (dispatch on type).
 
     This is the fallback of a single-dispatch function; the registered
@@ -214,7 +217,7 @@ class GridOptimizer(Optimizer):
             dict(zip(space.names(), combo, strict=True))
             for combo in itertools.product(*axes)
         ]
-        self.rng = random.Random(seed)  # nosec B311 - seeded, not security
+        self.rng = random.Random(seed)  # nosec B311  # noqa: S311 -- seeded, not security
         self.rng.shuffle(points)
         self.points = points
         self.position = 0
@@ -241,7 +244,7 @@ class GridOptimizer(Optimizer):
             else:
                 whole_mid = (whole_low + whole_high) // 2
             return sorted({whole_low, whole_mid, whole_high})
-        assert isinstance(parameter, search.FloatParameter)  # nosec B101
+        assert isinstance(parameter, search.FloatParameter)  # nosec B101  # noqa: S101 -- narrows the type for the last branch
         low, high = parameter.low, parameter.high
         middle = math.sqrt(low * high) if parameter.log else (low + high) / 2
         return [low, middle, high]
@@ -296,7 +299,7 @@ class OptunaOptimizer(Optimizer):
             raise errors.ConfigError(
                 "optimizer 'optuna' needs the 'optimization' extra"
             )
-        import optuna
+        import optuna  # noqa: PLC0415 -- optional dependency
 
         optuna.logging.set_verbosity(optuna.logging.WARNING)
         self.study = optuna.create_study(

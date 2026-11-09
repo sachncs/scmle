@@ -126,7 +126,7 @@ class MultiTargetMetric(scmle.contracts.metrics.Metric):
         """
         return False
 
-    def scorer(self, positive: Any = None) -> Any:
+    def scorer(self, positive: Any = None) -> Any:  # noqa: ARG002 -- metric scorer interface
         """Builds a scorer `(estimator, features, primary_target)`.
 
         Args:
@@ -146,7 +146,7 @@ class MultiTargetMetric(scmle.contracts.metrics.Metric):
             estimator: Any,
             features: pandas.DataFrame,
             target: pandas.Series,
-            sample_weight: Any = None,
+            sample_weight: Any = None,  # noqa: ARG001 -- scorer protocol passes sample_weight
         ) -> float:
             truth = numpy.column_stack(
                 [

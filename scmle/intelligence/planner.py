@@ -21,6 +21,9 @@ from scmle.intelligence import knowledge
 import scmle.models.registry
 from scmle.sampling import strategies
 
+EXPENSIVE_COST = 3
+MIN_ENSEMBLE_SIZE = 2
+MIN_DISTINCT_MODELS = 2
 FAST_EXCEPTIONS = frozenset(
     {
         "hist_gradient_boosting",
@@ -155,15 +158,15 @@ class GpuFilter(Refiner):
                 "resources.gpu='required' but no compatible model can use a "
                 "GPU; set gpu='auto' or install a GPU-capable adapter"
             )
-        for adapter in candidates:
-            if adapter not in capable:
-                decisions.append(
-                    experiments.Decision(
-                        adapter.name,
-                        experiments.DecisionAction.REJECT,
-                        "gpu required",
-                    )
-                )
+        decisions.extend(
+            experiments.Decision(
+                adapter.name,
+                experiments.DecisionAction.REJECT,
+                "gpu required",
+            )
+            for adapter in candidates
+            if adapter not in capable
+        )
         return capable
 
 
@@ -204,7 +207,7 @@ class BudgetFilter(Refiner):
         )
         kept = []
         for adapter in candidates:
-            expensive = adapter.capabilities.cost >= 3
+            expensive = adapter.capabilities.cost >= EXPENSIVE_COST
             if expensive and adapter.name not in FAST_EXCEPTIONS:
                 decisions.append(
                     experiments.Decision(
@@ -278,7 +281,7 @@ class SerializableFilter(Refiner):
 
     def apply(
         self,
-        context: PlanningContext,
+        context: PlanningContext,  # noqa: ARG002 -- Refiner.apply interface
         candidates: list[models.Model],
         decisions: list[experiments.Decision],
     ) -> list[models.Model]:
@@ -507,15 +510,15 @@ class ApprovalFilter(Refiner):
                 f"approved models not compatible with this plan: "
                 f"{sorted(unknown)}"
             )
-        for adapter in candidates:
-            if adapter.name not in approved:
-                decisions.append(
-                    experiments.Decision(
-                        adapter.name,
-                        experiments.DecisionAction.REJECT,
-                        "not in approved plan",
-                    )
-                )
+        decisions.extend(
+            experiments.Decision(
+                adapter.name,
+                experiments.DecisionAction.REJECT,
+                "not in approved plan",
+            )
+            for adapter in candidates
+            if adapter.name not in approved
+        )
         return [a for a in candidates if a.name in approved]
 
 
@@ -709,10 +712,10 @@ class EnsembleRecorder(Refiner):
         distinct = sum(
             1 for a in candidates if a.family not in ("baseline", "ensemble")
         )
-        if size < 2 or distinct < 2:
+        if size < MIN_ENSEMBLE_SIZE or distinct < MIN_DISTINCT_MODELS:
             reason = (
                 "disabled (ensemble.size < 2)"
-                if size < 2
+                if size < MIN_ENSEMBLE_SIZE
                 else "fewer than two eligible distinct models"
             )
             action = experiments.DecisionAction.DEFER

@@ -173,7 +173,7 @@ class NullExperimentStore(ExperimentStore):
         """
         return []
 
-    def trials(self, run_id: str) -> list[dict[str, Any]]:
+    def trials(self, run_id: str) -> list[dict[str, Any]]:  # noqa: ARG002 -- RunStore.trials interface
         """Returns nothing.
 
         Args:
@@ -355,7 +355,7 @@ class SqliteExperimentStore(ExperimentStore):
             # Column names come from the COLUMNS whitelist checked above and
             # every value is bound as a parameter, so this is not injectable.
             connection.execute(
-                f"UPDATE runs SET {assignments}, updated_at = "  # nosec B608
+                f"UPDATE runs SET {assignments}, updated_at = "  # nosec B608  # noqa: S608 -- whitelisted columns, bound values
                 "strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE run_id = ?",
                 (*values.values(), run_id),
             )

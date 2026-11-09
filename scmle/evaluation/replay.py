@@ -37,7 +37,7 @@ class PredictionReplay(base.BaseEstimator):
         self.probabilities = probabilities
         self.classes_ = classes
 
-    def predict(self, features: Any) -> numpy.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:  # noqa: ARG002 -- scikit-learn estimator interface
         """Returns the stored predictions.
 
         Args:
@@ -48,7 +48,7 @@ class PredictionReplay(base.BaseEstimator):
         """
         return self.predictions
 
-    def predict_proba(self, features: Any) -> numpy.ndarray:
+    def predict_proba(self, features: Any) -> numpy.ndarray:  # noqa: ARG002 -- scikit-learn estimator interface
         """Returns the stored probabilities.
 
         Args:

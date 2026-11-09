@@ -9,6 +9,7 @@ from scmle.evaluation import diagnostics
 
 MAX_INTERACTION_FEATURES = 10
 MAX_INTERACTION_ROWS = 200
+MIN_NUMERIC_FEATURES = 2
 
 
 class PairwiseInteraction(diagnostics.Diagnostic):
@@ -49,7 +50,7 @@ class PairwiseInteraction(diagnostics.Diagnostic):
             if column in columns
         ][:MAX_INTERACTION_FEATURES]
         sample = inputs.features[columns].head(MAX_INTERACTION_ROWS).copy()
-        if len(numeric) < 2 or sample.empty:
+        if len(numeric) < MIN_NUMERIC_FEATURES or sample.empty:
             return {
                 "features": [],
                 "features_considered": numeric,

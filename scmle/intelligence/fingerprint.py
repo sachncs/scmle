@@ -26,6 +26,8 @@ from scmle.monitoring import reference
 BYTES_PER_MB = 1024 * 1024
 SAMPLE_ROWS = 5000
 MAX_CORRELATION_COLUMNS = 150
+MIN_CORRELATION_COLUMNS = 2
+MIN_SPREADS = 2
 REDUNDANT_CORRELATION = 0.95
 MAX_REDUNDANT_PAIRS = 20
 THIRDS = 3
@@ -49,7 +51,7 @@ def redundant_pairs(
         threshold, strongest first.
     """
     names = list(numeric)[:MAX_CORRELATION_COLUMNS]
-    if len(names) < 2:
+    if len(names) < MIN_CORRELATION_COLUMNS:
         return []
     sample = frame[names].astype(float)
     if len(sample) > SAMPLE_ROWS:
@@ -169,7 +171,7 @@ def scale_range(frame: pandas.DataFrame, numeric: tuple[str, ...]) -> float:
         for c in numeric
         if frame[c].astype(float).std() > 0
     ]
-    if len(spreads) < 2:
+    if len(spreads) < MIN_SPREADS:
         return 0.0
     return float(numpy.log10(max(spreads) / min(spreads)))
 

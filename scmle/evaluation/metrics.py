@@ -24,6 +24,7 @@ from scmle.evaluation import survival
 from scmle.evaluation import uplift
 
 CLASSIFICATION = frozenset({tasks.Task.BINARY, tasks.Task.MULTICLASS})
+BINARY_CLASSES = 2
 
 
 def positive_label(target: pandas.Series, task: tasks.Task) -> Any:
@@ -46,7 +47,7 @@ def positive_label(target: pandas.Series, task: tasks.Task) -> Any:
     if task is not tasks.Task.BINARY:
         return None
     labels = sorted(target.dropna().unique())
-    if len(labels) < 2:
+    if len(labels) < BINARY_CLASSES:
         raise ValueError(
             "a binary target needs at least two distinct labels to name "
             f"the positive class; found {len(labels)}"
@@ -56,164 +57,222 @@ def positive_label(target: pandas.Series, task: tasks.Task) -> Any:
 
 DEFAULT_METRICS = (
     scmle.contracts.metrics.Metric(
-        "roc_auc", "roc_auc", True, frozenset({tasks.Task.BINARY})
+        "roc_auc",
+        "roc_auc",
+        greater_is_better=True,
+        tasks=frozenset({tasks.Task.BINARY}),
     ),
     scmle.contracts.metrics.Metric(
         "roc_auc_ovr",
         "roc_auc_ovr",
-        True,
-        frozenset({tasks.Task.MULTICLASS}),
+        greater_is_better=True,
+        tasks=frozenset({tasks.Task.MULTICLASS}),
     ),
     scmle.contracts.metrics.PositiveLabelMetric(
         "pr_auc",
         "average_precision",
-        True,
-        frozenset({tasks.Task.BINARY}),
-        sklearn.metrics.average_precision_score,
-        ("decision_function", "predict_proba"),
+        greater_is_better=True,
+        tasks=frozenset({tasks.Task.BINARY}),
+        score_function=sklearn.metrics.average_precision_score,
+        response_methods=("decision_function", "predict_proba"),
     ),
     scmle.contracts.metrics.Metric(
-        "log_loss", "neg_log_loss", False, CLASSIFICATION
+        "log_loss",
+        "neg_log_loss",
+        greater_is_better=False,
+        tasks=CLASSIFICATION,
     ),
     scmle.contracts.metrics.PositiveLabelMetric(
         "f1",
         "f1",
-        True,
-        frozenset({tasks.Task.BINARY}),
-        sklearn.metrics.f1_score,
-        ("predict",),
+        greater_is_better=True,
+        tasks=frozenset({tasks.Task.BINARY}),
+        score_function=sklearn.metrics.f1_score,
+        response_methods=("predict",),
     ),
     scmle.contracts.metrics.Metric(
-        "f1_macro", "f1_macro", True, CLASSIFICATION
+        "f1_macro", "f1_macro", greater_is_better=True, tasks=CLASSIFICATION
     ),
     scmle.contracts.metrics.Metric(
-        "balanced_accuracy", "balanced_accuracy", True, CLASSIFICATION
+        "balanced_accuracy",
+        "balanced_accuracy",
+        greater_is_better=True,
+        tasks=CLASSIFICATION,
     ),
     scmle.contracts.metrics.Metric(
-        "accuracy", "accuracy", True, CLASSIFICATION
+        "accuracy", "accuracy", greater_is_better=True, tasks=CLASSIFICATION
     ),
     scmle.contracts.metrics.Metric(
         "mae",
         "neg_mean_absolute_error",
-        False,
-        frozenset({tasks.Task.REGRESSION}),
+        greater_is_better=False,
+        tasks=frozenset({tasks.Task.REGRESSION}),
     ),
     scmle.contracts.metrics.Metric(
         "rmse",
         "neg_root_mean_squared_error",
-        False,
-        frozenset({tasks.Task.REGRESSION}),
+        greater_is_better=False,
+        tasks=frozenset({tasks.Task.REGRESSION}),
     ),
     scmle.contracts.metrics.Metric(
-        "r2", "r2", True, frozenset({tasks.Task.REGRESSION})
+        "r2",
+        "r2",
+        greater_is_better=True,
+        tasks=frozenset({tasks.Task.REGRESSION}),
     ),
     scmle.contracts.metrics.FunctionMetric(
         "qwk",
         "",
-        True,
-        frozenset({tasks.Task.ORDINAL}),
-        ordinal.quadratic_weighted_kappa,
-        "predict",
+        greater_is_better=True,
+        tasks=frozenset({tasks.Task.ORDINAL}),
+        score_function=ordinal.quadratic_weighted_kappa,
+        response_method="predict",
     ),
     scmle.contracts.metrics.FunctionMetric(
         "mace",
         "",
-        False,
-        frozenset({tasks.Task.ORDINAL}),
-        ordinal.mean_absolute_class_error,
-        "predict",
+        greater_is_better=False,
+        tasks=frozenset({tasks.Task.ORDINAL}),
+        score_function=ordinal.mean_absolute_class_error,
+        response_method="predict",
     ),
     scmle.contracts.metrics.Metric(
-        "accuracy_levels", "accuracy", True, frozenset({tasks.Task.ORDINAL})
+        "accuracy_levels",
+        "accuracy",
+        greater_is_better=True,
+        tasks=frozenset({tasks.Task.ORDINAL}),
     ),
     multitarget.MultiTargetMetric(
         "f1_macro_labels",
         "",
-        True,
-        frozenset({tasks.Task.MULTILABEL}),
-        "f1_macro_labels",
+        greater_is_better=True,
+        tasks=frozenset({tasks.Task.MULTILABEL}),
+        kind="f1_macro_labels",
     ),
     multitarget.MultiTargetMetric(
         "f1_micro_labels",
         "",
-        True,
-        frozenset({tasks.Task.MULTILABEL}),
-        "f1_micro_labels",
+        greater_is_better=True,
+        tasks=frozenset({tasks.Task.MULTILABEL}),
+        kind="f1_micro_labels",
     ),
     multitarget.MultiTargetMetric(
-        "hamming", "", False, frozenset({tasks.Task.MULTILABEL}), "hamming"
+        "hamming",
+        "",
+        greater_is_better=False,
+        tasks=frozenset({tasks.Task.MULTILABEL}),
+        kind="hamming",
     ),
     multitarget.MultiTargetMetric(
         "subset_accuracy",
         "",
-        True,
-        frozenset({tasks.Task.MULTILABEL}),
-        "subset_accuracy",
+        greater_is_better=True,
+        tasks=frozenset({tasks.Task.MULTILABEL}),
+        kind="subset_accuracy",
     ),
     multitarget.MultiTargetMetric(
-        "r2_mean", "", True, frozenset({tasks.Task.MULTIOUTPUT}), "r2_mean"
+        "r2_mean",
+        "",
+        greater_is_better=True,
+        tasks=frozenset({tasks.Task.MULTIOUTPUT}),
+        kind="r2_mean",
     ),
     multitarget.MultiTargetMetric(
         "mae_scaled",
         "",
-        False,
-        frozenset({tasks.Task.MULTIOUTPUT}),
-        "mae_scaled",
+        greater_is_better=False,
+        tasks=frozenset({tasks.Task.MULTIOUTPUT}),
+        kind="mae_scaled",
     ),
     forecast.ForecastMetric(
-        "mase", "", False, frozenset({tasks.Task.FORECAST}), "mase"
+        "mase",
+        "",
+        greater_is_better=False,
+        tasks=frozenset({tasks.Task.FORECAST}),
+        kind="mase",
     ),
     forecast.ForecastMetric(
-        "forecast_mae", "", False, frozenset({tasks.Task.FORECAST}), "mae"
+        "forecast_mae",
+        "",
+        greater_is_better=False,
+        tasks=frozenset({tasks.Task.FORECAST}),
+        kind="mae",
     ),
     forecast.ForecastMetric(
         "forecast_smape",
         "",
-        False,
-        frozenset({tasks.Task.FORECAST}),
-        "smape",
+        greater_is_better=False,
+        tasks=frozenset({tasks.Task.FORECAST}),
+        kind="smape",
     ),
     uplift.UpliftMetric(
-        "qini", "", True, frozenset({tasks.Task.UPLIFT}), "qini"
+        "qini",
+        "",
+        greater_is_better=True,
+        tasks=frozenset({tasks.Task.UPLIFT}),
+        kind="qini",
     ),
     uplift.UpliftMetric(
         "uplift_at_30",
         "",
-        True,
-        frozenset({tasks.Task.UPLIFT}),
-        "uplift_at_30",
+        greater_is_better=True,
+        tasks=frozenset({tasks.Task.UPLIFT}),
+        kind="uplift_at_30",
     ),
     ranking.RankingMetric(
-        "ndcg", "", True, frozenset({tasks.Task.RANKING}), "ndcg"
+        "ndcg",
+        "",
+        greater_is_better=True,
+        tasks=frozenset({tasks.Task.RANKING}),
+        kind="ndcg",
     ),
     ranking.RankingMetric(
-        "map", "", True, frozenset({tasks.Task.RANKING}), "map"
+        "map",
+        "",
+        greater_is_better=True,
+        tasks=frozenset({tasks.Task.RANKING}),
+        kind="map",
     ),
     ranking.RankingMetric(
-        "mrr", "", True, frozenset({tasks.Task.RANKING}), "mrr"
+        "mrr",
+        "",
+        greater_is_better=True,
+        tasks=frozenset({tasks.Task.RANKING}),
+        kind="mrr",
     ),
     ranking.RankingMetric(
         "precision_at_10",
         "",
-        True,
-        frozenset({tasks.Task.RANKING}),
-        "precision_at_10",
+        greater_is_better=True,
+        tasks=frozenset({tasks.Task.RANKING}),
+        kind="precision_at_10",
     ),
     ranking.RankingMetric(
         "recall_at_10",
         "",
-        True,
-        frozenset({tasks.Task.RANKING}),
-        "recall_at_10",
+        greater_is_better=True,
+        tasks=frozenset({tasks.Task.RANKING}),
+        kind="recall_at_10",
     ),
     concordance.ConcordanceMetric(
-        "c_index", "", True, frozenset({tasks.Task.SURVIVAL})
+        "c_index",
+        "",
+        greater_is_better=True,
+        tasks=frozenset({tasks.Task.SURVIVAL}),
     ),
     survival.SurvivalMetric(
-        "ibs", "", False, frozenset({tasks.Task.SURVIVAL}), "ibs"
+        "ibs",
+        "",
+        greater_is_better=False,
+        tasks=frozenset({tasks.Task.SURVIVAL}),
+        kind="ibs",
     ),
     survival.SurvivalMetric(
-        "td_auc", "", True, frozenset({tasks.Task.SURVIVAL}), "td_auc"
+        "td_auc",
+        "",
+        greater_is_better=True,
+        tasks=frozenset({tasks.Task.SURVIVAL}),
+        kind="td_auc",
     ),
 )
 

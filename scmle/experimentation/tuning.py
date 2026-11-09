@@ -14,6 +14,7 @@ from scmle.experimentation import trials
 from scmle.optimization import optimizers
 
 MIN_BATCH = 2
+MIN_FOLDS = 2
 
 
 class Tuner:
@@ -129,12 +130,10 @@ class Tuner:
             single full-evaluation rung if there are fewer than two folds.
         """
         folds = len(self.runner.folds)
-        if folds < 2:
+        if folds < MIN_FOLDS:
             return [[None]]
         eta = self.search.eta
-        counts = sorted(
-            {max(int(folds / eta**power), 1) for power in range(0, 4)}
-        )
+        counts = sorted({max(int(folds / eta**power), 1) for power in range(4)})
         rungs: list[int | None] = [c for c in counts if c < folds]
         rungs.append(None)
         return [rungs[start:] for start in range(len(rungs))]

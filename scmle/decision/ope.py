@@ -37,6 +37,8 @@ from scmle.contracts import qualification
 from scmle.evaluation import sequential
 
 ESTIMATORS = ("ipw", "snips", "dr")
+MATRIX_NDIM = 2
+BINARY_ACTIONS = 2
 ISSUED = "issued"
 REFUSED = "refused"
 
@@ -82,7 +84,7 @@ class LoggedBandit:
             raise ValueError("rewards must align with actions")
         for name in ("behaviour", "target"):
             matrix = getattr(self, name)
-            if matrix.ndim != 2 or matrix.shape[0] != n:
+            if matrix.ndim != MATRIX_NDIM or matrix.shape[0] != n:
                 raise ValueError(f"{name} must have shape (n, K)")
             if (matrix < 0).any() or not numpy.allclose(
                 matrix.sum(axis=1), 1.0
@@ -544,7 +546,7 @@ def fit_threshold_policy(
         ScmleError: If there is no candidate cut.
     """
     effect = numpy.asarray(tau, dtype=float)
-    if log.outcome_model is None or log.behaviour.shape[1] != 2:
+    if log.outcome_model is None or log.behaviour.shape[1] != BINARY_ACTIONS:
         raise ValueError("policy fitting needs a binary action and a q model")
     ratio = 1.0 / log.taken(log.behaviour)
     if clip is not None:

@@ -23,6 +23,7 @@ from sklearn import mixture
 from sklearn import preprocessing
 
 MIN_ROWS = 30
+MIN_CLUSTER_COUNT = 2
 STABLE_ARI = 0.7
 METHODS = ("kmeans", "gaussian_mixture", "agglomerative")
 
@@ -182,7 +183,7 @@ def score_candidate(
         stability 0) and no indices are computed.
     """
     labels = assign(method, count, seed, matrix)
-    if len(set(labels)) < 2:
+    if len(set(labels)) < MIN_CLUSTER_COUNT:
         return Candidate(method, count, -1.0, float("inf"), 0.0, 0.0), labels
     return (
         Candidate(
@@ -225,7 +226,7 @@ def find_clusters(
     """
     if len(features) < MIN_ROWS:
         raise ValueError(f"clustering needs at least {MIN_ROWS} rows")
-    if min(counts) < 2:
+    if min(counts) < MIN_CLUSTER_COUNT:
         raise ValueError("cluster counts start at 2")
     numeric = features.select_dtypes("number").dropna()
     matrix = preprocessing.StandardScaler().fit_transform(numeric)

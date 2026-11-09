@@ -85,21 +85,27 @@ def assess(
     ):
         verdict, note = (
             "underfit",
-            "neither training nor validation clearly beats the baseline; "
-            "try more capacity, more training or better features",
+            (
+                "neither training nor validation clearly beats the baseline; "
+                "try more capacity, more training or better features"
+            ),
         )
     elif train > TINY and retained < 1.0 - OVERFIT_LOSS_SHARE:
         verdict, note = (
             "overfit",
-            f"only {max(retained, 0.0):.0%} of the training gain survives on "
-            "validation; try stronger regularisation, fewer features, "
-            "early stopping or more data",
+            (
+                f"only {max(retained, 0.0):.0%} of the training gain "
+                "survives on validation; try stronger regularisation, fewer "
+                "features, early stopping or more data"
+            ),
         )
     elif noise > UNSTABLE_NOISE_SHARE:
         verdict, note = (
             "unstable",
-            "the fold-to-fold spread is large relative to the gain, so the "
-            "ranking against other candidates is unreliable",
+            (
+                "the fold-to-fold spread is large relative to the gain, so the "
+                "ranking against other candidates is unreliable"
+            ),
         )
     else:
         verdict, note = "healthy", "training gain carries over to validation"
