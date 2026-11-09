@@ -13,7 +13,7 @@ SIGNATURE_ALGORITHM = "hmac-sha256"
 
 
 def key_from_environment(environ: Mapping[str, str]) -> str | None:
-    """The configured key: `SCMLE_SIGNING_KEY`, else the file it names.
+    """Returns the configured key: `SCMLE_SIGNING_KEY`, else the file it names.
 
     The file form lets a secret manager mount the key (a Kubernetes secret, a
     Secrets Manager or Secret Manager volume) so it never sits in an
@@ -23,8 +23,9 @@ def key_from_environment(environ: Mapping[str, str]) -> str | None:
         environ: The environment variables.
 
     Returns:
-        The key from the variable, else the trimmed content of the file the
-        file variable names, or None if neither yields a key.
+        The key from the variable if it is non-empty, else the stripped
+        content of the file named by the file variable, or None if neither
+        yields a non-empty key. An unreadable file raises `OSError`.
     """
     direct = environ.get(SIGNING_KEY_ENV)
     if direct:
@@ -43,7 +44,9 @@ def resolve_key(signing_key: str | bytes | None) -> bytes | None:
         signing_key: The explicit key, or None to use the configured one.
 
     Returns:
-        The key as bytes, or None if there is none or it is empty.
+        The key as bytes (a string is UTF-8 encoded), or None if there is
+        no key or it is the empty string. An empty bytes key is returned
+        as is.
     """
     key = (
         signing_key
@@ -83,7 +86,8 @@ def sign_payload(payload: Mapping[str, Any], key: str | bytes) -> str:
         The hex HMAC-SHA256 of the canonical payload.
 
     Raises:
-        ValueError: If the key is empty.
+        ValueError: If the key is the empty string. An empty bytes key is
+            not rejected.
     """
     resolved = resolve_key(key)
     if resolved is None:

@@ -84,14 +84,14 @@ can train a model.
 
 
 def horizon_names(value: str, horizon: int) -> list[str]:
-    """Names of the future-value targets `<value>__h1 .. <value>__h<H>`.
+    """Returns the future-value target names `<value>__h1 .. <value>__h<H>`.
 
     Args:
         value: The series value column.
         horizon: The number of future steps.
 
     Returns:
-        One name for each step from 1 to `horizon`.
+        One name for each step from 1 to `horizon`, in step order.
     """
     return [f"{value}{HORIZON_SEPARATOR}{k}" for k in range(1, horizon + 1)]
 
@@ -99,7 +99,7 @@ def horizon_names(value: str, horizon: int) -> list[str]:
 def series_node(
     name: str, op: str, source: str, **params: Any
 ) -> dict[str, Any]:
-    """A feature-node record over one source column.
+    """Returns a feature-node record over one source column.
 
     Args:
         name: The node's name.
@@ -114,16 +114,19 @@ def series_node(
 
 
 def forecast_nodes(record: dict[str, Any], value: str) -> list[dict[str, Any]]:
-    """Lag, rolling and calendar nodes for a forecasting data record.
+    """Returns lag, rolling and calendar nodes for a forecasting data record.
 
     Args:
-        record: The data record, giving the lags, windows, seasonal period
-            and calendar parts.
+        record: The data record (a dict of `DataSpec` fields), giving the
+            lags, windows, seasonal period, time column and calendar parts;
+            an empty lags or windows list means the defaults.
         value: The series value column.
 
     Returns:
-        Lag nodes (including the seasonal period), rolling mean and standard
-        deviation nodes, and calendar nodes when a time column is set.
+        Lag nodes (plus one for the seasonal period if it is not already a
+        lag), a rolling mean and a rolling standard deviation node for each
+        window, and one date-part node per calendar part when a time column
+        is set.
     """
     period = record.get("seasonal_period")
     lags = list(record.get("forecast_lags") or DEFAULT_LAGS)
@@ -216,7 +219,7 @@ class FeatureGraphSpec(FrozenModel):
         return self
 
     def fingerprint(self) -> str:
-        """Content hash identifying this exact graph.
+        """Returns a content hash identifying this exact graph.
 
         Returns:
             The first 16 hex characters of a SHA-256 over the version and the
@@ -237,9 +240,9 @@ class DataSpec(FrozenModel):
     Attributes:
         uri: Where the data lives.
         target: Target column.
-        modality: Dataset family declared by the caller. The current supported
-            execution path is `tabular`; other values remain explicit so a
-            future reader cannot be mistaken for production support.
+        modality: Dataset family declared by the caller. Only `tabular` has
+            a supported execution path; every declared modality must still
+            pass the capability registry before a run can train a model.
         id_columns: Identifier columns (never features).
         group_column: Entity column for grouped and series data.
         time_column: Column ordering the rows in time.
@@ -286,9 +289,10 @@ class DataSpec(FrozenModel):
             defaults to 3 and 7.
         forecast_calendar: Date parts of the time column to add as features
             (for example `["dayofweek", "month"]`; needs a datetime column).
-        targets: For multi-label and multi-output tasks, every target
-            column (the first must equal `target`). Binary 0/1 columns for
-            `multilabel`, numeric ones for `multioutput`.
+        targets: For multi-label, multi-output and forecast tasks, every
+            target column (at least two distinct, the first equal to
+            `target`). Binary 0/1 columns for `multilabel`, numeric ones for
+            `multioutput`; filled in for `forecast` from `horizon`.
         text_encoding: How free-text columns become features: `tfidf`
             (default) or `embedding` (a pretrained sentence-embedding model
             run in the PyTorch worker; falls back to TF-IDF if unavailable).
@@ -327,8 +331,9 @@ class DataSpec(FrozenModel):
             the model selection is frozen and tests that model instead.
         ingest_plan: Path of an ingest plan (JSON) that names a database and
             the as-of views to synthesize features from. Needs a charter with
-            an `ingest` block (format 7); the table then needs the ingest
-            plan's key and moment columns. The synthesized columns are added
+            an `ingest` block (charter format 7 or later); the table then
+            needs the ingest plan's key and moment columns. The synthesized
+            columns are added
             before the split.
         logged_action_column: With a charter decision block, the 0/1 action
             the current process logged. Never a feature.
@@ -664,7 +669,7 @@ class ProjectSpec(FrozenModel):
 
         Returns:
             The specification with a lagged node for each delayed column and
-            those columns excluded; unchanged if it is not a mapping or has no
+            those columns excluded; unchanged if it is not a dict or has no
             delays.
         """
         if not isinstance(values, dict):
@@ -712,15 +717,16 @@ class ProjectSpec(FrozenModel):
 
         `data.target` is the series value; the expansion points the target at
         the first future-value column, lists them all as targets and adds the
-        lag / rolling feature nodes. It is idempotent, so a saved
-        configuration loads unchanged.
+        lag / rolling / calendar feature nodes and records the value column.
+        It is idempotent, so a saved configuration loads unchanged.
 
         Args:
             values: The raw specification.
 
         Returns:
-            The expanded specification; unchanged if the task is not forecast,
-            no horizon is set or it was already expanded.
+            The expanded specification; unchanged if the task is not
+            `forecast`, no horizon is set or `value_column` is already set
+            (already expanded).
         """
         if not isinstance(values, dict) or values.get("task") != "forecast":
             return values
@@ -763,10 +769,13 @@ class ProjectSpec(FrozenModel):
         """Validates constraints that span several fields.
 
         Returns:
-            The validated specification.
+            The specification, unchanged.
 
         Raises:
-            ValueError: If the combination of fields is inconsistent.
+            ValueError: If the combination of fields is inconsistent, for
+                example a validation strategy without the column it needs, or
+                a task without (or, for other tasks, with) its task-specific
+                data columns.
         """
         data, validation = self.data, self.validation
         if validation.strategy == "group" and not (
@@ -936,11 +945,11 @@ class ProjectSpec(FrozenModel):
         return self.resources.time_budget_seconds < FAST_BUDGET_SECONDS
 
     def effective_search(self) -> SearchSpec:
-        """The search settings in force: reduced under a short budget.
+        """Returns the search settings in force, reduced under a short budget.
 
         Returns:
-            The configured search settings, with the number of models and
-            configurations capped when the time budget is short.
+            The configured search settings; when the time budget is under 300
+            seconds, `top_models` is capped at 1 and `configs_per_model` at 3.
         """
         if not self.fast_budget:
             return self.search
@@ -954,11 +963,11 @@ class ProjectSpec(FrozenModel):
         )
 
     def effective_strategies(self) -> StrategySpec:
-        """The strategy settings in force: reduced under a short budget.
+        """Returns the strategy settings in force, reduced under a short budget.
 
         Returns:
-            The configured strategy settings, with the number of models capped
-            when the time budget is short.
+            The configured strategy settings; when the time budget is under
+            300 seconds, `top_models` is capped at 1.
         """
         if not self.fast_budget:
             return self.strategies

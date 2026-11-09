@@ -44,7 +44,7 @@ class ScoreRequest:
 
 
 def schema_digest(schema: Mapping[str, Any]) -> str:
-    """The `sha256:` digest of a bundle's input schema.
+    """Returns the `sha256:` digest of a bundle's input schema.
 
     Args:
         schema: The input schema.
@@ -64,14 +64,14 @@ def parse_request(payload: object, max_records: int) -> ScoreRequest:
 
     Args:
         payload: The decoded JSON body.
-        max_records: Most records one request may hold.
+        max_records: Largest number of records one request may hold.
 
     Returns:
         The request: its records, schema version and the digest the caller
         expects, if given.
 
     Raises:
-        ValueError: If the body does not match the request schema.
+        ValueError: If the body has unknown fields or no records.
         OverflowError: If it holds more than `max_records` records.
         SchemaChangeError: If it names an unsupported schema version.
         TypeError: If the body is not an object, the records are not a list

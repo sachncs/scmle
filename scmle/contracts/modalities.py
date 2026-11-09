@@ -38,8 +38,8 @@ class ExtensionModality:
 
     Extension identities let a dataset family enter the same lifecycle
     contract without pretending that the core package understands its raw
-    representation. They are deliberately namespaced and can never be
-    declared as production-supported by the built-in registry.
+    representation. A `ModalityDeclaration` for one must use the
+    extension-only status, so it can never be declared as supported.
     """
 
     name: str
@@ -49,8 +49,10 @@ class ExtensionModality:
 
         Raises:
             TypeError: If the name is not a string.
-            ValueError: If the name is not lowercase namespaced text such as
-                ``acme/point-cloud`` or conflicts with a built-in modality.
+            ValueError: If the name is not at least two characters of
+                lowercase letters, digits, ``.``, ``/`` and ``-`` that start
+                and end with a letter or digit (for example
+                ``acme/point-cloud``), or equals a built-in modality value.
         """
         if not isinstance(self.name, str):
             raise TypeError("extension modality name must be a string")
@@ -92,7 +94,7 @@ def modality_value(modality: ModalityIdentity) -> str:
 
 
 def modality_from_value(value: str) -> ModalityIdentity:
-    """Restore a built-in or extension modality from evidence text.
+    """Restores a built-in or extension modality from evidence text.
 
     Args:
         value: The serialized value, as returned by `modality_value`.
@@ -101,8 +103,9 @@ def modality_from_value(value: str) -> ModalityIdentity:
         The matching built-in or extension modality.
 
     Raises:
-        ValueError: If the value is not a non-empty string, or is neither a
-            built-in value nor an ``extension:`` name.
+        ValueError: If the value is not a non-empty string, is neither a
+            built-in value nor prefixed with ``extension:``, or the text
+            after the prefix is not a valid `ExtensionModality` name.
     """
     if not isinstance(value, str) or not value.strip():
         raise ValueError("modality value must be a non-empty string")
@@ -173,8 +176,8 @@ class StageEvidence:
         Raises:
             TypeError: If the stage is not a `LifecycleStage` or the evidence is
                 not a mapping.
-            ValueError: If the evidence is not JSON-native or does not serialize
-                to an object, or a link or note is blank.
+            ValueError: If the evidence is not JSON-native, or a link or note
+                is blank.
         """
         if not isinstance(self.stage, LifecycleStage):
             raise TypeError("stage must be LifecycleStage")
@@ -247,11 +250,11 @@ class ModalityDeclaration:
         Raises:
             TypeError: If the modality, status, resources or stage evidence has
                 the wrong type.
-            ValueError: If stages repeat, an extra, failure mode or limitation
-                is
-                blank, no failure mode is declared, an extension modality is not
-                extension-only, or a supported modality lacks evidence for a
-                required lifecycle stage.
+            ValueError: If a stage appears twice, a required extra, failure
+                mode or limitation is blank, no failure mode is declared, an
+                extension modality does not have extension-only status, or a
+                supported modality lacks evidence for a required lifecycle
+                stage.
         """
         if not isinstance(self.modality, (Modality, ExtensionModality)):
             raise TypeError("modality must be Modality or ExtensionModality")
@@ -351,10 +354,11 @@ class ModalityRegistry:
     def __init__(
         self, declarations: Iterable[ModalityDeclaration] = ()
     ) -> None:
-        """Creates a registry and register supplied declarations.
+        """Creates a registry and registers the supplied declarations.
 
         Args:
-            declarations: The declarations to register.
+            declarations: Declarations registered in order with `register`,
+                which rejects non-declarations and repeated modalities.
         """
         self.records: dict[ModalityIdentity, ModalityDeclaration] = {}
         for declaration in declarations:
@@ -400,13 +404,13 @@ class ModalityRegistry:
         modality: ModalityIdentity,
         allowed_statuses: Collection[ModalityStatus] | None = None,
     ) -> ModalityDeclaration:
-        """Require complete, status-eligible modality support.
+        """Requires complete, status-eligible modality support.
 
         Incomplete declarations fail regardless of requested status. This
         prevents an explicit experimental opt-in from bypassing the lifecycle
         evidence boundary. An absent, incomplete or status-ineligible modality
         is refused with `UnsupportedModalityError` (raised by
-        `raise_unsupported`).
+        `raise_unsupported`); a non-modality argument raises `TypeError`.
 
         Args:
             modality: Modality to resolve.
@@ -473,7 +477,8 @@ class ModalityRegistry:
         """Raises a structured pre-execution modality rejection.
 
         Args:
-            modality: The modality that was refused.
+            modality: The modality that was refused; it must be a `Modality`
+                or `ExtensionModality`, otherwise `TypeError` is raised.
             reason: Why it was refused.
             details: Extra facts added to the diagnostic.
 

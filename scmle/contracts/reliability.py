@@ -76,9 +76,11 @@ class EvidenceOutcome(enum.StrEnum):
 class FaultEvidence:
     """Evidence produced by an actual fault-injection execution.
 
-    The contract requires an execution identity and a content-addressed
-    artifact reference. A plan can be declared before execution, but callers
-    cannot represent a verification result without this evidence envelope.
+    The contract requires non-blank text for an execution identity, an
+    artifact URI and an artifact digest, among other fields; it does not
+    check the digest against the artifact. A plan can be declared before
+    execution, but callers cannot represent a verification result without
+    this evidence envelope.
 
     Attributes:
         evidence_type: Stable name of the evidence item, such as
@@ -138,7 +140,7 @@ class FaultEvidence:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild evidence from its JSON-compatible representation.
+        """Rebuilds evidence from its JSON-compatible representation.
 
         Args:
             record: A mapping as produced by `to_dict`.
@@ -193,7 +195,8 @@ class FaultScenarioPlan:
             ValueError: If the evidence requirements are empty, blank or
                 repeated, evidence types repeat, a status other than planned has
                 no evidence, or a passed scenario lacks a required evidence type
-                or has evidence of an unsafe outcome.
+                or has any evidence whose outcome is not
+                ``safe_outcome_observed``.
         """
         enum_fields = (
             ("scenario", self.scenario, FaultScenario),
@@ -260,7 +263,7 @@ class FaultScenarioPlan:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild a scenario plan from its JSON-compatible representation.
+        """Rebuilds a scenario plan from its JSON-compatible representation.
 
         Args:
             record: A mapping as produced by `to_dict`.
@@ -300,7 +303,11 @@ class FaultInjectionPlanRegistry:
     )
 
     def __post_init__(self) -> None:
-        """Validates and normalizes plans supplied at construction time."""
+        """Re-registers the plans supplied at construction time.
+
+        The mapping is rebuilt through `register`, so each key becomes the
+        plan's own scenario.
+        """
         supplied = tuple(self.plans.values())
         self.plans = {}
         for plan in supplied:
@@ -340,7 +347,7 @@ class FaultInjectionPlanRegistry:
         scenario: FaultScenario,
         evidence: tuple[FaultEvidence, ...],
     ) -> FaultScenarioPlan:
-        """Records one execution and derive its verification status.
+        """Records one execution and derives its verification status.
 
         Safe evidence for every declared requirement produces ``PASSED``.
         Unsafe evidence produces ``FAILED`` even when other requirements are
@@ -348,19 +355,25 @@ class FaultInjectionPlanRegistry:
         ``INCONCLUSIVE``. The registry is updated only after the complete
         replacement plan validates, so malformed evidence cannot overwrite a
         planned scenario. A scenario that is not registered fails with a
-        `KeyError`.
+        `KeyError`. Evidence for every requirement but with an
+        ``inconclusive`` outcome is not downgraded: validating the
+        scenario record rejects it with `ValueError`.
 
         Args:
             scenario: Scenario whose execution produced the evidence.
-            evidence: Unique evidence records from one execution.
+            evidence: A non-empty tuple of evidence records from one
+                execution, with distinct evidence types.
 
         Returns:
             The updated scenario plan.
 
         Raises:
-            TypeError: If the scenario or evidence shape is invalid.
-            ValueError: If evidence is empty, comes from more than one
-                execution, or belongs to another scenario's requirements.
+            TypeError: If `scenario` is not a `FaultScenario` or an item is
+                not a `FaultEvidence`.
+            ValueError: If `evidence` is not a non-empty tuple, comes from
+                more than one execution, repeats an evidence type, has a type
+                outside the scenario's requirements, or would give a passed
+                plan an unsafe or inconclusive outcome.
         """
         if not isinstance(scenario, FaultScenario):
             raise TypeError("scenario must be FaultScenario")
@@ -415,7 +428,13 @@ class FaultInjectionPlanRegistry:
             )
 
     def to_dict(self) -> dict[str, Any]:
-        """Returns the complete plan in deterministic dictionary form."""
+        """Returns the complete plan in deterministic dictionary form.
+
+        Returns:
+            A dict with ``schema_version`` 1 and ``scenarios``, the scenario
+            records ordered by scenario value. Raises `ValueError` if a
+            required scenario has no plan.
+        """
         self.validate_complete()
         ordered_plans = sorted(
             self.plans.values(), key=lambda plan: plan.scenario.value
@@ -426,10 +445,11 @@ class FaultInjectionPlanRegistry:
         }
 
     def to_json(self) -> str:
-        """Serialize the complete plan using canonical JSON ordering.
+        """Serializes the complete plan using canonical JSON ordering.
 
         Returns:
-            The plan as compact JSON with sorted keys.
+            The plan as compact, ASCII-only JSON with sorted keys. Raises
+            `ValueError` if a required scenario has no plan.
         """
         return json.dumps(
             self.to_dict(),
@@ -440,18 +460,20 @@ class FaultInjectionPlanRegistry:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild and validate a complete registry from a mapping.
+        """Rebuilds and validates a complete registry from a mapping.
 
         Args:
-            record: A mapping with schema version 1 and a list of scenarios.
+            record: A mapping with ``schema_version`` 1 and a ``scenarios``
+                list of scenario mappings.
 
         Returns:
             The registry.
 
         Raises:
             TypeError: If a scenario is not a mapping.
-            ValueError: If the schema version is unsupported or the scenarios
-                are not a list.
+            ValueError: If the schema version is unsupported, the scenarios
+                are not a list, a scenario repeats, a scenario record is
+                invalid, or a required scenario is missing.
         """
         if record.get("schema_version") != 1:
             raise ValueError("unsupported fault-injection plan schema version")
@@ -468,7 +490,7 @@ class FaultInjectionPlanRegistry:
 
     @classmethod
     def from_json(cls, serialized: str) -> Self:
-        """Rebuild and validate a complete registry from canonical JSON.
+        """Rebuilds and validates a complete registry from canonical JSON.
 
         Args:
             serialized: The JSON text.
@@ -478,6 +500,7 @@ class FaultInjectionPlanRegistry:
 
         Raises:
             TypeError: If the JSON does not hold an object.
+            ValueError: If the text is not valid JSON, or as `from_dict`.
         """
         record = json.loads(serialized)
         if not isinstance(record, Mapping):

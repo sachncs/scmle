@@ -80,11 +80,12 @@ class MetricSample:
     labels: Mapping[str, str] = dataclasses.field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        """Validates a metric before it is exported or persisted.
+        """Validates a metric and coerces `kind` to a `SignalKind`.
 
         Raises:
-            ValueError: If the name, unit or timestamp is invalid, the value is
-                not finite, or a label is empty.
+            ValueError: If the name, unit or timestamp is invalid, `kind` is
+                not a `SignalKind` value, the value is not finite, or a label
+                key or value is blank.
         """
         require_text(self.name, "metric.name")
         require_text(self.unit, "metric.unit")
@@ -115,10 +116,12 @@ class MetricSample:
         """Rebuilds a metric from serialized evidence.
 
         Args:
-            record: A mapping as produced by `to_dict`.
+            record: A mapping as produced by `to_dict`; `labels` may be
+                absent.
 
         Returns:
-            The metric sample.
+            The metric sample. A missing required key raises `KeyError`, and
+            invalid values raise the errors of `__post_init__`.
         """
         return cls(
             name=str(record["name"]),
@@ -145,13 +148,15 @@ class InferenceEvent:
     redacted_fields: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
-        """Validates event identity and prevent unbounded sensitive payloads.
+        """Validates event identity, timestamp, latency and error category.
+
+        Any outcome other than ``error`` counts as successful here.
 
         Raises:
             ValueError: If an identity field or the timestamp is invalid, the
-                latency is not finite and non-negative, an error event has no
-                category, a successful event has one, or a redacted field name
-                is empty.
+                latency is not finite and non-negative, an ``error`` event has
+                no error category, a successful event has one, or a redacted
+                field name is empty.
         """
         for field_name, value in (
             ("request_id", self.request_id),

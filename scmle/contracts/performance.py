@@ -55,9 +55,10 @@ class PerformanceObservation:
         """Rejects measurements that cannot support a budget decision.
 
         Raises:
-            ValueError: If the elapsed time or peak memory is not finite and
-                non-negative, the sample count is negative, the machine or
-                software is blank, or the timestamp is not offset-aware.
+            ValueError: If the operation is not a known operation, the elapsed
+                time or peak memory is not finite and non-negative, the sample
+                count is negative (or a bool), the machine or software is
+                blank, or the timestamp is malformed or not offset-aware.
         """
         if not isinstance(self.operation, PerformanceOperation):
             object.__setattr__(
@@ -93,7 +94,7 @@ class PerformanceObservation:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild an observation from JSON-native evidence.
+        """Rebuilds an observation from JSON-native evidence.
 
         Args:
             record: A mapping as produced by `to_dict`.
@@ -182,7 +183,7 @@ class PerformanceRun:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild a measured run from JSON-native evidence.
+        """Rebuilds a measured run from JSON-native evidence.
 
         Args:
             record: A mapping as produced by `to_dict`.
@@ -304,11 +305,15 @@ class PerformanceBaseline:
 
         Returns:
             The comparison: whether every operation stayed within the allowed
-            relative regression of the baseline median in time and, where the
-            baseline has it, peak memory; the regressions; and the violations.
+            relative regression of the baseline median in time and, where
+            every reference run recorded it, peak memory (a run lacking peak
+            memory then is itself a violation); the regressions by operation
+            value, each with ``elapsed_seconds`` and ``peak_memory_gb``
+            entries; and the violations.
 
         Raises:
-            RuntimeError: If an observation validated earlier cannot be found.
+            RuntimeError: If an observation that construction guarantees is
+                missing (defensive; not reachable for validated runs).
             ValueError: If the run covers different operations from the
                 baseline.
         """
@@ -493,11 +498,12 @@ class PerformanceBudget:
     max_peak_memory_gb: float | None = None
 
     def __post_init__(self) -> None:
-        """Validates positive ceilings and normalize operation names.
+        """Validates positive ceilings and normalizes operation names.
 
         Raises:
-            ValueError: If a time limit or the memory limit is not positive and
-                finite, or there are no time limits.
+            ValueError: If an operation name is unknown, a time limit or the
+                memory limit is not positive and finite, or there are no time
+                limits.
         """
         normalized: dict[PerformanceOperation, float] = {}
         for operation, limit in self.max_seconds.items():
@@ -529,9 +535,11 @@ class PerformanceBudget:
             observations: The observations, at most one for each operation.
 
         Returns:
-            The result: whether no violation was found, the observations and
-            the violations (a missing observation, an exceeded time budget or an
-            exceeded or missing peak memory).
+            The result: whether no violation was found, the observations as
+            given, and the violations. Only operations with a time limit are
+            checked (extra observations are ignored). Each is checked for a
+            missing observation, an exceeded time limit and, when
+            `max_peak_memory_gb` is set, an exceeded or missing peak memory.
 
         Raises:
             ValueError: If an operation is observed more than once.

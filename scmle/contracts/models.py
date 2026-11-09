@@ -186,7 +186,7 @@ class ModelAdapter(abc.ABC):
         return None
 
     def categorical_params(self, indices: list[int]) -> Mapping[str, Any]:
-        """Estimator parameters that mark columns as native categoricals.
+        """Returns estimator parameters marking columns as native categoricals.
 
         Adapters declaring `native_categorical` override this; the pipeline
         then feeds high-cardinality columns as integer codes and passes
@@ -201,7 +201,7 @@ class ModelAdapter(abc.ABC):
         return {}
 
     def gpu_usable(self) -> bool:
-        """Whether this adapter can use a GPU on this machine right now.
+        """Returns whether this adapter can use a GPU on this machine right now.
 
         The default trusts the declared capability; adapters whose GPU
         support depends on the installed hardware override it.
@@ -213,7 +213,7 @@ class ModelAdapter(abc.ABC):
         return self.capabilities.gpu
 
     def is_available(self) -> bool:
-        """Whether every required module is importable (checked lazily).
+        """Returns whether every module in `requires` is importable.
 
         Returns:
             True if every module in `requires` can be found.
@@ -226,7 +226,10 @@ class ModelAdapter(abc.ABC):
     def rejection_reason(
         self, task: tasks.TaskType, row_count: int | None = None
     ) -> str | None:
-        """Explains why the adapter cannot be used, if it cannot.
+        """Returns why the adapter cannot be used, if it cannot.
+
+        Checks, in order, task support, availability of the required modules
+        and the `max_rows` limit, and reports the first failure.
 
         Args:
             task: Resolved task type.

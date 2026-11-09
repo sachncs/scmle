@@ -59,7 +59,7 @@ DOCUMENTS = run.DOCUMENTS
 
 
 def load_dag(path: str | None) -> dag_module.Dag | None:
-    """The DAG hypothesis a causal block declares, verified by its hash.
+    """Loads the DAG hypothesis a causal block declares, verifying its hash.
 
     Args:
         path: Path of the stored DAG document, or None or empty if the block
@@ -69,7 +69,8 @@ def load_dag(path: str | None) -> dag_module.Dag | None:
         The loaded DAG, or None if no path is given.
 
     Raises:
-        ConfigError: If the file cannot be read or is not a stored DAG.
+        ConfigError: If the file cannot be read, is not valid JSON, is not a
+            stored DAG, or its stored hash does not match its content.
     """
     if not path:
         return None
@@ -89,7 +90,7 @@ def registration(
     error_budget: budget_module.ErrorBudget,
     exploration_rows: int,
 ) -> confirm.RegisteredClaim:
-    """The claim as it is fixed before `C` is opened.
+    """Returns the claim as it is fixed before `C` is opened.
 
     Args:
         spec: The charter's causal block.
@@ -124,7 +125,7 @@ def registration(
 
 
 def jsonable(document: Mapping[str, Any]) -> dict[str, Any]:
-    """A JSON round trip, so the hashed document is the written one.
+    """Returns a JSON round trip, so the hashed document is the written one.
 
     Args:
         document: The document to normalize; values that JSON cannot encode
@@ -143,7 +144,7 @@ def verified_attestors(
     charter_hash: str,
     signing_key: str | bytes | None,
 ) -> attest.Applied:
-    """Which attestations count for the assumptions the chosen strategy needs.
+    """Returns which attestations count for the strategy's assumptions.
 
     Args:
         spec: The charter's causal block, naming the attestors and the
@@ -160,9 +161,10 @@ def verified_attestors(
         as checked against today's date.
 
     Raises:
-        ConfigError: If the identification plan has no primary strategy,
-            the block names no attestations file, or the attestation file
-            cannot be read.
+        ConfigError: If the identification plan has no primary strategy, the
+            block names no attestations file, or the attestations file
+            cannot be read or is malformed (wrong format version, bad
+            record or two records for one assumption).
     """
     if plan.primary is None or spec.attestations is None:
         raise errors.ConfigError("the charter declares no attestations file")
@@ -193,7 +195,7 @@ def build_runner(
     charter_hash: str | None = None,
     signing_key: str | bytes | None = None,
 ) -> confirm.ClaimRunner | None:
-    """The registered primary claim, or None when no strategy identifies it.
+    """Returns the runner for the registered primary claim, if identified.
 
     Args:
         spec: The charter's causal block.
@@ -211,12 +213,15 @@ def build_runner(
             configured `SCMLE_SIGNING_KEY`.
 
     Returns:
-        None for a charter nothing identifies: no estimate can exist, `C` is
-        not opened for it, and the stage writes the refusal from `X`.
+        A claim runner holding the registered primary claim and a function
+        that estimates it on the frame the confirmation releases; or None
+        for a charter nothing identifies: no estimate can exist, `C` is not
+        opened for it, and the stage writes the refusal from `X`.
 
     Raises:
         ConfigError: If the block names attestors, none were supplied, and
-            no charter hash was given to verify attestations against.
+            no charter hash was given to verify attestations against, or
+            verifying them fails as in `verified_attestors`.
     """
     plan = select.select(spec, dag)
     if plan.primary is None:

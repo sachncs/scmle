@@ -179,13 +179,13 @@ class Check:
         """Validates the record.
 
         Raises:
-            ValueError: If an identity, statistic, effect or count is invalid,
-                the
-                p-value is outside [0, 1], the interval is malformed or
-                reversed,
-                neither a p-value nor an interval is given, a decision, set or
-                tier has the wrong type, or the confirmed tier is not on the
-                confirmation set.
+            ValueError: If an identity is blank, the statistic or effect is
+                not a finite number, `n` is not a non-negative integer, the
+                p-value is not within [0, 1], the interval is not a pair of
+                finite numbers in a tuple with low <= high, neither a p-value
+                nor an interval is given, the seed path is not a tuple, a
+                decision, set or tier has the wrong type, or the confirmed
+                tier is not on the confirmation set.
         """
         evidence.require_text(self.check_id, "check_id")
         evidence.require_text(self.null_hypothesis, "null_hypothesis")
@@ -217,7 +217,7 @@ class Check:
             raise ValueError("confirmed tier requires the confirmation set 'C'")
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record.
+        """Returns a JSON-ready record.
 
         Returns:
             The check's fields as a dict, with enums as their values and
@@ -290,10 +290,11 @@ class Claim:
         """Validates the record.
 
         Raises:
-            ValueError: If the id or statement is blank, there are no check ids,
-                the adjusted p-value is outside [0, 1], the effect is not
-                finite, the tier has the wrong type, or a confirmed claim has no
-                adjusted p-value.
+            ValueError: If the id or statement is blank, `check_ids` or
+                `assumptions` is not a tuple, there are no check ids or one is
+                blank, the adjusted p-value is not within [0, 1], the effect
+                is not a finite number, the tier has the wrong type, or a
+                confirmed claim has no adjusted p-value.
         """
         evidence.require_text(self.claim_id, "claim_id")
         evidence.require_text(self.statement, "statement")
@@ -312,7 +313,7 @@ class Claim:
             raise ValueError("confirmed claims need an adjusted_p_value")
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record.
+        """Returns a JSON-ready record.
 
         Returns:
             The claim's fields as a dict, with sequences as lists and the tier
@@ -380,10 +381,11 @@ class Certificate:
         """Validates the record.
 
         Raises:
-            ValueError: If an identity is blank, the planted or clean counts are
-                below one, the detected count exceeds the planted count, the
-                false alarms exceed the clean rows, or the seed path is not a
-                tuple.
+            ValueError: If an identity is blank, a count is not an integer,
+                the planted or clean-row count is below one, the detected or
+                false-alarm count is negative, the detected count exceeds the
+                planted count, the false alarms exceed the clean rows, or the
+                seed path is not a tuple.
         """
         evidence.require_text(self.detector_id, "detector_id")
         evidence.require_text(self.defect_type, "defect_type")
@@ -410,7 +412,7 @@ class Certificate:
     def recall_lower_bound(
         self, confidence: float = DEFAULT_CONFIDENCE
     ) -> float:
-        """Lower end of the two-sided Wilson interval for recall.
+        """Returns the lower end of the two-sided Wilson interval for recall.
 
         Args:
             confidence: Level of the two-sided interval, in (0, 1).
@@ -432,7 +434,7 @@ class Certificate:
         return max(0.0, centre - half)
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record.
+        """Returns a JSON-ready record.
 
         Returns:
             The certificate's fields as a dict, with the seed path as a list.

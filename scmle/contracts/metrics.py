@@ -41,18 +41,23 @@ class Metric:
         return scorer_value if self.greater_is_better else -scorer_value
 
     def accepts_weights(self) -> bool:
-        """Whether the scorer takes per-row `sample_weight`.
+        """Returns whether the metric can be scored with `sample_weight`.
 
         Returns:
-            True if the scorer takes per-row ``sample_weight``.
+            Always True here: stock scikit-learn scorers accept per-row
+            ``sample_weight``. Subclasses override it.
         """
         return True
 
     def scorer(self, positive: Any = None) -> Any:
-        """Returns the scikit-learn scorer.
+        """Returns the scikit-learn scorer named by `scorer_name`.
 
         Args:
-            positive: Positive class label (used by subclasses that need it).
+            positive: Positive class label; ignored here, used by subclasses
+                that need it.
+
+        Returns:
+            The stock scorer from `sklearn.metrics.get_scorer`.
         """
         return sk_metrics.get_scorer(self.scorer_name)
 
@@ -137,7 +142,7 @@ class FunctionMetric(Metric):
     response_method: str = "predict"
 
     def accepts_weights(self) -> bool:
-        """Whether the user function takes `sample_weight`.
+        """Returns whether the user function takes `sample_weight`.
 
         Returns:
             True if the user function has a ``sample_weight`` parameter.

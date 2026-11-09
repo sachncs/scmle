@@ -1,6 +1,6 @@
 """Hyperparameter search-space contracts.
 
-Each `Parameter` subclass knows how to sample and clip itself, so spaces are
+Each `Parameter` subclass knows how to sample itself, so spaces are
 composed polymorphically instead of branching on parameter type.
 """
 
@@ -68,9 +68,9 @@ class IntParameter(Parameter):
     """An integer in `[low, high]` (inclusive), optionally log-uniform.
 
     Attributes:
-        low: Lower bound.
+        low: Lower bound (> 0 when `log`).
         high: Upper bound.
-        log: Sample uniformly in log space.
+        log: Sample uniformly in log space, then truncate to an integer.
     """
 
     low: int
