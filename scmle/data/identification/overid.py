@@ -1,4 +1,4 @@
-"""Overidentification tests for several instruments (F10, descriptive).
+"""Overidentification tests for several instruments (descriptive).
 
 `iv.py` handles one instrument, where the model is just identified and the
 exclusion restriction cannot be tested. With `k >= 2` instruments for one
@@ -48,7 +48,22 @@ def prepare(
     NDArray[np.float64],
     NDArray[np.float64],
 ]:
-    """Outcome, regressor and instruments with the controls partialled out."""
+    """Partials the controls (and an intercept) out of every variable.
+
+    Args:
+        y: Outcome.
+        d: Endogenous regressor.
+        instruments: One column per instrument, or one vector.
+        controls: Exogenous controls, or None for an intercept only.
+
+    Returns:
+        The residualised outcome, regressor and instrument matrix (one
+        column per instrument).
+
+    Raises:
+        ValueError: If the outcome, regressor and instruments differ in
+            length, or the controls differ in length from the outcome.
+    """
     outcome = np.asarray(y, dtype=float)
     regressor = np.asarray(d, dtype=float)
     z = np.asarray(instruments, dtype=float)
@@ -78,7 +93,16 @@ def prepare(
 
 
 def not_testable(name: str, count: int) -> dict[str, Any]:
-    """The result when there is nothing to test."""
+    """Builds the result when there is nothing to test.
+
+    Args:
+        name: Name of the test.
+        count: Number of instruments.
+
+    Returns:
+        A record with status `not_testable`, no statistic or p-value and a
+        note that a single instrument is just identified.
+    """
     return {
         "test": name,
         "status": "not_testable",
@@ -93,7 +117,19 @@ def not_testable(name: str, count: int) -> dict[str, Any]:
 def result(
     name: str, statistic: float, count: int, rows: int
 ) -> dict[str, Any]:
-    """The described result of a test with `count - 1` degrees of freedom."""
+    """Builds the described result of a test with `count - 1` degrees.
+
+    Args:
+        name: Name of the test.
+        statistic: The test statistic.
+        count: Number of instruments.
+        rows: Number of rows used.
+
+    Returns:
+        A record with status `described`, the statistic, the degrees of
+        freedom, the chi-square upper-tail p-value, `count`, `rows` and a
+        note on how to read the result.
+    """
     df = count - 1
     return {
         "test": name,
@@ -110,7 +146,16 @@ def result(
 def two_stage(
     y: NDArray[np.float64], d: NDArray[np.float64], z: NDArray[np.float64]
 ) -> float:
-    """The 2SLS coefficient of `d` (all variables already residualised)."""
+    """Computes the 2SLS coefficient of `d`.
+
+    Args:
+        y: Residualised outcome.
+        d: Residualised regressor.
+        z: Residualised instruments, one column each.
+
+    Returns:
+        The coefficient of `d` in the 2SLS fit.
+    """
     projected = z @ np.linalg.lstsq(z, d, rcond=None)[0]
     return float(projected @ y / (projected @ d))
 
@@ -121,10 +166,20 @@ def sargan(
     instruments: ArrayLike,
     controls: ArrayLike | None = None,
 ) -> dict[str, Any]:
-    """Sargan's test: `n * R^2` of the 2SLS residual on the instruments.
+    """Computes Sargan's test: `n * R^2` of the 2SLS residual on instruments.
 
-    Raises:
-        ValueError: On inputs of unequal length.
+    Inputs of unequal length are refused with a `ValueError` by `prepare`.
+
+    Args:
+        y: Outcome.
+        d: Endogenous regressor.
+        instruments: One column per instrument, or one vector.
+        controls: Exogenous controls, or None.
+
+    Returns:
+        A result record; with fewer than two instruments the status is
+        `not_testable`, otherwise `described` with the statistic and its
+        p-value on `k - 1` degrees of freedom.
     """
     outcome, regressor, z = prepare(y, d, instruments, controls)
     count = z.shape[1]
@@ -144,10 +199,21 @@ def hansen_j(
     instruments: ArrayLike,
     controls: ArrayLike | None = None,
 ) -> dict[str, Any]:
-    """Hansen's J: the two-step efficient GMM criterion, robust weights.
+    """Computes Hansen's J: the two-step efficient GMM criterion.
 
-    Raises:
-        ValueError: On inputs of unequal length.
+    The weight matrix is heteroskedasticity robust. Inputs of unequal length
+    are refused with a `ValueError` by `prepare`.
+
+    Args:
+        y: Outcome.
+        d: Endogenous regressor.
+        instruments: One column per instrument, or one vector.
+        controls: Exogenous controls, or None.
+
+    Returns:
+        A result record; with fewer than two instruments the status is
+        `not_testable`, otherwise `described` with the statistic and its
+        p-value on `k - 1` degrees of freedom.
     """
     outcome, regressor, z = prepare(y, d, instruments, controls)
     count = z.shape[1]

@@ -1,4 +1,4 @@
-"""Difference in differences with group-time effects and an event study (F10).
+"""Difference in differences with group-time effects and an event study.
 
 Estimator in the spirit of Callaway and Sant'Anna (2021, Journal of
 Econometrics): for each adoption group `g` and period `t`, the effect is the
@@ -76,14 +76,34 @@ class DidResult:
     mean_horizon: float
 
     def sensitivity(self, m: float) -> tuple[float, float]:
-        """Interval widened by the relative-magnitudes bound at `m`."""
+        """Widens the interval by the relative-magnitudes bound at `m`.
+
+        Args:
+            m: The multiple of the largest pre-period change that the
+                post-treatment trend may change by per period.
+
+        Returns:
+            The lower and upper limits, each moved outward by
+            ``m * max_pre_change * mean_horizon``.
+
+        Raises:
+            ValueError: If fewer than two pre-periods exist.
+        """
         if self.max_pre_change is None:
             raise ValueError("sensitivity needs at least two pre-periods")
         bias = m * self.max_pre_change * self.mean_horizon
         return self.low - bias, self.high + bias
 
     def breakdown(self) -> float | None:
-        """Smallest `m` at which the widened interval contains zero."""
+        """Finds the smallest `m` at which the widened interval contains zero.
+
+        Returns:
+            None when fewer than two pre-periods exist; 0.0 when the
+            interval already contains zero; infinity when the bound does
+            not grow with `m`; otherwise the distance from zero to the
+            nearer interval limit divided by ``max_pre_change *
+            mean_horizon``.
+        """
         if self.max_pre_change is None:
             return None
         gap = min(abs(self.low), abs(self.high))
@@ -93,14 +113,32 @@ class DidResult:
         return float("inf") if scale == 0 else gap / scale
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Builds the JSON-ready record.
+
+        Returns:
+            A mapping of every field.
+        """
         return dataclasses.asdict(self)
 
 
 def wide_panel(
     frame: pd.DataFrame, unit: str, time: str, outcome: str
 ) -> pd.DataFrame:
-    """Outcome by unit (rows) and period (columns) of a balanced panel."""
+    """Reshapes a balanced panel to one row per unit and column per period.
+
+    Args:
+        frame: Long panel data.
+        unit: Unit column.
+        time: Period column.
+        outcome: Outcome column.
+
+    Returns:
+        The outcomes with units as rows and periods as columns, columns in
+        increasing period order.
+
+    Raises:
+        ValueError: If any unit-period outcome is missing.
+    """
     table = frame.pivot(index=unit, columns=time, values=outcome)
     if table.isna().any().any():
         raise ValueError("the panel must be balanced with no missing outcomes")
@@ -108,7 +146,20 @@ def wide_panel(
 
 
 def adoption_of(frame: pd.DataFrame, unit: str, adoption: str) -> pd.Series:
-    """First treated period of each unit (NaN for never treated)."""
+    """Finds the first treated period of each unit.
+
+    Args:
+        frame: Long panel data.
+        unit: Unit column.
+        adoption: Column holding the unit's adoption period (constant within
+            a unit; missing for never-treated units).
+
+    Returns:
+        The adoption period per unit (NaN for never treated).
+
+    Raises:
+        ValueError: If the adoption value varies within a unit.
+    """
     per_unit = frame.groupby(unit)[adoption]
     if (per_unit.nunique(dropna=False) > 1).any():
         raise ValueError("adoption must be constant within a unit")
@@ -123,7 +174,20 @@ def estimate(
     outcome: str,
     level: float = 0.95,
 ) -> DidResult:
-    """Group-time ATT against never-treated units, aggregated.
+    """Estimates group-time ATT against never-treated units, aggregated.
+
+    Args:
+        frame: Long panel data.
+        unit: Unit column.
+        time: Period column.
+        adoption: Column with the unit's first treated period (missing for
+            never-treated units).
+        outcome: Outcome column.
+        level: Confidence level.
+
+    Returns:
+        The overall ATT with its interval, the event-study coefficients,
+        their covariance and the quantities the sensitivity bound uses.
 
     Raises:
         ValueError: If the panel is unbalanced, has fewer than three

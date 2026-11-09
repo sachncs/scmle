@@ -1,7 +1,6 @@
-"""The tier of a causal claim as a pure function of its reports (F10).
+"""The tier of a causal claim as a pure function of its reports.
 
-The three tiers keep the canon's meaning (P4) and read as follows for a
-causal claim:
+The three tiers read as follows for a causal claim:
 
 * `confirmed` needs all five conditions: (1) the estimate and interval were
   computed on `C`, opened once; (2) every design diagnostic of the strategy
@@ -108,7 +107,12 @@ class TierDecision:
     action: str
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Builds the JSON-ready record.
+
+        Returns:
+            A mapping with the tier value (None when not identified), the
+            status, the conditions, the reasons and the action.
+        """
         return {
             "tier": None if self.tier is None else self.tier.value,
             "status": self.status,
@@ -119,7 +123,18 @@ class TierDecision:
 
 
 def decide(facts: TierInputs) -> TierDecision:
-    """Applies the tier rule."""
+    """Applies the tier rule.
+
+    Args:
+        facts: The facts about the run, copied from its report files.
+
+    Returns:
+        The tier decision: `not_identified` with no tier when no strategy
+        was eligible; `unverified` when an assumption lacks a named
+        attestor, a design diagnostic failed or a falsification test
+        rejected; `confirmed` when all five conditions hold; otherwise
+        `attested`. The reasons list every shortfall.
+    """
     if not facts.identified:
         return TierDecision(
             None,

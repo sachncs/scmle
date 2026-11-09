@@ -1,4 +1,4 @@
-"""Back-door adjustment by augmented inverse-probability weighting (F10).
+"""Back-door adjustment by augmented inverse-probability weighting.
 
 Nuisances (propensity `e(x)` and the two outcome regressions `m_t(x)`) are
 fitted once on the exploration set `X` and frozen. The score on the
@@ -52,6 +52,11 @@ class Design:
 
     Numeric columns pass through; other columns become indicator columns for
     the levels seen when the design was built (an unseen level is all zero).
+
+    Attributes:
+        numeric: Names of the columns that pass through unchanged.
+        levels: For each non-numeric column, its name and the levels seen
+            when the design was built, in sorted order.
     """
 
     numeric: tuple[str, ...]
@@ -59,7 +64,16 @@ class Design:
 
     @classmethod
     def build(cls, frame: pd.DataFrame, columns: tuple[str, ...]) -> "Design":
-        """Reads the column kinds from `frame`."""
+        """Reads the column kinds from `frame`.
+
+        Args:
+            frame: The rows to read the column kinds and levels from.
+            columns: The covariate columns, in order.
+
+        Returns:
+            A design in which numeric non-boolean columns pass through and
+            every other column is encoded by its levels.
+        """
         numeric = []
         levels = []
         for name in columns:
@@ -73,7 +87,18 @@ class Design:
         return cls(tuple(numeric), tuple(levels))
 
     def matrix(self, frame: pd.DataFrame) -> np.ndarray:
-        """The numeric matrix of `frame` under this design."""
+        """Encodes the rows of `frame` under this design.
+
+        Args:
+            frame: Rows holding the design's columns.
+
+        Returns:
+            A float matrix: the numeric columns, then one indicator column
+            per level of each non-numeric column.
+
+        Raises:
+            ValueError: If any encoded value is missing or not finite.
+        """
         parts = [frame[list(self.numeric)].to_numpy(dtype=float)]
         for name, seen in self.levels:
             column = frame[name].astype(str).to_numpy()
@@ -109,7 +134,16 @@ class Nuisances:
     digest: str
 
     def predict(self, frame: pd.DataFrame) -> tuple[np.ndarray, ...]:
-        """Returns `(e, m0, m1)` for the rows of `frame`."""
+        """Predicts the nuisances for the rows of `frame`.
+
+        Args:
+            frame: Rows holding the covariate columns.
+
+        Returns:
+            The propensity `e` (clipped away from 0 and 1), the control
+            outcome prediction `m0` and the treated outcome prediction `m1`,
+            one entry per row.
+        """
         matrix = self.scaler.transform(self.design.matrix(frame))
         e = self.propensity.predict_proba(matrix)[:, 1]
         return (
@@ -120,7 +154,19 @@ class Nuisances:
 
 
 def make_learners(learner: str, seed: int) -> tuple[Any, Any]:
-    """A propensity classifier and an outcome regressor."""
+    """Builds an unfitted propensity classifier and outcome regressor.
+
+    Args:
+        learner: `linear` (logistic and ridge regression) or `boosted`
+            (gradient boosting).
+        seed: Random seed of the boosted learners.
+
+    Returns:
+        The propensity classifier and the outcome regressor.
+
+    Raises:
+        ValueError: If `learner` is not a known learner.
+    """
     if learner == "linear":
         return (
             linear_model.LogisticRegression(C=10.0, max_iter=2000),
@@ -139,7 +185,18 @@ def make_learners(learner: str, seed: int) -> tuple[Any, Any]:
 
 
 def binary(values: pd.Series, name: str) -> np.ndarray:
-    """The 0/1 array of a two-valued column."""
+    """Reads a binary column as a 0/1 float array.
+
+    Args:
+        values: The column.
+        name: Column name used in the error message.
+
+    Returns:
+        The values as floats.
+
+    Raises:
+        ValueError: If a value is neither 0 nor 1.
+    """
     array = values.to_numpy(dtype=float)
     if not np.isin(array, (0.0, 1.0)).all():
         raise ValueError(f"{name} must be binary (0 or 1)")
@@ -154,7 +211,26 @@ def fit_nuisances(
     seed: int = 0,
     learner: str = "linear",
 ) -> Nuisances:
-    """Fits and freezes the nuisance models on the exploration rows."""
+    """Fits and freezes the nuisance models on the exploration rows.
+
+    Args:
+        frame: Exploration rows.
+        covariates: Adjustment columns; with none, a constant column is used.
+        treatment: Binary treatment column.
+        outcome: Outcome column.
+        seed: Random seed of the boosted learners.
+        learner: `linear` or `boosted`.
+
+    Returns:
+        The frozen models, their encoding and scaler, and a digest of their
+        predictions on the fitting rows.
+
+    Raises:
+        ValueError: If the outcome has missing values or an arm has fewer
+            than the minimum number of rows. A non-binary treatment, an
+            unknown learner or missing covariates are also refused with a
+            `ValueError`.
+    """
     t = binary(frame[treatment], treatment)
     y = frame[outcome].to_numpy(dtype=float)
     if not np.isfinite(y).all():
@@ -182,14 +258,32 @@ def fit_nuisances(
 
 
 def effective_sample_size(weights: np.ndarray) -> float:
-    """Kish effective sample size `(sum w)^2 / sum w^2`."""
+    """Computes the Kish effective sample size `(sum w)^2 / sum w^2`.
+
+    Args:
+        weights: The weights.
+
+    Returns:
+        The effective sample size.
+    """
     return sequential.effective_sample_size(np.asarray(weights, dtype=float))
 
 
 def weighted_smd(
     matrix: np.ndarray, t: np.ndarray, e: np.ndarray
 ) -> np.ndarray:
-    """Largest-first absolute standardized mean differences after IPW."""
+    """Computes absolute standardized mean differences after IPW.
+
+    Args:
+        matrix: Covariate matrix, one column per covariate.
+        t: Binary treatment, one entry per row.
+        e: Propensity score, one entry per row.
+
+    Returns:
+        One value per column: the absolute difference of the weighted
+        treated and control means divided by the pooled standard deviation
+        (0 when that is zero).
+    """
     w = np.where(t == 1, 1.0 / e, 1.0 / (1.0 - e))
     out = np.zeros(matrix.shape[1])
     for j in range(matrix.shape[1]):
@@ -211,6 +305,17 @@ def overlap_report(
 
     `passed` is the pre-registered overlap gate: at most `OVERLAP_SHARE` of
     the units may have a propensity outside `[eps, 1 - eps]`.
+
+    Args:
+        e: Propensity scores.
+        t: Binary treatment.
+        matrix: Covariate matrix for the weighted balance, or None.
+        eps: Lower propensity bound of the gate (the upper is `1 - eps`).
+
+    Returns:
+        A mapping with the propensity range, the share outside the bounds,
+        the effective sample sizes of the arms, the row count, `passed`, and
+        the largest weighted standardized difference when a matrix is given.
     """
     outside = (e < eps) | (e > 1 - eps)
     w = np.where(t == 1, 1.0 / e, 1.0 / (1.0 - e))
@@ -262,7 +367,11 @@ class AipwResult:
     nuisance_digest: str
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Builds the JSON-ready record.
+
+        Returns:
+            A mapping of every field.
+        """
         return dataclasses.asdict(self)
 
 
@@ -274,7 +383,23 @@ def scores(
     m0: np.ndarray,
     m1: np.ndarray,
 ) -> tuple[float, np.ndarray]:
-    """The point estimate and the per-row influence values."""
+    """Computes the point estimate and the per-row influence values.
+
+    Args:
+        estimand: `ATE` or `ATT`.
+        t: Binary treatment.
+        y: Outcome.
+        e: Propensity scores.
+        m0: Control outcome predictions.
+        m1: Treated outcome predictions.
+
+    Returns:
+        The estimate and the per-row influence values (the centred scores
+        for `ATE`).
+
+    Raises:
+        ValueError: If `estimand` is neither `ATE` nor `ATT`.
+    """
     if estimand == "ATE":
         psi = m1 - m0 + t * (y - m1) / e - (1 - t) * (y - m0) / (1 - e)
         return float(psi.mean()), psi - psi.mean()
@@ -309,8 +434,15 @@ def estimate(
         trim: Drop units whose propensity is outside `[trim, 1 - trim]`.
         min_share: Smallest share of rows that may remain after trimming.
 
+    Returns:
+        The estimate with its Wald interval, the overlap report on the
+        scored rows and the digest of the frozen models.
+
     Raises:
-        ValueError: If trimming leaves less than `min_share` of the rows.
+        ValueError: If trimming leaves less than `min_share` of the rows,
+            an arm has fewer than two scored rows, or the outcome has missing
+            values. A non-binary treatment or an unknown estimand is also
+            refused with a `ValueError`.
     """
     t = binary(frame[treatment], treatment)
     y = frame[outcome].to_numpy(dtype=float)
@@ -373,14 +505,32 @@ class DiffResult:
     n: int
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Builds the JSON-ready record.
+
+        Returns:
+            A mapping of every field.
+        """
         return dataclasses.asdict(self)
 
 
 def difference_in_means(
     frame: pd.DataFrame, treatment: str, outcome: str, level: float = 0.95
 ) -> DiffResult:
-    """Treated minus control mean with the Neyman variance estimate."""
+    """Computes the treated minus control mean with the Neyman variance.
+
+    Args:
+        frame: Rows with the treatment and outcome.
+        treatment: Binary treatment column.
+        outcome: Outcome column.
+        level: Confidence level.
+
+    Returns:
+        The difference, its Neyman standard error and a Welch t interval.
+
+    Raises:
+        ValueError: If an arm has fewer than two rows. A non-binary
+            treatment is also refused with a `ValueError`.
+    """
     t = binary(frame[treatment], treatment)
     y = frame[outcome].to_numpy(dtype=float)
     y1, y0 = y[t == 1], y[t == 0]

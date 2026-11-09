@@ -1,4 +1,4 @@
-"""Instrumental variables: just-identified 2SLS with weak-instrument care (F10).
+"""Instrumental variables: just-identified 2SLS with weak-instrument care.
 
 One endogenous regressor `d`, one instrument `z` and optional exogenous
 controls `W` (with an intercept). All variables are residualised on `W`; then
@@ -19,7 +19,7 @@ instrument's strength. The 2SLS interval is reported as the headline only when
 threshold 10 is the common rule of thumb, not a Stock-Yogo critical value;
 what it buys is measured in the certificate.
 
-Not done: overidentification tests (one instrument means the model is just
+Not covered: overidentification tests (one instrument means the model is just
 identified and `exclusion` cannot be tested), several instruments, several
 endogenous regressors. The estimand is the local average treatment effect for
 compliers and needs monotonicity; none of exclusion, independence or
@@ -76,7 +76,17 @@ class IvResult:
     n: int
 
     def excludes(self, value: float) -> bool:
-        """Whether the headline set excludes `value`."""
+        """Tests whether the headline set excludes a value.
+
+        Args:
+            value: The candidate value of the effect.
+
+        Returns:
+            True when `value` lies outside the 2SLS interval (headline
+            `wald`), outside the bounded Anderson-Rubin interval, or inside
+            the gap between the two rays of a `complement` set; always False
+            for the whole line.
+        """
         if self.headline == "wald":
             return not self.wald_low <= value <= self.wald_high
         if self.ar_kind == "bounded":
@@ -86,7 +96,12 @@ class IvResult:
         return False
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record (infinite ends are written as strings)."""
+        """Builds the JSON-ready record.
+
+        Returns:
+            A mapping of every field; non-finite floats (infinite interval
+            ends, NaN) are written as strings.
+        """
         record = dataclasses.asdict(self)
         for key, value in record.items():
             if isinstance(value, float) and not math.isfinite(value):
@@ -97,7 +112,16 @@ class IvResult:
 def residualise(
     columns: list[np.ndarray], controls: np.ndarray
 ) -> list[np.ndarray]:
-    """Residuals of each column on the controls (with an intercept)."""
+    """Residualises each column on the controls (with an intercept).
+
+    Args:
+        columns: The variables to residualise, each with one entry per row.
+        controls: Control matrix with one row per observation (no intercept
+            column; one is added).
+
+    Returns:
+        The residuals of each column, in the order given.
+    """
     design = np.column_stack([np.ones(len(controls)), controls])
     out = []
     for column in columns:
@@ -109,7 +133,20 @@ def residualise(
 def anderson_rubin(
     z: np.ndarray, y: np.ndarray, d: np.ndarray, level: float
 ) -> tuple[str, float, float]:
-    """The Anderson-Rubin set for one instrument as `(kind, low, high)`."""
+    """Computes the Anderson-Rubin set for one instrument.
+
+    Args:
+        z: Residualised instrument.
+        y: Residualised outcome.
+        d: Residualised regressor.
+        level: Confidence level.
+
+    Returns:
+        ``(kind, low, high)``. `bounded` gives the interval ends (both NaN
+        when the set is empty); `complement` gives the end of the left ray
+        and the start of the right ray; `whole_line` gives minus and plus
+        infinity.
+    """
     szz = float(z @ z)
     pi_y, pi_d = float(z @ y) / szz, float(z @ d) / szz
     r_y, r_d = y - pi_y * z, d - pi_d * z
@@ -145,6 +182,19 @@ def estimate(
     level: float = 0.95,
 ) -> IvResult:
     """Fits the just-identified model.
+
+    Args:
+        frame: The data.
+        treatment: Name of the endogenous regressor column.
+        outcome: Name of the outcome column.
+        instrument: Name of the instrument column.
+        controls: Names of the exogenous control columns.
+        level: Confidence level.
+
+    Returns:
+        The fit. The headline set is the 2SLS interval when the first-stage
+        F reaches the threshold, otherwise the Anderson-Rubin set (unbounded
+        ends when that set is not a bounded interval).
 
     Raises:
         ValueError: If the instrument has no variation after the controls or
@@ -202,5 +252,12 @@ def exclusion_bound(result: IvResult, direct_effect: float) -> float:
 
     A direct effect `gamma` of the instrument on the outcome moves the Wald
     ratio by `gamma / pi`.
+
+    Args:
+        result: The IV fit, whose first-stage coefficient is `pi`.
+        direct_effect: The assumed direct effect `gamma`.
+
+    Returns:
+        The bias `gamma / pi`.
     """
     return direct_effect / result.first_stage

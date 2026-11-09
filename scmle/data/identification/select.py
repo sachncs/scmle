@@ -1,4 +1,4 @@
-"""Choosing an identification strategy from the charter alone (F10).
+"""Choosing an identification strategy from the charter alone.
 
 A strategy is eligible only if the charter's estimand matches it, every
 assumption it needs is attested and the data design it needs is declared.
@@ -118,7 +118,12 @@ class Verdict:
     checked: bool = False
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Builds the JSON-ready record.
+
+        Returns:
+            A mapping of the strategy, eligibility, the missing pieces, the
+            reasons and whether a DAG checked the adjustment set.
+        """
         return {
             "strategy": self.strategy,
             "eligible": self.eligible,
@@ -150,14 +155,31 @@ class Plan:
     chartered_order: bool
 
     def verdict(self, name: str) -> Verdict:
-        """The verdict of one strategy."""
+        """Looks up the verdict of one strategy.
+
+        Args:
+            name: Registry name of the strategy.
+
+        Returns:
+            The verdict for that strategy.
+
+        Raises:
+            KeyError: If the strategy was not considered.
+        """
         for item in self.verdicts:
             if item.strategy == name:
                 return item
         raise KeyError(name)
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready plan."""
+        """Builds the JSON-ready plan.
+
+        Returns:
+            A mapping of the status, primary strategy, multiverse, order and
+            per-strategy verdicts. A plan that is not identified adds a null
+            estimate, the action `refuse_claim` and a note that any printed
+            summary is associational.
+        """
         record: dict[str, Any] = {
             "status": self.status,
             "primary": self.primary,
@@ -178,7 +200,19 @@ def judge(
     spec: causal.CausalSpec,
     dag: dag_module.Dag | None,
 ) -> Verdict:
-    """Whether one strategy may run on this charter."""
+    """Decides whether one strategy may run on this charter.
+
+    Args:
+        strategy: The strategy to judge.
+        spec: The charter's causal block.
+        dag: The declared DAG, or None.
+
+    Returns:
+        The verdict: eligible only when the estimand matches, every needed
+        assumption is attested, every needed design field is declared and,
+        for back-door adjustment, the DAG (when given) accepts the
+        adjustment set.
+    """
     reasons: list[str] = []
     if spec.estimand not in strategy.estimands:
         reasons.append(
@@ -210,7 +244,17 @@ def judge(
 def check_adjustment(
     spec: causal.CausalSpec, dag: dag_module.Dag | None
 ) -> tuple[list[str], bool]:
-    """Verifies the declared adjustment set against a declared DAG."""
+    """Verifies the declared adjustment set against a declared DAG.
+
+    Args:
+        spec: The charter's causal block.
+        dag: The declared DAG, or None.
+
+    Returns:
+        The reasons the set fails (empty when none) and whether a DAG
+        verified it. Without a DAG the set is unchecked: no reason is given
+        unless the charter declares a DAG that was not supplied.
+    """
     names = causal.covariates_of(spec.assumptions) or ()
     if dag is None:
         if spec.dag:
@@ -264,7 +308,18 @@ def select(spec: causal.CausalSpec, dag: dag_module.Dag | None = None) -> Plan:
 
 
 def refusal(plan: Plan, spec: causal.CausalSpec) -> Mapping[str, Any]:
-    """The `identification_report.json` of a run that cannot identify."""
+    """Builds the `identification_report.json` of a run that cannot identify.
+
+    Args:
+        plan: The selector's plan, with its verdicts.
+        spec: The charter's causal block.
+
+    Returns:
+        A mapping with status `not_identified`, the estimand, treatment and
+        outcome, a null estimate, the action `refuse_claim`, what each
+        strategy is missing and a note that any printed summary is
+        associational.
+    """
     missing = {
         v.strategy: {
             "missing_assumptions": list(v.missing_assumptions),

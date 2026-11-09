@@ -1,4 +1,4 @@
-"""Which F10 gates have a current, passing certificate (canon P1).
+"""Which causal-identification gates have a current, passing certificate.
 
 A gate may only count toward `confirmed` if its simulation certificate in
 `benchmarks/qualification/f10_certificates.json` passed its pre-registered
@@ -71,12 +71,26 @@ NOT_MEASURED = ("battery_iv", "battery_synth")
 
 
 def method_hashes() -> dict[str, str]:
-    """Code hash of the package methods behind each gate."""
+    """Hashes the package methods behind each gate.
+
+    Returns:
+        Gate name to the code hash of the functions listed for it in
+        `METHOD_SOURCES`.
+    """
     return {k: certificates.code_hash(*v) for k, v in METHOD_SOURCES.items()}
 
 
 def certified_gates(path: Path | None = None) -> set[str]:
-    """Gates whose stored certificate passed and matches the current code."""
+    """Lists the gates whose stored certificate passed and is current.
+
+    Args:
+        path: Certificate file; the shipped one when omitted.
+
+    Returns:
+        The names of the gates whose stored entry passed and whose method
+        hash equals the hash of the current code. The set is empty when the
+        file does not exist.
+    """
     target = STORE_PATH if path is None else path
     if not target.exists():
         return set()
@@ -112,16 +126,24 @@ class SubgroupGate:
     min_rows: int | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Builds the JSON-ready record.
+
+        Returns:
+            A mapping of the status, reason and minimum rows.
+        """
         return dataclasses.asdict(self)
 
 
 def subgroup_method_hash(report: Any) -> str:
-    """Hash of the code a subgroup certificate measured.
+    """Hashes the code a subgroup certificate measured.
 
     Args:
         report: `scmle.data.identification.run.subgroup_report`, passed in
             because that module imports this one's loader.
+
+    Returns:
+        The code hash of the report function, the Wald test and the
+        multiplicity adjustment.
     """
     return certificates.code_hash(
         report, battery.wald_test, multiplicity.adjust
@@ -129,7 +151,7 @@ def subgroup_method_hash(report: Any) -> str:
 
 
 def subgroup_gate(report: Any, path: Path | None = None) -> SubgroupGate:
-    """Whether subgroup results gate or only describe.
+    """Decides whether subgroup results gate or only describe.
 
     The subgroup family never changes the tier (the tier rule has no
     subgroup input); this decides only which word the report carries.
@@ -137,6 +159,11 @@ def subgroup_gate(report: Any, path: Path | None = None) -> SubgroupGate:
     Args:
         report: `scmle.data.identification.run.subgroup_report`.
         path: Certificate file; the shipped one when omitted.
+
+    Returns:
+        `gating` with the smallest certified subgroup size when the stored
+        certificate exists, matches the current code and passed; otherwise
+        `descriptive` with the reason.
     """
     target = SUBGROUP_STORE_PATH if path is None else path
     if not target.exists():

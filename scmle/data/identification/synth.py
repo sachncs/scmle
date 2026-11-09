@@ -1,4 +1,4 @@
-"""Synthetic control with placebo-in-space inference (F10).
+"""Synthetic control with placebo-in-space inference.
 
 One treated unit, many donors, a pre-period and a post-period. The weights
 are non-negative, sum to one and minimise the squared distance between the
@@ -58,12 +58,24 @@ class SynthResult:
     alpha: float
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Builds the JSON-ready record.
+
+        Returns:
+            A mapping of every field.
+        """
         return dataclasses.asdict(self)
 
 
 def fit_weights(target: np.ndarray, donors: np.ndarray) -> np.ndarray:
-    """Simplex-constrained least-squares weights (donors are columns)."""
+    """Fits simplex-constrained least-squares donor weights.
+
+    Args:
+        target: Pre-period outcomes of the unit to match.
+        donors: Pre-period outcomes of the donors, one column per donor.
+
+    Returns:
+        Non-negative weights, one per donor column, that sum to one.
+    """
     k = donors.shape[1]
     start = np.full(k, 1.0 / k)
 
@@ -89,7 +101,19 @@ def fit_weights(target: np.ndarray, donors: np.ndarray) -> np.ndarray:
 def ratio_for(
     pre: np.ndarray, post: np.ndarray, treated: int, pool: list[int]
 ) -> tuple[float, float, float, np.ndarray, np.ndarray]:
-    """Fit unit `treated` on `pool`; returns RMSPEs, ratio, gaps, weights."""
+    """Fits one unit on a donor pool and measures its prediction error.
+
+    Args:
+        pre: Pre-period outcomes, one column per unit.
+        post: Post-period outcomes, one column per unit.
+        treated: Column of the unit being fitted.
+        pool: Columns of the donors used.
+
+    Returns:
+        The pre-period RMSPE, the post-period RMSPE, their post/pre ratio
+        (infinity when the pre-period fit is exact), the post-period gaps
+        and the donor weights.
+    """
     w = fit_weights(pre[:, treated], pre[:, pool])
     pre_gap = pre[:, treated] - pre[:, pool] @ w
     post_gap = post[:, treated] - post[:, pool] @ w
@@ -100,7 +124,14 @@ def ratio_for(
 
 
 def min_donors(alpha: float) -> int:
-    """Donors needed so that `1 / (J + 1) <= alpha` (19 at 0.05)."""
+    """Counts the donors needed so that `1 / (J + 1) <= alpha`.
+
+    Args:
+        alpha: The level, in (0, 1).
+
+    Returns:
+        ``ceil(1 / alpha) - 1`` (19 at 0.05).
+    """
     return math.ceil(1.0 / alpha) - 1
 
 
@@ -114,6 +145,20 @@ def estimate(
     alpha: float = 0.05,
 ) -> SynthResult:
     """Fits the synthetic control and its placebo distribution.
+
+    Args:
+        frame: Long panel data.
+        unit: Unit column.
+        time: Period column.
+        outcome: Outcome column.
+        treated_unit: The one treated unit.
+        first_treated: First treated period; earlier periods are the
+            pre-period.
+        alpha: The level the donor count must be able to reach.
+
+    Returns:
+        The effect (mean post-period gap), the donor weights, the RMSPE
+        ratio, the placebo-in-space p-value and the placebo ratios.
 
     Raises:
         ValueError: If the panel is unbalanced, a period range is empty, or

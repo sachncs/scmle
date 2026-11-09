@@ -1,18 +1,17 @@
-"""Runs a chartered causal analysis end to end (F10).
+"""Runs a chartered causal analysis end to end.
 
-Order, as F10 specifies: select (a function of the charter), diagnose the
-design and fit frozen nuisances on `X`, estimate on `C` once, run the
-pre-registered falsification battery and the replication, assess sensitivity,
-and tier the claim. The function receives `X` and `C` as frames; opening `C`
-through the custody vault exactly once is the caller's job (the confirmation
-function), and nothing in this module reads `C` before the estimate step or
-refits anything on it.
+Order: select (a function of the charter), diagnose the design and fit frozen
+nuisances on `X`, estimate on `C` once, run the pre-registered falsification
+battery and the replication, assess sensitivity, and tier the claim. The
+function receives `X` and `C` as frames; opening `C` through the custody vault
+exactly once is the caller's job (the confirmation function), and nothing in
+this module reads `C` before the estimate step or refits anything on it.
 
-Outputs are five JSON-ready documents named as the feature file lists them.
-A claim is `not_identified` (and no estimate is printed) when no strategy is
-eligible, when the overlap gate fails with no trimming declared, when
-trimming leaves too few rows, or when the regression-discontinuity density
-check rejects on `X`.
+Outputs are five JSON-ready documents, named in `DOCUMENTS`. A claim is
+`not_identified` (and no estimate is printed) when no strategy is eligible,
+when the overlap gate fails with no trimming declared, when trimming leaves
+too few rows, or when the regression-discontinuity density check rejects on
+`X`.
 
 Single-treated-unit synthetic control has nothing to hold out: it runs on `X`
 and its tier is capped at `attested`.
@@ -86,7 +85,16 @@ LIMITS = (
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Est:
-    """A point estimate with its standard error and interval."""
+    """A point estimate with its standard error and interval.
+
+    Attributes:
+        estimate: The point estimate.
+        se: Its standard error (NaN when the strategy gives none).
+        low: Lower interval limit.
+        high: Upper interval limit.
+        n: Rows used.
+        detail: Strategy-specific extras for the report.
+    """
 
     estimate: float
     se: float
@@ -96,7 +104,12 @@ class Est:
     detail: Mapping[str, Any] = dataclasses.field(default_factory=dict)
 
     def excludes_zero(self) -> bool:
-        """Whether the interval excludes zero."""
+        """Tests whether the interval excludes zero.
+
+        Returns:
+            True when the lower limit is above zero or the upper limit is
+            below it.
+        """
         return self.low > 0 or self.high < 0
 
 
@@ -116,7 +129,16 @@ class Outcome:
 
 
 def digest(document: Mapping[str, Any]) -> str:
-    """SHA-256 of the canonical JSON of a document."""
+    """Hashes the canonical JSON of a document.
+
+    Args:
+        document: The JSON-ready document; values that are not JSON types are
+            converted with `str`.
+
+    Returns:
+        The SHA-256 hex digest of the document's JSON with sorted keys and
+        compact separators.
+    """
     text = json.dumps(
         document, sort_keys=True, separators=(",", ":"), default=str
     )
@@ -124,7 +146,16 @@ def digest(document: Mapping[str, Any]) -> str:
 
 
 def stratum_frames(frame: pd.DataFrame, column: str) -> dict[str, pd.DataFrame]:
-    """Rows of each stratum large enough to estimate in."""
+    """Splits rows into the strata large enough to estimate in.
+
+    Args:
+        frame: The rows to split.
+        column: The stratifying column.
+
+    Returns:
+        Stratum label (as text) to its rows, for each stratum with at least
+        `MIN_STRATUM_ROWS` rows.
+    """
     out = {}
     for level, part in frame.groupby(column):
         if len(part) >= MIN_STRATUM_ROWS:
@@ -133,7 +164,16 @@ def stratum_frames(frame: pd.DataFrame, column: str) -> dict[str, pd.DataFrame]:
 
 
 def wald_from(est: Est, name: str, kind: str) -> battery.Test | None:
-    """A Wald test of a placebo estimate, or None without a usable se."""
+    """Builds a Wald test of a placebo estimate.
+
+    Args:
+        est: The placebo estimate.
+        name: Name of the test.
+        kind: Kind of the test.
+
+    Returns:
+        The test, or None when the standard error is not finite and positive.
+    """
     if not np.isfinite(est.se) or est.se <= 0:
         return None
     return battery.wald_test(name, kind, est.estimate, est.se)
@@ -144,6 +184,19 @@ class Adapter:
 
     Subclasses fix `name` and implement the hooks. `prepare` runs on `X`
     only; every later method reads `C`.
+
+    Attributes:
+        spec: The charter's causal block.
+        x: Exploration rows.
+        seed: Seed of the learners.
+        learner: `linear` or `boosted` nuisance learners.
+        alpha_falsify: Familywise level of the falsification battery.
+        design: Design diagnostics for the report.
+        refusal: Why the claim must be refused, or None.
+        weak: Whether the instrument was found weak.
+        single_unit: Whether there is a single treated unit (nothing to hold
+            out).
+        notes: Remarks for the report.
     """
 
     name = ""
@@ -156,7 +209,15 @@ class Adapter:
         learner: str,
         alpha_falsify: float,
     ) -> None:
-        """Stores the settings of the strategy."""
+        """Stores the settings of the strategy.
+
+        Args:
+            spec: The charter's causal block.
+            x: Exploration rows.
+            seed: Seed of the learners.
+            learner: `linear` or `boosted` nuisance learners.
+            alpha_falsify: Familywise level of the falsification battery.
+        """
         self.spec = spec
         self.x = x
         self.seed = seed
@@ -169,24 +230,71 @@ class Adapter:
         self.notes: list[str] = []
 
     def prepare(self) -> None:
-        """Design diagnostics and frozen quantities, from `X` only."""
+        """Runs the design diagnostics and freezes quantities, from `X` only.
+
+        The base class does nothing; subclasses fill `design` and may set
+        `refusal`.
+        """
 
     def estimate(self, c: pd.DataFrame, level: float) -> Est:
-        """The primary estimate on `C`."""
+        """Computes the primary estimate on `C`.
+
+        Args:
+            c: The confirmation rows.
+            level: Confidence level.
+
+        Returns:
+            The estimate with its standard error and interval.
+
+        Raises:
+            NotImplementedError: Always, in the base class; subclasses
+                override it.
+        """
         raise NotImplementedError
 
     def estimate_for(
         self, c: pd.DataFrame, level: float, outcome: str | None = None
     ) -> Est:
-        """The same estimator on `C` with another outcome column."""
+        """Computes the same estimate on `C` with another outcome column.
+
+        Args:
+            c: The confirmation rows.
+            level: Confidence level.
+            outcome: The outcome column to use, or None for the charter's
+                outcome.
+
+        Returns:
+            The estimate with its standard error and interval.
+
+        Raises:
+            NotImplementedError: Always, in the base class; subclasses
+                override it.
+        """
         raise NotImplementedError
 
     def controls(self, c: pd.DataFrame, level: float) -> list[battery.Test]:
-        """Falsification tests on `C` (negative controls and placebos)."""
+        """Runs the falsification tests on `C` (negative controls and placebos).
+
+        Args:
+            c: The confirmation rows.
+            level: Confidence level.
+
+        Returns:
+            The tests; the base class has none.
+        """
         return []
 
     def sensitivity(self, c: pd.DataFrame, level: float) -> dict[str, Any]:
-        """Sensitivity document; `holds` is None when unavailable."""
+        """Assesses sensitivity to unmeasured confounding.
+
+        Args:
+            c: The confirmation rows.
+            level: Confidence level.
+
+        Returns:
+            The sensitivity document; the base class returns `holds` as None
+            with a note that the strategy has no sensitivity analysis.
+        """
         return {
             "holds": None,
             "note": "no sensitivity analysis for this strategy",
@@ -199,13 +307,21 @@ class BackdoorAdapter(Adapter):
     name = "backdoor_aipw"
 
     def __init__(self, *args: Any) -> None:
-        """Stores the settings of the strategy."""
+        """Stores the settings of the strategy.
+
+        Args:
+            *args: The `Adapter` constructor arguments.
+        """
         super().__init__(*args)
         self.covariates = causal.covariates_of(self.spec.assumptions) or ()
         self.nuisances: aipw.Nuisances | None = None
 
     def prepare(self) -> None:
-        """Design diagnostics and frozen quantities from `X` only."""
+        """Fits the frozen nuisances and checks overlap, from `X` only.
+
+        The claim is refused when the overlap gate fails on `X` and the charter
+        declares no trimming rule.
+        """
         spec = self.spec
         self.nuisances = aipw.fit_nuisances(
             self.x,
@@ -233,7 +349,18 @@ class BackdoorAdapter(Adapter):
             )
 
     def estimate(self, c: pd.DataFrame, level: float) -> Est:
-        """The primary estimate on `C`."""
+        """Computes the primary AIPW estimate on `C` with the frozen nuisances.
+
+        Args:
+            c: The confirmation rows.
+            level: Confidence level.
+
+        Returns:
+            The estimate, with the estimated population in its detail.
+
+        Raises:
+            ValueError: If `prepare` has not run.
+        """
         if self.nuisances is None:
             raise ValueError("prepare() must run first")
         spec = self.spec
@@ -261,7 +388,18 @@ class BackdoorAdapter(Adapter):
     def estimate_for(
         self, c: pd.DataFrame, level: float, outcome: str | None = None
     ) -> Est:
-        """The same estimator on `C` with another outcome column."""
+        """Computes the AIPW estimate on `C` with another outcome column.
+
+        The nuisances are refitted on `X` for that outcome.
+
+        Args:
+            c: The confirmation rows.
+            level: Confidence level.
+            outcome: The outcome column, or None for the charter's outcome.
+
+        Returns:
+            The estimate with its standard error and interval.
+        """
         spec = self.spec
         nuisances = aipw.fit_nuisances(
             self.x,
@@ -286,7 +424,16 @@ class BackdoorAdapter(Adapter):
         )
 
     def controls(self, c: pd.DataFrame, level: float) -> list[battery.Test]:
-        """Falsification tests on `C`."""
+        """Runs the declared negative controls on `C`.
+
+        Args:
+            c: The confirmation rows.
+            level: Confidence level.
+
+        Returns:
+            A Wald test for each negative-control outcome and exposure whose
+            estimate has a usable standard error.
+        """
         spec = self.spec
         tests = []
         for control in spec.negative_controls:
@@ -322,7 +469,21 @@ class BackdoorAdapter(Adapter):
         return tests
 
     def sensitivity(self, c: pd.DataFrame, level: float) -> dict[str, Any]:
-        """Sensitivity of the estimate to unmeasured confounding."""
+        """Assesses sensitivity of the estimate to unmeasured confounding.
+
+        Args:
+            c: The confirmation rows.
+            level: Confidence level.
+
+        Returns:
+            The sensitivity report of the linear-model summary on `C`, with a
+            note on its scale; or `holds` as None with a note when the
+            charter has no sensitivity block or no covariate exists to
+            benchmark against.
+
+        Raises:
+            ValueError: If `prepare` has not run.
+        """
         spec = self.spec
         if spec.sensitivity is None:
             return {
@@ -363,7 +524,15 @@ class RandomizedAdapter(Adapter):
     name = "randomized_diff"
 
     def estimate(self, c: pd.DataFrame, level: float) -> Est:
-        """The primary estimate on `C`."""
+        """Computes the difference in means on `C`.
+
+        Args:
+            c: The confirmation rows.
+            level: Confidence level.
+
+        Returns:
+            The estimate with its standard error and interval.
+        """
         spec = self.spec
         r = aipw.difference_in_means(c, spec.treatment, spec.outcome, level)
         return Est(r.estimate, r.se, r.low, r.high, r.n)
@@ -371,14 +540,32 @@ class RandomizedAdapter(Adapter):
     def estimate_for(
         self, c: pd.DataFrame, level: float, outcome: str | None = None
     ) -> Est:
-        """The same estimator on `C` with another outcome column."""
+        """Computes the difference in means on `C` with another outcome column.
+
+        Args:
+            c: The confirmation rows.
+            level: Confidence level.
+            outcome: The outcome column, or None for the charter's outcome.
+
+        Returns:
+            The estimate with its standard error and interval.
+        """
         r = aipw.difference_in_means(
             c, self.spec.treatment, outcome or self.spec.outcome, level
         )
         return Est(r.estimate, r.se, r.low, r.high, r.n)
 
     def controls(self, c: pd.DataFrame, level: float) -> list[battery.Test]:
-        """Falsification tests on `C`."""
+        """Runs the declared negative-control outcomes on `C`.
+
+        Args:
+            c: The confirmation rows.
+            level: Confidence level.
+
+        Returns:
+            A Wald test for each negative-control outcome whose estimate has a
+            usable standard error; exposures are not supported here.
+        """
         tests = []
         for control in self.spec.negative_controls:
             if control.kind != "outcome":
@@ -392,7 +579,15 @@ class RandomizedAdapter(Adapter):
         return tests
 
     def sensitivity(self, c: pd.DataFrame, level: float) -> dict[str, Any]:
-        """Sensitivity of the estimate to unmeasured confounding."""
+        """Reports that randomization leaves no unmeasured confounding to bound.
+
+        Args:
+            c: The confirmation rows (not read).
+            level: Confidence level (not read).
+
+        Returns:
+            A document with `holds` True and `applicable` False.
+        """
         return {
             "holds": True,
             "note": "randomized assignment: no unmeasured confounding to bound",
@@ -406,14 +601,21 @@ class DidAdapter(Adapter):
     name = "did"
 
     def columns(self) -> tuple[str, str, str]:
-        """The panel column names."""
+        """Reads the panel column names from the charter.
+
+        Returns:
+            The unit, time and adoption column names.
+
+        Raises:
+            ValueError: If any of them is not declared.
+        """
         s = self.spec
         if not (s.unit and s.time and s.adoption):
             raise ValueError("did needs unit, time and adoption")
         return s.unit, s.time, s.adoption
 
     def prepare(self) -> None:
-        """Design diagnostics and frozen quantities from `X` only."""
+        """Estimates on `X` to record the panel and the pre-trend test."""
         unit, time, adoption = self.columns()
         fit = did.estimate(self.x, unit, time, adoption, self.spec.outcome)
         self.design = {
@@ -427,14 +629,32 @@ class DidAdapter(Adapter):
     def fit(
         self, c: pd.DataFrame, level: float, outcome: str | None = None
     ) -> did.DidResult:
-        """Fits the estimator on `c` or `frame`."""
+        """Fits the difference-in-differences estimator on the given rows.
+
+        Args:
+            c: The panel rows.
+            level: Confidence level.
+            outcome: The outcome column, or None for the charter's outcome.
+
+        Returns:
+            The fitted group-time result.
+        """
         unit, time, adoption = self.columns()
         return did.estimate(
             c, unit, time, adoption, outcome or self.spec.outcome, level
         )
 
     def estimate(self, c: pd.DataFrame, level: float) -> Est:
-        """The primary estimate on `C`."""
+        """Computes the overall ATT on `C`.
+
+        Args:
+            c: The confirmation rows.
+            level: Confidence level.
+
+        Returns:
+            The estimate, with the pre-trend p-value and the event-study
+            coefficients in its detail.
+        """
         fit = self.fit(c, level)
         return Est(
             fit.estimate,
@@ -453,12 +673,31 @@ class DidAdapter(Adapter):
     def estimate_for(
         self, c: pd.DataFrame, level: float, outcome: str | None = None
     ) -> Est:
-        """The same estimator on `C` with another outcome column."""
+        """Computes the overall ATT on `C` with another outcome column.
+
+        Args:
+            c: The confirmation rows.
+            level: Confidence level.
+            outcome: The outcome column, or None for the charter's outcome.
+
+        Returns:
+            The estimate with its standard error and interval.
+        """
         fit = self.fit(c, level, outcome)
         return Est(fit.estimate, fit.se, fit.low, fit.high, len(c))
 
     def controls(self, c: pd.DataFrame, level: float) -> list[battery.Test]:
-        """Falsification tests on `C`."""
+        """Runs the pre-trend test and negative-control outcomes on `C`.
+
+        Args:
+            c: The confirmation rows.
+            level: Confidence level.
+
+        Returns:
+            The pre-trend Wald test when pre-period coefficients exist,
+            followed by a Wald test for each negative-control outcome with a
+            usable standard error.
+        """
         tests = []
         fit = self.fit(c, level)
         if fit.pretrend_p is not None:
@@ -478,7 +717,18 @@ class DidAdapter(Adapter):
         return tests
 
     def sensitivity(self, c: pd.DataFrame, level: float) -> dict[str, Any]:
-        """Sensitivity of the estimate to unmeasured confounding."""
+        """Applies the relative-magnitudes bound on `C`.
+
+        Args:
+            c: The confirmation rows.
+            level: Confidence level.
+
+        Returns:
+            The widened interval at the charter's `m_max`, whether it still
+            excludes zero, the breakdown multiple and the largest pre-period
+            change; or `holds` as None with a note when the charter has no
+            sensitivity block or fewer than two pre-periods exist.
+        """
         spec = self.spec
         if spec.sensitivity is None:
             return {
@@ -507,13 +757,30 @@ class IvAdapter(Adapter):
     name = "iv"
 
     def controls_columns(self) -> tuple[str, ...]:
-        """Covariates used as IV controls."""
+        """Lists the covariates used as IV controls.
+
+        Returns:
+            The covariate columns declared in the unconfoundedness
+            assumption, or an empty tuple.
+        """
         return causal.covariates_of(self.spec.assumptions) or ()
 
     def fit(
         self, frame: pd.DataFrame, level: float, outcome: str | None = None
     ) -> iv.IvResult:
-        """Fits the estimator on `c` or `frame`."""
+        """Fits the just-identified IV model on the given rows.
+
+        Args:
+            frame: The rows.
+            level: Confidence level.
+            outcome: The outcome column, or None for the charter's outcome.
+
+        Returns:
+            The fitted IV result.
+
+        Raises:
+            ValueError: If the charter declares no instrument.
+        """
         spec = self.spec
         if not spec.instrument:
             raise ValueError("iv needs an instrument")
@@ -527,7 +794,7 @@ class IvAdapter(Adapter):
         )
 
     def prepare(self) -> None:
-        """Design diagnostics and frozen quantities from `X` only."""
+        """Fits on `X` to record the first-stage F and instrument strength."""
         fit = self.fit(self.x, 0.95)
         self.weak = fit.weak
         self.design = {
@@ -540,7 +807,17 @@ class IvAdapter(Adapter):
         }
 
     def estimate(self, c: pd.DataFrame, level: float) -> Est:
-        """The primary estimate on `C`."""
+        """Computes the IV estimate on `C`.
+
+        A weak instrument on `C` also marks the run as weak.
+
+        Args:
+            c: The confirmation rows.
+            level: Confidence level.
+
+        Returns:
+            The estimate, with the headline interval kind in its detail.
+        """
         fit = self.fit(c, level)
         self.weak = self.weak or fit.weak
         self.design["first_stage_F_on_c"] = fit.f_stat
@@ -560,12 +837,30 @@ class IvAdapter(Adapter):
     def estimate_for(
         self, c: pd.DataFrame, level: float, outcome: str | None = None
     ) -> Est:
-        """The same estimator on `C` with another outcome column."""
+        """Computes the IV estimate on `C` with another outcome column.
+
+        Args:
+            c: The confirmation rows.
+            level: Confidence level.
+            outcome: The outcome column, or None for the charter's outcome.
+
+        Returns:
+            The estimate with its standard error and the 2SLS interval limits.
+        """
         fit = self.fit(c, level, outcome)
         return Est(fit.estimate, fit.se, fit.wald_low, fit.wald_high, fit.n)
 
     def controls(self, c: pd.DataFrame, level: float) -> list[battery.Test]:
-        """Falsification tests on `C`."""
+        """Runs the declared negative-control outcomes on `C`.
+
+        Args:
+            c: The confirmation rows.
+            level: Confidence level.
+
+        Returns:
+            A Wald test for each negative-control outcome whose estimate has a
+            usable standard error.
+        """
         tests = []
         for control in self.spec.negative_controls:
             if control.kind == "outcome":
@@ -586,12 +881,20 @@ class RdAdapter(Adapter):
     name = "rd"
 
     def __init__(self, *args: Any) -> None:
-        """Stores the settings of the strategy."""
+        """Stores the settings of the strategy.
+
+        Args:
+            *args: The `Adapter` constructor arguments.
+        """
         super().__init__(*args)
         self.bandwidth = 0.0
 
     def balance_columns(self) -> tuple[str, ...]:
-        """Predetermined covariates tested for a jump."""
+        """Lists the predetermined covariates tested for a jump.
+
+        Returns:
+            The variables of the declared negative-control outcomes.
+        """
         return tuple(
             c.variable
             for c in self.spec.negative_controls
@@ -599,7 +902,13 @@ class RdAdapter(Adapter):
         )
 
     def prepare(self) -> None:
-        """Design diagnostics and frozen quantities from `X` only."""
+        """Fixes the bandwidth and checks the density at the cutoff on `X`.
+
+        The claim is refused when the density check rejects at `alpha_falsify`.
+
+        Raises:
+            ValueError: If the charter declares no running variable or cutoff.
+        """
         spec = self.spec
         if not spec.running_variable or spec.cutoff is None:
             raise ValueError("rd needs a running variable and cutoff")
@@ -631,7 +940,20 @@ class RdAdapter(Adapter):
         outcome: str | None = None,
         covariates: tuple[str, ...] = (),
     ) -> rd.RdResult:
-        """Fits the estimator on `c` or `frame`."""
+        """Fits the discontinuity at the frozen bandwidth.
+
+        Args:
+            c: The rows to fit.
+            level: Confidence level.
+            outcome: The outcome column, or None for the charter's outcome.
+            covariates: Covariates to test for a jump.
+
+        Returns:
+            The fitted regression discontinuity result.
+
+        Raises:
+            ValueError: If the charter declares no running variable or cutoff.
+        """
         spec = self.spec
         if not spec.running_variable or spec.cutoff is None:
             raise ValueError("rd needs a running variable and cutoff")
@@ -646,7 +968,16 @@ class RdAdapter(Adapter):
         )
 
     def estimate(self, c: pd.DataFrame, level: float) -> Est:
-        """The primary estimate on `C`."""
+        """Computes the bias-corrected discontinuity on `C`.
+
+        Args:
+            c: The confirmation rows.
+            level: Confidence level.
+
+        Returns:
+            The bias-corrected estimate, with the conventional estimate and the
+            bandwidth in its detail.
+        """
         fit = self.fit(c, level)
         return Est(
             fit.bias_corrected,
@@ -660,7 +991,16 @@ class RdAdapter(Adapter):
     def estimate_for(
         self, c: pd.DataFrame, level: float, outcome: str | None = None
     ) -> Est:
-        """The same estimator on `C` with another outcome column."""
+        """Computes the bias-corrected discontinuity for another outcome.
+
+        Args:
+            c: The confirmation rows.
+            level: Confidence level.
+            outcome: The outcome column, or None for the charter's outcome.
+
+        Returns:
+            The estimate with its standard error and interval.
+        """
         fit = self.fit(c, level, outcome)
         return Est(
             fit.bias_corrected,
@@ -671,7 +1011,15 @@ class RdAdapter(Adapter):
         )
 
     def controls(self, c: pd.DataFrame, level: float) -> list[battery.Test]:
-        """Falsification tests on `C`."""
+        """Runs the placebo cutoffs and covariate balance tests on `C`.
+
+        Args:
+            c: The confirmation rows.
+            level: Confidence level.
+
+        Returns:
+            A test for each placebo cutoff and for each covariate discontinuity.
+        """
         fit = self.fit(c, level, covariates=self.balance_columns())
         tests = [
             battery.Test(
@@ -696,7 +1044,18 @@ class RdAdapter(Adapter):
         return tests
 
     def sensitivity(self, c: pd.DataFrame, level: float) -> dict[str, Any]:
-        """Sensitivity of the estimate to unmeasured confounding."""
+        """Reports how the estimate changes with the bandwidth.
+
+        Args:
+            c: The confirmation rows.
+            level: Confidence level.
+
+        Returns:
+            A document with `holds` True and `applicable` False (a regression
+            discontinuity has no unmeasured-confounding bound), the estimates at
+            other bandwidth multiples, and whether each leads to the same
+            conclusion about zero.
+        """
         fit = self.fit(c, level)
         stable = [
             (row["low"] <= 0 <= row["high"]) == (fit.low <= 0 <= fit.high)
@@ -718,12 +1077,33 @@ class SynthAdapter(Adapter):
     name = "synth"
 
     def __init__(self, *args: Any) -> None:
-        """Stores the settings of the strategy."""
+        """Stores the settings of the strategy and marks a single treated unit.
+
+        Args:
+            *args: The `Adapter` constructor arguments.
+        """
         super().__init__(*args)
         self.single_unit = True
 
     def estimate(self, c: pd.DataFrame, level: float) -> Est:
-        """The primary estimate on `C`."""
+        """Computes the synthetic control effect on `X`.
+
+        With one treated unit there is nothing to hold out, so the rows of
+        `X` are used and `c` is not read.
+
+        Args:
+            c: The confirmation rows (not read).
+            level: Confidence level; `1 - level` is the level the donor count is
+                checked against.
+
+        Returns:
+            The mean post-period gap, with NaN standard error and limits and the
+            placebo p-value and ratio in its detail.
+
+        Raises:
+            ValueError: If the charter lacks unit or time, or the panel does not
+                hold exactly one treated unit.
+        """
         spec = self.spec
         if not (spec.unit and spec.time):
             raise ValueError("synth needs unit and time")
@@ -760,7 +1140,16 @@ class SynthAdapter(Adapter):
     def estimate_for(
         self, c: pd.DataFrame, level: float, outcome: str | None = None
     ) -> Est:
-        """The same estimator on `C` with another outcome column."""
+        """Is not available for synthetic control.
+
+        Args:
+            c: The confirmation rows.
+            level: Confidence level.
+            outcome: The outcome column.
+
+        Raises:
+            NotImplementedError: Always.
+        """
         raise NotImplementedError
 
 
@@ -780,7 +1169,17 @@ def refusal_outcome(
     reason: str | None = None,
     dag_checks: Mapping[str, Any] | None = None,
 ) -> Outcome:
-    """The five documents of a claim that is not identified."""
+    """Builds the five documents of a claim that is not identified.
+
+    Args:
+        plan: The selector's plan.
+        spec: The charter's causal block.
+        reason: Why the claim is refused, or None.
+        dag_checks: What was found about the declared DAG, or None.
+
+    Returns:
+        The documents, their hashes and a tier decision with no tier.
+    """
     report = dict(select.refusal(plan, spec))
     if reason:
         report["reason"] = reason
@@ -824,7 +1223,27 @@ def assemble(
     subgroups: Mapping[str, Any] | None = None,
     attestation_report: Mapping[str, Any] | None = None,
 ) -> Outcome:
-    """Builds the documents and the claim file that hashes the others."""
+    """Builds the documents and the claim file that hashes the others.
+
+    Args:
+        plan: The selector's plan.
+        spec: The charter's causal block.
+        report: The identification report.
+        falsification: The falsification report.
+        sens: The sensitivity report.
+        decision: The tier decision.
+        strategy: Name of the chosen strategy, or an empty string.
+        needed: The assumptions the strategy relies on.
+        attestors: Assumption to the named attestor.
+        certified: Certificate gates used.
+        subgroups: The labelled subgroup report, or None.
+        attestation_report: What was decided about the signed attestations, or
+            None.
+
+    Returns:
+        The documents (the claim file included), the tier decision and the hash
+        of every document.
+    """
     documents = {
         "identification_plan.json": {
             **plan.to_dict(),
@@ -864,7 +1283,15 @@ def assemble(
 
 
 def alphas(error_budget: budget_module.ErrorBudget) -> tuple[float, float]:
-    """`(alpha_primary, alpha_falsify)` split from the confirmation level."""
+    """Splits the confirmation level into the primary and falsification levels.
+
+    Args:
+        error_budget: The charter's error budget.
+
+    Returns:
+        ``(alpha_primary, alpha_falsify)``, the confirmation level divided in
+        the ratio 4 to 1.
+    """
     parts = budget_module.split_budget(error_budget, battery.FALSIFY_WEIGHTS)
     return (
         float(parts["estimate"].confirmation.alpha_confirm),
@@ -875,7 +1302,20 @@ def alphas(error_budget: budget_module.ErrorBudget) -> tuple[float, float]:
 def replication(
     adapter: Adapter, c: pd.DataFrame, level: float, pooled: float, alpha: float
 ) -> dict[str, Any]:
-    """Re-estimates inside each declared stratum and tests agreement."""
+    """Re-estimates inside each declared stratum and tests agreement.
+
+    Args:
+        adapter: The strategy's adapter.
+        c: The confirmation rows.
+        level: Confidence level.
+        pooled: The pooled estimate whose sign the strata must share.
+        alpha: Level of the heterogeneity test.
+
+    Returns:
+        The replication result per stratifying column under ``by_column``, and
+        ``passed``: None when no column had two usable strata, otherwise whether
+        every column that did replicated.
+    """
     results: dict[str, Any] = {}
     passed: bool | None = None
     for column in adapter.spec.strata:
@@ -905,7 +1345,7 @@ def subgroup_report(
     level: float,
     subgroups: tuple[causal.Subgroup, ...],
 ) -> dict[str, Any]:
-    """The effect in each declared subgroup, adjusted as one family.
+    """Estimates the effect in each declared subgroup, adjusted as one family.
 
     The family is every declared (column, value) pair, fixed by the charter
     and registered with the primary claim before `C` is opened. Each
@@ -917,6 +1357,17 @@ def subgroup_report(
     usable standard error) stays in the family with p = 1, so a missing
     subgroup never shrinks the correction. The result describes
     heterogeneity; it does not enter the tier.
+
+    Args:
+        adapter: The strategy's adapter.
+        c: The confirmation rows.
+        level: Confidence level; the family level is `1 - level`.
+        subgroups: The declared subgroups.
+
+    Returns:
+        The rule, level and family size, the guarantee statement, one row per
+        hypothesis (estimate, p-value, adjusted p-value, decision, or why it was
+        skipped) and the names of the rejected subgroups.
     """
     saved = dict(adapter.design)
     rows: list[dict[str, Any]] = []
@@ -1219,11 +1670,25 @@ def design_only(
     learner: str = "linear",
     dag_checks: Mapping[str, Any] | None = None,
 ) -> Outcome:
-    """Selection and design diagnostics on `X`, with no estimate.
+    """Selects and diagnoses the design on `X`, with no estimate.
 
     Used by the pipeline stage, which never hands `C` to this module: the
     plan, the refusal if there is one, the design diagnostics and a claim
     file at tier `unverified`.
+
+    Args:
+        spec: The charter's causal block.
+        x: Exploration rows.
+        error_budget: The charter's error budget.
+        dag: The declared DAG, if any.
+        seed: Seed of the learners.
+        learner: `linear` or `boosted` nuisance learners.
+        dag_checks: What was found about the declared DAG, copied into the
+            report.
+
+    Returns:
+        The five documents, their hashes and a tier decision at `unverified`
+        (or the refusal documents when the claim is not identified).
     """
     plan = select.select(spec, dag)
     if plan.primary is None:
@@ -1270,7 +1735,15 @@ def design_only(
 
 
 def verdict_of(spec: causal.CausalSpec, est: Est) -> dict[str, Any]:
-    """The primary hypothesis `theta = 0` stated in words."""
+    """States the primary hypothesis `theta = 0` in words.
+
+    Args:
+        spec: The charter's causal block.
+        est: The primary estimate (not read).
+
+    Returns:
+        The hypothesis sentence and how the result is labelled.
+    """
     return {
         "hypothesis": (
             f"{spec.estimand} of {spec.treatment} on {spec.outcome} = 0"
@@ -1282,7 +1755,16 @@ def verdict_of(spec: causal.CausalSpec, est: Est) -> dict[str, Any]:
 def needed_assumptions(
     strategy: str, spec: causal.CausalSpec
 ) -> tuple[str, ...]:
-    """The attested assumptions the chosen strategy relies on."""
+    """Lists the attested assumptions the chosen strategy relies on.
+
+    Args:
+        strategy: Registry name of the strategy.
+        spec: The charter's causal block.
+
+    Returns:
+        The strategy's required assumptions, with the unconfoundedness
+        requirement replaced by the charter's matching assumption words.
+    """
     required = select.STRATEGIES[strategy].assumptions
     out = []
     for word in required:

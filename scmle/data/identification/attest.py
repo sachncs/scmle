@@ -1,4 +1,4 @@
-"""Signed attestations of the identification assumptions (F10).
+"""Signed attestations of the identification assumptions.
 
 A causal claim rests on assumptions no data can verify. The charter names who
 may vouch for which assumption (`causal.Attestor`) and where the signed
@@ -80,7 +80,13 @@ class Attestation:
     signature: str = ""
 
     def __post_init__(self) -> None:
-        """Validates the record."""
+        """Validates the record.
+
+        Raises:
+            ValueError: If `expires` precedes `date`. A blank text field or a
+                date that cannot be parsed is also refused with a
+                `ValueError`.
+        """
         for name in (
             "assumption",
             "attestor",
@@ -94,19 +100,38 @@ class Attestation:
             raise ValueError("expires must not precede date")
 
     def payload(self) -> dict[str, Any]:
-        """The signed content: every field but the signature."""
+        """Gives the signed content.
+
+        Returns:
+            A mapping of every field but the signature.
+        """
         record = dataclasses.asdict(self)
         del record["signature"]
         return record
 
     def signed(self, key: str | bytes) -> Self:
-        """A copy carrying the signature under `key`."""
+        """Signs the attestation.
+
+        Args:
+            key: The signing key.
+
+        Returns:
+            A copy carrying the signature computed under `key`.
+        """
         return dataclasses.replace(
             self, signature=signing.sign_payload(self.payload(), key)
         )
 
     def verify(self, key: str | bytes | None) -> bool:
-        """Whether the signature matches the content under `key`."""
+        """Checks the signature against the content.
+
+        Args:
+            key: The signing key, or None to use the key from the environment.
+
+        Returns:
+            True when a key is available, the attestation is signed and the
+            signature matches the content; False otherwise.
+        """
         resolved = signing.resolve_key(key)
         if resolved is None or not self.signature:
             return False
@@ -114,12 +139,23 @@ class Attestation:
         return hmac.compare_digest(expected, self.signature)
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Builds the JSON-ready record.
+
+        Returns:
+            A mapping of every field.
+        """
         return dataclasses.asdict(self)
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds the record, rejecting unknown or missing fields."""
+        """Rebuilds the record, rejecting unknown or missing fields.
+
+        Args:
+            record: A mapping as written by `to_dict`.
+
+        Returns:
+            The attestation described by the record.
+        """
         qualification.require_fields(cls, record)
         return cls(**record)
 
@@ -141,7 +177,12 @@ class Applied:
     evaluated_on: str
 
     def to_dict(self) -> dict[str, Any]:
-        """The `attestations` section of `causal_claims.json`."""
+        """Builds the `attestations` section of `causal_claims.json`.
+
+        Returns:
+            A mapping of the evaluation date, the accepted records and the
+            rejection reason per assumption.
+        """
         return {
             "evaluated_on": self.evaluated_on,
             "accepted": [r.to_dict() for r in self.records],
@@ -151,6 +192,12 @@ class Applied:
 
 def load(path: str | Path) -> tuple[Attestation, ...]:
     """Reads an attestation file.
+
+    Args:
+        path: The attestation JSON file.
+
+    Returns:
+        The attestations, in file order.
 
     Raises:
         ValueError: On an unreadable file, an unknown format version, a

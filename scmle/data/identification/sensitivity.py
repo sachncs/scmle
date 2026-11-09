@@ -1,4 +1,4 @@
-"""Sensitivity of a causal estimate to unmeasured confounding (F10).
+"""Sensitivity of a causal estimate to unmeasured confounding.
 
 E-value (VanderWeele and Ding 2017). For a risk ratio `RR >= 1` the minimum
 strength of association, on the risk-ratio scale, that an unmeasured
@@ -44,7 +44,7 @@ checked on 2026-11-05 against the paper's Supplement B (eq. 76 to 84:
 partial Cohen's f^2) and found to agree algebraically; the paper defines `kD`
 and `kY` on the partial R2 of `Xj` given `X-j` (eq. 21) and states the bound
 as an upper bound that is tight. The package was not run. The simulation
-certificate (A6) measures whether the resulting bound covers
+certificate measures whether the resulting bound covers
 the truth, and a failure there is published, not tuned away. Benchmarking is
 an assumption about the unobserved, and the report says so. The bound applies
 to the linear-model coefficient of `D`; for an AIPW estimate it is a
@@ -64,7 +64,19 @@ INFEASIBLE = 0.999
 
 
 def evalue(rr: float) -> float:
-    """E-value of a risk ratio (reciprocal taken below 1)."""
+    """Computes the E-value of a risk ratio (reciprocal taken below 1).
+
+    Args:
+        rr: The risk ratio, which must be positive.
+
+    Returns:
+        The minimum confounder strength, on the risk-ratio scale, that
+        explains the association away: ``RR + sqrt(RR (RR - 1))`` after
+        taking the reciprocal of a ratio below 1.
+
+    Raises:
+        ValueError: If `rr` is not positive.
+    """
     if not rr > 0:
         raise ValueError("a risk ratio must be positive")
     ratio = rr if rr >= 1 else 1.0 / rr
@@ -74,7 +86,21 @@ def evalue(rr: float) -> float:
 def evalue_interval(
     estimate: float, low: float, high: float
 ) -> dict[str, float]:
-    """E-values of a risk ratio and of its limit nearest the null."""
+    """Computes the E-values of a risk ratio and of its limit nearest null.
+
+    Args:
+        estimate: The risk ratio.
+        low: Lower confidence limit.
+        high: Upper confidence limit.
+
+    Returns:
+        A mapping with `point`, the E-value of the estimate, and `limit`,
+        the E-value of the limit nearest 1 (1.0 when the interval contains
+        1).
+
+    Raises:
+        ValueError: If the estimate does not lie within its limits.
+    """
     if not low <= estimate <= high:
         raise ValueError("the estimate must lie within its limits")
     nearest = low if estimate >= 1 else high
@@ -85,7 +111,14 @@ def evalue_interval(
 
 
 def smd_to_rr(d: float) -> float:
-    """Approximate risk ratio of a standardised mean difference."""
+    """Converts a standardised mean difference to a risk ratio.
+
+    Args:
+        d: The standardised mean difference.
+
+    Returns:
+        The approximate risk ratio ``exp(0.91 d)``.
+    """
     return math.exp(D_TO_RR * d)
 
 
@@ -111,7 +144,15 @@ class OlsFit:
 
 
 def partial_r2(t: float, dof: int) -> float:
-    """Partial R-squared from a t statistic."""
+    """Computes a partial R-squared from a t statistic.
+
+    Args:
+        t: The t statistic of a coefficient.
+        dof: Residual degrees of freedom.
+
+    Returns:
+        ``t^2 / (t^2 + dof)``.
+    """
     return t * t / (t * t + dof)
 
 
@@ -124,6 +165,20 @@ def ols_fit(
     """Fits `Y ~ D + X` and the benchmark partial R-squareds.
 
     Covariates must be numeric (encode categories first).
+
+    Args:
+        frame: The data.
+        treatment: Treatment column `D`.
+        outcome: Outcome column `Y`.
+        covariates: Numeric adjustment columns `X`.
+
+    Returns:
+        The coefficient of `D` with its standard error, t statistic and
+        residual degrees of freedom, and the benchmark partial R-squareds of
+        each covariate.
+
+    Raises:
+        ValueError: If fewer than three residual degrees of freedom remain.
     """
     n = len(frame)
     x = (
@@ -160,7 +215,22 @@ def ols_fit(
 def robustness_value(
     t: float, dof: int, q: float = 1.0, alpha: float | None = None
 ) -> float:
-    """Strength a confounder needs, with both, to cut the estimate by `q`."""
+    """Computes the robustness value of an estimate.
+
+    It is the strength a confounder needs, with both treatment and outcome,
+    to cut the estimate by a fraction `q`.
+
+    Args:
+        t: The t statistic of the treatment coefficient.
+        dof: Residual degrees of freedom.
+        q: Fraction of the estimate to explain away (1 for all of it).
+        alpha: Significance level for the version that makes the estimate
+            lose significance, or None for the point-estimate version.
+
+    Returns:
+        The robustness value as a partial R-squared; 0.0 when `alpha` is
+        given and the estimate is not significant at that level.
+    """
     f = abs(t) / math.sqrt(dof)
     fq = q * f
     if alpha is not None:
@@ -172,7 +242,21 @@ def robustness_value(
 
 
 def bias_bound(fit: OlsFit, r2yz: float, r2dz: float) -> float:
-    """Largest absolute bias of a confounder with the given strengths."""
+    """Computes the largest absolute bias of a confounder.
+
+    Args:
+        fit: The fitted regression.
+        r2yz: Partial R-squared of the confounder with the outcome, in
+            [0, 1).
+        r2dz: Partial R-squared of the confounder with the treatment, in
+            [0, 1).
+
+    Returns:
+        ``se * sqrt(dof) * sqrt(r2yz * r2dz / (1 - r2dz))``.
+
+    Raises:
+        ValueError: If either partial R-squared is outside [0, 1).
+    """
     if not (0 <= r2yz < 1 and 0 <= r2dz < 1):
         raise ValueError("partial R-squareds must lie in [0, 1)")
     return fit.se * math.sqrt(fit.dof) * math.sqrt(r2yz * r2dz / (1 - r2dz))
@@ -181,7 +265,19 @@ def bias_bound(fit: OlsFit, r2yz: float, r2dz: float) -> float:
 def adjusted_interval(
     fit: OlsFit, r2yz: float, r2dz: float, level: float = 0.95
 ) -> tuple[float, float]:
-    """Interval over both directions of a confounder of the given strength."""
+    """Computes the interval over both directions of a confounder.
+
+    Args:
+        fit: The fitted regression.
+        r2yz: Partial R-squared of the confounder with the outcome.
+        r2dz: Partial R-squared of the confounder with the treatment.
+        level: Confidence level.
+
+    Returns:
+        The lower and upper limits, the estimate moved by the bias bound and
+        the adjusted standard error times a t quantile. Partial R-squareds
+        outside [0, 1) are refused with a `ValueError` by `bias_bound`.
+    """
     bias = bias_bound(fit, r2yz, r2dz)
     se_adj = (
         fit.se
@@ -195,7 +291,26 @@ def adjusted_interval(
 def benchmark_strength(
     r2dxj: float, r2yxj: float, kd: float, ky: float
 ) -> tuple[float, float]:
-    """`(R2yz, R2dz)` of a confounder `kd`, `ky` times the benchmark's."""
+    """Converts benchmark multiples into confounder strengths.
+
+    Args:
+        r2dxj: Partial R-squared of the benchmark covariate with the
+            treatment given the others.
+        r2yxj: Partial R-squared of the benchmark covariate with the
+            outcome given the treatment and the others.
+        kd: How many times as strongly related to the treatment as the
+            benchmark.
+        ky: How many times as strongly related to the outcome as the
+            benchmark.
+
+    Returns:
+        ``(R2yz, R2dz)``, the confounder's partial R-squareds with the
+        outcome and with the treatment.
+
+    Raises:
+        ValueError: If a multiple is so large that the implied strength
+            reaches 1 or more.
+    """
     r2dz = kd * r2dxj / (1 - r2dxj)
     if r2dz >= 1:
         raise ValueError(
@@ -249,7 +364,11 @@ class SensitivityReport:
     covariate: str | None
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Builds the JSON-ready record.
+
+        Returns:
+            A mapping of every field.
+        """
         return dataclasses.asdict(self)
 
 
@@ -262,11 +381,29 @@ def assess(
     strength: float = 1.0,
     level: float = 0.95,
 ) -> SensitivityReport:
-    """The charter's sensitivity gate for the linear summary of the effect.
+    """Runs the charter's sensitivity gate for the linear effect summary.
 
     `strongest_observed` takes the covariate whose benchmarked bound is
     widest, with multiples `kd = ky = strength`; `fixed` uses `strength` as
     both partial R-squareds.
+
+    Args:
+        frame: The data.
+        treatment: Treatment column.
+        outcome: Outcome column.
+        covariates: Numeric adjustment columns.
+        benchmark: `strongest_observed` (default) or `fixed`.
+        strength: The multiple (or, for `fixed`, the partial R-squared).
+        level: Confidence level.
+
+    Returns:
+        The report: robustness values, the assumed strengths and their
+        bound, the adjusted interval, and whether it still excludes zero.
+        When a multiple is infeasible for a covariate its strengths are
+        set to 0.999 and the gate fails.
+
+    Raises:
+        ValueError: If benchmarking is requested without covariates.
     """
     fit = ols_fit(frame, treatment, outcome, covariates)
     chosen: str | None = None

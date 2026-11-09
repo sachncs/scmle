@@ -1,4 +1,4 @@
-"""Sharp regression discontinuity at a cutoff (F10).
+"""Sharp regression discontinuity at a cutoff.
 
 Estimator. Triangular-kernel local polynomial fits on each side of the
 cutoff. The conventional estimate is the difference of the two local-linear
@@ -45,7 +45,13 @@ SENSITIVITY_MULTIPLES = (0.5, 0.75, 1.25, 1.5)
 
 @dataclasses.dataclass(frozen=True)
 class Fit:
-    """Intercept of a weighted polynomial fit and its robust variance."""
+    """Intercept of a weighted polynomial fit and its robust variance.
+
+    Attributes:
+        intercept: The fitted value at the evaluation point.
+        variance: Heteroskedasticity-robust variance of the intercept.
+        n: Number of points with positive weight.
+    """
 
     intercept: float
     variance: float
@@ -53,7 +59,19 @@ class Fit:
 
 
 def local_fit(x: np.ndarray, y: np.ndarray, h: float, order: int) -> Fit | None:
-    """Triangular-kernel polynomial fit at 0 (x already centred)."""
+    """Fits a triangular-kernel polynomial and reads it at 0.
+
+    Args:
+        x: Running variable, already centred at the evaluation point.
+        y: Outcome.
+        h: Bandwidth; points at distance `h` or more get zero weight.
+        order: Polynomial order (1 for linear, 2 for quadratic).
+
+    Returns:
+        The intercept, its robust variance and the number of points used,
+        or None when fewer than ``order + 3`` points have positive weight
+        or the weighted Gram matrix is singular.
+    """
     weight = np.clip(1.0 - np.abs(x) / h, 0.0, None)
     keep = weight > 0
     if keep.sum() < order + 3:
@@ -79,6 +97,15 @@ def cv_bandwidth(x: np.ndarray, y: np.ndarray) -> float:
     `x` holds distances from the cutoff, positive, nearest first after
     sorting; evaluation points are the `CV_POINTS` evenly spread among the
     nearest half.
+
+    Args:
+        x: Distances from the cutoff, positive.
+        y: Outcomes, aligned with `x`.
+
+    Returns:
+        The bandwidth, one of the grid quantiles of `x`, that has the
+        smallest mean squared leave-out prediction error among those with at
+        least five evaluation errors; the median of `x` if none has.
     """
     order = np.argsort(x)
     x, y = x[order], y[order]
@@ -138,7 +165,11 @@ class RdResult:
     sensitivity: dict[str, dict[str, float]]
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Builds the JSON-ready record.
+
+        Returns:
+            A mapping of every field.
+        """
         return dataclasses.asdict(self)
 
 
@@ -149,7 +180,22 @@ def discontinuity(
     h: float,
     level: float,
 ) -> dict[str, float] | None:
-    """Conventional and bias-corrected jump at `cutoff` for bandwidth `h`."""
+    """Computes the conventional and bias-corrected jump at a cutoff.
+
+    Args:
+        x: Running variable.
+        y: Outcome (or a covariate whose jump is tested).
+        cutoff: Where the jump is measured.
+        h: Bandwidth, used on both sides.
+        level: Confidence level.
+
+    Returns:
+        None when a side has too few points for a fit. Otherwise a mapping
+        with the conventional `estimate`, the `bias_corrected` jump, its
+        robust `se`, the interval limits `low` and `high` around the
+        bias-corrected jump, and the two-sided normal p-value `p` of the
+        bias-corrected jump (1 when `se` is not positive).
+    """
     left = x < cutoff
     pieces = {}
     for name, mask in (("left", left), ("right", ~left)):
@@ -193,6 +239,11 @@ def estimate(
         level: Confidence level.
         bandwidth: A fixed bandwidth, or None to cross-validate.
         covariates: Predetermined covariates to test for a jump.
+
+    Returns:
+        The fit: the estimates and interval at the bandwidth, the binomial
+        density p-value, and the placebo, covariate and bandwidth-multiple
+        results (entries whose fit was degenerate are left out).
 
     Raises:
         ValueError: If a side has too few rows or a fit is degenerate.

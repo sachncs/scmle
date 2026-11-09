@@ -1,4 +1,4 @@
-"""The falsification battery and stratum replication (F10).
+"""The falsification battery and stratum replication.
 
 Every test here can only falsify. A battery that finds nothing does not show
 the assumptions hold: it shows that no violation of the kind and size it was
@@ -51,12 +51,30 @@ class Test:
     se: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Builds the JSON-ready record.
+
+        Returns:
+            A mapping of the name, kind, p-value, estimate and standard
+            error.
+        """
         return dataclasses.asdict(self)
 
 
 def wald_test(name: str, kind: str, estimate: float, se: float) -> Test:
-    """A two-sided Wald test of `estimate = 0`."""
+    """Runs a two-sided Wald test of `estimate = 0`.
+
+    Args:
+        name: What is tested.
+        kind: `negative_outcome`, `negative_exposure` or `placebo`.
+        estimate: The placebo effect.
+        se: Its standard error, which must be positive.
+
+    Returns:
+        The test, with the normal two-sided p-value of ``estimate / se``.
+
+    Raises:
+        ValueError: If `se` is not positive.
+    """
     if not se > 0:
         raise ValueError("a Wald test needs a positive standard error")
     p = float(2 * stats.norm.sf(abs(estimate) / se))
@@ -82,7 +100,12 @@ class BatteryReport:
     ran: bool
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Builds the JSON-ready record.
+
+        Returns:
+            A mapping of the level, the tests (as records), the rejected
+            names as a list, and the `passed` and `ran` flags.
+        """
         return {
             "alpha": self.alpha,
             "tests": [t.to_dict() for t in self.tests],
@@ -93,7 +116,19 @@ class BatteryReport:
 
 
 def run_battery(tests: list[Test], alpha: float) -> BatteryReport:
-    """Holm step-down over all tests at familywise level `alpha`."""
+    """Applies Holm's step-down over all tests at familywise level `alpha`.
+
+    Args:
+        tests: The tests of the battery, in the order run.
+        alpha: Familywise level, strictly between 0 and 1.
+
+    Returns:
+        The report: the names of the rejected tests, `ran` when any test was
+        given, and `passed` when tests ran and none was rejected.
+
+    Raises:
+        ValueError: If `alpha` is not strictly between 0 and 1.
+    """
     if not 0 < alpha < 1:
         raise ValueError("alpha must be within (0, 1)")
     flags = (
@@ -130,7 +165,12 @@ class Replication:
     passed: bool
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Builds the JSON-ready record.
+
+        Returns:
+            A mapping of every field, with each stratum written as a list
+            ``[estimate, se]``.
+        """
         record = dataclasses.asdict(self)
         record["strata"] = {k: list(v) for k, v in self.strata.items()}
         return record
@@ -141,7 +181,22 @@ def replicate(
     pooled: float,
     alpha: float = 0.05,
 ) -> Replication:
-    """Sign agreement and Cochran's Q across strata."""
+    """Checks sign agreement and Cochran's Q across strata.
+
+    Args:
+        strata: Stratum name to ``(estimate, se)``.
+        pooled: The pooled estimate whose sign the strata must share.
+        alpha: Level of the heterogeneity test.
+
+    Returns:
+        The replication result; `passed` needs every stratum estimate to
+        have the sign of `pooled` (zero counts as positive) and Cochran's Q
+        p-value to be at least `alpha`.
+
+    Raises:
+        ValueError: If there are fewer than two strata or a standard error
+            is not positive.
+    """
     if len(strata) < MIN_STRATA:
         raise ValueError(f"replication needs at least {MIN_STRATA} strata")
     est = np.array([v[0] for v in strata.values()])
