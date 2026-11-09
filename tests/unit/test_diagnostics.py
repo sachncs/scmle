@@ -303,7 +303,7 @@ def test_block_resamples_can_start_at_the_last_possible_position():
     rng = np.random.default_rng(0)
     firsts = {
         int(diagnostics.resample_rows(10, None, True, rng)[0])
-        for _ in range(300)
+        for draw in range(300)
     }
     assert 5 in firsts  # blocks of 5 rows may start at row 5 of 10
 
