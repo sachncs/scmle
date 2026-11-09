@@ -328,12 +328,10 @@ def estimate_value(
         tier = qualification.Tier.CONFIRMED.value
     elif eligible_strategy:
         tier = qualification.Tier.ATTESTED.value
-        notes.append(
-            "propensities estimated; tier inherits the evaluation tier"
-        )
+        notes.append("propensities estimated; tier inherits the F10 tier")
     else:
         tier = qualification.Tier.UNVERIFIED.value
-        notes.append("propensities estimated and no eligible estimator")
+        notes.append("propensities estimated and no eligible F10 strategy")
     return ValueEstimate(
         ISSUED,
         estimator,
