@@ -21,6 +21,7 @@ import dataclasses
 import hashlib
 import hmac
 import json
+import math
 import time
 from typing import Any
 import urllib.error
@@ -92,7 +93,12 @@ def sign(secret: str | bytes, timestamp: str, body: bytes) -> str:
     Returns:
         The HMAC-SHA256 of the timestamp, a dot and the body, prefixed with
         ``sha256=``.
+
+    Raises:
+        ValueError: If the secret is empty.
     """
+    if not secret:
+        raise ValueError("a signing secret is required")
     key = secret.encode() if isinstance(secret, str) else secret
     mac = hmac.new(key, timestamp.encode() + b"." + body, hashlib.sha256)
     return "sha256=" + mac.hexdigest()
@@ -119,7 +125,7 @@ def verify_signature(
     Returns:
         True if the timestamp parses as a number within the tolerance of
         `now` and the signature matches; False if the timestamp is missing,
-        not a number or too far from `now`, or the signature differs.
+        not a finite number or too far from `now`, or the signature differs.
     """
     timestamp = headers.get(TIMESTAMP_HEADER, "")
     given = headers.get(SIGNATURE_HEADER, "")
@@ -127,9 +133,11 @@ def verify_signature(
         age = abs(now - float(timestamp))
     except ValueError:
         return False
-    if age > tolerance_seconds:
+    if not math.isfinite(age) or age > tolerance_seconds:
         return False
-    return hmac.compare_digest(given, sign(secret, timestamp, body))
+    return hmac.compare_digest(
+        given.encode("utf-8"), sign(secret, timestamp, body).encode("ascii")
+    )
 
 
 def urllib_transport(timeout_seconds: float = 5.0) -> Transport:
@@ -218,7 +226,7 @@ class WebhookSender:
         Args:
             notification: The notification, which must carry a known
                 ``severity`` and be JSON-serialisable. A ``kind`` entry in it
-                replaces this sender's kind in the body.
+                is ignored: the body always carries this sender's kind.
 
         Returns:
             The compact, key-sorted JSON of the notification with a ``kind``
@@ -233,7 +241,7 @@ class WebhookSender:
         if severity not in SEVERITIES:
             raise ValueError(f"severity must be one of {SEVERITIES}")
         body = json.dumps(
-            {"kind": self.kind, **notification},
+            {**notification, "kind": self.kind},
             sort_keys=True,
             separators=(",", ":"),
         ).encode("utf-8")

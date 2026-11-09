@@ -642,3 +642,31 @@ def test_retained_telemetry_can_expire(tmp_path):
     desk.handle(window())
     assert desk.expire(older_than=1000.0) == 0
     assert desk.expire(older_than=3000.0) == 1 and desk.retained() == []
+
+
+def test_a_notification_cannot_override_the_senders_kind():
+    made, seen, ignored = sender([202], kind="pager")
+    made.send({**NOTE, "kind": "ticket"})
+    assert json.loads(seen[0].body)["kind"] == "pager"
+
+
+def test_verification_rejects_a_nan_timestamp_and_non_ascii_signatures():
+    made, seen, ignored = sender([202])
+    made.send(NOTE)
+    request = seen[0]
+    body = request.body
+    nan_stamp = "nan"
+    forged = {
+        notify.TIMESTAMP_HEADER: nan_stamp,
+        notify.SIGNATURE_HEADER: notify.sign("shared-secret", nan_stamp, body),
+    }
+    assert not notify.verify_signature("shared-secret", forged, body, 1000.0)
+    garbled = {**request.headers, notify.SIGNATURE_HEADER: "sha256=é"}
+    assert not notify.verify_signature("shared-secret", garbled, body, 1000.0)
+
+
+def test_signing_with_an_empty_secret_is_refused():
+    with pytest.raises(ValueError, match="secret"):
+        notify.sign("", "1000.000", b"{}")
+    with pytest.raises(ValueError, match="secret"):
+        notify.sign(b"", "1000.000", b"{}")
