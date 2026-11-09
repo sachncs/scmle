@@ -60,7 +60,8 @@ class Attestation:
     """One named person's statement about one assumption.
 
     Attributes:
-        assumption: A word of the closed assumption vocabulary.
+        assumption: Name of the assumption vouched for; it counts only if the
+            charter lets the attestor attest it.
         attestor: The name the charter lists.
         statement: What they vouch for, in words.
         evidence: A document a third party could check.
@@ -100,7 +101,7 @@ class Attestation:
             raise ValueError("expires must not precede date")
 
     def payload(self) -> dict[str, Any]:
-        """Gives the signed content.
+        """Returns the content covered by the signature.
 
         Returns:
             A mapping of every field but the signature.
@@ -113,7 +114,8 @@ class Attestation:
         """Signs the attestation.
 
         Args:
-            key: The signing key.
+            key: The signing key; an empty string is refused with a
+                `ValueError` by the signing helper.
 
         Returns:
             A copy carrying the signature computed under `key`.
@@ -154,7 +156,9 @@ class Attestation:
             record: A mapping as written by `to_dict`.
 
         Returns:
-            The attestation described by the record.
+            The attestation described by the record. A record that lacks a
+            field (including `signature`), has an extra one or fails the
+            checks of `__post_init__` raises `ValueError`.
         """
         qualification.require_fields(cls, record)
         return cls(**record)
@@ -200,8 +204,9 @@ def load(path: str | Path) -> tuple[Attestation, ...]:
         The attestations, in file order.
 
     Raises:
-        ValueError: On an unreadable file, an unknown format version, a
-            malformed record or two attestations for one assumption.
+        ValueError: On an unreadable or non-JSON file, a document that is not
+            an object with the current format version and an `attestations`
+            list, a malformed record or two attestations for one assumption.
     """
     try:
         document = json.loads(Path(path).read_text(encoding="utf-8"))
@@ -240,8 +245,10 @@ def apply(
         given: Everything the attestation file holds.
         needed: The assumptions the chosen strategy relies on.
         scope: The charter hash the run is bound to.
-        today: ISO date on which attestations must be valid.
-        key: Signing key; None accepts nothing.
+        today: ISO date on which attestations must be valid; any other
+            text raises `ValueError`.
+        key: Signing key; None uses the key from the environment. With no
+            key at all nothing is accepted.
 
     Returns:
         The accepted attestors by assumption, the accepted records and a

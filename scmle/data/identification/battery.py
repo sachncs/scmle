@@ -190,7 +190,8 @@ def replicate(
 
     Returns:
         The replication result; `passed` needs every stratum estimate to
-        have the sign of `pooled` (zero counts as positive) and Cochran's Q
+        have the sign of `pooled` (a zero `pooled` counts as positive; a
+        stratum estimate of exactly zero never matches) and Cochran's Q
         p-value to be at least `alpha`.
 
     Raises:

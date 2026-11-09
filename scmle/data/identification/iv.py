@@ -50,10 +50,14 @@ class IvResult:
         f_stat: Robust first-stage F.
         weak: Whether `f_stat < F_THRESHOLD`.
         ar_kind: `bounded`, `complement` or `whole_line`.
-        ar_low: Lower end (bounded) or end of the left ray (complement).
-        ar_high: Upper end (bounded) or start of the right ray.
-        low: Headline lower limit (finite only when not unbounded).
-        high: Headline upper limit.
+        ar_low: Lower end (bounded), end of the left ray (complement) or
+            minus infinity (whole line); NaN for an empty bounded set.
+        ar_high: Upper end (bounded), start of the right ray (complement)
+            or plus infinity (whole line); NaN for an empty bounded set.
+        low: Headline lower limit: the 2SLS limit, the bounded
+            Anderson-Rubin end, or minus infinity when the Anderson-Rubin
+            headline set is not a bounded interval.
+        high: Headline upper limit, with plus infinity in the same case.
         headline: `wald` or `anderson_rubin`.
         level: Confidence level.
         n: Rows.
@@ -85,7 +89,8 @@ class IvResult:
             True when `value` lies outside the 2SLS interval (headline
             `wald`), outside the bounded Anderson-Rubin interval, or inside
             the gap between the two rays of a `complement` set; always False
-            for the whole line.
+            for the whole line. An empty bounded set (NaN ends) counts every
+            value as excluded.
         """
         if self.headline == "wald":
             return not self.wald_low <= value <= self.wald_high
@@ -194,11 +199,14 @@ def estimate(
     Returns:
         The fit. The headline set is the 2SLS interval when the first-stage
         F reaches the threshold, otherwise the Anderson-Rubin set (unbounded
-        ends when that set is not a bounded interval).
+        ends when that set is not a bounded interval, NaN ends when it is
+        empty).
 
     Raises:
-        ValueError: If the instrument has no variation after the controls or
-            the data hold missing values.
+        ValueError: If the data hold missing or non-finite values, or the
+            residualised instrument has no variation or is uncorrelated with
+            the residualised regressor (sums of squares or products at most
+            1e-12).
     """
     names = [treatment, outcome, instrument, *controls]
     data = frame[names].to_numpy(dtype=float)
@@ -248,7 +256,7 @@ def estimate(
 
 
 def exclusion_bound(result: IvResult, direct_effect: float) -> float:
-    """Bias of the 2SLS estimate if the instrument had a direct effect.
+    """Returns the 2SLS bias if the instrument had a direct effect.
 
     A direct effect `gamma` of the instrument on the outcome moves the Wald
     ratio by `gamma / pi`.

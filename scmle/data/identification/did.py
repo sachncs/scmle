@@ -57,7 +57,8 @@ class DidResult:
         pretrend_p: Wald p-value of the pre-period coefficients, if any.
         max_pre_change: `J`, largest consecutive pre-period change, or None
             when fewer than two pre-periods exist.
-        mean_horizon: Mean of `e + 1` over the post cells (bias multiplier).
+        mean_horizon: Group-size-weighted mean of `e + 1` over the post
+            cells (bias multiplier).
     """
 
     estimate: float
@@ -137,7 +138,8 @@ def wide_panel(
         increasing period order.
 
     Raises:
-        ValueError: If any unit-period outcome is missing.
+        ValueError: If any unit-period outcome is missing or a unit-period
+            pair occurs more than once.
     """
     table = frame.pivot(index=unit, columns=time, values=outcome)
     if table.isna().any().any():
@@ -190,9 +192,11 @@ def estimate(
         their covariance and the quantities the sensitivity bound uses.
 
     Raises:
-        ValueError: If the panel is unbalanced, has fewer than three
-            periods, has no never-treated units, or no group has both a
-            pre-period and a post-period.
+        ValueError: If the panel is unbalanced or repeats a unit-period
+            pair, has fewer than three periods, has fewer than two
+            never-treated units, the adoption value varies within a unit, or
+            no adoption group has a pre-period (groups adopting in the first
+            period or in a period not observed are dropped).
     """
     wide = wide_panel(frame, unit, time, outcome)
     periods = list(wide.columns)

@@ -302,7 +302,7 @@ class Adapter:
 
 
 class BackdoorAdapter(Adapter):
-    """Cross-fitted-free AIPW with frozen nuisances."""
+    """AIPW with nuisances frozen on `X` and no cross-fitting."""
 
     name = "backdoor_aipw"
 
@@ -357,11 +357,15 @@ class BackdoorAdapter(Adapter):
             c: The confirmation rows.
             level: Confidence level.
 
+        Also records `overlap_on_c` and `population` in `design`.
+
         Returns:
             The estimate, with the estimated population in its detail.
 
         Raises:
-            ValueError: If `prepare` has not run.
+            ValueError: If `prepare` has not run. Errors of `aipw.estimate`
+                (trimming below `min_share`, a thin arm, missing outcomes)
+                are also `ValueError`.
         """
         if self.nuisances is None:
             raise ValueError("prepare() must run first")
@@ -484,7 +488,8 @@ class BackdoorAdapter(Adapter):
             benchmark against.
 
         Raises:
-            ValueError: If `prepare` has not run.
+            ValueError: If the charter has a sensitivity block and covariates
+                but `prepare` has not run.
         """
         spec = self.spec
         if spec.sensitivity is None:
@@ -617,7 +622,10 @@ class DidAdapter(Adapter):
         return s.unit, s.time, s.adoption
 
     def prepare(self) -> None:
-        """Estimates on `X` to record the panel and the pre-trend test."""
+        """Estimates on `X` to record the panel and the pre-trend test.
+
+        The results go into `design` (default level); the estimate is dropped.
+        """
         unit, time, adoption = self.columns()
         fit = did.estimate(self.x, unit, time, adoption, self.spec.outcome)
         self.design = {
@@ -796,7 +804,10 @@ class IvAdapter(Adapter):
         )
 
     def prepare(self) -> None:
-        """Fits on `X` to record the first-stage F and instrument strength."""
+        """Fits on `X` (level 0.95) to record the first-stage F and strength.
+
+        Sets `weak` and `design`.
+        """
         fit = self.fit(self.x, 0.95)
         self.weak = fit.weak
         self.design = {
@@ -811,7 +822,8 @@ class IvAdapter(Adapter):
     def estimate(self, c: pd.DataFrame, level: float) -> Est:
         """Computes the IV estimate on `C`.
 
-        A weak instrument on `C` also marks the run as weak.
+        A weak instrument on `C` also marks the run as weak (`weak`), and
+        the first-stage F on `C` is recorded in `design`.
 
         Args:
             c: The confirmation rows.
@@ -1020,7 +1032,8 @@ class RdAdapter(Adapter):
             level: Confidence level.
 
         Returns:
-            A test for each placebo cutoff and for each covariate discontinuity.
+            A test for each placebo cutoff and each covariate discontinuity
+            whose fit was not degenerate.
         """
         fit = self.fit(c, level, covariates=self.balance_columns())
         tests = [
@@ -1103,8 +1116,9 @@ class SynthAdapter(Adapter):
             placebo p-value and ratio in its detail.
 
         Raises:
-            ValueError: If the charter lacks unit or time, or the panel does not
-                hold exactly one treated unit.
+            ValueError: If the charter lacks unit or time, the panel does not
+                hold exactly one treated unit, or `synth.estimate` refuses
+                the panel (for example too few donors).
         """
         spec = self.spec
         if not (spec.unit and spec.time):
@@ -1142,7 +1156,7 @@ class SynthAdapter(Adapter):
     def estimate_for(
         self, c: pd.DataFrame, level: float, outcome: str | None = None
     ) -> Est:
-        """Is not available for synthetic control.
+        """Always refuses: synthetic control has no other-outcome estimate.
 
         Args:
             c: The confirmation rows.
@@ -1234,7 +1248,8 @@ def assemble(
         falsification: The falsification report.
         sens: The sensitivity report.
         decision: The tier decision.
-        strategy: Name of the chosen strategy, or an empty string.
+        strategy: Name of the chosen strategy, or an empty string (recorded
+            as null in the claim file).
         needed: The assumptions the strategy relies on.
         attestors: Assumption to the named attestor.
         certified: Certificate gates used.
@@ -1314,9 +1329,14 @@ def replication(
         alpha: Level of the heterogeneity test.
 
     Returns:
-        The replication result per stratifying column under ``by_column``, and
-        ``passed``: None when no column had two usable strata, otherwise whether
-        every column that did replicated.
+        The replication result per stratifying column under ``by_column``
+        (a skip reason when the column is absent from `c` or has fewer than
+        two usable strata), and ``passed``: None when no column had two usable
+        strata, otherwise whether every column that did replicated. A stratum
+        is usable when it has `MIN_STRATUM_ROWS` rows and `adapter.estimate`
+        gives a finite positive standard error without a `ValueError`. The
+        adapter's side effects of `estimate` (entries of `design`, `weak`)
+        are not undone.
     """
     results: dict[str, Any] = {}
     passed: bool | None = None
@@ -1367,9 +1387,11 @@ def subgroup_report(
         subgroups: The declared subgroups.
 
     Returns:
-        The rule, level and family size, the guarantee statement, one row per
-        hypothesis (estimate, p-value, adjusted p-value, decision, or why it was
-        skipped) and the names of the rejected subgroups.
+        A mapping with the rule, the family level `alpha` (`1 - level`), the
+        family size, the guarantee `statement`, one row per hypothesis under
+        `hypotheses` (estimate, p-value, adjusted p-value, decision, or why
+        it was skipped) and the names of the `rejected` subgroups. The
+        adapter's `design` is restored afterwards; its `weak` flag is not.
     """
     saved = dict(adapter.design)
     rows: list[dict[str, Any]] = []
@@ -1438,7 +1460,7 @@ def subgroup_report(
 def label_subgroups(
     found: dict[str, Any], named: tuple[str, ...] | None
 ) -> None:
-    """Says whether the subgroup family gates or only describes.
+    """Labels the subgroup report as gating or only descriptive, in place.
 
     The Holm family is certified by `subgroup_certificates.json` (gate
     `subgroup_holm`): both its error rates and its power met their
@@ -1448,9 +1470,13 @@ def label_subgroups(
     is not read from this: the tier rule has no subgroup input.
 
     Args:
-        found: The `subgroup_report` result, labelled in place.
+        found: The `subgroup_report` result; gets `gate`, `statement_gate`
+            and a `certified_size` flag on each hypothesis row.
         named: The certified gates the caller names (as `identify`'s
-            `certified`), or None to read the shipped certificate.
+            `certified`), or None to read the shipped certificate. When
+            given, it alone decides the status, but `min_rows` still comes
+            from the shipped certificate (None when it is absent, so every
+            estimated subgroup then counts as certified size).
     """
     from scmle.data.identification import certified as loader
 
@@ -1502,7 +1528,8 @@ def identify(
     Args:
         spec: The charter's causal block.
         x: Exploration rows (design, nuisances, bandwidth).
-        c: Confirmation rows; used for the estimate and the controls only.
+        c: Confirmation rows; used for the estimate, controls, replication,
+            sensitivity and subgroups, never to fit nuisances or a bandwidth.
         error_budget: The charter's error budget; its confirmation level is
             split into the primary level and `alpha_falsify` (weights 4:1).
         attestors: Assumption to the named attestor.
@@ -1519,7 +1546,11 @@ def identify(
             attestations (`Applied.to_dict()`), copied into the claim file.
 
     Returns:
-        The five documents, their hashes and the tier decision.
+        The five documents, their hashes and the tier decision. A
+        `ValueError` from the adapter's design check or primary estimate is
+        not raised: it gives the refusal documents with the error text as the
+        reason, as does a failed overlap or density gate. A `ValueError` from
+        the controls is recorded as a note instead.
     """
     plan = select.select(spec, dag)
     if plan.primary is None:

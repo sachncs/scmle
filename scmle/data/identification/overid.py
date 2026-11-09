@@ -100,8 +100,9 @@ def not_testable(name: str, count: int) -> dict[str, Any]:
         count: Number of instruments.
 
     Returns:
-        A record with status `not_testable`, no statistic or p-value and a
-        note that a single instrument is just identified.
+        A record with status `not_testable`, no statistic or p-value, zero
+        degrees of freedom, the instrument count and a note that a single
+        instrument is just identified.
     """
     return {
         "test": name,
@@ -117,7 +118,7 @@ def not_testable(name: str, count: int) -> dict[str, Any]:
 def result(
     name: str, statistic: float, count: int, rows: int
 ) -> dict[str, Any]:
-    """Builds the described result of a test with `count - 1` degrees.
+    """Builds the described result of a test on `count - 1` degrees of freedom.
 
     Args:
         name: Name of the test.

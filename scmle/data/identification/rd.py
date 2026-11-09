@@ -95,8 +95,8 @@ def cv_bandwidth(x: np.ndarray, y: np.ndarray) -> float:
     """Leave-out cross-validated bandwidth for one signed side of the cutoff.
 
     `x` holds distances from the cutoff, positive, nearest first after
-    sorting; evaluation points are the `CV_POINTS` evenly spread among the
-    nearest half.
+    sorting; evaluation points are at most `CV_POINTS` distinct positions
+    evenly spread among the nearest half (at least five positions).
 
     Args:
         x: Distances from the cutoff, positive.
@@ -145,9 +145,11 @@ class RdResult:
         n_left: Rows inside the bandwidth to the left.
         n_right: Rows inside the bandwidth to the right.
         density_p: Binomial p-value of the left/right counts.
-        placebos: Placebo cutoff to its estimate, interval and p-value.
-        balance: Covariate to its discontinuity, interval and p-value.
-        sensitivity: Bandwidth multiple to estimate and interval.
+        placebos: Placebo name (`left_median` or `right_median`) to its
+            `cutoff` and the `discontinuity` record at that cutoff.
+        balance: Covariate to its `discontinuity` record.
+        sensitivity: Bandwidth multiple (as text) to the `discontinuity`
+            record at that bandwidth.
     """
 
     estimate: float
@@ -190,7 +192,8 @@ def discontinuity(
         level: Confidence level.
 
     Returns:
-        None when a side has too few points for a fit. Otherwise a mapping
+        None when a side has too few points for a fit or a singular one.
+        Otherwise a mapping
         with the conventional `estimate`, the `bias_corrected` jump, its
         robust `se`, the interval limits `low` and `high` around the
         bias-corrected jump, and the two-sided normal p-value `p` of the
@@ -246,7 +249,9 @@ def estimate(
         results (entries whose fit was degenerate are left out).
 
     Raises:
-        ValueError: If a side has too few rows or a fit is degenerate.
+        ValueError: If a running or outcome value is missing or non-finite,
+            a side has fewer than `MIN_SIDE` rows, or the main fit has too
+            few rows inside the bandwidth.
     """
     x = frame[running].to_numpy(dtype=float)
     y = frame[outcome].to_numpy(dtype=float)

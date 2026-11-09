@@ -50,7 +50,8 @@ CLIP = 1e-6
 class Design:
     """A frozen map from covariate columns to a numeric matrix.
 
-    Numeric columns pass through; other columns become indicator columns for
+    Numeric non-boolean columns pass through; other columns (including
+    boolean ones) become indicator columns for
     the levels seen when the design was built (an unseen level is all zero).
 
     Attributes:
@@ -97,7 +98,9 @@ class Design:
             per level of each non-numeric column.
 
         Raises:
-            ValueError: If any encoded value is missing or not finite.
+            ValueError: If a numeric covariate holds a missing or non-finite
+                value. Missing values in other columns are encoded as the
+                level "nan" instead.
         """
         parts = [frame[list(self.numeric)].to_numpy(dtype=float)]
         for name, seen in self.levels:
@@ -264,7 +267,8 @@ def effective_sample_size(weights: np.ndarray) -> float:
         weights: The weights.
 
     Returns:
-        The effective sample size.
+        The squared sum of the weights over the sum of their squares, or 0.0
+        when the sum of squares is not positive.
     """
     return sequential.effective_sample_size(np.asarray(weights, dtype=float))
 
@@ -281,8 +285,9 @@ def weighted_smd(
 
     Returns:
         One value per column: the absolute difference of the weighted
-        treated and control means divided by the pooled standard deviation
-        (0 when that is zero).
+        treated and control means (each weighted by the inverse probability
+        of its arm) divided by the pooled unweighted standard deviation (0
+        when that is zero).
     """
     w = np.where(t == 1, 1.0 / e, 1.0 / (1.0 - e))
     out = np.zeros(matrix.shape[1])
@@ -301,7 +306,7 @@ def overlap_report(
     matrix: np.ndarray | None = None,
     eps: float = OVERLAP_EPS,
 ) -> dict[str, Any]:
-    """Propensity range, extreme share, Kish ESS and weighted balance.
+    """Reports propensity range, extreme share, Kish ESS and weighted balance.
 
     `passed` is the pre-registered overlap gate: at most `OVERLAP_SHARE` of
     the units may have a propensity outside `[eps, 1 - eps]`.
@@ -315,7 +320,8 @@ def overlap_report(
     Returns:
         A mapping with the propensity range, the share outside the bounds,
         the effective sample sizes of the arms, the row count, `passed`, and
-        the largest weighted standardized difference when a matrix is given.
+        the largest weighted standardized difference (`max_weighted_smd`) only
+        when a matrix with at least one column is given.
     """
     outside = (e < eps) | (e > 1 - eps)
     w = np.where(t == 1, 1.0 / e, 1.0 / (1.0 - e))
