@@ -8,124 +8,128 @@ which never overlap. Intervals are Wilson 95 percent. `tol(p, R)` is
 `2 sqrt(p (1 - p) / R)`. Worlds are simulated, except in the three gates
 that use the randomized Hillstrom email data (biased subsamples, A/A
 promotion and the positive control); real data may violate them. Each gate is
-the function named in brackets and is filed under the key in `GATES`.
+the function named in brackets and is filed under the key named with it,
+as listed in `GATES`.
 
 Offline
 
-* Threshold (`gate_a1`). `n_dev = 5000`, `R = 200` worlds each for score
-  skews 1.0 (calibrated), 0.6 and 1.6 (monotone distortions). Costs
+* Threshold (gate A1 `gate_a1`). `n_dev = 5000`, `R = 200` worlds each for
+  score skews 1.0 (calibrated), 0.6 and 1.6 (monotone distortions). Costs
   `c_FP = 5`, `c_FN = 100`. Excess cost is the exact expected cost of the
   frozen rule minus that of the oracle rule on the true risk, relative to the
-  oracle. Pass: median excess `<= 1%` in every world. The full distribution
-  is filed.
-* Calibration check (`gate_a1c`). Level 0.01, `n = 5000`, `R = 2000`. Pass:
-  false-alarm rate on calibrated scores `<= 0.01 + tol(0.01, R)`; power
-  `>= 0.80` at skews 0.6 and 1.6.
-* Net benefit identity (`gate_a2`): `NB(t) = (cost_none - cost_rule) / c_FN`
-  to 1e-12 on 1000 random tables; the sample net benefit is within `3 se` of
-  the binormal closed form over `R = 200` worlds of `n = 20000`.
-* Band coverage (`gate_a3`). Binormal world, prevalence 0.2, `delta = 1.5`,
-  rule `score >= 0.8`, range `[0.1, 0.4]` on 21 points, two baselines,
-  `B = 400`, level 0.05 one-sided, `R = 2000` per setting: independent rows at
-  `n = 2000` and `20000`; clusters of 10 with shared sd 0.5 (`n = 2000`,
-  `20000`). Pass: Wilson lower bound of "the true differences are above the
-  band" `>= 0.93` in all four settings.
-* False usefulness (`gate_a4`). Score independent of the label, prevalence
-  0.2, rule acts on 20 percent, `R = 2000` at `n = 2000` and `20000`. Pass:
-  share called `useful` `<= 0.05 + tol(0.05, R)`. Power by effect size is
+  oracle. Pass: median excess `<= 1%` in every world. The full distribution is
   filed.
-* Off-policy evaluation (`gate_a5`). `n = 2000`, `R = 2000`, propensity floor
-  0.05, sharpness 1 (`ESS/n` is filed). Estimators: IPW, SNIPS, DR with an
-  outcome model fitted on a separate log of 3000 (with the step feature, and
+* Calibration check (gate A1c `gate_a1c`). Level 0.01, `n = 5000`, `R = 2000`.
+  Pass: false-alarm rate on calibrated scores `<= 0.01 + tol(0.01, R)`; power
+  `>= 0.80` at skews 0.6 and 1.6.
+* Net benefit identity (gate A2 `gate_a2`):
+  `NB(t) = (cost_none - cost_rule) / c_FN` to 1e-12 on 1000 random tables; the
+  sample net benefit is within `3 se` of the binormal closed form over
+  `R = 200` worlds of `n = 20000`.
+* Band coverage (gate A3 `gate_a3`). Binormal world, prevalence 0.2,
+  `delta = 1.5`, rule `score >= 0.8`, range `[0.1, 0.4]` on 21 points, two
+  baselines, `B = 400`, level 0.05 one-sided, `R = 2000` per setting:
+  independent rows at `n = 2000` and `20000`; clusters of 10 with shared sd 0.5
+  (`n = 2000`, `20000`). Pass: Wilson lower bound of "the true differences are
+  above the band" `>= 0.93` in all four settings.
+* False usefulness (gate A4 `gate_a4`). Score independent of the label,
+  prevalence 0.2, rule acts on 20 percent, `R = 2000` at `n = 2000` and
+  `20000`. Pass: share called `useful` `<= 0.05 + tol(0.05, R)`. Power by
+  effect size is filed.
+* Off-policy evaluation (gate A5 `gate_a5`). `n = 2000`, `R = 2000`, propensity
+  floor 0.05, sharpness 1 (`ESS/n` is filed). Estimators: IPW, SNIPS, DR with
+  an outcome model fitted on a separate log of 3000 (with the step feature, and
   without it), IPW and DR clipped at 10. Pass: DR coverage (both outcome
-  models) Wilson lower `>= 0.93` among replicates with `ESS/n >= 0.2`.
-  Refusal: worlds with a planted support violation (the logging policy never
-  treats `x0 > 1`; or treats with probability 0.005 for `x0 > 1.5`),
-  `R = 300` each, refused in `>= 95%` with Wilson lower `>= 0.90`; worlds
-  without, refused in `<= 5%`.
-* Hillstrom biased subsamples (`gate_a6`; needs the data file). Men's e-mail
-  against no e-mail, conversion. Development half: outcome model and a
-  threshold policy; evaluation half: full-data value (randomized,
-  `mu = 0.5`) as reference; 200 subsamples with covariate-dependent logging
-  propensity `clip(sigmoid(z(recency)), 0.1, 0.9)`. Pass: the DR interval
-  covers the reference in `>= 90%` of 200 subsamples (Wilson interval filed).
-* Fairness verdicts (`gate_a7`). Two groups with true-positive rates 0.7 and
-  `0.7 - gap` at a fixed rule, `n = 20000`, `R = 2000`, `max_gap = 0.05`,
-  `gap` in 0, 0.03, 0.07, 0.10, 0.15. Pass: "satisfied" when `gap > 0.05` has
-  Wilson upper bound `<= 0.08` (and point rate `<= 0.05`) at 0.07, 0.10,
-  0.15; the upper bound covers the true gap with Wilson lower `>= 0.93` at
-  every gap. The share satisfied at 0 and 0.03 is filed.
-* Group thresholds (`gate_a7b`). Binormal groups (shift 1.0), `t = 0.3`, 20
-  worlds of `n = 100000`. Pass: the true net benefit of the fitted cuts is
-  within 2 percent of the equal-true-positive-rate oracle (fitted may exceed
-  it: the development bound allows a small gap).
-* Infeasible sets (`gate_a8`). Incompatible pairs with base rates 0.2 and 0.5
-  (`n = 2000`), `R = 100` per pair for three pairs: refused in 100 percent.
-  Base rates both 0.3: refused in `<= 0.05 + tol(0.05, 300)` of 300.
+  models) Wilson lower `>= 0.93` among replicates with `ESS/n >= 0.2`. Refusal:
+  worlds with a planted support violation (the logging policy never treats
+  `x0 > 1`; or treats with probability 0.005 for `x0 > 1.5`), `R = 300` each,
+  refused in `>= 95%` with Wilson lower `>= 0.90`; worlds without, refused in
+  `<= 5%`.
+* Hillstrom biased subsamples (gate A6 `gate_a6`; needs the data file). Men's
+  e-mail against no e-mail, conversion. Development half: outcome model and a
+  threshold policy; evaluation half: full-data value (randomized, `mu = 0.5`)
+  as reference; 200 subsamples with covariate-dependent logging propensity
+  `clip(sigmoid(z(recency)), 0.1, 0.9)`. Pass: the DR interval covers the
+  reference in `>= 90%` of 200 subsamples (Wilson interval filed).
+* Fairness verdicts (gate A7 `gate_a7`). Two groups with true-positive rates
+  0.7 and `0.7 - gap` at a fixed rule, `n = 20000`, `R = 2000`,
+  `max_gap = 0.05`, `gap` in 0, 0.03, 0.07, 0.10, 0.15. Pass: "satisfied" when
+  `gap > 0.05` has Wilson upper bound `<= 0.08` (and point rate `<= 0.05`) at
+  0.07, 0.10, 0.15; the upper bound covers the true gap with Wilson lower
+  `>= 0.93` at every gap. The share satisfied at 0 and 0.03 is filed.
+* Group thresholds (gate A7b `gate_a7b`). Binormal groups (shift 1.0),
+  `t = 0.3`, 20 worlds of `n = 100000`. Pass: the true net benefit of the
+  fitted cuts is within 2 percent of the equal-true-positive-rate oracle
+  (fitted may exceed it: the development bound allows a small gap).
+* Infeasible sets (gate A8 `gate_a8`). Incompatible pairs with base rates 0.2
+  and 0.5 (`n = 2000`), `R = 100` per pair for three pairs: refused in 100
+  percent. Base rates both 0.3: refused in `<= 0.05 + tol(0.05, 300)` of 300.
 
 Online (level `alpha_promote = 1/50` for one experiment, `alpha_rollback =
 1/100`)
 
-* Optional stopping (`gate_b1`). Control 0.10, challenger 0.12
+* Optional stopping (gate B1 `gate_b1`). Control 0.10, challenger 0.12
   (`Delta = delta_min = 0.02`), `q = 0.5`, a look after every unit up to
   `n_max = 3000`, `R = 10000`. Pass: share of runs that ever promote
   `<= 0.02 + tol(0.02, R)`. The same world with `abtest.compare_arms` after
   each batch of 500 (6 looks, `R = 100`, null `Delta = 0`) is run and its
   false-adopt rate filed, not gated. 100 runs are also passed through the
   `Rollout` class and must agree with the vectorised computation exactly.
-* Intersection-union (`gate_b2`). Primary effect 0.06 (3 delta_min),
+* Intersection-union (gate B2 `gate_b2`). Primary effect 0.06 (3 delta_min),
   guardrail at the boundary (control 0.20, challenger 0.25, margin 0.05),
   `n_max = 6000`, `R = 5000`. Pass: promotion share `<= 0.02 + tol(0.02, R)`.
-* Cost of anytime-validity (`gate_b3`). Expected sample number to promote at
-  `Delta = 2 delta_min` for a binary metric (control 0.10) and a bounded
-  metric (Beta(2, 8) control, mean shift 0.04), `n_max = 20000`, `R = 500`,
-  against the fixed-horizon sizes (`feasibility.n_required_two_proportions`
-  and the null-shifted normal approximation). Reported, no floor.
-* Rollback (`gate_b4`). Boundary `Delta = -tau` (0.20 against 0.18,
+* Cost of anytime-validity (gate B3 `gate_b3`). Expected sample number to
+  promote at `Delta = 2 delta_min` for a binary metric (control 0.10) and a
+  bounded metric (Beta(2, 8) control, mean shift 0.04), `n_max = 20000`,
+  `R = 500`, against the fixed-horizon sizes
+  (`feasibility.n_required_two_proportions` and the null-shifted normal
+  approximation). Reported, no floor.
+* Rollback (gate B4 `gate_b4`). Boundary `Delta = -tau` (0.20 against 0.18,
   `tau = 0.02`), `n_max = 4000`, `R = 10000`. Pass: false rollback
   `<= 0.01 + tol(0.01, R)`. Detection delay (median and 90th percentile of
   units, `R = 1000`, `n_max = 20000`) for true losses `2 tau` and `4 tau` is
   filed.
-* Budget algebra (`gate_b5`). 2000 random experiment sequences: assigned
-  levels sum to at most `alpha_promote` as `Fraction`s, an overspend raises,
-  a serialised budget rebuilds bit for bit. Pass: no violation.
-* Sample-ratio check (`gate_b6`) at level 0.001. Correct assignment
-  (q = 0.5), `n = 100000`, a look after every unit for the anytime form,
-  `R = 1000`. Pass: size `<= 0.01 + tol(0.01, R)` for the anytime form and
-  for the exact test at the final count; power `>= 0.95` at a 2 percent
-  distortion (0.52) for both.
-* A/A on Hillstrom (`gate_b7`; needs the data file). All 64000 rows, arms
-  relabelled at random, random stream order, first 20000 rows, conversion,
+* Budget algebra (gate B5 `gate_b5`). 2000 random experiment sequences:
+  assigned levels sum to at most `alpha_promote` as `Fraction`s, an overspend
+  raises, a serialised budget rebuilds bit for bit. Pass: no violation.
+* Sample-ratio check (gate B6 `gate_b6`) at level 0.001. Correct assignment (q
+  = 0.5), `n = 100000`, a look after every unit for the anytime form,
+  `R = 1000`. Pass: size `<= 0.01 + tol(0.01, R)` for the anytime form and for
+  the exact test at the final count; power `>= 0.95` at a 2 percent distortion
+  (0.52) for both.
+* A/A on Hillstrom (gate B7 `gate_b7`; needs the data file). All 64000 rows,
+  arms relabelled at random, random stream order, first 20000 rows, conversion,
   `delta_min = 0.001`, `R = 1000`. Pass: false promotion
   `<= 0.02 + tol(0.02, R)`.
-* Positive control on Hillstrom (`gate_b8`; needs the data file). The real
-  arms, conversion, `delta_min = 0.002`, 200 stream orders. Pass: promoted in
-  `>= 90%` of orders and the direction agrees with the fixed-sample result of
-  `scipy.stats.norm` on the full data; the numbers are filed, not asserted.
-* Lifecycle with drift (`gate_b9`). The control rate random-walks. (a) no
-  effect: false promotion `<= 0.02 + tol`, `R = 2000`; (b) effect
+* Positive control on Hillstrom (gate B8 `gate_b8`; needs the data file). The
+  real arms, conversion, `delta_min = 0.002`, 200 stream orders. Pass: promoted
+  in `>= 90%` of orders and the direction agrees with the fixed-sample result
+  of `scipy.stats.norm` on the full data; the numbers are filed, not asserted.
+* Lifecycle with drift (gate B9 `gate_b9`). The control rate random-walks. (a)
+  no effect: false promotion `<= 0.02 + tol`, `R = 2000`; (b) effect
   `delta_min / 2`: false promotion `<= 0.02 + tol` and `hold_final` in
   `>= 1 - 0.02 - tol` of runs; (c) a champion drifting from 0 to -0.015 (never
   beyond `tau`): false rollback `<= 0.01 + tol(0.01, R)`. (d) drifting from 0
-  to -0.06: rollback share filed.
-  Amendment of 2026-11-06, written before the first run of the hook path
-  and leaving the four floors above as they were: the same worlds are also
-  run through `RolloutHook` on a real `LifecycleManager` and a registry of
-  two small bundles (`through_hook`). Per scenario `HOOK_WORLDS = 100`
-  worlds (seeds `0 .. 99` of the scenario's stream, the first worlds of the
-  vectorised run), fed in batches of 500 to `hook.observe` (promotion
-  scenarios a, b) or `hook.watch` after a real `hook.promote` with a signed
-  approval (rollback scenarios c, d). The hook's decision in each world is
-  compared with the vectorised e-process on the same world at the level the
-  hook assigned (its experiment's or its monitor's own target). Added pass
-  condition: the two agree in every world (`agree == worlds`) in each of the
-  four scenarios; the hook-path false promotion and false rollback counts are
-  filed with Wilson intervals and are not gated (100 worlds cannot bound a
-  rate of 0.01). A world in which the hook stops on the sample-ratio check
-  (`hold_invalid`) is counted separately and not as a disagreement.
-* Determinism (`gate_b10`): two runs of a fixed battery give the same SHA-256
-  of the report, and no module of `scmle.decision` imports custody, vault or
-  ledger code. The check ran on one interpreter (the one that measured).
+  to -0.06: rollback share filed. Amendment of 2026-11-06, written before the
+  first run of the hook path and leaving the four floors above as they were:
+  the same worlds are also run through `RolloutHook` on a real
+  `LifecycleManager` and a registry of two small bundles (`through_hook`). Per
+  scenario `HOOK_WORLDS = 100` worlds (seeds `0 .. 99` of the scenario's
+  stream, the first worlds of the vectorised run), fed in batches of 500 to
+  `hook.observe` (promotion scenarios a, b) or `hook.watch` after a real
+  `hook.promote` with a signed approval (rollback scenarios c, d). The hook's
+  decision in each world is compared with the vectorised e-process on the same
+  world at the level the hook assigned (its experiment's or its monitor's own
+  target). Added pass condition: the two agree in every world
+  (`agree == worlds`) in each of the four scenarios; the hook-path false
+  promotion and false rollback counts are filed with Wilson intervals and are
+  not gated (100 worlds cannot bound a rate of 0.01). A world in which the hook
+  stops on the sample-ratio check (`hold_invalid`) is counted separately and
+  not as a disagreement.
+* Determinism (gate B10 `gate_b10`): two runs of a fixed battery give the same
+  SHA-256 of the report, and no module of `scmle.decision` imports custody,
+  vault or ledger code. The check ran on one interpreter (the one that
+  measured).
 
 What is not measured here: reproduction by an outside party, other
 interpreters (Python 3.11 and 3.14 bit identity of the ledger replay), the
