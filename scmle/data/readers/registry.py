@@ -463,7 +463,7 @@ class SourceRegistryStore:
                 handle.write("\n")
                 handle.flush()
                 os.fsync(handle.fileno())
-            os.replace(temporary_name, self.path)
+            pathlib.Path(temporary_name).replace(self.path)
             durability.sync_directory(self.path.parent)
         except BaseException:
             pathlib.Path(temporary_name).unlink(missing_ok=True)
