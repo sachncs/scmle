@@ -71,6 +71,32 @@ class Ranker(models.Model):
         )
     )
 
+    def __init__(
+        self,
+        *,
+        name: str | None = None,
+        library: str | None = None,
+        requires: tuple[str, ...] | None = None,
+    ) -> None:
+        """Sets the declared data on this instance.
+
+        An argument left out keeps the class-level value, so a subclass that
+        declares these names as class attributes keeps working.
+
+        Args:
+            name: Unique registry name.
+            library: Import name of the boosting library.
+            requires: Importable modules needed at build time.
+        """
+        given: dict[str, Any] = {
+            "name": name,
+            "library": library,
+            "requires": requires,
+        }
+        for attribute, value in given.items():
+            if value is not None:
+                setattr(self, attribute, value)
+
     def build(
         self,
         task: tasks.Task,
@@ -92,24 +118,19 @@ class Ranker(models.Model):
         )
 
 
-class LightGbmRanker(Ranker):
-    """LightGBM LambdaRank."""
-
-    name = "lightgbm_ranker"
-    library = "lightgbm"
-    requires = ("lightgbm",)
-
-
-class XgboostRanker(Ranker):
-    """XGBoost NDCG ranker."""
-
-    name = "xgboost_ranker"
-    library = "xgboost"
-    requires = ("xgboost",)
-
-
-RANKING_ADAPTERS: tuple[type[models.Model], ...] = (
-    Pointwise,
-    LightGbmRanker,
-    XgboostRanker,
+LIGHTGBM_RANKER = Ranker(
+    name="lightgbm_ranker", library="lightgbm", requires=("lightgbm",)
 )
+"""LightGBM LambdaRank."""
+
+XGBOOST_RANKER = Ranker(
+    name="xgboost_ranker", library="xgboost", requires=("xgboost",)
+)
+"""XGBoost NDCG ranker."""
+
+RANKING_ADAPTERS: tuple[models.Model, ...] = (
+    Pointwise(),
+    LIGHTGBM_RANKER,
+    XGBOOST_RANKER,
+)
+"""Ranking adapter instances, in registration order."""

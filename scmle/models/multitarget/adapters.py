@@ -32,6 +32,41 @@ class Multitarget(models.Model):
     classifier: type | None = None
     regressor: type | None = None
 
+    def __init__(
+        self,
+        *,
+        name: str | None = None,
+        family: str | None = None,
+        capabilities: models.Capabilities | None = None,
+        classifier: type | None = None,
+        regressor: type | None = None,
+        search_space: search.SearchSpace | None = None,
+    ) -> None:
+        """Sets the declared data on this instance.
+
+        An argument left out keeps the class-level value, so a subclass that
+        declares these names as class attributes keeps working.
+
+        Args:
+            name: Unique registry name.
+            family: Coarse family used for reporting.
+            capabilities: Declared capabilities.
+            classifier: Class fitted to each label (multi-label).
+            regressor: Class fitted to each quantity (multi-output).
+            search_space: Tunable hyperparameters.
+        """
+        given: dict[str, Any] = {
+            "name": name,
+            "family": family,
+            "capabilities": capabilities,
+            "classifier": classifier,
+            "regressor": regressor,
+            "search_space": search_space,
+        }
+        for attribute, value in given.items():
+            if value is not None:
+                setattr(self, attribute, value)
+
     def build(
         self,
         task: tasks.Task,
@@ -129,22 +164,21 @@ class MultioutputRidge(Multitarget):
         )
 
 
-class MultiBoosting(Multitarget):
-    """Histogram gradient boosting for every target."""
-
-    name = "multi_hist_gradient_boosting"
-    family = "boosting"
-    capabilities = models.Capabilities(
+MULTI_BOOSTING = Multitarget(
+    name="multi_hist_gradient_boosting",
+    family="boosting",
+    capabilities=models.Capabilities(
         MULTI, handles_missing=True, cost=3, memory_factor=3.0
-    )
-    classifier = ensemble.HistGradientBoostingClassifier
-    regressor = ensemble.HistGradientBoostingRegressor
-    search_space = search.SearchSpace(
+    ),
+    classifier=ensemble.HistGradientBoostingClassifier,
+    regressor=ensemble.HistGradientBoostingRegressor,
+    search_space=search.SearchSpace(
         (
             search.FloatParameter("learning_rate", 0.02, 0.3, log=True),
             search.IntParameter("max_leaf_nodes", 8, 64),
         )
-    )
+    ),
+)
 
 
 class MultiForest(models.Model):
@@ -174,9 +208,10 @@ class MultiForest(models.Model):
         return estimators.forest(task is tasks.Task.MULTILABEL, seed)
 
 
-MULTITARGET_ADAPTERS: tuple[type[models.Model], ...] = (
-    MultilabelLogistic,
-    MultioutputRidge,
-    MultiBoosting,
-    MultiForest,
+MULTITARGET_ADAPTERS: tuple[models.Model, ...] = (
+    MultilabelLogistic(),
+    MultioutputRidge(),
+    MULTI_BOOSTING,
+    MultiForest(),
 )
+"""Multi-target adapter instances, in registration order."""

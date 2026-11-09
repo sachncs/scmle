@@ -118,13 +118,16 @@ class Catalog:
             *networks.DEEP_LEARNING_ADAPTERS,
             *bagging.BAGGING_ADAPTERS,
             *scmle.models.survival.adapters.SURVIVAL_ADAPTERS,
-            *scmle.models.ordinal.adapters.ORDINAL_ADAPTERS,
-            *scmle.models.ranking.adapters.RANKING_ADAPTERS,
-            *scmle.models.multitarget.adapters.MULTITARGET_ADAPTERS,
             *scmle.models.uplift.adapters.UPLIFT_ADAPTERS,
         )
         registry = cls(
-            (*classical.BUILTIN_ADAPTERS, *(adapter() for adapter in classes))
+            (
+                *classical.BUILTIN_ADAPTERS,
+                *(adapter() for adapter in classes),
+                *scmle.models.ordinal.adapters.ORDINAL_ADAPTERS,
+                *scmle.models.ranking.adapters.RANKING_ADAPTERS,
+                *scmle.models.multitarget.adapters.MULTITARGET_ADAPTERS,
+            )
         )
         registry.register(ensembles.Stacking(registry))
         registry.register(ensembles.Blending(registry))
