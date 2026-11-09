@@ -409,8 +409,10 @@ class Ledger:
             The ledger rebuilt from the file.
 
         Raises:
-            LedgerError: If the file is missing, a row fails its hash, the
-                order of rows is invalid or a replayed decision differs.
+            LedgerError: If the file is missing or empty, a line is not JSON,
+                a row fails its hash or `ingest` refuses it (broken chain,
+                invalid order or content, a replayed level, decision or
+                wealth that differs), or `expected_head` does not match.
         """
         source = Path(path)
         if not source.exists():
@@ -465,7 +467,8 @@ class Ledger:
             run_dir: Run directory; the file is `hypothesis_ledger.jsonl`.
             charter: The `AnalysisCharter` governing the run. Its
                 exploration wealth is the FDR level of the online rule and its
-                confirmation level is carried into the ledger.
+                confirmation level is recorded in the `open` row of a new
+                ledger.
             rule: `e-lond` (default, arbitrary dependence), `lord++` or
                 `saffron` (independence only).
             horizon: Discount horizon (None for ``1 / (j (j + 1))``).
@@ -476,7 +479,10 @@ class Ledger:
 
         Raises:
             LedgerError: If an existing ledger belongs to another charter or
-                was created with a different rule.
+                was created with a different rule configuration (rule, level,
+                horizon or other parameters), or fails to load (see `load`).
+                An unknown `rule` or invalid `horizon` is refused with a
+                `ValueError` by `online_fdr.RuleConfig`.
         """
         directory = Path(run_dir)
         path = directory / FILE_NAME
@@ -539,6 +545,10 @@ class Ledger:
         Returns:
             The stored row, with its sequence number, previous hash and own
             hash.
+
+        Raises:
+            LedgerError: If `ingest` refuses the row; nothing is then written
+                to the file.
         """
         content = {
             "seq": len(self.rows),
@@ -743,7 +753,7 @@ class Ledger:
 
         Raises:
             LedgerError: If the e-value differs from the calibrated p-value
-                by more than a relative 1e-12.
+                by more than ``1e-12 * max(1, calibrated value)``.
         """
         if (
             isinstance(rule, online_fdr.ELond)
@@ -840,7 +850,9 @@ class Ledger:
 
         Raises:
             LedgerError: If the survivors are not frozen, the row names
-                different survivors, or registered claims lack an outcome.
+                different survivors, or (when claims are registered) its
+                ``claims`` mapping does not name exactly the registered
+                claims.
         """
         if self.survivor_set is None:
             raise LedgerError("confirmation needs frozen survivors")
@@ -947,7 +959,9 @@ class Ledger:
 
         Args:
             hypothesis: A registered hypothesis.
-            features: Exploration features (never confirmation data).
+            features: Exploration features (never confirmation data). The
+                column named by the specification is read, or the first
+                column if it names none.
             target: Exploration target, or class codes.
 
         Returns:
@@ -1149,7 +1163,9 @@ class Ledger:
             body: The confirmation content; the survivors' hash is added.
 
         Raises:
-            LedgerError: If the survivors have not been frozen.
+            LedgerError: If the survivors have not been frozen or `ingest`
+                refuses the row (for example, registered claims without an
+                outcome in ``body["claims"]``).
         """
         if self.survivor_set is None:
             raise LedgerError("freeze the survivors before confirming")
@@ -1159,10 +1175,15 @@ class Ledger:
         )
 
     def verify(self) -> None:
-        """Re-reads the file and checks it against memory.
+        """Checks the ledger against its file, or replays it if in memory.
+
+        A file-backed ledger is reloaded from its path and compared with the
+        rows in memory. An in-memory ledger replays its rows into a fresh
+        ledger.
 
         Raises:
-            LedgerError: If the file differs from this ledger.
+            LedgerError: If the reloaded file fails to load or differs from
+                this ledger, or a replayed row is refused.
         """
         if self.path is None:
             reloaded = Ledger(None)

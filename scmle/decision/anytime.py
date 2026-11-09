@@ -103,7 +103,7 @@ class Stream:
             raise ValueError("direction must be 'greater' or 'less'")
 
     def rescaled_null(self) -> float:
-        """The null in the orientation where larger values are evidence.
+        """Returns the null in the orientation where larger values are evidence.
 
         Returns:
             The null as a position in `(0, 1)` after rescaling to the unit
@@ -113,15 +113,15 @@ class Stream:
         return position if self.direction == "greater" else 1.0 - position
 
     def rescale(self, values: ArrayLike) -> NDArray[np.float64]:
-        """Values in the orientation where larger values are evidence.
+        """Rescales values so that larger values are evidence.
 
         Args:
             values: Observations of the stream, one-dimensional.
 
         Returns:
             The values rescaled to `[0, 1]` and reflected when `direction`
-            is `less`. Values outside `[low, high]` by no more than a
-            relative tolerance of 1e-9 are clipped.
+            is `less`. Values outside `[low, high]` by no more than 1e-9 of
+            the range `high - low` are clipped.
 
         Raises:
             ValueError: If `values` is not one-dimensional, is not finite,
@@ -142,7 +142,7 @@ class Stream:
 
 
 def bet_grid(null_unit: float, size: int = GRID_SIZE) -> NDArray[np.float64]:
-    """Fixed bet sizes `GRID_TOP / null_unit * 2 ** -k` for `k < size`.
+    """Builds the fixed bet sizes `GRID_TOP / null_unit * 2 ** -k`, `k < size`.
 
     Args:
         null_unit: The rescaled null, strictly between 0 and 1.
@@ -168,7 +168,7 @@ def bet_grid(null_unit: float, size: int = GRID_SIZE) -> NDArray[np.float64]:
 def log_wealth(
     unit: NDArray[np.float64], null_unit: float, size: int = GRID_SIZE
 ) -> NDArray[np.float64]:
-    """Log of the mixture e-process after every observation.
+    """Computes the log of the mixture e-process after every observation.
 
     Args:
         unit: Rescaled observations, shape `(T,)` or `(R, T)`; larger values
@@ -177,10 +177,8 @@ def log_wealth(
         size: Number of bet sizes in the mixture.
 
     Returns:
-        An array of the same shape as `unit`.
-
-    A `null_unit` outside `(0, 1)` or a `size` below 1 is rejected by
-    `bet_grid` with a `ValueError`.
+        An array of the same shape as `unit`. A `null_unit` outside `(0, 1)`
+        or a `size` below 1 is rejected by `bet_grid` with a `ValueError`.
 
     Raises:
         ScmleError: If the bet grid is empty, which `bet_grid` already
@@ -201,7 +199,7 @@ def log_wealth(
 def log_wealth_paths(
     values: ArrayLike, stream: Stream, size: int = GRID_SIZE
 ) -> NDArray[np.float64]:
-    """Log e-process paths for raw values, shape `(T,)` or `(R, T)`.
+    """Computes log e-process paths for raw values, `(T,)` or `(R, T)`.
 
     Args:
         values: Raw observations of the stream; `rescale` is applied to the
@@ -210,7 +208,9 @@ def log_wealth_paths(
         size: Number of bet sizes in the mixture.
 
     Returns:
-        The log e-value after each observation, same shape as `values`.
+        The log e-value after each observation, same shape as `values`. Values
+        that are not finite or lie outside the stream's range are refused
+        with a `ValueError` by `Stream.rescale`.
     """
     array = np.asarray(values, dtype=float)
     flat = stream.rescale(array.reshape(-1)).reshape(array.shape)
@@ -226,7 +226,8 @@ class EProcess:
         size: Number of bet sizes in the mixture.
         count: Observations so far.
         log_e: Log of the current e-value.
-        max_log_e: Largest log e-value at any observation so far.
+        max_log_e: Largest log e-value so far, including the starting value
+            0 (an e-value of one) before any observation.
         totals: Log wealth of each bet size.
         path: Log e-value after each observation of the last batch.
     """
@@ -245,7 +246,8 @@ class EProcess:
         """Starts every bet at wealth one.
 
         When no totals were supplied, the log wealth of each bet size is set
-        to zero.
+        to zero. A `size` below 1 is refused with a `ValueError` by
+        `bet_grid`.
         """
         grid = bet_grid(self.stream.rescaled_null(), self.size)
         if self.totals is None:
@@ -266,7 +268,9 @@ class EProcess:
             current value if `values` is empty.
 
         Raises:
-            ScmleError: If the bet totals are not initialised.
+            ScmleError: If the bet totals are not initialised. Values that
+                are not one-dimensional, not finite or outside the stream's
+                range are refused with a `ValueError` by `Stream.rescale`.
         """
         unit = self.stream.rescale(values)
         self.path = np.zeros(0)
@@ -287,7 +291,7 @@ class EProcess:
         return self.log_e
 
     def crossed(self, level: float) -> bool:
-        """Whether the e-value is at least `1 / level` now.
+        """Checks whether the current e-value is at least `1 / level`.
 
         Args:
             level: Level of the test, strictly between 0 and 1.
@@ -298,18 +302,19 @@ class EProcess:
         return self.log_e >= -math.log(positive_level(level))
 
     def ever_crossed(self, level: float) -> bool:
-        """Whether it was at least `1 / level` at any observation.
+        """Checks whether the e-value was at least `1 / level` at any point.
 
         Args:
             level: Level of the test, strictly between 0 and 1.
 
         Returns:
-            True if the e-value reached `1 / level` at some observation.
+            True if the e-value reached `1 / level` at some observation or at
+        the start (the starting value of one never does for a level below 1).
         """
         return self.max_log_e >= -math.log(positive_level(level))
 
     def evidence(self) -> online_fdr.Evidence:
-        """The current e-value as ledger evidence.
+        """Returns the current e-value as ledger evidence.
 
         An e-process evaluated at a stopping time is an e-value, so the
         value may enter an online FDR rule once the experiment has stopped.
@@ -321,7 +326,7 @@ class EProcess:
 
 
 def positive_level(level: float) -> float:
-    """A level strictly between 0 and 1.
+    """Validates a level that must lie strictly between 0 and 1.
 
     Args:
         level: The candidate level.
@@ -346,7 +351,9 @@ def pseudo_outcomes(
     assignment_prob: float,
     center: ArrayLike | None = None,
 ) -> NDArray[np.float64]:
-    """`z = a (y - c) / q - (1 - a) (y - c) / (1 - q)`, mean difference.
+    """Computes `z = a (y - c) / q - (1 - a) (y - c) / (1 - q)`.
+
+    The mean of `z` is the mean difference between the arms.
 
     Args:
         arm: 1 for the challenger, 0 for the champion.
@@ -356,15 +363,16 @@ def pseudo_outcomes(
             None for no centring.
 
     Returns:
-        Pseudo-outcomes with the mean difference as their mean; without a
-        centre they lie in `[-1 / (1 - q), 1 / q]`.
+        Pseudo-outcomes with the shape of `outcome` and the mean difference
+        as their mean; without a centre they lie in `[-1 / (1 - q), 1 / q]`.
 
     Raises:
         ValueError: If `assignment_prob` is not strictly between 0 and 1,
             `arm` and `outcome` differ in shape or are not 1-d or 2-d, `arm`
             holds a value other than 0 and 1, `outcome` is not finite or
             lies outside `[0, 1]`, or `center` differs in shape from
-            `outcome` or lies outside `[0, 1]`.
+            `outcome` or lies outside `[0, 1]` (a non-finite `center` is not
+            checked).
     """
     q = qualification.finite(assignment_prob, "assignment_prob")
     if not 0.0 < q < 1.0:
@@ -395,7 +403,7 @@ def running_center(
     strength: float = 2.0,
     carry: tuple[float, int] = (0.0, 0),
 ) -> NDArray[np.float64]:
-    """Centres that use only earlier outcomes: a shrunken running mean.
+    """Computes centres from earlier outcomes only: a shrunken running mean.
 
     `c_i = (prior * strength + sum_{j < i} y_j) / (strength + (i - 1))`, along
     the last axis; `carry` is the `(sum, count)` of outcomes seen in earlier
@@ -405,7 +413,9 @@ def running_center(
     Args:
         outcome: The metric rescaled to `[0, 1]`.
         prior: Value the centre shrinks toward.
-        strength: Weight of `prior`, in pseudo-observations.
+        strength: Weight of `prior`, in pseudo-observations. It is not
+            validated; zero with no carried outcomes gives NaN for the
+            first centre.
         carry: The `(sum, count)` of outcomes seen in earlier batches.
 
     Returns:
@@ -424,18 +434,18 @@ def running_center(
 def centered_stream(
     assignment_prob: float, null: float, direction: str = "greater"
 ) -> Stream:
-    """The stream of centred pseudo-outcomes, bounded in `[-M, M]`.
+    """Builds the stream of centred pseudo-outcomes, bounded in `[-M, M]`.
 
     Args:
         assignment_prob: The recorded probability `q` of the challenger,
-            strictly between 0 and 1.
+            expected strictly between 0 and 1 (not validated here; a Python
+            float of exactly 0 or 1 raises `ZeroDivisionError`).
         null: The null mean of the centred difference.
         direction: `greater` or `less`; any other value is rejected by
-            `Stream` with a `ValueError`.
+            `Stream` with a `ValueError`, as is a `null` outside `(-M, M)`.
 
     Returns:
-        The stream on `[-M, M]` with `M = max(1/q, 1/(1 - q))`. A Python
-        float `q` of exactly 0 or 1 raises `ZeroDivisionError`.
+        The stream on `[-M, M]` with `M = max(1/q, 1/(1 - q))`.
     """
     q = assignment_prob
     bound = max(1.0 / q, 1.0 / (1.0 - q))
@@ -450,7 +460,10 @@ def centered_paths(
     direction: str = "greater",
     sign: float = 1.0,
 ) -> NDArray[np.float64]:
-    """Log e-process paths of the centred pseudo-outcomes, `(T,)` or `(R, T)`.
+    """Computes log e-process paths of the centred pseudo-outcomes.
+
+    The result has shape `(T,)` or `(R, T)`, like `outcome`; the centre of
+    each unit is `running_center` of the outcomes before it.
 
     Args:
         arm: 1 for the challenger, 0 for the champion.
@@ -474,11 +487,11 @@ def centered_paths(
 def difference_stream(
     assignment_prob: float, null: float, direction: str = "greater"
 ) -> Stream:
-    """The stream of pseudo-outcomes for an effect on a `[0, 1]` metric.
+    """Builds the stream of pseudo-outcomes for an effect on a `[0, 1]` metric.
 
     Args:
         assignment_prob: The recorded probability `q` of the challenger,
-            strictly between 0 and 1.
+            expected strictly between 0 and 1 (not validated here).
         null: The null mean difference.
         direction: `greater` or `less`.
 
@@ -492,7 +505,7 @@ def difference_stream(
 def bound_stream(
     bound: float, null: float = 0.0, direction: str = "greater"
 ) -> Stream:
-    """The stream of paired differences bounded in `[-bound, bound]`.
+    """Builds the stream of paired differences bounded in `[-bound, bound]`.
 
     Args:
         bound: Largest absolute difference; positive.
@@ -520,7 +533,7 @@ def confidence_bound(
     size: int = GRID_SIZE,
     steps: int = 40,
 ) -> float:
-    """Time-uniform one-sided bound on the mean, valid at every sample size.
+    """Computes a time-uniform one-sided bound on the mean.
 
     For `direction='greater'` this is a lower bound `L_t` with
     `P(exists t: mean < L_t) <= alpha`; for `'less'` an upper bound. It is
@@ -537,7 +550,12 @@ def confidence_bound(
     Returns:
         The bound. When the e-process never reaches `1 / alpha`, even for a
         null at the edge of the range (and for empty `values`), the edge
-        itself: `stream.low` for `greater`, `stream.high` for `less`.
+        itself: `stream.low` for `greater`, `stream.high` for `less`. The
+        edge is tested at 1e-9 of the range inside it. Otherwise the bisection
+        returns its conservative end (the lower end for `greater`, the upper
+        end for `less`). An `alpha` outside `(0, 1)` is refused by
+        `positive_level` and values that are not finite or lie outside the
+        stream's range by `Stream.rescale`, both with a `ValueError`.
     """
     level = positive_level(alpha)
     array = np.asarray(values, dtype=float)

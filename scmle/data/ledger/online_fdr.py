@@ -295,7 +295,8 @@ def exact_alpha(value: Any, name: str) -> Fraction:
     """Reads a level in [0, 1] as an exact fraction.
 
     Args:
-        value: An int, float or `Fraction`.
+        value: An int, float or `Fraction`; a float is read as its shortest
+            decimal (not its binary value) and a bool is refused.
         name: Field name used in the error message.
 
     Returns:
@@ -837,7 +838,9 @@ class RuleConfig:
 
         Returns:
             A mapping of every parameter, with fractions written as
-            ``"p/q"`` strings and the SAFFRON threshold under ``lambda``.
+            ``"p/q"`` strings (``alpha``, ``w0``, ``lambda``), the SAFFRON
+            threshold stored under ``lambda`` and ``horizon`` and ``kappa``
+            unchanged.
         """
         return {
             "rule": self.rule,
@@ -859,7 +862,9 @@ class RuleConfig:
             The configuration described by the record.
 
         Raises:
-            ValueError: If the record has unexpected or missing fields.
+            ValueError: If the record has unexpected or missing fields. A
+                fraction that does not parse, an unknown rule or an invalid
+                parameter is also refused with a `ValueError`.
         """
         names = {"rule", "alpha", "horizon", "w0", "lambda", "kappa"}
         if set(record) != names:
