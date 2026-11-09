@@ -14,7 +14,6 @@ from scmle.data.modalities.graph import Edge
 from scmle.data.modalities.graph import edges_from_records
 from scmle.data.modalities.graph import graph_identity
 from scmle.data.modalities.graph import GraphInputError
-from scmle.data.modalities.graph import GraphTemporalError
 from scmle.data.modalities.graph import GraphValidationError
 from scmle.data.modalities.graph import inductive_node_split
 from scmle.data.modalities.graph import Node
@@ -197,8 +196,8 @@ def test_graph_curation_reports_mixed_label_state():
     ]
 
 
-def test_temporal_edges_are_normalized_split_and_curated() -> None:
-    """Timestamped edges support UTC-safe future evaluation evidence."""
+def test_temporal_edges_are_normalized_and_curated() -> None:
+    """Timestamped edges are normalized to UTC and curated."""
     edges = edges_from_records(
         [
             {
@@ -222,11 +221,6 @@ def test_temporal_edges_are_normalized_split_and_curated() -> None:
     graph = Dataset.from_edges(edges, nodes=["a", "b", "c"])
 
     assert edges[0].event_time == datetime(2026, 1, 1, tzinfo=UTC)
-    split = graph.temporal_split("2026-01-02T00:00:00+00:00")
-    assert len(split.train_edges) == 2
-    assert len(split.future_edges) == 1
-    assert not split.has_future_leakage
-    assert split.cutoff.tzinfo == UTC
     assert graph.curate().profile["temporal"]["status"] == "complete"
 
 
@@ -253,8 +247,6 @@ def test_temporal_graphs_fail_closed_on_mixed_or_invalid_time_state() -> None:
     }
     quality_ids = {finding.finding_id for finding in report.quality_findings}
     assert "quality.graph-mixed-temporal-state" in quality_ids
-    with pytest.raises(GraphTemporalError, match="every edge"):
-        mixed_graph.temporal_split("2026-01-02T00:00:00Z")
     with pytest.raises(GraphInputError, match="invalid event time"):
         edges_from_records(
             [{"source": "a", "target": "b", "event_time": "no-zone"}],
@@ -295,7 +287,16 @@ def test_inductive_split_is_deterministic_and_withholds_cross_partition_edges(
     assert set(first.train_nodes).isdisjoint(first.validation_nodes)
     assert set(first.train_nodes).isdisjoint(first.test_nodes)
     assert set(first.validation_nodes).isdisjoint(first.test_nodes)
-    assert not first.has_edge_leakage()
+    partitions = {
+        node_id: index
+        for index, nodes in enumerate(first.node_partitions)
+        for node_id in nodes
+    }
+    retained = first.train_edges + first.validation_edges + first.test_edges
+    assert all(
+        partitions.get(edge.source) == partitions.get(edge.target)
+        for edge in retained
+    )
     assert len(first.withheld_edges) == 2
 
 

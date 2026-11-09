@@ -107,11 +107,17 @@ def test_dataset_deduplication_is_content_based_and_order_independent(tmp_path):
     unique_path = tmp_path / "unique.png"
     unique_path.write_bytes(png_bytes((200, 5, 6)))
 
-    left = image.Dataset.from_paths(
-        [first_path, second_path, unique_path]
+    left = image.Dataset(
+        tuple(
+            image.Sample.from_path(path)
+            for path in [first_path, second_path, unique_path]
+        )
     ).deduplicate()
-    right = image.Dataset.from_paths(
-        [unique_path, second_path, first_path]
+    right = image.Dataset(
+        tuple(
+            image.Sample.from_path(path)
+            for path in [unique_path, second_path, first_path]
+        )
     ).deduplicate()
 
     assert left == right

@@ -5,7 +5,6 @@ it, while every operation that needs image decoding raises
 ``ImageDependencyError`` with an actionable, structured error envelope.
 """
 
-from collections.abc import Iterable
 from collections.abc import Mapping
 import dataclasses
 import hashlib
@@ -775,33 +774,6 @@ class Dataset:
             for sample in normalized
         )
         object.__setattr__(self, "content_hash", dataset_hash(identities))
-
-    @classmethod
-    def from_paths(
-        cls,
-        paths: Iterable[str | pathlib.Path],
-        max_bytes: int | None = DEFAULT_MAX_BYTES,
-        max_pixels: int | None = DEFAULT_MAX_PIXELS,
-        deduplicate: bool = False,
-    ) -> Self:
-        """Builds a dataset from local paths in caller-provided order.
-
-        Args:
-            paths: Paths of the image files.
-            max_bytes: Maximum file size per image, or None for no limit.
-            max_pixels: Maximum pixel count per image, or None for no limit.
-            deduplicate: Whether to drop samples with duplicate content.
-
-        Returns:
-            The dataset; deduplicated when requested. Failures of
-            `Sample.from_path` propagate unchanged.
-        """
-        dataset = cls(
-            tuple(
-                Sample.from_path(path, max_bytes, max_pixels) for path in paths
-            )
-        )
-        return dataset.deduplicate() if deduplicate else dataset
 
     @property
     def sample_count(self) -> int:
