@@ -8,7 +8,7 @@ from sklearn import base
 from sklearn import preprocessing
 
 
-class LabelEncodedClassifier(base.ClassifierMixin, base.BaseEstimator):
+class LabelEncodedClassifier(base.ClassifierMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Lets estimators that need integer labels accept arbitrary class labels.
 
     Fits the wrapped classifier on integer-encoded labels and decodes its
@@ -57,7 +57,8 @@ class LabelEncodedClassifier(base.ClassifierMixin, base.BaseEstimator):
             Array of original class labels, one per row.
         """
         encoded = numpy.asarray(self.estimator_.predict(features)).astype(int)
-        return self.encoder_.inverse_transform(encoded)
+        labels: numpy.ndarray = self.encoder_.inverse_transform(encoded)
+        return labels
 
     def predict_proba(self, features: Any) -> numpy.ndarray:
         """Predicts class probabilities.
@@ -69,10 +70,11 @@ class LabelEncodedClassifier(base.ClassifierMixin, base.BaseEstimator):
             Array with one row per input row and one column per class, in
             `classes_` order.
         """
-        return self.estimator_.predict_proba(features)
+        probabilities: numpy.ndarray = self.estimator_.predict_proba(features)
+        return probabilities
 
 
-class FlatPredictionClassifier(base.ClassifierMixin, base.BaseEstimator):
+class FlatPredictionClassifier(base.ClassifierMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Guarantees 1-D predictions from libraries that return column vectors.
 
     CatBoost's multiclass `predict` returns shape `(n, 1)`; the framework's
@@ -126,10 +128,11 @@ class FlatPredictionClassifier(base.ClassifierMixin, base.BaseEstimator):
         Returns:
             Array with one row per input row and one column per class.
         """
-        return self.estimator_.predict_proba(features)
+        probabilities: numpy.ndarray = self.estimator_.predict_proba(features)
+        return probabilities
 
 
-class FitParamsClassifier(base.ClassifierMixin, base.BaseEstimator):
+class FitParamsClassifier(base.ClassifierMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Passes fixed keyword arguments to the wrapped classifier's `fit`.
 
     Some libraries take dataset properties (for example which columns are
@@ -191,10 +194,11 @@ class FitParamsClassifier(base.ClassifierMixin, base.BaseEstimator):
         Returns:
             Array with one row per input row and one column per class.
         """
-        return self.estimator_.predict_proba(features)
+        probabilities: numpy.ndarray = self.estimator_.predict_proba(features)
+        return probabilities
 
 
-class FitParamsRegressor(base.RegressorMixin, base.BaseEstimator):
+class FitParamsRegressor(base.RegressorMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Passes fixed keyword arguments to the wrapped regressor's `fit`.
 
     Attributes:
@@ -242,7 +246,7 @@ class FitParamsRegressor(base.RegressorMixin, base.BaseEstimator):
         return numpy.asarray(self.estimator_.predict(features))
 
 
-class MonotoneEstimator(base.BaseEstimator):
+class MonotoneEstimator(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Sets per-column monotonic signs once the input width is known.
 
     The preprocessing decides how many columns the model receives (one-hot
@@ -312,7 +316,7 @@ class MonotoneEstimator(base.BaseEstimator):
         return numpy.asarray(self.estimator_.predict(features))
 
 
-class MonotoneClassifier(base.ClassifierMixin, MonotoneEstimator):
+class MonotoneClassifier(base.ClassifierMixin, MonotoneEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Monotonically constrained classifier."""
 
     @property
@@ -333,7 +337,7 @@ class MonotoneClassifier(base.ClassifierMixin, MonotoneEstimator):
         return numpy.asarray(self.estimator_.predict_proba(features))
 
 
-class MonotoneRegressor(base.RegressorMixin, MonotoneEstimator):
+class MonotoneRegressor(base.RegressorMixin, MonotoneEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Monotonically constrained regressor."""
 
 

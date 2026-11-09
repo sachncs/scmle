@@ -68,9 +68,10 @@ class Uplift(models.Model):
             An unfitted uplift learner of the adapter's `learner` class.
         """
         settings = dict(params or {})
-        return self.learner(
+        learner: models.Estimator = self.learner(
             classify=settings.pop("classify", True), random_state=seed
         )
+        return learner
 
 
 T_LEARNER = Uplift(

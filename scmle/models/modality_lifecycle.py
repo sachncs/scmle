@@ -47,6 +47,7 @@ from scmle.contracts import errors
 from scmle.contracts import events
 from scmle.contracts import modalities
 from scmle.contracts import performance
+from scmle.contracts import signing
 from scmle.core import limits
 from scmle.data.modalities import audio
 from scmle.data.modalities import curation
@@ -206,13 +207,14 @@ class Package:
             ValueError: If the path or signature is blank, the model digest is
                 not a SHA-256 digest, or the schema version is unsupported.
         """
-        if not isinstance(self.path, str) or not self.path.strip():
+        path: object = self.path
+        model_sha256: object = self.model_sha256
+        signature: object = self.signature
+        if not isinstance(path, str) or not path.strip():
             raise ValueError("package path must be non-empty")
-        if not isinstance(self.model_sha256, str) or not is_sha256(
-            self.model_sha256
-        ):
+        if not isinstance(model_sha256, str) or not is_sha256(model_sha256):
             raise ValueError("package model_sha256 must be a SHA-256 digest")
-        if not isinstance(self.signature, str) or not self.signature.strip():
+        if not isinstance(signature, str) or not signature.strip():
             raise ValueError("package signature must be non-empty")
         if self.schema_version != PACKAGE_SCHEMA_VERSION:
             raise ValueError("unsupported modality package schema version")
@@ -403,7 +405,10 @@ class Predictor:
         Returns:
             Array of predicted labels, one per sample.
         """
-        return self.model.predict(self.features_for(samples).values)
+        predictions: numpy.ndarray = self.model.predict(
+            self.features_for(samples).values
+        )
+        return predictions
 
     def predict_proba(self, samples: Sequence[Any]) -> numpy.ndarray:
         """Predicts class probabilities after feature-contract validation.
@@ -415,7 +420,10 @@ class Predictor:
             Array with one row per sample and one column per class, in the
             model's class order.
         """
-        return self.model.predict_proba(self.features_for(samples).values)
+        probabilities: numpy.ndarray = self.model.predict_proba(
+            self.features_for(samples).values
+        )
+        return probabilities
 
     def health(self) -> dict[str, object]:
         """Reports machine-readable package and inference readiness evidence.
@@ -523,7 +531,7 @@ def parse_package(raw_package: object) -> Package:
         path=cast("str", package_values["path"]),
         model_sha256=cast("str", package_values["model_sha256"]),
         signature=cast("str", package_values["signature"]),
-        schema_version=cast("int", package_values["schema_version"]),
+        schema_version=package_values["schema_version"],
     )
 
 
@@ -544,7 +552,7 @@ def parse_signature(raw_signature: object) -> str | None:
         return None
     if not isinstance(raw_signature, Mapping):
         raise ValueError("lifecycle report signature is invalid")
-    if raw_signature.get("algorithm") != attestation.SIGNATURE_ALGORITHM:
+    if raw_signature.get("algorithm") != signing.SIGNATURE_ALGORITHM:
         raise ValueError("unsupported lifecycle report signature")
     signature_value = raw_signature.get("value")
     if not isinstance(signature_value, str) or not signature_value.strip():
@@ -587,7 +595,7 @@ def parse_curation_signature(signature: object) -> str:
     """
     if not isinstance(signature, Mapping):
         raise ValueError("modality curation signature is missing")
-    if signature.get("algorithm") != attestation.SIGNATURE_ALGORITHM:
+    if signature.get("algorithm") != signing.SIGNATURE_ALGORITHM:
         raise ValueError("unsupported modality curation signature")
     signature_value = signature.get("value")
     if not isinstance(signature_value, str) or not is_sha256(signature_value):
@@ -610,7 +618,7 @@ def parse_checkpoint_signature(signature: object) -> str:
     """
     if not isinstance(signature, Mapping):
         raise ValueError("checkpoint signature is missing")
-    if signature.get("algorithm") != attestation.SIGNATURE_ALGORITHM:
+    if signature.get("algorithm") != signing.SIGNATURE_ALGORITHM:
         raise ValueError("unsupported lifecycle checkpoint signature")
     signature_value = signature.get("value")
     if not isinstance(signature_value, str) or not signature_value.strip():
@@ -737,9 +745,7 @@ class Record:
         """
         return dataclasses.replace(
             self,
-            signature=attestation.sign_payload(
-                self.unsigned_dict(), signing_key
-            ),
+            signature=signing.sign_payload(self.unsigned_dict(), signing_key),
         )
 
     def verify_signature(self, signing_key: str | bytes) -> bool:
@@ -754,7 +760,7 @@ class Record:
         """
         if self.signature is None:
             return False
-        expected = attestation.sign_payload(self.unsigned_dict(), signing_key)
+        expected = signing.sign_payload(self.unsigned_dict(), signing_key)
         return hmac.compare_digest(self.signature, expected)
 
     @classmethod
@@ -852,7 +858,7 @@ class Record:
             None
             if self.signature is None
             else {
-                "algorithm": attestation.SIGNATURE_ALGORITHM,
+                "algorithm": signing.SIGNATURE_ALGORITHM,
                 "value": self.signature,
             }
         )
@@ -1001,9 +1007,7 @@ class Checkpoint:
         """
         return dataclasses.replace(
             self,
-            signature=attestation.sign_payload(
-                self.unsigned_dict(), signing_key
-            ),
+            signature=signing.sign_payload(self.unsigned_dict(), signing_key),
         )
 
     def verify_signature(self, signing_key: str | bytes) -> bool:
@@ -1018,7 +1022,7 @@ class Checkpoint:
         """
         if self.signature is None:
             return False
-        expected = attestation.sign_payload(self.unsigned_dict(), signing_key)
+        expected = signing.sign_payload(self.unsigned_dict(), signing_key)
         return hmac.compare_digest(self.signature, expected)
 
     @classmethod
@@ -1071,7 +1075,7 @@ class Checkpoint:
             stage_digests=tuple(digests),
             require_independent_ground_truth=require_ground_truth,
             manifest_digest=manifest_digest,
-            status=cast("Literal['running', 'completed']", status),
+            status=status,
             signature=signature_value,
             schema_version=1,
         )
@@ -1085,7 +1089,7 @@ class Checkpoint:
         """
         record = self.unsigned_dict()
         record["signature"] = {
-            "algorithm": attestation.SIGNATURE_ALGORITHM,
+            "algorithm": signing.SIGNATURE_ALGORITHM,
             "value": self.signature,
         }
         return record
@@ -1167,13 +1171,15 @@ class Curation:
             value = getattr(self, field_name)
             if not isinstance(value, str) or not value.strip():
                 raise ValueError(f"{field_name} must be non-empty")
+        sample_count: object = self.sample_count
+        signature: object = self.signature
         if (
-            isinstance(self.sample_count, bool)
-            or not isinstance(self.sample_count, int)
-            or self.sample_count < 0
+            isinstance(sample_count, bool)
+            or not isinstance(sample_count, int)
+            or sample_count < 0
         ):
             raise ValueError("sample_count must be a non-negative integer")
-        if not isinstance(self.signature, str) or not is_sha256(self.signature):
+        if not isinstance(signature, str) or not is_sha256(signature):
             raise ValueError("signature must be a SHA-256 digest")
         normalized_curation = normalize_json_object(self.curation, "curation")
         normalized_card = normalize_json_object(
@@ -1225,7 +1231,7 @@ class Curation:
         Returns:
             True if the signature matches the unsigned evidence, else False.
         """
-        expected = attestation.sign_payload(self.unsigned_dict(), signing_key)
+        expected = signing.sign_payload(self.unsigned_dict(), signing_key)
         return hmac.compare_digest(self.signature, expected)
 
     def to_dict(self) -> dict[str, object]:
@@ -1239,7 +1245,7 @@ class Curation:
         record["content_digest"] = self.content_digest
         record["path"] = self.path
         record["signature"] = {
-            "algorithm": attestation.SIGNATURE_ALGORITHM,
+            "algorithm": signing.SIGNATURE_ALGORITHM,
             "value": self.signature,
         }
         return record
@@ -5185,11 +5191,11 @@ class PackagingStage(Stage):
                     if key != "predictions"
                 },
             }
-            signature = attestation.sign_payload(unsigned, context.signing_key)
+            signature = signing.sign_payload(unsigned, context.signing_key)
             manifest = {
                 **unsigned,
                 "signature": {
-                    "algorithm": attestation.SIGNATURE_ALGORITHM,
+                    "algorithm": signing.SIGNATURE_ALGORITHM,
                     "value": signature,
                 },
             }
@@ -6112,13 +6118,13 @@ def check_package_signature(
     """
     if (
         not isinstance(signature, dict)
-        or signature.get("algorithm") != attestation.SIGNATURE_ALGORITHM
+        or signature.get("algorithm") != signing.SIGNATURE_ALGORITHM
     ):
         raise ValueError("modality package signature is missing or unsupported")
     value = signature.get("value")
     if not isinstance(value, str) or not value.strip():
         raise ValueError("modality package signature is empty")
-    expected = attestation.sign_payload(unsigned, signing_key)
+    expected = signing.sign_payload(unsigned, signing_key)
     if not hmac.compare_digest(value, expected):
         raise ValueError("modality package signature does not verify")
 

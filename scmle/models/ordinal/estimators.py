@@ -21,7 +21,7 @@ SCALE_GRID = numpy.geomspace(0.05, 5.0, 40)
 EPSILON = 1e-12
 
 
-class CumulativeThresholdRegressor(base.RegressorMixin, base.BaseEstimator):
+class CumulativeThresholdRegressor(base.RegressorMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Ordinal classifier built from any regressor.
 
     Attributes:
@@ -103,7 +103,10 @@ class CumulativeThresholdRegressor(base.RegressorMixin, base.BaseEstimator):
         """
         edges = numpy.concatenate([[-numpy.inf], self.thresholds_, [numpy.inf]])
         below = special.expit((edges[None, :] - scores[:, None]) / scale)
-        return numpy.clip(numpy.diff(below, axis=1), EPSILON, None)
+        clipped: numpy.ndarray = numpy.clip(
+            numpy.diff(below, axis=1), EPSILON, None
+        )
+        return clipped
 
     def best_scale(self, scores: numpy.ndarray, ranks: numpy.ndarray) -> float:
         """The link width with the highest likelihood on the fitted scores.
@@ -139,7 +142,10 @@ class CumulativeThresholdRegressor(base.RegressorMixin, base.BaseEstimator):
         """
         scores = numpy.asarray(self.regressor_.predict(features), dtype=float)
         probabilities = self.level_probabilities(scores, self.scale_)
-        return probabilities / probabilities.sum(axis=1, keepdims=True)
+        normalized: numpy.ndarray = probabilities / probabilities.sum(
+            axis=1, keepdims=True
+        )
+        return normalized
 
     def predict(self, features: Any) -> numpy.ndarray:
         """Level rank: the number of thresholds the latent score has passed.

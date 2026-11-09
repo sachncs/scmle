@@ -71,7 +71,7 @@ def split_arms(
     return flag, ~flag
 
 
-class TwoModelLearner(base.BaseEstimator):
+class TwoModelLearner(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """T-learner: one outcome model per arm; uplift is their difference.
 
     Attributes:
@@ -127,12 +127,13 @@ class TwoModelLearner(base.BaseEstimator):
             Array of shape `(n_rows,)`: expected outcome under treatment minus
             expected outcome under control.
         """
-        return expected(self.treated_, features, self.classify) - expected(
-            self.control_, features, self.classify
-        )
+        effect: numpy.ndarray = expected(
+            self.treated_, features, self.classify
+        ) - expected(self.control_, features, self.classify)
+        return effect
 
 
-class SingleModelLearner(base.BaseEstimator):
+class SingleModelLearner(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """S-learner: one outcome model with the treatment as a feature.
 
     Attributes:
@@ -192,12 +193,13 @@ class SingleModelLearner(base.BaseEstimator):
         Returns:
             Array of shape `(n_rows,)` of estimated effects.
         """
-        return expected(
+        effect: numpy.ndarray = expected(
             self.model_, self.stacked(features, 1.0), self.classify
         ) - expected(self.model_, self.stacked(features, 0.0), self.classify)
+        return effect
 
 
-class CrossLearner(base.BaseEstimator):
+class CrossLearner(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """X-learner: imputes each row's missing outcome, then models the gap.
 
     Outcome models per arm predict what each row would have had under the
@@ -280,12 +282,15 @@ class CrossLearner(base.BaseEstimator):
         matrix = numpy.asarray(features)
         if self.degenerate_:
             return numpy.zeros(matrix.shape[0])
-        return (1 - self.share_) * self.treated_effect_.predict(
-            matrix
-        ) + self.share_ * (self.control_effect_.predict(matrix))
+        effect: numpy.ndarray = (
+            1 - self.share_
+        ) * self.treated_effect_.predict(matrix) + self.share_ * (
+            self.control_effect_.predict(matrix)
+        )
+        return effect
 
 
-class ZeroEffect(base.BaseEstimator):
+class ZeroEffect(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """The baseline: no row is expected to respond differently."""
 
     def fit(self, features: Any, outcome: Any, treatment: Any = None) -> Self:  # noqa: ARG002 -- fit signature of the uplift estimators

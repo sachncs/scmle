@@ -10,7 +10,7 @@ from sklearn import base
 from sklearn import pipeline
 
 
-class WeightedEstimator(base.BaseEstimator):
+class WeightedEstimator(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Fits a pipeline so each training row counts by its weight.
 
     The weight column travels with the features, is read at fit time and
@@ -47,27 +47,32 @@ class WeightedEstimator(base.BaseEstimator):
     @property
     def event_column(self) -> str:
         """The wrapped survival pipeline's event column name."""
-        return self.estimator.event_column
+        column: str = self.estimator.event_column
+        return column
 
     @property
     def treatment_column(self) -> str:
         """The wrapped uplift pipeline's treatment column."""
-        return self.estimator.treatment_column
+        column: str = self.estimator.treatment_column
+        return column
 
     @property
     def value_column(self) -> str:
         """The wrapped forecasting pipeline's value column."""
-        return self.estimator.value_column
+        column: str = self.estimator.value_column
+        return column
 
     @property
     def target_columns(self) -> tuple[str, ...]:
         """The wrapped multi-target pipeline's target columns."""
-        return self.estimator.target_columns
+        columns: tuple[str, ...] = self.estimator.target_columns
+        return columns
 
     @property
     def query_column(self) -> str:
         """The wrapped ranking pipeline's query column."""
-        return self.estimator.query_column
+        column: str = self.estimator.query_column
+        return column
 
     def accepts_weights(self, candidate: base.BaseEstimator) -> bool:
         """Checks whether a pipeline's model step takes `sample_weight`.
@@ -126,7 +131,8 @@ class WeightedEstimator(base.BaseEstimator):
         Returns:
             The fitted pipeline's predictions, one per row.
         """
-        return self.estimator_.predict(features)
+        predictions: numpy.ndarray = self.estimator_.predict(features)
+        return predictions
 
     def predict_survival(self, features: Any, times: Any) -> numpy.ndarray:
         """Predicts survival curves with the fitted survival pipeline.
@@ -139,10 +145,13 @@ class WeightedEstimator(base.BaseEstimator):
             The fitted pipeline's survival probabilities, one row per input
             row and one column per time point.
         """
-        return self.estimator_.predict_survival(features, times)
+        survival: numpy.ndarray = self.estimator_.predict_survival(
+            features, times
+        )
+        return survival
 
 
-class WeightedClassifier(base.ClassifierMixin, WeightedEstimator):
+class WeightedClassifier(base.ClassifierMixin, WeightedEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Weighted fitting for classifiers."""
 
     def fit(self, features: Any, target: Any) -> Self:
@@ -169,10 +178,11 @@ class WeightedClassifier(base.ClassifierMixin, WeightedEstimator):
             Array with one row per input row and one column per class, in
             `classes_` order.
         """
-        return self.estimator_.predict_proba(features)
+        probabilities: numpy.ndarray = self.estimator_.predict_proba(features)
+        return probabilities
 
 
-class WeightedRegressor(base.RegressorMixin, WeightedEstimator):
+class WeightedRegressor(base.RegressorMixin, WeightedEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Weighted fitting for regressors."""
 
 

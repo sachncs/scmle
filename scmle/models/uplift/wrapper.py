@@ -9,7 +9,7 @@ from sklearn import base
 from sklearn import pipeline
 
 
-class TreatmentAwareEstimator(base.RegressorMixin, base.BaseEstimator):
+class TreatmentAwareEstimator(base.RegressorMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Fits an uplift pipeline using the treatment column of the frame.
 
     The preprocessing never sees the treatment (it selects columns by name),
@@ -65,4 +65,7 @@ class TreatmentAwareEstimator(base.RegressorMixin, base.BaseEstimator):
         Returns:
             Array of shape `(n_rows,)` of estimated effects.
         """
-        return self.model_.predict(self.preprocessing_.transform(features))
+        effect: numpy.ndarray = self.model_.predict(
+            self.preprocessing_.transform(features)
+        )
+        return effect

@@ -44,7 +44,7 @@ class UpdatePlan:
     warmup_steps: int
 
 
-class Trainer(base.BaseEstimator, abc.ABC):
+class Trainer(base.BaseEstimator, abc.ABC):  # type: ignore[misc]  # scikit-learn ships no type information
     """Trains a network with early stopping and weighted losses.
 
     The matrix is expected to be numeric, complete and scaled (the standard
@@ -658,7 +658,8 @@ class Trainer(base.BaseEstimator, abc.ABC):
             outputs = self.network_(tensor)
             if outputs.dim() == SINGLE_MEMBER_OUTPUT_DIMS:
                 outputs = outputs.unsqueeze(1)
-            return outputs.numpy()
+            raw: numpy.ndarray = outputs.numpy()
+            return raw
 
     def explain(self, features: Any) -> numpy.ndarray:
         """Returns local gradient-times-input attributions.
@@ -688,10 +689,11 @@ class Trainer(base.BaseEstimator, abc.ABC):
                 1, scores.argmax(dim=1, keepdim=True)
             ).squeeze(1)
         gradient = torch.autograd.grad(selected.sum(), tensor)[0]
-        return (gradient * tensor).detach().numpy()
+        attribution: numpy.ndarray = (gradient * tensor).detach().numpy()
+        return attribution
 
 
-class Classifier(base.ClassifierMixin, Trainer):
+class Classifier(base.ClassifierMixin, Trainer):  # type: ignore[misc]  # scikit-learn ships no type information
     """Classifier: softmax over class scores, optional class balancing."""
 
     losses = ("default", "focal")
@@ -853,7 +855,8 @@ class Classifier(base.ClassifierMixin, Trainer):
         scores = scores - scores.max(axis=2, keepdims=True)
         exp = numpy.exp(scores)
         probabilities = exp / exp.sum(axis=2, keepdims=True)
-        return probabilities.mean(axis=1)
+        averaged: numpy.ndarray = probabilities.mean(axis=1)
+        return averaged
 
     def predict(self, features: Any) -> numpy.ndarray:
         """Most probable class.
@@ -867,7 +870,7 @@ class Classifier(base.ClassifierMixin, Trainer):
         return self.classes_[self.predict_proba(features).argmax(axis=1)]
 
 
-class Regressor(base.RegressorMixin, Trainer):
+class Regressor(base.RegressorMixin, Trainer):  # type: ignore[misc]  # scikit-learn ships no type information
     """Regressor trained on the standardized target (squared or Huber)."""
 
     losses = ("default", "huber")

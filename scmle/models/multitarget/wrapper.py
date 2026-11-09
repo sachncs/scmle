@@ -9,7 +9,7 @@ from sklearn import base
 from sklearn import pipeline
 
 
-class MultiTargetEstimator(base.BaseEstimator):
+class MultiTargetEstimator(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Fits a pipeline whose last step predicts a matrix of targets.
 
     The framework splits off the first (primary) target; the others stay in
@@ -69,10 +69,13 @@ class MultiTargetEstimator(base.BaseEstimator):
         Returns:
             Array of shape `(n_rows, len(target_columns))`.
         """
-        return self.model_.predict(self.preprocessing_.transform(features))
+        predictions: numpy.ndarray = self.model_.predict(
+            self.preprocessing_.transform(features)
+        )
+        return predictions
 
 
-class MultiLabelEstimator(base.ClassifierMixin, MultiTargetEstimator):
+class MultiLabelEstimator(base.ClassifierMixin, MultiTargetEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Multi-label flavour: also provides per-label probabilities."""
 
     def predict_proba(self, features: Any) -> numpy.ndarray:
@@ -84,10 +87,11 @@ class MultiLabelEstimator(base.ClassifierMixin, MultiTargetEstimator):
         Returns:
             Array of shape `(n_rows, n_labels)` as returned by the fitted model.
         """
-        return self.model_.predict_proba(
+        probabilities: numpy.ndarray = self.model_.predict_proba(
             self.preprocessing_.transform(features)
         )
+        return probabilities
 
 
-class MultiOutputEstimator(base.RegressorMixin, MultiTargetEstimator):
+class MultiOutputEstimator(base.RegressorMixin, MultiTargetEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Multi-output regression flavour."""

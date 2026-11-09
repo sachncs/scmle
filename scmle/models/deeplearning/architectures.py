@@ -112,7 +112,7 @@ class ResidualArchitecture(Architecture):
         """
         width = hidden_sizes[0]
 
-        class Block(torch.nn.Module):
+        class Block(torch.nn.Module):  # type: ignore[misc]  # torch is imported lazily and passed in as Any
             """One pre-normalized residual block."""
 
             def __init__(self) -> None:
@@ -179,7 +179,7 @@ class EnsembleArchitecture(Architecture):
         """
         members = ENSEMBLE_MEMBERS
 
-        class EnsembleLinear(torch.nn.Module):
+        class EnsembleLinear(torch.nn.Module):  # type: ignore[misc]  # torch is imported lazily and passed in as Any
             """Shared weight with per-member input/output scales and bias."""
 
             def __init__(self, width_in: int, width_out: int) -> None:
@@ -214,7 +214,7 @@ class EnsembleArchitecture(Architecture):
                     features * self.in_scale
                 ) @ self.weight * self.out_scale + self.bias
 
-        class Network(torch.nn.Module):
+        class Network(torch.nn.Module):  # type: ignore[misc]  # torch is imported lazily and passed in as Any
             """Repeats the input for every member and stacks the layers."""
 
             def __init__(self) -> None:
@@ -282,7 +282,7 @@ class TransformerArchitecture(Architecture):
         width = hidden_sizes[0]
         heads = ATTENTION_HEADS if width % ATTENTION_HEADS == 0 else 1
 
-        class Network(torch.nn.Module):
+        class Network(torch.nn.Module):  # type: ignore[misc]  # torch is imported lazily and passed in as Any
             """Feature tokenizer, transformer encoder and head."""
 
             def __init__(self) -> None:
@@ -359,7 +359,7 @@ class RobustMlpArchitecture(Architecture):
             layers with PReLU activations.
         """
 
-        class Scaling(torch.nn.Module):
+        class Scaling(torch.nn.Module):  # type: ignore[misc]  # torch is imported lazily and passed in as Any
             """Learned per-feature scale."""
 
             def __init__(self) -> None:
@@ -377,7 +377,7 @@ class RobustMlpArchitecture(Architecture):
                 """
                 return features * self.scale
 
-        class SmoothClip(torch.nn.Module):
+        class SmoothClip(torch.nn.Module):  # type: ignore[misc]  # torch is imported lazily and passed in as Any
             """Soft saturation of large magnitudes."""
 
             def forward(self, features: Any) -> Any:

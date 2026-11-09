@@ -130,7 +130,8 @@ class Learner(models.Model):
         kwargs: dict[str, Any] = {**self.fixed_params, **(params or {})}
         if "random_state" in inspect.signature(estimator_class).parameters:
             kwargs["random_state"] = seed
-        return estimator_class(**kwargs)
+        built: models.Estimator = estimator_class(**kwargs)
+        return built
 
 
 class Dummy(models.Model):
@@ -199,11 +200,12 @@ class Dummy(models.Model):
                 (params or {}).get("levels"),
                 seed,
             )
-        return (
+        baseline: models.Estimator = (
             dummy.DummyClassifier(strategy="prior")
             if task.is_classification
             else dummy.DummyRegressor(strategy="mean")
         )
+        return baseline
 
 
 class HistGradientBoosting(Learner):
@@ -248,14 +250,17 @@ class SupportVector(Learner):
             cross-fitted calibration for classification.
         """
         kwargs: dict[str, Any] = dict(params or {})
+        support: models.Estimator
         if not task.is_classification:
-            return svm.SVR(**kwargs)
-        return calibration.CalibratedClassifierCV(
-            svm.SVC(random_state=seed, **kwargs),
-            method="sigmoid",
-            ensemble=False,
-            cv=CALIBRATION_FOLDS,
-        )
+            support = svm.SVR(**kwargs)
+        else:
+            support = calibration.CalibratedClassifierCV(
+                svm.SVC(random_state=seed, **kwargs),
+                method="sigmoid",
+                ensemble=False,
+                cv=CALIBRATION_FOLDS,
+            )
+        return support
 
 
 TREE_ENSEMBLE_SPACE = search.SearchSpace(

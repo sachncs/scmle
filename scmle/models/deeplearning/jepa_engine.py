@@ -52,7 +52,8 @@ class JepaNetwork:
 
     def state_dict(self) -> dict[str, Any]:
         """Returns the complete network state."""
-        return self.module.state_dict()
+        state: dict[str, Any] = self.module.state_dict()
+        return state
 
     def load_state_dict(self, state: dict[str, Any]) -> None:
         """Restore the complete network state.
@@ -149,13 +150,16 @@ class Trainer:
                 batch size, the variance weight or the device name is
                 invalid.
         """
+        hidden_size: object = self.hidden_size
+        embedding_size: object = self.embedding_size
+        epochs: object = self.epochs
         if (
-            not isinstance(self.hidden_size, (int, numpy.integer))
-            or isinstance(self.hidden_size, bool)
-            or self.hidden_size < 1
-            or not isinstance(self.embedding_size, (int, numpy.integer))
-            or isinstance(self.embedding_size, bool)
-            or self.embedding_size < 1
+            not isinstance(hidden_size, (int, numpy.integer))
+            or isinstance(hidden_size, bool)
+            or hidden_size < 1
+            or not isinstance(embedding_size, (int, numpy.integer))
+            or isinstance(embedding_size, bool)
+            or embedding_size < 1
         ):
             raise ValueError("JEPA layer sizes must be positive integers")
         if (
@@ -175,9 +179,9 @@ class Trainer:
         if not numpy.isfinite(self.weight_decay) or self.weight_decay < 0.0:
             raise ValueError("weight_decay must be finite and non-negative")
         if (
-            not isinstance(self.epochs, (int, numpy.integer))
-            or isinstance(self.epochs, bool)
-            or self.epochs < 1
+            not isinstance(epochs, (int, numpy.integer))
+            or isinstance(epochs, bool)
+            or epochs < 1
         ):
             raise ValueError("epochs must be a positive integer")
         if self.batch_size != "auto" and (
@@ -403,9 +407,10 @@ class Trainer:
                 f"(rows, {self.input_width_})"
             )
         with torch.no_grad():
-            return self.network_.module.context_encoder(
+            embedding: numpy.ndarray = self.network_.module.context_encoder(
                 torch.from_numpy(matrix)
             ).numpy()
+            return embedding
 
     def explain(self, features: Any) -> numpy.ndarray:
         """Returns embedding-energy gradient-times-input attributions.
@@ -443,7 +448,8 @@ class Trainer:
         embedding = self.network_.module.context_encoder(tensor)
         energy = embedding.pow(2).mean(dim=1)
         gradient = torch.autograd.grad(energy.sum(), tensor)[0]
-        return (gradient * tensor).detach().numpy()
+        attribution: numpy.ndarray = (gradient * tensor).detach().numpy()
+        return attribution
 
     def __getstate__(self) -> dict[str, Any]:
         """Serialize weights as NumPy arrays for the parent process.

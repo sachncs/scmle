@@ -25,7 +25,7 @@ from scmle.models.deeplearning import contracts
 from scmle.models.deeplearning import worker
 
 
-class NetworkEstimator(base.BaseEstimator):
+class NetworkEstimator(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Common behaviour of the worker-backed estimators.
 
     Attributes:
@@ -422,7 +422,7 @@ class NetworkEstimator(base.BaseEstimator):
         return estimator
 
 
-class TorchClassifier(base.ClassifierMixin, NetworkEstimator):
+class TorchClassifier(base.ClassifierMixin, NetworkEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Classifier: softmax over class scores, optional class balancing."""
 
     engine_path = "scmle.models.deeplearning.engines.Classifier"
@@ -541,7 +541,7 @@ class TorchClassifier(base.ClassifierMixin, NetworkEstimator):
         return self.call("predict", features)
 
 
-class TorchRegressor(base.RegressorMixin, NetworkEstimator):
+class TorchRegressor(base.RegressorMixin, NetworkEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Regressor trained on the standardized target with squared error."""
 
     engine_path = "scmle.models.deeplearning.engines.Regressor"
@@ -558,7 +558,7 @@ class TorchRegressor(base.RegressorMixin, NetworkEstimator):
         return self.call("predict", features)
 
 
-class TabPfnEstimator(base.BaseEstimator):
+class TabPfnEstimator(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Worker-backed TabPFN with the scikit-learn estimator interface.
 
     Attributes:
@@ -647,7 +647,7 @@ class TabPfnEstimator(base.BaseEstimator):
         raise worker.WorkerError("the worker could not load the model state")
 
 
-class TabPfnClassifier(base.ClassifierMixin, TabPfnEstimator):
+class TabPfnClassifier(base.ClassifierMixin, TabPfnEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """TabPFN classifier."""
 
     engine_path = "scmle.models.deeplearning.foundation.Classifier"
@@ -683,7 +683,7 @@ class TabPfnClassifier(base.ClassifierMixin, TabPfnEstimator):
         return self.call("predict", features)
 
 
-class TabPfnRegressor(base.RegressorMixin, TabPfnEstimator):
+class TabPfnRegressor(base.RegressorMixin, TabPfnEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """TabPFN regressor."""
 
     engine_path = "scmle.models.deeplearning.foundation.Regressor"
@@ -753,7 +753,7 @@ class KerasEstimator(NetworkEstimator):
         self.random_state = random_state
 
 
-class KerasClassifier(base.ClassifierMixin, KerasEstimator):
+class KerasClassifier(base.ClassifierMixin, KerasEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Keras classifier."""
 
     engine_path = "scmle.models.deeplearning.keras_engine.Classifier"
@@ -789,7 +789,7 @@ class KerasClassifier(base.ClassifierMixin, KerasEstimator):
         return self.call("predict", features)
 
 
-class KerasRegressor(base.RegressorMixin, KerasEstimator):
+class KerasRegressor(base.RegressorMixin, KerasEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Keras regressor."""
 
     engine_path = "scmle.models.deeplearning.keras_engine.Regressor"

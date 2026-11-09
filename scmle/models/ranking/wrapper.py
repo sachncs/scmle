@@ -9,7 +9,7 @@ from sklearn import base
 from sklearn import pipeline
 
 
-class QueryAwareEstimator(base.RegressorMixin, base.BaseEstimator):
+class QueryAwareEstimator(base.RegressorMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Fits a ranking pipeline using the query column of the features frame.
 
     Rows are put in query order (a stable sort), the sizes of the consecutive
@@ -67,4 +67,7 @@ class QueryAwareEstimator(base.RegressorMixin, base.BaseEstimator):
         Returns:
             Array of shape `(n_rows,)`; compare scores only within a query.
         """
-        return self.model_.predict(self.preprocessing_.transform(features))
+        scores: numpy.ndarray = self.model_.predict(
+            self.preprocessing_.transform(features)
+        )
+        return scores
