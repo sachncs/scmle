@@ -1,11 +1,12 @@
 """Fault catalogue, declared objectives and the report of a recovery run.
 
 Each `Fault` names what is broken, which stateful components it touches and
-what a cloud run would need. `Runner` executes the scenarios it is given,
-records for each component the measured recovery time (RTO) and the
-acknowledged data lost (RPO) with the method used, compares them with the
-objectives declared *before* the run, and lists every fault it did not run
-with the reason. A fault with no scenario is ``not_run``, never ``passed``.
+what a run on a managed platform would need. `Runner` executes the
+scenarios it is given, records for each component the measured recovery
+time (RTO) and the acknowledged data lost (RPO) with the method used,
+compares them with the objectives declared *before* the run, and lists
+every fault it did not run with the reason. A fault with no scenario is
+``not_run``, never ``passed``.
 
 Objectives are declared in `OBJECTIVES` and are not tuned to a result. A
 local pass says the local service, emulators and files behaved within them
@@ -109,7 +110,7 @@ OBJECTIVES = (
         0,
         "acknowledged objects",
         "the local object-store emulator, from access restored to a "
-        "verified bundle serving; not S3 or GCS",
+        "verified bundle serving; not a managed object store",
     ),
     Objective(
         "secrets",
@@ -151,7 +152,7 @@ class Fault:
         components: Stateful components it touches.
         local: Whether a local scenario can run it.
         local_limits: What the local scenario is not.
-        cloud_needs: What a run on a provider needs.
+        cloud_needs: What a run on a managed platform needs.
     """
 
     id: str
@@ -183,9 +184,9 @@ CATALOGUE = (
         ("service",),
         True,
         "Processes, not containers; readiness-gated switching is done by "
-        "the runner, not by ECS or Cloud Run.",
-        "A failing health check and a rolling deployment on ECS and Cloud "
-        "Run with the load balancer's request log.",
+        "the runner, not by a managed platform.",
+        "A failing health check and a rolling deployment on a managed "
+        "platform with the load balancer's request log.",
     ),
     Fault(
         "invalid_credentials",
@@ -196,8 +197,8 @@ CATALOGUE = (
         True,
         "The credential is the bundle signing key in an environment "
         "variable; no IAM, token issuer or secret manager is involved.",
-        "Revoked or wrong workload identity and secret versions on each "
-        "provider.",
+        "Revoked or wrong workload identity and secret versions on a "
+        "managed platform.",
     ),
     Fault(
         "lost_object_store_access",
@@ -208,8 +209,8 @@ CATALOGUE = (
         True,
         "A local emulator (scmle.deploy.mocks); no IAM, bucket policy, "
         "versioning or replication.",
-        "A denied bucket policy or key on S3 and GCS and a restore from "
-        "versioned objects.",
+        "A denied bucket policy or key on a managed object store and a "
+        "restore from versioned objects.",
     ),
     Fault(
         "dependency_outage",
@@ -218,8 +219,8 @@ CATALOGUE = (
         "when it returns; serving is unaffected.",
         ("telemetry_spool",),
         True,
-        "A local metrics sink; not CloudWatch or Cloud Monitoring.",
-        "An outage or throttling of CloudWatch and Cloud Monitoring.",
+        "A local metrics sink; not a managed metrics backend.",
+        "An outage or throttling of a managed metrics backend.",
     ),
     Fault(
         "corrupted_bundle",
@@ -229,8 +230,8 @@ CATALOGUE = (
         ("service", "object_store"),
         True,
         "The copy is in a local folder and an emulator.",
-        "A corrupted object in S3 or GCS and an image whose bundle "
-        "digest differs from the release record.",
+        "A corrupted object in a managed object store and an image whose "
+        "bundle digest differs from the release record.",
     ),
     Fault(
         "incompatible_schema",
@@ -241,7 +242,7 @@ CATALOGUE = (
         ("service",),
         True,
         "One local service and one client.",
-        "A client and a model version released on a provider that differ "
+        "A client and a model version released on a platform that differ "
         "in schema.",
     ),
     Fault(
@@ -254,8 +255,8 @@ CATALOGUE = (
         ("service",),
         True,
         "Revisions are local processes behind a local control plane that "
-        "implements the same interface as the ECS and Cloud Run adapters.",
-        "The same on ECS and Cloud Run with their real revisions and traffic "
+        "implements the same interface as a managed platform's control plane.",
+        "The same on a managed platform with its real revisions and traffic "
         "shares.",
     ),
     Fault(
@@ -266,8 +267,7 @@ CATALOGUE = (
         ("job_state",),
         True,
         "The local executor and a local state directory.",
-        "Step Functions and Cloud Workflows executions with their own "
-        "retry and state.",
+        "Managed workflow executions with their own retry and state.",
     ),
     Fault(
         "audit_log_continuity",
@@ -277,7 +277,7 @@ CATALOGUE = (
         ("ledger",),
         True,
         "Process kill only; no machine crash, disk full or torn page.",
-        "The ledger on the provider's durable storage across a task "
+        "The ledger on the platform's durable storage across a task "
         "replacement.",
     ),
     Fault(
@@ -288,8 +288,8 @@ CATALOGUE = (
         ("secrets",),
         True,
         "A rotated environment variable; no secret manager versions.",
-        "A rotation in Secrets Manager and Secret Manager with the "
-        "workload picking up the new version.",
+        "A rotation in a managed secret store with the workload picking "
+        "up the new version.",
     ),
     Fault(
         "rollback_to_managed_revision",
@@ -300,17 +300,17 @@ CATALOGUE = (
         False,
         "The registry logic is exercised in bad_release against local "
         "processes; no managed revision exists locally.",
-        "A previous ECS task definition revision or Cloud Run revision "
-        "with the traffic split read back from the platform.",
+        "A previous revision of a managed service with the traffic split "
+        "read back from the platform.",
     ),
     Fault(
         "zone_or_region_loss",
         "Zone or region loss",
-        "A zone or region of the provider is unavailable.",
+        "A zone or region of the platform is unavailable.",
         ("service", "object_store", "ledger"),
         False,
         "Nothing local resembles it.",
-        "Two zones or regions per provider and a deliberate failover.",
+        "Two zones or regions and a deliberate failover.",
     ),
 )
 FAULT_IDS = tuple(item.id for item in CATALOGUE)
