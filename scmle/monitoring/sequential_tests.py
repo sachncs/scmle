@@ -155,7 +155,8 @@ class BettingTest:
         raw = numpy.sqrt(
             2.0 * self.threshold / (variance * step * math.log(1.0 + step))
         )
-        return numpy.minimum(raw, self.bound)
+        capped: numpy.ndarray = numpy.minimum(raw, self.bound)
+        return capped
 
     def update(self, observation: Any) -> numpy.ndarray:
         """Feeds one observation in ``[0, 1]``.
