@@ -268,6 +268,11 @@ def check_if_absent_race(store: objectstore.ObjectStore, base: str) -> None:
     start = threading.Barrier(RACERS)
 
     def racer(index: int) -> None:
+        """Races to create the shared key once and records the outcome.
+
+        Args:
+            index: Number of this racer, used in the payload it writes.
+        """
         start.wait()
         try:
             store.put(key, f"racer-{index}".encode(), if_absent=True)

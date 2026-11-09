@@ -64,6 +64,15 @@ def curve(specs: list[dict[str, Any]]) -> str:
     span = (high - low) or 1.0
 
     def y(value: float) -> float:
+        """Maps an effect value to a vertical pixel position.
+
+        Args:
+            value: Effect value between `low` and `high`.
+
+        Returns:
+            The y coordinate, with `high` at the top margin and `low` at
+            the bottom margin.
+        """
         return PAD + (HEIGHT - 2 * PAD) * (1.0 - (value - low) / span)
 
     step = (WIDTH - 2 * PAD) / max(len(points) - 1, 1)

@@ -300,6 +300,11 @@ class IncrementalProcessor:
         """
 
         def sleeper(seconds: float) -> None:
+            """Records a retry wait, then sleeps for it.
+
+            Args:
+                seconds: Length of the wait.
+            """
             self.waits.append(seconds)
             self.sleep(seconds)
 
