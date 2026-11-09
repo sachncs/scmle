@@ -45,8 +45,6 @@ const routes = [
   "./docs/local/",
   "./docs/orchestration/",
   "./docs/portable-training/",
-  "./docs/infrastructure/",
-  "./docs/cloud-release/",
   "./docs/releasing/",
   "./docs/threat-model/",
   "./docs/tenant-isolation/",

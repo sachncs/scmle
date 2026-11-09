@@ -21,7 +21,6 @@ SLUG = {
     "WHEN_THINGS_GO_WRONG.md": "when-things-go-wrong",
     "WHAT_SCMLE_CANNOT_DO.md": "what-scmle-cannot-do",
     "ARTIFACTS.md": "artifacts",
-    "CLOUD_RELEASE.md": "cloud-release",
     "SERVICE_SLO.md": "service",
     "TUTORIAL.md": "quickstart",
     "TENANT_ISOLATION.md": "tenant-isolation",

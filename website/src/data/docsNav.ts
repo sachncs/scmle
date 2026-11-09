@@ -71,10 +71,8 @@ export const docsNav: NavGroup[] = [
     ],
   },
   {
-    title: "Cloud and release",
+    title: "Release",
     pages: [
-      { slug: "infrastructure", label: "Infrastructure as code", key: "infrastructure", summary: "The Terraform for AWS and GCP, the policy check, and destroy without orphans." },
-      { slug: "cloud-release", label: "Cloud release", key: "cloud-release", summary: "Gate, live tests, signed record, promotion, rollback and reconcile." },
       { slug: "releasing", label: "Releasing the package", key: "releasing", summary: "Version, tag, preflight and the tag pipeline." },
     ],
   },
