@@ -1,1 +1,1 @@
-"""Problem framing and the decision-cost model (feature F8)."""
+"""Problem framing and the decision-cost model."""

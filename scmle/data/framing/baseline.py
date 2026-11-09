@@ -20,7 +20,7 @@ smallest count at which the measured size met its bound
 issued.
 
 The comparison is valid only if outcomes are observed independently of the
-baseline's decision. `selective_labels` tests that. The ledger of F3 is not
+baseline's decision. `selective_labels` tests that. The hypothesis ledger is not
 used here: its hypotheses are single-feature bivariate statistics. Instead a
 `BaselineGuard` registers the cost model and the frozen rule by hash before
 `C` is read and refuses a second evaluation.
@@ -80,7 +80,18 @@ class ClusterTest:
 
 
 def vector(values: ArrayLike, name: str) -> NDArray[np.float64]:
-    """A finite 1-d float array."""
+    """Converts `values` to a non-empty 1-d float array.
+
+    Args:
+        values: The values to convert.
+        name: Name of the argument, used in the error message.
+
+    Returns:
+        The values as a float array.
+
+    Raises:
+        ValueError: If the array is not 1-d or is empty.
+    """
     array = np.asarray(values, dtype=float)
     if array.ndim != 1 or array.size == 0:
         raise ValueError(f"{name} must be a non-empty 1-d array")
@@ -90,7 +101,21 @@ def vector(values: ArrayLike, name: str) -> NDArray[np.float64]:
 def paired_difference(
     y: ArrayLike, a: ArrayLike, b: ArrayLike, t: float
 ) -> NDArray[np.float64]:
-    """Per-row gain `d_i(t)` of the model rule over the baseline."""
+    """Computes the per-row gain `d_i(t)` of the model rule over the baseline.
+
+    Args:
+        y: Outcomes, 0 or 1.
+        a: Actions of the model rule, 0 or 1.
+        b: Decisions of the baseline, 0 or 1.
+        t: Threshold, strictly between 0 and 1.
+
+    Returns:
+        The gain of each row, `(a - b) * (y - (1 - y) * t / (1 - t))`.
+
+    Raises:
+        ValueError: If `y`, `a` and `b` differ in length. Values that
+            `costs.binary_vector` or `costs.odds` reject also raise it.
+    """
     outcomes = costs.binary_vector(y, "y")
     model = costs.binary_vector(a, "a")
     base = costs.binary_vector(b, "b")
@@ -135,7 +160,18 @@ def cluster_test(d: ArrayLike, clusters: ArrayLike) -> ClusterTest:
 
 
 def factorize(clusters: ArrayLike) -> tuple[NDArray[np.intp], int]:
-    """Integer codes of the cluster labels."""
+    """Codes the cluster labels as consecutive integers.
+
+    Args:
+        clusters: Cluster label of each row.
+
+    Returns:
+        The integer code of each row, in the sorted order of the labels, and
+        the number of distinct clusters (0 when there are no rows).
+
+    Raises:
+        ValueError: If `clusters` is not 1-d.
+    """
     labels = np.asarray(clusters)
     if labels.ndim != 1:
         raise ValueError("clusters must be 1-d")
@@ -167,7 +203,11 @@ class Selectivity:
     alpha: float
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Returns the finding as a JSON-ready record.
+
+        Returns:
+            A mapping of every field of the finding to its value.
+        """
         return dataclasses.asdict(self)
 
 
@@ -181,6 +221,10 @@ def selective_labels(observed: ArrayLike, b: ArrayLike) -> Selectivity:
     Returns:
         The finding. With fewer than `MIN_ARM_ROWS` rows in an arm it is not
         flagged and the p-value is 1, because nothing can be said.
+
+    Raises:
+        ValueError: If `observed` and `b` differ in length. A `b` that is
+            not a non-empty 1-d array of zeros and ones also raises it.
     """
     seen = np.asarray(observed).astype(bool)
     base = costs.binary_vector(b, "b").astype(bool)
@@ -210,7 +254,10 @@ def profile_on_exploration(
     model: costs.DecisionCostModel,
     observed: ArrayLike | None = None,
 ) -> dict[str, Any]:
-    """The baseline measured on `X`: its net benefit against the two defaults.
+    """Measures the baseline on `X`: its net benefit against the two defaults.
+
+    A `b` that is not a non-empty 1-d array of zeros and ones, or that
+    differs in length from the observation mask, raises `ValueError`.
 
     Args:
         y: Outcomes (NaN where unobserved).
@@ -219,9 +266,12 @@ def profile_on_exploration(
         observed: Observation mask; defaults to `y` not NaN.
 
     Returns:
-        A JSON-ready profile. When labels are selective, the baseline's net
-        benefit is not computed, because the observed rows are a biased
-        sample of the ones it acted on.
+        A JSON-ready profile with the selective-label finding, five
+        thresholds spread evenly over the cost range, and the net benefit of
+        acting on no row and of acting on every observed row. The baseline's
+        own net benefit is the string `not_computed` (with a `note`) when
+        labels are selective or no outcome is observed, because the observed
+        rows are then a biased sample of the ones it acted on.
     """
     outcomes = np.asarray(y, dtype=float)
     mask = ~np.isnan(outcomes) if observed is None else np.asarray(observed)
@@ -273,7 +323,7 @@ class BaselineRegistration:
 
     @property
     def registration_hash(self) -> str:
-        """SHA-256 over the registration."""
+        """The SHA-256 hex digest of the registration."""
         return hashlib.sha256(
             signing.canonical_payload(dataclasses.asdict(self))
         ).hexdigest()
@@ -293,6 +343,10 @@ def register(
 
     Returns:
         The registration, to be built before `C` is opened.
+
+    Raises:
+        ValueError: If `alpha` is not a finite number strictly between 0 and
+            1.
     """
     level = qualification.probability(alpha, "alpha")
     if not 0.0 < level < 1.0:
@@ -304,7 +358,14 @@ def register(
 
 
 def rule_digest(rule: Mapping[str, Any]) -> str:
-    """The hash `register` stores for a rule description."""
+    """Hashes a rule description the way `register` does.
+
+    Args:
+        rule: A JSON-ready description of the action rule.
+
+    Returns:
+        The SHA-256 hex digest of the canonical payload of `rule`.
+    """
     return hashlib.sha256(signing.canonical_payload(rule)).hexdigest()
 
 
@@ -336,7 +397,13 @@ class BaselineReport:
     claim: qualification.Claim
 
     def to_dict(self) -> dict[str, Any]:
-        """The `baseline_report.json` document."""
+        """Returns the `baseline_report.json` document.
+
+        Returns:
+            A JSON-ready mapping of the status, the reasons, the endpoint
+            tests, the selective-label finding, the checks, the claim and the
+            statement of the guarantee.
+        """
         return {
             "schema_version": 1,
             "status": self.status,
@@ -358,10 +425,20 @@ class BaselineReport:
 
 
 class BaselineGuard:
-    """Evaluates the registered claim on `C` exactly once."""
+    """Evaluates the registered claim on `C` exactly once.
+
+    Attributes:
+        registration: The registration the evaluation must match.
+        used: Whether the claim has already been evaluated.
+    """
 
     def __init__(self, registration: BaselineRegistration) -> None:
-        """Binds the guard to a registration."""
+        """Binds the guard to a registration.
+
+        Args:
+            registration: What was fixed before the confirmation set was
+                read.
+        """
         self.registration = registration
         self.used = False
 
@@ -427,7 +504,23 @@ class BaselineGuard:
         seed: int,
         model: costs.DecisionCostModel,
     ) -> BaselineReport:
-        """Computes the report once the call has been authorised."""
+        """Computes the report once the call has been authorised.
+
+        Args:
+            y: Outcomes on `C` (NaN where unobserved).
+            a: The frozen rule's actions on `C`.
+            b: The baseline decisions on `C`.
+            clusters: Grouping unit of each row.
+            observed: Observation mask; defaults to `y` not NaN.
+            input_tier: Highest tier the inputs allow.
+            seed: Run seed, recorded in the checks.
+            model: The cost model that was registered.
+
+        Returns:
+            The report. No endpoint test is run, and the claim is not
+            issued, when outcomes are selective or the observed rows span
+            fewer than `MIN_CLUSTERS` clusters.
+        """
         outcomes = np.asarray(y, dtype=float)
         mask = (
             ~np.isnan(outcomes)
@@ -475,7 +568,23 @@ class BaselineGuard:
         seed: int,
         model: costs.DecisionCostModel,
     ) -> BaselineReport:
-        """Builds the checks, the claim and the report."""
+        """Builds the checks, the claim and the report.
+
+        Args:
+            endpoints: The tests at `t_lo` and `t_hi`, or empty when none
+                was run.
+            reasons: Why no test was run; empty when the tests were run.
+            selectivity: The selective-label finding.
+            input_tier: Highest tier the inputs allow.
+            seed: Run seed, recorded in the checks.
+            model: The cost model that was registered.
+
+        Returns:
+            The report. Its status is `not_issued` when there are reasons,
+            `issued` when the larger endpoint p-value is at most the
+            registered level, and `not_shown` otherwise. The claim keeps
+            `input_tier` only when it is issued and is `unverified` if not.
+        """
         alpha = self.registration.alpha
         p_value = max((e.p_value for e in endpoints), default=None)
         issued = bool(endpoints) and p_value is not None and p_value <= alpha

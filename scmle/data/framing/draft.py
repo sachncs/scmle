@@ -1,4 +1,4 @@
-"""Draft charter, data-side checks and the framing result (feature F8).
+"""Draft charter, data-side checks and the framing result.
 
 `frame` turns a plain-language request and a source description into a draft
 `AnalysisCharter` (unsigned), reads only `X` rows, and records where every
@@ -64,7 +64,15 @@ class SourceDescription:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> "SourceDescription":
-        """Builds the description from a JSON object."""
+        """Builds the description from a JSON object.
+
+        Args:
+            record: A mapping with `uri` and `columns`, and optionally
+                `primary_key` and `target_time_column`.
+
+        Returns:
+            The description. A missing `uri` or `columns` raises `KeyError`.
+        """
         return cls(
             uri=str(record["uri"]),
             columns=tuple(record["columns"]),
@@ -75,7 +83,12 @@ class SourceDescription:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class FramingRequest:
-    """A plain-language request and the source it is about."""
+    """A plain-language request and the source it is about.
+
+    Attributes:
+        text: The request in plain language.
+        source: What the data source offers.
+    """
 
     text: str
     source: SourceDescription
@@ -98,7 +111,11 @@ class DataCheck:
     detail: str
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Returns the check as a JSON-ready record.
+
+        Returns:
+            A mapping of every field to its value.
+        """
         return dataclasses.asdict(self)
 
 
@@ -133,7 +150,14 @@ class FramingDraft:
     discarded: tuple[str, ...]
 
     def to_dict(self) -> dict[str, Any]:
-        """The `framing_draft.json` document."""
+        """Returns the `framing_draft.json` document.
+
+        Returns:
+            A JSON-ready mapping of the status, the charter and its hash
+            (both None when refused), the source of each field, the checks,
+            the open items, the LLM record, what was discarded, and a label
+            that the draft is unverified.
+        """
         return {
             "schema_version": 1,
             "status": self.status,
@@ -154,19 +178,37 @@ class FramingDraft:
 
     @property
     def draft_hash(self) -> str:
-        """SHA-256 of the stored draft."""
+        """The SHA-256 hex digest of the stored draft document."""
         return hashlib.sha256(
             signing.canonical_payload(self.to_dict())
         ).hexdigest()
 
 
 def normalise(name: str) -> str:
-    """Lower-case name with separators removed."""
+    """Lower-cases a name and removes separators.
+
+    Args:
+        name: The name to normalise.
+
+    Returns:
+        The name in lower case with every non-word character and underscore
+        removed.
+    """
     return re.sub(r"[\W_]+", "", name.lower())
 
 
 def mentioned(text: str, columns: Sequence[str]) -> list[str]:
-    """Columns whose normalised name appears as a word in the request."""
+    """Finds the columns that the request names.
+
+    Args:
+        text: The request.
+        columns: Column names to look for.
+
+    Returns:
+        The columns whose normalised name is a word of the request, or, for
+        names longer than four characters, appears anywhere in the
+        normalised request. They keep the order of `columns`.
+    """
     words = {normalise(w) for w in re.findall(r"[\w]+", text)}
     flat = normalise(text)
     return [
@@ -180,7 +222,20 @@ def mentioned(text: str, columns: Sequence[str]) -> list[str]:
 def deterministic_slots(
     request: FramingRequest, frame: pd.DataFrame
 ) -> dict[str, Any]:
-    """Slots filled by rules from the request and the schema."""
+    """Fills slots by rules from the request and the schema.
+
+    Args:
+        request: The request and the source description.
+        frame: The data sample, used to find datetime columns.
+
+    Returns:
+        The slots found: `target` (an explicit mention, a single column the
+        request names, or a single column with a conventional target name),
+        `prediction_moment` (the only datetime column other than the
+        target-time column), `unit` (the declared primary key) and
+        `question` (the request text). A slot that cannot be found is
+        absent.
+    """
     columns = list(request.source.columns)
     slots: dict[str, Any] = {}
     explicit = re.search(
@@ -219,7 +274,17 @@ def check_draft(
     slots: Mapping[str, Any],
     source: SourceDescription,
 ) -> tuple[DataCheck, ...]:
-    """Data-side checks on the slots, using `X` rows only."""
+    """Runs the data-side checks on the slots, using `X` rows only.
+
+    Args:
+        frame: The exploration rows.
+        slots: The drafted slots; only the ones present are checked.
+        source: The source description, for the target-time column.
+
+    Returns:
+        The checks in the order target, prediction moment, unit and
+        population, for the slots present.
+    """
     found: list[DataCheck] = []
     target = slots.get("target")
     if target is not None:
@@ -298,7 +363,19 @@ def assemble(
     request: FramingRequest,
     cost_model: costs.DecisionCostModel | None,
 ) -> tuple[charter_contracts.AnalysisCharter, list[str]]:
-    """Builds the unsigned charter, filling blanks with placeholders."""
+    """Builds the unsigned charter, filling blanks with placeholders.
+
+    Args:
+        slots: The drafted slots. `unit`, `target` and `prediction_moment`
+            must be present.
+        request: The request and the source description.
+        cost_model: The costs, or None if none were supplied.
+
+    Returns:
+        The charter, and the names of the slots left at a placeholder.
+        A missing required slot raises `KeyError`, and a record the charter
+        rejects raises `ValueError` or `ConfigError`.
+    """
     record = charter_contracts.template()
     open_items: list[str] = []
 
@@ -344,7 +421,19 @@ def refused(
     llm: dict[str, Any] | None = None,
     discarded: Sequence[str] = (),
 ) -> FramingDraft:
-    """A draft that stops here, with the reason on file."""
+    """Builds a refused draft, with the reason on file.
+
+    Args:
+        reason: Why the draft was refused.
+        detail: Further facts, stored with the reason.
+        checks: The data-side checks run so far.
+        llm: The LLM record, if the LLM path was used.
+        discarded: What was dropped and why.
+
+    Returns:
+        A draft with status `refused`, no charter, and the reason and detail
+        as its refusal.
+    """
     return FramingDraft(
         REFUSED,
         None,
@@ -376,7 +465,7 @@ def frame(
 
     Args:
         request: The request and the source description.
-        data_sample: Exploration rows only (canon P3).
+        data_sample: Exploration rows only.
         cost_model: The costs, if a person supplied them.
         baseline_column: Column of the current process's 0/1 decisions.
         pilot_actions: Actions of a rule fitted on `X`, used only to test
@@ -545,7 +634,19 @@ def frame(
 
 
 def write_artifacts(draft: FramingDraft, directory: str | Path) -> list[str]:
-    """Writes the framing artifacts and returns their names."""
+    """Writes the framing artifacts to a directory.
+
+    The directory is created if needed. The files are the draft, the
+    questions and, where they exist, the cost model, the baseline report and
+    the refusal.
+
+    Args:
+        draft: The draft to write.
+        directory: Where to write.
+
+    Returns:
+        The sorted names of the files written.
+    """
     target = Path(directory)
     target.mkdir(parents=True, exist_ok=True)
     documents: dict[str, Any] = {"framing_draft.json": draft.to_dict()}
@@ -572,10 +673,19 @@ def write_artifacts(draft: FramingDraft, directory: str | Path) -> list[str]:
 def link_report(
     charter: charter_contracts.AnalysisCharter, columns: Sequence[str]
 ) -> dict[str, Any]:
-    """Whether the charter's words name real columns (gap 1), descriptively.
+    """Reports whether the charter's words name real columns, descriptively.
 
     A name that matches no column is reported `unresolved`, never a
     failure: the charter allows free text for these fields.
+
+    Args:
+        charter: The charter to check.
+        columns: Column names of the data.
+
+    Returns:
+        A JSON-ready mapping with, for `target`, `prediction_moment` and
+        `unit`, the text, the matching columns and a status of `resolved`
+        or `unresolved`, and a `gating` flag that is always False.
     """
     known = {normalise(c): c for c in columns}
     fields = {

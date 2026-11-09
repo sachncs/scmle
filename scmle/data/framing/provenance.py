@@ -1,8 +1,8 @@
 """Where a drafted field came from, and the tier its claims may reach.
 
 An LLM-drafted field has no error rate the instrument can derive. A claim
-that depends on one stays `unverified` while the charter is unsigned (canon
-P4). Costs read from data are `unverified` as well. Fields written by a
+that depends on one stays `unverified` while the charter is unsigned. Costs
+read from data are `unverified` as well. Fields written by a
 person or filled by a deterministic rule do not cap the tier.
 """
 

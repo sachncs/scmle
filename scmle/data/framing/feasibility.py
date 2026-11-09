@@ -1,4 +1,4 @@
-"""Feasibility of the baseline claim from the closed form (feature F8).
+"""Feasibility of the baseline claim from the closed form.
 
 The per-row gains `d_i(t)` measured on `X` have standard deviation `s_d`. The
 smallest gain worth acting on, `delta_min`, gives the standardised effect
@@ -26,7 +26,20 @@ CONFIDENCE = 0.95
 
 
 def intraclass(d: ArrayLike, clusters: ArrayLike) -> tuple[float, float]:
-    """(rho, mean cluster size) by the one-way ANOVA estimator, rho >= 0."""
+    """Estimates the intraclass correlation by the one-way ANOVA estimator.
+
+    A `d` that is not a non-empty 1-d array, or a `clusters` that is not 1-d,
+    raises `ValueError`.
+
+    Args:
+        d: Per-row gains.
+        clusters: Cluster label of each row.
+
+    Returns:
+        The intraclass correlation `rho`, clipped to [0, 1], and the mean
+        cluster size. With fewer than two clusters, or no more rows than
+        clusters, `rho` is 0.
+    """
     values = baseline.vector(d, "d")
     codes, g = baseline.factorize(clusters)
     n = values.size
@@ -71,7 +84,12 @@ class BaselineFeasibility:
     reason: str
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Returns the verdict as a JSON-ready record.
+
+        Returns:
+            A mapping of every field to its value, with `s_d_interval` as a
+            list.
+        """
         record = dataclasses.asdict(self)
         record["s_d_interval"] = list(self.s_d_interval)
         return record
@@ -86,7 +104,20 @@ def verdict_at(
     k_max: int,
     power: float,
 ) -> feasibility.Feasibility:
-    """Closed-form verdict for a given `s_d` and effective rows."""
+    """Computes the closed-form verdict for a given `s_d` and effective rows.
+
+    Args:
+        s_d: Standard deviation of the per-row gain.
+        delta_min: Smallest net-benefit gain worth acting on.
+        n_confirmation: Effective confirmation rows (truncated to an int).
+        alpha: Level of the claim.
+        k_max: Claims carried into confirmation.
+        power: Target power.
+
+    Returns:
+        The feasibility verdict for the standardised effect
+        `delta_min / s_d`.
+    """
     return feasibility.assess(
         n_confirmation=int(n_confirmation),
         min_effect=delta_min / s_d,
@@ -118,7 +149,14 @@ def assess(
         power: Target power.
 
     Returns:
-        The verdict. Near the boundary it is `inconclusive`.
+        The verdict, computed at the point estimate of `s_d`. It is
+        `inconclusive` when the verdict differs at either end of the
+        chi-square interval for `s_d`.
+
+    Raises:
+        ValueError: If `delta_min` is not positive, or `d` has fewer than
+            three values or zero standard deviation. A `d` that is not a
+            non-empty 1-d array also raises it.
     """
     values = baseline.vector(d, "d")
     if delta_min <= 0:

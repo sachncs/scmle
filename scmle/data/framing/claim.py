@@ -1,11 +1,11 @@
-"""The baseline claim of F8 as a registered claim of a charter run.
+"""The baseline claim as a registered claim of a charter run.
 
 The comparison is "the model rule has a higher net benefit than the current
 process over the charter's cost range" (`baseline`). In a run it works like
 this:
 
 1. A rule is frozen on the exploration rows `X` before `C` is opened: a
-   standardised logistic regression on the numeric features of the plan,
+   standardised logistic regression on the numeric features of the run,
    fitted with the run seed, acting where its probability reaches the cost
    model's implied threshold. Its fitted parameters are hashed.
 2. The registration (cost-model hash, rule hash, level, range) is written to
@@ -89,7 +89,13 @@ class FrozenRule:
     cut: float
 
     def describe(self) -> dict[str, Any]:
-        """JSON-ready description, the thing that is hashed."""
+        """Describes the rule in the form that is hashed.
+
+        Returns:
+            A JSON-ready mapping of the rule kind, the ridge strength, the
+            columns and the fitted parameters (rounded to 12 places), and
+            the cut.
+        """
         return {
             "kind": "standardised_logistic",
             "ridge": RIDGE,
@@ -103,7 +109,16 @@ class FrozenRule:
         }
 
     def matrix(self, features: pd.DataFrame) -> np.ndarray:
-        """The standardised design for any rows."""
+        """Builds the standardised design matrix for any rows.
+
+        Args:
+            features: Rows holding every column of the rule. Entries that
+                are missing or not numeric are replaced by the medians.
+
+        Returns:
+            An array with one row per input row and one column per rule
+            column, centred by `means` and divided by `scales`.
+        """
         raw = (
             features[list(self.columns)]
             .apply(pd.to_numeric, errors="coerce")
@@ -113,7 +128,15 @@ class FrozenRule:
         return (raw - np.asarray(self.means)) / np.asarray(self.scales)
 
     def actions(self, features: pd.DataFrame) -> np.ndarray:
-        """0/1 actions on any rows."""
+        """Computes the actions of the rule on any rows.
+
+        Args:
+            features: Rows holding every column of the rule.
+
+        Returns:
+            1.0 for each row whose predicted probability reaches `cut`,
+            otherwise 0.0.
+        """
         score = self.matrix(features) @ np.asarray(self.coefficients)
         probability = 1.0 / (1.0 + np.exp(-(score + self.intercept)))
         return (probability >= self.cut).astype(float)
@@ -123,10 +146,21 @@ class Rule(Protocol):
     """What the claim needs of the rule it is about."""
 
     def describe(self) -> dict[str, Any]:
-        """JSON-ready description, the thing that is hashed."""
+        """Describes the rule in the form that is hashed.
+
+        Returns:
+            A JSON-ready mapping that identifies the rule.
+        """
 
     def actions(self, features: pd.DataFrame) -> np.ndarray:
-        """0/1 actions on any rows."""
+        """Computes the actions of the rule on any rows.
+
+        Args:
+            features: Rows to act on.
+
+        Returns:
+            1.0 for each row the rule acts on, otherwise 0.0.
+        """
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -153,7 +187,12 @@ class SelectedModelRule:
     identity: Mapping[str, Any]
 
     def describe(self) -> dict[str, Any]:
-        """JSON-ready description, the thing that is hashed."""
+        """Describes the rule in the form that is hashed.
+
+        Returns:
+            A JSON-ready mapping of the kind, the selection identity, the
+            cut, and `selection_sha256`, the digest of the identity.
+        """
         document = jsonable(
             {"kind": SELECTED, **self.identity, "cut": self.cut}
         )
@@ -163,7 +202,15 @@ class SelectedModelRule:
         return document
 
     def actions(self, features: pd.DataFrame) -> np.ndarray:
-        """0/1 actions on any rows."""
+        """Computes the actions of the selected model on any rows.
+
+        Args:
+            features: Rows to score with the fitted pipeline.
+
+        Returns:
+            1.0 for each row whose predicted probability of the positive
+            class reaches `cut`, otherwise 0.0.
+        """
         classes = list(self.pipeline.classes_)
         column = classes.index(self.positive)
         probability = np.asarray(self.pipeline.predict_proba(features))[
@@ -180,6 +227,18 @@ def freeze_rule(
     seed: int,
 ) -> FrozenRule:
     """Fits the rule on exploration rows with an observed outcome.
+
+    Args:
+        features: Exploration rows.
+        outcome: Outcome of each row, 0 or 1, NaN where unobserved.
+        columns: Candidate numeric feature names. Names absent from
+            `features` are dropped.
+        cut: Probability at which the rule acts.
+        seed: Seed of the logistic regression.
+
+    Returns:
+        The frozen rule, with medians, means and scales taken over all
+        exploration rows and the regression fitted on the observed ones.
 
     Raises:
         ConfigError: With no numeric feature, or one outcome class only.
@@ -230,12 +289,27 @@ def source_ceiling(
     *,
     signed: bool,
 ) -> tuple[qualification.Tier, dict[str, Any]]:
-    """Highest tier the inputs of the baseline claim allow, and why.
+    """Finds the highest tier the inputs of the baseline claim allow, and why.
 
     Reads `framing_draft.json` when given. A draft that does not describe this
     charter (its hash differs, because a person edited the charter) keeps its
     field sources, since the edit is not known to have replaced an LLM field;
     the charter's signature is what lifts the cap.
+
+    Args:
+        draft_path: Path of the framing draft, or None when none was named.
+        charter_hash: Hash of the charter being run.
+        model: The charter's cost model.
+        signed: Whether the charter carries a verified signature.
+
+    Returns:
+        The tier ceiling, and a JSON-ready explanation holding the ceiling,
+        whether the charter is signed, the LLM-filled fields, the costs not
+        given by a person, and how the draft relates to the charter.
+
+    Raises:
+        ConfigError: If the draft cannot be read, is not valid JSON, lacks a
+            `fields` mapping, or names an unknown field source.
     """
     fields: dict[str, str] = {}
     note = "no framing draft was named: no field is known to be LLM-filled"
@@ -276,7 +350,17 @@ def source_ceiling(
 
 
 def jsonable(document: Mapping[str, Any]) -> dict[str, Any]:
-    """A JSON round trip, so the hashed document is the written one."""
+    """Round-trips a document through JSON.
+
+    The hashed document is then the one that is written.
+
+    Args:
+        document: The document to convert. Values JSON cannot encode are
+            converted with `str`.
+
+    Returns:
+        A plain dict with sorted keys, built from JSON types only.
+    """
     return dict(json.loads(json.dumps(document, default=str, sort_keys=True)))
 
 
@@ -293,7 +377,7 @@ def build_runner(
     ceiling: qualification.Tier,
     seed: int,
 ) -> confirm.ClaimRunner:
-    """The registered baseline claim and the function that tests it on `C`.
+    """Registers the baseline claim and builds the function that tests it.
 
     Args:
         rule: The rule the claim is about: the one frozen on `X`, or the
@@ -310,6 +394,12 @@ def build_runner(
             (`baseline.Selectivity.to_dict()`), with the `flagged` key.
         ceiling: Highest tier the inputs allow.
         seed: The run seed.
+
+    Returns:
+        A runner holding the one registered claim and the function that
+        evaluates it on the frame released for confirmation. That function
+        writes the report document `baseline_report.json` and reports the
+        claim's status; with a flagged `selection` it runs no test.
     """
     description = rule.describe()
     registration = baseline.register(model, description, alpha)
@@ -323,6 +413,15 @@ def build_runner(
     )
 
     def run(features: pd.DataFrame, target: pd.Series) -> confirm.ClaimRun:
+        """Tests the registered claim on the rows released for confirmation.
+
+        Args:
+            features: Confirmation features.
+            target: Confirmation target.
+
+        Returns:
+            The status of the claim and the report document.
+        """
         if selection["flagged"]:
             document = refused(registration, selection, ceiling)
         else:
@@ -367,7 +466,18 @@ def refused(
     selection: Mapping[str, Any],
     ceiling: qualification.Tier,
 ) -> dict[str, Any]:
-    """The report when selective labels on `X` stop the comparison."""
+    """Builds the report for a claim stopped by selective labels on `X`.
+
+    Args:
+        registration: The registration of the claim.
+        selection: The selective-label finding on `X` and the unlabeled rows.
+        ceiling: Highest tier the inputs allow (not used in the report, as
+            the claim is not evaluated).
+
+    Returns:
+        A report document with status `not_issued`, the reason, no
+        endpoints or checks, and a claim at tier `unverified`.
+    """
     reason = (
         "outcomes are observed depending on the baseline decision on the "
         "exploration and unlabeled rows (selective labels); the naive "

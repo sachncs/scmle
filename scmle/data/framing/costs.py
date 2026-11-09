@@ -1,4 +1,4 @@
-"""Decision-cost model and net benefit for a binary action (feature F8).
+"""Decision-cost model and net benefit for a binary action.
 
 Binary action `a` (act or not), outcome `y` in {0, 1}, cost `c_ay` (a
 negative cost is a benefit). With `c_FP = c_10 - c_00` and
@@ -53,7 +53,19 @@ class DominatedActionError(ValueError):
 
 
 def sources_from(values: Sequence[Any]) -> tuple[CostSource, ...]:
-    """Coerces four source labels."""
+    """Coerces four source labels to `CostSource` values.
+
+    Args:
+        values: One source label per cost, in the order of `ENTRY_NAMES`.
+            Each is a `CostSource` or one of its string values.
+
+    Returns:
+        The labels as `CostSource` members, in the same order.
+
+    Raises:
+        ValueError: If a label is not a `CostSource` value, or the number of
+            labels differs from the number of costs.
+    """
     sources = tuple(CostSource(v) for v in values)
     if len(sources) != len(ENTRY_NAMES):
         raise ValueError("sources must hold one entry per cost")
@@ -85,7 +97,15 @@ class DecisionCostModel:
     range_source: CostSource
 
     def __post_init__(self) -> None:
-        """Validates the model, refusing one that is not a decision."""
+        """Validates the model, refusing one that is not a decision.
+
+        Raises:
+            DominatedActionError: If `c_FP` or `c_FN` is not positive.
+            ValueError: If a cost or a range bound is not a finite number,
+                the range does not satisfy `0 < t_lo <= t_hi < 1`, the
+                implied threshold lies outside the range, or `sources` or
+                `range_source` have the wrong type or length.
+        """
         for name in ENTRY_NAMES:
             qualification.finite(getattr(self, name), name)
         if self.c_fp <= 0 or self.c_fn <= 0:
@@ -122,12 +142,15 @@ class DecisionCostModel:
 
     @property
     def threshold(self) -> float:
-        """`t = c_FP / (c_FP + c_FN)`, the implied decision threshold."""
+        """The implied decision threshold `t = c_FP / (c_FP + c_FN)`."""
         return self.c_fp / (self.c_fp + self.c_fn)
 
     @property
     def unverified_entries(self) -> tuple[str, ...]:
-        """Costs that came from data or a template, not from a person."""
+        """Names of the costs that came from data or a template, not a person.
+
+        The names follow the order of `ENTRY_NAMES`.
+        """
         return tuple(
             name
             for name, source in zip(ENTRY_NAMES, self.sources, strict=True)
@@ -142,7 +165,12 @@ class DecisionCostModel:
         ).hexdigest()
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Returns the model as a JSON-ready record.
+
+        Returns:
+            A mapping of the four costs, the range bounds, the source of
+            each cost as its string value, and the source of the range.
+        """
         return {
             "c_00": self.c_00,
             "c_01": self.c_01,
@@ -156,7 +184,17 @@ class DecisionCostModel:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds the model, rejecting unknown or missing fields."""
+        """Rebuilds the model from a record made by `to_dict`.
+
+        A record that is invalid, or fails the checks in `__post_init__`,
+        raises `ValueError` or `DominatedActionError`.
+
+        Args:
+            record: A mapping holding exactly the fields of the model.
+
+        Returns:
+            The model.
+        """
         qualification.require_fields(cls, record)
         return cls(
             c_00=record["c_00"],
@@ -171,7 +209,17 @@ class DecisionCostModel:
 
 
 def odds(t: float) -> float:
-    """`t / (1 - t)`, the weight of a false positive in net benefit."""
+    """Returns `t / (1 - t)`, the weight of a false positive in net benefit.
+
+    Args:
+        t: Threshold, strictly between 0 and 1.
+
+    Returns:
+        The odds of the threshold.
+
+    Raises:
+        ValueError: If `t` is not a finite number strictly between 0 and 1.
+    """
     threshold = qualification.finite(t, "t")
     if not 0.0 < threshold < 1.0:
         raise ValueError("t must be strictly between 0 and 1")
@@ -179,7 +227,19 @@ def odds(t: float) -> float:
 
 
 def binary_vector(values: ArrayLike, name: str) -> NDArray[np.float64]:
-    """A 1-d array of zeros and ones."""
+    """Checks that `values` is a non-empty 1-d array of zeros and ones.
+
+    Args:
+        values: The values to check.
+        name: Name of the argument, used in error messages.
+
+    Returns:
+        The values as a float array.
+
+    Raises:
+        ValueError: If the array is not 1-d, is empty, or holds anything
+            other than 0 and 1.
+    """
     array = np.asarray(values, dtype=float)
     if array.ndim != 1 or array.size == 0:
         raise ValueError(f"{name} must be a non-empty 1-d array")
@@ -191,7 +251,19 @@ def binary_vector(values: ArrayLike, name: str) -> NDArray[np.float64]:
 def pair(
     y: ArrayLike, a: ArrayLike
 ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
-    """Outcomes and actions as aligned 0/1 arrays."""
+    """Checks and aligns outcomes and actions.
+
+    Args:
+        y: Outcomes, 0 or 1.
+        a: Actions, 0 or 1.
+
+    Returns:
+        The outcomes and the actions as float arrays of equal length.
+
+    Raises:
+        ValueError: If either is not a non-empty 1-d array of zeros and ones,
+            or the lengths differ.
+    """
     outcomes = binary_vector(y, "y")
     actions = binary_vector(a, "a")
     if outcomes.shape != actions.shape:
@@ -200,7 +272,9 @@ def pair(
 
 
 def net_benefit(y: ArrayLike, a: ArrayLike, t: float) -> float:
-    """`NB(t) = TP - [t / (1 - t)] FP` for a fixed action rule.
+    """Returns `NB(t) = TP - [t / (1 - t)] FP` for a fixed action rule.
+
+    Input that `pair` or `odds` rejects raises `ValueError`.
 
     Args:
         y: Outcomes, 0 or 1.
@@ -217,21 +291,47 @@ def net_benefit(y: ArrayLike, a: ArrayLike, t: float) -> float:
 
 
 def net_benefit_all(y: ArrayLike, t: float) -> float:
-    """Net benefit of acting on every row: `P - (1 - P) t / (1 - t)`."""
+    """Returns the net benefit of acting on every row.
+
+    The value is `P - (1 - P) t / (1 - t)`, with `P` the prevalence. Input
+    that `binary_vector` or `odds` rejects raises `ValueError`.
+
+    Args:
+        y: Outcomes, 0 or 1.
+        t: Threshold, strictly between 0 and 1.
+
+    Returns:
+        Net benefit per row.
+    """
     outcomes = binary_vector(y, "y")
     prevalence = float(np.mean(outcomes))
     return prevalence - (1.0 - prevalence) * odds(t)
 
 
 def net_benefit_none() -> float:
-    """Net benefit of acting on no row, which is zero."""
+    """Returns the net benefit of acting on no row.
+
+    Returns:
+        Always 0.0.
+    """
     return 0.0
 
 
 def expected_cost(
     y: ArrayLike, a: ArrayLike, model: DecisionCostModel
 ) -> float:
-    """Mean cost per row, read straight from the four cells."""
+    """Returns the mean cost per row, read straight from the four cells.
+
+    Input that `pair` rejects raises `ValueError`.
+
+    Args:
+        y: Outcomes, 0 or 1.
+        a: Actions, 0 or 1.
+        model: The cost model whose cells price each (action, outcome) pair.
+
+    Returns:
+        The mean of the cost of each row.
+    """
     outcomes, actions = pair(y, a)
     cost = np.where(
         actions == 1.0,
@@ -242,7 +342,17 @@ def expected_cost(
 
 
 def cost_constant(y: ArrayLike, model: DecisionCostModel) -> float:
-    """`const = c_00 (1 - P) + c_01 P` in `Cost = const - c_FN NB(t)`."""
+    """Returns `const = c_00 (1 - P) + c_01 P` in `Cost = const - c_FN NB(t)`.
+
+    Input that `binary_vector` rejects raises `ValueError`.
+
+    Args:
+        y: Outcomes, 0 or 1.
+        model: The cost model.
+
+    Returns:
+        The cost of never acting, given the prevalence of `y`.
+    """
     prevalence = float(np.mean(binary_vector(y, "y")))
     return model.c_00 * (1.0 - prevalence) + model.c_01 * prevalence
 
@@ -250,7 +360,19 @@ def cost_constant(y: ArrayLike, model: DecisionCostModel) -> float:
 def net_benefit_curve(
     y: ArrayLike, a: ArrayLike, thresholds: ArrayLike
 ) -> dict[str, list[float]]:
-    """Model, treat-all and treat-none net benefit on a grid of thresholds."""
+    """Computes model, treat-all and treat-none net benefit on a grid.
+
+    Input that `net_benefit` rejects raises `ValueError`.
+
+    Args:
+        y: Outcomes, 0 or 1.
+        a: Actions of the frozen rule, 0 or 1.
+        thresholds: Thresholds to evaluate, each strictly between 0 and 1.
+
+    Returns:
+        A mapping with `threshold` (the grid, flattened) and, for each
+        threshold in the same order, `model`, `all` and `none` net benefit.
+    """
     grid = [float(t) for t in np.asarray(thresholds, dtype=float).ravel()]
     return {
         "threshold": grid,
@@ -267,7 +389,17 @@ def decision_curve(
 
     This is the usual decision-curve display (act when `score >= t`). It is
     the form the reference-implementation comparison uses. The baseline
-    claim does not use it: there the rule is frozen on `X` first.
+    claim does not use it: there the rule is frozen on `X` first. Input that
+    `net_benefit` rejects raises `ValueError`.
+
+    Args:
+        y: Outcomes, 0 or 1.
+        scores: Risk score of each row; the rule acts when `score >= t`.
+        thresholds: Thresholds to evaluate, each strictly between 0 and 1.
+
+    Returns:
+        A mapping with `threshold` (the grid, flattened) and, for each
+        threshold in the same order, `model`, `all` and `none` net benefit.
     """
     risk = np.asarray(scores, dtype=float)
     grid = [float(t) for t in np.asarray(thresholds, dtype=float).ravel()]

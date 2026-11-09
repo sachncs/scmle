@@ -1,4 +1,4 @@
-"""The short list of questions only a person can answer (feature F8).
+"""The short list of questions only a person can answer.
 
 A question is raised only if the data and the request cannot fill it, a
 tipping-point test shows it changes the verdict, and it has a closed form (a
@@ -63,14 +63,30 @@ class HumanQuestion:
     verdicts: tuple[str, str]
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Returns the question as a JSON-ready record.
+
+        Returns:
+            A mapping of every field to its value, with `verdicts` as a
+            list.
+        """
         record = dataclasses.asdict(self)
         record["verdicts"] = list(self.verdicts)
         return record
 
 
 def tipping_point(unknown: Unknown) -> HumanQuestion | None:
-    """The question for `unknown`, or None if the verdict never changes."""
+    """Finds where the verdict changes as `unknown` varies over its range.
+
+    The range is scanned on a grid of `GRID_POINTS` values and the first
+    change is located by bisection.
+
+    Args:
+        unknown: The quantity to vary.
+
+    Returns:
+        The question, carrying the tipping value, or None if the verdict
+        never changes over the range.
+    """
     grid = np.linspace(unknown.low, unknown.high, GRID_POINTS)
     labels = [unknown.verdict(float(v)) for v in grid]
     if len(set(labels)) == 1:
@@ -96,7 +112,7 @@ def tipping_point(unknown: Unknown) -> HumanQuestion | None:
 def ask(
     unknowns: Sequence[Unknown], derivable: Collection[str] = ()
 ) -> tuple[list[HumanQuestion], list[dict[str, Any]]]:
-    """Questions to raise, and the unknowns reported as robust.
+    """Decides which unknowns need a question and which are robust.
 
     Args:
         unknowns: What the request leaves open.
@@ -129,9 +145,28 @@ def ask(
 def gain_sign_verdict(
     y: ArrayLike, a: ArrayLike, b: ArrayLike
 ) -> Callable[[float], str]:
-    """Verdict `model_better` or `baseline_better` as a function of `t`."""
+    """Builds a verdict function over the threshold `t`.
+
+    Args:
+        y: Outcomes, 0 or 1.
+        a: Actions of the model rule, 0 or 1.
+        b: Decisions of the baseline, 0 or 1.
+
+    Returns:
+        A function mapping a threshold to `model_better` when the mean gain
+        of the model over the baseline is positive there, otherwise
+        `baseline_better`.
+    """
 
     def verdict(t: float) -> str:
+        """Labels which rule has the higher net benefit at threshold `t`.
+
+        Args:
+            t: Threshold, strictly between 0 and 1.
+
+        Returns:
+            `model_better` or `baseline_better`.
+        """
         gain = float(np.mean(baseline.paired_difference(y, a, b, t)))
         return "model_better" if gain > 0 else "baseline_better"
 

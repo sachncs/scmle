@@ -13,8 +13,8 @@ largest value whose upper Clopper-Pearson bound on the error rate among
 accepted drafts, on a calibration split, is at most `epsilon`. Self-
 consistency is agreement, not correctness: a consistently wrong model passes.
 Refusal protects only as far as disagreement predicts error, which the
-held-out corpus measures. That corpus does not exist yet, so no `tau` is on
-file and the LLM path is descriptive.
+held-out corpus measures. No such corpus ships with the package, so no `tau`
+is on file and the LLM path is descriptive.
 """
 
 from collections import Counter
@@ -58,11 +58,27 @@ class SlotSampler(Protocol):
     model_id: str
 
     def sample(self, prompt: str, index: int) -> Mapping[str, Any]:
-        """Returns one JSON-like proposal for the draw `index`."""
+        """Returns one JSON-like proposal for the draw `index`.
+
+        Args:
+            prompt: The prompt text.
+            index: Position of the draw among the `k` draws.
+
+        Returns:
+            A mapping from slot name to proposed value.
+        """
 
 
 def prompt_for(request_text: str, columns: Sequence[str]) -> str:
-    """The prompt text; hashed with the samples into the stored draft."""
+    """Builds the prompt text, hashed with the samples into the stored draft.
+
+    Args:
+        request_text: The request in plain language.
+        columns: Names of the data columns, listed in the prompt.
+
+    Returns:
+        The prompt asking for the charter slots as JSON.
+    """
     return (
         "Fill these charter slots as JSON: "
         + ", ".join(SLOT_NAMES)
@@ -79,12 +95,28 @@ class ReplaySampler:
     def __init__(
         self, model_id: str, recorded: Sequence[Mapping[str, Any]]
     ) -> None:
-        """Stores the proposals, served in order of draw index."""
+        """Stores the proposals, served in order of draw index.
+
+        Args:
+            model_id: Name of the model the proposals are attributed to.
+            recorded: The proposals, one per draw.
+        """
         self.model_id = model_id
         self.recorded = [dict(r) for r in recorded]
 
     def sample(self, prompt: str, index: int) -> Mapping[str, Any]:
-        """Returns the recorded proposal for `index`."""
+        """Returns the recorded proposal for `index`.
+
+        Args:
+            prompt: The prompt text (not used; the replay is fixed).
+            index: Position of the draw.
+
+        Returns:
+            The proposal recorded at position `index`.
+
+        Raises:
+            ConfigError: If fewer than `index + 1` proposals were recorded.
+        """
         if index >= len(self.recorded):
             raise errors.ConfigError("no recorded sample for this draw")
         return self.recorded[index]
@@ -93,7 +125,17 @@ class ReplaySampler:
 def draw(
     sampler: SlotSampler, prompt: str, k: int = DEFAULT_K
 ) -> list[dict[str, Any]]:
-    """Draws `k` proposals and keeps only those with known slot names."""
+    """Draws `k` proposals and keeps only the known slot names in each.
+
+    Args:
+        sampler: The source of proposals.
+        prompt: The prompt text.
+        k: Number of draws.
+
+    Returns:
+        One mapping per draw, holding only the entries whose key is in
+        `SLOT_NAMES`.
+    """
     out = []
     for index in range(k):
         proposal = sampler.sample(prompt, index)
@@ -102,7 +144,16 @@ def draw(
 
 
 def samples_hash(model_id: str, prompt: str, samples: Sequence[Any]) -> str:
-    """SHA-256 over model id, prompt and the raw samples."""
+    """Hashes the model id, the prompt and the raw samples together.
+
+    Args:
+        model_id: Name of the model.
+        prompt: The prompt text.
+        samples: The raw proposals.
+
+    Returns:
+        The SHA-256 hex digest of their canonical payload.
+    """
     body = {"model": model_id, "prompt": prompt, "samples": list(samples)}
     return hashlib.sha256(signing.canonical_payload(body)).hexdigest()
 
@@ -114,6 +165,16 @@ def population_ids(
 
     The grammar is `column op literal` joined by `and`; anything else is
     rejected, so a proposal is never evaluated as code.
+
+    Args:
+        frame: The data the predicate refers to.
+        predicate: The predicate text; empty, None, `true` and `all` select
+            every row.
+
+    Returns:
+        The positions of the selected rows, or None if a part does not
+        match the grammar, names a missing column, or compares a column to a
+        value of an incompatible type.
     """
     text = str(predicate or "").strip()
     mask = np.ones(len(frame), dtype=bool)
@@ -140,7 +201,18 @@ def population_ids(
 
 
 def canonical(frame: pd.DataFrame, slot: str, value: Any) -> Any:
-    """Canonical, hashable form of a slot value."""
+    """Puts a slot value in a canonical, hashable form.
+
+    Args:
+        frame: The data, used to evaluate a population predicate.
+        slot: The slot name.
+        value: The proposed value.
+
+    Returns:
+        For `unit`, the sorted tuple of column names; for `population`, the
+        set of selected row positions (None if the predicate is invalid);
+        for any other slot, the text of the value, or None if it is None.
+    """
     if slot == "unit":
         keys = [value] if isinstance(value, str) else list(value or [])
         return tuple(sorted(str(k) for k in keys))
@@ -150,7 +222,16 @@ def canonical(frame: pd.DataFrame, slot: str, value: Any) -> Any:
 
 
 def jaccard(first: frozenset[int], second: frozenset[int]) -> float:
-    """Jaccard similarity of two row sets (1 for two empty sets)."""
+    """Computes the Jaccard similarity of two row sets.
+
+    Args:
+        first: One set of row positions.
+        second: The other set.
+
+    Returns:
+        The size of the intersection over the size of the union, or 1.0 for
+        two empty sets.
+    """
     union = len(first | second)
     return 1.0 if union == 0 else len(first & second) / union
 
@@ -175,7 +256,20 @@ class Consensus:
 def consensus(
     frame: pd.DataFrame, samples: Sequence[Mapping[str, Any]]
 ) -> Consensus:
-    """Canonical values, agreement and ambiguity of `samples`."""
+    """Computes canonical values, agreement and ambiguity of `samples`.
+
+    Args:
+        frame: The data, used to evaluate population predicates.
+        samples: The proposals drawn for one request.
+
+    Returns:
+        The modal raw value of each slot, the agreement `m_s` of each
+        critical slot, the ambiguity score, and the critical slots whose
+        agreement is below 1.
+
+    Raises:
+        ValueError: If there are no samples.
+    """
     if not samples:
         raise ValueError("at least one sample is needed")
     values: dict[str, Any] = {}
@@ -217,7 +311,17 @@ def consensus(
 def clopper_pearson_upper(
     errors_count: int, n: int, level: float = 0.95
 ) -> float:
-    """One-sided upper Clopper-Pearson bound on an error rate."""
+    """Computes a one-sided upper Clopper-Pearson bound on an error rate.
+
+    Args:
+        errors_count: Number of errors observed.
+        n: Number of trials.
+        level: Confidence level of the bound.
+
+    Returns:
+        The upper bound; 1.0 when there are no trials or every trial is an
+        error.
+    """
     if n < 1:
         return 1.0
     if errors_count >= n:
@@ -242,7 +346,12 @@ class Calibration:
     curve: tuple[tuple[float, float, float, float], ...]
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record (the risk-coverage certificate)."""
+        """Returns the calibration as a JSON-ready record.
+
+        Returns:
+            The risk-coverage certificate: `tau`, `epsilon`,
+            `n_calibration` and the curve as lists.
+        """
         return {
             "tau": self.tau,
             "epsilon": self.epsilon,
@@ -267,6 +376,10 @@ def calibrate_tau(
 
     Returns:
         The calibration. `tau` is None when no candidate meets `epsilon`.
+
+    Raises:
+        ValueError: If `ambiguity` and `wrong` differ in length or are
+            empty.
     """
     scores = np.asarray(ambiguity, dtype=float)
     bad = np.asarray(wrong, dtype=bool)
@@ -286,10 +399,27 @@ def calibrate_tau(
 
 
 def refuse(ambiguity: float, tau: float | None) -> bool:
-    """Whether to refuse: no calibrated `tau`, or `A > tau`."""
+    """Decides whether to refuse a draft.
+
+    Args:
+        ambiguity: The ambiguity score `A` of the draft.
+        tau: The calibrated largest accepted ambiguity, or None if there is
+            none.
+
+    Returns:
+        True when there is no calibrated `tau` or `ambiguity > tau`.
+    """
     return tau is None or ambiguity > tau
 
 
 def dump(value: Any) -> str:
-    """Stable JSON text, for artifacts."""
+    """Serialises a value as stable JSON text, for artifacts.
+
+    Args:
+        value: The value to serialise. Sets and other values JSON cannot
+            encode are converted with `list`.
+
+    Returns:
+        Indented JSON with sorted keys.
+    """
     return json.dumps(value, indent=2, sort_keys=True, default=list)
