@@ -52,7 +52,11 @@ class SplitManifest:
 
     @property
     def fingerprint(self) -> str:
-        """Deterministic hash of the entire split."""
+        """The first 16 hex digits of a SHA-256 hash of the entire split.
+
+        The hash covers the strategy name, seed, train and test ids and folds,
+        so equal splits have equal fingerprints.
+        """
         payload = repr(
             (
                 self.strategy,
@@ -65,7 +69,13 @@ class SplitManifest:
         return hashlib.sha256(payload.encode()).hexdigest()[:16]
 
     def to_dict(self) -> dict:
-        """Returns a JSON-serializable mapping."""
+        """Converts the manifest to a JSON-serializable mapping.
+
+        Returns:
+            A dict with the strategy, seed, fingerprint, row counts, the train
+            and test ids as lists, the folds as `{"train": ..., "val": ...}`
+            dicts of positions, and the notes as a list.
+        """
         return {
             "strategy": self.strategy,
             "seed": self.seed,
@@ -112,7 +122,11 @@ class LockedTestSet(abc.ABC):
 
     @abc.abstractmethod
     def issue_token(self) -> str:
-        """Returns the release token; call only once selection is frozen."""
+        """Returns the release token; call only once selection is frozen.
+
+        Returns:
+            The token that `open` requires.
+        """
 
     @abc.abstractmethod
     def bind(self, binding: str) -> None:
@@ -143,7 +157,8 @@ class LockedTestSet(abc.ABC):
             Test features and labels.
 
         Raises:
-            LeakageError: On a wrong token or a repeated release.
+            LeakageError: On a wrong token, a repeated release or a binding
+                that differs from the one set.
         """
 
     @abc.abstractmethod
@@ -151,7 +166,11 @@ class LockedTestSet(abc.ABC):
         """Releases any resource held for the lock."""
 
     def __len__(self) -> int:
-        """Number of test rows."""
+        """Returns the number of test rows.
+
+        Returns:
+            The length of `ids`.
+        """
         return len(self.ids)
 
 
@@ -183,11 +202,23 @@ class ResidentTestSet(LockedTestSet):
     binding: str | None = None
 
     def issue_token(self) -> str:
-        """Returns the release token; call only once selection is frozen."""
+        """Returns the release token; call only once selection is frozen.
+
+        Returns:
+            The token that `open` requires.
+        """
         return self.token
 
     def bind(self, binding: str) -> None:
-        """Fixes what the single release is for."""
+        """Fixes what the single release is for.
+
+        Args:
+            binding: Digest of the selection the release is meant to test.
+
+        Raises:
+            LeakageError: If a binding is already set or the rows were
+                released.
+        """
         if self.binding is not None or self.opened:
             raise errors.LeakageError("test set is already bound or used")
         self.binding = binding
@@ -195,7 +226,19 @@ class ResidentTestSet(LockedTestSet):
     def open(
         self, token: str, binding: str | None = None
     ) -> tuple[pd.DataFrame, pd.Series]:
-        """Releases the test data a single time."""
+        """Releases the test data a single time.
+
+        Args:
+            token: The token from `issue_token`.
+            binding: The binding fixed by `bind`; required once one is set.
+
+        Returns:
+            Test features and labels.
+
+        Raises:
+            LeakageError: On a wrong token, a repeated release or a binding
+                that differs from the one set.
+        """
         if token != self.token:
             raise errors.LeakageError("test set is locked: invalid token")
         if self.opened:
@@ -229,7 +272,14 @@ class SplitResult:
 
 
 def to_ids(values: np.ndarray) -> tuple[int, ...]:
-    """Converts an index array to a tuple of Python ints."""
+    """Converts an index array to a tuple of Python ints.
+
+    Args:
+        values: Row ids or positions.
+
+    Returns:
+        The same values, in order, as plain Python ints.
+    """
     return tuple(int(v) for v in values)
 
 
@@ -238,6 +288,10 @@ class SplitStrategy(abc.ABC):
 
     Attributes:
         name: Strategy name used in configuration.
+        supported_tasks: Task types the strategy can serve.
+        data: The data section of the project specification.
+        validation: The validation section of the project specification.
+        task: The resolved task type.
     """
 
     name: ClassVar[str]
@@ -248,12 +302,12 @@ class SplitStrategy(abc.ABC):
     def __init__(self, spec: tasks.ProjectSpec, task: tasks.TaskType) -> None:
         """Initializes the strategy.
 
+        The task is checked by `check_task`, so a `BlockedError` from it
+        propagates when the strategy cannot serve the task.
+
         Args:
             spec: Project specification.
             task: Resolved task type.
-
-        Raises:
-            BlockedError: If the strategy cannot serve the task.
         """
         self.data = spec.data
         self.validation = spec.validation
@@ -279,7 +333,7 @@ class SplitStrategy(abc.ABC):
             frame: The full dataset including the target column.
 
         Returns:
-            The partition.
+            The development ids, test ids, folds and notes.
 
         Raises:
             BlockedError: If a leakage-free split is impossible.
@@ -292,13 +346,32 @@ class RandomSplit(SplitStrategy):
     name = "random"
 
     def stratify_labels(self, frame: pd.DataFrame) -> pd.Series | None:
-        """Labels to stratify the holdout on; none for plain random."""
+        """Labels to stratify the holdout on; none for plain random.
+
+        Args:
+            frame: The full dataset including the target column.
+
+        Returns:
+            None, so the holdout is not stratified. Subclasses return one
+            label per row of the frame.
+        """
         return None
 
     def cross_validation_folds(
         self, frame: pd.DataFrame, dev_ids: np.ndarray, notes: list[str]
     ) -> list[Fold]:
-        """Builds shuffled K-fold splits over positions in `dev_ids`."""
+        """Builds shuffled K-fold splits over positions in `dev_ids`.
+
+        Args:
+            frame: The full dataset including the target column.
+            dev_ids: Row ids of the development partition.
+            notes: Adjustments made while splitting; subclasses append to it
+                when they change the number of folds.
+
+        Returns:
+            One `(train, validation)` pair of position arrays into `dev_ids`
+            for each of the configured number of folds.
+        """
         splitter = model_selection.KFold(
             n_splits=self.validation.folds,
             shuffle=True,
@@ -313,6 +386,10 @@ class RandomSplit(SplitStrategy):
         development part needs at least as many rows as classes. A table too
         small for that fails inside scikit-learn with a message about
         `test_size`; this says what to do instead.
+
+        Args:
+            rows: Number of rows in the dataset.
+            labels: The class label of each row.
 
         Raises:
             DataError: If `rows` is too few for the classes and the fraction.
@@ -331,7 +408,19 @@ class RandomSplit(SplitStrategy):
             )
 
     def partition(self, frame: pd.DataFrame) -> Partition:
-        """Random holdout followed by K-fold on the development rows."""
+        """Random holdout followed by K-fold on the development rows.
+
+        A `DataError` from `require_rows_per_class` propagates when a
+        stratified holdout cannot hold every class, and subclasses may raise
+        a `BlockedError` when they cannot stratify or fold the rows.
+
+        Args:
+            frame: The full dataset including the target column.
+
+        Returns:
+            The sorted development and test ids, the folds over development
+            positions and any notes.
+        """
         labels = self.stratify_labels(frame)
         if labels is not None:
             self.require_rows_per_class(len(frame), labels)
@@ -356,7 +445,17 @@ class StratifiedSplit(RandomSplit):
     )
 
     def stratify_labels(self, frame: pd.DataFrame) -> pd.Series:
-        """Stratifies on the target; every class needs two examples."""
+        """Stratifies on the target; every class needs two examples.
+
+        Args:
+            frame: The full dataset including the target column.
+
+        Returns:
+            The target column.
+
+        Raises:
+            BlockedError: If a class has fewer than two examples.
+        """
         labels = frame[self.data.target]
         if (labels.value_counts() < 2).any():
             raise errors.BlockedError(
@@ -367,7 +466,21 @@ class StratifiedSplit(RandomSplit):
     def cross_validation_folds(
         self, frame: pd.DataFrame, dev_ids: np.ndarray, notes: list[str]
     ) -> list[Fold]:
-        """Stratified K-fold, shrinking K to the rarest class if needed."""
+        """Stratified K-fold, shrinking K to the rarest class if needed.
+
+        Args:
+            frame: The full dataset including the target column.
+            dev_ids: Row ids of the development partition.
+            notes: Adjustments made while splitting; gets a note when the
+                number of folds is reduced.
+
+        Returns:
+            One `(train, validation)` pair of position arrays into `dev_ids`
+            for each fold.
+
+        Raises:
+            BlockedError: If a class has fewer than two development rows.
+        """
         labels = frame[self.data.target].iloc[dev_ids]
         rarest = int(labels.value_counts().min())
         if rarest < 2:
@@ -393,11 +506,28 @@ class EventStratifiedSplit(RandomSplit):
     supported_tasks = frozenset({tasks.TaskType.SURVIVAL})
 
     def events(self, frame: pd.DataFrame) -> pd.Series:
-        """The 0/1 event column."""
+        """Selects the 0/1 event column.
+
+        Args:
+            frame: The full dataset.
+
+        Returns:
+            The event column, one value per row.
+        """
         return frame[self.data.event_column]
 
     def stratify_labels(self, frame: pd.DataFrame) -> pd.Series:
-        """Stratifies the holdout on the event indicator."""
+        """Stratifies the holdout on the event indicator.
+
+        Args:
+            frame: The full dataset.
+
+        Returns:
+            The event column.
+
+        Raises:
+            BlockedError: If events or censored rows number fewer than two.
+        """
         events = self.events(frame)
         if (events.value_counts() < 2).any():
             raise errors.BlockedError(
@@ -408,7 +538,22 @@ class EventStratifiedSplit(RandomSplit):
     def cross_validation_folds(
         self, frame: pd.DataFrame, dev_ids: np.ndarray, notes: list[str]
     ) -> list[Fold]:
-        """Stratified K-fold on events, so every fold has events to rank."""
+        """Stratified K-fold on events, so every fold has events to rank.
+
+        Args:
+            frame: The full dataset.
+            dev_ids: Row ids of the development partition.
+            notes: Adjustments made while splitting; gets a note when the
+                number of folds is reduced.
+
+        Returns:
+            One `(train, validation)` pair of position arrays into `dev_ids`
+            for each fold.
+
+        Raises:
+            BlockedError: If events or censored rows number fewer than two
+                among the development rows.
+        """
         events = self.events(frame).iloc[dev_ids]
         rarest = int(events.value_counts().min())
         if rarest < 2:
@@ -432,11 +577,27 @@ class MultilabelStratifiedSplit(RandomSplit):
     supported_tasks = frozenset({tasks.TaskType.MULTILABEL})
 
     def label_matrix(self, frame: pd.DataFrame) -> np.ndarray:
-        """The 0/1 matrix of all label columns."""
+        """Collects all label columns into one matrix.
+
+        Args:
+            frame: The full dataset.
+
+        Returns:
+            An integer matrix with one row per frame row and one column per
+            label, in the order of the configured targets.
+        """
         return frame[self.data.targets].to_numpy().astype(int)
 
     def partition(self, frame: pd.DataFrame) -> Partition:
-        """Iteratively stratified holdout, then folds over development."""
+        """Iteratively stratified holdout, then folds over development.
+
+        Args:
+            frame: The full dataset.
+
+        Returns:
+            The development and test ids, the folds over development
+            positions and any notes.
+        """
         labels = self.label_matrix(frame)
         share = self.validation.test_fraction
         side = iterative.iterative_assignment(
@@ -451,7 +612,18 @@ class MultilabelStratifiedSplit(RandomSplit):
     def cross_validation_folds(
         self, frame: pd.DataFrame, dev_ids: np.ndarray, notes: list[str]
     ) -> list[Fold]:
-        """Iteratively stratified folds over the development rows."""
+        """Iteratively stratified folds over the development rows.
+
+        Args:
+            frame: The full dataset.
+            dev_ids: Row ids of the development partition.
+            notes: Adjustments made while splitting; gets a note naming the
+                labels that are absent from some validation fold.
+
+        Returns:
+            One `(train, validation)` pair of position arrays into `dev_ids`
+            for each configured fold.
+        """
         count = self.validation.folds
         assignment = iterative.iterative_assignment(
             self.label_matrix(frame)[dev_ids],
@@ -485,7 +657,15 @@ class TreatmentStratifiedSplit(RandomSplit):
     supported_tasks = frozenset({tasks.TaskType.UPLIFT})
 
     def cells(self, frame: pd.DataFrame) -> pd.Series:
-        """Treatment arm combined with a binary outcome (arm alone else)."""
+        """Combines the treatment arm with a binary outcome.
+
+        Args:
+            frame: The full dataset.
+
+        Returns:
+            For a 0/1 outcome, `2 * arm + outcome` per row; otherwise the
+            treatment arm alone.
+        """
         arm = frame[self.data.treatment_column].astype(int)
         outcome = frame[self.data.target]
         if set(pd.unique(outcome.dropna())) <= {0, 1}:
@@ -493,7 +673,17 @@ class TreatmentStratifiedSplit(RandomSplit):
         return arm
 
     def stratify_labels(self, frame: pd.DataFrame) -> pd.Series:
-        """Stratifies the holdout on the arm / outcome cell."""
+        """Stratifies the holdout on the arm / outcome cell.
+
+        Args:
+            frame: The full dataset.
+
+        Returns:
+            The arm / outcome cell of each row.
+
+        Raises:
+            BlockedError: If a cell has fewer than two rows.
+        """
         cells = self.cells(frame)
         if (cells.value_counts() < 2).any():
             raise errors.BlockedError(
@@ -504,7 +694,21 @@ class TreatmentStratifiedSplit(RandomSplit):
     def cross_validation_folds(
         self, frame: pd.DataFrame, dev_ids: np.ndarray, notes: list[str]
     ) -> list[Fold]:
-        """Stratified K-fold on the cells, shrinking K for rare ones."""
+        """Stratified K-fold on the cells, shrinking K for rare ones.
+
+        Args:
+            frame: The full dataset.
+            dev_ids: Row ids of the development partition.
+            notes: Adjustments made while splitting; gets a note when the
+                number of folds is reduced.
+
+        Returns:
+            One `(train, validation)` pair of position arrays into `dev_ids`
+            for each fold.
+
+        Raises:
+            BlockedError: If the rarest cell leaves fewer than two folds.
+        """
         cells = self.cells(frame).iloc[dev_ids]
         rarest = int(cells.value_counts().min())
         folds = min(self.validation.folds, rarest)
@@ -531,7 +735,17 @@ class PresetSplit(RandomSplit):
     name = "preset"
 
     def partition(self, frame: pd.DataFrame) -> Partition:
-        """Reads the sides from the column; folds over the development rows."""
+        """Reads the sides from the column; folds over the development rows.
+
+        Args:
+            frame: The full dataset, with the streaming split column.
+
+        Returns:
+            The development and test ids taken from the split column, folds
+            over development positions and a note that the split was decided
+            while streaming. Classification uses stratified folds, with at
+            least two, otherwise shuffled folds.
+        """
         side = frame[streaming.SPLIT_COLUMN].to_numpy()
         dev_ids = np.flatnonzero(side == streaming.DEVELOPMENT)
         test_ids = np.flatnonzero(side == streaming.LOCKED)
@@ -556,7 +770,21 @@ class GroupSplit(SplitStrategy):
     name = "group"
 
     def partition(self, frame: pd.DataFrame) -> Partition:
-        """Group-disjoint holdout and group K-fold."""
+        """Group-disjoint holdout and group K-fold.
+
+        Args:
+            frame: The full dataset including the target column.
+
+        Returns:
+            The development and test ids, group-disjoint folds over
+            development positions and any notes. Classification folds each
+            contain every class.
+
+        Raises:
+            BlockedError: If the group column has missing values, there are
+                fewer than `folds + 2` groups, or (for classification) no
+                group-disjoint folds keep every class.
+        """
         column = self.data.group_column or self.data.query_column
         groups = frame[column].to_numpy()
         if pd.isna(groups).any():
@@ -606,6 +834,17 @@ class GroupSplit(SplitStrategy):
         metrics such as ROC-AUC are undefined otherwise. Tries the requested
         number of folds, then fewer.
 
+        Args:
+            labels: Class label of each development row.
+            groups: Group of each development row.
+            folds: The requested number of folds.
+            notes: Adjustments made while splitting; gets a note when fewer
+                folds are used.
+
+        Returns:
+            One `(train, validation)` pair of position arrays for each fold,
+            with groups kept disjoint between the two.
+
         Raises:
             BlockedError: If no group-disjoint split keeps all classes in
                 every fold.
@@ -647,6 +886,14 @@ class TemporalSplit(SplitStrategy):
         A forecast row's target looks `horizon` steps ahead, so the rows just
         before a window would otherwise train on the window's own values; the
         embargo covers `horizon` time steps of every series.
+
+        Args:
+            frame: The full dataset.
+
+        Returns:
+            The configured embargo rows when no horizon is set; otherwise the
+            larger of that and the horizon times the number of series (the
+            groups, or one).
         """
         configured = self.validation.embargo_rows
         horizon = self.data.horizon
@@ -663,6 +910,9 @@ class TemporalSplit(SplitStrategy):
         self, frame: pd.DataFrame
     ) -> tuple[np.ndarray, np.ndarray]:
         """Orders rows in time and holds out the latest for the final test.
+
+        Args:
+            frame: The full dataset.
 
         Returns:
             Development row positions (oldest first, an embargo before the
@@ -685,7 +935,19 @@ class TemporalSplit(SplitStrategy):
         return order[: rows - test_rows - embargo], order[rows - test_rows :]
 
     def partition(self, frame: pd.DataFrame) -> Partition:
-        """Chronological holdout and expanding-window folds."""
+        """Chronological holdout and expanding-window folds.
+
+        Args:
+            frame: The full dataset.
+
+        Returns:
+            The development and test positions, the folds listed latest
+            window first, and notes on the embargo and fold order.
+
+        Raises:
+            BlockedError: If the time column cannot order the rows or there
+                are too few development rows for the folds and embargo.
+        """
         dev_ids, test_ids = self.chronological_holdout(frame)
         embargo = self.embargo(frame)
         folds = self.validation.folds
@@ -721,7 +983,20 @@ class RollingSplit(TemporalSplit):
     name = "rolling"
 
     def partition(self, frame: pd.DataFrame) -> Partition:
-        """Chronological holdout and sliding training/validation windows."""
+        """Chronological holdout and sliding training/validation windows.
+
+        Args:
+            frame: The full dataset.
+
+        Returns:
+            The development and test positions, the rolling windows listed
+            latest first as `(train, validation)` position arrays, and notes
+            describing them.
+
+        Raises:
+            BlockedError: If the time column cannot order the rows or fewer
+                than two windows fit.
+        """
         dev_ids, test_ids = self.chronological_holdout(frame)
         validation = self.validation
         rows = len(dev_ids)
@@ -809,7 +1084,13 @@ def resolve_strategy_name(spec: tasks.ProjectSpec, task: tasks.TaskType) -> str:
 
 
 class SplitManager:
-    """Selects and applies the validation protocol for a project."""
+    """Selects and applies the validation protocol for a project.
+
+    Attributes:
+        spec: Project specification.
+        task: Resolved task type.
+        strategy_name: Name of the strategy chosen for the project.
+    """
 
     def __init__(self, spec: tasks.ProjectSpec, task: tasks.TaskType) -> None:
         """Initializes the manager.
@@ -823,7 +1104,17 @@ class SplitManager:
         self.strategy_name = resolve_strategy_name(spec, task)
 
     def feature_columns(self, frame: pd.DataFrame) -> list[str]:
-        """Columns that describe a record (everything but the roles)."""
+        """Finds the columns that describe a record.
+
+        Args:
+            frame: The full dataset.
+
+        Returns:
+            The frame's column names, in order, other than those with a role:
+            target, treatment, baseline, propensity, logged action, targets,
+            group, time, weight, event, id, excluded and unavailable at
+            prediction.
+        """
         data = self.spec.data
         roles = {
             data.target,
@@ -845,7 +1136,17 @@ class SplitManager:
     def keep_duplicates_together(
         self, frame: pd.DataFrame, part: Partition
     ) -> Partition:
-        """Moves copies of one record to the same side of every split."""
+        """Moves copies of one record to the same side of every split.
+
+        Args:
+            frame: The full dataset.
+            part: The partition to adjust.
+
+        Returns:
+            `part` itself when no rows are duplicated; otherwise a new
+            partition with each duplicate group wholly in development or
+            test, and a note counting the groups and rows kept together.
+        """
         groups = duplicates.duplicate_groups(frame, self.feature_columns(frame))
         if (groups == duplicates.NOT_DUPLICATED).all():
             return part
@@ -862,6 +1163,10 @@ class SplitManager:
 
     def split(self, frame: pd.DataFrame) -> SplitResult:
         """Splits the dataset.
+
+        Errors from the chosen strategy propagate: a `BlockedError` when it
+        cannot serve the task or split the data without leakage, and a
+        `DataError` when a stratified holdout cannot hold every class.
 
         Args:
             frame: The full dataset including the target column.

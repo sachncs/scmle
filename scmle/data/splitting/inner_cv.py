@@ -63,13 +63,34 @@ class StructuredKFold(model_selection.BaseCrossValidator):
     def get_n_splits(
         self, features: Any = None, y: Any = None, groups: Any = None
     ) -> int:
-        """Returns the number of inner folds."""
+        """Returns the number of inner folds.
+
+        Args:
+            features: Ignored; present for the scikit-learn interface.
+            y: Ignored; present for the scikit-learn interface.
+            groups: Ignored; present for the scikit-learn interface.
+
+        Returns:
+            The configured number of inner folds.
+        """
         return self.n_splits
 
     def split(
         self, features: Any, y: Any = None, groups: Any = None
     ) -> Iterator[tuple[np.ndarray, np.ndarray]]:
-        """Yields (train, validation) positions for each inner fold."""
+        """Yields (train, validation) positions for each inner fold.
+
+        Args:
+            features: The training frame. A DataFrame is needed for the group
+                and time structures; anything else gets the unstructured
+                fallback.
+            y: Labels, used to stratify when `classification` is set.
+            groups: Ignored; the group column of `features` is used instead.
+
+        Yields:
+            A pair of integer arrays: the positions to fit on and the
+            positions to validate on, one pair per inner fold.
+        """
         frame = features if isinstance(features, pd.DataFrame) else None
         if frame is not None and self.group_column in frame.columns:
             keys = frame[self.group_column].astype(str).to_numpy()
@@ -99,7 +120,17 @@ def for_plan(
     folds: int,
     seed: int,
 ) -> StructuredKFold:
-    """Builds the inner splitter matching a feature plan's structure."""
+    """Builds the inner splitter matching a feature plan's structure.
+
+    Args:
+        plan: The feature plan whose group and time columns are used.
+        classification: Whether to stratify by label.
+        folds: Number of inner folds.
+        seed: Seed for shuffled folds.
+
+    Returns:
+        A splitter using the plan's group and time columns.
+    """
     return StructuredKFold(
         folds, plan.group_column, plan.time_column, classification, seed
     )

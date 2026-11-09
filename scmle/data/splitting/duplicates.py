@@ -16,14 +16,16 @@ NOT_DUPLICATED = -1
 
 
 def duplicate_groups(frame: pd.DataFrame, columns: list[str]) -> np.ndarray:
-    """Group id per row; rows with no copy get `NOT_DUPLICATED`.
+    """Labels each row with the id of its duplicate group.
 
     Args:
         frame: The full dataset.
         columns: Feature columns that define a record.
 
     Returns:
-        An integer array aligned with the frame's rows.
+        An integer array aligned with the frame's rows. Rows with no copy
+        get `NOT_DUPLICATED`; rows whose features match share one group id.
+        An empty `columns` list marks every row `NOT_DUPLICATED`.
     """
     if not columns:
         return np.full(len(frame), NOT_DUPLICATED)
@@ -40,7 +42,17 @@ def duplicate_groups(frame: pd.DataFrame, columns: list[str]) -> np.ndarray:
 
 
 def majority(values: list[int]) -> int:
-    """Most common value; the smallest wins ties (the conservative side)."""
+    """Finds the most common value, preferring the smallest on a tie.
+
+    An empty list is not valid: `max` fails on it with a `ValueError`.
+
+    Args:
+        values: A non-empty list of integers.
+
+    Returns:
+        The value that occurs most often; among equally common values, the
+        smallest (the conservative side).
+    """
     counts = Counter(values)
     best = max(counts.values())
     return min(value for value, count in counts.items() if count == best)
