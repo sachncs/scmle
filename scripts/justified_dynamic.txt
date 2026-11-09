@@ -1,0 +1,4 @@
+# Names used through a name built at run time, which a static scan cannot see.
+# Format: MODULE_GLOB NAME_GLOB reason (the reason is required).
+# An entry stays only while the dynamic use it names still exists.
+scmle/cli.py run_* subcommand dispatch getattr(self, f"run_{...}") at cli.py:906,1047,1285,1491,1686

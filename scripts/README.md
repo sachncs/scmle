@@ -23,6 +23,9 @@ test under `tests/unit/`. Run any script with `uv run python scripts/<name>.py`.
 | `verify_external_release.py` | After publishing, the public tag and the PyPI files match the locally built artifacts by digest. | `release.yml` |
 | `verify_release_review.py` | An independent release-review record covers every required claim for an exact commit. | release review ([`docs/RELEASING.md`](../docs/RELEASING.md)) |
 | `release_preflight.sh` | Runs the whole local release evidence chain: build, lint, types, bandit, pip-audit, API check, tests. | `release.yml`, maintainers |
+| `admit.py` | Runs a heavy command (tests, coverage, mutation, profiling) only when the one-minute load average and free memory allow, within a limited number of slots, with math-library threads set to 1. Not run by CI; a maintainer tool for a shared machine. | maintainers, `tests/unit/test_admit_script.py` |
+| `check_justified.py` | Lists functions and classes that nothing justifies: unreferenced, referenced only by tests, pass-throughs, getters, stateless one-method classes and single-implementation interfaces. Static and by name, so it under-reports; `justified_dynamic.txt` declares names used through run-time-built names, each with a reason. Report-only today (`--strict` fails while candidates remain); not yet a CI gate. | maintainers, `tests/unit/test_check_justified_script.py` |
+| `justified_dynamic.txt` | The declared run-time-built names (data for the script above). | `check_justified.py` |
 
 Adding a script: give it an argparse interface and a docstring, add a test,
 wire it into a workflow, and add a row here. Scripts that nothing calls are

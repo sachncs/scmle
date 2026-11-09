@@ -44,6 +44,10 @@
     {
       "category": "environment",
       "pattern": "^docker is not installed$"
+    },
+    {
+      "category": "environment",
+      "pattern": "^POSIX load average and slot directories$"
     }
   ]
 }
