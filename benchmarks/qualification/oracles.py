@@ -91,20 +91,38 @@ class Oracle:
 
 
 def canonical(record: Mapping[str, Any]) -> str:
-    """Stable JSON used for hashing and for the files themselves."""
+    """Stable JSON used for hashing and for the files themselves.
+
+    Args:
+        record: JSON-serialisable mapping without NaN or infinity.
+
+    Returns:
+        Compact JSON text with sorted keys.
+    """
     return json.dumps(
         record, sort_keys=True, separators=(",", ":"), allow_nan=False
     )
 
 
 def content_digest(record: Mapping[str, Any]) -> str:
-    """SHA-256 of a record without its own `content_sha256`."""
+    """SHA-256 of a record without its own `content_sha256`.
+
+    Args:
+        record: The oracle record.
+
+    Returns:
+        The hex digest of the canonical JSON of the other fields.
+    """
     body = {k: v for k, v in record.items() if k != "content_sha256"}
     return hashlib.sha256(canonical(body).encode("utf-8")).hexdigest()
 
 
 def generator_sha256() -> str:
-    """SHA-256 of the generator's current source file."""
+    """SHA-256 of the generator's current source file.
+
+    Returns:
+        The hex digest of `make_oracles.py` as it is now.
+    """
     return hashlib.sha256(GENERATOR.read_bytes()).hexdigest()
 
 
@@ -152,7 +170,14 @@ def load_oracle(name: str, directory: Path = ORACLE_DIR) -> Oracle:
 
 
 def is_number(value: Any) -> bool:
-    """Whether `value` is a real number (not a bool)."""
+    """Whether `value` is a real number (not a bool).
+
+    Args:
+        value: Any value.
+
+    Returns:
+        True for an int or float that is not a bool.
+    """
     return isinstance(value, int | float) and not isinstance(value, bool)
 
 
@@ -163,7 +188,22 @@ def differences(
     abs_tol: float,
     path: str,
 ) -> list[tuple[str, str, float]]:
-    """Disagreements as (path, description, error); empty when equal."""
+    """Disagreements as (path, description, error); empty when equal.
+
+    Mappings must have equal keys and sequences equal length; other numbers
+    are compared as in `assert_agrees`, and non-numbers by equality.
+
+    Args:
+        actual: Value from our code.
+        expected: Reference value of the same shape.
+        rel_tol: Relative tolerance.
+        abs_tol: Absolute tolerance.
+        path: Location of this value, used to label disagreements.
+
+    Returns:
+        One tuple per disagreement: where, what, and the relative error
+        (infinite for structural or non-numeric differences).
+    """
     if isinstance(expected, Mapping):
         if not isinstance(actual, Mapping) or set(actual) != set(expected):
             return [(path, "keys differ", math.inf)]

@@ -1,4 +1,4 @@
-"""Certificate for the leakage screen with multiplicity control (canon P1).
+"""Certificate for the leakage screen with multiplicity control.
 
 The detector is `scmle.data.admissibility.screen` (id `f4-leakage-screen`),
 the test that replaced the profiler's fixed cutoffs. It is measured on the
@@ -24,7 +24,7 @@ breast-cancer table that ships with scikit-learn, with the settings
 * The old profiler rule (association at least 0.98, or a missingness score
   of at least 0.9) is scored on the same worlds and plants as a baseline.
 
-Plants are synthetic, so recall is optimistic (canon limits).
+Plants are synthetic, so recall is optimistic.
 
     python -m benchmarks.qualification.screen_certify --write
     python -m benchmarks.qualification.screen_certify --check
@@ -70,7 +70,18 @@ Z_99 = f4_certify.Z_99
 
 
 def plant_column(frame: pd.DataFrame, defect: str, seed: int) -> pd.Series:
-    """The planted leak column for one defect type."""
+    """The planted leak column for one defect type.
+
+    Args:
+        frame: The clean table, including the target.
+        defect: A leak type in `DEFECTS`.
+        seed: Run seed.
+
+    Returns:
+        The planted column, aligned to `frame`; for `leak_rare_record` it is
+        standard normal noise recorded only for a random quarter of the rows
+        that share the first row's class (missing elsewhere).
+    """
     if defect != "leak_rare_record":
         return f4_certify.plant_leak(frame, defect, seed)
     rng = randomness.component_rng(seed, "screen.rare", 0)
@@ -81,14 +92,32 @@ def plant_column(frame: pd.DataFrame, defect: str, seed: int) -> pd.Series:
 
 
 def real_columns(frame: pd.DataFrame, count: int, seed: int) -> list[str]:
-    """A random subset of the real feature columns."""
+    """A random subset of the real feature columns.
+
+    Args:
+        frame: The table, including the target.
+        count: Number of columns to pick.
+        seed: Run seed.
+
+    Returns:
+        The chosen column names, in table order.
+    """
     rng = randomness.component_rng(seed, "screen.columns", 0)
     names = [c for c in frame.columns if c != TARGET]
     return [names[i] for i in sorted(rng.choice(len(names), count, False))]
 
 
 def with_gaps(features: pd.DataFrame, seed: int) -> pd.DataFrame:
-    """Deletes values completely at random from the first columns."""
+    """Deletes values completely at random from the first columns.
+
+    Args:
+        features: Feature table.
+        seed: Run seed.
+
+    Returns:
+        A copy in which `GAP_RATE` of the values of the first `GAP_COLUMNS`
+        columns are missing.
+    """
     rng = randomness.component_rng(seed, "screen.gaps", 0)
     out = features.copy()
     for name in list(out.columns)[:GAP_COLUMNS]:
@@ -97,7 +126,17 @@ def with_gaps(features: pd.DataFrame, seed: int) -> pd.DataFrame:
 
 
 def old_rule(frame: pd.DataFrame, names: Sequence[str]) -> dict[str, bool]:
-    """The retired profiler cutoffs, per column."""
+    """The retired profiler cutoffs, per column.
+
+    Args:
+        frame: Table including the target column.
+        names: Columns to judge.
+
+    Returns:
+        Mapping of column name to True when its association with the target
+        is at least `OLD_ASSOCIATION` or its missingness association at
+        least `OLD_MISSINGNESS`.
+    """
     target = frame[TARGET]
     flagged = {}
     for name in names:
@@ -112,13 +151,33 @@ def old_rule(frame: pd.DataFrame, names: Sequence[str]) -> dict[str, bool]:
 
 
 def run_screen(frame: pd.DataFrame, seed: int, groups: Any = None) -> Any:
-    """Screens every column but the target with the certified settings."""
+    """Screens every column but the target with the certified settings.
+
+    Args:
+        frame: Table including the target column.
+        seed: Run seed of the screen.
+        groups: Optional row groups for grouped permutation.
+
+    Returns:
+        The screen report.
+    """
     cfg = dataclasses.replace(leakage.CERTIFIED, run_seed=seed)
     return screen.screen(frame, TARGET, "classification", cfg, groups=groups)
 
 
 def null_replicate(seed: int, grouped: bool = False) -> dict[str, Any]:
-    """One null world: permuted outcome, gaps in two columns."""
+    """One null world: permuted outcome, gaps in two columns.
+
+    Args:
+        seed: Replicate seed.
+        grouped: Whether rows come in groups of `GROUP_SIZE` that are
+            permuted together.
+
+    Returns:
+        Whether the screen found any suspect or any significant column, the
+        size of the tested family, and whether the old rule flagged any
+        column.
+    """
     frame = f4_certify.breast_cancer()
     names = real_columns(frame, TABLE_COLUMNS, seed)
     groups = (
@@ -142,7 +201,17 @@ def null_replicate(seed: int, grouped: bool = False) -> dict[str, Any]:
 
 
 def plant_replicate(defect: str, seed: int) -> dict[str, Any]:
-    """One planted leak among real columns."""
+    """One planted leak among real columns.
+
+    Args:
+        defect: Leak type to plant.
+        seed: Replicate seed.
+
+    Returns:
+        Whether the planted column was found by the mechanism of its type,
+        whether it was a suspect by any mechanism, and whether the old rule
+        flagged it.
+    """
     frame = f4_certify.breast_cancer()
     names = real_columns(frame, TABLE_COLUMNS - 1, seed)
     table = frame[[*names, TARGET]].assign(
@@ -168,7 +237,16 @@ def plant_replicate(defect: str, seed: int) -> dict[str, Any]:
 
 
 def replicate(kind: str, seed: int) -> dict[str, Any]:
-    """A null (`""`), grouped null (`"grouped"`) or planted replicate."""
+    """A null (`""`), grouped null (`"grouped"`) or planted replicate.
+
+    Args:
+        kind: `""` for a null world, `"grouped"` for a grouped null world,
+            otherwise a leak type to plant.
+        seed: Replicate seed.
+
+    Returns:
+        The result of `null_replicate` or `plant_replicate`.
+    """
     if kind == "":
         return null_replicate(seed)
     if kind == "grouped":
@@ -179,7 +257,15 @@ def replicate(kind: str, seed: int) -> dict[str, Any]:
 def run_parallel(
     jobs: Sequence[tuple[str, int]], workers: int
 ) -> list[dict[str, Any]]:
-    """Runs the replicates in order."""
+    """Runs the replicates in order.
+
+    Args:
+        jobs: (kind, seed) pairs as accepted by `replicate`.
+        workers: Number of parallel workers.
+
+    Returns:
+        The replicate results in the order of `jobs`.
+    """
     from joblib import delayed
     from joblib import Parallel
 
@@ -189,17 +275,36 @@ def run_parallel(
 
 
 def wilson(successes: int, trials: int) -> tuple[float, float]:
-    """95 percent Wilson interval."""
+    """95 percent Wilson interval.
+
+    Args:
+        successes: Number of successes.
+        trials: Number of trials.
+
+    Returns:
+        The lower and upper bounds.
+    """
     return certificates.wilson_interval(successes, trials, 0.95)
 
 
 def band_99(alpha: float, runs: int) -> tuple[float, float]:
-    """99 percent normal-approximation band for a rate of `alpha`."""
+    """99 percent normal-approximation band for a rate of `alpha`.
+
+    Args:
+        alpha: The nominal rate.
+        runs: Number of replicates the rate is observed over.
+
+    Returns:
+        The lower and upper edges of the band.
+    """
     return f4_certify.band_99(alpha, runs)
 
 
 def certify_screen(workers: int = 1) -> tuple[Any, dict[str, Any]]:
     """Measures the screen on null worlds and planted leaks.
+
+    Args:
+        workers: Number of parallel workers.
 
     Returns:
         (certificate, measurements).
@@ -285,7 +390,15 @@ def certify_screen(workers: int = 1) -> tuple[Any, dict[str, Any]]:
 
 
 def problems(store: certificates.CertificateStore) -> list[str]:
-    """Why the certificate file is unusable: missing or stale entries."""
+    """Why the certificate file is unusable: missing or stale entries.
+
+    Args:
+        store: The loaded certificate store.
+
+    Returns:
+        A message per leak type whose certificate is missing or stale; empty
+        when all are current.
+    """
     found = []
     digest = screen.code_digest()
     for defect in DEFECTS:
@@ -300,7 +413,14 @@ def problems(store: certificates.CertificateStore) -> list[str]:
 
 
 def uncertified(store: certificates.CertificateStore) -> list[str]:
-    """Defect types that were measured and did not meet the policy."""
+    """Defect types that were measured and did not meet the policy.
+
+    Args:
+        store: The loaded certificate store.
+
+    Returns:
+        The leak types whose status is not gating.
+    """
     digest = screen.code_digest()
     return [
         defect
@@ -311,7 +431,15 @@ def uncertified(store: certificates.CertificateStore) -> list[str]:
 
 
 def main(arguments: list[str] | None = None) -> int:
-    """Measures (`--write`) or verifies (`--check`) the screen certificate."""
+    """Measures (`--write`) or verifies (`--check`) the screen certificate.
+
+    Args:
+        arguments: Command-line arguments; `None` reads `sys.argv`.
+
+    Returns:
+        With `--check`, 1 if any certificate is missing or stale, otherwise
+        0; with `--write`, always 0.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     action = parser.add_mutually_exclusive_group(required=True)
     action.add_argument("--write", action="store_true")

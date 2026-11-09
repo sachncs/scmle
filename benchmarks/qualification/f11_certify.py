@@ -1,106 +1,113 @@
-"""Measured gates for the F11 decision layer (canon P1).
+"""Measured gates for the decision layer.
 
 Every floor below is fixed in this docstring before the first certification
 run and is not retuned: a gate that misses its floor is filed with its
 numbers and `passed` false, and that method stays descriptive. Certification
 seeds are `0 .. runs - 1`; development looks use seeds from `DEV_SEED_BASE`,
 which never overlap. Intervals are Wilson 95 percent. `tol(p, R)` is
-`2 sqrt(p (1 - p) / R)`. Worlds are simulated (A1-A5, A7, A8, B1-B6, B9) or
-the randomized Hillstrom email data (A6, B7, B8); real data may violate them.
+`2 sqrt(p (1 - p) / R)`. Worlds are simulated, except in the three gates
+that use the randomized Hillstrom email data (biased subsamples, A/A
+promotion and the positive control); real data may violate them. Each gate is
+the function named in brackets and is filed under the key in `GATES`.
 
 Offline
 
-* A1 threshold. `n_dev = 5000`, `R = 200` worlds each for score skews 1.0
-  (calibrated), 0.6 and 1.6 (monotone distortions). Costs `c_FP = 5`,
-  `c_FN = 100`. Excess cost is the exact expected cost of the frozen rule
-  minus that of the oracle rule on the true risk, relative to the oracle.
-  Pass: median excess `<= 1%` in every world. The full distribution is filed.
-* A1c calibration check. Level 0.01, `n = 5000`, `R = 2000`. Pass: false-alarm
-  rate on calibrated scores `<= 0.01 + tol(0.01, R)`; power `>= 0.80` at skews
-  0.6 and 1.6.
-* A2 net benefit identity: `NB(t) = (cost_none - cost_rule) / c_FN` to 1e-12
-  on 1000 random tables; the sample net benefit is within `3 se` of the
-  binormal closed form over `R = 200` worlds of `n = 20000`.
-* A3 band coverage. Binormal world, prevalence 0.2, `delta = 1.5`, rule
-  `score >= 0.8`, range `[0.1, 0.4]` on 21 points, two baselines, `B = 400`,
-  level 0.05 one-sided, `R = 2000` per setting: independent rows at `n = 2000`
-  and `20000`; clusters of 10 with shared sd 0.5 (`n = 2000`, `20000`). Pass:
-  Wilson lower bound of "the true differences are above the band" `>= 0.93`
-  in all four settings.
-* A4 false usefulness. Score independent of the label, prevalence 0.2, rule
-  acts on 20 percent, `R = 2000` at `n = 2000` and `20000`. Pass: share
-  called `useful` `<= 0.05 + tol(0.05, R)`. Power by effect size is filed.
-* A5 off-policy evaluation. `n = 2000`, `R = 2000`, propensity floor 0.05,
-  sharpness 1 (`ESS/n` is filed). Estimators: IPW, SNIPS, DR with an outcome
-  model fitted on a separate log of 3000 (with the step feature, and without
-  it), IPW and DR clipped at 10. Pass: DR coverage (both outcome models)
-  Wilson lower `>= 0.93` among replicates with `ESS/n >= 0.2`. Refusal: worlds
-  with a planted support violation (the logging policy never treats `x0 > 1`;
-  or treats with probability 0.005 for `x0 > 1.5`), `R = 300` each, refused in
-  `>= 95%` with Wilson lower `>= 0.90`; worlds without, refused in `<= 5%`.
-* A6 Hillstrom biased subsamples (needs the data file). Men's e-mail against
-  no e-mail, conversion. Development half: outcome model and a threshold
-  policy; evaluation half: full-data value (randomized, `mu = 0.5`) as
-  reference; 200 subsamples with covariate-dependent logging propensity
-  `clip(sigmoid(z(recency)), 0.1, 0.9)`. Pass: the DR interval covers the
-  reference in `>= 90%` of 200 subsamples (Wilson interval filed).
-* A7 fairness verdicts. Two groups with true-positive rates 0.7 and
+* Threshold (`gate_a1`). `n_dev = 5000`, `R = 200` worlds each for score
+  skews 1.0 (calibrated), 0.6 and 1.6 (monotone distortions). Costs
+  `c_FP = 5`, `c_FN = 100`. Excess cost is the exact expected cost of the
+  frozen rule minus that of the oracle rule on the true risk, relative to the
+  oracle. Pass: median excess `<= 1%` in every world. The full distribution
+  is filed.
+* Calibration check (`gate_a1c`). Level 0.01, `n = 5000`, `R = 2000`. Pass:
+  false-alarm rate on calibrated scores `<= 0.01 + tol(0.01, R)`; power
+  `>= 0.80` at skews 0.6 and 1.6.
+* Net benefit identity (`gate_a2`): `NB(t) = (cost_none - cost_rule) / c_FN`
+  to 1e-12 on 1000 random tables; the sample net benefit is within `3 se` of
+  the binormal closed form over `R = 200` worlds of `n = 20000`.
+* Band coverage (`gate_a3`). Binormal world, prevalence 0.2, `delta = 1.5`,
+  rule `score >= 0.8`, range `[0.1, 0.4]` on 21 points, two baselines,
+  `B = 400`, level 0.05 one-sided, `R = 2000` per setting: independent rows at
+  `n = 2000` and `20000`; clusters of 10 with shared sd 0.5 (`n = 2000`,
+  `20000`). Pass: Wilson lower bound of "the true differences are above the
+  band" `>= 0.93` in all four settings.
+* False usefulness (`gate_a4`). Score independent of the label, prevalence
+  0.2, rule acts on 20 percent, `R = 2000` at `n = 2000` and `20000`. Pass:
+  share called `useful` `<= 0.05 + tol(0.05, R)`. Power by effect size is
+  filed.
+* Off-policy evaluation (`gate_a5`). `n = 2000`, `R = 2000`, propensity floor
+  0.05, sharpness 1 (`ESS/n` is filed). Estimators: IPW, SNIPS, DR with an
+  outcome model fitted on a separate log of 3000 (with the step feature, and
+  without it), IPW and DR clipped at 10. Pass: DR coverage (both outcome
+  models) Wilson lower `>= 0.93` among replicates with `ESS/n >= 0.2`.
+  Refusal: worlds with a planted support violation (the logging policy never
+  treats `x0 > 1`; or treats with probability 0.005 for `x0 > 1.5`),
+  `R = 300` each, refused in `>= 95%` with Wilson lower `>= 0.90`; worlds
+  without, refused in `<= 5%`.
+* Hillstrom biased subsamples (`gate_a6`; needs the data file). Men's e-mail
+  against no e-mail, conversion. Development half: outcome model and a
+  threshold policy; evaluation half: full-data value (randomized,
+  `mu = 0.5`) as reference; 200 subsamples with covariate-dependent logging
+  propensity `clip(sigmoid(z(recency)), 0.1, 0.9)`. Pass: the DR interval
+  covers the reference in `>= 90%` of 200 subsamples (Wilson interval filed).
+* Fairness verdicts (`gate_a7`). Two groups with true-positive rates 0.7 and
   `0.7 - gap` at a fixed rule, `n = 20000`, `R = 2000`, `max_gap = 0.05`,
   `gap` in 0, 0.03, 0.07, 0.10, 0.15. Pass: "satisfied" when `gap > 0.05` has
   Wilson upper bound `<= 0.08` (and point rate `<= 0.05`) at 0.07, 0.10,
   0.15; the upper bound covers the true gap with Wilson lower `>= 0.93` at
   every gap. The share satisfied at 0 and 0.03 is filed.
-* A7b group thresholds. Binormal groups (shift 1.0), `t = 0.3`, 20 worlds of
-  `n = 100000`. Pass: the true net benefit of the fitted cuts is within 2
-  percent of the equal-true-positive-rate oracle (fitted may exceed it: the
-  development bound allows a small gap).
-* A8 infeasible sets. Incompatible pairs with base rates 0.2 and 0.5
+* Group thresholds (`gate_a7b`). Binormal groups (shift 1.0), `t = 0.3`, 20
+  worlds of `n = 100000`. Pass: the true net benefit of the fitted cuts is
+  within 2 percent of the equal-true-positive-rate oracle (fitted may exceed
+  it: the development bound allows a small gap).
+* Infeasible sets (`gate_a8`). Incompatible pairs with base rates 0.2 and 0.5
   (`n = 2000`), `R = 100` per pair for three pairs: refused in 100 percent.
   Base rates both 0.3: refused in `<= 0.05 + tol(0.05, 300)` of 300.
 
 Online (level `alpha_promote = 1/50` for one experiment, `alpha_rollback =
 1/100`)
 
-* B1 optional stopping. Control 0.10, challenger 0.12 (`Delta = delta_min =
-  0.02`), `q = 0.5`, a look after every unit up to `n_max = 3000`, `R =
-  10000`. Pass: share of runs that ever promote `<= 0.02 + tol(0.02, R)`. The
-  same world with `abtest.compare_arms` after each batch of 500 (6 looks,
-  `R = 100`, null `Delta = 0`) is run and its false-adopt rate filed, not
-  gated. 100 runs are also passed through the `Rollout` class and must agree
-  with the vectorised computation exactly.
-* B2 intersection-union. Primary effect 0.06 (3 delta_min), guardrail at the
-  boundary (control 0.20, challenger 0.25, margin 0.05), `n_max = 6000`, `R =
-  5000`. Pass: promotion share `<= 0.02 + tol(0.02, R)`.
-* B3 cost of anytime-validity. Expected sample number to promote at `Delta =
-  2 delta_min` for a binary metric (control 0.10) and a bounded metric
-  (Beta(2, 8) control, mean shift 0.04), `n_max = 20000`, `R = 500`, against
-  the fixed-horizon sizes (`feasibility.n_required_two_proportions` and the
-  null-shifted normal approximation). Reported, no floor.
-* B4 rollback. Boundary `Delta = -tau` (0.20 against 0.18, `tau = 0.02`),
-  `n_max = 4000`, `R = 10000`. Pass: false rollback `<= 0.01 + tol(0.01, R)`.
-  Detection delay (median and 90th percentile of units, `R = 1000`,
-  `n_max = 20000`) for true losses `2 tau` and `4 tau` is filed.
-* B5 budget algebra. 2000 random experiment sequences: assigned levels sum to
-  at most `alpha_promote` as `Fraction`s, an overspend raises, a serialised
-  budget rebuilds bit for bit. Pass: no violation.
-* B6 sample-ratio check at level 0.001. Correct assignment (q = 0.5), `n =
-  100000`, a look after every unit for the anytime form, `R = 1000`. Pass:
-  size `<= 0.01 + tol(0.01, R)` for the anytime form and for the exact test
-  at the final count; power `>= 0.95` at a 2 percent distortion (0.52) for
-  both.
-* B7 A/A on Hillstrom (needs the data file). All 64000 rows, arms relabelled
-  at random, random stream order, first 20000 rows, conversion, `delta_min =
-  0.001`, `R = 1000`. Pass: false promotion `<= 0.02 + tol(0.02, R)`.
-* B8 positive control on Hillstrom (needs the data file). The real arms,
-  conversion, `delta_min = 0.002`, 200 stream orders. Pass: promoted in `>=
-  90%` of orders and the direction agrees with the fixed-sample result of
+* Optional stopping (`gate_b1`). Control 0.10, challenger 0.12
+  (`Delta = delta_min = 0.02`), `q = 0.5`, a look after every unit up to
+  `n_max = 3000`, `R = 10000`. Pass: share of runs that ever promote
+  `<= 0.02 + tol(0.02, R)`. The same world with `abtest.compare_arms` after
+  each batch of 500 (6 looks, `R = 100`, null `Delta = 0`) is run and its
+  false-adopt rate filed, not gated. 100 runs are also passed through the
+  `Rollout` class and must agree with the vectorised computation exactly.
+* Intersection-union (`gate_b2`). Primary effect 0.06 (3 delta_min),
+  guardrail at the boundary (control 0.20, challenger 0.25, margin 0.05),
+  `n_max = 6000`, `R = 5000`. Pass: promotion share `<= 0.02 + tol(0.02, R)`.
+* Cost of anytime-validity (`gate_b3`). Expected sample number to promote at
+  `Delta = 2 delta_min` for a binary metric (control 0.10) and a bounded
+  metric (Beta(2, 8) control, mean shift 0.04), `n_max = 20000`, `R = 500`,
+  against the fixed-horizon sizes (`feasibility.n_required_two_proportions`
+  and the null-shifted normal approximation). Reported, no floor.
+* Rollback (`gate_b4`). Boundary `Delta = -tau` (0.20 against 0.18,
+  `tau = 0.02`), `n_max = 4000`, `R = 10000`. Pass: false rollback
+  `<= 0.01 + tol(0.01, R)`. Detection delay (median and 90th percentile of
+  units, `R = 1000`, `n_max = 20000`) for true losses `2 tau` and `4 tau` is
+  filed.
+* Budget algebra (`gate_b5`). 2000 random experiment sequences: assigned
+  levels sum to at most `alpha_promote` as `Fraction`s, an overspend raises,
+  a serialised budget rebuilds bit for bit. Pass: no violation.
+* Sample-ratio check (`gate_b6`) at level 0.001. Correct assignment
+  (q = 0.5), `n = 100000`, a look after every unit for the anytime form,
+  `R = 1000`. Pass: size `<= 0.01 + tol(0.01, R)` for the anytime form and
+  for the exact test at the final count; power `>= 0.95` at a 2 percent
+  distortion (0.52) for both.
+* A/A on Hillstrom (`gate_b7`; needs the data file). All 64000 rows, arms
+  relabelled at random, random stream order, first 20000 rows, conversion,
+  `delta_min = 0.001`, `R = 1000`. Pass: false promotion
+  `<= 0.02 + tol(0.02, R)`.
+* Positive control on Hillstrom (`gate_b8`; needs the data file). The real
+  arms, conversion, `delta_min = 0.002`, 200 stream orders. Pass: promoted in
+  `>= 90%` of orders and the direction agrees with the fixed-sample result of
   `scipy.stats.norm` on the full data; the numbers are filed, not asserted.
-* B9 lifecycle with drift. The control rate random-walks. (a) no effect: false
-  promotion `<= 0.02 + tol`, `R = 2000`; (b) effect `delta_min / 2`: false
-  promotion `<= 0.02 + tol` and `hold_final` in `>= 1 - 0.02 - tol` of runs;
-  (c) a champion drifting from 0 to -0.015 (never beyond `tau`): false
-  rollback `<= 0.01 + tol(0.01, R)`. (d) drifting from 0 to -0.06: rollback
-  share filed.
+* Lifecycle with drift (`gate_b9`). The control rate random-walks. (a) no
+  effect: false promotion `<= 0.02 + tol`, `R = 2000`; (b) effect
+  `delta_min / 2`: false promotion `<= 0.02 + tol` and `hold_final` in
+  `>= 1 - 0.02 - tol` of runs; (c) a champion drifting from 0 to -0.015 (never
+  beyond `tau`): false rollback `<= 0.01 + tol(0.01, R)`. (d) drifting from 0
+  to -0.06: rollback share filed.
   Amendment of 2026-11-06, written before the first run of the hook path
   and leaving the four floors above as they were: the same worlds are also
   run through `RolloutHook` on a real `LifecycleManager` and a registry of
@@ -116,9 +123,9 @@ Online (level `alpha_promote = 1/50` for one experiment, `alpha_rollback =
   filed with Wilson intervals and are not gated (100 worlds cannot bound a
   rate of 0.01). A world in which the hook stops on the sample-ratio check
   (`hold_invalid`) is counted separately and not as a disagreement.
-* B10 determinism: two runs of a fixed battery give the same SHA-256 of the
-  report, and no module of `scmle.decision` imports custody, vault or ledger
-  code. The check ran on one interpreter (the one that measured).
+* Determinism (`gate_b10`): two runs of a fixed battery give the same SHA-256
+  of the report, and no module of `scmle.decision` imports custody, vault or
+  ledger code. The check ran on one interpreter (the one that measured).
 
 What is not measured here: reproduction by an outside party, other
 interpreters (Python 3.11 and 3.14 bit identity of the ledger replay), the
@@ -215,23 +222,53 @@ NOT_MEASURED = (
 
 
 def tol(p: float, runs: int) -> float:
-    """Two binomial standard errors at rate `p`."""
+    """Two binomial standard errors at rate `p`.
+
+    Args:
+        p: The rate.
+        runs: Number of replicates the rate is observed over.
+
+    Returns:
+        ``2 * sqrt(p * (1 - p) / runs)``.
+    """
     return 2.0 * math.sqrt(p * (1.0 - p) / runs)
 
 
 def wilson(hits: int, runs: int) -> list[float]:
-    """Wilson 95 percent interval as a list."""
+    """Wilson 95 percent interval as a list.
+
+    Args:
+        hits: Number of successes.
+        runs: Number of trials.
+
+    Returns:
+        The lower and upper bounds.
+    """
     low, high = certificates.wilson_interval(hits, runs, 0.95)
     return [low, high]
 
 
 def rng_for(base: int, name: str, index: int = 0) -> np.random.Generator:
-    """A named stream for one replicate or chunk."""
+    """A named stream for one replicate or chunk.
+
+    Args:
+        base: Seed offset.
+        name: Name of the stream within the gate.
+        index: Replicate or chunk number.
+
+    Returns:
+        A generator seeded from `base + index` and `name`.
+    """
     return randomness.component_rng(base + index, f"f11.{name}", 0)
 
 
 def cost_model() -> costs.DecisionCostModel:
-    """The cost model of the threshold worlds."""
+    """The cost model of the threshold worlds.
+
+    Returns:
+        A model with false-positive cost `C_FP` and false-negative cost
+        `C_FN`, both from a human source.
+    """
     human = (costs.CostSource.HUMAN,) * 4
     return costs.DecisionCostModel(
         0.0, C_FN, C_FP, 0.0, 0.02, 0.15, human, costs.CostSource.HUMAN
@@ -239,7 +276,14 @@ def cost_model() -> costs.DecisionCostModel:
 
 
 def summary(values: np.ndarray) -> dict[str, float]:
-    """Quantiles of a distribution."""
+    """Quantiles of a distribution.
+
+    Args:
+        values: The sample.
+
+    Returns:
+        The 5th, 25th, 50th, 75th and 95th percentiles and the maximum.
+    """
     q = np.quantile(values, [0.05, 0.25, 0.5, 0.75, 0.95])
     return {
         "q05": float(q[0]),
@@ -251,11 +295,21 @@ def summary(values: np.ndarray) -> dict[str, float]:
     }
 
 
-# --- A1, A1c, A2 -------------------------------------------------------------
+# --- threshold, calibration check, net benefit identity ----------------------
 
 
 def gate_a1(runs: int, base: int = 0) -> dict[str, Any]:
-    """Excess cost of the chosen threshold over the oracle."""
+    """Excess cost of the chosen threshold over the oracle.
+
+    Args:
+        runs: Number of worlds per score skew.
+        base: Seed offset (0 for certification).
+
+    Returns:
+        Per skew the oracle cost, the distribution of relative excess cost,
+        the counts of decision paths and whether the median floor is met;
+        and `passed`.
+    """
     model = cost_model()
     target = threshold.bayes_threshold(C_FP, C_FN)
     result: dict[str, Any] = {"worlds": {}}
@@ -295,7 +349,16 @@ def gate_a1(runs: int, base: int = 0) -> dict[str, Any]:
 
 
 def gate_a1c(runs: int, base: int = 0) -> dict[str, Any]:
-    """Size and power of the calibration check."""
+    """Size and power of the calibration check.
+
+    Args:
+        runs: Number of worlds per skew.
+        base: Seed offset (0 for certification).
+
+    Returns:
+        The false-alarm rate on calibrated scores with its interval and
+        bound, the power at the two distorted skews and `passed`.
+    """
     level = 0.01
     rejects = {1.0: 0, 0.6: 0, 1.6: 0}
     for index in range(runs):
@@ -320,7 +383,17 @@ def gate_a1c(runs: int, base: int = 0) -> dict[str, Any]:
 
 
 def gate_a2(runs: int, base: int = 0) -> dict[str, Any]:
-    """The identity to 1e-12 and the binormal closed form."""
+    """The identity to 1e-12 and the binormal closed form.
+
+    Args:
+        runs: Number of binormal worlds.
+        base: Seed offset (0 for certification).
+
+    Returns:
+        The largest identity error over 1000 random tables, the Monte Carlo
+        mean net benefit, the closed-form truth, the standard error and
+        `passed`.
+    """
     worst = 0.0
     rng = rng_for(base, "a2.tables", 0)
     for _ in range(1000):
@@ -357,7 +430,7 @@ def gate_a2(runs: int, base: int = 0) -> dict[str, Any]:
     }
 
 
-# --- A3, A4 ------------------------------------------------------------------
+# --- band coverage, false usefulness -----------------------------------------
 
 RANGE = (0.1, 0.4)
 CUT = 0.8
@@ -367,7 +440,19 @@ BOOTSTRAPS = 400
 
 
 def band_setting(runs: int, n: int, cluster: bool, base: int) -> dict[str, Any]:
-    """Coverage of the true differences by the lower band."""
+    """Coverage of the true differences by the lower band.
+
+    Args:
+        runs: Number of worlds.
+        n: Rows per world.
+        cluster: Whether rows come in clusters of 10 with a shared shift.
+        base: Seed offset.
+
+    Returns:
+        The number and share of worlds whose lower band lies below the true
+        differences at every grid point, the Wilson interval and whether its
+        lower bound is at least 0.93.
+    """
     size = 10 if cluster else 1
     shared = 0.5 if cluster else 0.0
     sd = math.sqrt(1.0 + shared**2)
@@ -405,7 +490,16 @@ def band_setting(runs: int, n: int, cluster: bool, base: int) -> dict[str, Any]:
 
 
 def gate_a3(runs: int, base: int = 0) -> dict[str, Any]:
-    """Simultaneous band coverage in four settings."""
+    """Simultaneous band coverage in four settings.
+
+    Args:
+        runs: Number of worlds per setting.
+        base: Seed offset (0 for certification).
+
+    Returns:
+        The `band_setting` result for each setting, the bootstrap count and
+        `passed`.
+    """
     settings = {
         f"{n}/{'clustered' if c else 'independent'}": band_setting(
             runs, n, c, base
@@ -422,7 +516,16 @@ def gate_a3(runs: int, base: int = 0) -> dict[str, Any]:
 
 
 def gate_a4(runs: int, base: int = 0) -> dict[str, Any]:
-    """False usefulness with a score independent of the label."""
+    """False usefulness with a score independent of the label.
+
+    Args:
+        runs: Number of worlds per size.
+        base: Seed offset (0 for certification).
+
+    Returns:
+        The share called `useful` at each size with its interval, the bound,
+        the power at four effect sizes (300 worlds each) and `passed`.
+    """
     result: dict[str, Any] = {"null": {}}
     bound = 0.05 + tol(0.05, runs)
     passed = True
@@ -477,7 +580,7 @@ def gate_a4(runs: int, base: int = 0) -> dict[str, Any]:
     return result
 
 
-# --- A5 ----------------------------------------------------------------------
+# --- off-policy evaluation ---------------------------------------------------
 
 BANDIT_ROWS = 2000
 DEV_ROWS = 3000
@@ -485,7 +588,15 @@ CLIP = 10.0
 
 
 def outcome_models(base: int) -> dict[str, Any]:
-    """Outcome models fitted on a separate log (with and without the step)."""
+    """Outcome models fitted on a separate log (with and without the step).
+
+    Args:
+        base: Seed offset.
+
+    Returns:
+        Two outcome-model functions: `dr`, which sees the step feature, and
+        `dr_misspec`, which does not.
+    """
     dev = worlds.bandit(rng_for(base, "a5.dev", 0), DEV_ROWS, 1.0)
     full = ope.fit_outcome_model(
         worlds.outcome_features(dev["x"]), dev["action"], dev["reward"], 2
@@ -498,7 +609,17 @@ def outcome_models(base: int) -> dict[str, Any]:
 
 
 def gate_a5(runs: int, base: int = 0) -> dict[str, Any]:
-    """Coverage of the estimators and the support and ESS gates."""
+    """Coverage of the estimators and the support and ESS gates.
+
+    Args:
+        runs: Number of logs.
+        base: Seed offset (0 for certification).
+
+    Returns:
+        The true value, per estimator the bias, mean effective-sample-size
+        ratio and coverage among replicates with ratio at least 0.2, whether
+        the doubly robust floor is met, the refusal rows and `passed`.
+    """
     models = outcome_models(base)
     truth = worlds.target_value()
     cells = {
@@ -561,7 +682,16 @@ def gate_a5(runs: int, base: int = 0) -> dict[str, Any]:
 
 
 def refusal_rows(base: int) -> dict[str, Any]:
-    """The support gate on planted violations and clean worlds."""
+    """The support gate on planted violations and clean worlds.
+
+    Args:
+        base: Seed offset.
+
+    Returns:
+        The number of refusals (with intervals) in worlds with a hard
+        violation, a weak violation and none, the runs per kind and whether
+        the refusal floors are met.
+    """
     runs = 300
     fired = {"hard": 0, "weak": 0, "clean": 0}
     for index in range(runs):
@@ -602,11 +732,16 @@ def refusal_rows(base: int) -> dict[str, Any]:
     }
 
 
-# --- A6, B7, B8 (Hillstrom) -------------------------------------------------
+# --- Hillstrom: biased subsamples, A/A, positive control ---------------------
 
 
 def hillstrom_path() -> Path | None:
-    """The downloaded data file, or None."""
+    """The downloaded data file, or None.
+
+    Returns:
+        The path named by the `SCMLE_HILLSTROM` environment variable if it
+        exists, otherwise None.
+    """
     import os
 
     given = os.environ.get(HILLSTROM_ENV)
@@ -616,7 +751,12 @@ def hillstrom_path() -> Path | None:
 
 
 def load_hillstrom() -> pd.DataFrame | None:
-    """The data frame when the file is present and its hash matches."""
+    """The data frame when the file is present and its hash matches.
+
+    Returns:
+        The table, or None when the file is missing or its SHA-256 differs
+        from `HILLSTROM_SHA256`.
+    """
     path = hillstrom_path()
     if path is None:
         return None
@@ -627,19 +767,44 @@ def load_hillstrom() -> pd.DataFrame | None:
 
 
 def not_run(reason: str) -> dict[str, Any]:
-    """A gate that could not run; it is not passed."""
+    """A gate that could not run; it is not passed.
+
+    Args:
+        reason: Why the gate could not run.
+
+    Returns:
+        A result with `passed` false and the reason under `not_run`.
+    """
     return {"passed": False, "not_run": reason}
 
 
 def covariates(frame: pd.DataFrame) -> np.ndarray:
-    """Numeric covariates of the Hillstrom rows."""
+    """Numeric covariates of the Hillstrom rows.
+
+    Args:
+        frame: The Hillstrom table.
+
+    Returns:
+        The standardised columns recency, history, newbie, mens and womens.
+    """
     columns = ["recency", "history", "newbie", "mens", "womens"]
     values = frame[columns].to_numpy(dtype=float)
     return (values - values.mean(axis=0)) / values.std(axis=0)
 
 
 def gate_a6(runs: int, base: int = 0) -> dict[str, Any]:
-    """Biased subsamples of the randomized Hillstrom data."""
+    """Biased subsamples of the randomized Hillstrom data.
+
+    Args:
+        runs: Number of subsamples.
+        base: Seed offset (0 for certification).
+
+    Returns:
+        The full-data reference value and interval, the policy cut, the
+        treated share, the coverage of the doubly robust interval with its
+        Wilson interval, the mean subsample size, the data hash and
+        `passed`; or a not-run result when the data file is absent.
+    """
     frame = load_hillstrom()
     if frame is None:
         return not_run(f"set {HILLSTROM_ENV} to the verified data file")
@@ -707,12 +872,32 @@ def peeking_paths(
     q: float,
     delta_min: float,
 ) -> np.ndarray:
-    """Log e-process paths of the primary metric for a batch of runs."""
+    """Log e-process paths of the primary metric for a batch of runs.
+
+    Args:
+        arm: Treatment indicators, shape (runs, units).
+        outcome: Outcomes, same shape.
+        q: Assignment probability of the treated arm.
+        delta_min: Smallest effect of interest.
+
+    Returns:
+        The log wealth after each unit, same shape.
+    """
     return anytime.centered_paths(arm, outcome, q, delta_min)
 
 
 def gate_b7(runs: int, base: int = 0) -> dict[str, Any]:
-    """A/A false promotion on the Hillstrom outcomes."""
+    """A/A false promotion on the Hillstrom outcomes.
+
+    Args:
+        runs: Number of A/A streams.
+        base: Seed offset (0 for certification).
+
+    Returns:
+        The false promotions, their rate, interval and bound, the design,
+        the data hash and `passed`; or a not-run result when the data file is
+        absent.
+    """
     frame = load_hillstrom()
     if frame is None:
         return not_run(f"set {HILLSTROM_ENV} to the verified data file")
@@ -742,7 +927,18 @@ def gate_b7(runs: int, base: int = 0) -> dict[str, Any]:
 
 
 def gate_b8(runs: int, base: int = 0) -> dict[str, Any]:
-    """Real arms: promotion and stopping time against a fixed-sample test."""
+    """Real arms: promotion and stopping time against a fixed-sample test.
+
+    Args:
+        runs: Number of stream orders.
+        base: Seed offset (0 for certification).
+
+    Returns:
+        The fixed-sample reference, the assignment share, the share of
+        orders promoted, the median stop, the full-sample lower bound, the
+        row count, the data hash and `passed`; or a not-run result when the
+        data file is absent.
+    """
     frame = load_hillstrom()
     if frame is None:
         return not_run(f"set {HILLSTROM_ENV} to the verified data file")
@@ -793,18 +989,35 @@ def gate_b8(runs: int, base: int = 0) -> dict[str, Any]:
     }
 
 
-# --- A7, A8 ------------------------------------------------------------------
+# --- fairness: verdicts, group thresholds, infeasible sets -------------------
 
 
 def fair_constraint(gap: float = 0.05) -> charter_decision.FairnessConstraint:
-    """The constraint of the fairness worlds."""
+    """The constraint of the fairness worlds.
+
+    Args:
+        gap: Largest allowed true-positive-rate gap.
+
+    Returns:
+        An equal-opportunity constraint on `group` with that gap.
+    """
     return charter_decision.FairnessConstraint(
         "group", "equal_opportunity", gap, "group_thresholds", "certify"
     )
 
 
 def gate_a7(runs: int, base: int = 0) -> dict[str, Any]:
-    """Verdicts and gap bounds with planted true-positive-rate gaps."""
+    """Verdicts and gap bounds with planted true-positive-rate gaps.
+
+    Args:
+        runs: Number of worlds per gap.
+        base: Seed offset (0 for certification).
+
+    Returns:
+        Per gap the share declared satisfied and the coverage of the gap's
+        upper bound with their intervals, whether the floors are met, and
+        `passed`.
+    """
     rule = fair_constraint()
     table = {}
     passed = True
@@ -840,7 +1053,16 @@ def gate_a7(runs: int, base: int = 0) -> dict[str, Any]:
 
 
 def gate_a7b(runs: int, base: int = 0) -> dict[str, Any]:
-    """Fitted group cuts against the equal-rate oracle."""
+    """Fitted group cuts against the equal-rate oracle.
+
+    Args:
+        runs: Number of worlds.
+        base: Seed offset (0 for certification).
+
+    Returns:
+        The oracle net benefit, the distribution of the relative loss of the
+        fitted cuts and `passed` (worst loss at most 2 percent).
+    """
     rule = fair_constraint()
     t, shift = 0.3, 1.0
     oracle = worlds.threshold_oracle(shift, t)
@@ -873,7 +1095,16 @@ def gate_a7b(runs: int, base: int = 0) -> dict[str, Any]:
 
 
 def gate_a8(runs: int, base: int = 0) -> dict[str, Any]:
-    """Infeasible criteria refused when base rates differ, not when equal."""
+    """Infeasible criteria refused when base rates differ, not when equal.
+
+    Args:
+        runs: Number of worlds per criterion pair.
+        base: Seed offset (0 for certification).
+
+    Returns:
+        The refusals for each unequal-base-rate pair, the false refusals and
+        rate with their bound for equal base rates, and `passed`.
+    """
     pairs = (
         ("demographic_parity", "equalized_odds"),
         ("demographic_parity", "predictive_parity"),
@@ -925,7 +1156,7 @@ def gate_a8(runs: int, base: int = 0) -> dict[str, Any]:
     }
 
 
-# --- B1-B6 -------------------------------------------------------------------
+# --- online: stopping, guardrail, cost, rollback, budget, sample ratio -------
 
 
 def plan_for(
@@ -934,7 +1165,18 @@ def plan_for(
     guardrails: tuple[charter_decision.Guardrail, ...] = (),
     tolerance: float = 0.02,
 ) -> charter_decision.RolloutPlan:
-    """The rollout plan the online worlds use."""
+    """The rollout plan the online worlds use.
+
+    Args:
+        delta_min: Smallest effect worth promoting.
+        n_max: Maximum number of units.
+        guardrails: Guardrail metrics.
+        tolerance: Loss that triggers a rollback.
+
+    Returns:
+        A plan for a conversion experiment with assignment probability 0.5
+        and the module's promotion and rollback levels.
+    """
     return charter_decision.RolloutPlan(
         unit="user",
         primary="conversion",
@@ -949,7 +1191,15 @@ def plan_for(
 
 
 def compare_arms_rate(base: int) -> dict[str, Any]:
-    """Realized false-adopt rate of the bootstrap rule under 6 looks."""
+    """Realized false-adopt rate of the bootstrap rule under 6 looks.
+
+    Args:
+        base: Seed offset.
+
+    Returns:
+        The runs, looks, false adoptions, rate and Wilson interval, and a
+        note on the null being tested.
+    """
     runs, looks, n = 100, 6, 3000
     classes = np.array([0, 1])
     adopted = 0
@@ -991,7 +1241,15 @@ def compare_arms_rate(base: int) -> dict[str, Any]:
 
 
 def class_agreement(base: int) -> dict[str, Any]:
-    """The Rollout class and the vectorised paths decide identically."""
+    """The Rollout class and the vectorised paths decide identically.
+
+    Args:
+        base: Seed offset.
+
+    Returns:
+        The number of runs and the number in which the class and the
+        vectorised computation promote at the same unit (or both do not).
+    """
     plan = plan_for()
     same = 0
     runs = 100
@@ -1009,7 +1267,17 @@ def class_agreement(base: int) -> dict[str, Any]:
 
 
 def gate_b1(runs: int, base: int = 0) -> dict[str, Any]:
-    """Ever-promote rate at the boundary null under peeking at every unit."""
+    """Ever-promote rate at the boundary null under peeking at every unit.
+
+    Args:
+        runs: Number of streams.
+        base: Seed offset (0 for certification).
+
+    Returns:
+        The ever-promote count, rate, interval and bound, the class
+        agreement, the bootstrap-rule comparison (only for 1000 or more
+        runs) and `passed`.
+    """
     plan = plan_for()
     hits = 0
     chunk = 500
@@ -1038,7 +1306,16 @@ def gate_b1(runs: int, base: int = 0) -> dict[str, Any]:
 
 
 def gate_b2(runs: int, base: int = 0) -> dict[str, Any]:
-    """Promotion when only a guardrail null is true."""
+    """Promotion when only a guardrail null is true.
+
+    Args:
+        runs: Number of streams.
+        base: Seed offset (0 for certification).
+
+    Returns:
+        The promotions (primary and guardrail both crossing), rate,
+        interval, bound and `passed`.
+    """
     guard = charter_decision.Guardrail("bounce", margin=0.05)
     plan = plan_for(n_max=6000, guardrails=(guard,))
     hits = 0
@@ -1073,6 +1350,15 @@ def fixed_horizon_normal(
     """Total units of a fixed-horizon test of `Delta <= delta_min` at power 0.8.
 
     Normal approximation with unpooled variances; `alpha` one-sided.
+
+    Args:
+        p_control: Control rate.
+        delta: True effect.
+        delta_min: Effect under the null being tested.
+        alpha: One-sided level.
+
+    Returns:
+        The total number of units over both arms.
     """
     p1 = p_control + delta
     v0 = p_control * (1 - p_control) + p1 * (1 - p1)
@@ -1085,7 +1371,17 @@ def fixed_horizon_normal(
 
 
 def esn_metric(kind: str, runs: int, base: int) -> dict[str, Any]:
-    """Expected sample number for one metric type."""
+    """Expected sample number for one metric type.
+
+    Args:
+        kind: `binary` or any other value for a bounded metric.
+        runs: Number of streams.
+        base: Seed offset.
+
+    Returns:
+        The share of streams that cross, the mean and median units to
+        promote, the fixed-horizon sizes and the ratios to them.
+    """
     plan = plan_for(delta_min=0.02, n_max=20000)
     stops = []
     chunk = 100
@@ -1140,7 +1436,16 @@ def esn_metric(kind: str, runs: int, base: int) -> dict[str, Any]:
 
 
 def gate_b3(runs: int, base: int = 0) -> dict[str, Any]:
-    """Expected sample number of the anytime design (reported, no floor)."""
+    """Expected sample number of the anytime design (reported, no floor).
+
+    Args:
+        runs: Number of streams per metric.
+        base: Seed offset (0 for certification).
+
+    Returns:
+        The results for the binary and the bounded metric, a note that no
+        floor applies and `passed` (always true).
+    """
     return {
         "binary": esn_metric("binary", runs, base),
         "bounded_mean": esn_metric("bounded", runs, base),
@@ -1153,12 +1458,31 @@ def gate_b3(runs: int, base: int = 0) -> dict[str, Any]:
 def rollback_paths(
     arm: np.ndarray, y: np.ndarray, tolerance: float
 ) -> np.ndarray:
-    """Log e-process paths of the rollback test for a batch of runs."""
+    """Log e-process paths of the rollback test for a batch of runs.
+
+    Args:
+        arm: Treatment indicators, shape (runs, units).
+        y: Outcomes, same shape.
+        tolerance: Loss at which the champion should be rolled back to.
+
+    Returns:
+        The log wealth after each unit, same shape.
+    """
     return anytime.centered_paths(arm, y, 0.5, -tolerance, "less")
 
 
 def gate_b4(runs: int, base: int = 0) -> dict[str, Any]:
-    """False rollback at the boundary and detection delay."""
+    """False rollback at the boundary and detection delay.
+
+    Args:
+        runs: Number of streams at the boundary.
+        base: Seed offset (0 for certification).
+
+    Returns:
+        The false rollbacks, rate, interval and bound, the detected share
+        and the median and 90th percentile delay for true losses of 2 and 4
+        tolerances, and `passed`.
+    """
     tau, target = 0.02, -math.log(ALPHA_ROLLBACK)
     hits = 0
     chunk = 500
@@ -1201,7 +1525,16 @@ def gate_b4(runs: int, base: int = 0) -> dict[str, Any]:
 
 
 def gate_b5(runs: int, base: int = 0) -> dict[str, Any]:
-    """Exact budget algebra on random experiment sequences."""
+    """Exact budget algebra on random experiment sequences.
+
+    Args:
+        runs: Number of sequences.
+        base: Seed offset (0 for certification).
+
+    Returns:
+        The number of sequences, the violations found and `passed` (no
+        violation).
+    """
     rng = rng_for(base, "b5", 0)
     violations = 0
     for _ in range(runs):
@@ -1242,7 +1575,17 @@ def gate_b5(runs: int, base: int = 0) -> dict[str, Any]:
 
 
 def gate_b6(runs: int, base: int = 0) -> dict[str, Any]:
-    """Size and power of the sample-ratio checks."""
+    """Size and power of the sample-ratio checks.
+
+    Args:
+        runs: Number of streams per case.
+        base: Seed offset (0 for certification).
+
+    Returns:
+        For the correct and the distorted assignment the rejection rate of
+        the anytime and the exact form with intervals, the level, the size
+        bound and `passed`.
+    """
     n, level = 100_000, 0.001
     target = -math.log(level)
     totals = np.arange(1, n + 1, dtype=float)
@@ -1278,7 +1621,7 @@ def gate_b6(runs: int, base: int = 0) -> dict[str, Any]:
     return out
 
 
-# --- B9, B10 -----------------------------------------------------------------
+# --- lifecycle with drift, determinism ---------------------------------------
 
 
 HOOK_WORLDS = 100
@@ -1287,7 +1630,14 @@ HOOK_KEY = "f11-b9-approval-key"
 
 
 def hook_bundle(seed: int) -> bundle_module.ModelBundle:
-    """A small fitted logistic model for the registry the hook runs on."""
+    """A small fitted logistic model for the registry the hook runs on.
+
+    Args:
+        seed: Seed of the training data.
+
+    Returns:
+        A bundle of a logistic regression on two features.
+    """
     rng = np.random.default_rng(seed)
     frame = pd.DataFrame({"a": rng.normal(size=300), "b": rng.normal(size=300)})
     frame["y"] = (frame.a + 0.3 * frame.b + rng.normal(0, 0.5, 300) > 0).astype(
@@ -1311,7 +1661,14 @@ def hook_bundle(seed: int) -> bundle_module.ModelBundle:
 
 
 def hook_approval(record: Any) -> registry_module.PromotionApproval:
-    """A signed independent approval for one registered version."""
+    """A signed independent approval for one registered version.
+
+    Args:
+        record: The registered model version.
+
+    Returns:
+        An approved, signed promotion approval for that version.
+    """
     return registry_module.PromotionApproval(
         model=record.model,
         version=record.version,
@@ -1325,7 +1682,15 @@ def hook_approval(record: Any) -> registry_module.PromotionApproval:
 
 
 def hook_registry(root: Path) -> tuple[Any, Any, Any]:
-    """A registry with champion v1 and a staged challenger v2."""
+    """A registry with champion v1 and a staged challenger v2.
+
+    Args:
+        root: Folder for the registry and the work files.
+
+    Returns:
+        The registry store, the lifecycle manager and the challenger's
+        record.
+    """
     store = registry_module.ModelRegistryStore(root / "registry")
     manager = lifecycle.LifecycleManager(store, "m", str(root / "work"))
     first = store.register(
@@ -1342,7 +1707,15 @@ def hook_registry(root: Path) -> tuple[Any, Any, Any]:
 
 
 def hook_in(manager: Any, plan: Any) -> rollout_hook.RolloutHook:
-    """A fresh hook, with its own in-memory ledger, on the shared manager."""
+    """A fresh hook, with its own in-memory ledger, on the shared manager.
+
+    Args:
+        manager: The lifecycle manager.
+        plan: The rollout plan.
+
+    Returns:
+        The rollout hook.
+    """
     ledger = deployment_ledger.DeploymentLedger.create(
         None, charter_hash="b" * 64, policy={"b9": 1}, alpha_promo="1/20"
     )
@@ -1352,7 +1725,13 @@ def hook_in(manager: Any, plan: Any) -> rollout_hook.RolloutHook:
 def hook_promotes(
     hook: rollout_hook.RolloutHook, record: Any, seed: int
 ) -> None:
-    """Starts an experiment, wins it on strong traffic and promotes."""
+    """Starts an experiment, wins it on strong traffic and promotes.
+
+    Args:
+        hook: The rollout hook.
+        record: The challenger's record, approved for promotion.
+        seed: Seed of the traffic.
+    """
     hook.start(f"promote-{seed}")
     rng = np.random.default_rng(seed)
     arm = (rng.random(6000) < 0.5).astype(float)
@@ -1362,11 +1741,19 @@ def hook_promotes(
 
 
 def hook_path(base: int = 0) -> dict[str, Any]:
-    """The four B9 scenarios run through `RolloutHook` on a real registry.
+    """The four lifecycle scenarios run through `RolloutHook` on a registry.
 
     Each of the first `HOOK_WORLDS` worlds of a scenario is fed to the hook in
     batches; the hook's decision is compared with the vectorised e-process on
     the same world at the level the hook itself assigned.
+
+    Args:
+        base: Seed offset.
+
+    Returns:
+        Per scenario the worlds, the worlds decided, those held for an
+        invalid sample ratio, the hook's decisions, the agreements with the
+        vectorised path and the rate with its interval.
     """
     n = 6000
     plan = plan_for(delta_min=0.02, n_max=n)
@@ -1453,13 +1840,33 @@ def hook_path(base: int = 0) -> dict[str, Any]:
 
 
 def gate_b9(runs: int, base: int = 0) -> dict[str, Any]:
-    """Promotion and rollback under a wandering control rate."""
+    """Promotion and rollback under a wandering control rate.
+
+    Args:
+        runs: Number of streams per scenario (half for the true-loss one).
+        base: Seed offset (0 for certification).
+
+    Returns:
+        The false promotions in the no-effect and below-minimum scenarios,
+        the false rollbacks, the share of true losses rolled back, the
+        through-hook results, the bounds, whether the hook agrees and
+        `passed`.
+    """
     n = 6000
     plan = plan_for(delta_min=0.02, n_max=n)
     target_p, target_r = -math.log(ALPHA_PROMOTE), -math.log(ALPHA_ROLLBACK)
     result: dict[str, Any] = {}
 
     def promoted(arm: np.ndarray, y: np.ndarray) -> np.ndarray:
+        """Which streams ever cross the promotion level.
+
+        Args:
+            arm: Treatment indicators, shape (runs, units).
+            y: Outcomes, same shape.
+
+        Returns:
+            A boolean array, True where the e-process reaches the level.
+        """
         paths = peeking_paths(arm, y, 0.5, plan.delta_min)
         return np.asarray(paths.max(axis=1) >= target_p)
 
@@ -1543,7 +1950,11 @@ def gate_b9(runs: int, base: int = 0) -> dict[str, Any]:
 
 
 def forbidden_imports() -> list[str]:
-    """Custody, vault or sealed-ledger imports found in `scmle.decision`."""
+    """Custody, vault or sealed-ledger imports found in `scmle.decision`.
+
+    Returns:
+        One `file: module` entry per forbidden import.
+    """
     root = Path(__file__).parents[2] / "scmle" / "decision"
     found = []
     for path in sorted(root.glob("*.py")):
@@ -1572,7 +1983,15 @@ def forbidden_imports() -> list[str]:
 
 
 def battery_digest(base: int) -> str:
-    """Hash of a small fixed battery of decision-layer outputs."""
+    """Hash of a small fixed battery of decision-layer outputs.
+
+    Args:
+        base: Seed offset.
+
+    Returns:
+        The SHA-256 of the threshold decision, the net-benefit band and a
+        rollout run, serialised.
+    """
     rng = rng_for(base, "b10", 0)
     score, _, y = worlds.calibration_world(rng, 3000, 0.7)
     decision = threshold.choose_threshold(
@@ -1593,7 +2012,16 @@ def battery_digest(base: int) -> str:
 
 
 def gate_b10(runs: int, base: int = 0) -> dict[str, Any]:
-    """Determinism and the import graph."""
+    """Determinism and the import graph.
+
+    Args:
+        runs: Unused; the gate always runs the battery twice.
+        base: Seed offset (0 for certification).
+
+    Returns:
+        The digest, whether the repeat is equal, the forbidden imports, the
+        interpreter measured and `passed`.
+    """
     first, second = battery_digest(base), battery_digest(base)
     forbidden = forbidden_imports()
     return {
@@ -1631,7 +2059,11 @@ RUNNERS = {
 
 
 def sources() -> dict[str, list[Any]]:
-    """Code each gate rests on (hashed so a change makes it stale)."""
+    """Code each gate rests on (hashed so a change makes it stale).
+
+    Returns:
+        Mapping of gate key to the functions its certificate covers.
+    """
     return {
         "A1": [
             threshold.choose_threshold,
@@ -1769,12 +2201,26 @@ def sources() -> dict[str, list[Any]]:
 
 
 def current_digests() -> dict[str, str]:
-    """Code hash of every gate."""
+    """Code hash of every gate.
+
+    Returns:
+        Mapping of gate key to its current code hash.
+    """
     return {k: certificates.code_hash(*v) for k, v in sources().items()}
 
 
 def certify_all(base: int = 0, scale: float = 1.0) -> dict[str, Any]:
-    """Runs every gate; `scale` shrinks replicate counts for dev looks."""
+    """Runs every gate; `scale` shrinks replicate counts for dev looks.
+
+    Args:
+        base: Seed offset (0 for certification, `DEV_SEED_BASE` for looks).
+        scale: Fraction of each gate's replicates to run (at least 2).
+
+    Returns:
+        The certificate document: version, development seed base, what was
+        not measured and, per gate, the measurement with its code hash, seed
+        range and duration.
+    """
     document: dict[str, Any] = {
         "version": 1,
         "dev_seed_base": DEV_SEED_BASE,
@@ -1795,7 +2241,16 @@ def certify_all(base: int = 0, scale: float = 1.0) -> dict[str, Any]:
 
 
 def problems(document: dict[str, Any] | None = None) -> list[str]:
-    """Why the stored certificates cannot be trusted (empty when current)."""
+    """Why the stored certificates cannot be trusted (empty when current).
+
+    Args:
+        document: The certificate document; read from `STORE_PATH` when
+            None.
+
+    Returns:
+        Messages for a missing file, a gate without a certificate and a
+        gate whose code hash differs from the current code.
+    """
     if document is None:
         if not STORE_PATH.exists():
             return ["f11_certificates.json is missing"]
@@ -1812,12 +2267,28 @@ def problems(document: dict[str, Any] | None = None) -> list[str]:
 
 
 def passed_gates(document: dict[str, Any]) -> list[str]:
-    """Gates that met their pre-registered floors."""
+    """Gates that met their pre-registered floors.
+
+    Args:
+        document: The certificate document.
+
+    Returns:
+        The keys of gates whose `passed` is true.
+    """
     return [k for k, v in document["gates"].items() if v["passed"]]
 
 
 def descriptive_only(document: dict[str, Any] | None = None) -> list[str]:
-    """Gates that missed their floors or could not run; filed, not gating."""
+    """Gates that missed their floors or could not run; filed, not gating.
+
+    Args:
+        document: The certificate document; read from `STORE_PATH` when
+            None.
+
+    Returns:
+        The keys of gates that did not pass; every gate when the file is
+        missing.
+    """
     if document is None:
         if not STORE_PATH.exists():
             return list(GATES)
@@ -1826,7 +2297,12 @@ def descriptive_only(document: dict[str, Any] | None = None) -> list[str]:
 
 
 def check() -> dict[str, Any]:
-    """The `--check f11` report."""
+    """The `--check f11` report.
+
+    Returns:
+        `ok`, the problems, the descriptive-only gates (empty when there are
+        problems) and what was not measured.
+    """
     issues = problems()
     return {
         "ok": not issues,
@@ -1837,7 +2313,15 @@ def check() -> dict[str, Any]:
 
 
 def main(arguments: list[str] | None = None) -> int:
-    """Writes (`--write`), checks (`--check`) or looks (`--dev`)."""
+    """Writes (`--write`), checks (`--check`) or looks (`--dev`).
+
+    Args:
+        arguments: Command-line arguments; `None` reads `sys.argv`.
+
+    Returns:
+        0 after `--write` and `--dev`; for `--check`, 0 when the certificates
+        are current and 1 otherwise.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--write", action="store_true")

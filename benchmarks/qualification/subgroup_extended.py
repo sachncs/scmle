@@ -1,4 +1,4 @@
-"""Subgroup family under unequal levels and overlapping columns (F10, P1).
+"""Subgroup family under unequal levels and overlapping columns.
 
 Registered on 2026-11-07, before the first run of this module. Every design,
 seed and floor below is fixed here and is not retuned: a design that misses
@@ -83,7 +83,17 @@ def unequal_world(
     sizes: tuple[int, ...],
     effects: dict[str, float],
 ) -> pd.DataFrame:
-    """A randomized experiment with levels of different sizes."""
+    """A randomized experiment with levels of different sizes.
+
+    Args:
+        rng: Random generator.
+        sizes: Rows in each level, in level order.
+        effects: Treatment effect by level name; levels not listed have none.
+
+    Returns:
+        A frame with the level `g`, a treatment `t` assigned with probability
+        1/2 and the outcome `y`.
+    """
     levels = base_gate.names()
     group = np.concatenate(
         [
@@ -98,12 +108,28 @@ def unequal_world(
 
 
 def overlap_names(prefix: str) -> tuple[str, ...]:
-    """The declared levels of one overlapping column."""
+    """The declared levels of one overlapping column.
+
+    Args:
+        prefix: Letter that starts each level name.
+
+    Returns:
+        The level names, such as `g0` to `g3`.
+    """
     return tuple(f"{prefix}{k}" for k in range(OVERLAP_LEVELS))
 
 
 def overlap_world(rng: np.random.Generator, effect_g0: float) -> pd.DataFrame:
-    """Two crossed columns; the effect is carried by `g == g0` rows."""
+    """Two crossed columns; the effect is carried by `g == g0` rows.
+
+    Args:
+        rng: Random generator.
+        effect_g0: Treatment effect for rows with `g == g0`.
+
+    Returns:
+        A frame of `OVERLAP_ROWS` rows with the columns `g` and `h` (levels
+        drawn independently and uniformly), treatment `t` and outcome `y`.
+    """
     g = rng.integers(0, OVERLAP_LEVELS, OVERLAP_ROWS)
     h = rng.integers(0, OVERLAP_LEVELS, OVERLAP_ROWS)
     tau = np.where(g == 0, effect_g0, 0.0)
@@ -124,7 +150,16 @@ def rejected(
     adapter: run.Adapter,
     groups: tuple[causal.Subgroup, ...],
 ) -> set[tuple[str, str]]:
-    """(column, level) pairs the Holm family rejects on one replicate."""
+    """(column, level) pairs the Holm family rejects on one replicate.
+
+    Args:
+        frame: One replicate's data.
+        adapter: The estimation adapter.
+        groups: The declared subgroup columns.
+
+    Returns:
+        The pairs whose hypothesis the subgroup report rejects.
+    """
     found = run.subgroup_report(adapter, frame, base_gate.LEVEL, groups)
     return {
         (r["column"], r["value"]) for r in found["hypotheses"] if r["rejected"]
@@ -134,12 +169,32 @@ def rejected(
 def any_rejected(
     pairs: set[tuple[str, str]], among: set[tuple[str, str]] | None
 ) -> bool:
-    """Whether a rejection falls among `among` (all when None)."""
+    """Whether a rejection falls among `among` (all when None).
+
+    Args:
+        pairs: The rejected (column, level) pairs.
+        among: The pairs of interest, or None for all.
+
+    Returns:
+        True if any rejected pair is among those of interest.
+    """
     return bool(pairs if among is None else pairs & among)
 
 
 def gate_unequal(replicates: int, base: int) -> dict[str, Any]:
-    """Family-wise error and power with unequal level sizes."""
+    """Family-wise error and power with unequal level sizes.
+
+    Args:
+        replicates: Replicates for the error-rate designs; the power design
+            uses a quarter of them, at least 100.
+        base: Seed offset.
+
+    Returns:
+        The sizes used, the two family-wise rates with Wilson intervals, the
+        bound, the power by planted level size, the smallest size whose
+        lower bound reaches the floor (None if none) and whether both error
+        rates are within the bound.
+    """
     adapter = base_gate.adapter_for()
     groups = (causal.Subgroup("g", base_gate.names()),)
     bound = base_gate.bound_for(replicates)
@@ -206,7 +261,16 @@ def gate_unequal(replicates: int, base: int) -> dict[str, Any]:
 
 
 def gate_overlap(replicates: int, base: int) -> dict[str, Any]:
-    """Family-wise error with two overlapping declared columns."""
+    """Family-wise error with two overlapping declared columns.
+
+    Args:
+        replicates: Number of replicates.
+        base: Seed offset.
+
+    Returns:
+        The two family-wise rates with Wilson intervals, the bound, the
+        design sizes and whether both rates are within the bound.
+    """
     adapter = base_gate.adapter_for()
     groups = (
         causal.Subgroup("g", overlap_names("g")),
@@ -252,7 +316,16 @@ def gate_overlap(replicates: int, base: int) -> dict[str, Any]:
 
 
 def measure_all(base: int = 0, scale: float = 1.0) -> dict[str, Any]:
-    """Runs every design; `scale` shrinks replicate counts for dev looks."""
+    """Runs every design; `scale` shrinks replicate counts for dev looks.
+
+    Args:
+        base: Seed offset (0 for the filed measurement).
+        scale: Fraction of `NULL_REPLICATES` to run, with a floor of 40.
+
+    Returns:
+        The document written to the measurements file: both designs, what was
+        not measured, the code hash and the duration.
+    """
     started = time.monotonic()
     count = max(40, int(NULL_REPLICATES * scale))
     document = {
@@ -283,7 +356,16 @@ def measure_all(base: int = 0, scale: float = 1.0) -> dict[str, Any]:
 
 
 def problems(document: dict[str, Any] | None = None) -> list[str]:
-    """Why the stored measurements are not for the current code."""
+    """Why the stored measurements are not for the current code.
+
+    Args:
+        document: The measurements document; read from `MEASUREMENTS_PATH`
+            when None.
+
+    Returns:
+        A message for a missing file or a code hash that differs from the
+        current code; empty when current.
+    """
     if document is None:
         if not MEASUREMENTS_PATH.exists():
             return ["subgroup_extended_measurements.json is missing"]
@@ -301,7 +383,15 @@ def problems(document: dict[str, Any] | None = None) -> list[str]:
 
 
 def main(arguments: list[str] | None = None) -> int:
-    """Writes (`--write`), checks (`--check`) or looks (`--dev`)."""
+    """Writes (`--write`), checks (`--check`) or looks (`--dev`).
+
+    Args:
+        arguments: Command-line arguments; `None` reads `sys.argv`.
+
+    Returns:
+        0 for `--dev` and `--write`; for `--check`, 0 when the measurements
+        are for the current code and 1 otherwise.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--write", action="store_true")

@@ -1,4 +1,4 @@
-"""Measured gate for the Holm family of subgroup hypotheses (F10, canon P1).
+"""Measured gate for the Holm family of subgroup hypotheses.
 
 Registered on 2026-11-06, before the first run of this module. Every floor,
 seed and design choice below is fixed here and is not retuned: a gate that
@@ -90,19 +90,43 @@ NOT_MEASURED = (
 
 
 def stream(base: int, index: int, which: int = 0) -> np.random.Generator:
-    """Independent random stream for one replicate."""
+    """Independent random stream for one replicate.
+
+    Args:
+        base: Seed offset of the run (0 for certification).
+        index: Replicate number.
+        which: Distinguishes the designs drawn within one replicate.
+
+    Returns:
+        A generator seeded with `[base + index, which]`.
+    """
     return np.random.default_rng([base + index, which])
 
 
 def names() -> tuple[str, ...]:
-    """The declared levels."""
+    """The declared levels.
+
+    Returns:
+        The level names `g0` to `g7`.
+    """
     return tuple(f"g{k}" for k in range(LEVELS))
 
 
 def world(
     rng: np.random.Generator, rows_per_level: int, effects: dict[str, float]
 ) -> pd.DataFrame:
-    """A randomized experiment whose effect differs by level of `g`."""
+    """A randomized experiment whose effect differs by level of `g`.
+
+    Args:
+        rng: Random generator.
+        rows_per_level: Rows in each of the levels.
+        effects: Treatment effect by level name; levels not listed have none.
+
+    Returns:
+        A frame with the level `g`, a treatment `t` assigned with probability
+        1/2 and the outcome `y` (effect times treatment plus standard normal
+        noise).
+    """
     group = np.repeat(names(), rows_per_level)
     tau = np.array([effects.get(g, 0.0) for g in group])
     t = (rng.uniform(size=len(group)) < 0.5).astype(float)
@@ -111,7 +135,12 @@ def world(
 
 
 def adapter_for() -> run.Adapter:
-    """The randomized-difference adapter the report is run with."""
+    """The randomized-difference adapter the report is run with.
+
+    Returns:
+        An adapter for the `randomized_diff` strategy on a randomized
+        treatment `t` and outcome `y`.
+    """
     spec = causal.CausalSpec(
         treatment="t",
         outcome="y",
@@ -125,7 +154,15 @@ def adapter_for() -> run.Adapter:
 
 
 def rejected_levels(frame: pd.DataFrame, adapter: run.Adapter) -> set[str]:
-    """Levels the Holm family rejects on one replicate."""
+    """Levels the Holm family rejects on one replicate.
+
+    Args:
+        frame: One replicate's data.
+        adapter: The estimation adapter.
+
+    Returns:
+        The level names whose hypothesis the subgroup report rejects.
+    """
     found = run.subgroup_report(
         adapter, frame, LEVEL, (causal.Subgroup("g", names()),)
     )
@@ -133,7 +170,16 @@ def rejected_levels(frame: pd.DataFrame, adapter: run.Adapter) -> set[str]:
 
 
 def rate(hits: int, n: int) -> dict[str, Any]:
-    """A proportion with its Wilson 95 percent interval."""
+    """A proportion with its Wilson 95 percent interval.
+
+    Args:
+        hits: Number of successes.
+        n: Number of trials.
+
+    Returns:
+        The counts, their ratio under `rate` and the interval as
+        `[low, high]` under `wilson`.
+    """
     low, high = certificates.wilson_interval(hits, n, 0.95)
     return {
         "hits": int(hits),
@@ -144,12 +190,31 @@ def rate(hits: int, n: int) -> dict[str, Any]:
 
 
 def bound_for(replicates: int) -> float:
-    """The pre-registered family-wise bound at this replicate count."""
+    """The pre-registered family-wise bound at this replicate count.
+
+    Args:
+        replicates: Number of replicates in the gate.
+
+    Returns:
+        `0.05 + 2 sqrt(0.05 * 0.95 / replicates)`.
+    """
     return ALPHA + 2 * math.sqrt(ALPHA * (1 - ALPHA) / replicates)
 
 
 def gate_subgroup_holm(replicates: int, base: int = 0) -> dict[str, Any]:
-    """Family-wise error under two nulls and power by subgroup size."""
+    """Family-wise error under two nulls and power by subgroup size.
+
+    Args:
+        replicates: Replicates for the two error-rate designs; the power
+            designs use a quarter of them, at least 100.
+        base: Seed offset (0 for certification).
+
+    Returns:
+        The measured rates with Wilson intervals, the bound, the power by
+        subgroup size, the effects filed without gating, the smallest size
+        whose power lower bound reaches the floor (None if none does), and
+        whether the gate passed.
+    """
     adapter = adapter_for()
     bound = bound_for(replicates)
     null_hits = sum(
@@ -210,12 +275,26 @@ def gate_subgroup_holm(replicates: int, base: int = 0) -> dict[str, Any]:
 
 
 def current_method_hash() -> str:
-    """Hash of the package code the gate measures."""
+    """Hash of the package code the gate measures.
+
+    Returns:
+        The method hash of `run.subgroup_report` and the code it depends on.
+    """
     return certified.subgroup_method_hash(run.subgroup_report)
 
 
 def certify_all(base: int = 0, scale: float = 1.0) -> dict[str, Any]:
-    """Runs the gate; `scale` shrinks replicate counts for dev looks."""
+    """Runs the gate; `scale` shrinks replicate counts for dev looks.
+
+    Args:
+        base: Seed offset (0 for certification, `DEV_SEED_BASE` for looks).
+        scale: Fraction of `NULL_REPLICATES` to run, with a floor of 40.
+
+    Returns:
+        The document written to the certificate file: version, development
+        seed base, what was not measured and the measured gate with its
+        hashes, seed range and duration.
+    """
     started = time.monotonic()
     count = max(40, int(NULL_REPLICATES * scale))
     measured = gate_subgroup_holm(count, base)
@@ -235,7 +314,16 @@ def certify_all(base: int = 0, scale: float = 1.0) -> dict[str, Any]:
 
 
 def problems(document: dict[str, Any] | None = None) -> list[str]:
-    """Why the stored certificate cannot be trusted (empty when current)."""
+    """Why the stored certificate cannot be trusted (empty when current).
+
+    Args:
+        document: The certificate document; read from `STORE_PATH` when
+            None.
+
+    Returns:
+        Messages for a missing file or entry, a changed method hash and a
+        changed gate hash; empty when the certificate is current.
+    """
     if document is None:
         if not STORE_PATH.exists():
             return ["subgroup_certificates.json is missing"]
@@ -255,7 +343,16 @@ def problems(document: dict[str, Any] | None = None) -> list[str]:
 
 
 def descriptive_only(document: dict[str, Any] | None = None) -> list[str]:
-    """Gates that missed their floors; subgroup results stay descriptive."""
+    """Gates that missed their floors; subgroup results stay descriptive.
+
+    Args:
+        document: The certificate document; read from `STORE_PATH` when
+            None.
+
+    Returns:
+        The names of gates that did not pass; the gate itself when the file
+        is missing.
+    """
     if document is None:
         if not STORE_PATH.exists():
             return [GATE]
@@ -264,7 +361,15 @@ def descriptive_only(document: dict[str, Any] | None = None) -> list[str]:
 
 
 def main(arguments: list[str] | None = None) -> int:
-    """Writes (`--write`), checks (`--check`) or looks (`--dev`)."""
+    """Writes (`--write`), checks (`--check`) or looks (`--dev`).
+
+    Args:
+        arguments: Command-line arguments; `None` reads `sys.argv`.
+
+    Returns:
+        0 for `--dev` and `--write`; for `--check`, 0 when the certificate is
+        current and 1 otherwise.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--write", action="store_true")

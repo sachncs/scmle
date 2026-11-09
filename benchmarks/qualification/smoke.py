@@ -1,4 +1,4 @@
-"""The Phase 1 gate: every harness piece, exercised once, with controls.
+"""The smoke gate: every harness piece, exercised once, with controls.
 
 `run_smoke` returns a named list of checks. Two of them are negative
 controls: a corrupted mask must be caught, and a deliberately liberal test
@@ -41,7 +41,13 @@ SABOTAGES = (None, "size")
 
 @dataclasses.dataclass(frozen=True)
 class SmokeCheck:
-    """One named check and what it found."""
+    """One named check and what it found.
+
+    Attributes:
+        name: What the check asserts.
+        ok: Whether it held.
+        detail: The measured values, as text.
+    """
 
     name: str
     ok: bool
@@ -50,7 +56,11 @@ class SmokeCheck:
 
 @dataclasses.dataclass(frozen=True)
 class SmokeReport:
-    """All checks of a smoke run."""
+    """All checks of a smoke run.
+
+    Attributes:
+        checks: The checks, in the order they ran.
+    """
 
     checks: tuple[SmokeCheck, ...]
 
@@ -60,7 +70,11 @@ class SmokeReport:
         return all(check.ok for check in self.checks)
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """JSON-ready record.
+
+        Returns:
+            The overall `ok` and each check as a dict.
+        """
         return {
             "ok": self.ok,
             "checks": [dataclasses.asdict(check) for check in self.checks],
@@ -70,7 +84,15 @@ class SmokeReport:
 def injection_cases(
     frame: pd.DataFrame,
 ) -> dict[str, Callable[[], inject.Injection]]:
-    """One call per injector, on the demo table."""
+    """One call per injector, on the demo table.
+
+    Args:
+        frame: The demo table, with a `target` column.
+
+    Returns:
+        Mapping of case name to a function that runs the injector with fixed
+        arguments and returns its injection.
+    """
     return {
         "label_flip": lambda: inject.flip_labels(frame, "target", 0.1, 0),
         "missing_mcar": lambda: inject.inject_missing(
@@ -105,13 +127,27 @@ def injection_cases(
 
 
 def mismatched_cells(original: pd.DataFrame, planted: inject.Injection) -> int:
-    """Cells where the mask disagrees with the before/after diff."""
+    """Cells where the mask disagrees with the before/after diff.
+
+    Args:
+        original: The table before injection.
+        planted: The injection to check.
+
+    Returns:
+        The number of cells on which the injection's mask differs from
+        `inject.changed_cells`.
+    """
     diff = inject.changed_cells(original, planted.frame)
     return int((planted.mask.to_numpy() != diff.to_numpy()).sum())
 
 
 def check_masks() -> list[SmokeCheck]:
-    """Exactness of every mask, plus a control that corrupts one."""
+    """Exactness of every mask, plus a control that corrupts one.
+
+    Returns:
+        Two checks: that every injector's mask equals the independent diff,
+        and that flipping one mask cell is detected.
+    """
     frame = standins.demo_frame().head(SMOKE_ROWS).reset_index(drop=True)
     total = 0
     cases = injection_cases(frame)
@@ -137,9 +173,26 @@ def check_masks() -> list[SmokeCheck]:
 
 
 def pearson_test(liberal: bool) -> Callable[[simulate.World], float]:
-    """P-value of a correlation test, optionally made too liberal."""
+    """P-value of a correlation test, optionally made too liberal.
+
+    Args:
+        liberal: Whether to halve the p-value, which makes the test reject
+            too often.
+
+    Returns:
+        A function mapping a world to the Pearson p-value of `bmi` against
+        the outcome.
+    """
 
     def test(world: simulate.World) -> float:
+        """The Pearson p-value of `bmi` against the outcome.
+
+        Args:
+            world: A world with a `bmi` feature.
+
+        Returns:
+            The p-value, halved when the test is liberal.
+        """
         value = float(
             stats.pearsonr(world.features["bmi"], world.outcome).pvalue
         )
@@ -149,10 +202,29 @@ def pearson_test(liberal: bool) -> Callable[[simulate.World], float]:
 
 
 def check_size(runs: int, seed: int, sabotage: str | None) -> list[SmokeCheck]:
-    """Empirical size of a valid test, and of a deliberately biased one."""
+    """Empirical size of a valid test, and of a deliberately biased one.
+
+    Args:
+        runs: Number of null worlds.
+        seed: Run seed.
+        sabotage: `size` makes the test under examination liberal, so the
+            first check must fail; None leaves it valid.
+
+    Returns:
+        Two checks: that the size lies inside the band, and that the
+        liberal test falls outside it.
+    """
     data = load_diabetes(as_frame=True)
 
     def measure(liberal: bool) -> simulate.RejectionRate:
+        """Rejection rate of the test over fresh null worlds.
+
+        Args:
+            liberal: Whether to use the liberal test.
+
+        Returns:
+            The rejection rate at level `ALPHA` over the null worlds.
+        """
         worlds = simulate.null_worlds(data.data, data.target, runs, seed)
         return simulate.rejection_rate(pearson_test(liberal), worlds, ALPHA)
 
@@ -177,7 +249,15 @@ def check_size(runs: int, seed: int, sabotage: str | None) -> list[SmokeCheck]:
 
 
 def shift_pair(seed: int, delta: float) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Two Gaussian samples; the second is shifted by `delta` in one column."""
+    """Two Gaussian samples; the second is shifted by `delta` in one column.
+
+    Args:
+        seed: Seed of the random generator.
+        delta: Shift added to column `a` of the second sample.
+
+    Returns:
+        Two frames of `SHIFT_ROWS` rows with columns `a` and `b`.
+    """
     rng = np.random.default_rng(seed)
     names = ["a", "b"]
     first = pd.DataFrame(rng.normal(size=(SHIFT_ROWS, 2)), columns=names)
@@ -191,6 +271,12 @@ def uniform_p_value(pvalues: list[float]) -> float:
 
     The p-values live on a grid of ``1 / (B + 1)``; they are jittered inside
     their cell so the grid itself is not read as non-uniformity.
+
+    Args:
+        pvalues: Permutation p-values from independent null tests.
+
+    Returns:
+        The Kolmogorov-Smirnov p-value of the jittered values.
     """
     rng = np.random.default_rng(0)
     cells = SHIFT_PERMUTATIONS + 1
@@ -205,6 +291,13 @@ def check_shift(seed: int) -> list[SmokeCheck]:
 
     The control squares every p-value, which makes the test liberal and
     non-uniform; the uniformity check must reject it.
+
+    Args:
+        seed: Run seed.
+
+    Returns:
+        Three checks: uniform null p-values, detection of a planted shift,
+        and rejection of the squared (liberal) p-values.
     """
     null = [
         shift.mmd_test(
@@ -241,7 +334,17 @@ def check_shift(seed: int) -> list[SmokeCheck]:
 
 
 def check_oracles() -> SmokeCheck:
-    """Oracle integrity and agreement of our statistics with scipy."""
+    """Oracle integrity and agreement of our statistics with scipy.
+
+    Returns:
+        One check that is false, with the message, when an oracle fails to
+        load, its generator hash is stale or a value disagrees; otherwise
+        true with the number of files and cases compared.
+
+    Raises:
+        OracleError: Raised inside the check when an oracle's generator hash
+            is stale; it is caught here and reported as a failed check.
+    """
     compared = 0
     try:
         for name in oracles.NAMES:
@@ -280,7 +383,12 @@ def check_oracles() -> SmokeCheck:
 
 
 def check_corpora() -> SmokeCheck:
-    """The manifest validates and no entry claims more than it has."""
+    """The manifest validates and no entry claims more than it has.
+
+    Returns:
+        One check; false with the message when the manifest is invalid,
+        otherwise true with the verified and candidate counts.
+    """
     try:
         manifest = corpora.load_manifest()
     except corpora.CorpusError as error:
@@ -295,7 +403,13 @@ def check_corpora() -> SmokeCheck:
 
 
 def check_certificates() -> list[SmokeCheck]:
-    """Stand-in certification, reproducibility and staleness."""
+    """Stand-in certification, reproducibility and staleness.
+
+    Returns:
+        Two checks: that the stand-ins pass their policy and certification
+        is reproducible, and that a certificate for other code is stale,
+        demotes gating and is refused by `mark_gating`.
+    """
     first = standins.certify_all()
     second = standins.certify_all()
     lines = []
@@ -345,7 +459,14 @@ def check_certificates() -> list[SmokeCheck]:
 
 
 def check_ledger(seed: int) -> list[SmokeCheck]:
-    """The claim ledger: vectorized tester, uniform p, FDR bound and power."""
+    """The claim ledger: vectorized tester, uniform p, FDR bound and power.
+
+    Args:
+        seed: Run seed.
+
+    Returns:
+        One check per finding of `ledger_checks.smoke_findings`.
+    """
     return [
         SmokeCheck(f.name, f.ok, f.detail)
         for f in ledger_checks.smoke_findings(seed)
@@ -353,7 +474,16 @@ def check_ledger(seed: int) -> list[SmokeCheck]:
 
 
 def check_power_and_fdr(seed: int) -> list[SmokeCheck]:
-    """Full mode only: a power curve and a pipeline false-discovery rate."""
+    """Full mode only: a power curve and a pipeline false-discovery rate.
+
+    Args:
+        seed: Run seed.
+
+    Returns:
+        Two checks: that power does not fall as the effect size rises, and
+        that the empirical false-discovery rate of Benjamini-Hochberg on
+        conditional coefficient tests supports the level.
+    """
     data = load_diabetes(as_frame=True)
     curve = simulate.power_curve(
         pearson_test(liberal=False),
@@ -409,7 +539,8 @@ def run_smoke(
     """Runs every harness check once.
 
     Args:
-        runs: Null worlds for the size check (the plan's gate uses 2000).
+        runs: Null worlds for the size check (default 2000; a full run uses
+            20000).
         seed: Run seed.
         full: Also run the power curve and pipeline FDR (nightly).
         sabotage: `size` swaps the valid test for a liberal one, so the size

@@ -1,4 +1,4 @@
-"""Point-in-time checks for F9: differential, metamorphic, late arrival.
+"""Point-in-time checks for ingestion: differential, metamorphic, late arrival.
 
 * Differential: the vectorised synthesis equals `ingest_naive`, a row-by-row
   reference written separately from the code under test, on random schemas.
@@ -31,7 +31,24 @@ RTOL = 1e-9
 
 @dataclasses.dataclass
 class Schema:
-    """A random parent/child/leaf schema and the feature to compare."""
+    """A random parent/child/leaf schema and the feature to compare.
+
+    Attributes:
+        targets: Parent rows with a key `cid` and a cutoff time `moment`.
+        orders: Child rows with key `cid`, id `oid`, event time `ev`,
+            recorded time `rec` and value `val`.
+        items: Leaf rows with key `oid`, `ev`, `rec` and `val`.
+        known: Whether the orders carry a recorded time (transaction time)
+            rather than an event time plus delay.
+        leaf_known: The same for the items.
+        delta: Delay added to the event time when no recorded time is known.
+        lag: Gap kept between a target's cutoff and the data it may read.
+        window: Look-back window of the feature, or None for unbounded.
+        primitive: Aggregate of the plain feature.
+        inner: Inner aggregate of the nested feature.
+        outer: Outer aggregate of the nested feature.
+        nested: Whether the feature is nested through the items.
+    """
 
     targets: pd.DataFrame
     orders: pd.DataFrame
@@ -48,7 +65,15 @@ class Schema:
 
 
 def random_schema(seed: int, name: str = "ingest.check.schema") -> Schema:
-    """One random schema, with ties, gaps, late rows and shared keys."""
+    """One random schema, with ties, gaps, late rows and shared keys.
+
+    Args:
+        seed: Run seed.
+        name: Component name the random stream is derived from.
+
+    Returns:
+        The schema, drawn only from `randomness.component_rng(seed, name, 0)`.
+    """
     rng = randomness.component_rng(seed, name, 0)
     n_targets = int(rng.integers(3, 12))
     keys = int(rng.integers(2, 6))
@@ -108,9 +133,26 @@ def random_schema(seed: int, name: str = "ingest.check.schema") -> Schema:
 
 
 def views(schema: Schema) -> tuple[synthesize.Source, asof_view.AsOfView]:
-    """The order source and the item view of a schema."""
+    """The order source and the item view of a schema.
+
+    Args:
+        schema: The schema.
+
+    Returns:
+        The synthesis source over the orders and the as-of view over the
+        items.
+    """
 
     def rule(known: bool) -> asof_view.TimeRule:
+        """The time rule of a table.
+
+        Args:
+            known: Whether the table has a recorded time.
+
+        Returns:
+            A transaction-time rule on `rec` when known, otherwise an
+            event-delay rule; both with the schema's delta.
+        """
         if known:
             return asof_view.TimeRule(
                 asof_view.TRANSACTION, "rec", schema.delta
@@ -127,7 +169,14 @@ def views(schema: Schema) -> tuple[synthesize.Source, asof_view.AsOfView]:
 
 
 def fast_feature(schema: Schema) -> pd.Series:
-    """The feature computed by the code under test."""
+    """The feature computed by the code under test.
+
+    Args:
+        schema: The schema.
+
+    Returns:
+        The vectorised feature, one value per target.
+    """
     source, items = views(schema)
     if schema.nested:
         spec = synthesize.FeatureSpec(
@@ -154,7 +203,14 @@ def fast_feature(schema: Schema) -> pd.Series:
 
 
 def naive_feature(schema: Schema) -> list[float]:
-    """The same feature by the reference implementation."""
+    """The same feature by the reference implementation.
+
+    Args:
+        schema: The schema.
+
+    Returns:
+        The row-by-row feature, one value per target.
+    """
     known = "rec" if schema.known else None
     leaf_known = "rec" if schema.leaf_known else None
     if schema.nested:
@@ -197,7 +253,15 @@ def naive_feature(schema: Schema) -> list[float]:
 
 
 def same(left: np.ndarray, right: np.ndarray) -> bool:
-    """Equal within the floating tolerance, NaN equal to NaN."""
+    """Equal within the floating tolerance, NaN equal to NaN.
+
+    Args:
+        left: First array.
+        right: Second array.
+
+    Returns:
+        True if every pair is within a relative and absolute `RTOL`.
+    """
     return bool(
         np.allclose(
             left.astype(float),
@@ -210,7 +274,14 @@ def same(left: np.ndarray, right: np.ndarray) -> bool:
 
 
 def differential_equal(seed: int) -> bool:
-    """Whether fast and naive agree on the schema of this seed."""
+    """Whether fast and naive agree on the schema of this seed.
+
+    Args:
+        seed: Run seed.
+
+    Returns:
+        True if the vectorised and the reference features agree.
+    """
     schema = random_schema(seed)
     fast = fast_feature(schema).to_numpy()
     return same(fast, np.array(naive_feature(schema)))
@@ -223,6 +294,12 @@ def metamorphic_unchanged(seed: int) -> bool:
     Their value and key are replaced at random, and their event time too when
     they have a recorded time; the recorded time column is untouched, because
     the rule reads it.
+
+    Args:
+        seed: Run seed.
+
+    Returns:
+        True if the feature of target 0 is the same before and after.
     """
     schema = random_schema(seed, "ingest.check.meta")
     rng = randomness.component_rng(seed, "ingest.check.meta.noise", 0)
@@ -250,14 +327,26 @@ def metamorphic_unchanged(seed: int) -> bool:
 
 @dataclasses.dataclass(frozen=True)
 class Leaks:
-    """Rows read that were recorded after their cutoff, in one world."""
+    """Rows read that were recorded after their cutoff, in one world.
+
+    Attributes:
+        baseline: Leaked rows of an event-time-only filter.
+        view: Leaked rows of the as-of view.
+    """
 
     baseline: int
     view: int
 
 
 def late_leaks(seed: int) -> Leaks:
-    """Leaked rows of an event-time-only filter and of the view."""
+    """Leaked rows of an event-time-only filter and of the view.
+
+    Args:
+        seed: Run seed of the late-arrival world.
+
+    Returns:
+        The counts of rows recorded after the cutoff that each method read.
+    """
     world = ingest_worlds.late_world(seed)
     cutoff = world.targets["moment"].to_numpy() - world.lag_days
     asked = pd.DataFrame(

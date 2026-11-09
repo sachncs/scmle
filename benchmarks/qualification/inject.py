@@ -9,7 +9,7 @@ it exactly; the tests compare the two cell by cell.
 
 Randomness comes only from keyed streams (`scmle.core.randomness`), so equal
 inputs and seeds give equal output in any process. Plants are synthetic, so
-detection rates measured on them are optimistic (see F7).
+detection rates measured on them are optimistic.
 """
 
 from collections.abc import Callable
@@ -94,7 +94,15 @@ def changed_cells(
 
 
 def check_frame(frame: pd.DataFrame) -> None:
-    """Requires a non-empty table with unique rows and column names."""
+    """Requires a non-empty table with unique rows and column names.
+
+    Args:
+        frame: The table to check.
+
+    Raises:
+        ValueError: If it is not a non-empty DataFrame, or its column names
+            or index labels repeat.
+    """
     if not isinstance(frame, pd.DataFrame) or frame.empty:
         raise ValueError("frame must be a non-empty DataFrame")
     if not frame.columns.is_unique or not frame.index.is_unique:
@@ -102,7 +110,18 @@ def check_frame(frame: pd.DataFrame) -> None:
 
 
 def check_columns(frame: pd.DataFrame, columns: Sequence[str]) -> list[str]:
-    """Returns `columns` as a list, requiring that they exist."""
+    """Returns `columns` as a list, requiring that they exist.
+
+    Args:
+        frame: The table.
+        columns: Column names to require.
+
+    Returns:
+        The names as a list, in the given order.
+
+    Raises:
+        ValueError: If the list is empty or a name is not a column of `frame`.
+    """
     names = list(columns)
     if not names:
         raise ValueError("columns must not be empty")
@@ -113,7 +132,18 @@ def check_columns(frame: pd.DataFrame, columns: Sequence[str]) -> list[str]:
 
 
 def check_rate(rate: float, name: str = "rate") -> float:
-    """Requires a rate in (0, 1]."""
+    """Requires a rate in (0, 1].
+
+    Args:
+        rate: The rate.
+        name: Name used in the error message.
+
+    Returns:
+        The rate as a float.
+
+    Raises:
+        ValueError: If it is outside (0, 1].
+    """
     value = qualification.finite(rate, name)
     if not 0.0 < value <= 1.0:
         raise ValueError(f"{name} must be within (0, 1]")
@@ -121,7 +151,19 @@ def check_rate(rate: float, name: str = "rate") -> float:
 
 
 def cell_count(rate: float, available: int, what: str) -> int:
-    """Number of cells to plant: `round(rate * available)`, at least one."""
+    """Number of cells to plant: `round(rate * available)`, at least one.
+
+    Args:
+        rate: Share of the available cells to plant.
+        available: Number of cells that could be chosen.
+        what: Noun for the error message, such as `cell` or `label`.
+
+    Returns:
+        The rounded count, capped at `available`.
+
+    Raises:
+        ValueError: If the count would be less than one.
+    """
     chosen = min(round(rate * available), available)
     if chosen < 1:
         raise ValueError(f"rate is too small: no {what} would be planted")
@@ -129,7 +171,14 @@ def cell_count(rate: float, available: int, what: str) -> int:
 
 
 def is_numeric(series: pd.Series) -> bool:
-    """Whether a column is numeric and not boolean."""
+    """Whether a column is numeric and not boolean.
+
+    Args:
+        series: The column.
+
+    Returns:
+        True for a numeric, non-boolean dtype.
+    """
     return bool(
         pd.api.types.is_numeric_dtype(series)
         and not pd.api.types.is_bool_dtype(series)
@@ -137,24 +186,54 @@ def is_numeric(series: pd.Series) -> bool:
 
 
 def require_numeric(frame: pd.DataFrame, columns: Sequence[str]) -> None:
-    """Requires every named column to be numeric."""
+    """Requires every named column to be numeric.
+
+    Args:
+        frame: The table.
+        columns: Names of the columns to check.
+
+    Raises:
+        ValueError: If any named column is not numeric (see `is_numeric`).
+    """
     bad = [name for name in columns if not is_numeric(frame[name])]
     if bad:
         raise ValueError(f"columns must be numeric: {bad}")
 
 
 def stream(seed: int, family: str, index: int) -> np.random.Generator:
-    """Random stream for one injector call."""
+    """Random stream for one injector call.
+
+    Args:
+        seed: Run seed.
+        family: Injector family, part of the stream key.
+        index: Repeat counter for the stream.
+
+    Returns:
+        The generator for `inject.<family>` at that index.
+    """
     return randomness.component_rng(seed, f"inject.{family}", index)
 
 
 def blank_mask(frame: pd.DataFrame) -> pd.DataFrame:
-    """An all-False mask shaped like `frame`."""
+    """An all-False mask shaped like `frame`.
+
+    Args:
+        frame: The table whose shape and labels the mask copies.
+
+    Returns:
+        A boolean frame of False values.
+    """
     return pd.DataFrame(False, index=frame.index, columns=frame.columns)
 
 
 def mark(mask: pd.DataFrame, column: str, positions: np.ndarray) -> None:
-    """Sets mask cells at row `positions` of `column`."""
+    """Sets mask cells at row `positions` of `column`.
+
+    Args:
+        mask: The mask, changed in place.
+        column: Name of the column to mark.
+        positions: Row positions (not labels) to set to True.
+    """
     flags = mask[column].to_numpy(dtype=bool, copy=True)
     flags[positions] = True
     mask[column] = flags
@@ -169,7 +248,20 @@ def finish(
     index: int,
     info: Mapping[str, Any],
 ) -> Injection:
-    """Packages an injection with its random-stream key."""
+    """Packages an injection with its random-stream key.
+
+    Args:
+        frame: The mutated table.
+        mask: The mask of changed cells.
+        defect_type: Name of the defect, the certificate key.
+        family: Injector family, part of the stream key.
+        seed: Run seed.
+        index: Repeat counter for the stream.
+        info: Parameters and ground truth beyond the mask; copied.
+
+    Returns:
+        The injection.
+    """
     return Injection(
         frame=frame,
         mask=mask,
@@ -182,7 +274,16 @@ def finish(
 def other_classes(
     rng: np.random.Generator, current: np.ndarray, n_classes: int
 ) -> np.ndarray:
-    """Uniformly random class indices that differ from `current`."""
+    """Uniformly random class indices that differ from `current`.
+
+    Args:
+        rng: Random generator.
+        current: Current class index of each row.
+        n_classes: Number of classes.
+
+    Returns:
+        New class indices, never equal to the current ones.
+    """
     offset = rng.integers(1, n_classes, size=len(current))
     return (current + offset) % n_classes
 
@@ -265,7 +366,18 @@ def flip_labels(
 
 
 def standardized(values: pd.Series) -> np.ndarray:
-    """Z-scores with missing values set to zero."""
+    """Z-scores with missing values set to zero.
+
+    Args:
+        values: The column.
+
+    Returns:
+        The standardized values as an array.
+
+    Raises:
+        ValueError: If the column has no spread (zero or undefined standard
+            deviation).
+    """
     numbers = values.astype(float)
     spread = float(numbers.std())
     if not math.isfinite(spread) or spread == 0.0:
@@ -277,7 +389,17 @@ def standardized(values: pd.Series) -> np.ndarray:
 def calibrated_probabilities(
     z: np.ndarray, strength: float, rate: float
 ) -> np.ndarray:
-    """Logistic selection probabilities whose mean equals `rate`."""
+    """Logistic selection probabilities whose mean equals `rate`.
+
+    Args:
+        z: Standardized driver values.
+        strength: Logit slope per standard deviation.
+        rate: Target mean probability.
+
+    Returns:
+        The probabilities `1 / (1 + exp(-(strength * z + b)))`, with the
+        intercept `b` found by bisection so that the mean is `rate`.
+    """
     low, high = -LOGIT_BRACKET, LOGIT_BRACKET
     for _ in range(BISECTION_STEPS):
         middle = (low + high) / 2.0
@@ -463,7 +585,14 @@ def inject_sentinels(
 
 
 def has_default_index(frame: pd.DataFrame) -> bool:
-    """Whether the index is exactly 0..n-1."""
+    """Whether the index is exactly 0..n-1.
+
+    Args:
+        frame: The table.
+
+    Returns:
+        True for a `RangeIndex` that starts at 0 with step 1.
+    """
     index = frame.index
     return (
         isinstance(index, pd.RangeIndex)
@@ -541,7 +670,15 @@ def inject_duplicates(
 
 
 def robust_scale(values: np.ndarray) -> float:
-    """Normal-consistent median absolute deviation; std if that is zero."""
+    """Normal-consistent median absolute deviation; std if that is zero.
+
+    Args:
+        values: The sample.
+
+    Returns:
+        The scaled median absolute deviation, or the standard deviation when
+        the deviation is zero.
+    """
     centre = float(np.median(values))
     mad = MAD_SCALE * float(np.median(np.abs(values - centre)))
     if mad > 0.0:
@@ -616,7 +753,15 @@ def inject_outliers(
 
 
 def is_classification(series: pd.Series) -> bool:
-    """Whether a target should be treated as class labels."""
+    """Whether a target should be treated as class labels.
+
+    Args:
+        series: The target column.
+
+    Returns:
+        True for a non-numeric column or one with at most
+        `MAX_LABEL_CLASSES` distinct values.
+    """
     return (not is_numeric(series)) or series.nunique() <= MAX_LABEL_CLASSES
 
 

@@ -1,4 +1,4 @@
-"""Verification harness for the qualification instrument (F7).
+"""Verification harness for the qualification instrument.
 
 It plants known defects in real data (`inject`), simulates null and
 alternative worlds (`simulate`), compares statistics with reference outputs

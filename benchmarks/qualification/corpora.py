@@ -96,7 +96,18 @@ class Corpus:
 
 
 def text_or_none(record: Mapping[str, Any], key: str) -> str | None:
-    """A non-empty string, or None."""
+    """A non-empty string, or None.
+
+    Args:
+        record: A manifest entry.
+        key: The field to read.
+
+    Returns:
+        The field's string, or None when it is null.
+
+    Raises:
+        CorpusError: If the field is neither null nor a non-empty string.
+    """
     value = record[key]
     if value is None:
         return None
@@ -107,6 +118,12 @@ def text_or_none(record: Mapping[str, Any], key: str) -> str | None:
 
 def parse_entry(record: Mapping[str, Any]) -> Corpus:
     """Validates one manifest entry.
+
+    Args:
+        record: The entry as parsed from JSON.
+
+    Returns:
+        The validated corpus.
 
     Raises:
         CorpusError: On unknown or missing fields, a malformed value, an
@@ -165,7 +182,18 @@ def parse_entry(record: Mapping[str, Any]) -> Corpus:
 
 
 def parse_manifest(document: Mapping[str, Any]) -> tuple[Corpus, ...]:
-    """Validates a whole manifest document."""
+    """Validates a whole manifest document.
+
+    Args:
+        document: The parsed manifest, with `schema_version` and `corpora`.
+
+    Returns:
+        The entries in manifest order.
+
+    Raises:
+        CorpusError: If the schema version or fields are wrong or an id
+            repeats (entry errors propagate from `parse_entry`).
+    """
     if document.get("schema_version") != SCHEMA_VERSION:
         raise CorpusError(f"schema_version must be {SCHEMA_VERSION}")
     extra = sorted(set(document) - {"schema_version", "corpora"})
@@ -179,12 +207,26 @@ def parse_manifest(document: Mapping[str, Any]) -> tuple[Corpus, ...]:
 
 
 def load_manifest(path: Path = MANIFEST) -> tuple[Corpus, ...]:
-    """Reads and validates a manifest file."""
+    """Reads and validates a manifest file.
+
+    Args:
+        path: The manifest JSON file.
+
+    Returns:
+        The validated entries.
+    """
     return parse_manifest(json.loads(path.read_text(encoding="utf-8")))
 
 
 def find(manifest: tuple[Corpus, ...], corpus_id: str) -> Corpus:
     """The entry with this id.
+
+    Args:
+        manifest: Entries to search.
+        corpus_id: The id to look for.
+
+    Returns:
+        The matching entry.
 
     Raises:
         CorpusError: If there is none.
@@ -196,12 +238,20 @@ def find(manifest: tuple[Corpus, ...], corpus_id: str) -> Corpus:
 
 
 def is_offline() -> bool:
-    """Whether `SCMLE_OFFLINE` asks for no network access."""
+    """Whether `SCMLE_OFFLINE` asks for no network access.
+
+    Returns:
+        True when the variable is `1`, `true` or `yes` (any case).
+    """
     return os.environ.get("SCMLE_OFFLINE", "").strip().lower() in OFFLINE_VALUES
 
 
 def corpus_root() -> Path:
-    """Folder that holds fetched corpora (`SCMLE_CORPORA_DIR` overrides)."""
+    """Folder that holds fetched corpora (`SCMLE_CORPORA_DIR` overrides).
+
+    Returns:
+        The configured folder, or `~/.cache/scmle/corpora`.
+    """
     configured = os.environ.get("SCMLE_CORPORA_DIR")
     if configured:
         return Path(configured)
@@ -210,6 +260,14 @@ def corpus_root() -> Path:
 
 def destination(entry: Corpus, root: Path) -> Path:
     """Where a corpus file is stored under `root`.
+
+    Args:
+        entry: The corpus.
+        root: Folder that holds corpora.
+
+    Returns:
+        `root/<id>/<file name of the URL>`, using `corpus.bin` when the URL
+        has no file name.
 
     Raises:
         CorpusUnavailableError: If the entry has no URL to name the file after.
@@ -221,7 +279,14 @@ def destination(entry: Corpus, root: Path) -> Path:
 
 
 def sha256_of(path: Path) -> str:
-    """SHA-256 of a file, read in chunks."""
+    """SHA-256 of a file, read in chunks.
+
+    Args:
+        path: The file.
+
+    Returns:
+        The hex digest.
+    """
     digest = hashlib.sha256()
     with path.open("rb") as handle:
         while chunk := handle.read(CHUNK_BYTES):
@@ -230,7 +295,16 @@ def sha256_of(path: Path) -> str:
 
 
 def is_available(entry: Corpus, root: Path) -> bool:
-    """Whether a verified corpus is present locally and matches its hash."""
+    """Whether a verified corpus is present locally and matches its hash.
+
+    Args:
+        entry: The corpus.
+        root: Folder that holds corpora.
+
+    Returns:
+        True only for a verified entry whose local file exists and hashes to
+        the recorded SHA-256.
+    """
     if entry.status != "verified" or entry.sha256 is None:
         return False
     target = destination(entry, root)

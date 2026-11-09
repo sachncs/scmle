@@ -1,6 +1,6 @@
-"""Certificates for the F4 detectors (canon P1).
+"""Certificates for the admissibility detectors.
 
-Three F4 checks may gate a run once certified:
+Three admissibility checks may gate a run once certified:
 
 * `f4-leakage-skill` (`scmle.data.admissibility.leakage`): the single-feature
   skill test. Defect types are leaks planted in the breast-cancer table that
@@ -17,7 +17,7 @@ Three F4 checks may gate a run once certified:
   gaps among quantities, some of which carry correct explanations.
 
 The settings and thresholds below were fixed before measuring and not tuned.
-Plants are synthetic, so recall is optimistic (canon limits). The leakage
+Plants are synthetic, so recall is optimistic. The leakage
 size measured by the permutation p-value alone is also recorded against a 99
 percent binomial band, in `f4_measurements.json`.
 
@@ -66,7 +66,12 @@ VERSIONS = 3
 
 
 def breast_cancer() -> pd.DataFrame:
-    """The table the leak plants go into."""
+    """The table the leak plants go into.
+
+    Returns:
+        The scikit-learn breast-cancer features and `target`, with a fresh
+        0..n-1 index.
+    """
     return load_breast_cancer(as_frame=True).frame.reset_index(drop=True)
 
 
@@ -102,7 +107,17 @@ def plant_leak(frame: pd.DataFrame, defect: str, seed: int) -> pd.Series:
 def leak_detected(
     feature: pd.Series, outcome: pd.Series, run_seed: int
 ) -> tuple[bool, float]:
-    """(suspect, permutation p-value) of one feature."""
+    """(suspect, permutation p-value) of one feature.
+
+    Args:
+        feature: The feature column.
+        outcome: The outcome column.
+        run_seed: Seed of the permutation test.
+
+    Returns:
+        Whether the certified skill test calls the feature a suspect, and
+        the permutation p-value of its skill.
+    """
     cfg = dataclasses.replace(leakage.CERTIFIED, run_seed=run_seed)
     result = leakage.assess_feature(
         feature,
@@ -116,7 +131,14 @@ def leak_detected(
 
 
 def null_replicate(seed: int) -> tuple[bool, float]:
-    """One null world: permuted outcome, one real feature tested."""
+    """One null world: permuted outcome, one real feature tested.
+
+    Args:
+        seed: Replicate seed; it also picks the feature tested.
+
+    Returns:
+        The result of `leak_detected` on the chosen feature.
+    """
     frame = breast_cancer()
     features = frame.drop(columns=TARGET)
     world = simulate.null_world(features, frame[TARGET], seed)
@@ -125,13 +147,29 @@ def null_replicate(seed: int) -> tuple[bool, float]:
 
 
 def plant_replicate(defect: str, seed: int) -> tuple[bool, float]:
-    """One planted leak, tested on the leak column alone."""
+    """One planted leak, tested on the leak column alone.
+
+    Args:
+        defect: One of `leakage.LEAK_DEFECTS`.
+        seed: Replicate seed.
+
+    Returns:
+        The result of `leak_detected` on the planted column.
+    """
     frame = breast_cancer()
     return leak_detected(plant_leak(frame, defect, seed), frame[TARGET], seed)
 
 
 def replicate(defect: str, seed: int) -> tuple[bool, float]:
-    """A planted replicate, or a null replicate when `defect` is empty."""
+    """A planted replicate, or a null replicate when `defect` is empty.
+
+    Args:
+        defect: A leak type to plant, or `""` for a null world.
+        seed: Replicate seed.
+
+    Returns:
+        The (suspect, p-value) pair of the replicate.
+    """
     if defect:
         return plant_replicate(defect, seed)
     return null_replicate(seed)
@@ -140,7 +178,15 @@ def replicate(defect: str, seed: int) -> tuple[bool, float]:
 def run_parallel(
     jobs: Sequence[tuple[str, int]], workers: int
 ) -> list[tuple[bool, float]]:
-    """Runs null (`""`) and planted replicates, in order."""
+    """Runs null (`""`) and planted replicates, in order.
+
+    Args:
+        jobs: (defect, seed) pairs as accepted by `replicate`.
+        workers: Number of parallel workers.
+
+    Returns:
+        The replicate results in the order of `jobs`.
+    """
     from joblib import delayed
     from joblib import Parallel
 
@@ -150,13 +196,24 @@ def run_parallel(
 
 
 def band_99(alpha: float, runs: int) -> tuple[float, float]:
-    """99 percent normal-approximation band for a rate of `alpha`."""
+    """99 percent normal-approximation band for a rate of `alpha`.
+
+    Args:
+        alpha: The nominal rate.
+        runs: Number of replicates the rate is observed over.
+
+    Returns:
+        The lower and upper edges of the band.
+    """
     half = Z_99 * math.sqrt(alpha * (1.0 - alpha) / runs)
     return alpha - half, alpha + half
 
 
 def certify_leakage(workers: int = 1) -> tuple[Any, dict[str, Any]]:
     """Measures the skill test on nulls and planted leaks.
+
+    Args:
+        workers: Number of parallel workers.
 
     Returns:
         (certificate, measurements) where measurements holds the size by
@@ -218,6 +275,13 @@ def asof_world(seed: int) -> tuple[pd.DataFrame, pd.DataFrame]:
     Each of `LOG_ROWS` entities has `VERSIONS` log entries at increasing
     times; the prediction moment falls between the first and last entry, and
     the stored value is the log value at the moment.
+
+    Args:
+        seed: Run seed.
+
+    Returns:
+        The rows (`key`, `moment`, `stored`, `backfill`, the latest log
+        value) and the change log (`key`, `written_at`, `value`).
     """
     rng = randomness.component_rng(seed, "f4.asof.world", 0)
     keys = np.arange(LOG_ROWS)
@@ -239,9 +303,25 @@ def asof_world(seed: int) -> tuple[pd.DataFrame, pd.DataFrame]:
 
 
 def asof_detector(log: pd.DataFrame) -> certify.Detector:
-    """Row detector bound to a change log."""
+    """Row detector bound to a change log.
+
+    Args:
+        log: The change log.
+
+    Returns:
+        A function that flags the rows whose stored value differs from the
+        value reconstructed from the log.
+    """
 
     def detect(frame: pd.DataFrame) -> pd.Series:
+        """Flags rows whose stored value does not match the log.
+
+        Args:
+            frame: Rows with `key`, `moment` and `stored`.
+
+        Returns:
+            A boolean Series with the index of `frame`.
+        """
         return asof.reconstruction_mismatch(
             frame, log, "key", "moment", "stored", "written_at", "value"
         )
@@ -250,9 +330,25 @@ def asof_detector(log: pd.DataFrame) -> certify.Detector:
 
 
 def overwrite_plan(rows: pd.DataFrame) -> certify.DefectPlan:
-    """Plants overwrites by replacing stored values with the latest one."""
+    """Plants overwrites by replacing stored values with the latest one.
+
+    Args:
+        rows: The clean rows (unused; the plant reads the frame it is given).
+
+    Returns:
+        The plan for the as-of reconstruction defect.
+    """
 
     def plant(frame: pd.DataFrame, seed: int) -> inject.Injection:
+        """Overwrites a random tenth of the stored values.
+
+        Args:
+            frame: Rows with `stored` and `backfill`.
+            seed: Run seed.
+
+        Returns:
+            The injection; only rows whose latest value differs actually change.
+        """
         rng = randomness.component_rng(seed, "f4.asof.plant", 0)
         pick = rng.random(len(frame)) < OVERWRITE_RATE
         changed = pick & (frame["backfill"] != frame["stored"]).to_numpy()
@@ -268,7 +364,11 @@ def overwrite_plan(rows: pd.DataFrame) -> certify.DefectPlan:
 
 
 def certify_asof() -> certificates.DetectorCertificate:
-    """Certifies the as-of reconstruction on synthetic change logs."""
+    """Certifies the as-of reconstruction on synthetic change logs.
+
+    Returns:
+        The detector certificate.
+    """
     rows, log = asof_world(0)
     return certify.certify_detector(
         asof.DETECTOR_ID,
@@ -282,7 +382,15 @@ def certify_asof() -> certificates.DetectorCertificate:
 
 
 def gap_frame(seed: int) -> pd.DataFrame:
-    """Quantities that all reconcile, a third by a correct explanation."""
+    """Quantities that all reconcile, a third by a correct explanation.
+
+    Args:
+        seed: Run seed.
+
+    Returns:
+        A frame with `source`, `extract` and `explained` (the signed
+        difference that a correct explanation accounts for).
+    """
     rng = randomness.component_rng(seed, "f4.gap.world", 0)
     source = rng.integers(1_000, 100_000, size=LOG_ROWS).astype(float)
     explained = np.zeros(LOG_ROWS)
@@ -300,7 +408,14 @@ def gap_frame(seed: int) -> pd.DataFrame:
 
 
 def gap_detector(frame: pd.DataFrame) -> pd.Series:
-    """Row detector: True where the reconciliation has an unexplained gap."""
+    """Row detector: True where the reconciliation has an unexplained gap.
+
+    Args:
+        frame: Rows with `source`, `extract` and `explained`.
+
+    Returns:
+        A boolean Series with the index of `frame`.
+    """
     flags = []
     columns = zip(
         frame["extract"].tolist(),
@@ -331,9 +446,22 @@ def gap_detector(frame: pd.DataFrame) -> pd.Series:
 
 
 def gap_plan() -> certify.DefectPlan:
-    """Plants unexplained shortfalls of 1 to 10 percent."""
+    """Plants unexplained shortfalls of 1 to 10 percent.
+
+    Returns:
+        The plan for the reconciliation defect.
+    """
 
     def plant(frame: pd.DataFrame, seed: int) -> inject.Injection:
+        """Cuts the extract of a random tenth of the rows.
+
+        Args:
+            frame: Rows with `source` and `extract`.
+            seed: Run seed.
+
+        Returns:
+            The injection; the cut is 1 to 10 percent of the source.
+        """
         rng = randomness.component_rng(seed, "f4.gap.plant", 0)
         pick = rng.random(len(frame)) < GAP_RATE
         cut = np.round(
@@ -351,7 +479,11 @@ def gap_plan() -> certify.DefectPlan:
 
 
 def certify_reconciliation() -> certificates.DetectorCertificate:
-    """Certifies reconciliation on planted unexplained gaps."""
+    """Certifies reconciliation on planted unexplained gaps.
+
+    Returns:
+        The detector certificate.
+    """
     return certify.certify_detector(
         reconciliation.DETECTOR_ID,
         gap_detector,
@@ -364,7 +496,11 @@ def certify_reconciliation() -> certificates.DetectorCertificate:
 
 
 def current_digests() -> dict[str, str]:
-    """Code hash of every F4 detector as it is now."""
+    """Code hash of every admissibility detector as it is now.
+
+    Returns:
+        Mapping of detector id to its current code hash.
+    """
     return {
         leakage.DETECTOR_ID: leakage.code_digest(),
         asof.DETECTOR_ID: certificates.code_hash(asof),
@@ -373,7 +509,11 @@ def current_digests() -> dict[str, str]:
 
 
 def required_defects() -> dict[str, tuple[str, ...]]:
-    """Defect types each F4 detector must be certified for."""
+    """Defect types each admissibility detector must be certified for.
+
+    Returns:
+        Mapping of detector id to its defect types.
+    """
     return {
         leakage.DETECTOR_ID: leakage.LEAK_DEFECTS,
         asof.DETECTOR_ID: (asof.DEFECT_TYPE,),
@@ -382,7 +522,10 @@ def required_defects() -> dict[str, tuple[str, ...]]:
 
 
 def audit_labels(store: certificates.CertificateStore) -> dict[str, list[str]]:
-    """F4 detector/defect pairs by why they may not gate.
+    """Detector/defect pairs by why they may not gate.
+
+    Args:
+        store: The certificate store.
 
     Returns:
         `missing` and `stale` are failures of the certificate file;
@@ -407,7 +550,14 @@ def audit_labels(store: certificates.CertificateStore) -> dict[str, list[str]]:
 
 
 def problems(store: certificates.CertificateStore) -> list[str]:
-    """Why the certificate file is unusable: missing or stale entries."""
+    """Why the certificate file is unusable: missing or stale entries.
+
+    Args:
+        store: The certificate store.
+
+    Returns:
+        One message per missing or stale detector/defect pair.
+    """
     labels = audit_labels(store)
     return [
         f"{item}: {kind}"
@@ -417,7 +567,15 @@ def problems(store: certificates.CertificateStore) -> list[str]:
 
 
 def main(arguments: list[str] | None = None) -> int:
-    """Measures (`--write`) or verifies (`--check`) the F4 certificates."""
+    """Measures (`--write`) or verifies (`--check`) the certificates.
+
+    Args:
+        arguments: Command-line arguments; `None` reads `sys.argv`.
+
+    Returns:
+        With `--check`, 1 if any certificate is missing or stale, otherwise
+        0; with `--write`, always 0.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     action = parser.add_mutually_exclusive_group(required=True)
     action.add_argument("--write", action="store_true")

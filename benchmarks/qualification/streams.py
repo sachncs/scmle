@@ -1,4 +1,4 @@
-"""Deployment streams with known truth (Phase 13, WP-13.1).
+"""Deployment streams with known truth.
 
 Every stream returns the true change point, the true per-batch risk and the
 true labelling mechanism, so a monitor's false-alarm rate, detection delay and
@@ -91,7 +91,13 @@ class StreamSpec:
     seed: int = 0
 
     def __post_init__(self) -> None:
-        """Validates the specification."""
+        """Validates the specification.
+
+        Raises:
+            ValueError: If `kind` or `labels` is unknown, `batches`, `size` or
+                `window` is out of range, or `base` is not in (0, 1) or
+                `epsilon` not in [0, 1).
+        """
         if self.kind not in KINDS:
             raise ValueError(f"kind must be one of {KINDS}")
         if self.labels not in LABELS:
@@ -136,12 +142,26 @@ class Stream:
     true_pi: np.ndarray
 
     def mean_risk(self) -> float:
-        """True mean loss rate over the whole stream."""
+        """True mean loss rate over the whole stream.
+
+        Returns:
+            The average of the per-batch true risk.
+        """
         return float(self.risk.mean())
 
 
 def risk_path(spec: StreamSpec) -> np.ndarray:
-    """True loss rate of each batch."""
+    """True loss rate of each batch.
+
+    Args:
+        spec: The stream specification.
+
+    Returns:
+        An array of length `batches`: constant `base` for `none` and
+        `covariate`, a step to `base + delta` at the change point for
+        `abrupt` and `concept`, and a linear ramp over `ramp` batches for
+        `gradual`.
+    """
     index = np.arange(spec.batches)
     path = np.full(spec.batches, spec.base, dtype=float)
     after = index >= spec.change
@@ -154,7 +174,15 @@ def risk_path(spec: StreamSpec) -> np.ndarray:
 
 
 def covariate_path(spec: StreamSpec) -> np.ndarray:
-    """Covariate mean of each batch."""
+    """Covariate mean of each batch.
+
+    Args:
+        spec: The stream specification.
+
+    Returns:
+        An array of length `batches`: zero, plus `shift` from the change
+        point on for `covariate` streams.
+    """
     path = np.zeros(spec.batches)
     if spec.kind == "covariate":
         path[np.arange(spec.batches) >= spec.change] = spec.shift
@@ -162,7 +190,14 @@ def covariate_path(spec: StreamSpec) -> np.ndarray:
 
 
 def logistic(value: np.ndarray) -> np.ndarray:
-    """The logistic function."""
+    """The logistic function.
+
+    Args:
+        value: Input array.
+
+    Returns:
+        `1 / (1 + exp(-value))`, elementwise.
+    """
     return 1.0 / (1.0 + np.exp(-value))
 
 
@@ -172,6 +207,14 @@ def marginal_risk(base: float, dependence: float) -> float:
     With `dependence > 0` the per-case probability is clipped to [0, 1], so
     its mean over `z ~ N(0, 1)` differs a little from `base`; this integrates
     it with Gauss-Hermite nodes.
+
+    Args:
+        base: Loss rate before any change.
+        dependence: How much a case's loss probability moves with its
+            covariate.
+
+    Returns:
+        The mean per-case loss probability over a standard normal covariate.
     """
     nodes, weights = np.polynomial.hermite_e.hermegauss(200)
     chance = np.clip(base + dependence * (logistic(nodes) - 0.5), 0.0, 1.0)
@@ -261,6 +304,9 @@ def feedback_stream(
         gamma: Strength of the loop; 0 for a loop-free world.
         bypass: Fraction of cases that skip the model.
         seed: Seed.
+
+    Returns:
+        The simulated loop with arrays of shape `(batches, size)`.
     """
     rng = np.random.default_rng(seed)
     shape = (batches, size)
@@ -308,6 +354,10 @@ def challenger_sequence(
         size: Cases per batch.
         base: Champion loss rate.
         seed: Seed.
+
+    Returns:
+        The champion's and challengers' simulated losses with their true
+        advantages.
     """
     rng = np.random.default_rng(seed)
     latent = rng.random((batches, size))
@@ -319,7 +369,17 @@ def challenger_sequence(
 
 
 def true_selective_risk(answered: np.ndarray, stream: Stream) -> float:
-    """Realised loss rate over answered cases (the simulator's truth)."""
+    """Realised loss rate over answered cases (the simulator's truth).
+
+    Args:
+        answered: Boolean mask of the cases the system answered, with the
+            shape of the stream's losses.
+        stream: The simulated stream holding the true losses.
+
+    Returns:
+        The mean true loss over the answered cases; NaN when none were
+        answered.
+    """
     count = float(answered.sum())
     if count == 0.0:
         return math.nan
@@ -337,6 +397,10 @@ def draw_calibration(count: int, r_star: float, seed: int) -> dict[str, Any]:
         count: Number of cases.
         r_star: Target risk (carried for the caller's convenience).
         seed: Seed.
+
+    Returns:
+        A dict with the arrays `score` and `loss` (0 or 1) of length `count`
+        and the target risk `r_star`.
     """
     rng = np.random.default_rng(seed)
     score = rng.random(count)
@@ -348,5 +412,11 @@ def oracle_risk(tau: float) -> float:
     """True selective risk ``E[loss | g >= tau]`` for `draw_calibration`.
 
     ``integral_tau^1 0.3 (1 - g)^2 dg / (1 - tau) = 0.1 (1 - tau)^2``.
+
+    Args:
+        tau: Score threshold; cases with a score at or above it are answered.
+
+    Returns:
+        The expected loss rate of the answered cases.
     """
     return 0.1 * (1.0 - tau) ** 2

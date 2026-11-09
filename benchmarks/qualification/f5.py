@@ -1,4 +1,4 @@
-"""Certification of the F5 detectors (missingness, labels, structure).
+"""Certification of the data detectors (missingness, labels, structure).
 
 Plants defects in a real table (scikit-learn's breast-cancer data, bundled,
 no download), runs each detector on the planted copies and on the clean
@@ -7,7 +7,7 @@ data, and files the counts as certificates in
 
 Pre-declared policy, fixed before any measurement and not tuned to results:
 recall lower Wilson bound at least 0.80 and false-alarm upper Wilson bound
-at most 0.05, 95 percent intervals (the F5 policy). Development used seeds
+at most 0.05, 95 percent intervals. Development used seeds
 100 and above; certification uses the seeds listed below, which are disjoint.
 
 Units. Row detectors (sentinels, duplicates, label noise, outlier error
@@ -66,7 +66,15 @@ CLASS_RATES = {0: 0.20, 1: 0.05}
 
 
 def label_detector(frame: pd.DataFrame) -> pd.Series:
-    """Rows both label-noise detectors flag (the gating rule)."""
+    """Rows both label-noise detectors flag (the gating rule).
+
+    Args:
+        frame: Table with feature columns and the `target` label column.
+
+    Returns:
+        A boolean Series with the index of `frame`; True for the rows in the
+        label-noise report's suspects.
+    """
     report = labels.detect(frame.drop(columns=[TARGET]), frame[TARGET], 0)
     flags = pd.Series(False, index=frame.index)
     flags.iloc[list(report.suspects)] = True
@@ -74,7 +82,16 @@ def label_detector(frame: pd.DataFrame) -> pd.Series:
 
 
 def provenance_for(frame: pd.DataFrame) -> dict[str, outliers.FieldProvenance]:
-    """Instrument ranges from the clean table, padded by `OUTLIER_PAD`."""
+    """Instrument ranges from the clean table, padded by `OUTLIER_PAD`.
+
+    Args:
+        frame: The clean table.
+
+    Returns:
+        For each column in `OUTLIER_COLUMNS`, a provenance whose instrument
+        range is the column's minimum and maximum widened by 10 percent of
+        the span on each side.
+    """
     out = {}
     for name in OUTLIER_COLUMNS:
         low, high = float(frame[name].min()), float(frame[name].max())
@@ -86,16 +103,39 @@ def provenance_for(frame: pd.DataFrame) -> dict[str, outliers.FieldProvenance]:
 
 
 def renamed(plan: certify.DefectPlan, name: str) -> certify.DefectPlan:
-    """The same plan under a different certificate key."""
+    """The same plan under a different certificate key.
+
+    Args:
+        plan: The plan to rename.
+        name: The new defect type.
+
+    Returns:
+        A plan that plants as `plan` does but labels the injection `name`.
+    """
 
     def plant(frame: pd.DataFrame, seed: int) -> inject.Injection:
+        """Plants with the original plan, then renames the defect type.
+
+        Args:
+            frame: Table to plant into.
+            seed: Run seed.
+
+        Returns:
+            The injection with `defect_type` replaced by the new name.
+        """
         return dataclasses.replace(plan.plant(frame, seed), defect_type=name)
 
     return certify.DefectPlan(name, plant)
 
 
 def row_plans() -> dict[str, list[certify.DefectPlan]]:
-    """Plans per row-level detector id."""
+    """Plans per row-level detector id.
+
+    Returns:
+        Mapping of detector id to the defect plans it is measured on:
+        sentinels, exact and near duplicates, symmetric and class-conditional
+        label flips, and outliers.
+    """
     return {
         "f5-sentinel": [
             certify.DefectPlan(
@@ -157,7 +197,14 @@ def row_plans() -> dict[str, list[certify.DefectPlan]]:
 def row_detectors(
     frame: pd.DataFrame,
 ) -> dict[str, Callable[[pd.DataFrame], pd.Series]]:
-    """Maps detector id to a function from frame to one flag per row."""
+    """Maps detector id to a function from frame to one flag per row.
+
+    Args:
+        frame: The clean table, from which outlier provenance is taken.
+
+    Returns:
+        Mapping of detector id to a function returning a boolean Series.
+    """
     provenance = provenance_for(frame)
     return {
         "f5-sentinel": sentinels.sentinel_rows,
@@ -172,7 +219,20 @@ def certify_missingness(
     seeds: Sequence[int] = MISSING_SEEDS,
     policy: certificates.CertificationPolicy = POLICY,
 ) -> certificates.DetectorCertificate:
-    """Replicate-level certificate for the MCAR rejection decision."""
+    """Replicate-level certificate for the MCAR rejection decision.
+
+    Plants missing values by each mechanism in the first `MISSING_COLUMNS`
+    columns, once per seed, and counts the tables on which MCAR is rejected.
+
+    Args:
+        frame: The clean table.
+        seeds: Replicate seeds, one table each.
+        policy: Pre-declared certification floors.
+
+    Returns:
+        The certificate with outcomes for MAR and MNAR plants; the MCAR
+        rejections serve as the false alarms.
+    """
     base = frame.iloc[:, :MISSING_COLUMNS].copy()
     names = list(base.columns)
     holes, driver = names[:3], names[-1]
@@ -224,6 +284,15 @@ def select_cut(
 
     The shipped default is one decade below this value, so the default keeps
     a margin on data other than the certification corpus.
+
+    Args:
+        frame: The clean table, screened for near duplicates against itself.
+        policy: Certification floors; the false-alarm ceiling and confidence
+            are used.
+
+    Returns:
+        The largest cut in `CUT_GRID` whose upper Wilson bound on clean
+        rows flagged is within the ceiling; the smallest cut when none is.
     """
     best = CUT_GRID[0]
     columns = list(frame.columns)
@@ -243,7 +312,7 @@ def certify_all(
     frame: pd.DataFrame | None = None,
     only: Sequence[str] | None = None,
 ) -> certificates.CertificateStore:
-    """Certifies the F5 detectors on the demo table.
+    """Certifies the data detectors on the demo table.
 
     Args:
         seeds: Run seeds for the row detectors; counts are pooled.
@@ -279,7 +348,15 @@ def certify_all(
 
 
 def problems(store: certificates.CertificateStore) -> list[str]:
-    """Why a store does not hold current certificates for every F5 detector."""
+    """Why a store does not hold current certificates for every detector.
+
+    Args:
+        store: Certificate store to audit.
+
+    Returns:
+        One message per registered detector whose certificate is not current
+        for its present code; empty when all are current.
+    """
     found = []
     for detector_id, spec in registry.SPECS.items():
         state = store.state(detector_id, spec.code_hash())
@@ -291,7 +368,14 @@ def problems(store: certificates.CertificateStore) -> list[str]:
 def gating(
     store: certificates.CertificateStore,
 ) -> list[tuple[str, str, str]]:
-    """(detector id, code hash, defect type) for every passing outcome."""
+    """(detector id, code hash, defect type) for every passing outcome.
+
+    Args:
+        store: Certificate store to read.
+
+    Returns:
+        One tuple per defect type whose current certificate passed its floors.
+    """
     registered = []
     for detector_id, spec in registry.SPECS.items():
         digest = spec.code_hash()
@@ -302,7 +386,15 @@ def gating(
 
 
 def audit_problems(store: certificates.CertificateStore) -> list[str]:
-    """Registered gating pairs that `mark_gating` would refuse."""
+    """Registered gating pairs that `mark_gating` would refuse.
+
+    Args:
+        store: Certificate store to audit.
+
+    Returns:
+        A message for each passing pair that `mark_gating` rejects with a
+        `CertificateError`; empty when all are accepted.
+    """
     found = []
     for detector_id, digest, defect in gating(store):
         try:
@@ -313,7 +405,17 @@ def audit_problems(store: certificates.CertificateStore) -> list[str]:
 
 
 def summary(store: certificates.CertificateStore) -> list[dict[str, object]]:
-    """One line per detector and defect type with the bounds and verdict."""
+    """One line per detector and defect type with the bounds and verdict.
+
+    Args:
+        store: Certificate store to read.
+
+    Returns:
+        Rows with the detector, defect type, planted and detected counts,
+        the lower recall bound, clean rows, false alarms, the upper
+        false-alarm bound (both rounded to four decimals) and whether the
+        outcome passed its floors.
+    """
     rows: list[dict[str, object]] = []
     for item in store.certificates:
         for outcome in item.outcomes:

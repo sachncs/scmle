@@ -1,4 +1,4 @@
-"""F5 detectors measured on more corpora than the one they are certified on.
+"""Data detectors measured on more corpora than the one they are certified on.
 
 The shipped certificates (`detector_certificates.json`) plant defects in the
 breast-cancer table only (see `f5.py`). This module repeats the same plants
@@ -14,7 +14,7 @@ class label.
 Plants are the ones of `f5.py`, with columns taken from the front of each
 table (the first two for sentinels, the first three for outliers, the first
 six for missingness) and class-conditional label noise at 0.20 for the first
-class and 0.05 for the others. Nothing here was tuned: the plan, the seeds
+class and 0.05 for the others. Nothing here was tuned: the plants, the seeds
 and the floors were written down before the first run.
 
 What this does and does not show. Each corpus is judged by rows, as in the
@@ -70,7 +70,14 @@ OTHER_CLASS_RATE = 0.05
 
 
 def corpus_frame(name: str) -> pd.DataFrame:
-    """The bundled table `name` with its class label in `TARGET`."""
+    """The bundled table `name` with its class label in `TARGET`.
+
+    Args:
+        name: Key of `CORPORA`.
+
+    Returns:
+        The table with constant columns dropped and a fresh 0..n-1 index.
+    """
     frame = CORPORA[name](as_frame=True).frame
     frame = frame.rename(columns={"target": TARGET})
     constant = [c for c in frame.columns if frame[c].nunique() < 2]
@@ -78,12 +85,26 @@ def corpus_frame(name: str) -> pd.DataFrame:
 
 
 def feature_names(frame: pd.DataFrame) -> list[str]:
-    """Columns of the table other than the label, in order."""
+    """Columns of the table other than the label, in order.
+
+    Args:
+        frame: Table including the `TARGET` column.
+
+    Returns:
+        The feature column names.
+    """
     return [name for name in frame.columns if name != TARGET]
 
 
 def class_rates(frame: pd.DataFrame) -> dict[int, float]:
-    """Class-conditional flip rates: 0.20 for the first class, else 0.05."""
+    """Class-conditional flip rates: 0.20 for the first class, else 0.05.
+
+    Args:
+        frame: Table including the `TARGET` column.
+
+    Returns:
+        Mapping of each class label, in sorted order, to its flip rate.
+    """
     classes = sorted(frame[TARGET].unique())
     return {
         int(c): FIRST_CLASS_RATE if i == 0 else OTHER_CLASS_RATE
@@ -92,7 +113,14 @@ def class_rates(frame: pd.DataFrame) -> dict[int, float]:
 
 
 def plans(frame: pd.DataFrame) -> dict[str, list[certify.DefectPlan]]:
-    """The plans of `f5.row_plans`, with columns picked from this table."""
+    """The plans of `f5.row_plans`, with columns picked from this table.
+
+    Args:
+        frame: Table whose first columns are used for the plants.
+
+    Returns:
+        Mapping of detector id to its defect plans.
+    """
     names = feature_names(frame)
     sentinel_columns = names[:SENTINEL_COUNT]
     outlier_columns = names[:OUTLIER_COUNT]
@@ -158,7 +186,16 @@ def plans(frame: pd.DataFrame) -> dict[str, list[certify.DefectPlan]]:
 def detectors(
     frame: pd.DataFrame,
 ) -> dict[str, Callable[[pd.DataFrame], pd.Series]]:
-    """The F5 row detectors with outlier provenance from this table."""
+    """The row detectors with outlier provenance from this table.
+
+    Temporarily points `f5.OUTLIER_COLUMNS` at this table's first columns.
+
+    Args:
+        frame: The clean table.
+
+    Returns:
+        Mapping of detector id to a function returning one flag per row.
+    """
     original = f5.OUTLIER_COLUMNS
     f5.OUTLIER_COLUMNS = feature_names(frame)[:OUTLIER_COUNT]
     try:
@@ -168,7 +205,16 @@ def detectors(
 
 
 def measure_corpus(name: str) -> dict[str, Any]:
-    """Outcomes of every F5 detector on one table."""
+    """Outcomes of every detector on one table.
+
+    Args:
+        name: Key of `CORPORA`.
+
+    Returns:
+        The row and feature counts, the table's SHA-256 and one outcome
+        per detector and defect type (counts, bounds and whether the floor
+        was met).
+    """
     frame = corpus_frame(name)
     table_plans = plans(frame)
     found = detectors(frame)
@@ -209,7 +255,15 @@ def measure_corpus(name: str) -> dict[str, Any]:
 
 
 def tally(tables: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
-    """Per defect type, on how many of the tables the floor was met."""
+    """Per defect type, on how many of the tables the floor was met.
+
+    Args:
+        tables: Output of `measure_corpus` by corpus name.
+
+    Returns:
+        Per detector and defect type, the number of passing tables, the number
+        of tables and the table-level Wilson lower bound (95 percent).
+    """
     keys: dict[tuple[str, str], int] = {}
     for table in tables.values():
         for row in table["outcomes"]:
@@ -231,7 +285,12 @@ def tally(tables: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def measure_all() -> dict[str, Any]:
-    """Every corpus and the per-defect tally."""
+    """Every corpus and the per-defect tally.
+
+    Returns:
+        The policy, seeds, detector code hashes, per-table measurements and
+        the tally.
+    """
     tables = {name: measure_corpus(name) for name in CORPORA}
     return {
         "policy": {
@@ -249,7 +308,12 @@ def measure_all() -> dict[str, Any]:
 
 
 def stale() -> list[str]:
-    """Detectors whose code changed since the measurement file was written."""
+    """Detectors whose code changed since the measurement file was written.
+
+    Returns:
+        The recorded detector keys that are no longer registered or whose
+        code hash differs; empty when the file is current.
+    """
     document = json.loads(OUTPUT_PATH.read_text(encoding="utf-8"))
     return [
         key
@@ -260,7 +324,15 @@ def stale() -> list[str]:
 
 
 def main(arguments: list[str] | None = None) -> int:
-    """Measures (`--write`) or checks the file against the code (`--check`)."""
+    """Measures (`--write`) or checks the file against the code (`--check`).
+
+    Args:
+        arguments: Command-line arguments; `None` reads `sys.argv`.
+
+    Returns:
+        With `--check`, 1 if any detector is stale, otherwise 0; with
+        `--write`, always 0.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     action = parser.add_mutually_exclusive_group(required=True)
     action.add_argument("--write", action="store_true")

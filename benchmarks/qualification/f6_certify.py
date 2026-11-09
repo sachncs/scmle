@@ -1,6 +1,6 @@
-"""Certificates for the F6 checks (canon P1).
+"""Certificates for the robustness checks.
 
-Three F6 checks may gate a run once certified:
+Three robustness checks may gate a run once certified:
 
 * `f6-shift-c2st` (`scmle.data.robustness.shift.c2st`): the classifier
   two-sample test.
@@ -17,13 +17,13 @@ independent standard normal columns. The clean side is `SHIFT_NULL`
 replicates of identical distributions, so a false alarm is a rejection under
 the null. The planted side is `SHIFT_PLANTED` replicates in which one column
 of the second sample is shifted by ``sqrt(2) * ppf(0.60)`` standard
-deviations, the shift whose Bayes-optimal AUC is 0.60 (the plan's power
-point). Plants are synthetic and easy, and the generator is Gaussian, so the
-power is optimistic for real data; no real deployment sample is available to
-plant into. Policy: recall Wilson lower bound at least 0.80, false-alarm
-Wilson upper bound at most 0.075 (a 5 percent test has Wilson upper bound
-near 0.065 over 1000 nulls), 95 percent intervals. The size by p-value
-alone is also recorded against a 99 percent binomial band.
+deviations, the shift whose Bayes-optimal AUC is 0.60 (the power point of
+the certification). Plants are synthetic and easy, and the generator is
+Gaussian, so the power is optimistic for real data; no real deployment sample
+is available to plant into. Policy: recall Wilson lower bound at least 0.80,
+false-alarm Wilson upper bound at most 0.075 (a 5 percent test has Wilson
+upper bound near 0.065 over 1000 nulls), 95 percent intervals. The size by
+p-value alone is also recorded against a 99 percent binomial band.
 
 Stability. Replicates are semi-synthetic: the feature is a real column of the
 breast-cancer table that ships with scikit-learn, sampled without
@@ -120,20 +120,41 @@ FRAGILE_KINDS = (stability.DEFECT_OUTLIER, stability.DEFECT_REVERSAL)
 
 
 def band_99(alpha: float, runs: int) -> tuple[float, float]:
-    """99 percent normal-approximation band for a rate of `alpha`."""
+    """99 percent normal-approximation band for a rate of `alpha`.
+
+    Args:
+        alpha: The nominal rate.
+        runs: Number of replicates the rate is observed over.
+
+    Returns:
+        The lower and upper edges of the band.
+    """
     half = Z_99 * math.sqrt(alpha * (1.0 - alpha) / runs)
     return alpha - half, alpha + half
 
 
 def shift_delta() -> float:
-    """Mean shift (in standard deviations) whose Bayes AUC is `PLANTED_AUC`."""
+    """Mean shift (in standard deviations) whose Bayes AUC is `PLANTED_AUC`.
+
+    Returns:
+        ``sqrt(2) * ppf(PLANTED_AUC)``.
+    """
     return math.sqrt(2.0) * float(stats.norm.ppf(PLANTED_AUC))
 
 
 def shift_samples(
     planted: bool, seed: int
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Two samples, the second shifted in its first column when planted."""
+    """Two samples, the second shifted in its first column when planted.
+
+    Args:
+        planted: Whether to shift the second sample by `shift_delta()`.
+        seed: Replicate seed.
+
+    Returns:
+        Two frames of `SHIFT_ROWS` rows and `SHIFT_COLUMNS` standard normal
+        columns `x0`, `x1`, ....
+    """
     rng = randomness.component_rng(seed, "f6.shift.world", int(planted))
     names = [f"x{k}" for k in range(SHIFT_COLUMNS)]
     first = pd.DataFrame(
@@ -148,7 +169,18 @@ def shift_samples(
 
 
 def shift_replicate(test: str, planted: bool, seed: int) -> tuple[bool, float]:
-    """(rejected, p-value) of one two-sample test on one replicate."""
+    """(rejected, p-value) of one two-sample test on one replicate.
+
+    Args:
+        test: `shift.C2ST_ID` for the classifier test, otherwise the kernel
+            test.
+        planted: Whether the second sample carries the planted shift.
+        seed: Replicate seed, also the test's seed.
+
+    Returns:
+        Whether the test's decision is not a pass, and its p-value (1.0 when
+        it reports none).
+    """
     first, second = shift_samples(planted, seed)
     run = shift.c2st if test == shift.C2ST_ID else shift.mmd_test
     check = run(first, second, seed, gate=certificates.GateStatus.GATING)
@@ -158,14 +190,32 @@ def shift_replicate(test: str, planted: bool, seed: int) -> tuple[bool, float]:
 
 
 def source_values() -> np.ndarray:
-    """Standardised values of the real source column."""
+    """Standardised values of the real source column.
+
+    Returns:
+        The `SOURCE_COLUMN` of the breast-cancer table with zero mean and
+        unit standard deviation.
+    """
     frame = load_breast_cancer(as_frame=True).frame
     values = frame[SOURCE_COLUMN].to_numpy(dtype=float)
     return (values - values.mean()) / values.std()
 
 
 def stability_world(kind: str, seed: int) -> tuple[np.ndarray, np.ndarray]:
-    """One semi-synthetic finding: the feature with holes, and the target."""
+    """One semi-synthetic finding: the feature with holes, and the target.
+
+    Args:
+        kind: `CLEAN` for a genuine effect, or a defect type of the
+            stability check.
+        seed: Replicate seed.
+
+    Returns:
+        The feature (with `MISSING_RATE` of its values missing) and the
+        target.
+
+    Raises:
+        ValueError: If `kind` is not a known kind.
+    """
     rng = randomness.component_rng(seed, f"f6.stability.world.{kind}", 0)
     pool = source_values()
     x = rng.permutation(pool)[:STABILITY_ROWS].copy()
@@ -191,7 +241,15 @@ def stability_world(kind: str, seed: int) -> tuple[np.ndarray, np.ndarray]:
 
 
 def stability_replicate(kind: str, seed: int) -> str:
-    """The verdict on one semi-synthetic finding."""
+    """The verdict on one semi-synthetic finding.
+
+    Args:
+        kind: `CLEAN` or a defect type of the stability check.
+        seed: Replicate seed.
+
+    Returns:
+        The stability status of the finding.
+    """
     x, y = stability_world(kind, seed)
     grid = multiverse.enumerate_grid(
         GRID_CHOICES, seed, multiverse.DEFAULT_MAX_SPECS * 2
@@ -205,7 +263,16 @@ def stability_replicate(kind: str, seed: int) -> str:
 def run_jobs(
     function: Any, jobs: Sequence[tuple[Any, ...]], workers: int
 ) -> list[Any]:
-    """Runs `function(*job)` for every job, in order."""
+    """Runs `function(*job)` for every job, in order.
+
+    Args:
+        function: The function to call.
+        jobs: Argument tuples.
+        workers: Number of parallel workers.
+
+    Returns:
+        The results in the order of `jobs`.
+    """
     from joblib import delayed
     from joblib import Parallel
 
@@ -215,7 +282,17 @@ def run_jobs(
 def shift_certificate(
     test: str, offset: int, workers: int
 ) -> tuple[certificates.DetectorCertificate, dict[str, Any]]:
-    """Measures one two-sample test on nulls and planted shifts."""
+    """Measures one two-sample test on nulls and planted shifts.
+
+    Args:
+        test: `shift.C2ST_ID` or `shift.MMD_ID`.
+        offset: Added to the replicate seeds.
+        workers: Number of parallel workers.
+
+    Returns:
+        The certificate and the measurements (size by p-value alone with its
+        99 percent band, and power).
+    """
     null_count = MMD_NULL if test == shift.MMD_ID else SHIFT_NULL
     nulls = run_jobs(
         shift_replicate,
@@ -280,7 +357,16 @@ def shift_certificate(
 def stability_certificate(
     offset: int, workers: int
 ) -> tuple[certificates.DetectorCertificate, dict[str, Any]]:
-    """Measures the survival rule on genuine and planted findings."""
+    """Measures the survival rule on genuine and planted findings.
+
+    Args:
+        offset: Added to the replicate seeds.
+        workers: Number of parallel workers.
+
+    Returns:
+        The certificate and the measurements (labels of genuine effects,
+        detections by defect type, the rule and the grid size).
+    """
     clean = run_jobs(
         stability_replicate,
         [(CLEAN, offset + s) for s in range(STABLE_REPS)],
@@ -358,7 +444,15 @@ def stability_certificate(
 def certify_all(
     workers: int = 1, offset: int = 0
 ) -> tuple[certificates.CertificateStore, dict[str, Any]]:
-    """Measures every F6 check; `offset` shifts the seed range."""
+    """Measures every robustness check; `offset` shifts the seed range.
+
+    Args:
+        workers: Number of parallel workers.
+        offset: Added to the replicate seeds.
+
+    Returns:
+        The certificate store and the measurements document.
+    """
     started = time.monotonic()
     store = certificates.CertificateStore()
     document: dict[str, Any] = {}
@@ -375,7 +469,11 @@ def certify_all(
 
 
 def current_digests() -> dict[str, str]:
-    """Code hash of every F6 check as it is now."""
+    """Code hash of every robustness check as it is now.
+
+    Returns:
+        Mapping of detector id to its current code hash.
+    """
     return {
         shift.C2ST_ID: shift.code_digest(),
         shift.MMD_ID: shift.code_digest(),
@@ -384,7 +482,11 @@ def current_digests() -> dict[str, str]:
 
 
 def required_defects() -> dict[str, tuple[str, ...]]:
-    """Defect types each F6 check must be certified for."""
+    """Defect types each robustness check must be certified for.
+
+    Returns:
+        Mapping of detector id to its defect types.
+    """
     return {
         shift.C2ST_ID: (shift.DEFECT_TYPE,),
         shift.MMD_ID: (shift.DEFECT_TYPE,),
@@ -393,7 +495,10 @@ def required_defects() -> dict[str, tuple[str, ...]]:
 
 
 def audit_labels(store: certificates.CertificateStore) -> dict[str, list[str]]:
-    """F6 detector/defect pairs by why they may not gate.
+    """Detector/defect pairs by why they may not gate.
+
+    Args:
+        store: The certificate store.
 
     Returns:
         `missing` and `stale` are failures of the certificate file;
@@ -418,7 +523,14 @@ def audit_labels(store: certificates.CertificateStore) -> dict[str, list[str]]:
 
 
 def problems(store: certificates.CertificateStore) -> list[str]:
-    """Why the certificate file is unusable: missing or stale entries."""
+    """Why the certificate file is unusable: missing or stale entries.
+
+    Args:
+        store: The certificate store.
+
+    Returns:
+        One message per missing or stale detector/defect pair.
+    """
     labels = audit_labels(store)
     return [
         f"{item}: {kind}"
@@ -428,7 +540,15 @@ def problems(store: certificates.CertificateStore) -> list[str]:
 
 
 def development_look(workers: int) -> dict[str, Any]:
-    """A small run on development seeds, to time the work. Writes nothing."""
+    """A small run on development seeds, to time the work. Writes nothing.
+
+    Args:
+        workers: Number of parallel workers.
+
+    Returns:
+        The raw replicate results of both shift tests (8 each) and the
+        stability verdicts (20 per kind).
+    """
     small = {
         "shift_rows": SHIFT_ROWS,
         "c2st": [
@@ -453,7 +573,15 @@ def development_look(workers: int) -> dict[str, Any]:
 
 
 def main(arguments: list[str] | None = None) -> int:
-    """Measures (`--write`), verifies (`--check`) or looks (`--dev`)."""
+    """Measures (`--write`), verifies (`--check`) or looks (`--dev`).
+
+    Args:
+        arguments: Command-line arguments; `None` reads `sys.argv`.
+
+    Returns:
+        With `--check`, 1 if any certificate is missing or stale, otherwise
+        0; with `--write` and `--dev`, always 0.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     action = parser.add_mutually_exclusive_group(required=True)
     action.add_argument("--write", action="store_true")

@@ -1,4 +1,4 @@
-"""Planted worlds for the F9 ingestion checks.
+"""Planted worlds for the ingestion checks.
 
 Each generator builds a small source with a known truth: a mutation applied
 mid-read, a join that duplicates or drops rows, late-arriving rows, a schema
@@ -30,23 +30,42 @@ URI = "sqlite://ingest/world"
 
 @dataclasses.dataclass
 class Database:
-    """An in-memory SQLite database that read connections can share."""
+    """An in-memory SQLite database that read connections can share.
+
+    Attributes:
+        keeper: The connection that keeps the database alive and writes.
+        address: The shared-cache URI that other connections open.
+    """
 
     keeper: sqlite3.Connection
     address: str
 
     def factory(self) -> sqlite3.Connection:
-        """A fresh connection to the same database."""
+        """A fresh connection to the same database.
+
+        Returns:
+            A new connection opened on the shared address.
+        """
         return sqlite3.connect(self.address, uri=True)
 
     def source(self) -> profile.SqlSource:
-        """A read-only `SqlSource` over the database."""
+        """A read-only `SqlSource` over the database.
+
+        Returns:
+            A source that opens a fresh connection per read.
+        """
         return profile.SqlSource(self.factory)
 
     def execute(
         self, sql: str, rows: list[tuple[Any, ...]] | None = None
     ) -> None:
-        """Runs one write on the keeper connection and commits."""
+        """Runs one write on the keeper connection and commits.
+
+        Args:
+            sql: The statement.
+            rows: Parameter tuples for a many-row statement, or None to run
+                `sql` once without parameters.
+        """
         if rows is None:
             self.keeper.execute(sql)
         else:
@@ -54,7 +73,14 @@ class Database:
         self.keeper.commit()
 
     def frame(self, sql: str) -> pd.DataFrame:
-        """Result of a query as a frame."""
+        """Result of a query as a frame.
+
+        Args:
+            sql: The query.
+
+        Returns:
+            The rows read through the keeper connection.
+        """
         return pd.read_sql_query(sql, self.keeper)
 
 
@@ -62,7 +88,14 @@ COUNTER = itertools.count()
 
 
 def new_database(tag: str) -> Database:
-    """A fresh named shared-cache in-memory database."""
+    """A fresh named shared-cache in-memory database.
+
+    Args:
+        tag: Prefix of the database name; a counter makes it unique.
+
+    Returns:
+        The new database.
+    """
     name = f"{tag}{next(COUNTER)}"
     address = f"file:{name}?mode=memory&cache=shared"
     keeper = sqlite3.connect(address, uri=True)
@@ -70,7 +103,13 @@ def new_database(tag: str) -> Database:
 
 
 def load(db: Database, table: str, frame: pd.DataFrame) -> None:
-    """Writes a frame as a table."""
+    """Writes a frame as a table.
+
+    Args:
+        db: The database.
+        table: Table name; an existing table is replaced.
+        frame: The rows to write, without the index.
+    """
     frame.to_sql(table, db.keeper, index=False, if_exists="replace")
     db.keeper.commit()
 
@@ -90,7 +129,14 @@ class MutatingConnector(connectors.DbApiConnector):
         mutate: Callable[[], None] | None,
         at_call: int,
     ) -> None:
-        """Binds the mutation and the batch call that triggers it."""
+        """Binds the mutation and the batch call that triggers it.
+
+        Args:
+            db: The database to read.
+            query: The query the connector reads.
+            mutate: Function that changes the source, or None for no mutation.
+            at_call: Number of the `read_rows` call before which `mutate` runs.
+        """
         super().__init__(URI, query, db.factory)
         self.mutate = mutate
         self.at_call = at_call
@@ -101,7 +147,15 @@ class MutatingConnector(connectors.DbApiConnector):
         checkpoint: connectors.SourceCheckpoint | None = None,
         limit: int = 1_000,
     ) -> connectors.RowBatch:
-        """Reads a batch, mutating the source first on the chosen call."""
+        """Reads a batch, mutating the source first on the chosen call.
+
+        Args:
+            checkpoint: Where to resume reading, or None for the start.
+            limit: Maximum rows in the batch.
+
+        Returns:
+            The batch from the underlying connector.
+        """
         self.calls += 1
         if self.mutate is not None and self.calls == self.at_call:
             self.mutate()
@@ -112,7 +166,16 @@ class MutatingConnector(connectors.DbApiConnector):
 def torn_world(
     seed: int, kind: str | None
 ) -> tuple[MutatingConnector, Database]:
-    """A table read in batches of 5, mutated before batch 2 if `kind` is set."""
+    """A table read in batches of 5, mutated before batch 2 if `kind` is set.
+
+    Args:
+        seed: Run seed.
+        kind: One of `TORN_KINDS` for the mutation to apply, or None for a
+            read with no mutation.
+
+    Returns:
+        The connector and the database it reads.
+    """
     rng = randomness.component_rng(seed, "ingest.world.torn", 0)
     rows = int(rng.integers(20, 80))
     db = new_database("torn")
@@ -150,7 +213,14 @@ EXTRACTS = ("clean", "fanout", "dropped_rows", "torn_read")
 
 @dataclasses.dataclass
 class Extract:
-    """An assembled table, its source, and the joins that produced it."""
+    """An assembled table, its source, and the joins that produced it.
+
+    Attributes:
+        db: The source database.
+        assembled: The extract as it was built.
+        left_rows: Row count of the left table of the join.
+        kind: One of `EXTRACTS`.
+    """
 
     db: Database
     assembled: pd.DataFrame
@@ -159,7 +229,17 @@ class Extract:
 
 
 def reconcile_world(seed: int, kind: str) -> Extract:
-    """Builds orders and customers, then extracts them correctly or not."""
+    """Builds orders and customers, then extracts them correctly or not.
+
+    Args:
+        seed: Run seed.
+        kind: One of `EXTRACTS`: a correct left join, a fan-out join, an
+            inner join that drops rows, or a correct join followed by a
+            change to the source (a torn read).
+
+    Returns:
+        The extract with its source database.
+    """
     rng = randomness.component_rng(seed, f"ingest.world.reconcile.{kind}", 0)
     customers = int(rng.integers(30, 80))
     orders = int(rng.integers(120, 400))
@@ -222,7 +302,13 @@ def reconcile_world(seed: int, kind: str) -> Extract:
 
 @dataclasses.dataclass
 class LateWorld:
-    """Targets, a child table with recorded times, and the leak counts."""
+    """Targets, a child table with recorded times, and the leak counts.
+
+    Attributes:
+        targets: Parent rows with a key `cid` and a cutoff time `moment`.
+        child: Event rows with `event_time`, `recorded` and `amount`.
+        lag_days: Gap between a target's cutoff and the data it may read.
+    """
 
     targets: pd.DataFrame
     child: pd.DataFrame
@@ -230,7 +316,14 @@ class LateWorld:
 
 
 def late_world(seed: int) -> LateWorld:
-    """Events whose recording time lags, with late arrivals and backfills."""
+    """Events whose recording time lags, with late arrivals and backfills.
+
+    Args:
+        seed: Run seed.
+
+    Returns:
+        The world.
+    """
     rng = randomness.component_rng(seed, "ingest.world.late", 0)
     entities = int(rng.integers(5, 15))
     targets = pd.DataFrame(
@@ -265,7 +358,16 @@ SHAPES = ("customers", "customer_months", "orders")
 
 
 def expected_verdict(unit: str, shape: str) -> str:
-    """Verdict that follows from the construction of the table."""
+    """Verdict that follows from the construction of the table.
+
+    Args:
+        unit: One of `UNITS`, the intended unit of analysis.
+        shape: One of `SHAPES`, the true grain of the table.
+
+    Returns:
+        `match`, `finer` (the table has more rows than the unit) or
+        `coarser`.
+    """
     if unit == "customer":
         return "match" if shape == "customers" else "finer"
     if shape == "customers":
@@ -274,7 +376,16 @@ def expected_verdict(unit: str, shape: str) -> str:
 
 
 def grain_world(seed: int, unit: str, shape: str) -> tuple[Database, str]:
-    """A table whose grain is `shape`, with decoy columns, for a unit text."""
+    """A table whose grain is `shape`, with decoy columns, for a unit text.
+
+    Args:
+        seed: Run seed.
+        unit: The intended unit of analysis; it does not change the table.
+        shape: One of `SHAPES`, the grain to build.
+
+    Returns:
+        The database and the name of its single table.
+    """
     rng = randomness.component_rng(seed, f"ingest.world.grain.{shape}", 0)
     customers = int(rng.integers(60, 200))
     months = int(rng.integers(3, 8))
@@ -311,7 +422,13 @@ def grain_world(seed: int, unit: str, shape: str) -> tuple[Database, str]:
 
 @dataclasses.dataclass
 class JoinWorld:
-    """Tables, and the foreign keys that are real."""
+    """Tables, and the foreign keys that are real.
+
+    Attributes:
+        db: The database.
+        tables: Table names.
+        truth: Real foreign keys as (table, column, parent table).
+    """
 
     db: Database
     tables: list[str]
@@ -319,7 +436,14 @@ class JoinWorld:
 
 
 def surrogate_world(seed: int) -> JoinWorld:
-    """Tables with integer keys `1..n`, real FKs, decoys and twin parents."""
+    """Tables with integer keys `1..n`, real FKs, decoys and twin parents.
+
+    Args:
+        seed: Run seed.
+
+    Returns:
+        The world with its true foreign keys.
+    """
     rng = randomness.component_rng(seed, "ingest.world.surrogate", 0)
     db = new_database("sur")
     names = ["customer", "product", "store", "region", "account", "user"]
@@ -421,7 +545,17 @@ LAST = [
 
 
 def typo(text: str, rng: np.random.Generator, rate: float) -> str:
-    """Drops, swaps or doubles one character with probability `rate`."""
+    """Drops, swaps or doubles one character with probability `rate`.
+
+    Args:
+        text: The text.
+        rng: Random generator.
+        rate: Probability that a typo is made.
+
+    Returns:
+        The text, changed in one inner character with that probability
+        and unchanged otherwise or when shorter than four characters.
+    """
     if len(text) < 4 or rng.random() >= rate:
         return text
     k = int(rng.integers(1, len(text) - 1))
@@ -438,6 +572,14 @@ def er_world(seed: int, entities: int = 300) -> pd.DataFrame:
 
     Synthetic and Febrl-like in spirit only: the corruption is ours, so the
     numbers do not transfer to a real registry.
+
+    Args:
+        seed: Run seed.
+        entities: Number of people.
+
+    Returns:
+        A frame with `entity` (the true identity), `first`, `last`, `dob` and
+        `addr`; a person has two records with probability one half.
     """
     rng = randomness.component_rng(seed, "ingest.world.er", 0)
     rows = []

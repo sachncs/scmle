@@ -1,4 +1,4 @@
-"""Measurements and certificates for F9 ingestion (canon P1).
+"""Measurements and certificates for ingestion.
 
 Two detectors have certificates in `ingest_certificates.json`:
 
@@ -106,7 +106,15 @@ EXTERNAL = {
 
 
 def digest(document: Any) -> str:
-    """SHA-256 of a JSON document with sorted keys."""
+    """SHA-256 of a JSON document with sorted keys.
+
+    Args:
+        document: A JSON-serialisable value; other types are converted with
+            `str`.
+
+    Returns:
+        The hex digest of the document's JSON text.
+    """
     text = json.dumps(document, sort_keys=True, default=str)
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
@@ -114,7 +122,16 @@ def digest(document: Any) -> str:
 def run_jobs(
     function: Any, jobs: Sequence[tuple[Any, ...]], workers: int
 ) -> list[Any]:
-    """Runs `function(*job)` for every job, in order."""
+    """Runs `function(*job)` for every job, in order.
+
+    Args:
+        function: The function to call.
+        jobs: Argument tuples.
+        workers: Number of parallel workers; one or fewer runs in process.
+
+    Returns:
+        The results in the order of `jobs`.
+    """
     if workers <= 1:
         return [function(*job) for job in jobs]
     from joblib import delayed
@@ -127,7 +144,15 @@ def run_jobs(
 
 
 def torn_detected(seed: int, noisy: bool) -> bool:
-    """Whether a read of one world was rejected as torn."""
+    """Whether a read of one world was rejected as torn.
+
+    Args:
+        seed: World seed; for a noisy world it also picks the mutation kind.
+        noisy: Whether the table is mutated during the read.
+
+    Returns:
+        True if `consistent_read` raised `TornReadError`.
+    """
     kind = ingest_worlds.TORN_KINDS[seed % 4] if noisy else None
     connector = ingest_worlds.torn_world(seed, kind)[0]
     try:
@@ -138,7 +163,12 @@ def torn_detected(seed: int, noisy: bool) -> bool:
 
 
 def torn_code() -> str:
-    """Hash of the code a torn-read certificate covers."""
+    """Hash of the code a torn-read certificate covers.
+
+    Returns:
+        The code hash of the consistent-read check and the connector batch
+        check.
+    """
     return certificates.code_hash(
         profile.consistent_read,
         profile.read_once,
@@ -151,7 +181,16 @@ def torn_code() -> str:
 def torn_certificate(
     offset: int, workers: int
 ) -> tuple[certificates.DetectorCertificate, dict[str, Any]]:
-    """Measures the torn-read check on mutated and static worlds."""
+    """Measures the torn-read check on mutated and static worlds.
+
+    Args:
+        offset: Added to the world seeds.
+        workers: Number of parallel workers.
+
+    Returns:
+        The certificate and the measurements (detections overall and by
+        mutation kind, and false detections on static worlds).
+    """
     noisy = run_jobs(
         torn_detected, [(offset + s, True) for s in range(TORN_RUNS)], workers
     )
@@ -196,7 +235,15 @@ def torn_certificate(
 
 
 def reconcile_flagged(kind: str, seed: int) -> bool:
-    """Whether the reconciliation of one extract has an unexplained gap."""
+    """Whether the reconciliation of one extract has an unexplained gap.
+
+    Args:
+        kind: One of `ingest_worlds.EXTRACTS`.
+        seed: World seed.
+
+    Returns:
+        True if the reconciliation report blocks.
+    """
     extract = ingest_worlds.reconcile_world(seed, kind)
     report = reconcile.reconcile_extract(
         extract.db.source(),
@@ -216,7 +263,16 @@ def reconcile_flagged(kind: str, seed: int) -> bool:
 def reconcile_certificate(
     offset: int, workers: int
 ) -> tuple[certificates.DetectorCertificate, dict[str, Any]]:
-    """Measures the reconciliation on planted defects and clean worlds."""
+    """Measures the reconciliation on planted defects and clean worlds.
+
+    Args:
+        offset: Added to the world seeds.
+        workers: Number of parallel workers.
+
+    Returns:
+        The certificate and the measurements (false alarms and detections by
+        defect).
+    """
     clean = run_jobs(
         reconcile_flagged,
         [("clean", offset + s) for s in range(RECONCILE_RUNS)],
@@ -272,7 +328,18 @@ def reconcile_certificate(
 
 
 def judged(passed: bool, referent: str | None, **fields: Any) -> dict[str, Any]:
-    """A measured section: its numbers, floor verdict and gating status."""
+    """A measured section: its numbers, floor verdict and gating status.
+
+    Args:
+        passed: Whether the pre-registered floor was met.
+        referent: Description of the external referent, or None when there
+            is none.
+        **fields: The measured numbers, kept in the section.
+
+    Returns:
+        The fields plus `floor_met`, `external_referent` and a `descriptive`
+        gate with its reason.
+    """
     return {
         **fields,
         "floor_met": bool(passed),
@@ -287,7 +354,16 @@ def judged(passed: bool, referent: str | None, **fields: Any) -> dict[str, Any]:
 
 
 def point_in_time(offset: int, workers: int) -> dict[str, Any]:
-    """Late arrival, differential and metamorphic measurements."""
+    """Late arrival, differential and metamorphic measurements.
+
+    Args:
+        offset: Added to the world seeds.
+        workers: Number of parallel workers.
+
+    Returns:
+        The judged section: leaks of the view and of the baseline, and the
+        differential and metamorphic results.
+    """
     leaks = run_jobs(
         ingest_checks.late_leaks,
         [(offset + s,) for s in range(LATE_WORLDS)],
@@ -329,7 +405,15 @@ def point_in_time(offset: int, workers: int) -> dict[str, Any]:
 
 
 def unit_pair(seed: int) -> tuple[str, str, str, str]:
-    """(unit, shape, expected, got) for pair number `seed`."""
+    """(unit, shape, expected, got) for pair number `seed`.
+
+    Args:
+        seed: Pair number; it also picks the unit and shape combination.
+
+    Returns:
+        The unit, the table's true shape, the verdict that follows from the
+        construction and the verdict of `grain.unit_verdict`.
+    """
     combos = [(u, s) for u in ingest_worlds.UNITS for s in ingest_worlds.SHAPES]
     unit, shape = combos[seed % len(combos)]
     db, table = ingest_worlds.grain_world(seed, unit, shape)
@@ -347,7 +431,13 @@ def unit_pair(seed: int) -> tuple[str, str, str, str]:
 
 
 def near_key_flips() -> dict[str, Any]:
-    """Whether a planted near key flips at the threshold, to one row."""
+    """Whether a planted near key flips at the threshold, to one row.
+
+    Returns:
+        The allowed number of duplicates, whether the column is accepted as
+        a key for each tested number of duplicates, and whether the verdict
+        flips exactly at the allowance.
+    """
     allowed = round(NEAR_KEY_EPS * NEAR_KEY_ROWS)
     flips = {}
     for duplicates in range(allowed - 3, allowed + 4):
@@ -369,7 +459,16 @@ def near_key_flips() -> dict[str, Any]:
 
 
 def unit_verdicts(offset: int, workers: int) -> dict[str, Any]:
-    """Unit-verdict accuracy and the zero-tolerance error."""
+    """Unit-verdict accuracy and the zero-tolerance error.
+
+    Args:
+        offset: Added to the world seeds.
+        workers: Number of parallel workers.
+
+    Returns:
+        The judged section: accuracy with its interval, `coarser` verdicts
+        reported as `match`, and the near-key result.
+    """
     rows = run_jobs(
         unit_pair, [(offset + s,) for s in range(UNIT_PAIRS)], workers
     )
@@ -395,7 +494,16 @@ def unit_verdicts(offset: int, workers: int) -> dict[str, Any]:
 
 
 def join_world(seed: int) -> tuple[int, int, int, int]:
-    """(accepted, accepted_true, truth, found_true) for one schema."""
+    """(accepted, accepted_true, truth, found_true) for one schema.
+
+    Args:
+        seed: Schema seed.
+
+    Returns:
+        The number of auto-accepted links, how many of them are real, the
+        number of real links, and the number of real links found (the same
+        count as the second entry).
+    """
     world = ingest_worlds.surrogate_world(seed)
     source = world.db.source()
     catalog = profile.profile_catalog(source, world.tables)
@@ -414,7 +522,16 @@ def join_world(seed: int) -> tuple[int, int, int, int]:
 
 
 def join_discovery(offset: int, workers: int) -> dict[str, Any]:
-    """Spurious auto-accepts and recall over surrogate-key schemas."""
+    """Spurious auto-accepts and recall over surrogate-key schemas.
+
+    Args:
+        offset: Added to the schema seeds.
+        workers: Number of parallel workers.
+
+    Returns:
+        The judged section: counts of accepted and spurious links,
+        precision and recall with intervals.
+    """
     rows = run_jobs(
         join_world, [(offset + s,) for s in range(JOIN_WORLDS)], workers
     )
@@ -455,7 +572,16 @@ ER_PASSES = [
 
 
 def er_world(seed: int) -> dict[str, Any]:
-    """Quality of one resolution against the truth of its registry."""
+    """Quality of one resolution against the truth of its registry.
+
+    Args:
+        seed: Registry seed.
+
+    Returns:
+        Counts of true pairs, true pairs compared, grouped pairs and false
+        group pairs, the reduction ratio and the precision estimate (None
+        when there is none).
+    """
     frame = ingest_worlds.er_world(seed, ER_ENTITIES)
     truth = frame["entity"].to_numpy()
     result = entities.resolve(
@@ -481,7 +607,16 @@ def er_world(seed: int) -> dict[str, Any]:
 
 
 def entity_resolution(offset: int, workers: int) -> dict[str, Any]:
-    """Pair completeness and cross-split link recall over registries."""
+    """Pair completeness and cross-split link recall over registries.
+
+    Args:
+        offset: Added to the registry seeds.
+        workers: Number of parallel workers.
+
+    Returns:
+        The judged section: pair completeness, link recall with its
+        interval and false group pairs.
+    """
     rows = run_jobs(
         er_world, [(offset + s,) for s in range(ER_WORLDS)], workers
     )
@@ -511,7 +646,16 @@ def entity_resolution(offset: int, workers: int) -> dict[str, Any]:
 
 
 def budget_run(seed: int, directory: Path) -> tuple[bool, list[dict[str, str]]]:
-    """(within budget, stop boundaries) for one randomized budget."""
+    """(within budget, stop boundaries) for one randomized budget.
+
+    Args:
+        seed: Budget seed.
+        directory: Parent folder for the run's files.
+
+    Returns:
+        Whether queries and rows scanned stayed within the budget, and the
+        stop boundaries recorded by the meter.
+    """
     rng = randomness.component_rng(seed, "ingest.certify.budget", 0)
     limit = budgets.IngestBudget(
         max_queries=int(rng.integers(0, 800)),
@@ -535,7 +679,16 @@ def budget_run(seed: int, directory: Path) -> tuple[bool, list[dict[str, str]]]:
 
 
 def budget_adherence(offset: int, directory: Path) -> dict[str, Any]:
-    """Spend within budget and identical stops on repeat."""
+    """Spend within budget and identical stops on repeat.
+
+    Args:
+        offset: Added to the budget seeds.
+        directory: Folder for the runs (a subfolder per repeat).
+
+    Returns:
+        The judged section: runs within budget, runs with identical stop
+        boundaries on repeat and runs stopped early.
+    """
     first = [budget_run(offset + s, directory / "a") for s in range(BUDGETS)]
     second = [budget_run(offset + s, directory / "b") for s in range(BUDGETS)]
     within = sum(item[0] for item in first)
@@ -554,7 +707,15 @@ def budget_adherence(offset: int, directory: Path) -> dict[str, Any]:
 
 
 def multiplicity(offset: int) -> dict[str, Any]:
-    """Declared family size against registered hypotheses."""
+    """Declared family size against registered hypotheses.
+
+    Args:
+        offset: First schema seed.
+
+    Returns:
+        The judged section: worlds in which the declared size equals the
+        registered count, and worlds in which a wrong size is refused.
+    """
     import fractions
 
     from scmle.data.ledger import ledger as ledger_module
@@ -600,7 +761,11 @@ def multiplicity(offset: int) -> dict[str, Any]:
 
 
 def code_hashes() -> dict[str, str]:
-    """Code hash of each measured module group, as it is now."""
+    """Code hash of each measured module group, as it is now.
+
+    Returns:
+        Mapping of group name to code hash.
+    """
     return {
         "torn_read": torn_code(),
         "reconcile": reconcile.code_digest(),
@@ -615,7 +780,16 @@ def code_hashes() -> dict[str, str]:
 def certify_all(
     workers: int = 1, offset: int = 0, scratch: Path | None = None
 ) -> tuple[certificates.CertificateStore, dict[str, Any]]:
-    """Measures everything; `offset` shifts the seed range."""
+    """Measures everything; `offset` shifts the seed range.
+
+    Args:
+        workers: Number of parallel workers.
+        offset: Added to the world seeds.
+        scratch: Folder for the budget runs; a temporary folder when None.
+
+    Returns:
+        The certificate store and the measurements document.
+    """
     started = time.monotonic()
     store = certificates.CertificateStore()
     document: dict[str, Any] = {}
@@ -641,7 +815,11 @@ def certify_all(
 
 
 def current_digests() -> dict[str, str]:
-    """Code hash of each certified detector as it is now."""
+    """Code hash of each certified detector as it is now.
+
+    Returns:
+        Mapping of detector id to its current code hash.
+    """
     return {
         TORN_ID: torn_code(),
         reconcile.DETECTOR_ID: reconcile.code_digest(),
@@ -649,7 +827,11 @@ def current_digests() -> dict[str, str]:
 
 
 def required_defects() -> dict[str, tuple[str, ...]]:
-    """Defect types each certified detector must be certified for."""
+    """Defect types each certified detector must be certified for.
+
+    Returns:
+        Mapping of detector id to its defect types.
+    """
     return {
         TORN_ID: (TORN_DEFECT,),
         reconcile.DETECTOR_ID: reconcile.DEFECT_TYPES,
@@ -661,6 +843,13 @@ def audit_labels(store: certificates.CertificateStore) -> dict[str, list[str]]:
 
     `missing` and `stale` are failures of the file; `uncertified` pairs were
     measured and did not meet the policy, so they stay descriptive.
+
+    Args:
+        store: The certificate store.
+
+    Returns:
+        Lists of `detector/defect` names under `missing`, `stale` and
+        `uncertified`.
     """
     found: dict[str, list[str]] = {
         "missing": [],
@@ -680,7 +869,14 @@ def audit_labels(store: certificates.CertificateStore) -> dict[str, list[str]]:
 
 
 def problems(store: certificates.CertificateStore) -> list[str]:
-    """Why the certificate file is unusable: missing or stale entries."""
+    """Why the certificate file is unusable: missing or stale entries.
+
+    Args:
+        store: The certificate store.
+
+    Returns:
+        One message per missing or stale detector/defect pair.
+    """
     labels = audit_labels(store)
     return [
         f"{item}: {kind}"
@@ -690,7 +886,15 @@ def problems(store: certificates.CertificateStore) -> list[str]:
 
 
 def measurement_problems(document: dict[str, Any]) -> list[str]:
-    """Why the measurements file no longer describes the code."""
+    """Why the measurements file no longer describes the code.
+
+    Args:
+        document: The stored measurements, with their `code_hashes`.
+
+    Returns:
+        One message per module group whose stored hash differs from the
+        current code.
+    """
     found = []
     stored = document.get("code_hashes", {})
     for name, current in code_hashes().items():
@@ -700,7 +904,13 @@ def measurement_problems(document: dict[str, Any]) -> list[str]:
 
 
 def live_checks() -> dict[str, Any]:
-    """A small live run of the point-in-time and torn-read checks."""
+    """A small live run of the point-in-time and torn-read checks.
+
+    Returns:
+        `ok` (True when the view leaks nothing, fast and naive agree, the
+        rewrite leaves features unchanged, mutated reads are caught and
+        static reads are not) and the number of cases of each kind.
+    """
     leaks = [ingest_checks.late_leaks(s) for s in range(20)]
     diff = [ingest_checks.differential_equal(s) for s in range(60)]
     meta = [ingest_checks.metamorphic_unchanged(s) for s in range(60)]
@@ -717,7 +927,12 @@ def live_checks() -> dict[str, Any]:
 
 
 def development_look() -> dict[str, Any]:
-    """A small run on development seeds. Writes nothing."""
+    """A small run on development seeds. Writes nothing.
+
+    Returns:
+        The raw results of a few torn-read, reconciliation, unit-verdict and
+        late-arrival worlds.
+    """
     base = ingest_worlds.DEV_SEED_BASE
     return {
         "torn": [torn_detected(base + s, s % 2 == 0) for s in range(6)],
@@ -728,7 +943,13 @@ def development_look() -> dict[str, Any]:
 
 
 def check() -> dict[str, Any]:
-    """Verifies the files against the code and re-runs the live checks."""
+    """Verifies the files against the code and re-runs the live checks.
+
+    Returns:
+        `ok`, the problems found, the descriptive-only detector/defect
+        pairs, the floors missed, the gates without an external referent and
+        the live-check result.
+    """
     store = certificates.CertificateStore.load(STORE_PATH)
     found = problems(store)
     measured = json.loads(MEASUREMENTS_PATH.read_text(encoding="utf-8"))
@@ -752,7 +973,15 @@ def check() -> dict[str, Any]:
 
 
 def main(arguments: list[str] | None = None) -> int:
-    """Measures (`--write`), verifies (`--check`) or looks (`--dev`)."""
+    """Measures (`--write`), verifies (`--check`) or looks (`--dev`).
+
+    Args:
+        arguments: Command-line arguments; `None` reads `sys.argv`.
+
+    Returns:
+        With `--check`, 0 when the files match the code and the live checks
+        pass, otherwise 1; with `--write` and `--dev`, always 0.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     action = parser.add_mutually_exclusive_group(required=True)
     action.add_argument("--write", action="store_true")

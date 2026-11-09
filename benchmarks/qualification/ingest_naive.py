@@ -29,7 +29,15 @@ NAN = float("nan")
 
 
 def is_missing(value: Any) -> bool:
-    """Return True for None or NaN cells."""
+    """Return True for None or NaN cells.
+
+    Args:
+        value: The cell value.
+
+    Returns:
+        True if the value is None or compares unequal to itself (NaN); False
+        when the comparison itself fails.
+    """
     if value is None:
         return True
     try:
@@ -39,7 +47,14 @@ def is_missing(value: Any) -> bool:
 
 
 def records(frame: pd.DataFrame) -> list[Mapping[str, Any]]:
-    """Return the frame rows as dicts keyed by column name."""
+    """Return the frame rows as dicts keyed by column name.
+
+    Args:
+        frame: The table.
+
+    Returns:
+        One dict per row, with column names converted to text.
+    """
     out: list[Mapping[str, Any]] = []
     for rec in frame.to_dict("records"):
         out.append({str(k): v for k, v in rec.items()})

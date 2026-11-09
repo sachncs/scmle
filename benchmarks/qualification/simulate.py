@@ -70,6 +70,9 @@ class World:
 def check_features(features: pd.DataFrame) -> None:
     """Requires finite numeric columns that each have spread.
 
+    Args:
+        features: The feature matrix to check.
+
     Raises:
         ValueError: On an empty frame, a non-numeric or boolean column, a
             missing or infinite value, a constant column or a repeated name.
@@ -92,7 +95,15 @@ def check_features(features: pd.DataFrame) -> None:
 
 
 def standardize(features: pd.DataFrame) -> pd.DataFrame:
-    """Z-scores each column (sample standard deviation)."""
+    """Z-scores each column (sample standard deviation).
+
+    Args:
+        features: Numeric feature matrix.
+
+    Returns:
+        The matrix with each column centred and divided by its sample
+        standard deviation.
+    """
     return (features - features.mean()) / features.std()
 
 
@@ -165,6 +176,17 @@ def random_effects(
 ) -> dict[str, float]:
     """Picks `n_signal` columns and gives each effect `+size` or `-size`.
 
+    Args:
+        columns: Candidate column names.
+        n_signal: Number of columns to give an effect.
+        size: Magnitude of each effect.
+        seed: Run seed.
+        index: Repeat counter for the random stream.
+
+    Returns:
+        Mapping of the chosen columns, in column order, to their signed
+        effects.
+
     Raises:
         ValueError: If `n_signal` is not between 1 and the column count or
             `size` is not positive.
@@ -190,7 +212,18 @@ def permuted(
     groups: pd.Series | None,
     block_size: int | None,
 ) -> np.ndarray:
-    """Permutes `values` globally, within groups or within time blocks."""
+    """Permutes `values` globally, within groups or within time blocks.
+
+    Args:
+        values: The values to permute; not changed.
+        rng: Random generator.
+        groups: Group label per value; permutes within each group when given.
+        block_size: Rows per consecutive block; permutes within each block
+            when given and `groups` is not.
+
+    Returns:
+        A permuted copy; a global permutation when neither scope is given.
+    """
     out = values.copy()
     if groups is not None:
         for _, positions in sorted(
@@ -209,7 +242,18 @@ def permuted(
 def check_permutation_scope(
     rows: int, groups: pd.Series | None, block_size: int | None
 ) -> None:
-    """Validates the grouping arguments of a null world."""
+    """Validates the grouping arguments of a null world.
+
+    Args:
+        rows: Number of rows.
+        groups: Group label per row, or None.
+        block_size: Rows per time block, or None.
+
+    Raises:
+        ValueError: If both scopes are given or `groups` does not have one
+            entry per row (a `block_size` below 2 is rejected by
+            `qualification.count`).
+    """
     if groups is not None and block_size is not None:
         raise ValueError("use groups or block_size, not both")
     if groups is not None and len(groups) != rows:
@@ -230,7 +274,8 @@ def null_world(
 
     The outcome is permuted: within `groups` (so group-level association is
     kept), within consecutive blocks of `block_size` rows (so slow time
-    structure is kept), or globally when neither is given.
+    structure is kept), or globally when neither is given. Invalid features,
+    a length mismatch or both scopes are refused with a `ValueError`.
 
     Args:
         features: Real numeric feature matrix.
@@ -242,9 +287,6 @@ def null_world(
 
     Returns:
         A null world with all effects zero.
-
-    Raises:
-        ValueError: On invalid features, a length mismatch or both scopes.
     """
     check_features(features)
     return build_null(features, outcome, seed, index, groups, block_size)
@@ -258,7 +300,23 @@ def build_null(
     groups: pd.Series | None,
     block_size: int | None,
 ) -> World:
-    """Builds a null world from already validated features."""
+    """Builds a null world from already validated features.
+
+    Args:
+        features: Validated numeric feature matrix.
+        outcome: Real outcome, one value per row.
+        seed: Run seed.
+        index: Repeat counter for the random stream.
+        groups: Group label per row, or None.
+        block_size: Rows per time block, or None.
+
+    Returns:
+        A null world with all effects zero.
+
+    Raises:
+        ValueError: If `outcome` and `features` differ in length (scope
+            errors propagate from `check_permutation_scope`).
+    """
     if len(outcome) != len(features):
         raise ValueError("outcome needs one value per feature row")
     check_permutation_scope(len(features), groups, block_size)
@@ -281,7 +339,19 @@ def null_worlds(
     groups: pd.Series | None = None,
     block_size: int | None = None,
 ) -> Iterator[World]:
-    """Yields `runs` independent null worlds (stream index 0..runs-1)."""
+    """Yields `runs` independent null worlds (stream index 0..runs-1).
+
+    Args:
+        features: Real numeric feature matrix.
+        outcome: Real outcome, one value per row.
+        runs: Number of worlds.
+        seed: Run seed.
+        groups: Group label per row, or None.
+        block_size: Rows per time block, or None.
+
+    Yields:
+        One null world per run, each with its own random stream.
+    """
     qualification.count(runs, "runs", minimum=1)
     check_features(features)
     for run in range(runs):
@@ -293,6 +363,13 @@ def size_band(alpha: float, runs: int) -> tuple[float, float]:
 
     A correct level-`alpha` test falls inside this band in about 95 percent
     of Monte Carlo experiments of `runs` worlds.
+
+    Args:
+        alpha: Nominal level.
+        runs: Number of worlds.
+
+    Returns:
+        The lower and upper edges of the band.
     """
     level = qualification.probability(alpha, "alpha")
     qualification.count(runs, "runs", minimum=1)
@@ -386,6 +463,9 @@ def power_curve(
 
     Returns:
         Rejection rate per effect size.
+
+    Raises:
+        ValueError: If an effect size is not positive.
     """
     qualification.count(runs, "runs", minimum=1)
     curve: dict[float, RejectionRate] = {}
@@ -448,6 +528,13 @@ def false_discovery_proportion(
 
     Zero when nothing is rejected.
 
+    Args:
+        rejected: Names of the rejected columns.
+        world: The world the rejections were made on.
+
+    Returns:
+        The proportion of distinct rejected names that are null columns.
+
     Raises:
         ValueError: If a rejected name is not a feature.
     """
@@ -478,7 +565,15 @@ class FalseDiscoverySummary:
     confidence: float
 
     def supports(self, alpha: float, slack: float = DEFAULT_SLACK) -> bool:
-        """Whether `upper <= alpha + slack`, the F7 acceptance rule."""
+        """Whether `upper <= alpha + slack`, the acceptance rule.
+
+        Args:
+            alpha: Target false-discovery level.
+            slack: Allowed excess over `alpha`.
+
+        Returns:
+            True if the upper confidence limit is within `alpha + slack`.
+        """
         return self.upper <= alpha + slack
 
 
@@ -486,6 +581,13 @@ def summarize_false_discoveries(
     proportions: Sequence[float], confidence: float = 0.95
 ) -> FalseDiscoverySummary:
     """Averages false-discovery proportions with an upper limit.
+
+    Args:
+        proportions: One false-discovery proportion per world.
+        confidence: One-sided level of the upper limit.
+
+    Returns:
+        The mean, its upper limit, the number of runs and the level.
 
     Raises:
         ValueError: On no proportions, a value outside [0, 1] or a

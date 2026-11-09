@@ -23,7 +23,12 @@ CASES = ((0, 300, 3), (1, 500, 2), (2, 400, 4))
 
 
 def build() -> dict[str, object]:
-    """Generates the fixture document (imports cleanlab lazily)."""
+    """Generates the fixture document (imports cleanlab lazily).
+
+    Returns:
+        The tool name and versions and, per seeded case, the labels,
+        probabilities and the issue mask from cleanlab.
+    """
     import cleanlab
     from cleanlab.filter import find_label_issues
 
@@ -53,7 +58,14 @@ def build() -> dict[str, object]:
 
 
 def main(arguments: list[str]) -> int:
-    """Writes the fixture to the path in `arguments[0]`."""
+    """Writes the fixture to the path in `arguments[0]`.
+
+    Args:
+        arguments: Command-line arguments; the first is the output path.
+
+    Returns:
+        Process exit status, always 0.
+    """
     Path(arguments[0]).write_text(
         json.dumps(build(), indent=1) + "\n", encoding="utf-8"
     )

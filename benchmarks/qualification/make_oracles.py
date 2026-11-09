@@ -47,19 +47,44 @@ class Family:
 def sample(
     seed: int, size: int, shift: float = 0.0, scale: float = 1.0
 ) -> list:
-    """Reproducible normal sample rounded to fixed decimals."""
+    """Reproducible normal sample rounded to fixed decimals.
+
+    Args:
+        seed: Seed of the random generator.
+        size: Number of values.
+        shift: Mean of the normal distribution.
+        scale: Standard deviation of the normal distribution.
+
+    Returns:
+        The values, each rounded to `SAMPLE_DECIMALS` places.
+    """
     rng = np.random.default_rng(seed)
     values = rng.normal(loc=shift, scale=scale, size=size)
     return [round(float(v), SAMPLE_DECIMALS) for v in values]
 
 
 def numbered(prefix: str, items: Sequence[dict[str, Any]]) -> list:
-    """Pairs each input with a stable id."""
+    """Pairs each input with a stable id.
+
+    Args:
+        prefix: Text before the position in each id.
+        items: The case inputs, in order.
+
+    Returns:
+        (id, inputs) pairs with ids `prefix-0`, `prefix-1`, ...
+    """
     return [(f"{prefix}-{i}", dict(item)) for i, item in enumerate(items)]
 
 
 def proportion_inputs(pairs: Sequence[tuple[int, int, float]]) -> list:
-    """Cases for a binomial proportion interval."""
+    """Cases for a binomial proportion interval.
+
+    Args:
+        pairs: (successes, trials, confidence) triples.
+
+    Returns:
+        (id, inputs) pairs with keys `successes`, `n` and `confidence`.
+    """
     return numbered(
         "ci",
         [{"successes": k, "n": n, "confidence": c} for k, n, c in pairs],
@@ -67,7 +92,11 @@ def proportion_inputs(pairs: Sequence[tuple[int, int, float]]) -> list:
 
 
 def wilson_inputs() -> list:
-    """Wilson interval cases, including both edges and n = 1."""
+    """Wilson interval cases, including both edges and n = 1.
+
+    Returns:
+        (id, inputs) pairs for the Wilson oracle.
+    """
     return proportion_inputs(
         [
             (0, 10, 0.95),
@@ -85,9 +114,25 @@ def wilson_inputs() -> list:
 
 
 def interval(method: str) -> Callable[[dict[str, Any]], dict[str, Any]]:
-    """Builds the computation for a named binomial interval method."""
+    """Builds the computation for a named binomial interval method.
+
+    Args:
+        method: A `scipy.stats` proportion-interval method, such as `exact`
+            or `wilson`.
+
+    Returns:
+        A function mapping a case's inputs to the `low` and `high` bounds.
+    """
 
     def compute(given: dict[str, Any]) -> dict[str, Any]:
+        """The scipy interval for one case.
+
+        Args:
+            given: Case inputs `successes`, `n` and `confidence`.
+
+        Returns:
+            The `low` and `high` bounds.
+        """
         found = stats.binomtest(given["successes"], given["n"]).proportion_ci(
             confidence_level=given["confidence"], method=method
         )
@@ -97,7 +142,11 @@ def interval(method: str) -> Callable[[dict[str, Any]], dict[str, Any]]:
 
 
 def clopper_inputs() -> list:
-    """Exact-interval cases."""
+    """Exact-interval cases.
+
+    Returns:
+        (id, inputs) pairs for the Clopper-Pearson oracle.
+    """
     return proportion_inputs(
         [
             (0, 10, 0.95),
@@ -110,7 +159,11 @@ def clopper_inputs() -> list:
 
 
 def chi2_inputs() -> list:
-    """Contingency tables, 2x2 up to 3x3."""
+    """Contingency tables, 2x2 up to 3x3.
+
+    Returns:
+        (id, inputs) pairs, each with a `table`.
+    """
     tables = [
         [[10, 20], [30, 25]],
         [[12, 5, 9], [7, 14, 8]],
@@ -122,7 +175,14 @@ def chi2_inputs() -> list:
 
 
 def chi2_compute(given: dict[str, Any]) -> dict[str, Any]:
-    """Pearson chi-square without continuity correction."""
+    """Pearson chi-square without continuity correction.
+
+    Args:
+        given: Case input `table`, a contingency table.
+
+    Returns:
+        The `statistic`, `pvalue` and `dof`.
+    """
     result = stats.chi2_contingency(given["table"], correction=False)
     return {
         "statistic": float(result.statistic),
@@ -132,7 +192,11 @@ def chi2_compute(given: dict[str, Any]) -> dict[str, Any]:
 
 
 def fisher_inputs() -> list:
-    """2x2 tables with no empty margin cell that makes the ratio infinite."""
+    """2x2 tables with no empty margin cell that makes the ratio infinite.
+
+    Returns:
+        (id, inputs) pairs, each with a `table`.
+    """
     tables = [
         [[3, 1], [1, 3]],
         [[10, 2], [3, 15]],
@@ -143,7 +207,14 @@ def fisher_inputs() -> list:
 
 
 def fisher_compute(given: dict[str, Any]) -> dict[str, Any]:
-    """Two-sided Fisher exact test."""
+    """Two-sided Fisher exact test.
+
+    Args:
+        given: Case input `table`, a 2x2 table.
+
+    Returns:
+        The `odds_ratio` and `pvalue`.
+    """
     result = stats.fisher_exact(given["table"])
     return {
         "odds_ratio": float(result.statistic),
@@ -152,7 +223,12 @@ def fisher_compute(given: dict[str, Any]) -> dict[str, Any]:
 
 
 def two_sample_inputs() -> list:
-    """Pairs of samples with and without a location shift."""
+    """Pairs of samples with and without a location shift.
+
+    Returns:
+        (id, inputs) pairs, each with samples `x` (28 values) and `y`
+        (31 values, scale 1.2).
+    """
     specs = [(1, 2, 0.0), (3, 4, 0.5), (5, 6, 1.0), (7, 8, 0.2)]
     return numbered(
         "pair",
@@ -167,7 +243,14 @@ def two_sample_inputs() -> list:
 
 
 def ks_compute(given: dict[str, Any]) -> dict[str, Any]:
-    """Two-sample Kolmogorov-Smirnov test (scipy's automatic method)."""
+    """Two-sample Kolmogorov-Smirnov test (scipy's automatic method).
+
+    Args:
+        given: Case inputs `x` and `y`, the two samples.
+
+    Returns:
+        The `statistic` and `pvalue`.
+    """
     result = stats.ks_2samp(given["x"], given["y"])
     return {
         "statistic": float(result.statistic),
@@ -176,7 +259,14 @@ def ks_compute(given: dict[str, Any]) -> dict[str, Any]:
 
 
 def mannwhitney_compute(given: dict[str, Any]) -> dict[str, Any]:
-    """Two-sided Mann-Whitney U test."""
+    """Two-sided Mann-Whitney U test.
+
+    Args:
+        given: Case inputs `x` and `y`, the two samples.
+
+    Returns:
+        The `statistic` and `pvalue`.
+    """
     result = stats.mannwhitneyu(given["x"], given["y"], alternative="two-sided")
     return {
         "statistic": float(result.statistic),
@@ -185,7 +275,12 @@ def mannwhitney_compute(given: dict[str, Any]) -> dict[str, Any]:
 
 
 def kruskal_inputs() -> list:
-    """Three groups of different size and location."""
+    """Three groups of different size and location.
+
+    Returns:
+        (id, inputs) pairs, each with `groups`, three samples of 12, 15 and
+        10 values.
+    """
     specs = [(11, 0.0), (21, 0.4), (31, 0.0)]
     return numbered(
         "groups",
@@ -202,7 +297,14 @@ def kruskal_inputs() -> list:
 
 
 def kruskal_compute(given: dict[str, Any]) -> dict[str, Any]:
-    """Kruskal-Wallis H test."""
+    """Kruskal-Wallis H test.
+
+    Args:
+        given: Case input `groups`, a list of samples.
+
+    Returns:
+        The `statistic` and `pvalue`.
+    """
     result = stats.kruskal(*given["groups"])
     return {
         "statistic": float(result.statistic),
@@ -211,7 +313,12 @@ def kruskal_compute(given: dict[str, Any]) -> dict[str, Any]:
 
 
 def paired_inputs() -> list:
-    """Pairs with weak, moderate and strong monotone association."""
+    """Pairs with weak, moderate and strong monotone association.
+
+    Returns:
+        (id, inputs) pairs, each with `x` and `y` of 25 values; `y` is
+        `strength * x` plus noise for strengths 0, 0.5, 1.5 and -1.
+    """
     items = []
     for seed, strength in ((41, 0.0), (42, 0.5), (43, 1.5), (44, -1.0)):
         x = sample(seed, 25)
@@ -225,9 +332,25 @@ def paired_inputs() -> list:
 
 
 def correlation(function: Callable[..., Any]) -> Callable[[dict], dict]:
-    """Builds the computation for a scipy correlation test."""
+    """Builds the computation for a scipy correlation test.
+
+    Args:
+        function: A scipy correlation test taking `x` and `y` and returning
+            a result with `statistic` and `pvalue`.
+
+    Returns:
+        A function mapping a case's inputs to those two values.
+    """
 
     def compute(given: dict[str, Any]) -> dict[str, Any]:
+        """The scipy correlation test for one case.
+
+        Args:
+            given: Case inputs `x` and `y`.
+
+        Returns:
+            The `statistic` and `pvalue`.
+        """
         result = function(given["x"], given["y"])
         return {
             "statistic": float(result.statistic),
@@ -238,7 +361,11 @@ def correlation(function: Callable[..., Any]) -> Callable[[dict], dict]:
 
 
 def fdr_inputs() -> list:
-    """P-value vectors under both adjustment methods."""
+    """P-value vectors under both adjustment methods.
+
+    Returns:
+        (id, inputs) pairs, each with `pvalues` and `method` (`bh` or `by`).
+    """
     vectors = [
         [0.001, 0.008, 0.039, 0.041, 0.042, 0.06, 0.074, 0.205],
         [0.01, 0.04, 0.03, 0.005, 0.5, 0.2, 0.9, 0.0001, 0.07],
@@ -249,7 +376,14 @@ def fdr_inputs() -> list:
 
 
 def fdr_compute(given: dict[str, Any]) -> dict[str, Any]:
-    """Benjamini-Hochberg or Benjamini-Yekutieli adjusted p-values."""
+    """Benjamini-Hochberg or Benjamini-Yekutieli adjusted p-values.
+
+    Args:
+        given: Case inputs `pvalues` and `method`.
+
+    Returns:
+        The adjusted p-values under `adjusted`.
+    """
     adjusted = stats.false_discovery_control(
         given["pvalues"], method=given["method"]
     )
@@ -257,13 +391,24 @@ def fdr_compute(given: dict[str, Any]) -> dict[str, Any]:
 
 
 def harmonic_inputs() -> list:
-    """Harmonic numbers across the exact and asymptotic ranges."""
+    """Harmonic numbers across the exact and asymptotic ranges.
+
+    Returns:
+        (id, inputs) pairs, each with an `n` from 1 to 1,000,000.
+    """
     sizes = [1, 2, 3, 10, 100, 1000, 10000, 10001, 100000, 1000000]
     return numbered("n", [{"n": n} for n in sizes])
 
 
 def harmonic_compute(given: dict[str, Any]) -> dict[str, Any]:
-    """H_n = digamma(n + 1) + Euler's constant, an independent route."""
+    """H_n = digamma(n + 1) + Euler's constant, an independent route.
+
+    Args:
+        given: Case input `n`.
+
+    Returns:
+        The harmonic number under `value`.
+    """
     value = float(special.digamma(given["n"] + 1) + np.euler_gamma)
     return {"value": value}
 
@@ -327,7 +472,16 @@ FAMILIES: dict[str, Family] = {
 
 
 def document(name: str) -> dict[str, Any]:
-    """Builds the full oracle record for one family, with its hashes."""
+    """Builds the full oracle record for one family, with its hashes.
+
+    Args:
+        name: Key of the family in `FAMILIES`.
+
+    Returns:
+        The record: oracle name, reference call, tool versions, generator
+        path and hash, tolerance, the cases with their expected values, and
+        the content hash.
+    """
     family = FAMILIES[name]
     cases: list[Case] = [
         {"id": case_id, "inputs": given, "expected": family.compute(given)}
@@ -347,7 +501,14 @@ def document(name: str) -> dict[str, Any]:
 
 
 def write_all(directory: Path) -> list[Path]:
-    """Writes every oracle file into `directory`."""
+    """Writes every oracle file into `directory`.
+
+    Args:
+        directory: Output folder; created if missing.
+
+    Returns:
+        The paths written, in name order.
+    """
     directory.mkdir(parents=True, exist_ok=True)
     written = []
     for name in sorted(FAMILIES):
@@ -361,7 +522,14 @@ def write_all(directory: Path) -> list[Path]:
 
 
 def main(arguments: list[str] | None = None) -> int:
-    """Command-line entry point."""
+    """Command-line entry point.
+
+    Args:
+        arguments: Command-line arguments (`--out`); `None` reads `sys.argv`.
+
+    Returns:
+        Process exit status, always 0.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", type=Path, default=oracles.ORACLE_DIR)
     options = parser.parse_args(arguments)

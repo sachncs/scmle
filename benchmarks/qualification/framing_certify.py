@@ -1,7 +1,7 @@
-"""Measurements and certificate for the F8 framing methods (canon P1).
+"""Measurements and certificate for the framing methods.
 
 Pre-registered before any certification run; a method that misses its floor
-stays descriptive and nothing is retuned until it passes (P1).
+stays descriptive and nothing is retuned until it passes.
 
 Intersection-union test (`baseline`). Clustered worlds: `G` clusters of mean
 size 10, cluster prevalence Beta with mean 0.3 and intraclass correlation
@@ -97,19 +97,44 @@ Z_95 = 1.6448536269514722
 
 
 def size_bound(runs: int = RUNS) -> float:
-    """Largest empirical rejection rate accepted for a level-0.05 test."""
+    """Largest empirical rejection rate accepted for a level-0.05 test.
+
+    Args:
+        runs: Number of replicates the rate is observed over.
+
+    Returns:
+        ``0.05 + 2 * sqrt(0.05 * 0.95 / runs)``.
+    """
     return ALPHA + 2 * math.sqrt(ALPHA * (1 - ALPHA) / runs)
 
 
 def power_floor(runs: int = RUNS) -> float:
-    """Smallest empirical power accepted where the closed form allows it."""
+    """Smallest empirical power accepted where the closed form allows it.
+
+    Args:
+        runs: Number of replicates the power is observed over.
+
+    Returns:
+        ``0.80 - 2 * sqrt(0.8 * 0.2 / runs)``.
+    """
     return POWER_FLOOR - 2 * math.sqrt(POWER_FLOOR * (1 - POWER_FLOOR) / runs)
 
 
 def world(
     seed: int, clusters: int, se_a: float, fp_a: float
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """One clustered world: outcomes, model actions, baseline, clusters."""
+    """One clustered world: outcomes, model actions, baseline, clusters.
+
+    Args:
+        seed: World seed.
+        clusters: Number of clusters.
+        se_a: Sensitivity of the model's action.
+        fp_a: False-positive rate of the model's action.
+
+    Returns:
+        The outcome `y`, the model's action `a`, the baseline's action `b`
+        (each 0/1 per row) and the cluster index of each row.
+    """
     rng = randomness.component_rng(seed, "framing.world", clusters)
     concentration = (1 - RHO) / RHO
     prevalence = rng.beta(
@@ -129,7 +154,18 @@ def world(
 
 
 def null_parameters(kind: str) -> tuple[float, float]:
-    """Model sensitivity and false-positive rate for a null world."""
+    """Model sensitivity and false-positive rate for a null world.
+
+    Args:
+        kind: `null_both` (no gain anywhere), `null_hi` (no gain at the upper
+            end of the range) or `null_lo` (no gain at the lower end).
+
+    Returns:
+        The model's sensitivity and false-positive rate.
+
+    Raises:
+        ValueError: If `kind` is not one of the three.
+    """
     w_lo, w_hi = (costs.odds(t) for t in RANGE)
     if kind == "null_both":
         return BASE_SENSITIVITY, BASE_FALSE_POSITIVE
@@ -145,7 +181,18 @@ def null_parameters(kind: str) -> tuple[float, float]:
 
 
 def claim_p(seed: int, clusters: int, se_a: float, fp_a: float) -> float:
-    """Intersection-union p-value of one world."""
+    """Intersection-union p-value of one world.
+
+    Args:
+        seed: World seed.
+        clusters: Number of clusters.
+        se_a: Sensitivity of the model's action.
+        fp_a: False-positive rate of the model's action.
+
+    Returns:
+        The larger of the cluster-robust p-values at the two ends of
+        `RANGE`.
+    """
     y, a, b, group = world(seed, clusters, se_a, fp_a)
     return max(
         baseline.cluster_test(
@@ -156,7 +203,16 @@ def claim_p(seed: int, clusters: int, se_a: float, fp_a: float) -> float:
 
 
 def size_rows(offset: int, runs: int) -> dict[str, Any]:
-    """Empirical size of the claim in every null world and cluster count."""
+    """Empirical size of the claim in every null world and cluster count.
+
+    Args:
+        offset: Added to the world seeds.
+        runs: Replicates per world and cluster count.
+
+    Returns:
+        For each `kind/clusters` key, the rejections, runs, rate and whether
+        the rate meets `size_bound(runs)`.
+    """
     rows: dict[str, Any] = {}
     for kind in ("null_hi", "null_lo", "null_both"):
         se_a, fp_a = null_parameters(kind)
@@ -175,7 +231,16 @@ def size_rows(offset: int, runs: int) -> dict[str, Any]:
 
 
 def minimum_clusters(rows: dict[str, Any]) -> int | None:
-    """Smallest tested count from which every count meets the bound."""
+    """Smallest tested count from which every count meets the bound.
+
+    Args:
+        rows: Output of `size_rows`.
+
+    Returns:
+        The smallest cluster count such that it and all larger tested counts
+        meet the bound in every null world; None if even the largest does
+        not.
+    """
     ok = {
         g: all(r["meets_bound"] for r in rows.values() if r["clusters"] == g)
         for g in CLUSTER_COUNTS
@@ -189,7 +254,17 @@ def minimum_clusters(rows: dict[str, Any]) -> int | None:
 
 
 def closed_form_power(se_a: float, fp_a: float, clusters: int) -> float:
-    """Power at the weaker end from `s_d`, the design effect and the gain."""
+    """Power at the weaker end from `s_d`, the design effect and the gain.
+
+    Args:
+        se_a: Sensitivity of the model's action.
+        fp_a: False-positive rate of the model's action.
+        clusters: Number of clusters of the studied sample.
+
+    Returns:
+        The smaller normal-approximation power over the two ends of
+        `RANGE` at one-sided level 0.05.
+    """
     y, a, b, group = world(DEV_SEED_BASE, 4000, se_a, fp_a)
     worst = 1.0
     for t in RANGE:
@@ -203,7 +278,16 @@ def closed_form_power(se_a: float, fp_a: float, clusters: int) -> float:
 
 
 def power_rows(offset: int, runs: int) -> dict[str, Any]:
-    """Empirical power of the claim in a world with a gain at both ends."""
+    """Empirical power of the claim in a world with a gain at both ends.
+
+    Args:
+        offset: Added to the world seeds.
+        runs: Number of replicates.
+
+    Returns:
+        The cluster count, closed-form and empirical power, the floor,
+        whether the closed form is attainable and the floor is met.
+    """
     se_a, fp_a = 0.72, 0.14
     rejected = sum(
         claim_p(offset + s, POWER_CLUSTERS, se_a, fp_a) <= ALPHA
@@ -222,7 +306,16 @@ def power_rows(offset: int, runs: int) -> dict[str, Any]:
 
 
 def label_world(planted: bool, seed: int) -> tuple[np.ndarray, np.ndarray]:
-    """(observed, b) of one world."""
+    """(observed, b) of one world.
+
+    Args:
+        planted: Whether outcomes of rows with `b = 0` are selectively
+            observed.
+        seed: World seed.
+
+    Returns:
+        A boolean array of observed outcomes and the 0/1 array `b`.
+    """
     rng = randomness.component_rng(seed, "framing.labels", int(planted))
     b = (rng.random(LABEL_ROWS) < 0.3).astype(float)
     if planted:
@@ -237,7 +330,14 @@ def label_world(planted: bool, seed: int) -> tuple[np.ndarray, np.ndarray]:
 def label_certificate(
     offset: int,
 ) -> tuple[certificates.DetectorCertificate, dict[str, Any]]:
-    """Measures the selective-label detector."""
+    """Measures the selective-label detector.
+
+    Args:
+        offset: Added to the world seeds.
+
+    Returns:
+        The certificate and the measurements.
+    """
     detected = sum(
         baseline.selective_labels(*label_world(True, offset + s)).flagged
         for s in range(LABEL_RUNS)
@@ -291,12 +391,26 @@ def label_certificate(
 
 
 def code_digest() -> str:
-    """Hash of the selective-label detector, the certificate key."""
+    """Hash of the selective-label detector, the certificate key.
+
+    Returns:
+        The code hash of `baseline.selective_labels`.
+    """
     return certificates.code_hash(baseline.selective_labels)
 
 
 def feasibility_run(seed: int, ratio: float) -> tuple[str, str]:
-    """(estimated verdict, oracle verdict) of one run."""
+    """(estimated verdict, oracle verdict) of one run.
+
+    Args:
+        seed: World seed.
+        ratio: Confirmation sample size as a multiple of the true
+            requirement.
+
+    Returns:
+        The verdict from the estimated requirement and the oracle verdict
+        (`feasible` for a ratio of at least 1, otherwise `downgrade`).
+    """
     se_a, fp_a = 0.85, 0.12
     big = world(DEV_SEED_BASE, 4000, se_a, fp_a)
     d_big = baseline.paired_difference(*big[:3], RANGE[0])
@@ -324,7 +438,17 @@ def feasibility_run(seed: int, ratio: float) -> tuple[str, str]:
 
 
 def feasibility_rows(offset: int, runs: int) -> dict[str, Any]:
-    """Agreement with the oracle away from the boundary, and at it."""
+    """Agreement with the oracle away from the boundary, and at it.
+
+    Args:
+        offset: Added to the world seeds.
+        runs: Runs per ratio.
+
+    Returns:
+        Agreements per ratio in `FEASIBILITY_RATIOS`, the overall agreement,
+        whether it meets the floor and the share of `inconclusive` verdicts
+        at ratio 1.
+    """
     out: dict[str, Any] = {}
     agree = total = 0
     for ratio in FEASIBILITY_RATIOS:
@@ -346,7 +470,15 @@ def feasibility_rows(offset: int, runs: int) -> dict[str, Any]:
 
 
 def omission_frame(seed: int, flips: bool) -> tuple[pd.DataFrame, np.ndarray]:
-    """Exploration rows and pilot actions; the gain may flip in the range."""
+    """Exploration rows and pilot actions; the gain may flip in the range.
+
+    Args:
+        seed: World seed.
+        flips: Whether the verdict flips inside the plausible cost range.
+
+    Returns:
+        The 600-row exploration table and the pilot's 0/1 actions.
+    """
     rng = randomness.component_rng(seed, "framing.omission", int(flips))
     n = 600
     y = (rng.random(n) < 0.3).astype(int)
@@ -370,7 +502,16 @@ def omission_frame(seed: int, flips: bool) -> tuple[pd.DataFrame, np.ndarray]:
 
 
 def omission_asks(seed: int, flips: bool, given: bool) -> bool:
-    """Whether the drafter raises the cost question for one request."""
+    """Whether the drafter raises the cost question for one request.
+
+    Args:
+        seed: World seed.
+        flips: Whether the verdict flips inside the plausible cost range.
+        given: Whether a cost model is supplied.
+
+    Returns:
+        True if the draft contains a question about the cost threshold.
+    """
     frame, pilot = omission_frame(seed, flips)
     source = draft.SourceDescription(
         "warehouse://crm/accounts",
@@ -403,7 +544,17 @@ def omission_asks(seed: int, flips: bool, given: bool) -> bool:
 
 
 def omission_rows(offset: int, runs: int) -> dict[str, Any]:
-    """Question recall and false-question rate."""
+    """Question recall and false-question rate.
+
+    Args:
+        offset: Added to the world seeds.
+        runs: Worlds per case.
+
+    Returns:
+        The counts of questions asked in each case, the Wilson lower bound of
+        recall, the Wilson upper bound of false questions and whether both
+        floors are met.
+    """
     asked = sum(omission_asks(offset + s, True, False) for s in range(runs))
     robust = sum(omission_asks(offset + s, False, False) for s in range(runs))
     given = sum(omission_asks(offset + s, True, True) for s in range(runs))
@@ -422,7 +573,14 @@ def omission_rows(offset: int, runs: int) -> dict[str, Any]:
 
 
 def fuzz_rows(count: int = 1000) -> dict[str, Any]:
-    """Malformed charter records that `from_dict` wrongly accepts."""
+    """Malformed charter records that `from_dict` wrongly accepts.
+
+    Args:
+        count: Number of malformed records to try.
+
+    Returns:
+        The number tried and the number accepted.
+    """
     base = charter_contracts.template()
     base["question"] = "q"
     base["estimand"].update(
@@ -463,7 +621,15 @@ def fuzz_rows(count: int = 1000) -> dict[str, Any]:
 def certify_all(
     offset: int = 0, runs: int = RUNS
 ) -> tuple[certificates.CertificateStore, dict[str, Any]]:
-    """Measures every F8 method; `offset` shifts the seed range."""
+    """Measures every framing method; `offset` shifts the seed range.
+
+    Args:
+        offset: Added to the world seeds.
+        runs: Replicates per size and power cell.
+
+    Returns:
+        The certificate store and the measurements document.
+    """
     started = time.monotonic()
     store = certificates.CertificateStore()
     cert, labels = label_certificate(offset)
@@ -488,7 +654,17 @@ def certify_all(
 def problems(
     store: certificates.CertificateStore, document: dict[str, Any] | None
 ) -> list[str]:
-    """Why the files are unusable: stale, missing or inconsistent."""
+    """Why the files are unusable: stale, missing or inconsistent.
+
+    Args:
+        store: The certificate store.
+        document: The stored measurements, or None when the file is absent.
+
+    Returns:
+        Messages for a missing or stale certificate, a missing measurements
+        file, a `MIN_CLUSTERS` that differs from the measured minimum and an
+        accepted malformed charter.
+    """
     found = []
     report = certificates.audit(
         store, {baseline.DETECTOR_ID: (code_digest(), baseline.DEFECT_TYPE)}
@@ -510,7 +686,15 @@ def problems(
 def descriptive_only(
     store: certificates.CertificateStore, document: dict[str, Any] | None
 ) -> list[str]:
-    """Methods measured and not meeting their floor (not an error)."""
+    """Methods measured and not meeting their floor (not an error).
+
+    Args:
+        store: The certificate store.
+        document: The stored measurements, or None.
+
+    Returns:
+        The names of methods that missed their floor.
+    """
     names = []
     report = certificates.audit(
         store, {baseline.DETECTOR_ID: (code_digest(), baseline.DEFECT_TYPE)}
@@ -530,7 +714,11 @@ def descriptive_only(
 
 
 def load_document() -> dict[str, Any] | None:
-    """The committed measurements, or None."""
+    """The committed measurements, or None.
+
+    Returns:
+        The parsed measurements file, or None when it does not exist.
+    """
     if not MEASUREMENTS_PATH.exists():
         return None
     loaded: dict[str, Any] = json.loads(
@@ -540,7 +728,12 @@ def load_document() -> dict[str, Any] | None:
 
 
 def check() -> dict[str, Any]:
-    """The `--check framing` report."""
+    """The `--check framing` report.
+
+    Returns:
+        `ok`, the problems, the descriptive-only methods and a note that no
+        gold corpus exists.
+    """
     store = certificates.CertificateStore.load(STORE_PATH)
     document = load_document()
     found = problems(store, document)
@@ -553,7 +746,15 @@ def check() -> dict[str, Any]:
 
 
 def main(arguments: list[str] | None = None) -> int:
-    """Measures (`--write`), verifies (`--check`) or looks (`--dev`)."""
+    """Measures (`--write`), verifies (`--check`) or looks (`--dev`).
+
+    Args:
+        arguments: Command-line arguments; `None` reads `sys.argv`.
+
+    Returns:
+        With `--check`, 0 when the files are consistent, otherwise 1; with
+        `--write` and `--dev`, always 0.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     action = parser.add_mutually_exclusive_group(required=True)
     action.add_argument("--write", action="store_true")

@@ -1,4 +1,4 @@
-"""Measured gates for the closed loop (Phase 13, H1 to H10).
+"""Measured gates for the closed loop.
 
 Every threshold below is fixed in this file before the measurement and is not
 retuned: a gate that misses its floor is filed as measured with `passed`
@@ -12,46 +12,51 @@ Charter inputs used by the gates (inputs, not claims): reference risk
 0.05`, `DELTA_RB = 0.05`, `R_STAR = 0.05`, `DELTA_CONF = 0.1`, batches of 50
 cases. The monitors take the batch mean as the observation.
 
-* H1 L1 false alarm: `R` stable streams of `T` batches. Pass: P(any alarm)
-  `<= alpha + 2 sqrt(alpha (1 - alpha) / R)` both at the stable risk `R_REF`
-  and on the boundary of the null (risk `R_REF + DELTA`). The existing
-  fixed rule (`MonitoringThresholds`: 10 percent relative degradation on
-  batches of 30 or more labelled rows) is measured on the same streams.
-* H2 L1 detection delay: abrupt rises to `R_REF + k DELTA`, `k` in 1.5, 2, 3
-  (a rise of exactly `DELTA` is the boundary of the null and is undetectable
-  by construction). Pass: P(detect `k = 2` within `D_MAX`) has a Clopper-
-  Pearson lower bound `>= 0.90`.
-* H3 benign shift: covariate-only shift. Pass: retrain-trigger rate `<=
-  alpha + tolerance`; the PSI rule of the existing monitor is measured on the
-  same streams.
-* H4 promotion: sequences of 200 challengers, 80 percent true nulls,
+Each gate is the function named in brackets and is filed under the key in
+`GATES`:
+
+* False alarm (`gate_h1`): `R` stable streams of `T` batches. Pass: P(any
+  alarm) `<= alpha + 2 sqrt(alpha (1 - alpha) / R)` both at the stable risk
+  `R_REF` and on the boundary of the null (risk `R_REF + DELTA`). The
+  existing fixed rule (`MonitoringThresholds`: 10 percent relative
+  degradation on batches of 30 or more labelled rows) is measured on the same
+  streams.
+* Detection delay (`gate_h2`): abrupt rises to `R_REF + k DELTA`, `k` in
+  1.5, 2, 3 (a rise of exactly `DELTA` is the boundary of the null and is
+  undetectable by construction). Pass: P(detect `k = 2` within `D_MAX`) has a
+  Clopper-Pearson lower bound `>= 0.90`.
+* Benign shift (`gate_h3`): covariate-only shift. Pass: retrain-trigger rate
+  `<= alpha + tolerance`; the PSI rule of the existing monitor is measured on
+  the same streams.
+* Promotion (`gate_h4`): sequences of 200 challengers, 80 percent true nulls,
   dependent through a shared latent; e-LOND over the sequence, decided in
   registration order (the loop's rule). Pass: realised FDR `<= alpha_promo +
   3 se`. The per-review bootstrap rule of `champion.py` is measured as a
   baseline.
-* H5 rollback: false-rollback rate at no difference `<= alpha_rb + 3 se`.
-* H6 selection: MAR with logged propensity. Pass: bias of the
+* Rollback (`gate_h5`): false-rollback rate at no difference
+  `<= alpha_rb + 3 se`.
+* Selection (`gate_h6`): MAR with logged propensity. Pass: bias of the
   Horvitz-Thompson risk within 3 se, the confidence sequence covers the true
   risk at all times in at least `1 - alpha - 3 se` of the streams, and the
   naive labelled-only mean is biased (published). MNAR without an audit slice:
   the loop takes no retrain, promotion or rollback action and tiers the stream
   `unverified`.
-* H7 maturity: outcome-dependent delay. Pass: the maturity-by-prediction-time
-  estimate is within 3 se of the truth and the arrival-based one is below it
-  by more than 3 se.
-* H8 feedback: the bypass-slice test. Pass: false detection in loop-free
-  worlds `<= alpha + tolerance`; power reported by bypass share; without a
-  bypass slice the verdict is `unverified`.
-* H9 threshold: `P(R(tau_hat) > r*) <= delta + 2 sqrt(delta (1 - delta) / R)`;
-  the best-observed-risk cut is measured as the naive baseline.
-* H10 under shift: the selective-risk alarm detects a rise of the answered
-  cases' risk to `2 r*` within `D_MAX` with probability `>= 0.90`
+* Maturity (`gate_h7`): outcome-dependent delay. Pass: the
+  maturity-by-prediction-time estimate is within 3 se of the truth and the
+  arrival-based one is below it by more than 3 se.
+* Feedback (`gate_h8`): the bypass-slice test. Pass: false detection in
+  loop-free worlds `<= alpha + tolerance`; power reported by bypass share;
+  without a bypass slice the verdict is `unverified`.
+* Threshold (`gate_h9`): `P(R(tau_hat) > r*) <= delta + 2 sqrt(delta (1 -
+  delta) / R)`; the best-observed-risk cut is measured as the naive baseline.
+* Under shift (`gate_h10`): the selective-risk alarm detects a rise of the
+  answered cases' risk to `2 r*` within `D_MAX` with probability `>= 0.90`
   (Clopper-Pearson lower bound); the window before the halt is reported.
 
-NOT measured here: H11 (agreement with a domain owner's signed escalation
-audit) and replay of recorded incident streams. No owner audit exists, no
-replay corpus is verified, and Python 3.11 replay of the ledger was not run
-(only the interpreter of the environment). The loop stays `unverified` for
+NOT measured here: agreement with a domain owner's signed escalation audit
+and replay of recorded incident streams. No owner audit exists, no replay
+corpus is verified, and Python 3.11 replay of the ledger was not run (only
+the interpreter of the environment). The loop stays `unverified` for
 production until those exist.
 
     python -m benchmarks.qualification.loop_certify --write
@@ -105,29 +110,74 @@ NOT_MEASURED = (
 
 
 def rate_floor(rate: float, alpha: float, runs: int) -> dict[str, Any]:
-    """A rate with the plan's `alpha + 2 sqrt(alpha (1 - alpha) / R)` bound."""
+    """A rate with the `alpha + 2 sqrt(alpha (1 - alpha) / R)` bound.
+
+    Args:
+        rate: The observed rate.
+        alpha: The nominal level.
+        runs: Number of replicates the rate is observed over.
+
+    Returns:
+        The rate, the bound and whether the rate is within it.
+    """
     bound = alpha + 2.0 * math.sqrt(alpha * (1.0 - alpha) / runs)
     return {"rate": rate, "bound": bound, "meets": rate <= bound}
 
 
 def lower_bound(hits: int, runs: int) -> float:
-    """Clopper-Pearson 95 percent lower limit."""
+    """Clopper-Pearson 95 percent lower limit.
+
+    Args:
+        hits: Number of successes.
+        runs: Number of trials.
+
+    Returns:
+        The lower limit of the Clopper-Pearson interval computed at
+        confidence 0.90 (a one-sided 95 percent limit).
+    """
     return coverage.clopper_pearson(hits, runs, 0.90)[0]
 
 
 def batch_means(rng: np.random.Generator, risk: float, runs: int) -> np.ndarray:
-    """One batch mean loss per stream, for Bernoulli(risk) cases."""
+    """One batch mean loss per stream, for Bernoulli(risk) cases.
+
+    Args:
+        rng: Random generator.
+        risk: Loss probability of each case.
+        runs: Number of streams.
+
+    Returns:
+        An array of `runs` batch means over `BATCH` cases.
+    """
     return rng.binomial(BATCH, risk, runs) / BATCH
 
 
 def fixed_rule(batch_mean: np.ndarray) -> np.ndarray:
-    """The existing rule: loss above `R_REF` by more than 10 percent."""
+    """The existing rule: loss above `R_REF` by more than 10 percent.
+
+    Args:
+        batch_mean: Batch mean losses.
+
+    Returns:
+        A boolean array, True where the mean exceeds
+        `R_REF * (1 + performance_tolerance)`.
+    """
     tolerance = monitor_module.MonitoringThresholds().performance_tolerance
     return batch_mean > R_REF * (1.0 + tolerance)
 
 
 def gate_h1(replicates: int, base: int = 0) -> dict[str, Any]:
-    """L1 false alarm at the stable risk and on the null's boundary."""
+    """False alarm at the stable risk and on the null's boundary.
+
+    Args:
+        replicates: Number of streams.
+        base: Seed of the random generator.
+
+    Returns:
+        For the stable and the boundary risk, the alarm rate of the
+        sequential test with its bound and the alarm rate of the fixed
+        rule, and `passed`.
+    """
     out: dict[str, Any] = {"replicates": replicates, "batches": T_FALSE_ALARM}
     for name, risk in (("stable", R_REF), ("boundary", R_REF + DELTA)):
         rng = np.random.default_rng(base)
@@ -156,7 +206,20 @@ def gate_h1(replicates: int, base: int = 0) -> dict[str, Any]:
 def detection(
     replicates: int, risk: float, pre: int, horizon: int, base: int
 ) -> dict[str, Any]:
-    """Batches from an abrupt change to the first L1 alarm."""
+    """Batches from an abrupt change to the first alarm.
+
+    Args:
+        replicates: Number of streams.
+        risk: Loss rate after the change.
+        pre: Batches at the reference risk before the change.
+        horizon: Batches after the change.
+        base: Seed of the random generator.
+
+    Returns:
+        The risk, the share detected, the share detected within `D_MAX` with
+        its lower bound, and the median delay of the sequential test and of
+        the fixed rule (None when none was detected).
+    """
     rng = np.random.default_rng(base)
     monitor = seq.MixtureTest(
         np.full(replicates, R_REF + DELTA), seq.GREATER, ALPHA_ALARM
@@ -191,7 +254,15 @@ def detection(
 
 
 def gate_h2(replicates: int, base: int = 0) -> dict[str, Any]:
-    """L1 detection delay."""
+    """Detection delay.
+
+    Args:
+        replicates: Number of streams.
+        base: Seed of the random generator.
+
+    Returns:
+        The `detection` result for each rise factor, `d_max` and `passed`.
+    """
     rows: dict[str, Any] = {}
     for factor in (1.5, 2.0, 3.0):
         rows[str(factor)] = detection(
@@ -206,7 +277,16 @@ def gate_h2(replicates: int, base: int = 0) -> dict[str, Any]:
 
 
 def gate_h3(replicates: int, base: int = 0) -> dict[str, Any]:
-    """Covariate-only shift: the loss monitor stays quiet, PSI does not."""
+    """Covariate-only shift: the loss monitor stays quiet, PSI does not.
+
+    Args:
+        replicates: Number of streams.
+        base: Seed offset.
+
+    Returns:
+        The retrain-trigger rate with its bound, the rate at which the PSI
+        rule flags the shift and `passed`.
+    """
     trigger = 0
     psi_flag = 0
     for index in range(replicates):
@@ -257,6 +337,15 @@ def sequence_gaps(
     `base - advantage`. So every challenger has the champion's error rate
     minus its advantage (a true null has exactly the champion's rate and a
     noisy, mean-zero gap), and the challengers are dependent through `u`.
+
+    Args:
+        rng: Random generator.
+        advantages: True advantage of each challenger.
+        batches: Number of batches.
+        base: Champion error rate.
+
+    Returns:
+        The mean loss difference per batch for every challenger.
     """
     latent = rng.random((batches, BATCH))
     count = len(advantages)
@@ -270,7 +359,14 @@ def sequence_gaps(
 
 
 def eprocess_paths(gaps: np.ndarray) -> np.ndarray:
-    """Log-capital paths of paired processes for rows of batch gaps."""
+    """Log-capital paths of paired processes for rows of batch gaps.
+
+    Args:
+        gaps: Batch mean gaps, shape (challengers, batches).
+
+    Returns:
+        The log capital after each batch, same shape.
+    """
     count, batches = gaps.shape
     test = seq.MixtureTest(
         np.full(count, (DELTA_PROMO + 1.0) / 2.0), seq.GREATER, ALPHA_PROMO
@@ -283,7 +379,15 @@ def eprocess_paths(gaps: np.ndarray) -> np.ndarray:
 
 
 def elond_decisions(paths: np.ndarray, horizon: int) -> np.ndarray:
-    """Replays the loop's rule: heads are decided in order by e-LOND."""
+    """Replays the loop's rule: heads are decided in order by e-LOND.
+
+    Args:
+        paths: Log-capital paths, shape (challengers, batches).
+        horizon: Number of batches.
+
+    Returns:
+        A boolean array, True for each promoted challenger.
+    """
     sequence = seq.PromotionSequence("1/20")
     rejected = np.zeros(paths.shape[0], dtype=bool)
     pointer = 0
@@ -309,6 +413,13 @@ def bootstrap_rule(gaps: np.ndarray, rng: np.random.Generator) -> np.ndarray:
     which the 2.5 percent bootstrap quantile of the mean gap is above zero.
     The batch gaps are multiples of 1/50 and are resampled as cases through
     their counts (a multinomial over the observed gap values).
+
+    Args:
+        gaps: Batch mean gaps, shape (challengers, batches).
+        rng: Random generator.
+
+    Returns:
+        A boolean array, True for each promoted challenger.
     """
     count, batches = gaps.shape
     promoted = np.zeros(count, dtype=bool)
@@ -331,7 +442,17 @@ def bootstrap_rule(gaps: np.ndarray, rng: np.random.Generator) -> np.ndarray:
 
 
 def gate_h4(replicates: int, base: int = 0) -> dict[str, Any]:
-    """False promotion over dependent challenger sequences."""
+    """False promotion over dependent challenger sequences.
+
+    Args:
+        replicates: Number of sequences.
+        base: Seed offset.
+
+    Returns:
+        The design, the false-discovery rate and power of e-LOND (with the
+        standard error) and of the bootstrap rule, whether the bootstrap
+        rule exceeds the level, and `passed`.
+    """
     count, batches, base_risk, better = 200, 150, 0.30, 0.20
     fdp: list[float] = []
     power: list[float] = []
@@ -376,7 +497,16 @@ def gate_h4(replicates: int, base: int = 0) -> dict[str, Any]:
 
 
 def gate_h5(replicates: int, base: int = 0) -> dict[str, Any]:
-    """Rollback: false rollback at no difference, power at worse champions."""
+    """Rollback: false rollback at no difference, power at worse champions.
+
+    Args:
+        replicates: Number of streams.
+        base: Seed of the random generator.
+
+    Returns:
+        For each degradation of the champion (0, 1 and 2 times `DELTA_RB`)
+        the rollback rate and median delay, and `passed`.
+    """
     rows: dict[str, Any] = {}
     for name, factor in (("0", 0.0), ("1", 1.0), ("2", 2.0)):
         rng = np.random.default_rng(base)
@@ -407,7 +537,15 @@ def gate_h5(replicates: int, base: int = 0) -> dict[str, Any]:
 
 
 def mar_stream(seed: int, batches: int = 120) -> streams.Stream:
-    """A MAR stream whose loss depends on the selecting covariate."""
+    """A MAR stream whose loss depends on the selecting covariate.
+
+    Args:
+        seed: Stream seed.
+        batches: Number of batches.
+
+    Returns:
+        The simulated stream.
+    """
     return streams.simulate(
         streams.StreamSpec(
             labels="mar",
@@ -422,7 +560,16 @@ def mar_stream(seed: int, batches: int = 120) -> streams.Stream:
 
 
 def run_mnar_loop(seed: int) -> dict[str, Any]:
-    """A rise on an MNAR stream without an audit slice, through the loop."""
+    """A rise on an MNAR stream without an audit slice, through the loop.
+
+    Args:
+        seed: Stream seed.
+
+    Returns:
+        The number of retrain, promotion-proposal and rollback-proposal
+        entries in the ledger, whether the loop tiers the stream
+        `unverified`, and whether the ledger halted.
+    """
     stream = streams.simulate(
         streams.StreamSpec(
             kind="abrupt",
@@ -477,7 +624,17 @@ def run_mnar_loop(seed: int) -> dict[str, Any]:
 
 
 def gate_h6(replicates: int, base: int = 0) -> dict[str, Any]:
-    """Selection correction with logged propensity; MNAR without a slice."""
+    """Selection correction with logged propensity; MNAR without a slice.
+
+    Args:
+        replicates: Number of streams (at most 300 are run).
+        base: Seed offset.
+
+    Returns:
+        The bias of the weighted estimator and its standard error, the bias
+        of the naive mean, the time-uniform coverage of the confidence
+        sequence and its floor, the MNAR results and `passed`.
+    """
     runs = min(replicates, 300)
     weighted, naive, truth, covered = [], [], [], 0
     for index in range(runs):
@@ -535,7 +692,16 @@ def gate_h6(replicates: int, base: int = 0) -> dict[str, Any]:
 
 
 def gate_h7(replicates: int, base: int = 0) -> dict[str, Any]:
-    """Maturity by prediction time against arrival time."""
+    """Maturity by prediction time against arrival time.
+
+    Args:
+        replicates: Number of streams.
+        base: Seed offset.
+
+    Returns:
+        The bias and standard error of the maturity-based and of the
+        arrival-based estimates, and `passed`.
+    """
     now, window, slow, base_risk = 150, 2, 6, 0.2
     by_prediction, by_arrival = [], []
     for index in range(replicates):
@@ -574,7 +740,17 @@ def gate_h7(replicates: int, base: int = 0) -> dict[str, Any]:
 
 
 def gate_h8(replicates: int, base: int = 0) -> dict[str, Any]:
-    """Feedback detection by the bypass slice."""
+    """Feedback detection by the bypass slice.
+
+    Args:
+        replicates: Number of worlds per case (at most 100 are run).
+        base: Seed offset.
+
+    Returns:
+        The detection rate for the loop-free world and for bypass shares of
+        0.05, 0.10 and 0.20, the false-detection bound, the verdict without
+        a bypass slice and `passed`.
+    """
     runs = min(replicates, 100)
     results: dict[str, Any] = {}
     for name, gamma, bypass in (
@@ -614,7 +790,17 @@ def gate_h8(replicates: int, base: int = 0) -> dict[str, Any]:
 
 
 def gate_h9(replicates: int, base: int = 0) -> dict[str, Any]:
-    """The selected threshold violates the target risk with prob <= delta."""
+    """The selected threshold violates the target risk with prob <= delta.
+
+    Args:
+        replicates: Number of calibration sets (at most 1000 are run).
+        base: Seed offset.
+
+    Returns:
+        The violation rate and bound, the naive best-cut violation rate, the
+        rate at which everything escalates, the mean coverage at the chosen
+        threshold, the oracle threshold and coverage, and `passed`.
+    """
     runs = min(replicates, 1000)
     violations, naive_violations, coverage_values, infinite = 0, 0, [], 0
     grid = np.linspace(1.0, 0.0, escalation.DEFAULT_GRID)
@@ -651,7 +837,17 @@ def gate_h9(replicates: int, base: int = 0) -> dict[str, Any]:
 
 
 def gate_h10(replicates: int, base: int = 0) -> dict[str, Any]:
-    """Selective-risk alarm after a rise of the answered cases' risk."""
+    """Selective-risk alarm after a rise of the answered cases' risk.
+
+    Args:
+        replicates: Number of streams.
+        base: Seed of the random generator.
+
+    Returns:
+        For rises to 2 and 3 times `R_STAR` the detection within `D_MAX`
+        with its lower bound and the delays, the coverage after a halt and
+        `passed`.
+    """
     rows: dict[str, Any] = {}
     for name, level in (("r_star_x_2", 2 * R_STAR), ("r_star_x_3", 3 * R_STAR)):
         rng = np.random.default_rng(base)
@@ -705,7 +901,11 @@ RUNNERS = {
 
 
 def sources() -> dict[str, list[Any]]:
-    """Code each gate rests on (hashed so a change makes it stale)."""
+    """Code each gate rests on (hashed so a change makes it stale).
+
+    Returns:
+        Mapping of gate key to the functions its certificate covers.
+    """
     return {
         "H1": [seq.MixtureTest, fixed_rule, batch_means, gate_h1],
         "H2": [seq.MixtureTest, fixed_rule, detection, gate_h2],
@@ -748,12 +948,22 @@ def sources() -> dict[str, list[Any]]:
 
 
 def current_digests() -> dict[str, str]:
-    """Code hash of every gate."""
+    """Code hash of every gate.
+
+    Returns:
+        Mapping of gate key to its current code hash.
+    """
     return {k: certificates.code_hash(*v) for k, v in sources().items()}
 
 
 def certify_all() -> dict[str, Any]:
-    """Runs every gate on certification seeds."""
+    """Runs every gate on certification seeds.
+
+    Returns:
+        The certificate document: version, development seed base, simulator
+        hash, charter inputs, what was not measured and, per gate, the
+        measurement with its code hash and seed range.
+    """
     document: dict[str, Any] = {
         "version": 1,
         "dev_seed_base": DEV_SEED_BASE,
@@ -785,7 +995,17 @@ def certify_all() -> dict[str, Any]:
 
 
 def problems(document: dict[str, Any] | None = None) -> list[str]:
-    """Why the stored certificates cannot be trusted (empty when current)."""
+    """Why the stored certificates cannot be trusted (empty when current).
+
+    Args:
+        document: The certificate document; read from `STORE_PATH` when
+            None.
+
+    Returns:
+        Messages for a missing file, a changed simulator, a gate without a
+        certificate and a gate whose code hash differs from the current
+        code.
+    """
     if document is None:
         if not STORE_PATH.exists():
             return ["loop_certificates.json is missing"]
@@ -804,12 +1024,28 @@ def problems(document: dict[str, Any] | None = None) -> list[str]:
 
 
 def passed_gates(document: dict[str, Any]) -> list[str]:
-    """Gates that met their pre-registered floors."""
+    """Gates that met their pre-registered floors.
+
+    Args:
+        document: The certificate document.
+
+    Returns:
+        The keys of gates whose `passed` is true.
+    """
     return [k for k, v in document["gates"].items() if v["passed"]]
 
 
 def descriptive_only(document: dict[str, Any] | None = None) -> list[str]:
-    """Gates that missed their floors; their rules stay descriptive."""
+    """Gates that missed their floors; their rules stay descriptive.
+
+    Args:
+        document: The certificate document; read from `STORE_PATH` when
+            None.
+
+    Returns:
+        The keys of gates that did not pass; every gate when the file is
+        missing.
+    """
     if document is None:
         if not STORE_PATH.exists():
             return list(GATES)
@@ -818,7 +1054,12 @@ def descriptive_only(document: dict[str, Any] | None = None) -> list[str]:
 
 
 def check() -> dict[str, Any]:
-    """The `--check loop` result."""
+    """The `--check loop` result.
+
+    Returns:
+        `ok`, the problems, the descriptive-only gates (empty when there are
+        problems) and what was not measured.
+    """
     issues = problems()
     return {
         "ok": not issues,
@@ -829,7 +1070,15 @@ def check() -> dict[str, Any]:
 
 
 def main(arguments: list[str] | None = None) -> int:
-    """Writes or checks the certificate file."""
+    """Writes or checks the certificate file.
+
+    Args:
+        arguments: Command-line arguments; `None` reads `sys.argv`.
+
+    Returns:
+        0 after `--write`, `--gate`, or a check without problems; 1 when the
+        check finds problems.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--write", action="store_true")

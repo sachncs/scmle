@@ -46,13 +46,28 @@ class DefectPlan:
 
 
 def frame_digest(frame: pd.DataFrame) -> str:
-    """SHA-256 of a table's values, independent of library hash functions."""
+    """SHA-256 of a table's values, independent of library hash functions.
+
+    Args:
+        frame: The table, hashed through its CSV text with its index.
+
+    Returns:
+        The hex digest.
+    """
     text = frame.to_csv(index=True, float_format=CSV_FLOAT_FORMAT)
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def flags_for(detector: Detector, frame: pd.DataFrame, what: str) -> pd.Series:
     """Runs a detector and checks that it returned one boolean per row.
+
+    Args:
+        detector: Maps a frame to one boolean flag per row.
+        frame: The data to run the detector on.
+        what: Description of the data, used in the error message.
+
+    Returns:
+        The detector's flags, a boolean Series with the index of `frame`.
 
     Raises:
         ValueError: If the output is not a boolean Series aligned to `frame`.

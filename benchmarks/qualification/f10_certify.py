@@ -1,4 +1,4 @@
-"""Measured gates for the F10 causal identification methods (canon P1).
+"""Measured gates for the causal identification methods.
 
 Every floor below is fixed in this file before the first run and is not
 retuned: a gate that misses is filed as measured and `passed` is false, so
@@ -6,8 +6,8 @@ that method is descriptive and cannot count toward a `confirmed` claim.
 Certification seeds are `0 .. replicates - 1`; development looks use seeds
 from `DEV_SEED_BASE`, which never overlap. Intervals are Wilson 95 percent.
 
-All worlds are simulated (`f10_generators`), including their covariates; the
-plan's real-covariate worlds, the NSW and STAR gold standards, the frozen
+All worlds are simulated (`f10_generators`), including their covariates;
+real-covariate worlds, the NSW and STAR gold standards, the frozen
 `rdrobust`/`sensemakr`/`EValue`/`did`/`HonestDiD` reference outputs and the
 outside-party replication need data or tools this repository does not have
 (`NOT_MEASURED`). Real data may violate every assumption made here.
@@ -120,12 +120,30 @@ NOT_MEASURED = (
 
 
 def stream(base: int, index: int, which: int = 0) -> np.random.Generator:
-    """Independent random stream for one replicate."""
+    """Independent random stream for one replicate.
+
+    Args:
+        base: Seed offset of the run (0 for certification).
+        index: Replicate number.
+        which: Distinguishes the streams drawn within one replicate.
+
+    Returns:
+        A generator seeded with `[base + index, which]`.
+    """
     return np.random.default_rng([base + index, which])
 
 
 def rate(hits: int, n: int) -> dict[str, Any]:
-    """A proportion with its Wilson 95 percent interval."""
+    """A proportion with its Wilson 95 percent interval.
+
+    Args:
+        hits: Number of successes.
+        n: Number of trials.
+
+    Returns:
+        The counts, their ratio under `rate` and the interval as
+        `[low, high]` under `wilson`.
+    """
     low, high = certificates.wilson_interval(hits, n, 0.95)
     return {
         "hits": int(hits),
@@ -138,7 +156,18 @@ def rate(hits: int, n: int) -> dict[str, Any]:
 def coverage_row(
     covered: list[bool], z: list[float] | None = None
 ) -> dict[str, Any]:
-    """Coverage with its interval and the mean standardised error."""
+    """Coverage with its interval and the mean standardised error.
+
+    Args:
+        covered: Whether each replicate's interval covered the truth.
+        z: Standardised error `(estimate - truth) / se` of each replicate,
+            or None when it does not apply; non-finite values are skipped.
+
+    Returns:
+        The `rate` row plus `meets_floor` (Wilson lower bound at least
+        `COVERAGE_FLOOR`) and, when `z` is given, `mean_z` and whether it is
+        within 0.1 of zero.
+    """
     row = rate(sum(covered), len(covered))
     row["meets_floor"] = row["wilson"][0] >= COVERAGE_FLOOR
     if z is not None:
@@ -149,19 +178,45 @@ def coverage_row(
 
 
 def passes(row: dict[str, Any]) -> bool:
-    """Whether a coverage row meets its floors."""
+    """Whether a coverage row meets its floors.
+
+    Args:
+        row: A row from `coverage_row`.
+
+    Returns:
+        True if the coverage floor is met and, when present, the mean
+        standardised error is within 0.1.
+    """
     return bool(row["meets_floor"] and row.get("z_within_0.1", True))
 
 
 def alarm_bound(alpha: float, replicates: int) -> float:
-    """Largest false-alarm rate accepted for `alpha` at `replicates`."""
+    """Largest false-alarm rate accepted for `alpha` at `replicates`.
+
+    Args:
+        alpha: Nominal false-alarm level.
+        replicates: Number of replicates the rate is observed over.
+
+    Returns:
+        ``alpha + 2 * sqrt(alpha * (1 - alpha) / replicates)``.
+    """
     return alpha + 2 * math.sqrt(alpha * (1 - alpha) / replicates)
 
 
 def power_curve(
     grid: list[float], hits: dict[float, tuple[int, int]]
 ) -> dict[str, Any]:
-    """Power by planted size and the smallest size with Wilson lower >= 0.8."""
+    """Power by planted size and the smallest size with Wilson lower >= 0.8.
+
+    Args:
+        grid: Planted sizes; 0 is the no-violation world.
+        hits: Mapping of each size to (flagged, replicates).
+
+    Returns:
+        The curve (a `rate` row per size) and `delta_min`, the smallest
+        positive size whose Wilson lower bound is at least 0.8 (None if
+        none).
+    """
     curve = {}
     delta_min = None
     for delta in grid:
@@ -179,6 +234,19 @@ def alarm_gate(
     """False-alarm rate at 0 and power over the grid for one detector.
 
     `detect(delta, rng_x, rng_c)` returns True when the test flags.
+
+    Args:
+        detect: The detector, called with the planted size and two
+            generators (exploration and confirmation).
+        grid: Planted sizes, including 0.
+        replicates: Replicates at size 0; other sizes use a quarter (at
+            least 100).
+        base: Seed offset.
+
+    Returns:
+        The false-alarm level, rate and bound, the power curve, `delta_min`
+        and `passed` (false alarms within the bound and some size reaching
+        power 0.8).
     """
     hits: dict[float, tuple[int, int]] = {}
     for delta in grid:
@@ -202,7 +270,16 @@ def alarm_gate(
 
 # ---------------------------------------------------------------- selector
 def gate_selector(replicates: int, base: int = 0) -> dict[str, Any]:
-    """Refusal and non-refusal over generated charters."""
+    """Refusal and non-refusal over generated charters.
+
+    Args:
+        replicates: Number of charters of each kind.
+        base: Seed offset (0 for certification).
+
+    Returns:
+        The refusal rate when no strategy is eligible, the acceptance rate
+        when one is, and `passed`.
+    """
     covariates = "unconfoundedness_given:x0,x1"
     fields: dict[str, Any] = {
         "unit": "id",
@@ -215,6 +292,16 @@ def gate_selector(replicates: int, base: int = 0) -> dict[str, Any]:
     names = list(select.STRATEGIES)
 
     def build(rng: np.random.Generator, eligible: bool) -> causal.CausalSpec:
+        """A charter for a random strategy, made ineligible when asked.
+
+        Args:
+            rng: Random generator.
+            eligible: Whether to keep every assumption and design field.
+
+        Returns:
+            The causal specification; when not eligible, one assumption word or
+            one design field is dropped at random.
+        """
         name = names[int(rng.integers(len(names)))]
         strategy = select.STRATEGIES[name]
         words = [
@@ -270,7 +357,20 @@ def aipw_world(
     runs: int,
     base: int,
 ) -> tuple[str, dict[str, Any]]:
-    """Coverage of one AIPW configuration."""
+    """Coverage of one AIPW configuration.
+
+    Args:
+        name: Label of the configuration.
+        estimand: `ATE` or `ATT`.
+        learner: Nuisance learner, `linear` or `boosted`.
+        nonlinear: Whether the outcome surface is nonlinear.
+        runs: Number of replicates.
+        base: Seed offset.
+
+    Returns:
+        The label and the coverage row of the 95 percent interval for the
+        true effect 2.0.
+    """
     covered, z = [], []
     cols = tuple(f"x{j}" for j in range(worlds.COVARIATES))
     for i in range(runs):
@@ -284,7 +384,16 @@ def aipw_world(
 
 
 def gate_coverage_aipw(replicates: int, base: int = 0) -> dict[str, Any]:
-    """Coverage of the AIPW interval in three worlds."""
+    """Coverage of the AIPW interval in three worlds.
+
+    Args:
+        replicates: Replicates for the linear worlds; the boosted world
+            uses a quarter (at least 50).
+        base: Seed offset (0 for certification).
+
+    Returns:
+        The coverage row of each world and `passed`.
+    """
     boosted = max(replicates // 4, 50)
     rows = dict(
         [
@@ -300,7 +409,15 @@ def gate_coverage_aipw(replicates: int, base: int = 0) -> dict[str, Any]:
 
 
 def gate_coverage_randomized(replicates: int, base: int = 0) -> dict[str, Any]:
-    """Coverage of the difference in means."""
+    """Coverage of the difference in means.
+
+    Args:
+        replicates: Number of replicates.
+        base: Seed offset (0 for certification).
+
+    Returns:
+        The coverage row and `passed`.
+    """
     covered = []
     for i in range(replicates):
         frame = worlds.randomized(stream(base, i), 800)
@@ -311,7 +428,16 @@ def gate_coverage_randomized(replicates: int, base: int = 0) -> dict[str, Any]:
 
 
 def gate_coverage_did(replicates: int, base: int = 0) -> dict[str, Any]:
-    """Coverage of the group-time ATT, one group and staggered."""
+    """Coverage of the group-time ATT, one group and staggered.
+
+    Args:
+        replicates: Replicates for the single-group world; the staggered
+            world uses half (at least 50).
+        base: Seed offset (0 for certification).
+
+    Returns:
+        The coverage row of each world and `passed`.
+    """
     rows = {}
     for name, second, runs in (
         ("single_group", False, replicates),
@@ -331,7 +457,15 @@ def gate_coverage_did(replicates: int, base: int = 0) -> dict[str, Any]:
 
 
 def gate_coverage_iv(replicates: int, base: int = 0) -> dict[str, Any]:
-    """Coverage of the headline set with a strong instrument."""
+    """Coverage of the headline set with a strong instrument.
+
+    Args:
+        replicates: Number of replicates.
+        base: Seed offset (0 for certification).
+
+    Returns:
+        The coverage row, the number of weak-instrument flags and `passed`.
+    """
     covered = []
     weak = 0
     for i in range(replicates):
@@ -343,7 +477,15 @@ def gate_coverage_iv(replicates: int, base: int = 0) -> dict[str, Any]:
 
 
 def gate_coverage_rd(replicates: int, base: int = 0) -> dict[str, Any]:
-    """Coverage of the bias-corrected interval."""
+    """Coverage of the bias-corrected interval.
+
+    Args:
+        replicates: Number of replicates.
+        base: Seed offset (0 for certification).
+
+    Returns:
+        The coverage row and `passed`.
+    """
     covered, z = [], []
     for i in range(replicates):
         out = rd.estimate(
@@ -356,7 +498,16 @@ def gate_coverage_rd(replicates: int, base: int = 0) -> dict[str, Any]:
 
 
 def gate_iv_strength(replicates: int, base: int = 0) -> dict[str, Any]:
-    """Weak-instrument handling: AR coverage, flag recall, false flags."""
+    """Weak-instrument handling: AR coverage, flag recall, false flags.
+
+    Args:
+        replicates: Number of replicates in each world.
+        base: Seed offset (0 for certification).
+
+    Returns:
+        The headline coverage and weak-flag recall in the weak world, the
+        false weak flags in the strong world and `passed`.
+    """
     covered, flagged = [], 0
     for i in range(replicates):
         out = iv.estimate(worlds.iv(stream(base, i), 300, 0.08), "d", "y", "z")
@@ -382,7 +533,17 @@ def gate_iv_strength(replicates: int, base: int = 0) -> dict[str, Any]:
 
 
 def gate_size_synth(replicates: int, base: int = 0) -> dict[str, Any]:
-    """Rejection rate of placebo-in-space with no effect."""
+    """Rejection rate of placebo-in-space with no effect.
+
+    Args:
+        replicates: Scales the number of replicates (a quarter, at least
+            100).
+        base: Seed offset (0 for certification).
+
+    Returns:
+        The size with its bound, the power at an effect of 3 over 60
+        replicates and `passed`.
+    """
     runs = max(replicates // 4, 100)
     rejected = 0
     for i in range(runs):
@@ -408,7 +569,18 @@ def gate_size_synth(replicates: int, base: int = 0) -> dict[str, Any]:
 
 
 def gate_overlap(replicates: int, base: int = 0) -> dict[str, Any]:
-    """False refusals, recall and coverage curves over planted overlap."""
+    """False refusals, recall and coverage curves over planted overlap.
+
+    Args:
+        replicates: Scales the number of replicates per setting (a quarter,
+            at least 100).
+        base: Seed offset (0 for certification).
+
+    Returns:
+        Per minimum propensity the gate-fire rate, coverage, mean estimated
+        minimum propensity and effective sample size share; the worst false
+        refusal rate and worst recall bound; and `passed`.
+    """
     runs = max(replicates // 4, 100)
     cols = tuple(f"x{j}" for j in range(worlds.COVARIATES))
     curves: dict[str, dict[str, Any]] = {}
@@ -450,10 +622,29 @@ def gate_overlap(replicates: int, base: int = 0) -> dict[str, Any]:
 
 # ----------------------------------------------------------------- battery
 def gate_battery_nco(replicates: int, base: int = 0) -> dict[str, Any]:
-    """Negative-control outcome against a shared hidden confounder."""
+    """Negative-control outcome against a shared hidden confounder.
+
+    Args:
+        replicates: Replicates at the no-violation size.
+        base: Seed offset (0 for certification).
+
+    Returns:
+        The `alarm_gate` result over confounder strengths 0 to 0.8.
+    """
     cols = tuple(f"x{j}" for j in range(worlds.COVARIATES))
 
     def detect(delta: float, rx: Any, rc: Any) -> bool:
+        """Whether the negative-control test flags a world.
+
+        Args:
+            delta: Strength of the shared hidden confounder.
+            rx: Generator for the exploration sample.
+            rc: Generator for the confirmation sample.
+
+        Returns:
+            True if the falsification battery on the negative-control outcome
+            fails.
+        """
         x = worlds.backdoor(
             rx, 1000, hidden_d=delta, hidden_y=delta, hidden_nco=delta
         )
@@ -471,9 +662,27 @@ def gate_battery_nco(replicates: int, base: int = 0) -> dict[str, Any]:
 
 
 def gate_battery_pretrend(replicates: int, base: int = 0) -> dict[str, Any]:
-    """Pre-period Wald test against a differential linear trend."""
+    """Pre-period Wald test against a differential linear trend.
+
+    Args:
+        replicates: Replicates at the no-violation size.
+        base: Seed offset (0 for certification).
+
+    Returns:
+        The `alarm_gate` result over trends 0 to 0.3 per period.
+    """
 
     def detect(delta: float, rx: Any, rc: Any) -> bool:
+        """Whether the pre-trend test flags a world.
+
+        Args:
+            delta: Differential linear trend per period.
+            rx: Generator for the panel.
+            rc: Unused.
+
+        Returns:
+            True if the falsification battery on the pre-trend p-value fails.
+        """
         frame = worlds.panel(rx, 150, 150, drift=delta)
         out = did.estimate(frame, "id", "t", "g", "y")
         test = battery.Test("pretrend", "placebo", float(out.pretrend_p or 1.0))
@@ -485,9 +694,27 @@ def gate_battery_pretrend(replicates: int, base: int = 0) -> dict[str, Any]:
 
 
 def gate_density_rd(replicates: int, base: int = 0) -> dict[str, Any]:
-    """Binomial density check against sorting across the cutoff."""
+    """Binomial density check against sorting across the cutoff.
+
+    Args:
+        replicates: Replicates at the no-violation size.
+        base: Seed offset (0 for certification).
+
+    Returns:
+        The `alarm_gate` result over sorting shares 0 to 0.7.
+    """
 
     def detect(delta: float, rx: Any, rc: Any) -> bool:
+        """Whether the density check flags a world.
+
+        Args:
+            delta: Share of units just below the cutoff that move above it.
+            rx: Generator for the world.
+            rc: Unused.
+
+        Returns:
+            True if the density p-value is below `ALPHA_FALSIFY`.
+        """
         out = rd.estimate(
             worlds.discontinuity(rx, 1500, sorting=delta), "x", "y", 0.0
         )
@@ -497,9 +724,29 @@ def gate_density_rd(replicates: int, base: int = 0) -> dict[str, Any]:
 
 
 def gate_battery_rd(replicates: int, base: int = 0) -> dict[str, Any]:
-    """Placebo cutoffs and covariate balance against a covariate jump."""
+    """Placebo cutoffs and covariate balance against a covariate jump.
+
+    Args:
+        replicates: Scales the replicates at the no-violation size (half,
+            at least 200).
+        base: Seed offset (0 for certification).
+
+    Returns:
+        The `alarm_gate` result over covariate jumps 0 to 0.5.
+    """
 
     def detect(delta: float, rx: Any, rc: Any) -> bool:
+        """Whether the placebo and balance tests flag a world.
+
+        Args:
+            delta: Jump of the predetermined covariate at the cutoff.
+            rx: Generator for the world.
+            rc: Unused.
+
+        Returns:
+            True if the falsification battery over the placebo cutoffs and the
+            covariate balance fails.
+        """
         out = rd.estimate(
             worlds.discontinuity(rx, 1500, jump=delta),
             "x",
@@ -525,7 +772,18 @@ def gate_battery_rd(replicates: int, base: int = 0) -> dict[str, Any]:
 def sensitivity_world(
     rng: np.random.Generator, n: int, multiple: float
 ) -> pd.DataFrame:
-    """Hidden `u` at `multiple` times the strongest covariate's strength."""
+    """Hidden `u` at `multiple` times the strongest covariate's strength.
+
+    Args:
+        rng: Random generator.
+        n: Number of rows.
+        multiple: Strength of the hidden confounder relative to the
+            strongest observed covariate.
+
+    Returns:
+        A frame with covariates `x0`..`x2`, treatment `d` and outcome `y`
+        (true effect 1.0).
+    """
     x = rng.standard_normal((n, 3))
     u = rng.standard_normal(n)
     d = (
@@ -547,7 +805,17 @@ def sensitivity_world(
 
 
 def gate_sensitivity_bound(replicates: int, base: int = 0) -> dict[str, Any]:
-    """Coverage of the benchmarked interval inside, at and beyond the bound."""
+    """Coverage of the benchmarked interval inside, at and beyond the bound.
+
+    Args:
+        replicates: Scales the replicates (half, at least 200).
+        base: Seed offset (0 for certification).
+
+    Returns:
+        For hidden confounders at half, once and twice the benchmark, the
+        coverage and the share of runs where the claim still holds, and
+        `passed` (the inside-the-benchmark coverage floor).
+    """
     runs = max(replicates // 2, 200)
     rows = {}
     for name, multiple in (
@@ -576,7 +844,16 @@ def gate_sensitivity_bound(replicates: int, base: int = 0) -> dict[str, Any]:
 
 
 def gate_sensitivity_did(replicates: int, base: int = 0) -> dict[str, Any]:
-    """Coverage of the relative-magnitudes interval under a linear trend."""
+    """Coverage of the relative-magnitudes interval under a linear trend.
+
+    Args:
+        replicates: Scales the replicates (a quarter, at least 100).
+        base: Seed offset (0 for certification).
+
+    Returns:
+        The coverage rows of the sensitivity interval at M = 1 and of the
+        plain interval, the drift and `passed`.
+    """
     runs = max(replicates // 4, 100)
     covered_m1, covered_m0 = [], []
     for i in range(runs):
@@ -597,7 +874,17 @@ def gate_sensitivity_did(replicates: int, base: int = 0) -> dict[str, Any]:
 
 # ------------------------------------------------------------ false confirm
 def confirm_world(kind: str, runs: int, base: int) -> dict[str, Any]:
-    """Share of end-to-end runs that reach `confirmed` in one world."""
+    """Share of end-to-end runs that reach `confirmed` in one world.
+
+    Args:
+        kind: `shared_confounder`, `unshared_confounder` or `clean`.
+        runs: Number of end-to-end runs.
+        base: Seed offset.
+
+    Returns:
+        The rate of runs whose claim tier is `confirmed` and of those whose
+        tier is `attested`.
+    """
     knobs: dict[str, Any] = {
         "shared_confounder": {"hidden_d": 0.8, "hidden_y": 0.8},
         "unshared_confounder": {
@@ -664,7 +951,17 @@ GATES_FOR_RUN = tuple(
 
 
 def gate_false_confirm(replicates: int, base: int = 0) -> dict[str, Any]:
-    """The tier rule end to end against shared and unshared confounding."""
+    """The tier rule end to end against shared and unshared confounding.
+
+    Args:
+        replicates: Scales the runs per world (a sixth, at least 100).
+        base: Seed offset (0 for certification).
+
+    Returns:
+        The confirmation rates in the three worlds, a note and `passed`
+        (shared-confounder confirmation within 0.05 with Wilson upper bound
+        at most 0.08).
+    """
     runs = max(replicates // 6, 100)
     rows = {
         kind: confirm_world(kind, runs, base)
@@ -703,7 +1000,12 @@ RUNNERS = {
 
 
 def runner_objects() -> dict[str, list[Any]]:
-    """Harness code each gate rests on, besides the package methods."""
+    """Harness code each gate rests on, besides the package methods.
+
+    Returns:
+        Mapping of gate name to the runner, the generators and the shared
+        helpers.
+    """
     return {
         name: [entry[0], worlds, alarm_gate, coverage_row, rate]
         for name, entry in RUNNERS.items()
@@ -711,7 +1013,11 @@ def runner_objects() -> dict[str, list[Any]]:
 
 
 def current_digests() -> dict[str, dict[str, str]]:
-    """Method and harness hashes of every gate."""
+    """Method and harness hashes of every gate.
+
+    Returns:
+        Mapping of gate name to its `method_hash` and `code_hash`.
+    """
     methods = certified.method_hashes()
     harness = runner_objects()
     return {
@@ -726,7 +1032,16 @@ def current_digests() -> dict[str, dict[str, str]]:
 
 
 def certify_all(only: tuple[str, ...] = ()) -> dict[str, Any]:
-    """Runs the gates on certification seeds."""
+    """Runs the gates on certification seeds.
+
+    Args:
+        only: Names of the gates to run; all when empty.
+
+    Returns:
+        The certificate document: version, development seed base, what was
+        not measured and, per gate, the measurement with its hashes and seed
+        range.
+    """
     document: dict[str, Any] = {
         "version": 1,
         "dev_seed_base": DEV_SEED_BASE,
@@ -746,14 +1061,27 @@ def certify_all(only: tuple[str, ...] = ()) -> dict[str, Any]:
 
 
 def load() -> dict[str, Any] | None:
-    """The stored certificates, or None."""
+    """The stored certificates, or None.
+
+    Returns:
+        The parsed certificate file, or None when it does not exist.
+    """
     if not STORE_PATH.exists():
         return None
     return json.loads(STORE_PATH.read_text(encoding="utf-8"))
 
 
 def problems(document: dict[str, Any] | None = None) -> list[str]:
-    """Why the stored certificates cannot be trusted (empty when current)."""
+    """Why the stored certificates cannot be trusted (empty when current).
+
+    Args:
+        document: The certificate document; loaded from `STORE_PATH` when
+            None.
+
+    Returns:
+        Messages for a missing file, a gate without a certificate and a
+        gate whose code hash differs from the current code.
+    """
     if document is None:
         document = load()
         if document is None:
@@ -770,7 +1098,16 @@ def problems(document: dict[str, Any] | None = None) -> list[str]:
 
 
 def descriptive_only(document: dict[str, Any] | None = None) -> list[str]:
-    """Gates that missed their floors; their methods stay descriptive."""
+    """Gates that missed their floors; their methods stay descriptive.
+
+    Args:
+        document: The certificate document; loaded from `STORE_PATH` when
+            None.
+
+    Returns:
+        The names of gates that did not pass; every gate when the file is
+        missing.
+    """
     document = document or load()
     if document is None:
         return list(GATES)
@@ -778,7 +1115,15 @@ def descriptive_only(document: dict[str, Any] | None = None) -> list[str]:
 
 
 def main(arguments: list[str] | None = None) -> int:
-    """Writes or checks the certificate file."""
+    """Writes or checks the certificate file.
+
+    Args:
+        arguments: Command-line arguments; `None` reads `sys.argv`.
+
+    Returns:
+        0 after a write, or after a check that finds no problem; 1 when the
+        check finds problems.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--write", action="store_true")

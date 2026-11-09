@@ -1,10 +1,10 @@
 """Trivial stand-in detectors that exercise the harness end to end.
 
-Phase 1 has no real detector yet. These three do just enough to run the whole
-chain (plant, detect, certify, store, go stale) on a real table that ships
-with scikit-learn. They are NOT part of the product and must never be marked
-gating; their certificates live in `sample_certificates.json` only as
-evidence that the machinery works.
+There is no real detector in this module. These three do just enough to run
+the whole chain (plant, detect, certify, store, go stale) on a real table
+that ships with scikit-learn. They are NOT part of the product and must
+never be marked gating; their certificates live in
+`sample_certificates.json` only as evidence that the machinery works.
 
 The policy below is fixed before any measurement and is not tuned to the
 results.
@@ -48,12 +48,25 @@ DEFAULT_SEEDS = (0, 1, 2)
 
 
 def demo_frame() -> pd.DataFrame:
-    """The breast-cancer table bundled with scikit-learn (no download)."""
+    """The breast-cancer table bundled with scikit-learn (no download).
+
+    Returns:
+        The features and the `target` column, with a fresh 0..n-1 index.
+    """
     return load_breast_cancer(as_frame=True).frame.reset_index(drop=True)
 
 
 def label_flip_standin(frame: pd.DataFrame) -> pd.Series:
-    """Flags rows whose label a cross-validated model confidently rejects."""
+    """Flags rows whose label a cross-validated model confidently rejects.
+
+    Args:
+        frame: Table with feature columns and the `target` label column.
+
+    Returns:
+        A boolean Series with the index of `frame`; True where the
+        cross-validated probability of the observed label is below
+        `CONFIDENT_DISAGREEMENT`.
+    """
     features = frame.drop(columns=[TARGET])
     labels = frame[TARGET]
     model = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000))
@@ -68,7 +81,16 @@ def label_flip_standin(frame: pd.DataFrame) -> pd.Series:
 
 
 def sentinel_standin(frame: pd.DataFrame) -> pd.Series:
-    """Flags rows that hold a common missing-value code."""
+    """Flags rows that hold a common missing-value code.
+
+    Args:
+        frame: Table to scan; numeric columns are checked against
+            `SENTINEL_NUMBERS` and the others against `SENTINEL_TEXT`.
+
+    Returns:
+        A boolean Series with the index of `frame`; True for a row with a
+        sentinel in any column.
+    """
     flags = pd.Series(False, index=frame.index)
     for name in frame.columns:
         column = frame[name]
@@ -80,7 +102,15 @@ def sentinel_standin(frame: pd.DataFrame) -> pd.Series:
 
 
 def duplicate_standin(frame: pd.DataFrame) -> pd.Series:
-    """Flags every copy after the first occurrence of a row."""
+    """Flags every copy after the first occurrence of a row.
+
+    Args:
+        frame: Table to scan.
+
+    Returns:
+        A boolean Series with the index of `frame`; True for each repeated
+        row after its first occurrence.
+    """
     return pd.Series(frame.duplicated(keep="first"), index=frame.index)
 
 
@@ -99,7 +129,11 @@ class StandIn:
     helpers: tuple[Any, ...] = ()
 
     def code_hash(self) -> str:
-        """Hash of the detector and its helpers' source."""
+        """Hash of the detector and its helpers' source.
+
+        Returns:
+            The code hash that certificates are filed under.
+        """
         return certificates.code_hash(self.detector, *self.helpers)
 
 
@@ -165,7 +199,15 @@ def certify_all(
 
 
 def sample_problems(store: certificates.CertificateStore) -> list[str]:
-    """Why a store of stand-in certificates is not current (empty if fine)."""
+    """Why a store of stand-in certificates is not current (empty if fine).
+
+    Args:
+        store: Certificate store to audit.
+
+    Returns:
+        One message per stand-in whose certificate is not current for its
+        present code; empty when all are current.
+    """
     problems = []
     for name, standin in STANDINS.items():
         digest = standin.code_hash()

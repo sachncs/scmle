@@ -55,7 +55,14 @@ class Wired:
 
 
 def wilson(given: Mapping[str, Any]) -> Any:
-    """Wilson interval as `{low, high}`."""
+    """Wilson interval as `{low, high}`.
+
+    Args:
+        given: Case inputs `successes`, `n` and `confidence`.
+
+    Returns:
+        The lower and upper bounds from `certificates.wilson_interval`.
+    """
     low, high = certificates.wilson_interval(
         given["successes"], given["n"], given["confidence"]
     )
@@ -63,7 +70,14 @@ def wilson(given: Mapping[str, Any]) -> Any:
 
 
 def clopper(given: Mapping[str, Any]) -> Any:
-    """Clopper-Pearson interval as `{low, high}`."""
+    """Clopper-Pearson interval as `{low, high}`.
+
+    Args:
+        given: Case inputs `successes`, `n` and `confidence`.
+
+    Returns:
+        The lower and upper bounds from `coverage.clopper_pearson`.
+    """
     low, high = coverage.clopper_pearson(
         given["successes"], given["n"], given["confidence"]
     )
@@ -71,13 +85,28 @@ def clopper(given: Mapping[str, Any]) -> Any:
 
 
 def spearman(given: Mapping[str, Any]) -> Any:
-    """Spearman p-value and statistic."""
+    """Spearman p-value and statistic.
+
+    Args:
+        given: Case inputs `x` and `y`, two equal-length numeric lists.
+
+    Returns:
+        `pvalue` and `statistic` from `bivariate.spearman`.
+    """
     out = bivariate.spearman(np.array(given["x"]), np.array(given["y"]))
     return {"pvalue": out.p, "statistic": out.statistic}
 
 
 def kruskal(given: Mapping[str, Any]) -> Any:
-    """Kruskal-Wallis p-value and statistic."""
+    """Kruskal-Wallis p-value and statistic.
+
+    Args:
+        given: Case input `groups`, a list of samples.
+
+    Returns:
+        `pvalue` and `statistic` from `bivariate.kruskal` on the pooled
+        sample with group labels.
+    """
     groups = given["groups"]
     x = np.concatenate([np.array(g) for g in groups])
     labels = np.concatenate([np.full(len(g), i) for i, g in enumerate(groups)])
@@ -86,14 +115,29 @@ def kruskal(given: Mapping[str, Any]) -> Any:
 
 
 def fdr(given: Mapping[str, Any]) -> Any:
-    """BH or BY adjusted p-values."""
+    """BH or BY adjusted p-values.
+
+    Args:
+        given: Case inputs `method` (the multiplicity rule) and `pvalues`.
+
+    Returns:
+        The adjusted p-values, as a list under `adjusted`, from
+        `multiplicity.adjust` at level 1/20.
+    """
     rule = budget.MultiplicityRule(given["method"])
     out = multiplicity.adjust(given["pvalues"], rule, Fraction(1, 20))
     return {"adjusted": list(out.adjusted)}
 
 
 def harmonic(given: Mapping[str, Any]) -> Any:
-    """Harmonic number."""
+    """Harmonic number.
+
+    Args:
+        given: Case input `n`.
+
+    Returns:
+        The harmonic number under `value`.
+    """
     return {"value": budget.harmonic(given["n"])}
 
 
@@ -112,7 +156,16 @@ WIRED: Mapping[str, Wired] = {
 
 
 def gap(actual: Any, expected: Any) -> float:
-    """Largest relative gap (absolute where the reference is zero)."""
+    """Largest relative gap (absolute where the reference is zero).
+
+    Args:
+        actual: Value from our code (number, sequence or mapping).
+        expected: Reference value of the same shape.
+
+    Returns:
+        The maximum over all leaves of `|a - e| / |e|`, or `|a - e|` where
+        the reference is zero; 0.0 for equal values, including two NaNs.
+    """
     if isinstance(expected, Mapping):
         return max(gap(actual[k], expected[k]) for k in expected)
     if isinstance(expected, list | tuple):
@@ -130,14 +183,28 @@ def gap(actual: Any, expected: Any) -> float:
 
 
 def bound(value: float) -> str:
-    """Power of ten at or above `value`, floored at `FLOOR`."""
+    """Power of ten at or above `value`, floored at `FLOOR`.
+
+    Args:
+        value: The observed maximum gap.
+
+    Returns:
+        The text `<= 1eN` for the smallest N with 10**N at least `value`,
+        or `<= 1e-14` when `value` does not exceed `FLOOR`.
+    """
     if value <= FLOOR:
         return f"<= {FLOOR:.0e}"
     return f"<= 1e{math.ceil(math.log10(value))}"
 
 
 def rows() -> list[dict[str, Any]]:
-    """One record per oracle, computed now."""
+    """One record per oracle, computed now.
+
+    Returns:
+        For each oracle name, the reference, tolerance, case count, the
+        producer's dotted name and the bounded difference with whether it is
+        within tolerance (both None when no producer is wired).
+    """
     found = []
     for name in oracles.NAMES:
         oracle = oracles.load_oracle(name)
@@ -162,7 +229,12 @@ def rows() -> list[dict[str, Any]]:
 
 
 def render() -> str:
-    """The Markdown table."""
+    """The Markdown table.
+
+    Returns:
+        The full document text: a row per oracle and the list of pending
+        references.
+    """
     lines = [
         "# Oracle comparison",
         "",
@@ -194,7 +266,15 @@ def render() -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Writes the table, or with `--check` compares it with a file."""
+    """Writes the table, or with `--check` compares it with a file.
+
+    Args:
+        argv: Command-line arguments; `None` reads `sys.argv`.
+
+    Returns:
+        0 after a write or a matching check; 1 when the check finds the file
+        missing or different from a fresh render.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("path")
     parser.add_argument("--check", action="store_true")

@@ -1,32 +1,33 @@
 """Command line for the verification harness.
 
-    python -m benchmarks.qualification --smoke            # the Phase 1 gate
+    python -m benchmarks.qualification --smoke            # the smoke gate
     python -m benchmarks.qualification --smoke --full     # nightly, longer
     python -m benchmarks.qualification --check            # certificates
-    python -m benchmarks.qualification --check fdr        # claim ledger (F3)
-    python -m benchmarks.qualification --check ingest     # ingestion (F9)
-    python -m benchmarks.qualification --check framing    # framing (F8)
-    python -m benchmarks.qualification --check loop       # closed loop (F13)
-    python -m benchmarks.qualification --check f10        # causal (F10)
-    python -m benchmarks.qualification --check f11        # decision layer (F11)
+    python -m benchmarks.qualification --check fdr        # claim ledger
+    python -m benchmarks.qualification --check ingest     # ingestion
+    python -m benchmarks.qualification --check framing    # framing
+    python -m benchmarks.qualification --check loop       # closed loop
+    python -m benchmarks.qualification --check f10        # causal gates
+    python -m benchmarks.qualification --check f11        # decision layer
     python -m benchmarks.qualification --check all        # every family above
     python -m benchmarks.qualification --write-sample F   # stand-in sample
-    python -m benchmarks.qualification --write-f5 F       # F5 certificates
+    python -m benchmarks.qualification --write-f5 F       # detector certs
 
-`--check` fails when a gating detector has no current certificate. The F5
+`--check` fails when a gating detector has no current certificate. The data
 detectors (`scmle.data.detectors`) are checked against
 `detector_certificates.json`: each must have a certificate for its current
 code, and each outcome that passed must still be accepted for gating. An
 outcome that did not pass is simply descriptive and does not fail the check.
-The F6 checks (`scmle.data.robustness`) are checked the same way against
-`f6_certificates.json`. The leakage screen (`scmle.data.admissibility.screen`,
-the test behind `leakage_policy="block"`) ships its certificates inside the
-package (`screen_certificates.json`) and is checked the same way. The F9
-ingestion detectors (torn-read check, extract reconciliation) are checked
-against `ingest_certificates.json`; `--check ingest` also verifies that
+The robustness checks (`scmle.data.robustness`) are checked the same way
+against `f6_certificates.json`. The leakage screen
+(`scmle.data.admissibility.screen`, the test behind
+`leakage_policy="block"`) ships its certificates inside the package
+(`screen_certificates.json`) and is checked the same way. The ingestion
+detectors (torn-read check, extract reconciliation) are checked against
+`ingest_certificates.json`; `--check ingest` also verifies that
 `ingest_measurements.json` was measured on the current code and re-runs a
 small live point-in-time and torn-read check.
-The F12 coverage and breadth gates (`uncertainty_certify.py`) are checked
+The coverage and breadth gates (`uncertainty_certify.py`) are checked
 against `uncertainty_certificates.json`: a certificate is stale when the code
 it measured changed. A gate that missed its floor is listed as descriptive and
 does not fail the check.
@@ -35,23 +36,23 @@ against `subgroup_certificates.json`: a certificate is stale when the method
 code changed; a family that missed its floors is listed as descriptive and
 does not fail the check, and the causal report then labels subgroups
 `descriptive`.
-The F8 framing methods (`framing_certify.py`) are checked by `--check framing`
+The framing methods (`framing_certify.py`) are checked by `--check framing`
 against `framing_certificates.json` and `framing_measurements.json`: stale
 code, a `MIN_CLUSTERS` that differs from the measured minimum, or an accepted
 malformed charter fails; a method that missed its floor is listed as
 descriptive.
-The F10 causal gates (`f10_certify.py`) are checked by `--check f10` against
+The causal gates (`f10_certify.py`) are checked by `--check f10` against
 `f10_certificates.json`: a certificate is stale when the code it measured
 changed; a gate that missed its floor is listed as descriptive and does not
 fail the check, and the package counts it as uncertified.
-The F11 decision-layer gates (`f11_certify.py`) are checked by `--check f11`
+The decision-layer gates (`f11_certify.py`) are checked by `--check f11`
 against `f11_certificates.json`: a certificate is stale when the code it
 measured changed; a gate that missed its floor, or could not run for lack of
 the Hillstrom file, is listed as descriptive and does not fail the check.
-The F13 closed-loop gates (`loop_certify.py`) are checked by `--check loop`
+The closed-loop gates (`loop_certify.py`) are checked by `--check loop`
 against `loop_certificates.json`: a certificate is stale when the code or the
 simulator it measured changed; a gate that missed its floor (today the
-detection delay of the alarm, H2 and H10) is listed as descriptive and does not
+detection delay of the alarm) is listed as descriptive and does not
 fail the check, and the loop then does not let an alarm retrain by itself.
 """
 
@@ -80,7 +81,14 @@ GATING: dict[str, tuple[str, str]] = {}
 
 
 def check_certificates() -> int:
-    """Validates the sample store and every registered gating detector."""
+    """Validates the sample store and every registered gating detector.
+
+    Prints a JSON report of the problems, missing, stale and descriptive-only
+    entries of each certificate family it covers.
+
+    Returns:
+        0 when no family has a problem, otherwise 1.
+    """
     store = certificates.CertificateStore.load(standins.SAMPLE_PATH)
     problems = standins.sample_problems(store)
     report = certificates.audit(store, GATING)
@@ -149,9 +157,12 @@ def check_certificates() -> int:
 def check_all() -> int:
     """Runs every certificate family and fails if any of them fails.
 
-    The families are the default certificate check and `fdr`-free checks of
-    F10, F11, F13, F8 and F9; each runs even when an earlier one failed, and
-    the combined result is printed last.
+    The families are the default certificate check and the causal,
+    decision-layer, closed-loop, framing and ingestion checks; each runs even
+    when an earlier one failed, and the combined result is printed last.
+
+    Returns:
+        0 when every family passes, otherwise 1.
     """
     results: dict[str, bool] = {}
     results["certificates"] = check_certificates() == 0
@@ -182,7 +193,14 @@ def check_all() -> int:
 
 
 def main(arguments: list[str] | None = None) -> int:
-    """Runs the requested action and returns a process exit code."""
+    """Runs the requested action and returns a process exit code.
+
+    Args:
+        arguments: Command-line arguments; `None` reads `sys.argv`.
+
+    Returns:
+        0 when the requested check or write succeeded, otherwise 1.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     action = parser.add_mutually_exclusive_group(required=True)
     action.add_argument("--smoke", action="store_true")

@@ -1,18 +1,20 @@
-"""Why CQR missed the G3 conditional-coverage floor: a filed analysis (F12).
+"""Why CQR missed its conditional-coverage floor: a filed analysis.
 
 Written on 2026-11-07 before it was run. This is not a gate and changes no
-certificate: G3 stays a published miss (`cqr_top_decile` 0.8637 against the
-floor 0.87 at 150 replicates, `uncertainty_certificates.json`), and a
-re-registered gate would need its own pre-registration. The question here is
-what the miss is made of. Two readings are open:
+certificate: the conditional-coverage gate of conformalized quantile
+regression (`gate_g3` in `uncertainty_certify`) stays a published miss
+(`cqr_top_decile` 0.8637 against the floor 0.87 at 150 replicates,
+`uncertainty_certificates.json`), and a re-registered gate would need its
+own pre-registration. The question here is what the miss is made of. Two
+readings are open:
 
 * sampling noise: with 150 replicates the mean of the highest-noise-decile
   coverage has a standard error of `se_150`, so 0.8637 may be within noise of
   0.87; and
-* model capacity: G3 fits 40 depth-2 trees per quantile, which may be too
-  little to follow a noise sd that rises fivefold, so the band is too narrow
-  where the noise is largest and the single additive margin of conformal
-  calibration cannot repair a conditional shortfall.
+* model capacity: the gate fits 40 depth-2 trees per quantile, which may be
+  too little to follow a noise sd that rises fivefold, so the band is too
+  narrow where the noise is largest and the single additive margin of
+  conformal calibration cannot repair a conditional shortfall.
 
 Design (same world and same calibration as `gate_g3`, development seeds
 `DEV_SEED_BASE` onwards, which never overlap the certification seeds): the
@@ -51,14 +53,40 @@ VARIANTS: tuple[dict[str, Any], ...] = (
 
 
 def draw(rng: np.random.Generator, n: int) -> tuple[np.ndarray, ...]:
-    """The G3 world: noise sd rises from 0.5 to 2.5 across x."""
+    """The conditional-coverage gate's world: noise sd rises from 0.5 to 2.5.
+
+    Args:
+        rng: Random generator.
+        n: Number of rows.
+
+    Returns:
+        The feature column x (uniform on [0, 1], shape (n, 1)), the target
+        noise draw `sd * standard normal` (shape (n,)) and the noise sd
+        `0.5 + 2x` (shape (n,)).
+    """
     x = rng.uniform(0, 1, (n, 1))
     sd = 0.5 + 2.0 * x[:, 0]
     return x, sd * rng.standard_normal(n), sd
 
 
 def replicate(index: int, base: int, trees: int, depth: int) -> list[float]:
-    """CQR and control coverage on one replicate (marginal, top decile)."""
+    """CQR and control coverage on one replicate (marginal, top decile).
+
+    Fits three boosted models on 1000 rows, calibrates the conformal band and
+    the constant-width control on 600 rows and measures coverage on 4000
+    fresh rows.
+
+    Args:
+        index: Replicate number; also the model seed.
+        base: Seed offset; the data generator is seeded with `base + index`.
+        trees: Number of boosting trees per model.
+        depth: Maximum tree depth.
+
+    Returns:
+        Three values: CQR marginal coverage, CQR coverage in the highest-noise
+        decile of the test rows, and the same decile coverage of the
+        constant-width split-conformal control.
+    """
     rng = np.random.default_rng(base + index)
     xf, yf, ignored = draw(rng, 1000)
     xc, yc, ignored = draw(rng, 600)
@@ -92,7 +120,15 @@ def replicate(index: int, base: int, trees: int, depth: int) -> list[float]:
 
 
 def summarize(values: np.ndarray) -> dict[str, float]:
-    """Mean and standard error of a column of replicate results."""
+    """Mean and standard error of a column of replicate results.
+
+    Args:
+        values: One result per replicate.
+
+    Returns:
+        The `mean` and `se` (sample standard deviation over the square root
+        of the number of replicates).
+    """
     return {
         "mean": float(values.mean()),
         "se": float(values.std(ddof=1) / np.sqrt(len(values))),
@@ -100,7 +136,17 @@ def summarize(values: np.ndarray) -> dict[str, float]:
 
 
 def analyse(replicates: int = REPLICATES) -> dict[str, Any]:
-    """Runs every variant on development seeds."""
+    """Runs every variant on development seeds.
+
+    Args:
+        replicates: Number of replicates per variant.
+
+    Returns:
+        The report: registration date, floor, replicates, seed range,
+        elapsed seconds and, per variant, the summary of CQR marginal
+        coverage, CQR top-decile coverage and constant-width top-decile
+        coverage.
+    """
     started = time.monotonic()
     report: dict[str, Any] = {
         "registered": "2026-11-07",
@@ -134,7 +180,15 @@ def analyse(replicates: int = REPLICATES) -> dict[str, Any]:
 
 
 def main(arguments: list[str] | None = None) -> int:
-    """Writes the analysis."""
+    """Writes the analysis.
+
+    Args:
+        arguments: Command-line arguments (`--write`, `--replicates`); `None`
+            reads `sys.argv`.
+
+    Returns:
+        Process exit status, always 0.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--write", action="store_true", required=True)
     parser.add_argument("--replicates", type=int, default=REPLICATES)
