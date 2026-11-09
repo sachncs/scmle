@@ -270,7 +270,9 @@ class IncrementalProcessor:
             The stored checkpoint, or an empty one if none exists yet.
         """
         try:
-            data, ignored = self.store.get(self.state_key)
+            data, ignored = self.retrying(
+                lambda: self.store.get(self.state_key)
+            )
         except objectstore.NotFoundError:
             return Checkpoint()
         return Checkpoint.from_bytes(data)
@@ -325,7 +327,10 @@ class IncrementalProcessor:
         Raises:
             ConcurrentRunError: If another run holds the lock.
 
-        The lock is released when the run ends, whatever the outcome.
+        The lock is released when the run ends, whatever the outcome. Every
+        store call is retried on a transient error except taking the lock:
+        retrying a conditional put could turn a timeout whose first try
+        landed into `AlreadyExistsError`, so that call is tried once.
         `CheckpointCorruptError` propagates if the checkpoint is damaged,
         and `ChangedInputError` if an input that was already processed now
         has different bytes; both leave the stored checkpoint as it was.
@@ -337,7 +342,7 @@ class IncrementalProcessor:
         try:
             return self.run_locked(max_objects)
         finally:
-            self.store.delete(self.lock_key)
+            self.retrying(lambda: self.store.delete(self.lock_key))
 
     def run_locked(self, max_objects: int | None) -> Processing:
         """Runs with the lock held.
@@ -359,8 +364,8 @@ class IncrementalProcessor:
         Raises:
             ChangedInputError: If a processed input now has different bytes.
         """
-        checkpoint = self.load_checkpoint()
         self.waits.clear()
+        checkpoint = self.load_checkpoint()
         done: list[str] = []
         skipped: list[str] = []
         duplicate_objects: list[str] = []
@@ -385,7 +390,14 @@ class IncrementalProcessor:
                 break
             if meta.sha256 in checkpoint.processed.values():
                 checkpoint.processed[meta.key] = meta.sha256
-                self.save_checkpoint(checkpoint)
+                try:
+                    self.retrying(lambda: self.save_checkpoint(checkpoint))
+                except retry.RetryExhaustedError as error:
+                    failed, problem = (
+                        meta.key,
+                        f"{type(error).__name__}: {error}",
+                    )
+                    break
                 duplicate_objects.append(meta.key)
                 continue
             try:
@@ -432,9 +444,13 @@ class IncrementalProcessor:
             lambda: self.reader.read(meta.key, self.contract)
         )
         if self.gate is not None:
-            frame = self.gate.run(
-                frame, record, self.contract, self.stage
-            ).frame
+            frame = self.retrying(
+                lambda: (
+                    self.gate.run(
+                        frame, record, self.contract, self.stage
+                    ).frame
+                )
+            )
         keys = row_keys(frame, self.contract.key_columns)
         fresh = ~keys.isin(checkpoint.seen) & ~keys.duplicated(keep="first")
         dropped = int((~fresh).sum())
