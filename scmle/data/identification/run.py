@@ -1335,11 +1335,13 @@ def replication(
         strata, otherwise whether every column that did replicated. A stratum
         is usable when it has `MIN_STRATUM_ROWS` rows and `adapter.estimate`
         gives a finite positive standard error without a `ValueError`. The
-        adapter's side effects of `estimate` (entries of `design`, `weak`)
-        are not undone.
+        adapter's `design` and `weak` are restored afterwards, so the report
+        keeps the values from the pooled estimate on `C`.
     """
     results: dict[str, Any] = {}
     passed: bool | None = None
+    saved_design = dict(adapter.design)
+    saved_weak = adapter.weak
     for column in adapter.spec.strata:
         if column not in c.columns:
             results[column] = {"skipped": "column not in C"}
@@ -1358,6 +1360,8 @@ def replication(
         rep = battery.replicate(values, pooled, alpha)
         results[column] = rep.to_dict()
         passed = rep.passed if passed is None else (passed and rep.passed)
+    adapter.design = saved_design
+    adapter.weak = saved_weak
     return {"by_column": results, "passed": passed}
 
 
@@ -1391,7 +1395,8 @@ def subgroup_report(
         family size, the guarantee `statement`, one row per hypothesis under
         `hypotheses` (estimate, p-value, adjusted p-value, decision, or why
         it was skipped) and the names of the `rejected` subgroups. The
-        adapter's `design` is restored afterwards; its `weak` flag is not.
+        adapter's `design` is restored afterwards; its `weak` flag is not
+        (`identify` restores it).
     """
     saved = dict(adapter.design)
     rows: list[dict[str, Any]] = []
@@ -1602,11 +1607,13 @@ def identify(
             "note": "single treated unit: inference is the placebo permutation",
         }
     )
+    weak_before_subgroups = adapter.weak
     subgroup_found = (
         subgroup_report(adapter, c, level, spec.subgroups)
         if spec.subgroups and not adapter.single_unit
         else None
     )
+    adapter.weak = weak_before_subgroups
     if subgroup_found is not None:
         label_subgroups(subgroup_found, named)
     verdict = verdict_of(spec, primary)
