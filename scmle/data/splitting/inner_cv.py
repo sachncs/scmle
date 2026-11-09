@@ -61,7 +61,10 @@ class StructuredKFold(model_selection.BaseCrossValidator):
         self.seed = seed
 
     def get_n_splits(
-        self, features: Any = None, y: Any = None, groups: Any = None
+        self,
+        features: Any = None,  # noqa: ARG002 -- scikit-learn cross-validator get_n_splits signature
+        y: Any = None,  # noqa: ARG002 -- scikit-learn cross-validator get_n_splits signature
+        groups: Any = None,  # noqa: ARG002 -- scikit-learn cross-validator get_n_splits signature
     ) -> int:
         """Returns the number of inner folds.
 
@@ -76,7 +79,10 @@ class StructuredKFold(model_selection.BaseCrossValidator):
         return self.n_splits
 
     def split(
-        self, features: Any, y: Any = None, groups: Any = None
+        self,
+        features: Any,
+        y: Any = None,
+        groups: Any = None,  # noqa: ARG002 -- scikit-learn cross-validator split signature
     ) -> Iterator[tuple[numpy.ndarray, numpy.ndarray]]:
         """Yields (train, validation) positions for each inner fold.
 
