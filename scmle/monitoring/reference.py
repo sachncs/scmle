@@ -130,7 +130,10 @@ class DistributionReference(abc.ABC):
         floor = self.noise_floor(int(values.notna().sum()))
         return max(raw - floor, 0.0)
 
-    def unseen_rate(self, values: pandas.Series) -> float:
+    def unseen_rate(
+        self,
+        values: pandas.Series,  # noqa: ARG002 -- subclasses override with this signature
+    ) -> float:
         """Computes the share of new values outside the reference domain.
 
         Args:

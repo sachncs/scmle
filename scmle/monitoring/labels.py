@@ -47,6 +47,7 @@ COMPLETE = "complete"
 LOGGED_PROPENSITY = "logged_propensity"
 AUDIT_SLICE = "audit_slice"
 UNVERIFIED = "unverified"
+LOOP_ALPHA = 0.05  # largest p-value that counts as a detected loop
 MECHANISMS = (COMPLETE, LOGGED_PROPENSITY, AUDIT_SLICE, UNVERIFIED)
 FEEDBACK_UNVERIFIED = (
     "no randomized bypass slice: a feedback loop cannot be detected from "
@@ -327,7 +328,7 @@ def feedback_verdict(
     """
     if bypass_rate <= 0.0 or check is None:
         return UNVERIFIED
-    if check.p_value is not None and check.p_value <= 0.05:
+    if check.p_value is not None and check.p_value <= LOOP_ALPHA:
         return "loop_detected"
     return "no_loop_detected"
 

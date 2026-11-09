@@ -62,6 +62,7 @@ LESS = "less"
 DIRECTIONS = (GREATER, LESS)
 DEFAULT_CAP = 0.5
 GRID_POINTS = 199
+MINIMUM_GRID_POINTS = 3  # fewer points cannot form a grid
 
 
 def validate_unit(value: Any, name: str) -> numpy.ndarray:
@@ -444,7 +445,7 @@ class ConfidenceSequence:
         Raises:
             ValueError: If `points` is below 3.
         """
-        if points < 3:
+        if points < MINIMUM_GRID_POINTS:
             raise ValueError("points must be at least 3")
         self.alpha = alpha
         self.grid = (numpy.arange(points) + 1.0) / (points + 1.0)
