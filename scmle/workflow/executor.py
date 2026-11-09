@@ -19,7 +19,7 @@ leaves a consistent record and a new one continues from it.
 * **Concurrency.** `max_concurrent_runs` is enforced with run leases;
   `max_parallel` and per-group limits bound the steps in flight.
 * **Timeouts** are cooperative here: the handler calls `context.check()`;
-  the cloud engines enforce theirs.
+  a hosting engine enforces its own.
 * **Cost.** Handlers report cost with `context.spend`; a step over its budget
   fails, and a run over its budget stops the remaining steps
   (`budget_stopped`).

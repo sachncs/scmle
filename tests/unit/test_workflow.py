@@ -1,6 +1,5 @@
-"""Workflow definition, local executor, scheduler and emitted definitions."""
+"""Workflow definition, local executor, and scheduler."""
 
-import copy
 import dataclasses
 import json
 import threading
@@ -9,16 +8,13 @@ import pytest
 
 from scmle.contracts import errors
 from scmle.core import retry
-from scmle.data.store import cloud
 from scmle.data.store import objectstore
 from scmle.runners import base
 from scmle.runners import local
 from scmle.workflow import definition as wd
-from scmle.workflow import emit
 from scmle.workflow import executor as ex
 from scmle.workflow import handlers
 from scmle.workflow import schedule as sched
-from tests import support_cloud as fakes
 from tests import support_runners as sr
 
 KEYS = {"ml-owner": "owner-signing-key-0001", "second": "second-key-0002"}
@@ -37,15 +33,9 @@ class Clock:
         self.now += seconds
 
 
-def make_store(kind, tmp_path):
-    if kind == "local":
-        return objectstore.LocalObjectStore(tmp_path / "state")
-    return cloud.S3ObjectStore(fakes.FakeS3Client(), "bkt", "wf")
-
-
-@pytest.fixture(params=["local", "s3"])
-def store(request, tmp_path):
-    return make_store(request.param, tmp_path)
+@pytest.fixture
+def store(tmp_path):
+    return objectstore.LocalObjectStore(tmp_path / "state")
 
 
 def fast():
@@ -638,7 +628,7 @@ def test_a_training_step_runs_through_a_runner_and_resumes_inside_it(tmp_path):
     handlers_["train"] = handlers.runner_handler(runner, spec_for)
     executor = ex.LocalExecutor(
         flow,
-        make_store("local", tmp_path),
+        objectstore.LocalObjectStore(tmp_path / "state"),
         handlers_,
         approver_keys=KEYS,
         clock=clock,
@@ -649,125 +639,3 @@ def test_a_training_step_runs_through_a_runner_and_resumes_inside_it(tmp_path):
     saved = executor.step_record(record["run_id"], "train")
     assert saved["outputs"]["attempts"] == 2
     assert record["cost"] > 0
-
-
-# ---- emitted definitions ----------------------------------------------------
-
-
-def test_the_step_functions_document_is_structurally_valid():
-    flow = scheduled(wd.CatchUp.LATEST_ONLY)
-    emitted = emit.to_step_functions(flow, {"cluster": "arn:aws:ecs:cluster/c"})
-    document = emitted["definition"]
-    assert emit.validate_step_functions(document) == []
-    json.dumps(emitted)
-    states = document["States"]
-    assert document["StartAt"] == "Layer0"
-    assert states["Layer3"]["Type"] == "Parallel"
-    assert {b["StartAt"] for b in states["Layer3"]["Branches"]} == {
-        "approve",
-        "monitor",
-    }
-    task = states["Layer1"]
-    assert task["Retry"][0]["MaxAttempts"] == 2
-    assert task["Retry"][0]["BackoffRate"] == 2.0
-    assert task["TimeoutSeconds"] == 600
-    approval = states["Layer3"]["Branches"][0]["States"]["approve"]
-    assert approval["Resource"].endswith("waitForTaskToken")
-    assert approval["TimeoutSeconds"] == 7200
-    assert emitted["schedule"] == "rate(1 hour)"
-    assert emitted["controls"]["approved_steps"] == ["batch_predict"]
-    assert emitted["controls"]["max_concurrent_runs"] == 1
-
-
-def test_the_step_functions_validator_finds_structural_problems():
-    good = emit.to_step_functions(wd.standard_workflow())["definition"]
-    broken = copy.deepcopy(good)
-    broken["States"]["Layer0"]["Next"] = "Nowhere"
-    assert any("Nowhere" in p for p in emit.validate_step_functions(broken))
-    broken = copy.deepcopy(good)
-    broken["StartAt"] = "Missing"
-    assert emit.validate_step_functions(broken)
-    broken = copy.deepcopy(good)
-    broken["States"]["Orphan"] = {"Type": "Succeed"}
-    assert any("unreachable" in p for p in emit.validate_step_functions(broken))
-    broken = copy.deepcopy(good)
-    broken["States"]["Layer0"]["Type"] = "Bogus"
-    assert any("Type" in p for p in emit.validate_step_functions(broken))
-    broken = copy.deepcopy(good)
-    del broken["States"]["Layer1"]["Next"]
-    assert any(
-        "Next and End" in p for p in emit.validate_step_functions(broken)
-    )
-    broken = copy.deepcopy(good)
-    broken["States"]["Layer1"]["Retry"][0]["BackoffRate"] = 0.5
-    assert any("BackoffRate" in p for p in emit.validate_step_functions(broken))
-    broken = copy.deepcopy(good)
-    broken["States"]["Layer3"]["Branches"][0]["States"]["approve"][
-        "Resource"
-    ] = "x"
-    assert any("branch 0" in p for p in emit.validate_step_functions(broken))
-    assert emit.validate_step_functions({"States": {}})
-
-
-def test_the_cloud_workflows_document_is_structurally_valid():
-    flow = scheduled(wd.CatchUp.LATEST_ONLY)
-    emitted = emit.to_cloud_workflows(flow, {"approve": "projects/p/topics/t"})
-    document = emitted["definition"]
-    assert emit.validate_cloud_workflows(document) == []
-    json.dumps(emitted)
-    steps = document["main"]["steps"]
-    names = [next(iter(item)) for item in steps]
-    assert names[0] == "init" and names[-1] == "finish"
-    parallel = next(
-        i for i in steps if any(k.startswith("layer_approve") for k in i)
-    )
-    assert "parallel" in next(iter(parallel.values()))
-    text = json.dumps(document)
-    assert "events.await_callback" in text and "approval rejected" in text
-    assert "execution_key" in text
-    assert emitted["schedule"] == "0 */1 * * *"
-    assert emitted["controls"]["approved_steps"] == ["batch_predict"]
-
-
-def test_the_cloud_workflows_validator_finds_structural_problems():
-    good = emit.to_cloud_workflows(wd.standard_workflow())["definition"]
-    broken = copy.deepcopy(good)
-    broken["main"]["steps"].append(copy.deepcopy(broken["main"]["steps"][0]))
-    assert any(
-        "more than once" in p for p in emit.validate_cloud_workflows(broken)
-    )
-    broken = copy.deepcopy(good)
-    broken["main"]["steps"][1] = {"ingest": {"nonsense": 1}}
-    assert any("keyword" in p for p in emit.validate_cloud_workflows(broken))
-    broken = copy.deepcopy(good)
-    broken["main"]["steps"].append(
-        {"jump": {"assign": [{"a": 1}], "next": "nope"}}
-    )
-    assert any("nope" in p for p in emit.validate_cloud_workflows(broken))
-    broken = copy.deepcopy(good)
-    first = next(i for i in broken["main"]["steps"] if "ingest" in i)["ingest"]
-    first["retry"]["max_retries"] = -1
-    assert any(
-        "max_retries" in p for p in emit.validate_cloud_workflows(broken)
-    )
-    assert emit.validate_cloud_workflows({"main": {}})
-    assert emit.validate_cloud_workflows(
-        {"main": {"steps": [{"a": 1, "b": 2}]}}
-    )
-
-
-def test_schedules_convert_or_are_refused():
-    assert emit.eventbridge_rate(60) == "rate(1 minute)"
-    assert emit.eventbridge_rate(900) == "rate(15 minutes)"
-    assert emit.eventbridge_rate(86400) == "rate(1 day)"
-    assert emit.eventbridge_rate(7200) == "rate(2 hours)"
-    assert emit.cron_for(900) == "*/15 * * * *"
-    assert emit.cron_for(21600) == "0 */6 * * *"
-    assert emit.cron_for(86400) == "0 0 * * *"
-    for bad in (30, 90):
-        with pytest.raises(errors.ConfigError):
-            emit.eventbridge_rate(bad)
-    with pytest.raises(errors.ConfigError):
-        emit.cron_for(7 * 60)
-    with pytest.raises(errors.ConfigError):
-        emit.cron_for(5 * 3600)
