@@ -62,7 +62,17 @@ PAGES_ROUTES = (
 
 
 def read_text(path: Path) -> str:
-    """Read one UTF-8 control file with a useful error."""
+    """Read one UTF-8 control file with a useful error.
+
+    Args:
+        path: The file.
+
+    Returns:
+        The file's text.
+
+    Raises:
+        ValueError: If the file cannot be read.
+    """
     try:
         return path.read_text(encoding="utf-8")
     except OSError as error:
@@ -70,7 +80,16 @@ def read_text(path: Path) -> str:
 
 
 def action_references(content: str) -> list[dict[str, str]]:
-    """Return every GitHub Action reference in a workflow."""
+    """Return every GitHub Action reference in a workflow.
+
+    Args:
+        content: The workflow text.
+
+    Returns:
+        One record per `uses:` line with the action, the revision and the
+        line number; a workflow of this repository (`./`) is skipped, and a
+        line that cannot be parsed is recorded with revision `unparseable`.
+    """
     references: list[dict[str, str]] = []
     for line_number, line in enumerate(content.splitlines(), 1):
         if "uses:" not in line:
@@ -98,7 +117,19 @@ def action_references(content: str) -> list[dict[str, str]]:
 
 
 def workflow_failures(root: Path) -> list[str]:
-    """Return static workflow-control failures for a repository root."""
+    """Return static workflow-control failures for a repository root.
+
+    Checks that each expected workflow exists, every action is pinned to a
+    40-character commit, `pull_request_target` and long-lived cloud
+    credentials are absent, each workflow carries its required control
+    markers, and the site configuration is present.
+
+    Args:
+        root: The repository root.
+
+    Returns:
+        One message per failure; empty when all controls hold.
+    """
     workflow_root = root / ".github" / "workflows"
     failures: list[str] = []
     contents: dict[str, str] = {}
@@ -197,7 +228,15 @@ def workflow_failures(root: Path) -> list[str]:
 
 
 def workflow_evidence(root: Path) -> dict[str, Any]:
-    """Build deterministic evidence for the static hosted-control check."""
+    """Build deterministic evidence for the static hosted-control check.
+
+    Args:
+        root: The repository root.
+
+    Returns:
+        The schema version and the static controls: workflow files, number of
+        action references, `passed` and the failures.
+    """
     workflow_root = root / ".github" / "workflows"
     references = 0
     for name in WORKFLOW_NAMES:
@@ -221,7 +260,22 @@ def public_page_evidence(
     routes: tuple[str, ...] = PAGES_ROUTES,
     timeout: float = 15.0,
 ) -> dict[str, Any]:
-    """GET every required public route and return digest-bound evidence."""
+    """GET every required public route and return digest-bound evidence.
+
+    Args:
+        pages_url: Absolute HTTPS base URL of the published site.
+        routes: Route paths to request.
+        timeout: Seconds to wait for each response.
+
+    Returns:
+        For each route that answered, its URL, status, SHA-256 and size;
+        the failures (a request error, a status outside 200-299 or an empty
+        body); and `passed`, true only without failures and with every route
+        answered.
+
+    Raises:
+        ValueError: If the URL is not an absolute HTTPS URL.
+    """
     parsed = urlparse(pages_url)
     if parsed.scheme != "https" or not parsed.netloc:
         raise ValueError("pages URL must be an absolute HTTPS URL")
@@ -263,7 +317,15 @@ def public_page_evidence(
 
 
 def parse_arguments(arguments: list[str] | None = None) -> argparse.Namespace:
-    """Parse the hosted-control verifier arguments."""
+    """Parse the hosted-control verifier arguments.
+
+    Args:
+        arguments: Command-line arguments; `None` reads `sys.argv`.
+
+    Returns:
+        The namespace with the repository root, the optional Pages URL, the
+        timeout and the output path.
+    """
     parser = argparse.ArgumentParser(
         description="Verify hosted CI and public GitHub Pages controls."
     )
@@ -275,7 +337,17 @@ def parse_arguments(arguments: list[str] | None = None) -> argparse.Namespace:
 
 
 def main(arguments: list[str] | None = None) -> int:
-    """Run static checks and, optionally, the unauthenticated Pages probe."""
+    """Run static checks and, optionally, the unauthenticated Pages probe.
+
+    Prints the evidence and writes it to `--output` when given.
+
+    Args:
+        arguments: Command-line arguments; `None` reads `sys.argv`.
+
+    Returns:
+        0 when every section passed; 1 when one did not; 2 when the
+        verification could not run (an I/O or HTTP error or invalid input).
+    """
     options = parse_arguments(arguments)
     try:
         evidence = workflow_evidence(options.root.resolve())

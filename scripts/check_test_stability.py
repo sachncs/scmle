@@ -41,7 +41,17 @@ STRICT_PYTEST_ARGUMENTS = ("-W", "error::ResourceWarning")
 
 
 def parse_date(value: str) -> datetime.date:
-    """Parse an ISO-8601 quarantine expiry date."""
+    """Parse an ISO-8601 quarantine expiry date.
+
+    Args:
+        value: The date text, such as `2026-12-31`.
+
+    Returns:
+        The parsed date.
+
+    Raises:
+        ValueError: If the text is not an ISO-8601 date.
+    """
     try:
         return datetime.date.fromisoformat(value)
     except ValueError as error:
@@ -50,7 +60,14 @@ def parse_date(value: str) -> datetime.date:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class QuarantineEntry:
-    """Owned, time-bounded explanation for one known unstable test."""
+    """Owned, time-bounded explanation for one known unstable test.
+
+    Attributes:
+        test_id: The test's identifier (`classname::name`).
+        owner: Who answers for the quarantine.
+        reason: Why the test is unstable.
+        expires_at: ISO-8601 date after which the quarantine is invalid.
+    """
 
     test_id: str
     owner: str
@@ -58,7 +75,12 @@ class QuarantineEntry:
     expires_at: str
 
     def __post_init__(self) -> None:
-        """Reject unreviewable quarantine records."""
+        """Reject unreviewable quarantine records.
+
+        Raises:
+            ValueError: If a field is empty or not text, or `expires_at` is not
+                an ISO-8601 date.
+        """
         for name in ("test_id", "owner", "reason", "expires_at"):
             value = getattr(self, name)
             if not isinstance(value, str) or not value.strip():
@@ -67,11 +89,19 @@ class QuarantineEntry:
 
     @property
     def expired(self) -> bool:
-        """Whether the quarantine is no longer valid today."""
+        """Whether the quarantine is no longer valid today.
+
+        Returns:
+            True when the expiry date is before today.
+        """
         return parse_date(self.expires_at) < datetime.date.today()
 
     def to_dict(self) -> dict[str, str]:
-        """Return JSON-native quarantine evidence."""
+        """Return JSON-native quarantine evidence.
+
+        Returns:
+            The owner, reason and expiry date.
+        """
         return {
             "owner": self.owner,
             "reason": self.reason,
@@ -80,7 +110,16 @@ class QuarantineEntry:
 
     @classmethod
     def from_dict(cls, test_id: str, record: Mapping[str, Any]) -> Self:
-        """Build a quarantine entry from policy JSON."""
+        """Build a quarantine entry from policy JSON.
+
+        Args:
+            test_id: The test's identifier.
+            record: The policy record with `owner`, `reason` and `expires_at`.
+
+        Returns:
+            The entry. A missing key raises `KeyError`, and an empty field
+            or an invalid date raises the `ValueError` of the constructor.
+        """
         return cls(
             test_id=test_id,
             owner=str(record["owner"]),
@@ -91,14 +130,25 @@ class QuarantineEntry:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class StabilityRun:
-    """Results from one pytest attempt."""
+    """Results from one pytest attempt.
+
+    Attributes:
+        attempt: The attempt number, starting at 1.
+        returncode: Exit status of pytest.
+        tests: Status of each test, by identifier.
+    """
 
     attempt: int
     returncode: int
     tests: dict[str, TestStatus]
 
     def __post_init__(self) -> None:
-        """Validate attempt identity and normalize status values."""
+        """Validate attempt identity and normalize status values.
+
+        Raises:
+            ValueError: If the attempt number is below 1 or there are no test
+                results.
+        """
         if self.attempt < 1:
             raise ValueError("attempt must be positive")
         normalized = {
@@ -112,7 +162,12 @@ class StabilityRun:
         object.__setattr__(self, "tests", normalized)
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-native run evidence."""
+        """Return JSON-native run evidence.
+
+        Returns:
+            The attempt, the return code and the status of each test, sorted by
+            identifier.
+        """
         return {
             "attempt": self.attempt,
             "returncode": self.returncode,
@@ -125,7 +180,20 @@ class StabilityRun:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class StabilityReport:
-    """Fail-closed stability decision with all observed test outcomes."""
+    """Fail-closed stability decision with all observed test outcomes.
+
+    Attributes:
+        status: `passed`, `passed_with_quarantine` or `failed`.
+        runs: The attempts that were evaluated.
+        unquarantined_failures: Failed, errored or skipped tests that are not
+            under a valid quarantine, plus non-zero exit statuses and
+            inventory changes.
+        quarantined_failures: Failed, errored or skipped tests under a valid
+            quarantine.
+        expired_quarantines: Quarantined tests whose expiry has passed.
+        inventory_changes: Attempts whose set of tests differs from the
+            first.
+    """
 
     status: str
     runs: tuple[StabilityRun, ...]
@@ -136,11 +204,20 @@ class StabilityReport:
 
     @property
     def passed(self) -> bool:
-        """Whether the policy permits a clean stability result."""
+        """Whether the policy permits a clean stability result.
+
+        Returns:
+            True when there are no unquarantined failures and no expired
+            quarantines.
+        """
         return not self.unquarantined_failures and not self.expired_quarantines
 
     def to_dict(self) -> dict[str, Any]:
-        """Return deterministic JSON-native stability evidence."""
+        """Return deterministic JSON-native stability evidence.
+
+        Returns:
+            The schema version, status, `passed` and the contents of the report.
+        """
         return {
             "schema_version": 1,
             "status": self.status,
@@ -154,14 +231,35 @@ class StabilityReport:
 
 
 class StabilityPolicy:
-    """Evaluate repeated test results against quarantine entries."""
+    """Evaluate repeated test results against quarantine entries.
+
+    Attributes:
+        entries: The quarantine entries by test identifier.
+    """
 
     def __init__(self, entries: Mapping[str, QuarantineEntry]) -> None:
-        """Create a policy from a normalized test-id mapping."""
+        """Create a policy from a normalized test-id mapping.
+
+        Args:
+            entries: Quarantine entries by test identifier.
+        """
         self.entries = dict(entries)
 
     def evaluate(self, runs: Sequence[StabilityRun]) -> StabilityReport:
-        """Return a fail-closed decision for repeated test results."""
+        """Return a fail-closed decision for repeated test results.
+
+        Args:
+            runs: The attempts, at least two.
+
+        Returns:
+            The report. It fails on a non-zero exit status, a failed, errored or
+            skipped test without a valid quarantine, a changed test inventory or
+            an expired quarantine; it is `passed_with_quarantine` when the only
+            failures are quarantined.
+
+        Raises:
+            ValueError: If fewer than two runs are given.
+        """
         normalized_runs = tuple(runs)
         if len(normalized_runs) < 2:
             raise ValueError("stability policy requires at least two runs")
@@ -216,7 +314,18 @@ class StabilityPolicy:
 
 
 def load_policy(path: Path) -> StabilityPolicy:
-    """Load and validate a quarantine policy file."""
+    """Load and validate a quarantine policy file.
+
+    Args:
+        path: The policy JSON file.
+
+    Returns:
+        The policy.
+
+    Raises:
+        ValueError: If `schema_version` is not 1 or `tests` is not an
+            object.
+    """
     record = json.loads(path.read_text(encoding="utf-8"))
     if record.get("schema_version") != 1:
         raise ValueError("quarantine policy schema_version must be 1")
@@ -231,7 +340,19 @@ def load_policy(path: Path) -> StabilityPolicy:
 
 
 def parse_junit(path: Path) -> dict[str, TestStatus]:
-    """Parse pytest JUnit XML into stable test identifiers and statuses."""
+    """Parse pytest JUnit XML into stable test identifiers and statuses.
+
+    Args:
+        path: The JUnit XML report.
+
+    Returns:
+        The status of each test case by `classname::name`; an error takes
+        precedence over a failure, then a skip, else passed.
+
+    Raises:
+        ValueError: If a test case has no identifier or the report has no
+            test cases.
+    """
     root = ElementTree.parse(path).getroot()
     results: dict[str, TestStatus] = {}
     for case in root.iter("testcase"):
@@ -257,7 +378,19 @@ def parse_junit(path: Path) -> dict[str, TestStatus]:
 def run_pytest(
     arguments: Sequence[str], attempt: int, directory: Path
 ) -> StabilityRun:
-    """Run pytest once and parse its durable JUnit result."""
+    """Run pytest once and parse its durable JUnit result.
+
+    Args:
+        arguments: Pytest arguments (test paths and options).
+        attempt: The attempt number; it names the report file.
+        directory: Folder for the JUnit report.
+
+    Returns:
+        The attempt's exit status and test statuses.
+
+    Raises:
+        RuntimeError: If pytest produced no JUnit report.
+    """
     report_path = directory / f"attempt-{attempt}.xml"
     command = [
         sys.executable,
@@ -287,7 +420,16 @@ def run_pytest(
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Run the stability policy command."""
+    """Run the stability policy command.
+
+    Prints and writes the JSON report.
+
+    Args:
+        argv: Command-line arguments; `None` reads `sys.argv`.
+
+    Returns:
+        0 when the report passed, otherwise 1.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--runs", type=int, default=2)
     parser.add_argument("--quarantine", default="tests/quarantine.json")

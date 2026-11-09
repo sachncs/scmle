@@ -259,7 +259,18 @@ EXTENSION_SURFACES = {
 
 
 def stable_value(value: Any) -> Any:
-    """Convert a default value into deterministic JSON-native evidence."""
+    """Convert a default value into deterministic JSON-native evidence.
+
+    Args:
+        value: A parameter default; may be `inspect.Signature.empty`.
+
+    Returns:
+        `"<empty>"` for no default; an `{"enum", "value"}` record for an
+        enumeration member; a list for a list or tuple (sorted when all items
+        are enumeration members); a sorted list for a set; `"<factory>"` for
+        a dataclass factory; the value itself for a string, number, boolean
+        or None; otherwise its `str`.
+    """
     if value is inspect.Signature.empty:
         return "<empty>"
     if isinstance(value, enum.Enum):
@@ -286,7 +297,15 @@ def stable_value(value: Any) -> Any:
 
 
 def stable_annotation(annotation: Any) -> str:
-    """Return an annotation string stable across supported Python builds."""
+    """Return an annotation string stable across supported Python builds.
+
+    Args:
+        annotation: A parameter or return annotation.
+
+    Returns:
+        The annotation's text with the platform-specific `pathlib` module
+        names replaced by `pathlib.Path`.
+    """
     rendered = str(annotation)
     # Python 3.13 exposes the concrete platform-specific pathlib module in
     # ``str(Path)`` while other supported interpreters render ``pathlib``.
@@ -302,6 +321,14 @@ def signature_record(value: Any) -> dict[str, Any]:
     An enumeration is recorded by its members: `inspect.signature` of an
     `Enum` class differs between Python versions (3.11 and 3.12 describe the
     functional API differently), which made the same code look changed.
+
+    Args:
+        value: A public class or callable.
+
+    Returns:
+        For an enumeration, its `members` as (name, value) pairs; otherwise
+        the `parameters` (name, kind, annotation, default) and the
+        `return_annotation`.
     """
     if inspect.isclass(value) and issubclass(value, enum.Enum):
         return {
@@ -326,7 +353,14 @@ def signature_record(value: Any) -> dict[str, Any]:
 
 
 def signature_digest(value: Any) -> str:
-    """Return the digest of a canonical public signature record."""
+    """Return the digest of a canonical public signature record.
+
+    Args:
+        value: A public class or callable.
+
+    Returns:
+        The hex SHA-256 of the record's canonical JSON.
+    """
     content = json.dumps(
         signature_record(value),
         ensure_ascii=True,
@@ -337,7 +371,13 @@ def signature_digest(value: Any) -> str:
 
 
 def current_snapshot() -> dict[str, Any]:
-    """Return the current top-level API in canonical JSON form."""
+    """Return the current top-level API in canonical JSON form.
+
+    Returns:
+        The schema version, the release, the digest of each name in
+        `scmle.__all__` and the digest of each name of the extension
+        surfaces.
+    """
     exports: dict[str, Any] = {}
     for name in sorted(scmle.__all__):
         value = getattr(scmle, name)
@@ -370,7 +410,17 @@ def current_snapshot() -> dict[str, Any]:
 def differences(
     expected: dict[str, Any], observed: dict[str, Any]
 ) -> list[str]:
-    """Return human-readable compatibility differences."""
+    """Return human-readable compatibility differences.
+
+    Args:
+        expected: The committed snapshot.
+        observed: The snapshot of the current API.
+
+    Returns:
+        One message per difference (a changed schema version or release, or
+        an export or extension that was added, removed or changed); empty
+        when compatible.
+    """
     if expected.get("schema_version") != observed.get("schema_version"):
         return ["compatibility snapshot schema version changed"]
     differences_found: list[str] = []
@@ -407,7 +457,14 @@ def differences(
 
 
 def parse_arguments(arguments: list[str] | None = None) -> argparse.Namespace:
-    """Parse compatibility-check arguments."""
+    """Parse compatibility-check arguments.
+
+    Args:
+        arguments: Command-line arguments; `None` reads `sys.argv`.
+
+    Returns:
+        The namespace with the snapshot path and the `write` flag.
+    """
     parser = argparse.ArgumentParser(
         description="Check the public API compatibility snapshot."
     )
@@ -422,7 +479,15 @@ def parse_arguments(arguments: list[str] | None = None) -> argparse.Namespace:
 
 
 def main(arguments: list[str] | None = None) -> int:
-    """Return zero only when the current API matches the snapshot."""
+    """Return zero only when the current API matches the snapshot.
+
+    Args:
+        arguments: Command-line arguments; `None` reads `sys.argv`.
+
+    Returns:
+        0 after `--write` or when the API matches; 1 when it differs; 2 when
+        the snapshot cannot be read.
+    """
     options = parse_arguments(arguments)
     if options.write:
         options.snapshot.write_text(

@@ -16,7 +16,15 @@ DEFAULT_DIRECTORY = Path("deploy/local/golden")
 
 
 def build(directory: Path) -> str:
-    """Return the expected-output document for the files in `directory`."""
+    """Return the expected-output document for the files in `directory`.
+
+    Args:
+        directory: Folder with the model spec and the records.
+
+    Returns:
+        The JSON text of the closed-form expected outputs, with a comment and
+        a trailing newline.
+    """
     golden = parity.load_golden(directory)
     document = {
         "comment": "Closed-form outputs of model_spec.json on records.json. "
@@ -27,7 +35,15 @@ def build(directory: Path) -> str:
 
 
 def main(arguments: list[str] | None = None) -> int:
-    """Write the file, or with --check fail when it is stale."""
+    """Write the file, or with --check fail when it is stale.
+
+    Args:
+        arguments: Command-line arguments; `None` reads `sys.argv`.
+
+    Returns:
+        0 after writing or when the file is current; 1 when `--check` finds
+        it missing or different.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--directory", type=Path, default=DEFAULT_DIRECTORY)
     parser.add_argument("--check", action="store_true")

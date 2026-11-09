@@ -47,34 +47,77 @@ OPERATORS = {
 
 
 def canonical(value: Any) -> bytes:
-    """The bytes a digest or a signature covers."""
+    """The bytes a digest or a signature covers.
+
+    Args:
+        value: A JSON-serialisable value.
+
+    Returns:
+        Compact ASCII JSON with sorted keys, encoded as UTF-8.
+    """
     return json.dumps(
         value, ensure_ascii=True, separators=(",", ":"), sort_keys=True
     ).encode("utf-8")
 
 
 def digest(value: Any) -> str:
-    """SHA-256 of the canonical JSON of a value."""
+    """SHA-256 of the canonical JSON of a value.
+
+    Args:
+        value: A JSON-serialisable value.
+
+    Returns:
+        The hex digest.
+    """
     return hashlib.sha256(canonical(value)).hexdigest()
 
 
 def sign(value: Any, key: str) -> str:
-    """HMAC-SHA256 over the canonical JSON of a value."""
+    """HMAC-SHA256 over the canonical JSON of a value.
+
+    Args:
+        value: A JSON-serialisable value.
+        key: The signing key.
+
+    Returns:
+        The hex HMAC.
+    """
     return hmac.new(key.encode(), canonical(value), hashlib.sha256).hexdigest()
 
 
 def file_digest(path: Path) -> str:
-    """SHA-256 of a file's bytes."""
+    """SHA-256 of a file's bytes.
+
+    Args:
+        path: The file.
+
+    Returns:
+        The hex digest.
+    """
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def load(path: Path) -> Any:
-    """Reads a JSON file."""
+    """Reads a JSON file.
+
+    Args:
+        path: The file.
+
+    Returns:
+        The parsed content.
+    """
     return json.loads(path.read_text(encoding="utf-8"))
 
 
 def lines(path: Path) -> list[dict[str, Any]]:
-    """Reads a JSON-lines file."""
+    """Reads a JSON-lines file.
+
+    Args:
+        path: The file.
+
+    Returns:
+        One parsed object per non-blank line.
+    """
     return [
         json.loads(text)
         for text in path.read_text(encoding="utf-8").splitlines()
@@ -83,7 +126,16 @@ def lines(path: Path) -> list[dict[str, Any]]:
 
 
 def dotted(document: Any, path: str) -> Any:
-    """Follows ``a.b.0`` through mappings and lists."""
+    """Follows ``a.b.0`` through mappings and lists.
+
+    Args:
+        document: The mapping or list to start from.
+        path: Dot-separated keys; a part is an index when the current
+            value is a list.
+
+    Returns:
+        The value at the end of the path.
+    """
     for part in path.split("."):
         document = (
             document[int(part)]
@@ -94,10 +146,24 @@ def dotted(document: Any, path: str) -> Any:
 
 
 class Walk:
-    """Collects the checks of one walk and prints them as it goes."""
+    """Collects the checks of one walk and prints them as it goes.
+
+    Attributes:
+        directory: The trail folder.
+        base: The `retained` folder inside it.
+        keys: Verification keys by role.
+        failed: Number of failed checks so far.
+        unchecked: Number of signatures that could not be checked for lack
+            of a key.
+    """
 
     def __init__(self, directory: Path, keys: dict[str, str]) -> None:
-        """Binds the trail folder and the keys by role."""
+        """Binds the trail folder and the keys by role.
+
+        Args:
+            directory: The trail folder.
+            keys: Verification keys by role.
+        """
         self.directory = directory
         self.base = directory / "retained"
         self.keys = keys
@@ -105,11 +171,23 @@ class Walk:
         self.unchecked = 0
 
     def say(self, text: str = "") -> None:
-        """Prints a line."""
+        """Prints a line.
+
+        Args:
+            text: The line.
+        """
         print(text)
 
     def check(self, passed: bool, text: str) -> bool:
-        """Prints a check and counts a failure."""
+        """Prints a check and counts a failure.
+
+        Args:
+            passed: Whether the check held.
+            text: What was checked.
+
+        Returns:
+            The value of `passed`.
+        """
         self.say(f"  [{'ok' if passed else 'FAIL'}] {text}")
         if not passed:
             self.failed += 1
@@ -118,7 +196,18 @@ class Walk:
     def signed(
         self, payload: Any, signature: str | None, role: str, text: str
     ) -> bool:
-        """Checks an HMAC with the role's key, or notes it is unchecked."""
+        """Checks an HMAC with the role's key, or notes it is unchecked.
+
+        Args:
+            payload: The signed value.
+            signature: The recorded signature, or None.
+            role: Whose key to use.
+            text: What was signed, for the printed line.
+
+        Returns:
+            True if the signature matches; False if it is missing or wrong, or
+            if no key is supplied for the role (counted as unchecked).
+        """
         key = self.keys.get(role)
         if not signature:
             return self.check(False, f"{text}: no signature")
@@ -134,7 +223,14 @@ class Walk:
     def criteria(
         self, items: list[dict[str, Any]], derived: dict[str, Any]
     ) -> None:
-        """Evaluates ``file#path op value`` criteria on the records."""
+        """Evaluates ``file#path op value`` criteria on the records.
+
+        Args:
+            items: Criteria with `id`, `path` (`file#dotted.path`), `op`,
+                `value` and an optional `reason`.
+            derived: Documents computed by the walk, used instead of a retained
+                file when the criterion names them.
+        """
         for item in items:
             name, _, path = item["path"].partition("#")
             document = (
@@ -149,7 +245,11 @@ class Walk:
             )
 
     def files_and_chain(self) -> dict[str, Any]:
-        """Step 1: sealed files and the step chain."""
+        """Step 1: sealed files and the step chain.
+
+        Returns:
+            The parsed `trail.json`.
+        """
         self.say("1. Sealed records and the step chain")
         trail = load(self.directory / "trail.json")
         for relative, held in sorted(trail["retained"].items()):
@@ -174,7 +274,11 @@ class Walk:
         return trail
 
     def question(self) -> dict[str, Any]:
-        """Step 2: the chartered question."""
+        """Step 2: the chartered question.
+
+        Returns:
+            The charter wrapper (charter, hash and signature).
+        """
         self.say("2. The business question")
         wrapper = load(self.base / "run/analysis_charter.json")
         charter = wrapper["charter"]
@@ -193,7 +297,15 @@ class Walk:
     def framing(
         self, charter_hash: str, charter: dict[str, Any]
     ) -> tuple[dict[str, Any], float]:
-        """Step 3: the framing and the cost model."""
+        """Step 3: the framing and the cost model.
+
+        Args:
+            charter_hash: The charter's hash.
+            charter: The charter.
+
+        Returns:
+            The cost model and the cost-minimising cut on the probability.
+        """
         self.say("3. Framing and the decision-cost model")
         draft = load(self.base / "framing/framing_draft.json")
         costs = load(self.base / "framing/decision_cost_model.json")
@@ -218,7 +330,16 @@ class Walk:
     def outcomes(
         self, costs: dict[str, Any], cut: float
     ) -> tuple[dict[str, Any], dict[str, Any]]:
-        """Costs the observed outcomes and compares them with the range."""
+        """Costs the observed outcomes and compares them with the range.
+
+        Args:
+            costs: The chartered cost model.
+            cut: The cost-minimising cut on the probability.
+
+        Returns:
+            The observed-outcome feed and a summary with the number of cases,
+            the mean cost and its 95 percent normal-approximation interval.
+        """
         feed = load(self.base / "deployment/observed_outcomes.json")
         self.check(
             abs(feed["threshold"] - cut) < 1e-9,
@@ -305,7 +426,12 @@ class Walk:
     def selection_and_approval(
         self, inputs: dict[str, Any], trail: dict[str, Any]
     ) -> None:
-        """Step 6: model identity and the signed approval."""
+        """Step 6: model identity and the signed approval.
+
+        Args:
+            inputs: The stakeholder and reviewer inputs.
+            trail: The parsed `trail.json`.
+        """
         self.say("6. Selection, registry and the signed approval")
         evaluation = load(self.base / "run/evaluation.json")
         content_id = file_digest(self.base / "run/model/model_manifest.json")
@@ -347,7 +473,11 @@ class Walk:
         )
 
     def deployment(self, trail: dict[str, Any]) -> None:
-        """Step 7: the deployment ledger."""
+        """Step 7: the deployment ledger.
+
+        Args:
+            trail: The parsed `trail.json`.
+        """
         self.say("7. The deployment ledger")
         rows = lines(self.base / "deployment/deployment_ledger.jsonl")
         previous, intact = GENESIS, True
@@ -384,7 +514,16 @@ class Walk:
 
 
 def main(arguments: list[str]) -> int:
-    """Entry point."""
+    """Entry point.
+
+    Args:
+        arguments: Command-line arguments (the trail folder and `--keys`).
+
+    Returns:
+        0 when every check passed with keys supplied; 1 when a check failed
+        or a needed record is missing or malformed; 2 when no key was
+        supplied for some signature, so it was not checked.
+    """
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("trail_dir", type=Path)
     parser.add_argument("--keys", type=Path, help="JSON: role -> key")

@@ -57,13 +57,26 @@ LICENSE_TEXT_PATTERNS = {
 def metadata_value(
     package_metadata: metadata.PackageMetadata, field: str
 ) -> str:
-    """Returns the first value for a metadata field, if present."""
+    """Returns the first value for a metadata field, if present.
+
+    Args:
+        package_metadata: The distribution's metadata.
+        field: Metadata field name.
+
+    Returns:
+        The first value of the field, or an empty string when it has none.
+    """
     values = package_metadata.get_all(field) or []
     return values[0] if values else ""
 
 
 def distribution_map() -> dict[str, metadata.Distribution]:
-    """Returns installed distributions keyed by normalized name."""
+    """Returns installed distributions keyed by normalized name.
+
+    Returns:
+        Mapping of lower-case, hyphenated distribution name to the
+        distribution; distributions without a name are skipped.
+    """
     return {
         name.lower().replace("_", "-"): distribution
         for distribution in metadata.distributions()
@@ -72,7 +85,17 @@ def distribution_map() -> dict[str, metadata.Distribution]:
 
 
 def dependency_names(project_file: Path, include_all_extras: bool) -> set[str]:
-    """Returns the project's declared runtime dependency roots."""
+    """Returns the project's declared runtime dependency roots.
+
+    Args:
+        project_file: Path of `pyproject.toml`.
+        include_all_extras: Whether the optional dependency groups count as
+            roots too.
+
+    Returns:
+        Normalized names of the requirements whose environment marker is
+        absent or true in this environment.
+    """
     project = tomllib.loads(project_file.read_text(encoding="utf-8"))["project"]
     requirements = list(project.get("dependencies", []))
     if include_all_extras:
@@ -91,7 +114,18 @@ def dependency_names(project_file: Path, include_all_extras: bool) -> set[str]:
 def applicable_requirements(
     distribution: metadata.Distribution,
 ) -> Iterable[str]:
-    """Yields dependency names whose installed markers apply."""
+    """Yields dependency names whose installed markers apply.
+
+    Args:
+        distribution: The installed distribution whose requirements to read.
+
+    Yields:
+        The normalized name of each requirement whose marker is absent or
+        true in this environment.
+
+    Raises:
+        RuntimeError: If a requirement string cannot be parsed.
+    """
     for requirement in distribution.requires or []:
         try:
             from packaging.requirements import Requirement
@@ -108,7 +142,20 @@ def applicable_requirements(
 def license_evidence(
     distribution: metadata.Distribution,
 ) -> tuple[str, str]:
-    """Returns a normalized license label and its metadata source."""
+    """Returns a normalized license label and its metadata source.
+
+    The sources are tried in order: the `License-Expression` field, the
+    license classifiers, the first line of the `License` field and the
+    license files.
+
+    Args:
+        distribution: The installed distribution.
+
+    Returns:
+        The license label and the source that gave it: `license-expression`,
+        `classifier`, `license-field`, `license-file`, or `UNKNOWN` with
+        `missing-metadata`.
+    """
     expression = metadata_value(
         distribution.metadata, "License-Expression"
     ).strip()
@@ -141,7 +188,16 @@ def license_evidence(
 
 
 def license_file_evidence(distribution: metadata.Distribution) -> str:
-    """Returns recognized license names from a distribution license file."""
+    """Returns recognized license names from a distribution license file.
+
+    Args:
+        distribution: The installed distribution.
+
+    Returns:
+        The recognized license names joined by ` OR ` (sorted), found by
+        matching known phrases in the first 128 KiB of each license file;
+        empty when there is no recognized file.
+    """
     if not distribution.files:
         return ""
     recognized: set[str] = set()
@@ -170,7 +226,18 @@ def license_file_evidence(distribution: metadata.Distribution) -> str:
 def collect_inventory(
     project_file: Path, include_all_extras: bool
 ) -> tuple[list[dict[str, str]], list[str]]:
-    """Collects the transitive runtime closure and missing roots."""
+    """Collects the transitive runtime closure and missing roots.
+
+    Args:
+        project_file: Path of `pyproject.toml`.
+        include_all_extras: Whether the optional dependency groups count as
+            roots too.
+
+    Returns:
+        The inventory (name, version, license and evidence of each installed
+        distribution reachable from the roots, sorted by name and version)
+        and the roots that are not installed.
+    """
     installed = distribution_map()
     pending = sorted(dependency_names(project_file, include_all_extras))
     missing = [name for name in pending if name not in installed]
@@ -203,7 +270,17 @@ def collect_inventory(
 def validate_inventory(
     inventory: list[dict[str, str]], missing: list[str]
 ) -> None:
-    """Fails when the runtime closure is incomplete or policy-violating."""
+    """Fails when the runtime closure is incomplete or policy-violating.
+
+    Args:
+        inventory: The inventory from `collect_inventory`.
+        missing: The declared roots that are not installed.
+
+    Raises:
+        SystemExit: With the failure messages if a root is not installed, a
+            package has no license evidence or a license matches the
+            forbidden pattern.
+    """
     failures = [f"missing installed dependency: {name}" for name in missing]
     for package in inventory:
         if package["license"] == "UNKNOWN":
@@ -217,7 +294,12 @@ def validate_inventory(
 
 
 def parse_arguments() -> argparse.Namespace:
-    """Parses command-line options."""
+    """Parses command-line options.
+
+    Returns:
+        The namespace with the project file, output path and `all_extras`
+        flag.
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--project-file", type=Path, default=Path("pyproject.toml")
@@ -232,7 +314,12 @@ def parse_arguments() -> argparse.Namespace:
 
 
 def main() -> None:
-    """Writes the deterministic inventory and enforces the license policy."""
+    """Writes the deterministic inventory and enforces the license policy.
+
+    An inventory that fails validation ends the process through the
+    `SystemExit` that `validate_inventory` raises, before anything is
+    written.
+    """
     arguments = parse_arguments()
     inventory, missing = collect_inventory(
         arguments.project_file, arguments.all_extras

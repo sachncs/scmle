@@ -14,7 +14,19 @@ DEFAULT_MANIFEST = Path(__file__).with_name("pytest_skip_manifest.json")
 def load_skip_rules(
     path: Path = DEFAULT_MANIFEST,
 ) -> tuple[tuple[str, re.Pattern[str]], ...]:
-    """Load the approved skip taxonomy from the checked-in manifest."""
+    """Load the approved skip taxonomy from the checked-in manifest.
+
+    Args:
+        path: The manifest JSON file.
+
+    Returns:
+        The (category, compiled reason pattern) pairs, in manifest order.
+
+    Raises:
+        ValueError: If the manifest lacks `approved_categories` or `rules`,
+            a rule is not an object, or a rule has an unapproved category or
+            a non-text pattern.
+    """
     manifest = json.loads(path.read_text(encoding="utf-8"))
     categories = manifest.get("approved_categories")
     rules = manifest.get("rules")
@@ -40,7 +52,16 @@ def load_skip_rules(
 def classify_reason(
     reason: str, rules: tuple[tuple[str, re.Pattern[str]], ...]
 ) -> str | None:
-    """Return the approved category for a reason, if one is registered."""
+    """Return the approved category for a reason, if one is registered.
+
+    Args:
+        reason: The skip reason text.
+        rules: The (category, pattern) pairs from `load_skip_rules`.
+
+    Returns:
+        The category of the first rule whose pattern matches the whole
+        reason, or None when no rule matches.
+    """
     for category, pattern in rules:
         if pattern.fullmatch(reason):
             return category
@@ -48,7 +69,15 @@ def classify_reason(
 
 
 def parse_skips(path: Path) -> tuple[tuple[str, str], ...]:
-    """Return stable test identifiers and reasons from a JUnit report."""
+    """Return stable test identifiers and reasons from a JUnit report.
+
+    Args:
+        path: The JUnit XML report.
+
+    Returns:
+        One (`classname::name`, reason) pair per skipped test, with any
+        `Skipped:` prefix removed from the reason.
+    """
     root = ElementTree.parse(path).getroot()
     records: list[tuple[str, str]] = []
     for case in root.iter("testcase"):
@@ -65,7 +94,15 @@ def parse_skips(path: Path) -> tuple[tuple[str, str], ...]:
 
 
 def parse_xfails(path: Path) -> tuple[tuple[str, str], ...]:
-    """Return test identifiers and reasons for xfail or xpass outcomes."""
+    """Return test identifiers and reasons for xfail or xpass outcomes.
+
+    Args:
+        path: The JUnit XML report.
+
+    Returns:
+        One (`classname::name`, reason) pair per test with an xfail or xpass
+        outcome; the reason is the outcome's message or its text.
+    """
     root = ElementTree.parse(path).getroot()
     records: list[tuple[str, str]] = []
     for case in root.iter("testcase"):
@@ -86,7 +123,14 @@ def parse_xfails(path: Path) -> tuple[tuple[str, str], ...]:
 
 
 def parse_arguments(arguments: list[str] | None = None) -> argparse.Namespace:
-    """Parse the JUnit report path."""
+    """Parse the JUnit report path.
+
+    Args:
+        arguments: Command-line arguments; `None` reads `sys.argv`.
+
+    Returns:
+        The namespace with the report path and the (hidden) manifest path.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("report", type=Path)
     parser.add_argument(
@@ -99,7 +143,17 @@ def parse_arguments(arguments: list[str] | None = None) -> argparse.Namespace:
 
 
 def main(arguments: list[str] | None = None) -> int:
-    """Return zero only when skips are approved and no xfail is collected."""
+    """Return zero only when skips are approved and no xfail is collected.
+
+    Prints a JSON summary of the skips, categories and xfails.
+
+    Args:
+        arguments: Command-line arguments; `None` reads `sys.argv`.
+
+    Returns:
+        0 when every skip has a reason that matches an approved category and
+        no xfail or xpass is recorded; otherwise 1.
+    """
     options = parse_arguments(arguments)
     records = parse_skips(options.report)
     rules = load_skip_rules(options.manifest)

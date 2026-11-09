@@ -22,7 +22,18 @@ from urllib.request import urlopen
 
 
 def artifact_records(directory: Path) -> list[dict[str, Any]]:
-    """Return deterministic digests for the wheel and source archives."""
+    """Return deterministic digests for the wheel and source archives.
+
+    Args:
+        directory: Folder holding the built artifacts.
+
+    Returns:
+        One record per `.whl` or `.tar.gz` file, sorted by name, with its
+        name, SHA-256 and size in bytes.
+
+    Raises:
+        ValueError: If the folder holds no wheel or source archive.
+    """
     paths = sorted(
         path
         for path in directory.iterdir()
@@ -41,7 +52,15 @@ def artifact_records(directory: Path) -> list[dict[str, Any]]:
 
 
 def request_bytes(url: str, timeout: float = 30.0) -> bytes:
-    """Fetch a public release response without credentials."""
+    """Fetch a public release response without credentials.
+
+    Args:
+        url: The URL to fetch.
+        timeout: Seconds to wait for the response.
+
+    Returns:
+        The response body.
+    """
     request = Request(
         url,
         headers={
@@ -54,7 +73,18 @@ def request_bytes(url: str, timeout: float = 30.0) -> bytes:
 
 
 def request_json(url: str, timeout: float = 30.0) -> dict[str, Any]:
-    """Fetch and decode one public JSON response."""
+    """Fetch and decode one public JSON response.
+
+    Args:
+        url: The URL to fetch.
+        timeout: Seconds to wait for the response.
+
+    Returns:
+        The decoded JSON object.
+
+    Raises:
+        ValueError: If the response is not a JSON object.
+    """
     value = json.loads(request_bytes(url, timeout=timeout))
     if not isinstance(value, dict):
         raise ValueError(f"expected JSON object from {url}")
@@ -64,7 +94,21 @@ def request_json(url: str, timeout: float = 30.0) -> dict[str, Any]:
 def retry_json(
     url: str, attempts: int, delay: float, timeout: float
 ) -> dict[str, Any]:
-    """Retry an eventually consistent public endpoint."""
+    """Retry an eventually consistent public endpoint.
+
+    Args:
+        url: The URL to fetch.
+        attempts: Maximum number of tries, at least 1.
+        delay: Seconds to wait between tries.
+        timeout: Seconds to wait for each response.
+
+    Returns:
+        The first JSON object successfully fetched. After the last failed
+        try the error of that try (`OSError` or `ValueError`) is re-raised.
+
+    Raises:
+        ValueError: If `attempts` is less than 1.
+    """
     if attempts < 1:
         raise ValueError("attempts must be positive")
     failure: Exception | None = None
@@ -91,7 +135,32 @@ def verify_external_release(
     delay: float = 0.0,
     timeout: float = 30.0,
 ) -> dict[str, Any]:
-    """Verify GitHub Release and PyPI publication against local artifacts."""
+    """Verify GitHub Release and PyPI publication against local artifacts.
+
+    Args:
+        repository: GitHub repository as `owner/name`.
+        tag: Release tag, starting with `v`; the PyPI version is the tag
+            without the `v`.
+        source_commit: The 40-character commit SHA the tag must name.
+        artifact_directory: Folder with the locally built artifacts.
+        pypi_project: Project name on PyPI.
+        github_api: Base URL of the GitHub API.
+        pypi_api: Base URL of the PyPI JSON API.
+        attempts: Tries per endpoint.
+        delay: Seconds between tries.
+        timeout: Seconds to wait for each response.
+
+    Returns:
+        The evidence: the local artifact digests, the digests found on the
+        GitHub release and on PyPI, the failures and `passed`, true only when
+        there are no failures and both publications carry exactly the local
+        artifacts.
+
+    Raises:
+        ValueError: If the repository, tag or commit has the wrong form (a
+            missing artifact or an unusable response also raises
+            `ValueError` from the helpers).
+    """
     if not repository or "/" not in repository:
         raise ValueError("repository must be in owner/name form")
     if not tag.startswith("v"):
@@ -183,7 +252,15 @@ def verify_external_release(
 
 
 def parse_arguments(arguments: list[str] | None = None) -> argparse.Namespace:
-    """Parse public release verification arguments."""
+    """Parse public release verification arguments.
+
+    Args:
+        arguments: Command-line arguments; `None` reads `sys.argv`.
+
+    Returns:
+        The namespace with the repository, tag, commit, artifact folder,
+        endpoints, retry settings and output path.
+    """
     parser = argparse.ArgumentParser(
         description="Verify public GitHub and PyPI release digests."
     )
@@ -202,7 +279,17 @@ def parse_arguments(arguments: list[str] | None = None) -> argparse.Namespace:
 
 
 def main(arguments: list[str] | None = None) -> int:
-    """Run public release checks and return a release-safe exit status."""
+    """Run public release checks and return a release-safe exit status.
+
+    Prints the evidence and writes it to `--output` when given.
+
+    Args:
+        arguments: Command-line arguments; `None` reads `sys.argv`.
+
+    Returns:
+        0 when the evidence passed; 1 when it did not; 2 when the
+        verification could not run (an I/O error or invalid input).
+    """
     options = parse_arguments(arguments)
     try:
         evidence = verify_external_release(

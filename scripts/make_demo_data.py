@@ -24,7 +24,17 @@ PLANS = ["basic", "pro", "team"]
 
 
 def make_frame(rows: int, seed: int, reverse: bool = False) -> pd.DataFrame:
-    """Customers with a churn label that depends on their features."""
+    """Customers with a churn label that depends on their features.
+
+    Args:
+        rows: Number of customers.
+        seed: Seed of the random generator.
+        reverse: Whether to reverse the label relationship.
+
+    Returns:
+        A frame with age, balance, tenure in months, plan and the 0/1
+        `churned` label.
+    """
     rng = np.random.default_rng(seed)
     frame = pd.DataFrame(
         {
@@ -47,7 +57,11 @@ def make_frame(rows: int, seed: int, reverse: bool = False) -> pd.DataFrame:
 
 
 def datasets() -> dict[str, pd.DataFrame]:
-    """The four demo tables by file name."""
+    """The four demo tables by file name.
+
+    Returns:
+        Mapping of file name to table.
+    """
     return {
         "train.csv": make_frame(800, 101),
         "bad_release_train.csv": make_frame(800, 101, reverse=True),
@@ -57,12 +71,27 @@ def datasets() -> dict[str, pd.DataFrame]:
 
 
 def render(frame: pd.DataFrame) -> str:
-    """The exact CSV text of a table."""
+    """The exact CSV text of a table.
+
+    Args:
+        frame: The table.
+
+    Returns:
+        CSV text without the index and with Unix line endings.
+    """
     return frame.to_csv(index=False, lineterminator="\n")
 
 
 def main(arguments: list[str] | None = None) -> int:
-    """Write the files, or with --check compare them."""
+    """Write the files, or with --check compare them.
+
+    Args:
+        arguments: Command-line arguments; `None` reads `sys.argv`.
+
+    Returns:
+        0 after writing or when the committed files match; 1 when `--check`
+        finds a file missing or different.
+    """
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--directory", type=Path, default=DEFAULT_DIRECTORY)
     parser.add_argument("--check", action="store_true")

@@ -18,12 +18,30 @@ DEFAULT_DIRECTORY = Path("deploy/local/golden")
 
 
 def run(url: str, directory: Path, level: str, timeout: float) -> dict:
-    """Return the parity report for the service at `url`."""
+    """Return the parity report for the service at `url`.
+
+    Args:
+        url: Base URL of the running service.
+        directory: Folder with the golden records and expected outputs.
+        level: `same_process` or `cross_environment` tolerance.
+        timeout: Seconds to wait for the answer.
+
+    Returns:
+        The report from `parity.check_remote`; its `passed` key says whether
+        every label matched and every probability was within tolerance.
+    """
     return parity.check_remote(url, directory, level, timeout)
 
 
 def main(arguments: list[str] | None = None) -> int:
-    """Run the check; print the report as JSON."""
+    """Run the check; print the report as JSON.
+
+    Args:
+        arguments: Command-line arguments; `None` reads `sys.argv`.
+
+    Returns:
+        0 when the report passed, otherwise 1.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--url", required=True)
     parser.add_argument("--directory", type=Path, default=DEFAULT_DIRECTORY)

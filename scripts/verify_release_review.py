@@ -13,7 +13,15 @@ DEFAULT_REQUIRED_KINDS = [kind.value for kind in review.ReviewClaimKind]
 
 
 def parse_arguments(arguments: list[str] | None = None) -> argparse.Namespace:
-    """Parse the review verification command line."""
+    """Parse the review verification command line.
+
+    Args:
+        arguments: Command-line arguments; `None` reads `sys.argv`.
+
+    Returns:
+        The namespace with the review path, source commit, required claim
+        kinds and the name of the signing-key environment variable.
+    """
     parser = argparse.ArgumentParser(
         description="Verify signed independent release review evidence."
     )
@@ -35,7 +43,16 @@ def parse_arguments(arguments: list[str] | None = None) -> argparse.Namespace:
 
 
 def main(arguments: list[str] | None = None) -> int:
-    """Return zero only when the signed review satisfies every gate."""
+    """Return zero only when the signed review satisfies every gate.
+
+    Args:
+        arguments: Command-line arguments; `None` reads `sys.argv`.
+
+    Returns:
+        0 when the review is accepted; 1 when the acceptance gate is not
+        satisfied; 2 when the signing key is missing or the review cannot be
+        read or verified.
+    """
     options = parse_arguments(arguments)
     signing_key = os.environ.get(options.signing_key_env)
     if not signing_key:
