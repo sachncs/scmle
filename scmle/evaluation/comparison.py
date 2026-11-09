@@ -73,7 +73,12 @@ def compare_paired(
             the usual value for k-fold cross-validation.
 
     Returns:
-        The posterior probabilities.
+        The comparison: the mean difference, the posterior probabilities
+        that the first is better, that they are equivalent and that the
+        second is better, and the number of folds. When every fold
+        difference is equal, the probabilities are 0 or 1 according to
+        whether the mean difference lies inside the ROPE or on which side
+        it lies outside.
 
     Raises:
         ValueError: If the score lists differ in length or are too short.

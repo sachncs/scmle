@@ -185,9 +185,10 @@ class NetBenefitReport:
         rows: Rows in the table.
         clusters: Clusters (equal to `rows` when rows are independent).
         claim: `useful` or `not_useful_in_range`.
-        useful_range: Largest `(t_lo, t_hi)` grid span on which the lower
-            bounds are all positive and that contains the first positive
-            point, or None.
+        useful_range: First and last grid value of the longest run of
+            consecutive grid points at which the lower bound is positive
+            against every baseline (the earliest run if several tie), or
+            None if there is no such point.
     """
 
     thresholds: tuple[float, ...]
@@ -265,7 +266,8 @@ def net_benefit_band(
         alpha: One-sided level of the band.
         replicates: Bootstrap replicates (the charter's `permutations_b`).
         seed: Seed of the bootstrap stream.
-        points: Grid points on the range.
+        points: Grid points on the range; ignored (one point) when the
+            range is a single value.
 
     Returns:
         The report, including the claim `useful` or `not_useful_in_range`.
@@ -341,7 +343,8 @@ class FinalNetBenefit:
 
     The rule is registered by its hash before the final table is read; the
     second call raises, so the interval is valid for the frozen rule and one
-    look.
+    look. The table counts as evaluated once the hash check passes, even if
+    the band then rejects its input.
 
     Attributes:
         frozen: The registered hash of the frozen rule.

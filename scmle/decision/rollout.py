@@ -171,8 +171,8 @@ def metric_values(
 class Rollout:
     """One experiment: a challenger against the champion.
 
-    The level is assigned from the `DecisionBudget` before any traffic and is
-    spent whether or not the experiment ends in a promotion.
+    The level is supplied by the caller, assigned from the `DecisionBudget`
+    before any traffic; nothing in this class draws on the budget.
 
     Attributes:
         plan: The rollout plan.
@@ -350,12 +350,15 @@ class RollbackMonitor:
         low: float = 0.0,
         high: float = 1.0,
     ) -> None:
-        """Starts the monitor with the champion's own rollback level.
+        """Starts a monitor for one promoted champion.
 
         Args:
             tolerance: Largest drop of the new champion against the old one
                 that is accepted, in metric units.
-            alpha_rollback: Level at which a rollback is triggered.
+            alpha_rollback: Level of the monitor: the e-process triggers a
+                rollback once it reaches `1 / alpha_rollback`, and a champion
+                no worse than `tolerance` is rolled back with probability at
+                most this value.
             new_prob: Probability that a unit is served the new champion.
             low: Smallest value of the metric.
             high: Largest value of the metric.
@@ -408,10 +411,12 @@ class RollbackMonitor:
 
 
 class DecisionLog:
-    """Hash-chained rows of the rollout decisions (`rollout_decisions.jsonl`).
+    """Hash-chained rows of the rollout decisions.
 
-    Each row carries the SHA-256 of the previous row, so a replay reproduces
-    the chain bit for bit and any edit is detected.
+    The pipeline writes it as `rollout_decisions.jsonl`. Each row carries the
+    SHA-256 of the previous row, so a replay reproduces the chain bit for bit
+    and `verify` fails if a row is edited, reordered or removed from before
+    the last row. Rows dropped from the end of the chain are not detected.
 
     Attributes:
         rows: The records in order, each with `seq`, `kind`, `body`,
@@ -474,7 +479,7 @@ class DecisionLog:
 
     @classmethod
     def read(cls, path: str | Path) -> "DecisionLog":
-        """Reads rows back; the chain is verified by `verify`.
+        """Reads rows back without verifying the chain; see `verify`.
 
         Args:
             path: A file of JSON lines written by `write`.

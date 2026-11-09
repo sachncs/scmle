@@ -51,13 +51,16 @@ def differential_missingness(
         level: Level of the anytime-valid test, in (0, 1).
 
     Returns:
+        A mapping with `status` (always `described`), `label`,
         `differential` (whether the Bayes factor ever reached `1 / level`),
-        the log Bayes factor at the end, the number of missing units, the
-        unit at which it first crossed (or None), and a description.
+        `missing_units`, `log_bayes_factor` at the last unit (0.0 when no
+        unit is missing), `first_unit` (the 1-based unit at which it first
+        crossed, or None), `level` and `note`.
 
     Raises:
-        ValueError: On unequal lengths, arms other than 0 and 1, or a
-            probability or level outside (0, 1).
+        ValueError: If `arm` and `observed` are not one-dimensional and of
+            equal length, if `arm` holds values other than 0 and 1, or if
+            `assignment_prob` or `level` lies outside (0, 1).
     """
     a = np.asarray(arm, dtype=float)
     seen = np.asarray(observed, dtype=bool)

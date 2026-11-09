@@ -52,10 +52,13 @@ def balance_test(
         level: Size of the test; `balanced` is `p_value > level`.
 
     Returns:
-        The statistic, the permutation p-value `(1 + #extreme) / (B + 1)`,
-        `balanced`, and what was and was not looked at. `balanced` and
-        `p_value` are None when there is no numeric covariate or one arm is
-        empty.
+        A mapping with `statistic`, the permutation p-value `p_value` =
+        `(1 + #extreme) / (B + 1)`, `balanced`, `level`, `permutations`,
+        `covariates` (the number of numeric covariates with non-zero spread
+        that entered the statistic) and `note` on what was and was not
+        looked at. `statistic`, `p_value` and `balanced` are None when no
+        such covariate remains or one arm is empty. Non-finite covariate
+        values are replaced by the column median.
 
     Raises:
         ValueError: On unequal lengths, no permutations, or a level outside

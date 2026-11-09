@@ -118,14 +118,18 @@ def coverage_summary(
 
     Args:
         covered: Boolean array, one entry per scored row.
-        widths: Interval widths (or set sizes), for the mean.
+        widths: Interval widths (or set sizes), for the mean; the mean is
+            None when this is None or empty, or any width is infinite.
         nominal: The requested coverage.
         tolerance: Slack below nominal that still counts as met.
         level: Confidence level of the interval.
 
     Returns:
-        Counts, the observed share, the Clopper-Pearson limits, the mean
-        width and whether the lower limit reaches `nominal - tolerance`.
+        A mapping with `nominal`, `rows`, `covered` (the count), `coverage`
+        (the observed share, NaN with no rows), the Clopper-Pearson `lower`
+        and `upper` limits, `level`, `tolerance`, `mean_width` and
+        `meets_nominal` (whether the lower limit reaches
+        `nominal - tolerance`; False with no rows).
     """
     flags = np.asarray(covered, dtype=bool)
     rows = int(flags.size)
@@ -172,8 +176,11 @@ def slice_coverage(
         level: Confidence level of each reported interval.
 
     Returns:
-        `slices` (n, coverage, interval, p-value, `flagged`), `skipped` and
-        the number of tests in the family.
+        A mapping with `nominal`, `familywise`, `tests` (the family size),
+        `skipped`, `slices` (a list of records with `slice`, `rows`,
+        `covered`, `coverage`, `lower`, `upper`, `p_value` and `flagged`,
+        in sorted label order) and `flagged` (the flagged slice names).
+        Labels are compared as text.
     """
     flags = np.asarray(covered, dtype=bool)
     names = np.asarray([str(label) for label in labels])
@@ -239,8 +246,10 @@ def slice_flag(
         min_rows: Smallest slice that is tested.
 
     Returns:
-        `slices` (name to `p_value` and `flagged`), `flagged` (the names),
-        `floor`, `margin` and the number of tests.
+        A mapping with `nominal`, `margin`, `floor` (`nominal - margin`),
+        `familywise`, `tests` (the family size), `slices` (slice name to
+        its `rows`, `p_value` and `flagged`) and `flagged` (the flagged
+        names). Labels are compared as text.
     """
     flags = np.asarray(covered, dtype=bool)
     names = np.asarray([str(label) for label in labels])

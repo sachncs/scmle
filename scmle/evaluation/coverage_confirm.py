@@ -185,8 +185,9 @@ def capped(task: str, status: str) -> str:
         status: The status from the coverage test.
 
     Returns:
-        `status` unchanged unless it is `confirmed`, in which case the
-        task type's tier ceiling applies.
+        `status` unchanged unless it is `confirmed`; a `confirmed` status
+        stays so if the task type passed its gate and becomes `unverified`
+        otherwise.
     """
     if status != CONFIRMED:
         return status
@@ -317,7 +318,10 @@ def build_runner(
     task: str,
     claim_sha256: str,
 ) -> confirm.ClaimRunner | None:
-    """The registered claim, or None when the task or bundle has no interval.
+    """The runner of the registered claim, or None when there is none.
+
+    There is none when the task type has no served interval or set, or the
+    bundle holds no calibration.
 
     Args:
         bundle: The frozen bundle, calibration included.
@@ -325,7 +329,8 @@ def build_runner(
         claim_sha256: Hash of `coverage_claim.json`.
 
     Returns:
-        A runner holding the registration and the evaluation of `C`, or None.
+        A runner holding the registration and the evaluation of `C`, or
+        None.
     """
     choice = primary_choice(task)
     if choice is None or bundle.conformal is None:

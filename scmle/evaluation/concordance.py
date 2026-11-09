@@ -16,8 +16,9 @@ def concordance_index(
 ) -> float:
     """Harrell's concordance index.
 
-    Among comparable pairs (the earlier row had the event), the share where
-    the earlier row got the higher risk; tied risks count half. 0.5 is chance
+    Among comparable pairs (the earlier row had the event and the other row
+    has a strictly later time), the share where the earlier row got the
+    higher risk; tied risks count half. 0.5 is chance
     and 1.0 is a perfect ordering.
 
     Args:

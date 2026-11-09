@@ -83,8 +83,9 @@ def weighted_quantile(
         coverage: Desired coverage in (0, 1).
 
     Returns:
-        The weighted quantile, infinity when the calibration mass cannot
-        reach `coverage`.
+        The weighted quantile; infinity when the calibration mass cannot
+        reach `coverage` or when the total mass, test weight included, is
+        not positive.
 
     Raises:
         ValueError: On a length mismatch or a negative weight.
@@ -115,7 +116,9 @@ def weighted_margins(
     """`weighted_quantile` for many test weights at once.
 
     Equal to calling `weighted_quantile` once per test weight (the tests
-    check this); sorts the calibration scores a single time.
+    check this), except when every calibration weight and the test weight
+    are zero: `weighted_quantile` then gives infinity, this function the
+    smallest score. It sorts the calibration scores a single time.
 
     Args:
         scores: Nonconformity scores on held-out rows.
@@ -176,7 +179,9 @@ def cv_plus_bounds(
         Lower and upper limits, one per prediction row.
 
     Raises:
-        ValueError: On a bad coverage or inconsistent shapes.
+        ValueError: If `coverage` is not strictly between 0 and 1,
+            `fold_of_row` and `residuals` differ in length, or a fold index
+            lies outside `0 .. K-1`.
     """
     if not 0.0 < coverage < 1.0:
         raise ValueError("coverage must lie strictly between 0 and 1")
@@ -360,7 +365,8 @@ class ConformalCalibrator:
             margin.
 
         Raises:
-            ValueError: For a classification calibrator.
+            ValueError: For a classification calibrator or a coverage not
+                strictly between 0 and 1.
         """
         if self.kind != "regression":
             raise ValueError("intervals need a regression calibrator")
@@ -435,7 +441,9 @@ class ConformalCalibrator:
             reach `coverage`).
 
         Raises:
-            ValueError: For a classification calibrator or bad lengths.
+            ValueError: For a classification calibrator, if `predictions`
+                and `test_weights` or the scores and `calibration_weights`
+                differ in length, or if a weight is negative.
         """
         if self.kind != "regression":
             raise ValueError("intervals need a regression calibrator")
@@ -470,7 +478,9 @@ class ConformalCalibrator:
             exceed the margin, in the order of `classes`.
 
         Raises:
-            ValueError: For a regression calibrator or an unknown mode.
+            ValueError: For a regression calibrator, an unknown
+                `conditional`, or (for `class`) a calibrator without
+                per-class scores; an invalid coverage is also rejected.
         """
         if self.kind != "classification":
             raise ValueError("sets need a classification calibrator")

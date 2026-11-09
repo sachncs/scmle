@@ -52,7 +52,8 @@ def seasonal_naive(
     Returns:
         An array `(rows, steps)`; step `k` repeats the value `lag` rows back
         within the entity, where the lag puts it one or more whole seasons
-        before the forecast time.
+        before the forecast time. An entry is NaN where the entity has no
+        row that far back.
     """
     series = frame.groupby(group, sort=False)[value] if group else frame[value]
     columns = []
@@ -87,15 +88,16 @@ def report(
     Args:
         estimator: A fitted forecaster exposing `predict`, `target_columns`
             and `value_column`.
-        features: Rows to forecast from.
+        features: Rows to forecast from; they must also hold the estimator's
+            other target columns (the later steps).
         primary: The first-step target for those rows.
         seasonal: Seasonal-naive forecasts of shape `(rows, steps)`, or None
             when no season is known.
 
     Returns:
-        One record per step ahead, starting at 1, with `model_mae`,
-        `last_value_mae` and `seasonal_naive_mae` (None when `seasonal` is
-        None).
+        One record per step ahead, with `step` (starting at 1),
+        `model_mae`, `last_value_mae` and `seasonal_naive_mae` (None when
+        `seasonal` is None).
     """
     truth = forecast.truth_matrix(estimator, features, primary)
     steps = truth.shape[1]

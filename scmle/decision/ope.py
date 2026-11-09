@@ -15,12 +15,13 @@ term minus its mean), clustered when clusters are given. Clipping at `M`
 trades bias for variance; the clipped IPW of non-negative rewards is a lower
 bound on the value, and the estimate is labelled as clipped.
 
-Three gates decide whether a value is issued, all declared in the charter:
-support (the target may put mass only where `mu >= eps`), the Kish effective
-sample size over `n`, and the presence of recorded propensities. A refusal
-returns no value. Observational logs, whose propensities are estimated, are
-accepted only with a statement from an eligible identification strategy;
-otherwise the result is labelled `unverified`.
+Two gates decide whether a value is issued, both declared by the caller:
+support (the target may put mass only where `mu >= eps`) and the Kish
+effective sample size over `n`, computed from the unclipped weights. A
+refusal returns no value. Whether the propensities were recorded decides the
+tier: a log whose propensities are estimated from observational data still
+gets a value, labelled `attested` with a statement from an eligible
+identification strategy and `unverified` without one.
 """
 
 import dataclasses
@@ -125,12 +126,14 @@ class ValueEstimate:
         status: `issued` or `refused`.
         estimator: One of `ESTIMATORS`.
         value: The estimate, or None when refused.
-        interval: Two-sided normal interval from the influence function.
+        interval: Two-sided normal interval from the influence function, or
+            None when refused.
         ess_ratio: Kish effective sample size over `n`.
         clipped_share: Share of rows whose weight was clipped.
         reasons: Why the value was refused or labelled.
         tier: `confirmed`, `attested` or `unverified`.
-        clipped: Whether weights were clipped at the declared level.
+        clipped: Whether a weight clip was declared (also True when the
+            estimate was refused or no weight exceeded it).
     """
 
     status: str
@@ -173,7 +176,7 @@ def weights(
 
 
 def support_violations(log: LoggedBandit, min_propensity: float) -> int:
-    """Rows where the target puts mass on an action with `mu < eps`.
+    """Counts rows where the target puts mass on an action with `mu < eps`.
 
     Args:
         log: The logged data and target policy.
@@ -225,6 +228,9 @@ def mean_interval(
 ) -> tuple[float, tuple[float, float]]:
     """Mean and normal interval from the (cluster-)influence variance.
 
+    Needs at least two rows, or at least two clusters when `clusters` is
+    given; fewer fail with a division error.
+
     Args:
         values: Per-row influence terms.
         clusters: Cluster label per row, or None to treat rows as
@@ -265,7 +271,8 @@ def estimate_value(
         estimator: `ipw`, `snips` or `dr`.
         clip: Declared weight clip, or None.
         min_propensity: Declared support floor.
-        ess_floor: Declared floor for the effective sample size ratio.
+        ess_floor: Declared floor for the effective sample size ratio,
+            which is computed from the unclipped weights.
         level: Confidence level of the interval.
         eligible_strategy: For a non-randomized log, whether an eligible
             identification strategy supports the propensities.
@@ -279,8 +286,8 @@ def estimate_value(
     Raises:
         ValueError: If `estimator` is not one of `ESTIMATORS` or `level` is
             not strictly between 0 and 1. A `min_propensity` that is not a
-            finite number, or `dr` without an outcome model, is also
-            rejected with a `ValueError`.
+            finite number is also rejected with a `ValueError`, as is `dr`
+            without an outcome model when neither gate refuses.
     """
     if estimator not in ESTIMATORS:
         raise ValueError(f"estimator must be one of {ESTIMATORS}")
@@ -372,8 +379,9 @@ def difference_value(
         The refused estimate of the target or of the baseline if either is
         refused; otherwise the target's estimate with the value and interval
         of the difference and the smaller of the two effective sample size
-        ratios. Invalid arguments are rejected with a `ValueError` by
-        `estimate_value`.
+        ratios. Invalid estimator, level or support floor are rejected with
+        a `ValueError` by `estimate_value`, and a `baseline` that is not an
+        `(n, K)` matrix of probabilities by `LoggedBandit`.
     """
     other = dataclasses.replace(log, target=np.asarray(baseline, dtype=float))
     main = estimate_value(
@@ -428,7 +436,8 @@ def fit_outcome_model(
         rewards: Logged reward of each row.
         n_actions: Number of actions `K`.
         ridge: Ridge penalty on the feature coefficients (the intercept is
-            not penalised).
+            not penalised). Rows whose action lies outside `0 .. n_actions-1`
+            are ignored.
 
     Returns:
         The fitted function, mapping a feature matrix to an `(n, K)` matrix
@@ -476,7 +485,8 @@ class ThresholdPolicy:
 
     Attributes:
         cut: The cut on `tau_hat(x)`.
-        objective: Penalised DR value on the fitting log.
+        objective: Mean penalised doubly robust gain of treating the rows
+            above `cut` on the fitting log.
         penalty: Per-treated-row penalty used in the fit.
     """
 

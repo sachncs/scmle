@@ -119,7 +119,9 @@ def calibration_check(
         bins: Equal-count bins by probability.
 
     Returns:
-        The statistic, p-value and whether the probabilities were accepted.
+        The check: its statistic, `bins` degrees of freedom, upper-tail
+        p-value, `level` and whether the p-value reached `level`
+        (`calibrated`).
 
     Raises:
         ValueError: If `level` is not strictly between 0 and 1, or there
@@ -305,9 +307,9 @@ class ThresholdDecision:
         expected_cost: Mean cost per row of the rule on the development rows.
         cost_interval: Bootstrap interval of that cost (cluster bootstrap
             when clusters are given).
-        stable_range: Span of `t` inside the chartered range on which the
-            rule's development net benefit beats treating all and none, or
-            None.
+        stable_range: First and last value of the longest run of grid points
+            of `t` inside the chartered range at which the rule's development
+            net benefit beats treating all and treating none, or None.
     """
 
     rule: ThresholdRule

@@ -30,11 +30,15 @@ def cv_interval(
         training_rows: Mean training rows per fold.
         validation_rows: Mean validation rows per fold.
         strategy: Validation strategy name (stratified, random, group,
-            temporal).
+            temporal); `temporal` and `group` add their own remark to the
+            note.
 
     Returns:
-        Mean, naive and corrected standard errors, the corrected interval and
-        a note on how far to trust it.
+        With at least two folds, a mapping with `available` (True), `level`
+        (0.95), the `mean`, the `naive_standard_error`, the
+        `corrected_standard_error`, the t-based `interval` as a two-item
+        list, `folds` and a `note` on how far to trust it. With fewer
+        folds, only `available` (False) and a `reason`.
     """
     scores = np.asarray(fold_scores, dtype=float)
     folds = len(scores)

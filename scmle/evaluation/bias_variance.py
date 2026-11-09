@@ -7,7 +7,8 @@ variance there; the distance of their consensus from the truth is its bias.
 
 * Regression, squared error: the consensus is the mean prediction. Variance
   is the mean prediction spread; `bias_plus_noise` is the squared distance of
-  the consensus from the observed value. Noise cannot be separated from bias
+  the consensus from the observed value, less the excess that the finite
+  number of refits adds to it. Noise cannot be separated from bias
   without extra assumptions, so the two are reported together.
 * Classification, 0-1 error (Domingos): the consensus is the most common
   predicted label. Bias is the share of rows where it is wrong; variance is
@@ -58,12 +59,15 @@ class Decomposition:
         kind: `squared_error` or `zero_one`.
         replicates: Bootstrap refits.
         rows: Rows predicted by enough out-of-bag refits.
-        bias_plus_noise: Distance of the consensus from the observed values
-            (squared for regression, 0-1 for classes); includes noise.
+        bias_plus_noise: Mean distance of the consensus from the observed
+            values (squared and corrected for the finite number of refits
+            for regression, 0-1 for classes); includes noise. It can be
+            negative for regression.
         noise: Estimated irreducible error (None when it cannot be
             estimated).
         bias: Reducible bias: `bias_plus_noise` minus `noise`, floored at 0
-            (equal to `bias_plus_noise` when noise is unknown).
+            (equal to `bias_plus_noise`, without the floor, when noise is
+            unknown).
         variance: Variance term.
         total: Mean error of the individual out-of-bag predictions.
         variance_share: Variance as a share of bias plus variance.

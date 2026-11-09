@@ -131,17 +131,21 @@ def srm_p_value(challenger: int, total: int, assignment_prob: float) -> float:
 def srm_log_bayes_factor(
     challenger: ArrayLike, total: ArrayLike, assignment_prob: float
 ) -> NDArray[np.float64]:
-    """Log Bayes factor of a uniform allocation against `assignment_prob`.
+    """Log Bayes factor of a uniform-prior allocation against a fixed rate.
 
-    A likelihood-ratio martingale under correct assignment, so by Ville's
-    inequality ``P(sup BF >= 1 / level) <= level`` however often it is read.
+    The numerator is the likelihood of the observed assignments averaged
+    over a uniform prior on the challenger probability; the denominator is
+    their likelihood at `assignment_prob`. It is a likelihood-ratio martingale
+    under correct assignment, so by Ville's inequality
+    ``P(sup BF >= 1 / level) <= level`` however often it is read.
 
     Args:
         challenger: Count of units assigned to the challenger, scalar or
             array.
         total: Count of units assigned, same shape as `challenger`.
         assignment_prob: The recorded probability of the challenger, in
-            (0, 1).
+            (0, 1); a value outside (0, 1) makes `math.log` raise a
+            `ValueError`.
 
     Returns:
         The log Bayes factor, one value per element of the broadcast
