@@ -52,60 +52,55 @@ class Ordinal(classical.Learner):
         return estimators.CumulativeThresholdRegressor(inner, levels, seed)
 
 
-class OrdinalRidge(Ordinal):
-    """Linear latent score."""
-
-    name = "ordinal_ridge"
-    family = "linear"
-    capabilities = models.Capabilities(
+ORDINAL_RIDGE = Ordinal(
+    name="ordinal_ridge",
+    family="linear",
+    capabilities=models.Capabilities(
         ORDINAL, needs_scaling=True, cost=2, probabilities=True
-    )
-    regressor = linear_model.Ridge
-    search_space = search.SearchSpace(
+    ),
+    regressor=linear_model.Ridge,
+    search_space=search.SearchSpace(
         (search.FloatParameter("alpha", 1e-3, 100.0, log=True),)
-    )
+    ),
+)
 
-
-class OrdinalForest(Ordinal):
-    """Random-forest latent score."""
-
-    name = "ordinal_random_forest"
-    family = "tree"
-    capabilities = models.Capabilities(
+ORDINAL_FOREST = Ordinal(
+    name="ordinal_random_forest",
+    family="tree",
+    capabilities=models.Capabilities(
         ORDINAL, cost=3, memory_factor=6.0, probabilities=True
-    )
-    regressor = ensemble.RandomForestRegressor
-    search_space = search.SearchSpace(
+    ),
+    regressor=ensemble.RandomForestRegressor,
+    search_space=search.SearchSpace(
         (
             search.IntParameter("n_estimators", 50, 300),
             search.IntParameter("min_samples_leaf", 1, 20, log=True),
         )
-    )
+    ),
+)
 
-
-class OrdinalBoosting(Ordinal):
-    """Gradient-boosted latent score."""
-
-    name = "ordinal_hist_gradient_boosting"
-    family = "boosting"
-    capabilities = models.Capabilities(
+ORDINAL_BOOSTING = Ordinal(
+    name="ordinal_hist_gradient_boosting",
+    family="boosting",
+    capabilities=models.Capabilities(
         ORDINAL,
         handles_missing=True,
         cost=3,
         memory_factor=3.0,
         probabilities=True,
-    )
-    regressor = ensemble.HistGradientBoostingRegressor
-    search_space = search.SearchSpace(
+    ),
+    regressor=ensemble.HistGradientBoostingRegressor,
+    search_space=search.SearchSpace(
         (
             search.FloatParameter("learning_rate", 0.02, 0.3, log=True),
             search.IntParameter("max_leaf_nodes", 8, 64),
         )
-    )
-
-
-ORDINAL_ADAPTERS: tuple[type[models.Model], ...] = (
-    OrdinalRidge,
-    OrdinalForest,
-    OrdinalBoosting,
+    ),
 )
+
+ORDINAL_ADAPTERS: tuple[models.Model, ...] = (
+    ORDINAL_RIDGE,
+    ORDINAL_FOREST,
+    ORDINAL_BOOSTING,
+)
+"""Ordinal adapter instances, in registration order."""
