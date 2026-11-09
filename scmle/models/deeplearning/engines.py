@@ -6,6 +6,7 @@ the estimators users see are the proxies in `estimators`.
 
 import abc
 import copy
+import dataclasses
 import importlib
 import math
 from typing import Any
@@ -19,6 +20,28 @@ from scmle.models.deeplearning import architectures
 import scmle.models.deeplearning.training
 
 MIN_ROWS_FOR_VALIDATION = 30
+SINGLE_MEMBER_OUTPUT_DIMS = 2
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class UpdatePlan:
+    """How one training run cuts its epochs into optimizer updates.
+
+    Attributes:
+        batch_rows: Rows per mini-batch.
+        second_order: Whether the optimizer takes full-batch L-BFGS steps.
+        accumulate: Mini-batches whose gradients are summed per update.
+        updates_per_epoch: Optimizer updates in one epoch.
+        total_steps: Optimizer updates over all epochs.
+        warmup_steps: Optimizer updates of the learning-rate warm-up.
+    """
+
+    batch_rows: int
+    second_order: bool
+    accumulate: int
+    updates_per_epoch: int
+    total_steps: int
+    warmup_steps: int
 
 
 class Trainer(base.BaseEstimator, abc.ABC):
@@ -205,6 +228,164 @@ class Trainer(base.BaseEstimator, abc.ABC):
             features = features.toarray()
         return numpy.asarray(features, dtype=numpy.float32)
 
+    def plan_updates(self, training_rows: int) -> UpdatePlan:
+        """Works out how the epochs are cut into optimizer updates.
+
+        Args:
+            training_rows: Number of rows used for training.
+
+        Returns:
+            The batch size, accumulation count and step counts. L-BFGS uses
+            one full batch and no accumulation.
+        """
+        second_order = self.optimizer == "lbfgs"
+        batch_rows = (
+            training_rows
+            if second_order
+            else scmle.models.deeplearning.training.resolve_batch_size(
+                self.batch_size, training_rows
+            )
+        )
+        accumulate = 1 if second_order else self.accumulation_steps
+        batches_per_epoch = max(math.ceil(training_rows / batch_rows), 1)
+        updates_per_epoch = max(math.ceil(batches_per_epoch / accumulate), 1)
+        return UpdatePlan(
+            batch_rows=batch_rows,
+            second_order=second_order,
+            accumulate=accumulate,
+            updates_per_epoch=updates_per_epoch,
+            total_steps=updates_per_epoch * self.epochs,
+            warmup_steps=updates_per_epoch * self.warmup_epochs,
+        )
+
+    def training_arrays(
+        self, features: Any, target: Any, sample_weight: Any
+    ) -> tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]:
+        """Converts the inputs to float32 matrix, encoded target and weights.
+
+        Args:
+            features: Numeric matrix.
+            target: Labels or values.
+            sample_weight: Optional per-row weights.
+
+        Returns:
+            The dense matrix, the encoded target and the row weights, which
+            combine the estimator's own weights with `sample_weight`.
+        """
+        matrix = self.dense(features)
+        encoded = self.encode_target(target)
+        weights = self.row_weights(encoded)
+        if sample_weight is not None:
+            weights = weights * numpy.asarray(
+                sample_weight, dtype=numpy.float32
+            )
+        return matrix, encoded, weights
+
+    def set_learning_rate(
+        self, optimizer: Any, step: int, plan: UpdatePlan
+    ) -> None:
+        """Applies the scheduled learning rate to every parameter group.
+
+        Args:
+            optimizer: The torch optimizer.
+            step: Optimizer updates taken so far.
+            plan: The run's update plan.
+        """
+        rate = scmle.models.deeplearning.training.learning_rate_at(
+            step,
+            plan.total_steps,
+            self.learning_rate,
+            plan.warmup_steps,
+            self.schedule,
+        )
+        for group in optimizer.param_groups:
+            group["lr"] = rate
+
+    def train_epoch(
+        self,
+        torch: Any,
+        network: Any,
+        optimizer: Any,
+        tensors: dict[str, Any],
+        monitor: scmle.models.deeplearning.training.Monitor,
+        plan: UpdatePlan,
+        batches: tuple[Any, int],
+    ) -> tuple[float, bool, int]:
+        """Runs one pass over the shuffled training rows.
+
+        Args:
+            torch: The imported torch module.
+            network: The network being trained.
+            optimizer: The torch optimizer.
+            tensors: Device tensors `x`, `y` and `w` (inputs, targets, weights).
+            monitor: Records losses and gradient norms for the report.
+            plan: The run's update plan.
+            batches: The shuffled training row indices on the device, and the
+                number of optimizer updates taken before this epoch.
+
+        Returns:
+            The summed update losses of the epoch, whether training is still
+            healthy (False when the monitor saw a divergence) and the number
+            of updates taken so far.
+        """
+        shuffled, step = batches
+        epoch_loss, alive = 0.0, True
+        pending, running = 0, 0.0
+        for start in range(0, len(shuffled), plan.batch_rows):
+            batch = shuffled[start : start + plan.batch_rows]
+            if plan.second_order:
+                value, norm = self.lbfgs_step(
+                    torch, network, optimizer, tensors, batch
+                )
+                alive = monitor.step(value, norm, None)
+                if not alive:
+                    break
+                epoch_loss += value
+                step += 1
+                continue
+            if pending == 0:
+                self.set_learning_rate(optimizer, step, plan)
+                optimizer.zero_grad()
+            loss = self.weighted_loss(torch, network, tensors, batch)
+            (loss / plan.accumulate).backward()
+            running += float(loss.detach())
+            pending += 1
+            last = start + plan.batch_rows >= len(shuffled)
+            if pending < plan.accumulate and not last:
+                continue
+            norm = float(
+                torch.nn.utils.clip_grad_norm_(
+                    network.parameters(), self.max_grad_norm or math.inf
+                )
+            )
+            value = running / pending
+            alive = monitor.step(value, norm, self.max_grad_norm)
+            if not alive:
+                break
+            optimizer.step()
+            epoch_loss += value
+            step += 1
+            pending, running = 0, 0.0
+        return epoch_loss, alive, step
+
+    def validation_score(
+        self, torch: Any, network: Any, tensors: dict[str, Any], rows: Any
+    ) -> float:
+        """Scores the held-out rows in evaluation mode.
+
+        Args:
+            torch: The imported torch module.
+            network: The network being trained.
+            tensors: Device tensors `x`, `y` and `w` (inputs, targets, weights).
+            rows: Indices of the held-out rows on the device.
+
+        Returns:
+            The weighted loss on the held-out rows.
+        """
+        network.eval()
+        with torch.no_grad():
+            return float(self.weighted_loss(torch, network, tensors, rows))
+
     def fit(
         self, features: Any, target: Any, sample_weight: Any = None
     ) -> "Trainer":
@@ -230,13 +411,9 @@ class Trainer(base.BaseEstimator, abc.ABC):
             )
         self.check_options()
         torch = importlib.import_module("torch")
-        matrix = self.dense(features)
-        encoded = self.encode_target(target)
-        weights = self.row_weights(encoded)
-        if sample_weight is not None:
-            weights = weights * numpy.asarray(
-                sample_weight, dtype=numpy.float32
-            )
+        matrix, encoded, weights = self.training_arrays(
+            features, target, sample_weight
+        )
         order = numpy.random.default_rng(self.random_state).permutation(
             len(matrix)
         )
@@ -256,90 +433,34 @@ class Trainer(base.BaseEstimator, abc.ABC):
             "w": torch.from_numpy(weights.astype(numpy.float32)).to(device),
         }
         optimizer = self.new_optimizer(torch, network)
-        second_order = self.optimizer == "lbfgs"
-        batch_rows = (
-            len(training)
-            if second_order
-            else scmle.models.deeplearning.training.resolve_batch_size(
-                self.batch_size, len(training)
-            )
-        )
-        accumulate = 1 if second_order else self.accumulation_steps
-        batches_per_epoch = max(math.ceil(len(training) / batch_rows), 1)
-        updates_per_epoch = max(math.ceil(batches_per_epoch / accumulate), 1)
-        total_steps = updates_per_epoch * self.epochs
-        warmup_steps = updates_per_epoch * self.warmup_epochs
+        plan = self.plan_updates(len(training))
         monitor = scmle.models.deeplearning.training.Monitor()
         generator = numpy.random.default_rng(self.random_state + 1)
         best, best_state, stale, step = numpy.inf, None, 0, 0
         self.n_iter_ = 0
         for epoch in range(self.epochs):
             network.train()
-            shuffled = generator.permutation(training)
-            epoch_loss, alive = 0.0, True
-            pending, running = 0, 0.0
-            for start in range(0, len(shuffled), batch_rows):
-                batch = torch.from_numpy(
-                    shuffled[start : start + batch_rows]
-                ).to(device)
-                if second_order:
-                    value, norm = self.lbfgs_step(
-                        torch, network, optimizer, tensors, batch
-                    )
-                    alive = monitor.step(value, norm, None)
-                    if not alive:
-                        break
-                    epoch_loss += value
-                    step += 1
-                    continue
-                if pending == 0:
-                    for group in optimizer.param_groups:
-                        group["lr"] = (
-                            scmle.models.deeplearning.training.learning_rate_at(
-                                step,
-                                total_steps,
-                                self.learning_rate,
-                                warmup_steps,
-                                self.schedule,
-                            )
-                        )
-                    optimizer.zero_grad()
-                loss = self.weighted_loss(torch, network, tensors, batch)
-                (loss / accumulate).backward()
-                running += float(loss.detach())
-                pending += 1
-                last = start + batch_rows >= len(shuffled)
-                if pending < accumulate and not last:
-                    continue
-                norm = float(
-                    torch.nn.utils.clip_grad_norm_(
-                        network.parameters(), self.max_grad_norm or math.inf
-                    )
-                )
-                value = running / pending
-                alive = monitor.step(value, norm, self.max_grad_norm)
-                if not alive:
-                    break
-                optimizer.step()
-                epoch_loss += value
-                step += 1
-                pending, running = 0, 0.0
+            shuffled = torch.from_numpy(generator.permutation(training)).to(
+                device
+            )
+            epoch_loss, alive, step = self.train_epoch(
+                torch,
+                network,
+                optimizer,
+                tensors,
+                monitor,
+                plan,
+                (shuffled, step),
+            )
             if not alive:
                 break
-            monitor.epoch(epoch_loss / updates_per_epoch)
+            monitor.epoch(epoch_loss / plan.updates_per_epoch)
             self.n_iter_ = epoch + 1
             if not held:
                 continue
-            network.eval()
-            with torch.no_grad():
-                score = float(
-                    self.weighted_loss(
-                        torch,
-                        network,
-                        tensors,
-                        torch.from_numpy(validation).to(device),
-                    )
-                )
+            score = self.validation_score(
+                torch, network, tensors, torch.from_numpy(validation).to(device)
+            )
             if score < best:
                 best, stale = score, 0
                 best_state = copy.deepcopy(network.state_dict())
@@ -508,7 +629,7 @@ class Trainer(base.BaseEstimator, abc.ABC):
             Scalar tensor: the member-averaged row losses weighted by `w`.
         """
         outputs = network(tensors["x"][rows])
-        if outputs.dim() == 2:
+        if outputs.dim() == SINGLE_MEMBER_OUTPUT_DIMS:
             outputs = outputs.unsqueeze(1)
         batch, members = outputs.shape[0], outputs.shape[1]
         losses = self.row_losses(
@@ -535,7 +656,7 @@ class Trainer(base.BaseEstimator, abc.ABC):
         with torch.no_grad():
             tensor = torch.from_numpy(self.dense(features))
             outputs = self.network_(tensor)
-            if outputs.dim() == 2:
+            if outputs.dim() == SINGLE_MEMBER_OUTPUT_DIMS:
                 outputs = outputs.unsqueeze(1)
             return outputs.numpy()
 
@@ -555,9 +676,9 @@ class Trainer(base.BaseEstimator, abc.ABC):
         """
         torch = importlib.import_module("torch")
         matrix = self.dense(features)
-        tensor = torch.from_numpy(matrix).requires_grad_(True)
+        tensor = torch.from_numpy(matrix).requires_grad_(requires_grad=True)
         outputs = self.network_(tensor)
-        if outputs.dim() == 2:
+        if outputs.dim() == SINGLE_MEMBER_OUTPUT_DIMS:
             outputs = outputs.unsqueeze(1)
         scores = outputs.mean(dim=1)
         if scores.shape[1] == 1:

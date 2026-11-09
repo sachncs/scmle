@@ -14,6 +14,7 @@ from sklearn import base
 
 STALL_IMPROVEMENT = 0.01
 MIN_ROWS_FOR_VALIDATION = 30
+MIN_EPOCHS_FOR_TREND = 3
 
 
 def load_keras() -> Any:
@@ -194,9 +195,12 @@ class Trainer(base.BaseEstimator):
         if not numpy.isfinite(losses).all():
             return {"verdict": "diverged", "steps": len(losses)}
         improvement = 0.0
-        if len(losses) > 2 and abs(losses[0]) > 0:
+        if len(losses) >= MIN_EPOCHS_FOR_TREND and abs(losses[0]) > 0:
             improvement = (losses[0] - losses[-1]) / abs(losses[0])
-        stalled = len(losses) > 2 and improvement < STALL_IMPROVEMENT
+        stalled = (
+            len(losses) >= MIN_EPOCHS_FOR_TREND
+            and improvement < STALL_IMPROVEMENT
+        )
         return {
             "verdict": "stalled" if stalled else "ok",
             "steps": len(losses),

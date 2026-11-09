@@ -11,12 +11,15 @@ import collections
 import importlib
 from multiprocessing import connection
 import os
-import subprocess  # nosec B404
 import threading
 from typing import Any
+from typing import TYPE_CHECKING
 
 from scmle.contracts import errors
 from scmle.core import ipc
+
+if TYPE_CHECKING:
+    import subprocess  # nosec B404
 
 CACHE_SIZE = 8
 NEED_STATE = "need_state"
@@ -113,7 +116,7 @@ def serve(channel: connection.Connection) -> None:
             return
         try:
             channel.send(("ok", handle(cache, operation, payload)))
-        except Exception as error:  # Isolation: report, keep serving.
+        except Exception as error:  # noqa: BLE001 -- isolation: report, keep serving
             channel.send(("error", f"{type(error).__name__}: {error}"))
 
 
