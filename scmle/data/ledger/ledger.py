@@ -15,14 +15,14 @@ reordering any line breaks the chain from there on. Rows are:
     unregistered or already tested hypothesis is refused in code and, on
     load, rejected as a broken ledger.
 ``diagnostic``
-    A `Check` from a detector run on `X` (leakage suspicion, F5 detectors).
+    A `Check` from a detector run on `X` (a leakage suspicion).
     It spends no wealth and never enters the survivors; it is chained so a
     suspicion that was raised cannot be removed afterwards.
 ``control``
     The negative-control summary (optional, before the survivors are frozen).
 ``claim``
     A registered claim that is not a single-feature statistic (the baseline
-    comparison of F8, the primary causal hypothesis of F10), written before
+    comparison, the primary causal hypothesis), written before
     the survivors are frozen with the hash of its registration. It spends no
     wealth, never enters the survivors and is evaluated once, on `C`, inside
     the single opening; the confirmation row records its outcome.
@@ -39,7 +39,7 @@ online rule from the stored evidence, comparing level, decision and wealth
 exactly (the rule uses exact fractions, so replay is bit-for-bit identical on
 every platform).
 
-Limits (canon P6). A hash chain shows that nothing was changed, removed from
+Limits. A hash chain shows that nothing was changed, removed from
 the middle or reordered since it was written. It cannot show that the *last*
 rows were never deleted: a prefix of a valid chain is valid. Pass the head
 hash recorded elsewhere (the custody log and the claims file store it) to
@@ -88,7 +88,14 @@ class LedgerError(errors.ArtifactError):
 
 
 def digest(body: Mapping[str, Any]) -> str:
-    """SHA-256 of the canonical JSON of `body`."""
+    """Hashes the canonical JSON of a record.
+
+    Args:
+        body: The JSON-ready record.
+
+    Returns:
+        The SHA-256 hex digest of the canonical JSON form of `body`.
+    """
     return hashlib.sha256(signing.canonical_payload(body)).hexdigest()
 
 
@@ -117,7 +124,13 @@ class HypothesisSpec:
     code_hash: str
 
     def __post_init__(self) -> None:
-        """Validates the specification."""
+        """Validates the specification.
+
+        Raises:
+            ValueError: If `direction` is not a known alternative or
+                `set_id` is not a `SetId`. A blank text field is refused with
+                a `ValueError` by `evidence.require_text`.
+        """
         for field, value in (
             ("name", self.name),
             ("family", self.family),
@@ -143,7 +156,21 @@ class HypothesisSpec:
         direction: str = bivariate.TWO_SIDED,
         set_id: qualification.SetId = qualification.SetId.EXPLORATION,
     ) -> "HypothesisSpec":
-        """Builds a specification, filling the code hash from the registry."""
+        """Builds a specification, filling the code hash from the registry.
+
+        Args:
+            name: Human-readable name, unique within the ledger.
+            family: Family the hypothesis belongs to.
+            statistic: Registered statistic; an unknown name is refused by
+                `bivariate.code_hash` with a `ValueError`.
+            null: The null hypothesis, in words.
+            column: Feature column the statistic reads, if any.
+            direction: `two-sided`, `greater` or `less`.
+            set_id: Set the test reads (exploration by default).
+
+        Returns:
+            The specification, with the hash of the statistic's code.
+        """
         return cls(
             name=name,
             family=family,
@@ -156,7 +183,12 @@ class HypothesisSpec:
         )
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Builds the JSON-ready record.
+
+        Returns:
+            A mapping of every field; the set is stored under ``set`` as its
+            value.
+        """
         return {
             "name": self.name,
             "family": self.family,
@@ -170,7 +202,19 @@ class HypothesisSpec:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> "HypothesisSpec":
-        """Rebuilds a specification, rejecting unknown or missing fields."""
+        """Rebuilds a specification, rejecting unknown or missing fields.
+
+        Args:
+            record: A mapping as written by `to_dict`.
+
+        Returns:
+            The specification described by the record.
+
+        Raises:
+            ValueError: If the record has unexpected or missing fields. An
+                unknown set value or an invalid field is also refused with a
+                `ValueError`.
+        """
         names = {
             "name",
             "family",
@@ -254,14 +298,29 @@ class SurvivorSet:
 def survivors_hash(
     ids: tuple[str, ...], specs: Mapping[str, HypothesisSpec]
 ) -> str:
-    """Hash that binds the survivor ids to their specifications."""
+    """Hashes the survivor ids together with their specifications.
+
+    Args:
+        ids: Survivor hypothesis ids, in registration order.
+        specs: Specification of every hypothesis, by id.
+
+    Returns:
+        The digest that binds the ids to their specifications.
+    """
     return digest(
         {"ids": list(ids), "specs": [specs[i].to_dict() for i in ids]}
     )
 
 
 def encode_fraction(value: Fraction) -> str:
-    """A fraction as ``"p/q"``."""
+    """Writes a fraction as text.
+
+    Args:
+        value: The fraction.
+
+    Returns:
+        The fraction as ``"p/q"`` (``"p"`` when the denominator is 1).
+    """
     return str(value)
 
 
@@ -304,6 +363,9 @@ class Ledger:
             alpha_confirm: Level of the later confirmation.
             seed: The run seed.
 
+        Returns:
+            The new ledger, holding only its `open` row.
+
         Raises:
             LedgerError: If the file already exists.
         """
@@ -343,6 +405,9 @@ class Ledger:
                 row must carry exactly this hash, which detects deleted rows
                 at the end of the file.
 
+        Returns:
+            The ledger rebuilt from the file.
+
         Raises:
             LedgerError: If the file is missing, a row fails its hash, the
                 order of rows is invalid or a replayed decision differs.
@@ -375,7 +440,15 @@ class Ledger:
     def verify_file(
         cls, path: str | Path, expected_head: str | None = None
     ) -> "Ledger":
-        """Loads a ledger, which verifies it (see `load`)."""
+        """Loads a ledger, which verifies it (see `load`).
+
+        Args:
+            path: The ledger file.
+            expected_head: Head hash recorded elsewhere, or None.
+
+        Returns:
+            The verified ledger.
+        """
         return cls.load(path, expected_head)
 
     @classmethod
@@ -396,6 +469,10 @@ class Ledger:
             rule: `e-lond` (default, arbitrary dependence), `lord++` or
                 `saffron` (independence only).
             horizon: Discount horizon (None for ``1 / (j (j + 1))``).
+
+        Returns:
+            The existing ledger loaded from the run directory, or a new one
+            if the file does not exist.
 
         Raises:
             LedgerError: If an existing ledger belongs to another charter or
@@ -431,7 +508,7 @@ class Ledger:
 
     @property
     def wealth(self) -> Fraction:
-        """Wealth of the online rule now."""
+        """The wealth of the online rule at present."""
         return self.require_rule().wealth(self.state)
 
     @property
@@ -440,13 +517,29 @@ class Ledger:
         return self.survivor_set is not None
 
     def require_rule(self) -> online_fdr.OnlineRule:
-        """The rule, which exists once the `open` row is in."""
+        """Returns the online rule, which exists once the `open` row is in.
+
+        Returns:
+            The online rule built from the `open` row.
+
+        Raises:
+            LedgerError: If there is no `open` row yet.
+        """
         if self.rule is None:
             raise LedgerError("ledger has no open row")
         return self.rule
 
     def commit(self, kind: str, body: dict[str, Any]) -> dict[str, Any]:
-        """Chains a new row, ingests it and persists it."""
+        """Chains a new row, ingests it and persists it.
+
+        Args:
+            kind: Row kind (`open`, `register`, `result`, ...).
+            body: The row's JSON-ready content.
+
+        Returns:
+            The stored row, with its sequence number, previous hash and own
+            hash.
+        """
         content = {
             "seq": len(self.rows),
             "kind": kind,
@@ -468,7 +561,9 @@ class Ledger:
             row: The row.
 
         Raises:
-            LedgerError: On a broken link, wrong order or replay mismatch.
+            LedgerError: On a broken link, wrong order or replay mismatch, an
+                unknown row kind, a row after the confirmation, or a row
+                whose body is malformed.
         """
         if set(row) != {"seq", "kind", "body", "prev", "hash"}:
             raise LedgerError(f"ledger row {len(self.rows)} has wrong fields")
@@ -509,7 +604,15 @@ class Ledger:
         self.rows.append(dict(row))
 
     def apply_open(self, body: Mapping[str, Any]) -> None:
-        """Reads the header and builds the rule."""
+        """Reads the header and builds the rule.
+
+        Args:
+            body: The `open` row's content.
+
+        Raises:
+            LedgerError: If the ledger version is unsupported or the stored
+                rule is invalid.
+        """
         if body.get("ledger_version") != LEDGER_VERSION:
             raise LedgerError("unsupported ledger version")
         try:
@@ -522,12 +625,27 @@ class Ledger:
         self.seed = int(body["seed"])
 
     def require_unfrozen(self) -> None:
-        """Hypotheses may only be added before the survivors are frozen."""
+        """Requires that the survivors are not yet frozen.
+
+        Hypotheses may only be added before the survivors are frozen.
+
+        Raises:
+            LedgerError: If the survivors are frozen.
+        """
         if self.survivor_set is not None:
             raise LedgerError("survivors are frozen: no new hypotheses")
 
     def apply_register(self, body: Mapping[str, Any]) -> None:
-        """Adds a hypothesis to the registry."""
+        """Adds a hypothesis to the registry.
+
+        Args:
+            body: The `register` row's content.
+
+        Raises:
+            LedgerError: If the survivors are frozen, the registration is
+                invalid, its id is not the next sequential one or its name
+                is already registered.
+        """
         self.require_unfrozen()
         try:
             spec = HypothesisSpec.from_dict(body["spec"])
@@ -541,7 +659,18 @@ class Ledger:
         self.hypotheses[hypothesis_id] = Hypothesis(hypothesis_id, spec)
 
     def apply_result(self, body: Mapping[str, Any]) -> None:
-        """Replays one result through the rule and stores it."""
+        """Replays one result through the rule and stores it.
+
+        Args:
+            body: The `result` row's content.
+
+        Raises:
+            LedgerError: If the survivors are frozen, the hypothesis is
+                unregistered or already tested, the evidence is invalid, the
+                replayed level, decision or wealth differs from the stored
+                one, the e-value is not the calibrated p-value, or the
+                decision is invalid.
+        """
         self.require_unfrozen()
         rule = self.require_rule()
         hypothesis_id = body.get("hypothesis_id")
@@ -604,7 +733,18 @@ class Ledger:
     def check_calibration(
         self, rule: online_fdr.OnlineRule, evidence: Mapping[str, Any]
     ) -> None:
-        """The stored e-value must be the calibrated p-value (to 1e-12)."""
+        """Checks that a stored e-value is the calibrated p-value.
+
+        Only e-LOND with both a p-value and an e-value is checked.
+
+        Args:
+            rule: The online rule.
+            evidence: The stored evidence with its ``p`` and ``e`` entries.
+
+        Raises:
+            LedgerError: If the e-value differs from the calibrated p-value
+                by more than a relative 1e-12.
+        """
         if (
             isinstance(rule, online_fdr.ELond)
             and evidence["p"] is not None
@@ -615,12 +755,27 @@ class Ledger:
                 raise LedgerError("stored e-value is not the calibrated p")
 
     def apply_control(self, body: Mapping[str, Any]) -> None:
-        """Stores the negative-control summary (before the survivors)."""
+        """Stores the negative-control summary (before the survivors).
+
+        A control row after the survivors are frozen is refused with a
+        `LedgerError`.
+
+        Args:
+            body: The `control` row's content.
+        """
         self.require_unfrozen()
         self.control = dict(body)
 
     def apply_diagnostic(self, body: Mapping[str, Any]) -> None:
-        """Stores a detector check; it never touches the online rule."""
+        """Stores a detector check; it never touches the online rule.
+
+        Args:
+            body: The `diagnostic` row's content.
+
+        Raises:
+            LedgerError: If the survivors are frozen or the check read a set
+                other than the exploration set.
+        """
         self.require_unfrozen()
         check = qualification.Check.from_dict(body["check"])
         if check.set_id is not qualification.SetId.EXPLORATION:
@@ -628,7 +783,15 @@ class Ledger:
         self.diagnostics.append(check)
 
     def apply_claim(self, body: Mapping[str, Any]) -> None:
-        """Registers a claim by the hash of its registration."""
+        """Registers a claim by the hash of its registration.
+
+        Args:
+            body: The `claim` row's content.
+
+        Raises:
+            LedgerError: If the survivors are frozen or the claim id is
+                already used by a claim or a hypothesis.
+        """
         self.require_unfrozen()
         claim_id = evidence_module.require_text(
             str(body["claim_id"]), "claim_id"
@@ -647,7 +810,15 @@ class Ledger:
         }
 
     def apply_survivors(self, body: Mapping[str, Any]) -> None:
-        """Freezes the survivor set, which must be the rejected hypotheses."""
+        """Freezes the survivor set, which must be the rejected hypotheses.
+
+        Args:
+            body: The `survivors` row's content.
+
+        Raises:
+            LedgerError: If the survivors are already frozen, the ids differ
+                from the rejected hypotheses or the hash does not match.
+        """
         self.require_unfrozen()
         ids = tuple(
             i
@@ -662,7 +833,15 @@ class Ledger:
         self.survivor_set = SurvivorSet(ids, str(body["sha256"]))
 
     def apply_confirmation(self, body: Mapping[str, Any]) -> None:
-        """Seals the ledger with the confirmation outcome."""
+        """Seals the ledger with the confirmation outcome.
+
+        Args:
+            body: The `confirmation` row's content.
+
+        Raises:
+            LedgerError: If the survivors are not frozen, the row names
+                different survivors, or registered claims lack an outcome.
+        """
         if self.survivor_set is None:
             raise LedgerError("confirmation needs frozen survivors")
         if body.get("survivors_sha256") != self.survivor_set.sha256:
@@ -680,6 +859,12 @@ class Ledger:
 
     def register(self, spec: HypothesisSpec) -> Hypothesis:
         """Registers a hypothesis before any data is touched.
+
+        Args:
+            spec: The specification of the hypothesis.
+
+        Returns:
+            The registered hypothesis, with its assigned id.
 
         Raises:
             LedgerError: If the survivors are frozen, the name repeats or the
@@ -700,11 +885,19 @@ class Ledger:
 
         The claim is evaluated once, on `C`, inside the single opening, and
         the confirmation row must record its outcome. Registering the same
-        claim again with the same hash returns the stored record.
+        claim again with the same hash returns the stored record. The ledger
+        refuses the registration with a `LedgerError` if the survivors are
+        frozen, or the id is registered with another hash or is a hypothesis
+        id.
 
-        Raises:
-            LedgerError: If the survivors are frozen, or the id is registered
-                with another hash or is a hypothesis id.
+        Args:
+            claim_id: Unique id of the claim.
+            kind: What the claim is.
+            statement: The claim in words.
+            sha256: Hash of the claim's registration.
+
+        Returns:
+            The stored record of the claim.
         """
         known = self.claims.get(claim_id)
         if known is not None and known["sha256"] == sha256:
@@ -721,7 +914,15 @@ class Ledger:
         return self.claims[claim_id]
 
     def require_registered(self, hypothesis: Hypothesis) -> None:
-        """Requires an untested hypothesis of this ledger."""
+        """Requires an untested hypothesis of this ledger.
+
+        Args:
+            hypothesis: The hypothesis to check.
+
+        Raises:
+            LedgerError: If it is not registered in this ledger or has
+                already been tested.
+        """
         known = self.hypotheses.get(hypothesis.hypothesis_id)
         if known is None or known != hypothesis:
             raise LedgerError(
@@ -750,10 +951,8 @@ class Ledger:
             target: Exploration target, or class codes.
 
         Returns:
-            The recorded result.
-
-        Raises:
-            LedgerError: If the hypothesis is unregistered or already tested.
+            The recorded result. A hypothesis that is unregistered or already
+            tested is refused with a `LedgerError`.
         """
         self.require_registered(hypothesis)
         rule = self.require_rule()
@@ -816,6 +1015,13 @@ class Ledger:
 
         It still uses its place in the sequence, as an untestable hypothesis
         that is never rejected.
+
+        Args:
+            hypothesis: A registered, untested hypothesis.
+            reason: Why it was not tested.
+
+        Returns:
+            The recorded result, with decision `not_tested`.
         """
         self.require_registered(hypothesis)
         rule = self.require_rule()
@@ -833,7 +1039,19 @@ class Ledger:
         decision: str,
         reason: str,
     ) -> Result:
-        """Writes the result row for a computed step."""
+        """Writes the result row for a computed step.
+
+        Args:
+            hypothesis: The hypothesis the step belongs to.
+            check: The check on `X`, or None if it was not tested.
+            p: The p-value given to the rule.
+            step: The rule's step for this hypothesis.
+            decision: `reject`, `retain` or `not_tested`.
+            reason: Why it was not tested, or an empty string.
+
+        Returns:
+            The result as stored in the ledger.
+        """
         self.commit(
             RESULT,
             {
@@ -852,7 +1070,13 @@ class Ledger:
         return self.results[hypothesis.hypothesis_id]
 
     def decision(self, hypothesis: Hypothesis) -> Result:
-        """The recorded result of a hypothesis.
+        """Looks up the recorded result of a hypothesis.
+
+        Args:
+            hypothesis: The hypothesis.
+
+        Returns:
+            Its recorded result.
 
         Raises:
             LedgerError: If it has not been tested.
@@ -863,7 +1087,11 @@ class Ledger:
         return result
 
     def survivors(self) -> tuple[Hypothesis, ...]:
-        """Rejected hypotheses so far, in registration order."""
+        """Lists the rejected hypotheses so far.
+
+        Returns:
+            The rejected hypotheses, in registration order.
+        """
         return tuple(
             h
             for i, h in self.hypotheses.items()
@@ -871,7 +1099,11 @@ class Ledger:
         )
 
     def record_control(self, summary: Mapping[str, Any]) -> None:
-        """Logs the negative-control summary; call before `freeze`."""
+        """Logs the negative-control summary; call before `freeze`.
+
+        Args:
+            summary: The JSON-ready summary; its hash is stored with it.
+        """
         self.commit(CONTROL, {**summary, "sha256": digest(dict(summary))})
 
     def record_diagnostic(
@@ -889,6 +1121,14 @@ class Ledger:
         """Freezes the survivor set before the confirmation set is opened.
 
         Calling it again returns the same set.
+
+        Returns:
+            The frozen survivor set: the rejected hypotheses, in registration
+            order, with their hash.
+
+        Raises:
+            LedgerError: If the freeze row was written but the set was not
+                recorded (a defect, not a data error).
         """
         if self.survivor_set is not None:
             return self.survivor_set
@@ -903,7 +1143,14 @@ class Ledger:
         return self.survivor_set
 
     def seal(self, body: Mapping[str, Any]) -> None:
-        """Appends the confirmation row; nothing may follow it."""
+        """Appends the confirmation row; nothing may follow it.
+
+        Args:
+            body: The confirmation content; the survivors' hash is added.
+
+        Raises:
+            LedgerError: If the survivors have not been frozen.
+        """
         if self.survivor_set is None:
             raise LedgerError("freeze the survivors before confirming")
         self.commit(

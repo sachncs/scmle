@@ -1,9 +1,10 @@
 """The exploration phase: one registered hypothesis per feature.
 
-For every usable feature the plan registers a bivariate hypothesis (feature
-against target) *before* any statistic is computed, then the ledger tests them
-in registration order under the online rule. The plan is a function of the
-feature names and the target kind only, never of any result.
+For every usable feature the exploration plan registers a bivariate
+hypothesis (feature against target) *before* any statistic is computed, then
+the ledger tests them in registration order under the online rule. The plan is
+a function of the feature names and the target kind only, never of any
+result.
 
 Nothing here imports custody or reads the confirmation set: the functions take
 exploration data as arguments and cannot reach anything else (an import-graph
@@ -43,7 +44,17 @@ class Plan:
 
 
 def target_kind(target: pd.Series, classification: bool) -> str:
-    """How the target is treated: numeric, binary or multiclass."""
+    """Decides how the target is treated.
+
+    Args:
+        target: The exploration target.
+        classification: Whether the task is classification.
+
+    Returns:
+        `numeric` for regression, otherwise `binary` when the target has at
+        most two distinct non-missing values and `multiclass` when it has
+        more.
+    """
     if not classification:
         return NUMERIC
     return BINARY if target.nunique(dropna=True) <= 2 else MULTICLASS
@@ -59,6 +70,18 @@ def encode_target(
     Codes follow the sorted order of the classes (or `classes` when given, so
     the confirmation set is coded exactly as exploration was), so they do not
     depend on the order in which rows appear. Missing labels stay missing.
+
+    Args:
+        target: The target to encode.
+        classification: Whether to code class labels (otherwise the target
+            is cast to float).
+        classes: Fixed class order for the codes, or None to use the sorted
+            distinct labels of `target`.
+
+    Returns:
+        A float series with the index of `target`: the class code of each
+        label for classification (NaN where the label is missing or not in
+        `classes`), or the values themselves for regression.
 
     Raises:
         ValueError: If a regression target is not numeric.
@@ -149,11 +172,21 @@ def count_discoveries(
     features: pd.DataFrame,
     codes: pd.Series,
 ) -> int:
-    """Number of rejections of the whole exploration on the given data.
+    """Counts the rejections of the whole exploration on the given data.
 
     It applies the same statistics and the same online rule as
     `run_exploration`, without writing a ledger; the negative controls call it
     once per re-run.
+
+    Args:
+        config: Configuration of the online rule to build.
+        plan: The exploration plan whose hypotheses are tested in order.
+        features: Exploration features.
+        codes: Encoded exploration target.
+
+    Returns:
+        The number of hypotheses the online rule rejects. A hypothesis
+        arriving when the rule's level is zero is given ``p = 1``.
     """
     rule = config.build()
     state = rule.initial()

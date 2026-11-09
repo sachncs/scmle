@@ -1,7 +1,7 @@
 """The error budget: exploration wealth and confirmation alpha.
 
-Canon P2: the exploration alpha-wealth is a triage budget; the final claim
-guarantee comes only from `alpha_confirm`, spent once on the confirmation set.
+The exploration alpha-wealth is a triage budget; the final claim guarantee
+comes only from `alpha_confirm`, spent once on the confirmation set.
 The two never add, so they are distinct types with no shared arithmetic, and
 `spend` can only touch the exploration side.
 
@@ -42,7 +42,19 @@ class MultiplicityRule(enum.StrEnum):
 
 
 def exact(value: Any, name: str) -> Fraction:
-    """Reads a number exactly; a float is taken as its shortest decimal."""
+    """Reads a number exactly; a float is taken as its shortest decimal.
+
+    Args:
+        value: An int, a float or a `Fraction`; a bool is refused.
+        name: Field name used in the error message.
+
+    Returns:
+        The value as an exact fraction.
+
+    Raises:
+        ValueError: If `value` is a bool, a non-finite float or not a
+            number.
+    """
     if isinstance(value, bool):
         raise ValueError(f"{name} must be a finite number")
     if isinstance(value, Fraction):
@@ -55,7 +67,19 @@ def exact(value: Any, name: str) -> Fraction:
 
 
 def parse_fraction(text: Any, name: str) -> Fraction:
-    """Parses a serialized fraction such as ``"1/20"``."""
+    """Parses a serialized fraction such as ``"1/20"``.
+
+    Args:
+        text: The serialized fraction; any value is converted with `str`.
+        name: Field name used in the error message.
+
+    Returns:
+        The parsed fraction.
+
+    Raises:
+        ValueError: If the text is not a valid fraction or has a zero
+            denominator.
+    """
     try:
         return Fraction(str(text))
     except (ValueError, ZeroDivisionError) as error:
@@ -73,7 +97,11 @@ class ConfirmationBudget:
     alpha_confirm: Fraction
 
     def __post_init__(self) -> None:
-        """Validates the level."""
+        """Validates the level.
+
+        Raises:
+            ValueError: If `alpha_confirm` is not strictly between 0 and 1.
+        """
         if not 0 < self.alpha_confirm < 1:
             raise ValueError("alpha_confirm must be strictly between 0 and 1")
 
@@ -91,7 +119,12 @@ class ExplorationBudget:
     wealth: Fraction
 
     def __post_init__(self) -> None:
-        """Validates the state."""
+        """Validates the state.
+
+        Raises:
+            ValueError: If `initial` is outside [0, 1] or `wealth` is outside
+                [0, initial].
+        """
         if not 0 <= self.initial <= 1:
             raise ValueError("initial must be within [0, 1]")
         if not 0 <= self.wealth <= self.initial:
@@ -113,7 +146,11 @@ class DetectorTolerance:
     min_recall_lower_bound: float
 
     def __post_init__(self) -> None:
-        """Validates the tolerances."""
+        """Validates the tolerances.
+
+        A blank detector id or a rate that is not a finite number in [0, 1]
+        is refused with a `ValueError` by the checks it calls.
+        """
         evidence.require_text(self.detector_id, "detector_id")
         qualification.probability(
             self.max_false_alarm_rate, "max_false_alarm_rate"
@@ -123,12 +160,23 @@ class DetectorTolerance:
         )
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Builds the JSON-ready record.
+
+        Returns:
+            A mapping of the three fields to their values.
+        """
         return dataclasses.asdict(self)
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds the tolerance, rejecting unknown or missing fields."""
+        """Rebuilds the tolerance, rejecting unknown or missing fields.
+
+        Args:
+            record: A mapping holding exactly the fields of the class.
+
+        Returns:
+            The tolerance described by the record.
+        """
         qualification.require_fields(cls, record)
         return cls(**record)
 
@@ -150,7 +198,14 @@ class ErrorBudget:
     detector_tolerances: tuple[DetectorTolerance, ...]
 
     def __post_init__(self) -> None:
-        """Validates the budget."""
+        """Validates the budget.
+
+        Raises:
+            ValueError: If `detector_id` appears twice among the tolerances.
+                A `permutations_b` below the minimum or not an integer, or
+                tolerances that are not a tuple, are refused by the
+                `qualification` checks with a `ValueError`.
+        """
         qualification.count(
             self.permutations_b, "permutations_b", minimum=MIN_PERMUTATIONS
         )
@@ -195,7 +250,12 @@ class ErrorBudget:
         )
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record; fractions are written as ``"p/q"`` strings."""
+        """Builds the JSON-ready record.
+
+        Returns:
+            A nested mapping in which fractions are written as ``"p/q"``
+            strings.
+        """
         return {
             "confirmation": {
                 "alpha_confirm": str(self.confirmation.alpha_confirm)
@@ -212,7 +272,18 @@ class ErrorBudget:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds a budget exactly, rejecting unknown or missing fields."""
+        """Rebuilds a budget exactly, rejecting unknown or missing fields.
+
+        Args:
+            record: A mapping as written by `to_dict`.
+
+        Returns:
+            The budget described by the record.
+
+        Raises:
+            ValueError: If the record or its confirmation or exploration
+                part has unexpected or missing fields.
+        """
         qualification.require_fields(cls, record)
         confirmation = record["confirmation"]
         exploration = record["exploration"]
@@ -238,7 +309,14 @@ class ErrorBudget:
 
 
 def remaining(budget: ErrorBudget) -> float:
-    """Exploration wealth still unspent."""
+    """Reports the exploration wealth still unspent.
+
+    Args:
+        budget: The run's budget.
+
+    Returns:
+        The unspent exploration wealth as a float.
+    """
     return float(budget.exploration.wealth)
 
 
@@ -320,7 +398,15 @@ def split_budget(
 
 
 def harmonic(n: int) -> float:
-    """The n-th harmonic number (asymptotic series beyond 10,000)."""
+    """Computes the n-th harmonic number.
+
+    Args:
+        n: Number of terms; the exact sum is used up to 10,000 terms and an
+            asymptotic series beyond.
+
+    Returns:
+        The harmonic number as a float.
+    """
     if n > EXACT_HARMONIC_LIMIT:
         return math.log(n) + EULER_GAMMA + 1 / (2 * n) - 1 / (12 * n * n)
     return math.fsum(1.0 / k for k in range(1, n + 1))
@@ -334,7 +420,7 @@ def confirmation_alpha(
     This is the level at which a lone hypothesis is certain to be rejected
     (the rank-1 threshold of the step rule): `alpha / n` for Bonferroni, Holm
     and Benjamini-Hochberg, and `alpha / (n * H_n)` for Benjamini-Yekutieli.
-    The full rank-dependent thresholds belong to the ledger (Phase 3). With no
+    The full rank-dependent thresholds belong to the ledger. With no
     survivors there is nothing to correct and the whole level is returned.
 
     Args:
@@ -360,11 +446,19 @@ def confirmation_alpha(
 
 
 def discount_weight(index: int, horizon: int | None) -> Fraction:
-    """`gamma_index` of the discount sequence (F11).
+    """Computes `gamma_index` of the discount sequence.
 
     With no horizon ``gamma_j = 1 / (j (j + 1))``, which sums to less than one
     for every finite count. With an integer ``H`` it is ``1 / H`` up to ``H``
-    and zero afterwards.
+    and zero afterwards. An `index` or `horizon` that is not an integer of at
+    least 1 is refused with a `ValueError` by `qualification.count`.
+
+    Args:
+        index: Position ``j`` in the sequence, at least 1.
+        horizon: ``H``, at least 1, or None for the open-ended sequence.
+
+    Returns:
+        The weight ``gamma_j`` as an exact fraction.
     """
     qualification.count(index, "index", minimum=1)
     if horizon is None:
@@ -375,7 +469,7 @@ def discount_weight(index: int, horizon: int | None) -> Fraction:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class DecisionBudget:
-    """Levels for sequential promote and rollback decisions (F11).
+    """Levels for sequential promote and rollback decisions.
 
     It sits beside the `ErrorBudget` and shares no arithmetic with it: the
     promotion levels are spent by started experiments, and each promoted
@@ -388,8 +482,8 @@ class DecisionBudget:
     Attributes:
         alpha_promote: Total level for false promotions, in (0, 1).
         alpha_rollback: Level of each champion's rollback monitor, in (0, 1).
-        horizon: Planned number of experiments, or None for the open-ended
-            sequence ``gamma_j = 1 / (j (j + 1))``.
+        horizon: Number of experiments the discount sequence covers, or None
+            for the open-ended sequence ``gamma_j = 1 / (j (j + 1))``.
         assigned: ``(experiment_id, level)`` in assignment order.
         monitored: Champions whose rollback monitor has been started.
     """
@@ -401,7 +495,15 @@ class DecisionBudget:
     monitored: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
-        """Validates the state, including that no level was overspent."""
+        """Validates the state, including that no level was overspent.
+
+        Raises:
+            ValueError: If a level is outside (0, 1), an experiment id or
+                champion appears twice, an assigned level is not positive,
+                or the assigned levels exceed `alpha_promote`. An invalid
+                `horizon` is refused by the `qualification` check with a
+                `ValueError`.
+        """
         for name in ("alpha_promote", "alpha_rollback"):
             if not 0 < getattr(self, name) < 1:
                 raise ValueError(f"{name} must be strictly between 0 and 1")
@@ -424,7 +526,18 @@ class DecisionBudget:
         alpha_rollback: Number,
         horizon: int | None = None,
     ) -> Self:
-        """Builds a fresh budget from plain numbers (floats read exactly)."""
+        """Builds a fresh budget from plain numbers (floats read exactly).
+
+        Args:
+            alpha_promote: Total level for false promotions, in (0, 1).
+            alpha_rollback: Level of each champion's rollback monitor, in
+                (0, 1).
+            horizon: Number of experiments the discount sequence covers, or
+                None for the open-ended sequence.
+
+        Returns:
+            A budget with no level assigned and no champion monitored.
+        """
         return cls(
             alpha_promote=exact(alpha_promote, "alpha_promote"),
             alpha_rollback=exact(alpha_rollback, "alpha_rollback"),
@@ -433,16 +546,21 @@ class DecisionBudget:
 
     @property
     def spent(self) -> Fraction:
-        """Sum of the assigned promotion levels."""
+        """The sum of the assigned promotion levels."""
         return sum((level for ignored, level in self.assigned), Fraction(0))
 
     @property
     def remaining(self) -> Fraction:
-        """Promotion level not yet assigned."""
+        """The promotion level not yet assigned."""
         return self.alpha_promote - self.spent
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record; fractions are written as ``"p/q"`` strings."""
+        """Builds the JSON-ready record.
+
+        Returns:
+            A mapping in which fractions are written as ``"p/q"`` strings
+            and the assignments as ``[experiment_id, level]`` pairs.
+        """
         return {
             "alpha_promote": str(self.alpha_promote),
             "alpha_rollback": str(self.alpha_rollback),
@@ -453,7 +571,14 @@ class DecisionBudget:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds the budget exactly, rejecting unknown or missing fields."""
+        """Rebuilds the budget exactly, rejecting unknown or missing fields.
+
+        Args:
+            record: A mapping as written by `to_dict`.
+
+        Returns:
+            The budget described by the record.
+        """
         qualification.require_fields(cls, record)
         return cls(
             alpha_promote=parse_fraction(
@@ -525,6 +650,14 @@ def start_rollback_monitor(
 
     The rollback level is per champion and is not shared, so starting the
     monitor never reduces the promotion budget. A champion is monitored once.
+
+    Args:
+        budget: The budget before the start; it is not modified.
+        champion_id: Identifier of the promoted champion.
+
+    Returns:
+        The new budget with the champion recorded as monitored, and the
+        rollback level that champion's monitor may spend.
 
     Raises:
         ValueError: If the id is blank or already monitored.

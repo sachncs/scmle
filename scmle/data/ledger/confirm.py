@@ -1,6 +1,6 @@
 """The single confirmation of the exploration survivors on `C`.
 
-Order of events (canon P2). The guarantee ``FDR <= alpha_confirm`` comes only
+Order of events. The guarantee ``FDR <= alpha_confirm`` comes only
 from this stage:
 
 1. The survivors, selected on `X` only, are frozen in the ledger with a hash.
@@ -47,8 +47,8 @@ the error rate with an `X`-only withdrawal rule that is correlated with the
 signal, and checks the order of events.
 
 Registered claims. A caller may hand over a `ClaimRunner`: claims that are not
-single-feature statistics (the baseline comparison of F8, the primary causal
-hypothesis of F10). Each is registered in the ledger by the hash of its
+single-feature statistics (the baseline comparison, the primary causal
+hypothesis). Each is registered in the ledger by the hash of its
 registration before the survivors are frozen, the sealed set is bound to the
 survivor family and the registrations, and the *same* released frame is given
 to the runner after the bivariate family was tested. The runner never sees `C`
@@ -119,7 +119,17 @@ class EventLog(Protocol):
         actor: str,
         detail: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Adds an event and returns the stored entry."""
+        """Adds an event and returns the stored entry.
+
+        Args:
+            set_id: Identifier of the sealed set the event concerns.
+            event: Name of the event.
+            actor: Who caused the event.
+            detail: Extra JSON-ready detail, or None.
+
+        Returns:
+            The entry as stored in the log.
+        """
 
 
 class ConfirmationSource(Protocol):
@@ -135,7 +145,15 @@ class ConfirmationSource(Protocol):
         """Returns the release token."""
 
     def commit(self, claims_hash: str, ledger_hash: str) -> str:
-        """Binds the single release to a claim set and a ledger state."""
+        """Binds the single release to a claim set and a ledger state.
+
+        Args:
+            claims_hash: Hash of the family (and registered claims) to test.
+            ledger_hash: Head hash of the ledger at the time of binding.
+
+        Returns:
+            The digest that binds the release to the two hashes.
+        """
 
     def open(
         self,
@@ -144,7 +162,17 @@ class ConfirmationSource(Protocol):
         claims_hash: str | None = ...,
         ledger_hash: str | None = ...,
     ) -> tuple[pd.DataFrame, pd.Series]:
-        """Releases the rows a single time."""
+        """Releases the rows a single time.
+
+        Args:
+            token: The release token from `issue_token`.
+            actor: Who opens the set.
+            claims_hash: The claim-set hash the release was bound to.
+            ledger_hash: The ledger head the release was bound to.
+
+        Returns:
+            The features and target of the confirmation set.
+        """
 
 
 STAGE_TWO_STATEMENT = (
@@ -179,7 +207,11 @@ class Withdrawal:
     accounted: bool = True
 
     def __post_init__(self) -> None:
-        """Refuses reasons without accounting."""
+        """Refuses reasons without accounting.
+
+        Raises:
+            ValueError: If `reasons` is not empty while `accounted` is False.
+        """
         if self.reasons and not self.accounted:
             raise ValueError("a withdrawal with reasons must be accounted")
 
@@ -234,10 +266,23 @@ class ClaimRunner:
 
 
 def merge_runners(*runners: ClaimRunner | None) -> ClaimRunner | None:
-    """One runner for several: all are evaluated on the same released frame.
+    """Combines several runners into one, all evaluated on the same frame.
 
-    Returns None when there is none. A document name two runners produce is
-    refused when it is evaluated, never overwritten silently.
+    A document name two runners produce is refused when it is evaluated,
+    never overwritten silently. A runner that raises while evaluating has all
+    its claims marked `failed`; the others still run.
+
+    Args:
+        *runners: The runners to combine; None entries are ignored.
+
+    Returns:
+        None when no runner is given, the single runner when only one is
+        given, otherwise a runner registering every claim of all of them.
+
+    Raises:
+        ValueError: If two runners register the same claim id. The runner
+            the function returns also raises it, when called, if two runners
+            produce a document with the same name.
     """
     chosen = [r for r in runners if r is not None]
     if not chosen:
@@ -279,7 +324,7 @@ class Confirmation:
         reason: One sentence for the report.
         claims: One claim per survivor.
         checks: The checks on `C` (empty when `C` was not tested).
-        rule: Multiplicity rule used (or planned).
+        rule: Multiplicity rule used (or that would have been used).
         alpha_confirm: The confirmation level.
         survivors_sha256: Hash of the frozen survivor set.
         ledger_head: Ledger head hash when the confirmation was written.
@@ -316,7 +361,14 @@ class Confirmation:
         )
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record (``confirmed_claims.json``)."""
+        """Builds the JSON-ready record (``confirmed_claims.json``).
+
+        Returns:
+            A mapping with the outcome, rule and its guarantee statement,
+            level, hashes, negative control, claims, checks and a note;
+            ``stage_two``, ``registered_claims`` and ``attachments`` (a hash
+            per document) are present only when they apply.
+        """
         record = {
             "outcome": self.outcome,
             "reason": self.reason,
@@ -350,7 +402,11 @@ class Confirmation:
         return record
 
     def write(self, path: str | Path) -> None:
-        """Writes ``confirmed_claims.json``."""
+        """Writes ``confirmed_claims.json``.
+
+        Args:
+            path: File to write; missing parent directories are created.
+        """
         target = Path(path)
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(
@@ -363,7 +419,17 @@ class Confirmation:
 def assumptions(
     rule: budget_module.MultiplicityRule, size: int, withdrawn: int = 0
 ) -> tuple[str, ...]:
-    """The assumptions a confirmed claim depends on."""
+    """Lists the assumptions a confirmed claim depends on.
+
+    Args:
+        rule: Multiplicity rule used for the family.
+        size: Number of survivors in the tested family.
+        withdrawn: Number of survivors withdrawn before `C` was opened.
+
+    Returns:
+        One sentence per assumption; a sentence on the withdrawal is added
+        when `withdrawn` is positive.
+    """
     lines = [
         f"{multiplicity.STATEMENTS[rule]} (rule {rule.value}, family of "
         f"{size} survivors fixed before C was opened)",
@@ -385,14 +451,32 @@ def assumptions(
 
 
 def statement(spec: ledger_module.HypothesisSpec) -> str:
-    """A claim's sentence."""
+    """Writes the sentence of a claim.
+
+    Args:
+        spec: The hypothesis specification.
+
+    Returns:
+        The hypothesis name followed by the null it is evidence against.
+    """
     return f"{spec.name}: evidence against '{spec.null}'"
 
 
 def unverified_claims(
     ledger: ledger_module.Ledger, why: str
 ) -> tuple[qualification.Claim, ...]:
-    """Claims for survivors that were not (or could not be) confirmed."""
+    """Builds claims for survivors that were not (or could not be) confirmed.
+
+    Args:
+        ledger: The ledger whose survivors are frozen.
+        why: Reason, recorded in each claim's assumptions.
+
+    Returns:
+        One unverified claim per survivor, in survivor order.
+
+    Raises:
+        LedgerError: If the survivors have not been frozen.
+    """
     survivors = ledger.survivor_set
     if survivors is None:
         raise ledger_module.LedgerError("freeze the survivors first")
@@ -436,6 +520,25 @@ def finish(
 
     With a `runner`, `ran` holds what it produced; None means it was not
     evaluated (no `C`, or the opening failed).
+
+    Args:
+        ledger: The ledger with frozen survivors.
+        outcome: Outcome code of the confirmation.
+        reason: One sentence for the report.
+        claims: One claim per survivor.
+        checks: The checks on `C` (empty when `C` was not tested).
+        rule: Multiplicity rule used.
+        alpha: The confirmation level.
+        custody_head: Custody log head after the open, or None.
+        stage_two: Withdrawal accounting, or None.
+        runner: Registered claim runner, or None.
+        ran: What the runner produced, or None if it was not evaluated.
+
+    Returns:
+        The confirmation, after its row has been sealed into the ledger.
+
+    Raises:
+        LedgerError: If the survivors have not been frozen.
     """
     survivors = ledger.survivor_set
     if survivors is None:
@@ -489,7 +592,15 @@ def finish(
 
 
 def check_policy(policy: str) -> None:
-    """Refuses a failure policy that is not available."""
+    """Refuses a failure policy that is not available.
+
+    Args:
+        policy: The failure policy name.
+
+    Raises:
+        ConfigError: If the policy is `thresholdout` (not implemented) or is
+            not a known policy.
+    """
     if policy == THRESHOLDOUT:
         raise errors.ConfigError(
             "the Thresholdout reusable holdout is not implemented; use the "
@@ -502,7 +613,15 @@ def check_policy(policy: str) -> None:
 def withdrawn_claims(
     ledger: ledger_module.Ledger, reasons: Mapping[str, str]
 ) -> dict[str, qualification.Claim]:
-    """Unverified claims for survivors withdrawn before `C` was opened."""
+    """Builds unverified claims for survivors withdrawn before `C` opened.
+
+    Args:
+        ledger: The ledger holding the survivors' results.
+        reasons: Hypothesis id to the sentence that withdrew it.
+
+    Returns:
+        Hypothesis id to an unverified claim that records the reason.
+    """
     claims = {}
     for hypothesis_id, why in reasons.items():
         result = ledger.results[hypothesis_id]
@@ -526,7 +645,16 @@ def withdrawn_claims(
 def stage_two_record(
     ledger: ledger_module.Ledger, withdrawal: Withdrawal
 ) -> dict[str, Any]:
-    """The accounting of a withdrawal, hashed over the surviving family.
+    """Builds the accounting of a withdrawal, hashed over the surviving family.
+
+    Args:
+        ledger: The ledger; its survivors are frozen if they are not yet.
+        withdrawal: The withdrawal to account for.
+
+    Returns:
+        A mapping with the survivors and their hash, the withdrawn ids with
+        reasons, the remaining family and its hash, the rule and the
+        guarantee statement.
 
     Raises:
         LedgerError: If a withdrawn id is not a frozen survivor.
@@ -574,6 +702,9 @@ def run_confirmation(
 
     Returns:
         Claims (in survivor order) and the checks on `C`.
+
+    Raises:
+        LedgerError: If the survivors have not been frozen.
     """
     survivors = ledger.survivor_set
     if survivors is None:
@@ -646,7 +777,15 @@ def run_confirmation(
 
 
 def default_encoding(target: pd.Series) -> Any:
-    """Target values as floats; classes are coded in sorted order."""
+    """Encodes the target as floats; classes are coded in sorted order.
+
+    Args:
+        target: The opened confirmation target.
+
+    Returns:
+        A float array: the values of a numeric target, or the code of each
+        label (by sorted order of the labels) otherwise, NaN where missing.
+    """
     if pd.api.types.is_numeric_dtype(target):
         return target.to_numpy(dtype=float)
     classes = sorted(target.dropna().unique(), key=str)
@@ -668,6 +807,9 @@ def confirm(
     claim_runner: ClaimRunner | None = None,
 ) -> Confirmation:
     """Freezes the survivors and tests them once on the confirmation set.
+
+    An unavailable failure policy is refused first, by `check_policy`, with a
+    `ConfigError`.
 
     Args:
         ledger: The run's ledger, after exploration (and the negative
@@ -693,8 +835,8 @@ def confirm(
 
     Raises:
         LeakageError: If the confirmation was already performed. The attempt
-            is written to the custody log.
-        ConfigError: For an unavailable failure policy.
+            is written to the custody log. A `LeakageError` from opening the
+            set is also propagated.
     """
     check_policy(policy)
     if ledger.confirmation is not None:
@@ -895,10 +1037,20 @@ def family_block(
     alpha_confirm: Fraction,
     require_control: bool,
 ) -> tuple[str, str, tuple[qualification.Claim, ...]] | None:
-    """Why the bivariate family cannot be promoted, or None when it can.
+    """Decides why the bivariate family cannot be promoted, if it cannot.
 
-    Returns the outcome, the sentence and the unverified claims, in the order
-    the gates apply: no survivors, no control, control floor not exceeded.
+    The gates apply in this order: no survivors, no control, control floor
+    not exceeded.
+
+    Args:
+        ledger: The ledger; its survivors are frozen if they are not yet.
+        record: Withdrawal accounting, or None. Not read by the gates.
+        alpha_confirm: The confirmation level. Not read by the gates.
+        require_control: Whether a missing negative control blocks promotion.
+
+    Returns:
+        None when the family can be promoted, otherwise the outcome code, the
+        sentence and the unverified claims.
     """
     survivors = ledger.freeze()
     if not survivors.hypothesis_ids:
@@ -926,7 +1078,16 @@ def family_block(
 
 
 def failure_reason(stage: str, failure: Exception) -> str:
-    """Why the confirmation crashed, under the 'unconfirmed' policy."""
+    """Words why the confirmation crashed, under the 'unconfirmed' policy.
+
+    Args:
+        stage: What was being done when it failed.
+        failure: The exception that was caught.
+
+    Returns:
+        A sentence naming the stage and the exception, and saying that all
+        claims stay unverified.
+    """
     return (
         f"the confirmation failed while {stage} "
         f"({type(failure).__name__}: {failure}); C is spent and all claims "
@@ -935,6 +1096,13 @@ def failure_reason(stage: str, failure: Exception) -> str:
 
 
 def head_of(log: Any) -> str | None:
-    """Hash of the custody log's last entry, when it has entries."""
+    """Reads the hash of the custody log's last entry.
+
+    Args:
+        log: The custody log, read through its ``entries`` attribute.
+
+    Returns:
+        The last entry's hash, or None when the log has no entries.
+    """
     entries: Sequence[dict[str, Any]] = getattr(log, "entries", ())
     return str(entries[-1]["hash"]) if entries else None

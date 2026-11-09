@@ -68,6 +68,14 @@ def quantile_index(b: int, q: float = QUANTILE) -> int:
     counts, ``P(observed > percentile) <= 1 - q``. With B = 20 that is the
     largest of the 20 counts (``1/21 < 0.05``), not the 19th, which would
     allow ``2/21 = 9.5%``.
+
+    Args:
+        b: Number of re-run counts.
+        q: Quantile level in (0, 1).
+
+    Returns:
+        The index into the ascending-sorted counts, clamped to the range
+        0 to ``b - 1``.
     """
     return min(b, max(1, math.ceil(q * (b + 1) - 1e-9))) - 1
 
@@ -76,6 +84,16 @@ def percentile(counts: tuple[int, ...], q: float = QUANTILE) -> int:
     """The conservative order-statistic percentile of discovery counts.
 
     It is the ``ceil(q * (B + 1))``-th smallest value (see `quantile_index`).
+
+    Args:
+        counts: Discovery counts of the re-runs.
+        q: Quantile level in (0, 1).
+
+    Returns:
+        The selected order statistic of `counts`.
+
+    Raises:
+        ValueError: If `counts` is empty.
     """
     if not counts:
         raise ValueError("counts must not be empty")
@@ -92,6 +110,17 @@ def percentile_interval(
     Uses the binomial distribution of the number of draws below the quantile
     to pick two order statistics. With few repeats the interval is wide and
     reaches the largest count; that is the honest statement of the error.
+
+    Args:
+        counts: Discovery counts of the re-runs.
+        q: Quantile level in (0, 1).
+        confidence: Nominal coverage of the interval.
+
+    Returns:
+        The (lower, upper) bounds, each an element of `counts`.
+
+    Raises:
+        ValueError: If `counts` is empty.
     """
     b = len(counts)
     if b == 0:
@@ -119,6 +148,10 @@ def permute_within(
 
     Returns:
         A permuted copy.
+
+    Raises:
+        ValueError: If `strata` is given and does not have one label per
+            entry of `values`.
     """
     out = np.array(values, copy=True)
     if strata is None:
@@ -194,7 +227,13 @@ class ControlResult:
         )
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record (``negative_control.json``)."""
+        """Builds the JSON-ready record (``negative_control.json``).
+
+        Returns:
+            A mapping of every field plus the number of re-runs, the
+            interval confidence, the report message and a note on Monte
+            Carlo error; lists replace tuples.
+        """
         return {
             "kind": self.kind,
             "scope": self.scope,
@@ -216,7 +255,14 @@ class ControlResult:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> "ControlResult":
-        """Rebuilds a result from its JSON record."""
+        """Rebuilds a result from its JSON record.
+
+        Args:
+            record: A mapping with the fields written by `to_dict`.
+
+        Returns:
+            The result described by the record.
+        """
         counts = tuple(int(c) for c in record["permuted"])
         low, high = record["p95_interval"]
         return cls(
@@ -234,7 +280,22 @@ class ControlResult:
 def summarize(
     kind: str, scope: str, observed: int, counts: tuple[int, ...]
 ) -> ControlResult:
-    """Builds the result for an observed count and the re-run counts."""
+    """Builds the result for an observed count and the re-run counts.
+
+    Args:
+        kind: `permuted_target` or `resampling`.
+        scope: `strata`, `blocks` or `global`.
+        observed: Discoveries on the real data.
+        counts: Discovery counts of the re-runs.
+
+    Returns:
+        The control result, with the 95th percentile, its interval and the
+        exceedance p-value computed from `counts`.
+
+    Raises:
+        ValueError: If there are fewer re-runs than the minimum number of
+            permutations.
+    """
     qualification.count(observed, "observed")
     if len(counts) < budget_module.MIN_PERMUTATIONS:
         raise ValueError(
@@ -310,7 +371,17 @@ def shuffle_columns(
     rng: np.random.Generator,
     strata: np.ndarray | None,
 ) -> pd.DataFrame:
-    """Shuffles every column independently (within strata when given)."""
+    """Shuffles every column independently (within strata when given).
+
+    Args:
+        features: The columns to shuffle.
+        rng: Random generator; advanced once per column.
+        strata: Label per row within which values are shuffled, or None for
+            a global shuffle.
+
+    Returns:
+        A new frame with the same index and columns.
+    """
     out = {}
     for name in features.columns:
         column = features[name].to_numpy()
@@ -326,6 +397,14 @@ def shuffle_blocks(
     Rows are first ordered by block label; a column's values keep their order
     inside each block but the blocks are laid out in a random order, which
     destroys slow drift while keeping short-range structure.
+
+    Args:
+        features: The columns to shuffle.
+        blocks: Block label per row.
+        rng: Random generator; one block order is drawn per column.
+
+    Returns:
+        A new frame with the same index and columns.
     """
     labels = np.asarray(blocks)
     order = np.argsort(labels, kind="stable")

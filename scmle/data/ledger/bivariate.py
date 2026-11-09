@@ -50,14 +50,36 @@ class Outcome:
 
 
 def untestable(n: int, note: str) -> Outcome:
-    """The outcome of a pair that cannot be tested."""
+    """Builds the outcome of a pair that cannot be tested.
+
+    Args:
+        n: Number of complete rows that were available.
+        note: Why the pair is untestable.
+
+    Returns:
+        An outcome with ``p = 1`` and zero statistic and effect, so the pair
+        can never be rejected.
+    """
     return Outcome(p=1.0, statistic=0.0, effect=0.0, n=n, note=note)
 
 
 def complete_pairs(
     x: np.ndarray, y: np.ndarray
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Both arrays restricted to rows where neither value is missing."""
+    """Restricts both arrays to rows where neither value is missing.
+
+    Args:
+        x: First variable.
+        y: Second variable, the same length as `x`.
+
+    Returns:
+        The two float arrays after dropping every row in which either value
+        is NaN or infinite, in the original row order.
+
+    Raises:
+        ValueError: If the arrays differ in shape or are not
+            one-dimensional.
+    """
     xs = np.asarray(x, dtype=float)
     ys = np.asarray(y, dtype=float)
     if xs.shape != ys.shape or xs.ndim != 1:
@@ -67,7 +89,18 @@ def complete_pairs(
 
 
 def tail_probability(t_value: float, freedom: int, direction: str) -> float:
-    """P-value of a t statistic for the requested alternative."""
+    """Computes the p-value of a t statistic for an alternative.
+
+    Args:
+        t_value: The observed t statistic.
+        freedom: Degrees of freedom of the t distribution.
+        direction: `two-sided`, `greater` or `less`; any other value is
+            treated as `less`.
+
+    Returns:
+        The tail probability: both tails for `two-sided`, the upper tail for
+        `greater`, the lower tail otherwise.
+    """
     if direction == TWO_SIDED:
         return float(2.0 * stats.t.sf(abs(t_value), freedom))
     if direction == GREATER:
@@ -156,10 +189,15 @@ def code_hash(statistic: str) -> str:
     """SHA-256 of the source of a registered statistic function.
 
     It identifies the code path that produced a p-value. It does not cover
-    scipy or numpy, whose versions the run records separately.
+    scipy or numpy, whose versions the run records separately. An unknown
+    statistic is rejected by `lookup` with a `ValueError`.
 
-    Raises:
-        ValueError: On an unknown statistic.
+    Args:
+        statistic: Name of a registered statistic.
+
+    Returns:
+        The hex digest of the function's source text, with Windows line
+        endings normalised to Unix ones.
     """
     function = lookup(statistic)
     source = inspect.getsource(function).replace("\r\n", "\n")
@@ -167,7 +205,17 @@ def code_hash(statistic: str) -> str:
 
 
 def lookup(statistic: str) -> Callable[..., Outcome]:
-    """The registered function, or a clear error."""
+    """Finds a registered statistic function by name.
+
+    Args:
+        statistic: Name of a registered statistic.
+
+    Returns:
+        The function registered under that name.
+
+    Raises:
+        ValueError: If no statistic is registered under that name.
+    """
     if statistic not in STATISTICS:
         raise ValueError(f"statistic must be one of {sorted(STATISTICS)}")
     return STATISTICS[statistic]
@@ -185,6 +233,6 @@ def run_statistic(
         direction: The alternative.
 
     Returns:
-        The outcome.
+        The outcome of the statistic on the given data.
     """
     return lookup(statistic)(x, y, direction)

@@ -60,7 +60,16 @@ class GovernedRun:
     scope: str
 
     def summary(self) -> dict[str, Any]:
-        """Counts and hashes for the run event."""
+        """Collects counts and hashes for the run event.
+
+        Returns:
+            A JSON-ready mapping with the online rule name, the numbers of
+            hypotheses, tested and rejected hypotheses, skipped features and
+            confirmed claims, the confirmation outcome, the negative control
+            figures (exceeds, observed, 95th percentile, scope), the ledger
+            head, the survivors hash and the number of survivors withdrawn
+            by the second stage (None when there was no second stage).
+        """
         results = self.ledger.results.values()
         return {
             "rule": self.ledger.header["rule"]["rule"],
@@ -243,6 +252,33 @@ def explore_governed(
     A caller that needs something computed after exploration (a selected
     model) before the registered claims are fixed calls this first and
     `confirm_explored` later; `C` is not touched in between.
+
+    Args:
+        charter: The governing `AnalysisCharter`.
+        features: Exploration features (never confirmation rows).
+        target: Exploration target.
+        classification: Whether the target holds classes.
+        run_dir: Directory for the artifacts, or None to keep them in memory.
+        exclude: Structure columns (group, time) that are not candidates.
+        strata: Permutation labels for the control.
+        rule: Online rule for exploration.
+        policy: Failure policy of the confirmation; checked before anything
+            else is done.
+        diagnostics: (source, check) pairs from detectors run on `X`; they
+            are logged once, before exploration, and spend no wealth.
+        second_stage: Pre-registered withdrawal rule that receives the
+            survivors and computes its answer from `X` alone, or None.
+
+    Returns:
+        The exploration state: the ledger with its results and negative
+        control recorded, the exploration plan, the control, the second-stage
+        withdrawal (None if there was none) and what `confirm_explored`
+        needs to open `C`.
+
+    Raises:
+        LedgerError: If the ledger holds no online rule configuration. An
+            unavailable `policy` is refused by `confirm.check_policy` with a
+            `ConfigError`.
     """
     confirm.check_policy(policy)
     kind = explore.target_kind(target, classification)
@@ -315,7 +351,20 @@ def confirm_explored(
     policy: str = confirm.UNCONFIRMED,
     claim_runner: confirm.ClaimRunner | None = None,
 ) -> GovernedRun:
-    """Freezes the survivors and tests once on `C` (see `run_governed`)."""
+    """Freezes the survivors and tests once on `C` (see `run_governed`).
+
+    Args:
+        explored: The state returned by `explore_governed`.
+        source: The sealed confirmation set, or None if none was carved.
+        confirmation_rule: Multiplicity rule for the confirmation.
+        policy: Failure policy of the confirmation.
+        claim_runner: Claims registered in the ledger and evaluated on the
+            same opening of `C`.
+
+    Returns:
+        The governed run. When the exploration has a run directory, the
+        claims file and the negative control record are written there.
+    """
     charter = explored.charter
     classification = explored.classification
     classes = explored.classes

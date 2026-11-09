@@ -71,7 +71,14 @@ class Adjustment:
 
 
 def harmonic_exact(m: int) -> Fraction:
-    """``sum_{i <= m} 1 / i`` as an exact fraction."""
+    """Computes the harmonic number as an exact fraction.
+
+    Args:
+        m: Number of terms.
+
+    Returns:
+        ``sum_{i <= m} 1 / i``, exactly; zero when `m` is zero.
+    """
     return sum((Fraction(1, i) for i in range(1, m + 1)), Fraction(0))
 
 
@@ -84,7 +91,8 @@ def adjust(pvalues: Sequence[float], rule: Rule, alpha: Fraction) -> Adjustment:
         alpha: Level in (0, 1).
 
     Returns:
-        The adjustment; an empty family gives empty tuples.
+        The adjusted p-values and exact rejection decisions, each in the
+        order of `pvalues`; an empty family gives empty tuples.
 
     Raises:
         ValueError: On an unknown rule, a level outside (0, 1) or a p-value
@@ -133,7 +141,15 @@ def adjust(pvalues: Sequence[float], rule: Rule, alpha: Fraction) -> Adjustment:
 
 
 def step_up(scaled: list[float]) -> list[float]:
-    """Running minimum from the largest rank down (BH and BY)."""
+    """Takes the running minimum from the largest rank down (BH and BY).
+
+    Args:
+        scaled: Scaled p-values sorted by increasing p-value.
+
+    Returns:
+        A new list in which each entry is the minimum of itself and every
+        later entry.
+    """
     out = list(scaled)
     for k in range(len(out) - 2, -1, -1):
         out[k] = min(out[k], out[k + 1])
@@ -141,7 +157,15 @@ def step_up(scaled: list[float]) -> list[float]:
 
 
 def step_down(scaled: list[float]) -> list[float]:
-    """Running maximum from the smallest rank up (Holm)."""
+    """Takes the running maximum from the smallest rank up (Holm).
+
+    Args:
+        scaled: Scaled p-values sorted by increasing p-value.
+
+    Returns:
+        A new list in which each entry is the maximum of itself and every
+        earlier entry.
+    """
     out = list(scaled)
     for k in range(1, len(out)):
         out[k] = max(out[k], out[k - 1])

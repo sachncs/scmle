@@ -47,9 +47,9 @@ Annals of Statistics 49(3), 2021, doi:10.1214/20-AOS2020)
 LORD++ (Ramdas, Yang, Wainwright and Jordan, "Online control of the false
 discovery rate with decaying memory", NeurIPS 2017, arXiv:1710.00499,
 equation (5) and Theorem 1)
-    ``alpha_t = gamma_t W0 + (alpha - W0) gamma_{t - tau_1}
+    ``alpha_t = gamma_t w0 + (alpha - w0) gamma_{t - tau_1}
     + alpha * sum_{j >= 2, tau_j < t} gamma_{t - tau_j}`` with ``tau_j`` the
-    time of the j-th rejection, ``0 <= W0 <= alpha`` and a nonincreasing
+    time of the j-th rejection, ``0 <= w0 <= alpha`` and a nonincreasing
     positive ``gamma`` summing to one. Hypothesis ``t`` is rejected when
     ``p_t <= alpha_t``. The theorem gives ``FDR <= alpha`` for *independent*
     p-values. The onlineFDR manual (Bioconductor 3.23, version 2.20.0) adds
@@ -61,14 +61,14 @@ SAFFRON (Ramdas, Zrnic, Wainwright and Jordan, "SAFFRON: an adaptive
 algorithm for online control of the false discovery rate", ICML 2018,
 arXiv:1802.09098, Section 2.3 and Theorem 1)
     A p-value ``<= lambda`` is a candidate. ``alpha_t = min(lambda,
-    (1 - lambda) * (W0 gamma_{t - C0+} + (alpha - W0) gamma_{t - tau_1 - C1+}
+    (1 - lambda) * (w0 gamma_{t - C0+} + (alpha - w0) gamma_{t - tau_1 - C1+}
     + alpha * sum_{j >= 2} gamma_{t - tau_j - Cj+}))`` where ``Cj+`` counts
     the candidates in ``(tau_j, t - 1]``. FDR control at ``alpha`` holds for
     independent p-values (Theorem 1(d), which also needs the levels to be
     monotone functions of the past, as here); only mFDR control is claimed
     under conditional super-uniformity. The onlineFDR manual gives the same
     independence statement and the defaults ``lambda = 1/2``,
-    ``W0 = alpha / 2``.
+    ``w0 = alpha / 2``.
 
 Not verified, so not claimed. R ``onlineFDR`` 2.20.0 has no e-LOND function,
 and no R output could be generated here (R is not installed), so these rules
@@ -77,7 +77,7 @@ brute-force re-derivations of the levels from the definitions, not against R.
 The package's default discount sequence is ``gamma_j`` proportional to
 ``j ** -1.6``, an irrational normalisation that cannot be held exactly, so the
 default here is the exact ``1 / (j (j + 1))`` (sum one). Defaults for the
-initial wealth follow the papers (``W0 = alpha / 2``); the onlineFDR LORD
+initial wealth follow the papers (``w0 = alpha / 2``); the onlineFDR LORD
 default is ``alpha / 10``.
 
 Bookkeeping of "wealth". For LORD++ and SAFFRON the wealth after ``t`` tests
@@ -148,12 +148,28 @@ class Discount:
     horizon: int | None = None
 
     def __post_init__(self) -> None:
-        """Validates the horizon."""
+        """Validates the horizon.
+
+        A horizon that is not an integer of at least 1 is refused with a
+        `ValueError` by `qualification.count`.
+        """
         if self.horizon is not None:
             qualification.count(self.horizon, "horizon", minimum=1)
 
     def weight(self, index: int) -> Fraction:
-        """`gamma_index` for ``index >= 1``."""
+        """Computes `gamma_index` for ``index >= 1``.
+
+        Args:
+            index: Position in the sequence, at least 1.
+
+        Returns:
+            The weight ``gamma_index``: ``1 / (index (index + 1))`` without a
+            horizon, otherwise ``1 / H`` up to the horizon ``H`` and zero
+            after it.
+
+        Raises:
+            ValueError: If `index` is below 1.
+        """
         if index < 1:
             raise ValueError("index must be at least 1")
         if self.horizon is None:
@@ -163,7 +179,15 @@ class Discount:
         )
 
     def cumulative(self, count: int) -> Fraction:
-        """``sum_{j <= count} gamma_j`` in closed form."""
+        """Computes ``sum_{j <= count} gamma_j`` in closed form.
+
+        Args:
+            count: Number of terms; a negative or non-integer count is
+                refused with a `ValueError` by `qualification.count`.
+
+        Returns:
+            The partial sum of the first `count` weights.
+        """
         qualification.count(count, "count")
         if self.horizon is None:
             return Fraction(count, count + 1)
@@ -183,7 +207,14 @@ class Evidence:
     e: float | None = None
 
     def __post_init__(self) -> None:
-        """Validates the values."""
+        """Validates the values.
+
+        Raises:
+            ValueError: If neither a p-value nor an e-value is given, or the
+                e-value is negative. A p-value outside [0, 1] or a
+                non-finite e-value is refused with a `ValueError` by the
+                `qualification` checks.
+        """
         if self.p is None and self.e is None:
             raise ValueError("evidence needs a p-value or an e-value")
         if self.p is not None:
@@ -261,7 +292,19 @@ def calibrate(p: float, kappa: float = DEFAULT_KAPPA) -> float:
 
 
 def exact_alpha(value: Any, name: str) -> Fraction:
-    """A level in [0, 1] as an exact fraction."""
+    """Reads a level in [0, 1] as an exact fraction.
+
+    Args:
+        value: An int, float or `Fraction`.
+        name: Field name used in the error message.
+
+    Returns:
+        The exact value.
+
+    Raises:
+        ValueError: If the value is outside [0, 1]. A value that is not a
+            finite number is refused by `budget.exact`.
+    """
     amount = budget_module.exact(value, name)
     if not 0 <= amount <= 1:
         raise ValueError(f"{name} must be within [0, 1]")
@@ -285,27 +328,66 @@ class OnlineRule(abc.ABC):
         self.discount = discount if discount is not None else Discount()
 
     def initial(self) -> State:
-        """The state before any hypothesis."""
+        """Gives the state before any hypothesis.
+
+        Returns:
+            A state with no tests, rejections or candidates and nothing
+            spent.
+        """
         return State()
 
     @abc.abstractmethod
     def level(self, state: State) -> Fraction:
-        """Level of the next hypothesis, a function of the past only."""
+        """Computes the level of the next hypothesis from the past only.
+
+        Args:
+            state: The state after the previous hypothesis.
+
+        Returns:
+            The test level ``alpha_t`` of the next hypothesis.
+        """
 
     @abc.abstractmethod
     def wealth(self, state: State) -> Fraction:
-        """Wealth in `state`."""
+        """Computes the wealth in a state.
+
+        Args:
+            state: The state to measure.
+
+        Returns:
+            The wealth, as the rule defines it.
+        """
 
     @abc.abstractmethod
     def decide(
         self, level: Fraction, evidence: Evidence
     ) -> tuple[bool, bool, float | None]:
-        """Returns (rejected, candidate, e-value used) for one test."""
+        """Decides one test.
+
+        Args:
+            level: The level assigned to the hypothesis.
+            evidence: Its p-value or e-value.
+
+        Returns:
+            Whether it is rejected, whether it is a candidate, and the
+            e-value used (None for the p-value rules).
+        """
 
     def update_spent(
         self, state: State, level: Fraction, candidate: bool
     ) -> Fraction:
-        """Level spent after a test; the default charges every level."""
+        """Computes the level spent after a test.
+
+        The default charges every level.
+
+        Args:
+            state: The state before the test.
+            level: The level the test was given.
+            candidate: Whether the test was a candidate.
+
+        Returns:
+            The total level spent after the test.
+        """
         return state.spent + level
 
     def step(self, state: State, evidence: Evidence) -> Step:
@@ -316,10 +398,11 @@ class OnlineRule(abc.ABC):
             evidence: The p-value or e-value of the next hypothesis.
 
         Returns:
-            The level, the decision, the wealth and the new state.
+            The level, the decision, the wealth and the new state. A rule
+            that needs a kind of evidence the item lacks refuses it with a
+            `ValueError` (see `decide`).
 
         Raises:
-            ValueError: If the rule needs a kind of evidence that is missing.
             RuleInvariantError: If the wealth would turn negative.
         """
         level = self.level(state)
@@ -349,7 +432,15 @@ class OnlineRule(abc.ABC):
         )
 
     def credit(self, state: State) -> Fraction:
-        """Initial wealth plus rewards, shared by LORD++ and SAFFRON."""
+        """Computes the credit earned, used by LORD++ and SAFFRON.
+
+        Args:
+            state: The state to measure.
+
+        Returns:
+            Zero in the base class; the p-value rules return the initial
+            wealth plus a reward per rejection.
+        """
         return Fraction(0)
 
 
@@ -384,7 +475,16 @@ class ELond(OnlineRule):
         discount: Discount | None = None,
         kappa: float = DEFAULT_KAPPA,
     ) -> None:
-        """Creates the rule; `kappa` is the p-to-e calibrator parameter."""
+        """Creates the rule.
+
+        Args:
+            alpha: Target FDR level in [0, 1].
+            discount: The discount sequence (default ``1 / (j (j + 1))``).
+            kappa: The p-to-e calibrator parameter, strictly between 0 and 1.
+
+        Raises:
+            ValueError: If `kappa` is not strictly between 0 and 1.
+        """
         super().__init__(alpha, discount)
         level = qualification.finite(kappa, "kappa")
         if not 0.0 < level < 1.0:
@@ -392,7 +492,14 @@ class ELond(OnlineRule):
         self.kappa = level
 
     def level(self, state: State) -> Fraction:
-        """``alpha * gamma_t * (|R_{t-1}| + 1)``."""
+        """Computes ``alpha * gamma_t * (|R_{t-1}| + 1)``.
+
+        Args:
+            state: The state after the previous hypothesis.
+
+        Returns:
+            The level of the next hypothesis.
+        """
         return (
             self.alpha
             * self.discount.weight(state.tests + 1)
@@ -400,13 +507,34 @@ class ELond(OnlineRule):
         )
 
     def wealth(self, state: State) -> Fraction:
-        """``alpha * (1 - sum_{i <= t} gamma_i)``."""
+        """Computes ``alpha * (1 - sum_{i <= t} gamma_i)``.
+
+        Args:
+            state: The state after ``t`` tests.
+
+        Returns:
+            The share of the level not yet assigned to any hypothesis.
+        """
         return self.alpha * (1 - self.discount.cumulative(state.tests))
 
     def decide(
         self, level: Fraction, evidence: Evidence
     ) -> tuple[bool, bool, float | None]:
-        """Rejects when ``e >= 1 / level`` (exactly, ``e * level >= 1``)."""
+        """Rejects when ``e >= 1 / level`` (exactly, ``e * level >= 1``).
+
+        Args:
+            level: The level assigned to the hypothesis.
+            evidence: Its evidence; a p-value is calibrated into an e-value
+                only when no e-value is given.
+
+        Returns:
+            Whether it is rejected, False (e-LOND has no candidates) and the
+            e-value used.
+
+        Raises:
+            ValueError: If the evidence holds neither value (`Evidence`
+                forbids this).
+        """
         if evidence.e is not None:
             e_value = evidence.e
         elif evidence.p is not None:
@@ -425,7 +553,16 @@ class PValueRule(OnlineRule):
         discount: Discount | None = None,
         w0: Any = None,
     ) -> None:
-        """Creates the rule; `w0` defaults to ``alpha / 2`` (the papers)."""
+        """Creates the rule.
+
+        Args:
+            alpha: Target FDR level in [0, 1].
+            discount: The discount sequence (default ``1 / (j (j + 1))``).
+            w0: Initial wealth; defaults to ``alpha / 2`` (the papers).
+
+        Raises:
+            ValueError: If `w0` is outside [0, alpha].
+        """
         super().__init__(alpha, discount)
         start = self.alpha / 2 if w0 is None else exact_alpha(w0, "w0")
         if not 0 <= start <= self.alpha:
@@ -433,13 +570,30 @@ class PValueRule(OnlineRule):
         self.w0 = start
 
     def credit(self, state: State) -> Fraction:
-        """``W0 + (alpha - W0) 1[R >= 1] + alpha * max(R - 1, 0)``."""
+        """Computes ``w0 + (alpha - w0) 1[R >= 1] + alpha * max(R - 1, 0)``.
+
+        Args:
+            state: The state to measure; ``R`` is its number of rejections.
+
+        Returns:
+            The initial wealth plus the reward for the rejections so far.
+        """
         rejected = len(state.rejections)
         first = (self.alpha - self.w0) if rejected >= 1 else Fraction(0)
         return self.w0 + first + self.alpha * max(rejected - 1, 0)
 
     def require_p(self, evidence: Evidence) -> Fraction:
-        """The exact p-value, which these rules need."""
+        """Reads the exact p-value, which these rules need.
+
+        Args:
+            evidence: The evidence of the hypothesis.
+
+        Returns:
+            The p-value as an exact fraction.
+
+        Raises:
+            ValueError: If the evidence has no p-value.
+        """
         if evidence.p is None:
             raise ValueError(f"{self.name} needs a p-value")
         return Fraction(evidence.p)
@@ -466,7 +620,14 @@ class LordPlusPlus(PValueRule):
     )
 
     def level(self, state: State) -> Fraction:
-        """Equation (5) of the paper."""
+        """Computes the level from equation (5) of the paper.
+
+        Args:
+            state: The state after the previous hypothesis.
+
+        Returns:
+            The level of the next hypothesis.
+        """
         time = state.tests + 1
         total = self.w0 * self.discount.weight(time)
         for position, moment in enumerate(state.rejections):
@@ -477,13 +638,30 @@ class LordPlusPlus(PValueRule):
         return total
 
     def wealth(self, state: State) -> Fraction:
-        """Credit earned minus the level spent."""
+        """Computes the credit earned minus the level spent.
+
+        Args:
+            state: The state to measure.
+
+        Returns:
+            The wealth in `state`.
+        """
         return self.credit(state) - state.spent
 
     def decide(
         self, level: Fraction, evidence: Evidence
     ) -> tuple[bool, bool, float | None]:
-        """Rejects when ``p <= level``."""
+        """Rejects when ``p <= level``.
+
+        Args:
+            level: The level assigned to the hypothesis.
+            evidence: Its evidence, which must hold a p-value (a missing one
+                is refused with a `ValueError` by `require_p`).
+
+        Returns:
+            Whether it is rejected, False (LORD++ has no candidates) and
+            None (no e-value is used).
+        """
         return self.require_p(evidence) <= level, False, None
 
 
@@ -516,7 +694,17 @@ class Saffron(PValueRule):
         w0: Any = None,
         lam: Any = DEFAULT_LAMBDA,
     ) -> None:
-        """Creates the rule; `lam` is the candidate threshold in (0, 1)."""
+        """Creates the rule.
+
+        Args:
+            alpha: Target FDR level in [0, 1].
+            discount: The discount sequence (default ``1 / (j (j + 1))``).
+            w0: Initial wealth; defaults to ``alpha / 2``.
+            lam: The candidate threshold, strictly between 0 and 1.
+
+        Raises:
+            ValueError: If `lam` is not strictly between 0 and 1.
+        """
         super().__init__(alpha, discount, w0)
         threshold = budget_module.exact(lam, "lambda")
         if not 0 < threshold < 1:
@@ -524,7 +712,14 @@ class Saffron(PValueRule):
         self.lam = threshold
 
     def level(self, state: State) -> Fraction:
-        """``min(lambda, (1 - lambda) * (...))`` from Section 2.3."""
+        """Computes ``min(lambda, (1 - lambda) * (...))`` from Section 2.3.
+
+        Args:
+            state: The state after the previous hypothesis.
+
+        Returns:
+            The level of the next hypothesis.
+        """
         time = state.tests + 1
         seen = state.candidates
         total = self.w0 * self.discount.weight(time - len(seen))
@@ -537,20 +732,49 @@ class Saffron(PValueRule):
         return min(self.lam, (1 - self.lam) * total)
 
     def wealth(self, state: State) -> Fraction:
-        """``(1 - lambda) * credit`` minus the level spent on non-candidates."""
+        """Computes ``(1 - lambda) * credit`` minus the level spent.
+
+        Only non-candidates are charged to the level spent.
+
+        Args:
+            state: The state to measure.
+
+        Returns:
+            The wealth in `state`.
+        """
         return (1 - self.lam) * self.credit(state) - state.spent
 
     def decide(
         self, level: Fraction, evidence: Evidence
     ) -> tuple[bool, bool, float | None]:
-        """Candidate when ``p <= lambda``; rejected when ``p <= level``."""
+        """Marks a candidate when ``p <= lambda``, a rejection ``p <= level``.
+
+        Args:
+            level: The level assigned to the hypothesis.
+            evidence: Its evidence, which must hold a p-value (a missing one
+                is refused with a `ValueError` by `require_p`).
+
+        Returns:
+            Whether it is rejected, whether it is a candidate, and None (no
+            e-value is used).
+        """
         p = self.require_p(evidence)
         return p <= level, p <= self.lam, None
 
     def update_spent(
         self, state: State, level: Fraction, candidate: bool
     ) -> Fraction:
-        """Candidates cost nothing; other tests cost their level."""
+        """Computes the level spent; candidates cost nothing.
+
+        Args:
+            state: The state before the test.
+            level: The level the test was given.
+            candidate: Whether the test was a candidate.
+
+        Returns:
+            The spent total unchanged for a candidate, otherwise increased by
+            the level.
+        """
         return state.spent if candidate else state.spent + level
 
 
@@ -560,7 +784,7 @@ class RuleConfig:
 
     Attributes:
         rule: `e-lond`, `lord++` or `saffron`.
-        alpha: Target FDR level (the exploration wealth `W0` of the budget).
+        alpha: Target FDR level (the exploration wealth of the budget).
         horizon: Discount horizon, or None for ``1 / (j (j + 1))``.
         w0: Initial wealth of LORD++/SAFFRON (None means ``alpha / 2``).
         lam: SAFFRON candidate threshold.
@@ -575,11 +799,19 @@ class RuleConfig:
     kappa: float = DEFAULT_KAPPA
 
     def __post_init__(self) -> None:
-        """Validates by building the rule."""
+        """Validates by building the rule.
+
+        A rule name or parameter that `build` refuses raises the same
+        `ValueError` here.
+        """
         self.build()
 
     def build(self) -> OnlineRule:
-        """The rule this configuration describes.
+        """Builds the rule this configuration describes.
+
+        Returns:
+            The rule object, with the discount sequence and parameters of
+            this configuration.
 
         Raises:
             ValueError: On an unknown rule or invalid parameters.
@@ -594,7 +826,12 @@ class RuleConfig:
         raise ValueError(f"rule must be one of {RULE_NAMES}")
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record; fractions are written as ``"p/q"``."""
+        """Builds the JSON-ready record.
+
+        Returns:
+            A mapping of every parameter, with fractions written as
+            ``"p/q"`` strings and the SAFFRON threshold under ``lambda``.
+        """
         return {
             "rule": self.rule,
             "alpha": str(self.alpha),
@@ -606,7 +843,17 @@ class RuleConfig:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds the configuration, rejecting unknown or missing fields."""
+        """Rebuilds the configuration, rejecting unknown or missing fields.
+
+        Args:
+            record: A mapping as written by `to_dict`.
+
+        Returns:
+            The configuration described by the record.
+
+        Raises:
+            ValueError: If the record has unexpected or missing fields.
+        """
         names = {"rule", "alpha", "horizon", "w0", "lambda", "kappa"}
         if set(record) != names:
             raise ValueError("unexpected or missing rule fields")
