@@ -11,6 +11,7 @@ import dataclasses
 import hashlib
 import math
 import secrets
+from typing import Any
 from typing import ClassVar
 
 import numpy
@@ -71,7 +72,7 @@ class Manifest:
         )
         return hashlib.sha256(payload.encode()).hexdigest()[:16]
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Converts the manifest to a JSON-serializable mapping.
 
         Returns:
