@@ -41,7 +41,7 @@ def make_context(
     models = model_registry or scmle.models.registry.Catalog(
         (
             classical.Dummy(),
-            classical.LogisticRegression(),
+            classical.LOGISTIC_REGRESSION,
         )
     )
     project = orchestrator.Orchestrator(

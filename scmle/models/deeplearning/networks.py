@@ -35,7 +35,7 @@ class Network(models.Model):
     """
 
     family = "deep_learning"
-    requires: ClassVar[tuple[str, ...]] = ("torch",)
+    requires: tuple[str, ...] = ("torch",)
     architecture: ClassVar[str]
     family_contract: ClassVar[contracts.ModelFamilyContract] = (
         contracts.TABULAR_TORCH_CONTRACT
@@ -181,7 +181,7 @@ class Jepa(Network):
     capability_family = "jepa"
     family_contract = contracts.TABULAR_JEPA_CONTRACT
     auto_candidate = False
-    requires: ClassVar[tuple[str, ...]] = ("torch",)
+    requires: tuple[str, ...] = ("torch",)
     capabilities = dataclasses.replace(
         Network.capabilities,
         max_rows=100_000,

@@ -33,10 +33,8 @@ def test_regression_uses_the_regression_bagger_and_trees_gain_from_bagging():
     features = rng.normal(size=(400, 3))
     target = features[:, 0] * 2 + rng.normal(0, 1.0, 400)
     adapter = bagging.BaggedTree()
-    single = (
-        adapter.base()
-        .build(tasks.Task.REGRESSION, 0)
-        .fit(features[:300], target[:300])
+    single = adapter.base.build(tasks.Task.REGRESSION, 0).fit(
+        features[:300], target[:300]
     )
     bagged = adapter.build(tasks.Task.REGRESSION, 0).fit(
         features[:300], target[:300]

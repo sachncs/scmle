@@ -10,7 +10,6 @@ from collections.abc import Mapping
 import dataclasses
 import importlib.util
 from typing import Any
-from typing import ClassVar
 from typing import Protocol
 
 from scmle.contracts import data
@@ -112,7 +111,11 @@ class Capabilities:
 class Model(abc.ABC):
     """A model family the framework can plan, train and package.
 
-    Subclasses declare class-level metadata and implement `build`.
+    The metadata below can be declared two ways: as class attributes of a
+    subclass that implements `build` (the original style, still supported
+    for user adapters), or as instance attributes set by a configurable
+    subclass such as `scmle.models.sklearn.classical.Learner`. Code that
+    consumes adapters only reads the attributes, so both work identically.
 
     Attributes:
         name: Unique registry name.
@@ -132,15 +135,15 @@ class Model(abc.ABC):
             enforce monotonic constraints.
     """
 
-    name: ClassVar[str]
-    family: ClassVar[str]
-    capability_family: ClassVar[str | None] = None
-    auto_candidate: ClassVar[bool] = True
-    capabilities: ClassVar[Capabilities]
-    requires: ClassVar[tuple[str, ...]] = ()
-    search_space: ClassVar[search.SearchSpace | None] = None
-    conformance_params: ClassVar[Mapping[str, Any] | None] = None
-    monotonic_param: ClassVar[str | None] = None
+    name: str
+    family: str
+    capability_family: str | None = None
+    auto_candidate: bool = True
+    capabilities: Capabilities
+    requires: tuple[str, ...] = ()
+    search_space: search.SearchSpace | None = None
+    conformance_params: Mapping[str, Any] | None = None
+    monotonic_param: str | None = None
 
     @abc.abstractmethod
     def build(

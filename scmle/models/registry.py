@@ -114,7 +114,6 @@ class Catalog:
             blending adapters, and the user adapters if requested.
         """
         classes = (
-            *classical.BUILTIN_ADAPTERS,
             *boosters.BOOSTING_ADAPTERS,
             *networks.DEEP_LEARNING_ADAPTERS,
             *bagging.BAGGING_ADAPTERS,
@@ -124,7 +123,9 @@ class Catalog:
             *scmle.models.multitarget.adapters.MULTITARGET_ADAPTERS,
             *scmle.models.uplift.adapters.UPLIFT_ADAPTERS,
         )
-        registry = cls(tuple(adapter() for adapter in classes))
+        registry = cls(
+            (*classical.BUILTIN_ADAPTERS, *(adapter() for adapter in classes))
+        )
         registry.register(ensembles.Stacking(registry))
         registry.register(ensembles.Blending(registry))
         if include_user:

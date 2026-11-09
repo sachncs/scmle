@@ -1,5 +1,7 @@
 """Tests for the model registry, adapters and conformance suite."""
 
+import pickle
+
 import pytest
 from sklearn import dummy
 
@@ -27,10 +29,10 @@ def test_candidates_depend_on_task(registry):
 
 
 @pytest.mark.parametrize(
-    "adapter_class", classical.BUILTIN_ADAPTERS, ids=lambda c: c.name
+    "adapter", classical.BUILTIN_ADAPTERS, ids=lambda adapter: adapter.name
 )
-def test_builtins_pass_conformance(adapter_class):
-    conformance.check_conformance(adapter_class())
+def test_builtins_pass_conformance(adapter):
+    conformance.check_conformance(adapter)
 
 
 def test_builtin_estimator_types(registry):
@@ -67,6 +69,60 @@ def test_third_party_registration_without_core_edits(registry):
     registry.register(adapter, overwrite=True)
     registry.unregister("third_party")
     assert "third_party" not in registry.adapters
+
+
+class ClassStyleLearner(classical.Learner):
+    """A subclass declaring its data as class attributes (the old style)."""
+
+    name = "class_style"
+    family = "linear"
+    capabilities = models.Capabilities(classical.REGRESSION_ONLY)
+    regressor = dummy.DummyRegressor
+
+
+def test_subclass_declaring_class_attributes_still_works(registry):
+    adapter = ClassStyleLearner()
+    assert (adapter.name, adapter.family) == ("class_style", "linear")
+    assert adapter.fixed_params == {}
+    assert adapter.capability_family is None
+    assert adapter.auto_candidate is True
+    conformance.check_conformance(adapter)
+    registry.register(adapter)
+    built = registry.get("class_style").build(tasks.Task.REGRESSION, 0)
+    assert isinstance(built, dummy.DummyRegressor)
+    other = ThirdPartyAdapter()
+    assert other.requires == () and other.search_space is None
+
+
+def test_configured_instances_do_not_share_data():
+    first = classical.Learner(
+        name="one",
+        family="linear",
+        capabilities=models.Capabilities(classical.REGRESSION_ONLY),
+        regressor=dummy.DummyRegressor,
+        fixed_params={"strategy": "median"},
+    )
+    second = classical.Learner(
+        name="two",
+        family="tree",
+        capabilities=models.Capabilities(classical.CLASSIFICATION),
+        classifier=dummy.DummyClassifier,
+    )
+    assert (first.name, second.name) == ("one", "two")
+    assert first.build(tasks.Task.REGRESSION, 0).strategy == "median"
+    assert second.fixed_params == {} and second.regressor is None
+    assert classical.Learner.regressor is None
+    with pytest.raises(errors.ConfigError, match="no estimator class"):
+        second.build(tasks.Task.REGRESSION, 0)
+
+
+def test_configured_instances_pickle_for_worker_processes():
+    for adapter in (classical.RIDGE, classical.HIST_GRADIENT_BOOSTING):
+        clone = pickle.loads(pickle.dumps(adapter))
+        assert type(clone) is type(adapter)
+        assert clone.name == adapter.name
+        assert clone.capabilities == adapter.capabilities
+        assert clone.search_space == adapter.search_space
 
 
 def test_unknown_model(registry):
