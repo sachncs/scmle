@@ -107,8 +107,10 @@ class StateMachine:
             artifacts: Run-relative artifact paths relevant to the change.
 
         Raises:
-            InvalidTransitionError: If the machine is terminal or `target`
-                is not the immediate successor (aborts are always allowed).
+            InvalidTransitionError: If the machine is in a terminal state, or
+                `target` is neither the immediate successor of the current
+                state nor an abort state (an abort is allowed from any
+                non-terminal state).
         """
         if self.state in TERMINAL_STATES:
             raise InvalidTransitionError(

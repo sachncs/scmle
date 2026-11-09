@@ -71,8 +71,8 @@ class ReleaseAttestation:
 
         Raises:
             TypeError: If `signature_present` is not a bool.
-            ValueError: If an identity or digest field is blank, or the
-                signature is blank text.
+            ValueError: If an identity or digest field is not non-blank text,
+                or the signature, when given, is not non-blank text.
         """
         for field_name in (
             "run_id",
@@ -108,11 +108,11 @@ class ReleaseAttestation:
 
         Returns:
             The attestation binding the run, its model manifest, provenance
-            and SBOM digests.
+            and SBOM digests, signed when a key is available.
 
         Raises:
             ValueError: If the provenance has no boolean signature presence or
-                lacks a required field.
+                lacks a non-blank `run_id` or `model.manifest_sha256`.
         """
         signature = provenance.get("signature")
         if not isinstance(signature, Mapping) or not isinstance(
@@ -138,7 +138,11 @@ class ReleaseAttestation:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Parses a persisted release attestation without trusting its claims.
+        """Parses a persisted release attestation without verifying it.
+
+        The signature is carried over as stored; `verify` checks it. A
+        `signature_present` that is not a bool raises `TypeError` from the
+        constructor, and a missing one reads as False.
 
         Args:
             record: The persisted attestation.
@@ -207,7 +211,7 @@ class ReleaseAttestation:
         sbom: Mapping[str, Any],
         signing_key: str | bytes | None = None,
     ) -> bool:
-        """Verify that the attestation still matches its source records.
+        """Verifies that the attestation still matches its source records.
 
         Args:
             provenance: The provenance record of the run.
@@ -217,7 +221,8 @@ class ReleaseAttestation:
 
         Returns:
             True if the attestation matches records rebuilt from the inputs and
-            its signature matches (or both are unsigned); False otherwise.
+            its signature matches (or both are unsigned); False otherwise,
+            including when the records are malformed.
         """
         try:
             expected = type(self).from_records(provenance, sbom, signing_key)

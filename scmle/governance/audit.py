@@ -37,10 +37,11 @@ class AuditReport:
     """The result of auditing one run.
 
     Attributes:
-        run_id: Identifier of the audited run.
+        run_id: Name of the audited run directory.
         events: Number of events read.
         decisions: Automated decisions in order: planner decisions first,
-            then selection and test-set events with their reasons.
+            then the selection, test-opening, strategy, ensemble, plan and
+            approval events with their reasons.
         findings: Violated invariants; empty when the run is clean.
     """
 
@@ -59,19 +60,24 @@ class RunAuditor:
     """Checks a run directory against the governance invariants.
 
     Invariants: the log is ordered and consistent; state transitions follow
-    the lifecycle; the locked test set is opened exactly once, only after
-    the selection was frozen and every trial finished; referenced artifacts
-    exist; the run ends in a terminal state.
+    the lifecycle; the locked test set is opened at most once, and only after
+    the selection was frozen and every trial event was logged; referenced
+    artifacts exist; the run ends in a terminal state.
     """
 
     def audit(self, run_dir: str | pathlib.Path) -> AuditReport:
         """Audits one run directory.
 
+        A malformed log (invalid JSON, or a record without the expected keys)
+        is not guarded against and raises.
+
         Args:
             run_dir: Directory of a run.
 
         Returns:
-            The decisions made and any violated invariants.
+            The decisions made and any violated invariants; for a directory
+            with no event log, a report with no events and a `log.missing`
+            finding.
         """
         root = pathlib.Path(run_dir)
         path = root / EVENTS_FILE
@@ -122,12 +128,16 @@ class RunAuditor:
     def check_states(records: list[dict[str, Any]]) -> list[AuditFinding]:
         """Checks that state events follow the lifecycle and end terminal.
 
+        A first `CREATED` event, or one whose reason starts with "run resumed",
+        starts the sequence again without a finding.
+
         Args:
             records: The event records, in log order.
 
         Returns:
             A finding for each state entered out of order or after a terminal
-            state, and one if the last state is not terminal.
+            state, and one if the last state is not terminal (which includes a
+            log with no state events).
         """
         found = []
         current: state.RunState | None = None
@@ -172,8 +182,8 @@ class RunAuditor:
 
         Returns:
             Findings for a test set opened more than once, opened before the
-            selection was frozen, or followed by trial events; empty if it
-            was never opened or none applies.
+            selection was frozen (or with no freeze logged), or followed by
+            trial events; empty if it was never opened or none applies.
         """
         kinds = [r["kind"] for r in records]
         opened = [i for i, kind in enumerate(kinds) if kind == TEST_OPENED]
@@ -249,8 +259,9 @@ class RunAuditor:
                 and strategy, ensemble, plan and approval events are taken.
 
         Returns:
-            The planner's decisions first, then the matching events in log
-            order.
+            The planner's decisions first, each with the source "planner", then
+            the matching events in log order, each as a mapping of the event
+            kind as `source`, its `reason` and its `timestamp`.
         """
         found: list[dict[str, Any]] = []
         log = root / DECISION_LOG
