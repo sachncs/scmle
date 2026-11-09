@@ -28,7 +28,16 @@ DIGEST_LENGTH = 64
 
 
 def canonical_json(value: Any) -> str:
-    """Return deterministic JSON for an already JSON-compatible value."""
+    """Return deterministic JSON for an already JSON-compatible value.
+
+    Args:
+        value: A JSON-compatible value (mappings, lists, strings, finite
+            numbers, booleans, or None).
+
+    Returns:
+        Compact JSON text with sorted keys, non-ASCII characters kept, and no
+        whitespace between tokens.
+    """
     return json.dumps(
         value,
         ensure_ascii=False,
@@ -39,14 +48,32 @@ def canonical_json(value: Any) -> str:
 
 
 def digest_value(value: Any) -> str:
-    """Return a SHA-256 identity for deterministic JSON content."""
+    """Return a SHA-256 identity for deterministic JSON content.
+
+    Args:
+        value: A JSON-compatible value, serialized with ``canonical_json``.
+
+    Returns:
+        The string ``"sha256:"`` followed by 64 lowercase hex digits.
+    """
     return (
         f"sha256:{hashlib.sha256(canonical_json(value).encode()).hexdigest()}"
     )
 
 
 def normalize_uri(uri: str) -> str:
-    """Normalize a source URI without resolving caller-owned remote data."""
+    """Normalize a source URI without resolving caller-owned remote data.
+
+    Args:
+        uri: A URI or a local filesystem path. Surrounding whitespace is
+            stripped.
+
+    Returns:
+        For a URI with a scheme, the same URI with the scheme lower-cased.
+        A single-letter scheme followed by a colon (a Windows drive) is
+        treated as a path, as is any value without a scheme: it is expanded
+        and resolved to an absolute ``file://`` URI.  Nothing is fetched.
+    """
     value = uri.strip()
     parsed = urlsplit(value)
     if parsed.scheme and not (len(parsed.scheme) == 1 and value[1:2] == ":"):
@@ -63,7 +90,21 @@ def normalize_uri(uri: str) -> str:
 
 
 def validate_digest(value: str, field_name: str) -> str:
-    """Validate and normalize a SHA-256 identity."""
+    """Validate and normalize a SHA-256 identity.
+
+    Args:
+        value: A 64-character hexadecimal digest, optionally prefixed with
+            ``"sha256:"``.
+        field_name: Name of the field being validated, used in the error
+            message.
+
+    Returns:
+        The digest as ``"sha256:"`` followed by 64 lowercase hex digits.
+
+    Raises:
+        ValueError: If the value (after removing the prefix) is not exactly
+            64 characters or is not hexadecimal.
+    """
     normalized = value.removeprefix("sha256:")
     if len(normalized) != DIGEST_LENGTH:
         raise ValueError(f"{field_name} must be a SHA-256 digest")
@@ -85,7 +126,13 @@ class DatasetSource:
     privacy_classification: str = ""
 
     def __post_init__(self) -> None:
-        """Validate and normalize source identity fields."""
+        """Validate and normalize source identity fields.
+
+        Raises:
+            ValueError: If ``uri`` is empty or whitespace.
+            TypeError: If ``version``, ``owner``, ``acquisition_method``, or
+                ``privacy_classification`` is not a string.
+        """
         uri_value = str(self.uri)
         if not uri_value.strip():
             raise ValueError("uri must not be empty")
@@ -103,7 +150,11 @@ class DatasetSource:
 
     @property
     def source_identity(self) -> str:
-        """Return deterministic identity for the declared source."""
+        """The deterministic identity of the declared source.
+
+        This is the ``sha256:`` digest of the URI, version, owner,
+        acquisition method, and privacy classification.
+        """
         return digest_value(
             {
                 "uri": self.uri,
@@ -115,7 +166,11 @@ class DatasetSource:
         )
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-native source evidence."""
+        """Return JSON-native source evidence.
+
+        Returns:
+            A dictionary of the five source fields plus ``source_identity``.
+        """
         return {
             "uri": self.uri,
             "version": self.version,
@@ -127,7 +182,20 @@ class DatasetSource:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild a source and verify its declared identity."""
+        """Rebuild a source and verify its declared identity.
+
+        Args:
+            record: A mapping as produced by ``to_dict``.  ``uri`` is required;
+                the other fields default to empty strings.  A missing ``uri``
+                raises ``KeyError``.
+
+        Returns:
+            The reconstructed source.
+
+        Raises:
+            ValueError: If the record's ``source_identity`` is absent or differs
+                from the identity recomputed from the source fields.
+        """
         source = cls(
             uri=str(record["uri"]),
             version=str(record.get("version", "")),
@@ -151,7 +219,12 @@ class DatasetField:
     data_type: str
 
     def __post_init__(self) -> None:
-        """Validate schema field names and types."""
+        """Validate schema field names and types.
+
+        Raises:
+            ValueError: If ``name`` or ``data_type`` is not a string or is
+                empty after stripping whitespace.
+        """
         if not isinstance(self.name, str) or not self.name.strip():
             raise ValueError("field name must not be empty")
         if not isinstance(self.data_type, str) or not self.data_type.strip():
@@ -160,12 +233,23 @@ class DatasetField:
         object.__setattr__(self, "data_type", self.data_type.strip())
 
     def to_dict(self) -> dict[str, str]:
-        """Return JSON-native field evidence."""
+        """Return JSON-native field evidence.
+
+        Returns:
+            A dictionary with ``name`` and ``data_type``.
+        """
         return {"name": self.name, "data_type": self.data_type}
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild a schema field from JSON evidence."""
+        """Rebuild a schema field from JSON evidence.
+
+        Args:
+            record: A mapping with ``name`` and ``data_type`` entries.
+
+        Returns:
+            The reconstructed field.
+        """
         return cls(str(record["name"]), str(record["data_type"]))
 
 
@@ -180,7 +264,14 @@ class MissingnessSummary:
     by_field: Mapping[str, int]
 
     def __post_init__(self) -> None:
-        """Validate missingness accounting."""
+        """Validate missingness accounting.
+
+        Raises:
+            TypeError: If a count is not an integer (booleans are rejected).
+            ValueError: If ``status`` is empty, a count is negative,
+                ``missing_values`` exceeds ``total_values``, or ``by_field``
+                has a blank name or a negative or non-integer count.
+        """
         if not self.status.strip():
             raise ValueError("missingness status must not be empty")
         for field_name, field_value in (
@@ -211,13 +302,22 @@ class MissingnessSummary:
 
     @property
     def fraction(self) -> float:
-        """Return the fraction of observed values that are missing."""
+        """The fraction of observed values that are missing.
+
+        This is ``missing_values / total_values``, or 0.0 when there are no
+        values.
+        """
         if self.total_values == 0:
             return 0.0
         return self.missing_values / self.total_values
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-native missingness evidence."""
+        """Return JSON-native missingness evidence.
+
+        Returns:
+            A dictionary of the counts, the per-field counts, and the computed
+            ``missing_fraction``.
+        """
         return {
             "status": self.status,
             "total_values": self.total_values,
@@ -229,7 +329,19 @@ class MissingnessSummary:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild missingness evidence and recompute its fraction."""
+        """Rebuild missingness evidence and recompute its fraction.
+
+        Args:
+            record: A mapping as produced by ``to_dict``.  A recorded
+                ``missing_fraction`` is optional and is checked when present.
+
+        Returns:
+            The reconstructed summary.
+
+        Raises:
+            ValueError: If a recorded ``missing_fraction`` does not match the
+                fraction computed from the counts.
+        """
         result = cls(
             status=str(record["status"]),
             total_values=int(record["total_values"]),
@@ -258,7 +370,15 @@ class DuplicateSummary:
     method: str
 
     def __post_init__(self) -> None:
-        """Validate duplicate accounting."""
+        """Validate duplicate accounting.
+
+        Raises:
+            ValueError: If ``status`` or ``method`` is empty, ``duplicate_rows``
+                is negative, or ``duplicate_fraction`` is not a finite number
+                in [0, 1].
+            TypeError: If ``duplicate_rows`` is not an integer (booleans are
+                rejected).
+        """
         if not self.status.strip() or not self.method.strip():
             raise ValueError("duplicate status and method must not be empty")
         if isinstance(self.duplicate_rows, bool) or not isinstance(
@@ -274,7 +394,12 @@ class DuplicateSummary:
             raise ValueError("duplicate_fraction must be between zero and one")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-native duplicate evidence."""
+        """Return JSON-native duplicate evidence.
+
+        Returns:
+            A dictionary of status, duplicate row count, duplicate fraction,
+            and method.
+        """
         return {
             "status": self.status,
             "duplicate_rows": self.duplicate_rows,
@@ -284,7 +409,14 @@ class DuplicateSummary:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild duplicate evidence."""
+        """Rebuild duplicate evidence.
+
+        Args:
+            record: A mapping as produced by ``to_dict``.
+
+        Returns:
+            The reconstructed summary.
+        """
         return cls(
             status=str(record["status"]),
             duplicate_rows=int(record["duplicate_rows"]),
@@ -305,7 +437,15 @@ class LabelSummary:
     distribution: Mapping[str, int]
 
     def __post_init__(self) -> None:
-        """Validate label accounting."""
+        """Validate label accounting.
+
+        Raises:
+            ValueError: If ``status`` is empty, ``field`` is blank, a count is
+                negative, ``distinct_count`` exceeds ``observed_count``,
+                ``distribution`` has an empty key or a negative or non-integer
+                count, or its counts do not sum to ``observed_count``.
+            TypeError: If a count is not an integer (booleans are rejected).
+        """
         if not self.status.strip():
             raise ValueError("label status must not be empty")
         if self.field is not None and not self.field.strip():
@@ -339,7 +479,11 @@ class LabelSummary:
         )
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-native label evidence."""
+        """Return JSON-native label evidence.
+
+        Returns:
+            A dictionary of status, field, counts, and the label distribution.
+        """
         return {
             "status": self.status,
             "field": self.field,
@@ -351,7 +495,15 @@ class LabelSummary:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild label evidence."""
+        """Rebuild label evidence.
+
+        Args:
+            record: A mapping as produced by ``to_dict``.  ``distribution`` is
+                optional and defaults to empty.
+
+        Returns:
+            The reconstructed summary.
+        """
         return cls(
             status=str(record["status"]),
             field=record.get("field"),
@@ -389,7 +541,19 @@ class DatasetCatalog:
     schema_version: int = CATALOG_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
-        """Validate evidence consistency before publication."""
+        """Validate evidence consistency before publication.
+
+        Raises:
+            TypeError: If ``source``, ``missingness``, ``duplicates``,
+                ``label``, or a schema entry has the wrong class, or if
+                ``sample_count`` or ``schema_version`` is not an integer
+                (booleans are rejected).
+            ValueError: If ``data_kind`` is empty, ``sample_count`` is
+                negative, ``schema_version`` is unsupported, ``shape`` has a
+                negative or non-integer entry, ``limitations`` is empty or has
+                a blank entry, ``release_blockers`` has a blank entry, or
+                ``content_identity`` is not a SHA-256 digest.
+        """
         if not isinstance(self.source, DatasetSource):
             raise TypeError("source must be DatasetSource")
         if not isinstance(self.data_kind, str) or not self.data_kind.strip():
@@ -461,7 +625,27 @@ class DatasetCatalog:
         limitations: Sequence[str],
         release_blockers: Sequence[str] = (),
     ) -> Self:
-        """Build a catalog from adapter-owned evidence for any data format."""
+        """Build a catalog from adapter-owned evidence for any data format.
+
+        Args:
+            source: The data source, or a URI or path that is wrapped in a
+                ``DatasetSource`` with default governance fields.
+            data_kind: Name of the kind of data observed.
+            shape: Dimensions of the data.
+            schema: Ordered fields of the observed schema.
+            sample_count: Number of samples (rows) observed.
+            missingness: Observed missing-value summary.
+            duplicates: Observed duplicate-row summary.
+            label: Label summary.
+            content_identity: SHA-256 digest of the data content.
+            limitations: Non-empty statements of what the evidence does not
+                establish.
+            release_blockers: Conditions that block release; duplicates are
+                removed, keeping first-seen order.
+
+        Returns:
+            The validated catalog.
+        """
         source_value = (
             source
             if isinstance(source, DatasetSource)
@@ -497,6 +681,25 @@ class DatasetCatalog:
         mappings of columns, sequences of records or values, scalars, and
         bytes.  Opaque objects require ``content_identity`` so the catalog
         cannot publish a non-reproducible identity.
+
+        Args:
+            data: The object to observe.
+            source: The data source, or a URI or path that is wrapped in a
+                ``DatasetSource`` with default governance fields.
+            label_column: Name of the label column, or None when no label
+                is declared.
+            content_identity: Caller-supplied SHA-256 digest of the
+                content, or None to compute one from the observed content.
+            limitations: Extra limitation statements appended to the
+                observed ones.
+            release_blockers: Extra release blockers appended to those
+                derived from the source metadata and the observation.
+
+        Returns:
+            A catalog whose limitations and release blockers combine the
+            built-in curation-only limitation, those found while
+            observing, and the caller's, with duplicates removed in
+            first-seen order.
         """
         source_value = (
             source
@@ -530,11 +733,19 @@ class DatasetCatalog:
 
     @property
     def catalog_digest(self) -> str:
-        """Return the digest of all catalog evidence except this digest."""
+        """The digest of all catalog evidence except this digest.
+
+        This is the ``sha256:`` digest of ``content_dict()``.
+        """
         return digest_value(self.content_dict())
 
     def content_dict(self) -> dict[str, Any]:
-        """Return canonical catalog content without the external digest."""
+        """Return canonical catalog content without the external digest.
+
+        Returns:
+            A JSON-native dictionary of every catalog field, with nested
+            summaries converted by their own ``to_dict``.
+        """
         return {
             "schema_version": self.schema_version,
             "source": self.source.to_dict(),
@@ -551,17 +762,30 @@ class DatasetCatalog:
         }
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-native catalog evidence with its integrity digest."""
+        """Return JSON-native catalog evidence with its integrity digest.
+
+        Returns:
+            The content dictionary plus a ``catalog_digest`` entry.
+        """
         record = self.content_dict()
         record["catalog_digest"] = self.catalog_digest
         return record
 
     def canonical_json(self) -> str:
-        """Return canonical catalog content suitable for verification."""
+        """Return canonical catalog content suitable for verification.
+
+        Returns:
+            Canonical JSON text of ``content_dict()``.
+        """
         return canonical_json(self.content_dict())
 
     def write(self, path: str | pathlib.Path) -> None:
-        """Persist the catalog atomically as verified JSON evidence."""
+        """Persist the catalog atomically as verified JSON evidence.
+
+        Args:
+            path: Destination file.  The indented JSON, including
+                ``catalog_digest``, is written atomically.
+        """
         encoded = (
             json.dumps(
                 self.to_dict(),
@@ -575,7 +799,20 @@ class DatasetCatalog:
 
     @classmethod
     def read_verified(cls, path: str | pathlib.Path) -> Self:
-        """Read a catalog and fail closed if its digest or schema is invalid."""
+        """Read a catalog and fail closed if its digest or schema is invalid.
+
+        Args:
+            path: A file written by ``write``.
+
+        Returns:
+            The catalog rebuilt from the file, whose recorded digest matches
+            its recomputed digest.
+
+        Raises:
+            ValueError: If the file cannot be read or parsed, is not a JSON
+                object, lacks a string ``catalog_digest``, does not rebuild
+                into a valid catalog, or its digest does not match the content.
+        """
         try:
             record = json.loads(pathlib.Path(path).read_text(encoding="utf-8"))
         except (OSError, TypeError, ValueError) as error:
@@ -601,7 +838,18 @@ class DatasetCatalog:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild a catalog from content without trusting its digest."""
+        """Rebuild a catalog from content without trusting its digest.
+
+        Args:
+            record: A mapping of catalog content as produced by ``to_dict``.
+                Any ``catalog_digest`` is not checked here.
+
+        Returns:
+            The reconstructed catalog.
+
+        Raises:
+            ValueError: If ``schema_version`` is missing or unsupported.
+        """
         if int(record.get("schema_version", 0)) != CATALOG_SCHEMA_VERSION:
             raise ValueError("unsupported catalog schema version")
         return cls(
@@ -640,7 +888,15 @@ class DataObservation:
 
 
 def source_blockers(source: DatasetSource) -> tuple[str, ...]:
-    """Return governance blockers that can be proven from source metadata."""
+    """Return governance blockers that can be proven from source metadata.
+
+    Args:
+        source: The data source whose governance fields are checked.
+
+    Returns:
+        Blocker names, one for each of owner, acquisition method, and
+        privacy classification that is empty.
+    """
     blockers: list[str] = []
     if not source.owner:
         blockers.append("source_owner_not_declared")
@@ -652,7 +908,15 @@ def source_blockers(source: DatasetSource) -> tuple[str, ...]:
 
 
 def is_sequence_value(value: Any) -> bool:
-    """Return whether a value can represent an ordered column."""
+    """Return whether a value can represent an ordered column.
+
+    Args:
+        value: Any object.
+
+    Returns:
+        True for sequences and NumPy arrays other than strings, bytes,
+        byte arrays, and mappings.
+    """
     return isinstance(value, (Sequence, np.ndarray)) and not isinstance(
         value, (str, bytes, bytearray, Mapping)
     )
@@ -661,7 +925,21 @@ def is_sequence_value(value: Any) -> bool:
 def frame_for_data(
     data: Any,
 ) -> tuple[pd.DataFrame | None, str, tuple[int, ...]]:
-    """Convert supported record-shaped data to a bounded observation frame."""
+    """Convert supported record-shaped data to a bounded observation frame.
+
+    Args:
+        data: The object to convert.
+
+    Returns:
+        A tuple ``(frame, data_kind, shape)``.  ``frame`` is a DataFrame,
+        or None for byte payloads, NumPy arrays with more than two
+        dimensions, and opaque objects.  ``data_kind`` names the detected
+        form (the type name for opaque objects).  ``shape`` is the
+        dimensions of the data, ``()`` for scalars and opaque objects.
+
+    Raises:
+        ValueError: If a mapping of columns has columns of unequal length.
+    """
     if isinstance(data, pd.DataFrame):
         return (
             data,
@@ -727,7 +1005,23 @@ def frame_for_data(
 
 
 def canonical_value(value: Any) -> Any:
-    """Convert one supported value into deterministic JSON-native content."""
+    """Convert one supported value into deterministic JSON-native content.
+
+    Args:
+        value: A scalar, bytes, date or time, mapping, list, tuple, set, or
+            NumPy value.
+
+    Returns:
+        None for missing values; a length-and-SHA-256 mapping for bytes;
+        an ISO string for dates and times; a mapping with string keys
+        sorted by key for mappings; lists in order for sequences; sorted
+        lists for sets; a ``{"non_finite": ...}`` mapping for NaN and
+        infinities; otherwise the plain string, number, or boolean.
+
+    Raises:
+        TypeError: If the value is of a type that cannot be converted
+            deterministically.
+    """
     if value is None or value is pd.NA:
         return None
     if isinstance(value, (bytes, bytearray, memoryview)):
@@ -770,7 +1064,14 @@ def canonical_value(value: Any) -> Any:
 
 
 def schema_for_frame(frame: pd.DataFrame) -> tuple[DatasetField, ...]:
-    """Return ordered field metadata, preserving duplicate column positions."""
+    """Return ordered field metadata, preserving duplicate column positions.
+
+    Args:
+        frame: The frame whose columns are described.
+
+    Returns:
+        One field per column, in column order, with the dtype as a string.
+    """
     return tuple(
         DatasetField(str(name), str(data_type))
         for name, data_type in zip(
@@ -780,7 +1081,15 @@ def schema_for_frame(frame: pd.DataFrame) -> tuple[DatasetField, ...]:
 
 
 def missingness_for_frame(frame: pd.DataFrame) -> MissingnessSummary:
-    """Measure missingness over a frame without imputing or modifying it."""
+    """Measure missingness over a frame without imputing or modifying it.
+
+    Args:
+        frame: The frame to inspect.
+
+    Returns:
+        An observed summary.  Per-field counts are keyed by column name,
+        with ``name[position]`` used for names that occur more than once.
+    """
     missing = frame.isna()
     counts = missing.sum(axis=0)
     missing_values = int(counts.sum())
@@ -801,7 +1110,17 @@ def missingness_for_frame(frame: pd.DataFrame) -> MissingnessSummary:
 
 
 def duplicates_for_frame(frame: pd.DataFrame) -> DuplicateSummary:
-    """Measure duplicate rows and preserve unsupported cases as evidence."""
+    """Measure duplicate rows and preserve unsupported cases as evidence.
+
+    Args:
+        frame: The frame to inspect.
+
+    Returns:
+        A summary counting every row that has at least one identical row
+        (all copies, not only the repeats).  If row equality is not
+        supported for some field, a ``not_observed`` summary with zero
+        duplicates.
+    """
     try:
         duplicate_mask = frame.duplicated(keep=False)
     except (TypeError, ValueError):
@@ -824,7 +1143,19 @@ def duplicates_for_frame(frame: pd.DataFrame) -> DuplicateSummary:
 def label_for_frame(
     frame: pd.DataFrame | None, label_column: str | None
 ) -> tuple[LabelSummary, tuple[str, ...], tuple[str, ...]]:
-    """Summarize only an explicitly named label column."""
+    """Summarize only an explicitly named label column.
+
+    Args:
+        frame: The observation frame, or None when there is none.
+        label_column: Name of the declared label column, or None.
+
+    Returns:
+        A tuple ``(summary, limitations, blockers)``.  The summary is
+        ``not_declared`` without a label column, ``not_observed`` when the
+        column is absent or appears more than once, and otherwise
+        ``missing_all``, ``constant``, or ``observed`` with a distribution
+        keyed by canonical JSON of each value.
+    """
     if label_column is None:
         return (
             LabelSummary("not_declared", None, 0, 0, 0, {}),
@@ -874,7 +1205,17 @@ def label_for_frame(
 def frame_content(
     frame: pd.DataFrame, data_kind: str, shape: tuple[int, ...]
 ) -> dict[str, Any]:
-    """Return canonical content for a frame-backed observation."""
+    """Return canonical content for a frame-backed observation.
+
+    Args:
+        frame: The observed frame.
+        data_kind: Name of the detected data form.
+        shape: Dimensions of the original data.
+
+    Returns:
+        A JSON-native dictionary of the kind, shape, schema, and all rows
+        in order, with each value canonicalized.
+    """
     rows = [
         [canonical_value(value) for value in row]
         for row in frame.itertuples(index=False, name=None)
@@ -888,7 +1229,14 @@ def frame_content(
 
 
 def bytes_content(data: bytes | bytearray | memoryview) -> str:
-    """Return direct content identity for raw byte observations."""
+    """Return direct content identity for raw byte observations.
+
+    Args:
+        data: The raw bytes.
+
+    Returns:
+        The ``sha256:``-prefixed digest of the bytes.
+    """
     return f"sha256:{hashlib.sha256(bytes(data)).hexdigest()}"
 
 
@@ -897,7 +1245,24 @@ def observe_data(
     label_column: str | None,
     supplied_identity: str | None,
 ) -> DataObservation:
-    """Observe a supported object and produce structured quality evidence."""
+    """Observe a supported object and produce structured quality evidence.
+
+    Args:
+        data: The object to observe.
+        label_column: Name of the declared label column, or None.
+        supplied_identity: Caller-supplied SHA-256 digest of the content,
+            or None to compute one when the content is observable.
+
+    Returns:
+        The observation.  Frame-backed data gets schema, missingness,
+        duplicate, and label evidence; bytes get a single payload field;
+        opaque objects get only the supplied identity and a
+        single-sample placeholder.
+
+    Raises:
+        TypeError: If the object is opaque (neither frame-backed nor
+            bytes) and no ``supplied_identity`` is given.
+    """
     frame, data_kind, shape = frame_for_data(data)
     limitations: list[str] = []
     blockers: list[str] = []
