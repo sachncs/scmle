@@ -272,7 +272,7 @@ def test_racing_processors_never_work_at_the_same_time(tmp_path):
         except processing.ConcurrentRunError as error:
             outcomes.append(error)
 
-    threads = [threading.Thread(target=race) for _ in range(racers)]
+    threads = [threading.Thread(target=race) for number in range(racers)]
     for thread in threads:
         thread.start()
     for thread in threads:
