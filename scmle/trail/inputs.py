@@ -10,6 +10,7 @@ not identity.
 """
 
 from collections.abc import Mapping
+from collections.abc import Sequence
 import hmac
 from typing import Any
 
@@ -96,6 +97,44 @@ def signature_problem(
     return None
 
 
+def missing_fields(
+    section: Mapping[str, Any], names: Sequence[str], message: str
+) -> list[str]:
+    """Lists a message for every required field a section lacks.
+
+    Args:
+        section: The mapping to check.
+        names: The required field names, in the order to report them.
+        message: A template with a `{name}` placeholder for the field.
+
+    Returns:
+        One formatted message per missing field.
+    """
+    return [message.format(name=name) for name in names if name not in section]
+
+
+def criterion_problems(items: Sequence[Mapping[str, Any]]) -> list[str]:
+    """Lists the missing fields and bad operators of criteria.
+
+    Args:
+        items: The acceptance criteria and reviewer thresholds.
+
+    Returns:
+        One message per missing criterion field and per operator that is not
+        in `records.OPERATORS`.
+    """
+    found: list[str] = []
+    for item in items:
+        found.extend(
+            missing_fields(
+                item, ("id", "path", "op", "value"), "a criterion lacks {name}"
+            )
+        )
+        if item.get("op") not in records.OPERATORS:
+            found.append(f"criterion {item.get('id')} has a bad operator")
+    return found
+
+
 def structure_problems(record: Mapping[str, Any]) -> list[str]:
     """Lists missing or malformed fields in the inputs.
 
@@ -108,33 +147,48 @@ def structure_problems(record: Mapping[str, Any]) -> list[str]:
         (for both acceptance criteria and reviewer thresholds), criterion
         operator not in `records.OPERATORS`, or expectation field.
     """
-    found: list[str] = []
-    for name in ("model", "version", "charter_hash", "builder"):
-        if name not in record:
-            found.append(f"missing {name}")
+    found = missing_fields(
+        record,
+        ("model", "version", "charter_hash", "builder"),
+        "missing {name}",
+    )
     stakeholder = record.get("stakeholder", {})
     reviewer = record.get("reviewer", {})
-    for name in ("name", "kpis", "acceptance", "expectation"):
-        if name not in stakeholder:
-            found.append(f"stakeholder section lacks {name}")
-    for name in ("name", "thresholds", "evidence"):
-        if name not in reviewer:
-            found.append(f"reviewer section lacks {name}")
+    found.extend(
+        missing_fields(
+            stakeholder,
+            ("name", "kpis", "acceptance", "expectation"),
+            "stakeholder section lacks {name}",
+        )
+    )
+    found.extend(
+        missing_fields(
+            reviewer,
+            ("name", "thresholds", "evidence"),
+            "reviewer section lacks {name}",
+        )
+    )
     for kpi in stakeholder.get("kpis", []):
-        for name in ("kpi", "owner", "metric", "direction"):
-            if name not in kpi:
-                found.append(f"a KPI lacks {name}")
-    for item in [
-        *stakeholder.get("acceptance", []),
-        *reviewer.get("thresholds", []),
-    ]:
-        for name in ("id", "path", "op", "value"):
-            if name not in item:
-                found.append(f"a criterion lacks {name}")
-        if item.get("op") not in records.OPERATORS:
-            found.append(f"criterion {item.get('id')} has a bad operator")
-    expectation = stakeholder.get("expectation", {})
-    for name in EXPECTATION_FIELDS:
-        if name not in expectation:
-            found.append(f"the expectation lacks {name}")
+        found.extend(
+            missing_fields(
+                kpi,
+                ("kpi", "owner", "metric", "direction"),
+                "a KPI lacks {name}",
+            )
+        )
+    found.extend(
+        criterion_problems(
+            [
+                *stakeholder.get("acceptance", []),
+                *reviewer.get("thresholds", []),
+            ]
+        )
+    )
+    found.extend(
+        missing_fields(
+            stakeholder.get("expectation", {}),
+            EXPECTATION_FIELDS,
+            "the expectation lacks {name}",
+        )
+    )
     return found

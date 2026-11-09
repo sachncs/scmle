@@ -12,6 +12,7 @@ import math
 from typing import Any
 
 Z95 = 1.959964
+MINIMUM_VALUES_FOR_SPREAD = 2  # a sample variance needs two values
 WITHIN = "within"
 ABOVE = "above"
 BELOW = "below"
@@ -81,7 +82,7 @@ def interval(values: list[float]) -> tuple[float, float, float]:
     """
     n = len(values)
     mean = math.fsum(values) / n
-    if n < 2:
+    if n < MINIMUM_VALUES_FOR_SPREAD:
         return mean, mean, mean
     spread = math.fsum((v - mean) ** 2 for v in values) / (n - 1)
     half = Z95 * math.sqrt(spread / n)
