@@ -815,6 +815,24 @@ marked `Breaking:` and listed first in their group.
 
 ### Changed
 
+- Lint and types are strict. `ruff` selects every rule (16 ignores, each with a
+  reason in `pyproject.toml`) and `mypy` runs in strict mode with
+  `warn_unreachable` and the extra error codes. `scmle` and `benchmarks` pass
+  both; `# type: ignore` appears only with an error code and a reason (almost
+  all on scikit-learn and torch base classes, which ship no types).
+- The model adapters are plain classes configured by keyword arguments, in
+  place of five unrelated adapter hierarchies; the 44 built-in adapters
+  register in the same order and build the same estimators.
+- `check_remote` rejects URLs that are not `http` or `https`; an alert date
+  such as `"2026-01-01Z"` raises `ValueError`; a few unused internal
+  parameters were removed.
+- A fit that has standard errors but no interval errors now builds its
+  intervals from the standard errors, as documented, instead of raising
+  `TypeError`.
+- The coverage ledger reports the exact `interval_coverage` and
+  `p95_interval_achieved_confidence` in place of `percentile_interval`, which
+  covered only 0.626 at 20 reruns.
+
 - Breaking: `ServingAdapter.respond_locked` is gone (use `respond_frame`), the
   serving error body carries `schema_version` and `request_id`, and
   `HttpServing(bundle)` warms up in `start()` and answers 503 before that
