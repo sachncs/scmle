@@ -4,8 +4,7 @@ Names follow [`00-canon.md`](00-canon.md) (principle P5). Item classes and
 reasons: [`COMPLETION_AUDIT.md`](COMPLETION_AUDIT.md), "Stage 2". Feature: F16
 in [`../product/features.md`](../product/features.md). What exists is described
 in [`../docs/AUTONOMY.md`](../docs/AUTONOMY.md). Depends on stage 1 and on the
-built closed loop (`scmle/governance/loop.py`). The cloud half of the same goal
-is stage 4.
+built closed loop (`scmle/governance/loop.py`).
 
 ## Decision (owner, recorded 2026-11-08)
 
@@ -55,7 +54,7 @@ Not built, and the reason each item below exists:
 | 2.2 | 2.6 | A | A per-day action cap, an `operate start` action that loops ticks with a kill switch, and a workflow handler so `Schedule.tick` (slot-derived run ids) or a workflow engine drives `operate tick` | a double tick is one run; the cap refuses the extra action; tests in `tests/unit` |
 | 2.3 | 2.7 | A | Add `envelope.py` and `controller.py` to `setup.cfg` `source_paths`; write the envelope's refusal floors; record survivors in `tests/unit/MUTANTS_envelope.md` and `MUTANTS_controller.md` | mutation score at the repo floor, each survivor justified |
 | 2.4 | 2.8 | A | Shadow, canary and rollback to the previously approved champion as envelope actions, each with refusal tests; rollback keeps the registry's rules | `pytest tests/unit -k envelope`; the human-only actions remain inexpressible |
-| 2.5 | 2.5 | C | The controller in a staging deployment with real label delay and a real business outcome, after item 4.20 | a retained record of the run, reviewed by someone other than the author |
+| 2.5 | 2.5 | C | The controller in a staging deployment with real label delay and a real business outcome, after item 4.29 | a retained record of the run, reviewed by someone other than the author |
 
 ## Exit gate
 

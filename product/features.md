@@ -2,7 +2,7 @@
 
 Names and principles: [`../plan/00-canon.md`](../plan/00-canon.md). Where each
 item is scheduled: [`../plan/README.md`](../plan/README.md). Item IDs, classes
-(A buildable here, B outside people or data, C cloud account or daemon, D owner
+(A buildable here, B outside people or data, C container daemon, real deployment or approver, D owner
 decision) and reasons: [`../plan/COMPLETION_AUDIT.md`](../plan/COMPLETION_AUDIT.md).
 
 This file lists only what is not built. A built part is deleted from it and
@@ -15,16 +15,16 @@ is published.
 
 | ID | Feature | Stage | Open |
 |---|---|---|---|
-| R1 | Instrument residuals | 3, 5 | uncertified detectors, unbuilt checks, citations, independent artifacts |
-| F7 | Verification harness | 5 | backtest, red team, replication, TabArena, R fixtures, mutation floor |
-| F8 | Problem framing | 3, 5 | gold corpus and the LLM gate |
-| F9 | Raw-data ingestion | 3, 4, 5 | outside corpora, interpreters, a second backend |
-| F10 | Causal identification | 3, 5 | method gaps, gold standards, reference outputs |
-| F11 | Decision layer | 3, 5 | fairness integration, policy classes, referents |
-| F12 | Uncertainty and breadth | 3, 5 | other task types, real-data gates |
-| F13 | Closed loop and escalation | 2, 3, 5 | alarm design, owner audit |
-| F14 | Cloud portability and production operation | 4 | everything that needs a cloud |
-| F15 | Business trail and qualified breadth | 4, 5 | a real trace, explanations, breadth slices |
+| R1 | Instrument residuals | 3, 4 | uncertified detectors, unbuilt checks, citations, independent artifacts |
+| F7 | Verification harness | 4 | backtest, red team, replication, TabArena, R fixtures, mutation floor |
+| F8 | Problem framing | 3, 4 | gold corpus and the LLM gate |
+| F9 | Raw-data ingestion | 3, 4 | outside corpora, interpreters, a second backend |
+| F10 | Causal identification | 3, 4 | method gaps, gold standards, reference outputs |
+| F11 | Decision layer | 3, 4 | fairness integration, policy classes, referents |
+| F12 | Uncertainty and breadth | 3, 4 | other task types, real-data gates |
+| F13 | Closed loop and escalation | 2, 3, 4 | alarm design, owner audit |
+| F14 | Container path and local operation | 4 | a container daemon, an image scanner, a real deployment |
+| F15 | Business trail and qualified breadth | 4 | a real trace, explanations, breadth slices |
 | F16 | Autonomous operation | 2 | alarm gate, more envelope actions, driving the tick, staging run |
 
 ## R1: Instrument residuals
@@ -56,7 +56,7 @@ behaviour named is the stated limit (P6) and documents may not claim more.
   document may cite one of these as verified until its row is closed.
 
 Closing criteria are in `../plan/3-methods-and-instrument.md` (A items) and
-`../plan/5-external-validation-and-release.md`.
+`../plan/4-external-validation-and-release.md`.
 
 Acceptance (unmet): every ID is closed (criterion met, row deleted) or accepted
 (limit recorded in `docs/SECURITY.md` or `docs/ARTIFACTS.md` with the date);
@@ -81,7 +81,7 @@ time" and at what strength; whether `confirmed` may be described as resistant
 to a motivated analyst; whether a release may be signed off; whether "close to
 the state of the art" in `benchmarks/sota` is supported.
 
-* **W1 Predictive-validity backtest** (5.3). Do datasets the instrument calls
+* **W1 Predictive-validity backtest** (4.3). Do datasets the instrument calls
   `block` show a larger out-of-time gap than those it calls `pass`? The gap
   (earliest-period validation score minus latest-period score under a frozen
   reference model and metric) is fixed before any verdict. The verdict may not
@@ -95,7 +95,7 @@ the state of the art" in `benchmarks/sota` is supported.
   secondary, BH-adjusted and labelled exploratory. A wide interval is reported
   as "unsupported", not softened. Open design risk: TabArena tasks are mostly
   not temporal; if fewer than 15 datasets qualify the outcome is "unsupported".
-* **W2 Red team** (5.4). An analyst who did not write F1 to F6 and has not read
+* **W2 Red team** (4.4). An analyst who did not write F1 to F6 and has not read
   the detector code gets 3 datasets and a rules sheet and tries to push a
   planted-null feature to `confirmed` or get a planted leak admitted using only
   legal inputs. Reading sealed sets or editing code is a custody finding, not
@@ -106,19 +106,19 @@ the state of the art" in `benchmarks/sota` is supported.
   test and a ledger rule. Attack surface to put on the sheet: re-running with
   different seeds or charters, the caller-held copy of the data, the
   non-charter path (no custody).
-* **W3 Independent replication** (5.5). A third party reruns the qualification
+* **W3 Independent replication** (4.5). A third party reruns the qualification
   campaign (`--smoke --full`, `--check`, the backtest, the SOTA Lite tier) from
   a tag on a fresh machine using only the committed protocol; statistics match
   within the pre-stated tolerance or a dated amendment explains the gap.
-* **W4 TabArena campaign** (5.6). Execute the written campaign
+* **W4 TabArena campaign** (4.6). Execute the written campaign
   (`benchmarks/sota/campaign.py`, `scmle_runner.py`, `baselines.py`,
   `analyze.py`, 51 pinned tasks, development 31 and hold-out 20): the
   calibration step, the development run, then the hold-out once. A claim about
   the SCMLE modelling stages, not the instrument. About 9 machine-days.
-* **W5 R oracle fixtures** (5.7). `onlineFDR`, `knockoff`, `dagitty`, frozen
+* **W5 R oracle fixtures** (4.7). `onlineFDR`, `knockoff`, `dagitty`, frozen
   with generator script, versions and content hash; decisions exact, levels to
   1e-9.
-* **W6 Mutation floor** (5.8). mutmut over the full configured scope; committed
+* **W6 Mutation floor** (4.8). mutmut over the full configured scope; committed
   per-module survivors in `benchmarks/qualification/mutation_survivors.json`;
   score at least 80; all comparison, constant or sign mutants in `ledger/` and
   p-value code killed or justified.
@@ -210,7 +210,7 @@ warehouse.
   entity resolution does not charge the budget per step (F9-bud, D);
   wall-time stops repeat only with a fixed clock and the budget unit is rows
   (F9-w, D); read-only is a textual allow-list and a query-only session, and a
-  read-only role cannot be verified (4.24, C).
+  read-only role cannot be verified (4.31, C).
 
 Acceptance (unmet): (2) key inference recall and precision Wilson lower bounds
 at least 0.9 at `L = 3` on a declared-key corpus, targets re-set after the first
@@ -408,52 +408,29 @@ External referent: a domain owner's signed escalation audit (two auditors for
 set; public streams with a documented regime change (names unverified); R
 `onlineFDR` and an independent confidence-sequence implementation.
 
-## F14: Cloud portability and production operation
+## F14: Container path and local operation
 
-One ML lifecycle with portable execution and provider adapters: local, AWS and
-GCP run the same bundle, API and contracts. The local half of items 1 to 13 is
-built; what is open needs a container daemon or an account, a spending cap and
-a named approver.
+One ML lifecycle with one signed bundle, API and contracts, run locally and in
+a container. The local half is built; what is open needs a container daemon
+and an image scanner, a real deployment, or an owner decision.
 
 | # | Item | Open |
 |---|---|---|
-| 1 | Reproducible local environment | Run the container path with Docker; arm64 (4.1 to 4.3) |
-| 2 | Immutable, secure artifacts | Build and scan a real image, attest its digest, measure two-build reproducibility; prediction parity and the vulnerability gate on both clouds (4.2, 4.4 to 4.6) |
-| 3 | Infrastructure as code | `plan` with credentials; apply, test, destroy, recorded cost; the known gaps (4.14, 4.15, 4.28) |
-| 4 | Authentication and security | An independent review; a real identity provider; TLS, workload identity and managed keys in each cloud (4.8, 5.19) |
-| 5 | Online and batch inference | Restart, load and scaling tests on each cloud (4.7) |
-| 6 | Portable training | The AWS and GCP adapters against real services; reproducibility-tolerance report (4.11) |
-| 7 | Governed data sources | The conformance suite against MinIO, the GCS emulator and real buckets; one warehouse per cloud (4.9, 4.10) |
-| 8 | Orchestration | Services accept the emitted definitions; duplicate, partial, missed and interruption runs (4.12, 4.13) |
-| 9 | CI/CD release gates | Run the workflows; build and scan a real image (4.16) |
-| 10 | Registry bound to the runtime | Real revision from ECS and Cloud Run, traffic split, staged traffic on ECS, previous-revision rollback (4.17) |
-| 11 | Observability and incidents | CloudWatch and Cloud Monitoring, a real pager, classifier tuned on real incidents, cost against a bill (4.18, 4.19) |
-| 12 | Continuous evaluation | Controlled degradation in staging; the F13 alarm does not gate retraining (4.20, 2.2) |
-| 13 | Failure recovery and DR | Machine crash, zone or region loss, every fault in staging, objectives revisited with the owner (4.21, 4.22, 4.25, 4.30) |
+| 1 | Reproducible local environment | Run the container path with Docker; arm64 (4.23 to 4.25) |
+| 2 | Immutable, secure artifacts | Build and scan a real image, attest its digest, measure two-build reproducibility; the vulnerability gate and prediction parity on the built image (4.24, 4.26 to 4.28) |
+| 3 | Continuous evaluation | Controlled degradation in a real deployment; the F13 alarm does not gate retraining (4.29, 2.2) |
+| 4 | Failure recovery | Machine crash or power loss, a torn-write simulation, objectives revisited with the owner (4.30, 4.32, 4.36) |
 
-Acceptance (unmet), per provider: the same approved bundle passes signature
-verification, image build, vulnerability gate and prediction parity; a new
-environment is provisioned, deployed, tested and destroyed from version control
-with infrastructure and cost recorded; a permitted release proceeds from commit
-to staging to production with a complete evidence chain and a failed gate
-refuses promotion and changes nothing; registry and live state reconcile after a
-successful and a failed release; staging passes the declared recovery scenarios
-within the documented RTO and RPO; a clean-runner CI run builds the image and
-runs the demo including a rollback drill.
+Acceptance (unmet): the same approved bundle passes signature verification,
+image build, vulnerability gate and prediction parity; a clean-runner CI run
+builds the image and runs the demo including a rollback drill; the declared
+recovery scenarios pass within the documented RTO and RPO.
 
-Release gate: "production-qualified on AWS and GCP" only when items 1 to 13 pass
-on both providers; every release identifies the application, model, data and
-configuration versions, the cloud environment tested, the evidence and the
-responsible approver. Differences between providers in latency, cost and scaling
-are reported, not equalised.
-
-External referent: the cloud runtime itself (revision, digest, traffic split,
-metrics), an independent scanner and attestation verifier, and a reviewer other
-than the author who signs the staging evidence.
+External referent: an independent scanner and attestation verifier.
 
 ## F15: Business trail and qualified breadth
 
-* **Part A, a trail on a real deployment** (4.26, 4.27, 5.20 to 5.22): a
+* **Part A, a trail on a real deployment** (4.33, 4.34, 4.20 to 4.22): a
   runtime-confirmed `production` release with real predictions and real business
   outcomes that arrive after a real delay; stakeholder-owned acceptance criteria,
   costs and expected range signed before deployment by a person who holds their
@@ -462,7 +439,7 @@ than the author who signs the staging evidence.
   reasoning); independent confirmation of released claims where required; source
   data, event logs and schema history behind the model (the committed trail
   starts from a flat extract).
-* **Part B, breadth** (4.31, D): no slice is qualified. One independent vertical
+* **Part B, breadth** (4.37, D): no slice is qualified. One independent vertical
   slice at a time, never by adding unsupported algorithms to the production
   registry: clustering, association analysis and dimensionality reduction
   (library functions only today); forecasting and ranking (task paths exist in
@@ -478,9 +455,9 @@ Acceptance (unmet): a reviewer who did not build the model traces one deployed
 model from the business question through source data, model selection, approval,
 production predictions and observed outcomes using only retained records
 (`scripts/trace_model.py`); each new task or modality completes ingestion to
-serving, including evaluation, packaging, cloud deployment, monitoring and
+serving, including evaluation, packaging, deployment, monitoring and
 recovery, before it is labelled production-supported. Part B starts only after
-F14 passes on both providers.
+F14 passes.
 
 External referent: a stakeholder's recorded sign-off and a reviewer who did not
 build the model; a public or domain benchmark per slice and an independent

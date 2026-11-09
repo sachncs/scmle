@@ -16,10 +16,10 @@ production loop with escalation, and a local portable service with a release
 gate. It runs unattended on a framed, prepared table and degrades visibly when
 a person's facts are missing.
 
-Not built: unattended operation of the production loop, evidence from a real
-cloud, and validation by people and data outside this project. Nothing is
-published; nothing has run on AWS or GCP. `features.md` defines only these and
-the open items of the parts above.
+Not built: unattended operation of the production loop, the container path on
+a real daemon, and validation by people and data outside this project. Nothing
+is published. `features.md` defines only these and the open items of the parts
+above.
 
 ## What it is not
 
@@ -30,17 +30,14 @@ the open items of the parts above.
 - Not adversary-proof custody on a single machine.
 
 The per-item register of everything still open, with a class for each (A
-buildable here, B outside people or data, C cloud account or approver, D owner
+buildable here, B outside people or data, C container daemon, real deployment
+or approver, D owner
 decision), is [`../plan/COMPLETION_AUDIT.md`](../plan/COMPLETION_AUDIT.md).
 
 ## Production standard
 
-The product may claim production-qualified deployment on AWS and GCP only when
-F14 items 1 to 13 have passed their acceptance on both providers, with the
-exact application, model, data and configuration versions, the cloud
-environment tested, the evidence and the responsible approver recorded. A
-running container, a successful request, a registered model or an
-infrastructure manifest is not that claim.
+The product makes no production-qualified deployment claim. A running
+container, a successful request or a registered model is not that claim.
 
 ## Autonomy standard
 

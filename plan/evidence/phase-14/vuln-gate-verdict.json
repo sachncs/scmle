@@ -1,9 +1,0 @@
-{
-  "blocking": [],
-  "excepted": [],
-  "packages_scanned": 16,
-  "passed": true,
-  "sbom_components_not_scanned": [],
-  "scanner": "pip-audit",
-  "threshold": "HIGH"
-}

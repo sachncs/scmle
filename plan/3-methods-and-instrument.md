@@ -8,8 +8,8 @@ Names follow [`00-canon.md`](00-canon.md). Item classes and reasons:
 
 Close or formally accept every class A open item of the built instrument and of
 the framing, ingestion, causal, decision, uncertainty and loop features, so
-that the external sign-offs of stage 5 rest on stated, current limits. Items
-that need outside people, data or an owner decision are in stage 5, not here.
+that the external sign-offs of stage 4 rest on stated, current limits. Items
+that need outside people, data or an owner decision are in stage 4, not here.
 
 ## Rules for every item
 
@@ -40,7 +40,7 @@ that need outside people, data or an owner decision are in stage 5, not here.
 | R1-B12 | MinHash text near-duplicates (`scmle/data/detectors/duplicates.py`) | Implemented, with a planted near-duplicate-text defect, a certificate and a cross-check against an exact Jaccard computation |
 | R1-B13 | Instance-dependent label noise is not modelled (symmetric and class-conditional flips only) | A planted instance-dependent flip type in `benchmarks/qualification/inject.py` with a certificate, or an explicit statement in `docs/ARTIFACTS.md` that it is not covered |
 | R1-D4a | Producers for the six oracles that have none (`chi2_contingency`, `fisher_exact`, `kendalltau`, `ks_2samp`, `mannwhitneyu`, `pearsonr`) | Each gets a producer in `oracle_table.WIRED`, or is removed with a dated reason |
-| R1-E1, R1-E3, R1-E4 | Primary-source re-reads that are openly available: e-LOND venue, Gretton et al. 2012, PCS and the specification curve | Date and result recorded in the module docstring; `grep -rn "from memory" scmle` lists only items still open in stage 5 |
+| R1-E1, R1-E3, R1-E4 | Primary-source re-reads that are openly available: e-LOND venue, Gretton et al. 2012, PCS and the specification curve | Date and result recorded in the module docstring; `grep -rn "from memory" scmle` lists only items still open in stage 4 |
 | R1-acc | A test that each register row ID that names a file still resolves | The test passes, and fails when a named file is removed |
 
 ### 3.2 Framing and ingestion (F8, F9)
@@ -118,4 +118,4 @@ written in `docs/ARTIFACTS.md` or `docs/SECURITY.md` with the date.
 | A5 or A6 cannot reach the floor with the current methods | Accept as descriptive; do not lower the floor after seeing the interval |
 | Mutation floor 80 is not reachable on a module | Report survivors per module and justify each; do not drop modules from scope |
 | A change to a hashed source invalidates a certificate | Re-measure with the same seeds and floors in the same commit |
-| A method passes on simulation and fails on real data | Tiers follow held-out measurement, not the theorem; misses are published (stage 5 supplies the real data) |
+| A method passes on simulation and fails on real data | Tiers follow held-out measurement, not the theorem; misses are published (stage 4 supplies the real data) |

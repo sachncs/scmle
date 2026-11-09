@@ -5,7 +5,7 @@ State on 2026-11-08, `master` at `9356b89`. `ci.yml` is green on this head (run
 step but its mutation step has failed since 4 Nov; a fix is committed and
 unverified (item 1.4).
 
-This file lists only open items, grouped under the five stages of
+This file lists only open items, grouped under the four stages of
 [`README.md`](README.md). A closed or built item is deleted from it; the record
 is `CHANGELOG.md` and `git log`. Each row has one class. An item that needs
 both local work and outside input is split into two rows (suffix `a` and `b`).
@@ -13,34 +13,33 @@ both local work and outside input is split into two rows (suffix `a` and `b`).
 Classes:
 
 * **A**: buildable here and verifiable here (local code, existing
-  dependencies, this machine's tools: Python 3.11 and 3.14, OpenTofu, mutmut).
+  dependencies, this machine's tools: Python 3.11 and 3.14, mutmut).
 * **B**: needs outside people or data: labelled corpora, gold standards,
   reference implementations (R, MAPIE, scikit-survival), a red team,
   replication, a domain owner, a prospective head-to-head, clerical samples,
   real panels, external benchmarks, a reviewer other than the author, or
   something that exists only after a push (a CI observation, a published
   release).
-* **C**: needs an AWS or GCP account, a spending cap, an approver, or a
-  container daemon or scanner that is not on this machine (the Docker daemon
-  is not running here; `trivy`, `skopeo` and MinIO are not installed).
+* **C**: needs a container daemon or scanner that is not on this machine
+  (the Docker daemon is not running here; `trivy` and `skopeo` are not
+  installed), a real deployment, a real database role or an approver.
 * **D**: needs a design decision from the owner (a version number, a new
   dependency, a protocol's thresholds, a business metric).
 
 Placement rule: class A items from the old instrument, framing, ingestion,
 causal, decision, uncertainty and loop work are in stage 3; class B and D
-items of that work are in stage 5; class C and D items of the cloud work, and
-the local parts of it, are in stage 4; class B items of the cloud work are in
-stage 5.
+items of that work, and the container, real-deployment, trail and breadth
+items, are in stage 4.
 
 ## Counts
 
-| Class | Stage 1 | Stage 2 | Stage 3 | Stage 4 | Stage 5 | Total |
-|---|---|---|---|---|---|---|
-| A, buildable here | 1 | 4 | 43 | 3 | 2 | 53 |
-| B, outside people or data | 2 | 0 | 0 | 0 | 50 | 52 |
-| C, cloud account, cap, approver or daemon | 0 | 1 | 0 | 24 | 1 | 26 |
-| D, owner decision | 0 | 0 | 0 | 4 | 20 | 24 |
-| Total | 3 | 5 | 43 | 31 | 73 | 155 |
+| Class | Stage 1 | Stage 2 | Stage 3 | Stage 4 | Total |
+|---|---|---|---|---|---|
+| A, buildable here | 1 | 4 | 43 | 5 | 53 |
+| B, outside people or data | 2 | 0 | 0 | 50 | 52 |
+| C, container daemon, real deployment or approver | 0 | 1 | 0 | 10 | 11 |
+| D, owner decision | 0 | 0 | 0 | 23 | 23 |
+| Total | 3 | 5 | 43 | 88 | 139 |
 
 ## Stage 1: trustworthy evidence ([`1-trustworthy-evidence.md`](1-trustworthy-evidence.md))
 
@@ -58,7 +57,7 @@ stage 5.
 | 2.6 | a per-day action cap, a `start` action that loops ticks, and a workflow handler so `Schedule.tick` or a workflow engine drives `scmle operate tick` | A | `scmle operate` has `tick`, `status`, `grant`, `revoke` and `halt`; nothing calls `Schedule.tick`; the only cap is an envelope's use limit |
 | 2.7 | a mutation survivor record for `scmle/governance/envelope.py` and `scmle/operations/controller.py`, both added to `setup.cfg` `source_paths`, with the envelope's refusal floors written down | A | `tests/unit/test_envelope.py`, `tests/unit/test_controller.py` and `tests/simulation/` exist; no `tests/unit/MUTANTS_*.md` covers them |
 | 2.8 | further envelope actions: shadow, canary and rollback to the previously approved champion (only `train_challenger` can be put in an envelope today) | A | `EnvelopeAction` has one member; rollback stays behind `Guard` and the registry |
-| 2.5 | the controller in a real staging deployment with real label delay and a real business outcome | C | accounts and a staging environment; also needs 4.20 |
+| 2.5 | the controller in a real staging deployment with real label delay and a real business outcome | C | a staging deployment; also needs 4.29 |
 
 ## Stage 3: methods and instrument ([`3-methods-and-instrument.md`](3-methods-and-instrument.md))
 
@@ -135,66 +134,30 @@ stage 5.
 | F13-5a1 | novelty and set size for regression bundles; a certified `novelty_bound` | A | `scmle/governance/uncertainty_feed.py` handles classification only; `loop.py` default 0.05 |
 | F13-5a2 | exact or conservative weighted threshold test, certified | A | `scmle/governance/escalation.py` uses Kish sizes and a rounded-up error count; H9 measured the unweighted case only |
 
-## Stage 4: cloud and production ([`4-cloud-and-production.md`](4-cloud-and-production.md))
-
-| ID | Item | Class | Evidence / reason |
-|---|---|---|---|
-| 4.1 | container path: build the image, start compose | C | `docker info`: daemon not running; no image built |
-| 4.2 | image reproducibility (two builds, same digest) | C | needs a daemon |
-| 4.3 | arm64 build and run | C | needs a daemon |
-| 4.4 | `image-attestation.json` bound to a real digest; asymmetric or keyless signing and an independent verifier | C | needs a real image |
-| 4.5 | scan gate against a built image (Trivy in CI) | C | `trivy` not installed; no image |
-| 4.6 | CI builds the image from pinned inputs and verifies its own signature | C | follows 4.1 |
-| 4.7 | restart, load and scaling tests on each cloud | C | cloud |
-| 4.8 | TLS ingress, workload identity, managed keys on AWS and GCP; a real identity provider | C | accounts |
-| 4.9 | object-store conformance against MinIO, the GCS emulator, real S3 and GCS | C | none installed; no daemon (`scripts/run_object_store_conformance.py`) |
-| 4.10 | one warehouse per cloud; ingest, train and trace on a cloud dataset | C | accounts and an owner's choice |
-| 4.11 | training in each cloud: ECS and Cloud Run runs, IAM identities, interruption, billing check, `RunV2Client` and `ecs_client`, reproducibility-tolerance report | C | accounts |
-| 4.12 | deploy the emitted Step Functions and Cloud Workflows definitions with schedulers and a notification channel; duplicate, partial, missed and interruption runs on each engine | C | accounts |
-| 4.13 | concurrency and cost budgets enforced in the infrastructure | C | the definitions return `controls`; enforcement is a cloud setting |
-| 4.14 | `tofu plan` per environment | C | needs provider credentials |
-| 4.15 | apply, test, destroy, orphan check on real listings, cost against the bill | C | accounts, spending cap |
-| 4.16 | protected environments, OIDC trust, `cloud-release.yml` run once to success and once refused, real image scan, reviewer sign-off, asymmetric deployment record | C | accounts, approver; the workflows have never run |
-| 4.17 | runtime adapters against real ECS and Cloud Run; traffic splitting; ECS staged traffic; rollback; `reconcile` | C | accounts |
-| 4.18 | CloudWatch and Cloud Monitoring, a real pager and ticket endpoint, injected failure and drift on staging, operator response | C | accounts, operator |
-| 4.19 | cost report with real rates against a bill; incident classifier tuned on real incidents | C | a bill, incidents |
-| 4.20 | controlled degradation in staging with real delayed labels | C | staging |
-| 4.21 | every catalogued fault in each provider's staging; RTO and RPO there | C | accounts |
-| 4.22 | machine crash or power loss; zone or region loss | C | the ledger and state files are shown to survive a killed process only |
-| 4.23 | all P0 acceptance on both providers, `signoff.json` by a reviewer with a key the pipeline does not hold, `scripts/check_production_claim.py` | C | accounts, reviewer; the claim has not been made |
-| 4.24 | read-only database role cannot be verified by the instrument | C | `scmle/data/ingest` uses a textual allow-list and a query-only session; needs a real database role |
-| 4.25 | torn-write simulation of the ledger and state files | A | local half of the crash item |
-| 4.26 | trail: record types, signature, verify and show for written explanations of data-quality findings, performance trade-offs and deployment decisions | A | `scmle.trail` records facts only |
-| 4.27 | trail: record types for point-in-time and source-data steps, on a synthetic source | A | the Titanic extract has no source system |
-| 4.28 | known gaps: customer-managed keys for Artifact Registry and Secret Manager, custom domain and certificate, API Gateway access-log permissions, WAF or Cloud Armor | D | each is a design and cost decision |
-| 4.29 | business metrics and margins `post_promotion_check` watches | D | per product |
-| 4.30 | revisit `recovery.OBJECTIVES` with the owner | D | declared for a local run |
-| 4.31 | breadth slices (clustering, association, dimensionality reduction, forecasting, ranking, documents, image/audio/video, geospatial, pretrained, GPU, streaming) | D | each needs the owner's declared requirement and parameters in `benchmarks/breadth/`; then a public benchmark and replication (B) and both clouds (C) |
-
-## Stage 5: external validation and release ([`5-external-validation-and-release.md`](5-external-validation-and-release.md))
+## Stage 4: external validation and release ([`4-external-validation-and-release.md`](4-external-validation-and-release.md))
 
 ### Protocol, corpora and the external gates
 
 | ID | Item | Class | Evidence / reason |
 |---|---|---|---|
-| 5.1 | `benchmarks/qualification/PROTOCOL.md` committed and tagged `qualification-protocol-v1` before any result | D | file and tag do not exist; claim, corpus rule, thresholds and stop rules are the owner's pre-registration |
-| 5.2 | corpora: at least 15 datasets, 5 per defect family, SHA-256 verified | B | `corpora.json` entries are `candidate`; retrieval and licence checks needed |
-| 5.3 | backtest (`backtest.py`) | B | at least 15 real datasets with a time axis; no module exists |
-| 5.4 | red team | B | an analyst who did not write F1 to F6 |
-| 5.5 | independent replication | B | a third party |
-| 5.6 | TabArena campaign | B | about 9 machine-days, AutoGluon baselines not in the dependencies, OpenML downloads; no result committed under `benchmarks/sota/` |
-| 5.7 | R oracle fixtures: `onlineFDR`, `knockoff`, `dagitty` | B | R is not installed |
-| 5.8 | mutation floor 80 with a committed `mutation_survivors.json` | A | mutmut 3.8.0 installed; scope in `setup.cfg`; per-module survivors in `tests/unit/MUTANTS_*.md`; the repo-wide run takes many hours |
-| 5.9 | domain-owner pilot | B | a team that owns a dataset |
-| 5.10 | version choice (`0.1.0b1` reuse or `0.2.0b1`) | D | owner's decision |
-| 5.11 | changelog moved under the new version | D | follows 5.10 |
-| 5.12 | annotated tag `v<version>` | D | follows 5.10; tagging is not pushing |
-| 5.13 | `SECURITY.md` supported-versions text | D | follows 5.10 |
-| 5.14 | a test that every file a charter run writes is named in `docs/ARTIFACTS.md` | A | the document exists; the test does not |
-| 5.15 | `scripts/release_preflight.sh` exits 0 | C | needs `npm ci` of the website, `uv sync --all-extras` on 3.14, pip-audit; CI covers its pieces |
-| 5.16 | publish to PyPI, site snippet, operational rehearsal by a non-author, independent review | B | outside people and a PyPI project |
-| 5.17 | go/no-go rows 1 to 13 signed by someone other than the author | B | statisticians, red team, replicating party, domain owner |
-| 5.18 | `CITATION.cff` validated with `cffconvert` | B | not installed here; a key-and-version test exists |
+| 4.1 | `benchmarks/qualification/PROTOCOL.md` committed and tagged `qualification-protocol-v1` before any result | D | file and tag do not exist; claim, corpus rule, thresholds and stop rules are the owner's pre-registration |
+| 4.2 | corpora: at least 15 datasets, 5 per defect family, SHA-256 verified | B | `corpora.json` entries are `candidate`; retrieval and licence checks needed |
+| 4.3 | backtest (`backtest.py`) | B | at least 15 real datasets with a time axis; no module exists |
+| 4.4 | red team | B | an analyst who did not write F1 to F6 |
+| 4.5 | independent replication | B | a third party |
+| 4.6 | TabArena campaign | B | about 9 machine-days, AutoGluon baselines not in the dependencies, OpenML downloads; no result committed under `benchmarks/sota/` |
+| 4.7 | R oracle fixtures: `onlineFDR`, `knockoff`, `dagitty` | B | R is not installed |
+| 4.8 | mutation floor 80 with a committed `mutation_survivors.json` | A | mutmut 3.8.0 installed; scope in `setup.cfg`; per-module survivors in `tests/unit/MUTANTS_*.md`; the repo-wide run takes many hours |
+| 4.9 | domain-owner pilot | B | a team that owns a dataset |
+| 4.10 | version choice (`0.1.0b1` reuse or `0.2.0b1`) | D | owner's decision |
+| 4.11 | changelog moved under the new version | D | follows 4.10 |
+| 4.12 | annotated tag `v<version>` | D | follows 4.10; tagging is not pushing |
+| 4.13 | `SECURITY.md` supported-versions text | D | follows 4.10 |
+| 4.14 | a test that every file a charter run writes is named in `docs/ARTIFACTS.md` | A | the document exists; the test does not |
+| 4.15 | `scripts/release_preflight.sh` exits 0 | C | needs `npm ci` of the website, `uv sync --all-extras` on 3.14, pip-audit; CI covers its pieces |
+| 4.16 | publish to PyPI, site snippet, operational rehearsal by a non-author, independent review | B | outside people and a PyPI project |
+| 4.17 | go/no-go rows 1 to 13 signed by someone other than the author | B | statisticians, red team, replicating party, domain owner |
+| 4.18 | `CITATION.cff` validated with `cffconvert` | B | not installed here; a key-and-version test exists |
 
 ### Instrument (R1)
 
@@ -267,11 +230,31 @@ stage 5.
 | F13-7 | replay and domain-owner audit (H11) | B | the owner |
 | F13-8a | halt connected to `scmle/monitoring/incidents.py` | D | a halt has no SLO evaluation; which SLO is the owner's |
 
-### Cloud evidence that needs people
+### Trail, security review and independent confirmation
 
 | ID | Item | Class | Evidence / reason |
 |---|---|---|---|
-| 5.19 | pen-test style review of the security gateway by someone other than the author | B | a reviewer |
-| 5.20 | independent trace of one deployed model; real outcomes after a real delay; stakeholder criteria signed before deployment | B | reviewer, stakeholder, deployment (also needs cloud accounts) |
-| 5.21 | independent confirmation of a released analytical claim | B | |
-| 5.22 | the reasoning behind trail explanations and a real source system for the trail | B | follows 4.26 and 4.27 |
+| 4.19 | pen-test style review of the security gateway by someone other than the author | B | a reviewer |
+| 4.20 | independent trace of one deployed model; real outcomes after a real delay; stakeholder criteria signed before deployment | B | reviewer, stakeholder, a real deployment |
+| 4.21 | independent confirmation of a released analytical claim | B | |
+| 4.22 | the reasoning behind trail explanations and a real source system for the trail | B | follows 4.33 and 4.34 |
+
+### Container path, real deployment, trail and breadth
+
+| ID | Item | Class | Evidence / reason |
+|---|---|---|---|
+| 4.23 | container path: build the image, start compose | C | `docker info`: daemon not running; no image built |
+| 4.24 | image reproducibility (two builds, same digest) | C | needs a daemon |
+| 4.25 | arm64 build and run | C | needs a daemon |
+| 4.26 | `image-attestation.json` bound to a real digest; asymmetric or keyless signing and an independent verifier | C | needs a real image |
+| 4.27 | scan gate against a built image (Trivy in CI) | C | `trivy` not installed; no image |
+| 4.28 | CI builds the image from pinned inputs and verifies its own signature | C | follows 4.23 |
+| 4.29 | controlled degradation in a real deployment with real delayed labels | C | a deployment; also what item 2.5 needs |
+| 4.30 | machine crash or power loss | C | the ledger and state files are shown to survive a killed process only |
+| 4.31 | read-only database role cannot be verified by the instrument | C | `scmle/data/ingest` uses a textual allow-list and a query-only session; needs a real database role |
+| 4.32 | torn-write simulation of the ledger and state files | A | local half of 4.30 |
+| 4.33 | trail: record types, signature, verify and show for written explanations of data-quality findings, performance trade-offs and deployment decisions | A | `scmle.trail` records facts only |
+| 4.34 | trail: record types for point-in-time and source-data steps, on a synthetic source | A | the Titanic extract has no source system |
+| 4.35 | business metrics and margins `post_promotion_check` watches | D | per product |
+| 4.36 | revisit `recovery.OBJECTIVES` with the owner | D | declared for a local run |
+| 4.37 | breadth slices (clustering, association, dimensionality reduction, forecasting, ranking, documents, image/audio/video, geospatial, pretrained, GPU, streaming) | D | each needs the owner's declared requirement and parameters in `benchmarks/breadth/`; then a public benchmark and replication (B) |

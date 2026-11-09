@@ -15,8 +15,8 @@ decision-cost model, raw-data ingestion with point-in-time features, causal
 identification, the decision and rollout layer, interval guarantees, the
 closed production loop with escalation, and a local portable service with a
 release gate. What is missing is unattended operation (a controller that runs
-the loop inside a human-signed envelope), evidence from a real cloud, and
-validation by people and data outside this project. Those are the five stages
+the loop inside a human-signed envelope), the container path on a real daemon, and
+validation by people and data outside this project. Those are the four stages
 in this folder. Whatever a charter or a person cannot supply is reported as
 `unverified`, never silently assumed.
 
@@ -104,8 +104,7 @@ and `benchmarks/qualification/`.
 | 1 | `1-trustworthy-evidence.md` | Green cross-platform CI and a quickstart that runs as written |
 | 2 | `2-autonomous-operation.md` | Envelope, alarm-gated retraining, controller, simulation, docs; promotion stays human-approved |
 | 3 | `3-methods-and-instrument.md` | Class A open items of the instrument and the framing, ingestion, causal, decision, uncertainty and loop features |
-| 4 | `4-cloud-and-production.md` | AWS and GCP evidence, the production claim, trail and breadth |
-| 5 | `5-external-validation-and-release.md` | Red team, replication, gold corpora, owner decisions, the release |
+| 4 | `4-external-validation-and-release.md` | Red team, replication, gold corpora, owner decisions, the container path, trail and breadth, the release |
 
 Feature IDs F7 to F16 and R1 are used in `../product/features.md`; the item
 register is `COMPLETION_AUDIT.md`. Dependencies and the definition of done are

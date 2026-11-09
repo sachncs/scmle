@@ -1,7 +1,7 @@
 # plan.md has moved
 
 The plan this file once held (a review of what separates SCMLE from an
-autonomous ML/DS lifecycle, in phases 0 to 5) is now the five stages in
+autonomous ML/DS lifecycle, in phases 0 to 5) is now the four stages in
 [`plan/README.md`](plan/README.md), with only what is still to be built, one
 register of open items ([`plan/COMPLETION_AUDIT.md`](plan/COMPLETION_AUDIT.md))
 and the features still to build ([`product/features.md`](product/features.md)).
