@@ -171,7 +171,8 @@ def pick_blocks(
     Args:
         times: Ordering value per row.
         fraction: Share of rows to mark.
-        embargo: Embargo in rows; sets the minimum block length.
+        embargo: Embargo in rows; blocks are at least `4 * embargo` rows
+            long (and at least a twentieth of the rows).
         rng: Random generator that orders the blocks.
 
     Returns:
@@ -269,11 +270,13 @@ def acf_embargo(values: np.ndarray, max_lag: int | None = None) -> int:
 
     Args:
         values: Numeric series in time order.
-        max_lag: Largest lag examined; defaults to a quarter of the length,
-            at most 1000.
+        max_lag: Largest lag examined; defaults to a quarter of the length.
+            Either way it is capped at half the length and at 1000.
 
     Returns:
         The embargo in rows (0 for fewer than 8 values or a constant series).
+        When every examined lag is outside the band, the largest lag
+        examined.
     """
     size = len(values)
     if size < 8:
@@ -371,16 +374,19 @@ def carve_confirmation(
         seed: Seed from the charter.
         charter_hash: Hash of the charter (part of the pure function).
         data_hash: Hash of the data (part of the pure function).
-        labels: Class label per development row (stratifies the draw).
+        labels: Class label per development row (stratifies the draw of
+            whole units; not used when `times` is given).
         groups: Group value per development row.
         times: Ordering value per development row; given for temporal
             strategies, it switches the draw to contiguous blocks.
         duplicates: Duplicate-group id per development row (-1 = none).
-        embargo_rows: Rows dropped around temporal blocks.
+        embargo_rows: Rows dropped around temporal blocks (used only when
+            `times` is given).
 
     Returns:
-        The division, with folds restricted to `X`.
-
+        The division, with folds restricted to `X`. When fewer than two
+        units exist or nothing was drawn, `C` and the embargo are empty,
+        every development row is in `X` and a note says so.
     """
     dev_ids = np.asarray(dev_ids)
     size = len(dev_ids)

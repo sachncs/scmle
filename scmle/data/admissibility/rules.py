@@ -18,8 +18,9 @@ A field whose timing or serving availability is unknown is `unverified`: in
 strict mode it is quarantined, in permissive mode admitted with a flag. A
 log that disagrees with the stored values quarantines the field in both
 modes. A leakage suspicion alone quarantines a field only when the leakage
-detector has a current certificate and the field has no log-derived as-of
-evidence that it precedes the moment.
+detector has a current certificate and the field is unverified (its as-of
+rule is unverified or its serving availability is unknown); otherwise a
+suspect is admitted, flagged when its as-of rule is only attested.
 """
 
 from collections.abc import Mapping
@@ -144,10 +145,10 @@ def decide_timing(
         The decision, with the reasons that applied. A failed log check,
         unavailability at serving, or a lead below the declared lag
         quarantines the field. An unknown serving availability or an
-        unverified tier gives the unverified outcome of `mode`, which is
-        quarantine for a leakage suspect when the detector is gating. A
-        suspect with a confirmed tier is admitted; with an attested tier it
-        is admitted flagged.
+        unverified tier gives the unverified outcome of `mode`; for a
+        leakage suspect it becomes quarantine when `leakage_gate` is
+        gating. Otherwise a suspect with a confirmed tier is admitted and
+        one with an attested tier is admitted flagged.
     """
     tier = record.tier(today)
     reasons: list[str] = []

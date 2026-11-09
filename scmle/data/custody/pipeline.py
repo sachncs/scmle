@@ -138,7 +138,7 @@ def measured_embargo(
     times: np.ndarray | None,
     task: tasks.TaskType,
 ) -> int:
-    """Embargo rows measured from the target's autocorrelation, or 0.
+    """Measures the embargo in rows from the target's autocorrelation, or 0.
 
     Only temporal strategies carry an embargo. The target is read in time
     order over the development rows; a target that is not numeric gives 0.
@@ -152,8 +152,8 @@ def measured_embargo(
         task: Resolved task type; class labels are coded as integers first.
 
     Returns:
-        The embargo in rows; 0 when `times` is None or the target has
-        missing or non-numeric values.
+        The embargo in rows; 0 when `times` is None or, for a regression,
+        the target has missing or non-numeric values.
     """
     if times is None:
         return 0
@@ -191,7 +191,9 @@ def apply_custody(
     Returns:
         The restricted split, the exploration view, the v2 manifest and the
         feasibility verdict. If `C` cannot be confirmed the carve is skipped:
-        all development rows stay in `X` and the scope is capped.
+        all development rows stay in `X` and the scope is capped. The
+        embargo is the larger of the charter's and the measured one, or the
+        charter's when no `C` remains.
     """
     data, old = spec.data, split.manifest
     dev_ids = np.asarray(old.train_ids, dtype=int)

@@ -64,7 +64,7 @@ def row_hash(row_id: int, cells: Sequence[tuple[str, Any]]) -> str:
         cells: The `(column name, value)` pairs in frame order.
 
     Returns:
-        The SHA-256 hex digest of the row text, prefixed with the leaf tag.
+        The SHA-256 hex digest of the leaf tag followed by the row text.
     """
     text = SEPARATOR.join(
         [f"id={int(row_id)}"]

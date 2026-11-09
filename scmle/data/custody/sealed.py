@@ -121,16 +121,18 @@ class OpenLog:
         actor: str,
         detail: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Adds an event and persists it.
+        """Adds an event and, when the log has a path, appends it to the file.
 
         Args:
             set_id: Set concerned (`C`, `final_test`, ...).
-            event: `sealed`, `token_issued`, `open` or `denied`.
+            event: Event name, for example `sealed`, `token_issued`,
+                `bound`, `open` or `denied`.
             actor: Who acted.
             detail: Counts and reasons; never row values.
 
         Returns:
-            The stored entry including its hash.
+            The stored entry including its hash, and its MAC when the log
+            has a key.
         """
         body = {
             "seq": len(self.entries),
@@ -250,7 +252,8 @@ class SealedSet:
         two hashes; a release for any other selection is refused by the
         vault (or, for an in-process set, by the protocol check). The
         binding is logged with both hashes. The locked set raises
-        LeakageError when the set is already committed or was opened.
+        LeakageError when the set is already committed or was opened, or
+        when its vault process is gone.
 
         Args:
             claims_hash: Digest of the claims (survivors) to be tested.
@@ -291,7 +294,8 @@ class SealedSet:
 
         Raises:
             LeakageError: On a wrong token, a binding that does not match,
-                or a repeated release. The refusal is logged as `denied`.
+                or a repeated release (or a vault process that is gone). The
+                refusal is logged as `denied`.
         """
         offered = (
             binding_digest(claims_hash, ledger_hash)

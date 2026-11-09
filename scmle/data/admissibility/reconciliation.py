@@ -261,7 +261,7 @@ def reconcile_item(
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Reconciliation:
-    """All quantities of an extract, as `reconciliation.json`.
+    """All quantities of an extract with their verdicts.
 
     Attributes:
         results: One result per quantity.
@@ -302,7 +302,7 @@ def reconcile(
     gate: certificates.GateStatus = certificates.GateStatus.DESCRIPTIVE,
     set_id: qualification.SetId = qualification.SetId.ALL,
 ) -> Reconciliation:
-    """Reconcile every quantity.
+    """Reconciles every quantity.
 
     Args:
         items: Quantities, with unique names.

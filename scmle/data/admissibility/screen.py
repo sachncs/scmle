@@ -216,10 +216,11 @@ def strata_of(
 def batch_permutations(
     strata: np.ndarray, count: int, rng: np.random.Generator
 ) -> np.ndarray:
-    """`count` row permutations, each permuting rows within their stratum.
+    """Draws `count` permutations of the rows, each within its stratum.
 
-    Row `i` of the result `p` gives the position whose outcome row `i`
-    receives, so `y[p[b]]` is the outcome permuted within strata.
+    Entry `p[b, i]` of the result is the position whose outcome row `i`
+    receives in permutation `b`, so `y[p[b]]` is the outcome permuted within
+    strata.
 
     Args:
         strata: Stratum label per row.
@@ -365,7 +366,8 @@ class Problem:
         task: `classification` or `regression`.
         classes: Number of classes (0 for regression).
         splits: Cross-fitting folds.
-        total_squares: Total sum of squares of a continuous outcome.
+        total_squares: Total sum of squares of a continuous outcome (0.0 for
+            a classification).
     """
 
     y: np.ndarray
@@ -445,8 +447,8 @@ def sample_skill(
 
     Returns:
         The skill on the sample, or None when it cannot be computed: a
-        constant regression sample, or a classification sample in which no
-        fold holds both a positive and a negative row.
+        constant regression sample, or a classification sample in which, for
+        some scored class, no fold holds both a positive and a negative row.
     """
     y = problem.y[index]
     if problem.task == "regression":
@@ -478,8 +480,9 @@ def skill_bound(
     """One-sided lower confidence bound of the skill by bootstrap.
 
     Rows are resampled, or whole groups when `groups` is given, and the
-    out-of-fold predictions stay attached to their rows and folds. Draws that
-    lack a class are skipped; with none left the bound is -inf.
+    out-of-fold predictions stay attached to their rows and folds. Draws whose
+    skill cannot be computed (see `sample_skill`) are skipped; with none left
+    the bound is -inf.
 
     Args:
         problem: The outcome, task and folds.
@@ -521,6 +524,9 @@ def chi_square_rows(
     missing: np.ndarray, labels: np.ndarray, totals: np.ndarray
 ) -> np.ndarray:
     """Computes the Pearson chi-square of the 2 x K (missing by class) table.
+
+    Both the missing and the present rows, and every class, must be
+    non-empty; otherwise a zero expected count gives a non-finite value.
 
     Args:
         missing: Boolean array of length n, True where the value is missing.
@@ -632,8 +638,8 @@ def bootstrap_v(
     """One-sided lower confidence bound of Cramer's V by bootstrap.
 
     Rows are resampled, or whole groups when `groups` is given. Draws that
-    lose the missing or the present rows are skipped; with none left the bound
-    is -inf.
+    lose the missing rows, the present rows or a whole class are skipped;
+    with none left the bound is -inf.
 
     Args:
         missing: Boolean array, True where the value is missing.
@@ -681,7 +687,7 @@ class Pending:
 
     Attributes:
         feature: Column name.
-        mechanism: `skill` or `missingness`.
+        mechanism: `skill`, `missingness` or `record_purity`.
         observed: Observed statistic.
         statistic: Function of a batch of permuted labels, or None when the
             p-value is analytic.
@@ -728,11 +734,12 @@ def draw_permutations(
     alpha: Fraction,
     seed: int,
 ) -> None:
-    """Draws `total` shared permutations and update every hypothesis in place.
+    """Draws `total` shared permutations and updates every hypothesis in place.
 
     A hypothesis stops once its final p-value is certain to exceed the
     largest threshold of the step-up rule. The `exceed`, `drawn` and
-    `active` fields of each hypothesis in `pending` are updated.
+    `active` fields of each hypothesis in `pending` with a statistic are
+    updated; one with an analytic p-value is left unchanged.
 
     Args:
         pending: The hypotheses of the family.
@@ -772,12 +779,14 @@ class Finding:
 
     Attributes:
         feature: Column name.
-        mechanism: `skill` (cross-fitted AUC or R^2) or `missingness`
-            (Cramer's V).
+        mechanism: `skill` (cross-fitted AUC or R^2), `missingness`
+            (Cramer's V) or `record_purity` (share of the commonest class
+            among recorded values).
         statistic: Observed effect size.
         p_value: Permutation (or analytic) p-value. When `complete` is False
-            the run stopped early and this is only an estimate above the
-            largest threshold.
+            the run stopped early and this is the estimate from the
+            permutations drawn so far, which lies above the largest
+            threshold.
         adjusted_p: Benjamini-Yekutieli adjusted p-value (1.0 when stopped
             early).
         significant: Rejected by the Benjamini-Yekutieli step.
@@ -841,7 +850,8 @@ class ScreenReport:
         findings: One per tested column and mechanism.
         rows: Rows used.
         family: Number of hypotheses adjusted together.
-        permutations: Permutations per hypothesis (0 if none were run).
+        permutations: Permutations planned per hypothesis (0 if none were
+            run); a hypothesis that stopped early drew fewer.
         alpha: Level of the Benjamini-Yekutieli step.
         gates: Gate status per mechanism.
         ceilings: Pre-registered ceilings by mechanism.
@@ -992,7 +1002,7 @@ def gate_statuses(
     task: str,
     n_classes: int,
 ) -> dict[str, certificates.GateStatus]:
-    """Determine the gate status per mechanism from the certificates on file.
+    """Determines the gate status per mechanism from the certificates on file.
 
     A mechanism gates only when the screen's current code has a passing
     certificate for every leak type of that mechanism, the settings equal the
@@ -1092,8 +1102,9 @@ def screen_table(
 ) -> ScreenReport:
     """Screens training data with the certified settings.
 
-    Groups keep entities whole. A time column orders the rows and defines
-    `TIME_BLOCKS` consecutive blocks; groups win when both are given.
+    Groups keep entities whole. A time column orders the rows (stable sort)
+    and defines consecutive blocks of `len(frame) // TIME_BLOCKS` rows, at
+    least 2; groups win when both are given.
 
     Args:
         frame: Training rows including the target and any structure columns.
@@ -1101,8 +1112,10 @@ def screen_table(
         task: `classification` or `regression`.
         features: Candidate columns.
         seed: Run seed for every random stream.
-        group_column: Entity column, or None.
-        time_column: Time column, or None.
+        group_column: Entity column, or None. Ignored when it is not a
+            column of `frame`.
+        time_column: Time column, or None. Ignored when it is not a column
+            of `frame` or when `group_column` is used.
         store: Certificates for gating; defaults to the shipped ones.
         time_budget_seconds: The project's declared time budget; it bounds
             the screen's work by `work_cap`. None means no cap beyond
@@ -1110,7 +1123,9 @@ def screen_table(
 
     Returns:
         The report, using `CERTIFIED` settings with `seed`. A screen that was
-        declined says so in `unchecked` and `warning`.
+        declined says so in `unchecked` and `warning`. A `features` entry
+        that is not a candidate column, or a missing `target`, raises as in
+        `screen`.
     """
     cfg = dataclasses.replace(CERTIFIED, run_seed=seed)
     chosen = store if store is not None else shipped_store()
@@ -1255,9 +1270,10 @@ def scan_frame(
             beyond `MAX_PERMUTATIONS`.
 
     Returns:
-        The report. It is empty, with the reason in its notes, when the
-        outcome is invalid, there are too few rows, no column could be
-        tested, or the permutations or work needed exceed the limits.
+        The report. It has no findings, with the reason in its notes, when
+        the outcome is invalid, there are too few rows, no column could be
+        tested, or the permutations or work needed exceed the limits; in the
+        last case the candidate columns are listed in `unchecked`.
     """
     n = len(frame)
     try:
@@ -1433,7 +1449,7 @@ def screen(
     Args:
         frame: Training (or exploration) rows including the target. For time
             blocks the rows must be in time order.
-        target: Name of the target column.
+        target: Name of the target column; it must be a column of `frame`.
         task: `classification` or `regression`.
         cfg: Settings; `alpha` is the Benjamini-Yekutieli level and the
             ceilings are pre-registered, never tuned on this data.
