@@ -51,7 +51,7 @@ class NoveltyDetector:
         categorical: tuple[str, ...],
         seed: int = 0,
     ) -> Self | None:
-        """Learns the training distribution.
+        """Learn the training distribution.
 
         Args:
             features: Training features.
@@ -93,7 +93,17 @@ class NoveltyDetector:
     def far_out_fences(
         features: pd.DataFrame, numeric: tuple[str, ...]
     ) -> dict[str, tuple[float, float]]:
-        """Tukey far-out fences of each numeric feature."""
+        """Compute the Tukey far-out fences of each numeric feature.
+
+        Args:
+            features: Training features.
+            numeric: Numeric feature columns.
+
+        Returns:
+            Per column, the (lower, upper) fence: the quartiles extended by
+            three interquartile ranges. Columns without numeric values are
+            omitted.
+        """
         fences = {}
         for column in numeric:
             values = (
@@ -112,15 +122,17 @@ class NoveltyDetector:
         return fences
 
     def score(self, features: pd.DataFrame) -> pd.DataFrame:
-        """Scores new rows.
+        """Score new rows.
 
         Args:
             features: Rows with the training feature columns.
 
         Returns:
-            `novelty_score` (higher means more unusual), the numeric
-            features beyond their far-out fences, and the boolean
-            `out_of_distribution`.
+            A frame indexed like `features` with `novelty_score` (higher
+            means more unusual), `out_of_range_features` (the numeric
+            features beyond their far-out fences), and the boolean
+            `out_of_distribution` (score past the threshold or any feature
+            out of range).
         """
         raw = self.model.score_samples(features)
         outside = pd.DataFrame(index=features.index)

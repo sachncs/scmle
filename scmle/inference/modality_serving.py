@@ -36,11 +36,22 @@ class ModalitySampleDecoder(abc.ABC):
 
     @abc.abstractmethod
     def decode(self, payload: object) -> tuple[Any, ...]:
-        """Decode and validate a JSON payload into finite sample objects."""
+        """Decode and validate a JSON payload into finite sample objects.
+
+        Args:
+            payload: The parsed JSON request body.
+
+        Returns:
+            The decoded samples, one object per sample.
+        """
 
     @abc.abstractmethod
     def schema(self) -> dict[str, object]:
-        """Describe the decoder's input contract as JSON evidence."""
+        """Describe the decoder's input contract as JSON evidence.
+
+        Returns:
+            A JSON-serializable description of the accepted input.
+        """
 
 
 class ModalityHttpServing:
@@ -71,13 +82,25 @@ class ModalityHttpServing:
     ) -> None:
         """Bind a verified predictor and an explicit sample decoder.
 
-        The pinned constructor is unchanged; `set_gateway` adds
-        authentication, and `start` refuses a non-loopback ``host`` without
-        one.
+        Authentication is added with `set_gateway`, and `start` refuses a
+        non-loopback ``host`` without one.
 
-        ``require_lifecycle_report`` enables the production-boundary mode.
-        In that mode the predictor must have been loaded with a verified,
-        identity-matching signed lifecycle report.
+        Args:
+            predictor: The verified modality predictor.
+            decoder: Caller-owned decoder for request payloads.
+            host: Interface to bind.
+            port: Port to bind; 0 picks a free port.
+            max_request_bytes: Largest accepted request body, in bytes.
+            max_samples: Largest accepted number of samples per request.
+            require_lifecycle_report: Whether to enable the
+                production-boundary mode, in which the predictor must have
+                been loaded with a verified, identity-matching signed
+                lifecycle report.
+
+        Raises:
+            ValueError: If a request bound is below 1, or
+                `require_lifecycle_report` is set and the predictor carries
+                no lifecycle report digest.
         """
         if max_request_bytes < 1 or max_samples < 1:
             raise ValueError("request bounds must be positive")
@@ -109,7 +132,7 @@ class ModalityHttpServing:
         self.thread: threading.Thread | None = None
 
     def set_gateway(self, gateway: access.Gateway | None) -> None:
-        """Requires a bearer token on every request except the probes.
+        """Require a bearer token on every request except the probes.
 
         Args:
             gateway: Authenticates, authorizes, rate-limits and audits
@@ -119,7 +142,11 @@ class ModalityHttpServing:
 
     @property
     def address(self) -> str:
-        """Return the base URL after the server has started."""
+        """The base URL of the running server.
+
+        Raises:
+            ScmleError: If the server is not running.
+        """
         if self.httpd is None:
             raise errors.ScmleError("server is not running")
         return f"http://{self.host}:{self.httpd.server_address[1]}"
@@ -127,10 +154,14 @@ class ModalityHttpServing:
     def set_limits(
         self, max_concurrent: int, scoring_timeout_seconds: float
     ) -> None:
-        """Replaces the concurrency and scoring-time limits before `start`.
+        """Replace the concurrency and scoring-time limits before `start`.
 
-        The constructor signature is part of the pinned public API, so the
-        limits (default 8 in flight, 30 seconds) are set here.
+        The limits (default 8 in flight, 30 seconds) are not constructor
+        arguments, so they are set here.
+
+        Args:
+            max_concurrent: Requests allowed in flight.
+            scoring_timeout_seconds: Seconds a scoring call may take.
 
         Raises:
             ScmleError: If the server is running.
@@ -148,7 +179,20 @@ class ModalityHttpServing:
         return "sha256:" + self.predictor.package.model_sha256
 
     def response(self, payload: object) -> dict[str, object]:
-        """Decode samples and return deterministic predictions."""
+        """Decode samples and return deterministic predictions.
+
+        Args:
+            payload: The parsed JSON request body.
+
+        Returns:
+            The response body: schema and model versions, the package
+            digest, modality, predictions and probabilities as lists, the
+            sample count, and the verification flags.
+
+        Raises:
+            ValueError: If the decoder returns no samples.
+            OverflowError: If there are more samples than `max_samples`.
+        """
         samples = self.decoder.decode(payload)
         if not samples:
             raise ValueError("samples must not be empty")
@@ -178,7 +222,14 @@ class ModalityHttpServing:
 
     @staticmethod
     def is_valid_request_id(request_id: str) -> bool:
-        """Return whether a caller request ID is safe to echo in headers."""
+        """Check whether a caller request ID is safe to echo in headers.
+
+        Args:
+            request_id: The ID supplied by the caller.
+
+        Returns:
+            True when it has 1 to 128 allowed characters.
+        """
         return (
             1 <= len(request_id) <= MAX_REQUEST_ID_LENGTH
             and REQUEST_ID_PATTERN.fullmatch(request_id) is not None
@@ -186,11 +237,21 @@ class ModalityHttpServing:
 
     @staticmethod
     def new_server_request_id() -> str:
-        """Return a bounded, opaque request ID that contains no request data."""
+        """Make a bounded, opaque request ID that contains no request data.
+
+        Returns:
+            A new random ID of the form `srv-<32 hex digits>`.
+        """
         return f"srv-{uuid.uuid4().hex}"
 
     def start(self) -> None:
-        """Bind the socket and serve in a daemon thread."""
+        """Bind the socket and serve in a daemon thread.
+
+        Raises:
+            ScmleError: If the server is already running. A non-loopback
+                host without a gateway is refused by
+                `access.require_authentication_for`.
+        """
         if self.httpd is not None:
             raise errors.ScmleError("server is already running")
         adapter = self
@@ -199,7 +260,13 @@ class ModalityHttpServing:
             """Handle one modality reference-server request."""
 
             def request_identity(self) -> tuple[str, str | None]:
-                """Return the safe ID and an optional validation error."""
+                """Resolve the request ID of the current request.
+
+                Returns:
+                    The caller's `X-Request-ID` when it is valid, else a new
+                    server ID, and an error message when the caller's ID was
+                    invalid (None otherwise).
+                """
                 caller_request_id = self.headers.get("X-Request-ID")
                 if caller_request_id is None:
                     return adapter.new_server_request_id(), None
@@ -218,7 +285,14 @@ class ModalityHttpServing:
                 request_id: str,
                 headers: dict[str, str] | None = None,
             ) -> None:
-                """Send a JSON response with safe reference-server headers."""
+                """Send a JSON response with safe reference-server headers.
+
+                Args:
+                    status: HTTP status code.
+                    payload: Response body; `request_id` is added to it.
+                    request_id: The ID echoed in the body and header.
+                    headers: Extra response headers.
+                """
                 response_payload = dict(payload)
                 response_payload["request_id"] = request_id
                 body = json.dumps(response_payload).encode()
@@ -235,7 +309,16 @@ class ModalityHttpServing:
                 self.wfile.write(body)
 
             def authorized(self, method: str, request_id: str) -> bool:
-                """Apply the gateway; answer a refusal with a safe body."""
+                """Apply the gateway; answer a refusal with a safe body.
+
+                Args:
+                    method: The HTTP method.
+                    request_id: The ID of the current request.
+
+                Returns:
+                    True when the request may proceed (no gateway, or the
+                    gateway accepted it); False after a refusal was sent.
+                """
                 gateway = adapter.gateway
                 if gateway is None:
                     return True
@@ -305,7 +388,17 @@ class ModalityHttpServing:
                     self.send_json(404, {"error": "not found"}, request_id)
 
             def do_POST(self) -> None:
-                """Decode and score a bounded prediction request."""
+                """Decode and score a bounded prediction request.
+
+                Failures are answered with an error response (415, 411, 400,
+                413, 422, 429, 504 or 500 as appropriate) rather than
+                propagated.
+
+                Raises:
+                    OverflowError: Raised for a negative or oversized
+                        `Content-Length`; it is caught within this method
+                        and answered with 413, so it never escapes.
+                """
                 request_id, identity_error = self.request_identity()
                 if identity_error is not None:
                     self.send_json(
@@ -432,7 +525,12 @@ class ModalityHttpServing:
                     )
 
             def log_message(self, format: str, *args: Any) -> None:
-                """Suppress per-request reference-server logging."""
+                """Suppress per-request reference-server logging.
+
+                Args:
+                    format: Unused log format string.
+                    *args: Unused format arguments.
+                """
 
         access.require_authentication_for(self.host, self.gateway)
         self.httpd = server.ThreadingHTTPServer((self.host, self.port), Handler)

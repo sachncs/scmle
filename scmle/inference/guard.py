@@ -59,7 +59,7 @@ class Readiness:
     """Tracks verify, load and warm-up; ready only when all three finished."""
 
     def __init__(self) -> None:
-        """Starts in the `starting` phase."""
+        """Start in the `starting` phase."""
         self.lock = threading.Lock()
         self.phase = Phase.STARTING
         self.done: dict[str, float] = {}
@@ -68,7 +68,15 @@ class Readiness:
         self.started = time.monotonic()
 
     def begin(self, step: Phase) -> None:
-        """Enters `step`; steps must run in order and none may be skipped."""
+        """Enter `step`; steps must run in order and none may be skipped.
+
+        Args:
+            step: The step to begin: verifying, loading or warming.
+
+        Raises:
+            ScmleError: If the service has failed, or `step` is not the next
+                step after those already completed.
+        """
         with self.lock:
             index = STEPS.index(step)
             expected = STEPS[len(self.done)] if len(self.done) < 3 else None
@@ -79,7 +87,15 @@ class Readiness:
             self.phase = STEPS[index]
 
     def complete(self, step: Phase, note: str = "") -> None:
-        """Marks `step` finished; the last step makes the service ready."""
+        """Mark `step` finished; the last step makes the service ready.
+
+        Args:
+            step: The step that finished; it must be the one in progress.
+            note: Optional detail recorded for the step.
+
+        Raises:
+            ScmleError: If `step` is not the phase currently in progress.
+        """
         with self.lock:
             if self.phase is not step:
                 raise errors.ScmleError(f"{step.value} is not in progress")
@@ -91,7 +107,11 @@ class Readiness:
             )
 
     def fail(self, reason: str) -> None:
-        """Records why the service will not become ready."""
+        """Record why the service will not become ready.
+
+        Args:
+            reason: The failure description reported by `snapshot`.
+        """
         with self.lock:
             self.phase = Phase.FAILED
             self.reason = reason
@@ -103,7 +123,13 @@ class Readiness:
             return self.phase is Phase.READY
 
     def snapshot(self) -> dict[str, Any]:
-        """The state for `/readyz`."""
+        """Report the state for `/readyz`.
+
+        Returns:
+            A mapping with `ready`, the current `phase` name, the seconds
+            since start at which each step `completed`, per-step `notes`,
+            and the failure `reason` (None unless failed).
+        """
         with self.lock:
             return {
                 "ready": self.phase is Phase.READY,
@@ -118,7 +144,7 @@ class AdmissionControl:
     """Bounds concurrent requests and the time one request may take."""
 
     def __init__(self, max_concurrent: int, timeout_seconds: float) -> None:
-        """Creates the limits.
+        """Create the limits.
 
         Args:
             max_concurrent: Requests allowed in flight; more get a 429.
@@ -140,7 +166,14 @@ class AdmissionControl:
 
     @contextlib.contextmanager
     def admit(self) -> Iterator[None]:
-        """Takes a slot without waiting, or raises `OverloadedError`."""
+        """Take a slot without waiting, or raise `OverloadedError`.
+
+        Yields:
+            None, while the slot is held; it is released on exit.
+
+        Raises:
+            OverloadedError: If all slots are in use.
+        """
         if not self.slots.acquire(blocking=False):
             raise OverloadedError(
                 f"more than {self.max_concurrent} requests in flight"
@@ -151,7 +184,18 @@ class AdmissionControl:
             self.slots.release()
 
     def run(self, work: Callable[[], Any]) -> Any:
-        """Runs `work` and waits at most the timeout for its result."""
+        """Run `work` and wait at most the timeout for its result.
+
+        Args:
+            work: Zero-argument callable executed on a worker thread.
+
+        Returns:
+            Whatever `work` returns.
+
+        Raises:
+            DeadlineError: If `work` does not finish within the timeout. The
+                call keeps running on its worker.
+        """
         future = self.pool.submit(work)
         try:
             return future.result(timeout=self.timeout_seconds)
@@ -161,15 +205,26 @@ class AdmissionControl:
             ) from error
 
     def close(self) -> None:
-        """Releases the workers without waiting for stuck calls."""
+        """Release the workers without waiting for stuck calls."""
         self.pool.shutdown(wait=False, cancel_futures=True)
 
 
 def is_valid_request_id(request_id: str) -> bool:
-    """Whether a caller request id is safe to echo in a header."""
+    """Check whether a caller request id is safe to echo in a header.
+
+    Args:
+        request_id: The id supplied by the caller.
+
+    Returns:
+        True when it matches `REQUEST_ID_PATTERN` in full.
+    """
     return REQUEST_ID_PATTERN.fullmatch(request_id) is not None
 
 
 def new_request_id() -> str:
-    """An opaque server-made id that contains no request data."""
+    """Make an opaque server-side request id that contains no request data.
+
+    Returns:
+        A new random id of the form `srv-<32 hex digits>`.
+    """
     return f"srv-{uuid.uuid4().hex}"

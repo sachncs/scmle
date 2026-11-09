@@ -16,7 +16,16 @@ from scmle.contracts import lineage
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class InferenceEvidenceLink:
-    """Identity of one inference event linked to an exact model bundle."""
+    """Identity of one inference event linked to an exact model bundle.
+
+    Attributes:
+        event_id: Unique identifier of the inference event.
+        input_fingerprint: Fingerprint of the request input.
+        output_fingerprint: Fingerprint of the produced output.
+        bundle_digest: Digest of the model bundle that served the event.
+        timestamp: ISO 8601 time of the event, including a timezone.
+        graph_digest: Digest of the evidence graph after the event was added.
+    """
 
     event_id: str
     input_fingerprint: str
@@ -26,7 +35,12 @@ class InferenceEvidenceLink:
     graph_digest: str
 
     def __post_init__(self) -> None:
-        """Validate immutable inference identity and timestamp evidence."""
+        """Validate the identity fields and the timestamp.
+
+        Raises:
+            ValueError: If a field is not a non-blank string, the timestamp
+                is not ISO 8601, or the timestamp has no timezone.
+        """
         for name in (
             "event_id",
             "input_fingerprint",
@@ -45,7 +59,11 @@ class InferenceEvidenceLink:
             raise ValueError("timestamp must include a timezone")
 
     def to_dict(self) -> dict[str, str]:
-        """Return JSON-native inference linkage evidence."""
+        """Convert the link to a JSON-native record.
+
+        Returns:
+            A dictionary with one string entry per field.
+        """
         return dataclasses.asdict(self)
 
 
@@ -68,6 +86,24 @@ class InferenceEvidenceLinker:
         linker never infers identity from prediction values or mutable logs.
         Repeating the exact event is idempotent; reusing an event ID with any
         changed identity is rejected.
+
+        Args:
+            graph_path: Path of the evidence graph JSON file.
+            event_id: Unique identifier of the inference event.
+            input_fingerprint: Fingerprint of the request input.
+            output_fingerprint: Fingerprint of the produced output.
+            bundle_digest: Digest of the model bundle; it must equal the
+                digest of the graph's `bundle` node.
+            timestamp: ISO 8601 time of the event, including a timezone.
+
+        Returns:
+            The link, carrying the digest of the graph after the event was
+            added.
+
+        Raises:
+            ValueError: If an identity field is blank, the timestamp is
+                invalid or lacks a timezone, the graph has no bundle node,
+                or `bundle_digest` does not match the graph's bundle.
         """
         candidate = InferenceEvidenceLink(
             event_id=event_id,
@@ -128,7 +164,19 @@ class InferenceEvidenceLinker:
 
     @staticmethod
     def load(path: str | pathlib.Path) -> lineage.EvidenceGraph:
-        """Load and validate a persisted evidence graph."""
+        """Load and validate a persisted evidence graph.
+
+        Args:
+            path: Path of the evidence graph JSON file.
+
+        Returns:
+            The graph rebuilt from the file.
+
+        Raises:
+            TypeError: If the file does not hold a JSON object.
+            ValueError: If the stored `graph_digest` does not match the
+                content.
+        """
         record = json.loads(pathlib.Path(path).read_text(encoding="utf-8"))
         if not isinstance(record, Mapping):
             raise TypeError("evidence graph must be a JSON object")
@@ -140,7 +188,16 @@ class InferenceEvidenceLinker:
 
     @staticmethod
     def write_atomically(path: pathlib.Path, record: dict[str, Any]) -> None:
-        """Persist graph JSON with flushed contents and directory metadata."""
+        """Persist graph JSON with flushed contents and directory metadata.
+
+        The record is written to a temporary file in the same directory,
+        synced, and moved over `path`; the temporary file is removed on any
+        failure.
+
+        Args:
+            path: Destination file; missing parent directories are created.
+            record: JSON-serializable graph record.
+        """
         path.parent.mkdir(parents=True, exist_ok=True)
         descriptor, temporary_name = tempfile.mkstemp(
             dir=path.parent, prefix=f".{path.name}.", suffix=".tmp"

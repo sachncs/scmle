@@ -25,13 +25,22 @@ class ColumnMapping:
     strip_whitespace: bool = False
 
     def normalize(self, name: str) -> str:
-        """Applies the matching normalizations to a column name."""
+        """Apply the matching normalizations to a column name.
+
+        Args:
+            name: The column name.
+
+        Returns:
+            The name stripped of surrounding whitespace when
+            `strip_whitespace` is set and lower-cased when `case_insensitive`
+            is set.
+        """
         if self.strip_whitespace:
             name = name.strip()
         return name.lower() if self.case_insensitive else name
 
     def apply(self, frame: pd.DataFrame, expected: list[str]) -> pd.DataFrame:
-        """Renames incoming columns according to the policy.
+        """Rename incoming columns according to the policy.
 
         Args:
             frame: Incoming data (not modified).
@@ -41,8 +50,9 @@ class ColumnMapping:
             A frame whose matching columns carry the expected names.
 
         Raises:
-            SchemaError: If two incoming columns map to the same expected
-                column, or a rename target does not exist in the schema.
+            SchemaError: If a rename target is not an expected column, two
+                incoming columns map to the same expected column, or a
+                mapped name is already a column of the frame.
         """
         unknown = sorted(set(self.renames.values()) - set(expected))
         if unknown:

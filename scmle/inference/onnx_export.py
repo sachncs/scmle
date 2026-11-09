@@ -38,7 +38,14 @@ WRAPPERS = (
 
 
 def load_converter() -> tuple[Any, Any]:
-    """Imports the converter and runtime, or explains how to install them."""
+    """Import the converter and runtime, or explain how to install them.
+
+    Returns:
+        The `skl2onnx` module and the `onnxruntime` module.
+
+    Raises:
+        ArtifactError: If either module cannot be imported.
+    """
     try:
         convert = importlib.import_module("skl2onnx")
         runtime = importlib.import_module("onnxruntime")
@@ -62,7 +69,10 @@ CODES_KEY = "label_codes"
 
 
 def inner_model(step: Any) -> tuple[Any, bool]:
-    """The fitted model inside the framework's model wrappers.
+    """Find the fitted model inside the framework's model wrappers.
+
+    Args:
+        step: A fitted estimator, possibly wrapped.
 
     Returns:
         The innermost estimator and whether it was trained on integer codes
@@ -76,7 +86,10 @@ def inner_model(step: Any) -> tuple[Any, bool]:
 
 
 def register_booster_converters() -> None:
-    """Teaches the converter LightGBM and XGBoost when onnxmltools exists."""
+    """Register LightGBM and XGBoost converters when onnxmltools exists.
+
+    Nothing is registered when any of the needed modules cannot be imported.
+    """
     try:
         registry = importlib.import_module("skl2onnx")
         shapes = importlib.import_module(
@@ -125,7 +138,13 @@ def register_booster_converters() -> None:
 
 
 def unwrap(fitted: Any) -> pipeline.Pipeline:
-    """The fitted scikit-learn pipeline inside the framework's wrappers.
+    """Find the fitted scikit-learn pipeline inside the framework's wrappers.
+
+    Args:
+        fitted: A fitted estimator, possibly wrapped.
+
+    Returns:
+        The pipeline underneath the wrappers.
 
     Raises:
         ArtifactError: If the model is not a plain pipeline underneath.
@@ -143,7 +162,14 @@ def unwrap(fitted: Any) -> pipeline.Pipeline:
 
 
 def is_token_imputer(step: Any) -> bool:
-    """Whether `step` fills missing text with a constant token."""
+    """Check whether `step` fills missing text with a constant token.
+
+    Args:
+        step: A pipeline step.
+
+    Returns:
+        True for a constant-strategy simple imputer with a string fill value.
+    """
     return (
         isinstance(step, impute.SimpleImputer)
         and step.strategy == "constant"
@@ -152,16 +178,30 @@ def is_token_imputer(step: Any) -> bool:
 
 
 def passthrough(step: Any) -> Any:
-    """An identity that stands in for steps done before the graph runs."""
+    """Make an identity that stands in for steps done before the graph runs.
+
+    Args:
+        step: The step being replaced; unused.
+
+    Returns:
+        A fitted identity function transformer.
+    """
     return preprocessing.FunctionTransformer().fit(np.zeros((1, 1)))
 
 
 def without_casts(model: Any) -> Any:
-    """Copy of `model` with its type casts and text imputers made identities.
+    """Copy a model, replacing its type casts and text imputers by identities.
 
     Casting columns to float or string, and filling missing text with the
     missing token, happen before the graph runs (see `feed`), because the
     converter cannot express them.
+
+    Args:
+        model: A fitted pipeline.
+
+    Returns:
+        A deep copy in which every function transformer and constant text
+        imputer is an identity; `model` is not modified.
     """
     clone = copy.deepcopy(model)
     stack: list[Any] = [clone]
@@ -187,7 +227,16 @@ def without_casts(model: Any) -> Any:
 
 
 def input_types(bundle: Any, types: Any) -> list[tuple[str, Any]]:
-    """ONNX input declarations: floats for numeric, strings for categorical."""
+    """Declare the ONNX inputs: floats for numeric, strings for categorical.
+
+    Args:
+        bundle: A bundle whose schema lists the numeric and categorical
+            columns.
+        types: The `skl2onnx.common.data_types` module.
+
+    Returns:
+        One (column name, tensor type) pair per input, numeric columns first.
+    """
     schema = bundle.schema
     return [
         *((c, types.FloatTensorType([None, 1])) for c in schema.numeric),
@@ -196,7 +245,7 @@ def input_types(bundle: Any, types: Any) -> list[tuple[str, Any]]:
 
 
 def export(bundle: Any, path: str | pathlib.Path) -> pathlib.Path:
-    """Writes the bundle's pipeline as an ONNX file.
+    """Write the bundle's pipeline as an ONNX file.
 
     Args:
         bundle: A fitted `ModelBundle`.
@@ -258,7 +307,17 @@ def export(bundle: Any, path: str | pathlib.Path) -> pathlib.Path:
 
 
 def decode(bundle: Any, session: Any, labels: np.ndarray) -> np.ndarray:
-    """Maps integer class codes back to labels when the graph was trained so."""
+    """Map integer class codes back to labels when the graph was trained so.
+
+    Args:
+        bundle: The bundle the graph came from; supplies the class labels.
+        session: The ONNX runtime session of the graph.
+        labels: The graph's label output.
+
+    Returns:
+        The class labels when the graph carries the code marker, else
+        `labels` as an array.
+    """
     meta = session.get_modelmeta().custom_metadata_map
     if meta.get(CODES_KEY) == "1":
         return np.asarray(bundle.classes, dtype=object)[
@@ -268,7 +327,17 @@ def decode(bundle: Any, session: Any, labels: np.ndarray) -> np.ndarray:
 
 
 def feed(bundle: Any, frame: pd.DataFrame) -> dict[str, np.ndarray]:
-    """Inputs for the exported graph from a validated frame."""
+    """Build the exported graph's inputs from a validated frame.
+
+    Args:
+        bundle: The bundle the graph came from.
+        frame: Incoming rows.
+
+    Returns:
+        One column array of shape (rows, 1) per input: float32 for numeric
+        columns and strings for categorical ones, with missing categories
+        replaced by the missing token.
+    """
     prepared = bundle.prepare_frame(frame)
     schema = bundle.schema
     inputs = {
@@ -295,11 +364,19 @@ def verify(
     frame: pd.DataFrame,
     tolerance: float = DEFAULT_TOLERANCE,
 ) -> dict[str, float]:
-    """Compares the exported graph with the in-process pipeline.
+    """Compare the exported graph with the in-process pipeline.
+
+    Args:
+        bundle: The bundle the graph came from.
+        path: The ONNX file.
+        frame: Rows to compare on.
+        tolerance: Largest allowed difference.
 
     Returns:
-        `max_difference` (probabilities or values) and `label_agreement`
-        (share of identical predicted labels, 1.0 for regression).
+        `max_difference` (largest absolute probability difference, or for
+        regression the largest absolute difference relative to the larger of
+        the largest absolute value and 1) and `label_agreement` (share of
+        identical predicted labels, 1.0 for regression).
 
     Raises:
         ArtifactError: If the difference exceeds `tolerance`.
@@ -336,7 +413,7 @@ class OnnxScorer:
     """Scores frames with an exported graph, without the framework pipeline."""
 
     def __init__(self, bundle: Any, path: str | pathlib.Path) -> None:
-        """Opens the graph.
+        """Open the graph.
 
         Args:
             bundle: The bundle the graph was exported from (for its schema).
@@ -347,10 +424,24 @@ class OnnxScorer:
         self.session = runtime.InferenceSession(str(path))
 
     def predict(self, frame: pd.DataFrame) -> np.ndarray:
-        """Labels or values."""
+        """Predict labels or values.
+
+        Args:
+            frame: Incoming rows.
+
+        Returns:
+            A one-dimensional array of labels or values.
+        """
         outputs = self.session.run(None, feed(self.bundle, frame))
         return decode(self.bundle, self.session, outputs[0]).ravel()
 
     def predict_proba(self, frame: pd.DataFrame) -> np.ndarray:
-        """Class probabilities."""
+        """Predict class probabilities.
+
+        Args:
+            frame: Incoming rows.
+
+        Returns:
+            An array of shape (rows, classes).
+        """
         return np.asarray(self.session.run(None, feed(self.bundle, frame))[1])

@@ -34,7 +34,18 @@ MISSING_CATEGORY = "__missing__"
 
 
 def read_json(path: str | pathlib.Path) -> dict[str, Any]:
-    """Reads a JSON object from `path`."""
+    """Read a JSON object from `path`.
+
+    Args:
+        path: The JSON file.
+
+    Returns:
+        The parsed top-level object.
+
+    Raises:
+        ArtifactError: If the file cannot be read or decoded, or does not
+            hold a JSON object.
+    """
     try:
         record = json.loads(pathlib.Path(path).read_text(encoding="utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as error:
@@ -46,13 +57,24 @@ def read_json(path: str | pathlib.Path) -> dict[str, Any]:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Tolerance:
-    """How closely one environment must match the reference."""
+    """How closely one environment must match the reference.
+
+    Attributes:
+        probability_abs: Largest allowed absolute difference in the class-1
+            probability, in [0, 1).
+        label: Label comparison mode; only "exact" is supported.
+    """
 
     probability_abs: float
     label: str = "exact"
 
     def __post_init__(self) -> None:
-        """Validates the tolerance."""
+        """Validate the tolerance.
+
+        Raises:
+            ConfigError: If `label` is not "exact" or `probability_abs` is
+                outside [0, 1).
+        """
         if self.label != "exact":
             raise errors.ConfigError("labels are compared exactly")
         if not (0 <= self.probability_abs < 1):
@@ -61,7 +83,14 @@ class Tolerance:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class GoldenSet:
-    """Reference model, records, expected outputs and declared tolerances."""
+    """Reference model, records and declared tolerances.
+
+    Attributes:
+        spec: The hand-written model specification.
+        records: The input records.
+        same_process: Tolerance for a comparison within one process.
+        cross_environment: Tolerance for a comparison across environments.
+    """
 
     spec: dict[str, Any]
     records: list[dict[str, Any]]
@@ -71,7 +100,16 @@ class GoldenSet:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class ParityReport:
-    """The outcome of one comparison."""
+    """The outcome of one comparison.
+
+    Attributes:
+        passed: Whether labels and probabilities were all within tolerance.
+        records: Number of expected records.
+        max_probability_error: Largest absolute class-1 probability
+            difference; infinite when the output count was wrong.
+        tolerance: The probability tolerance applied.
+        mismatches: Description of each difference found.
+    """
 
     passed: bool
     records: int
@@ -80,7 +118,12 @@ class ParityReport:
     mismatches: tuple[str, ...]
 
     def to_dict(self) -> dict[str, Any]:
-        """Returns a JSON-compatible record."""
+        """Convert the report to a JSON-compatible record.
+
+        Returns:
+            A dictionary with one entry per attribute; the mismatches are a
+            list.
+        """
         return {
             "passed": self.passed,
             "records": self.records,
@@ -91,7 +134,16 @@ class ParityReport:
 
 
 def load_golden(directory: str | pathlib.Path) -> GoldenSet:
-    """Loads the golden files from `directory`."""
+    """Load the golden files from `directory`.
+
+    Args:
+        directory: Folder with `tolerances.json`, `model_spec.json` and
+            `records.json`.
+
+    Returns:
+        The golden set. A file that cannot be read or is not a JSON object
+        makes `read_json` raise `ArtifactError`.
+    """
     root = pathlib.Path(directory)
     tolerances = read_json(root / "tolerances.json")
     return GoldenSet(
@@ -103,22 +155,47 @@ def load_golden(directory: str | pathlib.Path) -> GoldenSet:
 
 
 def to_float(frame: Any) -> Any:
-    """Casts a frame to float; a named function so the pipeline can pickle."""
+    """Cast a frame to float; a named function so the pipeline can pickle.
+
+    Args:
+        frame: Array-like data.
+
+    Returns:
+        A data frame of floats, NaN where a value is not numeric.
+    """
     return pd.DataFrame(frame).apply(pd.to_numeric, errors="coerce")
 
 
 def to_object(frame: Any) -> Any:
-    """Casts a frame to object; a named function so the pipeline can pickle."""
+    """Cast a frame to object; a named function so the pipeline can pickle.
+
+    Args:
+        frame: Array-like data.
+
+    Returns:
+        A data frame with object dtype.
+    """
     return pd.DataFrame(frame).astype(object)
 
 
 def reference_bundle(spec: dict[str, Any]) -> bundle_module.ModelBundle:
-    """Builds the hand-written model as a bundle.
+    """Build the hand-written model as a bundle.
 
     The pipeline has the structure of a trained one (median imputation,
     scaling, one-hot encoding, logistic regression). It is fitted on two rows
     only to create its objects; every learned number is then overwritten with
     the value from `spec`.
+
+    Args:
+        spec: The model specification: columns, categories, medians, means,
+            scales, coefficients, intercept, classes, target and model
+            name and version.
+
+    Returns:
+        The bundle holding the hand-written pipeline.
+
+    Raises:
+        ArtifactError: If the reference categories are not sorted.
     """
     numeric = list(spec["numeric"])
     categorical = list(spec["categorical"])
@@ -204,7 +281,17 @@ def reference_bundle(spec: dict[str, Any]) -> bundle_module.ModelBundle:
 def expected_outputs(
     spec: dict[str, Any], records: list[dict[str, Any]]
 ) -> dict[str, Any]:
-    """Computes labels and probabilities in closed form with numpy only."""
+    """Compute labels and probabilities in closed form with numpy only.
+
+    Args:
+        spec: The model specification.
+        records: Input records; a missing numeric value is replaced by the
+            median, and an unknown category adds nothing.
+
+    Returns:
+        The `classes`, the predicted `labels` (1 when the probability
+        exceeds 0.5) and the `probability_of_class_1` per record.
+    """
     numeric = list(spec["numeric"])
     category_name = spec["categorical"][0]
     categories = sorted(spec["categories"])
@@ -233,7 +320,19 @@ def compare(
     probabilities: list[list[float]],
     tolerance: Tolerance,
 ) -> ParityReport:
-    """Compares a serving path's outputs with the expected ones."""
+    """Compare a serving path's outputs with the expected ones.
+
+    Args:
+        expected: Output of `expected_outputs`.
+        predictions: Labels returned by the serving path.
+        probabilities: Class probabilities per record, with class 1 in
+            column 1.
+        tolerance: The tolerance to apply.
+
+    Returns:
+        The report; failed with an infinite error if the output count
+        differs from the expected one.
+    """
     mismatches = []
     count = len(expected["labels"])
     if len(predictions) != count or len(probabilities) != count:
@@ -270,7 +369,7 @@ def check_remote(
     level: str = "cross_environment",
     timeout: float = 30.0,
 ) -> dict[str, Any]:
-    """Sends the golden records to a running service and compares.
+    """Send the golden records to a running service and compare.
 
     Args:
         url: Base URL of the service.
@@ -279,9 +378,11 @@ def check_remote(
         timeout: Seconds to wait for the answer.
 
     Returns:
-        The parity report as a dictionary, plus the model version and
-        artifact digest the service answered with. It fails when the
-        response lacks any field of response schema version 1.
+        The parity report as a dictionary, plus the model version, artifact
+        digest and level. The report is marked failed when the response
+        lacks any key in `serving_contract.RESPONSE_KEYS`. On an HTTP error
+        status only `passed` (False) and `mismatches` are returned. An
+        unreadable golden file raises `ArtifactError` from `read_json`.
     """
     root = pathlib.Path(directory)
     golden = load_golden(root)

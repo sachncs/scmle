@@ -160,7 +160,14 @@ environment the model was built in; `sbom.cdx.json` is the CycloneDX SBOM;
 
 
 def lock_roots(info: Any) -> list[str]:
-    """Distributions the service needs, by name."""
+    """List the distributions the service needs, by name.
+
+    Args:
+        info: The bundle information; its `libraries` are included.
+
+    Returns:
+        `scmle`, `scikit-learn`, `pandas` and the bundle's libraries.
+    """
     return ["scmle", "scikit-learn", "pandas", *info.libraries]
 
 
@@ -170,7 +177,7 @@ def write_service(
     scmle_pin: str | None = None,
     signing_key: str | bytes | None = None,
 ) -> pathlib.Path:
-    """Writes a deployable service folder for `bundle`.
+    """Write a deployable service folder for `bundle`.
 
     Args:
         bundle: A `ModelBundle`.
@@ -296,5 +303,10 @@ def write_service(
 
 
 def write_text(path: pathlib.Path, text: str) -> None:
-    """Writes UTF-8 text with Unix newlines."""
+    """Write UTF-8 text with Unix newlines.
+
+    Args:
+        path: The file to write.
+        text: The content.
+    """
     path.write_text(text, encoding="utf-8", newline="\n")
