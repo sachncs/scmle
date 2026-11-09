@@ -29,8 +29,8 @@ CQR conditional coverage in the highest-noise decile and the slice flag's
 familywise false-flag rate. Gates that need outside data or tools have not
 run and are listed under `not_measured` in the file.
 
-These complement, and do not replace, `tests/leakage`, the mutation gate and
-the operational rehearsal ([`OPERATIONS_REHEARSAL.md`](OPERATIONS_REHEARSAL.md)).
+These complement, and do not replace, `tests/leakage`, the mutation gate (a manual workflow, not run on every
+push) and the operational rehearsal ([`OPERATIONS_REHEARSAL.md`](OPERATIONS_REHEARSAL.md)).
 Reproduce the accuracy tables with the commands in
 [`benchmarks/README.md`](../benchmarks/README.md).
 

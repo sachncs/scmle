@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+* Removed the planning and audit documents (`plan/`, `product/` and
+  `plan.md`) and the two local audit files, none of which are part of the
+  package.
+* The mutation gate no longer runs in CI. It was part of the nightly full
+  suite; its scope is about 42,000 mutants, more than six hours on one hosted
+  runner, so it could not finish inside the time limit even when split into
+  four jobs. It is now the manual `mutation` workflow (Actions, Run workflow)
+  and `uv run mutmut run` locally. The last partial run (32,010 of 41,746
+  mutants) killed 78.6 percent of the scored mutants, above the 70 percent
+  floor. The floor is not enforced on every push or night; run the workflow
+  before a release. Also, `setup.cfg` listed `scmle/data/charter/rules.py`
+  twice, which mutmut rejects; and 28 tests that check certificate currency
+  are skipped while mutmut has rewritten the hashed sources.
 * Removed the cloud infrastructure and everything built on it, to focus on the
   package. Gone: the Terraform for AWS and GCP and its reader, policy check and
   orphan finder; the ECS and Cloud Run runtime adapters and `scmle deploy
