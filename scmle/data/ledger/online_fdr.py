@@ -312,7 +312,14 @@ def exact_alpha(value: Any, name: str) -> Fraction:
 
 
 class OnlineRule(abc.ABC):
-    """Base class: a level function plus a decision and wealth bookkeeping."""
+    """Base class: a level function plus a decision and wealth bookkeeping.
+
+    Attributes:
+        name: The rule's name.
+        guarantee: What the rule promises and under which assumptions.
+        alpha: Target FDR level, as an exact fraction.
+        discount: The discount sequence.
+    """
 
     name: ClassVar[str]
     guarantee: ClassVar[Guarantee]
