@@ -22,9 +22,8 @@ from scmle.experimentation import stores
 from scmle.features import feature_graph
 from scmle.inference import serving
 from scmle.intelligence import planner
+from scmle.models import registry
 from scmle.models import thresholds
-from scmle.models.boosting import boosters
-from scmle.models.sklearn import classical
 from scmle.monitoring import monitor
 from scmle.optimization import optimizers
 from scmle.sampling import resampling
@@ -89,13 +88,14 @@ def test_every_concrete_component_implements_its_abstract_interface(
 
 
 def test_every_model_adapter_declares_complete_metadata():
-    adapters = classical.BUILTIN_ADAPTERS + boosters.BOOSTING_ADAPTERS
+    adapters = registry.Catalog.with_builtins(include_user=False).adapters
+    assert len(adapters) >= 40
     names = set()
-    for cls in adapters:
-        assert not inspect.isabstract(cls)
-        assert cls.name and cls.family and cls.capabilities.tasks
-        assert cls.name not in names
-        names.add(cls.name)
+    for adapter in adapters.values():
+        assert not inspect.isabstract(type(adapter))
+        assert adapter.name and adapter.family and adapter.capabilities.tasks
+        assert adapter.name not in names
+        names.add(adapter.name)
 
 
 def test_strategy_registry_entries_are_self_describing():
