@@ -105,7 +105,9 @@ class MissingnessAdvice(Advisor):
     """Flags columns that are mostly missing."""
 
     def advise(
-        self, profile: data.DatasetProfile, spec: tasks.Config
+        self,
+        profile: data.DatasetProfile,
+        spec: tasks.Config,  # noqa: ARG002 -- Advisor.advise interface
     ) -> list[Recommendation]:
         """Advises on heavy missingness.
 
@@ -217,7 +219,9 @@ class SmallDataAdvice(Advisor):
     """Warns that estimates from few rows are noisy."""
 
     def advise(
-        self, profile: data.DatasetProfile, spec: tasks.Config
+        self,
+        profile: data.DatasetProfile,
+        spec: tasks.Config,  # noqa: ARG002 -- Advisor.advise interface
     ) -> list[Recommendation]:
         """Advises on small development sets.
 
