@@ -109,14 +109,52 @@ src = ["."]
 extend-exclude = ["mutants", "website"]
 
 [tool.ruff.lint]
-select = ["E", "W", "F", "I", "UP", "B", "N", "D", "DOC", "ANN", "SIM", "RUF", "C4", "SLF"]
-ignore = ["ANN401", "RUF012"]
-# DOC (documented arguments, returns and raises) and D421 are preview rules;
-# only the rules named in `select` are switched on, not all preview behaviour
+# Every rule, plus the preview rule DOC (documented arguments, returns and
+# raises). `preview = true` with `explicit-preview-rules = true` switches on only
+# the preview rules named here, not all preview behaviour.
+select = ["ALL", "DOC"]
+ignore = [
+    # The formatter and the Google docstring convention settle these.
+    "COM812",
+    "ISC001",
+    "D203",
+    "D213",
+    # No copyright header in every file.
+    "CPY001",
+    # It would force `import numpy as np`; import aliases are forbidden
+    # (tests/unit/test_conventions.py).
+    "ICN001",
+    # They would force a new exception class per message and a `msg = ...` line
+    # before each `raise`; the package already has about 85 exception classes.
+    "TRY003",
+    "EM101",
+    "EM102",
+    # Boolean positional parameters and too many arguments: fixing either
+    # changes public signatures that the API snapshot pins. Known debt.
+    "FBT001",
+    "FBT002",
+    "PLR0913",
+    "PLR0917",
+    # Explicit `Any`, kept to describe values that really are arbitrary.
+    "ANN401",
+    # Mutable class defaults, ignored before this configuration.
+    "RUF012",
+    # It asks for TypeError where the code raises ValueError for a type check;
+    # changing the exception type breaks callers that catch the current one.
+    "TRY004",
+]
 preview = true
 explicit-preview-rules = true
 # underscore names are banned by tests/unit/test_conventions.py
 dummy-variable-rgx = "^(_\\w*|ignored)$"
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.pylint]
+max-branches = 12
+max-statements = 50
+max-returns = 6
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
@@ -129,8 +167,16 @@ case-sensitive = false
 order-by-type = false
 
 [tool.ruff.lint.per-file-ignores]
-# tests are documented by their names and bodies, not by Args and Returns
-"tests/**" = ["D", "DOC", "ANN", "E501", "SLF"]
+# Tests assert, use magic values, are documented by their names, and import
+# inside functions to test lazy imports.
+"tests/**" = ["S", "PLR", "D", "DOC", "ANN", "INP001", "PLC0415", "ARG", "FBT", "PT011", "PT018", "E501", "SLF", "T201", "C901", "TRY", "EM", "PD901"]
+# The command line tool and the demo print: printing is their output.
+"scmle/cli.py" = ["T201"]
+"scmle/deploy/demo.py" = ["T201"]
+# Command-line tools and benchmark scripts print and are not packages.
+"scripts/**" = ["T201", "INP001", "S", "PLC0415"]
+"benchmarks/**" = ["T201", "INP001", "S", "PLC0415"]
+"examples/**" = ["T201", "INP001", "S", "D", "DOC", "ANN"]
 
 [tool.ruff.format]
 quote-style = "double"
