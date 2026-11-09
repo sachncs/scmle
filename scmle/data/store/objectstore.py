@@ -113,7 +113,12 @@ def check_key(key: str) -> str:
             characters, or a segment is empty, `.`, `..` or uses a character
             outside the allowed set.
     """
-    if not isinstance(key, str) or not key or len(key) > MAX_KEY_LENGTH:
+    candidate: object = key
+    if (
+        not isinstance(candidate, str)
+        or not candidate
+        or len(candidate) > MAX_KEY_LENGTH
+    ):
         raise StoreError("a key must be a non-empty string of at most 1024")
     for segment in key.split("/"):
         if segment in ("", ".", "..") or KEY_PATTERN.fullmatch(segment) is None:
