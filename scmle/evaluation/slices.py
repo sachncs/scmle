@@ -79,7 +79,17 @@ class SliceReport(diagnostics.Diagnostic):
     def assignments(
         self, inputs: diagnostics.DiagnosticInput
     ) -> list[tuple[str, pd.Series]]:
-        """Slice labels for each feature used to slice the data."""
+        """Slice labels for each feature used to slice the data.
+
+        Args:
+            inputs: The fitted candidate, evaluation data and feature plan.
+
+        Returns:
+            Up to `MAX_FEATURES` pairs of feature name and a slice label per
+            row: the level for a categorical feature with at most
+            `MAX_LEVELS` levels, or a quantile band for a numeric feature
+            (not used for rank-based metrics).
+        """
         plan = inputs.feature_plan
         found: list[tuple[str, pd.Series]] = []
         for column in plan.categorical:
@@ -99,7 +109,17 @@ class SliceReport(diagnostics.Diagnostic):
     def slice_score(
         self, inputs: diagnostics.DiagnosticInput, rows: np.ndarray
     ) -> float | None:
-        """Scores one slice, or None when it cannot be scored reliably."""
+        """Scores one slice, or None when it cannot be scored reliably.
+
+        Args:
+            inputs: The fitted candidate and evaluation data.
+            rows: Boolean mask selecting the slice's rows.
+
+        Returns:
+            The metric on the slice, or None when it has fewer than
+            `MIN_SUPPORT` rows, a classification slice holds one class, or
+            the metric cannot be computed.
+        """
         if rows.sum() < MIN_SUPPORT:
             return None
         target = inputs.target[rows]

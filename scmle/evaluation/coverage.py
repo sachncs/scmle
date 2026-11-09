@@ -4,7 +4,7 @@ A conformal theorem says what coverage to expect under exchangeability. What
 this module reports is what was measured on rows the calibration never saw:
 the Clopper-Pearson interval of the covered share, the same by slice with a
 Holm correction over the slice family fixed beforehand, and the tier the
-measurement earns (canon P4). Conditional coverage is measured, never
+measurement earns. Conditional coverage is measured, never
 promised; only class-conditional sets carry a within-class construction.
 
 The slice flag changes a decision, so its false-flag rate and its recall by
@@ -67,7 +67,15 @@ def clopper_pearson(
 
 
 def holm_rejections(p_values: Sequence[float], alpha: float) -> list[bool]:
-    """Holm step-down: which hypotheses are rejected at familywise `alpha`."""
+    """Holm step-down: which hypotheses are rejected at familywise `alpha`.
+
+    Args:
+        p_values: One p-value per hypothesis.
+        alpha: Familywise error rate, in (0, 1).
+
+    Returns:
+        One flag per hypothesis, in input order: True if it is rejected.
+    """
     count = len(p_values)
     order = np.argsort(np.asarray(p_values, dtype=float), kind="stable")
     rejected = [False] * count
@@ -84,6 +92,15 @@ def undercoverage_p_value(covered: int, rows: int, nominal: float) -> float:
 
     The null is that each row is covered with probability at least
     `nominal`; a small value says the interval or set under-covers.
+
+    Args:
+        covered: Number of rows inside their interval or set.
+        rows: Number of rows scored.
+        nominal: The requested coverage.
+
+    Returns:
+        The probability of at most `covered` hits in `rows` trials at rate
+        `nominal`; 1.0 when `rows` is zero.
     """
     if rows == 0:
         return 1.0
@@ -206,7 +223,7 @@ def slice_flag(
 
     `slice_coverage` compares each slice with the nominal level itself, but
     the conformal quantile varies with the calibration sample, so the slice
-    coverages move together and that test flags too often (G5). Here each
+    coverages move together and that test flags too often. Here each
     slice of at least `min_rows` rows is tested against `nominal - margin`
     (one-sided exact binomial, "coverage is at least that"), the margin fixed
     in advance, and Holm at `familywise` is applied over the whole family. A
@@ -261,7 +278,18 @@ def class_coverage(
     nominal: float = 0.9,
     level: float = 0.95,
 ) -> dict[str, dict[str, Any]]:
-    """Coverage within each true class (for class-conditional sets)."""
+    """Coverage within each true class (for class-conditional sets).
+
+    Args:
+        covered: Boolean array, one entry per scored row.
+        true_labels: True class of each row.
+        nominal: The requested coverage.
+        level: Confidence level of each interval.
+
+    Returns:
+        For each class (as text, sorted), the `coverage_summary` of its
+        rows, with zero tolerance and no widths.
+    """
     flags = np.asarray(covered, dtype=bool)
     names = np.asarray([str(label) for label in true_labels])
     return {
@@ -275,7 +303,7 @@ def coverage_tier(
     attested_exchangeable: bool = False,
     clean_holdout: bool = True,
 ) -> str:
-    """Tier of a coverage claim (canon P4).
+    """Tier of a coverage claim.
 
     `confirmed` needs a clean held-out measurement whose lower limit reaches
     `nominal - tolerance`; the theorem's assumption is then not what is
@@ -283,6 +311,15 @@ def coverage_tier(
     the data are exchangeable with deployment gives `attested`; a measured
     shortfall is never overridden by an attestation. Anything else is
     `unverified`.
+
+    Args:
+        summary: A `coverage_summary` result.
+        attested_exchangeable: Whether a named person attests that the data
+            are exchangeable with deployment.
+        clean_holdout: Whether the measurement comes from untouched data.
+
+    Returns:
+        One of `confirmed`, `attested` and `unverified`.
     """
     measured = bool(clean_holdout and summary.get("rows", 0) > 0)
     if measured and summary.get("meets_nominal"):
@@ -313,6 +350,10 @@ def coverage_report(
         tolerance: Charter tolerance below nominal (default 0.02).
         attested_exchangeable: A named person attests exchangeability.
         clean_holdout: Whether `covered` comes from untouched data.
+
+    Returns:
+        The marginal summary and the coverage tier, plus `by_slice` when
+        `labels` is given and `by_class` when `true_classes` is given.
     """
     summary = coverage_summary(covered, widths, nominal, tolerance)
     report: dict[str, Any] = {

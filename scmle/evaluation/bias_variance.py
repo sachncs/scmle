@@ -84,7 +84,11 @@ class Decomposition:
     advice: str
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Returns the JSON-ready record.
+
+        Returns:
+            A mapping of every field of the decomposition.
+        """
         return dataclasses.asdict(self)
 
 
@@ -100,8 +104,15 @@ def noise_floor(
     `e = 2b(1-b)` (Cover and Hart). Only numeric columns are used; with high
     dimension the estimate is biased upward, so treat it as a rough guide.
 
+    Args:
+        features: Candidate feature columns; only numeric ones are used.
+        target: Target aligned with `features`.
+        classification: Whether the target is a class label.
+
     Returns:
-        The estimate, or None when there are no numeric features.
+        The estimated noise (the Bayes error for classes, the noise variance
+        otherwise), or None when there are no numeric features or fewer than
+        `MIN_NOISE_ROWS` rows.
     """
     numeric = features.select_dtypes("number")
     if numeric.shape[1] == 0 or len(numeric) < MIN_NOISE_ROWS:
@@ -120,7 +131,17 @@ def noise_floor(
 
 
 def verdict_of(variance: float, bias: float) -> str:
-    """Names the dominant source of error."""
+    """Names the dominant source of error.
+
+    Args:
+        variance: The variance term.
+        bias: The reducible bias term.
+
+    Returns:
+        `variance-dominated` when variance is at least `VARIANCE_DOMINATED`
+        of their sum, `bias-dominated` when at most `BIAS_DOMINATED`,
+        otherwise `balanced` (also when the sum is not positive).
+    """
     share = variance / (variance + bias) if variance + bias > 0 else 0.5
     if share >= VARIANCE_DOMINATED:
         return "variance-dominated"
@@ -137,7 +158,20 @@ def collect(
     seed: int,
     should_stop: Callable[[], bool],
 ) -> list[list[Any]] | None:
-    """Out-of-bag predictions per row from bootstrap refits."""
+    """Out-of-bag predictions per row from bootstrap refits.
+
+    Args:
+        build: Creates a fresh unfitted estimator.
+        features: Development rows.
+        target: Target aligned with `features`.
+        replicates: Number of bootstrap refits.
+        seed: Seed of the resampling.
+        should_stop: Polled before each refit; True ends the work.
+
+    Returns:
+        For each row, the predictions made by the refits that did not train
+        on it, or None when `should_stop` returned True.
+    """
     rows = len(features)
     predictions: list[list[Any]] = [[] for position in range(rows)]
     for draw in range(replicates):
@@ -164,6 +198,15 @@ def decompose(
     should_stop: Callable[[], bool] = lambda: False,
 ) -> Decomposition | None:
     """Estimates bias and variance of a model on the given rows.
+
+    Args:
+        build: Creates a fresh unfitted estimator.
+        features: Development rows.
+        target: Target aligned with `features`.
+        classification: Whether to use 0-1 error rather than squared error.
+        replicates: Number of bootstrap refits.
+        seed: Seed of the resampling.
+        should_stop: Polled before each refit; True ends the work.
 
     Returns:
         The decomposition, or None when time ran out or too few rows were

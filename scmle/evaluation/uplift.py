@@ -34,6 +34,11 @@ def qini_curve(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Cumulative incremental outcome along the uplift ranking.
 
+    Args:
+        outcome: Observed outcome of each row.
+        treatment: 1 where the row was treated, 0 for control.
+        score: Predicted uplift of each row; higher ranks earlier.
+
     Returns:
         The number of rows walked and the incremental outcome there:
         treated outcomes minus control outcomes rescaled to the treated
@@ -57,6 +62,14 @@ def qini_coefficient(
 
     Normalized by the number of rows, so it is in outcome units; larger is
     better and a random ranking scores about zero.
+
+    Args:
+        outcome: Observed outcome of each row.
+        treatment: 1 where the row was treated, 0 for control.
+        score: Predicted uplift of each row; higher ranks earlier.
+
+    Returns:
+        The coefficient, or NaN with fewer than two rows.
     """
     rows, curve = qini_curve(outcome, treatment, score)
     if len(rows) < 2:
@@ -71,7 +84,18 @@ def uplift_at(
     score: np.ndarray,
     share: float = TOP_SHARE,
 ) -> float:
-    """Treated-minus-control outcome rate in the top `share` of the ranking."""
+    """Treated-minus-control outcome rate in the top `share` of the ranking.
+
+    Args:
+        outcome: Observed outcome of each row.
+        treatment: 1 where the row was treated, 0 for control.
+        score: Predicted uplift of each row; higher ranks earlier.
+        share: Fraction of rows, by rank, that counts as the top.
+
+    Returns:
+        The mean outcome of the treated minus that of the controls among the
+        top rows (at least one row); NaN if either arm is absent there.
+    """
     count = max(int(len(score) * share), 1)
     top = np.argsort(-np.asarray(score, dtype=float), kind="stable")[:count]
     y = np.asarray(outcome, dtype=float)[top]
@@ -82,7 +106,15 @@ def uplift_at(
 
 
 def average_effect(outcome: np.ndarray, treatment: np.ndarray) -> float:
-    """Overall treated-minus-control difference in the outcome."""
+    """Overall treated-minus-control difference in the outcome.
+
+    Args:
+        outcome: Observed outcome of each row.
+        treatment: 1 where the row was treated, 0 for control.
+
+    Returns:
+        The mean outcome of the treated minus that of the controls.
+    """
     y = np.asarray(outcome, dtype=float)
     t = np.asarray(treatment).astype(int)
     return float(y[t == 1].mean() - y[t == 0].mean())
@@ -111,14 +143,29 @@ class Propensity:
     balance_p_value: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Returns the JSON-ready record.
+
+        Returns:
+            A mapping of the fields.
+        """
         return dataclasses.asdict(self)
 
 
 def check_propensity(
     features: pd.DataFrame, treatment: np.ndarray, seed: int = 0
 ) -> Propensity:
-    """Judges from the covariates whether treatment looks randomized."""
+    """Judges from the covariates whether treatment looks randomized.
+
+    Args:
+        features: Covariates of each row.
+        treatment: 1 where the row was treated, 0 for control.
+        seed: Seed of the cross-validation and the permutation test.
+
+    Returns:
+        The treated share, the cross-validated AUC, the verdict and a note.
+        An arm with under `MIN_ARM_SHARE` of the rows gives a NaN AUC and
+        not randomized; no numeric covariates gives AUC 0.5 and randomized.
+    """
     arm = np.asarray(treatment).astype(int)
     share = float(arm.mean())
     if share < MIN_ARM_SHARE or share > 1 - MIN_ARM_SHARE:
@@ -172,11 +219,25 @@ class UpliftMetric(metric_contracts.Metric):
     kind: str = "qini"
 
     def accepts_weights(self) -> bool:
-        """These scores are unweighted."""
+        """These scores are unweighted.
+
+        Returns:
+            Always False.
+        """
         return False
 
     def scorer(self, positive: Any = None) -> Any:
-        """Builds a scorer `(estimator, features, outcome)`."""
+        """Builds a scorer `(estimator, features, outcome)`.
+
+        Args:
+            positive: Unused; there is no positive class.
+
+        Returns:
+            A function returning the Qini coefficient (`qini`) or the
+            uplift in the top share (otherwise) of the estimator's
+            predictions. The treatment indicator is read from the
+            estimator's `treatment_column`; sample weights are ignored.
+        """
         kind = self.kind
 
         def score(

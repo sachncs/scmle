@@ -12,10 +12,9 @@ number of floored weights is returned, never hidden.
 `truncated_concordance` is the IPCW concordance of Uno et al. (2011),
 truncated at a horizon `tau` that the charter must fix: statistics cannot
 choose it. The estimator's form here is written from memory of that paper and
-is checked by simulation (`uncertainty_certify.py`, gate G11(i)) and against
-the Harrell index when nothing is censored, not against a reference
-implementation; a differential test against scikit-survival needs that
-package and the reference outputs, and has not been run.
+is checked by simulation and against the Harrell index when nothing is
+censored, not against a reference implementation; it has not been compared
+with scikit-survival.
 """
 
 from collections.abc import Callable
@@ -65,8 +64,14 @@ def censoring_weights(
         floor: Lower bound on the censoring survival probability.
         penalty: Ridge strength of the Cox censoring model.
 
+    Returns:
+        The weights `1 / max(G, floor)` per row, the floor, the number of
+        floored rows, whether covariates were used, and the function giving
+        `G` at another time for chosen rows.
+
     Raises:
-        ValueError: On a bad floor or mismatched lengths.
+        ValueError: If `floor` is not strictly between 0 and 1, or
+            `duration`, `event` and `features` differ in length.
     """
     if not 0.0 < floor < 1.0:
         raise ValueError("floor must lie strictly between 0 and 1")

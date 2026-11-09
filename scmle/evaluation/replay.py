@@ -26,17 +26,40 @@ class PredictionReplay(base.BaseEstimator):
         probabilities: np.ndarray | None = None,
         classes: np.ndarray | None = None,
     ) -> None:
-        """Stores the arrays."""
+        """Stores the arrays.
+
+        Args:
+            predictions: Predicted labels or values for the whole set.
+            probabilities: Class probabilities, if the model has them.
+            classes: Class labels, if any.
+        """
         self.predictions = predictions
         self.probabilities = probabilities
         self.classes_ = classes
 
     def predict(self, features: Any) -> np.ndarray:
-        """The stored predictions."""
+        """Returns the stored predictions.
+
+        Args:
+            features: Ignored.
+
+        Returns:
+            The predictions given at construction.
+        """
         return self.predictions
 
     def predict_proba(self, features: Any) -> np.ndarray:
-        """The stored probabilities."""
+        """Returns the stored probabilities.
+
+        Args:
+            features: Ignored.
+
+        Returns:
+            The probabilities given at construction.
+
+        Raises:
+            ValueError: If no probabilities were stored.
+        """
         if self.probabilities is None:
             raise ValueError("no probabilities were stored")
         return self.probabilities

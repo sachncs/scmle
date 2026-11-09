@@ -47,14 +47,32 @@ class Mitigation:
     reason: str
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Returns the JSON-ready record.
+
+        Returns:
+            A mapping of every field of the mitigation.
+        """
         return dataclasses.asdict(self)
 
 
 def rates(
     groups: pd.Series, flagged: np.ndarray, actual: np.ndarray, criterion: str
 ) -> dict[str, float]:
-    """Per-group selection rate or true-positive rate."""
+    """Per-group selection rate or true-positive rate.
+
+    Args:
+        groups: Group name per row.
+        flagged: True where the row is selected by the rule.
+        actual: True where the label is the positive class.
+        criterion: `demographic_parity` (selection rate) or any other value
+            for the true-positive rate.
+
+    Returns:
+        Group name to rate. Groups with fewer than
+        `thresholds.MIN_GROUP_ROWS` rows are left out, and so are groups
+        with fewer than `MIN_POSITIVES` positives under the true-positive
+        rate.
+    """
     found = {}
     for level in groups.dropna().unique():
         rows = (groups == level).to_numpy()
@@ -72,7 +90,18 @@ def rates(
 def gap(
     groups: pd.Series, flagged: np.ndarray, actual: np.ndarray, criterion: str
 ) -> float:
-    """Largest between-group difference in the criterion's rate."""
+    """Largest between-group difference in the criterion's rate.
+
+    Args:
+        groups: Group name per row.
+        flagged: True where the row is selected by the rule.
+        actual: True where the label is the positive class.
+        criterion: `demographic_parity` or `equal_opportunity`.
+
+    Returns:
+        The largest rate minus the smallest, or 0.0 when fewer than two
+        groups have a rate.
+    """
     found = list(rates(groups, flagged, actual, criterion).values())
     return float(max(found) - min(found)) if len(found) > 1 else 0.0
 
@@ -84,7 +113,19 @@ def group_cuts(
     criterion: str,
     base: float,
 ) -> dict[str, float]:
-    """Threshold per group that matches the overall rate at `base`."""
+    """Threshold per group that matches the overall rate at `base`.
+
+    Args:
+        probabilities: Positive-class probabilities.
+        groups: Group name per row.
+        actual: True where the label is the positive class.
+        criterion: `demographic_parity` or `equal_opportunity`.
+        base: The single threshold whose overall rate is matched.
+
+    Returns:
+        Group name to threshold, clipped to [0, 1]. Groups too small for the
+        criterion are left out.
+    """
     flagged = probabilities >= base
     if criterion == "demographic_parity":
         target = float(flagged.mean())

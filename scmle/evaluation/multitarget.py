@@ -11,38 +11,87 @@ from scmle.contracts import metrics as metric_contracts
 
 
 def f1_macro_labels(truth: np.ndarray, guess: np.ndarray) -> float:
-    """F1 averaged over labels, each label counting equally."""
+    """F-measure averaged over labels, each label counting equally.
+
+    Args:
+        truth: Observed 0/1 label matrix, `(rows, labels)`.
+        guess: Predicted 0/1 label matrix, same shape.
+
+    Returns:
+        The macro-averaged F-measure; undefined cases count as 0.
+    """
     return float(
         sk_metrics.f1_score(truth, guess, average="macro", zero_division=0)
     )
 
 
 def f1_micro_labels(truth: np.ndarray, guess: np.ndarray) -> float:
-    """F1 over all label decisions pooled."""
+    """F-measure over all label decisions pooled.
+
+    Args:
+        truth: Observed 0/1 label matrix, `(rows, labels)`.
+        guess: Predicted 0/1 label matrix, same shape.
+
+    Returns:
+        The micro-averaged F-measure; undefined cases count as 0.
+    """
     return float(
         sk_metrics.f1_score(truth, guess, average="micro", zero_division=0)
     )
 
 
 def hamming(truth: np.ndarray, guess: np.ndarray) -> float:
-    """Share of label decisions that are wrong (lower is better)."""
+    """Share of label decisions that are wrong (lower is better).
+
+    Args:
+        truth: Observed 0/1 label matrix, `(rows, labels)`.
+        guess: Predicted 0/1 label matrix, same shape.
+
+    Returns:
+        The Hamming loss.
+    """
     return float(sk_metrics.hamming_loss(truth, guess))
 
 
 def subset_accuracy(truth: np.ndarray, guess: np.ndarray) -> float:
-    """Share of rows where every label is right."""
+    """Share of rows where every label is right.
+
+    Args:
+        truth: Observed label matrix, `(rows, labels)`.
+        guess: Predicted label matrix, same shape.
+
+    Returns:
+        The share of rows that match in every column.
+    """
     return float((np.asarray(truth) == np.asarray(guess)).all(axis=1).mean())
 
 
 def r2_mean(truth: np.ndarray, guess: np.ndarray) -> float:
-    """R-squared averaged over the target columns."""
+    """R-squared averaged over the target columns.
+
+    Args:
+        truth: Observed values.
+        guess: Predicted values, same shape as `truth`.
+
+    Returns:
+        The uniformly averaged R-squared.
+    """
     return float(
         sk_metrics.r2_score(truth, guess, multioutput="uniform_average")
     )
 
 
 def mae_mean_scaled(truth: np.ndarray, guess: np.ndarray) -> float:
-    """Mean absolute error per column, in units of that column's spread."""
+    """Mean absolute error per column, in units of that column's spread.
+
+    Args:
+        truth: Observed values.
+        guess: Predicted values, same shape as `truth`.
+
+    Returns:
+        The mean over all entries of the absolute error divided by the
+        standard deviation of the observed column (1 if it is constant).
+    """
     truth = np.asarray(truth, dtype=float)
     spread = np.where(truth.std(axis=0) > 0, truth.std(axis=0), 1.0)
     return float((np.abs(truth - np.asarray(guess)) / spread).mean())
@@ -69,11 +118,26 @@ class MultiTargetMetric(metric_contracts.Metric):
     kind: str = "f1_macro_labels"
 
     def accepts_weights(self) -> bool:
-        """These scores are unweighted."""
+        """These scores are unweighted.
+
+        Returns:
+            Always False.
+        """
         return False
 
     def scorer(self, positive: Any = None) -> Any:
-        """Builds a scorer `(estimator, features, primary_target)`."""
+        """Builds a scorer `(estimator, features, primary_target)`.
+
+        Args:
+            positive: Unused; there is no positive class.
+
+        Returns:
+            A function that scores the estimator's predictions for all
+            target columns (the other columns are read from the features by
+            the estimator's `target_columns`). The sign is flipped when
+            lower is better, so higher is always better. Sample weights are
+            ignored.
+        """
         function = FUNCTIONS[self.kind]
         sign = 1.0 if self.greater_is_better else -1.0
 

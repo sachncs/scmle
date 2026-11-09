@@ -40,7 +40,20 @@ REQUIRED_ASSUMPTIONS = frozenset(
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class LongitudinalEstimand:
-    """Declaration of the period-specific longitudinal causal quantity."""
+    """Declaration of the period-specific longitudinal causal quantity.
+
+    Attributes:
+        name: Non-empty label of the estimand.
+        subject_identity: Column identifying each subject.
+        time_column: Column giving the period of each row.
+        treatment_column: Binary (0/1) treatment column.
+        outcome: Outcome column.
+        covariates: Adjustment columns; each must be constant within a
+            subject.
+        population: Non-empty description of the target population.
+        assumptions: Declared identification assumptions; must include every
+            member of `REQUIRED_ASSUMPTIONS`.
+    """
 
     name: str
     subject_identity: str
@@ -52,7 +65,13 @@ class LongitudinalEstimand:
     assumptions: tuple[str, ...]
 
     def __post_init__(self) -> None:
-        """Validate the columns and required causal assumptions."""
+        """Validate the columns and required causal assumptions.
+
+        Raises:
+            ValueError: If the name or population is empty, any column name
+                is empty or not a string, column names repeat, no
+                assumptions are given, or a required assumption is missing.
+        """
         if not isinstance(self.name, str) or not self.name.strip():
             raise ValueError("estimand name must not be empty")
         names = (
@@ -78,13 +97,38 @@ class LongitudinalEstimand:
             )
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-compatible estimand metadata."""
+        """Return JSON-compatible estimand metadata.
+
+        Returns:
+            The estimand fields keyed by field name.
+        """
         return dataclasses.asdict(self)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class LongitudinalEstimationPolicy:
-    """Bounded numerical and missingness policy for longitudinal IPW."""
+    """Bounded numerical and missingness policy for longitudinal IPW.
+
+    Attributes:
+        confidence_level: Two-sided confidence level of the intervals, in
+            (0, 1).
+        propensity_clip: Bound in (0, 0.5) to which fitted propensities are
+            clipped before weighting.
+        missingness: Either "reject" (any missing value is an error) or
+            "complete_case" (rows with a missing value are dropped).
+        seed: Non-negative integer recorded with the policy.
+        tolerance: Convergence threshold on the largest absolute Newton step
+            of the propensity fit.
+        max_iterations: Maximum Newton iterations per propensity fit.
+        minimum_rows_per_period: Minimum number of rows in each period and in
+            the analysed frame; at least twice `minimum_rows_per_arm`.
+        minimum_rows_per_arm: Minimum number of rows in each treatment arm
+            of each period.
+        minimum_effective_sample_size: Minimum Kish effective sample size of
+            the weights of each arm in each period.
+        reference_tolerance: Largest absolute difference allowed between the
+            primary period estimates and their independent recomputation.
+    """
 
     confidence_level: float = 0.95
     propensity_clip: float = 0.01
@@ -98,7 +142,14 @@ class LongitudinalEstimationPolicy:
     reference_tolerance: float = 1e-6
 
     def __post_init__(self) -> None:
-        """Reject an unbounded or ambiguous estimation policy."""
+        """Reject an unbounded or ambiguous estimation policy.
+
+        Raises:
+            ValueError: If a field lies outside the range given in the class
+                attributes, `missingness` is not a recognised value, or
+                `minimum_rows_per_period` is below twice
+                `minimum_rows_per_arm`.
+        """
         if not 0.0 < self.confidence_level < 1.0:
             raise ValueError(
                 "confidence_level must lie strictly between 0 and 1"
@@ -143,13 +194,37 @@ class LongitudinalEstimationPolicy:
             )
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-compatible policy metadata."""
+        """Return JSON-compatible policy metadata.
+
+        Returns:
+            The policy fields keyed by field name.
+        """
         return dataclasses.asdict(self)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class PeriodATE:
-    """A period-specific Hájek IPW treatment-effect estimate."""
+    """A period-specific Hájek IPW treatment-effect estimate.
+
+    Attributes:
+        period: Label of the period.
+        estimate: Treated weighted mean minus control weighted mean.
+        standard_error: Influence-function standard error of the estimate.
+        interval: Lower and upper confidence limits of the estimate.
+        rows: Number of rows in the period.
+        treated_rows: Number of treated rows in the period.
+        control_rows: Number of control rows in the period.
+        propensity_min: Smallest fitted propensity before clipping.
+        propensity_max: Largest fitted propensity before clipping.
+        fraction_clipped: Share of rows whose propensity was changed by
+            clipping, in [0, 1].
+        effective_sample_size_treated: Kish effective sample size of the
+            treated-arm weights.
+        effective_sample_size_control: Kish effective sample size of the
+            control-arm weights.
+        converged: Whether the propensity fit converged; must be True.
+        iterations: Newton iterations the propensity fit used.
+    """
 
     period: str
     estimate: float
@@ -167,7 +242,16 @@ class PeriodATE:
     iterations: int
 
     def __post_init__(self) -> None:
-        """Validate finite period-level evidence."""
+        """Validate finite period-level evidence.
+
+        Raises:
+            ValueError: If the period label is empty, a row count is not
+                positive, arm counts do not sum to `rows`, `iterations` is
+                below 1, the fit did not converge, a value is not finite,
+                the standard error is negative, the interval is reversed,
+                the clipped fraction lies outside [0, 1], or a propensity
+                lies outside [0, 1].
+        """
         if not self.period:
             raise ValueError("period label must not be empty")
         if self.rows < 1 or self.treated_rows < 1 or self.control_rows < 1:
@@ -207,13 +291,34 @@ class PeriodATE:
             raise ValueError("propensities must lie between 0 and 1")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-compatible period evidence."""
+        """Return JSON-compatible period evidence.
+
+        Returns:
+            The period fields keyed by field name.
+        """
         return dataclasses.asdict(self)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class LongitudinalEstimationResult:
-    """Complete serializable evidence for one longitudinal estimation run."""
+    """Complete serializable evidence for one longitudinal estimation run.
+
+    Attributes:
+        estimand: The declared estimand.
+        policy: The policy the run used.
+        periods: Per-period estimates, in time order, with unique labels.
+        covariance: Symmetric covariance matrix of the period estimates, one
+            row and column per period in the order of `periods`.
+        rows_input: Number of rows in the supplied frame.
+        rows_used: Number of rows analysed.
+        rows_dropped: Number of rows removed by the missingness policy.
+        diagnostics: Method, overlap, and effective-sample-size details.
+        limitations: Statements of what the estimates do not cover.
+        reference: Record of the independent recomputation of the period
+            estimates.
+        raw_input_fingerprint: Lowercase SHA-256 digest of the supplied
+            frame.
+    """
 
     estimand: LongitudinalEstimand
     policy: LongitudinalEstimationPolicy
@@ -228,7 +333,17 @@ class LongitudinalEstimationResult:
     raw_input_fingerprint: str
 
     def __post_init__(self) -> None:
-        """Validate the report shape before serialization."""
+        """Validate the report shape before serialization.
+
+        Raises:
+            ValueError: If there are no periods, period labels repeat, the
+                covariance is not square over the periods, not finite, or
+                not symmetric, a count is not a non-negative integer, used
+                plus dropped rows do not equal input rows, or the
+                fingerprint is not a lowercase SHA-256 digest.
+            TypeError: If `diagnostics`, `limitations`, or `reference` is
+                not a mapping.
+        """
         if not self.periods:
             raise ValueError("longitudinal result needs at least one period")
         labels = tuple(item.period for item in self.periods)
@@ -277,7 +392,12 @@ class LongitudinalEstimationResult:
             )
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a JSON-compatible longitudinal report."""
+        """Return a JSON-compatible longitudinal report.
+
+        Returns:
+            All report fields keyed by field name, with nested objects
+            converted to dictionaries and tuples to lists.
+        """
         return {
             "estimand": self.estimand.to_dict(),
             "policy": self.policy.to_dict(),
@@ -293,14 +413,32 @@ class LongitudinalEstimationResult:
         }
 
     def digest(self) -> str:
-        """Return the digest of the canonical report content."""
+        """Return the digest of the canonical report content.
+
+        Returns:
+            The hexadecimal SHA-256 digest of the report serialized as
+            sorted-key compact JSON.
+        """
         content = json.dumps(
             self.to_dict(), sort_keys=True, separators=(",", ":")
         ).encode("utf-8")
         return hashlib.sha256(content).hexdigest()
 
     def write(self, path: str | Path) -> str:
-        """Atomically write a digest-bound report and return its digest."""
+        """Atomically write a digest-bound report.
+
+        The report is written to a temporary file in the destination
+        directory, flushed, and renamed over the destination.
+
+        Args:
+            path: Destination file; missing parent directories are created.
+
+        Returns:
+            The report digest stored in the envelope.
+
+        Raises:
+            RuntimeError: If the temporary file path was not recorded.
+        """
         destination = Path(path)
         destination.parent.mkdir(parents=True, exist_ok=True)
         envelope = {
@@ -335,7 +473,19 @@ class LongitudinalEstimationResult:
 
     @classmethod
     def read(cls, path: str | Path) -> "LongitudinalEstimationResult":
-        """Read and verify an atomic report envelope."""
+        """Read and verify an atomic report envelope.
+
+        Args:
+            path: File previously written by `write`.
+
+        Returns:
+            The result rebuilt from the stored report.
+
+        Raises:
+            ValueError: If the schema version is not 1, the report is not a
+                mapping, the stored digest does not match the report, or the
+                rebuilt result serializes to a different digest.
+        """
         envelope = json.loads(Path(path).read_text(encoding="utf-8"))
         if envelope.get("schema_version") != 1:
             raise ValueError("unsupported longitudinal report schema")
@@ -357,7 +507,15 @@ class LongitudinalEstimationResult:
     def from_dict(
         cls, record: Mapping[str, Any]
     ) -> "LongitudinalEstimationResult":
-        """Rebuild a result from its JSON-compatible representation."""
+        """Rebuild a result from its JSON-compatible representation.
+
+        Args:
+            record: Mapping in the form produced by `to_dict`.
+
+        Returns:
+            The result built from the record; field validation runs on
+            construction.
+        """
         estimand_values = dict(record["estimand"])
         estimand_values["covariates"] = tuple(estimand_values["covariates"])
         estimand_values["assumptions"] = tuple(estimand_values["assumptions"])
@@ -407,21 +565,50 @@ class LongitudinalEstimationResult:
 
 
 class LongitudinalIPWEstimator:
-    """Estimate period-specific binary-treatment ATEs with Hájek IPW."""
+    """Estimate period-specific binary-treatment ATEs with Hájek IPW.
+
+    Attributes:
+        estimand: The declared estimand.
+        policy: The estimation policy; the default policy when none was
+            supplied.
+    """
 
     def __init__(
         self,
         estimand: LongitudinalEstimand,
         policy: LongitudinalEstimationPolicy | None = None,
     ) -> None:
-        """Store a validated declaration and policy."""
+        """Store a validated declaration and policy.
+
+        Args:
+            estimand: The causal quantity to estimate.
+            policy: Estimation policy; `LongitudinalEstimationPolicy()` is
+                used when None.
+
+        Raises:
+            TypeError: If `estimand` is not a `LongitudinalEstimand`.
+        """
         if not isinstance(estimand, LongitudinalEstimand):
             raise TypeError("estimand must be LongitudinalEstimand")
         self.estimand = estimand
         self.policy = policy or LongitudinalEstimationPolicy()
 
     def fit(self, frame: pd.DataFrame) -> LongitudinalEstimationResult:
-        """Fit one covariate-adjusted period-specific ATE per time value."""
+        """Fit one covariate-adjusted period-specific ATE per time value.
+
+        Args:
+            frame: Long-format panel with one row per subject and period.
+
+        Returns:
+            The period estimates in ascending time order, their covariance,
+            row accounting, diagnostics, and the independent recomputation.
+
+        Raises:
+            ValueError: If the time values cannot be sorted.  Invalid
+                panels and periods that fail the support, overlap, or
+                effective-sample-size checks raise `ValueError` from the
+                helper functions and `fit_period`.
+        """
         prepared, rows_dropped = prepare_longitudinal_frame(
             frame, self.estimand, self.policy
         )
@@ -521,7 +708,29 @@ class LongitudinalIPWEstimator:
     def fit_period(
         self, period_frame: pd.DataFrame, period_value: Any
     ) -> dict[str, Any]:
-        """Fit one period and retain influence values for covariance."""
+        """Fit one period and retain influence values for covariance.
+
+        Args:
+            period_frame: Prepared rows of a single period.
+            period_value: The period's time value, used in labels and error
+                messages.
+
+        Returns:
+            A dictionary of the period label, estimate, row and arm counts,
+            raw and clipped propensities, treatment and outcome arrays,
+            clipped fraction, propensity range, common-support bounds,
+            arm effective sample sizes, subject identities, per-row
+            influence values, fit iterations, and the treated and control
+            weighted means.
+
+        Raises:
+            ValueError: If the period has fewer rows than
+                `minimum_rows_per_period`, either arm has fewer rows than
+                `minimum_rows_per_arm`, the treated and control propensity
+                ranges do not overlap, an arm has no weighted support, or an
+                arm's effective sample size is below the policy minimum.
+                A failed propensity fit also raises `ValueError`.
+        """
         policy = self.policy
         if len(period_frame) < policy.minimum_rows_per_period:
             raise ValueError(
@@ -621,7 +830,26 @@ def prepare_longitudinal_frame(
     estimand: LongitudinalEstimand,
     policy: LongitudinalEstimationPolicy,
 ) -> tuple[pd.DataFrame, int]:
-    """Validate and numerically prepare a long-format input frame."""
+    """Validate and numerically prepare a long-format input frame.
+
+    Args:
+        frame: Long-format panel to check.
+        estimand: Declares the columns that must be present.
+        policy: Supplies the missingness rule and the minimum row count.
+
+    Returns:
+        A tuple of the prepared frame (declared columns only, numeric, rows
+        with missing values removed) and the number of rows removed.
+
+    Raises:
+        TypeError: If `frame` is not a pandas DataFrame.
+        ValueError: If the frame is empty, declared columns are missing,
+            subject identities or time values are missing or non-finite,
+            subject-time pairs repeat, time values are invalid, values are
+            missing under the "reject" policy, a column is non-numeric or
+            non-finite, treatment is not binary, no rows remain, too few
+            rows remain, or a covariate varies within a subject.
+    """
     if not isinstance(frame, pd.DataFrame):
         raise TypeError("frame must be a pandas DataFrame")
     if frame.empty:
@@ -691,7 +919,20 @@ def prepare_longitudinal_frame(
 def validate_time_order(
     frame: pd.DataFrame, estimand: LongitudinalEstimand
 ) -> None:
-    """Require strict, comparable time ordering within each subject."""
+    """Require strictly increasing time values within each subject.
+
+    Args:
+        frame: Long-format panel.
+        estimand: Names the subject and time columns.
+
+    Raises:
+        ValueError: If a subject's time values, in row order, are not
+            strictly increasing or cannot be compared.
+        TypeError: Only if a `TypeError` raised while examining the values
+            has a message containing "strictly increasing", which the
+            comparisons used do not produce; every other `TypeError` is
+            converted to `ValueError`.
+    """
     subject_name = estimand.subject_identity
     time_name = estimand.time_column
     try:
@@ -717,7 +958,16 @@ def validate_time_order(
 def validate_baseline_covariates(
     frame: pd.DataFrame, estimand: LongitudinalEstimand
 ) -> None:
-    """Check the declared no-time-varying-covariates condition in the data."""
+    """Check the declared no-time-varying-covariates condition in the data.
+
+    Args:
+        frame: Long-format panel.
+        estimand: Names the subject column and the covariates.
+
+    Raises:
+        ValueError: If a covariate takes more than one value (counting
+            missing as a value) within a subject.
+    """
     if not estimand.covariates:
         return
     grouped = frame.groupby(estimand.subject_identity, sort=False, dropna=False)
@@ -734,7 +984,23 @@ def fit_logistic_propensity(
     treatment: np.ndarray,
     policy: LongitudinalEstimationPolicy,
 ) -> tuple[np.ndarray, int]:
-    """Fit a deterministic ridge-logistic propensity model by Newton steps."""
+    """Fit a deterministic ridge-logistic propensity model by Newton steps.
+
+    Args:
+        covariates: Two-dimensional matrix, rows by features, without an
+            intercept column; one is added.
+        treatment: Treatment indicator per row (0 or 1).
+        policy: Supplies the iteration limit and convergence tolerance.
+
+    Returns:
+        A tuple of the fitted treatment probability for each row and the
+        number of iterations used.
+
+    Raises:
+        ValueError: If `covariates` is not two-dimensional, the Hessian is
+            singular, a step is not finite, or the fit does not converge
+            within `policy.max_iterations`.
+    """
     if covariates.ndim != 2:
         raise ValueError("covariates must be a two-dimensional matrix")
     design = np.column_stack((np.ones(len(treatment)), covariates))
@@ -764,7 +1030,15 @@ def fit_logistic_propensity(
 
 
 def effective_sample_size(weights: np.ndarray) -> float:
-    """Return the Kish effective sample size for positive arm weights."""
+    """Return the Kish effective sample size for positive arm weights.
+
+    Args:
+        weights: Non-negative weights of one arm.
+
+    Returns:
+        The squared sum of the weights divided by the sum of their squares,
+        or 0.0 when the sum of squares is not positive.
+    """
     total = float(np.sum(weights))
     squared = float(np.sum(weights**2))
     if squared <= 0.0:
@@ -773,7 +1047,18 @@ def effective_sample_size(weights: np.ndarray) -> float:
 
 
 def influence_covariance(fitted: Sequence[Mapping[str, Any]]) -> np.ndarray:
-    """Estimate covariance from subject-aligned influence values."""
+    """Estimate covariance from subject-aligned influence values.
+
+    Args:
+        fitted: One `fit_period` record per period, in period order.
+
+    Returns:
+        A symmetric matrix with one row and column per period.  Each entry
+        sums, over subjects present in both periods, the product of their
+        centred influence values divided by the period row counts; a
+        diagonal entry with more than one subject is scaled by
+        `n / (n - 1)`.  Entries are 0.0 when no subject is shared.
+    """
     periods = len(fitted)
     covariance = np.zeros((periods, periods), dtype=float)
     influence_by_period: list[dict[Any, float]] = []
@@ -811,7 +1096,19 @@ def influence_covariance(fitted: Sequence[Mapping[str, Any]]) -> np.ndarray:
 def build_period_result(
     fitted: Mapping[str, Any], variance: float, critical_value: float
 ) -> PeriodATE:
-    """Build a serializable period result after covariance is available."""
+    """Build a serializable period result after covariance is available.
+
+    Args:
+        fitted: The `fit_period` record of the period.
+        variance: Variance of the period estimate; negative values are
+            treated as zero.
+        critical_value: Normal quantile that scales the standard error into
+            the interval half-width.
+
+    Returns:
+        The period estimate with its standard error, interval, and fit
+        diagnostics, marked as converged.
+    """
     standard_error = math.sqrt(max(float(variance), 0.0))
     estimate = float(fitted["estimate"])
     return PeriodATE(
@@ -842,7 +1139,18 @@ def build_period_result(
 def independent_reference(
     fitted: Sequence[Mapping[str, Any]], tolerance: float
 ) -> dict[str, Any]:
-    """Recalculate normalized weighted means through an independent path."""
+    """Recalculate normalized weighted means through an independent path.
+
+    Args:
+        fitted: One `fit_period` record per period.
+        tolerance: Largest absolute difference counted as agreement.
+
+    Returns:
+        A dictionary with the method name, the tolerance, an overall
+        "passed" flag, and one record per period (recomputed estimate,
+        primary estimate, absolute difference, pass flag, arm row counts,
+        propensity range, and the recomputed arm means).
+    """
     records = []
     for item in fitted:
         propensity = np.asarray(item["propensity"], dtype=float)
@@ -889,7 +1197,15 @@ def independent_reference(
 
 
 def period_label(value: Any) -> str:
-    """Convert a pandas/numpy time value to a stable JSON label."""
+    """Convert a pandas/numpy time value to a stable JSON label.
+
+    Args:
+        value: A time value from the time column.
+
+    Returns:
+        The ISO 8601 text for a timestamp, date, or datetime, otherwise
+        `str` of the value with NumPy scalars unwrapped first.
+    """
     if isinstance(value, pd.Timestamp):
         return value.isoformat()
     if isinstance(value, (datetime.date, datetime.datetime)):
@@ -900,7 +1216,18 @@ def period_label(value: Any) -> str:
 
 
 def fingerprint_frame(frame: pd.DataFrame) -> str:
-    """Return a deterministic digest of the supplied frame."""
+    """Return a deterministic digest of the supplied frame.
+
+    Args:
+        frame: Frame to fingerprint.
+
+    Returns:
+        The hexadecimal SHA-256 digest covering the column names, dtypes,
+        shape, and hashed row values including the index.
+
+    Raises:
+        ValueError: If the frame values cannot be hashed.
+    """
     try:
         values = (
             pd.util.hash_pandas_object(frame, index=True).to_numpy().tobytes()

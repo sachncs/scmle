@@ -13,6 +13,11 @@ def full_suite() -> tuple[diagnostics.Diagnostic, ...]:
 
     Performance reports, subgroup scores, stress tests, distribution shift
     between development and test rows, and model explanations.
+
+    Returns:
+        The default diagnostics, then slice, fairness, robustness and
+        adversarial-validation diagnostics, then the explanation
+        diagnostics.
     """
     return (
         *diagnostics.default_suite(),

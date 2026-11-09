@@ -42,7 +42,11 @@ class LearningCurve:
     total_gain: float
 
     def to_dict(self) -> dict[str, Any]:
-        """Returns a JSON-serializable mapping."""
+        """Returns a JSON-serializable mapping.
+
+        Returns:
+            A mapping of every field of the curve.
+        """
         record = dataclasses.asdict(self)
         record["sizes"] = list(self.sizes)
         record["scores"] = list(self.scores)
@@ -56,6 +60,14 @@ def judge(scores: Sequence[float]) -> tuple[str, float, float]:
     of what the whole curve earned per step; it is flat when the whole curve
     moves by less than a tiny tolerance, and unclear when more data made the
     score worse.
+
+    Args:
+        scores: Held-out scores at increasing training sizes, at least two,
+            larger is better.
+
+    Returns:
+        The verdict (`more data likely helps`, `plateau` or `unclear`), the
+        gain of the last step and the gain of the whole curve.
     """
     total = float(scores[-1] - scores[0])
     last = float(scores[-1] - scores[-2])

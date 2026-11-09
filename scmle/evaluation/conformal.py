@@ -116,6 +116,20 @@ def weighted_margins(
 
     Equal to calling `weighted_quantile` once per test weight (the tests
     check this); sorts the calibration scores a single time.
+
+    Args:
+        scores: Nonconformity scores on held-out rows.
+        weights: Likelihood ratios of those rows; non-negative.
+        test_weights: Likelihood ratios at the test points; non-negative.
+        coverage: Desired coverage in (0, 1).
+
+    Returns:
+        One margin per test weight: the weighted quantile, or infinity where
+        the calibration mass cannot reach `coverage`.
+
+    Raises:
+        ValueError: If `scores` and `weights` differ in length, or any weight
+            is negative.
     """
     values = np.asarray(scores, dtype=float)
     mass = np.asarray(weights, dtype=float)
@@ -195,7 +209,8 @@ def one_row_per_entity(
     For a new entity the exchangeable unit is the entity, not the row: rows of
     one entity share a random effect, so pooling them overstates how many
     independent scores there are. Taking one row per entity gives scores that
-    are exchangeable with the score of a new entity (`gate_g13` measures it).
+    are exchangeable with the score of a new entity (the coverage
+    certification measures it).
 
     Args:
         entities: Entity label of each calibration row.
@@ -243,8 +258,11 @@ class ConformalCalibrator:
             observed: True values of held-out rows.
             predicted: Out-of-sample predictions for the same rows.
 
-        Raises:
-            ValueError: With too few rows.
+        Returns:
+            A regression calibrator whose scores are the absolute errors.
+
+        Fewer than `MIN_CALIBRATION_ROWS` rows are rejected by `checked`
+        with a `ValueError`.
         """
         errors = np.abs(np.asarray(observed) - np.asarray(predicted))
         return cls("regression", cls.checked(errors))
@@ -263,8 +281,14 @@ class ConformalCalibrator:
             probabilities: Out-of-sample probabilities, one column per class.
             classes: Class labels in column order.
 
+        Returns:
+            A classification calibrator holding the pooled scores (one minus
+            the probability of the true class) and the scores grouped by
+            true class.
+
         Raises:
-            ValueError: With too few rows or labels outside `classes`.
+            ValueError: If a label is outside `classes`. Fewer than
+                `MIN_CALIBRATION_ROWS` rows are also rejected, by `checked`.
         """
         position = {label: index for index, label in enumerate(classes)}
         if any(label not in position for label in labels):
@@ -285,7 +309,18 @@ class ConformalCalibrator:
 
     @staticmethod
     def checked(scores: np.ndarray) -> tuple[float, ...]:
-        """Validates calibration input and freezes it."""
+        """Validates calibration input and freezes it.
+
+        Args:
+            scores: Nonconformity scores.
+
+        Returns:
+            The scores as a tuple of floats.
+
+        Raises:
+            ValueError: If there are fewer than `MIN_CALIBRATION_ROWS`
+                scores.
+        """
         if len(scores) < MIN_CALIBRATION_ROWS:
             raise ValueError(
                 f"need at least {MIN_CALIBRATION_ROWS} calibration rows"
@@ -294,6 +329,13 @@ class ConformalCalibrator:
 
     def margin(self, coverage: float = DEFAULT_COVERAGE) -> float:
         """The margin guaranteeing `coverage` for exchangeable new rows.
+
+        Args:
+            coverage: Desired coverage, strictly between 0 and 1.
+
+        Returns:
+            The finite-sample quantile of the pooled scores; infinity when
+            there are too few scores for `coverage`.
 
         Raises:
             ValueError: If coverage is not strictly between 0 and 1.
@@ -308,6 +350,14 @@ class ConformalCalibrator:
         coverage: float = DEFAULT_COVERAGE,
     ) -> tuple[np.ndarray, np.ndarray]:
         """Prediction intervals for a regression model.
+
+        Args:
+            predictions: Point predictions.
+            coverage: Desired coverage in (0, 1).
+
+        Returns:
+            The lower and upper limits: each prediction minus and plus the
+            margin.
 
         Raises:
             ValueError: For a classification calibrator.
@@ -326,6 +376,12 @@ class ConformalCalibrator:
         A class with fewer than `ceil(1 / (1 - coverage)) - 1` rows has an
         infinite margin: its label is kept in every set.
 
+        Args:
+            coverage: Desired coverage, strictly between 0 and 1.
+
+        Returns:
+            The margin of each class, in the order of `classes`.
+
         Raises:
             ValueError: Without per-class scores or with a bad coverage.
         """
@@ -339,7 +395,17 @@ class ConformalCalibrator:
         )
 
     def thin_classes(self, coverage: float = DEFAULT_COVERAGE) -> list[Any]:
-        """Classes too rare for a finite class-conditional margin."""
+        """Classes too rare for a finite class-conditional margin.
+
+        Args:
+            coverage: Desired coverage, strictly between 0 and 1.
+
+        Returns:
+            The labels whose class-conditional margin is infinite, in the
+            order of `classes`. A calibrator without per-class scores or an
+            invalid coverage is rejected by `class_margins` with a
+            `ValueError`.
+        """
         margins = self.class_margins(coverage)
         return [
             label
@@ -362,6 +428,11 @@ class ConformalCalibrator:
                 in the order the scores were stored.
             test_weights: Likelihood ratios of the test rows.
             coverage: Desired coverage in (0, 1).
+
+        Returns:
+            The lower and upper limits: each prediction minus and plus its
+            own weighted margin (infinite where the calibration mass cannot
+            reach `coverage`).
 
         Raises:
             ValueError: For a classification calibrator or bad lengths.
@@ -394,6 +465,10 @@ class ConformalCalibrator:
             conditional: `None` for the pooled margin, `class` for one
                 margin per true class (coverage within each class).
 
+        Returns:
+            For each row, the labels whose score `1 - probability` does not
+            exceed the margin, in the order of `classes`.
+
         Raises:
             ValueError: For a regression calibrator or an unknown mode.
         """
@@ -417,7 +492,12 @@ class ConformalCalibrator:
         ]
 
     def to_dict(self) -> dict[str, Any]:
-        """Returns a JSON-serializable mapping."""
+        """Returns a JSON-serializable mapping.
+
+        Returns:
+            The kind, scores, classes and per-class scores, with tuples as
+            lists.
+        """
         return {
             "kind": self.kind,
             "scores": list(self.scores),
@@ -427,7 +507,15 @@ class ConformalCalibrator:
 
     @classmethod
     def from_dict(cls, record: dict[str, Any]) -> Self:
-        """Rebuilds a calibrator from `to_dict` output."""
+        """Rebuilds a calibrator from `to_dict` output.
+
+        Args:
+            record: A mapping with `kind`, `scores`, `classes` and
+                optionally `class_scores`.
+
+        Returns:
+            The rebuilt calibrator.
+        """
         return cls(
             record["kind"],
             tuple(record["scores"]),

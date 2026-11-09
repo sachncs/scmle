@@ -15,9 +15,9 @@ is singular or unstable when there are many series. The shrinkage intensity
 is the Schaefer-Strimmer plug-in as the paper describes it (intensity
 `sum Var(r_ij) / sum r_ij^2` over the off-diagonal sample correlations); the
 paper states it under a constant-variance assumption, and its source
-(Schaefer and Strimmer 2005) was not read. The measurement that
-matters is gate G9 (`uncertainty_certify.py`), where MinT must not be worse
-than bottom-up on a world with a non-diagonal covariance.
+(Schaefer and Strimmer 2005) was not read. The property that matters is that
+MinT is not worse than bottom-up on simulated data with a non-diagonal
+covariance.
 
 Not implemented: top-down, ensembles of reconcilers, non-negativity.
 """
@@ -33,6 +33,9 @@ def bottom_up(bottom_forecasts: np.ndarray, summing: np.ndarray) -> np.ndarray:
     Args:
         bottom_forecasts: `(steps, m)` forecasts of the bottom series.
         summing: `(n, m)` summing matrix.
+
+    Returns:
+        `(steps, n)` coherent forecasts of all series.
     """
     return np.asarray(bottom_forecasts, dtype=float) @ np.asarray(summing).T
 
@@ -91,6 +94,14 @@ def coherence_residual(forecasts: np.ndarray, summing: np.ndarray) -> float:
 
     The bottom series are the rows of `summing` that are unit vectors; they
     are taken as the last `m` columns of `forecasts`.
+
+    Args:
+        forecasts: `(steps, n)` forecasts of all series.
+        summing: `(n, m)` summing matrix.
+
+    Returns:
+        The largest absolute difference between a forecast and the sum of
+        the bottom forecasts that make it up, over all steps and series.
     """
     s = np.asarray(summing, dtype=float)
     values = np.asarray(forecasts, dtype=float)

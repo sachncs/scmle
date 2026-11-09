@@ -44,7 +44,25 @@ REQUIRED_ASSUMPTIONS = frozenset(
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class SequentialEstimand:
-    """Declaration of a sustained binary-treatment causal contrast."""
+    """Declaration of a sustained binary-treatment causal contrast.
+
+    Attributes:
+        name: Non-empty label of the estimand.
+        subject_identity: Column identifying each subject.
+        time_column: Column giving the period of each row.
+        treatment_column: Binary (0/1) treatment column.
+        outcome: Outcome column; the value at the last period is analysed.
+        baseline_covariates: Columns that must be constant within a subject.
+        time_varying_covariates: Columns measured before treatment in each
+            period; they enter the denominator propensity model.
+        population: Non-empty description of the target population.
+        assumptions: Declared identification assumptions; must include every
+            member of `REQUIRED_ASSUMPTIONS`.
+        target_treatment: Treatment value (0 or 1) held in every period by
+            the target regime.
+        comparator_treatment: Treatment value (0 or 1) held in every period
+            by the comparator regime; differs from `target_treatment`.
+    """
 
     name: str
     subject_identity: str
@@ -59,7 +77,15 @@ class SequentialEstimand:
     comparator_treatment: int = 0
 
     def __post_init__(self) -> None:
-        """Validate the declared columns, regimes, and assumptions."""
+        """Validate the declared columns, regimes, and assumptions.
+
+        Raises:
+            ValueError: If the name or population is empty, any column name
+                is empty or not a string, column names repeat, no
+                assumptions are given, a required assumption is missing, a
+                treatment value is not 0 or 1, or the target and comparator
+                treatments are equal.
+        """
         if not isinstance(self.name, str) or not self.name.strip():
             raise ValueError("estimand name must not be empty")
         names = (
@@ -92,13 +118,39 @@ class SequentialEstimand:
             raise ValueError("target and comparator treatments must differ")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-compatible estimand metadata."""
+        """Return JSON-compatible estimand metadata.
+
+        Returns:
+            The estimand fields keyed by field name.
+        """
         return dataclasses.asdict(self)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class SequentialEstimationPolicy:
-    """Bounded numerical, support, and truncation policy."""
+    """Bounded numerical, support, and truncation policy.
+
+    Attributes:
+        confidence_level: Two-sided confidence level of the intervals, in
+            (0, 1).
+        propensity_clip: Positivity bound in (0, 0.5); fitted propensities
+            must lie within `[propensity_clip, 1 - propensity_clip]`.
+        maximum_weight: Finite cap, greater than 1, applied to the
+            cumulative stabilized weight.
+        missingness: Either "reject" (any missing value is an error) or
+            "complete_case" (subjects with a missing value are dropped).
+        seed: Non-negative integer recorded with the policy.
+        tolerance: Convergence threshold on the largest absolute Newton step
+            of the propensity fit.
+        max_iterations: Maximum Newton iterations per propensity fit.
+        minimum_subjects: Minimum number of subjects in the analysed panel.
+        minimum_arm_rows: Minimum number of subjects in each treatment arm
+            per period and in each regime.
+        minimum_effective_sample_size: Minimum Kish effective sample size of
+            the truncated weights per period and per regime.
+        reference_tolerance: Largest absolute difference allowed between the
+            primary regime means and their independent recomputation.
+    """
 
     confidence_level: float = 0.95
     propensity_clip: float = 0.01
@@ -113,7 +165,12 @@ class SequentialEstimationPolicy:
     reference_tolerance: float = 1e-6
 
     def __post_init__(self) -> None:
-        """Reject an unbounded or ambiguous estimation policy."""
+        """Reject an unbounded or ambiguous estimation policy.
+
+        Raises:
+            ValueError: If a field lies outside the range given in the class
+                attributes, or `missingness` is not a recognised value.
+        """
         if not 0.0 < self.confidence_level < 1.0:
             raise ValueError(
                 "confidence_level must lie strictly between 0 and 1"
@@ -156,13 +213,34 @@ class SequentialEstimationPolicy:
             raise ValueError("minimum_effective_sample_size must be positive")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-compatible policy metadata."""
+        """Return JSON-compatible policy metadata.
+
+        Returns:
+            The policy fields keyed by field name.
+        """
         return dataclasses.asdict(self)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class SequentialPeriodDiagnostics:
-    """Auditable propensity and cumulative-weight evidence for one period."""
+    """Auditable propensity and cumulative-weight evidence for one period.
+
+    Attributes:
+        period: Label of the period.
+        rows: Number of subjects in the period.
+        treated_rows: Number of subjects treated in the period.
+        control_rows: Number of subjects not treated in the period.
+        denominator_propensity_min: Smallest fitted denominator propensity.
+        denominator_propensity_max: Largest fitted denominator propensity.
+        numerator_propensity_min: Smallest fitted numerator propensity.
+        numerator_propensity_max: Largest fitted numerator propensity.
+        fraction_weight_truncated: Share of subjects whose cumulative weight
+            exceeds the cap, in [0, 1].
+        maximum_untruncated_weight: Largest cumulative weight before the cap.
+        maximum_weight: Largest cumulative weight after the cap.
+        effective_sample_size: Kish effective sample size of the capped
+            cumulative weights.
+    """
 
     period: str
     rows: int
@@ -178,7 +256,15 @@ class SequentialPeriodDiagnostics:
     effective_sample_size: float
 
     def __post_init__(self) -> None:
-        """Validate finite, reconcilable period diagnostics."""
+        """Validate finite, reconcilable period diagnostics.
+
+        Raises:
+            ValueError: If the period label is empty, a row count is not
+                positive, arm counts do not sum to `rows`, a value is not
+                finite, a propensity lies outside (0, 1), the truncated
+                fraction lies outside [0, 1], or a weight bound or the
+                effective sample size is not positive.
+        """
         if not self.period:
             raise ValueError("period label must not be empty")
         if self.rows < 1 or self.treated_rows < 1 or self.control_rows < 1:
@@ -215,13 +301,28 @@ class SequentialPeriodDiagnostics:
             raise ValueError("effective_sample_size must be positive")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-compatible period diagnostics."""
+        """Return JSON-compatible period diagnostics.
+
+        Returns:
+            The diagnostic fields keyed by field name.
+        """
         return dataclasses.asdict(self)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class SequentialRegimeEstimate:
-    """A weighted mean outcome for one sustained treatment regime."""
+    """A weighted mean outcome for one sustained treatment regime.
+
+    Attributes:
+        regime: Name of the regime, "always_treated" or "always_control".
+        treatment: Treatment value (0 or 1) held in every period.
+        estimate: Normalized weighted mean of the final-period outcome.
+        standard_error: Influence-function standard error of the estimate.
+        interval: Lower and upper confidence limits of the estimate.
+        rows: Number of subjects whose full history follows the regime.
+        weight_sum: Sum of the capped cumulative weights of those subjects.
+        effective_sample_size: Kish effective sample size of those weights.
+    """
 
     regime: str
     treatment: int
@@ -233,7 +334,14 @@ class SequentialRegimeEstimate:
     effective_sample_size: float
 
     def __post_init__(self) -> None:
-        """Validate finite regime-level evidence."""
+        """Validate finite regime-level evidence.
+
+        Raises:
+            ValueError: If the regime name is empty, the treatment is not 0
+                or 1, rows or weight sum are not positive, the effective
+                sample size is not positive, a value is not finite, the
+                standard error is negative, or the interval is reversed.
+        """
         if not self.regime:
             raise ValueError("regime name must not be empty")
         if self.treatment not in (0, 1):
@@ -256,13 +364,44 @@ class SequentialRegimeEstimate:
             )
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-compatible regime evidence."""
+        """Return JSON-compatible regime evidence.
+
+        Returns:
+            The regime fields keyed by field name.
+        """
         return dataclasses.asdict(self)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class SequentialEstimationResult:
-    """Complete auditable evidence for one sequential estimation run."""
+    """Complete auditable evidence for one sequential estimation run.
+
+    Attributes:
+        estimand: The declared estimand.
+        policy: The policy the run used.
+        periods: Per-period diagnostics, in time order; at least two.
+        regimes: The target regime estimate followed by the comparator
+            regime estimate.
+        contrast_estimate: Target mean minus comparator mean.
+        contrast_standard_error: Standard error of the contrast.
+        contrast_interval: Lower and upper confidence limits of the
+            contrast.
+        covariance: Symmetric 2 by 2 covariance of the two regime means,
+            ordered target then comparator.
+        rows_input: Number of rows in the supplied frame.
+        rows_used: Number of rows analysed.
+        rows_dropped: Number of rows removed by the missingness policy.
+        subjects_input: Number of distinct subjects in the supplied frame.
+        subjects_used: Number of subjects analysed.
+        subjects_dropped: Number of subjects removed by the missingness
+            policy.
+        diagnostics: Method, model, and fit details.
+        limitations: Statements of what the estimate does not cover.
+        reference: Record of the independent recomputation of the regime
+            means.
+        raw_input_fingerprint: Lowercase SHA-256 digest of the supplied
+            frame.
+    """
 
     estimand: SequentialEstimand
     policy: SequentialEstimationPolicy
@@ -284,7 +423,19 @@ class SequentialEstimationResult:
     raw_input_fingerprint: str
 
     def __post_init__(self) -> None:
-        """Validate report shape and accounting before serialization."""
+        """Validate report shape and accounting before serialization.
+
+        Raises:
+            ValueError: If there are fewer than two periods, there are not
+                exactly two regimes, the covariance is not a finite
+                symmetric 2 by 2 matrix, a count is not a non-negative
+                integer, used plus dropped counts do not equal input
+                counts, a contrast value is not finite, the standard error
+                is negative, the interval is reversed, or the fingerprint
+                is not a lowercase SHA-256 digest.
+            TypeError: If `diagnostics`, `limitations`, or `reference` is
+                not a mapping.
+        """
         if len(self.periods) < 2:
             raise ValueError("sequential result needs at least two periods")
         if len(self.regimes) != 2:
@@ -352,7 +503,12 @@ class SequentialEstimationResult:
             )
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a JSON-compatible sequential report."""
+        """Return a JSON-compatible sequential report.
+
+        Returns:
+            All report fields keyed by field name, with nested objects
+            converted to dictionaries and tuples to lists.
+        """
         return {
             "estimand": self.estimand.to_dict(),
             "policy": self.policy.to_dict(),
@@ -375,14 +531,32 @@ class SequentialEstimationResult:
         }
 
     def digest(self) -> str:
-        """Return the digest of canonical report content."""
+        """Return the digest of canonical report content.
+
+        Returns:
+            The hexadecimal SHA-256 digest of the report serialized as
+            sorted-key compact JSON.
+        """
         content = json.dumps(
             self.to_dict(), sort_keys=True, separators=(",", ":")
         ).encode("utf-8")
         return hashlib.sha256(content).hexdigest()
 
     def write(self, path: str | Path) -> str:
-        """Atomically write a digest-bound report and return its digest."""
+        """Atomically write a digest-bound report.
+
+        The report is written to a temporary file in the destination
+        directory, flushed, and renamed over the destination.
+
+        Args:
+            path: Destination file; missing parent directories are created.
+
+        Returns:
+            The report digest stored in the envelope.
+
+        Raises:
+            RuntimeError: If the temporary file path was not recorded.
+        """
         destination = Path(path)
         destination.parent.mkdir(parents=True, exist_ok=True)
         envelope = {
@@ -417,7 +591,19 @@ class SequentialEstimationResult:
 
     @classmethod
     def read(cls, path: str | Path) -> "SequentialEstimationResult":
-        """Read and verify an atomic report envelope."""
+        """Read and verify an atomic report envelope.
+
+        Args:
+            path: File previously written by `write`.
+
+        Returns:
+            The result rebuilt from the stored report.
+
+        Raises:
+            ValueError: If the schema version is not 1, the report is not a
+                mapping, the stored digest does not match the report, or the
+                rebuilt result serializes to a different digest.
+        """
         envelope = json.loads(Path(path).read_text(encoding="utf-8"))
         if envelope.get("schema_version") != 1:
             raise ValueError("unsupported sequential report schema")
@@ -439,7 +625,15 @@ class SequentialEstimationResult:
     def from_dict(
         cls, record: Mapping[str, Any]
     ) -> "SequentialEstimationResult":
-        """Rebuild a result from its JSON-compatible representation."""
+        """Rebuild a result from its JSON-compatible representation.
+
+        Args:
+            record: Mapping in the form produced by `to_dict`.
+
+        Returns:
+            The result built from the record; field validation runs on
+            construction.
+        """
         estimand_values = dict(record["estimand"])
         estimand_values["baseline_covariates"] = tuple(
             estimand_values["baseline_covariates"]
@@ -498,9 +692,12 @@ class SequentialEstimationResult:
 
 
 class SequentialIPWEstimator:
-    """Estimate a sustained-treatment contrast with stabilized sequential.
+    """Estimate a sustained-treatment contrast with stabilized sequential IPW.
 
-    IPW.
+    Attributes:
+        estimand: The declared estimand.
+        policy: The estimation policy; the default policy when none was
+            supplied.
     """
 
     def __init__(
@@ -508,7 +705,17 @@ class SequentialIPWEstimator:
         estimand: SequentialEstimand,
         policy: SequentialEstimationPolicy | None = None,
     ) -> None:
-        """Store a validated estimand and bounded policy."""
+        """Store a validated estimand and bounded policy.
+
+        Args:
+            estimand: The contrast to estimate.
+            policy: Estimation policy; `SequentialEstimationPolicy()` is
+                used when None.
+
+        Raises:
+            TypeError: If `estimand` is not a `SequentialEstimand` or
+                `policy` is neither None nor a `SequentialEstimationPolicy`.
+        """
         if not isinstance(estimand, SequentialEstimand):
             raise TypeError("estimand must be SequentialEstimand")
         if policy is not None and not isinstance(
@@ -519,7 +726,23 @@ class SequentialIPWEstimator:
         self.policy = policy or SequentialEstimationPolicy()
 
     def fit(self, frame: pd.DataFrame) -> SequentialEstimationResult:
-        """Fit sequential stabilized weights and a sustained regime contrast."""
+        """Fit sequential stabilized weights and a sustained regime contrast.
+
+        Args:
+            frame: Balanced long-format panel with one row per subject and
+                period.
+
+        Returns:
+            The regime means, their contrast, per-period diagnostics, and
+            accounting for the run.
+
+        Raises:
+            ValueError: If a period has fewer than `minimum_arm_rows`
+                subjects in either arm or its effective sample size is
+                below the policy minimum.  Invalid panels, failed
+                propensity fits, positivity violations, and unsupported
+                regimes raise `ValueError` from the helper functions.
+        """
         prepared, rows_dropped, subjects_input, subjects_dropped = (
             prepare_sequential_frame(frame, self.estimand, self.policy)
         )
@@ -733,7 +956,29 @@ def prepare_sequential_frame(
     estimand: SequentialEstimand,
     policy: SequentialEstimationPolicy,
 ) -> tuple[pd.DataFrame, int, int, int]:
-    """Validate and prepare a balanced numeric long-format panel."""
+    """Validate and prepare a balanced numeric long-format panel.
+
+    Args:
+        frame: Long-format panel to check.
+        estimand: Declares the columns that must be present.
+        policy: Supplies the missingness rule and the minimum subject count.
+
+    Returns:
+        A tuple of the prepared frame (declared columns only, numeric,
+        without dropped subjects), the number of rows dropped, the number of
+        distinct subjects in the input, and the number of subjects dropped.
+
+    Raises:
+        TypeError: If `frame` is not a pandas DataFrame.
+        ValueError: If the frame is empty, declared columns are missing,
+            subject or time values are missing or non-finite, subject-time
+            pairs repeat, time values are invalid, values are missing under
+            the "reject" policy, a column is non-numeric or non-finite,
+            nothing remains after dropping, treatment is not binary,
+            fewer than two periods remain, a subject lacks a row in some
+            period, too few subjects remain, or a baseline covariate varies
+            within a subject.
+    """
     if not isinstance(frame, pd.DataFrame):
         raise TypeError("frame must be a pandas DataFrame")
     if frame.empty:
@@ -814,7 +1059,20 @@ def prepare_sequential_frame(
 def validate_time_order(
     frame: pd.DataFrame, estimand: SequentialEstimand
 ) -> None:
-    """Require strictly increasing, comparable time within each subject."""
+    """Reject repeated consecutive time values within a subject.
+
+    Args:
+        frame: Long-format panel.
+        estimand: Names the subject and time columns.
+
+    Raises:
+        ValueError: If a subject has two equal consecutive time values, or
+            its time values cannot be examined in order.
+        TypeError: Only if a `TypeError` raised while examining the values
+            has a message containing "strictly increasing", which the
+            comparisons used do not produce; every other `TypeError` is
+            converted to `ValueError`.
+    """
     try:
         for item in frame.groupby(
             estimand.subject_identity, sort=False, dropna=False
@@ -832,7 +1090,18 @@ def validate_time_order(
 
 
 def ordered_periods(frame: pd.DataFrame, time_column: str) -> list[Any]:
-    """Return stable sorted period values."""
+    """Return stable sorted period values.
+
+    Args:
+        frame: Long-format panel.
+        time_column: Name of the time column.
+
+    Returns:
+        The distinct time values in ascending order.
+
+    Raises:
+        ValueError: If the time values cannot be sorted.
+    """
     try:
         return frame[time_column].drop_duplicates().sort_values().tolist()
     except (TypeError, ValueError) as error:
@@ -840,7 +1109,16 @@ def ordered_periods(frame: pd.DataFrame, time_column: str) -> list[Any]:
 
 
 def ordered_subjects(frame: pd.DataFrame, subject_column: str) -> list[Any]:
-    """Return subject identities in a deterministic, type-aware order."""
+    """Return subject identities in a deterministic, type-aware order.
+
+    Args:
+        frame: Long-format panel.
+        subject_column: Name of the subject column.
+
+    Returns:
+        The distinct subject identities sorted by type name, then by
+        `repr`.
+    """
     values = frame[subject_column].drop_duplicates().tolist()
     return sorted(values, key=lambda value: (type(value).__name__, repr(value)))
 
@@ -848,7 +1126,16 @@ def ordered_subjects(frame: pd.DataFrame, subject_column: str) -> list[Any]:
 def validate_baseline_covariates(
     frame: pd.DataFrame, estimand: SequentialEstimand
 ) -> None:
-    """Ensure declared baseline covariates are stable within subjects."""
+    """Ensure declared baseline covariates are stable within subjects.
+
+    Args:
+        frame: Long-format panel.
+        estimand: Names the subject column and the baseline covariates.
+
+    Raises:
+        ValueError: If a baseline covariate takes more than one value
+            (counting missing as a value) within a subject.
+    """
     grouped = frame.groupby(estimand.subject_identity, sort=False)
     for name in estimand.baseline_covariates:
         if (grouped[name].nunique(dropna=False) > 1).any():
@@ -863,7 +1150,23 @@ def build_matrices(
     period_values: Sequence[Any],
     subject_values: Sequence[Any],
 ) -> dict[str, np.ndarray]:
-    """Build deterministic subject-by-period arrays from the long frame."""
+    """Build deterministic subject-by-period arrays from the long frame.
+
+    Args:
+        frame: Prepared long-format panel.
+        estimand: Names the treatment, outcome, and covariate columns.
+        period_values: Periods in time order; fixes the period axis.
+        subject_values: Subjects in order; fixes the subject axis.
+
+    Returns:
+        A dictionary with "treatment" and "outcome" (subjects by periods),
+        "baseline" (subjects by baseline covariates, read at the first
+        period), and "time_varying" (subjects by periods by time-varying
+        covariates).
+
+    Raises:
+        ValueError: If a subject-time pair maps to more than one row.
+    """
     indexed = frame.set_index(
         [estimand.subject_identity, estimand.time_column], drop=False
     )
@@ -908,7 +1211,24 @@ def fit_propensity(
     treatment: np.ndarray,
     policy: SequentialEstimationPolicy,
 ) -> tuple[np.ndarray, int]:
-    """Fit a deterministic ridge-logistic propensity by bounded Newton steps."""
+    """Fit a deterministic ridge-logistic propensity by bounded Newton steps.
+
+    Args:
+        covariates: Two-dimensional matrix, subjects by features, without an
+            intercept column; one is added.
+        treatment: Treatment indicator per subject (0 or 1).
+        policy: Supplies the iteration limit and convergence tolerance.
+
+    Returns:
+        A tuple of the fitted treatment probability for each subject and
+        the number of iterations used.
+
+    Raises:
+        ValueError: If `covariates` is not two-dimensional, its rows do not
+            match `treatment`, the Hessian is singular, a step is not
+            finite, or the fit does not converge within
+            `policy.max_iterations`.
+    """
     if covariates.ndim != 2:
         raise ValueError("covariates must be a two-dimensional matrix")
     if len(covariates) != len(treatment):
@@ -939,7 +1259,18 @@ def fit_propensity(
 def check_propensity_support(
     propensity: np.ndarray, period: Any, minimum: float
 ) -> None:
-    """Reject fitted propensities outside the declared positivity support."""
+    """Reject fitted propensities outside the declared positivity support.
+
+    Args:
+        propensity: Fitted probabilities for one period.
+        period: Period value, used in the error message.
+        minimum: Smallest allowed probability; the largest allowed is
+            `1 - minimum`.
+
+    Raises:
+        ValueError: If any probability is below `minimum` or above
+            `1 - minimum`.
+    """
     lower = float(np.min(propensity))
     upper = float(np.max(propensity))
     if lower < minimum or upper > 1.0 - minimum:
@@ -950,7 +1281,15 @@ def check_propensity_support(
 
 
 def effective_sample_size(weights: np.ndarray) -> float:
-    """Return the Kish effective sample size for positive weights."""
+    """Return the Kish effective sample size for positive weights.
+
+    Args:
+        weights: Non-negative weights.
+
+    Returns:
+        The squared sum of the weights divided by the sum of their squares,
+        or 0.0 when the sum of squares is not positive.
+    """
     total = float(np.sum(weights))
     squared = float(np.sum(weights**2))
     if squared <= 0.0:
@@ -967,7 +1306,27 @@ def build_regime_estimate(
     policy: SequentialEstimationPolicy,
     critical_value: float,
 ) -> SequentialRegimeEstimate:
-    """Build a normalized weighted regime mean and influence standard error."""
+    """Build a normalized weighted regime mean and influence standard error.
+
+    Args:
+        regime: Name of the regime.
+        treatment: Treatment value held in every period.
+        mask: Boolean flag per subject for following the regime.
+        weights: Capped cumulative weight per subject.
+        outcome: Final-period outcome per subject.
+        policy: Supplies the support and effective-sample-size minimums.
+        critical_value: Normal quantile that scales the standard error into
+            the interval half-width.
+
+    Returns:
+        The weighted mean over the selected subjects with its standard
+        error, interval, row count, weight sum, and effective sample size.
+
+    Raises:
+        ValueError: If fewer than `policy.minimum_arm_rows` subjects follow
+            the regime, their weights sum to zero or less, or their
+            effective sample size is below the policy minimum.
+    """
     selected_weights = weights[mask]
     selected_outcome = outcome[mask]
     if len(selected_weights) < policy.minimum_arm_rows:
@@ -1008,7 +1367,22 @@ def regime_covariance(
     target: SequentialRegimeEstimate,
     comparator: SequentialRegimeEstimate,
 ) -> np.ndarray:
-    """Estimate subject-level covariance of two normalized regime means."""
+    """Estimate subject-level covariance of two normalized regime means.
+
+    Args:
+        target_mask: Boolean flag per subject for following the target
+            regime.
+        comparator_mask: Boolean flag per subject for following the
+            comparator regime.
+        weights: Capped cumulative weight per subject.
+        outcome: Final-period outcome per subject.
+        target: Target regime estimate.
+        comparator: Comparator regime estimate.
+
+    Returns:
+        A symmetric 2 by 2 array ordered target then comparator, holding
+        sums over subjects of the products of the influence values.
+    """
     target_influence = np.zeros(len(outcome), dtype=float)
     comparator_influence = np.zeros(len(outcome), dtype=float)
     target_influence[target_mask] = (
@@ -1045,7 +1419,25 @@ def independent_reference(
     comparator: SequentialRegimeEstimate,
     tolerance: float,
 ) -> dict[str, Any]:
-    """Recalculate normalized regime means through an independent path."""
+    """Recalculate normalized regime means through an independent path.
+
+    Args:
+        target_mask: Boolean flag per subject for following the target
+            regime.
+        comparator_mask: Boolean flag per subject for following the
+            comparator regime.
+        weights: Capped cumulative weight per subject.
+        outcome: Final-period outcome per subject.
+        target: Target regime estimate to compare against.
+        comparator: Comparator regime estimate to compare against.
+        tolerance: Largest absolute difference counted as agreement.
+
+    Returns:
+        A dictionary with the method name, the tolerance, an overall
+        "passed" flag, one record per regime (recomputed estimate, primary
+        estimate, absolute difference, pass flag, rows), and the recomputed
+        contrast.
+    """
     records: list[dict[str, Any]] = []
     for name, mask, primary in (
         (target.regime, target_mask, target),
@@ -1083,7 +1475,15 @@ def independent_reference(
 
 
 def period_label(value: Any) -> str:
-    """Convert a period value into a stable report label."""
+    """Convert a period value into a stable report label.
+
+    Args:
+        value: A period value from the time column.
+
+    Returns:
+        The ISO 8601 text for a timestamp, otherwise `str` of the value
+        with NumPy scalars unwrapped first.
+    """
     if isinstance(value, pd.Timestamp):
         return value.isoformat()
     if isinstance(value, np.generic):
@@ -1092,7 +1492,18 @@ def period_label(value: Any) -> str:
 
 
 def fingerprint_frame(frame: pd.DataFrame) -> str:
-    """Return a deterministic SHA-256 digest of the supplied frame."""
+    """Return a deterministic SHA-256 digest of the supplied frame.
+
+    Args:
+        frame: Frame to fingerprint.
+
+    Returns:
+        The hexadecimal digest covering the column names, dtypes, shape,
+        and hashed row values including the index.
+
+    Raises:
+        ValueError: If the frame values cannot be hashed.
+    """
     try:
         values = (
             pd.util.hash_pandas_object(frame, index=True).to_numpy().tobytes()

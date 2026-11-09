@@ -1,4 +1,4 @@
-"""The registered coverage claim, tested on the sealed rows `C` (F12).
+"""The registered coverage claim, tested on the sealed rows `C`.
 
 A charter whose `uncertainty` block asks for it (format 11,
 `coverage_on_confirmation`) turns the coverage claim into a registered claim
@@ -54,7 +54,16 @@ NOTE = (
 
 
 def primary_choice(task: str) -> dict[str, Any] | None:
-    """The one served interval or set the claim is about, or None."""
+    """The one served interval or set the claim is about, or None.
+
+    Args:
+        task: The task type value.
+
+    Returns:
+        The method (`residual` for interval tasks, `pooled` for set tasks),
+        the level, the tolerance and the test level; None for any other
+        task.
+    """
     if task in coverage_run.INTERVAL_TASKS:
         method = "residual"
     elif task in coverage_run.SET_TASKS:
@@ -72,7 +81,15 @@ def primary_choice(task: str) -> dict[str, Any] | None:
 def registration_body(
     claim_sha256: str, choice: Mapping[str, Any]
 ) -> dict[str, Any]:
-    """What is frozen before `C` opens."""
+    """What is frozen before `C` opens.
+
+    Args:
+        claim_sha256: Hash of `coverage_claim.json`.
+        choice: The primary choice from `primary_choice`.
+
+    Returns:
+        The claim hash, the primary choice and the decision rule in words.
+    """
     return {
         "coverage_claim_sha256": claim_sha256,
         "primary": dict(choice),
@@ -84,7 +101,16 @@ def registration_body(
 def registration(
     claim_sha256: str, choice: Mapping[str, Any]
 ) -> confirm.RegisteredClaim:
-    """The ledger registration of the claim."""
+    """The ledger registration of the claim.
+
+    Args:
+        claim_sha256: Hash of `coverage_claim.json`.
+        choice: The primary choice from `primary_choice`.
+
+    Returns:
+        The registered claim, whose statement names the method, level and
+        floor `level - tolerance` and whose digest covers the frozen body.
+    """
     floor = float(choice["level"]) - float(choice["tolerance"])
     return confirm.RegisteredClaim(
         CLAIM_ID,
@@ -99,6 +125,15 @@ def floor_p_value(covered: int, rows: int, floor: float) -> float:
     """One-sided exact p-value of "coverage is at most `floor`".
 
     Small values say the coverage is above the floor.
+
+    Args:
+        covered: Number of rows inside their interval or set.
+        rows: Number of rows scored.
+        floor: The coverage level the null hypothesis assumes at most.
+
+    Returns:
+        The probability of at least `covered` hits in `rows` trials at rate
+        `floor`; 1.0 when `rows` is zero.
     """
     if rows == 0:
         return 1.0
@@ -108,7 +143,18 @@ def floor_p_value(covered: int, rows: int, floor: float) -> float:
 def decide(
     covered: int, rows: int, choice: Mapping[str, Any]
 ) -> dict[str, Any]:
-    """The test and its status for a covered count."""
+    """The test and its status for a covered count.
+
+    Args:
+        covered: Number of rows inside their interval or set.
+        rows: Number of rows scored.
+        choice: The primary choice from `primary_choice`.
+
+    Returns:
+        The counts, observed coverage (None without rows), floor, p-value,
+        one-sided lower limit, `ALPHA` and the status: `confirmed` when the
+        p-value is at most `ALPHA`, otherwise `unverified`.
+    """
     floor = float(choice["level"]) - float(choice["tolerance"])
     p_value = floor_p_value(covered, rows, floor)
     lower = (
@@ -133,6 +179,14 @@ def capped(task: str, status: str) -> str:
 
     A task type that has not passed its measured gate cannot carry a
     `confirmed` status; the cap never raises a status.
+
+    Args:
+        task: The task type value.
+        status: The status from the coverage test.
+
+    Returns:
+        `status` unchanged unless it is `confirmed`, in which case the
+        task type's tier ceiling applies.
     """
     if status != CONFIRMED:
         return status
@@ -145,7 +199,18 @@ def inside_of(
     target: Any,
     choice: Mapping[str, Any],
 ) -> np.ndarray:
-    """Whether the primary interval or set holds, per released row."""
+    """Whether the primary interval or set holds, per released row.
+
+    Args:
+        bundle: The frozen bundle that serves intervals and sets.
+        features: Features of the released rows.
+        target: True values (regression) or labels (classification).
+        choice: The primary choice from `primary_choice`.
+
+    Returns:
+        A boolean array: True where the value lies in the interval, or the
+        label is in the pooled prediction set.
+    """
     level = float(choice["level"])
     if choice["method"] == "residual":
         band = bundle.predict_interval(
@@ -178,6 +243,19 @@ def evaluate_document(
     The task type's gate (`task_gate_status.json`) caps the status: a type
     that has not passed its gate is reported `unverified` whatever the test
     says, and the document records the gate and whether the cap applied.
+
+    Args:
+        bundle: The frozen bundle, calibration included.
+        features: Features of the released rows of `C`.
+        target: True values or labels of those rows.
+        claim_sha256: Hash of `coverage_claim.json`.
+        choice: The primary choice from `primary_choice`.
+        task: The task type value.
+
+    Returns:
+        The document: the claim identity, the tested result with its
+        status after the cap, the task gate, and a description of the other
+        methods and levels and of exchangeability on the same rows.
     """
     inside = inside_of(bundle, features, target, choice)
     result = decide(int(inside.sum()), len(inside), choice)
@@ -218,7 +296,14 @@ def evaluate_document(
 
 
 def not_evaluated(reason: str) -> dict[str, Any]:
-    """The document of a claim that `C` could not test."""
+    """The document of a claim that `C` could not test.
+
+    Args:
+        reason: Why the claim was not evaluated.
+
+    Returns:
+        A document with the not-evaluated status and the reason.
+    """
     return {
         "schema_version": 1,
         "claim_id": CLAIM_ID,
@@ -238,6 +323,9 @@ def build_runner(
         bundle: The frozen bundle, calibration included.
         task: The task value.
         claim_sha256: Hash of `coverage_claim.json`.
+
+    Returns:
+        A runner holding the registration and the evaluation of `C`, or None.
     """
     choice = primary_choice(task)
     if choice is None or bundle.conformal is None:

@@ -45,6 +45,9 @@ def positive_label(target: pd.Series, task: tasks.TaskType) -> Any:
     Args:
         target: Labels.
         task: Resolved task type.
+
+    Returns:
+        The positive class for a binary task, otherwise None.
     """
     if task is not BINARY:
         return None
@@ -243,6 +246,9 @@ class MetricCatalog:
 
         The reported names shrink first, so no reader is told to score a
         metric that is already gone.
+
+        Args:
+            name: Name of the metric to remove.
         """
         with self.lock:
             self.report_names = {
@@ -345,7 +351,9 @@ def register_metric(
         replace: Allow overriding an existing metric of the same name.
 
     Returns:
-        The registered metric.
+        The registered metric. A name that is already taken while `replace`
+        is False is rejected with a `ConfigError` by
+        `MetricCatalog.register`.
     """
     metric = metric_contracts.FunctionMetric(
         name,

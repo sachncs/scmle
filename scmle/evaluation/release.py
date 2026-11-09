@@ -66,7 +66,19 @@ class ReleaseFinding:
     evidence: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
-        """Validate the immutable finding shape."""
+        """Validate the immutable finding shape.
+
+        Numeric `observed` and `expected` values are converted to floats.
+
+        Raises:
+            TypeError: If `kind` is not a `FindingKind`, `passed` or
+                `blocking` is not a bool, `evidence` is not a tuple,
+                `observed` or `expected` is a bool, or is neither a number,
+                text nor None.
+            ValueError: If `name` or `reason` is blank, an evidence item is
+                blank or repeated, or a numeric `observed` or `expected`
+                is not finite.
+        """
         if not isinstance(self.kind, FindingKind):
             raise TypeError("kind must be FindingKind")
         if not isinstance(self.name, str) or not self.name.strip():
@@ -99,7 +111,12 @@ class ReleaseFinding:
                 raise TypeError(f"{field_name} must be numeric, text, or None")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a deterministic JSON-compatible finding."""
+        """Return a deterministic JSON-compatible finding.
+
+        Returns:
+            A mapping of the finding's fields. `observed` and `expected`
+            appear only when they are not None.
+        """
         record: dict[str, Any] = {
             "kind": self.kind.value,
             "name": self.name,
@@ -117,7 +134,15 @@ class ReleaseFinding:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class FindingCounts:
-    """Validated aggregate counts for a set of release findings."""
+    """Validated aggregate counts for a set of release findings.
+
+    Attributes:
+        total: Number of findings.
+        passed: Number of passed findings.
+        failed: Number of failed findings.
+        blocking: Number of findings that are blocking gates.
+        blocking_failures: Number of failed blocking findings.
+    """
 
     total: int
     passed: int
@@ -126,7 +151,14 @@ class FindingCounts:
     blocking_failures: int
 
     def __post_init__(self) -> None:
-        """Validate count relationships before exposing the aggregate."""
+        """Validate count relationships before exposing the aggregate.
+
+        Raises:
+            TypeError: If a count is not an integer (bools are rejected).
+            ValueError: If a count is negative, `total` differs from
+                `passed` plus `failed`, `blocking` exceeds `total`, or
+                `blocking_failures` exceeds `failed` or `blocking`.
+        """
         values = {
             "total": self.total,
             "passed": self.passed,
@@ -149,7 +181,11 @@ class FindingCounts:
             raise ValueError("blocking_failures must not exceed blocking")
 
     def to_dict(self) -> dict[str, int]:
-        """Return deterministic JSON-compatible aggregate counts."""
+        """Return deterministic JSON-compatible aggregate counts.
+
+        Returns:
+            A mapping from each count's name to its value.
+        """
         return {
             "total": self.total,
             "passed": self.passed,
@@ -166,6 +202,19 @@ class ReleaseReadinessSummary:
     The summary intentionally contains counts rather than duplicating the
     findings. Callers can use it for release dashboards and automation, then
     retain ``ReleaseEvaluation`` as the detailed evidence-backed record.
+
+    Attributes:
+        task: Task type the policy applies to.
+        policy_schema_version: Schema version of the evaluated policy.
+        status: Blocked when any blocking finding failed, otherwise ready.
+        total_findings: Number of findings.
+        passed_findings: Number of passed findings.
+        failed_findings: Number of failed findings.
+        blocking_findings: Number of findings that are blocking gates.
+        blocking_failures: Number of failed blocking findings.
+        non_blocking_failures: Number of failed non-blocking findings.
+        counts_by_kind: Counts for every finding kind, keyed by the kind's
+            value; stored as a read-only mapping.
     """
 
     task: str
@@ -180,7 +229,18 @@ class ReleaseReadinessSummary:
     counts_by_kind: Mapping[str, FindingCounts]
 
     def __post_init__(self) -> None:
-        """Validate summary counts, status, and kind coverage."""
+        """Validate summary counts, status, and kind coverage.
+
+        Raises:
+            ValueError: If `task` is blank, `policy_schema_version` is not
+                a non-negative integer, a count is negative, the counts are
+                inconsistent with one another, `status` does not match
+                `blocking_failures`, `counts_by_kind` does not cover every
+                finding kind, or its totals differ from the aggregate counts.
+            TypeError: If `status` is not a `ReleaseStatus`, a count is not
+                an integer, or `counts_by_kind` is not a mapping of strings
+                to `FindingCounts`.
+        """
         if not isinstance(self.task, str) or not self.task.strip():
             raise ValueError("task must not be empty")
         if (
@@ -256,7 +316,12 @@ class ReleaseReadinessSummary:
             raise ValueError("aggregate counts do not match counts_by_kind")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return deterministic JSON-compatible readiness data."""
+        """Return deterministic JSON-compatible readiness data.
+
+        Returns:
+            A mapping of the summary's fields, with the status as its value
+            and the per-kind counts as mappings in sorted kind order.
+        """
         return {
             "task": self.task,
             "policy_schema_version": self.policy_schema_version,
@@ -274,7 +339,12 @@ class ReleaseReadinessSummary:
         }
 
     def canonical_json(self) -> str:
-        """Return stable JSON suitable for release automation."""
+        """Return stable JSON suitable for release automation.
+
+        Returns:
+            The `to_dict` record as compact JSON with sorted keys and ASCII
+            only.
+        """
         return json.dumps(
             self.to_dict(),
             allow_nan=False,
@@ -286,7 +356,16 @@ class ReleaseReadinessSummary:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class ReleaseEvaluation:
-    """Immutable outcome of evaluating one policy and its supplied evidence."""
+    """Immutable outcome of evaluating one policy and its supplied evidence.
+
+    Attributes:
+        task: Task type the policy applies to.
+        policy_schema_version: Schema version of the evaluated policy.
+        passed: Whether no blocking finding failed.
+        findings: Every finding, in the order produced.
+        blocking_reasons: The reasons of the failed blocking findings, in
+            the order of `findings`.
+    """
 
     task: str
     policy_schema_version: int
@@ -295,7 +374,16 @@ class ReleaseEvaluation:
     blocking_reasons: tuple[str, ...]
 
     def __post_init__(self) -> None:
-        """Ensure the aggregate outcome agrees with its findings."""
+        """Ensure the aggregate outcome agrees with its findings.
+
+        Raises:
+            ValueError: If `task` is blank, `policy_schema_version` is
+                negative, `blocking_reasons` differs from the reasons of
+                the failed blocking findings, or `passed` disagrees with
+                them.
+            TypeError: If `passed` is not a bool, `findings` is not a tuple
+                of `ReleaseFinding`, or `blocking_reasons` is not a tuple.
+        """
         if not isinstance(self.task, str) or not self.task.strip():
             raise ValueError("task must not be empty")
         if self.policy_schema_version < 0:
@@ -324,7 +412,13 @@ class ReleaseEvaluation:
         return not self.passed
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a deterministic JSON-compatible release outcome."""
+        """Return a deterministic JSON-compatible release outcome.
+
+        Returns:
+            A mapping with the task, schema version, pass and blocked
+            flags, blocking reasons, findings as mappings, and the
+            readiness summary as a mapping.
+        """
         return {
             "task": self.task,
             "policy_schema_version": self.policy_schema_version,
@@ -336,7 +430,12 @@ class ReleaseEvaluation:
         }
 
     def canonical_json(self) -> str:
-        """Return stable JSON suitable for release evidence storage."""
+        """Return stable JSON suitable for release evidence storage.
+
+        Returns:
+            The `to_dict` record as compact JSON with sorted keys and ASCII
+            only.
+        """
         return json.dumps(
             self.to_dict(),
             allow_nan=False,
@@ -346,7 +445,12 @@ class ReleaseEvaluation:
         )
 
     def readiness_summary(self) -> ReleaseReadinessSummary:
-        """Return deterministic readiness counts derived from findings."""
+        """Return deterministic readiness counts derived from findings.
+
+        Returns:
+            The summary, with overall counts and counts for every finding
+            kind.
+        """
         counts: dict[str, FindingCounts] = {}
         for kind in FindingKind:
             matching = tuple(
@@ -394,6 +498,12 @@ def required_evidence_references(
     diagnostic gates, fairness gates, and explanation policy. Duplicate
     references are evaluated once because one accepted evidence record can
     support several declarations.
+
+    Args:
+        policy: The evaluation policy to read the declarations from.
+
+    Returns:
+        The unique references, sorted.
     """
     references = set(policy.release.required_evidence)
     for metric in policy.metrics:
@@ -413,6 +523,15 @@ def fairness_metric_values(report: Any, metric: str) -> tuple[float, ...]:
     named report entry. The traversal accepts JSON-like mappings and lists and
     ignores unrelated scalar fields. A non-numeric metric value is not treated
     as a passing value.
+
+    Args:
+        report: A nested JSON-like report of mappings, lists and tuples.
+        metric: Key under which the metric value is stored.
+
+    Returns:
+        The finite numeric values stored under `metric` anywhere in the
+        report, sorted ascending. Boolean, non-numeric and non-finite
+        values are skipped.
     """
     values: list[float] = []
     pending: list[Any] = [report]
@@ -444,7 +563,17 @@ def fairness_metric_values(report: Any, metric: str) -> tuple[float, ...]:
 
 
 def explanation_quality_value(report: Any, field_name: str) -> float | None:
-    """Return one finite quality score from an explanation report."""
+    """Return one finite quality score from an explanation report.
+
+    Args:
+        report: An explanation report with a `quality` mapping.
+        field_name: Key of the score inside `quality`.
+
+    Returns:
+        The score as a float, or None if the report, its `quality` entry or
+        the score is not of the expected form, or the score is not a number
+        in [0, 1].
+    """
     if not isinstance(report, Mapping):
         return None
     quality = report.get("quality")
@@ -468,7 +597,18 @@ def apply_reliability_gate(
     unsafe to release. The fault-injection plan is therefore an independent
     release gate. Only an explicitly completed plan with
     ``execution_status=passed`` and ``release_blocked=false`` can pass this
-    gate; malformed or planned evidence fails closed.
+    gate; malformed or incomplete evidence fails closed.
+
+    Args:
+        outcome: The evaluation to extend.
+        reliability_plan: The persisted fault-injection plan, as a mapping.
+
+    Returns:
+        `outcome` unchanged when the gate passes; otherwise a blocked
+        evaluation with an added failed blocking finding.
+
+    Raises:
+        TypeError: If `outcome` is not a `ReleaseEvaluation`.
     """
     if not isinstance(outcome, ReleaseEvaluation):
         raise TypeError("outcome must be ReleaseEvaluation")
@@ -516,7 +656,24 @@ def apply_attestation_gate(
     attestation_record: Any,
     verified: bool | None = None,
 ) -> ReleaseEvaluation:
-    """Block release until packaged evidence has a valid signed attestation."""
+    """Block release until packaged evidence has a valid signed attestation.
+
+    Args:
+        outcome: The evaluation to extend.
+        attestation_record: The attestation, as a mapping holding a
+            `signature` with an `hmac-sha256` algorithm and a non-blank
+            value.
+        verified: Result of verifying the signature; None when it was not
+            checked, which is treated as acceptable.
+
+    Returns:
+        `outcome` unchanged when the signature is present and not known to
+        be invalid; otherwise a blocked evaluation with an added failed
+        blocking finding.
+
+    Raises:
+        TypeError: If `outcome` is not a `ReleaseEvaluation`.
+    """
     if not isinstance(outcome, ReleaseEvaluation):
         raise TypeError("outcome must be ReleaseEvaluation")
     signature = (
@@ -572,7 +729,21 @@ def apply_evidence_index_gate(
     index: evidence.EvidenceIndex | None,
     verified: bool,
 ) -> ReleaseEvaluation:
-    """Block release until the persisted evidence index is signed."""
+    """Block release until the persisted evidence index is signed.
+
+    Args:
+        outcome: The evaluation to extend.
+        index: The persisted evidence index, or None if missing.
+        verified: Whether the index signature was verified.
+
+    Returns:
+        `outcome` unchanged when the index is signed and verified;
+        otherwise a blocked evaluation with an added failed blocking
+        finding.
+
+    Raises:
+        TypeError: If `outcome` is not a `ReleaseEvaluation`.
+    """
     if not isinstance(outcome, ReleaseEvaluation):
         raise TypeError("outcome must be ReleaseEvaluation")
     passed = (
@@ -642,6 +813,10 @@ def evaluate_release(
         An immutable evaluation. A warning diagnostic may produce a failed
         finding without blocking. Unsupported inputs, failed blocking gates,
         and missing or unaccepted evidence always block.
+
+    Raises:
+        ValueError: If a required explanation quality measure has no
+            threshold in the policy.
     """
     if not isinstance(policy, evaluation.EvaluationPolicy):
         finding = ReleaseFinding(

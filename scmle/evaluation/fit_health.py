@@ -43,7 +43,11 @@ class FitHealth:
     note: str
 
     def to_dict(self) -> dict[str, Any]:
-        """Returns a JSON-serializable mapping."""
+        """Returns a JSON-serializable mapping.
+
+        Returns:
+            A mapping of every field of the assessment.
+        """
         return dataclasses.asdict(self)
 
 

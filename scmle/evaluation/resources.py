@@ -35,7 +35,11 @@ class ResourceUsage:
     machine: str
 
     def to_dict(self) -> dict[str, Any]:
-        """Returns a JSON-serializable mapping."""
+        """Returns a JSON-serializable mapping.
+
+        Returns:
+            A mapping of every field of the measurement.
+        """
         return dataclasses.asdict(self)
 
 
@@ -62,7 +66,15 @@ class ResourceLimits:
         )
 
     def violations(self, usage: ResourceUsage) -> list[str]:
-        """Lists the limits a measurement breaks."""
+        """Lists the limits a measurement breaks.
+
+        Args:
+            usage: The measured model size and latency.
+
+        Returns:
+            One message per broken limit; empty when none is broken. Latency
+            is compared after multiplying by `latency_safety_factor`.
+        """
         broken = []
         if self.max_model_mb is not None and usage.model_mb > self.max_model_mb:
             broken.append(

@@ -16,7 +16,17 @@ from scmle.evaluation import forecast
 
 
 def seasonal_lag(step: int, period: int) -> int:
-    """Rows back to the value at the same season point as `t + step`."""
+    """Rows back to the value at the same season point as `t + step`.
+
+    Args:
+        step: Steps ahead of the forecast time; at least 1.
+        period: Length of a season in rows; at least 1.
+
+    Returns:
+        The smallest non-negative lag that puts the value a whole number of
+        seasons before the forecast target (0 when `step` is a multiple of
+        `period`).
+    """
     seasons = -(-step // period)  # Ceiling division.
     return seasons * period - step
 
@@ -30,6 +40,14 @@ def seasonal_naive(
     period: int,
 ) -> np.ndarray:
     """Seasonal-naive forecasts for the rows at `positions` of an ordered frame.
+
+    Args:
+        frame: Rows ordered in time (within entity when `group` is given).
+        positions: Integer positions of the forecast origins in `frame`.
+        value: Column holding the series value.
+        group: Column identifying the entity, or None for a single series.
+        steps: Number of steps ahead.
+        period: Length of a season in rows.
 
     Returns:
         An array `(rows, steps)`; step `k` repeats the value `lag` rows back
@@ -46,7 +64,15 @@ def seasonal_naive(
 
 
 def per_step_errors(truth: np.ndarray, guess: np.ndarray) -> list[float]:
-    """Mean absolute error at each step ahead."""
+    """Mean absolute error at each step ahead.
+
+    Args:
+        truth: Observed values, shape `(rows, steps)`.
+        guess: Forecast values, same shape.
+
+    Returns:
+        One mean absolute error per step (column), in step order.
+    """
     return [float(v) for v in np.abs(truth - guess).mean(axis=0)]
 
 
@@ -56,7 +82,21 @@ def report(
     primary: pd.Series,
     seasonal: np.ndarray | None,
 ) -> list[dict[str, float | None]]:
-    """Per-step comparison of the model with the baselines on given rows."""
+    """Per-step comparison of the model with the baselines on given rows.
+
+    Args:
+        estimator: A fitted forecaster exposing `predict`, `target_columns`
+            and `value_column`.
+        features: Rows to forecast from.
+        primary: The first-step target for those rows.
+        seasonal: Seasonal-naive forecasts of shape `(rows, steps)`, or None
+            when no season is known.
+
+    Returns:
+        One record per step ahead, starting at 1, with `model_mae`,
+        `last_value_mae` and `seasonal_naive_mae` (None when `seasonal` is
+        None).
+    """
     truth = forecast.truth_matrix(estimator, features, primary)
     steps = truth.shape[1]
     model = per_step_errors(
@@ -80,7 +120,16 @@ def report(
 def origins(
     fitted: Sequence[tuple[Any, pd.DataFrame, pd.Series]],
 ) -> list[dict[str, Any]]:
-    """Per-origin step errors for models fitted on each fold's past."""
+    """Per-origin step errors for models fitted on each fold's past.
+
+    Args:
+        fitted: One (estimator, features, primary target) triple per
+            origin, in order.
+
+    Returns:
+        One record per origin, numbered from 1, with the row count and the
+        per-step `model_mae` and `last_value_mae` lists.
+    """
     found = []
     for number, (estimator, features, primary) in enumerate(fitted, start=1):
         rows = report(estimator, features, primary, None)

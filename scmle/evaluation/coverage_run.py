@@ -56,6 +56,14 @@ def claim_document(
     `slice_columns` are the charter's declared slice columns; they are part
     of the hashed document, so the slices read are the slices declared.
 
+    Args:
+        task: The task type value.
+        levels: Coverage levels to be measured.
+        tolerance: Slack below each level that still counts as met.
+        split_fingerprint: Fingerprint of the data split.
+        charter_hash: Hash of the charter, or None without one.
+        slice_columns: Declared slice columns.
+
     Returns:
         The document, or None for a task that stores no interval or set.
     """
@@ -83,7 +91,14 @@ def claim_document(
 
 
 def claim_hash(claim: dict[str, Any]) -> str:
-    """The hash that registers the claim."""
+    """The hash that registers the claim.
+
+    Args:
+        claim: The claim document.
+
+    Returns:
+        Its ledger digest.
+    """
     return ledger_module.digest(claim)
 
 
@@ -93,7 +108,19 @@ def declared_slices(
     labels: Mapping[str, Any],
     level: float,
 ) -> dict[str, Any]:
-    """The slice descriptions of one method and level, per declared column."""
+    """The slice descriptions of one method and level, per declared column.
+
+    Args:
+        inside: Whether the interval or set held, per row.
+        sizes: Interval width or set size, per row.
+        labels: Slice label of each row by column; None for a column that
+            cannot be sliced.
+        level: The coverage level.
+
+    Returns:
+        By column, a `coverage_slices.summary`, or a `not_assessable`
+        record for a column without labels.
+    """
     found: dict[str, Any] = {}
     for column, assigned in labels.items():
         if assigned is None:
@@ -115,7 +142,19 @@ def regression_reports(
     levels: Sequence[float],
     slices: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Coverage reports of each interval method the bundle holds."""
+    """Coverage reports of each interval method the bundle holds.
+
+    Args:
+        bundle: The frozen bundle that serves intervals.
+        features: Features of the released rows.
+        target: True values of those rows.
+        levels: Coverage levels to measure.
+        slices: Slice labels by declared column, or None.
+
+    Returns:
+        By method and level, a `coverage.coverage_report`. A method the
+        bundle does not hold, or a level it cannot serve, is omitted.
+    """
     values = np.asarray(target, dtype=float)
     reports: dict[str, Any] = {}
     for method in REGRESSION_METHODS:
@@ -150,7 +189,19 @@ def classification_reports(
     levels: Sequence[float],
     slices: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Coverage reports of pooled and class-conditional prediction sets."""
+    """Coverage reports of pooled and class-conditional prediction sets.
+
+    Args:
+        bundle: The frozen bundle that serves prediction sets.
+        features: Features of the released rows.
+        target: True labels of those rows.
+        levels: Coverage levels to measure.
+        slices: Slice labels by declared column, or None.
+
+    Returns:
+        By `pooled` or `class_conditional` and level, a
+        `coverage.coverage_report` with the coverage within each class.
+    """
     truth = list(target)
     reports: dict[str, Any] = {}
     for mode in SET_MODES:
@@ -189,6 +240,19 @@ def run_report(
     read; the report repeats it. `slices` maps each declared slice column to
     the slice label of every row (or None when it cannot be sliced); each
     level then also gets `declared_slices`, descriptive only.
+
+    Args:
+        bundle: The frozen bundle, calibration included.
+        features: Features of the released rows.
+        target: True values or labels of those rows.
+        levels: Coverage levels to measure.
+        claim_sha256: Hash of the registered claim, repeated in the report.
+        slices: Slice labels by declared column, or None.
+
+    Returns:
+        The kind, claim hash, row count, a note and the coverage reports by
+        method; None when the bundle has neither conformal calibration nor
+        quantile models.
     """
     if bundle.conformal is None and bundle.quantile is None:
         return None

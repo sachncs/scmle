@@ -7,7 +7,7 @@ two-sample test (any difference of shape) and the Mann-Whitney test (a
 shift of location), and flags a difference when the smaller p-value, doubled
 for the two tests, is at most `ALPHA`.
 
-Gate status (canon P1): none. The flag is a description beside the coverage
+This is not a gate. The flag is a description beside the coverage
 claim, never a condition on it. Its size follows from the tests (for rows
 that are exchangeable the doubled minimum p-value is at most `ALPHA` with
 probability at most `ALPHA`, which `tests/unit/test_exchangeability.py`
@@ -82,6 +82,14 @@ def released_scores(bundle: Any, features: Any, target: Any) -> np.ndarray:
 
     Absolute error for regression and one minus the probability of the true
     class for classification, the scores the calibrator stores.
+
+    Args:
+        bundle: A model bundle with a conformal calibrator.
+        features: Released rows.
+        target: True targets of the released rows.
+
+    Returns:
+        One score per released row.
     """
     calibrator = bundle.conformal
     if calibrator.kind == "regression":
@@ -99,7 +107,17 @@ def released_scores(bundle: Any, features: Any, target: Any) -> np.ndarray:
 
 
 def describe(bundle: Any, features: Any, target: Any) -> dict[str, Any]:
-    """The comparison for a bundle's calibration and the released rows."""
+    """The comparison for a bundle's calibration and the released rows.
+
+    Args:
+        bundle: A model bundle with a conformal calibrator.
+        features: Released rows.
+        target: True targets of the released rows.
+
+    Returns:
+        The result of `compare` for the bundle's calibration scores and the
+        released scores.
+    """
     return compare(
         bundle.conformal.scores, released_scores(bundle, features, target)
     )

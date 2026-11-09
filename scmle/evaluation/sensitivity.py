@@ -48,7 +48,11 @@ class Spread:
     range: float
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Returns the JSON-ready record.
+
+        Returns:
+            A mapping of the scores, mean, standard deviation and range.
+        """
         return dataclasses.asdict(self)
 
 
@@ -72,7 +76,12 @@ class SensitivityReport:
     decay: float
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Returns the JSON-ready record.
+
+        Returns:
+            A mapping of the three spreads as mappings, the noise curve
+            keyed by the level as text, and the decay.
+        """
         return {
             "seed": self.seed.to_dict(),
             "resample": self.resample.to_dict(),
@@ -82,7 +91,11 @@ class SensitivityReport:
         }
 
     def dominant(self) -> str:
-        """Which source moves the score most: seed, resample or split."""
+        """Which source moves the score most: seed, resample or split.
+
+        Returns:
+            The name of the spread with the largest standard deviation.
+        """
         spreads = {
             "seed": self.seed.std,
             "resample": self.resample.std,
@@ -92,7 +105,14 @@ class SensitivityReport:
 
 
 def spread_of(scores: list[float]) -> Spread:
-    """Summarizes repeated scores."""
+    """Summarizes repeated scores.
+
+    Args:
+        scores: The scores of the repeated runs; at least one.
+
+    Returns:
+        Their mean, sample standard deviation (0.0 for one score) and range.
+    """
     values = np.asarray(scores, dtype=float)
     return Spread(
         tuple(float(v) for v in values),
@@ -103,7 +123,15 @@ def spread_of(scores: list[float]) -> Spread:
 
 
 def reseeded(build: Callable[[], base.BaseEstimator], seed: int) -> Any:
-    """A fresh estimator with its random seed set, when it has one."""
+    """A fresh estimator with its random seed set, when it has one.
+
+    Args:
+        build: Creates an unfitted estimator.
+        seed: Value for its `random_state`, if it has that parameter.
+
+    Returns:
+        The new estimator.
+    """
     model = build()
     if "random_state" in model.get_params():
         model.set_params(random_state=seed)
@@ -121,6 +149,14 @@ def training_sensitivity(
     """Spread over training seeds and over bootstrap resamples.
 
     One fixed split is used so that only training varies.
+
+    Args:
+        build: Creates an unfitted estimator.
+        features: All rows' features.
+        target: All rows' targets.
+        scorer: Scores a fitted estimator; higher is better.
+        repeats: Number of fits of each kind.
+        seed: Seed of the split and of the resampling.
 
     Returns:
         (seed spread, resample spread).
@@ -153,7 +189,19 @@ def evaluation_sensitivity(
     repeats: int = 10,
     seed: int = 0,
 ) -> Spread:
-    """Spread of the score over random train/test splits."""
+    """Spread of the score over random train/test splits.
+
+    Args:
+        build: Creates an unfitted estimator.
+        features: All rows' features.
+        target: All rows' targets.
+        scorer: Scores a fitted estimator; higher is better.
+        repeats: Number of splits.
+        seed: Base seed; split `i` uses `seed + i`.
+
+    Returns:
+        The spread of the held-out scores.
+    """
     scores = []
     for index in range(repeats):
         train, test = model_selection.train_test_split(
@@ -169,7 +217,17 @@ def evaluation_sensitivity(
 def noisy(
     features: pd.DataFrame, level: float, generator: np.random.Generator
 ) -> pd.DataFrame:
-    """Adds Gaussian noise of `level` standard deviations to numeric columns."""
+    """Adds Gaussian noise of `level` standard deviations to numeric columns.
+
+    Args:
+        features: Rows to perturb.
+        level: Noise standard deviation, in units of each column's own
+            standard deviation.
+        generator: Source of the noise.
+
+    Returns:
+        A perturbed copy; non-numeric columns are unchanged.
+    """
     result = features.copy()
     for name in result.select_dtypes("number").columns:
         scale = float(result[name].std() or 0.0)
@@ -189,6 +247,15 @@ def performance_sensitivity(
     seed: int = 0,
 ) -> tuple[dict[float, float], float]:
     """Score of a fitted model as noise is added to the features.
+
+    Args:
+        model: A fitted estimator.
+        features: Held-out features.
+        target: Held-out targets.
+        scorer: Scores a fitted estimator; higher is better.
+        levels: Noise levels, in standard deviations of each column.
+        repeats: Noise draws averaged at each nonzero level.
+        seed: Seed of the noise.
 
     Returns:
         (mean score per noise level, least-squares slope of score on level).
@@ -218,6 +285,17 @@ def analyze(
     seed: int = 0,
 ) -> SensitivityReport:
     """Training, evaluation and performance sensitivity of one model.
+
+    Args:
+        build: Creates an unfitted estimator.
+        features: All rows' features.
+        target: All rows' targets.
+        scorer: Scores a fitted estimator; higher is better.
+        repeats: Number of fits or splits in each repeated measure.
+        seed: Base seed.
+
+    Returns:
+        The three spreads, the noise curve and its slope.
 
     Raises:
         ValueError: With fewer than `MIN_ROWS` rows.

@@ -27,17 +27,38 @@ class DirichletCalibrator(base.BaseEstimator, base.ClassifierMixin):
     """
 
     def __init__(self, estimator: Any, regularization: float = 1.0) -> None:
-        """Stores the settings (scikit-learn convention)."""
+        """Stores the settings (scikit-learn convention).
+
+        Args:
+            estimator: A fitted classifier with `predict_proba`.
+            regularization: Strength of the L2 penalty on the map.
+        """
         self.estimator = estimator
         self.regularization = regularization
 
     def log_probabilities(self, features: Any) -> np.ndarray:
-        """Log of the wrapped model's probabilities, floored."""
+        """Log of the wrapped model's probabilities, floored.
+
+        Args:
+            features: Rows to predict probabilities for.
+
+        Returns:
+            The natural log of each class probability, with probabilities
+            clipped to `[FLOOR, 1]` first; shape `(rows, classes)`.
+        """
         probabilities = np.asarray(self.estimator.predict_proba(features))
         return np.log(np.clip(probabilities, FLOOR, 1.0))
 
     def fit(self, features: Any, labels: Any) -> Self:
-        """Learns the map on labeled rows the model was not trained on."""
+        """Learns the map on labeled rows the model was not trained on.
+
+        Args:
+            features: Calibration rows.
+            labels: Class labels of those rows.
+
+        Returns:
+            The fitted calibrator itself.
+        """
         self.map_ = linear_model.LogisticRegression(
             C=1.0 / max(self.regularization, 1e-9), max_iter=1000
         ).fit(self.log_probabilities(features), np.asarray(labels))
@@ -45,9 +66,24 @@ class DirichletCalibrator(base.BaseEstimator, base.ClassifierMixin):
         return self
 
     def predict_proba(self, features: Any) -> np.ndarray:
-        """Calibrated class probabilities."""
+        """Calibrated class probabilities.
+
+        Args:
+            features: Rows to predict for.
+
+        Returns:
+            Probabilities of shape `(rows, classes)`, columns in `classes_`
+            order.
+        """
         return self.map_.predict_proba(self.log_probabilities(features))
 
     def predict(self, features: Any) -> np.ndarray:
-        """Most probable class after calibration."""
+        """Most probable class after calibration.
+
+        Args:
+            features: Rows to predict for.
+
+        Returns:
+            The class with the highest calibrated probability for each row.
+        """
         return self.classes_[self.predict_proba(features).argmax(axis=1)]

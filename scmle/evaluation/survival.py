@@ -24,14 +24,32 @@ MIN_CENSORING_PROBABILITY = 0.05
 def censoring_curve(
     duration: np.ndarray, event: np.ndarray
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Kaplan-Meier curve of the censoring times (censoring as the event)."""
+    """Kaplan-Meier curve of the censoring times (censoring as the event).
+
+    Args:
+        duration: Observed times.
+        event: 1 where the event was observed, 0 where censored.
+
+    Returns:
+        The curve as the distinct times and the estimated probability of
+        remaining uncensored at each.
+    """
     return estimators.kaplan_meier(duration, 1 - np.asarray(event))
 
 
 def censoring_probability(
     curve: tuple[np.ndarray, np.ndarray], times: np.ndarray
 ) -> np.ndarray:
-    """Chance of still being uncensored at each time, kept above a floor."""
+    """Chance of still being uncensored at each time, kept above a floor.
+
+    Args:
+        curve: The censoring curve from `censoring_curve`.
+        times: Times to look up.
+
+    Returns:
+        The step-function value at each time (1.0 before the first step),
+        at least `MIN_CENSORING_PROBABILITY`.
+    """
     moments, values = curve
     found = estimators.step_lookup(moments, values, times, 1.0)
     return np.maximum(found, MIN_CENSORING_PROBABILITY)
@@ -42,6 +60,14 @@ def floored_count(duration: np.ndarray, event: np.ndarray) -> int:
 
     Their weight is capped at `1 / MIN_CENSORING_PROBABILITY`, a bias that
     the Brier and AUC scores do not otherwise show. Report it with them.
+
+    Args:
+        duration: Observed times.
+        event: 1 where the event was observed.
+
+    Returns:
+        The number of rows whose censoring probability at their own time is
+        below `MIN_CENSORING_PROBABILITY`.
     """
     moments, values = censoring_curve(duration, event)
     found = estimators.step_lookup(moments, values, duration, 1.0)
@@ -49,7 +75,16 @@ def floored_count(duration: np.ndarray, event: np.ndarray) -> int:
 
 
 def time_grid(duration: np.ndarray, event: np.ndarray) -> np.ndarray:
-    """Evaluation times between the 10th and 90th percentile of event times."""
+    """Evaluation times between the 10th and 90th percentile of event times.
+
+    Args:
+        duration: Observed times.
+        event: 1 where the event was observed.
+
+    Returns:
+        The distinct values at `GRID_POINTS` evenly spaced quantiles of the
+        event times (of all durations if no event was observed).
+    """
     observed = duration[np.asarray(event, dtype=bool)]
     source = observed if observed.size else duration
     return np.unique(
@@ -98,7 +133,18 @@ def integrated_brier(
     survival: np.ndarray,
     times: np.ndarray,
 ) -> float:
-    """Brier score averaged over the time grid (trapezoid rule)."""
+    """Brier score averaged over the time grid (trapezoid rule).
+
+    Args:
+        duration: Observed times.
+        event: 1 where the event was observed.
+        survival: Predicted probability of no event, `(rows, len(times))`.
+        times: The times the columns of `survival` refer to, ascending.
+
+    Returns:
+        The integral of the Brier score divided by the time span; the single
+        score when there is one time.
+    """
     scores = brier_scores(duration, event, survival, times)
     if len(times) < 2:
         return float(scores[0])
@@ -115,6 +161,16 @@ def dynamic_auc(
     the inverse censoring probability) and rows still event-free are
     controls; the AUC is the weighted share of case-control pairs the risk
     score orders correctly.
+
+    Args:
+        duration: Observed times.
+        event: 1 where the event was observed.
+        risk: Risk score of each row; higher means earlier event.
+        times: Times at which to evaluate.
+
+    Returns:
+        The mean AUC over the times that have both a case and a control, or
+        NaN if there are none.
     """
     seen = np.asarray(event, dtype=bool)
     weights = 1.0 / censoring_probability(
@@ -150,11 +206,26 @@ class SurvivalMetric(metric_contracts.Metric):
     kind: str = "ibs"
 
     def accepts_weights(self) -> bool:
-        """These scores weight by censoring, not by row weights."""
+        """These scores weight by censoring, not by row weights.
+
+        Returns:
+            Always False.
+        """
         return False
 
     def scorer(self, positive: Any = None) -> Any:
-        """Builds a scorer `(estimator, features, durations)`."""
+        """Builds a scorer `(estimator, features, durations)`.
+
+        Args:
+            positive: Unused; survival has no positive class.
+
+        Returns:
+            A function returning the score of the estimator on the rows,
+            where higher is better: the negated integrated Brier score for
+            `ibs`, the mean dynamic AUC otherwise. The event indicator is
+            read from the estimator's `event_column`; sample weights are
+            ignored.
+        """
         kind = self.kind
 
         def score(

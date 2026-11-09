@@ -20,6 +20,22 @@ def release_policy_from_criteria(
     score. The metric-uncertainty diagnostic is a blocking evidence gate for
     every task because a point estimate without an uncertainty report is not
     sufficient release evidence.
+
+    Args:
+        task: The task type.
+        primary_metric: Name of the primary metric.
+        primary_greater_is_better: Whether larger values of the primary
+            metric are better.
+        success_criteria: Required score per metric name.
+
+    Returns:
+        A release policy with one metric gate per success criterion and a
+        blocking gate on the metric-uncertainty diagnostic, or None when
+        there are no success criteria.
+
+    Raises:
+        UnsupportedEvaluationPolicyError: If a success criterion names a
+            metric with no declared release direction.
     """
     if not success_criteria:
         return None

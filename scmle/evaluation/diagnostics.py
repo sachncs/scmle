@@ -72,12 +72,19 @@ class DiagnosticInput:
     deadline: float | None = None
 
     def out_of_time(self) -> bool:
-        """Whether the diagnostic's time allowance has run out."""
+        """Whether the diagnostic's time allowance has run out.
+
+        Returns:
+            True if a deadline is set and the monotonic clock has passed it.
+        """
         return self.deadline is not None and time.monotonic() > self.deadline
 
     @property
     def positive_label(self) -> Any:
-        """Positive class of a binary target, else None."""
+        """The positive class of a binary target, else None.
+
+        It is the second class of the fitted estimator.
+        """
         classes = getattr(self.estimator, "classes_", None)
         if self.task is tasks.TaskType.BINARY and classes is not None:
             return classes[1]
@@ -108,13 +115,22 @@ class Diagnostic(abc.ABC):
 
 
 class ClassificationReport(Diagnostic):
-    """Confusion matrix and per-class precision / recall / F1."""
+    """Confusion matrix and per-class precision / recall / F-measure."""
 
     name = "classification_report"
     applies_to = CLASSIFICATION
 
     def compute(self, inputs: DiagnosticInput) -> dict[str, Any]:
-        """Builds the confusion matrix and per-class scores."""
+        """Builds the confusion matrix and per-class scores.
+
+        Args:
+            inputs: The fitted candidate and evaluation data.
+
+        Returns:
+            The class labels as text, the confusion matrix (rows are true
+            classes, columns predicted, in label order) and, per class, the
+            precision, recall, F-measure and support.
+        """
         predicted = inputs.estimator.predict(inputs.features)
         labels = list(inputs.estimator.classes_)
         matrix = sk_metrics.confusion_matrix(
@@ -147,7 +163,16 @@ class CalibrationReport(Diagnostic):
     applies_to = BINARY_ONLY
 
     def compute(self, inputs: DiagnosticInput) -> dict[str, Any]:
-        """Bins predicted probabilities and compares them with outcomes."""
+        """Bins predicted probabilities and compares them with outcomes.
+
+        Args:
+            inputs: The fitted candidate and evaluation data.
+
+        Returns:
+            The Brier score, the expected calibration error (bin-weighted
+            mean absolute gap between predicted and observed frequency) and
+            the curve of the non-empty equal-width bins.
+        """
         probability = inputs.estimator.predict_proba(inputs.features)[:, 1]
         observed = (inputs.target == inputs.positive_label).astype(float)
         edges = np.linspace(0.0, 1.0, CALIBRATION_BINS + 1)
@@ -184,7 +209,15 @@ class MulticlassCalibrationReport(Diagnostic):
     applies_to = frozenset({tasks.TaskType.MULTICLASS})
 
     def compute(self, inputs: DiagnosticInput) -> dict[str, Any]:
-        """Compares confidence in the predicted class with its accuracy."""
+        """Compares confidence in the predicted class with its accuracy.
+
+        Args:
+            inputs: The fitted candidate and evaluation data.
+
+        Returns:
+            The multiclass Brier score, the top-label expected calibration
+            error and the top-label reliability curve.
+        """
         probabilities = np.asarray(
             inputs.estimator.predict_proba(inputs.features)
         )
@@ -204,13 +237,21 @@ class MulticlassCalibrationReport(Diagnostic):
 
 
 class ThresholdReport(Diagnostic):
-    """Precision / recall / F1 across decision thresholds."""
+    """Precision / recall / F-measure across decision thresholds."""
 
     name = "threshold_analysis"
     applies_to = BINARY_ONLY
 
     def compute(self, inputs: DiagnosticInput) -> dict[str, Any]:
-        """Scores the positive class at a grid of thresholds."""
+        """Scores the positive class at a grid of thresholds.
+
+        Args:
+            inputs: The fitted candidate and evaluation data.
+
+        Returns:
+            The precision, recall and F-measure at each threshold in
+            `THRESHOLDS`.
+        """
         probability = inputs.estimator.predict_proba(inputs.features)[:, 1]
         actual = (inputs.target == inputs.positive_label).to_numpy()
         rows = []
@@ -238,7 +279,18 @@ class ResidualReport(Diagnostic):
     applies_to = REGRESSION_ONLY
 
     def compute(self, inputs: DiagnosticInput) -> dict[str, Any]:
-        """Summarizes residuals and the worst-served segments."""
+        """Summarizes residuals and the worst-served segments.
+
+        Args:
+            inputs: The fitted candidate and evaluation data.
+
+        Returns:
+            The residual bias and standard deviation, the mean absolute
+            error, quantiles of the absolute error and, for the first
+            categorical and numeric features, the mean absolute error and
+            row count by level (numeric features with many distinct values
+            are cut into quartile bands).
+        """
         residual = inputs.target.to_numpy(dtype=float) - np.asarray(
             inputs.estimator.predict(inputs.features), dtype=float
         )
@@ -290,7 +342,19 @@ class ErrorAnalysis(Diagnostic):
     applies_to = CLASSIFICATION | REGRESSION_ONLY
 
     def compute(self, inputs: DiagnosticInput) -> dict[str, Any]:
-        """Return bounded row-level error evidence and its limitations."""
+        """Return bounded row-level error evidence and its limitations.
+
+        Args:
+            inputs: The fitted candidate and evaluation data.
+
+        Returns:
+            The task, row count and up to `MAX_ERROR_ROWS` rows ranked
+            worst first, with the ranking rule and stated limitations.
+            Classification ranks misclassified rows first, then by low
+            confidence, and also reports the misclassified count;
+            regression ranks by absolute error and reports the mean
+            absolute error.
+        """
         predicted = np.asarray(inputs.estimator.predict(inputs.features))
         row_ids = [str(value) for value in inputs.features.index]
         if inputs.task in CLASSIFICATION:
@@ -395,11 +459,28 @@ class CachedPredictions(base.BaseEstimator):
         )
 
     def predict(self, features: pd.DataFrame) -> np.ndarray:
-        """Looks up predictions for the given rows."""
+        """Looks up predictions for the given rows.
+
+        Args:
+            features: Rows whose index labels were seen at construction.
+
+        Returns:
+            The cached predictions, in the order of `features`.
+        """
         return self.predictions.loc[features.index].to_numpy()
 
     def predict_proba(self, features: pd.DataFrame) -> np.ndarray:
-        """Looks up probabilities for the given rows."""
+        """Looks up probabilities for the given rows.
+
+        Args:
+            features: Rows whose index labels were seen at construction.
+
+        Returns:
+            The cached class probabilities, in the order of `features`.
+
+        Raises:
+            errors.ArtifactError: If the wrapped model had no probabilities.
+        """
         if self.probabilities is None:
             raise errors.ArtifactError("the model has no probabilities")
         return self.probabilities.loc[features.index].to_numpy()
@@ -460,7 +541,18 @@ class MetricUncertainty(Diagnostic):
     confidence = 95
 
     def compute(self, inputs: DiagnosticInput) -> dict[str, Any]:
-        """Bootstraps the primary metric on the evaluation rows."""
+        """Bootstraps the primary metric on the evaluation rows.
+
+        Args:
+            inputs: The fitted candidate and evaluation data.
+
+        Returns:
+            The metric name, its point estimate, the percentile interval
+            (key `ci_` plus the confidence), the resampling unit, the number
+            of successful resamples (resamples that fail with a
+            `ValueError`, such as one missing a class, are skipped), the
+            number of evaluation rows and the number of independent units.
+        """
         features = inputs.features[list(inputs.feature_plan.input_columns)]
         features = features.reset_index(drop=True)
         target = inputs.target.reset_index(drop=True)
@@ -520,7 +612,11 @@ class MetricUncertainty(Diagnostic):
 
 
 def default_suite() -> tuple[Diagnostic, ...]:
-    """Returns the standard diagnostics."""
+    """Returns the standard diagnostics.
+
+    Returns:
+        One instance of each diagnostic, in the order they are run.
+    """
     return (
         ClassificationReport(),
         CalibrationReport(),

@@ -26,7 +26,19 @@ SCALE_FLOOR = 1e-12
 def pinball_loss(
     truth: np.ndarray, forecast: np.ndarray, level: float
 ) -> float:
-    """Mean pinball (quantile) loss of `forecast` as the `level` quantile."""
+    """Mean pinball (quantile) loss of `forecast` as the `level` quantile.
+
+    Args:
+        truth: Observed values.
+        forecast: Forecast of the `level` quantile, one per observation.
+        level: Quantile level, strictly between 0 and 1.
+
+    Returns:
+        The mean loss; lower is better.
+
+    Raises:
+        ValueError: If `level` is not strictly between 0 and 1.
+    """
     if not 0.0 < level < 1.0:
         raise ValueError("level must lie strictly between 0 and 1")
     gap = np.asarray(truth, dtype=float) - np.asarray(forecast, dtype=float)
@@ -40,6 +52,18 @@ def interval_score(
 
     Width plus `2 / alpha` times the distance by which the truth falls
     outside.
+
+    Args:
+        truth: Observed values.
+        lower: Lower limits of the intervals.
+        upper: Upper limits of the intervals.
+        alpha: Miscoverage level, strictly between 0 and 1.
+
+    Returns:
+        The mean interval score.
+
+    Raises:
+        ValueError: If `alpha` is not strictly between 0 and 1.
     """
     if not 0.0 < alpha < 1.0:
         raise ValueError("alpha must lie strictly between 0 and 1")
@@ -66,6 +90,9 @@ def weighted_interval_score(
         intervals: `alpha -> (lower, upper)` for each central `1 - alpha`
             interval.
 
+    Returns:
+        The weighted interval score; lower is better.
+
     Raises:
         ValueError: With no interval.
     """
@@ -87,6 +114,14 @@ def crps_from_quantiles(
         truth: Observed values, length `rows`.
         quantiles: `(rows, len(levels))` forecast quantiles.
         levels: The probability levels of the columns, in (0, 1).
+
+    Returns:
+        The approximate CRPS; lower is better.
+
+    Raises:
+        ValueError: If the number of columns differs from the number of
+            levels. A level outside (0, 1) is rejected by `pinball_loss`
+            with a `ValueError`.
     """
     values = np.asarray(quantiles, dtype=float)
     grid = list(levels)
@@ -103,7 +138,19 @@ def crps_from_quantiles(
 
 
 def insample_scale(history: np.ndarray, season: int = 1) -> float:
-    """Mean absolute seasonal-naive error on the training history."""
+    """Mean absolute seasonal-naive error on the training history.
+
+    Args:
+        history: Training values of the series.
+        season: Seasonal period; 1 is the no-change forecast.
+
+    Returns:
+        The mean absolute difference between values `season` steps apart.
+
+    Raises:
+        ValueError: If `season` is below 1 or the history is not longer than
+            the season.
+    """
     series = np.asarray(history, dtype=float)
     if season < 1 or len(series) <= season:
         raise ValueError("history must be longer than the season")
@@ -123,6 +170,11 @@ def mase(
         forecast: Forecasts for the same window.
         history: Training values of the same series.
         season: Seasonal period of the naive benchmark (1 is no-change).
+
+    Returns:
+        The mean absolute error divided by the in-sample naive error, which
+        is floored at `SCALE_FLOOR`. A history that is too short is rejected
+        by `insample_scale` with a `ValueError`.
     """
     scale = max(insample_scale(history, season), SCALE_FLOOR)
     gap = np.abs(np.asarray(truth, dtype=float) - np.asarray(forecast, float))

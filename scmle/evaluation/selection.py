@@ -50,7 +50,17 @@ class SelectionPolicy(abc.ABC):
         metric: metric_contracts.Metric,
         registry: registry_module.ModelRegistry,
     ) -> experiments.TrialResult:
-        """Returns the best-ranked trial."""
+        """Returns the best-ranked trial.
+
+        Args:
+            trials: All trials, any status.
+            metric: The optimized metric.
+            registry: Registry used to look up model costs.
+
+        Returns:
+            The first trial of `rank`. A run with no successful trial is
+            rejected by `rank`.
+        """
         return self.rank(trials, metric, registry)[0]
 
 
@@ -78,7 +88,15 @@ class BestMeanPolicy(SelectionPolicy):
 
     @staticmethod
     def describe(rule: tasks.SelectionSpec) -> str:
-        """Human-readable rule recorded in the evaluation report."""
+        """Human-readable rule recorded in the evaluation report.
+
+        Args:
+            rule: The selection settings.
+
+        Returns:
+            A sentence describing the tie tolerance, tie-breaker and
+            uncertainty handling of `rule`.
+        """
         tie = f"{rule.tie_tolerance:g}" if rule.tie_tolerance else "exact"
         noise = {
             "one_standard_error": (
@@ -104,6 +122,16 @@ class BestMeanPolicy(SelectionPolicy):
 
         Only used with `uncertainty="bayesian"` and when both candidates were
         scored on the same number of folds (at least three).
+
+        Args:
+            best: The best-scoring trial.
+            other: The trial compared with it.
+            sign: 1 when larger scores are better, -1 otherwise.
+
+        Returns:
+            True if the Bayesian comparison finds the best trial better with
+            probability below the configured confidence. False when the
+            policy is not Bayesian or the fold scores cannot be compared.
         """
         if self.rule.uncertainty != "bayesian":
             return False
@@ -125,7 +153,21 @@ class BestMeanPolicy(SelectionPolicy):
         metric: metric_contracts.Metric,
         registry: registry_module.ModelRegistry,
     ) -> list[experiments.TrialResult]:
-        """Sorts by score, resolving ties with the configured tie-breaker."""
+        """Sorts by score, resolving ties with the configured tie-breaker.
+
+        Args:
+            trials: All trials, any status.
+            metric: The optimized metric.
+            registry: Registry used to look up model costs.
+
+        Returns:
+            The successful trials (without the dummy baseline when another
+            model ran): first those tied with the best, ordered by the
+            tie-breaker, then the rest by score.
+
+        Raises:
+            ScmleError: If no trial succeeded.
+        """
         ok = [t for t in trials if t.status is experiments.TrialStatus.OK]
         if not ok:
             raise errors.ScmleError(

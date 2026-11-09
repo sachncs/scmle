@@ -46,12 +46,26 @@ class NestedResult:
     configurations: int
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Returns the JSON-ready record.
+
+        Returns:
+            A mapping of every field of the result.
+        """
         return dataclasses.asdict(self)
 
 
 def inner_splitter(labels: pd.Series, classification: bool, seed: int) -> Any:
-    """Shuffled folds, stratified for classes."""
+    """Shuffled folds, stratified for classes.
+
+    Args:
+        labels: Development labels.
+        classification: Whether the target holds class labels.
+        seed: Seed of the shuffle.
+
+    Returns:
+        A stratified splitter when classifying and every class has at least
+        `INNER_FOLDS` rows, otherwise a plain shuffled one.
+    """
     if classification and labels.value_counts().min() >= INNER_FOLDS:
         return model_selection.StratifiedKFold(
             INNER_FOLDS, shuffle=True, random_state=seed
@@ -67,7 +81,19 @@ def mean_cv_score(
     classification: bool,
     seed: int,
 ) -> float:
-    """Mean scorer value over inner folds."""
+    """Mean scorer value over inner folds.
+
+    Args:
+        model: Unfitted candidate; cloned for each fold.
+        features: Training features.
+        target: Training labels.
+        scorer: scikit-learn scorer (larger is better).
+        classification: Whether the target holds class labels.
+        seed: Seed of the inner folds.
+
+    Returns:
+        The mean score over the inner folds.
+    """
     folds = inner_splitter(target, classification, seed)
     scores = []
     for fit, held in folds.split(features, target):

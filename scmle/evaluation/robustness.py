@@ -34,6 +34,9 @@ class Stressor(abc.ABC):
             features: The evaluation features (not modified).
             inputs: The diagnostic inputs, for the feature plan.
             rng: Source of randomness.
+
+        Returns:
+            The degraded copy of `features`.
         """
 
 
@@ -41,7 +44,11 @@ class MissingValues(Stressor):
     """Blanks a share of the cells."""
 
     def __init__(self, rate: float) -> None:
-        """Stores the share of cells to blank."""
+        """Stores the share of cells to blank.
+
+        Args:
+            rate: Probability that a cell of an input column is blanked.
+        """
         self.rate = rate
         self.name = f"missing_{int(rate * 100)}pct"
 
@@ -51,7 +58,17 @@ class MissingValues(Stressor):
         inputs: diagnostics.DiagnosticInput,
         rng: np.random.Generator,
     ) -> pd.DataFrame:
-        """Sets random cells of the input columns to missing."""
+        """Sets random cells of the input columns to missing.
+
+        Args:
+            features: The evaluation features (not modified).
+            inputs: The diagnostic inputs, for the feature plan.
+            rng: Source of randomness.
+
+        Returns:
+            A copy in which each cell of each input column is missing with
+            probability `rate`.
+        """
         damaged = features.copy()
         for column in inputs.feature_plan.input_columns:
             mask = rng.random(len(damaged)) < self.rate
@@ -67,7 +84,12 @@ class GaussianNoise(Stressor):
     """Adds noise proportional to each numeric column's spread."""
 
     def __init__(self, scale: float) -> None:
-        """Stores the noise level in standard deviations."""
+        """Stores the noise level in standard deviations.
+
+        Args:
+            scale: Standard deviation of the noise, in units of each
+                column's own standard deviation.
+        """
         self.scale = scale
         self.name = f"noise_{self.scale:g}sd"
 
@@ -77,7 +99,16 @@ class GaussianNoise(Stressor):
         inputs: diagnostics.DiagnosticInput,
         rng: np.random.Generator,
     ) -> pd.DataFrame:
-        """Perturbs the numeric columns."""
+        """Perturbs the numeric columns.
+
+        Args:
+            features: The evaluation features (not modified).
+            inputs: The diagnostic inputs, for the feature plan.
+            rng: Source of randomness.
+
+        Returns:
+            A copy in which every numeric column has normal noise added.
+        """
         damaged = features.copy()
         for column in inputs.feature_plan.numeric:
             spread = float(pd.to_numeric(damaged[column]).std() or 0.0)
@@ -91,7 +122,11 @@ class UnseenCategories(Stressor):
     """Replaces a share of categorical values with a level never trained on."""
 
     def __init__(self, rate: float) -> None:
-        """Stores the share of values to replace."""
+        """Stores the share of values to replace.
+
+        Args:
+            rate: Probability that a categorical value is replaced.
+        """
         self.rate = rate
         self.name = f"unseen_categories_{int(rate * 100)}pct"
 
@@ -101,7 +136,17 @@ class UnseenCategories(Stressor):
         inputs: diagnostics.DiagnosticInput,
         rng: np.random.Generator,
     ) -> pd.DataFrame:
-        """Overwrites random categorical cells with an unseen level."""
+        """Overwrites random categorical cells with an unseen level.
+
+        Args:
+            features: The evaluation features (not modified).
+            inputs: The diagnostic inputs, for the feature plan.
+            rng: Source of randomness.
+
+        Returns:
+            A copy in which each categorical cell is replaced by
+            `UNSEEN_TOKEN` with probability `rate`.
+        """
         damaged = features.copy()
         for column in inputs.feature_plan.categorical:
             mask = rng.random(len(damaged)) < self.rate
@@ -112,7 +157,12 @@ class UnseenCategories(Stressor):
 
 
 def default_stressors() -> tuple[Stressor, ...]:
-    """Returns the standard stress scenarios."""
+    """Returns the standard stress scenarios.
+
+    Returns:
+        10% and 30% missing values, noise of 0.1 and 0.5 standard
+        deviations, and 20% unseen categories.
+    """
     return (
         MissingValues(0.10),
         MissingValues(0.30),
@@ -128,7 +178,11 @@ class RobustnessReport(diagnostics.Diagnostic):
     name = "robustness"
 
     def __init__(self, stressors: tuple[Stressor, ...] | None = None) -> None:
-        """Chooses the scenarios (the standard ones by default)."""
+        """Chooses the scenarios (the standard ones by default).
+
+        Args:
+            stressors: The scenarios to run, or None for `default_stressors`.
+        """
         self.stressors = stressors or default_stressors()
 
     def compute(self, inputs: diagnostics.DiagnosticInput) -> dict[str, Any]:
@@ -139,8 +193,9 @@ class RobustnessReport(diagnostics.Diagnostic):
 
         Returns:
             The clean score and, per scenario, the score and the loss in the
-            metric's own units (positive means worse), plus the scenarios
-            where the relative loss is large.
+            metric's own units (positive means worse) and relative to the
+            clean score, plus the sorted names of scenarios whose relative
+            loss exceeds `FRAGILE_DROP`.
         """
         metric = inputs.metric
         clean = metric.score(

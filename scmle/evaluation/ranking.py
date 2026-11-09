@@ -14,7 +14,15 @@ MIN_DOCUMENTS = 2
 
 
 def query_groups(queries: Any) -> list[np.ndarray]:
-    """Row positions of each query."""
+    """Row positions of each query.
+
+    Args:
+        queries: Query label of each row.
+
+    Returns:
+        One array of row positions per distinct query (labels compared as
+        text), in order of first appearance.
+    """
     codes, uniques = pd.factorize(pd.Series(np.asarray(queries)).astype(str))
     return [np.flatnonzero(codes == code) for code in range(len(uniques))]
 
@@ -29,6 +37,15 @@ def mean_ndcg(
 
     Queries with fewer than two documents, or with nothing relevant, cannot
     be ranked and are skipped.
+
+    Args:
+        relevance: Relevance grade of each document.
+        scores: Predicted score of each document, aligned with `relevance`.
+        queries: Query label of each document.
+        cutoff: Number of top-ranked documents considered.
+
+    Returns:
+        The mean NDCG over the scorable queries, or NaN if there are none.
     """
     values = []
     for rows in query_groups(queries):
@@ -55,6 +72,16 @@ def per_query_ndcg(
 
     A query with nothing relevant (or a single document) is excluded and
     counted, not scored as zero.
+
+    Args:
+        relevance: Relevance grade of each document.
+        scores: Predicted score of each document, aligned with `relevance`.
+        queries: Query label of each document.
+        cutoff: Number of top-ranked documents considered.
+
+    Returns:
+        The NDCG of each scorable query, in query order, and the number of
+        excluded queries.
     """
     values = []
     excluded = 0
@@ -87,6 +114,20 @@ def query_bootstrap_ndcg(
     Documents of one query are not independent, so queries are the
     resampling unit. Returns the mean, the limits, the number of scored
     queries and the number excluded for having nothing relevant.
+
+    Args:
+        relevance: Relevance grade of each document.
+        scores: Predicted score of each document, aligned with `relevance`.
+        queries: Query label of each document.
+        cutoff: Number of top-ranked documents considered.
+        replicates: Number of bootstrap resamples of the queries.
+        level: Confidence level of the interval.
+        seed: Seed of the resampling.
+
+    Returns:
+        The `mean`, `lower` and `upper` limits (NaN when no query is
+        scorable), the number of scored `queries` and the number
+        `excluded`.
     """
     values, excluded = per_query_ndcg(relevance, scores, queries, cutoff)
     if values.size == 0:
@@ -117,7 +158,18 @@ def mean_average_precision(
     queries: Any,
     cutoff: int = CUTOFF,
 ) -> float:
-    """Average precision at `cutoff` (relevant means grade above zero)."""
+    """Average precision at `cutoff` (relevant means grade above zero).
+
+    Args:
+        relevance: Relevance grade of each document.
+        scores: Predicted score of each document, aligned with `relevance`.
+        queries: Query label of each document.
+        cutoff: Number of top-ranked documents considered.
+
+    Returns:
+        The mean over queries with at least two documents and one relevant
+        document, or NaN if there are none.
+    """
     values = []
     for rows in query_groups(queries):
         truth = np.asarray(relevance, dtype=float)[rows] > 0
@@ -137,7 +189,17 @@ def mean_average_precision(
 def ranked_hits(
     relevance: np.ndarray, scores: np.ndarray, rows: np.ndarray
 ) -> np.ndarray:
-    """Relevance (above zero) of one query's documents in score order."""
+    """Relevance (above zero) of one query's documents in score order.
+
+    Args:
+        relevance: Relevance grade of each document.
+        scores: Predicted score of each document, aligned with `relevance`.
+        rows: Row positions of the query's documents.
+
+    Returns:
+        A boolean array, highest score first (ties in row order): True where
+        the grade is above zero.
+    """
     truth = np.asarray(relevance, dtype=float)[rows] > 0
     order = np.argsort(-np.asarray(scores, dtype=float)[rows], kind="stable")
     return truth[order]
@@ -146,7 +208,17 @@ def ranked_hits(
 def mean_reciprocal_rank(
     relevance: np.ndarray, scores: np.ndarray, queries: Any
 ) -> float:
-    """Average of one over the rank of the first relevant document."""
+    """Average of one over the rank of the first relevant document.
+
+    Args:
+        relevance: Relevance grade of each document.
+        scores: Predicted score of each document, aligned with `relevance`.
+        queries: Query label of each document.
+
+    Returns:
+        The mean reciprocal rank over queries with at least two documents
+        and one relevant document, or NaN if there are none.
+    """
     values = []
     for rows in query_groups(queries):
         hits = ranked_hits(relevance, scores, rows)
@@ -162,7 +234,18 @@ def precision_at(
     queries: Any,
     cutoff: int = CUTOFF,
 ) -> float:
-    """Share of the top `cutoff` documents that are relevant, per query."""
+    """Share of the top `cutoff` documents that are relevant, per query.
+
+    Args:
+        relevance: Relevance grade of each document.
+        scores: Predicted score of each document, aligned with `relevance`.
+        queries: Query label of each document.
+        cutoff: Number of top-ranked documents considered.
+
+    Returns:
+        The mean over queries with at least two documents and one relevant
+        document, or NaN if there are none.
+    """
     values = []
     for rows in query_groups(queries):
         hits = ranked_hits(relevance, scores, rows)
@@ -178,7 +261,18 @@ def recall_at(
     queries: Any,
     cutoff: int = CUTOFF,
 ) -> float:
-    """Share of a query's relevant documents found in the top `cutoff`."""
+    """Share of a query's relevant documents found in the top `cutoff`.
+
+    Args:
+        relevance: Relevance grade of each document.
+        scores: Predicted score of each document, aligned with `relevance`.
+        queries: Query label of each document.
+        cutoff: Number of top-ranked documents considered.
+
+    Returns:
+        The mean over queries with at least two documents and one relevant
+        document, or NaN if there are none.
+    """
     values = []
     for rows in query_groups(queries):
         hits = ranked_hits(relevance, scores, rows)
@@ -210,11 +304,24 @@ class RankingMetric(metric_contracts.Metric):
     kind: str = "ndcg"
 
     def accepts_weights(self) -> bool:
-        """Queries are the unit of scoring, not weighted rows."""
+        """Queries are the unit of scoring, not weighted rows.
+
+        Returns:
+            Always False.
+        """
         return False
 
     def scorer(self, positive: Any = None) -> Any:
-        """Builds a scorer `(estimator, features, relevance)`."""
+        """Builds a scorer `(estimator, features, relevance)`.
+
+        Args:
+            positive: Unused; ranking has no positive class.
+
+        Returns:
+            A function that scores the estimator's predictions for the
+            features against the relevance grades, grouping documents by the
+            estimator's `query_column`. It ignores sample weights.
+        """
         function = FUNCTIONS[self.kind]
 
         def score(

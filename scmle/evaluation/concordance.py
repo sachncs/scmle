@@ -57,11 +57,24 @@ class ConcordanceMetric(metric_contracts.Metric):
     """
 
     def accepts_weights(self) -> bool:
-        """The concordance index here is unweighted."""
+        """Reports whether the metric uses sample weights.
+
+        Returns:
+            Always False; the concordance index here is unweighted.
+        """
         return False
 
     def scorer(self, positive: Any = None) -> Any:
-        """Builds a scorer `(estimator, features, durations)`."""
+        """Builds a scorer `(estimator, features, durations)`.
+
+        Args:
+            positive: Unused; present for the shared metric interface.
+
+        Returns:
+            A callable that scores a fitted estimator on features and observed
+            durations, reading events from `estimator.event_column`. Its
+            optional `sample_weight` argument is ignored.
+        """
 
         def score(
             estimator: Any,

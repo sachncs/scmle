@@ -81,6 +81,18 @@ class AdversarialValidation(diagnostics.Diagnostic):
         `scmle.evaluation.shift_weights.estimate_weights` (which uses a
         logistic discriminator fitted on all rows; this one is the boosted
         classifier of the report, scored out of fold). Descriptive.
+
+        Args:
+            scores: Out-of-fold probability that each row is an evaluation
+                row; the reference rows come first, then the evaluation rows.
+            reference_rows: Number of reference rows at the start of `scores`.
+
+        Returns:
+            The clip, the size correction, summaries (mean, 95th percentile,
+            maximum, clipped share, effective size) of the odds on the
+            reference and on the evaluation rows, whether weighted conformal
+            is `possible` or `refused` by the reference effective size, and a
+            note.
         """
         new_rows = len(scores) - reference_rows
         clip = shift_weights.DEFAULT_CLIP
@@ -122,7 +134,16 @@ class AdversarialValidation(diagnostics.Diagnostic):
 
     @staticmethod
     def sample(frame: pd.DataFrame, rng: np.random.Generator) -> pd.DataFrame:
-        """Caps the rows used, keeping runtime bounded."""
+        """Caps the rows used, keeping runtime bounded.
+
+        Args:
+            frame: Rows to sample from.
+            rng: Source of the random choice.
+
+        Returns:
+            `frame` with a fresh index when it has at most `MAX_ROWS` rows,
+            otherwise `MAX_ROWS` randomly chosen rows in original order.
+        """
         if len(frame) <= MAX_ROWS:
             return frame.reset_index(drop=True)
         chosen = rng.choice(len(frame), MAX_ROWS, replace=False)
@@ -132,7 +153,17 @@ class AdversarialValidation(diagnostics.Diagnostic):
     def encode(
         frame: pd.DataFrame, inputs: diagnostics.DiagnosticInput
     ) -> pd.DataFrame:
-        """Numeric view of the rows: numbers as is, categories as codes."""
+        """Numeric view of the rows: numbers as is, categories as codes.
+
+        Args:
+            frame: Rows holding the feature columns.
+            inputs: The diagnostic inputs naming the numeric and
+                categorical columns.
+
+        Returns:
+            A copy of `frame` with categorical columns replaced by category
+            codes and numeric columns converted to numbers.
+        """
         encoded = frame.copy()
         for column in inputs.feature_plan.categorical:
             encoded[column] = encoded[column].astype("category").cat.codes
@@ -142,7 +173,15 @@ class AdversarialValidation(diagnostics.Diagnostic):
 
     @staticmethod
     def verdict(auc: float) -> str:
-        """Names the degree of shift."""
+        """Names the degree of shift.
+
+        Args:
+            auc: Separability AUC.
+
+        Returns:
+            `strong shift` from `STRONG_AUC`, `moderate shift` from
+            `MODERATE_AUC`, otherwise `no meaningful shift`.
+        """
         if auc >= STRONG_AUC:
             return "strong shift"
         if auc >= MODERATE_AUC:
@@ -160,6 +199,16 @@ class AdversarialValidation(diagnostics.Diagnostic):
         Numeric features use the single-feature AUC distance from 0.5;
         categorical features use the total-variation distance between level
         frequencies. Both lie in [0, 1] and are comparable as a ranking.
+
+        Args:
+            old: Sampled reference rows.
+            new: Sampled evaluation rows.
+            inputs: The diagnostic inputs naming the numeric and
+                categorical columns.
+
+        Returns:
+            Up to `TOP_FEATURES` entries of feature name and distance,
+            largest distance first.
         """
         found = []
         for column in inputs.feature_plan.numeric:

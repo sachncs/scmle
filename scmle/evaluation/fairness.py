@@ -72,7 +72,16 @@ class FairnessReport(diagnostics.Diagnostic):
 
     @staticmethod
     def groups(values: pd.Series) -> pd.Series:
-        """Group labels: levels for categories, quartile bands for numbers."""
+        """Group labels: levels for categories, quartile bands for numbers.
+
+        Args:
+            values: One sensitive column.
+
+        Returns:
+            The group of each row as text, aligned with `values`: quartile
+            bands for a numeric column with more than `MAX_LEVELS` distinct
+            values, otherwise the value itself. Missing values stay missing.
+        """
         if pd.api.types.is_numeric_dtype(values) and (
             values.nunique() > MAX_LEVELS
         ):
@@ -88,6 +97,15 @@ class FairnessReport(diagnostics.Diagnostic):
         Numeric columns use the same deterministic bands as their standalone
         report. Missing values remain missing so they cannot be mistaken for
         a real group. A single sensitive column has no intersection to add.
+
+        Args:
+            features: Rows holding the sensitive columns.
+            columns: The sensitive columns.
+
+        Returns:
+            For each row, the group labels of every column joined with
+            ` | `, missing where any column is missing; None with fewer than
+            two columns.
         """
         if len(columns) < 2:
             return None
@@ -105,7 +123,19 @@ class FairnessReport(diagnostics.Diagnostic):
         predicted: np.ndarray,
         positive: Any,
     ) -> dict[str, Any]:
-        """Selection, true-positive and false-positive rates per group."""
+        """Selection, true-positive and false-positive rates per group.
+
+        Args:
+            groups: Group label of each row.
+            truth: Observed labels.
+            predicted: Predicted labels.
+            positive: The positive class.
+
+        Returns:
+            The `binary_summary` of the statistics of each group with at
+            least `MIN_GROUP_ROWS` rows. A rate whose denominator is zero is
+            None.
+        """
         actual = truth == positive
         chosen = predicted == positive
         stats = {}
@@ -135,7 +165,15 @@ class FairnessReport(diagnostics.Diagnostic):
         return self.binary_summary(stats, excluded)
 
     def small_groups(self, groups: pd.Series) -> dict[str, int]:
-        """Returns groups excluded because their cell size is too small."""
+        """Returns groups excluded because their cell size is too small.
+
+        Args:
+            groups: Group label of each row.
+
+        Returns:
+            The row count of each group with fewer than `MIN_GROUP_ROWS`
+            rows, by group name.
+        """
         return {
             str(level): int((groups == level).sum())
             for level in groups.dropna().unique()
@@ -147,7 +185,18 @@ class FairnessReport(diagnostics.Diagnostic):
         stats: dict[str, dict[str, Any]],
         excluded: dict[str, int] | None = None,
     ) -> dict[str, Any]:
-        """Disparity measures and flags over the group statistics."""
+        """Disparity measures and flags over the group statistics.
+
+        Args:
+            stats: Per-group statistics from `binary`.
+            excluded: Row counts of the groups left out as too small.
+
+        Returns:
+            The groups, the demographic parity, equal opportunity and
+            equalized odds differences, the disparate-impact ratio, the
+            flags and the exclusion metadata. With fewer than two groups,
+            only the groups, empty flags, a note and the metadata.
+        """
         excluded = excluded or {}
         metadata = {
             "excluded_groups": excluded,
@@ -202,7 +251,20 @@ class FairnessReport(diagnostics.Diagnostic):
     def numeric(
         self, groups: pd.Series, truth: np.ndarray, predicted: np.ndarray
     ) -> dict[str, Any]:
-        """Mean prediction, bias and RMSE per group (regression)."""
+        """Mean prediction, bias and RMSE per group (regression).
+
+        Args:
+            groups: Group label of each row.
+            truth: Observed values.
+            predicted: Predicted values.
+
+        Returns:
+            The statistics of each group with at least `MIN_GROUP_ROWS`
+            rows, the gap between the largest and smallest group bias in
+            target standard deviations, flags, and the exclusion metadata.
+            With fewer than two groups, only the groups, empty flags, a note
+            and the metadata.
+        """
         error = predicted.astype(float) - truth.astype(float)
         stats = {}
         excluded = self.small_groups(groups)

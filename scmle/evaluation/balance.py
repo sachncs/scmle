@@ -1,4 +1,4 @@
-"""Permutation test of covariate balance across treatment arms (F10).
+"""Permutation test of covariate balance across treatment arms.
 
 The check that the arms of a supposedly randomized experiment look alike on
 the covariates. The statistic is the sum over numeric covariates of the

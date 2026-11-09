@@ -100,6 +100,11 @@ def plan_scores(
         observed: Number of calibration scores.
         models: The fold models.
         max_bytes: Largest serialized size of the models to keep.
+
+    Returns:
+        A plan with mode `cv_plus`, the fold of each calibration row and no
+        reason when the fold models are kept; otherwise mode
+        `pooled_out_of_fold`, no folds and the reason they are not kept.
     """
     folds = partition_folds(held_out, rows)
     reason = None
@@ -118,7 +123,14 @@ def plan_scores(
 
 
 def serialized_size(models: Sequence[Any]) -> int:
-    """Bytes the fold models take when written with joblib."""
+    """Bytes the fold models take when written with joblib.
+
+    Args:
+        models: The fold models.
+
+    Returns:
+        The size in bytes of the serialized list of models.
+    """
     buffer = io.BytesIO()
     joblib.dump(list(models), buffer)
     return buffer.getbuffer().nbytes
@@ -139,7 +151,13 @@ class CvPlusEnsemble:
     residuals: np.ndarray
 
     def __post_init__(self) -> None:
-        """Checks that every calibration row names a model."""
+        """Checks that every calibration row names a model.
+
+        Raises:
+            ValueError: If `fold_of_row` and `residuals` differ in length,
+                there are fewer than `conformal.MIN_CALIBRATION_ROWS`
+                calibration rows, or a row names a fold that has no model.
+        """
         if len(self.fold_of_row) != len(self.residuals):
             raise ValueError("fold_of_row and residuals differ in length")
         if len(self.residuals) < conformal.MIN_CALIBRATION_ROWS:
@@ -163,6 +181,15 @@ class CvPlusEnsemble:
         The guarantee of the paper is a coverage of at least `1 - 2a` for
         the nominal `1 - a`; the measured coverage on held-out data is what
         this package reports.
+
+        Args:
+            features: New rows to predict for.
+            coverage: Nominal coverage of the interval.
+
+        Returns:
+            The lower and the upper limit, each with one value per row of
+            `features`. Invalid input is rejected by
+            `conformal.cv_plus_bounds`.
         """
         predictions = np.column_stack(
             [np.asarray(m.predict(features), dtype=float) for m in self.models]

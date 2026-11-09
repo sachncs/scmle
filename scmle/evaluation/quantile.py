@@ -28,6 +28,15 @@ def predicted_band(
     """Uncalibrated band with the lower edge never above the upper.
 
     Separately fitted quantile models can cross; the edges are swapped back.
+
+    Args:
+        lower_model: Fitted model of the low quantile.
+        upper_model: Fitted model of the high quantile.
+        features: Rows to predict for.
+
+    Returns:
+        The lower and upper edges: the elementwise minimum and maximum of
+        the two predictions.
     """
     low = np.asarray(lower_model.predict(features), dtype=float)
     high = np.asarray(upper_model.predict(features), dtype=float)
@@ -55,8 +64,17 @@ class QuantileBand:
     ) -> "QuantileBand":
         """Scores held-out rows against their predicted band.
 
-        Raises:
-            ValueError: With too few rows.
+        Args:
+            observed: True values of held-out rows.
+            lower: Lower edge of the predicted band for those rows.
+            upper: Upper edge of the predicted band for those rows.
+
+        Returns:
+            The band holding each row's miss: the larger of lower minus
+            value and value minus upper.
+
+        Fewer rows than `ConformalCalibrator.checked` requires are rejected
+        by it with a `ValueError`.
         """
         values = np.asarray(observed, dtype=float)
         low = np.asarray(lower, dtype=float)
@@ -65,7 +83,18 @@ class QuantileBand:
         return cls(conformal.ConformalCalibrator.checked(misses))
 
     def margin(self, coverage: float) -> float:
-        """Widening (or tightening, when negative) that gives `coverage`."""
+        """Widening (or tightening, when negative) that gives `coverage`.
+
+        Args:
+            coverage: Desired coverage, strictly between 0 and 1.
+
+        Returns:
+            The finite-sample quantile of the misses; infinity when there are
+            too few rows for `coverage`.
+
+        Raises:
+            ValueError: If `coverage` is not strictly between 0 and 1.
+        """
         if not 0.0 < coverage < 1.0:
             raise ValueError("coverage must lie strictly between 0 and 1")
         return conformal.finite_sample_quantile(
@@ -90,7 +119,17 @@ class QuantileIntervals:
     def interval(
         self, features: pd.DataFrame, coverage: float
     ) -> tuple[np.ndarray, np.ndarray]:
-        """Calibrated lower and upper bounds for each row."""
+        """Calibrated lower and upper bounds for each row.
+
+        Args:
+            features: Rows to predict for.
+            coverage: Desired coverage, strictly between 0 and 1; an invalid
+                value is rejected by `QuantileBand.margin` with a
+                `ValueError`.
+
+        Returns:
+            The raw band widened by the margin on each side.
+        """
         low, high = self.raw_band(features)
         margin = self.band.margin(coverage)
         return low - margin, high + margin
@@ -127,5 +166,12 @@ class QuantileIntervals:
         return curve
 
     def raw_band(self, features: pd.DataFrame) -> tuple[np.ndarray, np.ndarray]:
-        """The model band before calibration."""
+        """The model band before calibration.
+
+        Args:
+            features: Rows to predict for.
+
+        Returns:
+            The lower and upper edges from `predicted_band`.
+        """
         return predicted_band(self.lower_model, self.upper_model, features)

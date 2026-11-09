@@ -32,7 +32,11 @@ class CriterionResult:
     met: bool
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Returns the JSON-ready record.
+
+        Returns:
+            A mapping of every field of the result.
+        """
         return dataclasses.asdict(self)
 
 
@@ -42,6 +46,16 @@ def check(
     catalog: metrics.MetricCatalog = metrics.CATALOG,
 ) -> list[CriterionResult]:
     """Compares each criterion with the achieved score.
+
+    Args:
+        criteria: Required score per metric name.
+        test_metrics: Achieved score per metric name.
+        catalog: Metric catalog giving each metric's direction.
+
+    Returns:
+        One result per criterion, in the order of `criteria`. A criterion is
+        met when the score is at least (higher-is-better metrics) or at most
+        (otherwise) the required value.
 
     Raises:
         ConfigError: If a criterion names a metric that was not reported

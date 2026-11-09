@@ -39,7 +39,15 @@ class Comparison:
     folds: int
 
     def decisive(self, threshold: float) -> bool:
-        """Whether one side is better with at least `threshold` probability."""
+        """Whether one side is better with at least `threshold` probability.
+
+        Args:
+            threshold: Probability a side must reach.
+
+        Returns:
+            True if the larger of the two "better" probabilities is at least
+            `threshold`.
+        """
         return (
             max(self.probability_first_better, self.probability_second_better)
             >= threshold

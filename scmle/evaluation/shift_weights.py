@@ -6,7 +6,7 @@ likelihood ratio `p_target(x) / p_calibration(x)`. Weights are clipped, and
 the effective sample size `(sum w)^2 / sum w^2` is reported. Below
 `MIN_EFFECTIVE_SIZE` the weights are refused: a handful of rows would carry
 the interval. With an estimated ratio the coverage guarantee is approximate,
-and it is reported that way (A4 of the F12 feature file).
+and it is reported that way.
 """
 
 import dataclasses
@@ -44,7 +44,15 @@ class ShiftWeights:
     scale: float = 1.0
 
     def ratio(self, features: np.ndarray) -> np.ndarray:
-        """Clipped likelihood ratio at new rows (for test-point weights)."""
+        """Clipped likelihood ratio at new rows (for test-point weights).
+
+        Args:
+            features: Numeric feature matrix of the new rows, with the
+                columns the discriminator was fitted on.
+
+        Returns:
+            The size-corrected odds of the discriminator, at most `clip`.
+        """
         probability = self.discriminator.predict_proba(
             np.asarray(features, dtype=float)
         )[:, 1]
@@ -53,7 +61,14 @@ class ShiftWeights:
 
 
 def effective_sample_size(weights: np.ndarray) -> float:
-    """`(sum w)^2 / sum w^2`."""
+    """`(sum w)^2 / sum w^2`.
+
+    Args:
+        weights: Non-negative weights.
+
+    Returns:
+        The Kish effective sample size; 0.0 if all weights are zero.
+    """
     values = np.asarray(weights, dtype=float)
     squares = float((values**2).sum())
     return float(values.sum() ** 2 / squares) if squares > 0 else 0.0
@@ -66,6 +81,17 @@ def estimate_weights(
     minimum: float = MIN_EFFECTIVE_SIZE,
 ) -> ShiftWeights:
     """Fits the discriminator and returns clipped, size-corrected odds.
+
+    Args:
+        calibration: Covariate matrix of the calibration rows.
+        target: Covariate matrix of the unlabeled target rows, with the same
+            columns.
+        clip: Upper bound applied to the odds.
+        minimum: Smallest acceptable effective sample size.
+
+    Returns:
+        The weights of both groups, the effective size of the calibration
+        weights, the clip, the fitted discriminator and the size correction.
 
     Raises:
         WeightRefusedError: When the effective sample size of the
@@ -108,5 +134,12 @@ class StoredShiftWeights:
     columns: tuple[str, ...]
 
     def test_weights(self, frame: Any) -> np.ndarray:
-        """Likelihood ratios of new rows, read from `columns`."""
+        """Likelihood ratios of new rows, read from `columns`.
+
+        Args:
+            frame: Rows holding the numeric feature columns.
+
+        Returns:
+            The clipped likelihood ratio of each row.
+        """
         return self.weights.ratio(frame[list(self.columns)].to_numpy(float))
