@@ -28,6 +28,7 @@ GREATER = "greater"
 LESS = "less"
 DIRECTIONS = (TWO_SIDED, GREATER, LESS)
 MIN_PAIRS = 3
+MIN_CLASSES = 2
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -178,7 +179,7 @@ def kruskal(
     n = len(xs)
     groups = [xs[ls == code] for code in numpy.unique(ls)]
     groups = [g for g in groups if len(g) > 0]
-    if len(groups) < 2 or n < MIN_PAIRS:
+    if len(groups) < MIN_CLASSES or n < MIN_PAIRS:
         return untestable(n, "fewer than two classes or three rows")
     if numpy.ptp(xs) == 0.0:
         return untestable(n, "a variable is constant")

@@ -26,6 +26,7 @@ NUMERIC = "numeric"
 BINARY = "binary"
 MULTICLASS = "multiclass"
 FAMILY = "bivariate"
+BINARY_CLASSES = 2
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -57,7 +58,9 @@ def target_kind(target: pandas.Series, classification: bool) -> str:
     """
     if not classification:
         return NUMERIC
-    return BINARY if target.nunique(dropna=True) <= 2 else MULTICLASS
+    return (
+        BINARY if target.nunique(dropna=True) <= BINARY_CLASSES else MULTICLASS
+    )
 
 
 def encode_target(
