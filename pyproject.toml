@@ -109,8 +109,12 @@ src = ["."]
 extend-exclude = ["mutants", "website"]
 
 [tool.ruff.lint]
-select = ["E", "W", "F", "I", "UP", "B", "N", "D", "ANN", "SIM", "RUF", "C4", "SLF"]
+select = ["E", "W", "F", "I", "UP", "B", "N", "D", "DOC", "ANN", "SIM", "RUF", "C4", "SLF"]
 ignore = ["ANN401", "RUF012"]
+# DOC (documented arguments, returns and raises) and D421 are preview rules;
+# only the rules named in `select` are switched on, not all preview behaviour
+preview = true
+explicit-preview-rules = true
 # underscore names are banned by tests/unit/test_conventions.py
 dummy-variable-rgx = "^(_\\w*|ignored)$"
 
@@ -125,7 +129,8 @@ case-sensitive = false
 order-by-type = false
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["D", "ANN", "E501", "SLF"]
+# tests are documented by their names and bodies, not by Args and Returns
+"tests/**" = ["D", "DOC", "ANN", "E501", "SLF"]
 
 [tool.ruff.format]
 quote-style = "double"

@@ -3,7 +3,6 @@
 from collections.abc import Iterable
 import datetime
 import importlib.metadata
-import importlib.util
 import os
 import pathlib
 import re

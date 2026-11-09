@@ -17,7 +17,6 @@ import pathlib
 import threading
 import time
 from typing import Any
-import urllib.error
 import urllib.request
 
 from scmle import durability
