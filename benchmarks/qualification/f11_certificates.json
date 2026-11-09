@@ -2,10 +2,10 @@
   "dev_seed_base": 10000,
   "gates": {
     "A1": {
-      "code_hash": "0d1795b23c0fc154e19959dd108c569a29817a1a2a72da999836c079375e776b",
+      "code_hash": "e32daedb3c6b894c37e9be9605f59933e1cb4db341763888debe352fc3ddfaba",
       "passed": true,
       "replicates": 200,
-      "seconds": 7.7,
+      "seconds": 7.4,
       "seeds": [
         0,
         200
@@ -61,7 +61,7 @@
       }
     },
     "A1c": {
-      "code_hash": "1fafc271f5487c083b6ef5223eab438d137713746b26d292aa149dbad8a69d30",
+      "code_hash": "861e9ff49844f944f00542329773d39ff3aa27f2118371f1582612eca6c2f3d3",
       "false_alarm_interval": [
         0.005700499728577407,
         0.014182040701612969
@@ -74,7 +74,7 @@
         "1.6": 1.0
       },
       "replicates": 2000,
-      "seconds": 3.2,
+      "seconds": 2.9,
       "seeds": [
         0,
         2000
@@ -82,7 +82,7 @@
       "size_bound": 0.014449719092257398
     },
     "A2": {
-      "code_hash": "a3cd3613cc11497386d7f867a29c1dfac69575b1323bf1afd7386ded018a8e67",
+      "code_hash": "e5cbba94e522c4f8b7a6bad8a21a14a70a26ee623fbfcae0e298aa16c57be7b8",
       "max_identity_error": 8.881784197001252e-16,
       "monte_carlo_mean": 0.10910374999999999,
       "passed": true,
@@ -97,10 +97,10 @@
     },
     "A3": {
       "bootstraps": 400,
-      "code_hash": "a8d1e0b4dfb3d3a263e71b563b0eaf273361da888048ee277d047603c041d240",
+      "code_hash": "dbb17f9f946093d23fdac06a21f75bc91f21c2c1c29736afbf9bd2fe49a8a3d2",
       "passed": false,
       "replicates": 2000,
-      "seconds": 193.5,
+      "seconds": 111.6,
       "seeds": [
         0,
         2000
@@ -158,7 +158,7 @@
     },
     "A4": {
       "bound": 0.059746794344808965,
-      "code_hash": "1c3260b6d88aa90ed22a36ec1287ddeab8a7a3e3e5179ccc3464c468ed2d58c9",
+      "code_hash": "23adafa613a72f3edc8046c25b775dbde7fd0cce538507d3ff394a34c34df6fd",
       "null": {
         "2000": {
           "interval": [
@@ -185,14 +185,14 @@
         "1.5": 0.9133333333333333
       },
       "replicates": 2000,
-      "seconds": 55.1,
+      "seconds": 37.6,
       "seeds": [
         0,
         2000
       ]
     },
     "A5": {
-      "code_hash": "f48dabdbaeefbdcb1031d407d8aba97d5d6781fa7074c8d94ed6bebe4171923c",
+      "code_hash": "5bfa44ebe470f1df24f114985e01b5eefb8a6148ef4f6f8b9f99f17fc82c9b26",
       "dr_floor_met": true,
       "estimators": {
         "dr": {
@@ -283,7 +283,7 @@
         }
       },
       "replicates": 2000,
-      "seconds": 3.4,
+      "seconds": 2.5,
       "seeds": [
         0,
         2000
@@ -291,7 +291,7 @@
       "truth": 0.425
     },
     "A6": {
-      "code_hash": "4043df92fbc00c57c2d5cfbed68345810bd706cb538d869d5d04b13c3cf1d434",
+      "code_hash": "a2a57080c42cdb0a3e6c85bafd7e887a3d0f55fe30db5eaccf2b2e150896a5ed",
       "not_run": "set SCMLE_HILLSTROM to the verified data file",
       "passed": false,
       "seconds": 0.0,
@@ -301,7 +301,7 @@
       ]
     },
     "A7": {
-      "code_hash": "137586d12871d1c7e324eb93a0cb7e93f90788ee5c9a6f793fd97c73dfad928e",
+      "code_hash": "6735b820817a3c3a1f22008485984ef5418b9544742efcdea779c9ef2c6eb5ad",
       "gaps": {
         "0.0": {
           "bound_cover_interval": [
@@ -371,14 +371,14 @@
       },
       "passed": true,
       "replicates": 2000,
-      "seconds": 16.4,
+      "seconds": 12.9,
       "seeds": [
         0,
         2000
       ]
     },
     "A7b": {
-      "code_hash": "18f1de157c55f3dbe3d1e3f630353a8ade918ae4c52bfd35e94d9214abb2f54f",
+      "code_hash": "25f4264d931a5cc9e918c83b228e5dfab251149dfb3de5a090af329556b26864",
       "oracle_net_benefit": 0.15607519226292352,
       "passed": true,
       "relative_loss": {
@@ -390,14 +390,14 @@
         "q95": 0.004483527626684906
       },
       "replicates": 20,
-      "seconds": 100.8,
+      "seconds": 61.2,
       "seeds": [
         0,
         20
       ]
     },
     "A8": {
-      "code_hash": "9af717b78ba88bf918ea444e120d563380aae60afd5e2ca6436f5c3a972ce394",
+      "code_hash": "ed78fbb7ddd29c85b541abd471937d6cd916f1d53528ba4544e21df0da1ceb54",
       "false_refusal_bound": 0.07516611478423584,
       "false_refusal_rate": 0.04666666666666667,
       "false_refusals_equal": 14,
@@ -408,7 +408,7 @@
         "equalized_odds/predictive_parity": 100
       },
       "runs_each": 100,
-      "seconds": 0.2,
+      "seconds": 0.1,
       "seeds": [
         0,
         100
@@ -420,7 +420,7 @@
         "agree": 100,
         "runs": 100
       },
-      "code_hash": "3c4294f41df8a04b3fc73d9a7dcd79f9612a470ffc37ab85317aea4f5dde43ad",
+      "code_hash": "0abc51fd302ee369bca41b4f34f690932530a4cc16846c903df36a538fbae2a1",
       "compare_arms": {
         "false_adopt": 10,
         "interval": [
@@ -440,14 +440,14 @@
       "passed": true,
       "rate": 0.0037,
       "replicates": 10000,
-      "seconds": 228.4,
+      "seconds": 167.4,
       "seeds": [
         0,
         10000
       ]
     },
     "B10": {
-      "code_hash": "42d1da59fbba1e674a1c3f930b57763a0395b29e247783184f162a05cdb8fc37",
+      "code_hash": "52869edb9c0521708aea2f852df263f8cc8f5a99ce85db451bf07dcd0214d83c",
       "digest": "bc035de9a4a818426c06d342b36196663d37798a8e15e611d2fe6e3fb1b0c289",
       "forbidden_imports": [],
       "interpreters_measured": [
@@ -456,7 +456,7 @@
       "passed": true,
       "repeat_equal": true,
       "replicates": 2,
-      "seconds": 0.3,
+      "seconds": 0.1,
       "seeds": [
         0,
         2
@@ -473,7 +473,7 @@
       "promotions": 6,
       "rate": 0.0012,
       "replicates": 5000,
-      "seconds": 19.3,
+      "seconds": 11.7,
       "seeds": [
         0,
         5000
@@ -498,11 +498,11 @@
         "ratio_to_null_shifted": 1.677921338912134,
         "ratio_to_zero_null": null
       },
-      "code_hash": "bbeceb160c524f0d7ba2ba64fc5198dda508bc106d681c0f0943d6f26255d3a1",
+      "code_hash": "19fb2332b8d0010053389b4930be30e1469e282ff128f6d2a7d052a4811031f3",
       "floor": "none: reported",
       "passed": true,
       "replicates": 500,
-      "seconds": 6.7,
+      "seconds": 4.1,
       "seeds": [
         0,
         500
@@ -510,7 +510,7 @@
     },
     "B4": {
       "bound": 0.01198997487421324,
-      "code_hash": "4818196744ef72ba0717475ef9e5feb27823df10b325686911ecf106417e4979",
+      "code_hash": "a63fed1a88324ef23704f4eda001e9ccd016bb2c56819244ab41cd89d78efeec",
       "detection_delay": {
         "2tau": {
           "detected_share": 0.557,
@@ -531,7 +531,7 @@
       "passed": true,
       "rate": 0.0019,
       "replicates": 10000,
-      "seconds": 23.8,
+      "seconds": 15.3,
       "seeds": [
         0,
         10000
@@ -541,7 +541,7 @@
       "code_hash": "94028f5d638d18c2d87fb2ed8b00d09f88538fbfcf2e419ff3eab49df540e417",
       "passed": true,
       "replicates": 2000,
-      "seconds": 1.2,
+      "seconds": 0.7,
       "seeds": [
         0,
         2000
@@ -550,7 +550,7 @@
       "violations": 0
     },
     "B6": {
-      "code_hash": "016f47300195e8b47634cb12bc391c1db1fe920dfee6139822bd23a7cfcb88f8",
+      "code_hash": "46f69720f5615eb9be202fae38c7149d1b99a46d16e9310d325dd198abee4b30",
       "level": 0.001,
       "passed": true,
       "power": {
@@ -566,7 +566,7 @@
         ]
       },
       "replicates": 1000,
-      "seconds": 10.2,
+      "seconds": 5.9,
       "seeds": [
         0,
         1000
@@ -586,7 +586,7 @@
       "size_bound": 0.01629285308902091
     },
     "B7": {
-      "code_hash": "c5960373059fac5e2b24b9707bd979ef60eb82a9105ecdc38f57cf7486da7e63",
+      "code_hash": "c7529a702a0c4a01364dc9b31eeacf3087f48db51e7b4dc9977b2699aaa774f9",
       "not_run": "set SCMLE_HILLSTROM to the verified data file",
       "passed": false,
       "seconds": 0.0,
@@ -596,7 +596,7 @@
       ]
     },
     "B8": {
-      "code_hash": "a7eab51444abc6bd2a0e2f6d412497c3d8cca5ba1c9d45d4c2a46a4024d6636d",
+      "code_hash": "e59dcd33403bd3d4a4d480a481aab713706840628c36ef4c213e7448f9510687",
       "not_run": "set SCMLE_HILLSTROM to the verified data file",
       "passed": false,
       "seconds": 0.0,
@@ -615,7 +615,7 @@
         ],
         "rate": 0.001
       },
-      "code_hash": "46647b2502a805d34c23e5c47fab6a85ae2561c81706a29ea4f1dd0c16f1df9e",
+      "code_hash": "a4186095575f5605cd53dad1e4cd03adc868e2d829a9a5e4c1e71f4d75323417",
       "false_rollback": {
         "interval": [
           8.826773070546787e-05,
@@ -638,7 +638,7 @@
       "promote_bound": 0.026260990336999412,
       "replicates": 2000,
       "rollback_bound": 0.014449719092257398,
-      "seconds": 64.8,
+      "seconds": 66.6,
       "seeds": [
         0,
         2000

@@ -253,9 +253,9 @@
    }
   }
  ],
- "content_sha256": "7c24e876696c881f3b512557b2fb2dedf0f2d3f6d761706a9bdde9ad120579a4",
+ "content_sha256": "a68a8e026f2c6bbf8f1c0555c26fbd20fa47add5fef5a9932924ba8b7f0e1dc3",
  "generator": "benchmarks/qualification/make_oracles.py",
- "generator_sha256": "82a3f34bebeef1efb0c54c404a820fa79d3a3fc74eb34323aa9a270cd79ce2af",
+ "generator_sha256": "6841ec9eb770339c722a64cae28ebe8354066c9c1669b04015362d7e0995b11e",
  "oracle": "kendalltau",
  "reference": "scipy.stats.kendalltau(x, y)",
  "tolerance": {

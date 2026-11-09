@@ -12,12 +12,12 @@
   },
   "code_hashes": {
     "budget": "aa9c713475314c37e0ee1cab85c41aced138d369c3ceca8eccb39e2c3016198b",
-    "entities": "29baca222bb7591a9cf2b41ac95be06495c87691bc3a53bde1af13d6930bfc17",
+    "entities": "21c1c381ef596ddec9d95bd74b45118b460655bb9fadacf1fc54b876780e0092",
     "grain": "96a67e86e170fec0a20b02f509a12c6c0e6107c5fb0b6d737ebce5afd95ed3fc",
     "joins": "2694c6787db1f27fe57b4622a899669ee837a4ced9d27e162d8bbc3006096420",
-    "point_in_time": "76f6dd8f1cb5b1eaac1266148e12262fbb0c29034c5e9878c88020befe16b359",
-    "reconcile": "0b981814c6da7322eed7183d40cfd41c67ebefcf9d424de3df8186c2ef9ce1a0",
-    "torn_read": "2b0cf34ada24996152c727298d250ccc3e6378469178fa650739c5d538fe300f"
+    "point_in_time": "9028e2b5d3985078e43e4f449b3a903ba0ab4051a6ac815be6df657f89598834",
+    "reconcile": "7b65d92c613a564235f9187335b734a45a49df8c10dbfb0686ff8c87970d80f2",
+    "torn_read": "8e1fbde77a90fa58b463a75369fb1925490218c439453c097179dc1cf2772ce3"
   },
   "development_seed_base": 10000,
   "entities": {
@@ -105,7 +105,7 @@
     "seed_offset": 0,
     "tolerance": 0.0
   },
-  "seconds": 71.1,
+  "seconds": 80.5,
   "torn_read": {
     "batch_rows": 5,
     "detected": 500,
