@@ -54,10 +54,14 @@ class FeatureOp(abc.ABC):
     defaults: ClassVar[Mapping[str, Any]] = {}
 
     def validate(self, node: tasks.FeatureNode) -> None:
-        """Checks arity and parameters.
+        """Check the node's input count and parameter names.
+
+        Args:
+            node: The node to check.
 
         Raises:
-            ConfigError: For a wrong input count or unknown parameter.
+            ConfigError: If the input count is outside `min_inputs` to
+                `max_inputs`, or a parameter is not in `defaults`.
         """
         count = len(node.inputs)
         if not self.min_inputs <= count <= self.max_inputs:
@@ -73,20 +77,51 @@ class FeatureOp(abc.ABC):
             )
 
     def resolved(self, node: tasks.FeatureNode) -> dict[str, Any]:
-        """Parameters with defaults applied."""
+        """Apply the defaults to a node's parameters.
+
+        Args:
+            node: The node whose parameters are resolved.
+
+        Returns:
+            The defaults updated with the node's own parameters.
+        """
         return {**self.defaults, **node.params}
 
     def fit(self, inputs: Inputs, params: Params) -> Any:
-        """Learns state from training data; default is stateless."""
+        """Learn state from training data; the default is stateless.
+
+        Args:
+            inputs: The input columns of the training fold.
+            params: The resolved parameters.
+
+        Returns:
+            The learned state passed to `apply`; None when stateless.
+        """
         return None
 
     @abc.abstractmethod
     def apply(self, inputs: Inputs, params: Params, state: Any) -> pd.Series:
-        """Computes the derived column."""
+        """Compute the derived column.
+
+        Args:
+            inputs: The input columns.
+            params: The resolved parameters.
+            state: The value returned by `fit`.
+
+        Returns:
+            The derived column, aligned with the inputs' index.
+        """
 
 
 def numeric(series: pd.Series) -> pd.Series:
-    """Coerces to float; unparseable and infinite values become NaN."""
+    """Coerce to float; unparseable and infinite values become NaN.
+
+    Args:
+        series: The column to convert.
+
+    Returns:
+        A float series with NaN in place of unparseable or infinite values.
+    """
     return columns.to_finite(series)
 
 
@@ -96,7 +131,16 @@ class Log1p(FeatureOp):
     name = "log1p"
 
     def apply(self, inputs: Inputs, params: Params, state: Any) -> pd.Series:
-        """Log-transforms the clipped input."""
+        """Log-transform the input after clipping it at zero.
+
+        Args:
+            inputs: One column.
+            params: Unused.
+            state: Unused.
+
+        Returns:
+            `log(1 + max(x, 0))` per row.
+        """
         return np.log1p(numeric(inputs[0]).clip(lower=0))
 
 
@@ -106,7 +150,16 @@ class Sqrt(FeatureOp):
     name = "sqrt"
 
     def apply(self, inputs: Inputs, params: Params, state: Any) -> pd.Series:
-        """Square root of the clipped input."""
+        """Take the square root of the input after clipping it at zero.
+
+        Args:
+            inputs: One column.
+            params: Unused.
+            state: Unused.
+
+        Returns:
+            `sqrt(max(x, 0))` per row.
+        """
         return np.sqrt(numeric(inputs[0]).clip(lower=0))
 
 
@@ -116,7 +169,16 @@ class Square(FeatureOp):
     name = "square"
 
     def apply(self, inputs: Inputs, params: Params, state: Any) -> pd.Series:
-        """Squares the input."""
+        """Square the input.
+
+        Args:
+            inputs: One column.
+            params: Unused.
+            state: Unused.
+
+        Returns:
+            `x ** 2` per row.
+        """
         return numeric(inputs[0]) ** 2
 
 
@@ -126,7 +188,16 @@ class Absolute(FeatureOp):
     name = "abs"
 
     def apply(self, inputs: Inputs, params: Params, state: Any) -> pd.Series:
-        """Absolute value."""
+        """Take the absolute value of the input.
+
+        Args:
+            inputs: One column.
+            params: Unused.
+            state: Unused.
+
+        Returns:
+            `abs(x)` per row.
+        """
         return numeric(inputs[0]).abs()
 
 
@@ -136,7 +207,16 @@ class IsMissing(FeatureOp):
     name = "is_missing"
 
     def apply(self, inputs: Inputs, params: Params, state: Any) -> pd.Series:
-        """Missing-value indicator (works for any dtype)."""
+        """Flag missing values; works for any dtype.
+
+        Args:
+            inputs: One column.
+            params: Unused.
+            state: Unused.
+
+        Returns:
+            1.0 where the input is missing, else 0.0.
+        """
         return inputs[0].isna().astype(float)
 
 
@@ -148,7 +228,16 @@ class Sum(FeatureOp):
     max_inputs = MAX_ARITY
 
     def apply(self, inputs: Inputs, params: Params, state: Any) -> pd.Series:
-        """Adds the inputs."""
+        """Add the inputs.
+
+        Args:
+            inputs: Two or more columns.
+            params: Unused.
+            state: Unused.
+
+        Returns:
+            The row-wise sum; NaN where any input is NaN.
+        """
         return sum(numeric(s) for s in inputs[1:]) + numeric(inputs[0])
 
 
@@ -160,7 +249,16 @@ class Difference(FeatureOp):
     max_inputs = 2
 
     def apply(self, inputs: Inputs, params: Params, state: Any) -> pd.Series:
-        """Subtracts the second input from the first."""
+        """Subtract the second input from the first.
+
+        Args:
+            inputs: Two columns.
+            params: Unused.
+            state: Unused.
+
+        Returns:
+            `a - b` per row.
+        """
         return numeric(inputs[0]) - numeric(inputs[1])
 
 
@@ -172,7 +270,16 @@ class Product(FeatureOp):
     max_inputs = MAX_ARITY
 
     def apply(self, inputs: Inputs, params: Params, state: Any) -> pd.Series:
-        """Multiplies the inputs."""
+        """Multiply the inputs.
+
+        Args:
+            inputs: Two or more columns.
+            params: Unused.
+            state: Unused.
+
+        Returns:
+            The row-wise product; NaN where any input is NaN.
+        """
         result = numeric(inputs[0])
         for series in inputs[1:]:
             result = result * numeric(series)
@@ -187,7 +294,16 @@ class Ratio(FeatureOp):
     max_inputs = 2
 
     def apply(self, inputs: Inputs, params: Params, state: Any) -> pd.Series:
-        """Divides the first input by the second."""
+        """Divide the first input by the second.
+
+        Args:
+            inputs: Two columns.
+            params: Unused.
+            state: Unused.
+
+        Returns:
+            `a / b` per row, NaN where `b` is zero.
+        """
         denominator = numeric(inputs[1]).replace(0.0, np.nan)
         return numeric(inputs[0]) / denominator
 
@@ -199,7 +315,16 @@ class Clip(FeatureOp):
     defaults = {"lower": 0.01, "upper": 0.99}
 
     def fit(self, inputs: Inputs, params: Params) -> Any:
-        """Learns the clipping bounds from training data."""
+        """Learn the clipping bounds from training data.
+
+        Args:
+            inputs: One column.
+            params: Parameters with the `lower` and `upper` quantile levels.
+
+        Returns:
+            The (low, high) quantile values, or (-inf, inf) when the column
+            has no finite values.
+        """
         values = numeric(inputs[0]).dropna()
         if values.empty:
             return (-np.inf, np.inf)
@@ -207,7 +332,16 @@ class Clip(FeatureOp):
         return float(low), float(high)
 
     def apply(self, inputs: Inputs, params: Params, state: Any) -> pd.Series:
-        """Clips to the learned bounds."""
+        """Clip to the learned bounds.
+
+        Args:
+            inputs: One column.
+            params: Unused.
+            state: The (low, high) bounds returned by `fit`.
+
+        Returns:
+            The column limited to the bounds.
+        """
         return numeric(inputs[0]).clip(lower=state[0], upper=state[1])
 
 
@@ -217,13 +351,31 @@ class Standardize(FeatureOp):
     name = "standardize"
 
     def fit(self, inputs: Inputs, params: Params) -> Any:
-        """Learns mean and std from training data."""
+        """Learn the mean and standard deviation from training data.
+
+        Args:
+            inputs: One column.
+            params: Unused.
+
+        Returns:
+            The (mean, std) pair; the std is 1.0 when it is zero or fewer than
+            two values exist, and the mean is 0.0 for an empty column.
+        """
         values = numeric(inputs[0]).dropna()
         spread = float(values.std()) if len(values) > 1 else 0.0
         return (float(values.mean()) if len(values) else 0.0, spread or 1.0)
 
     def apply(self, inputs: Inputs, params: Params, state: Any) -> pd.Series:
-        """Standardizes with the learned statistics."""
+        """Standardize with the learned statistics.
+
+        Args:
+            inputs: One column.
+            params: Unused.
+            state: The (mean, std) pair returned by `fit`.
+
+        Returns:
+            The z-score per row.
+        """
         return (numeric(inputs[0]) - state[0]) / state[1]
 
 
@@ -234,7 +386,16 @@ class Bin(FeatureOp):
     defaults = {"bins": 5}
 
     def fit(self, inputs: Inputs, params: Params) -> Any:
-        """Learns interior quantile edges from training data."""
+        """Learn the interior quantile edges from training data.
+
+        Args:
+            inputs: One column.
+            params: Parameters with the number of `bins`.
+
+        Returns:
+            The sorted unique interior edges as an array; empty when the
+            column has no finite values.
+        """
         values = numeric(inputs[0]).dropna().to_numpy()
         if values.size == 0:
             return np.array([])
@@ -244,7 +405,16 @@ class Bin(FeatureOp):
         return np.unique(edges)
 
     def apply(self, inputs: Inputs, params: Params, state: Any) -> pd.Series:
-        """Assigns each value to its bin (NaN stays NaN)."""
+        """Assign each value to its bin.
+
+        Args:
+            inputs: One column.
+            params: Unused.
+            state: The edges returned by `fit`.
+
+        Returns:
+            The ordinal bin code per row as a float; NaN stays NaN.
+        """
         values = numeric(inputs[0])
         codes = np.searchsorted(state, values.to_numpy(), side="right").astype(
             float
@@ -274,7 +444,15 @@ class DatePart(FeatureOp):
     )
 
     def validate(self, node: tasks.FeatureNode) -> None:
-        """Also checks the requested part."""
+        """Check arity, parameters and the requested datetime part.
+
+        Args:
+            node: The node to check.
+
+        Raises:
+            ConfigError: If the arity or parameters are wrong, or `part` is
+                not one of `parts`.
+        """
         super().validate(node)
         part = self.resolved(node)["part"]
         if part not in self.parts:
@@ -284,7 +462,17 @@ class DatePart(FeatureOp):
             )
 
     def apply(self, inputs: Inputs, params: Params, state: Any) -> pd.Series:
-        """Extracts the part; unparseable dates give NaN."""
+        """Extract the requested part of the datetime.
+
+        Args:
+            inputs: One column.
+            params: Parameters with the `part` to extract.
+            state: Unused.
+
+        Returns:
+            The part as a float per row (days since 1970-01-01 for
+            `timestamp`); NaN where the date cannot be parsed.
+        """
         stamps = pd.to_datetime(inputs[0], errors="coerce")
         if params["part"] == "timestamp":
             return (stamps - EPOCH) / pd.Timedelta(days=1)
@@ -297,16 +485,42 @@ class OrderedOp(FeatureOp):
     ordered = True
 
     def apply(self, inputs: Inputs, params: Params, state: Any) -> pd.Series:
-        """Ordered operations run through `SeriesFeatureBuilder` only."""
+        """Reject row-wise application of an ordered operation.
+
+        Ordered operations run through `SeriesFeatureBuilder` only.
+
+        Args:
+            inputs: Unused.
+            params: Unused.
+            state: Unused.
+
+        Raises:
+            ConfigError: Always.
+        """
         raise errors.ConfigError(f"{self.name} is an ordered operation")
 
     @abc.abstractmethod
     def compute(self, grouped: Any, params: Mapping[str, Any]) -> pd.Series:
-        """Computes the feature from values already sorted by time per group."""
+        """Compute the feature from values already sorted by time per group.
+
+        Args:
+            grouped: The values, sorted by time and grouped by entity.
+            params: The resolved parameters.
+
+        Returns:
+            The feature, aligned with the sorted values.
+        """
 
     @abc.abstractmethod
     def lookback(self, params: Mapping[str, Any]) -> int | None:
-        """Earlier rows needed per entity (None = all of them)."""
+        """Report how many earlier rows an entity needs.
+
+        Args:
+            params: The resolved parameters.
+
+        Returns:
+            The number of earlier rows needed, or None when all are needed.
+        """
 
 
 class Lag(OrderedOp):
@@ -316,17 +530,42 @@ class Lag(OrderedOp):
     defaults = {"k": 1}
 
     def validate(self, node: tasks.FeatureNode) -> None:
-        """Requires a positive lag so no future value can leak."""
+        """Check arity, parameters and that the lag is positive.
+
+        A positive lag ensures no future value can leak.
+
+        Args:
+            node: The node to check.
+
+        Raises:
+            ConfigError: If the arity or parameters are wrong, or `k` is
+                below 1.
+        """
         super().validate(node)
         if int(self.resolved(node)["k"]) < 1:
             raise errors.ConfigError(f"node '{node.name}': lag k must be >= 1")
 
     def compute(self, grouped: Any, params: Params) -> pd.Series:
-        """Shifts forward in time."""
+        """Shift the values forward in time.
+
+        Args:
+            grouped: The values, sorted by time and grouped by entity.
+            params: Parameters with the lag `k`.
+
+        Returns:
+            The value `k` rows earlier, NaN at the start of each entity.
+        """
         return grouped.shift(int(params["k"]))
 
     def lookback(self, params: Params) -> int | None:
-        """The lag distance."""
+        """Report the lag distance.
+
+        Args:
+            params: Parameters with the lag `k`.
+
+        Returns:
+            The lag `k`, the number of earlier rows needed.
+        """
         return int(params["k"])
 
 
@@ -337,17 +576,41 @@ class Diff(OrderedOp):
     defaults = {"k": 1}
 
     def validate(self, node: tasks.FeatureNode) -> None:
-        """Requires a positive lag."""
+        """Check arity, parameters and that the lag is positive.
+
+        Args:
+            node: The node to check.
+
+        Raises:
+            ConfigError: If the arity or parameters are wrong, or `k` is
+                below 1.
+        """
         super().validate(node)
         if int(self.resolved(node)["k"]) < 1:
             raise errors.ConfigError(f"node '{node.name}': diff k must be >= 1")
 
     def compute(self, grouped: Any, params: Params) -> pd.Series:
-        """Current value minus the lagged one."""
+        """Subtract the lagged value from the current one.
+
+        Args:
+            grouped: The values, sorted by time and grouped by entity.
+            params: Parameters with the lag `k`.
+
+        Returns:
+            The change versus `k` rows earlier, NaN at the start of each
+            entity.
+        """
         return grouped.transform(lambda s: s - s.shift(int(params["k"])))
 
     def lookback(self, params: Params) -> int | None:
-        """The lag distance."""
+        """Report the lag distance.
+
+        Args:
+            params: Parameters with the lag `k`.
+
+        Returns:
+            The lag `k`, the number of earlier rows needed.
+        """
         return int(params["k"])
 
 
@@ -358,14 +621,29 @@ class RollingMean(OrderedOp):
     defaults = {"window": 3}
 
     def compute(self, grouped: Any, params: Params) -> pd.Series:
-        """Trailing mean."""
+        """Compute the trailing mean.
+
+        Args:
+            grouped: The values, sorted by time and grouped by entity.
+            params: Parameters with the `window` size.
+
+        Returns:
+            The mean of up to `window` rows ending at the current one.
+        """
         window = int(params["window"])
         return grouped.transform(
             lambda s: s.rolling(window, min_periods=1).mean()
         )
 
     def lookback(self, params: Params) -> int | None:
-        """The window."""
+        """Report the window size.
+
+        Args:
+            params: Parameters with the `window` size.
+
+        Returns:
+            The window, the number of rows needed including the current one.
+        """
         return int(params["window"])
 
 
@@ -376,14 +654,30 @@ class RollingStd(OrderedOp):
     defaults = {"window": 3}
 
     def compute(self, grouped: Any, params: Params) -> pd.Series:
-        """Trailing standard deviation (needs two observations)."""
+        """Compute the trailing standard deviation.
+
+        Args:
+            grouped: The values, sorted by time and grouped by entity.
+            params: Parameters with the `window` size.
+
+        Returns:
+            The standard deviation of up to `window` rows ending at the
+            current one; NaN until two observations exist.
+        """
         window = int(params["window"])
         return grouped.transform(
             lambda s: s.rolling(window, min_periods=2).std()
         )
 
     def lookback(self, params: Params) -> int | None:
-        """The window."""
+        """Report the window size.
+
+        Args:
+            params: Parameters with the `window` size.
+
+        Returns:
+            The window, the number of rows needed including the current one.
+        """
         return int(params["window"])
 
 
@@ -393,11 +687,26 @@ class ExpandingMean(OrderedOp):
     name = "expanding_mean"
 
     def compute(self, grouped: Any, params: Params) -> pd.Series:
-        """Running mean."""
+        """Compute the running mean.
+
+        Args:
+            grouped: The values, sorted by time and grouped by entity.
+            params: Unused.
+
+        Returns:
+            The mean of all rows up to and including the current one.
+        """
         return grouped.transform(lambda s: s.expanding().mean())
 
     def lookback(self, params: Params) -> int | None:
-        """Every earlier row contributes."""
+        """Report that every earlier row contributes.
+
+        Args:
+            params: Unused.
+
+        Returns:
+            None, meaning all earlier rows are needed.
+        """
         return None
 
 
@@ -427,7 +736,13 @@ OPS: dict[str, FeatureOp] = {
 
 
 def get_op(name: str) -> FeatureOp:
-    """Returns a registered operation.
+    """Look up a registered operation.
+
+    Args:
+        name: The operation name, as used in `FeatureNode.op`.
+
+    Returns:
+        The registered operation.
 
     Raises:
         ConfigError: If the name is unknown.
@@ -442,7 +757,15 @@ def get_op(name: str) -> FeatureOp:
 def split_nodes(
     spec: tasks.FeatureGraphSpec,
 ) -> tuple[list[tasks.FeatureNode], list[tasks.FeatureNode]]:
-    """Separates ordered (series) nodes from row-wise nodes."""
+    """Separate ordered (series) nodes from row-wise nodes.
+
+    Args:
+        spec: The graph.
+
+    Returns:
+        The ordered nodes and the row-wise nodes, each in graph order. An
+        unknown operation name propagates `get_op`'s `ConfigError`.
+    """
     ordered = [n for n in spec.nodes if get_op(n.op).ordered]
     rowwise = [n for n in spec.nodes if not get_op(n.op).ordered]
     return ordered, rowwise
@@ -502,7 +825,15 @@ def validate_graph(
 def required_raw_inputs(
     nodes: list[tasks.FeatureNode], derived: set[str]
 ) -> list[str]:
-    """Raw columns (not produced by the graph) that `nodes` read."""
+    """List the raw columns that `nodes` read.
+
+    Args:
+        nodes: The nodes to inspect.
+        derived: Names of columns produced by the graph, which are skipped.
+
+    Returns:
+        The distinct input columns not in `derived`, in first-use order.
+    """
     needed: list[str] = []
     for node in nodes:
         for column in node.inputs:
@@ -541,7 +872,11 @@ class SeriesFeatureBuilder:
 
     @property
     def history_columns(self) -> list[str]:
-        """Columns a history frame holds."""
+        """The columns a history frame holds.
+
+        These are the group and time columns (when set) and the raw inputs of
+        the nodes, without duplicates.
+        """
         derived = {node.name for node in self.nodes}
         raw = required_raw_inputs(self.nodes, derived)
         names = [self.group_column, self.time_column, *raw]
@@ -549,7 +884,14 @@ class SeriesFeatureBuilder:
 
     @property
     def history_rows(self) -> int | None:
-        """Earlier rows to keep per entity (None = all)."""
+        """The number of earlier rows to keep per entity.
+
+        This is the sum of the nodes' look-back distances, or None when any
+        node needs all earlier rows.
+
+        Raises:
+            ConfigError: If a node is not an ordered operation.
+        """
         total = 0
         for node in self.nodes:
             op = get_op(node.op)
@@ -562,13 +904,20 @@ class SeriesFeatureBuilder:
         return total
 
     def entity_keys(self, frame: pd.DataFrame) -> np.ndarray:
-        """Entity key per row (one shared key without a group column)."""
+        """Compute the entity key of every row.
+
+        Args:
+            frame: The rows.
+
+        Returns:
+            One key per row, as strings; all zeros without a group column.
+        """
         if self.group_column:
             return frame[self.group_column].astype(str).to_numpy()
         return np.zeros(len(frame), dtype=int)
 
     def build_history(self, frame: pd.DataFrame) -> pd.DataFrame:
-        """Keeps the rows later predictions can still need.
+        """Keep the rows later predictions can still need.
 
         Args:
             frame: Rows with at least the history columns.
@@ -576,6 +925,8 @@ class SeriesFeatureBuilder:
         Returns:
             The most recent rows per entity in time order, enough for every
             ordered node (all rows if some node looks back without limit).
+            Rows with an unparseable time are dropped. A node that is not an
+            ordered operation makes `history_rows` raise `ConfigError`.
         """
         columns = self.history_columns
         subset = frame[columns].copy()
@@ -597,11 +948,17 @@ class SeriesFeatureBuilder:
         return ordered[(rank_from_end < rows).to_numpy()].reset_index(drop=True)
 
     def apply(self, frame: pd.DataFrame) -> pd.DataFrame:
-        """Returns a copy of `frame` with the ordered features appended.
+        """Append the ordered features to a frame.
 
-        Raises:
-            ConfigError: If the time column cannot be parsed.
-            DataError: If the time column is missing from the frame.
+        Args:
+            frame: The rows to extend.
+
+        Returns:
+            A copy of `frame` with one column per node; `frame` itself when
+            there are no nodes. Errors from `compute` or
+            `compute_with_history` propagate: `DataError` when the time
+            column is missing, `ConfigError` when it has unparseable values
+            or a node is not an ordered operation.
         """
         if not self.nodes:
             return frame
@@ -610,10 +967,21 @@ class SeriesFeatureBuilder:
         return self.compute_with_history(frame)
 
     def compute_with_history(self, frame: pd.DataFrame) -> pd.DataFrame:
-        """Appends the features, adding stored history before the batch.
+        """Append the features, adding stored history before the batch.
 
         Only history strictly earlier than an entity's first row in `frame`
         is used, so the batch's own rows always win on overlap.
+
+        Args:
+            frame: The rows to extend.
+
+        Returns:
+            A copy of `frame` with one column per node.
+
+        Raises:
+            DataError: If the time column is missing from the frame.
+            ConfigError: If the time column has unparseable values, or a node
+                is not an ordered operation.
         """
         if self.time_column not in frame.columns:
             raise errors.DataError(
@@ -643,7 +1011,20 @@ class SeriesFeatureBuilder:
         return result
 
     def compute(self, frame: pd.DataFrame) -> pd.DataFrame:
-        """Appends the features using only the rows of `frame`."""
+        """Append the features using only the rows of `frame`.
+
+        Args:
+            frame: The rows to extend.
+
+        Returns:
+            A copy of `frame` with one column per node, in the original row
+            order.
+
+        Raises:
+            DataError: If the time column is missing from the frame.
+            ConfigError: If the time column has unparseable values, or a node
+                is not an ordered operation.
+        """
         if self.time_column not in frame.columns:
             raise errors.DataError(
                 f"time column '{self.time_column}' is required to compute "
@@ -697,7 +1078,15 @@ class FeatureGraphTransformer(base.TransformerMixin, base.BaseEstimator):
         self.nodes = nodes
 
     def fit(self, features: Any, target: Any = None) -> Self:
-        """Learns operation state by evaluating the graph on training data."""
+        """Learn operation state by evaluating the graph on training data.
+
+        Args:
+            features: The training rows, convertible to a data frame.
+            target: Unused.
+
+        Returns:
+            The fitted transformer.
+        """
         frame = pd.DataFrame(features).copy()
         self.states_: dict[str, Any] = {}
         for node in self.nodes:
@@ -709,7 +1098,14 @@ class FeatureGraphTransformer(base.TransformerMixin, base.BaseEstimator):
         return self
 
     def transform(self, features: Any) -> pd.DataFrame:
-        """Appends the derived columns using the learned state."""
+        """Append the derived columns using the learned state.
+
+        Args:
+            features: The rows, convertible to a data frame.
+
+        Returns:
+            A copy of the rows with one column per node.
+        """
         frame = pd.DataFrame(features).copy()
         for node in self.nodes:
             op = get_op(node.op)
