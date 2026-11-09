@@ -13,6 +13,7 @@ from sklearn import compose
 from sklearn import pipeline
 
 from scmle.contracts import data as data_contracts
+from scmle.contracts import errors
 from scmle.contracts import models
 from scmle.contracts import tasks
 from scmle.data.curation import selection
@@ -127,6 +128,35 @@ def monotonic_signs(
     return (0,) * offset + tuple(
         plan.monotonic.get(column, 0) for column in plan.numeric
     )
+
+
+def monotonic_layout_problem(
+    plan: data_contracts.FeaturePlan, select: bool, missing: str
+) -> str | None:
+    """Why the monotonic signs cannot follow the encoded numeric columns.
+
+    Args:
+        plan: Feature plan with the numeric columns and their monotonic
+            signs.
+        select: Whether the sparse column selector follows the encoder.
+        missing: The numeric missing-value strategy.
+
+    Returns:
+        A reason when the encoded matrix would not hold the numeric columns
+        in plan order, or None when the sign vector lines up.
+    """
+    if not plan.monotonic:
+        return None
+    if select:
+        return "feature selection drops columns the signs are indexed by"
+    if missing == "indicator":
+        flagged, rest = split_flagged(plan, list(plan.numeric))
+        if flagged and rest:
+            return (
+                "missing indicators move the flagged numeric columns ahead "
+                "of the others"
+            )
+    return None
 
 
 def split_high_cardinality(
@@ -273,6 +303,11 @@ def build_pipeline(
             )
         )
     estimator = adapter.build(task, seed, params)
+    problem = monotonic_layout_problem(plan, options.select, options.missing)
+    if problem:
+        raise errors.ConfigError(
+            f"monotonic constraints cannot apply: {problem}"
+        )
     if plan.monotonic:
         estimator = wrappers.monotone(
             estimator,

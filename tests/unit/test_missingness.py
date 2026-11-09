@@ -1,9 +1,13 @@
 """Tests that tell informative gaps from random ones."""
 
+import dataclasses
+
 import numpy as np
 import pandas as pd
+import pytest
 
 from scmle.contracts import data as data_contracts
+from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.data.curation import preprocessing
 from scmle.data.profiling import missingness
@@ -92,3 +96,33 @@ def test_indicators_are_added_only_for_flagged_columns():
     names = list(fitted.steps[0][1].get_feature_names_out())
     flags = [name for name in names if "missingindicator" in name]
     assert len(flags) == 1 and "informative" in flags[0]
+
+
+def test_monotonic_signs_that_missing_indicators_would_misalign_are_refused():
+    plan = data_contracts.FeaturePlan(
+        ("informative", "random", "complete"),
+        (),
+        informative_missing=("informative",),
+        monotonic={"random": 1},
+    )
+    adapter = registry_module.ModelRegistry.with_builtins().get(
+        "hist_gradient_boosting"
+    )
+    options = data_contracts.PreprocessingOptions(
+        scale=False, impute=True, missing="indicator"
+    )
+
+    with pytest.raises(errors.ConfigError, match="monotonic"):
+        preprocessing.build_pipeline(
+            plan, adapter, tasks.TaskType.BINARY, 0, options=options
+        )
+    with pytest.raises(errors.ConfigError, match="monotonic"):
+        preprocessing.build_pipeline(
+            plan,
+            adapter,
+            tasks.TaskType.BINARY,
+            0,
+            options=dataclasses.replace(
+                options, missing="median", select=True
+            ),
+        )

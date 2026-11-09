@@ -850,6 +850,11 @@ class MissingIndicatorStrategy(MissingValueStrategy):
         if reason is not None:
             return reason
         plan = profile.feature_plan
+        problem = preprocessing.monotonic_layout_problem(
+            plan, False, self.missing
+        )
+        if problem:
+            return problem
         if plan.informative_missing is None:
             return None  # Not assessed: keep the earlier behaviour.
         flagged = [c for c in plan.informative_missing if c in plan.numeric]
