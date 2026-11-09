@@ -5,3 +5,6 @@ scmle/cli.py run_* subcommand dispatch getattr(self, f"run_{...}") at cli.py:906
 scmle/data/splitting/inner_cv.py get_n_splits scikit-learn calls a cross-validator's get_n_splits by name
 scmle/deploy/demo.py http_request urllib finds a handler's http_request method by name
 scmle/data/store/objectstore.py CorruptObjectError named by the ObjectStore.get contract for backends that record a hash; the shipped local backend cannot raise it
+scmle/deploy/mocks.py do_PUT http.server calls do_<METHOD> on a request handler by name
+scmle/deploy/mocks.py do_HEAD http.server calls do_<METHOD> on a request handler by name
+scmle/inference/serving.py version_string http.server reads version_string on a request handler by name

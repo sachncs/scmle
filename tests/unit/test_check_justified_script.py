@@ -200,3 +200,23 @@ def test_the_default_mode_reports_without_failing(tmp_path):
 
     assert result.returncode == 0
     assert "unreferenced" in result.stdout
+
+
+def test_fail_on_a_shape_exits_nonzero_only_when_that_flag_is_given(tmp_path):
+    root = build(tmp_path)
+
+    plain = run(root)[0]
+    unreferenced = run(root, "--fail-on", "unreferenced")[0]
+
+    assert plain.returncode == 0
+    assert unreferenced.returncode == 1
+
+
+def test_fail_on_a_shape_with_no_candidates_exits_zero(tmp_path):
+    root = build(
+        tmp_path, dynamic="scmle/pkg.py * every name is declared used\n"
+    )
+
+    result = run(root, "--fail-on", "unreferenced")[0]
+
+    assert result.returncode == 0

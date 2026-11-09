@@ -2,6 +2,7 @@
 
 Usage:
     python scripts/check_justified.py [--json PATH] [--strict]
+        [--fail-on SHAPE ...]
 
 A static, name-based check of the rule in plan.md section 3a. It finds:
 
@@ -437,11 +438,19 @@ def main() -> int:
     """Runs the check and prints a summary.
 
     Returns:
-        1 if `--strict` is set and any candidate remains, otherwise 0.
+        1 if `--strict` is set and any candidate remains, or if a candidate
+        of a shape named by `--fail-on` remains; otherwise 0.
     """
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--json", type=pathlib.Path, default=None)
     parser.add_argument("--strict", action="store_true")
+    parser.add_argument(
+        "--fail-on",
+        action="append",
+        default=[],
+        choices=SHAPES,
+        help="exit 1 if any candidate of this shape remains (repeatable)",
+    )
     parser.add_argument(
         "--dynamic",
         type=pathlib.Path,
@@ -472,7 +481,10 @@ def main() -> int:
         options.json.write_text(
             json.dumps(finder.found, indent=1) + "\n", encoding="utf-8"
         )
-    return 1 if options.strict and finder.found else 0
+    blocking = [
+        item for item in finder.found if item["shape"] in options.fail_on
+    ]
+    return 1 if (options.strict and finder.found) or blocking else 0
 
 
 if __name__ == "__main__":
