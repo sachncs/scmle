@@ -381,7 +381,7 @@ def gating(
     Returns:
         One tuple per defect type whose current certificate passed its floors.
     """
-    registered = []
+    registered: list[tuple[str, str, str]] = []
     for detector_id, spec in registry.SPECS.items():
         digest = spec.code_hash()
         registered.extend(

@@ -212,7 +212,7 @@ def mapping_differences(
 
 def sequence_differences(
     actual: Any,
-    expected: list | tuple,
+    expected: list[Any] | tuple[Any, ...],
     rel_tol: float,
     abs_tol: float,
     path: str,

@@ -2042,7 +2042,7 @@ def forbidden_imports() -> list[str]:
         One `file: module` entry per forbidden import.
     """
     root = Path(__file__).parents[2] / "scmle" / "decision"
-    found = []
+    found: list[str] = []
     for path in sorted(root.glob("*.py")):
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
