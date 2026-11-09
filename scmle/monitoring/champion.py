@@ -42,7 +42,14 @@ class Comparison:
 
 
 class ChampionChallenger:
-    """Decides whether a challenger should replace the champion."""
+    """Decides whether a challenger should replace the champion.
+
+    Attributes:
+        champion: Model currently serving.
+        challenger: Candidate replacement.
+        bootstraps: Number of bootstrap resamples.
+        seed: Random seed.
+    """
 
     def __init__(
         self,
@@ -77,11 +84,11 @@ class ChampionChallenger:
     ) -> Comparison:
         """Compares both models on rows whose outcome is known.
 
-        The challenger is promoted only if the lower end of the 95% interval
-        of its advantage is above zero, so noise cannot unseat the champion.
-        The bootstrap resamples whole groups for clustered data and
-        contiguous time blocks for temporal data, so the interval reflects
-        the independent units of observation.
+        The challenger is promoted only if the lower end of the 95% interval of
+        its advantage is above zero, so noise cannot unseat the champion. The
+        bootstrap resamples whole groups for clustered data and contiguous time
+        blocks for temporal data, so the interval reflects the independent units
+        of observation.
 
         Args:
             data: Rows served (must satisfy both models' schemas).
@@ -132,6 +139,16 @@ class ChampionChallenger:
             view: pd.DataFrame,
             rows: np.ndarray,
         ) -> float:
+            """Scores a model on a subset of the rows.
+
+            Args:
+                bundle: The model.
+                view: The model's input frame.
+                rows: Positions of the rows to score.
+
+            Returns:
+                The metric value on those rows.
+            """
             return metric.score(
                 bundle.pipeline,
                 view.iloc[rows].reset_index(drop=True),

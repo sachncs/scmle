@@ -18,14 +18,30 @@ Method = TypeVar("Method", bound=Callable[..., Any])
 
 
 def serialized(method: Method) -> Method:
-    """Runs a workflow method while holding the journal's lock.
+    """Run a workflow method while holding the journal's lock.
 
-    Every transition reads the journal, decides, then appends; the lock
-    makes that one step, so concurrent threads see one hash chain.
+    Every transition reads the journal, decides, then appends; the lock makes
+    that one step, so concurrent threads see one hash chain.
+
+    Args:
+        method: A method of `IncidentWorkflow`.
+
+    Returns:
+        The method wrapped so it holds the workflow's lock while it runs.
     """
 
     @functools.wraps(method)
     def wrapper(self: "IncidentWorkflow", *args: Any, **kwargs: Any) -> Any:
+        """Call the method under the workflow's lock.
+
+        Args:
+            self: The workflow.
+            *args: Positional arguments of the method.
+            **kwargs: Keyword arguments of the method.
+
+        Returns:
+            Whatever the method returns.
+        """
         with self.lock:
             return method(self, *args, **kwargs)
 
@@ -33,7 +49,13 @@ def serialized(method: Method) -> Method:
 
 
 class IncidentStatus(enum.StrEnum):
-    """States an operator can record for an SLO incident."""
+    """States an operator can record for an SLO incident.
+
+    Attributes:
+        OPEN: Opened, nobody has taken it yet.
+        ACKNOWLEDGED: An operator took it.
+        RESOLVED: Resolved with evidence.
+    """
 
     OPEN = "open"
     ACKNOWLEDGED = "acknowledged"
@@ -41,14 +63,33 @@ class IncidentStatus(enum.StrEnum):
 
 
 def require_text(value: str, field_name: str) -> str:
-    """Return non-empty incident metadata."""
+    """Return non-empty incident metadata.
+
+    Args:
+        value: The field value.
+        field_name: Name used in the error message.
+
+    Returns:
+        The value with surrounding whitespace removed.
+
+    Raises:
+        ValueError: If the value is not a string or is blank.
+    """
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{field_name} must not be empty")
     return value.strip()
 
 
 def incident_id(target: slo.SLOTarget, observed_at: str) -> str:
-    """Return an idempotent identity for one target evaluation window."""
+    """Return an idempotent identity for one target evaluation window.
+
+    Args:
+        target: The objective.
+        observed_at: Evaluation time as given to the SLO monitor.
+
+    Returns:
+        The hex SHA-256 of the target name, evaluation time and alert route.
+    """
     payload = json.dumps(
         {
             "target": target.name,
@@ -63,7 +104,27 @@ def incident_id(target: slo.SLOTarget, observed_at: str) -> str:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Incident:
-    """Current operator-facing state of one SLO incident."""
+    """Current operator-facing state of one SLO incident.
+
+    Attributes:
+        incident_id: Identity of the incident.
+        target_name: Name of the SLO target.
+        status: Current state.
+        opened_at: Time it was opened.
+        observed_at: Time of the SLO evaluation that caused it.
+        owner: Who answers for the target.
+        runbook: Where the response procedure is described.
+        alert_route: Where alerts go.
+        reason: Why the SLO needs an incident.
+        run_id: Serving run the incident concerns.
+        rollback_target: Where to roll back to.
+        acknowledged_at: Time it was acknowledged, if it was.
+        acknowledged_by: Who acknowledged it.
+        resolved_at: Time it was resolved, if it was.
+        resolved_by: Who resolved it.
+        resolution: How it was resolved.
+        evidence_digest: Digest of the resolution evidence.
+    """
 
     incident_id: str
     target_name: str
@@ -84,7 +145,13 @@ class Incident:
     evidence_digest: str | None = None
 
     def __post_init__(self) -> None:
-        """Validate the state record before it enters the journal."""
+        """Validate the state record before it enters the journal.
+
+        Raises:
+            ValueError: If a required text field is blank, a timestamp is not
+                ISO-8601 with timezone, or the acknowledgement and resolution
+                fields do not fit the status.
+        """
         for field_name in (
             "incident_id",
             "target_name",
@@ -121,7 +188,11 @@ class Incident:
             raise ValueError("resolved incidents require resolution")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return deterministic incident evidence."""
+        """Return deterministic incident evidence.
+
+        Returns:
+            A dict of all fields, with the status as its value.
+        """
         return {
             "incident_id": self.incident_id,
             "target_name": self.target_name,
@@ -144,7 +215,14 @@ class Incident:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> "Incident":
-        """Rebuild an incident from a journal snapshot."""
+        """Rebuild an incident from a journal snapshot.
+
+        Args:
+            record: A dict produced by `to_dict`.
+
+        Returns:
+            The incident.
+        """
         return cls(
             incident_id=str(record["incident_id"]),
             target_name=str(record["target_name"]),
@@ -167,7 +245,14 @@ class Incident:
 
 
 def event_digest(event: Mapping[str, Any]) -> str:
-    """Hash a journal event without trusting its stored digest."""
+    """Hash a journal event without trusting its stored digest.
+
+    Args:
+        event: A journal event.
+
+    Returns:
+        The hex SHA-256 of the event's other fields.
+    """
     payload = {
         key: value for key, value in event.items() if key != "event_digest"
     }
@@ -176,19 +261,37 @@ def event_digest(event: Mapping[str, Any]) -> str:
 
 
 class IncidentWorkflow:
-    """Append-only incident workflow with idempotent transitions."""
+    """Append-only incident workflow with idempotent transitions.
+
+    Attributes:
+        path: The JSONL event journal.
+        lock: Serializes transitions per journal.
+    """
 
     def __init__(self, path: str | pathlib.Path) -> None:
         """Initialize a workflow backed by a JSONL event journal.
 
         Transitions are serialized per journal file within this process.
+
+        Args:
+            path: The journal file.
         """
         self.path = pathlib.Path(path)
         self.lock = durability.path_lock(self.path)
 
     @serialized
     def read_events(self) -> tuple[dict[str, Any], ...]:
-        """Read and verify the complete journal, failing closed on tamper."""
+        """Read and verify the complete journal, failing closed on tamper.
+
+        Returns:
+            The events in journal order; empty if there is no journal.
+
+        Raises:
+            ValueError: If an event is not an object, the hash chain or an event
+                digest is invalid, an event type does not match its status, a
+                transition is out of order, an incident's identity changes, or
+                timestamps go backwards.
+        """
         if not self.path.exists():
             return ()
         events: list[dict[str, Any]] = []
@@ -251,7 +354,11 @@ class IncidentWorkflow:
 
     @serialized
     def records(self) -> tuple[Incident, ...]:
-        """Return the latest state for every incident in journal order."""
+        """Return the latest state for every incident in journal order.
+
+        Returns:
+            One incident per identity, in the order first opened.
+        """
         latest: dict[str, Incident] = {}
         for record in self.read_events():
             incident = Incident.from_dict(record["incident"])
@@ -267,7 +374,22 @@ class IncidentWorkflow:
         run_id: str,
         rollback_target: str,
     ) -> Incident:
-        """Open or return the existing incident for an SLO evaluation."""
+        """Open or return the existing incident for an SLO evaluation.
+
+        Args:
+            evaluation: The SLO evaluation that needs an incident.
+            opened_at: Time of opening, an ISO-8601 timestamp with timezone.
+            run_id: Serving run the incident concerns.
+            rollback_target: Where to roll back to.
+
+        Returns:
+            The incident, which is the existing one if this evaluation window
+            already opened one.
+
+        Raises:
+            TypeError: If `evaluation` is not an `SLOEvaluation`.
+            ValueError: If the SLO passed, so no incident is required.
+        """
         if not isinstance(evaluation, slo.SLOEvaluation):
             raise TypeError("evaluation must be SLOEvaluation")
         if not evaluation.incident_required:
@@ -303,7 +425,20 @@ class IncidentWorkflow:
         actor: str,
         acknowledged_at: str,
     ) -> Incident:
-        """Acknowledge an open incident exactly once."""
+        """Acknowledge an open incident exactly once.
+
+        Args:
+            identity: Identity of the incident.
+            actor: Who acknowledges.
+            acknowledged_at: Time, an ISO-8601 timestamp with timezone.
+
+        Returns:
+            The acknowledged incident; the existing one if it already was.
+
+        Raises:
+            ValueError: If the incident is resolved, or the acknowledgement
+                precedes the opening.
+        """
         incident = self.require_record(identity)
         if incident.status is IncidentStatus.ACKNOWLEDGED:
             return incident
@@ -332,7 +467,22 @@ class IncidentWorkflow:
         resolution: str,
         evidence_digest: str,
     ) -> Incident:
-        """Resolve an acknowledged incident with evidence."""
+        """Resolve an acknowledged incident with evidence.
+
+        Args:
+            identity: Identity of the incident.
+            actor: Who resolves.
+            resolved_at: Time, an ISO-8601 timestamp with timezone.
+            resolution: How it was resolved.
+            evidence_digest: Digest of the evidence.
+
+        Returns:
+            The resolved incident; the existing one if it already was.
+
+        Raises:
+            ValueError: If the incident is not acknowledged, or the resolution
+                precedes the acknowledgement.
+        """
         incident = self.require_record(identity)
         if incident.status is IncidentStatus.RESOLVED:
             return incident
@@ -358,7 +508,17 @@ class IncidentWorkflow:
         return updated
 
     def require_record(self, identity: str) -> Incident:
-        """Return one incident or fail clearly when it is unknown."""
+        """Return one incident or fail clearly when it is unknown.
+
+        Args:
+            identity: Identity of the incident.
+
+        Returns:
+            The incident.
+
+        Raises:
+            KeyError: If no incident has that identity.
+        """
         require_text(identity, "incident_id")
         for record in self.records():
             if record.incident_id == identity:
@@ -367,7 +527,12 @@ class IncidentWorkflow:
 
     @serialized
     def append_event(self, event_type: str, incident: Incident) -> None:
-        """Append one chained state snapshot durably."""
+        """Append one chained state snapshot durably.
+
+        Args:
+            event_type: `opened`, `acknowledged` or `resolved`.
+            incident: The incident state to record.
+        """
         require_text(event_type, "event_type")
         existing = self.read_events()
         previous_digest = str(existing[-1]["event_digest"]) if existing else ""
@@ -388,7 +553,11 @@ class IncidentWorkflow:
 
 
 def os_fsync(handle: Any) -> None:
-    """Flush a journal file descriptor without exposing platform details."""
+    """Flush a journal file descriptor without exposing platform details.
+
+    Args:
+        handle: An open file object.
+    """
     import os
 
     os.fsync(handle.fileno())

@@ -63,7 +63,13 @@ class OutcomeEvent:
 
 
 class PredictionLog:
-    """Append-only JSONL log of predictions and outcomes."""
+    """Append-only JSONL log of predictions and outcomes.
+
+    Attributes:
+        path: The JSONL file.
+        observability_policy: Policy enabling the redacted sidecar, if any.
+        run_id: Serving-run identity used in observability events, if given.
+    """
 
     def __init__(
         self,
@@ -87,11 +93,16 @@ class PredictionLog:
 
     @property
     def observability_path(self) -> pathlib.Path:
-        """Path of the redacted sidecar, next to the prediction log."""
+        """The path of the redacted sidecar, next to the prediction log."""
         return self.path.with_suffix(".observability.jsonl")
 
     def append(self, kind: str, record: dict[str, Any]) -> None:
-        """Appends one typed record."""
+        """Appends one typed record.
+
+        Args:
+            kind: Record type, stored as `type`.
+            record: Fields of the record.
+        """
         line = json.dumps({"type": kind, **record}, default=str)
         durability.append_text(self.path, line + "\n")
 
@@ -103,6 +114,10 @@ class PredictionLog:
     ) -> list[PredictionEvent]:
         """Predicts with a bundle and logs every row.
 
+        When an observability policy is set, a redacted inference event is
+        written per request, and a failure is logged as an `error` event before
+        it propagates.
+
         Args:
             bundle: Serving model.
             data: Rows to predict.
@@ -110,6 +125,9 @@ class PredictionLog:
 
         Returns:
             The logged events, in row order.
+
+        Raises:
+            ValueError: If `event_ids` does not have one id per input row.
         """
         started = time.perf_counter()
         if event_ids is not None and len(event_ids) != len(data):
@@ -179,7 +197,16 @@ class PredictionLog:
         input_fingerprint: str | None,
         error_category: str | None = None,
     ) -> None:
-        """Writes one redacted inference event when telemetry is enabled."""
+        """Writes one redacted inference event when telemetry is enabled.
+
+        Args:
+            bundle: Serving model.
+            request_id: Identifier of the request.
+            started: `time.perf_counter()` reading when the request began.
+            outcome: `success` or `error`.
+            input_fingerprint: Digest of the input rows, or None.
+            error_category: Name of the error type for a failure.
+        """
         if self.observability_policy is None:
             return
         model_fingerprint = bundle.info.files.get(
@@ -216,6 +243,14 @@ class PredictionLog:
         aborts before replacement so an operator never receives a silently
         truncated log. Appends to the sidecar wait while the rewrite runs, so
         none is lost to the replaced file.
+
+        Args:
+            observed_at: Evaluation time as an ISO-8601 timestamp with timezone;
+                the current time if None.
+
+        Returns:
+            The evaluation time, the cutoff and the number of events retained
+            and removed.
         """
         with durability.path_lock(self.observability_path):
             return self.enforce_retention_locked(observed_at)
@@ -223,7 +258,20 @@ class PredictionLog:
     def enforce_retention_locked(
         self, observed_at: str | None
     ) -> dict[str, Any]:
-        """Rewrites the sidecar while holding its lock."""
+        """Rewrites the sidecar while holding its lock.
+
+        Args:
+            observed_at: Evaluation time as an ISO-8601 timestamp with timezone;
+                the current time if None.
+
+        Returns:
+            The evaluation time, the cutoff and the number of events retained
+            and removed (0 and 0 if there is no sidecar).
+
+        Raises:
+            ValueError: If no observability policy is set, or a sidecar record
+                is not a JSON object of type `inference`.
+        """
         if self.observability_policy is None:
             raise ValueError(
                 "retention enforcement requires an observability policy"
@@ -290,6 +338,9 @@ class PredictionLog:
 
         Args:
             outcomes: Mapping of event id to the observed value.
+
+        Returns:
+            The logged events, in the order of the mapping.
         """
         logged = []
         for event_id, actual in outcomes.items():
@@ -328,5 +379,12 @@ class PredictionLog:
 
 
 def to_plain(value: Any) -> Any:
-    """Converts numpy scalars to plain Python values."""
+    """Converts numpy scalars to plain Python values.
+
+    Args:
+        value: Any value.
+
+    Returns:
+        `value.item()` if it has one, otherwise the value unchanged.
+    """
     return value.item() if hasattr(value, "item") else value

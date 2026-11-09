@@ -11,7 +11,14 @@ from scmle.contracts import observability
 
 
 class SLOStatus(enum.StrEnum):
-    """Outcome of evaluating one SLO window."""
+    """Outcome of evaluating one SLO window.
+
+    Attributes:
+        PASS: The worst in-window value is within the target.
+        BREACHED: The worst in-window value exceeds the target.
+        INSUFFICIENT_DATA: Fewer in-window samples than required.
+        INVALID: Samples from the future make the window unusable.
+    """
 
     PASS = "pass"  # nosec B105 - operational status, not a credential
     BREACHED = "breached"
@@ -20,14 +27,36 @@ class SLOStatus(enum.StrEnum):
 
 
 def require_text(value: str, field_name: str) -> str:
-    """Return a non-empty SLO field."""
+    """Return a non-empty SLO field.
+
+    Args:
+        value: The field value.
+        field_name: Name used in the error message.
+
+    Returns:
+        The value with surrounding whitespace removed.
+
+    Raises:
+        ValueError: If the value is not a string or is blank.
+    """
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{field_name} must not be empty")
     return value.strip()
 
 
 def parse_timestamp(value: str, field_name: str) -> datetime.datetime:
-    """Parse a timezone-aware timestamp for SLO window checks."""
+    """Parse a timezone-aware timestamp for SLO window checks.
+
+    Args:
+        value: An ISO-8601 timestamp; a trailing `Z` means UTC.
+        field_name: Name used in error messages.
+
+    Returns:
+        The timestamp as an aware datetime.
+
+    Raises:
+        ValueError: If the value is not ISO-8601 or has no timezone.
+    """
     try:
         parsed = datetime.datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError as error:
@@ -39,7 +68,19 @@ def parse_timestamp(value: str, field_name: str) -> datetime.datetime:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class SLOTarget:
-    """One upper-bound operational objective and its incident ownership."""
+    """One upper-bound operational objective and its incident ownership.
+
+    Attributes:
+        name: Objective name.
+        metric_name: Name of the metric samples to evaluate.
+        kind: Kind of signal the samples carry.
+        maximum: Largest acceptable value.
+        window_days: Length of the evaluation window, in days.
+        minimum_samples: Fewest in-window samples for a decision.
+        owner: Who answers for the objective.
+        runbook: Where the response procedure is described.
+        alert_route: Where alerts are sent.
+    """
 
     name: str
     metric_name: str
@@ -52,7 +93,12 @@ class SLOTarget:
     alert_route: str
 
     def __post_init__(self) -> None:
-        """Validate the measurable target and response path."""
+        """Validate the measurable target and response path.
+
+        Raises:
+            ValueError: If a text field is blank, `maximum` is negative or not
+                finite, or `window_days` or `minimum_samples` is below 1.
+        """
         for field_name in (
             "name",
             "metric_name",
@@ -73,7 +119,11 @@ class SLOTarget:
             raise ValueError("minimum_samples must be at least 1")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return deterministic SLO policy metadata."""
+        """Return deterministic SLO policy metadata.
+
+        Returns:
+            A dict of all fields, with the kind as its value.
+        """
         return {
             "name": self.name,
             "metric_name": self.metric_name,
@@ -89,7 +139,19 @@ class SLOTarget:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class SLOEvaluation:
-    """Auditable result of one SLO evaluation window."""
+    """Auditable result of one SLO evaluation window.
+
+    Attributes:
+        target: The objective evaluated.
+        observed_at: Evaluation time as given.
+        status: The outcome.
+        sample_count: Samples matching the target's metric and kind.
+        in_window_count: Matching samples inside the window.
+        observed_maximum: Largest in-window value, or None without a decision.
+        error_budget_remaining: Share of the allowed maximum not yet used, in
+            [0, 1], or None without a decision.
+        reason: One sentence explaining the status.
+    """
 
     target: SLOTarget
     observed_at: str
@@ -101,7 +163,14 @@ class SLOEvaluation:
     reason: str
 
     def __post_init__(self) -> None:
-        """Validate the result and its measurable bounds."""
+        """Validate the result and its measurable bounds.
+
+        Raises:
+            TypeError: If `target` is not an `SLOTarget`.
+            ValueError: If a count is negative, the in-window count exceeds the
+                sample count, the observed maximum is negative or not finite,
+                the error budget is outside [0, 1], or the reason is blank.
+        """
         if not isinstance(self.target, SLOTarget):
             raise TypeError("target must be SLOTarget")
         parse_timestamp(self.observed_at, "observed_at")
@@ -133,7 +202,13 @@ class SLOEvaluation:
         }
 
     def to_dict(self) -> dict[str, Any]:
-        """Return an operator-facing evaluation record."""
+        """Return an operator-facing evaluation record.
+
+        Returns:
+            A dict with the target, status, counts, observed maximum, error
+            budget, whether an incident is required, and the owner, runbook,
+            alert route and reason.
+        """
         return {
             "target": self.target.to_dict(),
             "observed_at": self.observed_at,
@@ -162,9 +237,24 @@ class SLOMonitor:
     ) -> SLOEvaluation:
         """Evaluate one target over its declared time window.
 
-        The maximum observed value is used deliberately: a single breach is
-        not averaged away. Missing samples are an explicit operational state,
-        not a passing result.
+        The maximum observed value is used deliberately: a single breach is not
+        averaged away. Missing samples are an explicit operational state, not a
+        passing result.
+
+        Args:
+            target: The objective.
+            samples: Metric samples; only those with the target's metric name
+                and kind count.
+            observed_at: Evaluation time, an ISO-8601 timestamp with timezone.
+
+        Returns:
+            The evaluation: `invalid` if any matching sample is later than
+            `observed_at`, `insufficient_data` if fewer than `minimum_samples`
+            fall in the window, otherwise `pass` or `breached` by comparing the
+            window maximum with the target.
+
+        Raises:
+            TypeError: If `target` is not an `SLOTarget`.
         """
         if not isinstance(target, SLOTarget):
             raise TypeError("target must be SLOTarget")

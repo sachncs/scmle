@@ -35,7 +35,18 @@ class Agreement:
 
 
 class ShadowEvaluator:
-    """Runs a challenger beside a champion on live rows."""
+    """Runs a challenger beside a champion on live rows.
+
+    Attributes:
+        champion: The model that answers requests.
+        challenger: The model that scores silently.
+        rows: Observed request frames, in order.
+        champion_output: The champion's predictions per frame.
+        challenger_output: The challenger's predictions per frame.
+        gaps: Absolute positive-class probability differences per frame (binary
+            classification only).
+        lock: Keeps the parallel lists growing together.
+    """
 
     def __init__(
         self,
@@ -43,6 +54,10 @@ class ShadowEvaluator:
         challenger_bundle: bundle_module.ModelBundle,
     ) -> None:
         """Binds the pair.
+
+        Args:
+            champion_bundle: The model that answers requests.
+            challenger_bundle: The model that scores silently.
 
         Raises:
             ConfigError: If the models solve different tasks.
@@ -59,6 +74,9 @@ class ShadowEvaluator:
 
     def observe(self, data: pd.DataFrame) -> np.ndarray:
         """Answers with the champion; the challenger scores silently.
+
+        Args:
+            data: The request rows.
 
         Returns:
             The champion's predictions (the only thing a caller sees).
@@ -82,7 +100,16 @@ class ShadowEvaluator:
         return served
 
     def agreement(self) -> Agreement:
-        """Disagreement between the two on everything observed so far."""
+        """Measures disagreement between the two on everything observed so far.
+
+        Returns:
+            The number of rows, the share on which the predictions differ, and
+            the mean positive-class probability gap (None unless the task is
+            binary classification).
+
+        Raises:
+            ConfigError: If nothing has been observed yet.
+        """
         with self.lock:
             champion_output = list(self.champion_output)
             challenger_output = list(self.challenger_output)
@@ -108,6 +135,10 @@ class ShadowEvaluator:
         Args:
             outcomes: True outcomes aligned to the rows in observation order.
             metric_name: Metric; defaults to the champion's.
+
+        Returns:
+            The champion-challenger comparison over all observed rows. Too few
+            labeled rows raise `ConfigError` (from the comparison).
         """
         with self.lock:
             rows = list(self.rows)

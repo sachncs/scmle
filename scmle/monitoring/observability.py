@@ -10,7 +10,20 @@ from scmle.contracts import observability
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class ObservabilityEvaluation:
-    """Fail-closed result of evaluating operational metric evidence."""
+    """Fail-closed result of evaluating operational metric evidence.
+
+    Attributes:
+        passed: True only if nothing is missing, expired, from the future or
+            over a threshold.
+        observed_at: Evaluation time as given.
+        missing_signals: Required signal kinds with no metric, sorted.
+        expired_metrics: Names of metrics older than the retention window,
+            sorted.
+        future_metrics: Names of metrics timestamped after `observed_at`,
+            sorted.
+        threshold_breaches: Metrics over their alert threshold, each with the
+            metric name, observed value, threshold and unit, sorted by name.
+    """
 
     passed: bool
     observed_at: str
@@ -20,7 +33,11 @@ class ObservabilityEvaluation:
     threshold_breaches: tuple[dict[str, Any], ...]
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a deterministic JSON-compatible evaluation."""
+        """Return a deterministic JSON-compatible evaluation.
+
+        Returns:
+            A dict of all fields, with tuples as lists.
+        """
         return {
             "passed": self.passed,
             "observed_at": self.observed_at,
@@ -44,6 +61,16 @@ def evaluate(
     Thresholds are intentionally interpreted as upper bounds. A service can
     define a metric such as ``latency_p95_ms`` or ``error_rate`` and make a
     breach release- or incident-visible without inventing a default.
+
+    Args:
+        metrics: The metric samples observed.
+        policy: Required signals, retention window and alert thresholds.
+        observed_at: Evaluation time, an ISO-8601 timestamp with timezone.
+
+    Returns:
+        The evaluation. It fails if a required signal has no sample, a sample is
+        older than the retention window or later than `observed_at`, or a value
+        exceeds its threshold.
     """
     observed_timestamp = parse_timestamp(observed_at, "observed_at")
     cutoff = observed_timestamp - datetime.timedelta(days=policy.retention_days)
@@ -87,7 +114,18 @@ def evaluate(
 
 
 def parse_timestamp(value: str, field_name: str) -> datetime.datetime:
-    """Parse a timezone-aware timestamp for temporal policy checks."""
+    """Parse a timezone-aware timestamp for temporal policy checks.
+
+    Args:
+        value: An ISO-8601 timestamp; a trailing `Z` means UTC.
+        field_name: Name used in error messages.
+
+    Returns:
+        The timestamp as an aware datetime.
+
+    Raises:
+        ValueError: If the value is not ISO-8601 or has no timezone.
+    """
     try:
         parsed = datetime.datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError as error:

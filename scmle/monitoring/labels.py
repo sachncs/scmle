@@ -1,4 +1,4 @@
-"""Delayed, partial and selected labels (F13, L4 and L5).
+"""Delayed, partial and selected labels.
 
 Three separate problems, one estimator each.
 
@@ -28,7 +28,7 @@ slice only, the estimate uses the audit-labelled cases alone, each with weight
 Feedback. A model's decisions can change the data that later trains and
 evaluates it. Only a randomized bypass slice (a logged fraction of cases that
 skip the model) can show it: `bypass_test` compares next-period features of
-bypass and model-decided cases with the F6 kernel two-sample test. Without a
+bypass and model-decided cases with a kernel two-sample test. Without a
 bypass slice the loop is undetectable and `FEEDBACK_UNVERIFIED` says so.
 """
 
@@ -55,7 +55,14 @@ FEEDBACK_UNVERIFIED = (
 
 
 class Mechanism(enum.StrEnum):
-    """How the labels of a batch were selected."""
+    """How the labels of a batch were selected.
+
+    Attributes:
+        COMPLETE: Every label was observed.
+        LOGGED_PROPENSITY: The probability of observing each label was logged.
+        AUDIT_SLICE: A randomized audit slice was labelled.
+        UNVERIFIED: The selection cannot be tested.
+    """
 
     COMPLETE = COMPLETE
     LOGGED_PROPENSITY = LOGGED_PROPENSITY
@@ -64,14 +71,33 @@ class Mechanism(enum.StrEnum):
 
 
 def is_matured(batch: int, now: int, window: int) -> bool:
-    """Whether a case predicted in `batch` has matured at batch `now`."""
+    """Reports whether a case predicted in `batch` has matured at batch `now`.
+
+    Args:
+        batch: Batch in which the case was predicted.
+        now: Current batch.
+        window: Batches an outcome needs to be known.
+
+    Returns:
+        True if at least `window` batches have passed.
+
+    Raises:
+        ValueError: If `window` is negative.
+    """
     if window < 0:
         raise ValueError("window must not be negative")
     return now - batch >= window
 
 
 def permits_action(mechanism: Mechanism) -> bool:
-    """Whether a retrain, promotion or rollback may rest on this stream."""
+    """Reports whether a retrain, promotion or rollback may rest on this stream.
+
+    Args:
+        mechanism: The stream's label mechanism.
+
+    Returns:
+        False only for `unverified`.
+    """
     return mechanism is not Mechanism.UNVERIFIED
 
 
@@ -104,7 +130,7 @@ def classify(
     audit: np.ndarray | None,
     epsilon: float,
 ) -> Mechanism:
-    """The label mechanism a batch supports.
+    """Determines the label mechanism a batch supports.
 
     Args:
         observed: Whether each matured case's label was observed.
@@ -113,9 +139,9 @@ def classify(
         epsilon: The smallest propensity the policy declares.
 
     Returns:
-        `complete` when every label was observed; `logged_propensity` when
-        every propensity is logged and at least `epsilon`; `audit_slice` when
-        an audit slice exists and `epsilon > 0`; otherwise `unverified`.
+        `complete` when every label was observed; `logged_propensity` when every
+        propensity is logged and at least `epsilon`; `audit_slice` when an audit
+        slice exists and `epsilon > 0`; otherwise `unverified`.
     """
     if bool(np.all(observed)):
         return Mechanism.COMPLETE
@@ -137,11 +163,11 @@ def estimate_batch(
     bound: float = 1.0,
     signed: bool = False,
 ) -> BatchEstimate:
-    """Horvitz-Thompson mean loss of one matured batch.
+    """Estimates the Horvitz-Thompson mean loss of one matured batch.
 
     Args:
-        loss: Loss of each matured case; entries of unobserved cases are
-            ignored (they may be NaN).
+        loss: Loss of each matured case; entries of unobserved cases are ignored
+            (they may be NaN).
         observed: Whether each label was observed.
         propensity: Logged probability of observing each label, or None.
         audit: Whether each case was in the audit slice, or None.
@@ -150,8 +176,8 @@ def estimate_batch(
         signed: Allow values in ``[-bound, bound]`` (paired differences).
 
     Returns:
-        The estimate. For `audit_slice` the cases outside the slice are
-        ignored and the audit rate is `epsilon`.
+        The estimate. For `audit_slice` the cases outside the slice are ignored
+        and the audit rate is `epsilon`.
 
     Raises:
         ValueError: On misaligned inputs, or a loss outside ``[0, bound]``.
@@ -221,13 +247,20 @@ def check_randomization(
     """Tests that the audit slice's draws have the declared rate.
 
     A two-sided exact binomial test of the number of audited cases against
-    `rate`. It catches a slice that is not drawn at the declared rate; it
-    cannot show independence from the covariates or the outcome.
+    `rate`. It catches a slice that is not drawn at the declared rate; it cannot
+    show independence from the covariates or the outcome.
 
     Args:
         audit: Whether each logged case was audited.
         rate: Declared audit rate, in ``(0, 1)``.
         alpha: Level of the test.
+
+    Returns:
+        The audited and logged counts, the declared rate, the p-value, and
+        whether the p-value is above `alpha`.
+
+    Raises:
+        ValueError: If `rate` is not strictly between 0 and 1.
     """
     flags = np.asarray(audit, dtype=bool)
     if not 0.0 < rate < 1.0:
@@ -249,12 +282,12 @@ def bypass_test(
     permutations: int = 199,
     alpha: float = 0.05,
 ) -> qualification.Check:
-    """Do the model's decisions shift the next-period features?
+    """Tests whether the model's decisions shift the next-period features.
 
     Compares next-period features of cases whose decision bypassed the model
-    (randomized, logged) with those of model-decided cases, with the F6 kernel
-    two-sample test (`scmle.data.robustness.shift.mmd_test`). A small p-value
-    is evidence that the model's decisions change the data it will see.
+    (randomized, logged) with those of model-decided cases, with a kernel
+    two-sample test (`scmle.data.robustness.shift.mmd_test`). A small p-value is
+    evidence that the model's decisions change the data it will see.
 
     Args:
         bypass_features: Next-period features of the bypass slice.
@@ -262,6 +295,9 @@ def bypass_test(
         seed: Seed of the permutation test.
         permutations: Number of permutations.
         alpha: Level of the test.
+
+    Returns:
+        The check from the two-sample test.
     """
     return shift.mmd_test(
         model_features,
@@ -275,7 +311,16 @@ def bypass_test(
 def feedback_verdict(
     bypass_rate: float, check: qualification.Check | None
 ) -> str:
-    """`unverified`, `loop_detected` or `no_loop_detected`."""
+    """Summarizes the feedback-loop evidence.
+
+    Args:
+        bypass_rate: Share of cases that bypassed the model.
+        check: The result of `bypass_test`, or None.
+
+    Returns:
+        `unverified` without a bypass slice or check, `loop_detected` if the
+        p-value is at most 0.05, otherwise `no_loop_detected`.
+    """
     if bypass_rate <= 0.0 or check is None:
         return UNVERIFIED
     if check.p_value is not None and check.p_value <= 0.05:
@@ -284,7 +329,15 @@ def feedback_verdict(
 
 
 def stream_mechanism(batches: Sequence[BatchEstimate]) -> Mechanism:
-    """The weakest mechanism over a window of batches."""
+    """Finds the weakest mechanism over a window of batches.
+
+    Args:
+        batches: The batch estimates.
+
+    Returns:
+        The mechanism that comes last in the order complete, logged propensity,
+        audit slice, unverified; `complete` for no batches.
+    """
     order = {m: i for i, m in enumerate(Mechanism)}
     weakest = Mechanism.COMPLETE
     for item in batches:

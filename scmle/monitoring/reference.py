@@ -58,33 +58,59 @@ class DistributionReference(abc.ABC):
 
     @abc.abstractmethod
     def proportions(self, values: pd.Series) -> np.ndarray:
-        """Bins new values into this reference's bins as proportions."""
+        """Bins new values into this reference's bins as proportions.
+
+        Args:
+            values: New observations.
+
+        Returns:
+            The share of the (non-missing) values in each bin, in the order of
+            `expected()`; all zeros if there are no values.
+        """
 
     @abc.abstractmethod
     def expected(self) -> np.ndarray:
-        """Returns the reference proportions."""
+        """Returns the reference proportions.
+
+        Returns:
+            The reference share of each bin.
+        """
 
     @abc.abstractmethod
     def to_dict(self) -> dict[str, Any]:
-        """Returns a JSON-serializable mapping."""
+        """Returns a JSON-serializable mapping.
+
+        Returns:
+            A dict that `reference_from_dict` can rebuild this reference from.
+        """
 
     def psi(self, values: pd.Series) -> float:
-        """Raw PSI of new values against this reference."""
+        """Computes the raw PSI of new values against this reference.
+
+        Args:
+            values: New observations.
+
+        Returns:
+            The population stability index, without the noise floor removed.
+        """
         return population_stability_index(
             self.expected(), self.proportions(values)
         )
 
     def noise_floor(self, new_rows: int) -> float:
-        """PSI level that sampling noise alone produces (no drift).
+        """Estimates the PSI level that sampling noise alone produces.
 
-        With few observations PSI is positive even without drift: its mean
-        is about `(bins - 1) * (1/n_reference + 1/n_new)` (verified by
-        simulation) and its 95th percentile about twice that, so the floor
-        is scaled by `NOISE_TAIL`. Comparing PSI to fixed thresholds without
-        removing this floor causes false alarms.
+        With few observations PSI is positive even without drift: its mean is
+        about `(bins - 1) * (1/n_reference + 1/n_new)` (verified by simulation)
+        and its 95th percentile about twice that, so the floor is scaled by
+        `NOISE_TAIL`. Comparing PSI to fixed thresholds without removing this
+        floor causes false alarms.
 
         Args:
             new_rows: Number of non-missing new observations.
+
+        Returns:
+            The floor; 0.0 if either sample size is not positive.
         """
         if self.rows <= 0 or new_rows <= 0:
             return 0.0
@@ -92,13 +118,27 @@ class DistributionReference(abc.ABC):
         return NOISE_TAIL * (bins - 1) * (1.0 / self.rows + 1.0 / new_rows)
 
     def adjusted_psi(self, values: pd.Series) -> float:
-        """PSI minus its sampling-noise floor, never below zero."""
+        """Computes PSI minus its sampling-noise floor, never below zero.
+
+        Args:
+            values: New observations.
+
+        Returns:
+            The adjusted PSI.
+        """
         raw = self.psi(values)
         floor = self.noise_floor(int(values.notna().sum()))
         return max(raw - floor, 0.0)
 
     def unseen_rate(self, values: pd.Series) -> float:
-        """Share of new values outside the reference domain (if defined)."""
+        """Computes the share of new values outside the reference domain.
+
+        Args:
+            values: New observations.
+
+        Returns:
+            0.0 here; subclasses with a defined domain override it.
+        """
         return 0.0
 
 
@@ -117,7 +157,15 @@ class NumericReference(DistributionReference):
 
     @classmethod
     def fit(cls, values: pd.Series) -> Self:
-        """Learns decile edges from reference values."""
+        """Learns decile edges from reference values.
+
+        Args:
+            values: Reference observations; non-finite values count as missing.
+
+        Returns:
+            The reference, with the unique decile edges and the share of values
+            in each bin.
+        """
         numeric = columns.to_finite(values)
         present = numeric.dropna().to_numpy(dtype=float)
         edges = (
@@ -131,7 +179,14 @@ class NumericReference(DistributionReference):
         return cls(missing, len(present), edges, fractions)
 
     def proportions(self, values: pd.Series) -> np.ndarray:
-        """Bins values by the stored edges."""
+        """Bins values by the stored edges.
+
+        Args:
+            values: New observations; values that are not numeric are ignored.
+
+        Returns:
+            The share of numeric values in each bin.
+        """
         numeric = (
             pd.to_numeric(values, errors="coerce")
             .dropna()
@@ -143,11 +198,19 @@ class NumericReference(DistributionReference):
         return counts / total if total else counts
 
     def expected(self) -> np.ndarray:
-        """Returns the stored proportions."""
+        """Returns the stored proportions.
+
+        Returns:
+            The reference share of each bin.
+        """
         return np.asarray(self.fractions, dtype=float)
 
     def to_dict(self) -> dict[str, Any]:
-        """Returns a JSON-serializable mapping."""
+        """Returns a JSON-serializable mapping.
+
+        Returns:
+            A dict with the kind, missing rate, row count, edges and fractions.
+        """
         return {
             "kind": self.kind,
             "missing_rate": self.missing_rate,
@@ -170,7 +233,15 @@ class CategoricalReference(DistributionReference):
 
     @classmethod
     def fit(cls, values: pd.Series) -> Self:
-        """Learns category frequencies from reference values."""
+        """Learns category frequencies from reference values.
+
+        Args:
+            values: Reference observations.
+
+        Returns:
+            The reference, keeping the `MAX_CATEGORIES` most frequent categories
+            and pooling the rest under `__other__`.
+        """
         present = values.dropna().astype(str)
         top = present.value_counts(normalize=True).head(MAX_CATEGORIES)
         frequencies = {str(k): float(v) for k, v in top.items()}
@@ -178,11 +249,22 @@ class CategoricalReference(DistributionReference):
         return cls(float(values.isna().mean()), len(present), frequencies)
 
     def levels(self) -> list[str]:
-        """Category names in a stable order."""
+        """Lists the category names in a stable order.
+
+        Returns:
+            The sorted category names, including `__other__`.
+        """
         return sorted(self.frequencies)
 
     def proportions(self, values: pd.Series) -> np.ndarray:
-        """Counts new values per reference category (unknown -> other)."""
+        """Counts new values per reference category (unknown -> other).
+
+        Args:
+            values: New observations.
+
+        Returns:
+            The share of values in each category, in `levels()` order.
+        """
         known = set(self.frequencies)
         mapped = (
             values.dropna()
@@ -197,18 +279,34 @@ class CategoricalReference(DistributionReference):
         return vector / total if total else vector
 
     def expected(self) -> np.ndarray:
-        """Returns reference proportions in `levels()` order."""
+        """Returns reference proportions in `levels()` order.
+
+        Returns:
+            The reference share of each category.
+        """
         return np.array([self.frequencies[level] for level in self.levels()])
 
     def unseen_rate(self, values: pd.Series) -> float:
-        """Share of new values whose category was never seen in training."""
+        """Computes the share of new values with a category unseen in training.
+
+        Args:
+            values: New observations.
+
+        Returns:
+            The share of non-missing values not among the reference categories;
+            0.0 if there are none.
+        """
         present = values.dropna().astype(str)
         if present.empty:
             return 0.0
         return float((~present.isin(set(self.frequencies) - {OTHER})).mean())
 
     def to_dict(self) -> dict[str, Any]:
-        """Returns a JSON-serializable mapping."""
+        """Returns a JSON-serializable mapping.
+
+        Returns:
+            A dict with the kind, missing rate, row count and frequencies.
+        """
         return {
             "kind": self.kind,
             "missing_rate": self.missing_rate,
@@ -223,7 +321,15 @@ REFERENCE_KINDS: dict[str, type[DistributionReference]] = {
 
 
 def reference_from_dict(record: dict[str, Any]) -> DistributionReference:
-    """Rebuilds a reference from `to_dict` output."""
+    """Rebuilds a reference from `to_dict` output.
+
+    Args:
+        record: A dict produced by `to_dict`.
+
+    Returns:
+        A numeric reference if its kind is `numeric`, otherwise a categorical
+        one.
+    """
     kind = record["kind"]
     if kind == "numeric":
         return NumericReference(
@@ -267,10 +373,14 @@ class ReferenceProfile:
         Args:
             features: Reference feature rows.
             plan: Feature columns by kind.
-            output: The model's score (numeric) or predicted class
-                (categorical) on held-out rows.
+            output: The model's score (numeric) or predicted class (categorical)
+                on held-out rows.
             output_name: Description of `output`.
             reference_metrics: Held-out metrics at training time.
+
+        Returns:
+            The profile, with a reference for each planned numeric and
+            categorical column present in `features` and one for the output.
         """
         references: dict[str, DistributionReference] = {}
         for column in plan.numeric:
@@ -288,7 +398,12 @@ class ReferenceProfile:
         return cls(references, output_reference, output_name, reference_metrics)
 
     def to_dict(self) -> dict[str, Any]:
-        """Returns a JSON-serializable mapping."""
+        """Returns a JSON-serializable mapping.
+
+        Returns:
+            A dict with the feature references, the output reference, its name
+            and the reference metrics.
+        """
         return {
             "features": {k: v.to_dict() for k, v in self.features.items()},
             "output": self.output.to_dict(),
@@ -298,7 +413,14 @@ class ReferenceProfile:
 
     @classmethod
     def from_dict(cls, record: dict[str, Any]) -> Self:
-        """Rebuilds a profile from `to_dict` output."""
+        """Rebuilds a profile from `to_dict` output.
+
+        Args:
+            record: A dict produced by `to_dict`.
+
+        Returns:
+            The profile.
+        """
         return cls(
             {k: reference_from_dict(v) for k, v in record["features"].items()},
             reference_from_dict(record["output"]),

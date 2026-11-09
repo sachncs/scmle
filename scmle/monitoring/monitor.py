@@ -41,7 +41,15 @@ class MonitoringThresholds:
     performance_tolerance: float = 0.10
 
     def status(self, psi: float) -> str:
-        """Classifies a PSI value."""
+        """Classifies a PSI value.
+
+        Args:
+            psi: A population stability index.
+
+        Returns:
+            `high` at or above `psi_high`, `moderate` at or above
+            `psi_moderate`, otherwise `stable`.
+        """
         if psi >= self.psi_high:
             return HIGH
         return MODERATE if psi >= self.psi_moderate else STABLE
@@ -90,7 +98,7 @@ class DriftReport:
 
     @property
     def high_share(self) -> float:
-        """Share of features with large drift."""
+        """The share of features with large drift."""
         flagged = sum(1 for f in self.features if f.status == HIGH)
         return flagged / max(len(self.features), 1)
 
@@ -147,7 +155,12 @@ class MonitoringReport:
     recommendation: Recommendation
 
     def to_dict(self) -> dict[str, Any]:
-        """Returns a JSON-serializable mapping."""
+        """Returns a JSON-serializable mapping.
+
+        Returns:
+            A dict of the drift, performance and recommendation, with nested
+            objects as dicts.
+        """
         return dataclasses.asdict(self)
 
 
@@ -163,6 +176,11 @@ class AdvisoryRule(abc.ABC):
     ) -> tuple[str, str] | None:
         """Judges the evidence.
 
+        Args:
+            drift: Drift of the batch.
+            performance: Performance on labeled rows, if any.
+            thresholds: Decision thresholds.
+
         Returns:
             `(action, reason)` when the rule fires, otherwise None.
         """
@@ -177,7 +195,17 @@ class PerformanceRule(AdvisoryRule):
         performance: PerformanceReport | None,
         thresholds: MonitoringThresholds,
     ) -> tuple[str, str] | None:
-        """Fires on degraded performance."""
+        """Fires on degraded performance.
+
+        Args:
+            drift: Drift of the batch. Unused.
+            performance: Performance on labeled rows, if any.
+            thresholds: Decision thresholds. Unused.
+
+        Returns:
+            A `retrain` verdict naming the worst-changed metric when the status
+            is `degraded`, otherwise None.
+        """
         if performance is not None and performance.status == "degraded":
             worst = min(
                 performance.relative_change.items(), key=lambda kv: kv[1]
@@ -199,7 +227,18 @@ class FeatureDriftRule(AdvisoryRule):
         performance: PerformanceReport | None,
         thresholds: MonitoringThresholds,
     ) -> tuple[str, str] | None:
-        """Fires on feature drift."""
+        """Fires on feature drift.
+
+        Args:
+            drift: Drift of the batch.
+            performance: Performance on labeled rows, if any. Unused.
+            thresholds: Decision thresholds.
+
+        Returns:
+            A `retrain` verdict when the share of strongly drifted features
+            reaches `high_drift_feature_share`; an `investigate` verdict for the
+            worst feature that is not stable; otherwise None.
+        """
         if drift.high_share >= thresholds.high_drift_feature_share:
             names = ", ".join(
                 f"'{f.feature}' (PSI {f.psi:.2f})"
@@ -229,7 +268,18 @@ class OutputDriftRule(AdvisoryRule):
         performance: PerformanceReport | None,
         thresholds: MonitoringThresholds,
     ) -> tuple[str, str] | None:
-        """Fires on output drift."""
+        """Fires on output drift.
+
+        Args:
+            drift: Drift of the batch.
+            performance: Performance on labeled rows, if any.
+            thresholds: Decision thresholds. Unused.
+
+        Returns:
+            For strong output drift, `retrain` when no performance is available
+            and `investigate` otherwise; `investigate` for moderate drift;
+            otherwise None.
+        """
         if drift.output_status == HIGH:
             return (
                 "retrain" if performance is None else "investigate",
@@ -252,7 +302,17 @@ class UnseenCategoryRule(AdvisoryRule):
         performance: PerformanceReport | None,
         thresholds: MonitoringThresholds,
     ) -> tuple[str, str] | None:
-        """Fires on unseen categories."""
+        """Fires on unseen categories.
+
+        Args:
+            drift: Drift of the batch.
+            performance: Performance on labeled rows, if any. Unused.
+            thresholds: Decision thresholds.
+
+        Returns:
+            An `investigate` verdict for the first feature whose unseen-category
+            rate reaches `unseen_category_rate`, otherwise None.
+        """
         for feature in drift.features:
             if feature.unseen_rate >= thresholds.unseen_category_rate:
                 return (
@@ -277,7 +337,18 @@ def advise(
     thresholds: MonitoringThresholds,
     rules: tuple[AdvisoryRule, ...] = DEFAULT_RULES,
 ) -> Recommendation:
-    """Combines the rules; the strongest action wins, all reasons are kept."""
+    """Combines the rules; the strongest action wins, all reasons are kept.
+
+    Args:
+        drift: Drift of the batch.
+        performance: Performance on labeled rows, if any.
+        thresholds: Decision thresholds.
+        rules: Rules to apply; the default rules if omitted.
+
+    Returns:
+        The strongest action among `none`, `investigate` and `retrain`, with the
+        reasons of every rule that fired.
+    """
     order = {"none": 0, "investigate": 1, "retrain": 2}
     fired = [
         verdict
@@ -291,7 +362,13 @@ def advise(
 
 
 class ModelMonitor:
-    """Compares production data and outcomes with a bundle's training state."""
+    """Compares production data and outcomes with a bundle's training state.
+
+    Attributes:
+        bundle: The serving model.
+        reference: Its training-time reference profile.
+        thresholds: Decision thresholds.
+    """
 
     def __init__(
         self,
@@ -316,13 +393,28 @@ class ModelMonitor:
         self.thresholds = thresholds or MonitoringThresholds()
 
     def model_output(self, frame: pd.DataFrame) -> pd.Series:
-        """Computes the output the reference describes."""
+        """Computes the output the reference describes.
+
+        Args:
+            frame: Prepared feature rows.
+
+        Returns:
+            The positive-class probability for a binary task, otherwise the
+            predictions.
+        """
         if self.bundle.schema.task == tasks.TaskType.BINARY.value:
             return pd.Series(self.bundle.predict_proba(frame)[:, 1])
         return pd.Series(self.bundle.predict(frame))
 
     def drift(self, data: pd.DataFrame) -> DriftReport:
-        """Measures feature and output drift of a batch."""
+        """Measures feature and output drift of a batch.
+
+        Args:
+            data: Served rows.
+
+        Returns:
+            The drift report, with features ordered by decreasing adjusted PSI.
+        """
         frame = self.bundle.prepare_frame(data)
         features = []
         for name, ref in self.reference.features.items():
@@ -361,20 +453,26 @@ class ModelMonitor:
 
         Args:
             data: Served rows.
-            outcomes: Observed outcomes aligned to `data`; missing values
-                mean the label has not arrived yet.
+            outcomes: Observed outcomes aligned to `data`; missing values mean
+                the label has not arrived yet.
             propensity: Optional logged probability that each row's label was
                 observed (``1 / propensity`` is the Horvitz-Thompson weight).
                 When given, the labelled rows are resampled with probability
                 proportional to ``1 / propensity`` before the metrics are
-                computed, which approximates the weighted metric; the
-                resample is seeded, so the report is reproducible. Without
-                it the metrics are computed on the labelled rows unweighted
-                (the previous behaviour), which is biased if labels were
-                selected.
-            maturity: Optional boolean per row; only rows marked True count
-                (a row whose outcome window has not elapsed is treated like
-                a missing label, even if a label has arrived).
+                computed, which approximates the weighted metric; the resample
+                is seeded, so the report is reproducible. Without it the metrics
+                are computed unweighted on the labelled rows, which is biased if
+                labels were selected.
+            maturity: Optional boolean per row; only rows marked True count (a
+                row whose outcome window has not elapsed is treated like a
+                missing label, even if a label has arrived).
+
+        Returns:
+            The performance report: `insufficient_labels` with no metrics when
+            fewer than `min_labeled_rows` rows count, otherwise the metrics,
+            their oriented relative change from the reference, and `degraded` if
+            the primary metric fell by more than `performance_tolerance`, else
+            `ok`.
 
         Raises:
             ValueError: If a labelled row has a propensity outside ``(0, 1]``.
@@ -443,6 +541,9 @@ class ModelMonitor:
         Args:
             data: Served rows.
             outcomes: Optional (possibly partial) observed outcomes.
+
+        Returns:
+            The drift, the performance (None without outcomes) and the advice.
         """
         drift = self.drift(data)
         performance = (

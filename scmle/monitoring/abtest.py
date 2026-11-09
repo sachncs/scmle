@@ -64,7 +64,11 @@ class ABResult:
     decision: str
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Builds a JSON-ready record.
+
+        Returns:
+            A dict of all fields.
+        """
         return dataclasses.asdict(self)
 
 
@@ -74,7 +78,17 @@ def score_arm(
     metric: Any,
     task: tasks.TaskType,
 ) -> float:
-    """The metric on a subset of an arm's requests (natural units)."""
+    """Scores a subset of an arm's requests.
+
+    Args:
+        arm: The arm.
+        rows: Positions of the requests to score.
+        metric: The metric, from the catalog.
+        task: Resolved task type.
+
+    Returns:
+        The metric on those requests, in natural units.
+    """
     outcomes = pd.Series(arm.outcomes[rows])
     classification = task.is_classification
     stand_in = (
@@ -107,6 +121,8 @@ def compare_arms(
 ) -> ABResult:
     """Compares two arms with independent bootstrap resampling.
 
+    Resamples that miss a class are skipped.
+
     Args:
         task: Resolved task type.
         metric_name: Metric to compare on.
@@ -117,7 +133,9 @@ def compare_arms(
         min_rows: Fewest requests per arm for a verdict.
 
     Returns:
-        The result with its 95% interval and decision.
+        The result with its 95% interval and decision: `adopt` if the whole
+        interval is above zero, `keep` if it is below, otherwise (or if an arm
+        has fewer than `min_rows` requests) `inconclusive`.
     """
     metric = metrics.CATALOG.resolve(metric_name, task)
     sign = 1.0 if metric.greater_is_better else -1.0

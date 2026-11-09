@@ -23,7 +23,17 @@ class AlertDeliveryError(RuntimeError):
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Alert:
-    """One operator-facing alert bound to evidence."""
+    """One operator-facing alert bound to evidence.
+
+    Attributes:
+        alert_id: Deterministic identity of the alert.
+        route: Name of the route (sink) it goes to.
+        severity: Severity label.
+        title: Short title.
+        details: Further JSON-compatible facts.
+        evidence_digest: Digest of the evidence the alert is bound to.
+        created_at: ISO-8601 creation time.
+    """
 
     alert_id: str
     route: str
@@ -34,7 +44,13 @@ class Alert:
     created_at: str
 
     def __post_init__(self) -> None:
-        """Validate identity, route, and timestamp fields."""
+        """Validate identity, route, and timestamp fields.
+
+        Raises:
+            ValueError: If a text field is blank or `created_at` is not
+                ISO-8601.
+            TypeError: If `details` is not a mapping.
+        """
         for name in (
             "alert_id",
             "route",
@@ -57,7 +73,11 @@ class Alert:
         object.__setattr__(self, "details", dict(self.details))
 
     def to_dict(self) -> dict[str, object]:
-        """Return JSON-native alert evidence."""
+        """Return JSON-native alert evidence.
+
+        Returns:
+            A dict of all fields.
+        """
         return {
             "alert_id": self.alert_id,
             "route": self.route,
@@ -78,7 +98,20 @@ class Alert:
         evidence: Mapping[str, Any],
         created_at: str,
     ) -> "Alert":
-        """Build a deterministic ID from the complete alert evidence."""
+        """Build a deterministic ID from the complete alert evidence.
+
+        Args:
+            route: Name of the route the alert goes to.
+            severity: Severity label.
+            title: Short title.
+            details: Further JSON-compatible facts.
+            evidence: The evidence, digested into the alert.
+            created_at: ISO-8601 creation time.
+
+        Returns:
+            The alert, whose ID is the digest of the route, severity, title,
+            details and evidence digest, so the same evidence gives the same ID.
+        """
         encoded_evidence = json.dumps(
             evidence, ensure_ascii=True, sort_keys=True, separators=(",", ":")
         ).encode("utf-8")
@@ -109,7 +142,16 @@ class Alert:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class AlertDelivery:
-    """Auditable outcome of one sink delivery attempt."""
+    """Auditable outcome of one sink delivery attempt.
+
+    Attributes:
+        alert_id: The alert delivered.
+        route: Its route.
+        status: `delivered`, `failed` or `deduplicated`.
+        attempts: Delivery attempts made.
+        reason: One sentence explaining the status.
+        observed_at: ISO-8601 time of the outcome.
+    """
 
     alert_id: str
     route: str
@@ -119,7 +161,12 @@ class AlertDelivery:
     observed_at: str
 
     def __post_init__(self) -> None:
-        """Validate delivery state."""
+        """Validate delivery state.
+
+        Raises:
+            ValueError: If the status is unsupported, `attempts` is negative or
+                the reason is blank.
+        """
         if self.status not in {"delivered", "failed", "deduplicated"}:
             raise ValueError("unsupported alert delivery status")
         if self.attempts < 0:
@@ -128,7 +175,11 @@ class AlertDelivery:
             raise ValueError("reason must not be empty")
 
     def to_dict(self) -> dict[str, object]:
-        """Return JSON-native delivery evidence."""
+        """Return JSON-native delivery evidence.
+
+        Returns:
+            A dict of all fields.
+        """
         return dataclasses.asdict(self)
 
 
@@ -137,18 +188,40 @@ class AlertSink(abc.ABC):
 
     @abc.abstractmethod
     def deliver(self, alert: Alert) -> AlertDelivery:
-        """Deliver an alert and return a bounded outcome."""
+        """Deliver an alert and return a bounded outcome.
+
+        Args:
+            alert: The alert.
+
+        Returns:
+            The outcome of the delivery.
+        """
 
 
 class JsonlAlertSink(AlertSink):
-    """Append-only local sink for operator pickup and test evidence."""
+    """Append-only local sink for operator pickup and test evidence.
+
+    Attributes:
+        path: The journal file.
+    """
 
     def __init__(self, path: str | Path) -> None:
-        """Bind a local alert journal."""
+        """Bind a local alert journal.
+
+        Args:
+            path: The journal file; its directory is created on delivery.
+        """
         self.path = Path(path)
 
     def deliver(self, alert: Alert) -> AlertDelivery:
-        """Append one alert record and flush it durably."""
+        """Append one alert record and flush it durably.
+
+        Args:
+            alert: The alert.
+
+        Returns:
+            A `delivered` outcome after one attempt.
+        """
         self.path.parent.mkdir(parents=True, exist_ok=True)
         delivered_at = datetime.datetime.now(datetime.UTC).isoformat()
         record = {
@@ -173,7 +246,15 @@ class JsonlAlertSink(AlertSink):
 
 
 class WebhookAlertSink(AlertSink):
-    """Deliver JSON alerts to an HTTPS-compatible pager or incident gateway."""
+    """Deliver JSON alerts to an HTTPS-compatible pager or incident gateway.
+
+    Attributes:
+        url: Webhook URL.
+        token: Bearer token sent with each request, if any.
+        timeout_seconds: Seconds to wait for each request.
+        max_attempts: Most delivery attempts.
+        backoff_seconds: Base delay between attempts.
+    """
 
     def __init__(
         self,
@@ -185,7 +266,22 @@ class WebhookAlertSink(AlertSink):
         backoff_seconds: float = 0.1,
         allow_insecure_localhost: bool = False,
     ) -> None:
-        """Validate the bounded webhook delivery policy."""
+        """Validate the bounded webhook delivery policy.
+
+        Args:
+            url: Webhook URL; must be HTTPS.
+            token: Bearer token to send, or None.
+            timeout_seconds: Seconds to wait for each request.
+            max_attempts: Most delivery attempts.
+            backoff_seconds: Base delay between attempts; the wait grows with
+                the attempt number and is capped at one second.
+            allow_insecure_localhost: Allow plain HTTP to a loopback host.
+
+        Raises:
+            ValueError: If the URL is not HTTPS (or allowed loopback HTTP), the
+                timeout is not positive, `max_attempts` is below 1 or the
+                backoff is negative.
+        """
         parsed = url_parse.urlparse(url)
         if parsed.scheme != "https":
             local = parsed.hostname in {"127.0.0.1", "localhost", "::1"}
@@ -202,7 +298,17 @@ class WebhookAlertSink(AlertSink):
         self.backoff_seconds = backoff_seconds
 
     def deliver(self, alert: Alert) -> AlertDelivery:
-        """POST an alert with bounded retries and no false success."""
+        """POST an alert with bounded retries and no false success.
+
+        Args:
+            alert: The alert.
+
+        Returns:
+            A `delivered` outcome if some attempt gets an HTTP 2xx answer.
+
+        Raises:
+            AlertDeliveryError: If no attempt succeeds within `max_attempts`.
+        """
         body = json.dumps(alert.to_dict(), sort_keys=True).encode("utf-8")
         headers = {"Content-Type": "application/json"}
         if self.token:
@@ -243,12 +349,26 @@ class WebhookAlertSink(AlertSink):
 
 
 class AlertDispatcher:
-    """Route alerts once and persist delivery outcomes for replay safety."""
+    """Route alerts once and persist delivery outcomes for replay safety.
+
+    Attributes:
+        sinks: Sink by route name.
+        journal: The delivery journal file.
+        lock: Serializes dispatching per journal.
+    """
 
     def __init__(
         self, sinks: Mapping[str, AlertSink], journal: str | Path
     ) -> None:
-        """Bind routes and an append-only delivery journal."""
+        """Bind routes and an append-only delivery journal.
+
+        Args:
+            sinks: Sink by route name.
+            journal: The delivery journal file.
+
+        Raises:
+            ValueError: If there are no sinks or a route name is blank.
+        """
         if not sinks:
             raise ValueError("at least one alert sink is required")
         if any(not route.strip() for route in sinks):
@@ -260,15 +380,31 @@ class AlertDispatcher:
     def dispatch(self, alert: Alert) -> AlertDelivery:
         """Deliver an alert or return a prior successful delivery.
 
-        The journal check, the delivery and the journal write are one step
-        per journal within this process, so concurrent threads cannot both
-        send the same alert.
+        The journal check, the delivery and the journal write are one step per
+        journal within this process, so concurrent threads cannot both send the
+        same alert.
+
+        Args:
+            alert: The alert.
+
+        Returns:
+            The delivery outcome: `deduplicated` if a delivery is already
+            recorded, `failed` if the route has no sink or the sink gave up,
+            otherwise the sink's outcome.
         """
         with self.lock:
             return self.dispatch_locked(alert)
 
     def dispatch_locked(self, alert: Alert) -> AlertDelivery:
-        """Dispatches one alert while holding the journal lock."""
+        """Dispatch one alert while holding the journal lock.
+
+        Args:
+            alert: The alert.
+
+        Returns:
+            The delivery outcome, which is also appended to the journal unless
+            the alert was deduplicated.
+        """
         previous = self.successful_alerts()
         if alert.alert_id in previous:
             return AlertDelivery(
@@ -305,7 +441,12 @@ class AlertDispatcher:
         return delivery
 
     def successful_alerts(self) -> set[str]:
-        """Return alert IDs with a durable successful delivery record."""
+        """Return alert IDs with a durable successful delivery record.
+
+        Returns:
+            The IDs of alerts whose journal record has status `delivered`; empty
+            if there is no journal.
+        """
         if not self.journal.exists():
             return set()
         successful: set[str] = set()
@@ -316,7 +457,12 @@ class AlertDispatcher:
         return successful
 
     def append(self, alert: Alert, delivery: AlertDelivery) -> None:
-        """Persist one alert and its delivery outcome durably."""
+        """Persist one alert and its delivery outcome durably.
+
+        Args:
+            alert: The alert.
+            delivery: Its delivery outcome.
+        """
         self.journal.parent.mkdir(parents=True, exist_ok=True)
         record = {"alert": alert.to_dict(), "delivery": delivery.to_dict()}
         with self.lock:

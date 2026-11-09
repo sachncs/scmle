@@ -65,7 +65,18 @@ GRID_POINTS = 199
 
 
 def validate_unit(value: Any, name: str) -> np.ndarray:
-    """The values as floats, which must lie in ``[0, 1]``."""
+    """Checks that values are finite and lie in ``[0, 1]``.
+
+    Args:
+        value: A number or array of numbers.
+        name: Name used in the error message.
+
+    Returns:
+        The values as a float array.
+
+    Raises:
+        ValueError: If a value is not finite or is outside ``[0, 1]``.
+    """
     array = np.asarray(value, dtype=float)
     if not np.all(np.isfinite(array)) or np.any(array < 0) or np.any(array > 1):
         raise ValueError(f"{name} must be finite and within [0, 1]")
@@ -124,11 +135,16 @@ class BettingTest:
 
     @property
     def threshold(self) -> float:
-        """``log(1 / alpha)``, the log capital at which the test crosses."""
+        """The value ``log(1 / alpha)``, where the test crosses."""
         return math.log(1.0 / self.alpha)
 
     def bet(self) -> np.ndarray:
-        """The predictable bet size for the next observation."""
+        """Computes the predictable bet size for the next observation.
+
+        Returns:
+            The bet, from the running variance of the observations so far and
+            capped at the positivity bound; one value per null mean.
+        """
         step = self.count + 1
         variance = (0.25 + self.deviation) / step
         raw = np.sqrt(
@@ -137,7 +153,15 @@ class BettingTest:
         return np.minimum(raw, self.bound)
 
     def update(self, observation: Any) -> np.ndarray:
-        """Feeds one observation in ``[0, 1]``; returns the log capital."""
+        """Feeds one observation in ``[0, 1]``.
+
+        Args:
+            observation: The observation. A value that is not finite or is
+                outside ``[0, 1]`` raises `ValueError`.
+
+        Returns:
+            The log capital after the observation.
+        """
         value = validate_unit(observation, "observation")
         size = self.bet()
         factor = 1.0 + self.sign * size * (value - self.null_mean)
@@ -165,7 +189,15 @@ class BettingTest:
         return np.exp(self.log_capital)
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready state (scalar tests only)."""
+        """Returns the JSON-ready state (scalar tests only).
+
+        Returns:
+            A dict with the settings, the observation count and sums, the log
+            capital and its peak.
+
+        Raises:
+            ValueError: If the test has more than one null mean.
+        """
         if self.null_mean.ndim != 0:
             raise ValueError("only a single test can be serialized")
         return {
@@ -182,7 +214,14 @@ class BettingTest:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> "BettingTest":
-        """Rebuilds a test from `to_dict`."""
+        """Rebuilds a test from `to_dict`.
+
+        Args:
+            record: A dict produced by `to_dict`.
+
+        Returns:
+            The test, in the state that was saved.
+        """
         test = cls(
             record["null_mean"],
             record["direction"],
@@ -234,6 +273,9 @@ class MixtureTest:
             stride: Observations between starts.
             terms: Newest starts kept.
             cap: Share of the positivity bound a bet may use.
+
+        Raises:
+            ValueError: If `stride` or `terms` is not positive.
         """
         if stride < 1 or terms < 1:
             raise ValueError("stride and terms must be positive")
@@ -252,7 +294,10 @@ class MixtureTest:
         self.start_term()
 
     def start_term(self) -> None:
-        """Adds a term that starts with the next observation."""
+        """Adds a term that starts with the next observation.
+
+        The oldest term is dropped when more than `terms` are kept.
+        """
         self.inner.append(
             BettingTest(self.null_mean, self.direction, self.alpha, self.cap)
         )
@@ -266,11 +311,20 @@ class MixtureTest:
 
     @property
     def threshold(self) -> float:
-        """``log(1 / alpha)``."""
+        """The value ``log(1 / alpha)``."""
         return math.log(1.0 / self.alpha)
 
     def update(self, observation: Any) -> np.ndarray:
-        """Feeds one observation in ``[0, 1]``; returns the log capital."""
+        """Feeds one observation in ``[0, 1]``.
+
+        A new term starts every `stride` observations.
+
+        Args:
+            observation: The observation.
+
+        Returns:
+            The log of the weighted sum of the terms' capitals.
+        """
         if self.count > 0 and self.count % self.stride == 0:
             self.start_term()
         for test in self.inner:
@@ -303,7 +357,15 @@ class MixtureTest:
         return np.exp(self.log_capital)
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready state (scalar tests only)."""
+        """Returns the JSON-ready state (scalar tests only).
+
+        Returns:
+            A dict with the settings, counts, term weights, the terms' states,
+            the log capital and its peak.
+
+        Raises:
+            ValueError: If the test has more than one null mean.
+        """
         if self.null_mean.ndim != 0:
             raise ValueError("only a single test can be serialized")
         return {
@@ -323,7 +385,14 @@ class MixtureTest:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> "MixtureTest":
-        """Rebuilds a test from `to_dict`."""
+        """Rebuilds a test from `to_dict`.
+
+        Args:
+            record: A dict produced by `to_dict`.
+
+        Returns:
+            The test, in the state that was saved.
+        """
         test = cls(
             record["null_mean"],
             record["direction"],
@@ -346,12 +415,27 @@ class ConfidenceSequence:
 
     Two one-sided betting tests per grid point, each at ``alpha / 2``; a grid
     point is out when either crosses. Limits are the running intersection, so
-    they only tighten, and are rounded outward to the grid (so the interval
-    is never narrower than the exact one on the grid).
+    they only tighten, and are rounded outward to the grid (so the interval is
+    never narrower than the exact one on the grid).
+
+    Attributes:
+        alpha: Level of the sequence.
+        grid: The grid of candidate means.
+        upper_tests: Tests of the null "mean at most the grid value".
+        lower_tests: Tests of the null "mean at least the grid value".
+        alive: Grid points not yet excluded.
     """
 
     def __init__(self, alpha: float, points: int = GRID_POINTS) -> None:
-        """Creates a sequence with `points` grid values in ``(0, 1)``."""
+        """Creates a sequence with `points` grid values in ``(0, 1)``.
+
+        Args:
+            alpha: Level of the sequence.
+            points: Number of grid values.
+
+        Raises:
+            ValueError: If `points` is below 3.
+        """
         if points < 3:
             raise ValueError("points must be at least 3")
         self.alpha = alpha
@@ -361,7 +445,14 @@ class ConfidenceSequence:
         self.alive = np.ones(points, dtype=bool)
 
     def update(self, observation: Any) -> tuple[float, float]:
-        """Feeds one observation; returns the interval ``(low, high)``."""
+        """Feeds one observation.
+
+        Args:
+            observation: The observation, in ``[0, 1]``.
+
+        Returns:
+            The interval ``(low, high)``.
+        """
         self.upper_tests.update(observation)
         self.lower_tests.update(observation)
         self.alive &= ~(self.upper_tests.crossed | self.lower_tests.crossed)
@@ -369,7 +460,10 @@ class ConfidenceSequence:
 
     @property
     def interval(self) -> tuple[float, float]:
-        """Current limits, rounded outward to the grid and clipped to [0, 1]."""
+        """The current limits, rounded outward to the grid, within [0, 1].
+
+        ``(1.0, 0.0)`` means every grid point has been excluded.
+        """
         if not self.alive.any():
             return (1.0, 0.0)
         where = np.flatnonzero(self.alive)
@@ -380,11 +474,15 @@ class ConfidenceSequence:
 
 
 class RiskAlarm:
-    """L1: alarm when the mean loss is evidenced to exceed ``r_ref + delta``.
+    """Alarm when the mean loss is evidenced to exceed ``r_ref + delta``.
 
     Observations are mean losses in ``[0, scale]`` (``scale`` is the
     charter-declared bound, or ``1 / epsilon`` for propensity-weighted losses)
     and are divided by `scale` before betting.
+
+    Attributes:
+        scale: Upper bound of an observation.
+        test: The mixture test that decides the alarm.
     """
 
     def __init__(
@@ -414,12 +512,23 @@ class RiskAlarm:
         self.test = MixtureTest(null, GREATER, alpha)
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready state."""
+        """Returns the JSON-ready state.
+
+        Returns:
+            A dict with the scale and the test's state.
+        """
         return {"scale": self.scale, "test": self.test.to_dict()}
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> "RiskAlarm":
-        """Rebuilds an alarm from `to_dict`."""
+        """Rebuilds an alarm from `to_dict`.
+
+        Args:
+            record: A dict produced by `to_dict`.
+
+        Returns:
+            The alarm, in the state that was saved.
+        """
         state = record["test"]
         alarm = cls(
             state["null_mean"] * record["scale"],
@@ -431,30 +540,53 @@ class RiskAlarm:
         return alarm
 
     def update(self, mean_loss: float) -> bool:
-        """Feeds the mean loss of one matured batch; True when alarming."""
+        """Feeds the mean loss of one matured batch.
+
+        Args:
+            mean_loss: Mean loss of the batch, in loss units; it is divided by
+                the scale and clipped to ``[0, 1]``.
+
+        Returns:
+            True when the alarm is raised (capital at or above ``1 / alpha``).
+        """
         self.test.update(min(max(mean_loss / self.scale, 0.0), 1.0))
         return bool(self.test.crossed)
 
 
 class PairedEProcess:
-    """L2 and L3: e-process on paired loss differences.
+    """E-process on paired loss differences, for promotion and rollback.
 
-    The first argument of `update` is the model in service, the second the
-    one it is compared with, and the difference is first minus second (loss
-    of the serving model above the other's). For promotion the serving model
-    is the champion and the null is "the challenger is not better by at
-    least `margin`". For rollback (the reverse process) the serving model is
-    the new champion, the other is the previous one, and the null is "the new
-    champion is not worse by more than `margin`", which is the same bet on
-    ``(difference / scale + 1) / 2`` with the roles read that way.
+    The first argument of `update` is the model in service, the second the one
+    it is compared with, and the difference is first minus second (loss of the
+    serving model above the other's). For promotion the serving model is the
+    champion and the null is "the challenger is not better by at least
+    `margin`". For rollback (the reverse process) the serving model is the new
+    champion, the other is the previous one, and the null is "the new champion
+    is not worse by more than `margin`", which is the same bet on ``(difference
+    / scale + 1) / 2`` with the roles read that way.
 
     With propensity-weighted losses a batch difference lies in ``[-scale,
     scale]`` where ``scale = bound / epsilon``; pass it as `scale` and feed
     `update_gap`.
+
+    Attributes:
+        margin: The margin of the null, in loss units.
+        scale: Largest absolute batch difference.
+        test: The mixture test that carries the process.
     """
 
     def __init__(self, margin: float, alpha: float, scale: float = 1.0) -> None:
-        """Creates the process; `alpha` is the level of one proposal."""
+        """Creates the process; `alpha` is the level of one proposal.
+
+        Args:
+            margin: Margin of the null, strictly within ``(-scale, scale)``.
+            alpha: Level of one proposal.
+            scale: Largest absolute batch difference.
+
+        Raises:
+            ValueError: If `scale` is not positive or `margin` is not strictly
+                within ``(-scale, scale)``.
+        """
         if scale <= 0.0 or not -scale < margin < scale:
             raise ValueError("margin must lie strictly within (-scale, scale)")
         self.margin = margin
@@ -487,6 +619,13 @@ class PairedEProcess:
 
         Args:
             gap: Mean of first minus second, within ``[-scale, scale]``.
+
+        Returns:
+            Whether the process is at or above ``1 / alpha``.
+
+        Raises:
+            ValueError: If `gap` is not finite or lies outside ``[-scale,
+                scale]``.
         """
         if not np.isfinite(gap) or abs(gap) > self.scale + 1e-12:
             raise ValueError("gap must be finite and within [-scale, scale]")
@@ -505,7 +644,11 @@ class PairedEProcess:
         return bool(self.test.crossed)
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready state."""
+        """Returns the JSON-ready state.
+
+        Returns:
+            A dict with the margin, the scale and the test's state.
+        """
         return {
             "margin": self.margin,
             "scale": self.scale,
@@ -514,7 +657,14 @@ class PairedEProcess:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> "PairedEProcess":
-        """Rebuilds a process from `to_dict`."""
+        """Rebuilds a process from `to_dict`.
+
+        Args:
+            record: A dict produced by `to_dict`.
+
+        Returns:
+            The process, in the state that was saved.
+        """
         state = record["test"]
         process = cls(record["margin"], state["alpha"], record["scale"])
         process.test = MixtureTest.from_dict(state)
@@ -522,18 +672,28 @@ class PairedEProcess:
 
 
 class PromotionSequence:
-    """e-LOND across challengers, decided in registration order.
+    """E-LOND across challengers, decided in registration order.
 
-    e-LOND controls the false-discovery rate over the sequence under
-    arbitrary dependence if every true null has an e-value with
-    ``E[e] <= 1`` and the hypotheses are indexed in advance. A challenger is
-    registered before it is scored; decisions are taken in registration order
-    (a later challenger waits for the earlier ones), so the order never
-    depends on the evidence.
+    e-LOND controls the false-discovery rate over the sequence under arbitrary
+    dependence if every true null has an e-value with ``E[e] <= 1`` and the
+    hypotheses are indexed in advance. A challenger is registered before it is
+    scored; decisions are taken in registration order (a later challenger waits
+    for the earlier ones), so the order never depends on the evidence.
+
+    Attributes:
+        config: The online-FDR rule configuration.
+        rule: The e-LOND rule.
+        state: The rule's current state.
+        names: Registered challengers, in registration order.
+        decisions: The step taken for each decided challenger.
     """
 
     def __init__(self, alpha: Fraction | float | str) -> None:
-        """Creates the sequence at FDR level `alpha`."""
+        """Creates the sequence at FDR level `alpha`.
+
+        Args:
+            alpha: The false-discovery rate level.
+        """
         config = online_fdr.RuleConfig(
             rule=online_fdr.ELOND, alpha=Fraction(alpha).limit_denominator()
         )
@@ -544,7 +704,17 @@ class PromotionSequence:
         self.decisions: dict[str, online_fdr.Step] = {}
 
     def register(self, name: str) -> int:
-        """Registers a challenger before it is scored; returns its index."""
+        """Registers a challenger before it is scored.
+
+        Args:
+            name: Name of the challenger.
+
+        Returns:
+            Its index in the registration order, from 1.
+
+        Raises:
+            ValueError: If the challenger is already registered.
+        """
         if name in self.names:
             raise ValueError(f"challenger {name!r} is already registered")
         self.names.append(name)
@@ -552,6 +722,13 @@ class PromotionSequence:
 
     def decide(self, name: str, e_value: float) -> online_fdr.Step:
         """Decides the next undecided challenger with its final e-value.
+
+        Args:
+            name: Name of the challenger.
+            e_value: Its final e-value.
+
+        Returns:
+            The rule's step, which carries the decision.
 
         Raises:
             ValueError: If `name` is unregistered, decided, or not next.
@@ -572,5 +749,5 @@ class PromotionSequence:
 
     @property
     def wealth(self) -> Fraction:
-        """Remaining alpha-wealth of the rule."""
+        """The remaining alpha-wealth of the rule."""
         return self.rule.wealth(self.state)
