@@ -823,9 +823,19 @@ marked `Breaking:` and listed first in their group.
 - The model adapters are plain classes configured by keyword arguments, in
   place of five unrelated adapter hierarchies; the 44 built-in adapters
   register in the same order and build the same estimators.
-- `check_remote` rejects URLs that are not `http` or `https`; an alert date
-  such as `"2026-01-01Z"` raises `ValueError`; a few unused internal
-  parameters were removed.
+- `check_remote` rejects URLs that are not `http` or `https` (a `ValueError`
+  before the golden files are read).
+- A timestamp is read by `datetime.fromisoformat` as written, without first
+  replacing a trailing `Z`: a full timestamp ending in `Z` still parses, but a
+  date-only text such as `"2026-01-01Z"` now raises `ValueError`. This applies
+  to the evidence, observability and performance contracts, the incremental
+  and streaming readers, inference evidence, and monitoring alerts,
+  observability and SLO.
+- The serving warm-up and load failures are logged with a traceback
+  (`LOGGER.exception`) instead of only the error text; the traceback can show
+  file paths.
+- About twelve unused internal parameters were removed (a caller that passed
+  one gets a `TypeError`).
 - A fit that has standard errors but no interval errors now builds its
   intervals from the standard errors, as documented, instead of raising
   `TypeError`.

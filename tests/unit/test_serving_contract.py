@@ -610,6 +610,14 @@ def test_a_remote_answer_without_predictions_is_reported_as_failed():
     assert any("predictions" in m for m in report["mismatches"])
 
 
+@pytest.mark.parametrize(
+    "url", ["file:///etc/passwd", "ftp://example.com/", "127.0.0.1:8000"]
+)
+def test_a_remote_check_refuses_a_url_that_is_not_http_or_https(url):
+    with pytest.raises(ValueError, match="http or https"):
+        parity.check_remote(url, GOLDEN)
+
+
 def test_a_timeout_raised_by_the_work_itself_is_not_a_deadline_error():
     control = guard.AdmissionControl(1, 5.0)
 
