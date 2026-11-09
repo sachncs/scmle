@@ -4524,6 +4524,8 @@ class PackageStage(Stage):
         if context.resource_governor.skip_reason(first=False):
             return {"skipped": "time budget spent"}
         split = require(context.split, "split")
+        if len(split.dev_target) < sensitivity.MIN_ROWS:
+            return {"skipped": "too few rows"}
         adapter = context.registry.get(selected.model_name)
         strategy = strategies.get_strategy(selected.strategy)
         plan = require(context.profile, "profile").feature_plan

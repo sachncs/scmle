@@ -123,3 +123,23 @@ def test_asking_for_intervals_without_calibration_points_at_the_event():
 
     with pytest.raises(errors.ArtifactError, match=r"conformal\.skipped"):
         model.require_conformal("regression")
+
+
+def test_sensitivity_below_the_minimum_rows_is_skipped_not_raised():
+    from types import SimpleNamespace
+
+    from scmle.contracts import tasks
+    from scmle.core import stages
+
+    context = SimpleNamespace(
+        spec=SimpleNamespace(
+            selection=SimpleNamespace(sensitivity_repeats=3)
+        ),
+        task=tasks.TaskType.REGRESSION,
+        resource_governor=SimpleNamespace(skip_reason=lambda first: None),
+        split=SimpleNamespace(dev_target=np.arange(10.0)),
+    )
+
+    record = stages.PackageStage().sensitivity(context, None)
+
+    assert "skipped" in record
