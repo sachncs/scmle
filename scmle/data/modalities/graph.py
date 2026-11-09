@@ -3,7 +3,7 @@
 This module intentionally stops at a data foundation. It represents a graph,
 validates its structural invariants, profiles its contents, creates leakage-
 safe inductive node splits, and prepares bounded numeric features. Graph
-models, graph explainers, and graph serving are separate capability slices.
+models, graph explainers, and graph serving are not part of this module.
 """
 
 from collections import defaultdict
@@ -40,24 +40,46 @@ class GraphTemporalError(GraphError):
 
 
 class GraphValidationError(GraphError):
-    """Raised when a graph fails structural validation."""
+    """Raised when a graph fails structural validation.
+
+    Attributes:
+        report: The complete validation report that caused the error.
+    """
 
     def __init__(self, report: "GraphValidationReport") -> None:
-        """Builds an error containing the complete validation report."""
+        """Builds an error containing the complete validation report.
+
+        Args:
+            report: The validation report; its messages, joined by ``; ``,
+                form the error message.
+        """
         self.report = report
         super().__init__("; ".join(issue.message for issue in report.issues))
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class GraphNode:
-    """Immutable node with an optional numeric feature vector and label."""
+    """Immutable node with an optional numeric feature vector and label.
+
+    Attributes:
+        node_id: Non-empty node identifier.
+        features: Finite numeric feature vector, stored as floats; may be
+            empty.
+        label: Optional node label.
+    """
 
     node_id: str
     features: tuple[float, ...] = ()
     label: str | int | float | bool | None = None
 
     def __post_init__(self) -> None:
-        """Validates the node identifier and numeric feature vector."""
+        """Validates the node identifier and numeric feature vector.
+
+        Raises:
+            ValueError: If node_id is not a non-empty string or a feature is
+                not finite.
+            TypeError: If a feature is not an int or float.
+        """
         if not isinstance(self.node_id, str) or not self.node_id.strip():
             raise ValueError("node_id must be a non-empty string")
         if any(not isinstance(value, (int, float)) for value in self.features):
@@ -73,7 +95,15 @@ class GraphNode:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class GraphEdge:
-    """Immutable weighted edge between two node identifiers."""
+    """Immutable weighted edge between two node identifiers.
+
+    Attributes:
+        source: Non-empty identifier of the source node.
+        target: Non-empty identifier of the target node.
+        weight: Finite edge weight, stored as a float.
+        relation: Non-empty relation name.
+        event_time: Optional timezone-aware time, stored in UTC.
+    """
 
     source: str
     target: str
@@ -82,7 +112,15 @@ class GraphEdge:
     event_time: datetime | None = None
 
     def __post_init__(self) -> None:
-        """Validates endpoint, relation, and weight values."""
+        """Validates endpoint, relation, and weight values.
+
+        Raises:
+            ValueError: If an endpoint or the relation is not a non-empty
+                string, the weight is not finite, or the event time has no
+                timezone.
+            TypeError: If the weight is not numeric or the event time is not
+                a datetime.
+        """
         if not isinstance(self.source, str) or not self.source.strip():
             raise ValueError("edge source must be a non-empty string")
         if not isinstance(self.target, str) or not self.target.strip():
@@ -111,14 +149,25 @@ class GraphEdge:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class TemporalGraphSplit:
-    """Time-ordered graph edges separated at an explicit UTC cutoff."""
+    """Time-ordered graph edges separated at an explicit UTC cutoff.
+
+    Attributes:
+        cutoff: Timezone-aware cutoff, converted to UTC.
+        train_edges: Edges with event time at or before the cutoff.
+        future_edges: Edges with event time after the cutoff.
+    """
 
     cutoff: datetime
     train_edges: tuple[GraphEdge, ...]
     future_edges: tuple[GraphEdge, ...]
 
     def __post_init__(self) -> None:
-        """Validate the cutoff and timestamp completeness of both partitions."""
+        """Validate the cutoff and timestamp completeness of both partitions.
+
+        Raises:
+            ValueError: If the cutoff is not timezone-aware or an edge in
+                either partition has no event time.
+        """
         if self.cutoff.tzinfo is None or self.cutoff.utcoffset() is None:
             raise ValueError("cutoff must be timezone-aware")
         object.__setattr__(
@@ -133,7 +182,7 @@ class TemporalGraphSplit:
 
     @property
     def has_future_leakage(self) -> bool:
-        """Return whether a training edge occurs after the cutoff."""
+        """Whether a training edge occurs after the cutoff."""
         cutoff = self.cutoff.astimezone(UTC)
         return any(
             edge.event_time is not None and edge.event_time > cutoff
@@ -142,7 +191,18 @@ class TemporalGraphSplit:
 
 
 def canonical_event_time(value: datetime | str) -> datetime:
-    """Parse and normalize a timezone-aware graph event timestamp to UTC."""
+    """Parse and normalize a timezone-aware graph event timestamp to UTC.
+
+    Args:
+        value: A datetime, or ISO 8601 text; a trailing ``Z`` means UTC.
+
+    Returns:
+        The same instant as a UTC datetime.
+
+    Raises:
+        GraphTemporalError: If the text is not ISO 8601, the value is
+            neither datetime nor text, or the time has no timezone.
+    """
     if isinstance(value, str):
         normalized = value.strip()
         if normalized.endswith(("Z", "z")):
@@ -164,14 +224,24 @@ def canonical_event_time(value: datetime | str) -> datetime:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class GraphValidationIssue:
-    """One deterministic graph validation finding."""
+    """One deterministic graph validation finding.
+
+    Attributes:
+        code: Machine-readable issue code.
+        message: Human-readable description.
+        affected: Identifiers of the nodes or edge parts concerned.
+    """
 
     code: str
     message: str
     affected: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
-        """Returns a JSON-compatible issue mapping."""
+        """Returns a JSON-compatible issue mapping.
+
+        Returns:
+            A dict with `code`, `message` and `affected` (as a list).
+        """
         return {
             "code": self.code,
             "message": self.message,
@@ -181,22 +251,31 @@ class GraphValidationIssue:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class GraphValidationReport:
-    """Complete graph validation result."""
+    """Complete graph validation result.
+
+    Attributes:
+        issues: Every issue found; empty when the graph is valid.
+    """
 
     issues: tuple[GraphValidationIssue, ...]
 
     @property
     def is_valid(self) -> bool:
-        """Returns whether no validation issues were found."""
+        """Whether no validation issues were found."""
         return not self.issues
 
     @property
     def error_codes(self) -> tuple[str, ...]:
-        """Returns unique issue codes in deterministic order."""
+        """The unique issue codes, sorted."""
         return tuple(sorted({issue.code for issue in self.issues}))
 
     def to_dict(self) -> dict[str, Any]:
-        """Returns a JSON-compatible report mapping."""
+        """Returns a JSON-compatible report mapping.
+
+        Returns:
+            A dict with `is_valid`, `error_codes` and `issues` (each issue as
+            a dict).
+        """
         return {
             "is_valid": self.is_valid,
             "error_codes": list(self.error_codes),
@@ -206,7 +285,17 @@ class GraphValidationReport:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class NodeProfile:
-    """Summary statistics for graph nodes and their degrees."""
+    """Summary statistics for graph nodes and their degrees.
+
+    Attributes:
+        node_count: Number of nodes.
+        isolated_node_count: Number of nodes with degree zero.
+        labeled_node_count: Number of nodes with a label.
+        feature_dimension: Longest feature vector among the nodes.
+        degree_min: Smallest degree; 0 for an empty graph.
+        degree_max: Largest degree; 0 for an empty graph.
+        degree_mean: Mean degree; 0.0 for an empty graph.
+    """
 
     node_count: int
     isolated_node_count: int
@@ -217,13 +306,27 @@ class NodeProfile:
     degree_mean: float
 
     def to_dict(self) -> dict[str, Any]:
-        """Returns a JSON-compatible node profile."""
+        """Returns a JSON-compatible node profile.
+
+        Returns:
+            A dict of the profile fields.
+        """
         return dataclasses.asdict(self)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class EdgeProfile:
-    """Summary statistics for graph edges and weights."""
+    """Summary statistics for graph edges and weights.
+
+    Attributes:
+        edge_count: Number of edges.
+        duplicate_edge_count: Number of edges beyond the first for each
+            duplicate-detection key.
+        self_loop_count: Number of edges whose source equals the target.
+        weight_min: Smallest weight, or None without edges.
+        weight_max: Largest weight, or None without edges.
+        weight_mean: Mean weight, or None without edges.
+    """
 
     edge_count: int
     duplicate_edge_count: int
@@ -233,13 +336,25 @@ class EdgeProfile:
     weight_mean: float | None
 
     def to_dict(self) -> dict[str, Any]:
-        """Returns a JSON-compatible edge profile."""
+        """Returns a JSON-compatible edge profile.
+
+        Returns:
+            A dict of the profile fields.
+        """
         return dataclasses.asdict(self)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class GraphProfile:
-    """Combined graph, node, and edge profile."""
+    """Combined graph, node, and edge profile.
+
+    Attributes:
+        graph_identity: SHA-256 identity of the graph content.
+        directed: Whether the graph is directed.
+        component_count: Number of weakly connected components.
+        node: Node profile.
+        edge: Edge profile.
+    """
 
     graph_identity: str
     directed: bool
@@ -248,7 +363,12 @@ class GraphProfile:
     edge: EdgeProfile
 
     def to_dict(self) -> dict[str, Any]:
-        """Returns a JSON-compatible graph profile."""
+        """Returns a JSON-compatible graph profile.
+
+        Returns:
+            A dict with the identity, direction, component count and the
+            node and edge profiles as nested dicts.
+        """
         return {
             "graph_identity": self.graph_identity,
             "directed": self.directed,
@@ -260,7 +380,18 @@ class GraphProfile:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class InductiveNodeSplit:
-    """Leakage-safe node partitions and within-partition edge partitions."""
+    """Leakage-safe node partitions and within-partition edge partitions.
+
+    Attributes:
+        train_nodes: Sorted identifiers of the training nodes.
+        validation_nodes: Sorted identifiers of the validation nodes.
+        test_nodes: Sorted identifiers of the test nodes.
+        train_edges: Edges with both endpoints in the training nodes.
+        validation_edges: Edges with both endpoints in the validation nodes.
+        test_edges: Edges with both endpoints in the test nodes.
+        withheld_edges: Edges whose endpoints fall in different partitions.
+        seed: Seed used for the shuffle.
+    """
 
     train_nodes: tuple[str, ...]
     validation_nodes: tuple[str, ...]
@@ -273,11 +404,17 @@ class InductiveNodeSplit:
 
     @property
     def node_partitions(self) -> tuple[tuple[str, ...], ...]:
-        """Returns train, validation, and test node partitions."""
+        """The train, validation and test node partitions, in that order."""
         return (self.train_nodes, self.validation_nodes, self.test_nodes)
 
     def has_edge_leakage(self) -> bool:
-        """Returns whether any retained edge crosses node partitions."""
+        """Returns whether any retained edge crosses node partitions.
+
+        Returns:
+            True if a retained edge has endpoints in different partitions
+            (an endpoint in no partition differs from any partition); False
+            otherwise.
+        """
         partitions = {
             node_id: index
             for index, nodes in enumerate(self.node_partitions)
@@ -292,7 +429,15 @@ class InductiveNodeSplit:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class PreparedFeatures:
-    """Bounded numeric features for a graph baseline."""
+    """Bounded numeric features for a graph baseline.
+
+    Attributes:
+        node_ids: Identifier of each row.
+        feature_names: Name of each column.
+        values: One tuple of feature values per node.
+        standardized: Whether columns were standardised to zero mean and
+            unit variance.
+    """
 
     node_ids: tuple[str, ...]
     feature_names: tuple[str, ...]
@@ -301,17 +446,31 @@ class PreparedFeatures:
 
     @property
     def shape(self) -> tuple[int, int]:
-        """Returns the prepared matrix shape."""
+        """The number of nodes and the number of features, as a pair."""
         return (len(self.node_ids), len(self.feature_names))
 
     def to_numpy(self) -> np.ndarray:
-        """Returns a writable copy of the prepared feature matrix."""
+        """Returns a writable copy of the prepared feature matrix.
+
+        Returns:
+            A float64 array of shape ``(nodes, features)``.
+        """
         return np.asarray(self.values, dtype=np.float64).copy()
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class GraphData:
-    """Immutable graph dataset with canonical node and edge ordering."""
+    """Immutable graph dataset with canonical node and edge ordering.
+
+    Attributes:
+        nodes: Nodes, sorted by identifier; identifiers are unique.
+        edges: Edges, sorted by source, target, relation, weight and event
+            time.
+        directed: Whether edges are directed.
+        feature_names: Names of the node feature columns; when given, they
+            match the populated feature length.
+        source_uri: URI the graph was loaded from.
+    """
 
     nodes: tuple[GraphNode, ...] = ()
     edges: tuple[GraphEdge, ...] = ()
@@ -320,7 +479,13 @@ class GraphData:
     source_uri: str = "memory://"
 
     def __post_init__(self) -> None:
-        """Normalizes collections and checks basic shape invariants."""
+        """Normalizes collections and checks basic shape invariants.
+
+        Raises:
+            ValueError: If node identifiers repeat, populated feature
+                vectors differ in length, feature_names does not match that
+                length, or a feature name is blank.
+        """
         nodes = tuple(sorted(self.nodes, key=lambda node: node.node_id))
         edges = tuple(
             sorted(
@@ -364,7 +529,20 @@ class GraphData:
         feature_names: Iterable[str] = (),
         source_uri: str = "memory://",
     ) -> "GraphData":
-        """Builds a graph and derives nodes when no node collection is given."""
+        """Builds a graph and derives nodes when no node collection is given.
+
+        Args:
+            edges: The edges.
+            nodes: Nodes or node identifiers. When None, one featureless
+                node is created for every edge endpoint.
+            directed: Whether edges are directed.
+            feature_names: Names of the node feature columns.
+            source_uri: URI recorded as the graph source.
+
+        Returns:
+            The new graph. It is not validated beyond the invariants checked
+            on construction; call `require_valid` for endpoint checks.
+        """
         edge_values = tuple(edges)
         if nodes is None:
             node_values = tuple(
@@ -402,7 +580,25 @@ class GraphData:
         relation_column: str = "relation",
         time_column: str | None = None,
     ) -> "GraphData":
-        """Loads CSV or JSONL edges into a validated graph dataset."""
+        """Loads CSV or JSONL edges into a validated graph dataset.
+
+        Args:
+            path: Edge file (``.csv``, ``.jsonl`` or ``.ndjson``).
+            nodes: Nodes or node identifiers. When None, nodes are derived
+                from the edge endpoints.
+            directed: Whether edges are directed.
+            source_column: Name of the source column or key.
+            target_column: Name of the target column or key.
+            weight_column: Name of the weight column or key.
+            relation_column: Name of the relation column or key.
+            time_column: Name of the event-time column or key, or None for
+                untimed edges.
+
+        Returns:
+            The graph, with its source URI set to the file's URI. Errors
+            from `read_edges` propagate; a graph that fails `validate`
+            raises GraphValidationError.
+        """
         edges = read_edges(
             path,
             source_column=source_column,
@@ -422,12 +618,12 @@ class GraphData:
 
     @property
     def node_ids(self) -> tuple[str, ...]:
-        """Returns canonical node identifiers."""
+        """The node identifiers, in canonical (sorted) order."""
         return tuple(node.node_id for node in self.nodes)
 
     @property
     def identity(self) -> str:
-        """Returns the full SHA-256 identity of graph content."""
+        """The full SHA-256 hex identity of the graph content."""
         return graph_identity(
             self.nodes,
             self.edges,
@@ -436,7 +632,13 @@ class GraphData:
         )
 
     def validate(self) -> GraphValidationReport:
-        """Finds missing endpoints, duplicates, self-loops, and bad weights."""
+        """Finds missing endpoints, duplicates, self-loops, and bad weights.
+
+        Returns:
+            A report with the issues found, in edge order followed by
+            duplicates. Codes are `missing_endpoint`, `self_loop`,
+            `invalid_weight` and `duplicate_edge`.
+        """
         node_ids = set(self.node_ids)
         issues: list[GraphValidationIssue] = []
         duplicate_counts: defaultdict[tuple[str, str, str, str], int] = (
@@ -491,13 +693,26 @@ class GraphData:
         return GraphValidationReport(tuple(issues))
 
     def require_valid(self) -> None:
-        """Raises `GraphValidationError` unless the graph is valid."""
+        """Raises `GraphValidationError` unless the graph is valid.
+
+        Raises:
+            GraphValidationError: If `validate` finds any issue.
+        """
         report = self.validate()
         if not report.is_valid:
             raise GraphValidationError(report)
 
     def edge_key(self, edge: GraphEdge) -> tuple[str, str, str, str]:
-        """Returns the canonical duplicate-detection key for an edge."""
+        """Returns the canonical duplicate-detection key for an edge.
+
+        Args:
+            edge: The edge.
+
+        Returns:
+            The tuple (first endpoint, second endpoint, relation, ISO event
+            time or empty text). The endpoints are sorted when the graph is
+            undirected. The weight is not part of the key.
+        """
         endpoints = (edge.source, edge.target)
         if not self.directed:
             endpoints = tuple(sorted(endpoints))  # type: ignore[assignment]
@@ -505,7 +720,15 @@ class GraphData:
         return (endpoints[0], endpoints[1], edge.relation, event_time)
 
     def connected_components(self) -> tuple[frozenset[str], ...]:
-        """Returns deterministic weakly connected components."""
+        """Returns deterministic weakly connected components.
+
+        Edges are treated as undirected and edges to undeclared nodes are
+        ignored.
+
+        Returns:
+            The components as frozensets of node identifiers, ordered by
+            their smallest identifier.
+        """
         adjacency: dict[str, set[str]] = {
             node_id: set() for node_id in self.node_ids
         }
@@ -530,7 +753,13 @@ class GraphData:
         return tuple(sorted(components, key=lambda component: min(component)))
 
     def profile_nodes(self) -> NodeProfile:
-        """Profiles node counts, labels, features, and undirected degree."""
+        """Profiles node counts, labels, features, and undirected degree.
+
+        A self-loop adds one to its node's degree.
+
+        Returns:
+            The node profile.
+        """
         degrees = dict.fromkeys(self.node_ids, 0)
         for edge in self.edges:
             if edge.source in degrees:
@@ -553,7 +782,11 @@ class GraphData:
         )
 
     def profile_edges(self) -> EdgeProfile:
-        """Profiles edge counts, duplicate edges, loops, and weights."""
+        """Profiles edge counts, duplicate edges, loops, and weights.
+
+        Returns:
+            The edge profile.
+        """
         weights = tuple(edge.weight for edge in self.edges)
         duplicate_count = sum(
             max(0, count - 1) for count in self.edge_key_counts().values()
@@ -570,14 +803,23 @@ class GraphData:
         )
 
     def edge_key_counts(self) -> dict[tuple[str, str, str, str], int]:
-        """Returns canonical edge multiplicities."""
+        """Returns canonical edge multiplicities.
+
+        Returns:
+            A dict from `edge_key` to the number of edges with that key.
+        """
         counts: defaultdict[tuple[str, str, str, str], int] = defaultdict(int)
         for edge in self.edges:
             counts[self.edge_key(edge)] += 1
         return dict(counts)
 
     def profile(self) -> GraphProfile:
-        """Returns the combined graph profile."""
+        """Returns the combined graph profile.
+
+        Returns:
+            The profile with identity, direction, component count, and node
+            and edge profiles.
+        """
         return GraphProfile(
             graph_identity=self.identity,
             directed=self.directed,
@@ -592,6 +834,16 @@ class GraphData:
         Edges at the cutoff belong to training; edges after the cutoff belong
         to the future evaluation partition. Untimestamped edges fail closed
         because they cannot be assigned without inventing temporal order.
+
+        Args:
+            cutoff: Timezone-aware datetime or ISO 8601 text.
+
+        Returns:
+            The split, with the cutoff in UTC.
+
+        Raises:
+            GraphTemporalError: If any edge has no event time, or the cutoff
+                is invalid (see `canonical_event_time`).
         """
         cutoff_time = canonical_event_time(cutoff)
         if any(edge.event_time is None for edge in self.edges):
@@ -615,7 +867,16 @@ class GraphData:
         )
 
     def curate(self) -> ModalityCurationReport:
-        """Build graph-structure evidence before choosing a graph model."""
+        """Build graph-structure evidence before choosing a graph model.
+
+        Returns:
+            A curation report for modality ``graph`` whose sample count is
+            the node count. The profile holds the graph profile, node label
+            counts and temporal status (`complete`, `mixed` or `absent`).
+            Findings cover partly timestamped edges, duplicate edges,
+            isolated nodes, missing declared features and mixed labelled and
+            unlabelled nodes.
+        """
         profile = self.profile()
         labels = label_counts(node.label for node in self.nodes)
         profile_data = profile.to_dict()
@@ -723,7 +984,21 @@ def graph_identity(
     directed: bool = True,
     feature_names: Iterable[str] = (),
 ) -> str:
-    """Returns a canonical SHA-256 identity independent of input ordering."""
+    """Returns a canonical SHA-256 identity independent of input ordering.
+
+    For an undirected graph the endpoints of each edge are sorted before
+    hashing.
+
+    Args:
+        nodes: The nodes.
+        edges: The edges.
+        directed: Whether edges are directed.
+        feature_names: Names of the node feature columns; hashed in sorted
+            order.
+
+    Returns:
+        The SHA-256 hex digest of the canonical JSON of the content.
+    """
     node_records: list[dict[str, Any]] = [
         {
             "node_id": node.node_id,
@@ -783,7 +1058,30 @@ def read_edges(
     relation_column: str = "relation",
     time_column: str | None = None,
 ) -> tuple[GraphEdge, ...]:
-    """Reads CSV or JSONL edge records with bounded schema handling."""
+    """Reads CSV or JSONL edge records with bounded schema handling.
+
+    The format is chosen from the file name: ``.csv``, ``.jsonl`` or
+    ``.ndjson`` (case-insensitive). Blank JSONL lines are skipped.
+
+    Args:
+        path: Edge file.
+        source_column: Name of the source column or key.
+        target_column: Name of the target column or key.
+        weight_column: Name of the weight column or key; a missing weight
+            defaults to 1.0.
+        relation_column: Name of the relation column or key; a missing
+            relation defaults to ``default``.
+        time_column: Name of the event-time column or key, or None for
+            untimed edges.
+
+    Returns:
+        The edges in file order.
+
+    Raises:
+        GraphInputError: If the file does not exist, has another extension,
+            cannot be read or parsed, a JSONL line is not an object, or a
+            record is invalid (see `edges_from_records`).
+    """
     input_path = Path(path)
     if not input_path.exists():
         raise GraphInputError(f"graph edge file not found: {input_path}")
@@ -852,7 +1150,27 @@ def edges_from_records(
     relation_column: str = "relation",
     time_column: str | None = None,
 ) -> tuple[GraphEdge, ...]:
-    """Converts mappings into immutable edges with deterministic errors."""
+    """Converts mappings into immutable edges with deterministic errors.
+
+    Args:
+        records: Mappings holding one edge each.
+        source_column: Key of the source identifier.
+        target_column: Key of the target identifier.
+        weight_column: Key of the weight; a missing key defaults to 1.0.
+        relation_column: Key of the relation; a missing or null value
+            becomes ``default``.
+        time_column: Key of the event time, or None for untimed edges. A
+            missing or null value leaves the edge untimed.
+
+    Returns:
+        The edges in record order; identifiers are converted to text.
+
+    Raises:
+        GraphInputError: If a record lacks the source or target key or has a
+            null endpoint, a null or non-numeric weight, an invalid event
+            time, or values that `GraphEdge` rejects. The message gives the
+            1-based record number.
+    """
     edges: list[GraphEdge] = []
     for index, record in enumerate(records, start=1):
         if source_column not in record or target_column not in record:
@@ -910,7 +1228,28 @@ def inductive_node_split(
     test_fraction: float = 0.1,
     seed: int = 0,
 ) -> InductiveNodeSplit:
-    """Creates deterministic node partitions with no retained edge leakage."""
+    """Creates deterministic node partitions with no retained edge leakage.
+
+    Nodes are shuffled with the seed and divided by the fractions; every
+    partition with a positive fraction receives at least one node when there
+    are enough nodes. Edges inside a partition are retained for it and edges
+    between partitions are withheld.
+
+    Args:
+        graph: The graph; it must be valid.
+        train_fraction: Share of nodes for training.
+        validation_fraction: Share of nodes for validation.
+        test_fraction: Share of nodes for testing.
+        seed: Seed of the node shuffle.
+
+    Returns:
+        The node and edge partitions with the seed.
+
+    Raises:
+        ValueError: If a fraction is negative or not finite, or the
+            fractions do not sum to one. An invalid graph raises
+            GraphValidationError from `GraphData.require_valid`.
+    """
     graph.require_valid()
     fractions = (train_fraction, validation_fraction, test_fraction)
     if any(value < 0 or not math.isfinite(value) for value in fractions):
@@ -999,6 +1338,24 @@ def prepare_features(
     User-provided features are followed by deterministic degree features when
     ``include_structural`` is true. Nodes and features are truncated in
     canonical order, and no graph-neural-network dependency is introduced.
+    Structural features are out-degree, in-degree and weighted degree (the
+    summed weight of incident edges).
+
+    Args:
+        graph: The graph; it must be valid.
+        max_nodes: Largest number of nodes kept, in canonical order.
+        max_features: Largest number of columns kept.
+        standardize: Whether to scale each column to zero mean and unit
+            variance (constant columns are only centred).
+        include_structural: Whether to append the degree features.
+
+    Returns:
+        The prepared features. Without any column the rows are empty.
+
+    Raises:
+        ValueError: If ``max_nodes`` or ``max_features`` is below one, or a
+            feature value is not finite. An invalid graph raises
+            GraphValidationError from `GraphData.require_valid`.
     """
     graph.require_valid()
     if max_nodes < 1 or max_features < 1:
@@ -1050,7 +1407,19 @@ def load_graph(
     directed: bool = True,
     time_column: str | None = None,
 ) -> GraphData:
-    """Loads a CSV or JSONL graph using the default edge column names."""
+    """Loads a CSV or JSONL graph using the default edge column names.
+
+    Args:
+        path: Edge file (``.csv``, ``.jsonl`` or ``.ndjson``).
+        nodes: Nodes or node identifiers. When None, nodes are derived from
+            the edge endpoints.
+        directed: Whether edges are directed.
+        time_column: Name of the event-time column or key, or None for
+            untimed edges.
+
+    Returns:
+        The validated graph; see `GraphData.from_edge_file`.
+    """
     return GraphData.from_edge_file(
         path,
         nodes=nodes,

@@ -1,6 +1,6 @@
 """Document data contracts and dependency-light ingestion.
 
-The document slice deliberately keeps parsing small and explicit. UTF-8 text
+This module deliberately keeps parsing small and explicit. UTF-8 text
 and Markdown are supported by the standard library. PDF support is an
 optional injected reader so the core package never imports a document parser
 implicitly or silently changes its dependency surface.
@@ -41,7 +41,13 @@ class DocumentValidationError(errors.DataError):
         code: str,
         details: dict[str, Any] | None = None,
     ) -> None:
-        """Initializes a structured document validation failure."""
+        """Initializes a structured document validation failure.
+
+        Args:
+            message: Human-readable description of the failure.
+            code: Machine-readable failure code, stored in the context.
+            details: Extra context entries merged into the error context.
+        """
         context = {"code": code}
         if details:
             context.update(details)
@@ -60,7 +66,14 @@ class DocumentDependencyError(errors.DataError):
         extra: str,
         details: dict[str, Any] | None = None,
     ) -> None:
-        """Initializes a structured optional-dependency failure."""
+        """Initializes a structured optional-dependency failure.
+
+        Args:
+            message: Human-readable description of the failure.
+            dependency: Name of the missing parser dependency.
+            extra: Name of the package extra that provides it.
+            details: Extra context entries merged into the error context.
+        """
         context = {
             "code": "missing_dependency",
             "dependency": dependency,
@@ -84,7 +97,16 @@ SENSITIVE_PATTERNS: dict[str, re.Pattern[str]] = {
 
 
 def sensitive_matches(content: str) -> dict[str, int]:
-    """Count supported sensitive-value patterns without returning values."""
+    """Count supported sensitive-value patterns without returning values.
+
+    Args:
+        content: Text to scan for email addresses, phone numbers and social
+            security numbers.
+
+    Returns:
+        A dict from pattern name (`email`, `phone`, `ssn`) to the number of
+        matches, sorted by name. Patterns with no match are omitted.
+    """
     return {
         name: len(pattern.findall(content))
         for name, pattern in sorted(SENSITIVE_PATTERNS.items())
@@ -93,7 +115,15 @@ def sensitive_matches(content: str) -> dict[str, int]:
 
 
 def redact_sensitive_text(content: str) -> str:
-    """Replace supported sensitive values with type-only placeholders."""
+    """Replace supported sensitive values with type-only placeholders.
+
+    Args:
+        content: Text to redact.
+
+    Returns:
+        The text with each match replaced by ``[REDACTED_<NAME>]``, for
+        example ``[REDACTED_EMAIL]``.
+    """
     redacted = content
     for name, pattern in sorted(SENSITIVE_PATTERNS.items()):
         redacted = pattern.sub(f"[REDACTED_{name.upper()}]", redacted)
@@ -102,7 +132,15 @@ def redact_sensitive_text(content: str) -> str:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class DocumentSpan:
-    """A character range with simple document provenance."""
+    """A character range with simple document provenance.
+
+    Attributes:
+        kind: Either ``page`` or ``section``.
+        start: Offset of the first character; not negative.
+        end: Offset after the last character; greater than ``start``.
+        label: Human-readable label, such as a heading text.
+        page_number: One-based page number; required for page spans.
+    """
 
     kind: str
     start: int
@@ -111,7 +149,13 @@ class DocumentSpan:
     page_number: int | None = None
 
     def __post_init__(self) -> None:
-        """Validates the span and its provenance kind."""
+        """Validates the span and its provenance kind.
+
+        Raises:
+            ValueError: If kind is not ``page`` or ``section``, the range is
+                empty or starts below zero, or a page span lacks a positive
+                page number.
+        """
         if self.kind not in {"page", "section"}:
             raise ValueError("kind must be 'page' or 'section'")
         if self.start < 0 or self.end <= self.start:
@@ -124,7 +168,17 @@ class DocumentSpan:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class DocumentCitation:
-    """A source-backed locator for a document character span."""
+    """A source-backed locator for a document character span.
+
+    Attributes:
+        document_id: Non-empty identity of the document.
+        source_uri: Non-empty URI of the raw source.
+        source_digest: Lowercase SHA-256 hex digest of the raw source.
+        start: Offset of the first character; not negative.
+        end: Offset after the last character; greater than ``start``.
+        locator: Non-empty human-readable locator.
+        page_number: Optional one-based page number.
+    """
 
     document_id: str
     source_uri: str
@@ -135,7 +189,13 @@ class DocumentCitation:
     page_number: int | None = None
 
     def __post_init__(self) -> None:
-        """Validate the source identity and character locator."""
+        """Validate the source identity and character locator.
+
+        Raises:
+            ValueError: If document_id, source_uri or locator is blank,
+                source_digest is not a lowercase SHA-256 digest, the range is
+                empty or starts below zero, or page_number is below one.
+        """
         if not self.document_id.strip():
             raise ValueError("document_id must not be empty")
         if not self.source_uri.strip():
@@ -150,13 +210,27 @@ class DocumentCitation:
             raise ValueError("page_number must be positive")
 
     def to_dict(self) -> dict[str, object]:
-        """Return JSON-native citation evidence."""
+        """Return JSON-native citation evidence.
+
+        Returns:
+            A dict of the citation fields.
+        """
         return dataclasses.asdict(self)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class DocumentElement:
-    """One extracted layout, OCR, or table element with source offsets."""
+    """One extracted layout, OCR, or table element with source offsets.
+
+    Attributes:
+        kind: One of ``text``, ``heading``, ``table``, ``image`` or ``ocr``.
+        start: Offset of the first character; not negative.
+        end: Offset after the last character; greater than ``start``.
+        page_number: One-based page number.
+        confidence: Optional confidence in [0, 1].
+        table_rows: Number of table rows; required for tables.
+        table_columns: Number of table columns; required for tables.
+    """
 
     kind: str
     start: int
@@ -167,7 +241,14 @@ class DocumentElement:
     table_columns: int | None = None
 
     def __post_init__(self) -> None:
-        """Validate element type, offsets, page, confidence, and table shape."""
+        """Validate element type, offsets, page, confidence, and table shape.
+
+        Raises:
+            ValueError: If kind is unsupported, the range is empty or starts
+                below zero, page_number is below one, the confidence is a
+                bool, not finite or outside [0, 1], a table lacks row or
+                column counts, or a given count is below one.
+        """
         if self.kind not in {"text", "heading", "table", "image", "ocr"}:
             raise ValueError("unsupported document element kind")
         if self.start < 0 or self.end <= self.start:
@@ -192,7 +273,17 @@ class DocumentElement:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class DocumentLayout:
-    """Caller-owned extraction provenance for OCR, layout, and tables."""
+    """Caller-owned extraction provenance for OCR, layout, and tables.
+
+    Attributes:
+        source: Non-blank identifier of the extracted source.
+        provider: Non-blank name of the extraction provider.
+        provider_version: Non-blank version of the provider.
+        elements: Extracted elements.
+        ocr_confidence: Optional overall OCR confidence in [0, 1].
+        source_digest: Optional SHA-256 hex digest of the raw source the
+            layout was extracted from.
+    """
 
     source: str
     provider: str
@@ -202,7 +293,14 @@ class DocumentLayout:
     source_digest: str | None = None
 
     def __post_init__(self) -> None:
-        """Validate the extraction identity and optional OCR confidence."""
+        """Validate the extraction identity and optional OCR confidence.
+
+        Raises:
+            ValueError: If source, provider or provider_version is blank, the
+                OCR confidence is a bool, not finite or outside [0, 1], or
+                source_digest is not a lowercase SHA-256 digest.
+            TypeError: If elements is not a tuple of DocumentElement.
+        """
         for field_name, value in (
             ("source", self.source),
             ("provider", self.provider),
@@ -231,17 +329,30 @@ class DocumentLayout:
 
     @property
     def table_count(self) -> int:
-        """Return the number of extracted table elements."""
+        """The number of extracted table elements."""
         return sum(element.kind == "table" for element in self.elements)
 
     def to_dict(self) -> dict[str, object]:
-        """Return JSON-native extraction evidence."""
+        """Return JSON-native extraction evidence.
+
+        Returns:
+            A dict of the layout fields, with elements as nested dicts.
+        """
         return dataclasses.asdict(self)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class DocumentProfile:
-    """Bounded lexical profile for one document."""
+    """Bounded lexical profile for one document.
+
+    Attributes:
+        document_id: Non-blank identity of the document.
+        character_count: Number of characters inspected.
+        token_count: Number of word tokens, capped at the token bound.
+        language: Language code from a script-ratio heuristic, or
+            ``unknown``.
+        truncated: Whether the character or token bound cut the document.
+    """
 
     document_id: str
     character_count: int
@@ -250,7 +361,12 @@ class DocumentProfile:
     truncated: bool
 
     def __post_init__(self) -> None:
-        """Validates profile counts and identity."""
+        """Validates profile counts and identity.
+
+        Raises:
+            ValueError: If document_id or language is blank or a count is
+                negative.
+        """
         if not self.document_id.strip():
             raise ValueError("document_id must not be empty")
         if self.character_count < 0 or self.token_count < 0:
@@ -268,6 +384,32 @@ class DocumentCurationReport:
     corpus can be useful for retrieval or unsupervised work even when labels
     are absent, while conflicting labels on identical content remain a risk
     that must be reviewed.
+
+    Attributes:
+        dataset_hash: Order-independent digest of the dataset.
+        sample_count: Number of samples.
+        document_count: Number of distinct document identities.
+        profiles: One profile per sample, in sample order.
+        duplicate_groups: Groups of document ids with identical content.
+        language_counts: Samples per language code, sorted by code.
+        format_counts: Samples per document format, sorted by name.
+        label_counts: Samples per label bucket (``unlabeled`` or
+            ``<type>:<label>``), sorted by bucket.
+        quality_findings: Findings about data quality.
+        risk_findings: Findings about risk such as sensitive content and
+            conflicting labels.
+        max_characters: Character bound used for profiling.
+        max_tokens: Token bound used for profiling.
+        layout_coverage: Share of samples with layout evidence.
+        layout_providers: Sorted names of the layout providers.
+        layout_element_count: Total number of layout elements.
+        table_element_count: Total number of table elements.
+        ocr_confidence_min: Smallest OCR confidence, or None.
+        ocr_confidence_max: Largest OCR confidence, or None.
+        sensitive_match_counts: Matches per sensitive-value pattern.
+        source_traceability_coverage: Share of samples with both a source URI
+            and a source digest.
+        citation_count: Number of citations over the traceable samples.
     """
 
     dataset_hash: str
@@ -298,7 +440,11 @@ class DocumentCurationReport:
     def unresolved_blocking_findings(
         self,
     ) -> tuple[data_contracts.CurationFinding, ...]:
-        """Return blocking findings without a safe review disposition."""
+        """The blocking findings without a safe review disposition.
+
+        A disposition is safe when it is resolved, waived or a false
+        positive. Quality findings come before risk findings.
+        """
         safe_dispositions = {
             data_contracts.FindingDisposition.RESOLVED,
             data_contracts.FindingDisposition.WAIVED,
@@ -312,11 +458,17 @@ class DocumentCurationReport:
 
     @property
     def release_ready(self) -> bool:
-        """Return whether no unresolved finding blocks the next lifecycle."""
+        """Whether no unresolved blocking finding remains."""
         return not self.unresolved_blocking_findings
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-native evidence for a dataset card or run artifact."""
+        """Return JSON-native evidence for a dataset card or run artifact.
+
+        Returns:
+            A dict with every report field (profiles and findings as nested
+            dicts), schema version 1, the derived `release_ready` flag and
+            the ids of the unresolved blocking findings.
+        """
         return {
             "schema_version": 1,
             "dataset_hash": self.dataset_hash,
@@ -358,7 +510,26 @@ class DocumentCurationReport:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class DocumentSample:
-    """Immutable decoded document content and its identity."""
+    """Immutable decoded document content and its identity.
+
+    Attributes:
+        document_id: Non-blank document identity.
+        content: Non-blank decoded text; pages are separated by form feeds.
+        format: Document format; a string is converted to the enum.
+        source_uri: URI of the raw source; may be empty.
+        encoding: Source encoding; only UTF-8 is accepted.
+        source_digest: Optional lowercase SHA-256 hex digest of the raw
+            source bytes.
+        label: Optional task label.
+        provenance: Page and section spans; derived from the content when
+            empty.
+        layout: Optional layout evidence; no element may extend past the
+            content.
+        content_hash: SHA-256 hex digest of the UTF-8 content; set on
+            construction.
+        size_bytes: Length of the UTF-8 content in bytes; set on
+            construction.
+    """
 
     document_id: str
     content: str
@@ -373,7 +544,15 @@ class DocumentSample:
     size_bytes: int = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
-        """Validates content and derives immutable identity fields."""
+        """Validates content and derives immutable identity fields.
+
+        Raises:
+            DocumentValidationError: If the document id or content is blank,
+                the encoding is not UTF-8, the source digest is not a
+                lowercase SHA-256 digest, a layout element extends past the
+                content, or the layout's source digest differs from the
+                sample's.
+        """
         if not self.document_id.strip():
             raise DocumentValidationError(
                 "document_id must not be empty",
@@ -439,6 +618,11 @@ class DocumentSample:
         in-memory sample without a raw-source identity. The method never
         invents a URI or treats the decoded content digest as a raw-source
         digest.
+
+        Returns:
+            One citation per provenance span, or an empty tuple when the
+            sample has no source URI or no source digest. The locator is the
+            span label, or ``<kind>:<start>-<end>`` when the label is empty.
         """
         if not self.source_uri.strip() or self.source_digest is None:
             return ()
@@ -467,7 +651,9 @@ class DocumentSample:
             max_tokens: Maximum tokens retained in the profile.
 
         Returns:
-            A deterministic bounded profile.
+            A deterministic bounded profile. Tokens are word characters
+            runs; the language comes from `language_heuristic` over the
+            inspected characters.
 
         Raises:
             ValueError: If either bound is not positive.
@@ -490,14 +676,25 @@ class DocumentSample:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class DocumentSplit:
-    """Leakage-aware document-level split."""
+    """Leakage-aware document-level split.
+
+    Attributes:
+        train: Samples assigned to training.
+        validation: Samples assigned to validation.
+        test: Samples assigned to testing.
+    """
 
     train: tuple[DocumentSample, ...]
     validation: tuple[DocumentSample, ...]
     test: tuple[DocumentSample, ...]
 
     def document_ids(self) -> dict[str, tuple[str, ...]]:
-        """Returns sorted document IDs assigned to each split."""
+        """Returns sorted document IDs assigned to each split.
+
+        Returns:
+            A dict from partition name (`train`, `validation`, `test`) to
+            the sorted distinct document ids.
+        """
         return {
             "train": tuple(
                 sorted({sample.document_id for sample in self.train})
@@ -511,13 +708,25 @@ class DocumentSplit:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class DocumentDataset:
-    """Immutable collection of documents with identity and split operations."""
+    """Immutable collection of documents with identity and split operations.
+
+    Attributes:
+        samples: The samples, in caller order.
+        content_hash: SHA-256 hex digest of the sorted document ids and
+            content hashes, so independent of sample order; set on
+            construction.
+    """
 
     samples: tuple[DocumentSample, ...]
     content_hash: str = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
-        """Validates the collection and derives order-independent identity."""
+        """Validates the collection and derives order-independent identity.
+
+        Raises:
+            DocumentValidationError: If there are no samples.
+            TypeError: If an element is not a DocumentSample.
+        """
         normalized_samples = tuple(self.samples)
         if not normalized_samples:
             raise DocumentValidationError(
@@ -540,7 +749,12 @@ class DocumentDataset:
         object.__setattr__(self, "content_hash", dataset_hash)
 
     def duplicate_groups(self) -> tuple[tuple[str, ...], ...]:
-        """Returns deterministic groups of samples with identical content."""
+        """Returns deterministic groups of samples with identical content.
+
+        Returns:
+            Groups of two or more document ids that share a content hash.
+            Each group is sorted, and the groups are sorted.
+        """
         groups: defaultdict[str, list[str]] = defaultdict(list)
         for sample in self.samples:
             groups[sample.content_hash].append(sample.document_id)
@@ -556,7 +770,16 @@ class DocumentDataset:
         max_characters: int = 100_000,
         max_tokens: int = 20_000,
     ) -> tuple[DocumentProfile, ...]:
-        """Profiles every sample using the same bounded limits."""
+        """Profiles every sample using the same bounded limits.
+
+        Args:
+            max_characters: Maximum characters inspected per sample.
+            max_tokens: Maximum tokens retained per sample.
+
+        Returns:
+            One profile per sample, in sample order. A bound that is not
+            positive raises ValueError from `DocumentSample.profile`.
+        """
         return tuple(
             sample.profile(max_characters, max_tokens)
             for sample in self.samples
@@ -573,6 +796,18 @@ class DocumentDataset:
         duplicate is often expected for replicated sources, while identical
         content with different labels is a blocking risk for supervised work.
         The method does not silently remove samples or infer a modelling task.
+
+        Args:
+            max_characters: Maximum characters inspected per sample.
+            max_tokens: Maximum tokens retained per sample.
+
+        Returns:
+            The curation report: profiles, duplicate groups, language,
+            format and label counts, layout and OCR statistics, sensitive
+            value matches, source traceability, and findings.
+
+        Raises:
+            ValueError: If either bound is not positive.
         """
         if max_characters < 1 or max_tokens < 1:
             raise ValueError("curation bounds must be positive")
@@ -585,7 +820,14 @@ class DocumentDataset:
         sample_by_id = {sample.document_id: sample for sample in self.samples}
 
         def label_key(label: str | int | float | bool | None) -> str:
-            """Return a stable human-readable label bucket."""
+            """Return a stable human-readable label bucket.
+
+            Args:
+                label: A sample label, possibly None.
+
+            Returns:
+                ``unlabeled`` for None, otherwise ``<type name>:<label>``.
+            """
             if label is None:
                 return "unlabeled"
             return f"{type(label).__name__}:{label}"
@@ -627,7 +869,20 @@ class DocumentDataset:
             remediation: str,
             blocking: bool,
         ) -> data_contracts.CurationFinding:
-            """Create a document-specific finding with one stable rule."""
+            """Create a document-specific finding with one stable rule.
+
+            Args:
+                finding_id: Identifier of the finding.
+                severity: Severity of the finding.
+                scope: Description of what the finding affects.
+                evidence: Evidence supporting the finding.
+                remediation: Action that would resolve the finding.
+                blocking: Whether the finding blocks release until resolved.
+
+            Returns:
+                An open finding with confidence 1.0 and owner
+                ``data-curation``.
+            """
             return data_contracts.CurationFinding(
                 finding_id=finding_id,
                 rule_version="document-curation.v1",
@@ -833,6 +1088,21 @@ class DocumentDataset:
         their original order within each partition. This supports chunked
         documents and prevents content from one document leaking into a test
         partition through another chunk.
+
+        Args:
+            validation_fraction: Share of document ids for validation, in
+                [0, 1).
+            test_fraction: Share of document ids for testing, in [0, 1).
+            seed: Seed of the shuffle of the sorted document ids.
+
+        Returns:
+            The split. With at least three document ids a non-zero fraction
+            gets at least one id; the remaining samples form the training
+            set.
+
+        Raises:
+            ValueError: If a fraction is outside [0, 1) or the fractions sum
+                to 1 or more.
         """
         if not 0 <= validation_fraction < 1:
             raise ValueError("validation_fraction must be in [0, 1)")
@@ -892,7 +1162,13 @@ LayoutReader = Callable[[bytes, str, DocumentFormat], DocumentLayout | None]
 
 
 class DocumentReader:
-    """Reads UTF-8 text, Markdown, and optionally injected PDF pages."""
+    """Reads UTF-8 text, Markdown, and optionally injected PDF pages.
+
+    Attributes:
+        max_bytes: Largest encoded source size accepted.
+        pdf_reader: Optional callable that returns page text from PDF bytes.
+        layout_reader: Optional callable that returns layout evidence.
+    """
 
     def __init__(
         self,
@@ -924,7 +1200,22 @@ class DocumentReader:
         source: str | pathlib.Path,
         document_format: DocumentFormat | str | None = None,
     ) -> DocumentFormat:
-        """Resolves a format from an explicit value or a path suffix."""
+        """Resolves a format from an explicit value or a path suffix.
+
+        Args:
+            source: Path whose suffix is used when no format is given.
+            document_format: Explicit format, as the enum or its value.
+
+        Returns:
+            The explicit format when given; otherwise markdown for ``.md``
+            and ``.markdown``, pdf for ``.pdf`` and text for ``.txt``,
+            ``.text`` or no suffix.
+
+        Raises:
+            DocumentValidationError: If no format is given and the suffix is
+                not recognised. An explicit value that is not a known format
+                raises ValueError from the enum.
+        """
         if document_format is not None:
             return DocumentFormat(document_format)
         suffix = pathlib.Path(source).suffix.lower()
@@ -954,18 +1245,19 @@ class DocumentReader:
             source: A local path or already-acquired bytes.
             document_id: Stable document identity. Bytes receive a digest-based
                 identity when omitted; paths receive their file name.
-            document_format: Explicit format, required only when bytes are not
-                a PDF or text path with a recognizable suffix.
+            document_format: Explicit format. Bytes default to text; for a
+                path it is inferred from the suffix when omitted.
             label: Optional task label carried without interpretation.
             layout: Optional caller-owned OCR, layout, and table evidence.
 
         Returns:
-            An immutable decoded document sample.
+            An immutable decoded document sample. A PDF without a supplied
+            reader raises DocumentDependencyError from `read_pdf`.
 
         Raises:
-            DocumentDependencyError: If PDF support was not supplied.
-            DocumentValidationError: If bytes, size, format, or content is
-                invalid.
+            DocumentValidationError: If a path is not an existing file, the
+                size exceeds ``max_bytes``, the suffix is not recognised, or
+                the bytes or content are invalid.
         """
         path: pathlib.Path | None = None
         if isinstance(source, bytes):
@@ -1024,7 +1316,19 @@ class DocumentReader:
         )
 
     def decode_utf8(self, raw_bytes: bytes, document_id: str) -> str:
-        """Decodes strict UTF-8 and reports malformed byte offsets."""
+        """Decodes strict UTF-8 and reports malformed byte offsets.
+
+        Args:
+            raw_bytes: The encoded source.
+            document_id: Identity recorded in the error context.
+
+        Returns:
+            The decoded text.
+
+        Raises:
+            DocumentValidationError: If the bytes are not valid UTF-8; the
+                context holds the offsets of the malformed bytes.
+        """
         try:
             content = raw_bytes.decode("utf-8")
         except UnicodeDecodeError as error:
@@ -1041,7 +1345,21 @@ class DocumentReader:
         return content
 
     def read_pdf(self, raw_bytes: bytes) -> str:
-        """Reads PDF pages through the optional injected parser."""
+        """Reads PDF pages through the optional injected parser.
+
+        Args:
+            raw_bytes: The PDF file.
+
+        Returns:
+            The page texts joined by form feeds.
+
+        Raises:
+            DocumentDependencyError: If no PDF reader was supplied or the
+                reader fails with ImportError.
+            DocumentValidationError: If the reader fails with any other
+                exception, returns no pages, or returns a page that is not
+                text.
+        """
         if self.pdf_reader is None:
             raise DocumentDependencyError(
                 "PDF input requires the optional document parser extra",
@@ -1078,7 +1396,23 @@ class DocumentReader:
         document_id: str,
         document_format: DocumentFormat,
     ) -> DocumentLayout | None:
-        """Read optional layout, OCR, or table evidence through a callback."""
+        """Read optional layout, OCR, or table evidence through a callback.
+
+        Args:
+            raw_bytes: The raw source.
+            document_id: Stable document identity passed to the callback.
+            document_format: Resolved format passed to the callback.
+
+        Returns:
+            The layout the callback returns, or None when no layout reader
+            is set or the callback returns None.
+
+        Raises:
+            DocumentDependencyError: If the callback fails with ImportError.
+            DocumentValidationError: If the callback fails with any other
+                exception or returns something other than a DocumentLayout
+                or None.
+        """
         if self.layout_reader is None:
             return None
         try:
@@ -1110,6 +1444,14 @@ class DocumentReader:
         """Returns a deterministic fallback identity for an unlabelled source.
 
         The identity is stable for the same path name or source bytes.
+
+        Args:
+            raw_bytes: The raw source bytes.
+            path: Path of the source, or None for in-memory bytes.
+
+        Returns:
+            The file name of ``path``, or ``document-`` followed by the first
+            16 hex digits of the SHA-256 of the bytes.
         """
         if path is not None:
             return path.name
@@ -1117,7 +1459,16 @@ class DocumentReader:
 
 
 def language_heuristic(content: str) -> str:
-    """Returns a conservative language code using Unicode script ratios."""
+    """Returns a conservative language code using Unicode script ratios.
+
+    Args:
+        content: Text to classify.
+
+    Returns:
+        ``hi`` if at least 25% of the letters are Devanagari, else ``en`` if
+        at least 60% are ASCII, else ``unknown`` (also when there are no
+        letters).
+    """
     letters = [character for character in content if character.isalpha()]
     if not letters:
         return "unknown"
@@ -1131,7 +1482,17 @@ def language_heuristic(content: str) -> str:
 
 
 def provenance_for_content(content: str) -> tuple[DocumentSpan, ...]:
-    """Builds page and Markdown-heading spans from character offsets."""
+    """Builds page and Markdown-heading spans from character offsets.
+
+    Args:
+        content: Document text; form feeds separate pages.
+
+    Returns:
+        Page spans for every non-empty page, followed by section spans for
+        each Markdown heading (levels 1 to 6). A section runs from its
+        heading to the next heading or the end, and carries the page number
+        of its heading.
+    """
     spans: list[DocumentSpan] = []
     page_starts = [0]
     page_ends: list[int] = []
