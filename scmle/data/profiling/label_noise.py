@@ -48,7 +48,12 @@ class LabelNoiseReport:
     folds: int = 0
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Builds the JSON-ready record.
+
+        Returns:
+            A dict with the suspects, suggested labels, confidences and the
+            flagged rate.
+        """
         return {
             "suspects": self.suspects,
             "suggested": self.suggested,
@@ -168,7 +173,16 @@ def find_label_noise(
 
 
 def label_noise_note(report: LabelNoiseReport, rows_checked: int) -> str | None:
-    """Returns the existing finding text for a label-noise report."""
+    """Writes the finding text for a label-noise report.
+
+    Args:
+        report: The label-noise report.
+        rows_checked: Rows the check used.
+
+    Returns:
+        A sentence naming the flagged share, or None when the rate is below
+        `NOTE_RATE`.
+    """
     if report.rate < NOTE_RATE:
         return None
     return (

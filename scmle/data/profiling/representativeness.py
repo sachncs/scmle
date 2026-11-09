@@ -55,7 +55,11 @@ class RepresentativenessReport:
     gaps: tuple[ColumnGap, ...]
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Builds the JSON-ready record.
+
+        Returns:
+            The report's fields as a dict, with `gaps` as a list of dicts.
+        """
         return dataclasses.asdict(self)
 
     def quality_evidence(
@@ -124,7 +128,17 @@ class RepresentativenessReport:
 
 
 def column_gap(sample: pd.Series, reference: pd.Series) -> ColumnGap:
-    """KS test for numbers; largest share difference for categories."""
+    """Measures how one column differs between sample and reference.
+
+    Args:
+        sample: The column in the development rows.
+        reference: The same column in the reference rows.
+
+    Returns:
+        For a numeric column, the two-sample Kolmogorov-Smirnov distance
+        and p-value (missing values dropped). Otherwise the largest
+        absolute difference in category share, with no p-value.
+    """
     if pd.api.types.is_numeric_dtype(sample):
         result = stats.ks_2samp(sample.dropna(), reference.dropna())
         return ColumnGap(
@@ -184,7 +198,15 @@ def compare_to_reference(
 def representativeness_report_note(
     report: RepresentativenessReport,
 ) -> str | None:
-    """Returns the existing finding text for a comparison report."""
+    """Writes the finding text for a comparison report.
+
+    Args:
+        report: The comparison report.
+
+    Returns:
+        A sentence naming the AUC and the column with the largest gap, or
+        None when the sample is representative.
+    """
     if report.representative:
         return None
     worst = report.gaps[0]

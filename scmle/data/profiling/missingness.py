@@ -44,14 +44,27 @@ class MissingnessFinding:
     informative: bool
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Builds the JSON-ready record.
+
+        Returns:
+            The finding's fields as a dict.
+        """
         return dataclasses.asdict(self)
 
 
 def class_association(
     gaps: pd.Series, target: pd.Series
 ) -> tuple[str, float, float]:
-    """Chi-square test and Cramer's V of gaps against class labels."""
+    """Tests gaps against class labels with a chi-square test.
+
+    Args:
+        gaps: Boolean series, True where the value is missing.
+        target: Class labels aligned with `gaps`.
+
+    Returns:
+        The test name, the p-value and Cramer's V (0.0 when the table has a
+        single row or column).
+    """
     table = pd.crosstab(gaps, target)
     result = stats.chi2_contingency(table)
     size = table.to_numpy().sum()
@@ -65,7 +78,16 @@ def class_association(
 def value_association(
     gaps: pd.Series, target: pd.Series
 ) -> tuple[str, float, float]:
-    """Mann-Whitney test and rank-biserial effect of gaps on a number."""
+    """Tests gaps against a numeric target with a Mann-Whitney test.
+
+    Args:
+        gaps: Boolean series, True where the value is missing.
+        target: Numeric target aligned with `gaps`.
+
+    Returns:
+        The test name, the p-value and the absolute rank-biserial
+        correlation.
+    """
     missing = target[gaps].to_numpy(dtype=float)
     present = target[~gaps].to_numpy(dtype=float)
     result = stats.mannwhitneyu(missing, present, alternative="two-sided")

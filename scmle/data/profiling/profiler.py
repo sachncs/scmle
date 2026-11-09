@@ -37,7 +37,19 @@ DATETIME_PARTS = (
 def column_exclusion_reason(
     kind: columns.ColumnKind, series: pd.Series, stats: dict
 ) -> str | None:
-    """Returns why a column cannot be a feature, or None."""
+    """Finds why a column cannot be a feature.
+
+    Args:
+        kind: The column's kind.
+        series: The column.
+        stats: The column's statistics, with `missing_rate` and `n_unique`.
+
+    Returns:
+        `missing >95%` when the missing rate exceeds `HIGH_MISSING_DROP`,
+        `constant` for a column with at most one distinct value, otherwise
+        the reason given by `kind.exclusion_reason`; None when the column
+        can be a feature.
+    """
     if stats["missing_rate"] > HIGH_MISSING_DROP:
         return "missing >95%"
     if stats["n_unique"] <= 1:
@@ -48,7 +60,19 @@ def column_exclusion_reason(
 def summarize_target(
     target: pd.Series, task: tasks.TaskType
 ) -> tuple[dict, list[str]]:
-    """Summarizes the target distribution and imbalance risk."""
+    """Summarizes the target distribution and imbalance risk.
+
+    Args:
+        target: The target column.
+        task: Resolved task type.
+
+    Returns:
+        A pair of the summary dict and the risk sentences. For
+        classification the summary holds class counts and the imbalance
+        ratio (largest to smallest class) and the risks include a warning
+        when the ratio reaches `SEVERE_IMBALANCE`. Otherwise the summary
+        holds mean, std and skew, and the risks are empty.
+    """
     if not task.is_classification:
         moments = target.astype(float).agg(["mean", "std", "skew"])
         stats = {str(k): float(v) for k, v in moments.to_dict().items()}
@@ -85,8 +109,15 @@ class DatasetProfiler:
     def role_columns(self, frame: pd.DataFrame) -> dict[str, str]:
         """Maps configured non-feature columns to why they are excluded.
 
+        Args:
+            frame: The dataset.
+
+        Returns:
+            A dict from column name to the reason it is not a feature.
+
         Raises:
-            DataError: If a configured column is absent from the data.
+            DataError: If a configured column is absent from the data, or
+                the weight column fails `check_weights`.
         """
         data = self.spec.data
         roles = dict.fromkeys(data.id_columns, "id column")
@@ -138,6 +169,9 @@ class DatasetProfiler:
 
     def check_weights(self, weights: pd.Series) -> None:
         """Requires finite, non-negative weights with a positive total.
+
+        Args:
+            weights: The weight column.
 
         Raises:
             DataError: If the weight column cannot weight training rows.
@@ -200,6 +234,13 @@ class DatasetProfiler:
     def monotonic_features(self, numeric: list[str]) -> dict[str, int]:
         """Validates the monotonic constraints against the numeric features.
 
+        Args:
+            numeric: Names of the numeric feature columns.
+
+        Returns:
+            The monotonic constraints from the project specification, as a
+            dict from column name to direction.
+
         Raises:
             BlockedError: If a constrained column is not a numeric feature.
         """
@@ -216,10 +257,18 @@ class DatasetProfiler:
     def datetime_nodes(
         frame: pd.DataFrame, stamps: tuple[str, ...]
     ) -> list[tasks.FeatureNode]:
-        """Calendar and trend features for each datetime column.
+        """Builds calendar and trend features for each datetime column.
 
         Only parts that vary in the data are produced: a column holding one
-        year yields no year feature. The elapsed-days part carries the trend.
+        year yields no year feature. The `timestamp` part carries the trend.
+
+        Args:
+            frame: The dataset.
+            stamps: Names of the datetime columns.
+
+        Returns:
+            One `datepart` feature node per varying part and column, named
+            `<column>__<part>`.
         """
         nodes = []
         for column in stamps:
@@ -241,7 +290,15 @@ class DatasetProfiler:
         return nodes
 
     def duplicate_count(self, frame: pd.DataFrame) -> int:
-        """Counts rows duplicated apart from their identifier columns."""
+        """Counts rows duplicated apart from their identifier columns.
+
+        Args:
+            frame: The dataset.
+
+        Returns:
+            The number of rows that repeat an earlier row once the
+            identifier columns are dropped.
+        """
         data = self.spec.data
         deduplicated = frame.drop(columns=list(data.id_columns))
         return int(deduplicated.duplicated().sum())
@@ -253,6 +310,15 @@ class DatasetProfiler:
         Real data are rarely perfectly balanced, so equal counts usually mean
         the table was down-sampled. Scores on it then describe a world with
         equal prevalence, not the one the model will serve.
+
+        Args:
+            target: The target column.
+            task: Resolved task type.
+
+        Returns:
+            One warning sentence when there are at least
+            `MIN_BALANCE_CLASSES` classes, at least `MIN_BALANCE_ROWS` rows
+            and all classes have the same count; otherwise an empty list.
         """
         if not task.is_classification or len(target) < MIN_BALANCE_ROWS:
             return []
@@ -271,7 +337,18 @@ class DatasetProfiler:
         feature_columns: list[str],
         task: tasks.TaskType,
     ) -> list[str]:
-        """Reports duplicate rows and, for classification, label conflicts."""
+        """Reports duplicate rows and, for classification, label conflicts.
+
+        Args:
+            frame: The dataset.
+            feature_columns: Feature columns that define a combination.
+            task: Resolved task type.
+
+        Returns:
+            An empty list without duplicate rows; otherwise the duplicate
+            count and, for classification, the number of feature
+            combinations that carry more than one label.
+        """
         data = self.spec.data
         duplicates = self.duplicate_count(frame)
         if not duplicates:
@@ -300,6 +377,13 @@ class DatasetProfiler:
         These two numbers feed the dataset fingerprint only. They carry no
         cutoff and raise no finding; leakage suspicion comes from
         `leakage_screen`.
+
+        Args:
+            frame: The dataset.
+            statistics: Per-column statistics; updated in place with
+                `target_association` and `missingness_association`.
+            feature_columns: Feature columns to describe.
+            task: Resolved task type.
         """
         target = frame[self.spec.data.target]
         for name in feature_columns:
@@ -324,6 +408,15 @@ class DatasetProfiler:
         development rows given to the profiler. The screen controls the false
         discovery rate of its significant list; see `screen` for what that
         does and does not mean.
+
+        Args:
+            frame: The development rows.
+            feature_columns: Feature columns to screen.
+            task: Resolved task type.
+
+        Returns:
+            The screen report; None when the task is not classification and
+            the target is not numeric.
         """
         data = self.spec.data
         target = frame[data.target]
@@ -354,6 +447,9 @@ class DatasetProfiler:
     ) -> data_contracts.DatasetProfile:
         """Profiles the dataset.
 
+        A configured column that is absent from the data raises DataError
+        from `role_columns`.
+
         Args:
             frame: The rows to profile (the development partition when the
                 locked test rows must not influence any statistic).
@@ -366,9 +462,9 @@ class DatasetProfiler:
             The profile including the resulting feature plan.
 
         Raises:
-            BlockedError: If the target has missing values or no usable
-                feature remains.
-            DataError: If a configured column is absent.
+            BlockedError: If the target has missing values, no usable
+                feature remains, or a monotonic constraint names a column
+                that is not a numeric feature.
         """
         target = frame[self.spec.data.target]
         if target.isna().any():
