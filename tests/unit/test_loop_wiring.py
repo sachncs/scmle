@@ -2,42 +2,44 @@
 
 import json
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
 from benchmarks.qualification import streams
-from scmle.artifacts import bundle as bundle_module
-from scmle.contracts import data as data_contracts
+from scmle.artifacts import bundle
+from scmle.contracts import data
 from scmle.contracts import tasks
 from scmle.data.curation import preprocessing
-from scmle.governance import deployment_ledger as dl
+from scmle.governance import deployment_ledger
 from scmle.governance import lifecycle
 from scmle.governance import loop as loop_module
 from scmle.governance import never_list
 from scmle.governance import registry as registry_module
 from scmle.models import registry as models_module
-from tests.unit import test_loop as base
+from tests.unit import test_loop
 
 APPROVAL_KEY = "promotion-review-key"
-PLAN = data_contracts.FeaturePlan(("a", "b"), ())
+PLAN = data.FeaturePlan(("a", "b"), ())
 MODELS = models_module.ModelRegistry.with_builtins()
 
 
 def halted_loop(tmp_path, hooks=None):
-    loop = base.open_loop(
+    loop = test_loop.open_loop(
         tmp_path,
-        base.make_policy(reference_risk=0.5, tolerance=0.4, r_star=0.05),
+        test_loop.make_policy(reference_risk=0.5, tolerance=0.4, r_star=0.05),
         hooks=hooks,
     )
-    base.feed(loop, streams.simulate(base.spec(base=0.3, batches=60, seed=8)))
+    test_loop.feed(
+        loop, streams.simulate(test_loop.spec(base=0.3, batches=60, seed=8))
+    )
     return loop
 
 
 def test_a_halt_writes_one_open_incident_row(tmp_path):
     loop = halted_loop(tmp_path)
     assert loop.ledger.halted
-    incidents = base.rows(loop, dl.INCIDENT)
+    incidents = test_loop.rows(loop, deployment_ledger.INCIDENT)
     assert len(incidents) == 1
     assert incidents[0]["body"]["status"] == "open"
     assert incidents[0]["body"]["reason"] == loop_module.HALT_SELECTIVE
@@ -48,7 +50,7 @@ def test_the_open_incident_hook_runs_after_the_ledger_row(tmp_path):
     seen = []
 
     def hook(reason):
-        text = (tmp_path / "deploy" / dl.FILE_NAME).read_text()
+        text = (tmp_path / "deploy" / deployment_ledger.FILE_NAME).read_text()
         seen.append((reason, text.count('"kind": "incident"')))
 
     halted_loop(tmp_path, loop_module.Hooks(open_incident=hook))
@@ -57,7 +59,7 @@ def test_the_open_incident_hook_runs_after_the_ledger_row(tmp_path):
 
 def feedback_groups(gamma):
     stream = streams.feedback_stream(100, 100, gamma=gamma, bypass=0.3, seed=1)
-    frame = pd.DataFrame({"z": stream.next_z.reshape(-1)})
+    frame = pandas.DataFrame({"z": stream.next_z.reshape(-1)})
     flags = stream.bypass.reshape(-1)
     return frame[flags].iloc[:300], frame[~flags].iloc[:300]
 
@@ -69,7 +71,7 @@ def read_mechanism(loop):
 
 
 def test_feedback_cannot_be_tested_without_a_declared_bypass_slice(tmp_path):
-    loop = base.open_loop(tmp_path)
+    loop = test_loop.open_loop(tmp_path)
     bypass, model = feedback_groups(0.8)
     with pytest.raises(ValueError) as caught:
         loop.check_feedback(bypass, model)
@@ -82,7 +84,7 @@ def test_feedback_cannot_be_tested_without_a_declared_bypass_slice(tmp_path):
 def test_a_feedback_loop_is_recorded_escalated_and_survives_reopening(
     tmp_path,
 ):
-    loop = base.open_loop(tmp_path, base.make_policy(bypass_rate=0.3))
+    loop = test_loop.open_loop(tmp_path, test_loop.make_policy(bypass_rate=0.3))
     bypass, model = feedback_groups(0.8)
     check = loop.check_feedback(bypass, model)
     assert check.p_value is not None and check.p_value <= 0.05
@@ -93,13 +95,15 @@ def test_a_feedback_loop_is_recorded_escalated_and_survives_reopening(
         e.question["action"] == "feedback_loop_detected"
         for e in loop.pending_escalations()
     )
-    again = base.open_loop(tmp_path, base.make_policy(bypass_rate=0.3))
+    again = test_loop.open_loop(
+        tmp_path, test_loop.make_policy(bypass_rate=0.3)
+    )
     assert not again.halted
     assert again.feedback == loop.feedback
 
 
 def test_no_feedback_loop_is_reported_without_an_escalation(tmp_path):
-    loop = base.open_loop(tmp_path, base.make_policy(bypass_rate=0.3))
+    loop = test_loop.open_loop(tmp_path, test_loop.make_policy(bypass_rate=0.3))
     bypass, model = feedback_groups(0.0)
     loop.check_feedback(bypass, model)
     assert read_mechanism(loop)["feedback"] == "no_loop_detected"
@@ -110,8 +114,8 @@ def test_no_feedback_loop_is_reported_without_an_escalation(tmp_path):
 
 
 def traffic(rows=400, seed=0, flip=False):
-    rng = np.random.default_rng(seed)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    frame = pandas.DataFrame(
         {"a": rng.normal(size=rows), "b": rng.normal(size=rows)}
     )
     signal = frame.a + 0.3 * frame.b + rng.normal(0, 0.5, rows)
@@ -124,7 +128,7 @@ def bundle_of(frame):
     fitted = preprocessing.build_pipeline(
         PLAN, MODELS.get("logistic_regression"), tasks.TaskType.BINARY, 0
     ).fit(features, frame.y)
-    return bundle_module.ModelBundle.create(
+    return bundle.ModelBundle.create(
         fitted,
         PLAN,
         features,
@@ -158,7 +162,7 @@ def exported(tmp_path_factory):
 
 
 def guarded(tmp_path, exported):
-    loop = base.open_loop(tmp_path)
+    loop = test_loop.open_loop(tmp_path)
     store = registry_module.ModelRegistryStore(tmp_path / "registry")
     loop.guard_registry(store)
     first = store.register("m", exported[0], trusted=True)
@@ -169,7 +173,7 @@ def guarded(tmp_path, exported):
 def approve_pending(loop):
     pending = loop.pending_escalations()
     assert len(pending) == 1
-    loop.reply(pending[0].id, base.reply_to(pending[0]))
+    loop.reply(pending[0].id, test_loop.reply_to(pending[0]))
 
 
 def test_an_unattested_champion_move_is_refused_and_escalated(
@@ -187,7 +191,7 @@ def test_an_unattested_champion_move_is_refused_and_escalated(
         "version": 1,
     }
     # The loop's saved state still matches the ledger the guard wrote to.
-    assert not base.open_loop(tmp_path).halted
+    assert not test_loop.open_loop(tmp_path).halted
 
 
 def test_staging_aliases_stay_free(tmp_path, exported):
@@ -247,7 +251,7 @@ def test_a_rollback_needs_an_attestation_naming_the_rollback(
 def test_a_guarded_loop_move_spends_a_single_use_attestation_once(
     tmp_path, exported
 ):
-    loop = base.open_loop(tmp_path, single_use_attestations=True)
+    loop = test_loop.open_loop(tmp_path, single_use_attestations=True)
     store = registry_module.ModelRegistryStore(tmp_path / "registry")
     loop.guard_registry(store)
     record = store.register("m", exported[0], trusted=True)
@@ -257,13 +261,13 @@ def test_a_guarded_loop_move_spends_a_single_use_attestation_once(
     approve_pending(loop)
     loop.move_champion(store, "m", 1, approval, APPROVAL_KEY)
     assert store.resolve("m").version == 1
-    assert len(base.rows(loop, dl.ATTESTATION_USED)) == 1
+    assert len(test_loop.rows(loop, deployment_ledger.ATTESTATION_USED)) == 1
 
 
 def test_a_refused_approval_does_not_spend_a_single_use_attestation(
     tmp_path, exported
 ):
-    loop = base.open_loop(tmp_path, single_use_attestations=True)
+    loop = test_loop.open_loop(tmp_path, single_use_attestations=True)
     store = registry_module.ModelRegistryStore(tmp_path / "registry")
     loop.guard_registry(store)
     record = store.register("m", exported[0], trusted=True)
@@ -273,6 +277,6 @@ def test_a_refused_approval_does_not_spend_a_single_use_attestation(
     approve_pending(loop)
     with pytest.raises(registry_module.errors.ArtifactError):
         store.promote("m", 1, approval=None, signing_key=APPROVAL_KEY)
-    assert base.rows(loop, dl.ATTESTATION_USED) == []
+    assert test_loop.rows(loop, deployment_ledger.ATTESTATION_USED) == []
     store.promote("m", 1, approval=approval, signing_key=APPROVAL_KEY)
     assert store.resolve("m").version == 1

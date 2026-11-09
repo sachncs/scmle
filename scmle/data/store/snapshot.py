@@ -26,7 +26,7 @@ import pathlib
 from typing import Any
 from urllib.parse import urlsplit
 
-import pandas as pd
+import pandas
 
 from scmle import durability
 from scmle.contracts import errors
@@ -45,7 +45,7 @@ class SnapshotError(errors.DataError):
     category = "snapshot"
 
 
-def kind_of(series: pd.Series) -> str:
+def kind_of(series: pandas.Series) -> str:
     """The storage-independent kind of a column.
 
     `int`, `float`, `bool`, `datetime` or `string`, so a contract does not
@@ -58,18 +58,18 @@ def kind_of(series: pd.Series) -> str:
         One of `KINDS`: `bool`, `int`, `float` or `datetime` by the
         series' dtype, tested in that order, and `string` for anything else.
     """
-    if pd.api.types.is_bool_dtype(series):
+    if pandas.api.types.is_bool_dtype(series):
         return "bool"
-    if pd.api.types.is_integer_dtype(series):
+    if pandas.api.types.is_integer_dtype(series):
         return "int"
-    if pd.api.types.is_float_dtype(series):
+    if pandas.api.types.is_float_dtype(series):
         return "float"
-    if pd.api.types.is_datetime64_any_dtype(series):
+    if pandas.api.types.is_datetime64_any_dtype(series):
         return "datetime"
     return "string"
 
 
-def observed_schema(frame: pd.DataFrame) -> dict[str, str]:
+def observed_schema(frame: pandas.DataFrame) -> dict[str, str]:
     """Reads the schema a frame actually has.
 
     Args:
@@ -141,7 +141,7 @@ class DataContract:
         """Hash of the declared schema."""
         return schema_digest(self.columns)
 
-    def mismatches(self, frame: pd.DataFrame) -> list[str]:
+    def mismatches(self, frame: pandas.DataFrame) -> list[str]:
         """Lists how the frame differs from the declared schema.
 
         Args:
@@ -319,7 +319,7 @@ class SnapshotReader:
         key: str,
         contract: DataContract,
         parents: Sequence[SnapshotRecord | str] = (),
-    ) -> tuple[pd.DataFrame, SnapshotRecord]:
+    ) -> tuple[pandas.DataFrame, SnapshotRecord]:
         """Reads one object and records the snapshot.
 
         A schema mismatch or a stale object does not stop the read; it is

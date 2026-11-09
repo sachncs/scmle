@@ -28,8 +28,8 @@ import re
 from typing import Any
 from typing import Protocol
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from scipy import stats
 
 from scmle.contracts import errors
@@ -159,7 +159,7 @@ def samples_hash(model_id: str, prompt: str, samples: Sequence[Any]) -> str:
 
 
 def population_ids(
-    frame: pd.DataFrame, predicate: Any
+    frame: pandas.DataFrame, predicate: Any
 ) -> frozenset[int] | None:
     """Row positions a simple predicate selects, or None if it is invalid.
 
@@ -177,7 +177,7 @@ def population_ids(
         value of an incompatible type.
     """
     text = str(predicate or "").strip()
-    mask = np.ones(len(frame), dtype=bool)
+    mask = numpy.ones(len(frame), dtype=bool)
     if text and text.lower() not in {"true", "all"}:
         for part in re.split(r"\s+and\s+", text):
             match = PREDICATE.match(part)
@@ -197,10 +197,10 @@ def population_ids(
                 }[op].to_numpy()
             except TypeError:
                 return None
-    return frozenset(int(i) for i in np.flatnonzero(mask))
+    return frozenset(int(i) for i in numpy.flatnonzero(mask))
 
 
-def canonical(frame: pd.DataFrame, slot: str, value: Any) -> Any:
+def canonical(frame: pandas.DataFrame, slot: str, value: Any) -> Any:
     """Puts a slot value in a canonical, hashable form.
 
     Args:
@@ -254,7 +254,7 @@ class Consensus:
 
 
 def consensus(
-    frame: pd.DataFrame, samples: Sequence[Mapping[str, Any]]
+    frame: pandas.DataFrame, samples: Sequence[Mapping[str, Any]]
 ) -> Consensus:
     """Computes canonical values, agreement and ambiguity of `samples`.
 
@@ -284,7 +284,7 @@ def consensus(
             invalid = len(canon) - len(sets)
             pairs = list(itertools.combinations(sets, 2))
             mean = (
-                float(np.mean([jaccard(p, q) for p, q in pairs]))
+                float(numpy.mean([jaccard(p, q) for p, q in pairs]))
                 if pairs
                 else 1.0
             )
@@ -383,8 +383,8 @@ def calibrate_tau(
         ValueError: If `ambiguity` and `wrong` differ in length or are
             empty.
     """
-    scores = np.asarray(ambiguity, dtype=float)
-    bad = np.asarray(wrong, dtype=bool)
+    scores = numpy.asarray(ambiguity, dtype=float)
+    bad = numpy.asarray(wrong, dtype=bool)
     if scores.shape != bad.shape or scores.size == 0:
         raise ValueError("ambiguity and wrong must be equal, non-empty")
     curve = []

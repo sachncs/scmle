@@ -8,8 +8,8 @@ your own subclass.
 
 import logging
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from sklearn import naive_bayes
 
 import scmle
@@ -17,10 +17,10 @@ import scmle
 LOGGER = logging.getLogger(__name__)
 
 
-def make_dataset(rows: int = 500) -> pd.DataFrame:
+def make_dataset(rows: int = 500) -> pandas.DataFrame:
     """Builds a small binary-classification dataset."""
-    rng = np.random.default_rng(5)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(5)
+    frame = pandas.DataFrame(
         {"a": rng.normal(size=rows), "b": rng.normal(size=rows)}
     )
     noise = rng.normal(scale=0.5, size=rows)

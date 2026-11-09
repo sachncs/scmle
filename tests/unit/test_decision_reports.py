@@ -2,8 +2,8 @@
 
 from fractions import Fraction
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.core import decision_reports
 from scmle.data.charter import decision as decision_module
@@ -41,7 +41,7 @@ def charter(**kwargs):
 
 def test_without_a_randomized_log_the_value_is_not_assessable():
     found = decision_reports.policy_value(
-        layer(), np.ones(5), np.ones(5), None, None
+        layer(), numpy.ones(5), numpy.ones(5), None, None
     )
     assert found["status"] == decision_reports.NOT_ASSESSABLE
     assert "never estimated" in found["reason"]
@@ -50,22 +50,22 @@ def test_without_a_randomized_log_the_value_is_not_assessable():
 def test_bad_propensities_are_refused_not_clipped():
     found = decision_reports.policy_value(
         layer(),
-        np.ones(4),
-        np.ones(4),
-        np.ones(4),
-        np.array([0.5, 1, 0.5, 0.5]),
+        numpy.ones(4),
+        numpy.ones(4),
+        numpy.ones(4),
+        numpy.array([0.5, 1, 0.5, 0.5]),
     )
     assert found["status"] == decision_reports.NOT_ASSESSABLE
 
 
 def test_a_randomized_log_gives_a_value_near_the_truth():
-    rng = np.random.default_rng(0)
+    rng = numpy.random.default_rng(0)
     n = 4000
     logged = (rng.random(n) < 0.5).astype(float)
     outcome = (rng.random(n) < 0.3 + 0.2 * logged).astype(float)
-    acts = np.ones(n)  # treat everyone: true value 0.5
+    acts = numpy.ones(n)  # treat everyone: true value 0.5
     found = decision_reports.policy_value(
-        layer(), acts, outcome, logged, np.full(n, 0.5)
+        layer(), acts, outcome, logged, numpy.full(n, 0.5)
     )
     assert found["status"] == "issued"
     low, high = found["interval"]
@@ -73,9 +73,9 @@ def test_a_randomized_log_gives_a_value_near_the_truth():
 
 
 def test_fairness_reports_each_constraint_and_missing_columns():
-    rng = np.random.default_rng(1)
+    rng = numpy.random.default_rng(1)
     n = 600
-    frame = pd.DataFrame({"g": rng.choice(["a", "b"], n)})
+    frame = pandas.DataFrame({"g": rng.choice(["a", "b"], n)})
     outcome = (rng.random(n) < 0.5).astype(float)
     acts = (rng.random(n) < 0.5).astype(float)
     items = (

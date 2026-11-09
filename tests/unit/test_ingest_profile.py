@@ -2,14 +2,14 @@
 
 import pytest
 
-from benchmarks.qualification import ingest_worlds as worlds
-from scmle.data.ingest import budget as budgets
+from benchmarks.qualification import ingest_worlds
+from scmle.data.ingest import budget
 from scmle.data.ingest import profile
 from scmle.data.readers import connectors
 
 
 def test_profile_counts_are_exact():
-    db = worlds.new_database("prof")
+    db = ingest_worlds.new_database("prof")
     db.execute("CREATE TABLE t (a INTEGER, b TEXT)")
     db.execute(
         "INSERT INTO t VALUES (?, ?)",
@@ -26,7 +26,7 @@ def test_profile_counts_are_exact():
 
 
 def test_catalog_fingerprint_changes_with_the_data():
-    db = worlds.new_database("fp")
+    db = ingest_worlds.new_database("fp")
     db.execute("CREATE TABLE t (a INTEGER)")
     db.execute("INSERT INTO t VALUES (?)", [(1,), (2,)])
     first = profile.profile_catalog(db.source(), ["t"])
@@ -40,7 +40,7 @@ def test_catalog_fingerprint_changes_with_the_data():
 
 
 def test_source_refuses_writes_and_keeps_data():
-    db = worlds.new_database("ro")
+    db = ingest_worlds.new_database("ro")
     db.execute("CREATE TABLE t (a INTEGER)")
     db.execute("INSERT INTO t VALUES (?)", [(1,)])
     with pytest.raises(connectors.ConnectorError) as caught:
@@ -56,11 +56,11 @@ def test_unsafe_identifiers_are_rejected():
 
 
 def test_budget_stops_profile_at_a_table_boundary():
-    db = worlds.new_database("bud")
+    db = ingest_worlds.new_database("bud")
     for name in ("t1", "t2"):
         db.execute(f"CREATE TABLE {name} (a INTEGER, b INTEGER)")
         db.execute(f"INSERT INTO {name} VALUES (?, ?)", [(1, 2), (3, 4)])
-    meter = budgets.BudgetMeter(budgets.IngestBudget(max_queries=5))
+    meter = budget.BudgetMeter(budget.IngestBudget(max_queries=5))
     source = profile.SqlSource(db.factory, meter)
     catalog = profile.profile_catalog(source, ["t1", "t2"])
     assert catalog.partial
@@ -71,7 +71,7 @@ def test_budget_stops_profile_at_a_table_boundary():
 
 
 def test_consistent_read_on_static_data_is_verified_and_complete():
-    connector = worlds.torn_world(1, None)[0]
+    connector = ingest_worlds.torn_world(1, None)[0]
     read = profile.consistent_read(connector, 5)
     assert read.verified
     assert read.attempts == 1
@@ -79,25 +79,25 @@ def test_consistent_read_on_static_data_is_verified_and_complete():
     assert read.frame["id"].is_unique
 
 
-@pytest.mark.parametrize("kind", worlds.TORN_KINDS)
+@pytest.mark.parametrize("kind", ingest_worlds.TORN_KINDS)
 def test_torn_read_is_detected(kind):
-    connector = worlds.torn_world(2, kind)[0]
+    connector = ingest_worlds.torn_world(2, kind)[0]
     with pytest.raises(profile.TornReadError):
         profile.consistent_read(connector, 5, attempts=1)
 
 
 def test_torn_read_recovers_on_retry_within_budget():
-    connector, db = worlds.torn_world(3, "insert")
+    connector, db = ingest_worlds.torn_world(3, "insert")
     read = profile.consistent_read(connector, 5, attempts=2)
     assert read.attempts == 2
     assert len(read.frame) == db.frame("SELECT COUNT(*) AS n FROM t")["n"][0]
 
 
 def test_unordered_query_is_refused():
-    db = worlds.new_database("ord")
+    db = ingest_worlds.new_database("ord")
     db.execute("CREATE TABLE t (a INTEGER)")
     connector = connectors.DbApiConnector(
-        worlds.URI, "SELECT a FROM t", db.factory
+        ingest_worlds.URI, "SELECT a FROM t", db.factory
     )
     with pytest.raises(connectors.ConnectorError) as caught:
         profile.consistent_read(connector)
@@ -125,8 +125,8 @@ def test_read_without_a_token_is_marked_unverified():
 
 def test_budget_meter_is_deterministic_and_validates():
     def run():
-        meter = budgets.BudgetMeter(
-            budgets.IngestBudget(max_rows_scanned=100, max_queries=10)
+        meter = budget.BudgetMeter(
+            budget.IngestBudget(max_rows_scanned=100, max_queries=10)
         )
         done = [meter.admit("s", f"u{k}", 30) for k in range(6)]
         return done, [s.to_dict() for s in meter.stops], meter.rows
@@ -137,13 +137,13 @@ def test_budget_meter_is_deterministic_and_validates():
     assert rows == 90
     assert len(stops) == 1
     with pytest.raises(ValueError):
-        budgets.IngestBudget(max_queries=-1)
+        budget.IngestBudget(max_queries=-1)
 
 
 def test_wall_time_limit_uses_the_clock():
     ticks = iter(range(100))
-    meter = budgets.BudgetMeter(
-        budgets.IngestBudget(max_seconds=3), lambda: float(next(ticks))
+    meter = budget.BudgetMeter(
+        budget.IngestBudget(max_seconds=3), lambda: float(next(ticks))
     )
     outcomes = [meter.admit("s", f"u{k}", 0) for k in range(5)]
     assert outcomes[0] and not outcomes[-1]

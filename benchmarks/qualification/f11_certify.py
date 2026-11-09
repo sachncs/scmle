@@ -154,12 +154,12 @@ import tempfile
 import time
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from scipy import stats
 
-from benchmarks.qualification import f11_generators as worlds
-from scmle.artifacts import bundle as bundle_module
+from benchmarks.qualification import f11_generators
+from scmle.artifacts import bundle
 from scmle.contracts import data as data_contracts
 from scmle.contracts import tasks
 from scmle.core import randomness
@@ -252,7 +252,7 @@ def wilson(hits: int, runs: int) -> list[float]:
     return [low, high]
 
 
-def rng_for(base: int, name: str, index: int = 0) -> np.random.Generator:
+def rng_for(base: int, name: str, index: int = 0) -> numpy.random.Generator:
     """A named stream for one replicate or chunk.
 
     Args:
@@ -279,7 +279,7 @@ def cost_model() -> costs.DecisionCostModel:
     )
 
 
-def summary(values: np.ndarray) -> dict[str, float]:
+def summary(values: numpy.ndarray) -> dict[str, float]:
     """Quantiles of a distribution.
 
     Args:
@@ -288,7 +288,7 @@ def summary(values: np.ndarray) -> dict[str, float]:
     Returns:
         The 5th, 25th, 50th, 75th and 95th percentiles and the maximum.
     """
-    q = np.quantile(values, [0.05, 0.25, 0.5, 0.75, 0.95])
+    q = numpy.quantile(values, [0.05, 0.25, 0.5, 0.75, 0.95])
     return {
         "q05": float(q[0]),
         "q25": float(q[1]),
@@ -320,26 +320,28 @@ def gate_a1(runs: int, base: int = 0) -> dict[str, Any]:
     passed = True
     for skew in (1.0, 0.6, 1.6):
         fresh_rng = rng_for(base, "a1.fresh", int(skew * 10))
-        _, p_fresh, _ = worlds.calibration_world(fresh_rng, 400_000, 1.0)
-        oracle = worlds.beta_cost(
+        _, p_fresh, _ = f11_generators.calibration_world(
+            fresh_rng, 400_000, 1.0
+        )
+        oracle = f11_generators.beta_cost(
             p_fresh, (p_fresh >= target).astype(float), C_FP, C_FN
         )
         excess = []
         paths: dict[str, int] = {}
         for index in range(runs):
             rng = rng_for(base, f"a1.{skew}", index)
-            score, _, y = worlds.calibration_world(rng, 5000, skew)
+            score, _, y = f11_generators.calibration_world(rng, 5000, skew)
             decision = threshold.choose_threshold(
                 score, y, model, seed=base + index, replicates=50
             )
             paths[decision.rule.path] = paths.get(decision.rule.path, 0) + 1
             fresh_score = p_fresh**skew
-            cost = worlds.beta_cost(
+            cost = f11_generators.beta_cost(
                 p_fresh, decision.rule.act(fresh_score), C_FP, C_FN
             )
             excess.append((cost - oracle) / oracle)
-        values = np.array(excess)
-        meets = float(np.median(values)) <= 0.01
+        values = numpy.array(excess)
+        meets = float(numpy.median(values)) <= 0.01
         passed = passed and meets
         result["worlds"][str(skew)] = {
             "oracle_cost": oracle,
@@ -368,7 +370,7 @@ def gate_a1c(runs: int, base: int = 0) -> dict[str, Any]:
     for index in range(runs):
         for skew in rejects:
             rng = rng_for(base, f"a1c.{skew}", index)
-            score, _, y = worlds.calibration_world(rng, 5000, skew)
+            score, _, y = f11_generators.calibration_world(rng, 5000, skew)
             check = threshold.calibration_check(score, y, level)
             rejects[skew] += int(not check.calibrated)
     size = rejects[1.0] / runs
@@ -414,14 +416,16 @@ def gate_a2(runs: int, base: int = 0) -> dict[str, Any]:
         rhs = (fn * y.mean() - costs.expected_cost(y, a, model)) / fn
         worst = max(worst, abs(lhs - rhs))
     cut, prevalence, delta, t = 0.8, 0.2, 1.5, 0.2
-    truth = float(worlds.binormal_nb(prevalence, delta, cut, np.array([t]))[0])
+    truth = float(
+        f11_generators.binormal_nb(prevalence, delta, cut, numpy.array([t]))[0]
+    )
     values = []
     for index in range(runs):
-        score, y, _ = worlds.binormal(
+        score, y, _ = f11_generators.binormal(
             rng_for(base, "a2.world", index), 20000, prevalence, delta
         )
         values.append(costs.net_benefit(y, (score >= cut).astype(float), t))
-    arr = np.array(values)
+    arr = numpy.array(values)
     se = float(arr.std(ddof=1) / math.sqrt(runs))
     inside = abs(float(arr.mean()) - truth) <= 3 * se
     return {
@@ -460,11 +464,13 @@ def band_setting(runs: int, n: int, cluster: bool, base: int) -> dict[str, Any]:
     size = 10 if cluster else 1
     shared = 0.5 if cluster else 0.0
     sd = math.sqrt(1.0 + shared**2)
-    grid = np.linspace(RANGE[0], RANGE[1], netbenefit.GRID_POINTS)
-    truth = worlds.binormal_differences(PREVALENCE, DELTA, CUT, grid, sd)
+    grid = numpy.linspace(RANGE[0], RANGE[1], netbenefit.GRID_POINTS)
+    truth = f11_generators.binormal_differences(
+        PREVALENCE, DELTA, CUT, grid, sd
+    )
     hits = 0
     for index in range(runs):
-        score, y, groups = worlds.binormal(
+        score, y, groups = f11_generators.binormal(
             rng_for(base, f"a3.{n}.{cluster}", index),
             n,
             PREVALENCE,
@@ -480,7 +486,7 @@ def band_setting(runs: int, n: int, cluster: bool, base: int) -> dict[str, Any]:
             replicates=BOOTSTRAPS,
             seed=base + index,
         )
-        lower = np.array(report.lower)
+        lower = numpy.array(report.lower)
         hits += int((lower <= truth + 1e-15).all())
     return {
         "rows": n,
@@ -558,7 +564,7 @@ def gate_a4(runs: int, base: int = 0) -> dict[str, Any]:
     for delta in (0.25, 0.5, 1.0, 1.5):
         hits = 0
         for index in range(300):
-            score, y, _ = worlds.binormal(
+            score, y, _ = f11_generators.binormal(
                 rng_for(base, f"a4.power.{delta}", index),
                 2000,
                 PREVALENCE,
@@ -601,13 +607,16 @@ def outcome_models(base: int) -> dict[str, Any]:
         Two outcome-model functions: `dr`, which sees the step feature, and
         `dr_misspec`, which does not.
     """
-    dev = worlds.bandit(rng_for(base, "a5.dev", 0), DEV_ROWS, 1.0)
+    dev = f11_generators.bandit(rng_for(base, "a5.dev", 0), DEV_ROWS, 1.0)
     full = ope.fit_outcome_model(
-        worlds.outcome_features(dev["x"]), dev["action"], dev["reward"], 2
+        f11_generators.outcome_features(dev["x"]),
+        dev["action"],
+        dev["reward"],
+        2,
     )
     plain = ope.fit_outcome_model(dev["x"], dev["action"], dev["reward"], 2)
     return {
-        "dr": lambda x: full(worlds.outcome_features(x)),
+        "dr": lambda x: full(f11_generators.outcome_features(x)),
         "dr_misspec": plain,
     }
 
@@ -625,7 +634,7 @@ def gate_a5(runs: int, base: int = 0) -> dict[str, Any]:
         the doubly robust floor is met, the refusal rows and `passed`.
     """
     models = outcome_models(base)
-    truth = worlds.target_value()
+    truth = f11_generators.target_value()
     cells = {
         "ipw": ("ipw", None, None),
         "snips": ("snips", None, None),
@@ -638,8 +647,10 @@ def gate_a5(runs: int, base: int = 0) -> dict[str, Any]:
         k: {"hits": 0, "values": [], "ess": [], "used": 0} for k in cells
     }
     for index in range(runs):
-        data = worlds.bandit(rng_for(base, "a5.log", index), BANDIT_ROWS, 1.0)
-        target = worlds.target_policy(data["x"])
+        data = f11_generators.bandit(
+            rng_for(base, "a5.log", index), BANDIT_ROWS, 1.0
+        )
+        target = f11_generators.target_policy(data["x"])
         for name, (estimator, clip, model_name) in cells.items():
             q = None if model_name is None else models[model_name](data["x"])
             log = ope.LoggedBandit(
@@ -660,11 +671,11 @@ def gate_a5(runs: int, base: int = 0) -> dict[str, Any]:
                 tally[name]["hits"] += int(low <= truth <= high)
     table = {}
     for name, cell in tally.items():
-        values = np.array(cell["values"])
+        values = numpy.array(cell["values"])
         used = cell["used"]
         table[name] = {
             "bias": float(values.mean() - truth),
-            "mean_ess_ratio": float(np.mean(cell["ess"])),
+            "mean_ess_ratio": float(numpy.mean(cell["ess"])),
             "coverage": cell["hits"] / used if used else None,
             "interval": wilson(cell["hits"], used) if used else None,
             "replicates_used": used,
@@ -702,14 +713,16 @@ def refusal_rows(base: int) -> dict[str, Any]:
         for kind in fired:
             rng = rng_for(base, f"a5.refuse.{kind}", index)
             if kind == "clean":
-                data = worlds.bandit(rng, BANDIT_ROWS, 1.0)
+                data = f11_generators.bandit(rng, BANDIT_ROWS, 1.0)
             elif kind == "hard":
-                data = worlds.bandit(rng, BANDIT_ROWS, 1.0, blind_above=1.0)
+                data = f11_generators.bandit(
+                    rng, BANDIT_ROWS, 1.0, blind_above=1.0
+                )
             else:
-                data = worlds.bandit(rng, BANDIT_ROWS, 1.0)
+                data = f11_generators.bandit(rng, BANDIT_ROWS, 1.0)
                 tail = data["x"][:, 0] > 1.5
-                data["behaviour"][tail] = np.array([0.995, 0.005])
-            target = worlds.target_policy(data["x"])
+                data["behaviour"][tail] = numpy.array([0.995, 0.005])
+            target = f11_generators.target_policy(data["x"])
             log = ope.LoggedBandit(
                 data["action"], data["reward"], data["behaviour"], target
             )
@@ -754,7 +767,7 @@ def hillstrom_path() -> Path | None:
     return None
 
 
-def load_hillstrom() -> pd.DataFrame | None:
+def load_hillstrom() -> pandas.DataFrame | None:
     """The data frame when the file is present and its hash matches.
 
     Returns:
@@ -767,7 +780,7 @@ def load_hillstrom() -> pd.DataFrame | None:
     digest = hashlib.sha256(path.read_bytes()).hexdigest()
     if digest != HILLSTROM_SHA256:
         return None
-    return pd.read_csv(path)
+    return pandas.read_csv(path)
 
 
 def not_run(reason: str) -> dict[str, Any]:
@@ -782,7 +795,7 @@ def not_run(reason: str) -> dict[str, Any]:
     return {"passed": False, "not_run": reason}
 
 
-def covariates(frame: pd.DataFrame) -> np.ndarray:
+def covariates(frame: pandas.DataFrame) -> numpy.ndarray:
     """Numeric covariates of the Hillstrom rows.
 
     Args:
@@ -815,7 +828,7 @@ def gate_a6(runs: int, base: int = 0) -> dict[str, Any]:
         return not_run(f"set {HILLSTROM_ENV} to the verified data file")
     two = frame[frame["segment"].isin(["Mens E-Mail", "No E-Mail"])]
     two = two.reset_index(drop=True)
-    arm = np.asarray(two["segment"] == "Mens E-Mail", dtype=np.intp)
+    arm = numpy.asarray(two["segment"] == "Mens E-Mail", dtype=numpy.intp)
     y = two["conversion"].to_numpy(dtype=float)
     x = covariates(two)
     order = rng_for(base, "a6.split", 0).permutation(len(two))
@@ -825,8 +838,8 @@ def gate_a6(runs: int, base: int = 0) -> dict[str, Any]:
     dev_log = ope.LoggedBandit(
         arm[dev],
         y[dev],
-        np.full((len(dev), 2), 0.5),
-        np.full((len(dev), 2), 0.5),
+        numpy.full((len(dev), 2), 0.5),
+        numpy.full((len(dev), 2), 0.5),
         predict(x[dev]),
     )
     policy = ope.fit_threshold_policy(dev_log, tau_dev)
@@ -834,13 +847,13 @@ def gate_a6(runs: int, base: int = 0) -> dict[str, Any]:
     tau_e = predict(x_e)[:, 1] - predict(x_e)[:, 0]
     pi_e = policy.probabilities(tau_e)
     full_log = ope.LoggedBandit(
-        a_e, y_e, np.full((len(a_e), 2), 0.5), pi_e, predict(x_e)
+        a_e, y_e, numpy.full((len(a_e), 2), 0.5), pi_e, predict(x_e)
     )
     reference = ope.estimate_value(full_log, "dr")
     assert reference.value is not None
-    treat_p = np.clip(1 / (1 + np.exp(-x_e[:, 0])), 0.1, 0.9)
-    behaviour = np.column_stack([1 - treat_p, treat_p])
-    logged = behaviour[np.arange(len(a_e)), a_e]
+    treat_p = numpy.clip(1 / (1 + numpy.exp(-x_e[:, 0])), 0.1, 0.9)
+    behaviour = numpy.column_stack([1 - treat_p, treat_p])
+    logged = behaviour[numpy.arange(len(a_e)), a_e]
     hits = 0
     kept_rows = []
     for index in range(runs):
@@ -864,7 +877,7 @@ def gate_a6(runs: int, base: int = 0) -> dict[str, Any]:
         "treated_share": float(pi_e[:, 1].mean()),
         "coverage": coverage,
         "interval": wilson(hits, runs),
-        "mean_kept_rows": float(np.mean(kept_rows)),
+        "mean_kept_rows": float(numpy.mean(kept_rows)),
         "data_sha256": HILLSTROM_SHA256,
         "passed": bool(coverage >= 0.90),
         "replicates": runs,
@@ -872,11 +885,11 @@ def gate_a6(runs: int, base: int = 0) -> dict[str, Any]:
 
 
 def peeking_paths(
-    arm: np.ndarray,
-    outcome: np.ndarray,
+    arm: numpy.ndarray,
+    outcome: numpy.ndarray,
     q: float,
     delta_min: float,
-) -> np.ndarray:
+) -> numpy.ndarray:
     """Log e-process paths of the primary metric for a batch of runs.
 
     Args:
@@ -913,7 +926,7 @@ def gate_b7(runs: int, base: int = 0) -> dict[str, Any]:
     for start in range(0, runs, chunk):
         size = min(chunk, runs - start)
         rng = rng_for(base, "b7", start)
-        y = np.stack([rng.permutation(y_all)[:n_max] for _ in range(size)])
+        y = numpy.stack([rng.permutation(y_all)[:n_max] for _ in range(size)])
         arm = (rng.random((size, n_max)) < 0.5).astype(float)
         paths = peeking_paths(arm, y, 0.5, delta_min)
         hits += int((paths.max(axis=1) >= -math.log(ALPHA_PROMOTE)).sum())
@@ -970,7 +983,7 @@ def gate_b8(runs: int, base: int = 0) -> dict[str, Any]:
         arm = arm_all[order][None, :]
         y = y_all[order][None, :]
         paths = peeking_paths(arm, y, share, delta_min)
-        hit = np.nonzero(paths[0] >= -math.log(ALPHA_PROMOTE))[0]
+        hit = numpy.nonzero(paths[0] >= -math.log(ALPHA_PROMOTE))[0]
         stops.append(int(hit[0]) + 1 if hit.size else None)
     promoted = [s for s in stops if s is not None]
     direction = (p1 - p0) > 0 and bool(promoted)
@@ -985,7 +998,7 @@ def gate_b8(runs: int, base: int = 0) -> dict[str, Any]:
         "assignment_share": share,
         "delta_min": delta_min,
         "promoted_share": share_promoted,
-        "median_stop": float(np.median(promoted)) if promoted else None,
+        "median_stop": float(numpy.median(promoted)) if promoted else None,
         "full_sample_lower_bound": bound + 0.0,
         "rows": len(y_all),
         "data_sha256": HILLSTROM_SHA256,
@@ -1030,7 +1043,7 @@ def gate_a7(runs: int, base: int = 0) -> dict[str, Any]:
         satisfied = 0
         covered = 0
         for index in range(runs):
-            score, y, groups = worlds.fairness_world(
+            score, y, groups = f11_generators.fairness_world(
                 rng_for(base, f"a7.{gap}", index), 20000, gap
             )
             test = constraints.satisfaction_test(
@@ -1070,30 +1083,32 @@ def gate_a7b(runs: int, base: int = 0) -> dict[str, Any]:
     """
     rule = fair_constraint()
     t, shift = 0.3, 1.0
-    oracle = worlds.threshold_oracle(shift, t)
+    oracle = f11_generators.threshold_oracle(shift, t)
     w = t / (1.0 - t)
     losses = []
     for index in range(runs):
-        score, y, groups = worlds.threshold_world(
+        score, y, groups = f11_generators.threshold_world(
             rng_for(base, "a7b", index), 100_000, shift
         )
         # The fit reads probabilities; a monotone map of the score keeps the
         # equal-true-positive-rate oracle unchanged.
-        risk = 1.0 / (1.0 + np.exp(-score))
+        risk = 1.0 / (1.0 + numpy.exp(-score))
         fitted = constraints.fit_group_thresholds(
             risk, y, groups, rule, t, margin=0.5
         )
         value = 0.0
         for g in (0, 1):
-            cut = float(np.log(fitted.cuts[str(g)] / (1 - fitted.cuts[str(g)])))
-            tpr = 1.0 - worlds.Z.cdf(cut - (1.5 - shift * g))
-            fpr = 1.0 - worlds.Z.cdf(cut + 0.5)
+            cut = float(
+                numpy.log(fitted.cuts[str(g)] / (1 - fitted.cuts[str(g)]))
+            )
+            tpr = 1.0 - f11_generators.Z.cdf(cut - (1.5 - shift * g))
+            fpr = 1.0 - f11_generators.Z.cdf(cut + 0.5)
             value += 0.5 * (0.3 * tpr - 0.7 * w * fpr)
         losses.append((oracle - value) / abs(oracle))
     worst = float(max(losses))
     return {
         "oracle_net_benefit": oracle,
-        "relative_loss": summary(np.array(losses)),
+        "relative_loss": summary(numpy.array(losses)),
         "passed": bool(worst <= 0.02),
         "replicates": runs,
     }
@@ -1123,7 +1138,7 @@ def gate_a8(runs: int, base: int = 0) -> dict[str, Any]:
         )
         count = 0
         for index in range(runs):
-            y, groups = worlds.base_rate_world(
+            y, groups = f11_generators.base_rate_world(
                 rng_for(base, f"a8.{pair[0]}.{pair[1]}", index),
                 4000,
                 (0.2, 0.5),
@@ -1140,7 +1155,7 @@ def gate_a8(runs: int, base: int = 0) -> dict[str, Any]:
     false_refusals = 0
     equal_runs = 3 * runs
     for index in range(equal_runs):
-        y, groups = worlds.base_rate_world(
+        y, groups = f11_generators.base_rate_world(
             rng_for(base, "a8.equal", index), 4000, (0.3, 0.3)
         )
         try:
@@ -1206,7 +1221,7 @@ def compare_arms_rate(base: int) -> dict[str, Any]:
         note on the null being tested.
     """
     runs, looks, n = 100, 6, 3000
-    classes = np.array([0, 1])
+    classes = numpy.array([0, 1])
     adopted = 0
     for index in range(runs):
         rng = rng_for(base, "b1.compare", index)
@@ -1216,12 +1231,12 @@ def compare_arms_rate(base: int) -> dict[str, Any]:
             m = look * (n // looks)
             seen_arm, seen_y = arm[:m], y[:m]
             control = abtest.Arm(
-                np.ones((~seen_arm).sum(), dtype=int),
+                numpy.ones((~seen_arm).sum(), dtype=int),
                 seen_y[~seen_arm],
                 classes=classes,
             )
             treat = abtest.Arm(
-                np.ones(seen_arm.sum(), dtype=int),
+                numpy.ones(seen_arm.sum(), dtype=int),
                 seen_y[seen_arm],
                 classes=classes,
             )
@@ -1260,9 +1275,9 @@ def class_agreement(base: int) -> dict[str, Any]:
     runs = 100
     for index in range(runs):
         rng = rng_for(base, "b1.class", index)
-        arm, y = worlds.experiment(rng, 1, plan.n_max, 0.5, 0.10, 0.04)
+        arm, y = f11_generators.experiment(rng, 1, plan.n_max, 0.5, 0.10, 0.04)
         paths = peeking_paths(arm, y, 0.5, plan.delta_min)
-        vector_stop = np.nonzero(paths[0] >= -math.log(ALPHA_PROMOTE))[0]
+        vector_stop = numpy.nonzero(paths[0] >= -math.log(ALPHA_PROMOTE))[0]
         run = rollout.Rollout(plan, f"e{index}", ALPHA_PROMOTE)
         decision = run.observe(arm[0], y[0])
         vector = int(vector_stop[0]) + 1 if vector_stop.size else None
@@ -1288,7 +1303,7 @@ def gate_b1(runs: int, base: int = 0) -> dict[str, Any]:
     chunk = 500
     for start in range(0, runs, chunk):
         size = min(chunk, runs - start)
-        arm, y = worlds.experiment(
+        arm, y = f11_generators.experiment(
             rng_for(base, "b1", start), size, plan.n_max, 0.5, 0.10, 0.02
         )
         paths = peeking_paths(arm, y, 0.5, plan.delta_min)
@@ -1397,7 +1412,7 @@ def esn_metric(kind: str, runs: int, base: int) -> dict[str, Any]:
         if kind == "binary":
             y = (rng.random(arm.shape) < 0.10 + 0.04 * arm).astype(float)
         else:
-            y = np.where(
+            y = numpy.where(
                 arm == 1,
                 rng.beta(2.4, 7.6, arm.shape),
                 rng.beta(2.0, 8.0, arm.shape),
@@ -1405,7 +1420,7 @@ def esn_metric(kind: str, runs: int, base: int) -> dict[str, Any]:
         paths = peeking_paths(arm, y, 0.5, plan.delta_min)
         hit = paths >= -math.log(ALPHA_PROMOTE)
         crossed = hit.any(axis=1)
-        when = np.where(crossed, hit.argmax(axis=1) + 1, plan.n_max)
+        when = numpy.where(crossed, hit.argmax(axis=1) + 1, plan.n_max)
         stops.extend(when[crossed].tolist() + [None] * int((~crossed).sum()))
     done = [s for s in stops if s is not None]
     if kind == "binary":
@@ -1422,11 +1437,11 @@ def esn_metric(kind: str, runs: int, base: int) -> dict[str, Any]:
         ) ** 2
         fixed_zero = None
         fixed_null = math.ceil(2 * per_arm)
-    mean_stop = float(np.mean(done)) if done else None
+    mean_stop = float(numpy.mean(done)) if done else None
     return {
         "crossed_share": len(done) / runs,
         "mean_units": mean_stop,
-        "median_units": float(np.median(done)) if done else None,
+        "median_units": float(numpy.median(done)) if done else None,
         "fixed_horizon_zero_null": fixed_zero,
         "fixed_horizon_null_shifted": fixed_null,
         "ratio_to_null_shifted": (
@@ -1461,8 +1476,8 @@ def gate_b3(runs: int, base: int = 0) -> dict[str, Any]:
 
 
 def rollback_paths(
-    arm: np.ndarray, y: np.ndarray, tolerance: float
-) -> np.ndarray:
+    arm: numpy.ndarray, y: numpy.ndarray, tolerance: float
+) -> numpy.ndarray:
     """Log e-process paths of the rollback test for a batch of runs.
 
     Args:
@@ -1493,7 +1508,7 @@ def gate_b4(runs: int, base: int = 0) -> dict[str, Any]:
     chunk = 500
     for start in range(0, runs, chunk):
         size = min(chunk, runs - start)
-        arm, y = worlds.experiment(
+        arm, y = f11_generators.experiment(
             rng_for(base, "b4", start), size, 4000, 0.5, 0.20, -tau
         )
         hits += int((rollback_paths(arm, y, tau).max(axis=1) >= target).sum())
@@ -1501,7 +1516,7 @@ def gate_b4(runs: int, base: int = 0) -> dict[str, Any]:
     for factor in (2, 4):
         stops = []
         for start in range(0, 1000, 250):
-            arm, y = worlds.experiment(
+            arm, y = f11_generators.experiment(
                 rng_for(base, f"b4.delay.{factor}", start),
                 250,
                 20000,
@@ -1514,8 +1529,8 @@ def gate_b4(runs: int, base: int = 0) -> dict[str, Any]:
             stops.extend((hit.argmax(axis=1) + 1)[crossed].tolist())
         delays[f"{factor}tau"] = {
             "detected_share": len(stops) / 1000,
-            "median": float(np.median(stops)) if stops else None,
-            "p90": float(np.quantile(stops, 0.9)) if stops else None,
+            "median": float(numpy.median(stops)) if stops else None,
+            "p90": float(numpy.quantile(stops, 0.9)) if stops else None,
         }
     bound = ALPHA_ROLLBACK + tol(ALPHA_ROLLBACK, runs)
     return {
@@ -1593,7 +1608,7 @@ def gate_b6(runs: int, base: int = 0) -> dict[str, Any]:
     """
     n, level = 100_000, 0.001
     target = -math.log(level)
-    totals = np.arange(1, n + 1, dtype=float)
+    totals = numpy.arange(1, n + 1, dtype=float)
     out: dict[str, Any] = {}
     for label, q_true in (("size", 0.5), ("power", 0.52)):
         anytime_hits = exact_hits = 0
@@ -1601,7 +1616,7 @@ def gate_b6(runs: int, base: int = 0) -> dict[str, Any]:
         for start in range(0, runs, chunk):
             size = min(chunk, runs - start)
             rng = rng_for(base, f"b6.{label}", start)
-            counts = np.cumsum(rng.random((size, n)) < q_true, axis=1)
+            counts = numpy.cumsum(rng.random((size, n)) < q_true, axis=1)
             bf = design.srm_log_bayes_factor(counts, totals, 0.5)
             anytime_hits += int((bf.max(axis=1) >= target).sum())
             exact_hits += sum(
@@ -1634,7 +1649,7 @@ HOOK_BATCH = 500
 HOOK_KEY = "f11-b9-approval-key"
 
 
-def hook_bundle(seed: int) -> bundle_module.ModelBundle:
+def hook_bundle(seed: int) -> bundle.ModelBundle:
     """A small fitted logistic model for the registry the hook runs on.
 
     Args:
@@ -1643,8 +1658,10 @@ def hook_bundle(seed: int) -> bundle_module.ModelBundle:
     Returns:
         A bundle of a logistic regression on two features.
     """
-    rng = np.random.default_rng(seed)
-    frame = pd.DataFrame({"a": rng.normal(size=300), "b": rng.normal(size=300)})
+    rng = numpy.random.default_rng(seed)
+    frame = pandas.DataFrame(
+        {"a": rng.normal(size=300), "b": rng.normal(size=300)}
+    )
     frame["y"] = (frame.a + 0.3 * frame.b + rng.normal(0, 0.5, 300) > 0).astype(
         int
     )
@@ -1654,7 +1671,7 @@ def hook_bundle(seed: int) -> bundle_module.ModelBundle:
     fitted = preprocessing.build_pipeline(
         plan, models.get("logistic_regression"), tasks.TaskType.BINARY, 0
     ).fit(features, frame.y)
-    return bundle_module.ModelBundle.create(
+    return bundle.ModelBundle.create(
         fitted,
         plan,
         features,
@@ -1738,7 +1755,7 @@ def hook_promotes(
         seed: Seed of the traffic.
     """
     hook.start(f"promote-{seed}")
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     arm = (rng.random(6000) < 0.5).astype(float)
     outcome = (rng.random(6000) < 0.15 + 0.25 * arm).astype(float)
     hook.observe(arm, outcome)
@@ -1778,7 +1795,7 @@ def hook_path(base: int = 0) -> dict[str, Any]:
     with tempfile.TemporaryDirectory() as scratch:
         store, manager, challenger = hook_registry(Path(scratch))
         for label, (kind, start, end) in scenarios.items():
-            arm, y = worlds.drifting_experiment(
+            arm, y = f11_generators.drifting_experiment(
                 rng_for(base, stream_names[label], 0),
                 HOOK_WORLDS,
                 n,
@@ -1862,7 +1879,7 @@ def gate_b9(runs: int, base: int = 0) -> dict[str, Any]:
     target_p, target_r = -math.log(ALPHA_PROMOTE), -math.log(ALPHA_ROLLBACK)
     result: dict[str, Any] = {}
 
-    def promoted(arm: np.ndarray, y: np.ndarray) -> np.ndarray:
+    def promoted(arm: numpy.ndarray, y: numpy.ndarray) -> numpy.ndarray:
         """Which streams ever cross the promotion level.
 
         Args:
@@ -1873,7 +1890,7 @@ def gate_b9(runs: int, base: int = 0) -> dict[str, Any]:
             A boolean array, True where the e-process reaches the level.
         """
         paths = peeking_paths(arm, y, 0.5, plan.delta_min)
-        return np.asarray(paths.max(axis=1) >= target_p)
+        return numpy.asarray(paths.max(axis=1) >= target_p)
 
     for label, (start, end) in {
         "no_effect": (0.0, 0.0),
@@ -1881,7 +1898,7 @@ def gate_b9(runs: int, base: int = 0) -> dict[str, Any]:
     }.items():
         hits = 0
         for chunk in range(0, runs, 500):
-            arm, y = worlds.drifting_experiment(
+            arm, y = f11_generators.drifting_experiment(
                 rng_for(base, f"b9.{label}", chunk),
                 min(500, runs - chunk),
                 n,
@@ -1898,7 +1915,7 @@ def gate_b9(runs: int, base: int = 0) -> dict[str, Any]:
         }
     hits = 0
     for chunk in range(0, runs, 500):
-        arm, y = worlds.drifting_experiment(
+        arm, y = f11_generators.drifting_experiment(
             rng_for(base, "b9.rollback", chunk),
             min(500, runs - chunk),
             n,
@@ -1917,7 +1934,7 @@ def gate_b9(runs: int, base: int = 0) -> dict[str, Any]:
     caught = 0
     harm_runs = runs // 2
     for chunk in range(0, harm_runs, 500):
-        arm, y = worlds.drifting_experiment(
+        arm, y = f11_generators.drifting_experiment(
             rng_for(base, "b9.harm", chunk),
             min(500, harm_runs - chunk),
             n,
@@ -1998,15 +2015,17 @@ def battery_digest(base: int) -> str:
         rollout run, serialised.
     """
     rng = rng_for(base, "b10", 0)
-    score, _, y = worlds.calibration_world(rng, 3000, 0.7)
+    score, _, y = f11_generators.calibration_world(rng, 3000, 0.7)
     decision = threshold.choose_threshold(
         score, y, cost_model(), seed=1, replicates=50
     )
-    sample, outcome, groups = worlds.binormal(rng, 2000, 0.2, 1.5, 10, 0.5)
+    sample, outcome, groups = f11_generators.binormal(
+        rng, 2000, 0.2, 1.5, 10, 0.5
+    )
     band = netbenefit.net_benefit_band(
         outcome, (sample >= 0.8).astype(float), RANGE, clusters=groups, seed=2
     )
-    arm, y2 = worlds.experiment(rng, 1, 3000, 0.5, 0.1, 0.04)
+    arm, y2 = f11_generators.experiment(rng, 1, 3000, 0.5, 0.1, 0.04)
     run = rollout.Rollout(plan_for(), "e", ALPHA_PROMOTE).observe(arm[0], y2[0])
     payload = json.dumps(
         [decision.to_dict(), band.to_dict(), run.to_dict()],
@@ -2078,7 +2097,7 @@ def sources() -> dict[str, list[Any]]:
             threshold.ThresholdRule,
             threshold.bayes_threshold,
             gate_a1,
-            worlds.calibration_world,
+            f11_generators.calibration_world,
         ],
         "A1c": [threshold.calibration_check, gate_a1c],
         "A2": [costs.net_benefit, costs.expected_cost, gate_a2],
@@ -2088,8 +2107,8 @@ def sources() -> dict[str, list[Any]]:
             netbenefit.diffs,
             band_setting,
             gate_a3,
-            worlds.binormal,
-            worlds.binormal_differences,
+            f11_generators.binormal,
+            f11_generators.binormal_differences,
         ],
         "A4": [netbenefit.net_benefit_band, netbenefit.resample_means, gate_a4],
         "A5": [
@@ -2101,7 +2120,7 @@ def sources() -> dict[str, list[Any]]:
             ope.fit_outcome_model,
             gate_a5,
             refusal_rows,
-            worlds.bandit,
+            f11_generators.bandit,
         ],
         "A6": [
             ope.estimate_value,
@@ -2114,7 +2133,7 @@ def sources() -> dict[str, list[Any]]:
             constraints.newcombe,
             constraints.rate_tables,
             gate_a7,
-            worlds.fairness_world,
+            f11_generators.fairness_world,
         ],
         "A7b": [constraints.fit_group_thresholds, gate_a7b],
         "A8": [constraints.check_feasibility, gate_a8],

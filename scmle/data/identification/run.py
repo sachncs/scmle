@@ -24,8 +24,8 @@ import hashlib
 import json
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.contracts import qualification
 from scmle.data.admissibility import dag as dag_module
@@ -39,7 +39,7 @@ from scmle.data.identification import select
 from scmle.data.identification import sensitivity
 from scmle.data.identification import synth
 from scmle.data.identification import tier
-from scmle.data.ledger import budget as budget_module
+from scmle.data.ledger import budget
 from scmle.data.ledger import multiplicity
 
 DOCUMENTS = (
@@ -145,7 +145,9 @@ def digest(document: Mapping[str, Any]) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def stratum_frames(frame: pd.DataFrame, column: str) -> dict[str, pd.DataFrame]:
+def stratum_frames(
+    frame: pandas.DataFrame, column: str
+) -> dict[str, pandas.DataFrame]:
     """Splits rows into the strata large enough to estimate in.
 
     Args:
@@ -174,7 +176,7 @@ def wald_from(est: Est, name: str, kind: str) -> battery.Test | None:
     Returns:
         The test, or None when the standard error is not finite and positive.
     """
-    if not np.isfinite(est.se) or est.se <= 0:
+    if not numpy.isfinite(est.se) or est.se <= 0:
         return None
     return battery.wald_test(name, kind, est.estimate, est.se)
 
@@ -204,7 +206,7 @@ class Adapter:
     def __init__(
         self,
         spec: causal.CausalSpec,
-        x: pd.DataFrame,
+        x: pandas.DataFrame,
         seed: int,
         learner: str,
         alpha_falsify: float,
@@ -236,7 +238,7 @@ class Adapter:
         `refusal`.
         """
 
-    def estimate(self, c: pd.DataFrame, level: float) -> Est:
+    def estimate(self, c: pandas.DataFrame, level: float) -> Est:
         """Computes the primary estimate on `C`.
 
         Args:
@@ -253,7 +255,7 @@ class Adapter:
         raise NotImplementedError
 
     def estimate_for(
-        self, c: pd.DataFrame, level: float, outcome: str | None = None
+        self, c: pandas.DataFrame, level: float, outcome: str | None = None
     ) -> Est:
         """Computes the same estimate on `C` with another outcome column.
 
@@ -272,7 +274,7 @@ class Adapter:
         """
         raise NotImplementedError
 
-    def controls(self, c: pd.DataFrame, level: float) -> list[battery.Test]:
+    def controls(self, c: pandas.DataFrame, level: float) -> list[battery.Test]:
         """Runs the falsification tests on `C` (negative controls and placebos).
 
         Args:
@@ -284,7 +286,7 @@ class Adapter:
         """
         return []
 
-    def sensitivity(self, c: pd.DataFrame, level: float) -> dict[str, Any]:
+    def sensitivity(self, c: pandas.DataFrame, level: float) -> dict[str, Any]:
         """Assesses sensitivity to unmeasured confounding.
 
         Args:
@@ -350,7 +352,7 @@ class BackdoorAdapter(Adapter):
                 "trimming rule"
             )
 
-    def estimate(self, c: pd.DataFrame, level: float) -> Est:
+    def estimate(self, c: pandas.DataFrame, level: float) -> Est:
         """Computes the primary AIPW estimate on `C` with the frozen nuisances.
 
         Args:
@@ -392,7 +394,7 @@ class BackdoorAdapter(Adapter):
         )
 
     def estimate_for(
-        self, c: pd.DataFrame, level: float, outcome: str | None = None
+        self, c: pandas.DataFrame, level: float, outcome: str | None = None
     ) -> Est:
         """Computes the AIPW estimate on `C` with another outcome column.
 
@@ -429,7 +431,7 @@ class BackdoorAdapter(Adapter):
             result.estimate, result.se, result.low, result.high, result.n
         )
 
-    def controls(self, c: pd.DataFrame, level: float) -> list[battery.Test]:
+    def controls(self, c: pandas.DataFrame, level: float) -> list[battery.Test]:
         """Runs the declared negative controls on `C`.
 
         Args:
@@ -474,7 +476,7 @@ class BackdoorAdapter(Adapter):
                 tests.append(test)
         return tests
 
-    def sensitivity(self, c: pd.DataFrame, level: float) -> dict[str, Any]:
+    def sensitivity(self, c: pandas.DataFrame, level: float) -> dict[str, Any]:
         """Assesses sensitivity of the estimate to unmeasured confounding.
 
         Args:
@@ -504,7 +506,7 @@ class BackdoorAdapter(Adapter):
         design = self.nuisances.design
         matrix = design.matrix(c)
         names = [f"x{j}" for j in range(matrix.shape[1])]
-        frame = pd.DataFrame(matrix, columns=names)
+        frame = pandas.DataFrame(matrix, columns=names)
         frame["t"] = c[spec.treatment].to_numpy(dtype=float)
         frame["y"] = c[spec.outcome].to_numpy(dtype=float)
         report = sensitivity.assess(
@@ -530,7 +532,7 @@ class RandomizedAdapter(Adapter):
 
     name = "randomized_diff"
 
-    def estimate(self, c: pd.DataFrame, level: float) -> Est:
+    def estimate(self, c: pandas.DataFrame, level: float) -> Est:
         """Computes the difference in means on `C`.
 
         Args:
@@ -545,7 +547,7 @@ class RandomizedAdapter(Adapter):
         return Est(r.estimate, r.se, r.low, r.high, r.n)
 
     def estimate_for(
-        self, c: pd.DataFrame, level: float, outcome: str | None = None
+        self, c: pandas.DataFrame, level: float, outcome: str | None = None
     ) -> Est:
         """Computes the difference in means on `C` with another outcome column.
 
@@ -562,7 +564,7 @@ class RandomizedAdapter(Adapter):
         )
         return Est(r.estimate, r.se, r.low, r.high, r.n)
 
-    def controls(self, c: pd.DataFrame, level: float) -> list[battery.Test]:
+    def controls(self, c: pandas.DataFrame, level: float) -> list[battery.Test]:
         """Runs the declared negative-control outcomes on `C`.
 
         Args:
@@ -585,7 +587,7 @@ class RandomizedAdapter(Adapter):
                 tests.append(test)
         return tests
 
-    def sensitivity(self, c: pd.DataFrame, level: float) -> dict[str, Any]:
+    def sensitivity(self, c: pandas.DataFrame, level: float) -> dict[str, Any]:
         """Reports that randomization leaves no unmeasured confounding to bound.
 
         Args:
@@ -637,7 +639,7 @@ class DidAdapter(Adapter):
         }
 
     def fit(
-        self, c: pd.DataFrame, level: float, outcome: str | None = None
+        self, c: pandas.DataFrame, level: float, outcome: str | None = None
     ) -> did.DidResult:
         """Fits the difference-in-differences estimator on the given rows.
 
@@ -654,7 +656,7 @@ class DidAdapter(Adapter):
             c, unit, time, adoption, outcome or self.spec.outcome, level
         )
 
-    def estimate(self, c: pd.DataFrame, level: float) -> Est:
+    def estimate(self, c: pandas.DataFrame, level: float) -> Est:
         """Computes the overall ATT on `C`.
 
         Args:
@@ -681,7 +683,7 @@ class DidAdapter(Adapter):
         )
 
     def estimate_for(
-        self, c: pd.DataFrame, level: float, outcome: str | None = None
+        self, c: pandas.DataFrame, level: float, outcome: str | None = None
     ) -> Est:
         """Computes the overall ATT on `C` with another outcome column.
 
@@ -696,7 +698,7 @@ class DidAdapter(Adapter):
         fit = self.fit(c, level, outcome)
         return Est(fit.estimate, fit.se, fit.low, fit.high, len(c))
 
-    def controls(self, c: pd.DataFrame, level: float) -> list[battery.Test]:
+    def controls(self, c: pandas.DataFrame, level: float) -> list[battery.Test]:
         """Runs the pre-trend test and negative-control outcomes on `C`.
 
         Args:
@@ -726,7 +728,7 @@ class DidAdapter(Adapter):
                     tests.append(test)
         return tests
 
-    def sensitivity(self, c: pd.DataFrame, level: float) -> dict[str, Any]:
+    def sensitivity(self, c: pandas.DataFrame, level: float) -> dict[str, Any]:
         """Applies the relative-magnitudes bound on `C`.
 
         Args:
@@ -776,7 +778,7 @@ class IvAdapter(Adapter):
         return causal.covariates_of(self.spec.assumptions) or ()
 
     def fit(
-        self, frame: pd.DataFrame, level: float, outcome: str | None = None
+        self, frame: pandas.DataFrame, level: float, outcome: str | None = None
     ) -> iv.IvResult:
         """Fits the just-identified IV model on the given rows.
 
@@ -819,7 +821,7 @@ class IvAdapter(Adapter):
             ),
         }
 
-    def estimate(self, c: pd.DataFrame, level: float) -> Est:
+    def estimate(self, c: pandas.DataFrame, level: float) -> Est:
         """Computes the IV estimate on `C`.
 
         A weak instrument on `C` also marks the run as weak (`weak`), and
@@ -849,7 +851,7 @@ class IvAdapter(Adapter):
         )
 
     def estimate_for(
-        self, c: pd.DataFrame, level: float, outcome: str | None = None
+        self, c: pandas.DataFrame, level: float, outcome: str | None = None
     ) -> Est:
         """Computes the IV estimate on `C` with another outcome column.
 
@@ -864,7 +866,7 @@ class IvAdapter(Adapter):
         fit = self.fit(c, level, outcome)
         return Est(fit.estimate, fit.se, fit.wald_low, fit.wald_high, fit.n)
 
-    def controls(self, c: pd.DataFrame, level: float) -> list[battery.Test]:
+    def controls(self, c: pandas.DataFrame, level: float) -> list[battery.Test]:
         """Runs the declared negative-control outcomes on `C`.
 
         Args:
@@ -949,7 +951,7 @@ class RdAdapter(Adapter):
 
     def fit(
         self,
-        c: pd.DataFrame,
+        c: pandas.DataFrame,
         level: float,
         outcome: str | None = None,
         covariates: tuple[str, ...] = (),
@@ -981,7 +983,7 @@ class RdAdapter(Adapter):
             covariates,
         )
 
-    def estimate(self, c: pd.DataFrame, level: float) -> Est:
+    def estimate(self, c: pandas.DataFrame, level: float) -> Est:
         """Computes the bias-corrected discontinuity on `C`.
 
         Args:
@@ -1003,7 +1005,7 @@ class RdAdapter(Adapter):
         )
 
     def estimate_for(
-        self, c: pd.DataFrame, level: float, outcome: str | None = None
+        self, c: pandas.DataFrame, level: float, outcome: str | None = None
     ) -> Est:
         """Computes the bias-corrected discontinuity for another outcome.
 
@@ -1024,7 +1026,7 @@ class RdAdapter(Adapter):
             fit.n_left + fit.n_right,
         )
 
-    def controls(self, c: pd.DataFrame, level: float) -> list[battery.Test]:
+    def controls(self, c: pandas.DataFrame, level: float) -> list[battery.Test]:
         """Runs the placebo cutoffs and covariate balance tests on `C`.
 
         Args:
@@ -1058,7 +1060,7 @@ class RdAdapter(Adapter):
         )
         return tests
 
-    def sensitivity(self, c: pd.DataFrame, level: float) -> dict[str, Any]:
+    def sensitivity(self, c: pandas.DataFrame, level: float) -> dict[str, Any]:
         """Reports how the estimate changes with the bandwidth.
 
         Args:
@@ -1100,7 +1102,7 @@ class SynthAdapter(Adapter):
         super().__init__(*args)
         self.single_unit = True
 
-    def estimate(self, c: pd.DataFrame, level: float) -> Est:
+    def estimate(self, c: pandas.DataFrame, level: float) -> Est:
         """Computes the synthetic control effect on `X`.
 
         With one treated unit there is nothing to hold out, so the rows of
@@ -1154,7 +1156,7 @@ class SynthAdapter(Adapter):
         )
 
     def estimate_for(
-        self, c: pd.DataFrame, level: float, outcome: str | None = None
+        self, c: pandas.DataFrame, level: float, outcome: str | None = None
     ) -> Est:
         """Always refuses: synthetic control has no other-outcome estimate.
 
@@ -1299,7 +1301,7 @@ def assemble(
     return Outcome(documents, decision, hashes)
 
 
-def alphas(error_budget: budget_module.ErrorBudget) -> tuple[float, float]:
+def alphas(error_budget: budget.ErrorBudget) -> tuple[float, float]:
     """Splits the confirmation level into the primary and falsification levels.
 
     Args:
@@ -1309,7 +1311,7 @@ def alphas(error_budget: budget_module.ErrorBudget) -> tuple[float, float]:
         ``(alpha_primary, alpha_falsify)``, the confirmation level divided in
         the ratio 4 to 1.
     """
-    parts = budget_module.split_budget(error_budget, battery.FALSIFY_WEIGHTS)
+    parts = budget.split_budget(error_budget, battery.FALSIFY_WEIGHTS)
     return (
         float(parts["estimate"].confirmation.alpha_confirm),
         float(parts["falsify"].confirmation.alpha_confirm),
@@ -1317,7 +1319,11 @@ def alphas(error_budget: budget_module.ErrorBudget) -> tuple[float, float]:
 
 
 def replication(
-    adapter: Adapter, c: pd.DataFrame, level: float, pooled: float, alpha: float
+    adapter: Adapter,
+    c: pandas.DataFrame,
+    level: float,
+    pooled: float,
+    alpha: float,
 ) -> dict[str, Any]:
     """Re-estimates inside each declared stratum and tests agreement.
 
@@ -1352,7 +1358,7 @@ def replication(
                 est = adapter.estimate(part, level)
             except ValueError:
                 continue
-            if np.isfinite(est.se) and est.se > 0:
+            if numpy.isfinite(est.se) and est.se > 0:
                 values[f"{column}={label}"] = (est.estimate, est.se)
         if len(values) < battery.MIN_STRATA:
             results[column] = {"skipped": "fewer than two usable strata"}
@@ -1367,7 +1373,7 @@ def replication(
 
 def subgroup_report(
     adapter: Adapter,
-    c: pd.DataFrame,
+    c: pandas.DataFrame,
     level: float,
     subgroups: tuple[causal.Subgroup, ...],
 ) -> dict[str, Any]:
@@ -1421,7 +1427,7 @@ def subgroup_report(
                 except ValueError as error:
                     row["skipped"] = str(error)
                 else:
-                    if np.isfinite(est.se) and est.se > 0:
+                    if numpy.isfinite(est.se) and est.se > 0:
                         test = battery.wald_test(
                             f"{group.column}={value}",
                             "subgroup",
@@ -1517,9 +1523,9 @@ def label_subgroups(
 
 def identify(
     spec: causal.CausalSpec,
-    x: pd.DataFrame,
-    c: pd.DataFrame,
-    error_budget: budget_module.ErrorBudget,
+    x: pandas.DataFrame,
+    c: pandas.DataFrame,
+    error_budget: budget.ErrorBudget,
     attestors: Mapping[str, str] | None = None,
     dag: dag_module.Dag | None = None,
     seed: int = 0,
@@ -1617,7 +1623,9 @@ def identify(
     if subgroup_found is not None:
         label_subgroups(subgroup_found, named)
     verdict = verdict_of(spec, primary)
-    verdict_sig = primary.excludes_zero() if np.isfinite(primary.low) else None
+    verdict_sig = (
+        primary.excludes_zero() if numpy.isfinite(primary.low) else None
+    )
     verdict["interval_excludes_zero"] = verdict_sig
     needed = needed_assumptions(strategy, spec)
     checked = strategy != "backdoor_aipw" or plan.verdict(strategy).checked
@@ -1703,8 +1711,8 @@ NOT_ESTIMATED = (
 
 def design_only(
     spec: causal.CausalSpec,
-    x: pd.DataFrame,
-    error_budget: budget_module.ErrorBudget,
+    x: pandas.DataFrame,
+    error_budget: budget.ErrorBudget,
     dag: dag_module.Dag | None = None,
     seed: int = 0,
     learner: str = "linear",

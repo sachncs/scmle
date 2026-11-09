@@ -17,7 +17,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-import numpy as np
+import numpy
 import scipy
 from scipy import special
 from scipy import stats
@@ -58,7 +58,7 @@ def sample(
     Returns:
         The values, each rounded to `SAMPLE_DECIMALS` places.
     """
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     values = rng.normal(loc=shift, scale=scale, size=size)
     return [round(float(v), SAMPLE_DECIMALS) for v in values]
 
@@ -409,7 +409,7 @@ def harmonic_compute(given: dict[str, Any]) -> dict[str, Any]:
     Returns:
         The harmonic number under `value`.
     """
-    value = float(special.digamma(given["n"] + 1) + np.euler_gamma)
+    value = float(special.digamma(given["n"] + 1) + numpy.euler_gamma)
     return {"value": value}
 
 
@@ -490,7 +490,7 @@ def document(name: str) -> dict[str, Any]:
     record: dict[str, Any] = {
         "oracle": name,
         "reference": family.reference,
-        "tool": {"numpy": np.__version__, "scipy": scipy.__version__},
+        "tool": {"numpy": numpy.__version__, "scipy": scipy.__version__},
         "generator": "benchmarks/qualification/make_oracles.py",
         "generator_sha256": oracles.generator_sha256(),
         "tolerance": dict(TOLERANCE),

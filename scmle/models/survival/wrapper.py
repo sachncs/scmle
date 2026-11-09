@@ -3,8 +3,8 @@
 from typing import Any
 from typing import Self
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from sklearn import base
 from sklearn import pipeline
 
@@ -44,19 +44,19 @@ class EventAwareEstimator(base.RegressorMixin, base.BaseEstimator):
         Returns:
             This fitted estimator.
         """
-        frame = pd.DataFrame(features)
+        frame = pandas.DataFrame(features)
         events = frame[self.event_column].to_numpy(dtype=float)
         steps = base.clone(self.estimator)
         self.preprocessing_ = steps[:-1]
         transformed = self.preprocessing_.fit_transform(
-            frame, np.asarray(target)
+            frame, numpy.asarray(target)
         )
         self.model_ = steps[-1].fit(
-            transformed, np.asarray(target, dtype=float), event=events
+            transformed, numpy.asarray(target, dtype=float), event=events
         )
         return self
 
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """Risk score per row; larger means the event is expected sooner.
 
         Args:
@@ -67,7 +67,7 @@ class EventAwareEstimator(base.RegressorMixin, base.BaseEstimator):
         """
         return self.model_.predict(self.preprocessing_.transform(features))
 
-    def predict_survival(self, features: Any, times: Any) -> np.ndarray:
+    def predict_survival(self, features: Any, times: Any) -> numpy.ndarray:
         """Probability of no event yet at each time, `(rows, len(times))`.
 
         Args:

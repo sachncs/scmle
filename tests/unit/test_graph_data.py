@@ -6,7 +6,7 @@ from datetime import UTC
 import json
 from pathlib import Path
 
-import numpy as np
+import numpy
 import pytest
 
 from scmle.data.modalities.graph import edges_from_records
@@ -108,7 +108,9 @@ def test_invalid_weight_fails_closed() -> None:
     with pytest.raises(GraphInputError, match="non-numeric"):
         edges_from_records([{"source": "a", "target": "b", "weight": "bad"}])
     with pytest.raises(GraphInputError, match="invalid weight"):
-        edges_from_records([{"source": "a", "target": "b", "weight": np.nan}])
+        edges_from_records(
+            [{"source": "a", "target": "b", "weight": numpy.nan}]
+        )
     with pytest.raises(ValueError, match="finite"):
         GraphEdge("a", "b", float("inf"))
 
@@ -322,7 +324,7 @@ def test_feature_preparation_is_bounded_and_shift_fixture_is_observable(
 
     assert prepared.shape == (2, 3)
     assert prepared.feature_names == ("x", "y", "out_degree")
-    assert np.isfinite(prepared.to_numpy()).all()
+    assert numpy.isfinite(prepared.to_numpy()).all()
     assert shifted_graph.identity != unshifted.identity
     assert baseline.to_numpy().shape == (3, 3)
 

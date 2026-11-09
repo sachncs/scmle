@@ -57,8 +57,8 @@ from pathlib import Path
 import time
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from benchmarks.qualification import ingest_checks
 from benchmarks.qualification import ingest_worlds
@@ -66,7 +66,7 @@ from scmle.contracts import qualification
 from scmle.core import randomness
 from scmle.data.detectors import certificates
 from scmle.data.ingest import asof_view
-from scmle.data.ingest import budget as budgets
+from scmle.data.ingest import budget
 from scmle.data.ingest import entities
 from scmle.data.ingest import grain
 from scmle.data.ingest import joins
@@ -441,10 +441,10 @@ def near_key_flips() -> dict[str, Any]:
     allowed = round(NEAR_KEY_EPS * NEAR_KEY_ROWS)
     flips = {}
     for duplicates in range(allowed - 3, allowed + 4):
-        values = np.arange(NEAR_KEY_ROWS)
+        values = numpy.arange(NEAR_KEY_ROWS)
         values[:duplicates] = values[NEAR_KEY_ROWS - duplicates :]
         db = ingest_worlds.new_database("nk")
-        ingest_worlds.load(db, "t", pd.DataFrame({"k": values}))
+        ingest_worlds.load(db, "t", pandas.DataFrame({"k": values}))
         source = db.source()
         table = profile.profile_table(source, "t")
         assert table is not None
@@ -637,7 +637,7 @@ def entity_resolution(offset: int, workers: int) -> dict[str, Any]:
         link_recall_interval=list(interval),
         false_group_pairs=sum(r["false_group_pairs"] for r in rows),
         mean_reduction_ratio=float(
-            np.mean([r["reduction_ratio"] for r in rows])
+            numpy.mean([r["reduction_ratio"] for r in rows])
         ),
         note="the corruption is ours; not a public ER benchmark. Grouping "
         "stays unverified until a labelled benchmark is run: "
@@ -657,7 +657,7 @@ def budget_run(seed: int, directory: Path) -> tuple[bool, list[dict[str, str]]]:
         stop boundaries recorded by the meter.
     """
     rng = randomness.component_rng(seed, "ingest.certify.budget", 0)
-    limit = budgets.IngestBudget(
+    limit = budget.IngestBudget(
         max_queries=int(rng.integers(0, 800)),
         max_rows_scanned=int(rng.integers(0, 150_000)),
     )
@@ -773,7 +773,7 @@ def code_hashes() -> dict[str, str]:
         "grain": certificates.code_hash(grain),
         "joins": certificates.code_hash(joins),
         "entities": certificates.code_hash(entities),
-        "budget": certificates.code_hash(budgets, ingest_plan),
+        "budget": certificates.code_hash(budget, ingest_plan),
     }
 
 

@@ -2,8 +2,8 @@
 
 import logging
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 import scmle
 from scmle.contracts import tasks
@@ -11,10 +11,10 @@ from scmle.contracts import tasks
 LOGGER = logging.getLogger(__name__)
 
 
-def make_dataset(rows: int, seed: int) -> pd.DataFrame:
+def make_dataset(rows: int, seed: int) -> pandas.DataFrame:
     """Builds a linear problem with unit-variance noise."""
-    rng = np.random.default_rng(seed)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    frame = pandas.DataFrame(
         {"area": rng.uniform(30, 200, rows), "age": rng.uniform(0, 60, rows)}
     )
     frame["price"] = 2.5 * frame.area - 1.2 * frame.age + rng.normal(0, 8, rows)

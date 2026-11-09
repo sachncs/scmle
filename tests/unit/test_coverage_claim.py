@@ -2,12 +2,12 @@
 
 import json
 
-import numpy as np
+import numpy
 import pytest
 
 from scmle.artifacts import claims_audit
 from scmle.data.custody import sealed
-from scmle.data.ledger import ledger as ledger_module
+from scmle.data.ledger import ledger
 from scmle.evaluation import coverage_run
 
 
@@ -33,7 +33,7 @@ def test_the_claim_names_levels_methods_and_the_rule_and_hashes_stably():
     assert coverage_run.claim_hash(claim) == coverage_run.claim_hash(
         make_claim()
     )
-    assert coverage_run.claim_hash(claim) == ledger_module.digest(claim)
+    assert coverage_run.claim_hash(claim) == ledger.digest(claim)
     assert coverage_run.claim_hash(claim) != coverage_run.claim_hash(
         make_claim(levels=(0.5, 0.95))
     )
@@ -60,7 +60,7 @@ class FakeBundle:
         import pandas as pd
 
         return pd.DataFrame(
-            {"lower": np.full(len(features), -1e9), "upper": 1e9}
+            {"lower": numpy.full(len(features), -1e9), "upper": 1e9}
         )
 
 
@@ -69,7 +69,7 @@ def test_the_report_carries_the_hash_of_the_claim():
 
     features = pd.DataFrame({"a": range(40)})
     report = coverage_run.run_report(
-        FakeBundle(), features, np.zeros(40), (0.5,), claim_sha256="f" * 64
+        FakeBundle(), features, numpy.zeros(40), (0.5,), claim_sha256="f" * 64
     )
     assert report["claim_sha256"] == "f" * 64
 

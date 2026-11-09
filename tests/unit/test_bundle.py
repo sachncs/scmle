@@ -4,25 +4,25 @@ import dataclasses
 import json
 import platform
 
-import numpy as np
+import numpy
 import pandas as pd
 import pytest
 
 from scmle.artifacts import bundle as bundle_module
 from scmle.artifacts import store as store_module
-from scmle.contracts import data as data_contracts
+from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.data.curation import preprocessing
 from scmle.inference import mapping as mapping_module
 from scmle.models import registry as registry_module
 
-PLAN = data_contracts.FeaturePlan(("num",), ("cat",))
+PLAN = data.FeaturePlan(("num",), ("cat",))
 
 
 @pytest.fixture
 def trained():
-    rng = np.random.default_rng(0)
+    rng = numpy.random.default_rng(0)
     features = pd.DataFrame(
         {"num": rng.normal(size=200), "cat": rng.choice(["a", "b"], 200)}
     )
@@ -41,10 +41,10 @@ def test_roundtrip_prediction_equivalence(trained, tmp_path):
     bundle, features = trained
     bundle.save(tmp_path / "m")
     loaded = bundle_module.ModelBundle.load(tmp_path / "m", trusted=True)
-    np.testing.assert_array_equal(
+    numpy.testing.assert_array_equal(
         bundle.predict(features), loaded.predict(features)
     )
-    np.testing.assert_allclose(
+    numpy.testing.assert_allclose(
         bundle.predict_proba(features), loaded.predict_proba(features)
     )
     assert loaded.classes == (0, 1)
@@ -70,7 +70,7 @@ def test_schema_errors_are_structured(trained):
 def test_unknown_categories_and_missing_values_are_reported(trained):
     bundle, features = trained
     novel = features.head(3).assign(cat="zzz")
-    novel.loc[0, "num"] = np.nan
+    novel.loc[0, "num"] = numpy.nan
     report = bundle.validate(novel)
     assert report.unseen_categories == {"cat": ["zzz"]}
     assert report.missing_value_counts == {"num": 1}
@@ -165,10 +165,10 @@ def test_unknown_signature_algorithm_is_rejected(trained, tmp_path):
 
 
 def test_regression_bundle_has_no_probabilities(tmp_path):
-    rng = np.random.default_rng(1)
+    rng = numpy.random.default_rng(1)
     features = pd.DataFrame({"num": rng.normal(size=80)})
     registry = registry_module.ModelRegistry.with_builtins()
-    plan = data_contracts.FeaturePlan(("num",), ())
+    plan = data.FeaturePlan(("num",), ())
     pipe = preprocessing.build_pipeline(
         plan, registry.get("ridge"), tasks.TaskType.REGRESSION, 0
     ).fit(features, features.num * 2)
@@ -336,7 +336,7 @@ def test_explicit_renames_map_incoming_names(trained):
     mapping = mapping_module.ColumnMapping(
         {"customer_age": "num", "segment": "cat"}
     )
-    np.testing.assert_array_equal(
+    numpy.testing.assert_array_equal(
         bundle.predict(renamed, mapping), bundle.predict(features)
     )
     report = bundle.validate(renamed, mapping)
@@ -351,7 +351,7 @@ def test_case_and_whitespace_insensitive_matching_is_opt_in(trained):
     loose = mapping_module.ColumnMapping(
         case_insensitive=True, strip_whitespace=True
     )
-    np.testing.assert_array_equal(
+    numpy.testing.assert_array_equal(
         bundle.predict(messy, loose), bundle.predict(features)
     )
     only_case = mapping_module.ColumnMapping(case_insensitive=True)
@@ -381,7 +381,7 @@ def test_exact_matches_are_never_renamed(trained):
         {"num": "cat"}, case_insensitive=True
     )
     # "num" already exists exactly, so the rename request is ignored.
-    np.testing.assert_array_equal(
+    numpy.testing.assert_array_equal(
         bundle.predict(features, mapping), bundle.predict(features)
     )
 
@@ -416,13 +416,13 @@ def test_inference_time_calibration_is_optional_persisted_and_verified(
     plain = bundle.predict_proba(features)
     report = bundle.calibrate(features, labels, method="sigmoid")
     calibrated = bundle.predict_proba(features)
-    assert not np.allclose(plain, calibrated)
-    np.testing.assert_allclose(calibrated.sum(axis=1), 1.0, atol=1e-9)
+    assert not numpy.allclose(plain, calibrated)
+    numpy.testing.assert_allclose(calibrated.sum(axis=1), 1.0, atol=1e-9)
     assert report["brier_after"] <= report["brier_before"] + 1e-9
     assert bundle.info.calibration.startswith("sigmoid on 200 rows")
     bundle.save(tmp_path / "m")
     loaded = bundle_module.ModelBundle.load(tmp_path / "m", trusted=True)
-    np.testing.assert_allclose(loaded.predict_proba(features), calibrated)
+    numpy.testing.assert_allclose(loaded.predict_proba(features), calibrated)
     assert bundle.verify_round_trip(tmp_path / "m", features)["rows"] == 200
     (tmp_path / "m" / bundle_module.CALIBRATOR_FILE).write_bytes(b"broken")
     with pytest.raises(errors.ArtifactError, match="calibrator"):
@@ -457,7 +457,7 @@ def test_score_returns_the_structured_inference_result(trained):
     assert result["model_version"] == "v1" and result["schema_valid"] is True
     assert result["diagnostics"]["ignored_columns"] == ["junk"]
     assert result["classes"] == [0, 1]
-    assert np.allclose(np.sum(result["probabilities"], axis=1), 1.0)
+    assert numpy.allclose(numpy.sum(result["probabilities"], axis=1), 1.0)
     with pytest.raises(errors.SchemaError):
         bundle.score(features.drop(columns="num"))
 
@@ -471,7 +471,7 @@ def test_the_environment_lock_pins_the_build_environment(trained, tmp_path):
     assert path.read_text() == text
     assert text.startswith("# scmle environment lock")
     assert f"# python {platform.python_version()}" in text
-    assert f"numpy=={np.__version__}" in text
+    assert f"numpy=={numpy.__version__}" in text
     assert "# platform " in text and "unknown" not in text.splitlines()[2]
     names = [line.split("==")[0] for line in text.splitlines() if "==" in line]
     assert names == sorted(names)
@@ -499,7 +499,7 @@ def test_a_version_mismatch_arrives_with_the_lock_attached(trained, tmp_path):
 
     lock = caught.value.details["environment_lock"]
     assert lock == bundle.environment_lock()
-    assert f"numpy=={np.__version__}" in lock
+    assert f"numpy=={numpy.__version__}" in lock
 
 
 def test_an_empty_bytes_key_is_rejected_when_resolved():

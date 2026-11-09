@@ -9,8 +9,8 @@ control, not from a fixed cutoff.
 
 import dataclasses
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.contracts import data as data_contracts
 from scmle.contracts import errors
@@ -35,7 +35,7 @@ DATETIME_PARTS = (
 
 
 def column_exclusion_reason(
-    kind: columns.ColumnKind, series: pd.Series, stats: dict
+    kind: columns.ColumnKind, series: pandas.Series, stats: dict
 ) -> str | None:
     """Finds why a column cannot be a feature.
 
@@ -58,7 +58,7 @@ def column_exclusion_reason(
 
 
 def summarize_target(
-    target: pd.Series, task: tasks.TaskType
+    target: pandas.Series, task: tasks.TaskType
 ) -> tuple[dict, list[str]]:
     """Summarizes the target distribution and imbalance risk.
 
@@ -106,7 +106,7 @@ class DatasetProfiler:
         """
         self.spec = spec
 
-    def role_columns(self, frame: pd.DataFrame) -> dict[str, str]:
+    def role_columns(self, frame: pandas.DataFrame) -> dict[str, str]:
         """Maps configured non-feature columns to why they are excluded.
 
         Args:
@@ -167,7 +167,7 @@ class DatasetProfiler:
             self.check_weights(frame[data.weight_column])
         return roles
 
-    def check_weights(self, weights: pd.Series) -> None:
+    def check_weights(self, weights: pandas.Series) -> None:
         """Requires finite, non-negative weights with a positive total.
 
         Args:
@@ -176,9 +176,9 @@ class DatasetProfiler:
         Raises:
             DataError: If the weight column cannot weight training rows.
         """
-        numeric = pd.to_numeric(weights, errors="coerce").to_numpy(float)
+        numeric = pandas.to_numeric(weights, errors="coerce").to_numpy(float)
         name = self.spec.data.weight_column
-        if not np.isfinite(numeric).all():
+        if not numpy.isfinite(numeric).all():
             raise errors.DataError(
                 f"weight column '{name}' has missing or non-numeric values"
             )
@@ -189,7 +189,7 @@ class DatasetProfiler:
             )
 
     def inspect_columns(
-        self, frame: pd.DataFrame, roles: dict[str, str]
+        self, frame: pandas.DataFrame, roles: dict[str, str]
     ) -> tuple[dict, dict[str, str], dict[str, list[str]], list[str]]:
         """Computes statistics and decides which columns become features.
 
@@ -255,7 +255,7 @@ class DatasetProfiler:
 
     @staticmethod
     def datetime_nodes(
-        frame: pd.DataFrame, stamps: tuple[str, ...]
+        frame: pandas.DataFrame, stamps: tuple[str, ...]
     ) -> list[tasks.FeatureNode]:
         """Builds calendar and trend features for each datetime column.
 
@@ -272,7 +272,7 @@ class DatasetProfiler:
         """
         nodes = []
         for column in stamps:
-            values = pd.to_datetime(frame[column], errors="coerce")
+            values = pandas.to_datetime(frame[column], errors="coerce")
             for part in DATETIME_PARTS:
                 if part == "timestamp":
                     varies = values.nunique() > 1
@@ -289,7 +289,7 @@ class DatasetProfiler:
                     )
         return nodes
 
-    def duplicate_count(self, frame: pd.DataFrame) -> int:
+    def duplicate_count(self, frame: pandas.DataFrame) -> int:
         """Counts rows duplicated apart from their identifier columns.
 
         Args:
@@ -304,7 +304,9 @@ class DatasetProfiler:
         return int(deduplicated.duplicated().sum())
 
     @staticmethod
-    def balance_findings(target: pd.Series, task: tasks.TaskType) -> list[str]:
+    def balance_findings(
+        target: pandas.Series, task: tasks.TaskType
+    ) -> list[str]:
         """Warns when classes are exactly equal in size.
 
         Real data are rarely perfectly balanced, so equal counts usually mean
@@ -333,7 +335,7 @@ class DatasetProfiler:
 
     def duplicate_findings(
         self,
-        frame: pd.DataFrame,
+        frame: pandas.DataFrame,
         feature_columns: list[str],
         task: tasks.TaskType,
     ) -> list[str]:
@@ -367,7 +369,7 @@ class DatasetProfiler:
 
     def describe_associations(
         self,
-        frame: pd.DataFrame,
+        frame: pandas.DataFrame,
         statistics: dict[str, dict],
         feature_columns: list[str],
         task: tasks.TaskType,
@@ -398,7 +400,7 @@ class DatasetProfiler:
 
     def leakage_screen(
         self,
-        frame: pd.DataFrame,
+        frame: pandas.DataFrame,
         feature_columns: list[str],
         task: tasks.TaskType,
     ) -> screen.ScreenReport | None:
@@ -422,7 +424,7 @@ class DatasetProfiler:
         target = frame[data.target]
         if task.is_classification:
             kind = "classification"
-        elif pd.api.types.is_numeric_dtype(target):
+        elif pandas.api.types.is_numeric_dtype(target):
             kind = "regression"
         else:
             return None
@@ -439,7 +441,7 @@ class DatasetProfiler:
 
     def profile(
         self,
-        frame: pd.DataFrame,
+        frame: pandas.DataFrame,
         manifest: data_contracts.DatasetManifest,
         task: tasks.TaskType,
         read_seconds: float = 0.0,
@@ -515,7 +517,7 @@ class DatasetProfiler:
             target_columns=tuple(self.spec.data.targets),
             value_column=self.spec.data.value_column,
             treatment_column=self.spec.data.treatment_column,
-            binary_outcome=bool(set(pd.unique(target.dropna())) <= {0, 1}),
+            binary_outcome=bool(set(pandas.unique(target.dropna())) <= {0, 1}),
             text_encoding=self.spec.data.text_encoding,
             embedding_model=self.spec.data.embedding_model,
             ordinal_levels=len(self.spec.data.ordinal_order) or None,

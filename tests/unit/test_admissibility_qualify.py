@@ -1,7 +1,7 @@
 """Wiring of the admissibility tests and data detectors onto the exploration set."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
 from scmle.contracts import qualification
@@ -16,11 +16,11 @@ from tests.unit.test_charter_contracts import make_charter
 
 
 def leaky(rows=400, seed=0):
-    rng = np.random.default_rng(seed)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    frame = pandas.DataFrame(
         {"a": rng.normal(size=rows), "b": rng.normal(size=rows)}
     )
-    target = pd.Series(
+    target = pandas.Series(
         (frame.a + rng.normal(size=rows) > 0).astype(int), name="y"
     )
     frame["copy"] = target.to_numpy() * 1.0
@@ -140,7 +140,7 @@ def test_an_uncertified_mechanism_only_warns(monkeypatch):
 
 def test_a_regression_target_is_never_gated():
     features, target = leaky()
-    target = target.astype(float) + np.arange(len(target)) * 1e-3
+    target = target.astype(float) + numpy.arange(len(target)) * 1e-3
 
     found = qualify.run(
         features, target, kind="predictive", classification=False, seed=0
@@ -163,12 +163,12 @@ def test_a_causal_estimand_without_a_graph_skips_admissibility():
 
 
 def causal_world(rows=500, seed=0):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     x1 = rng.normal(size=rows)
-    t = (rng.uniform(size=rows) < 1 / (1 + np.exp(-x1))).astype(float)
+    t = (rng.uniform(size=rows) < 1 / (1 + numpy.exp(-x1))).astype(float)
     after = t + rng.normal(size=rows)  # a descendant of the treatment
-    y = pd.Series(2 * t + x1 + rng.normal(size=rows), name="y")
-    return pd.DataFrame({"x1": x1, "t": t, "after": after}), y
+    y = pandas.Series(2 * t + x1 + rng.normal(size=rows), name="y")
+    return pandas.DataFrame({"x1": x1, "t": t, "after": after}), y
 
 
 def spec(assumptions):
@@ -255,11 +255,11 @@ def test_a_graph_that_names_missing_columns_cannot_be_tested_but_runs():
 
 
 def test_many_candidates_without_a_declared_set_say_the_claim_is_attested_at_best():
-    rng = np.random.default_rng(1)
+    rng = numpy.random.default_rng(1)
     columns = {f"c{i}": rng.normal(size=300) for i in range(17)}
     columns["t"] = rng.integers(0, 2, 300).astype(float)
-    features = pd.DataFrame(columns)
-    target = pd.Series(rng.normal(size=300), name="y")
+    features = pandas.DataFrame(columns)
+    target = pandas.Series(rng.normal(size=300), name="y")
     nodes = tuple(sorted([*columns, "y"]))
     edges = tuple(sorted([("t", "y"), *[(f"c{i}", "y") for i in range(17)]]))
 
@@ -278,7 +278,7 @@ def test_many_candidates_without_a_declared_set_say_the_claim_is_attested_at_bes
 
 def test_structure_columns_are_not_candidates():
     features, target = leaky(rows=120)
-    features["g"] = np.arange(len(target)) % 6
+    features["g"] = numpy.arange(len(target)) % 6
 
     found = qualify.run(
         features,

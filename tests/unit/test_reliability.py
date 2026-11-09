@@ -2,23 +2,23 @@
 
 import dataclasses
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 from sklearn import base
 from sklearn import linear_model
 
 from scmle.artifacts import bundle as bundle_module
-from scmle.contracts import data as data_contracts
+from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.data.curation import preprocessing
 from scmle.evaluation import reliability
-from scmle.models import registry as registry_module
+from scmle.models import registry
 
 
 def test_a_perfectly_confident_correct_model_has_no_error():
-    probabilities = np.array([[1.0, 0.0], [0.0, 1.0]])
+    probabilities = numpy.array([[1.0, 0.0], [0.0, 1.0]])
 
     error, curve = reliability.top_label_curve(probabilities, [0, 1], [0, 1])
 
@@ -27,7 +27,7 @@ def test_a_perfectly_confident_correct_model_has_no_error():
 
 
 def test_overconfidence_is_measured_as_the_gap_to_accuracy():
-    probabilities = np.tile([0.9, 0.1], (10, 1))
+    probabilities = numpy.tile([0.9, 0.1], (10, 1))
     labels = [0] * 5 + [1] * 5  # right half the time at 0.9 confidence
 
     error = reliability.top_label_curve(probabilities, labels, [0, 1])[0]
@@ -51,7 +51,7 @@ class Overconfident(base.ClassifierMixin, base.BaseEstimator):
     def predict_proba(self, features):
         scores = self.inner_.decision_function(features) * self.sharpen
         scores = scores - scores.max(axis=1, keepdims=True)
-        weights = np.exp(scores)
+        weights = numpy.exp(scores)
         return weights / weights.sum(axis=1, keepdims=True)
 
     def predict(self, features):
@@ -59,20 +59,18 @@ class Overconfident(base.ClassifierMixin, base.BaseEstimator):
 
 
 def test_calibrating_a_multiclass_bundle_lowers_its_calibration_error():
-    rng = np.random.default_rng(0)
-    features = pd.DataFrame(
+    rng = numpy.random.default_rng(0)
+    features = pandas.DataFrame(
         {"a": rng.normal(size=900), "b": rng.normal(size=900)}
     )
-    scores = np.column_stack(
+    scores = numpy.column_stack(
         [features.a, features.b, -features.a - features.b]
     ) + rng.normal(0, 1.5, (900, 3))
-    target = pd.Series(scores.argmax(axis=1))
-    plan = data_contracts.FeaturePlan(("a", "b"), ())
+    target = pandas.Series(scores.argmax(axis=1))
+    plan = data.FeaturePlan(("a", "b"), ())
     pipe = preprocessing.build_pipeline(
         plan,
-        registry_module.ModelRegistry.with_builtins().get(
-            "logistic_regression"
-        ),
+        registry.ModelRegistry.with_builtins().get("logistic_regression"),
         tasks.TaskType.MULTICLASS,
         0,
     )
@@ -86,25 +84,23 @@ def test_calibrating_a_multiclass_bundle_lowers_its_calibration_error():
 
     assert report["ece_after"] < report["ece_before"]
     probabilities = bundle.predict_proba(features)
-    np.testing.assert_allclose(probabilities.sum(axis=1), 1.0, atol=1e-9)
+    numpy.testing.assert_allclose(probabilities.sum(axis=1), 1.0, atol=1e-9)
     assert list(bundle.classes) == [0, 1, 2]
 
 
 def overconfident_bundle():
-    rng = np.random.default_rng(0)
-    features = pd.DataFrame(
+    rng = numpy.random.default_rng(0)
+    features = pandas.DataFrame(
         {"a": rng.normal(size=900), "b": rng.normal(size=900)}
     )
-    scores = np.column_stack(
+    scores = numpy.column_stack(
         [features.a, features.b, -features.a - features.b]
     ) + rng.normal(0, 1.5, (900, 3))
-    target = pd.Series(scores.argmax(axis=1))
-    plan = data_contracts.FeaturePlan(("a", "b"), ())
+    target = pandas.Series(scores.argmax(axis=1))
+    plan = data.FeaturePlan(("a", "b"), ())
     pipe = preprocessing.build_pipeline(
         plan,
-        registry_module.ModelRegistry.with_builtins().get(
-            "logistic_regression"
-        ),
+        registry.ModelRegistry.with_builtins().get("logistic_regression"),
         tasks.TaskType.MULTICLASS,
         0,
     )
@@ -124,11 +120,11 @@ def test_dirichlet_calibration_lowers_error_and_survives_a_round_trip(tmp_path):
     assert report["ece_after"] < report["ece_before"]
     assert report["brier_after"] < report["brier_before"]
     probabilities = bundle.predict_proba(features)
-    np.testing.assert_allclose(probabilities.sum(axis=1), 1.0, atol=1e-9)
+    numpy.testing.assert_allclose(probabilities.sum(axis=1), 1.0, atol=1e-9)
     loaded = bundle_module.ModelBundle.load(
         bundle.save(tmp_path / "b"), trusted=True
     )
-    np.testing.assert_allclose(loaded.predict_proba(features), probabilities)
+    numpy.testing.assert_allclose(loaded.predict_proba(features), probabilities)
 
 
 def test_dirichlet_calibration_refuses_binary_models():

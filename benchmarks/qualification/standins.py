@@ -16,8 +16,8 @@ import dataclasses
 from pathlib import Path
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from sklearn.datasets import load_breast_cancer
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import cross_val_predict
@@ -47,7 +47,7 @@ POLICY = certificates.CertificationPolicy(
 DEFAULT_SEEDS = (0, 1, 2)
 
 
-def demo_frame() -> pd.DataFrame:
+def demo_frame() -> pandas.DataFrame:
     """The breast-cancer table bundled with scikit-learn (no download).
 
     Returns:
@@ -56,7 +56,7 @@ def demo_frame() -> pd.DataFrame:
     return load_breast_cancer(as_frame=True).frame.reset_index(drop=True)
 
 
-def label_flip_standin(frame: pd.DataFrame) -> pd.Series:
+def label_flip_standin(frame: pandas.DataFrame) -> pandas.Series:
     """Flags rows whose label a cross-validated model confidently rejects.
 
     Args:
@@ -74,13 +74,13 @@ def label_flip_standin(frame: pd.DataFrame) -> pd.Series:
     probability = cross_val_predict(
         model, features, labels, cv=folds, method="predict_proba"
     )
-    classes = np.sort(labels.unique())
-    observed = np.searchsorted(classes, labels.to_numpy())
-    own = probability[np.arange(len(frame)), observed]
-    return pd.Series(own < CONFIDENT_DISAGREEMENT, index=frame.index)
+    classes = numpy.sort(labels.unique())
+    observed = numpy.searchsorted(classes, labels.to_numpy())
+    own = probability[numpy.arange(len(frame)), observed]
+    return pandas.Series(own < CONFIDENT_DISAGREEMENT, index=frame.index)
 
 
-def sentinel_standin(frame: pd.DataFrame) -> pd.Series:
+def sentinel_standin(frame: pandas.DataFrame) -> pandas.Series:
     """Flags rows that hold a common missing-value code.
 
     Args:
@@ -91,17 +91,17 @@ def sentinel_standin(frame: pd.DataFrame) -> pd.Series:
         A boolean Series with the index of `frame`; True for a row with a
         sentinel in any column.
     """
-    flags = pd.Series(False, index=frame.index)
+    flags = pandas.Series(False, index=frame.index)
     for name in frame.columns:
         column = frame[name]
-        if pd.api.types.is_numeric_dtype(column):
+        if pandas.api.types.is_numeric_dtype(column):
             flags |= column.isin(SENTINEL_NUMBERS)
         else:
             flags |= column.isin(SENTINEL_TEXT)
     return flags
 
 
-def duplicate_standin(frame: pd.DataFrame) -> pd.Series:
+def duplicate_standin(frame: pandas.DataFrame) -> pandas.Series:
     """Flags every copy after the first occurrence of a row.
 
     Args:
@@ -111,7 +111,7 @@ def duplicate_standin(frame: pd.DataFrame) -> pd.Series:
         A boolean Series with the index of `frame`; True for each repeated
         row after its first occurrence.
     """
-    return pd.Series(frame.duplicated(keep="first"), index=frame.index)
+    return pandas.Series(frame.duplicated(keep="first"), index=frame.index)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -124,7 +124,7 @@ class StandIn:
         helpers: Extra callables whose source is part of the code hash.
     """
 
-    detector: Callable[[pd.DataFrame], pd.Series]
+    detector: Callable[[pandas.DataFrame], pandas.Series]
     plan: certify.DefectPlan
     helpers: tuple[Any, ...] = ()
 
@@ -170,7 +170,7 @@ STANDINS: dict[str, StandIn] = {
 
 def certify_all(
     seeds: Sequence[int] = DEFAULT_SEEDS,
-    frame: pd.DataFrame | None = None,
+    frame: pandas.DataFrame | None = None,
 ) -> certificates.CertificateStore:
     """Certifies every stand-in on the demo table.
 

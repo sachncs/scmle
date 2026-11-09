@@ -2,10 +2,10 @@
 
 import itertools
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
-from scmle.contracts import data as data_contracts
+from scmle.contracts import data
 from scmle.contracts import tasks
 from scmle.data.splitting import inner_cv
 from scmle.models import registry as registry_module
@@ -15,19 +15,19 @@ BINARY = tasks.TaskType.BINARY
 
 
 def grouped_frame(groups=12, per_group=15, seed=0):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     rows = groups * per_group
-    frame = pd.DataFrame(
+    frame = pandas.DataFrame(
         {
-            "unit": np.repeat([f"u{i}" for i in range(groups)], per_group),
-            "day": np.tile(
-                pd.date_range("2024-01-01", periods=per_group), groups
+            "unit": numpy.repeat([f"u{i}" for i in range(groups)], per_group),
+            "day": numpy.tile(
+                pandas.date_range("2024-01-01", periods=per_group), groups
             ),
             "a": rng.normal(size=rows),
             "b": rng.normal(size=rows),
         }
     )
-    target = pd.Series(
+    target = pandas.Series(
         (frame.a + rng.normal(scale=0.5, size=rows) > 0).astype(int)
     )
     return frame, target
@@ -66,9 +66,7 @@ def test_unstructured_data_falls_back_to_stratified_folds():
 
 
 def plan(**kwargs):
-    return data_contracts.FeaturePlan(
-        numeric=("a", "b"), categorical=(), **kwargs
-    )
+    return data.FeaturePlan(numeric=("a", "b"), categorical=(), **kwargs)
 
 
 def test_calibration_strategy_uses_the_structured_splitter():

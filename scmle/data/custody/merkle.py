@@ -20,7 +20,7 @@ import hashlib
 import math
 from typing import Any
 
-import pandas as pd
+import pandas
 
 LEAF = b"\x00"
 NODE = b"\x01"
@@ -39,9 +39,9 @@ def canonical(value: Any) -> str:
         `null` for None, NaT or NaN; otherwise a type tag and the value
         (`b:`, `i:`, `f:` with the round-trip `repr`, `t:` ISO 8601, or `s:`).
     """
-    if value is None or value is pd.NaT:
+    if value is None or value is pandas.NaT:
         return "null"
-    if hasattr(value, "item") and not isinstance(value, pd.Timestamp):
+    if hasattr(value, "item") and not isinstance(value, pandas.Timestamp):
         value = value.item()
     if isinstance(value, bool):
         return f"b:{int(value)}"
@@ -51,7 +51,7 @@ def canonical(value: Any) -> str:
         if math.isnan(value):
             return "null"
         return f"f:{value!r}"
-    if isinstance(value, pd.Timestamp):
+    if isinstance(value, pandas.Timestamp):
         return f"t:{value.isoformat()}"
     return f"s:{value}"
 
@@ -73,7 +73,7 @@ def row_hash(row_id: int, cells: Sequence[tuple[str, Any]]) -> str:
     return hashlib.sha256(LEAF + text.encode("utf-8")).hexdigest()
 
 
-def row_hashes(frame: pd.DataFrame, ids: Sequence[int]) -> list[str]:
+def row_hashes(frame: pandas.DataFrame, ids: Sequence[int]) -> list[str]:
     """Hashes the rows of a frame at the given positions.
 
     Args:
@@ -131,7 +131,7 @@ def merkle_root(leaves: Sequence[str]) -> str:
     return level[0]
 
 
-def frame_root(frame: pd.DataFrame, ids: Sequence[int]) -> str:
+def frame_root(frame: pandas.DataFrame, ids: Sequence[int]) -> str:
     """Computes the Merkle root over the content of selected rows.
 
     Args:

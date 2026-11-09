@@ -5,8 +5,8 @@ Lag features come from a covariate; lagging the target is refused as leakage.
 
 import logging
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 import scmle
 from scmle.contracts import tasks
@@ -14,20 +14,20 @@ from scmle.contracts import tasks
 LOGGER = logging.getLogger(__name__)
 
 
-def make_dataset(days: int = 500) -> pd.DataFrame:
+def make_dataset(days: int = 500) -> pandas.DataFrame:
     """Builds daily demand with weekly seasonality and a temperature effect."""
-    rng = np.random.default_rng(0)
-    day = pd.date_range("2025-01-01", periods=days, freq="D")
-    steps = np.arange(days)
-    temperature = 15 + 10 * np.sin(2 * np.pi * steps / 365)
+    rng = numpy.random.default_rng(0)
+    day = pandas.date_range("2025-01-01", periods=days, freq="D")
+    steps = numpy.arange(days)
+    temperature = 15 + 10 * numpy.sin(2 * numpy.pi * steps / 365)
     temperature = temperature + rng.normal(0, 1, days)
     demand = (
         100
         + 2 * temperature
-        + 15 * np.sin(2 * np.pi * steps / 7)
+        + 15 * numpy.sin(2 * numpy.pi * steps / 7)
         + rng.normal(0, 3, days)
     )
-    return pd.DataFrame(
+    return pandas.DataFrame(
         {"day": day, "store": "A", "temperature": temperature, "demand": demand}
     )
 

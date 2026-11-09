@@ -4,8 +4,8 @@ from fractions import Fraction
 import json
 import pathlib
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import support
 
 from scmle.data.charter import decision as decision_module
@@ -18,16 +18,16 @@ KEY = "decision-reports-key"
 
 
 def frame():
-    rng = np.random.default_rng(0)
+    rng = numpy.random.default_rng(0)
     rows = 600
     x = rng.normal(size=rows)
-    table = pd.DataFrame(
+    table = pandas.DataFrame(
         {
             "x": x,
             "z": rng.normal(size=rows),
             "grp": rng.choice(["a", "b"], rows),
             "treat": (rng.random(rows) < 0.5).astype(float),
-            "prop": np.full(rows, 0.5),
+            "prop": numpy.full(rows, 0.5),
         }
     )
     table["y"] = (x + rng.normal(scale=0.7, size=rows) > 0).astype(int)

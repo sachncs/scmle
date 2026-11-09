@@ -37,8 +37,8 @@ import json
 from pathlib import Path
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from benchmarks.qualification import certify
 from benchmarks.qualification import f4_certify
@@ -69,7 +69,9 @@ POLICY = f4_certify.LEAK_POLICY
 Z_99 = f4_certify.Z_99
 
 
-def plant_column(frame: pd.DataFrame, defect: str, seed: int) -> pd.Series:
+def plant_column(
+    frame: pandas.DataFrame, defect: str, seed: int
+) -> pandas.Series:
     """The planted leak column for one defect type.
 
     Args:
@@ -85,13 +87,15 @@ def plant_column(frame: pd.DataFrame, defect: str, seed: int) -> pd.Series:
     if defect != "leak_rare_record":
         return f4_certify.plant_leak(frame, defect, seed)
     rng = randomness.component_rng(seed, "screen.rare", 0)
-    values = pd.Series(rng.normal(size=len(frame)), index=frame.index)
+    values = pandas.Series(rng.normal(size=len(frame)), index=frame.index)
     first = frame[TARGET] == frame[TARGET].iloc[0]
-    kept = first & pd.Series(rng.random(len(frame)) < RARE_SHARE, frame.index)
+    kept = first & pandas.Series(
+        rng.random(len(frame)) < RARE_SHARE, frame.index
+    )
     return values.where(kept)
 
 
-def real_columns(frame: pd.DataFrame, count: int, seed: int) -> list[str]:
+def real_columns(frame: pandas.DataFrame, count: int, seed: int) -> list[str]:
     """A random subset of the real feature columns.
 
     Args:
@@ -107,7 +111,7 @@ def real_columns(frame: pd.DataFrame, count: int, seed: int) -> list[str]:
     return [names[i] for i in sorted(rng.choice(len(names), count, False))]
 
 
-def with_gaps(features: pd.DataFrame, seed: int) -> pd.DataFrame:
+def with_gaps(features: pandas.DataFrame, seed: int) -> pandas.DataFrame:
     """Deletes values completely at random from the first columns.
 
     Args:
@@ -121,11 +125,11 @@ def with_gaps(features: pd.DataFrame, seed: int) -> pd.DataFrame:
     rng = randomness.component_rng(seed, "screen.gaps", 0)
     out = features.copy()
     for name in list(out.columns)[:GAP_COLUMNS]:
-        out.loc[rng.random(len(out)) < GAP_RATE, name] = np.nan
+        out.loc[rng.random(len(out)) < GAP_RATE, name] = numpy.nan
     return out
 
 
-def old_rule(frame: pd.DataFrame, names: Sequence[str]) -> dict[str, bool]:
+def old_rule(frame: pandas.DataFrame, names: Sequence[str]) -> dict[str, bool]:
     """The retired profiler cutoffs, per column.
 
     Args:
@@ -150,7 +154,7 @@ def old_rule(frame: pd.DataFrame, names: Sequence[str]) -> dict[str, bool]:
     return flagged
 
 
-def run_screen(frame: pd.DataFrame, seed: int, groups: Any = None) -> Any:
+def run_screen(frame: pandas.DataFrame, seed: int, groups: Any = None) -> Any:
     """Screens every column but the target with the certified settings.
 
     Args:
@@ -181,7 +185,7 @@ def null_replicate(seed: int, grouped: bool = False) -> dict[str, Any]:
     frame = f4_certify.breast_cancer()
     names = real_columns(frame, TABLE_COLUMNS, seed)
     groups = (
-        pd.Series(np.arange(len(frame)) // GROUP_SIZE, index=frame.index)
+        pandas.Series(numpy.arange(len(frame)) // GROUP_SIZE, index=frame.index)
         if grouped
         else None
     )

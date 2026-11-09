@@ -1,7 +1,7 @@
 """Survival splits keep the event rate steady and every fold rankable."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
 from scmle.contracts import errors
@@ -17,8 +17,8 @@ def spec():
 
 
 def cohort(rows=1000, event_rate=0.12, seed=0):
-    rng = np.random.default_rng(seed)
-    return pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    return pandas.DataFrame(
         {
             "x": rng.normal(size=rows),
             "time": rng.exponential(1.0, rows) + 0.01,

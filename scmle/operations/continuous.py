@@ -35,8 +35,8 @@ import pathlib
 import time
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from scipy import stats
 
 from scmle import durability
@@ -47,7 +47,7 @@ from scmle.governance import loop as loop_module
 from scmle.governance import never_list
 from scmle.governance import release_state
 from scmle.monitoring import champion as champion_module
-from scmle.operations import signals as signals_module
+from scmle.operations import signals
 
 RECOMMEND = "recommend"
 TRIGGER = "trigger"
@@ -62,7 +62,7 @@ DATA_FAULTS = frozenset(
 )
 
 
-def canonical_csv(frame: pd.DataFrame) -> bytes:
+def canonical_csv(frame: pandas.DataFrame) -> bytes:
     """The bytes a dataset version is computed from.
 
     Args:
@@ -76,7 +76,7 @@ def canonical_csv(frame: pd.DataFrame) -> bytes:
     return ordered.to_csv(index=False, lineterminator="\n").encode("utf-8")
 
 
-def dataset_version(frame: pd.DataFrame) -> str:
+def dataset_version(frame: pandas.DataFrame) -> str:
     """``sha256:<hex>`` of the canonical CSV of a dataset.
 
     Args:
@@ -88,7 +88,9 @@ def dataset_version(frame: pd.DataFrame) -> str:
     return "sha256:" + hashlib.sha256(canonical_csv(frame)).hexdigest()
 
 
-def load_dataset(directory: str | pathlib.Path, version: str) -> pd.DataFrame:
+def load_dataset(
+    directory: str | pathlib.Path, version: str
+) -> pandas.DataFrame:
     """Reads a preserved dataset back and checks its digest.
 
     Args:
@@ -104,7 +106,7 @@ def load_dataset(directory: str | pathlib.Path, version: str) -> pd.DataFrame:
             for.
     """
     path = pathlib.Path(directory) / DATASET_DIRECTORY
-    frame = pd.read_csv(
+    frame = pandas.read_csv(
         path / (version.replace(":", "-") + ".csv"),
         float_precision="round_trip",
     )
@@ -272,7 +274,7 @@ class RetrainDecision:
 
 def judge_retraining(
     policy: RetrainPolicy,
-    rows: Sequence[signals_module.Signal],
+    rows: Sequence[signals.Signal],
     alarm_since_last: bool,
     age_days: float | None,
     batches_since_proposal: int | None,
@@ -372,8 +374,8 @@ class MetricSpec:
 
 
 def bootstrap_difference(
-    before: np.ndarray,
-    after: np.ndarray,
+    before: numpy.ndarray,
+    after: numpy.ndarray,
     alpha: float,
     resamples: int,
     seed: int,
@@ -391,11 +393,11 @@ def bootstrap_difference(
     Returns:
         The lower and upper bounds of the interval.
     """
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     first = rng.choice(before, size=(resamples, len(before))).mean(axis=1)
     second = rng.choice(after, size=(resamples, len(after))).mean(axis=1)
     gap = second - first
-    low, high = np.quantile(gap, [alpha / 2.0, 1.0 - alpha / 2.0])
+    low, high = numpy.quantile(gap, [alpha / 2.0, 1.0 - alpha / 2.0])
     return float(low), float(high)
 
 
@@ -448,8 +450,8 @@ def post_promotion_check(
     for spec in specs:
         if spec.name not in before or spec.name not in after:
             raise ValueError(f"no values for {spec.name} in both periods")
-        old = np.asarray(before[spec.name], dtype=float)
-        new = np.asarray(after[spec.name], dtype=float)
+        old = numpy.asarray(before[spec.name], dtype=float)
+        new = numpy.asarray(after[spec.name], dtype=float)
         if min(len(old), len(new)) < min_samples:
             results.append(
                 {
@@ -515,7 +517,7 @@ def post_promotion_check(
 
 def holdback_assignment(
     unit_ids: Sequence[Any], fraction: float, salt: str
-) -> np.ndarray:
+) -> numpy.ndarray:
     """Which units stay on the previous model: a keyed hash of the unit id.
 
     The side of a unit depends only on its id and the `salt` (for example the
@@ -538,7 +540,7 @@ def holdback_assignment(
     """
     if not 0.0 < fraction < 1.0:
         raise ValueError("fraction must lie strictly between 0 and 1")
-    draws = np.array(
+    draws = numpy.array(
         [
             int.from_bytes(
                 hashlib.sha256(f"{salt}:{unit}".encode()).digest()[:8], "big"
@@ -823,7 +825,7 @@ class ContinuousEvaluation:
 
     def review(
         self,
-        rows: Sequence[signals_module.Signal],
+        rows: Sequence[signals.Signal],
         age_days: float | None = None,
     ) -> RetrainDecision:
         """Applies the policy to a window of signals.
@@ -965,7 +967,7 @@ class ContinuousEvaluation:
     def record_training(
         self,
         name: str,
-        frame: pd.DataFrame,
+        frame: pandas.DataFrame,
         metrics: Mapping[str, float],
         reason: str,
         preserve: bool = True,
@@ -1022,8 +1024,8 @@ class ContinuousEvaluation:
         self,
         champion: Any,
         challenger: Any,
-        data: pd.DataFrame,
-        outcomes: pd.Series,
+        data: pandas.DataFrame,
+        outcomes: pandas.Series,
         metric_name: str | None = None,
         seed: int = 0,
     ) -> champion_module.Comparison:

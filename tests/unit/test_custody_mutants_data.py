@@ -6,8 +6,8 @@ characters still contains the original as a substring.
 
 from functools import partial
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
 from scmle.contracts import errors
@@ -107,7 +107,7 @@ def test_scope_error_lists_the_allowed_scopes():
 
 
 def test_verify_rows_messages_are_exact():
-    frame = pd.DataFrame({"a": [float(i) for i in range(8)]})
+    frame = pandas.DataFrame({"a": [float(i) for i in range(8)]})
     assert message(lambda: make().verify_rows(frame)) == (
         "manifest holds no row content roots"
     )
@@ -165,49 +165,55 @@ def test_pairs_of_a_root_are_stored_as_tuples_after_a_round_trip():
 
 
 def test_pick_units_takes_the_target_and_never_every_unit():
-    rng = np.random.default_rng(0)
-    units = np.arange(10)
-    strata = np.zeros(10, dtype=str)
+    rng = numpy.random.default_rng(0)
+    units = numpy.arange(10)
+    strata = numpy.zeros(10, dtype=str)
     assert carve.pick_units(units, strata, 0.3, rng).sum() == 3
     assert carve.pick_units(units, strata, 0.5, rng).sum() == 5
     assert carve.pick_units(units, strata, 1.0, rng).sum() == 9
 
 
 def test_pick_blocks_sizes_and_cap_are_exact():
-    times = np.arange(40)
-    rng = np.random.default_rng(1)
+    times = numpy.arange(40)
+    rng = numpy.random.default_rng(1)
     mask, order = carve.pick_blocks(times, 0.5, 0, rng)
     assert mask.sum() == 20 and list(order) == list(range(40))
-    mask, ignored = carve.pick_blocks(times, 0.425, 0, np.random.default_rng(2))
+    mask, ignored = carve.pick_blocks(
+        times, 0.425, 0, numpy.random.default_rng(2)
+    )
     assert mask.sum() == 18
-    mask, ignored = carve.pick_blocks(times, 1.0, 0, np.random.default_rng(3))
+    mask, ignored = carve.pick_blocks(
+        times, 1.0, 0, numpy.random.default_rng(3)
+    )
     assert mask.sum() == 38
     mask, ignored = carve.pick_blocks(
-        np.arange(100), 0.3, 3, np.random.default_rng(4)
+        numpy.arange(100), 0.3, 3, numpy.random.default_rng(4)
     )
     assert mask.sum() == 36
 
 
 def test_pick_blocks_has_a_block_of_at_least_one_row():
     mask, order = carve.pick_blocks(
-        np.array([]), 0.3, 0, np.random.default_rng(0)
+        numpy.array([]), 0.3, 0, numpy.random.default_rng(0)
     )
     assert len(mask) == 0 and len(order) == 0
     mask, ignored = carve.pick_blocks(
-        np.arange(10), 0.3, 0, np.random.default_rng(0)
+        numpy.arange(10), 0.3, 0, numpy.random.default_rng(0)
     )
     assert mask.sum() == 3
 
 
 def test_pick_blocks_orders_ties_by_position():
-    times = np.array([5, 5, 5, 5, 1, 1, 1, 1] * 4)
-    ignored, order = carve.pick_blocks(times, 0.3, 0, np.random.default_rng(0))
-    assert list(order) == [int(i) for i in np.argsort(times, kind="stable")]
+    times = numpy.array([5, 5, 5, 5, 1, 1, 1, 1] * 4)
+    ignored, order = carve.pick_blocks(
+        times, 0.3, 0, numpy.random.default_rng(0)
+    )
+    assert list(order) == [int(i) for i in numpy.argsort(times, kind="stable")]
 
 
 def test_a_unit_split_between_c_and_the_rest_leaves_c_entirely():
-    in_c = np.array([True, False, True, True])
-    units = np.array([0, 0, 2, 2])
+    in_c = numpy.array([True, False, True, True])
+    units = numpy.array([0, 0, 2, 2])
     assert carve.close_over_units(in_c, units).tolist() == [
         False,
         False,
@@ -217,28 +223,30 @@ def test_a_unit_split_between_c_and_the_rest_leaves_c_entirely():
 
 
 def test_embargo_mask_window_is_exactly_rows_on_each_side():
-    in_c = np.zeros(11, dtype=bool)
+    in_c = numpy.zeros(11, dtype=bool)
     in_c[5] = True
-    order = np.arange(11)
+    order = numpy.arange(11)
     one = carve.embargo_mask(in_c, order, 1)
     two = carve.embargo_mask(in_c, order, 2)
-    assert np.flatnonzero(one).tolist() == [4, 6]
-    assert np.flatnonzero(two).tolist() == [3, 4, 6, 7]
+    assert numpy.flatnonzero(one).tolist() == [4, 6]
+    assert numpy.flatnonzero(two).tolist() == [3, 4, 6, 7]
     assert not carve.embargo_mask(in_c, order, 0).any()
 
 
 def test_acf_embargo_boundaries():
-    alternating = np.array([1.0, -1.0] * 4)
+    alternating = numpy.array([1.0, -1.0] * 4)
     assert carve.acf_embargo(alternating) == 2
-    assert carve.acf_embargo(np.array([1.0, -1.0] * 3 + [1.0])) == 0
-    flip = np.array([1.0, -1.0] * 20)
+    assert carve.acf_embargo(numpy.array([1.0, -1.0] * 3 + [1.0])) == 0
+    flip = numpy.array([1.0, -1.0] * 20)
     assert carve.acf_embargo(flip, max_lag=1000) == 20
-    assert carve.acf_embargo(np.array([1.0, -1.0] * 2200), max_lag=5000) == 1000
+    assert (
+        carve.acf_embargo(numpy.array([1.0, -1.0] * 2200), max_lag=5000) == 1000
+    )
 
 
 def test_carve_defaults_and_input_messages():
-    ids = np.arange(40)
-    folds = [(np.arange(20), np.arange(20, 40))]
+    ids = numpy.arange(40)
+    folds = [(numpy.arange(20), numpy.arange(20, 40))]
     result = carve.carve_confirmation(
         ids,
         folds,
@@ -246,7 +254,7 @@ def test_carve_defaults_and_input_messages():
         seed=1,
         charter_hash="c",
         data_hash="d",
-        times=np.arange(40),
+        times=numpy.arange(40),
     )
     assert len(result.embargo_ids) == 0
     for name in ("labels", "groups", "times", "duplicates"):
@@ -258,7 +266,7 @@ def test_carve_defaults_and_input_messages():
                 seed=1,
                 charter_hash="c",
                 data_hash="d",
-                **{name: np.arange(3)},
+                **{name: numpy.arange(3)},
             )
         assert str(caught.value) == (
             f"{name} must have one entry per development row"
@@ -266,9 +274,9 @@ def test_carve_defaults_and_input_messages():
 
 
 def test_string_labels_stratify_and_two_units_can_still_be_split():
-    ids = np.arange(40)
-    folds = [(np.arange(1, 40, 2), np.arange(0, 40, 2))]
-    labels = np.array(["a", "b"] * 20)
+    ids = numpy.arange(40)
+    folds = [(numpy.arange(1, 40, 2), numpy.arange(0, 40, 2))]
+    labels = numpy.array(["a", "b"] * 20)
     result = carve.carve_confirmation(
         ids,
         folds,
@@ -279,7 +287,7 @@ def test_string_labels_stratify_and_two_units_can_still_be_split():
         labels=labels,
     )
     assert len(result.confirmation_ids) > 0
-    groups = np.repeat([0, 1], 20)
+    groups = numpy.repeat([0, 1], 20)
     two = carve.carve_confirmation(
         ids,
         folds,
@@ -293,8 +301,8 @@ def test_string_labels_stratify_and_two_units_can_still_be_split():
 
 
 def test_an_empty_draw_is_reported_with_its_exact_note():
-    ids = np.arange(40)
-    folds = [(np.arange(20), np.arange(20, 40))]
+    ids = numpy.arange(40)
+    folds = [(numpy.arange(20), numpy.arange(20, 40))]
     result = carve.carve_confirmation(
         ids,
         folds,
@@ -312,9 +320,9 @@ def test_an_empty_draw_is_reported_with_its_exact_note():
 def test_a_validation_fold_left_empty_is_refused_in_full():
     with pytest.raises(errors.ConfigError) as caught:
         carve.restrict_folds(
-            [(np.array([0, 1]), np.array([2, 3]))],
-            np.arange(4),
-            np.array([0, 1]),
+            [(numpy.array([0, 1]), numpy.array([2, 3]))],
+            numpy.arange(4),
+            numpy.array([0, 1]),
         )
     assert str(caught.value) == (
         "carving the confirmation set left a validation fold empty"
@@ -325,11 +333,11 @@ def test_a_validation_fold_left_empty_is_refused_in_full():
 
 
 def test_minority_rows_counts_the_smaller_class_share():
-    labels = np.array([0] * 8 + [1] * 2)
+    labels = numpy.array([0] * 8 + [1] * 2)
     assert pipeline.minority_rows(labels, 0.5) == 1
     assert pipeline.minority_rows(labels, 0.25) == 0
     assert pipeline.minority_rows(None, 0.5) is None
-    assert pipeline.minority_rows(np.array([0] * 6 + [1] * 4), 0.5) == 2
+    assert pipeline.minority_rows(numpy.array([0] * 6 + [1] * 4), 0.5) == 2
 
 
 def test_an_infeasible_set_reports_the_reason_in_the_manifest_notes():
@@ -351,10 +359,10 @@ def test_the_view_and_split_carry_what_the_manifest_says():
     assert split.manifest.test_ids == original.manifest.test_ids
     assert split.manifest.notes == manifest.notes
     assert split.locked_test is original.locked_test
-    assert isinstance(split.dev_features.index, pd.RangeIndex)
-    assert isinstance(split.dev_target.index, pd.RangeIndex)
+    assert isinstance(split.dev_features.index, pandas.RangeIndex)
+    assert isinstance(split.dev_target.index, pandas.RangeIndex)
     assert list(split.dev_features.columns) == ["x", "z"]
-    assert isinstance(split.dev_target, pd.Series)
+    assert isinstance(split.dev_target, pandas.Series)
     assert view.target.equals(split.dev_target)
     assert view.folds == manifest.folds
     assert view.manifest_sha256 == manifest.sha256
@@ -366,17 +374,17 @@ def test_sealed_rows_have_a_fresh_index_and_their_own_labels():
     ran = run(frame)
     held = ran.vault.sets["C"]
     features, target = held.open(held.issue_token(), actor="test")
-    assert isinstance(features.index, pd.RangeIndex)
-    assert isinstance(target.index, pd.RangeIndex)
+    assert isinstance(features.index, pandas.RangeIndex)
+    assert isinstance(target.index, pandas.RangeIndex)
     assert list(features.columns) == ["x", "z"]
     ids = list(held.ids)
-    assert np.allclose(target.to_numpy(), frame["y"].iloc[ids].to_numpy())
+    assert numpy.allclose(target.to_numpy(), frame["y"].iloc[ids].to_numpy())
     ran.vault.close()
 
 
 def test_a_time_column_does_not_make_a_stratified_split_temporal():
     frame = make_frame()
-    frame["t"] = np.arange(len(frame))
+    frame["t"] = numpy.arange(len(frame))
     spec = make_spec(time_column="t")
     ran = run(frame, spec=spec)
     assert not any("time blocks" in note for note in ran.outcome.manifest.notes)
@@ -401,7 +409,7 @@ def test_copies_of_a_record_land_on_one_side():
 
 def test_a_missing_class_in_c_means_no_confirmation_set():
     frame = make_frame(rows=1600)
-    frame["g"] = np.arange(len(frame)) // 100
+    frame["g"] = numpy.arange(len(frame)) // 100
     frame["y"] = 0
     frame.loc[frame["g"] == 3, "y"] = 1
     spec = make_spec(group_column="g")
@@ -426,13 +434,13 @@ def test_a_missing_class_in_c_means_no_confirmation_set():
 
 
 def test_a_classification_target_is_measured_through_its_codes():
-    rng = np.random.default_rng(0)
-    runs = np.repeat(rng.integers(0, 2, size=60), 25)
-    frame = pd.DataFrame(
-        {"t": np.arange(len(runs)), "x": rng.normal(size=len(runs))}
+    rng = numpy.random.default_rng(0)
+    runs = numpy.repeat(rng.integers(0, 2, size=60), 25)
+    frame = pandas.DataFrame(
+        {"t": numpy.arange(len(runs)), "x": rng.normal(size=len(runs))}
     )
-    frame["y"] = np.where(runs == 1, "yes", "no")
-    dev = np.arange(len(frame))
+    frame["y"] = numpy.where(runs == 1, "yes", "no")
+    dev = numpy.arange(len(frame))
     data = tasks.DataSpec(uri="m", target="y", time_column="t")
     assert (
         pipeline.measured_embargo(
@@ -444,13 +452,13 @@ def test_a_classification_target_is_measured_through_its_codes():
 
 
 def test_a_text_target_in_a_regression_gives_no_measured_embargo():
-    frame = pd.DataFrame(
-        {"t": np.arange(40), "y": ["a", "b"] * 20, "x": np.arange(40.0)}
+    frame = pandas.DataFrame(
+        {"t": numpy.arange(40), "y": ["a", "b"] * 20, "x": numpy.arange(40.0)}
     )
     data = tasks.DataSpec(uri="m", target="y", time_column="t")
     got = pipeline.measured_embargo(
         frame,
-        np.arange(40),
+        numpy.arange(40),
         data,
         frame["t"].to_numpy(),
         tasks.TaskType.REGRESSION,

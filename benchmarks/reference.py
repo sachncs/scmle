@@ -8,18 +8,18 @@ on the same locked test rows, so the comparison is apples to apples.
 import json
 import pathlib
 
-import pandas as pd
+import pandas
 from sklearn import compose
 from sklearn import ensemble
 from sklearn import pipeline
 from sklearn import preprocessing
 
 from scmle.contracts import tasks
-from scmle.evaluation import metrics as scmle_metrics
+from scmle.evaluation import metrics
 
 
 def reference_score(
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     target: str,
     run_dir: pathlib.Path,
     task: str,
@@ -59,8 +59,8 @@ def reference_score(
     estimator = pipeline.make_pipeline(transformer, model_class(random_state=0))
     dev, test = manifest["train_ids"], manifest["test_ids"]
     estimator.fit(features.iloc[dev], frame[target].iloc[dev])
-    metric = scmle_metrics.CATALOG.metrics[metric_name]
-    positive = scmle_metrics.positive_label(frame[target], tasks.TaskType(task))
+    metric = metrics.CATALOG.metrics[metric_name]
+    positive = metrics.positive_label(frame[target], tasks.TaskType(task))
     return metric.score(
         estimator, features.iloc[test], frame[target].iloc[test], positive
     )

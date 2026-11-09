@@ -1,10 +1,12 @@
 """Metrics for ordered categories, computed on integer level ranks."""
 
-import numpy as np
-from sklearn import metrics as sk_metrics
+import numpy
+from sklearn import metrics
 
 
-def quadratic_weighted_kappa(truth: np.ndarray, guess: np.ndarray) -> float:
+def quadratic_weighted_kappa(
+    truth: numpy.ndarray, guess: numpy.ndarray
+) -> float:
     """Agreement beyond chance, with larger misses punished quadratically.
 
     Args:
@@ -15,15 +17,17 @@ def quadratic_weighted_kappa(truth: np.ndarray, guess: np.ndarray) -> float:
         The quadratic-weighted Cohen's kappa; 1 is perfect agreement.
     """
     return float(
-        sk_metrics.cohen_kappa_score(
-            np.asarray(truth).astype(int),
-            np.asarray(guess).astype(int),
+        metrics.cohen_kappa_score(
+            numpy.asarray(truth).astype(int),
+            numpy.asarray(guess).astype(int),
             weights="quadratic",
         )
     )
 
 
-def mean_absolute_class_error(truth: np.ndarray, guess: np.ndarray) -> float:
+def mean_absolute_class_error(
+    truth: numpy.ndarray, guess: numpy.ndarray
+) -> float:
     """Average number of levels the guess is away from the truth.
 
     Args:
@@ -34,7 +38,8 @@ def mean_absolute_class_error(truth: np.ndarray, guess: np.ndarray) -> float:
         The mean absolute difference between the ranks.
     """
     return float(
-        np.abs(
-            np.asarray(truth, dtype=float) - np.asarray(guess, dtype=float)
+        numpy.abs(
+            numpy.asarray(truth, dtype=float)
+            - numpy.asarray(guess, dtype=float)
         ).mean()
     )

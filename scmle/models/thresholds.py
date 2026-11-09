@@ -13,8 +13,8 @@ from typing import Any
 from typing import ClassVar
 from typing import Self
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from sklearn import base
 
 GRID = tuple(round(0.01 * step, 2) for step in range(1, 100))
@@ -30,7 +30,7 @@ class ThresholdObjective(abc.ABC):
     name: ClassVar[str]
 
     @abc.abstractmethod
-    def score(self, actual: np.ndarray, flagged: np.ndarray) -> float:
+    def score(self, actual: numpy.ndarray, flagged: numpy.ndarray) -> float:
         """Scores a set of positive decisions (larger is better).
 
         Args:
@@ -47,7 +47,7 @@ class F1Objective(ThresholdObjective):
 
     name = "f1"
 
-    def score(self, actual: np.ndarray, flagged: np.ndarray) -> float:
+    def score(self, actual: numpy.ndarray, flagged: numpy.ndarray) -> float:
         """Scores decisions by precision and recall of the positive class.
 
         Args:
@@ -68,7 +68,7 @@ class AccuracyObjective(ThresholdObjective):
 
     name = "accuracy"
 
-    def score(self, actual: np.ndarray, flagged: np.ndarray) -> float:
+    def score(self, actual: numpy.ndarray, flagged: numpy.ndarray) -> float:
         """Scores decisions by the share that are correct.
 
         Args:
@@ -86,7 +86,7 @@ class BalancedAccuracyObjective(ThresholdObjective):
 
     name = "balanced_accuracy"
 
-    def score(self, actual: np.ndarray, flagged: np.ndarray) -> float:
+    def score(self, actual: numpy.ndarray, flagged: numpy.ndarray) -> float:
         """Scores decisions by the mean of recall and specificity.
 
         Args:
@@ -117,7 +117,7 @@ class CostObjective(ThresholdObjective):
     false_negative_cost: float = 1.0
     name: ClassVar[str] = "cost"
 
-    def score(self, actual: np.ndarray, flagged: np.ndarray) -> float:
+    def score(self, actual: numpy.ndarray, flagged: numpy.ndarray) -> float:
         """Scores decisions by their negative mean cost.
 
         Args:
@@ -144,8 +144,8 @@ OBJECTIVES: dict[str, Callable[..., ThresholdObjective]] = {
 
 
 def optimize_threshold(
-    probabilities: np.ndarray,
-    actual: np.ndarray,
+    probabilities: numpy.ndarray,
+    actual: numpy.ndarray,
     objective: ThresholdObjective,
     grid: Sequence[float] = GRID,
 ) -> tuple[float, float]:
@@ -225,7 +225,7 @@ class ThresholdClassifier(base.ClassifierMixin, base.BaseEstimator):
         self.classes_ = self.estimator_.classes_
         return self
 
-    def predict_proba(self, features: Any) -> np.ndarray:
+    def predict_proba(self, features: Any) -> numpy.ndarray:
         """Predicts class probabilities with the wrapped classifier.
 
         Args:
@@ -237,7 +237,7 @@ class ThresholdClassifier(base.ClassifierMixin, base.BaseEstimator):
         """
         return self.estimator_.predict_proba(features)
 
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """Predicts the positive class where probability >= threshold.
 
         Args:
@@ -248,15 +248,15 @@ class ThresholdClassifier(base.ClassifierMixin, base.BaseEstimator):
             probability is at or above the threshold, else the first.
         """
         positive = self.predict_proba(features)[:, 1] >= self.threshold
-        return np.where(positive, self.classes_[1], self.classes_[0])
+        return numpy.where(positive, self.classes_[1], self.classes_[0])
 
 
 def out_of_fold_probabilities(
     build: Callable[[], Any],
-    features: pd.DataFrame,
-    target: pd.Series,
+    features: pandas.DataFrame,
+    target: pandas.Series,
     folds: Sequence[tuple[Sequence[int], Sequence[int]]],
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[numpy.ndarray, numpy.ndarray]:
     """Predicts every validation row with a model that never saw it.
 
     Works for any fold scheme (including expanding-window temporal folds
@@ -274,13 +274,14 @@ def out_of_fold_probabilities(
     probabilities, positions = [], []
     for train, validation in folds:
         model = build().fit(
-            features.iloc[np.asarray(train)], target.iloc[np.asarray(train)]
+            features.iloc[numpy.asarray(train)],
+            target.iloc[numpy.asarray(train)],
         )
         probabilities.append(
-            model.predict_proba(features.iloc[np.asarray(validation)])[:, 1]
+            model.predict_proba(features.iloc[numpy.asarray(validation)])[:, 1]
         )
-        positions.append(np.asarray(validation))
-    return np.concatenate(probabilities), np.concatenate(positions)
+        positions.append(numpy.asarray(validation))
+    return numpy.concatenate(probabilities), numpy.concatenate(positions)
 
 
 MIN_GROUP_ROWS = 30
@@ -303,7 +304,7 @@ class GroupAssigner:
     edges: tuple[float, ...] = ()
 
     @classmethod
-    def fit(cls, values: pd.Series) -> Self:
+    def fit(cls, values: pandas.Series) -> Self:
         """Learns the grouping from training values.
 
         Args:
@@ -314,17 +315,17 @@ class GroupAssigner:
             with more than 12 distinct values, otherwise one that keeps
             categories as they are.
         """
-        numeric = pd.api.types.is_numeric_dtype(values) and (
+        numeric = pandas.api.types.is_numeric_dtype(values) and (
             values.nunique() > NUMERIC_LEVELS
         )
         if not numeric:
             return cls()
-        cuts = np.quantile(
-            values.dropna(), np.linspace(0, 1, NUMERIC_BANDS + 1)[1:-1]
+        cuts = numpy.quantile(
+            values.dropna(), numpy.linspace(0, 1, NUMERIC_BANDS + 1)[1:-1]
         )
-        return cls(tuple(float(c) for c in np.unique(cuts)))
+        return cls(tuple(float(c) for c in numpy.unique(cuts)))
 
-    def assign(self, values: pd.Series) -> pd.Series:
+    def assign(self, values: pandas.Series) -> pandas.Series:
         """Names the group of each row.
 
         Args:
@@ -336,8 +337,8 @@ class GroupAssigner:
             values stay missing.
         """
         if self.edges:
-            bands = np.searchsorted(self.edges, values.to_numpy(float))
-            named = pd.Series(
+            bands = numpy.searchsorted(self.edges, values.to_numpy(float))
+            named = pandas.Series(
                 [f"band_{band}" for band in bands], index=values.index
             )
             return named.where(values.notna())
@@ -398,7 +399,7 @@ class GroupThresholdClassifier(base.ClassifierMixin, base.BaseEstimator):
         self.classes_ = self.estimator.classes_
         return self
 
-    def predict_proba(self, features: Any) -> np.ndarray:
+    def predict_proba(self, features: Any) -> numpy.ndarray:
         """Predicts class probabilities with the wrapped classifier.
 
         Args:
@@ -410,7 +411,7 @@ class GroupThresholdClassifier(base.ClassifierMixin, base.BaseEstimator):
         """
         return self.estimator.predict_proba(features)
 
-    def cuts(self, features: Any) -> np.ndarray:
+    def cuts(self, features: Any) -> numpy.ndarray:
         """Looks up the threshold that applies to each row.
 
         Args:
@@ -420,9 +421,9 @@ class GroupThresholdClassifier(base.ClassifierMixin, base.BaseEstimator):
             Float array with one threshold per row: that of the row's group,
             or the default if the column is absent or the group is unknown.
         """
-        frame = pd.DataFrame(features)
+        frame = pandas.DataFrame(features)
         if self.column not in frame.columns:
-            return np.full(len(frame), self.default_threshold)
+            return numpy.full(len(frame), self.default_threshold)
         groups = self.assigner.assign(frame[self.column])
         return (
             groups.map(self.thresholds)
@@ -430,7 +431,7 @@ class GroupThresholdClassifier(base.ClassifierMixin, base.BaseEstimator):
             .to_numpy(float)
         )
 
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """Predicts the positive class where probability reaches the threshold.
 
         Args:
@@ -442,4 +443,4 @@ class GroupThresholdClassifier(base.ClassifierMixin, base.BaseEstimator):
             first.
         """
         positive = self.predict_proba(features)[:, 1] >= self.cuts(features)
-        return np.where(positive, self.classes_[1], self.classes_[0])
+        return numpy.where(positive, self.classes_[1], self.classes_[0])

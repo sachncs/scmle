@@ -22,8 +22,8 @@ from typing import Any
 from typing import ClassVar
 from typing import Self
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pyarrow.parquet as pq
 
 from scmle import durability
@@ -38,15 +38,15 @@ CSV_EXPANSION = 4
 BYTES_PER_CELL = 8
 SAMPLE_SHARE = 0.5
 MIN_SAMPLE_ROWS = 1_000
-MIX = np.uint64(0x9E3779B97F4A7C15)
-MIX_A = np.uint64(0xBF58476D1CE4E5B9)
-MIX_B = np.uint64(0x94D049BB133111EB)
+MIX = numpy.uint64(0x9E3779B97F4A7C15)
+MIX_A = numpy.uint64(0xBF58476D1CE4E5B9)
+MIX_B = numpy.uint64(0x94D049BB133111EB)
 STREAM_STATE_SCHEMA = 2
 STREAM_ACKNOWLEDGEMENT_SCHEMA = 1
 STREAM_TRANSACTION_SCHEMA = 1
 
 
-def row_hash(positions: np.ndarray, seed: int) -> np.ndarray:
+def row_hash(positions: numpy.ndarray, seed: int) -> numpy.ndarray:
     """A deterministic number in [0, 1) for each row position (SplitMix64).
 
     Args:
@@ -58,12 +58,12 @@ def row_hash(positions: np.ndarray, seed: int) -> np.ndarray:
         A float64 array with one value in [0, 1) per entry of `positions`,
         in the same order.
     """
-    with np.errstate(over="ignore"):
-        z = positions.astype(np.uint64) + MIX * np.uint64(seed + 1)
-        z = (z ^ (z >> np.uint64(30))) * MIX_A
-        z = (z ^ (z >> np.uint64(27))) * MIX_B
-        z = z ^ (z >> np.uint64(31))
-    return (z >> np.uint64(11)).astype(np.float64) / float(1 << 53)
+    with numpy.errstate(over="ignore"):
+        z = positions.astype(numpy.uint64) + MIX * numpy.uint64(seed + 1)
+        z = (z ^ (z >> numpy.uint64(30))) * MIX_A
+        z = (z ^ (z >> numpy.uint64(27))) * MIX_B
+        z = z ^ (z >> numpy.uint64(31))
+    return (z >> numpy.uint64(11)).astype(numpy.float64) / float(1 << 53)
 
 
 class ChunkSource(abc.ABC):
@@ -85,7 +85,7 @@ class ChunkSource(abc.ABC):
         self.path = path
 
     @abc.abstractmethod
-    def batches(self, rows: int = BATCH_ROWS) -> Iterator[pd.DataFrame]:
+    def batches(self, rows: int = BATCH_ROWS) -> Iterator[pandas.DataFrame]:
         """Yields the table in consecutive frames of about `rows` rows.
 
         Args:
@@ -211,12 +211,12 @@ class ChunkSource(abc.ABC):
             if checkpoint is not None and current.offset > 0
             else watermark_column
         )
-        selected: pd.DataFrame | None = None
+        selected: pandas.DataFrame | None = None
         offset = 0
         has_more = False
         batches = iter(self.batches(rows))
         for batch in batches:
-            if not isinstance(batch, pd.DataFrame):
+            if not isinstance(batch, pandas.DataFrame):
                 raise StreamingError(
                     "invalid_batch",
                     "chunk source yielded a non-DataFrame batch",
@@ -497,7 +497,7 @@ def batch_identity(
 
 
 def watermark_value(
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     column: str | None,
     current: str,
     source_identity: str,
@@ -532,7 +532,7 @@ def watermark_value(
             {"column": column},
         )
     try:
-        values = pd.to_datetime(frame[column], utc=True, errors="raise")
+        values = pandas.to_datetime(frame[column], utc=True, errors="raise")
     except (TypeError, ValueError) as error:
         raise StreamingError(
             "invalid_watermark",
@@ -569,7 +569,7 @@ class StreamBatch:
     source_identity: str
     snapshot_sha256: str
     start_offset: int
-    frame: pd.DataFrame = dataclasses.field(repr=False)
+    frame: pandas.DataFrame = dataclasses.field(repr=False)
     next_checkpoint: StreamCheckpoint
     has_more: bool = False
     batch_id: str = dataclasses.field(init=False)
@@ -589,7 +589,7 @@ class StreamBatch:
             raise ValueError("batch and checkpoint snapshots differ")
         if self.start_offset < 0:
             raise ValueError("start_offset must be non-negative")
-        if not isinstance(self.frame, pd.DataFrame) or self.frame.empty:
+        if not isinstance(self.frame, pandas.DataFrame) or self.frame.empty:
             raise ValueError("frame must contain at least one row")
         if self.next_checkpoint.offset <= self.start_offset:
             raise ValueError("checkpoint must advance past the batch start")
@@ -1459,7 +1459,7 @@ class StreamingLedger:
     def commit_with_writer(
         self,
         batch: StreamBatch,
-        writer: Callable[[pd.DataFrame, str], None],
+        writer: Callable[[pandas.DataFrame, str], None],
         acknowledgement: StreamAcknowledgement | None = None,
     ) -> StreamCommitReceipt:
         """Commits a batch once and stages its external acknowledgement.
@@ -1576,7 +1576,7 @@ class StreamingConsumer:
         self,
         ledger: StreamingLedger,
         consumer_group: str,
-        writer: Callable[[pd.DataFrame, str], None],
+        writer: Callable[[pandas.DataFrame, str], None],
         acknowledge: Callable[[StreamAcknowledgement], None],
     ) -> None:
         """Initializes a transport-neutral consumer boundary.
@@ -1673,7 +1673,7 @@ class ParquetChunks(ChunkSource):
 
     suffixes = (".parquet", ".pq")
 
-    def batches(self, rows: int = BATCH_ROWS) -> Iterator[pd.DataFrame]:
+    def batches(self, rows: int = BATCH_ROWS) -> Iterator[pandas.DataFrame]:
         """Yields Arrow record batches as frames.
 
         Pre-buffering and threads are off: with them Arrow keeps decoded
@@ -1706,7 +1706,7 @@ class CsvChunks(ChunkSource):
 
     suffixes = (".csv", ".csv.gz", ".csv.bz2", ".csv.xz", ".csv.zip")
 
-    def batches(self, rows: int = BATCH_ROWS) -> Iterator[pd.DataFrame]:
+    def batches(self, rows: int = BATCH_ROWS) -> Iterator[pandas.DataFrame]:
         """Yields consecutive chunks.
 
         Args:
@@ -1715,7 +1715,7 @@ class CsvChunks(ChunkSource):
         Yields:
             Frames of `rows` rows each, except possibly the last.
         """
-        yield from pd.read_csv(self.path, chunksize=rows)
+        yield from pandas.read_csv(self.path, chunksize=rows)
 
     def shape(self) -> tuple[int | None, int]:
         """Reports the column count; the row count is unknown without a pass.
@@ -1723,7 +1723,7 @@ class CsvChunks(ChunkSource):
         Returns:
             None for the row count and the number of columns in the header.
         """
-        return None, len(pd.read_csv(self.path, nrows=1).columns)
+        return None, len(pandas.read_csv(self.path, nrows=1).columns)
 
 
 class JsonLinesChunks(ChunkSource):
@@ -1731,7 +1731,7 @@ class JsonLinesChunks(ChunkSource):
 
     suffixes = (".jsonl", ".ndjson", ".jsonl.gz", ".ndjson.gz")
 
-    def batches(self, rows: int = BATCH_ROWS) -> Iterator[pd.DataFrame]:
+    def batches(self, rows: int = BATCH_ROWS) -> Iterator[pandas.DataFrame]:
         """Yields JSON records in bounded batches.
 
         Args:
@@ -1740,7 +1740,7 @@ class JsonLinesChunks(ChunkSource):
         Yields:
             Frames of `rows` records each, except possibly the last.
         """
-        yield from pd.read_json(self.path, lines=True, chunksize=rows)
+        yield from pandas.read_json(self.path, lines=True, chunksize=rows)
 
     def shape(self) -> tuple[int | None, int]:
         """Reports the column count; the row count is unknown without a pass.
@@ -1785,7 +1785,9 @@ def source_for(uri: str | pathlib.Path) -> ChunkSource:
     )
 
 
-def side_of(positions: np.ndarray, fraction: float, seed: int) -> np.ndarray:
+def side_of(
+    positions: numpy.ndarray, fraction: float, seed: int
+) -> numpy.ndarray:
     """Assigns each row position to development (0) or locked (1).
 
     Args:
@@ -1840,8 +1842,8 @@ def sample_caps(
 
 
 def keep_smallest(
-    buffer: pd.DataFrame | None, batch: pd.DataFrame, cap: int
-) -> pd.DataFrame:
+    buffer: pandas.DataFrame | None, batch: pandas.DataFrame, cap: int
+) -> pandas.DataFrame:
     """Merges a batch into a buffer, keeping the `cap` lowest-priority rows.
 
     Args:
@@ -1853,7 +1855,7 @@ def keep_smallest(
         The merged frame; when it exceeds `cap` rows, only the `cap` rows
         with the smallest `priority` value remain.
     """
-    merged = batch if buffer is None else pd.concat([buffer, batch])
+    merged = batch if buffer is None else pandas.concat([buffer, batch])
     if len(merged) > cap:
         merged = merged.nsmallest(cap, "priority")
     return merged
@@ -1865,7 +1867,7 @@ def sample_pass(
     locked_cap: int,
     test_fraction: float,
     seed: int,
-) -> tuple[pd.DataFrame, Totals]:
+) -> tuple[pandas.DataFrame, Totals]:
     """One pass: hash-assign every row, keep a priority sample of each side.
 
     Args:
@@ -1882,12 +1884,12 @@ def sample_pass(
     Raises:
         DataError: If either side ends up with no rows.
     """
-    dev: pd.DataFrame | None = None
-    locked: pd.DataFrame | None = None
+    dev: pandas.DataFrame | None = None
+    locked: pandas.DataFrame | None = None
     offset = 0
     locked_total = 0
     for batch in source.batches():
-        positions = np.arange(offset, offset + len(batch))
+        positions = numpy.arange(offset, offset + len(batch))
         offset += len(batch)
         side = side_of(positions, test_fraction, seed)
         locked_total += int(side.sum())
@@ -1897,6 +1899,6 @@ def sample_pass(
         locked = keep_smallest(locked, tagged[side == LOCKED], locked_cap)
     if dev is None or locked is None or dev.empty or locked.empty:
         raise errors.DataError("the file is too small to split")
-    kept = pd.concat([dev, locked]).sort_values("priority")
+    kept = pandas.concat([dev, locked]).sort_values("priority")
     kept = kept.drop(columns="priority").reset_index(drop=True)
     return kept, Totals(offset, locked_total, len(dev), len(locked))

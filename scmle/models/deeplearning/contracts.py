@@ -11,7 +11,7 @@ import dataclasses
 from typing import Any
 from typing import Self
 
-import numpy as np
+import numpy
 
 from scmle.contracts import capabilities
 
@@ -158,7 +158,7 @@ class FeatureExplanation:
         feature_count: Number of input features, equal to the column count.
     """
 
-    values: np.ndarray
+    values: numpy.ndarray
     method: str
     target: str
     feature_count: int
@@ -171,14 +171,14 @@ class FeatureExplanation:
                 differs from `feature_count`, it contains non-finite numbers, or
                 the method or target is blank.
         """
-        values = np.asarray(self.values, dtype=np.float64)
+        values = numpy.asarray(self.values, dtype=numpy.float64)
         if values.ndim != 2:
             raise ValueError(
                 "explanation values must be a two-dimensional matrix"
             )
         if values.shape[1] != self.feature_count:
             raise ValueError("explanation feature count does not match values")
-        if not np.isfinite(values).all():
+        if not numpy.isfinite(values).all():
             raise ValueError("explanation values must be finite")
         if not self.method.strip() or not self.target.strip():
             raise ValueError("explanation method and target must not be empty")
@@ -285,7 +285,7 @@ class ModelFamilyContract:
 
     def validate_features(
         self, features: Any, expected_width: int | None = None
-    ) -> np.ndarray:
+    ) -> numpy.ndarray:
         """Converts and validates the numeric tabular inference boundary.
 
         Args:
@@ -307,7 +307,7 @@ class ModelFamilyContract:
         try:
             if hasattr(features, "toarray"):
                 features = features.toarray()
-            matrix = np.asarray(features, dtype=np.float32)
+            matrix = numpy.asarray(features, dtype=numpy.float32)
         except (TypeError, ValueError) as error:
             raise ValueError(
                 f"{self.model_family} requires a finite numeric 2-D matrix"
@@ -322,7 +322,7 @@ class ModelFamilyContract:
                 f"{self.model_family} expected {expected_width} features, "
                 f"received {matrix.shape[1]}"
             )
-        if not np.isfinite(matrix).all():
+        if not numpy.isfinite(matrix).all():
             raise ValueError(f"{self.model_family} requires finite features")
         return matrix
 

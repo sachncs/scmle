@@ -2,16 +2,16 @@
 
 import json
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import support
 
 from scmle.contracts import tasks
 
 
 def frame(informative, rows=1500, seed=0):
-    rng = np.random.default_rng(seed)
-    data = pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    data = pandas.DataFrame(
         {"x": rng.normal(size=rows), "gappy": rng.normal(size=rows)}
     )
     data["y"] = (data.x + rng.normal(0, 1.0, rows) > 0).astype(int)
@@ -19,7 +19,7 @@ def frame(informative, rows=1500, seed=0):
         gaps = (data.y == 1) & (rng.random(rows) < 0.6)
     else:
         gaps = rng.random(rows) < 0.25
-    data.loc[gaps, "gappy"] = np.nan
+    data.loc[gaps, "gappy"] = numpy.nan
     return data
 
 

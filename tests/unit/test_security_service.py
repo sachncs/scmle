@@ -18,7 +18,7 @@ from scmle.inference import serving
 from scmle.security import access
 from scmle.security import audit
 from scmle.security import tokens
-from tests import support_identity as idp
+from tests import support_identity
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 KEY = "security-test-signing-key-31c9"
@@ -37,12 +37,16 @@ def make_gateway(clock, **options):
     check = tokens.TokenVerifier(
         tokens.KeySet(
             [
-                tokens.VerificationKey.from_jwk(idp.hs_jwk("hs-1")),
-                tokens.VerificationKey.from_jwk(idp.rsa_jwk("k1", "rs-1")),
+                tokens.VerificationKey.from_jwk(
+                    support_identity.hs_jwk("hs-1")
+                ),
+                tokens.VerificationKey.from_jwk(
+                    support_identity.rsa_jwk("k1", "rs-1")
+                ),
             ]
         ),
-        idp.ISSUER,
-        idp.AUDIENCE,
+        support_identity.ISSUER,
+        support_identity.AUDIENCE,
         clock=clock,
     )
     log = audit.AuditLog.open(None, clock=clock)
@@ -51,7 +55,9 @@ def make_gateway(clock, **options):
 
 def bearer(clock, **claims):
     return tokens.sign_hs256(
-        idp.HS_SECRET, "hs-1", idp.claims_at(clock.now, **claims)
+        support_identity.HS_SECRET,
+        "hs-1",
+        support_identity.claims_at(clock.now, **claims),
     )
 
 
@@ -70,7 +76,7 @@ def call(base, path, token=None, payload=None):
 
 @pytest.fixture
 def service(reference):
-    clock = idp.Clock()
+    clock = support_identity.Clock()
     gateway = make_gateway(clock, tenant="acme")
     adapter = serving.HttpServing(reference, gateway=gateway)
     adapter.start()
@@ -142,8 +148,8 @@ def test_a_token_of_another_tenant_is_forbidden(service, reference):
 
 
 def test_the_rate_limit_answers_429_with_retry_after(reference):
-    clock = idp.Clock()
-    ticks = idp.Clock(0.0)
+    clock = support_identity.Clock()
+    ticks = support_identity.Clock(0.0)
     gateway = make_gateway(
         clock, limiter=access.RateLimiter(1.0, 2, clock=ticks)
     )
@@ -164,8 +170,8 @@ def test_the_rate_limit_answers_429_with_retry_after(reference):
 
 
 def test_guessing_credentials_is_slowed(reference):
-    clock = idp.Clock()
-    ticks = idp.Clock(0.0)
+    clock = support_identity.Clock()
+    ticks = support_identity.Clock(0.0)
     gateway = make_gateway(
         clock, failure_limiter=access.RateLimiter(1.0, 3, clock=ticks)
     )
@@ -183,7 +189,7 @@ def test_guessing_credentials_is_slowed(reference):
 def test_the_request_size_limit_still_applies_behind_the_gateway(
     reference,
 ):
-    clock = idp.Clock()
+    clock = support_identity.Clock()
     adapter = serving.HttpServing(
         reference, gateway=make_gateway(clock), max_request_bytes=64
     )
@@ -198,13 +204,15 @@ def test_the_request_size_limit_still_applies_behind_the_gateway(
 def test_audit_records_activation_access_and_admin_in_a_valid_chain(
     reference, tmp_path
 ):
-    clock = idp.Clock()
+    clock = support_identity.Clock()
     path = tmp_path / "audit.jsonl"
     log = audit.AuditLog.open(path, clock=clock)
     check = tokens.TokenVerifier(
-        tokens.KeySet([tokens.VerificationKey.from_jwk(idp.hs_jwk("hs-1"))]),
-        idp.ISSUER,
-        idp.AUDIENCE,
+        tokens.KeySet(
+            [tokens.VerificationKey.from_jwk(support_identity.hs_jwk("hs-1"))]
+        ),
+        support_identity.ISSUER,
+        support_identity.AUDIENCE,
         clock=clock,
     )
     gateway = access.Gateway(check, audit=log)
@@ -217,7 +225,11 @@ def test_audit_records_activation_access_and_admin_in_a_valid_chain(
         adapter.stop()
     gateway.rotate(
         tokens.KeySet(
-            [tokens.VerificationKey.from_jwk(idp.rsa_jwk("k1", "rs-2"))]
+            [
+                tokens.VerificationKey.from_jwk(
+                    support_identity.rsa_jwk("k1", "rs-2")
+                )
+            ]
         ),
         actor="ops",
         reason="scheduled",
@@ -254,7 +266,7 @@ def test_an_edited_audit_row_breaks_the_chain(tmp_path):
 
 
 def test_a_failed_activation_is_audited(tmp_path):
-    clock = idp.Clock()
+    clock = support_identity.Clock()
     gateway = make_gateway(clock)
 
     def failing(readiness):
@@ -275,7 +287,7 @@ def test_no_unauthenticated_server_can_listen_beyond_loopback(reference):
         serving.HttpServing(reference, host="0.0.0.0")  # nosec B104
     for host in ("127.0.0.1", "::1", "localhost"):
         serving.HttpServing(reference, host=host)
-    clock = idp.Clock()
+    clock = support_identity.Clock()
     serving.HttpServing(
         reference,
         host="0.0.0.0",
@@ -290,9 +302,9 @@ def test_the_runtime_default_host_needs_authentication():
         access.require_authentication_for(plain["host"], plain["gateway"])
     secured = runtime.settings(
         {
-            "SCMLE_AUTH_HS256_SECRET": idp.HS_SECRET.decode(),
-            "SCMLE_AUTH_ISSUER": idp.ISSUER,
-            "SCMLE_AUTH_AUDIENCE": idp.AUDIENCE,
+            "SCMLE_AUTH_HS256_SECRET": support_identity.HS_SECRET.decode(),
+            "SCMLE_AUTH_ISSUER": support_identity.ISSUER,
+            "SCMLE_AUTH_AUDIENCE": support_identity.AUDIENCE,
             "SCMLE_TENANT": "acme",
         }
     )
@@ -303,7 +315,7 @@ def test_the_runtime_default_host_needs_authentication():
 def test_authentication_settings_need_an_issuer_and_audience():
     with pytest.raises(errors.ConfigError, match="ISSUER"):
         access.gateway_from_environment(
-            {"SCMLE_AUTH_HS256_SECRET": idp.HS_SECRET.decode()}
+            {"SCMLE_AUTH_HS256_SECRET": support_identity.HS_SECRET.decode()}
         )
     assert access.gateway_from_environment({}) is None
 
@@ -360,9 +372,9 @@ def test_a_tampered_artifact_never_loads_in_production(reference, tmp_path):
 def test_the_modality_service_is_gated_the_same_way(tmp_path):
     from scmle.inference import modality_serving
     from scmle.models import modality_lifecycle
-    from tests.unit import test_modality_serving as helpers
+    from tests.unit import test_modality_serving
 
-    reference = helpers.adapter()
+    reference = test_modality_serving.adapter()
     report = modality_lifecycle.ModalityLifecycle().run(
         reference, tmp_path / "package", signing_key="serving-key"
     )
@@ -371,14 +383,14 @@ def test_the_modality_service_is_gated_the_same_way(tmp_path):
     )
     open_host = modality_serving.ModalityHttpServing(
         predictor,
-        helpers.DocumentDecoder(),
+        test_modality_serving.DocumentDecoder(),
         host="0.0.0.0",  # nosec B104
     )
     with pytest.raises(errors.ConfigError, match="without authentication"):
         open_host.start()
-    clock = idp.Clock()
+    clock = support_identity.Clock()
     service = modality_serving.ModalityHttpServing(
-        predictor, helpers.DocumentDecoder()
+        predictor, test_modality_serving.DocumentDecoder()
     )
     service.set_gateway(make_gateway(clock))
     service.start()

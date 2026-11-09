@@ -35,8 +35,8 @@ import time
 import traceback
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from sklearn import base
 
 import scmle
@@ -75,13 +75,13 @@ class CrashingClassifier(base.ClassifierMixin, base.BaseEstimator):
         """
         if len(features) >= CRASH_ROWS:
             raise RuntimeError("deliberate failure from the reliability check")
-        self.classes_, counts = np.unique(
-            np.asarray(target), return_counts=True
+        self.classes_, counts = numpy.unique(
+            numpy.asarray(target), return_counts=True
         )
-        self.majority_ = self.classes_[int(np.argmax(counts))]
+        self.majority_ = self.classes_[int(numpy.argmax(counts))]
         return self
 
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """Predicts the majority class.
 
         Args:
@@ -90,9 +90,9 @@ class CrashingClassifier(base.ClassifierMixin, base.BaseEstimator):
         Returns:
             An array holding the majority class once per row.
         """
-        return np.full(len(features), self.majority_)
+        return numpy.full(len(features), self.majority_)
 
-    def predict_proba(self, features: Any) -> np.ndarray:
+    def predict_proba(self, features: Any) -> numpy.ndarray:
         """One-hot probabilities of the majority class.
 
         Args:
@@ -102,8 +102,8 @@ class CrashingClassifier(base.ClassifierMixin, base.BaseEstimator):
             An array of shape (rows, classes) with 1.0 in the majority-class
             column and 0.0 elsewhere.
         """
-        proba = np.zeros((len(features), len(self.classes_)))
-        proba[:, int(np.where(self.classes_ == self.majority_)[0][0])] = 1.0
+        proba = numpy.zeros((len(features), len(self.classes_)))
+        proba[:, int(numpy.where(self.classes_ == self.majority_)[0][0])] = 1.0
         return proba
 
 
@@ -131,7 +131,7 @@ class CheckRecord:
 
 
 def fast_project(
-    data: pd.DataFrame, target: str, directory: pathlib.Path, **kwargs: Any
+    data: pandas.DataFrame, target: str, directory: pathlib.Path, **kwargs: Any
 ) -> scmle.MLProject:
     """Builds a small in-process project so checks stay quick.
 
@@ -162,7 +162,7 @@ def fast_project(
     return scmle.MLProject(data, target, output_dir=directory, **kwargs)
 
 
-def binary_data(rows: int = 600, seed: int = 0) -> pd.DataFrame:
+def binary_data(rows: int = 600, seed: int = 0) -> pandas.DataFrame:
     """A binary problem with a real, learnable signal.
 
     Args:
@@ -173,8 +173,8 @@ def binary_data(rows: int = 600, seed: int = 0) -> pd.DataFrame:
         A frame with numeric `a` and `b`, categorical `c` and the 0/1 label
         `y`, which depends on all three.
     """
-    rng = np.random.default_rng(seed)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    frame = pandas.DataFrame(
         {
             "a": rng.normal(size=rows),
             "b": rng.normal(size=rows),
@@ -186,7 +186,7 @@ def binary_data(rows: int = 600, seed: int = 0) -> pd.DataFrame:
     return frame
 
 
-def regression_data(rows: int, seed: int) -> pd.DataFrame:
+def regression_data(rows: int, seed: int) -> pandas.DataFrame:
     """A linear regression problem with unit-variance noise.
 
     Args:
@@ -197,8 +197,8 @@ def regression_data(rows: int, seed: int) -> pd.DataFrame:
         A frame with numeric `a` and `b` and the target `y`
         (3a - 2b plus noise).
     """
-    rng = np.random.default_rng(seed)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    frame = pandas.DataFrame(
         {"a": rng.normal(size=rows), "b": rng.normal(size=rows)}
     )
     frame["y"] = 3 * frame.a - 2 * frame.b + rng.normal(size=rows)
@@ -282,14 +282,16 @@ def check_no_false_skill(directory: pathlib.Path) -> CheckRecord:
     )
     gaps = []
     for seed in NOISE_SEEDS:
-        rng = np.random.default_rng(seed)
-        frame = pd.DataFrame({f"f{i}": rng.normal(size=500) for i in range(8)})
+        rng = numpy.random.default_rng(seed)
+        frame = pandas.DataFrame(
+            {f"f{i}": rng.normal(size=500) for i in range(8)}
+        )
         frame["y"] = rng.integers(0, 2, 500)
         result = fast_project(
             frame, "y", directory / f"seed{seed}", seed=seed
         ).run()
         gaps.append(abs(result.evaluation["test_metrics"]["roc_auc"] - 0.5))
-    record.measured = {"mean_gap": float(np.mean(gaps)), "worst": max(gaps)}
+    record.measured = {"mean_gap": float(numpy.mean(gaps)), "worst": max(gaps)}
     record.passed = record.measured["mean_gap"] <= 0.08 and max(gaps) <= 0.15
     return record
 
@@ -363,9 +365,9 @@ def check_bundle_roundtrip(directory: pathlib.Path) -> CheckRecord:
     result.save(bundle_directory, signing_key=SIGNING_KEY)
     loaded = scmle.predict(bundle_directory, features, signing_key=SIGNING_KEY)
     difference = float(
-        np.abs(
-            np.asarray(result.predict(features), dtype=float)
-            - np.asarray(loaded, dtype=float)
+        numpy.abs(
+            numpy.asarray(result.predict(features), dtype=float)
+            - numpy.asarray(loaded, dtype=float)
         ).max()
     )
     record.measured = {"max_difference": difference}

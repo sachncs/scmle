@@ -10,11 +10,13 @@ adjust decisions afterwards, this changes what the model learns; it needs the
 sensitive column only at training time.
 """
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 
-def reweighing_weights(groups: pd.Series, labels: pd.Series) -> np.ndarray:
+def reweighing_weights(
+    groups: pandas.Series, labels: pandas.Series
+) -> numpy.ndarray:
     """Returns row weights that remove the association of group and label.
 
     Args:
@@ -29,7 +31,7 @@ def reweighing_weights(groups: pd.Series, labels: pd.Series) -> np.ndarray:
     """
     if len(groups) != len(labels) or len(groups) == 0:
         raise ValueError("groups and labels must be the same non-zero length")
-    frame = pd.DataFrame(
+    frame = pandas.DataFrame(
         {"group": groups.to_numpy(), "label": labels.to_numpy()}
     )
     total = float(len(frame))

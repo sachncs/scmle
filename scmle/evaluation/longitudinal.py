@@ -20,8 +20,8 @@ from pathlib import Path
 import tempfile
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from scipy import special
 from scipy import stats
 
@@ -354,10 +354,10 @@ class LongitudinalEstimationResult:
             len(row) != expected for row in self.covariance
         ):
             raise ValueError("covariance must be square over periods")
-        covariance = np.asarray(self.covariance, dtype=float)
-        if not np.isfinite(covariance).all():
+        covariance = numpy.asarray(self.covariance, dtype=float)
+        if not numpy.isfinite(covariance).all():
             raise ValueError("covariance must contain finite values")
-        if not np.allclose(covariance, covariance.T, rtol=1e-10, atol=1e-12):
+        if not numpy.allclose(covariance, covariance.T, rtol=1e-10, atol=1e-12):
             raise ValueError("covariance must be symmetric")
         for name, value in (
             ("rows_input", self.rows_input),
@@ -600,7 +600,7 @@ class LongitudinalIPWEstimator:
         self.estimand = estimand
         self.policy = policy or LongitudinalEstimationPolicy()
 
-    def fit(self, frame: pd.DataFrame) -> LongitudinalEstimationResult:
+    def fit(self, frame: pandas.DataFrame) -> LongitudinalEstimationResult:
         """Fits one covariate-adjusted period-specific ATE per time value.
 
         Args:
@@ -713,7 +713,7 @@ class LongitudinalIPWEstimator:
         )
 
     def fit_period(
-        self, period_frame: pd.DataFrame, period_value: Any
+        self, period_frame: pandas.DataFrame, period_value: Any
     ) -> dict[str, Any]:
         """Fits one period and retains influence values for covariance.
 
@@ -746,8 +746,8 @@ class LongitudinalIPWEstimator:
             )
         treatment_name = self.estimand.treatment_column
         treatment = period_frame[treatment_name].to_numpy(dtype=float)
-        treated_rows = int(np.sum(treatment == 1.0))
-        control_rows = int(np.sum(treatment == 0.0))
+        treated_rows = int(numpy.sum(treatment == 1.0))
+        control_rows = int(numpy.sum(treatment == 0.0))
         if (
             treated_rows < policy.minimum_rows_per_arm
             or control_rows < policy.minimum_rows_per_arm
@@ -762,16 +762,16 @@ class LongitudinalIPWEstimator:
         propensity, iterations = fit_logistic_propensity(
             covariates, treatment, policy
         )
-        clipped = np.clip(
+        clipped = numpy.clip(
             propensity, policy.propensity_clip, 1.0 - policy.propensity_clip
         )
         treated_propensity = propensity[treatment == 1.0]
         control_propensity = propensity[treatment == 0.0]
         common_support_lower = float(
-            max(np.min(treated_propensity), np.min(control_propensity))
+            max(numpy.min(treated_propensity), numpy.min(control_propensity))
         )
         common_support_upper = float(
-            min(np.max(treated_propensity), np.max(control_propensity))
+            min(numpy.max(treated_propensity), numpy.max(control_propensity))
         )
         if common_support_lower >= common_support_upper:
             raise ValueError(
@@ -779,15 +779,15 @@ class LongitudinalIPWEstimator:
             )
         treated_weights = treatment / clipped
         control_weights = (1.0 - treatment) / (1.0 - clipped)
-        treated_weight_sum = float(np.sum(treated_weights))
-        control_weight_sum = float(np.sum(control_weights))
+        treated_weight_sum = float(numpy.sum(treated_weights))
+        control_weight_sum = float(numpy.sum(control_weights))
         if treated_weight_sum <= 0.0 or control_weight_sum <= 0.0:
             raise ValueError(f"period {period_value!r} has no weighted support")
         treated_mean = float(
-            np.sum(treated_weights * outcome) / treated_weight_sum
+            numpy.sum(treated_weights * outcome) / treated_weight_sum
         )
         control_mean = float(
-            np.sum(control_weights * outcome) / control_weight_sum
+            numpy.sum(control_weights * outcome) / control_weight_sum
         )
         estimate = treated_mean - control_mean
         influence = treated_weights * (outcome - treated_mean) / (
@@ -817,9 +817,9 @@ class LongitudinalIPWEstimator:
             "clipped_propensity": clipped,
             "treatment": treatment,
             "outcome": outcome,
-            "fraction_clipped": float(np.mean(propensity != clipped)),
-            "propensity_min": float(np.min(propensity)),
-            "propensity_max": float(np.max(propensity)),
+            "fraction_clipped": float(numpy.mean(propensity != clipped)),
+            "propensity_min": float(numpy.min(propensity)),
+            "propensity_max": float(numpy.max(propensity)),
             "common_support_lower": common_support_lower,
             "common_support_upper": common_support_upper,
             "effective_sample_size_treated": ess_treated,
@@ -833,10 +833,10 @@ class LongitudinalIPWEstimator:
 
 
 def prepare_longitudinal_frame(
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     estimand: LongitudinalEstimand,
     policy: LongitudinalEstimationPolicy,
-) -> tuple[pd.DataFrame, int]:
+) -> tuple[pandas.DataFrame, int]:
     """Validates and numerically prepares a long-format input frame.
 
     Args:
@@ -859,7 +859,7 @@ def prepare_longitudinal_frame(
             non-finite, treatment is not binary, no rows remain, too few
             rows remain, or a covariate varies within a subject.
     """
-    if not isinstance(frame, pd.DataFrame):
+    if not isinstance(frame, pandas.DataFrame):
         raise TypeError("frame must be a pandas DataFrame")
     if frame.empty:
         raise ValueError("longitudinal frame must not be empty")
@@ -883,9 +883,9 @@ def prepare_longitudinal_frame(
     if frame[estimand.time_column].isna().any():
         raise ValueError("missing time values are not allowed")
     for name in (estimand.subject_identity, estimand.time_column):
-        if pd.api.types.is_numeric_dtype(frame[name]):
+        if pandas.api.types.is_numeric_dtype(frame[name]):
             values = frame[name].to_numpy(dtype=float)
-            if not np.isfinite(values).all():
+            if not numpy.isfinite(values).all():
                 raise ValueError(f"column {name!r} contains non-finite values")
     if frame.duplicated(
         [estimand.subject_identity, estimand.time_column]
@@ -906,11 +906,11 @@ def prepare_longitudinal_frame(
         prepared = prepared.loc[~missing_mask].copy()
     for name in value_columns:
         try:
-            prepared[name] = pd.to_numeric(prepared[name], errors="raise")
+            prepared[name] = pandas.to_numeric(prepared[name], errors="raise")
         except (TypeError, ValueError) as error:
             raise ValueError(f"column {name!r} must be numeric") from error
         values = prepared[name].to_numpy(dtype=float)
-        if not np.isfinite(values).all():
+        if not numpy.isfinite(values).all():
             raise ValueError(f"column {name!r} contains non-finite values")
     treatment_values = set(
         prepared[estimand.treatment_column].unique().tolist()
@@ -926,7 +926,7 @@ def prepare_longitudinal_frame(
 
 
 def validate_time_order(
-    frame: pd.DataFrame, estimand: LongitudinalEstimand
+    frame: pandas.DataFrame, estimand: LongitudinalEstimand
 ) -> None:
     """Requires strictly increasing time values within each subject.
 
@@ -964,7 +964,7 @@ def validate_time_order(
 
 
 def validate_baseline_covariates(
-    frame: pd.DataFrame, estimand: LongitudinalEstimand
+    frame: pandas.DataFrame, estimand: LongitudinalEstimand
 ) -> None:
     """Checks the declared no-time-varying-covariates condition in the data.
 
@@ -988,10 +988,10 @@ def validate_baseline_covariates(
 
 
 def fit_logistic_propensity(
-    covariates: np.ndarray,
-    treatment: np.ndarray,
+    covariates: numpy.ndarray,
+    treatment: numpy.ndarray,
     policy: LongitudinalEstimationPolicy,
-) -> tuple[np.ndarray, int]:
+) -> tuple[numpy.ndarray, int]:
     """Fits a deterministic ridge-logistic propensity model by Newton steps.
 
     The ridge penalty is fixed at 1e-8 and the starting coefficients are
@@ -1014,25 +1014,25 @@ def fit_logistic_propensity(
     """
     if covariates.ndim != 2:
         raise ValueError("covariates must be a two-dimensional matrix")
-    design = np.column_stack((np.ones(len(treatment)), covariates))
-    coefficients = np.zeros(design.shape[1], dtype=float)
+    design = numpy.column_stack((numpy.ones(len(treatment)), covariates))
+    coefficients = numpy.zeros(design.shape[1], dtype=float)
     ridge = 1e-8
-    ridge_matrix = ridge * np.eye(design.shape[1])
+    ridge_matrix = ridge * numpy.eye(design.shape[1])
     for iteration in range(1, policy.max_iterations + 1):
         probabilities = special.expit(design @ coefficients)
-        variance = np.maximum(probabilities * (1.0 - probabilities), 1e-12)
+        variance = numpy.maximum(probabilities * (1.0 - probabilities), 1e-12)
         gradient = design.T @ (probabilities - treatment) + ridge * coefficients
         hessian = design.T @ (variance[:, None] * design) + ridge_matrix
         try:
-            step = np.linalg.solve(hessian, gradient)
-        except np.linalg.LinAlgError as error:
+            step = numpy.linalg.solve(hessian, gradient)
+        except numpy.linalg.LinAlgError as error:
             raise ValueError("propensity model is not identifiable") from error
-        if not np.isfinite(step).all():
+        if not numpy.isfinite(step).all():
             raise ValueError(
                 "propensity model produced non-finite coefficients"
             )
         coefficients -= step
-        if float(np.max(np.abs(step))) <= policy.tolerance:
+        if float(numpy.max(numpy.abs(step))) <= policy.tolerance:
             probabilities = special.expit(design @ coefficients)
             return probabilities, iteration
     raise ValueError(
@@ -1040,7 +1040,7 @@ def fit_logistic_propensity(
     )
 
 
-def effective_sample_size(weights: np.ndarray) -> float:
+def effective_sample_size(weights: numpy.ndarray) -> float:
     """Returns the Kish effective sample size for positive arm weights.
 
     Args:
@@ -1050,14 +1050,14 @@ def effective_sample_size(weights: np.ndarray) -> float:
         The squared sum of the weights divided by the sum of their squares,
         or 0.0 when the sum of squares is not positive.
     """
-    total = float(np.sum(weights))
-    squared = float(np.sum(weights**2))
+    total = float(numpy.sum(weights))
+    squared = float(numpy.sum(weights**2))
     if squared <= 0.0:
         return 0.0
     return total**2 / squared
 
 
-def influence_covariance(fitted: Sequence[Mapping[str, Any]]) -> np.ndarray:
+def influence_covariance(fitted: Sequence[Mapping[str, Any]]) -> numpy.ndarray:
     """Estimates covariance from subject-aligned influence values.
 
     Args:
@@ -1072,17 +1072,17 @@ def influence_covariance(fitted: Sequence[Mapping[str, Any]]) -> np.ndarray:
         is shared.
     """
     periods = len(fitted)
-    covariance = np.zeros((periods, periods), dtype=float)
+    covariance = numpy.zeros((periods, periods), dtype=float)
     influence_by_period: list[dict[Any, float]] = []
     for item in fitted:
         subjects = item["subjects"]
-        influence = np.asarray(item["influence"], dtype=float)
+        influence = numpy.asarray(item["influence"], dtype=float)
         count = int(item["rows"])
         values = {
             subject: float(value / count)
             for subject, value in zip(subjects, influence, strict=True)
         }
-        mean = float(np.mean(list(values.values())))
+        mean = float(numpy.mean(list(values.values())))
         influence_by_period.append(
             {subject: value - mean for subject, value in values.items()}
         )
@@ -1166,19 +1166,21 @@ def independent_reference(
     """
     records = []
     for item in fitted:
-        propensity = np.asarray(item["propensity"], dtype=float)
-        clipped = np.asarray(item["clipped_propensity"], dtype=float)
-        treatment = np.asarray(item["treatment"], dtype=float)
-        outcome = np.asarray(item["outcome"], dtype=float)
+        propensity = numpy.asarray(item["propensity"], dtype=float)
+        clipped = numpy.asarray(item["clipped_propensity"], dtype=float)
+        treatment = numpy.asarray(item["treatment"], dtype=float)
+        outcome = numpy.asarray(item["outcome"], dtype=float)
         treated_count = int(item["treated_rows"])
         control_count = int(item["control_rows"])
-        treated_weights = np.where(treatment == 1.0, 1.0 / clipped, 0.0)
-        control_weights = np.where(treatment == 0.0, 1.0 / (1.0 - clipped), 0.0)
+        treated_weights = numpy.where(treatment == 1.0, 1.0 / clipped, 0.0)
+        control_weights = numpy.where(
+            treatment == 0.0, 1.0 / (1.0 - clipped), 0.0
+        )
         treated_mean = float(
-            np.sum(treated_weights * outcome) / np.sum(treated_weights)
+            numpy.sum(treated_weights * outcome) / numpy.sum(treated_weights)
         )
         control_mean = float(
-            np.sum(control_weights * outcome) / np.sum(control_weights)
+            numpy.sum(control_weights * outcome) / numpy.sum(control_weights)
         )
         primary = float(item["estimate"])
         reference_estimate = treated_mean - control_mean
@@ -1193,8 +1195,8 @@ def independent_reference(
                 "treated_rows": treated_count,
                 "control_rows": control_count,
                 "propensity_range": [
-                    float(np.min(propensity)),
-                    float(np.max(propensity)),
+                    float(numpy.min(propensity)),
+                    float(numpy.max(propensity)),
                 ],
                 "independent_method": "direct_normalized_weighted_means",
                 "treated_mean": treated_mean,
@@ -1219,16 +1221,16 @@ def period_label(value: Any) -> str:
         The ISO 8601 text for a timestamp, date, or datetime, otherwise
         `str` of the value with NumPy scalars unwrapped first.
     """
-    if isinstance(value, pd.Timestamp):
+    if isinstance(value, pandas.Timestamp):
         return value.isoformat()
     if isinstance(value, (datetime.date, datetime.datetime)):
         return value.isoformat()
-    if isinstance(value, np.generic):
+    if isinstance(value, numpy.generic):
         value = value.item()
     return str(value)
 
 
-def fingerprint_frame(frame: pd.DataFrame) -> str:
+def fingerprint_frame(frame: pandas.DataFrame) -> str:
     """Returns a deterministic digest of the supplied frame.
 
     Args:
@@ -1243,7 +1245,9 @@ def fingerprint_frame(frame: pd.DataFrame) -> str:
     """
     try:
         values = (
-            pd.util.hash_pandas_object(frame, index=True).to_numpy().tobytes()
+            pandas.util.hash_pandas_object(frame, index=True)
+            .to_numpy()
+            .tobytes()
         )
     except (TypeError, ValueError) as error:
         raise ValueError(

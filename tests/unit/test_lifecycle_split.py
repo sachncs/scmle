@@ -1,17 +1,17 @@
 import types
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.governance import lifecycle
 
 
 def frame(rows=100):
-    rng = np.random.default_rng(0)
-    return pd.DataFrame(
+    rng = numpy.random.default_rng(0)
+    return pandas.DataFrame(
         {
-            "when": pd.date_range("2026-01-01", periods=rows)[::-1],
-            "who": np.repeat(np.arange(rows // 5), 5),
+            "when": pandas.date_range("2026-01-01", periods=rows)[::-1],
+            "who": numpy.repeat(numpy.arange(rows // 5), 5),
             "x": rng.normal(size=rows),
         }
     )

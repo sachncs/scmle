@@ -27,7 +27,7 @@ from pathlib import Path
 import time
 
 from scmle.contracts import qualification
-from scmle.data.charter import contracts as charter_contracts
+from scmle.data.charter import contracts
 
 DEFAULT_MAX_SPECS = 12
 
@@ -82,7 +82,7 @@ class Specification:
         return dict(self.values)
 
 
-def declaration_sha256(choices: Sequence[charter_contracts.Choice]) -> str:
+def declaration_sha256(choices: Sequence[contracts.Choice]) -> str:
     """Hashes the declared choices.
 
     Args:
@@ -145,7 +145,7 @@ class Grid:
 
 
 def enumerate_grid(
-    choices: Sequence[charter_contracts.Choice],
+    choices: Sequence[contracts.Choice],
     seed: int,
     max_specs: int = DEFAULT_MAX_SPECS,
 ) -> Grid:

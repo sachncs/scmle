@@ -1,19 +1,19 @@
 """CV+ fold models are stored in the bundle, served, signed and checked."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 import support
 
 import scmle
-from scmle.artifacts import bundle as bundle_module
+from scmle.artifacts import bundle
 from scmle.contracts import errors
 
 
 def world(rows, seed):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     x = rng.uniform(0, 10, rows)
-    return pd.DataFrame({"x": x, "y": 2 * x + rng.normal(0, 1, rows)})
+    return pandas.DataFrame({"x": x, "y": 2 * x + rng.normal(0, 1, rows)})
 
 
 @pytest.fixture(scope="module")
@@ -43,18 +43,18 @@ def test_cv_plus_intervals_cover_new_rows(result):
 
 
 def test_cv_plus_survives_saving_and_loading(result, tmp_path):
-    grid = pd.DataFrame({"x": [1.0, 5.0, 9.0]})
+    grid = pandas.DataFrame({"x": [1.0, 5.0, 9.0]})
     expected = result.bundle.predict_interval(grid, method="cv_plus")
     result.bundle.save(tmp_path / "copy")
     loaded = scmle.ModelBundle.load(tmp_path / "copy", trusted=True)
-    pd.testing.assert_frame_equal(
+    pandas.testing.assert_frame_equal(
         loaded.predict_interval(grid, method="cv_plus"), expected
     )
 
 
 def test_a_changed_fold_model_file_is_refused(result, tmp_path):
     result.bundle.save(tmp_path / "copy")
-    path = tmp_path / "copy" / bundle_module.CV_PLUS_FILE
+    path = tmp_path / "copy" / bundle.CV_PLUS_FILE
     data = bytearray(path.read_bytes())
     data[len(data) // 2] ^= 0xFF
     path.write_bytes(bytes(data))
@@ -67,4 +67,4 @@ def test_a_bundle_without_the_models_says_so(result):
         result.bundle.pipeline, result.bundle.schema, result.bundle.info
     )
     with pytest.raises(errors.ArtifactError, match="no CV\\+ fold models"):
-        plain.predict_interval(pd.DataFrame({"x": [1.0]}), method="cv_plus")
+        plain.predict_interval(pandas.DataFrame({"x": [1.0]}), method="cv_plus")

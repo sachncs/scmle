@@ -1,7 +1,7 @@
 """Self-training labels only confident rows and is judged on held-out rows."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from sklearn import linear_model
 from sklearn import metrics
 
@@ -9,15 +9,15 @@ from scmle.sampling import pseudo_labeling
 
 
 def blobs(rows, seed):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     labels = rng.integers(0, 2, rows)
-    features = pd.DataFrame(
+    features = pandas.DataFrame(
         {
             "a": rng.normal(labels * 3.0, 1.0),
             "b": rng.normal(0, 1.0, rows),
         }
     )
-    return features, pd.Series(labels)
+    return features, pandas.Series(labels)
 
 
 def test_only_confident_rows_receive_a_label():

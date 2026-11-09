@@ -4,7 +4,7 @@ import dataclasses
 import json
 import pathlib
 
-import numpy as np
+import numpy
 import support
 
 from scmle.contracts import tasks
@@ -55,7 +55,7 @@ def test_every_decision_that_shapes_the_run_is_an_audit_event(
 
 
 def test_exclusions_are_audited_with_reasons(binary_frame, tmp_path):
-    frame = binary_frame.assign(constant=1, rid=np.arange(len(binary_frame)))
+    frame = binary_frame.assign(constant=1, rid=numpy.arange(len(binary_frame)))
     result = run(frame, tmp_path, id_columns=["rid"])
     features = next(
         e

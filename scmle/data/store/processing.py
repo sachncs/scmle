@@ -39,13 +39,13 @@ import json
 import time
 from typing import Any
 
-import pandas as pd
+import pandas
 
 from scmle.contracts import errors
 from scmle.core import retry
 from scmle.data.store import objectstore
 from scmle.data.store import quality
-from scmle.data.store import snapshot as snapshot_module
+from scmle.data.store import snapshot
 
 FORMAT = 1
 SEPARATOR = "\x1f"
@@ -166,7 +166,9 @@ class RunResult:
         return dataclasses.asdict(self)
 
 
-def row_keys(frame: pd.DataFrame, columns: tuple[str, ...]) -> pd.Series:
+def row_keys(
+    frame: pandas.DataFrame, columns: tuple[str, ...]
+) -> pandas.Series:
     """Builds one string key per row from the key columns.
 
     Args:
@@ -205,8 +207,8 @@ class IncrementalProcessor:
     def __init__(
         self,
         store: objectstore.ObjectStore,
-        contract: snapshot_module.DataContract,
-        transform: Callable[[pd.DataFrame], pd.DataFrame],
+        contract: snapshot.DataContract,
+        transform: Callable[[pandas.DataFrame], pandas.DataFrame],
         *,
         input_prefix: str = "input/",
         output_prefix: str = "output/",
@@ -216,7 +218,7 @@ class IncrementalProcessor:
         stage: quality.Stage = quality.Stage.TRAIN,
         policy: retry.RetryPolicy | None = None,
         sleep: Callable[[float], None] = time.sleep,
-        reader: snapshot_module.SnapshotReader | None = None,
+        reader: snapshot.SnapshotReader | None = None,
         before_commit: Callable[[str], None] | None = None,
     ) -> None:
         """Initializes the processor.
@@ -253,7 +255,7 @@ class IncrementalProcessor:
         self.stage = stage
         self.policy = policy or retry.RetryPolicy()
         self.sleep = sleep
-        self.reader = reader or snapshot_module.SnapshotReader(store)
+        self.reader = reader or snapshot.SnapshotReader(store)
         self.before_commit = before_commit
         self.waits: list[float] = []
 

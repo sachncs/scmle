@@ -1,7 +1,7 @@
 """Monotonic constraints are enforced, not just requested."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 import support
 
@@ -11,21 +11,21 @@ from scmle.contracts import tasks
 
 def noisy_frame(rows=900, seed=0):
     """Risk rises with `missed` overall, but the data has a local dip."""
-    rng = np.random.default_rng(seed)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    frame = pandas.DataFrame(
         {
             "missed": rng.uniform(0, 10, rows),
             "age": rng.uniform(20, 70, rows),
         }
     )
-    dip = -1.5 * np.exp(-((frame.missed - 5) ** 2))
+    dip = -1.5 * numpy.exp(-((frame.missed - 5) ** 2))
     score = 0.6 * frame.missed + dip + rng.normal(0, 1.2, rows) - 3
     frame["y"] = (score > 0).astype(int)
     return frame
 
 
 def sweep(result, column="missed"):
-    grid = pd.DataFrame({column: np.linspace(0, 10, 60)})
+    grid = pandas.DataFrame({column: numpy.linspace(0, 10, 60)})
     grid["age"] = 40.0
     return result.bundle.predict_proba(grid)[:, 1]
 
@@ -46,7 +46,7 @@ def test_constrained_predictions_never_fall_as_the_feature_rises(tmp_path):
 
     curve = sweep(result)
 
-    assert np.all(np.diff(curve) >= -1e-9)
+    assert numpy.all(numpy.diff(curve) >= -1e-9)
     assert result.selected_model in {
         "hist_gradient_boosting",
         "lightgbm",
@@ -79,7 +79,7 @@ def test_a_decreasing_constraint_is_respected_too(tmp_path):
 
     result = run(frame, tmp_path, monotonic_constraints={"missed": -1})
 
-    assert np.all(np.diff(sweep(result)) <= 1e-9)
+    assert numpy.all(numpy.diff(sweep(result)) <= 1e-9)
 
 
 def test_constraints_on_unusable_columns_or_multiclass_tasks_are_refused(
@@ -96,7 +96,7 @@ def test_constraints_on_unusable_columns_or_multiclass_tasks_are_refused(
             )
         )
     multi = noisy_frame()
-    multi["y"] = pd.cut(multi.missed, 3, labels=False)
+    multi["y"] = pandas.cut(multi.missed, 3, labels=False)
     with pytest.raises(errors.BlockedError, match="multiclass"):
         support.make_project(
             multi,

@@ -3,8 +3,8 @@
 from typing import Any
 from typing import Self
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from sklearn import base
 from sklearn import pipeline
 
@@ -43,9 +43,9 @@ class QueryAwareEstimator(base.RegressorMixin, base.BaseEstimator):
         Returns:
             This fitted estimator.
         """
-        frame = pd.DataFrame(features).reset_index(drop=True)
-        relevance = np.asarray(target)
-        order = np.argsort(
+        frame = pandas.DataFrame(features).reset_index(drop=True)
+        relevance = numpy.asarray(target)
+        order = numpy.argsort(
             frame[self.query_column].astype(str).to_numpy(), kind="stable"
         )
         frame, relevance = frame.iloc[order], relevance[order]
@@ -58,7 +58,7 @@ class QueryAwareEstimator(base.RegressorMixin, base.BaseEstimator):
         self.model_ = steps[-1].fit(transformed, relevance, group=group)
         return self
 
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """Ranking score per row, in the rows' order.
 
         Args:

@@ -9,7 +9,7 @@ import importlib
 import os
 from typing import Any
 
-import numpy as np
+import numpy
 from sklearn import base
 
 STALL_IMPROVEMENT = 0.01
@@ -92,7 +92,7 @@ class KerasEngine(base.BaseEstimator):
         """
         return "mse"
 
-    def encode_target(self, target: Any) -> np.ndarray:
+    def encode_target(self, target: Any) -> numpy.ndarray:
         """Converts the target to what the loss consumes.
 
         Args:
@@ -101,7 +101,7 @@ class KerasEngine(base.BaseEstimator):
         Returns:
             The target as a float32 array.
         """
-        return np.asarray(target, dtype=np.float32)
+        return numpy.asarray(target, dtype=numpy.float32)
 
     def build_network(self, keras: Any, width: int) -> Any:
         """Creates the untrained network.
@@ -144,7 +144,7 @@ class KerasEngine(base.BaseEstimator):
         """
         keras = load_keras()
         keras.utils.set_random_seed(self.random_state)
-        matrix = np.asarray(features, dtype=np.float32)
+        matrix = numpy.asarray(features, dtype=numpy.float32)
         encoded = self.encode_target(target)
         self.input_width_ = matrix.shape[1]
         network = self.build_network(keras, self.input_width_)
@@ -165,7 +165,7 @@ class KerasEngine(base.BaseEstimator):
             encoded,
             sample_weight=None
             if sample_weight is None
-            else np.asarray(sample_weight, dtype=np.float32),
+            else numpy.asarray(sample_weight, dtype=numpy.float32),
             epochs=self.epochs,
             batch_size=int(self.batch_size),
             validation_split=self.validation_fraction if held else 0.0,
@@ -191,7 +191,7 @@ class KerasEngine(base.BaseEstimator):
             number of epochs; a run that did not diverge also carries the
             relative loss improvement.
         """
-        if not np.isfinite(losses).all():
+        if not numpy.isfinite(losses).all():
             return {"verdict": "diverged", "steps": len(losses)}
         improvement = 0.0
         if len(losses) > 2 and abs(losses[0]) > 0:
@@ -214,7 +214,7 @@ class KerasEngine(base.BaseEstimator):
         network = state.pop("network_", None)
         if network is not None:
             state["weights_"] = [
-                np.asarray(weight) for weight in network.get_weights()
+                numpy.asarray(weight) for weight in network.get_weights()
             ]
         return state
 
@@ -233,7 +233,7 @@ class KerasEngine(base.BaseEstimator):
             network.set_weights(weights)
             self.network_ = network
 
-    def raw_outputs(self, features: Any) -> np.ndarray:
+    def raw_outputs(self, features: Any) -> numpy.ndarray:
         """Network outputs for new rows.
 
         Args:
@@ -242,9 +242,9 @@ class KerasEngine(base.BaseEstimator):
         Returns:
             Array of shape `(n_rows, output_units)`.
         """
-        return np.asarray(
+        return numpy.asarray(
             self.network_.predict(
-                np.asarray(features, dtype=np.float32), verbose=0
+                numpy.asarray(features, dtype=numpy.float32), verbose=0
             )
         )
 
@@ -269,7 +269,7 @@ class ClassifierEngine(base.ClassifierMixin, KerasEngine):
         keras = load_keras()
         return keras.losses.SparseCategoricalCrossentropy(from_logits=True)
 
-    def encode_target(self, target: Any) -> np.ndarray:
+    def encode_target(self, target: Any) -> numpy.ndarray:
         """Maps labels to 0..K-1 and remembers the classes.
 
         Args:
@@ -278,12 +278,12 @@ class ClassifierEngine(base.ClassifierMixin, KerasEngine):
         Returns:
             Integer codes into `classes_`, as int64.
         """
-        self.classes_, codes = np.unique(
-            np.asarray(target), return_inverse=True
+        self.classes_, codes = numpy.unique(
+            numpy.asarray(target), return_inverse=True
         )
-        return codes.astype(np.int64)
+        return codes.astype(numpy.int64)
 
-    def predict_proba(self, features: Any) -> np.ndarray:
+    def predict_proba(self, features: Any) -> numpy.ndarray:
         """Class probabilities, columns ordered like `classes_`.
 
         Args:
@@ -294,10 +294,10 @@ class ClassifierEngine(base.ClassifierMixin, KerasEngine):
         """
         scores = self.raw_outputs(features)
         scores = scores - scores.max(axis=1, keepdims=True)
-        exp = np.exp(scores)
+        exp = numpy.exp(scores)
         return exp / exp.sum(axis=1, keepdims=True)
 
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """Most probable class.
 
         Args:
@@ -312,7 +312,7 @@ class ClassifierEngine(base.ClassifierMixin, KerasEngine):
 class RegressorEngine(base.RegressorMixin, KerasEngine):
     """Regressor trained on the standardized target."""
 
-    def encode_target(self, target: Any) -> np.ndarray:
+    def encode_target(self, target: Any) -> numpy.ndarray:
         """Standardizes the target and remembers its scale.
 
         Args:
@@ -322,14 +322,14 @@ class RegressorEngine(base.RegressorMixin, KerasEngine):
             The values minus their mean and divided by their standard deviation
             (1 when it is zero), as float32.
         """
-        values = np.asarray(target, dtype=np.float64)
+        values = numpy.asarray(target, dtype=numpy.float64)
         self.target_mean_ = float(values.mean())
         self.target_scale_ = float(values.std()) or 1.0
         return ((values - self.target_mean_) / self.target_scale_).astype(
-            np.float32
+            numpy.float32
         )
 
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """Predicted values in the original units.
 
         Args:

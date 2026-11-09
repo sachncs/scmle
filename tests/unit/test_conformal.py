@@ -2,7 +2,7 @@
 
 import math
 
-import numpy as np
+import numpy
 import pytest
 
 from scmle.evaluation import conformal
@@ -14,7 +14,7 @@ def noisy_regression(rows, rng):
 
 
 def test_regression_intervals_cover_at_the_requested_rate():
-    rng = np.random.default_rng(0)
+    rng = numpy.random.default_rng(0)
     predicted, observed = noisy_regression(2000, rng)
     calibrator = conformal.ConformalCalibrator.for_regression(
         observed, predicted
@@ -29,7 +29,7 @@ def test_regression_intervals_cover_at_the_requested_rate():
 
 
 def test_any_coverage_level_can_be_asked_for_later():
-    rng = np.random.default_rng(6)
+    rng = numpy.random.default_rng(6)
     predicted, observed = noisy_regression(3000, rng)
     calibrator = conformal.ConformalCalibrator.for_regression(
         observed, predicted
@@ -40,44 +40,46 @@ def test_any_coverage_level_can_be_asked_for_later():
 
 
 def test_classification_sets_cover_and_shrink_when_the_model_is_sure():
-    rng = np.random.default_rng(1)
+    rng = numpy.random.default_rng(1)
     classes = ["a", "b", "c"]
     labels = rng.choice(classes, 3000)
     logits = rng.normal(0, 1, (3000, 3))
-    logits[np.arange(3000), [classes.index(x) for x in labels]] += 2.0
-    probabilities = np.exp(logits) / np.exp(logits).sum(axis=1, keepdims=True)
+    logits[numpy.arange(3000), [classes.index(x) for x in labels]] += 2.0
+    probabilities = numpy.exp(logits) / numpy.exp(logits).sum(
+        axis=1, keepdims=True
+    )
     calibrator = conformal.ConformalCalibrator.for_classification(
         labels, probabilities, classes
     )
 
     sets = calibrator.sets(probabilities, coverage=0.9)
-    covered = np.mean(
+    covered = numpy.mean(
         [label in s for label, s in zip(labels, sets, strict=True)]
     )
 
     assert covered >= 0.88
-    assert np.mean([len(s) for s in sets]) < 3.0
+    assert numpy.mean([len(s) for s in sets]) < 3.0
 
 
 def test_too_few_rows_or_bad_coverage_is_rejected():
-    values = np.arange(10.0)
+    values = numpy.arange(10.0)
     with pytest.raises(ValueError, match="at least"):
         conformal.ConformalCalibrator.for_regression(values, values + 1)
     calibrator = conformal.ConformalCalibrator.for_regression(
-        np.arange(50.0), np.arange(50.0) + 1
+        numpy.arange(50.0), numpy.arange(50.0) + 1
     )
     with pytest.raises(ValueError, match="strictly between"):
         calibrator.margin(1.0)
 
 
 def test_demanding_coverage_with_few_rows_gives_an_infinite_margin():
-    scores = np.arange(1.0, 21.0)
+    scores = numpy.arange(1.0, 21.0)
     assert math.isinf(conformal.finite_sample_quantile(scores, 0.99))
     assert conformal.finite_sample_quantile(scores, 0.5) == 11.0
 
 
 def test_round_trip_and_wrong_kind_errors():
-    rng = np.random.default_rng(2)
+    rng = numpy.random.default_rng(2)
     predicted, observed = noisy_regression(200, rng)
     calibrator = conformal.ConformalCalibrator.for_regression(
         observed, predicted
@@ -87,7 +89,7 @@ def test_round_trip_and_wrong_kind_errors():
 
     assert restored == calibrator
     with pytest.raises(ValueError, match="classification"):
-        restored.sets(np.ones((2, 2)))
+        restored.sets(numpy.ones((2, 2)))
 
 
 class RecordingContext:
@@ -115,10 +117,10 @@ def test_a_skipped_calibration_is_recorded_as_an_event():
 
 
 def test_asking_for_intervals_without_calibration_points_at_the_event():
-    from scmle.artifacts import bundle as bundle_module
+    from scmle.artifacts import bundle
     from scmle.contracts import errors
 
-    model = bundle_module.ModelBundle.__new__(bundle_module.ModelBundle)
+    model = bundle.ModelBundle.__new__(bundle.ModelBundle)
     model.conformal = None
 
     with pytest.raises(errors.ArtifactError, match=r"conformal\.skipped"):
@@ -135,7 +137,7 @@ def test_sensitivity_below_the_minimum_rows_is_skipped_not_raised():
         spec=SimpleNamespace(selection=SimpleNamespace(sensitivity_repeats=3)),
         task=tasks.TaskType.REGRESSION,
         resource_governor=SimpleNamespace(skip_reason=lambda first: None),
-        split=SimpleNamespace(dev_target=np.arange(10.0)),
+        split=SimpleNamespace(dev_target=numpy.arange(10.0)),
     )
 
     record = stages.PackageStage().sensitivity(context, None)

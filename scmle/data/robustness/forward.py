@@ -25,8 +25,8 @@ import dataclasses
 import math
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.contracts import qualification
 from scmle.core import randomness
@@ -140,8 +140,8 @@ def label_for(effect_x: float, low: float, high: float) -> str:
 def evaluate_finding(
     name: str,
     effect_x: float,
-    values: np.ndarray,
-    target: np.ndarray,
+    values: numpy.ndarray,
+    target: numpy.ndarray,
     seed: int,
     bootstrap: int,
 ) -> ForwardFinding:
@@ -170,13 +170,13 @@ def evaluate_finding(
     rng = randomness.component_rng(seed, f"{CHECK_ID}.{name}", 0)
     rows = len(values)
     picks = [rng.integers(0, rows, size=rows) for index in range(bootstrap)]
-    draws = np.array(
+    draws = numpy.array(
         [stability.rank_effect(values[p], target[p]) for p in picks]
     )
-    draws = draws[np.isfinite(draws)]
+    draws = draws[numpy.isfinite(draws)]
     tail = (1.0 - CONFIDENCE) / 2.0 * 100.0
     low, high = (
-        (float(v) for v in np.percentile(draws, (tail, 100.0 - tail)))
+        (float(v) for v in numpy.percentile(draws, (tail, 100.0 - tail)))
         if draws.size
         else (effect, effect)
     )
@@ -205,7 +205,7 @@ def evaluate_finding(
 def forward_check(
     source: confirm.ConfirmationSource | None,
     effects: Mapping[str, float],
-    encode: Callable[[pd.Series], np.ndarray],
+    encode: Callable[[pandas.Series], numpy.ndarray],
     *,
     temporal: bool,
     seed: int,
@@ -249,7 +249,7 @@ def forward_check(
                 name,
                 effect_x,
                 features[name].to_numpy(dtype=float),
-                np.asarray(codes, dtype=float),
+                numpy.asarray(codes, dtype=float),
                 seed,
                 bootstrap,
             )

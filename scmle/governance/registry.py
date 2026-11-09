@@ -18,7 +18,7 @@ from typing import Any
 from typing import Self
 
 from scmle import durability
-from scmle.artifacts import bundle as bundle_module
+from scmle.artifacts import bundle
 from scmle.contracts import errors
 from scmle.contracts import events
 from scmle.governance import attestation
@@ -227,8 +227,8 @@ def content_id_of(bundle_directory: str | pathlib.Path) -> str:
     Returns:
         The SHA-256 of the bundle's manifest file.
     """
-    manifest = pathlib.Path(bundle_directory) / bundle_module.MANIFEST_FILE
-    return bundle_module.file_sha256(manifest)
+    manifest = pathlib.Path(bundle_directory) / bundle.MANIFEST_FILE
+    return bundle.file_sha256(manifest)
 
 
 class ModelRegistryStore:
@@ -346,10 +346,10 @@ class ModelRegistryStore:
             identical content is already registered (registration is
             idempotent for the same content).
         """
-        bundle_module.ModelBundle.load(
+        bundle.ModelBundle.load(
             bundle_directory, trusted=trusted, signing_key=signing_key
         )
-        signed = bundle_module.verify_signature(
+        signed = bundle.verify_signature(
             pathlib.Path(bundle_directory), signing_key
         )
         content_id = content_id_of(bundle_directory)
@@ -616,7 +616,7 @@ class ModelRegistryStore:
         model: str,
         ref: str | int = CHAMPION,
         signing_key: str | bytes | None = None,
-    ) -> bundle_module.ModelBundle:
+    ) -> bundle.ModelBundle:
         """Loads a registered bundle by alias or version.
 
         A bundle registered as signed is authenticated again with the key; one
@@ -633,7 +633,7 @@ class ModelRegistryStore:
             The loaded bundle.
         """
         record = self.resolve(model, ref)
-        return bundle_module.ModelBundle.load(
+        return bundle.ModelBundle.load(
             self.root / record.path,
             trusted=not record.signed,
             signing_key=signing_key,

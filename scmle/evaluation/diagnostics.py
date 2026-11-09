@@ -12,12 +12,12 @@ import time
 from typing import Any
 from typing import ClassVar
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from sklearn import base
 from sklearn import metrics as sk_metrics
 
-from scmle.contracts import data as data_contracts
+from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.contracts import metrics as metric_contracts
 from scmle.contracts import tasks
@@ -59,15 +59,15 @@ class DiagnosticInput:
     """
 
     estimator: Any
-    features: pd.DataFrame
-    target: pd.Series
+    features: pandas.DataFrame
+    target: pandas.Series
     task: tasks.TaskType
     metric: metric_contracts.Metric
-    feature_plan: data_contracts.FeaturePlan
+    feature_plan: data.FeaturePlan
     seed: int
-    groups: pd.Series | None = None
+    groups: pandas.Series | None = None
     temporal: bool = False
-    reference_features: pd.DataFrame | None = None
+    reference_features: pandas.DataFrame | None = None
     sensitive_columns: tuple[str, ...] = ()
     deadline: float | None = None
 
@@ -175,9 +175,9 @@ class CalibrationReport(Diagnostic):
         """
         probability = inputs.estimator.predict_proba(inputs.features)[:, 1]
         observed = (inputs.target == inputs.positive_label).astype(float)
-        edges = np.linspace(0.0, 1.0, CALIBRATION_BINS + 1)
-        bins = np.clip(
-            np.digitize(probability, edges[1:-1]), 0, CALIBRATION_BINS - 1
+        edges = numpy.linspace(0.0, 1.0, CALIBRATION_BINS + 1)
+        bins = numpy.clip(
+            numpy.digitize(probability, edges[1:-1]), 0, CALIBRATION_BINS - 1
         )
         curve, error = [], 0.0
         for index in range(CALIBRATION_BINS):
@@ -196,7 +196,7 @@ class CalibrationReport(Diagnostic):
                 }
             )
         return {
-            "brier_score": float(np.mean((probability - observed) ** 2)),
+            "brier_score": float(numpy.mean((probability - observed) ** 2)),
             "expected_calibration_error": float(error),
             "curve": curve,
         }
@@ -218,18 +218,20 @@ class MulticlassCalibrationReport(Diagnostic):
             The multiclass Brier score, the top-label expected calibration
             error and the top-label reliability curve.
         """
-        probabilities = np.asarray(
+        probabilities = numpy.asarray(
             inputs.estimator.predict_proba(inputs.features)
         )
         classes = list(inputs.estimator.classes_)
-        labels = np.asarray(inputs.target)
+        labels = numpy.asarray(inputs.target)
         error, curve = reliability.top_label_curve(
             probabilities, labels, classes, CALIBRATION_BINS
         )
-        truth = (labels[:, None] == np.asarray(classes)[None, :]).astype(float)
+        truth = (labels[:, None] == numpy.asarray(classes)[None, :]).astype(
+            float
+        )
         return {
             "brier_score": float(
-                np.mean(np.sum((probabilities - truth) ** 2, axis=1))
+                numpy.mean(numpy.sum((probabilities - truth) ** 2, axis=1))
             ),
             "expected_calibration_error": error,
             "curve": curve,
@@ -294,16 +296,16 @@ class ResidualReport(Diagnostic):
             levels are skipped; numeric features with more than that many
             distinct values are cut into quartile bands.
         """
-        residual = inputs.target.to_numpy(dtype=float) - np.asarray(
+        residual = inputs.target.to_numpy(dtype=float) - numpy.asarray(
             inputs.estimator.predict(inputs.features), dtype=float
         )
-        absolute = np.abs(residual)
+        absolute = numpy.abs(residual)
         report: dict[str, Any] = {
             "bias": float(residual.mean()),
             "residual_std": float(residual.std()),
             "mae": float(absolute.mean()),
             "abs_error_quantiles": {
-                str(q): float(np.quantile(absolute, q))
+                str(q): float(numpy.quantile(absolute, q))
                 for q in (0.5, 0.9, 0.99)
             },
             "segments": {},
@@ -321,11 +323,11 @@ class ResidualReport(Diagnostic):
                 for level, group in grouped
             }
         for column in inputs.feature_plan.numeric[:MAX_SEGMENT_FEATURES]:
-            values = pd.to_numeric(frame[column], errors="coerce")
+            values = pandas.to_numeric(frame[column], errors="coerce")
             keys = (
                 values
                 if values.nunique() <= MAX_SEGMENT_LEVELS
-                else pd.qcut(values, SEGMENT_BANDS, duplicates="drop")
+                else pandas.qcut(values, SEGMENT_BANDS, duplicates="drop")
             )
             grouped = frame["abs_error"].groupby(keys, observed=True)
             report["segments"][column] = {
@@ -358,10 +360,10 @@ class ErrorAnalysis(Diagnostic):
             regression ranks by absolute error and reports the mean
             absolute error.
         """
-        predicted = np.asarray(inputs.estimator.predict(inputs.features))
+        predicted = numpy.asarray(inputs.estimator.predict(inputs.features))
         row_ids = [str(value) for value in inputs.features.index]
         if inputs.task in CLASSIFICATION:
-            probabilities = np.asarray(
+            probabilities = numpy.asarray(
                 inputs.estimator.predict_proba(inputs.features)
             )
             confidence = probabilities.max(axis=1)
@@ -400,7 +402,7 @@ class ErrorAnalysis(Diagnostic):
         actual = inputs.target.to_numpy(dtype=float)
         numeric_prediction = predicted.astype(float)
         residual = actual - numeric_prediction
-        absolute = np.abs(residual)
+        absolute = numpy.abs(residual)
         positions = sorted(
             range(len(predicted)),
             key=lambda position: (-float(absolute[position]), position),
@@ -445,7 +447,7 @@ class CachedPredictions(base.BaseEstimator):
     `predict_proba`.
     """
 
-    def __init__(self, estimator: Any, features: pd.DataFrame) -> None:
+    def __init__(self, estimator: Any, features: pandas.DataFrame) -> None:
         """Predicts every row once.
 
         Args:
@@ -453,18 +455,18 @@ class CachedPredictions(base.BaseEstimator):
             features: Rows with a unique index.
         """
         self.classes_ = getattr(estimator, "classes_", None)
-        self.predictions = pd.Series(
-            np.asarray(estimator.predict(features)), index=features.index
+        self.predictions = pandas.Series(
+            numpy.asarray(estimator.predict(features)), index=features.index
         )
         self.probabilities = (
-            pd.DataFrame(
+            pandas.DataFrame(
                 estimator.predict_proba(features), index=features.index
             )
             if self.classes_ is not None and hasattr(estimator, "predict_proba")
             else None
         )
 
-    def predict(self, features: pd.DataFrame) -> np.ndarray:
+    def predict(self, features: pandas.DataFrame) -> numpy.ndarray:
         """Looks up predictions for the given rows.
 
         Args:
@@ -475,7 +477,7 @@ class CachedPredictions(base.BaseEstimator):
         """
         return self.predictions.loc[features.index].to_numpy()
 
-    def predict_proba(self, features: pd.DataFrame) -> np.ndarray:
+    def predict_proba(self, features: pandas.DataFrame) -> numpy.ndarray:
         """Looks up probabilities for the given rows.
 
         Args:
@@ -503,10 +505,10 @@ class RegressorReplay(base.RegressorMixin, CachedPredictions):
 
 def resample_rows(
     rows: int,
-    groups: pd.Series | None,
+    groups: pandas.Series | None,
     temporal: bool,
-    rng: np.random.Generator,
-) -> np.ndarray:
+    rng: numpy.random.Generator,
+) -> numpy.ndarray:
     """Draws one bootstrap resample that respects the data's dependence.
 
     Args:
@@ -528,12 +530,12 @@ def resample_rows(
         )
         labels = list(members)
         drawn = rng.integers(0, len(labels), len(labels))
-        return np.concatenate([members[labels[i]] for i in drawn])
+        return numpy.concatenate([members[labels[i]] for i in drawn])
     if temporal:
-        length = max(5, int(np.sqrt(rows)))
+        length = max(5, int(numpy.sqrt(rows)))
         starts = rng.integers(0, max(rows - length + 1, 1), -(-rows // length))
-        blocks = np.concatenate(
-            [np.arange(s, min(s + length, rows)) for s in starts]
+        blocks = numpy.concatenate(
+            [numpy.arange(s, min(s + length, rows)) for s in starts]
         )
         return blocks[:rows]
     return rng.integers(0, rows, rows)
@@ -582,7 +584,7 @@ class MetricUncertainty(Diagnostic):
             if inputs.groups is not None
             else None
         )
-        rng = np.random.default_rng(inputs.seed)
+        rng = numpy.random.default_rng(inputs.seed)
         scores: list[float] = []
         unit = (
             "groups"
@@ -609,7 +611,7 @@ class MetricUncertainty(Diagnostic):
                 continue
         interval = None
         if scores:
-            low, high = np.percentile(
+            low, high = numpy.percentile(
                 scores,
                 [
                     (100 - self.confidence) / 2,

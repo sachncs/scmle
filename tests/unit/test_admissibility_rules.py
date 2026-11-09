@@ -5,76 +5,86 @@ import datetime
 import pytest
 
 from scmle.contracts.qualification import Tier
-from scmle.data.admissibility import dag as dag_module
-from scmle.data.admissibility import provenance as p
-from scmle.data.admissibility import rules as r
+from scmle.data.admissibility import dag
+from scmle.data.admissibility import provenance
+from scmle.data.admissibility import rules
 from scmle.data.detectors import certificates
 from tests.unit.test_admissibility_provenance import attestation
 from tests.unit.test_admissibility_provenance import make_field
 
 DAY = datetime.date(2026, 6, 15)
 GATING = certificates.GateStatus.GATING
-A, Q, F = r.Admission.ADMIT, r.Admission.QUARANTINE, r.Admission.ADMIT_FLAGGED
+A, Q, F = (
+    rules.Admission.ADMIT,
+    rules.Admission.QUARANTINE,
+    rules.Admission.ADMIT_FLAGGED,
+)
 
 
 def unverified(name="u"):
-    return p.undeclared(name)
+    return provenance.undeclared(name)
 
 
 def test_a_planted_mediator_known_before_the_moment_is_admitted():
     # T -> M -> Y: M is a mediator, known an hour before the moment.
-    graph = dag_module.Dag.build([("T", "M"), ("M", "Y")], "expert")
-    table = p.ProvenanceTable(
+    graph = dag.Dag.build([("T", "M"), ("M", "Y")], "expert")
+    table = provenance.ProvenanceTable(
         (make_field("M", lead=3600.0), make_field("T", lead=7200.0))
     )
-    out = r.build_table(table, "predictive", graph=graph)
+    out = rules.build_table(table, "predictive", graph=graph)
     assert out.names(A) == ("M", "T")
     assert out.dag_hash is None  # a pure prediction task never reads roles
 
 
 def test_a_planted_post_outcome_field_is_quarantined():
-    table = p.ProvenanceTable((make_field("after", lead=-60.0),))
-    out = r.build_table(table, "predictive", mode=r.Mode.PERMISSIVE)
+    table = provenance.ProvenanceTable((make_field("after", lead=-60.0),))
+    out = rules.build_table(table, "predictive", mode=rules.Mode.PERMISSIVE)
     assert out.names(Q) == ("after",)
     assert "less than the declared" in out.decisions[0].reasons[0]
 
 
 def test_the_declared_lag_boundary_is_inclusive():
-    on = r.decide_predictive(make_field(lead=100.0), declared_lag_seconds=100.0)
-    below = r.decide_predictive(
+    on = rules.decide_predictive(
+        make_field(lead=100.0), declared_lag_seconds=100.0
+    )
+    below = rules.decide_predictive(
         make_field(lead=99.999), declared_lag_seconds=100.0
     )
     assert on.admission is A
     assert below.admission is Q
-    zero = r.decide_predictive(make_field(lead=0.0))
+    zero = rules.decide_predictive(make_field(lead=0.0))
     assert zero.admission is A  # known exactly at the moment, no lag declared
-    assert r.decide_predictive(make_field(lead=-1e-9)).admission is Q
+    assert rules.decide_predictive(make_field(lead=-1e-9)).admission is Q
 
 
 def test_a_negative_or_nonfinite_lag_is_rejected():
     with pytest.raises(ValueError):
-        r.decide_predictive(make_field(), declared_lag_seconds=-1.0)
+        rules.decide_predictive(make_field(), declared_lag_seconds=-1.0)
     with pytest.raises(ValueError):
-        r.decide_predictive(make_field(), declared_lag_seconds=float("inf"))
+        rules.decide_predictive(make_field(), declared_lag_seconds=float("inf"))
 
 
 def test_not_available_at_serving_is_quarantined_in_every_mode():
-    record = make_field(serving=p.Availability.NO)
-    for mode in r.Mode:
-        d = r.decide_predictive(record, mode)
+    record = make_field(serving=provenance.Availability.NO)
+    for mode in rules.Mode:
+        d = rules.decide_predictive(record, mode)
         assert d.admission is Q and "serving" in d.reasons[0]
 
 
 def test_unknown_serving_availability_follows_the_mode():
-    record = make_field(serving=p.Availability.UNKNOWN)
-    assert r.decide_predictive(record, r.Mode.STRICT).admission is Q
-    assert r.decide_predictive(record, r.Mode.PERMISSIVE).admission is F
+    record = make_field(serving=provenance.Availability.UNKNOWN)
+    assert rules.decide_predictive(record, rules.Mode.STRICT).admission is Q
+    assert rules.decide_predictive(record, rules.Mode.PERMISSIVE).admission is F
 
 
 def test_strict_quarantines_every_unverified_field_permissive_flags_it():
-    table = p.ProvenanceTable.covering(["a", "b"], [make_field("b")])
-    strict = r.build_table(table, "predictive", r.Mode.STRICT, today=DAY)
-    loose = r.build_table(table, "predictive", r.Mode.PERMISSIVE, today=DAY)
+    table = provenance.ProvenanceTable.covering(["a", "b"], [make_field("b")])
+    strict = rules.build_table(
+        table, "predictive", rules.Mode.STRICT, today=DAY
+    )
+    loose = rules.build_table(
+        table, "predictive", rules.Mode.PERMISSIVE, today=DAY
+    )
     assert strict.names(Q) == ("a",) and strict.names(A) == ("b",)
     assert loose.names(F) == ("a",) and loose.names(A) == ("b",)
     for d in strict.decisions + loose.decisions:
@@ -83,52 +93,54 @@ def test_strict_quarantines_every_unverified_field_permissive_flags_it():
 
 def test_expired_attestation_is_treated_as_unverified():
     record = make_field(att=attestation(expires="2026-06-14"))
-    assert r.decide_predictive(record, today=DAY).admission is Q
-    assert r.decide_predictive(record, today=None).admission is A
+    assert rules.decide_predictive(record, today=DAY).admission is Q
+    assert rules.decide_predictive(record, today=None).admission is A
 
 
 def test_a_log_that_disagrees_quarantines_even_a_permissive_run():
     record = make_field(
-        source=p.AsOfSource.LOG,
-        kind=p.AsOfKind.TIMESTAMP,
-        log=p.LogCheck(100, 3, 0.0),
+        source=provenance.AsOfSource.LOG,
+        kind=provenance.AsOfKind.TIMESTAMP,
+        log=provenance.LogCheck(100, 3, 0.0),
         att=attestation(),
     )
-    d = r.decide_predictive(record, r.Mode.PERMISSIVE, today=DAY)
+    d = rules.decide_predictive(record, rules.Mode.PERMISSIVE, today=DAY)
     assert d.admission is Q and "change log disagrees" in d.reasons[0]
 
 
 def test_suspicion_without_as_of_evidence_quarantines_only_when_gating():
     record = unverified()
-    off = r.decide_predictive(record, r.Mode.PERMISSIVE, suspect=True)
-    on = r.decide_predictive(
-        record, r.Mode.PERMISSIVE, suspect=True, leakage_gate=GATING
+    off = rules.decide_predictive(record, rules.Mode.PERMISSIVE, suspect=True)
+    on = rules.decide_predictive(
+        record, rules.Mode.PERMISSIVE, suspect=True, leakage_gate=GATING
     )
     assert off.admission is F and on.admission is Q
     assert off.suspicion_kept and on.suspicion_kept
 
 
 def test_a_suspect_with_log_evidence_is_admitted_and_the_suspicion_kept():
-    record = make_field(source=p.AsOfSource.LOG, kind=p.AsOfKind.TIMESTAMP)
-    d = r.decide_predictive(record, suspect=True, leakage_gate=GATING)
+    record = make_field(
+        source=provenance.AsOfSource.LOG, kind=provenance.AsOfKind.TIMESTAMP
+    )
+    d = rules.decide_predictive(record, suspect=True, leakage_gate=GATING)
     assert d.admission is A and d.suspicion_kept and d.tier is Tier.CONFIRMED
     assert any("suspicion kept" in x for x in d.reasons)
 
 
 def test_a_suspect_with_only_an_attestation_is_flagged():
-    d = r.decide_predictive(make_field(), today=DAY, suspect=True)
+    d = rules.decide_predictive(make_field(), today=DAY, suspect=True)
     assert d.admission is F and d.tier is Tier.ATTESTED
 
 
 def test_no_suspicion_no_flag():
-    d = r.decide_predictive(make_field(), today=DAY)
+    d = rules.decide_predictive(make_field(), today=DAY)
     assert d.admission is A and not d.suspicion_kept
 
 
 # T -> M -> Y mediator, C -> T and C -> Y confounder,
 # U1 -> T, U1 -> K <- U2, U2 -> Y with K a collider (U latent), P -> Y a pure
 # predictor, D descends from T.
-GRAPH = dag_module.Dag.build(
+GRAPH = dag.Dag.build(
     [
         ("C", "T"),
         ("C", "Y"),
@@ -147,8 +159,8 @@ GRAPH = dag_module.Dag.build(
 )
 
 
-def causal(name, graph=GRAPH, mode=r.Mode.STRICT, lead=3600.0):
-    return r.decide_causal(
+def causal(name, graph=GRAPH, mode=rules.Mode.STRICT, lead=3600.0):
+    return rules.decide_causal(
         make_field(name, lead=lead), graph, "T", "Y", mode, today=DAY
     )
 
@@ -174,7 +186,7 @@ def test_treatment_and_outcome_are_decided_on_timing_alone():
 
 def test_a_field_outside_the_dag_follows_the_mode():
     assert causal("Z").admission is Q
-    assert causal("Z", mode=r.Mode.PERMISSIVE).admission is F
+    assert causal("Z", mode=rules.Mode.PERMISSIVE).admission is F
     assert "not in the declared DAG" in causal("Z").reasons[-1]
 
 
@@ -184,7 +196,7 @@ def test_timing_quarantine_wins_before_the_graph_is_consulted():
 
 
 def test_without_a_valid_adjustment_set_covariates_are_flagged():
-    graph = dag_module.Dag.build(
+    graph = dag.Dag.build(
         [("U", "T"), ("U", "Y"), ("T", "Y"), ("P", "Y")], "e", latent=["U"]
     )
     d = causal("P", graph)
@@ -193,8 +205,8 @@ def test_without_a_valid_adjustment_set_covariates_are_flagged():
 
 def test_causal_table_records_the_graph_hash_and_set():
     fields = [make_field(n) for n in ("C", "K", "M", "P", "T", "Y")]
-    out = r.build_table(
-        p.ProvenanceTable(tuple(fields)),
+    out = rules.build_table(
+        provenance.ProvenanceTable(tuple(fields)),
         "causal",
         graph=GRAPH,
         treatment="T",
@@ -208,31 +220,33 @@ def test_causal_table_records_the_graph_hash_and_set():
 
 
 def test_arguments_of_the_table_are_validated():
-    table = p.ProvenanceTable((make_field("a"),))
+    table = provenance.ProvenanceTable((make_field("a"),))
     with pytest.raises(ValueError, match="kind"):
-        r.build_table(table, "descriptive")
+        rules.build_table(table, "descriptive")
     with pytest.raises(ValueError, match="graph, treatment, outcome"):
-        r.build_table(table, "causal")
+        rules.build_table(table, "causal")
     with pytest.raises(ValueError, match="unique"):
-        d = r.decide_predictive(make_field("a"))
-        r.AdmissibilityTable("predictive", r.Mode.STRICT, (d, d), None, None)
+        d = rules.decide_predictive(make_field("a"))
+        rules.AdmissibilityTable(
+            "predictive", rules.Mode.STRICT, (d, d), None, None
+        )
     with pytest.raises(ValueError, match="kind"):
-        r.AdmissibilityTable("x", r.Mode.STRICT, (), None, None)
+        rules.AdmissibilityTable("x", rules.Mode.STRICT, (), None, None)
 
 
 def test_decisions_round_trip():
-    d = r.decide_predictive(make_field(), today=DAY, suspect=True)
-    assert r.FieldDecision.from_dict(d.to_dict()) == d
+    d = rules.decide_predictive(make_field(), today=DAY, suspect=True)
+    assert rules.FieldDecision.from_dict(d.to_dict()) == d
     with pytest.raises(ValueError, match="unexpected"):
-        r.FieldDecision.from_dict({**d.to_dict(), "x": 1})
+        rules.FieldDecision.from_dict({**d.to_dict(), "x": 1})
 
 
 def test_a_gate_per_field_blocks_only_the_field_it_names():
-    table = p.ProvenanceTable.covering(["a", "b"])
-    out = r.build_table(
+    table = provenance.ProvenanceTable.covering(["a", "b"])
+    out = rules.build_table(
         table,
         "predictive",
-        r.Mode.PERMISSIVE,
+        rules.Mode.PERMISSIVE,
         suspects={"a": True, "b": True},
         leakage_gate={"a": GATING},
     )

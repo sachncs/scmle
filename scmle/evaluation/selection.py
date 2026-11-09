@@ -5,7 +5,7 @@ import math
 
 from scmle.contracts import errors
 from scmle.contracts import experiments
-from scmle.contracts import metrics as metric_contracts
+from scmle.contracts import metrics
 from scmle.contracts import tasks
 from scmle.evaluation import comparison
 from scmle.models import registry as registry_module
@@ -27,7 +27,7 @@ class SelectionPolicy(abc.ABC):
     def rank(
         self,
         trials: list[experiments.TrialResult],
-        metric: metric_contracts.Metric,
+        metric: metrics.Metric,
         registry: registry_module.ModelRegistry,
     ) -> list[experiments.TrialResult]:
         """Orders the eligible trials best first.
@@ -47,7 +47,7 @@ class SelectionPolicy(abc.ABC):
     def select(
         self,
         trials: list[experiments.TrialResult],
-        metric: metric_contracts.Metric,
+        metric: metrics.Metric,
         registry: registry_module.ModelRegistry,
     ) -> experiments.TrialResult:
         """Returns the best-ranked trial.
@@ -151,7 +151,7 @@ class BestMeanPolicy(SelectionPolicy):
     def rank(
         self,
         trials: list[experiments.TrialResult],
-        metric: metric_contracts.Metric,
+        metric: metrics.Metric,
         registry: registry_module.ModelRegistry,
     ) -> list[experiments.TrialResult]:
         """Sorts by score, resolving ties with the configured tie-breaker.

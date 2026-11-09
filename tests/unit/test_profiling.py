@@ -1,7 +1,7 @@
 """Tests for task resolution and dataset profiling."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
 from scmle.contracts import errors
@@ -26,9 +26,9 @@ def profile(frame, task="auto", **data_overrides):
 
 @pytest.fixture
 def classification_frame():
-    rng = np.random.default_rng(0)
+    rng = numpy.random.default_rng(0)
     rows = 300
-    return pd.DataFrame(
+    return pandas.DataFrame(
         {
             "num": rng.normal(size=rows),
             "cat": rng.choice(list("abc"), rows),
@@ -47,19 +47,19 @@ def test_task_resolution(classification_frame):
     frame = classification_frame
     assert resolve(frame) is tasks.TaskType.BINARY
     assert resolve(frame, "classification") is tasks.TaskType.BINARY
-    multi = frame.assign(y=np.arange(len(frame)) % 4)
+    multi = frame.assign(y=numpy.arange(len(frame)) % 4)
     assert resolve(multi, "classification") is tasks.TaskType.MULTICLASS
     continuous = frame.assign(
-        y=np.random.default_rng(1).normal(size=len(frame))
+        y=numpy.random.default_rng(1).normal(size=len(frame))
     )
     assert resolve(continuous) is tasks.TaskType.REGRESSION
-    strings = frame.assign(y=np.where(frame.y == 1, "yes", "no"))
+    strings = frame.assign(y=numpy.where(frame.y == 1, "yes", "no"))
     assert resolve(strings) is tasks.TaskType.BINARY
 
 
 def test_ambiguous_integer_target_blocks(classification_frame):
     ambiguous = classification_frame.assign(
-        y=np.arange(len(classification_frame)) % 5
+        y=numpy.arange(len(classification_frame)) % 5
     )
     with pytest.raises(errors.BlockedError, match="ambiguous"):
         resolve(ambiguous)
@@ -68,10 +68,12 @@ def test_ambiguous_integer_target_blocks(classification_frame):
 def test_explicit_requests_must_match_data(classification_frame):
     with pytest.raises(errors.BlockedError):
         resolve(classification_frame, "multiclass_classification")
-    two_class = classification_frame.assign(y=np.arange(300) % 3)
+    two_class = classification_frame.assign(y=numpy.arange(300) % 3)
     with pytest.raises(errors.BlockedError):
         resolve(two_class, "binary_classification")
-    text = classification_frame.assign(y=np.where(np.arange(300) % 2, "a", "b"))
+    text = classification_frame.assign(
+        y=numpy.where(numpy.arange(300) % 2, "a", "b")
+    )
     with pytest.raises(errors.BlockedError):
         resolve(text, "regression")
     with pytest.raises(errors.BlockedError):
@@ -87,7 +89,9 @@ def test_feature_plan_drops_constant_and_id_like(classification_frame):
 
 
 def test_roles_are_excluded_from_features(classification_frame):
-    frame = classification_frame.assign(grp=np.arange(300) % 30, rid=range(300))
+    frame = classification_frame.assign(
+        grp=numpy.arange(300) % 30, rid=range(300)
+    )
     result = profile(frame, group_column="grp", id_columns=["rid"])[1]
     dropped = result.feature_plan.dropped
     assert "splitting" in dropped["grp"] and dropped["rid"] == "id column"
@@ -125,10 +129,10 @@ def test_clean_table_has_an_empty_screen_result(classification_frame):
 
 
 def test_a_strong_legitimate_predictor_is_not_a_leakage_risk():
-    rng = np.random.default_rng(3)
+    rng = numpy.random.default_rng(3)
     rows = 600
     y = rng.integers(0, 2, rows)
-    frame = pd.DataFrame(
+    frame = pandas.DataFrame(
         {"strong": y + rng.normal(scale=0.8, size=rows), "y": y}
     )
     result = profile(frame)[1]
@@ -140,8 +144,8 @@ def test_a_strong_legitimate_predictor_is_not_a_leakage_risk():
 def test_the_screen_uses_groups_and_the_time_order(classification_frame):
     frame = classification_frame.assign(
         leak=classification_frame["y"] + 0.0,
-        grp=np.arange(300) % 30,
-        when=np.arange(300)[::-1],
+        grp=numpy.arange(300) % 30,
+        when=numpy.arange(300)[::-1],
     )
     grouped = profile(frame, group_column="grp")[1]
     timed = profile(frame, time_column="when")[1]
@@ -150,7 +154,7 @@ def test_the_screen_uses_groups_and_the_time_order(classification_frame):
 
 
 def test_the_screen_is_skipped_for_a_non_numeric_non_class_target():
-    frame = pd.DataFrame({"a": range(120), "y": ["x"] * 120})
+    frame = pandas.DataFrame({"a": range(120), "y": ["x"] * 120})
     spec = make_spec("auto")
     report = profiler.DatasetProfiler(spec).leakage_screen(
         frame, ["a"], tasks.TaskType.MULTILABEL
@@ -160,30 +164,30 @@ def test_the_screen_is_skipped_for_a_non_numeric_non_class_target():
 
 def test_missing_target_blocks(classification_frame):
     broken = classification_frame.copy()
-    broken.loc[0, "y"] = np.nan
+    broken.loc[0, "y"] = numpy.nan
     with pytest.raises(errors.BlockedError, match="missing"):
         profile(broken)
 
 
 def test_no_usable_features_blocks():
-    frame = pd.DataFrame({"c": 1, "y": [0, 1] * 20})
+    frame = pandas.DataFrame({"c": 1, "y": [0, 1] * 20})
     with pytest.raises(errors.BlockedError, match="no usable"):
         profile(frame)
 
 
 def test_imbalance_and_duplicates(classification_frame):
     frame = classification_frame
-    skewed = pd.concat([frame[frame.y == 0], frame[frame.y == 1].head(5)])
+    skewed = pandas.concat([frame[frame.y == 0], frame[frame.y == 1].head(5)])
     result = profile(skewed)[1]
     assert any("imbalance" in r for r in result.risk_findings)
-    duplicated = pd.concat([frame, frame.head(5)])
+    duplicated = pandas.concat([frame, frame.head(5)])
     result = profile(duplicated)[1]
     assert any("duplicate" in q for q in result.quality_findings)
 
 
 def test_regression_target_summary():
-    rng = np.random.default_rng(0)
-    frame = pd.DataFrame({"x": rng.normal(size=100)})
+    rng = numpy.random.default_rng(0)
+    frame = pandas.DataFrame({"x": rng.normal(size=100)})
     frame["y"] = frame.x * 2
     task, result = profile(frame)
     assert task is tasks.TaskType.REGRESSION
@@ -198,12 +202,12 @@ def test_profile_serializes(classification_frame):
 
 
 def test_outcome_dependent_recording_is_reported_as_possible_leakage():
-    rng = np.random.default_rng(4)
+    rng = numpy.random.default_rng(4)
     rows = 400
-    frame = pd.DataFrame({"signal": rng.normal(size=rows)})
+    frame = pandas.DataFrame({"signal": rng.normal(size=rows)})
     frame["y"] = rng.integers(0, 2, rows)
-    frame["discharge_code"] = np.where(
-        frame.y == 1, rng.integers(1, 5, rows), np.nan
+    frame["discharge_code"] = numpy.where(
+        frame.y == 1, rng.integers(1, 5, rows), numpy.nan
     )
     result = profile(frame)[1]
     assert any(
@@ -233,11 +237,13 @@ def test_target_cannot_be_declared_unavailable():
 
 
 def test_datetime_columns_become_calendar_and_trend_features():
-    rng = np.random.default_rng(0)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(0)
+    frame = pandas.DataFrame(
         {
-            "signed_up": pd.date_range("2022-01-01", periods=400, freq="40h"),
-            "constant_day": pd.Timestamp("2024-03-04"),
+            "signed_up": pandas.date_range(
+                "2022-01-01", periods=400, freq="40h"
+            ),
+            "constant_day": pandas.Timestamp("2024-03-04"),
             "x": rng.normal(size=400),
             "y": rng.integers(0, 2, 400),
         }

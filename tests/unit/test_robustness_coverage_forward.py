@@ -1,7 +1,7 @@
 """Subgroup coverage and the forward-in-time check."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 from scipy import stats
 
@@ -16,14 +16,14 @@ FAIL = shift.Status.FAIL
 
 
 def test_without_a_reference_every_level_is_unverifiable_never_pass():
-    sample = pd.Series(["a"] * 30 + ["b"] * 70, name="g")
+    sample = pandas.Series(["a"] * 30 + ["b"] * 70, name="g")
     rows = coverage.subgroup_coverage(sample, None)
     assert {r.status for r in rows} == {shift.Status.UNVERIFIABLE}
     assert [r.level for r in rows] == ["a", "b"]
 
 
 def test_the_interval_is_the_exact_one_and_decides_pass_or_fail():
-    sample = pd.Series(["a"] * 30 + ["b"] * 70, name="g")
+    sample = pandas.Series(["a"] * 30 + ["b"] * 70, name="g")
     rows = {
         r.level: r
         for r in coverage.subgroup_coverage(sample, {"a": 0.3, "b": 0.7})
@@ -39,7 +39,7 @@ def test_the_interval_is_the_exact_one_and_decides_pass_or_fail():
 
 
 def test_a_level_missing_from_the_sample_or_the_deployment_is_listed():
-    sample = pd.Series(["a"] * 50, name="g")
+    sample = pandas.Series(["a"] * 50, name="g")
     rows = {
         r.level: r
         for r in coverage.subgroup_coverage(sample, {"a": 0.5, "z": 0.5})
@@ -52,14 +52,14 @@ def test_a_level_missing_from_the_sample_or_the_deployment_is_listed():
 
 
 def test_missing_values_are_their_own_level_and_input_is_validated():
-    sample = pd.Series(["a", None, "a", None], name="g")
+    sample = pandas.Series(["a", None, "a", None], name="g")
     assert {r.level for r in coverage.subgroup_coverage(sample, None)} == {
         "a",
         coverage.MISSING_LEVEL,
     }
     assert coverage.shares(sample)["a"] == 0.5
     with pytest.raises(ValueError, match="empty"):
-        coverage.subgroup_coverage(pd.Series([], dtype=object), None)
+        coverage.subgroup_coverage(pandas.Series([], dtype=object), None)
     with pytest.raises(ValueError, match="alpha"):
         coverage.subgroup_coverage(sample, None, alpha=1.0)
     record = coverage.subgroup_coverage(sample, {"a": 0.5})[0].to_dict()
@@ -67,10 +67,10 @@ def test_missing_values_are_their_own_level_and_input_is_validated():
 
 
 def forward_set(rows=300, beta=0.8, seed=0):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     x = rng.normal(size=rows)
-    frame = pd.DataFrame({"f": x, "g": rng.normal(size=rows)})
-    target = pd.Series(beta * x + rng.normal(size=rows), name="y")
+    frame = pandas.DataFrame({"f": x, "g": rng.normal(size=rows)})
+    target = pandas.Series(beta * x + rng.normal(size=rows), name="y")
     vault = sealed.CustodyVault(sealed.OpenLog(), process=False)
     held = vault.seal("final_test", frame, target, tuple(range(rows)))
     return vault, held

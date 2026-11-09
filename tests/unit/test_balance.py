@@ -1,19 +1,19 @@
 """Permutation balance test of covariates across treatment arms."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
 from scmle.evaluation import balance
 
 
 def world(seed, n=400, columns=4, confound=0.0, q=0.5):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     x = rng.standard_normal((n, columns))
     logit = confound * x[:, 0]
-    probability = 1.0 / (1.0 + np.exp(-(np.log(q / (1 - q)) + logit)))
+    probability = 1.0 / (1.0 + numpy.exp(-(numpy.log(q / (1 - q)) + logit)))
     arm = (rng.uniform(size=n) < probability).astype(int)
-    return pd.DataFrame(x, columns=[f"x{k}" for k in range(columns)]), arm
+    return pandas.DataFrame(x, columns=[f"x{k}" for k in range(columns)]), arm
 
 
 def test_randomized_assignment_is_flagged_at_most_at_the_level():
@@ -25,7 +25,7 @@ def test_randomized_assignment_is_flagged_at_most_at_the_level():
         not balance.balance_test(*world(seed), seed=seed)["balanced"]
         for seed in range(worlds)
     )
-    assert flagged / worlds <= 0.05 + 3 * np.sqrt(0.05 * 0.95 / worlds)
+    assert flagged / worlds <= 0.05 + 3 * numpy.sqrt(0.05 * 0.95 / worlds)
 
 
 def test_assignment_that_follows_a_covariate_is_flagged():
@@ -59,18 +59,18 @@ def test_same_seed_same_result_and_constant_columns_are_dropped():
 
 def test_missing_values_and_text_columns_are_handled():
     features, arm = world(2)
-    features.loc[::7, "x1"] = np.nan
+    features.loc[::7, "x1"] = numpy.nan
     features["label"] = "a"
     found = balance.balance_test(features, arm, seed=0)
     assert found["covariates"] == 4
 
 
 def test_no_numeric_covariate_or_one_arm_cannot_be_tested():
-    features = pd.DataFrame({"label": ["a", "b", "a", "b"]})
-    none = balance.balance_test(features, np.array([0, 1, 0, 1]))
+    features = pandas.DataFrame({"label": ["a", "b", "a", "b"]})
+    none = balance.balance_test(features, numpy.array([0, 1, 0, 1]))
     assert none["balanced"] is None and none["p_value"] is None
     features, arm = world(3)
-    single = balance.balance_test(features, np.zeros_like(arm))
+    single = balance.balance_test(features, numpy.zeros_like(arm))
     assert single["balanced"] is None
 
 

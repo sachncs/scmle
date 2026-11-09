@@ -11,7 +11,7 @@ information leaks backward. Ties follow the Breslow convention.
 from typing import Any
 from typing import Self
 
-import numpy as np
+import numpy
 from scipy import optimize
 
 MAX_CELLS = 50_000_000
@@ -51,13 +51,13 @@ class TimeVaryingCox:
             ValueError: If a row has `stop <= start`, there is no event, or
                 the risk-set table would be too large.
         """
-        matrix = np.asarray(features, dtype=float)
-        begin = np.asarray(start, dtype=float)
-        end = np.asarray(stop, dtype=float)
-        seen = np.asarray(event, dtype=bool)
+        matrix = numpy.asarray(features, dtype=float)
+        begin = numpy.asarray(start, dtype=float)
+        end = numpy.asarray(stop, dtype=float)
+        seen = numpy.asarray(event, dtype=bool)
         if (end <= begin).any():
             raise ValueError("every row needs stop > start")
-        moments = np.unique(end[seen])
+        moments = numpy.unique(end[seen])
         if len(moments) == 0:
             raise ValueError("no event was observed")
         if len(end) * len(moments) > MAX_CELLS:
@@ -69,7 +69,7 @@ class TimeVaryingCox:
         count = deaths.sum(axis=1).astype(float)
         event_rows = matrix[seen]
 
-        def objective(beta: np.ndarray) -> tuple[float, np.ndarray]:
+        def objective(beta: numpy.ndarray) -> tuple[float, numpy.ndarray]:
             """Penalised negative log partial likelihood and its gradient.
 
             Args:
@@ -80,10 +80,12 @@ class TimeVaryingCox:
             """
             eta = matrix @ beta
             shift = eta.max()
-            weight = np.exp(eta - shift)
+            weight = numpy.exp(eta - shift)
             risk = at_risk @ weight
             mean = (at_risk @ (matrix * weight[:, None])) / risk[:, None]
-            value = -(eta[seen].sum() - (count * (np.log(risk) + shift)).sum())
+            value = -(
+                eta[seen].sum() - (count * (numpy.log(risk) + shift)).sum()
+            )
             gradient = -(
                 event_rows.sum(axis=0) - (count[:, None] * mean).sum(axis=0)
             )
@@ -93,17 +95,17 @@ class TimeVaryingCox:
             )
 
         fitted = optimize.minimize(
-            objective, np.zeros(matrix.shape[1]), jac=True, method="L-BFGS-B"
+            objective, numpy.zeros(matrix.shape[1]), jac=True, method="L-BFGS-B"
         )
         self.coefficients_ = fitted.x
         eta = matrix @ self.coefficients_
         self.scale_ = float(eta.max())
-        weight = np.exp(eta - self.scale_)
+        weight = numpy.exp(eta - self.scale_)
         self.moments_ = moments
-        self.baseline_ = np.cumsum(count / (at_risk @ weight))
+        self.baseline_ = numpy.cumsum(count / (at_risk @ weight))
         return self
 
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """Linear predictor (log relative hazard) for a covariate row.
 
         Args:
@@ -112,4 +114,4 @@ class TimeVaryingCox:
         Returns:
             Array of shape `(n_rows,)` of linear predictors.
         """
-        return np.asarray(features, dtype=float) @ self.coefficients_
+        return numpy.asarray(features, dtype=float) @ self.coefficients_

@@ -2,8 +2,8 @@
 
 import dataclasses
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.contracts import data as data_contracts
 from scmle.contracts import tasks
@@ -11,15 +11,15 @@ from scmle.data.curation import preprocessing
 from scmle.evaluation import diagnostics
 from scmle.evaluation import metrics
 from scmle.evaluation import slices
-from scmle.models import registry as registry_module
+from scmle.models import registry
 
-REGISTRY = registry_module.ModelRegistry.with_builtins()
+REGISTRY = registry.ModelRegistry.with_builtins()
 PLAN = data_contracts.FeaturePlan(("signal",), ("region",))
 
 
 def make_inputs(rows=1200):
-    rng = np.random.default_rng(0)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(0)
+    frame = pandas.DataFrame(
         {
             "signal": rng.normal(size=rows),
             "region": rng.choice(["north", "south", "east"], rows),
@@ -29,7 +29,7 @@ def make_inputs(rows=1200):
     # whole data must do worse there.
     clean = (frame.signal + rng.normal(0, 0.3, rows) > 0).astype(int)
     noisy = rng.integers(0, 2, rows)
-    target = pd.Series(np.where(frame.region == "south", noisy, clean))
+    target = pandas.Series(numpy.where(frame.region == "south", noisy, clean))
     half = rows // 2
     model = preprocessing.build_pipeline(
         PLAN, REGISTRY.get("logistic_regression"), tasks.TaskType.BINARY, 0

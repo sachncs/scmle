@@ -57,10 +57,10 @@ import sys
 import time
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
-from benchmarks.qualification import subgroup_certify as base_gate
+from benchmarks.qualification import subgroup_certify
 from scmle.data.charter import causal
 from scmle.data.detectors import certificates
 from scmle.data.identification import run
@@ -79,10 +79,10 @@ POWER_REPLICATES = 500
 
 
 def unequal_world(
-    rng: np.random.Generator,
+    rng: numpy.random.Generator,
     sizes: tuple[int, ...],
     effects: dict[str, float],
-) -> pd.DataFrame:
+) -> pandas.DataFrame:
     """A randomized experiment with levels of different sizes.
 
     Args:
@@ -94,17 +94,17 @@ def unequal_world(
         A frame with the level `g`, a treatment `t` assigned with probability
         1/2 and the outcome `y`.
     """
-    levels = base_gate.names()
-    group = np.concatenate(
+    levels = subgroup_certify.names()
+    group = numpy.concatenate(
         [
-            np.repeat(level, size)
+            numpy.repeat(level, size)
             for level, size in zip(levels, sizes, strict=True)
         ]
     )
-    tau = np.array([effects.get(g, 0.0) for g in group])
+    tau = numpy.array([effects.get(g, 0.0) for g in group])
     t = (rng.uniform(size=len(group)) < 0.5).astype(float)
     y = tau * t + rng.standard_normal(len(group))
-    return pd.DataFrame({"g": group, "t": t, "y": y})
+    return pandas.DataFrame({"g": group, "t": t, "y": y})
 
 
 def overlap_names(prefix: str) -> tuple[str, ...]:
@@ -119,7 +119,9 @@ def overlap_names(prefix: str) -> tuple[str, ...]:
     return tuple(f"{prefix}{k}" for k in range(OVERLAP_LEVELS))
 
 
-def overlap_world(rng: np.random.Generator, effect_g0: float) -> pd.DataFrame:
+def overlap_world(
+    rng: numpy.random.Generator, effect_g0: float
+) -> pandas.DataFrame:
     """Two crossed columns; the effect is carried by `g == g0` rows.
 
     Args:
@@ -132,10 +134,10 @@ def overlap_world(rng: np.random.Generator, effect_g0: float) -> pd.DataFrame:
     """
     g = rng.integers(0, OVERLAP_LEVELS, OVERLAP_ROWS)
     h = rng.integers(0, OVERLAP_LEVELS, OVERLAP_ROWS)
-    tau = np.where(g == 0, effect_g0, 0.0)
+    tau = numpy.where(g == 0, effect_g0, 0.0)
     t = (rng.uniform(size=OVERLAP_ROWS) < 0.5).astype(float)
     y = tau * t + rng.standard_normal(OVERLAP_ROWS)
-    return pd.DataFrame(
+    return pandas.DataFrame(
         {
             "g": [f"g{k}" for k in g],
             "h": [f"h{k}" for k in h],
@@ -146,7 +148,7 @@ def overlap_world(rng: np.random.Generator, effect_g0: float) -> pd.DataFrame:
 
 
 def rejected(
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     adapter: run.Adapter,
     groups: tuple[causal.Subgroup, ...],
 ) -> set[tuple[str, str]]:
@@ -160,7 +162,7 @@ def rejected(
     Returns:
         The pairs whose hypothesis the subgroup report rejects.
     """
-    found = run.subgroup_report(adapter, frame, base_gate.LEVEL, groups)
+    found = run.subgroup_report(adapter, frame, subgroup_certify.LEVEL, groups)
     return {
         (r["column"], r["value"]) for r in found["hypotheses"] if r["rejected"]
     }
@@ -195,14 +197,14 @@ def gate_unequal(replicates: int, base: int) -> dict[str, Any]:
         lower bound reaches the floor (None if none) and whether both error
         rates are within the bound.
     """
-    adapter = base_gate.adapter_for()
-    groups = (causal.Subgroup("g", base_gate.names()),)
-    bound = base_gate.bound_for(replicates)
+    adapter = subgroup_certify.adapter_for()
+    groups = (causal.Subgroup("g", subgroup_certify.names()),)
+    bound = subgroup_certify.bound_for(replicates)
     sizes = UNEQUAL_SIZES
     null_hits = sum(
         bool(
             rejected(
-                unequal_world(base_gate.stream(base, i), sizes, {}),
+                unequal_world(subgroup_certify.stream(base, i), sizes, {}),
                 adapter,
                 groups,
             )
@@ -210,14 +212,16 @@ def gate_unequal(replicates: int, base: int) -> dict[str, Any]:
         for i in range(replicates)
     )
     planted = {"g5": EFFECT, "g7": EFFECT}
-    true_nulls = {("g", g) for g in base_gate.names()} - {
+    true_nulls = {("g", g) for g in subgroup_certify.names()} - {
         ("g", "g5"),
         ("g", "g7"),
     }
     partial_hits = sum(
         any_rejected(
             rejected(
-                unequal_world(base_gate.stream(base, i, 1), sizes, planted),
+                unequal_world(
+                    subgroup_certify.stream(base, i, 1), sizes, planted
+                ),
                 adapter,
                 groups,
             ),
@@ -233,21 +237,21 @@ def gate_unequal(replicates: int, base: int) -> dict[str, Any]:
             ("g", "g0")
             in rejected(
                 unequal_world(
-                    base_gate.stream(base, i, 2), layout, {"g0": EFFECT}
+                    subgroup_certify.stream(base, i, 2), layout, {"g0": EFFECT}
                 ),
                 adapter,
                 groups,
             )
             for i in range(runs)
         )
-        power[str(rows)] = base_gate.rate(hits, runs)
+        power[str(rows)] = subgroup_certify.rate(hits, runs)
     enough = [int(k) for k, v in power.items() if v["wilson"][0] >= POWER_FLOOR]
     return {
         "sizes": list(sizes),
         "replicates": replicates,
         "power_replicates": runs,
-        "familywise_error_null": base_gate.rate(null_hits, replicates),
-        "familywise_error_partial_null": base_gate.rate(
+        "familywise_error_null": subgroup_certify.rate(null_hits, replicates),
+        "familywise_error_partial_null": subgroup_certify.rate(
             partial_hits, replicates
         ),
         "familywise_bound": bound,
@@ -271,16 +275,16 @@ def gate_overlap(replicates: int, base: int) -> dict[str, Any]:
         The two family-wise rates with Wilson intervals, the bound, the
         design sizes and whether both rates are within the bound.
     """
-    adapter = base_gate.adapter_for()
+    adapter = subgroup_certify.adapter_for()
     groups = (
         causal.Subgroup("g", overlap_names("g")),
         causal.Subgroup("h", overlap_names("h")),
     )
-    bound = base_gate.bound_for(replicates)
+    bound = subgroup_certify.bound_for(replicates)
     null_hits = sum(
         bool(
             rejected(
-                overlap_world(base_gate.stream(base, i, 3), 0.0),
+                overlap_world(subgroup_certify.stream(base, i, 3), 0.0),
                 adapter,
                 groups,
             )
@@ -291,7 +295,7 @@ def gate_overlap(replicates: int, base: int) -> dict[str, Any]:
     partial_hits = sum(
         any_rejected(
             rejected(
-                overlap_world(base_gate.stream(base, i, 4), EFFECT),
+                overlap_world(subgroup_certify.stream(base, i, 4), EFFECT),
                 adapter,
                 groups,
             ),
@@ -303,8 +307,8 @@ def gate_overlap(replicates: int, base: int) -> dict[str, Any]:
         "rows": OVERLAP_ROWS,
         "levels_per_column": OVERLAP_LEVELS,
         "replicates": replicates,
-        "familywise_error_null": base_gate.rate(null_hits, replicates),
-        "familywise_error_true_nulls_with_effect_in_g0": base_gate.rate(
+        "familywise_error_null": subgroup_certify.rate(null_hits, replicates),
+        "familywise_error_true_nulls_with_effect_in_g0": subgroup_certify.rate(
             partial_hits, replicates
         ),
         "familywise_bound": bound,
@@ -400,7 +404,7 @@ def main(arguments: list[str] | None = None) -> int:
     parser.add_argument("--scale", type=float, default=0.05)
     options = parser.parse_args(arguments)
     if options.dev:
-        document = measure_all(base_gate.DEV_SEED_BASE, options.scale)
+        document = measure_all(subgroup_certify.DEV_SEED_BASE, options.scale)
         print(json.dumps(document, indent=2, sort_keys=True, default=float))
         return 0
     if options.write:

@@ -9,10 +9,10 @@ question with the same bootstrap comparison used for retraining.
 import dataclasses
 import threading
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
-from scmle.artifacts import bundle as bundle_module
+from scmle.artifacts import bundle
 from scmle.contracts import errors
 from scmle.monitoring import champion
 
@@ -50,8 +50,8 @@ class ShadowEvaluator:
 
     def __init__(
         self,
-        champion_bundle: bundle_module.ModelBundle,
-        challenger_bundle: bundle_module.ModelBundle,
+        champion_bundle: bundle.ModelBundle,
+        challenger_bundle: bundle.ModelBundle,
     ) -> None:
         """Binds the pair.
 
@@ -66,13 +66,13 @@ class ShadowEvaluator:
             raise errors.ConfigError("models were trained for different tasks")
         self.champion = champion_bundle
         self.challenger = challenger_bundle
-        self.rows: list[pd.DataFrame] = []
-        self.champion_output: list[np.ndarray] = []
-        self.challenger_output: list[np.ndarray] = []
-        self.gaps: list[np.ndarray] = []
+        self.rows: list[pandas.DataFrame] = []
+        self.champion_output: list[numpy.ndarray] = []
+        self.challenger_output: list[numpy.ndarray] = []
+        self.gaps: list[numpy.ndarray] = []
         self.lock = threading.Lock()
 
-    def observe(self, data: pd.DataFrame) -> np.ndarray:
+    def observe(self, data: pandas.DataFrame) -> numpy.ndarray:
         """Answers with the champion; the challenger scores silently.
 
         Args:
@@ -81,10 +81,10 @@ class ShadowEvaluator:
         Returns:
             The champion's predictions (the only thing a caller sees).
         """
-        served = np.asarray(self.champion.predict(data))
-        shadowed = np.asarray(self.challenger.predict(data))
+        served = numpy.asarray(self.champion.predict(data))
+        shadowed = numpy.asarray(self.challenger.predict(data))
         gap = (
-            np.abs(
+            numpy.abs(
                 self.champion.predict_proba(data)[:, 1]
                 - self.challenger.predict_proba(data)[:, 1]
             )
@@ -116,19 +116,19 @@ class ShadowEvaluator:
             all_gaps = list(self.gaps)
         if not champion_output:
             raise errors.ConfigError("nothing has been observed yet")
-        served = np.concatenate(champion_output)
-        shadowed = np.concatenate(challenger_output)
+        served = numpy.concatenate(champion_output)
+        shadowed = numpy.concatenate(challenger_output)
         if self.champion.schema.task == "regression":
-            tolerance = 0.1 * float(np.std(served)) or 1e-9
-            differ = np.abs(served.astype(float) - shadowed.astype(float))
-            rate = float(np.mean(differ > tolerance))
+            tolerance = 0.1 * float(numpy.std(served)) or 1e-9
+            differ = numpy.abs(served.astype(float) - shadowed.astype(float))
+            rate = float(numpy.mean(differ > tolerance))
         else:
-            rate = float(np.mean(served != shadowed))
-        gap = float(np.concatenate(all_gaps).mean()) if all_gaps else None
+            rate = float(numpy.mean(served != shadowed))
+        gap = float(numpy.concatenate(all_gaps).mean()) if all_gaps else None
         return Agreement(len(served), rate, gap)
 
     def settle(
-        self, outcomes: pd.Series, metric_name: str | None = None
+        self, outcomes: pandas.Series, metric_name: str | None = None
     ) -> champion.Comparison:
         """Compares the models on the observed rows once outcomes are known.
 
@@ -142,7 +142,7 @@ class ShadowEvaluator:
         """
         with self.lock:
             rows = list(self.rows)
-        data = pd.concat(rows, ignore_index=True)
+        data = pandas.concat(rows, ignore_index=True)
         return champion.ChampionChallenger(
             self.champion, self.challenger
         ).compare(data, outcomes.reset_index(drop=True), metric_name)

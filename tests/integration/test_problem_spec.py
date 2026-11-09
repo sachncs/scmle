@@ -2,8 +2,8 @@
 
 import json
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 import support
 
@@ -14,8 +14,8 @@ from scmle.governance import attestation
 
 
 def frame(rows=700, seed=0):
-    rng = np.random.default_rng(seed)
-    data = pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    data = pandas.DataFrame(
         {"a": rng.normal(size=rows), "b": rng.normal(size=rows)}
     )
     data["y"] = (data.a + rng.normal(0, 0.4, rows) > 0).astype(int)

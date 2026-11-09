@@ -1,18 +1,18 @@
 """AIPW score, overlap diagnostics and the difference in means."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
 from scmle.data.identification import aipw
 
 
 def test_the_ate_score_equals_the_hand_computed_toy_table():
-    t = np.array([1.0, 1.0, 0.0, 0.0])
-    y = np.array([3.0, 5.0, 1.0, 2.0])
-    e = np.array([0.5, 0.25, 0.5, 0.25])
-    m0 = np.array([1.0, 1.5, 1.0, 1.5])
-    m1 = np.array([2.0, 4.0, 2.5, 3.5])
+    t = numpy.array([1.0, 1.0, 0.0, 0.0])
+    y = numpy.array([3.0, 5.0, 1.0, 2.0])
+    e = numpy.array([0.5, 0.25, 0.5, 0.25])
+    m0 = numpy.array([1.0, 1.5, 1.0, 1.5])
+    m1 = numpy.array([2.0, 4.0, 2.5, 3.5])
     # psi_i by hand:
     #   1: 2-1   + 1*(3-2)/0.5            = 1 + 2           = 3
     #   2: 4-1.5 + 1*(5-4)/0.25           = 2.5 + 4         = 6.5
@@ -25,11 +25,11 @@ def test_the_ate_score_equals_the_hand_computed_toy_table():
 
 
 def test_the_att_score_equals_the_hand_computed_toy_table():
-    t = np.array([1.0, 1.0, 0.0, 0.0])
-    y = np.array([3.0, 5.0, 1.0, 2.0])
-    e = np.array([0.5, 0.25, 0.5, 0.25])
-    m0 = np.array([1.0, 1.5, 1.0, 1.5])
-    m1 = np.zeros(4)
+    t = numpy.array([1.0, 1.0, 0.0, 0.0])
+    y = numpy.array([3.0, 5.0, 1.0, 2.0])
+    e = numpy.array([0.5, 0.25, 0.5, 0.25])
+    m0 = numpy.array([1.0, 1.5, 1.0, 1.5])
+    m1 = numpy.zeros(4)
     # raw: 2, 3.5, -(1*0)=0, -(1/3 * 0.5) = -1/6; p = 0.5
     expected = (2 + 3.5 + 0 - 0.5 / 3) / 4 / 0.5
     theta = aipw.scores("ATT", t, y, e, m0, m1)[0]
@@ -37,12 +37,12 @@ def test_the_att_score_equals_the_hand_computed_toy_table():
 
 
 def planted(n: int, seed: int, tau: float = 2.0, confound: float = 1.0):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     x = rng.standard_normal((n, 3))
-    e = 1 / (1 + np.exp(-confound * x[:, 0]))
+    e = 1 / (1 + numpy.exp(-confound * x[:, 0]))
     t = (rng.uniform(size=n) < e).astype(float)
-    y = tau * t + x @ np.array([1.5, -1.0, 0.5]) + rng.standard_normal(n)
-    return pd.DataFrame(
+    y = tau * t + x @ numpy.array([1.5, -1.0, 0.5]) + rng.standard_normal(n)
+    return pandas.DataFrame(
         {"a": x[:, 0], "b": x[:, 1], "c": x[:, 2], "t": t, "y": y}
     )
 
@@ -93,9 +93,9 @@ def test_trimming_changes_the_estimand_and_can_refuse():
 
 
 def test_overlap_gate_flags_extreme_propensities_only():
-    rng = np.random.default_rng(0)
+    rng = numpy.random.default_rng(0)
     good = rng.uniform(0.2, 0.8, 1000)
-    bad = np.concatenate([rng.uniform(0.001, 0.02, 300), good[:700]])
+    bad = numpy.concatenate([rng.uniform(0.001, 0.02, 300), good[:700]])
     t = (rng.uniform(size=1000) < 0.5).astype(float)
     assert aipw.overlap_report(good, t)["passed"]
     report = aipw.overlap_report(bad, t)
@@ -105,12 +105,12 @@ def test_overlap_gate_flags_extreme_propensities_only():
 
 def test_categorical_covariates_are_encoded_with_frozen_levels():
     frame = planted(400, 8)
-    frame["g"] = np.where(frame["a"] > 0, "up", "down")
+    frame["g"] = numpy.where(frame["a"] > 0, "up", "down")
     nuis = aipw.fit_nuisances(frame, ("a", "g"), "t", "y")
     fresh = frame.head(50).copy()
     fresh["g"] = "unseen"
     e, m0, m1 = nuis.predict(fresh)
-    assert np.isfinite(e).all() and np.isfinite(m1 - m0).all()
+    assert numpy.isfinite(e).all() and numpy.isfinite(m1 - m0).all()
 
 
 def test_bad_inputs_are_refused():
@@ -118,7 +118,7 @@ def test_bad_inputs_are_refused():
     with pytest.raises(ValueError, match="binary"):
         aipw.fit_nuisances(frame.assign(t=frame["t"] * 2), ("a",), "t", "y")
     with pytest.raises(ValueError, match="missing"):
-        aipw.fit_nuisances(frame.assign(y=np.nan), ("a",), "t", "y")
+        aipw.fit_nuisances(frame.assign(y=numpy.nan), ("a",), "t", "y")
     with pytest.raises(ValueError, match="learner"):
         aipw.fit_nuisances(frame, ("a",), "t", "y", learner="x")
     with pytest.raises(ValueError, match="at least"):
@@ -126,7 +126,7 @@ def test_bad_inputs_are_refused():
 
 
 def test_difference_in_means_matches_welch():
-    frame = pd.DataFrame(
+    frame = pandas.DataFrame(
         {"t": [1, 1, 1, 0, 0, 0], "y": [5.0, 6.0, 7.0, 1.0, 2.0, 4.0]}
     )
     out = aipw.difference_in_means(frame, "t", "y")

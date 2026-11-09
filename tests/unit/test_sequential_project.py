@@ -2,8 +2,8 @@
 
 import dataclasses
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
 from scmle.api.sequential import resolve_tabular_input
@@ -42,9 +42,9 @@ def make_policy() -> SequentialEstimationPolicy:
     )
 
 
-def make_frame() -> pd.DataFrame:
+def make_frame() -> pandas.DataFrame:
     """Return a deterministic balanced panel with treatment variation."""
-    generator = np.random.default_rng(23)
+    generator = numpy.random.default_rng(23)
     rows = []
     for subject_id in range(80):
         baseline_score = float(generator.normal())
@@ -56,7 +56,7 @@ def make_frame() -> pd.DataFrame:
                 + generator.normal(scale=0.4)
             )
             probability = 1.0 / (
-                1.0 + np.exp(-(-0.1 + 0.2 * baseline_score + 0.2 * state))
+                1.0 + numpy.exp(-(-0.1 + 0.2 * baseline_score + 0.2 * state))
             )
             treatment = int(generator.random() < probability)
             outcome = float(
@@ -77,7 +77,7 @@ def make_frame() -> pd.DataFrame:
                 }
             )
             previous_treatment = treatment
-    return pd.DataFrame(rows)
+    return pandas.DataFrame(rows)
 
 
 def test_project_requires_explicit_estimator_declarations() -> None:

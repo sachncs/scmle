@@ -1,7 +1,7 @@
 """Time-to-event modelling with right-censored rows."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 import support
 
@@ -10,19 +10,19 @@ from scmle.contracts import errors
 
 
 def censored_frame(rows=1200, seed=0):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     x1 = rng.normal(size=rows)
     x2 = rng.normal(size=rows)
     noise = rng.normal(size=rows)
-    rate = np.exp(1.0 * x1 - 0.7 * x2)
+    rate = numpy.exp(1.0 * x1 - 0.7 * x2)
     happens = rng.exponential(1 / rate)
     stops = rng.exponential(1.5, rows)
-    return pd.DataFrame(
+    return pandas.DataFrame(
         {
             "x1": x1,
             "x2": x2,
             "noise": noise,
-            "time": np.minimum(happens, stops),
+            "time": numpy.minimum(happens, stops),
             "event": (happens <= stops).astype(int),
         }
     )
@@ -57,7 +57,7 @@ def test_the_event_column_is_never_a_feature(result):
 
 
 def test_risk_scores_rise_with_the_true_hazard(result):
-    rows = pd.DataFrame(
+    rows = pandas.DataFrame(
         {"x1": [-2.0, 2.0], "x2": [0.0, 0.0], "noise": [0.0, 0.0]}
     )
 
@@ -67,14 +67,14 @@ def test_risk_scores_rise_with_the_true_hazard(result):
 
 
 def test_survival_curves_fall_over_time_and_start_near_one(result):
-    rows = pd.DataFrame(
+    rows = pandas.DataFrame(
         {"x1": [-1.0, 1.0], "x2": [0.0, 0.0], "noise": [0.0, 0.0]}
     )
 
     curves = result.bundle.predict_survival(rows, [0.05, 0.5, 2.0])
 
     assert curves.shape == (2, 3)
-    assert (np.diff(curves, axis=1) <= 1e-9).all()
+    assert (numpy.diff(curves, axis=1) <= 1e-9).all()
     assert (curves[:, 0] > 0.8).all()
     assert curves[0, 1] > curves[1, 1]  # lower hazard survives longer
 
@@ -96,7 +96,7 @@ def test_too_few_events_are_refused(tmp_path):
 
 
 def test_curves_survive_saving_and_loading(result, tmp_path):
-    rows = pd.DataFrame(
+    rows = pandas.DataFrame(
         {"x1": [-1.0, 1.0], "x2": [0.0, 0.0], "noise": [0.0, 0.0]}
     )
     expected = result.bundle.predict_survival(rows, [0.1, 1.0])
@@ -104,7 +104,7 @@ def test_curves_survive_saving_and_loading(result, tmp_path):
     result.bundle.save(tmp_path / "copy")
     loaded = scmle.ModelBundle.load(tmp_path / "copy", trusted=True)
 
-    np.testing.assert_allclose(
+    numpy.testing.assert_allclose(
         loaded.predict_survival(rows, [0.1, 1.0]), expected
     )
 
@@ -125,7 +125,7 @@ def test_other_tasks_refuse_survival_curves(tmp_path):
 
 def test_survival_works_with_a_weight_column(tmp_path):
     frame = censored_frame(800)
-    frame["w"] = np.random.default_rng(2).uniform(0.5, 2.0, len(frame))
+    frame["w"] = numpy.random.default_rng(2).uniform(0.5, 2.0, len(frame))
 
     result = run(tmp_path, frame, weight_column="w")
 
@@ -142,7 +142,7 @@ def test_time_dependent_metrics_are_reported_on_the_locked_rows(result):
 
 
 def test_the_selected_model_has_a_lower_brier_score_than_kaplan_meier(result):
-    from scmle.evaluation import survival as survival_metrics
+    from scmle.evaluation import survival
     from scmle.models.survival import estimators
 
     train = censored_frame(1200, seed=0)
@@ -150,16 +150,14 @@ def test_the_selected_model_has_a_lower_brier_score_than_kaplan_meier(result):
     baseline = estimators.MarginalSurvival().fit(
         train[["x1"]], train.time, train.event
     )
-    times = survival_metrics.time_grid(
-        fresh.time.to_numpy(), fresh.event.to_numpy()
-    )
+    times = survival.time_grid(fresh.time.to_numpy(), fresh.event.to_numpy())
     features = fresh[["x1", "x2", "noise"]]
 
     model_curves = result.bundle.predict_survival(features, times)
     base_curves = baseline.predict_survival(features, times)
 
     def score(curves):
-        return survival_metrics.integrated_brier(
+        return survival.integrated_brier(
             fresh.time.to_numpy(), fresh.event.to_numpy(), curves, times
         )
 

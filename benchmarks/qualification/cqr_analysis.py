@@ -34,10 +34,10 @@ from pathlib import Path
 import time
 from typing import Any
 
-import numpy as np
+import numpy
 from sklearn import ensemble
 
-from benchmarks.qualification import uncertainty_certify as cert
+from benchmarks.qualification import uncertainty_certify
 from scmle.evaluation import conformal
 from scmle.evaluation import quantile
 
@@ -52,7 +52,7 @@ VARIANTS: tuple[dict[str, Any], ...] = (
 )
 
 
-def draw(rng: np.random.Generator, n: int) -> tuple[np.ndarray, ...]:
+def draw(rng: numpy.random.Generator, n: int) -> tuple[numpy.ndarray, ...]:
     """The conditional-coverage gate's world: noise sd rises from 0.5 to 2.5.
 
     Args:
@@ -87,7 +87,7 @@ def replicate(index: int, base: int, trees: int, depth: int) -> list[float]:
         decile of the test rows, and the same decile coverage of the
         constant-width split-conformal control.
     """
-    rng = np.random.default_rng(base + index)
+    rng = numpy.random.default_rng(base + index)
     xf, yf, ignored = draw(rng, 1000)
     xc, yc, ignored = draw(rng, 600)
     xt, yt, sdt = draw(rng, 4000)
@@ -99,19 +99,19 @@ def replicate(index: int, base: int, trees: int, depth: int) -> list[float]:
         loss="quantile", alpha=quantile.UPPER_LEVEL, **kw
     ).fit(xf, yf)
     mean = ensemble.GradientBoostingRegressor(**kw).fit(xf, yf)
-    low_c = np.minimum(lo.predict(xc), hi.predict(xc))
-    high_c = np.maximum(lo.predict(xc), hi.predict(xc))
+    low_c = numpy.minimum(lo.predict(xc), hi.predict(xc))
+    high_c = numpy.maximum(lo.predict(xc), hi.predict(xc))
     band = quantile.QuantileBand.calibrate(yc.tolist(), low_c, high_c)
-    margin = band.margin(cert.LEVEL)
+    margin = band.margin(uncertainty_certify.LEVEL)
     a, b = lo.predict(xt), hi.predict(xt)
-    inside = (yt >= np.minimum(a, b) - margin) & (
-        yt <= np.maximum(a, b) + margin
+    inside = (yt >= numpy.minimum(a, b) - margin) & (
+        yt <= numpy.maximum(a, b) + margin
     )
     resid = conformal.finite_sample_quantile(
-        np.abs(yc - mean.predict(xc)), cert.LEVEL
+        numpy.abs(yc - mean.predict(xc)), uncertainty_certify.LEVEL
     )
-    plain = np.abs(yt - mean.predict(xt)) <= resid
-    top = sdt >= np.quantile(sdt, 0.9)
+    plain = numpy.abs(yt - mean.predict(xt)) <= resid
+    top = sdt >= numpy.quantile(sdt, 0.9)
     return [
         float(inside.mean()),
         float(inside[top].mean()),
@@ -119,7 +119,7 @@ def replicate(index: int, base: int, trees: int, depth: int) -> list[float]:
     ]
 
 
-def summarize(values: np.ndarray) -> dict[str, float]:
+def summarize(values: numpy.ndarray) -> dict[str, float]:
     """Mean and standard error of a column of replicate results.
 
     Args:
@@ -131,7 +131,7 @@ def summarize(values: np.ndarray) -> dict[str, float]:
     """
     return {
         "mean": float(values.mean()),
-        "se": float(values.std(ddof=1) / np.sqrt(len(values))),
+        "se": float(values.std(ddof=1) / numpy.sqrt(len(values))),
     }
 
 
@@ -153,15 +153,18 @@ def analyse(replicates: int = REPLICATES) -> dict[str, Any]:
         "note": "analysis of a published miss; no gate, no certificate",
         "g3_floor": FLOOR,
         "replicates": replicates,
-        "seeds": [cert.DEV_SEED_BASE, cert.DEV_SEED_BASE + replicates],
+        "seeds": [
+            uncertainty_certify.DEV_SEED_BASE,
+            uncertainty_certify.DEV_SEED_BASE + replicates,
+        ],
         "variants": {},
     }
     for variant in VARIANTS:
-        data = np.array(
+        data = numpy.array(
             [
                 replicate(
                     i,
-                    cert.DEV_SEED_BASE,
+                    uncertainty_certify.DEV_SEED_BASE,
                     variant["n_estimators"],
                     variant["max_depth"],
                 )

@@ -2,8 +2,8 @@
 
 import dataclasses
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.artifacts import bundle as bundle_module
 from scmle.contracts import errors
@@ -78,8 +78,8 @@ class ChampionChallenger:
 
     def compare(
         self,
-        data: pd.DataFrame,
-        outcomes: pd.Series,
+        data: pandas.DataFrame,
+        outcomes: pandas.Series,
         metric_name: str | None = None,
     ) -> Comparison:
         """Compares both models on rows whose outcome is known.
@@ -123,8 +123,10 @@ class ChampionChallenger:
             groups is None and time_name and time_name in frame.columns
         )
         if temporal:
-            order = np.argsort(
-                pd.to_datetime(frame[time_name], errors="coerce").to_numpy(),
+            order = numpy.argsort(
+                pandas.to_datetime(
+                    frame[time_name], errors="coerce"
+                ).to_numpy(),
                 kind="stable",
             )
             frame = frame.iloc[order].reset_index(drop=True)
@@ -136,8 +138,8 @@ class ChampionChallenger:
 
         def score(
             bundle: bundle_module.ModelBundle,
-            view: pd.DataFrame,
-            rows: np.ndarray,
+            view: pandas.DataFrame,
+            rows: numpy.ndarray,
         ) -> float:
             """Scores a model on a subset of the rows.
 
@@ -156,10 +158,10 @@ class ChampionChallenger:
                 positive,
             )
 
-        everything = np.arange(len(target))
+        everything = numpy.arange(len(target))
         champion_score = score(self.champion, champion_view, everything)
         challenger_score = score(self.challenger, challenger_view, everything)
-        rng = np.random.default_rng(self.seed)
+        rng = numpy.random.default_rng(self.seed)
         advantages = []
         draws = [
             diagnostics.resample_rows(len(target), groups, temporal, rng)
@@ -173,8 +175,8 @@ class ChampionChallenger:
             except ValueError:  # A resample missing a class.
                 continue
             advantages.append(sign * difference)
-        samples = np.asarray(advantages)
-        low, high = np.percentile(samples, [2.5, 97.5])
+        samples = numpy.asarray(advantages)
+        low, high = numpy.percentile(samples, [2.5, 97.5])
         return Comparison(
             metric=metric.name,
             rows=len(target),

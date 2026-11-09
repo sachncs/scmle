@@ -2,8 +2,8 @@
 
 import importlib.util
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 import support
 
@@ -17,13 +17,13 @@ FOOD = ["sweet apple", "the bread is warm", "ripe banana", "fresh cheese"]
 
 
 def reviews(rows=400, seed=0):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     label = rng.integers(0, 2, rows)
     texts = [
         f"{rng.choice(VEHICLES if y else FOOD)} number {i}"
         for i, y in enumerate(label)
     ]
-    return pd.DataFrame(
+    return pandas.DataFrame(
         {"text": texts, "size": rng.normal(size=rows), "y": label}
     )
 

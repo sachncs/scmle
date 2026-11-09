@@ -35,10 +35,10 @@ from typing import Any
 import urllib.error
 import urllib.request
 
-import pandas as pd
+import pandas
 
 import scmle
-from scmle.artifacts import bundle as bundle_module
+from scmle.artifacts import bundle
 from scmle.contracts import errors
 from scmle.contracts import observability
 from scmle.contracts import tasks
@@ -48,7 +48,7 @@ from scmle.governance import lifecycle
 from scmle.governance import registry as registry_module
 from scmle.inference import parity
 from scmle.inference import serving
-from scmle.monitoring import monitor as monitor_module
+from scmle.monitoring import monitor
 from scmle.security import tokens
 
 DEMO_SIGNING_KEY = "scmle-local-demo-signing-key-published-fixture"
@@ -157,7 +157,7 @@ def train(name: str, data: pathlib.Path) -> scmle.RunResult:
     Returns:
         The run result, including the model bundle and its evaluation.
     """
-    frame = pd.read_csv(data)
+    frame = pandas.read_csv(data)
     return scmle.MLProject(
         frame,
         TARGET,
@@ -551,8 +551,8 @@ def predict_checks(
         the largest probability difference, the artifact digests seen in the
         response and in the batch manifest, and whether they are the same.
     """
-    frame = pd.read_csv(data / "fresh.csv").drop(columns=[TARGET])
-    direct = bundle_module.ModelBundle.load(
+    frame = pandas.read_csv(data / "fresh.csv").drop(columns=[TARGET])
+    direct = bundle.ModelBundle.load(
         model_directory, signing_key=DEMO_SIGNING_KEY
     )
     rows = frame.head(60).to_dict("records")
@@ -565,12 +565,12 @@ def predict_checks(
     if status == 200:
         expected = direct.predict_proba(frame.head(60))
         worst = float(
-            abs(expected - pd.DataFrame(body["probabilities"]).values).max()
+            abs(expected - pandas.DataFrame(body["probabilities"]).values).max()
         )
     batch = serving.BatchServing(direct)
     batch_path = workdir / "batch-predictions.csv"
     batch.score_file(data / "fresh.csv", batch_path)
-    scored = pd.read_csv(batch_path)
+    scored = pandas.read_csv(batch_path)
     batch_match = (
         scored["prediction"].tolist() == direct.predict(frame).tolist()
     )
@@ -610,9 +610,9 @@ def corrupted_and_unsigned_stay_unready(
         if target.exists():
             shutil.rmtree(target)
         shutil.copytree(service, target)
-    with (corrupt / "model" / bundle_module.MODEL_FILE).open("ab") as handle:
+    with (corrupt / "model" / bundle.MODEL_FILE).open("ab") as handle:
         handle.write(b"tampered")
-    (unsigned / "model" / bundle_module.SIGNATURE_FILE).unlink()
+    (unsigned / "model" / bundle.SIGNATURE_FILE).unlink()
     for label, folder in (("corrupted", corrupt), ("unsigned", unsigned)):
         port = free_port()
         process = start_service(folder, port)
@@ -689,7 +689,7 @@ def drill_steps(workdir: pathlib.Path, data: pathlib.Path) -> dict[str, Any]:
     """
     registry = registry_module.ModelRegistryStore(workdir / "registry")
     manager = lifecycle.LifecycleManager(registry, MODEL, str(workdir / "work"))
-    fresh = pd.read_csv(data / "fresh.csv")
+    fresh = pandas.read_csv(data / "fresh.csv")
     good_record = registry.versions(MODEL)[0]
     bad_record = registry.versions(MODEL)[1]
     registry.promote(
@@ -700,7 +700,7 @@ def drill_steps(workdir: pathlib.Path, data: pathlib.Path) -> dict[str, Any]:
     )
     champion_before = registry.resolve(MODEL).version
     features = fresh.drop(columns=[TARGET])
-    report = monitor_module.ModelMonitor(
+    report = monitor.ModelMonitor(
         registry.load(MODEL, signing_key=DEMO_SIGNING_KEY)
     ).assess(features, fresh[TARGET])
     outcome = manager.check_rollback(
@@ -710,7 +710,7 @@ def drill_steps(workdir: pathlib.Path, data: pathlib.Path) -> dict[str, Any]:
         signing_key=DEMO_SIGNING_KEY,
     )
     restored = registry.load(MODEL, signing_key=DEMO_SIGNING_KEY)
-    original = bundle_module.ModelBundle.load(
+    original = bundle.ModelBundle.load(
         workdir / "export-v1", signing_key=DEMO_SIGNING_KEY
     )
     adapter = serving.HttpServing(restored)
@@ -744,7 +744,7 @@ def drill_steps(workdir: pathlib.Path, data: pathlib.Path) -> dict[str, Any]:
     }
 
 
-def records_of(frame: pd.DataFrame) -> list[dict[str, Any]]:
+def records_of(frame: pandas.DataFrame) -> list[dict[str, Any]]:
     """Converts rows to JSON-ready dictionaries with string keys.
 
     Args:
@@ -1003,7 +1003,7 @@ def run(
         )
 
         started = time.monotonic()
-        frame = pd.read_csv(data / "fresh.csv").drop(columns=[TARGET])
+        frame = pandas.read_csv(data / "fresh.csv").drop(columns=[TARGET])
         single = measure_latency(base, records_of(frame.head(1)))
         hundred = measure_latency(base, records_of(frame.head(100)), 40)
         memory = process_memory_mb(process)

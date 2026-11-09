@@ -11,8 +11,8 @@ import time
 from typing import Any
 
 import joblib
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 BYTES_PER_MB = 1024 * 1024
 LATENCY_ROWS = 30
@@ -95,7 +95,7 @@ class ResourceLimits:
 
 
 def measure(
-    estimator: Any, features: pd.DataFrame, rows: int = LATENCY_ROWS
+    estimator: Any, features: pandas.DataFrame, rows: int = LATENCY_ROWS
 ) -> ResourceUsage:
     """Measures serialized size and single-row prediction latency.
 
@@ -120,7 +120,7 @@ def measure(
         timings.append((time.perf_counter() - started) * 1000.0)
     return ResourceUsage(
         model_mb=buffer.getbuffer().nbytes / BYTES_PER_MB,
-        p95_latency_ms=float(np.percentile(timings, 95)),
+        p95_latency_ms=float(numpy.percentile(timings, 95)),
         rows_timed=len(timings),
         machine=f"{platform.machine()} {platform.system()} "
         f"python {platform.python_version()}",

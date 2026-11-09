@@ -1,14 +1,14 @@
 """Tests for the paired Bayesian comparison."""
 
-import numpy as np
+import numpy
 import pytest
 
 from scmle.evaluation import comparison
 
 
 def test_a_consistent_gain_is_decisive():
-    base = np.array([0.80, 0.81, 0.79, 0.80, 0.82])
-    better = base + np.array([0.020, 0.021, 0.019, 0.020, 0.022])
+    base = numpy.array([0.80, 0.81, 0.79, 0.80, 0.82])
+    better = base + numpy.array([0.020, 0.021, 0.019, 0.020, 0.022])
 
     result = comparison.compare_paired(better, base)
 
@@ -19,8 +19,8 @@ def test_a_consistent_gain_is_decisive():
 
 
 def test_noise_around_zero_is_not_decisive():
-    first = np.array([0.80, 0.84, 0.78, 0.83, 0.79])
-    second = np.array([0.82, 0.79, 0.81, 0.80, 0.82])
+    first = numpy.array([0.80, 0.84, 0.78, 0.83, 0.79])
+    second = numpy.array([0.82, 0.79, 0.81, 0.80, 0.82])
 
     result = comparison.compare_paired(first, second)
 
@@ -29,7 +29,7 @@ def test_noise_around_zero_is_not_decisive():
 
 
 def test_the_probabilities_form_a_distribution():
-    rng = np.random.default_rng(0)
+    rng = numpy.random.default_rng(0)
     first, second = rng.normal(0.8, 0.02, 10), rng.normal(0.79, 0.02, 10)
 
     result = comparison.compare_paired(first, second, rope=0.005)
@@ -44,7 +44,7 @@ def test_the_probabilities_form_a_distribution():
 
 
 def test_a_rope_turns_a_tiny_steady_gain_into_equivalence():
-    base = np.array([0.80, 0.81, 0.79, 0.80, 0.82])
+    base = numpy.array([0.80, 0.81, 0.79, 0.80, 0.82])
     tiny = base + 0.001
 
     result = comparison.compare_paired(tiny, base, rope=0.01)
@@ -53,7 +53,7 @@ def test_a_rope_turns_a_tiny_steady_gain_into_equivalence():
 
 
 def test_swapping_the_candidates_swaps_the_probabilities():
-    rng = np.random.default_rng(1)
+    rng = numpy.random.default_rng(1)
     first, second = rng.normal(0.8, 0.02, 8), rng.normal(0.78, 0.02, 8)
 
     forward = comparison.compare_paired(first, second)

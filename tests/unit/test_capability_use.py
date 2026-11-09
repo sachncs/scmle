@@ -1,7 +1,7 @@
 """Declared model capabilities change what the pipeline and planner do."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
 from scmle.contracts import data as data_contracts
@@ -20,13 +20,15 @@ def registry():
 
 
 def high_cardinality_frame(rows=900, levels=40, seed=0):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     cat = rng.choice([f"c{i}" for i in range(levels)], rows)
     effect = {f"c{i}": rng.normal() for i in range(levels)}
     x = rng.normal(size=rows)
-    signal = np.array([effect[c] for c in cat]) + x
+    signal = numpy.array([effect[c] for c in cat]) + x
     target = (signal + rng.normal(scale=0.5, size=rows) > 0).astype(int)
-    return pd.DataFrame({"cat": cat, "x": x}), pd.Series(target, name="y")
+    return pandas.DataFrame({"cat": cat, "x": x}), pandas.Series(
+        target, name="y"
+    )
 
 
 PLAN = data_contracts.FeaturePlan(

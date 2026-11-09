@@ -9,7 +9,7 @@ import abc
 import dataclasses
 from typing import ClassVar
 
-import pandas as pd
+import pandas
 from sklearn import datasets
 
 from scmle.contracts import tasks
@@ -45,14 +45,14 @@ class BenchmarkDataset(abc.ABC):
     online: ClassVar[bool] = False
 
     @abc.abstractmethod
-    def fetch(self) -> pd.DataFrame:
+    def fetch(self) -> pandas.DataFrame:
         """Downloads/loads the raw table, including the target column.
 
         Returns:
             The full table before any dropping or subsampling.
         """
 
-    def load(self) -> pd.DataFrame:
+    def load(self) -> pandas.DataFrame:
         """Loads the table, subsampling deterministically if capped.
 
         Drops the `drop` columns, converts the target to numbers when
@@ -64,7 +64,7 @@ class BenchmarkDataset(abc.ABC):
         """
         frame = self.fetch().drop(columns=list(self.drop))
         if self.numeric_target:
-            frame[self.target] = pd.to_numeric(frame[self.target])
+            frame[self.target] = pandas.to_numeric(frame[self.target])
         if self.max_rows is not None and len(frame) > self.max_rows:
             frame = frame.sample(self.max_rows, random_state=0)
         return frame.reset_index(drop=True)
@@ -80,7 +80,7 @@ class SklearnDataset(BenchmarkDataset):
 
     loader: str = ""
 
-    def fetch(self) -> pd.DataFrame:
+    def fetch(self) -> pandas.DataFrame:
         """Loads the bundled dataset as a DataFrame.
 
         Returns:
@@ -107,7 +107,7 @@ class OpenMlDataset(BenchmarkDataset):
     version: int = 1
     online: ClassVar[bool] = True
 
-    def fetch(self) -> pd.DataFrame:
+    def fetch(self) -> pandas.DataFrame:
         """Downloads the dataset (cached after the first call).
 
         Returns:
@@ -135,7 +135,7 @@ class HuggingFaceDataset(BenchmarkDataset):
     filename: str = ""
     online: ClassVar[bool] = True
 
-    def fetch(self) -> pd.DataFrame:
+    def fetch(self) -> pandas.DataFrame:
         """Downloads the file (cached by `huggingface_hub`) and reads it.
 
         Returns:
@@ -146,8 +146,8 @@ class HuggingFaceDataset(BenchmarkDataset):
 
         path = hf_hub_download(self.repo, self.filename, repo_type="dataset")
         if self.filename.endswith(".parquet"):
-            return pd.read_parquet(path)
-        return pd.read_csv(path)
+            return pandas.read_parquet(path)
+        return pandas.read_csv(path)
 
 
 OFFLINE = (

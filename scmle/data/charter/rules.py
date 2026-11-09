@@ -17,7 +17,7 @@ from typing import Any
 from typing import Self
 
 from scmle.contracts import qualification
-from scmle.data.ledger import budget as budget_module
+from scmle.data.ledger import budget
 from scmle.data.ledger import confirm
 from scmle.data.ledger import online_fdr
 
@@ -47,7 +47,7 @@ class RunRules:
     """
 
     ledger_rule: str = online_fdr.DEFAULT_RULE
-    confirmation_rule: str = budget_module.MultiplicityRule.BY.value
+    confirmation_rule: str = budget.MultiplicityRule.BY.value
     failure_policy: str = confirm.UNCONFIRMED
     stability_filter: bool = False
     s_min: float = DEFAULT_S_MIN
@@ -69,7 +69,7 @@ class RunRules:
             raise ValueError(
                 f"ledger_rule must be one of {online_fdr.RULE_NAMES}"
             )
-        allowed = tuple(r.value for r in budget_module.MultiplicityRule)
+        allowed = tuple(r.value for r in budget.MultiplicityRule)
         if self.confirmation_rule not in allowed:
             raise ValueError(f"confirmation_rule must be one of {allowed}")
         if self.failure_policy != confirm.UNCONFIRMED:

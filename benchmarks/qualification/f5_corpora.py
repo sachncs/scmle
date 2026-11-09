@@ -46,7 +46,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-import pandas as pd
+import pandas
 from sklearn import datasets
 
 from benchmarks.qualification import certify
@@ -69,7 +69,7 @@ FIRST_CLASS_RATE = 0.20
 OTHER_CLASS_RATE = 0.05
 
 
-def corpus_frame(name: str) -> pd.DataFrame:
+def corpus_frame(name: str) -> pandas.DataFrame:
     """The bundled table `name` with its class label in `TARGET`.
 
     Args:
@@ -84,7 +84,7 @@ def corpus_frame(name: str) -> pd.DataFrame:
     return frame.drop(columns=constant).reset_index(drop=True)
 
 
-def feature_names(frame: pd.DataFrame) -> list[str]:
+def feature_names(frame: pandas.DataFrame) -> list[str]:
     """Columns of the table other than the label, in order.
 
     Args:
@@ -96,7 +96,7 @@ def feature_names(frame: pd.DataFrame) -> list[str]:
     return [name for name in frame.columns if name != TARGET]
 
 
-def class_rates(frame: pd.DataFrame) -> dict[int, float]:
+def class_rates(frame: pandas.DataFrame) -> dict[int, float]:
     """Class-conditional flip rates: 0.20 for the first class, else 0.05.
 
     Args:
@@ -112,7 +112,7 @@ def class_rates(frame: pd.DataFrame) -> dict[int, float]:
     }
 
 
-def plans(frame: pd.DataFrame) -> dict[str, list[certify.DefectPlan]]:
+def plans(frame: pandas.DataFrame) -> dict[str, list[certify.DefectPlan]]:
     """The plans of `f5.row_plans`, with columns picked from this table.
 
     Args:
@@ -184,8 +184,8 @@ def plans(frame: pd.DataFrame) -> dict[str, list[certify.DefectPlan]]:
 
 
 def detectors(
-    frame: pd.DataFrame,
-) -> dict[str, Callable[[pd.DataFrame], pd.Series]]:
+    frame: pandas.DataFrame,
+) -> dict[str, Callable[[pandas.DataFrame], pandas.Series]]:
     """The row detectors with outlier provenance from this table.
 
     Temporarily points `f5.OUTLIER_COLUMNS` at this table's first columns.

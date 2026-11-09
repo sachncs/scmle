@@ -2,14 +2,14 @@
 
 import json
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 from scipy import stats
 
 from scmle.data.ledger import confirm
 from scmle.data.ledger import governed
-from scmle.data.ledger import ledger as ledger_module
+from scmle.data.ledger import ledger
 from tests.unit.test_charter_contracts import make_charter
 from tests.unit.test_ledger_governed import build
 from tests.unit.test_ledger_governed import source_for
@@ -88,8 +88,8 @@ def test_the_accounting_is_in_the_claims_file_and_the_sealed_ledger(tmp_path):
     assert set(stage_two["withdrawn"]) == set(stage_two["survivors"]) - set(
         stage_two["family"]
     )
-    reloaded = ledger_module.Ledger.load(
-        tmp_path / ledger_module.FILE_NAME, expected_head=result.ledger.head
+    reloaded = ledger.Ledger.load(
+        tmp_path / ledger.FILE_NAME, expected_head=result.ledger.head
     )
     assert reloaded.confirmation["stage_two"] == stage_two
     assert reloaded.survivor_set.sha256 == stage_two["survivors_sha256"]
@@ -131,7 +131,7 @@ def test_a_withdrawal_naming_a_non_survivor_is_refused():
     def stage(survivors):
         return confirm.Withdrawal({"h999999": "invented"}, {"name": "bad"})
 
-    with pytest.raises(ledger_module.LedgerError, match="not frozen survivors"):
+    with pytest.raises(ledger.LedgerError, match="not frozen survivors"):
         run(stage)
 
 
@@ -151,14 +151,14 @@ def test_an_empty_withdrawal_keeps_every_survivor():
 
 
 def weak_world(seed):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
 
     def draw(rows):
-        frame = pd.DataFrame(
+        frame = pandas.DataFrame(
             {f"f{i}": rng.normal(size=rows) for i in range(10)}
         )
         signal = 0.35 * (frame["f0"] + frame["f1"] + frame["f2"])
-        return frame, pd.Series(signal + rng.normal(size=rows))
+        return frame, pandas.Series(signal + rng.normal(size=rows))
 
     return draw(400), draw(300)
 
@@ -173,7 +173,7 @@ def below_median_rule(features, target):
             )
             for h in survivors
         }
-        cut = float(np.median(list(effects.values()))) if effects else 0.0
+        cut = float(numpy.median(list(effects.values()))) if effects else 0.0
         reasons = {
             i: "small effect on X" for i, v in effects.items() if v < cut
         }

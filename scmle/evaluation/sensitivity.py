@@ -20,15 +20,15 @@ from collections.abc import Callable
 import dataclasses
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from sklearn import base
 from sklearn import model_selection
 
 MIN_ROWS = 40
 NOISE_LEVELS = (0.0, 0.1, 0.25, 0.5, 1.0)
 
-Scorer = Callable[[Any, pd.DataFrame, pd.Series], float]
+Scorer = Callable[[Any, pandas.DataFrame, pandas.Series], float]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -113,7 +113,7 @@ def spread_of(scores: list[float]) -> Spread:
     Returns:
         Their mean, sample standard deviation (0.0 for one score) and range.
     """
-    values = np.asarray(scores, dtype=float)
+    values = numpy.asarray(scores, dtype=float)
     return Spread(
         tuple(float(v) for v in values),
         float(values.mean()),
@@ -140,8 +140,8 @@ def reseeded(build: Callable[[], base.BaseEstimator], seed: int) -> Any:
 
 def training_sensitivity(
     build: Callable[[], base.BaseEstimator],
-    features: pd.DataFrame,
-    target: pd.Series,
+    features: pandas.DataFrame,
+    target: pandas.Series,
     scorer: Scorer,
     repeats: int = 10,
     seed: int = 0,
@@ -165,12 +165,12 @@ def training_sensitivity(
         (seed spread, resample spread).
     """
     train, test = model_selection.train_test_split(
-        np.arange(len(target)), test_size=0.3, random_state=seed
+        numpy.arange(len(target)), test_size=0.3, random_state=seed
     )
     held = features.iloc[test], target.iloc[test]
     by_seed = []
     by_resample = []
-    generator = np.random.default_rng(seed)
+    generator = numpy.random.default_rng(seed)
     for index in range(repeats):
         model = reseeded(build, index).fit(
             features.iloc[train], target.iloc[train]
@@ -186,8 +186,8 @@ def training_sensitivity(
 
 def evaluation_sensitivity(
     build: Callable[[], base.BaseEstimator],
-    features: pd.DataFrame,
-    target: pd.Series,
+    features: pandas.DataFrame,
+    target: pandas.Series,
     scorer: Scorer,
     repeats: int = 10,
     seed: int = 0,
@@ -211,7 +211,7 @@ def evaluation_sensitivity(
     scores = []
     for index in range(repeats):
         train, test = model_selection.train_test_split(
-            np.arange(len(target)), test_size=0.3, random_state=seed + index
+            numpy.arange(len(target)), test_size=0.3, random_state=seed + index
         )
         model = reseeded(build, seed).fit(
             features.iloc[train], target.iloc[train]
@@ -221,8 +221,8 @@ def evaluation_sensitivity(
 
 
 def noisy(
-    features: pd.DataFrame, level: float, generator: np.random.Generator
-) -> pd.DataFrame:
+    features: pandas.DataFrame, level: float, generator: numpy.random.Generator
+) -> pandas.DataFrame:
     """Adds Gaussian noise of `level` standard deviations to numeric columns.
 
     Args:
@@ -237,7 +237,7 @@ def noisy(
     result = features.copy()
     for name in result.select_dtypes("number").columns:
         scale = float(result[name].std())
-        if not np.isfinite(scale):
+        if not numpy.isfinite(scale):
             scale = 0.0
         result[name] = result[name] + generator.normal(
             0.0, level * scale, len(result)
@@ -247,8 +247,8 @@ def noisy(
 
 def performance_sensitivity(
     model: Any,
-    features: pd.DataFrame,
-    target: pd.Series,
+    features: pandas.DataFrame,
+    target: pandas.Series,
     scorer: Scorer,
     levels: tuple[float, ...] = NOISE_LEVELS,
     repeats: int = 5,
@@ -268,10 +268,10 @@ def performance_sensitivity(
     Returns:
         (mean score per noise level, least-squares slope of score on level).
     """
-    generator = np.random.default_rng(seed)
+    generator = numpy.random.default_rng(seed)
     curve = {
         level: float(
-            np.mean(
+            numpy.mean(
                 [
                     scorer(model, noisy(features, level, generator), target)
                     for unused in range(1 if level == 0 else repeats)
@@ -280,14 +280,14 @@ def performance_sensitivity(
         )
         for level in levels
     }
-    slope = float(np.polyfit(list(curve), list(curve.values()), 1)[0])
+    slope = float(numpy.polyfit(list(curve), list(curve.values()), 1)[0])
     return curve, slope
 
 
 def analyze(
     build: Callable[[], base.BaseEstimator],
-    features: pd.DataFrame,
-    target: pd.Series,
+    features: pandas.DataFrame,
+    target: pandas.Series,
     scorer: Scorer,
     repeats: int = 10,
     seed: int = 0,
@@ -321,7 +321,7 @@ def analyze(
         build, features, target, scorer, repeats, seed
     )
     train, test = model_selection.train_test_split(
-        np.arange(len(target)), test_size=0.3, random_state=seed
+        numpy.arange(len(target)), test_size=0.3, random_state=seed
     )
     model = reseeded(build, seed).fit(features.iloc[train], target.iloc[train])
     curve, slope = performance_sensitivity(

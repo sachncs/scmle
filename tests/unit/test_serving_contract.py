@@ -6,7 +6,7 @@ import threading
 import urllib.error
 import urllib.request
 
-import pandas as pd
+import pandas
 import pytest
 
 from scmle import cli
@@ -73,7 +73,7 @@ def running(bundle):
 def test_the_reference_matches_the_closed_form_in_process(
     golden, expected, bundle
 ):
-    frame = pd.DataFrame(golden.records)
+    frame = pandas.DataFrame(golden.records)
     report = parity.compare(
         expected,
         bundle.predict(frame).tolist(),
@@ -111,13 +111,13 @@ def test_batch_serving_shares_the_online_path(
     golden, expected, running, bundle, tmp_path
 ):
     source = tmp_path / "records.csv"
-    pd.DataFrame(golden.records).to_csv(source, index=False)
+    pandas.DataFrame(golden.records).to_csv(source, index=False)
     destination = tmp_path / "scored.csv"
     batch = serving.BatchServing(bundle)
     assert batch.score_file(source, destination, chunk_rows=3) == len(
         golden.records
     )
-    scored = pd.read_csv(destination)
+    scored = pandas.read_csv(destination)
     online = call(f"{running.address}/predict", {"records": golden.records})[1]
     assert scored["prediction"].tolist() == online["predictions"]
     assert scored["proba_1"].tolist() == pytest.approx(
@@ -487,7 +487,7 @@ def test_the_batch_command_scores_a_file_and_writes_a_manifest(
 ):
     folder = bundle.save(tmp_path / "bundle", signing_key="batch-key")
     source = tmp_path / "records.csv"
-    pd.DataFrame(golden.records).to_csv(source, index=False)
+    pandas.DataFrame(golden.records).to_csv(source, index=False)
     output = tmp_path / "scored.csv"
 
     refused = cli.main(
@@ -506,7 +506,7 @@ def test_the_batch_command_scores_a_file_and_writes_a_manifest(
         ]
     )
     assert code == cli.EXIT_OK
-    scored = pd.read_csv(output)
+    scored = pandas.read_csv(output)
     report = parity.compare(
         expected,
         scored["prediction"].tolist(),

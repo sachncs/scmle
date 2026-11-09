@@ -3,8 +3,8 @@
 from typing import Any
 from typing import Self
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from sklearn import base
 from sklearn import pipeline
 
@@ -46,17 +46,17 @@ class TreatmentAwareEstimator(base.RegressorMixin, base.BaseEstimator):
         Returns:
             This fitted estimator.
         """
-        frame = pd.DataFrame(features)
+        frame = pandas.DataFrame(features)
         arm = frame[self.treatment_column].to_numpy(dtype=int)
         steps = base.clone(self.estimator)
         self.preprocessing_ = steps[:-1]
         transformed = self.preprocessing_.fit_transform(
-            frame, np.asarray(target)
+            frame, numpy.asarray(target)
         )
-        self.model_ = steps[-1].fit(transformed, np.asarray(target), arm)
+        self.model_ = steps[-1].fit(transformed, numpy.asarray(target), arm)
         return self
 
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """Estimated effect of treating each row.
 
         Args:

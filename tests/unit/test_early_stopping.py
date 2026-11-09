@@ -1,13 +1,13 @@
 """Tests for holdout early stopping of boosting libraries."""
 
-import numpy as np
+import numpy
 import pytest
 
 from scmle.models.boosting import early_stopping
 
 
 def noisy_problem(rows=1500, seed=0):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     features = rng.normal(size=(rows, 6))
     target = (features[:, 0] + rng.normal(0, 1.5, rows) > 0).astype(int)
     return features, target
@@ -42,7 +42,7 @@ def test_xgboost_stops_early_and_still_predicts():
 
 def test_regression_with_lightgbm_stops_early():
     lightgbm = pytest.importorskip("lightgbm")
-    rng = np.random.default_rng(2)
+    rng = numpy.random.default_rng(2)
     features = rng.normal(size=(1200, 4))
     target = features[:, 0] + rng.normal(0, 2.0, 1200)
     model = early_stopping.wrap(
@@ -113,7 +113,7 @@ def test_regressors_are_typed_as_regressors():
 def test_string_labels_survive_early_stopping():
     lightgbm = pytest.importorskip("lightgbm")
     features, numeric = noisy_problem()
-    labels = np.where(numeric == 1, "late", "early")
+    labels = numpy.where(numeric == 1, "late", "early")
     model = early_stopping.wrap(
         lightgbm.LGBMClassifier(n_estimators=50, verbose=-1, n_jobs=1)
     ).fit(features, labels)

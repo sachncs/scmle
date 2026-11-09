@@ -17,7 +17,7 @@ from typing import Any
 from typing import Self
 
 import joblib
-import numpy as np
+import numpy
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import f1_score
@@ -422,7 +422,7 @@ class ImageClassifier:
         estimator = self.estimator
         if estimator is None:
             raise RuntimeError("classifier is not fitted")
-        strengths = np.mean(np.abs(estimator.coef_), axis=0)
+        strengths = numpy.mean(numpy.abs(estimator.coef_), axis=0)
         selected = sorted(
             zip(self.feature_names, strengths, strict=True),
             key=lambda item: (-float(item[1]), item[0]),
@@ -468,7 +468,7 @@ class ImageClassifier:
         matrix = self.transform(image.ImageDataset((sample,)))
         predicted_label = estimator.predict(matrix)[0]
         class_index = int(
-            np.flatnonzero(estimator.classes_ == predicted_label)[0]
+            numpy.flatnonzero(estimator.classes_ == predicted_label)[0]
         )
         coefficients = estimator.coef_[0]
         if len(estimator.classes_) == 2 and class_index == 0:
@@ -566,7 +566,7 @@ class ImageClassifier:
             ),
         )
 
-    def predicted_class_score(self, features: np.ndarray) -> float:
+    def predicted_class_score(self, features: numpy.ndarray) -> float:
         """Computes the decision score of the predicted class.
 
         Args:
@@ -584,8 +584,8 @@ class ImageClassifier:
         if estimator is None:
             raise RuntimeError("classifier is not fitted")
         predicted = estimator.predict(features)[0]
-        class_index = int(np.flatnonzero(estimator.classes_ == predicted)[0])
-        decision = np.asarray(estimator.decision_function(features))
+        class_index = int(numpy.flatnonzero(estimator.classes_ == predicted)[0])
+        decision = numpy.asarray(estimator.decision_function(features))
         if decision.ndim == 1:
             raw_score = float(decision[0])
             return raw_score if class_index == 1 else -raw_score
@@ -692,7 +692,7 @@ class ImageClassifier:
             raise ValueError("image model digest does not match manifest")
         return loaded
 
-    def transform(self, dataset: image.ImageDataset) -> np.ndarray:
+    def transform(self, dataset: image.ImageDataset) -> numpy.ndarray:
         """Prepares pixels with the fitted configuration.
 
         Args:
@@ -772,15 +772,17 @@ class ImageMonitor:
             Drift report with the mean pixel distance and duplicate rate.
         """
         current = observed.curate()
-        reference_mean = np.asarray(
+        reference_mean = numpy.asarray(
             self.reference.profile.get("mean_pixel", (0.0, 0.0, 0.0)),
             dtype=float,
         )
-        current_mean = np.asarray(
+        current_mean = numpy.asarray(
             current.profile.get("mean_pixel", (0.0, 0.0, 0.0)),
             dtype=float,
         )
-        distance = float(np.mean(np.abs(current_mean - reference_mean)) / 255.0)
+        distance = float(
+            numpy.mean(numpy.abs(current_mean - reference_mean)) / 255.0
+        )
         duplicate_rate = current.profile["duplicate_count"] / max(
             current.sample_count, 1
         )

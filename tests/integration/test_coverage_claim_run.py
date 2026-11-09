@@ -4,10 +4,10 @@ import json
 import pathlib
 
 import support
-from test_decision_reports_run import run as charter_run
+from test_decision_reports_run import run
 
 from scmle.artifacts import claims_audit
-from scmle.data.ledger import ledger as ledger_module
+from scmle.data.ledger import ledger
 from scmle.evaluation import coverage_run
 
 
@@ -23,12 +23,12 @@ def kinds(folder):
 def test_the_claim_is_hashed_and_registered_before_the_test_rows_open(
     tmp_path,
 ):
-    result = charter_run(tmp_path, plan=False)
+    result = run(tmp_path, plan=False)
     folder = pathlib.Path(result.run_dir)
 
     claim = read(folder, "coverage_claim.json")
     report = read(folder, "coverage_report.json")
-    sha = ledger_module.digest(claim)
+    sha = ledger.digest(claim)
     assert report["claim_sha256"] == sha == coverage_run.claim_hash(claim)
     order = kinds(folder)
     assert order.index("coverage.registered") < order.index("test.opened")
@@ -47,12 +47,12 @@ def test_the_claim_is_hashed_and_registered_before_the_test_rows_open(
 
 
 def test_a_run_without_a_charter_writes_the_claim_too(tmp_path):
-    import numpy as np
-    import pandas as pd
+    import numpy
+    import pandas
 
-    rng = np.random.default_rng(0)
+    rng = numpy.random.default_rng(0)
     x = rng.normal(size=400)
-    frame = pd.DataFrame({"x": x, "y": 2 * x + rng.normal(size=400)})
+    frame = pandas.DataFrame({"x": x, "y": 2 * x + rng.normal(size=400)})
     result = support.make_project(
         frame, "y", time_budget=120, output_dir=tmp_path / "out"
     ).run()
@@ -70,7 +70,7 @@ def test_a_run_without_a_charter_writes_the_claim_too(tmp_path):
 def test_declared_slices_are_in_the_claim_and_flagged_by_the_margin(tmp_path):
     from scmle.data.charter import uncertainty
 
-    result = charter_run(
+    result = run(
         tmp_path,
         plan=False,
         uncertainty=uncertainty.UncertaintySpec(None, ("grp", "z", "ghost")),
@@ -98,7 +98,7 @@ def test_declared_slices_are_in_the_claim_and_flagged_by_the_margin(tmp_path):
 def confirmation_run(tmp_path):
     from scmle.data.charter import uncertainty
 
-    return charter_run(
+    return run(
         tmp_path,
         plan=False,
         uncertainty=uncertainty.UncertaintySpec(None, (), True),
@@ -149,7 +149,7 @@ def test_an_edited_confirmation_document_fails_the_verification(tmp_path):
 
 
 def test_without_the_flag_c_is_not_held_back_for_coverage(tmp_path):
-    result = charter_run(tmp_path, plan=False)
+    result = run(tmp_path, plan=False)
     folder = pathlib.Path(result.run_dir)
 
     assert not (folder / "coverage_confirmation.json").exists()

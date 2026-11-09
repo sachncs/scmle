@@ -3,7 +3,7 @@
 from typing import Any
 from typing import Self
 
-import numpy as np
+import numpy
 from sklearn import base
 from sklearn import preprocessing
 
@@ -47,7 +47,7 @@ class LabelEncodedClassifier(base.ClassifierMixin, base.BaseEstimator):
         )
         return self
 
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """Predicts and decodes back to the original labels.
 
         Args:
@@ -56,10 +56,10 @@ class LabelEncodedClassifier(base.ClassifierMixin, base.BaseEstimator):
         Returns:
             Array of original class labels, one per row.
         """
-        encoded = np.asarray(self.estimator_.predict(features)).astype(int)
+        encoded = numpy.asarray(self.estimator_.predict(features)).astype(int)
         return self.encoder_.inverse_transform(encoded)
 
-    def predict_proba(self, features: Any) -> np.ndarray:
+    def predict_proba(self, features: Any) -> numpy.ndarray:
         """Predicts class probabilities.
 
         Args:
@@ -103,10 +103,10 @@ class FlatPredictionClassifier(base.ClassifierMixin, base.BaseEstimator):
             This wrapper, fitted.
         """
         self.estimator_ = base.clone(self.estimator).fit(features, target)
-        self.classes_ = np.asarray(self.estimator_.classes_).ravel()
+        self.classes_ = numpy.asarray(self.estimator_.classes_).ravel()
         return self
 
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """Predicts, flattened to one dimension.
 
         Args:
@@ -115,9 +115,9 @@ class FlatPredictionClassifier(base.ClassifierMixin, base.BaseEstimator):
         Returns:
             One-dimensional array of predicted labels, one per row.
         """
-        return np.asarray(self.estimator_.predict(features)).ravel()
+        return numpy.asarray(self.estimator_.predict(features)).ravel()
 
-    def predict_proba(self, features: Any) -> np.ndarray:
+    def predict_proba(self, features: Any) -> numpy.ndarray:
         """Predicts class probabilities.
 
         Args:
@@ -168,10 +168,10 @@ class FitParamsClassifier(base.ClassifierMixin, base.BaseEstimator):
         self.estimator_ = base.clone(self.estimator).fit(
             features, target, **self.fit_params
         )
-        self.classes_ = np.asarray(self.estimator_.classes_)
+        self.classes_ = numpy.asarray(self.estimator_.classes_)
         return self
 
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """Predicts class labels.
 
         Args:
@@ -180,9 +180,9 @@ class FitParamsClassifier(base.ClassifierMixin, base.BaseEstimator):
         Returns:
             Array of predicted labels, one per row.
         """
-        return np.asarray(self.estimator_.predict(features))
+        return numpy.asarray(self.estimator_.predict(features))
 
-    def predict_proba(self, features: Any) -> np.ndarray:
+    def predict_proba(self, features: Any) -> numpy.ndarray:
         """Predicts class probabilities.
 
         Args:
@@ -230,7 +230,7 @@ class FitParamsRegressor(base.RegressorMixin, base.BaseEstimator):
         )
         return self
 
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """Predicts values.
 
         Args:
@@ -239,7 +239,7 @@ class FitParamsRegressor(base.RegressorMixin, base.BaseEstimator):
         Returns:
             Array of predicted values, one per row.
         """
-        return np.asarray(self.estimator_.predict(features))
+        return numpy.asarray(self.estimator_.predict(features))
 
 
 class MonotoneEstimator(base.BaseEstimator):
@@ -300,7 +300,7 @@ class MonotoneEstimator(base.BaseEstimator):
         self.estimator_ = model.fit(features, target)
         return self
 
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """Predicts with the constrained model.
 
         Args:
@@ -309,18 +309,18 @@ class MonotoneEstimator(base.BaseEstimator):
         Returns:
             Array of predictions, one per row.
         """
-        return np.asarray(self.estimator_.predict(features))
+        return numpy.asarray(self.estimator_.predict(features))
 
 
 class MonotoneClassifier(base.ClassifierMixin, MonotoneEstimator):
     """Monotonically constrained classifier."""
 
     @property
-    def classes_(self) -> np.ndarray:
+    def classes_(self) -> numpy.ndarray:
         """The class labels of the fitted model."""
-        return np.asarray(self.estimator_.classes_)
+        return numpy.asarray(self.estimator_.classes_)
 
-    def predict_proba(self, features: Any) -> np.ndarray:
+    def predict_proba(self, features: Any) -> numpy.ndarray:
         """Predicts class probabilities with the constrained model.
 
         Args:
@@ -330,7 +330,7 @@ class MonotoneClassifier(base.ClassifierMixin, MonotoneEstimator):
             Array with one row per input row and one column per class, in
             `classes_` order.
         """
-        return np.asarray(self.estimator_.predict_proba(features))
+        return numpy.asarray(self.estimator_.predict_proba(features))
 
 
 class MonotoneRegressor(base.RegressorMixin, MonotoneEstimator):

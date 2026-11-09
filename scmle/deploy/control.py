@@ -20,7 +20,7 @@ import dataclasses
 import time
 
 from scmle.contracts import errors
-from scmle.deploy import observation as observation_module
+from scmle.deploy import observation
 
 
 class RuntimeUnconfirmed(errors.ScmleError):
@@ -71,7 +71,7 @@ class ControlPlane(abc.ABC):
     provider: str = ""
 
     @abc.abstractmethod
-    def observe(self) -> observation_module.Observation:
+    def observe(self) -> observation.Observation:
         """Reads what is running and how traffic is split.
 
         Returns:
@@ -107,9 +107,9 @@ class ControlPlane(abc.ABC):
 
 def confirm(
     plane: ControlPlane,
-    check: Callable[[observation_module.Observation], list[str]],
+    check: Callable[[observation.Observation], list[str]],
     policy: ConfirmPolicy | None = None,
-) -> observation_module.Observation:
+) -> observation.Observation:
     """Reads the platform until ``check`` finds nothing wrong.
 
     An observation that cannot be read counts as a failed attempt.
@@ -147,7 +147,7 @@ def confirm(
 
 def expecting(
     revision: str, image_digest: str, percent: int
-) -> Callable[[observation_module.Observation], list[str]]:
+) -> Callable[[observation.Observation], list[str]]:
     """Builds a `confirm` check for one revision.
 
     Args:
@@ -161,7 +161,7 @@ def expecting(
         with the service ready; empty if it does.
     """
 
-    def check(seen: observation_module.Observation) -> list[str]:
+    def check(seen: observation.Observation) -> list[str]:
         """Compares one observation with the expectation.
 
         Args:

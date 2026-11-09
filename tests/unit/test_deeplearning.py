@@ -8,7 +8,7 @@ import sys
 import textwrap
 
 import joblib
-import numpy as np
+import numpy
 import pytest
 from scipy import sparse
 import support
@@ -16,7 +16,7 @@ import support
 import scmle
 from scmle.contracts import tasks
 from scmle.models import conformance
-from scmle.models import registry as registry_module
+from scmle.models import registry
 from scmle.models.deeplearning import estimators
 from scmle.models.deeplearning import worker
 
@@ -24,15 +24,15 @@ pytestmark = pytest.mark.skipif(
     importlib.util.find_spec("torch") is None, reason="torch is not installed"
 )
 
-REGISTRY = registry_module.ModelRegistry.with_builtins()
+REGISTRY = registry.ModelRegistry.with_builtins()
 FAST = {"epochs": 60, "patience": 6}
 
 
 def separable(rows=400, seed=0):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     features = rng.normal(size=(rows, 4))
-    labels = np.where(features[:, 0] + features[:, 1] > 0, "yes", "no")
-    return features.astype(np.float32), labels
+    labels = numpy.where(features[:, 0] + features[:, 1] > 0, "yes", "no")
+    return features.astype(numpy.float32), labels
 
 
 def test_classifier_learns_and_keeps_string_labels():
@@ -42,12 +42,12 @@ def test_classifier_learns_and_keeps_string_labels():
     assert set(model.classes_) == {"no", "yes"}
     assert (model.predict(features) == labels).mean() > 0.9
     probabilities = model.predict_proba(features)
-    np.testing.assert_allclose(probabilities.sum(axis=1), 1.0, rtol=1e-5)
+    numpy.testing.assert_allclose(probabilities.sum(axis=1), 1.0, rtol=1e-5)
 
 
 def test_regressor_recovers_a_linear_signal_in_original_units():
-    rng = np.random.default_rng(1)
-    features = rng.normal(size=(400, 3)).astype(np.float32)
+    rng = numpy.random.default_rng(1)
+    features = rng.normal(size=(400, 3)).astype(numpy.float32)
     target = 50 + 10 * features[:, 0] - 4 * features[:, 1]
 
     model = estimators.TorchRegressor(**FAST).fit(features, target)
@@ -74,7 +74,7 @@ def test_same_seed_gives_the_same_network():
         features, labels
     )
 
-    np.testing.assert_allclose(
+    numpy.testing.assert_allclose(
         first.predict_proba(features), second.predict_proba(features)
     )
 
@@ -89,8 +89,8 @@ def test_pickling_keeps_predictions_and_leaves_the_live_model_intact():
     buffer.seek(0)
     restored = joblib.load(buffer)
 
-    np.testing.assert_allclose(restored.predict_proba(features), before)
-    np.testing.assert_allclose(model.predict_proba(features), before)
+    numpy.testing.assert_allclose(restored.predict_proba(features), before)
+    numpy.testing.assert_allclose(model.predict_proba(features), before)
 
 
 def test_early_stopping_ends_training_before_the_epoch_limit():
@@ -103,8 +103,8 @@ def test_early_stopping_ends_training_before_the_epoch_limit():
 
 
 def test_balanced_class_weight_raises_minority_probability():
-    rng = np.random.default_rng(2)
-    features = rng.normal(size=(600, 3)).astype(np.float32)
+    rng = numpy.random.default_rng(2)
+    features = rng.normal(size=(600, 3)).astype(numpy.float32)
     labels = (features[:, 0] + rng.normal(0, 1.5, 600) > 1.8).astype(int)
     plain = estimators.TorchClassifier(**FAST).fit(features, labels)
     balanced = estimators.TorchClassifier(class_weight="balanced", **FAST).fit(
@@ -119,7 +119,7 @@ def test_balanced_class_weight_raises_minority_probability():
 
 def test_sparse_input_and_sample_weights_are_accepted():
     features, labels = separable()
-    weights = np.where(labels == "yes", 2.0, 1.0)
+    weights = numpy.where(labels == "yes", 2.0, 1.0)
 
     model = estimators.TorchClassifier(**FAST).fit(
         sparse.csr_matrix(features), labels, sample_weight=weights
@@ -168,7 +168,7 @@ def test_a_pytorch_model_family_trains_packages_and_predicts(
     features = binary_frame.drop(columns="y").head(20)
     result.save(tmp_path / "net")
     reloaded = scmle.load_model(tmp_path / "net", trusted=True)
-    np.testing.assert_array_equal(
+    numpy.testing.assert_array_equal(
         reloaded.predict(features), result.predict(features)
     )
     assert reloaded.predict_proba(features).shape == (20, 2)
@@ -238,7 +238,7 @@ def test_a_killed_worker_is_restarted_on_the_next_request():
     worker.client().process.kill()
     worker.client().process.wait()
 
-    np.testing.assert_allclose(model.predict_proba(features), before)
+    numpy.testing.assert_allclose(model.predict_proba(features), before)
 
 
 def test_training_reports_its_health_and_clips_gradients():
@@ -291,15 +291,15 @@ def test_modern_architectures_learn_classification(architecture, sizes):
 
     assert (model.predict(features) == labels).mean() > 0.9
     probabilities = model.predict_proba(features)
-    np.testing.assert_allclose(probabilities.sum(axis=1), 1.0, rtol=1e-5)
+    numpy.testing.assert_allclose(probabilities.sum(axis=1), 1.0, rtol=1e-5)
 
 
 @pytest.mark.parametrize(
     "architecture", ["tabm", "ft_transformer", "robust_mlp"]
 )
 def test_modern_architectures_learn_regression(architecture):
-    rng = np.random.default_rng(3)
-    features = rng.normal(size=(400, 4)).astype(np.float32)
+    rng = numpy.random.default_rng(3)
+    features = rng.normal(size=(400, 4)).astype(numpy.float32)
     target = 20 + 5 * features[:, 0] - 3 * features[:, 2]
 
     model = estimators.TorchRegressor(

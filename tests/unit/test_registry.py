@@ -202,7 +202,7 @@ def test_a_third_party_deep_learning_adapter_needs_no_core_edit(registry):
 def test_a_default_orchestrator_discovers_conforming_plugins_only(
     monkeypatch, binary_frame
 ):
-    from scmle.core import orchestrator as orchestrator_module
+    from scmle.core import orchestrator
 
     class NoProba:
         def fit(self, features, target):
@@ -239,7 +239,7 @@ def test_a_default_orchestrator_discovers_conforming_plugins_only(
         ],
     )
     spec = tasks.ProjectSpec(data=tasks.DataSpec(uri="<in-memory>", target="y"))
-    engine = orchestrator_module.Orchestrator(spec, binary_frame)
+    engine = orchestrator.Orchestrator(spec, binary_frame)
     assert "third_party" in engine.registry.adapters
     assert "non_conforming" not in engine.registry.adapters
     assert "predict_proba" in engine.registry.plugin_failures["bad"]

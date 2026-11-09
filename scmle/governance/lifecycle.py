@@ -6,7 +6,7 @@ import json
 import pathlib
 from typing import Any
 
-import pandas as pd
+import pandas
 
 import scmle
 from scmle import durability
@@ -14,15 +14,15 @@ from scmle.api import results
 from scmle.contracts import errors
 from scmle.governance import registry as registry_module
 from scmle.monitoring import champion
-from scmle.monitoring import monitor as monitor_module
+from scmle.monitoring import monitor
 
 HOLDOUT_FRACTION = 0.3
 STATE_SUFFIX = ".lifecycle.json"
 
 
 def split_fresh(
-    fresh: pd.DataFrame, schema: Any
-) -> tuple[pd.DataFrame, pd.DataFrame]:
+    fresh: pandas.DataFrame, schema: Any
+) -> tuple[pandas.DataFrame, pandas.DataFrame]:
     """Splits fresh rows into training and holdout rows.
 
     Data with a time column (named by the schema and present in `fresh`) are
@@ -46,14 +46,14 @@ def split_fresh(
     time_name = getattr(schema, "time_column", None)
     group_name = getattr(schema, "group_column", None)
     if time_name and time_name in fresh.columns:
-        order = pd.to_datetime(fresh[time_name], errors="coerce")
+        order = pandas.to_datetime(fresh[time_name], errors="coerce")
         ordered = fresh.iloc[order.argsort(kind="stable")].reset_index(
             drop=True
         )
         cut = int(len(ordered) * (1 - HOLDOUT_FRACTION))
         return ordered.iloc[:cut], ordered.iloc[cut:]
     if group_name and group_name in fresh.columns:
-        names = pd.Series(fresh[group_name].astype(str).unique())
+        names = pandas.Series(fresh[group_name].astype(str).unique())
         names = names.sample(frac=1.0, random_state=0).reset_index(drop=True)
         held = set(names.iloc[int(len(names) * (1 - HOLDOUT_FRACTION)) :])
         mask = fresh[group_name].astype(str).isin(held)
@@ -119,7 +119,7 @@ class RollbackOutcome:
     reason: str
 
 
-def fingerprint(frame: pd.DataFrame) -> str:
+def fingerprint(frame: pandas.DataFrame) -> str:
     """Short digest of the rows, to recognise data already acted on.
 
     Args:
@@ -128,7 +128,7 @@ def fingerprint(frame: pd.DataFrame) -> str:
     Returns:
         The first 16 hex characters of a SHA-256 over the row hashes.
     """
-    hashes = pd.util.hash_pandas_object(frame, index=False).to_numpy()
+    hashes = pandas.util.hash_pandas_object(frame, index=False).to_numpy()
     return hashlib.sha256(hashes.tobytes()).hexdigest()[:16]
 
 
@@ -148,7 +148,7 @@ class LifecycleOutcome:
             `cooldown` or `too_few_rows`), if it did not.
     """
 
-    monitoring: monitor_module.MonitoringReport
+    monitoring: monitor.MonitoringReport
     retrained: bool
     comparison: champion.Comparison | None
     promoted_version: int | None
@@ -222,7 +222,7 @@ class LifecycleManager:
         )
 
     def skip_reason(
-        self, state: dict[str, Any], fresh: pd.DataFrame
+        self, state: dict[str, Any], fresh: pandas.DataFrame
     ) -> str | None:
         """Why a recommended retrain should not run now, if any reason holds.
 
@@ -326,7 +326,7 @@ class LifecycleManager:
 
     def review(
         self,
-        fresh: pd.DataFrame,
+        fresh: pandas.DataFrame,
         target: str,
         retrain: bool = True,
         project_options: dict[str, Any] | None = None,
@@ -359,7 +359,7 @@ class LifecycleManager:
 
     def review_locked(
         self,
-        fresh: pd.DataFrame,
+        fresh: pandas.DataFrame,
         target: str,
         retrain: bool,
         project_options: dict[str, Any] | None,
@@ -378,9 +378,7 @@ class LifecycleManager:
         """
         current = self.registry.load(self.model)
         features = fresh.drop(columns=[target])
-        report = monitor_module.ModelMonitor(current).assess(
-            features, fresh[target]
-        )
+        report = monitor.ModelMonitor(current).assess(features, fresh[target])
         notes = list(report.recommendation.reasons)
         state = self.read_state()
         self.registry.audit(
@@ -469,7 +467,7 @@ class LifecycleManager:
 
     def check_rollback(
         self,
-        fresh: pd.DataFrame,
+        fresh: pandas.DataFrame,
         target: str,
         policy: RollbackPolicy | None = None,
         approval: registry_module.PromotionApproval | None = None,
@@ -645,7 +643,7 @@ class LifecycleManager:
         )
         return int(target)
 
-    def note_rows(self, state: dict[str, Any], fresh: pd.DataFrame) -> None:
+    def note_rows(self, state: dict[str, Any], fresh: pandas.DataFrame) -> None:
         """Counts fresh rows toward the cooldown after an attempt.
 
         Does nothing if there was no attempt or these rows are the ones last

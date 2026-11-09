@@ -5,10 +5,10 @@ from types import SimpleNamespace
 from typing import Any
 from typing import Literal
 
-import numpy as np
+import numpy
 import pytest
 
-from scmle.evaluation import parameter_estimation as estimation_module
+from scmle.evaluation import parameter_estimation
 from scmle.evaluation.parameter_estimation import BayesianPrior
 from scmle.evaluation.parameter_estimation import EstimandSpec
 from scmle.evaluation.parameter_estimation import estimate_parameters
@@ -47,16 +47,18 @@ def causal_estimand() -> EstimandSpec:
     )
 
 
-def clustered_causal_fixture() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def clustered_causal_fixture() -> tuple[
+    numpy.ndarray, numpy.ndarray, numpy.ndarray
+]:
     """Return fixed clustered observations for causal uncertainty tests."""
-    rng = np.random.default_rng(303)
+    rng = numpy.random.default_rng(303)
     cluster_count = 20
     rows_per_cluster = 12
-    clusters = np.repeat(np.arange(cluster_count), rows_per_cluster)
+    clusters = numpy.repeat(numpy.arange(cluster_count), rows_per_cluster)
     age = rng.normal(size=len(clusters))
     risk_score = rng.normal(size=len(clusters))
     treatment_probability = 1.0 / (
-        1.0 + np.exp(-(-0.25 + 0.65 * age - 0.35 * risk_score))
+        1.0 + numpy.exp(-(-0.25 + 0.65 * age - 0.35 * risk_score))
     )
     treatment = rng.binomial(1, treatment_probability)
     outcome = (
@@ -66,7 +68,7 @@ def clustered_causal_fixture() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         - 0.2 * risk_score
         + rng.normal(scale=0.7, size=len(clusters))
     )
-    return np.column_stack((treatment, age, risk_score)), outcome, clusters
+    return numpy.column_stack((treatment, age, risk_score)), outcome, clusters
 
 
 def clustered_causal_policy(
@@ -124,9 +126,9 @@ def continuous_treatment_policy(
 
 def continuous_treatment_fixture(
     cluster_count: int = 1,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray | None]:
+) -> tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray | None]:
     """Return a confounded continuous-treatment fixture with known slope."""
-    rng = np.random.default_rng(414)
+    rng = numpy.random.default_rng(414)
     rows = 720 if cluster_count == 1 else cluster_count * 24
     age = rng.normal(size=rows)
     risk_score = rng.normal(size=rows)
@@ -141,9 +143,9 @@ def continuous_treatment_fixture(
     clusters = (
         None
         if cluster_count == 1
-        else np.repeat(np.arange(cluster_count), rows // cluster_count)
+        else numpy.repeat(numpy.arange(cluster_count), rows // cluster_count)
     )
-    return np.column_stack((dose, age, risk_score)), outcome, clusters
+    return numpy.column_stack((dose, age, risk_score)), outcome, clusters
 
 
 def hierarchical_estimand() -> EstimandSpec:
@@ -163,7 +165,7 @@ def hierarchical_estimand() -> EstimandSpec:
 
 def test_linear_estimation_records_robust_uncertainty_and_reference():
     """A known linear relationship produces auditable coefficient evidence."""
-    rng = np.random.default_rng(7)
+    rng = numpy.random.default_rng(7)
     features = rng.normal(size=(180, 2))
     outcome = 1.5 + 2.0 * features[:, 0] - 0.75 * features[:, 1]
     outcome += rng.normal(scale=0.2, size=len(outcome))
@@ -189,10 +191,10 @@ def test_linear_estimation_records_robust_uncertainty_and_reference():
 
 def test_estimation_fingerprint_binds_raw_feature_outcome_and_clusters():
     """Raw inputs have stable fingerprints before missing-row filtering."""
-    values = np.arange(15, dtype=float)
-    features = np.column_stack((values, values**2))
+    values = numpy.arange(15, dtype=float)
+    features = numpy.column_stack((values, values**2))
     outcome = 1.0 + features[:, 0] - 0.5 * features[:, 1]
-    clusters = np.repeat(("a", "b", "c"), 5)
+    clusters = numpy.repeat(("a", "b", "c"), 5)
     policy = EstimationPolicy(
         estimator="linear", covariance="clustered", cluster_name="site"
     )
@@ -212,7 +214,7 @@ def test_estimation_fingerprint_binds_raw_feature_outcome_and_clusters():
         outcome,
         linear_estimand(),
         policy,
-        clusters=np.roll(clusters, 1),
+        clusters=numpy.roll(clusters, 1),
     )
 
     assert first.raw_input_fingerprint == second.raw_input_fingerprint
@@ -225,9 +227,9 @@ def test_estimation_fingerprint_binds_raw_feature_outcome_and_clusters():
 
 def test_clustered_covariance_and_shift_diagnostics_are_explicit():
     """Cluster and target-population policies cannot disappear into a score."""
-    rng = np.random.default_rng(11)
+    rng = numpy.random.default_rng(11)
     features = rng.normal(size=(120, 2))
-    clusters = np.repeat(np.arange(12), 10)
+    clusters = numpy.repeat(numpy.arange(12), 10)
     outcome = 0.5 + features[:, 0] + features[:, 1] + rng.normal(size=120)
 
     result = estimate_parameters(
@@ -242,7 +244,7 @@ def test_clustered_covariance_and_shift_diagnostics_are_explicit():
             seed=3,
         ),
         clusters=clusters,
-        shift_reference=features + np.array([2.0, 0.0]),
+        shift_reference=features + numpy.array([2.0, 0.0]),
     )
 
     assert result.sensitivity["sampling"]["status"] == "available"
@@ -258,10 +260,10 @@ def test_clustered_covariance_and_shift_diagnostics_are_explicit():
 
 def test_logistic_estimation_has_independent_optimization_check():
     """A Bernoulli likelihood reports convergence and a second calculation."""
-    rng = np.random.default_rng(4)
+    rng = numpy.random.default_rng(4)
     features = rng.normal(size=(500, 2))
     logits = -0.3 + 1.1 * features[:, 0] - 0.8 * features[:, 1]
-    outcome = rng.binomial(1, 1.0 / (1.0 + np.exp(-logits)))
+    outcome = rng.binomial(1, 1.0 / (1.0 + numpy.exp(-logits)))
     estimand = EstimandSpec(
         name="conversion_log_odds",
         outcome="converted",
@@ -285,7 +287,7 @@ def test_logistic_estimation_has_independent_optimization_check():
 
 def test_bayesian_linear_estimation_reports_posterior_evidence():
     """A declared conjugate prior produces auditable posterior evidence."""
-    rng = np.random.default_rng(19)
+    rng = numpy.random.default_rng(19)
     features = rng.normal(size=(180, 2))
     outcome = 1.25 + 1.8 * features[:, 0] - 0.6 * features[:, 1]
     outcome += rng.normal(scale=0.35, size=len(outcome))
@@ -316,7 +318,7 @@ def test_bayesian_linear_estimation_reports_posterior_evidence():
 
 def test_bayesian_prior_round_trip_preserves_digest_contract(tmp_path):
     """A Bayesian report reloads with its prior and digest unchanged."""
-    features = np.arange(30, dtype=float).reshape(15, 2)
+    features = numpy.arange(30, dtype=float).reshape(15, 2)
     outcome = 1.0 + 0.5 * features[:, 0] - 0.25 * features[:, 1]
     prior = BayesianPrior(
         mean=(0.0, 0.0, 0.0),
@@ -371,12 +373,12 @@ def test_bayesian_estimation_fails_closed_for_unsupported_policies():
 
 def test_bayesian_ate_reports_causal_posterior_evidence():
     """A Gaussian outcome model identifies a declared binary-treatment ATE."""
-    rng = np.random.default_rng(121)
+    rng = numpy.random.default_rng(121)
     rows = 420
     age = rng.normal(size=rows)
     risk_score = rng.normal(size=rows)
     treatment_probability = 1.0 / (
-        1.0 + np.exp(-(-0.3 + 0.7 * age - 0.4 * risk_score))
+        1.0 + numpy.exp(-(-0.3 + 0.7 * age - 0.4 * risk_score))
     )
     treatment = rng.binomial(1, treatment_probability)
     outcome = (
@@ -386,7 +388,7 @@ def test_bayesian_ate_reports_causal_posterior_evidence():
         - 0.3 * risk_score
         + rng.normal(scale=0.4, size=rows)
     )
-    features = np.column_stack((treatment, age, risk_score))
+    features = numpy.column_stack((treatment, age, risk_score))
     prior = BayesianPrior(
         mean=(0.0, 0.0, 0.0, 0.0),
         precision=tuple(
@@ -473,14 +475,14 @@ def test_bayesian_ate_validates_causal_policy_and_prior_shape():
     }
     with pytest.raises(ValueError, match="prior dimension"):
         estimate_parameters(
-            np.column_stack(
+            numpy.column_stack(
                 (
-                    np.tile((0.0, 1.0), 6),
-                    np.arange(12, dtype=float),
-                    np.arange(12, dtype=float) ** 2,
+                    numpy.tile((0.0, 1.0), 6),
+                    numpy.arange(12, dtype=float),
+                    numpy.arange(12, dtype=float) ** 2,
                 )
             ),
-            np.arange(12, dtype=float),
+            numpy.arange(12, dtype=float),
             causal_estimand(),
             EstimationPolicy(**policy_values),
         )
@@ -538,17 +540,17 @@ def test_bayesian_ate_validates_causal_policy_and_prior_shape():
 
 def test_ipw_ate_requires_declared_assumptions_and_reports_overlap():
     """IPW exposes treatment assignment evidence without claiming proof."""
-    rng = np.random.default_rng(23)
+    rng = numpy.random.default_rng(23)
     rows = 500
     age = rng.normal(size=rows)
     risk_score = rng.normal(size=rows)
     treatment_probability = 1.0 / (
-        1.0 + np.exp(-(-0.2 + 0.8 * age - 0.4 * risk_score))
+        1.0 + numpy.exp(-(-0.2 + 0.8 * age - 0.4 * risk_score))
     )
     treatment = rng.binomial(1, treatment_probability)
     outcome = 1.0 + 2.0 * treatment + 0.5 * age - 0.25 * risk_score
     outcome += rng.normal(scale=0.8, size=rows)
-    features = np.column_stack((treatment, age, risk_score))
+    features = numpy.column_stack((treatment, age, risk_score))
     policy = EstimationPolicy(
         estimator="ipw_ate",
         covariance="iid",
@@ -653,9 +655,9 @@ def test_continuous_ipw_ate_requires_declared_density_assumptions():
     del unused_clusters
     with pytest.raises(ValueError, match="at least four distinct"):
         estimate_parameters(
-            np.column_stack(
+            numpy.column_stack(
                 (
-                    np.tile((0.0, 1.0), len(features) // 2),
+                    numpy.tile((0.0, 1.0), len(features) // 2),
                     features[:, 1],
                     features[:, 2],
                 )
@@ -684,17 +686,17 @@ def test_continuous_policy_round_trip_preserves_explicit_capability():
 
 def test_aipw_ate_reports_augmented_score_and_reference_evidence():
     """AIPW combines propensity and outcome nuisance evidence."""
-    rng = np.random.default_rng(24)
+    rng = numpy.random.default_rng(24)
     rows = 600
     age = rng.normal(size=rows)
     risk_score = rng.normal(size=rows)
     treatment_probability = 1.0 / (
-        1.0 + np.exp(-(-0.2 + 0.8 * age - 0.4 * risk_score))
+        1.0 + numpy.exp(-(-0.2 + 0.8 * age - 0.4 * risk_score))
     )
     treatment = rng.binomial(1, treatment_probability)
     outcome = 1.0 + 2.0 * treatment + 0.5 * age - 0.25 * risk_score
     outcome += rng.normal(scale=0.8, size=rows)
-    features = np.column_stack((treatment, age, risk_score))
+    features = numpy.column_stack((treatment, age, risk_score))
     policy = EstimationPolicy(
         estimator="aipw_ate",
         covariance="iid",
@@ -806,23 +808,23 @@ def test_causal_clustered_uncertainty_rejects_hc3_and_one_cluster():
             outcome,
             causal_estimand(),
             clustered_causal_policy("aipw_ate"),
-            clusters=np.zeros(len(clusters), dtype=int),
+            clusters=numpy.zeros(len(clusters), dtype=int),
         )
 
 
 def test_aipw_ate_cross_fitting_is_deterministic_and_auditable():
     """Cross-fitting uses held-out scores and records every fold contract."""
-    rng = np.random.default_rng(24)
+    rng = numpy.random.default_rng(24)
     rows = 600
     age = rng.normal(size=rows)
     risk_score = rng.normal(size=rows)
     treatment_probability = 1.0 / (
-        1.0 + np.exp(-(-0.2 + 0.8 * age - 0.4 * risk_score))
+        1.0 + numpy.exp(-(-0.2 + 0.8 * age - 0.4 * risk_score))
     )
     treatment = rng.binomial(1, treatment_probability)
     outcome = 1.0 + 2.0 * treatment + 0.5 * age - 0.25 * risk_score
     outcome += rng.normal(scale=0.8, size=rows)
-    features = np.column_stack((treatment, age, risk_score))
+    features = numpy.column_stack((treatment, age, risk_score))
     policy = EstimationPolicy(
         estimator="aipw_ate",
         covariance="iid",
@@ -975,7 +977,7 @@ def test_causal_bootstrap_records_failed_replicates(
             "positivity",
         ),
     )
-    original_fit = estimation_module.fit_ipw_ate
+    original_fit = parameter_estimation.fit_ipw_ate
     calls = 0
 
     def fail_one_replicate(*args: Any, **kwargs: Any) -> Any:
@@ -985,7 +987,7 @@ def test_causal_bootstrap_records_failed_replicates(
             raise ValueError("forced invalid bootstrap replicate")
         return original_fit(*args, **kwargs)
 
-    monkeypatch.setattr(estimation_module, "fit_ipw_ate", fail_one_replicate)
+    monkeypatch.setattr(parameter_estimation, "fit_ipw_ate", fail_one_replicate)
     result = estimate_parameters(features, outcome, causal_estimand(), policy)
     sampling = result.sensitivity["sampling"]
 
@@ -1027,7 +1029,7 @@ def test_causal_bootstrap_fails_closed_when_too_few_replicates_succeed(
             "positivity",
         ),
     )
-    original_fit = estimation_module.fit_aipw_ate
+    original_fit = parameter_estimation.fit_aipw_ate
     calls = 0
 
     def fail_bootstrap(*args: Any, **kwargs: Any) -> Any:
@@ -1037,7 +1039,7 @@ def test_causal_bootstrap_fails_closed_when_too_few_replicates_succeed(
             raise ValueError("forced bootstrap failure")
         return original_fit(*args, **kwargs)
 
-    monkeypatch.setattr(estimation_module, "fit_aipw_ate", fail_bootstrap)
+    monkeypatch.setattr(parameter_estimation, "fit_aipw_ate", fail_bootstrap)
     with pytest.raises(
         ValueError,
         match="at least two successful replicates; received 0 of 3",
@@ -1061,9 +1063,9 @@ def test_aipw_cross_fitting_validates_policy_and_fold_support():
     with pytest.raises(ValueError, match="only by aipw_ate"):
         EstimationPolicy(estimator="linear", cross_fitting_folds=2)
 
-    treatment = np.tile((0.0, 1.0), 4)
-    signal = np.arange(8, dtype=float)
-    features = np.column_stack((treatment, signal, signal**2))
+    treatment = numpy.tile((0.0, 1.0), 4)
+    signal = numpy.arange(8, dtype=float)
+    features = numpy.column_stack((treatment, signal, signal**2))
     outcome = signal
     policy = EstimationPolicy(
         estimator="aipw_ate",
@@ -1083,10 +1085,10 @@ def test_aipw_cross_fitting_validates_policy_and_fold_support():
 
 def test_hierarchical_linear_reports_random_intercept_variance():
     """Grouped GLS reports its variance components and reference evidence."""
-    rng = np.random.default_rng(29)
+    rng = numpy.random.default_rng(29)
     cluster_count = 16
     rows_per_cluster = 18
-    clusters = np.repeat(np.arange(cluster_count), rows_per_cluster)
+    clusters = numpy.repeat(numpy.arange(cluster_count), rows_per_cluster)
     signal = rng.normal(size=len(clusters))
     random_intercepts = rng.normal(scale=1.1, size=cluster_count)
     outcome = (
@@ -1132,11 +1134,11 @@ def test_hierarchical_linear_reports_random_intercept_variance():
 
 
 def make_hierarchical_reml_fixture() -> tuple[
-    np.ndarray, np.ndarray, np.ndarray
+    numpy.ndarray, numpy.ndarray, numpy.ndarray
 ]:
     """Return deterministic grouped data with a non-zero random intercept."""
-    rng = np.random.default_rng(41)
-    clusters = np.repeat(np.arange(8), 12)
+    rng = numpy.random.default_rng(41)
+    clusters = numpy.repeat(numpy.arange(8), 12)
     signal = rng.normal(size=len(clusters))
     random_intercepts = rng.normal(scale=0.8, size=8)
     outcome = (
@@ -1190,11 +1192,11 @@ def test_hierarchical_linear_selects_bounded_reml_method():
 
 
 def make_hierarchical_random_slope_fixture() -> tuple[
-    np.ndarray, np.ndarray, np.ndarray
+    numpy.ndarray, numpy.ndarray, numpy.ndarray
 ]:
     """Return deterministic data with a declared random signal slope."""
-    rng = np.random.default_rng(151)
-    clusters = np.repeat(np.arange(14), 20)
+    rng = numpy.random.default_rng(151)
+    clusters = numpy.repeat(numpy.arange(14), 20)
     signal = rng.normal(size=len(clusters))
     random_intercepts = rng.normal(scale=0.75, size=14)
     random_slopes = rng.normal(scale=0.35, size=14)
@@ -1420,7 +1422,7 @@ def test_hierarchical_bootstrap_records_failed_replicates(
             "seed": 109,
         }
     )
-    original_fit = estimation_module.fit_hierarchical_linear
+    original_fit = parameter_estimation.fit_hierarchical_linear
     calls = 0
 
     def fail_one_replicate(*args: Any, **kwargs: Any) -> Any:
@@ -1431,7 +1433,7 @@ def test_hierarchical_bootstrap_records_failed_replicates(
         return original_fit(*args, **kwargs)
 
     monkeypatch.setattr(
-        estimation_module, "fit_hierarchical_linear", fail_one_replicate
+        parameter_estimation, "fit_hierarchical_linear", fail_one_replicate
     )
     result = estimate_parameters(
         features,
@@ -1466,9 +1468,9 @@ def test_hierarchical_linear_rejects_invalid_reml_optimizer_state(
             success=False,
             status=2,
             message="forced optimizer failure",
-            x=np.array([0.0, 0.0]),
+            x=numpy.array([0.0, 0.0]),
             fun=1.0,
-            jac=np.array([0.0, 0.0]),
+            jac=numpy.array([0.0, 0.0]),
             nit=1,
             nfev=1,
         )
@@ -1533,8 +1535,8 @@ def test_hierarchical_linear_requires_groups_and_rejects_robust_policy():
         cluster_name="site_id",
         hierarchical_assumptions=assumptions,
     )
-    features = np.arange(20, dtype=float).reshape(10, 2)
-    outcome = np.arange(10, dtype=float)
+    features = numpy.arange(20, dtype=float).reshape(10, 2)
+    outcome = numpy.arange(10, dtype=float)
     with pytest.raises(ValueError, match="requires cluster labels"):
         estimate_parameters(
             features,
@@ -1546,8 +1548,8 @@ def test_hierarchical_linear_requires_groups_and_rejects_robust_policy():
 
 def test_complete_case_is_explicit_and_reject_is_fail_closed():
     """Missingness must be a declared policy, never an accidental drop."""
-    features = np.array([[0.0], [1.0], [np.nan], [3.0], [4.0], [5.0]])
-    outcome = np.array([0.0, 1.0, 2.0, 3.0, 4.0, 5.0])
+    features = numpy.array([[0.0], [1.0], [numpy.nan], [3.0], [4.0], [5.0]])
+    outcome = numpy.array([0.0, 1.0, 2.0, 3.0, 4.0, 5.0])
     estimand = EstimandSpec(
         name="slope",
         outcome="outcome",
@@ -1578,9 +1580,9 @@ def test_complete_case_is_explicit_and_reject_is_fail_closed():
 
 def test_estimation_validates_vector_and_cluster_shapes_before_fitting():
     """Malformed row shapes fail before a model can consume ambiguous data."""
-    signal = np.arange(6, dtype=float)
-    features = np.column_stack((signal, signal**2))
-    outcome = np.arange(6, dtype=float)
+    signal = numpy.arange(6, dtype=float)
+    features = numpy.column_stack((signal, signal**2))
+    outcome = numpy.arange(6, dtype=float)
     policy = EstimationPolicy(estimator="linear")
 
     with pytest.raises(ValueError, match=r"outcome must have shape \(rows,\)"):
@@ -1597,7 +1599,7 @@ def test_estimation_validates_vector_and_cluster_shapes_before_fitting():
             outcome,
             linear_estimand(),
             policy,
-            clusters=np.zeros((6, 1)),
+            clusters=numpy.zeros((6, 1)),
         )
 
 
@@ -1605,15 +1607,15 @@ def test_covariance_conditioning_is_reported_and_nonfinite_shift_fails_closed(
     monkeypatch: pytest.MonkeyPatch,
 ):
     """Release evidence records covariance identifiability and finite shifts."""
-    signal = np.arange(6, dtype=float)
-    features = np.column_stack((signal, signal**2))
+    signal = numpy.arange(6, dtype=float)
+    features = numpy.column_stack((signal, signal**2))
     outcome = 1.0 + features[:, 0] - 0.5 * features[:, 1]
 
     def return_zero_covariance(
         *arguments: object, **keywords: object
-    ) -> np.ndarray:
+    ) -> numpy.ndarray:
         del arguments, keywords
-        return np.zeros((3, 3))
+        return numpy.zeros((3, 3))
 
     monkeypatch.setattr(
         "scmle.evaluation.parameter_estimation.covariance_matrix",
@@ -1637,7 +1639,9 @@ def test_covariance_conditioning_is_reported_and_nonfinite_shift_fails_closed(
             outcome,
             linear_estimand(),
             EstimationPolicy(estimator="linear"),
-            shift_reference=np.array([[0.0, 1.0], [np.nan, 2.0], [2.0, 3.0]]),
+            shift_reference=numpy.array(
+                [[0.0, 1.0], [numpy.nan, 2.0], [2.0, 3.0]]
+            ),
         )
 
 
@@ -1654,8 +1658,8 @@ def test_declared_likelihood_must_match_estimation_method():
 
     with pytest.raises(ValueError, match="expected bernoulli"):
         estimate_parameters(
-            np.ones((12, 1)),
-            np.zeros(12),
+            numpy.ones((12, 1)),
+            numpy.zeros(12),
             estimand,
             EstimationPolicy(estimator="logistic"),
         )
@@ -1663,7 +1667,7 @@ def test_declared_likelihood_must_match_estimation_method():
 
 def test_report_persistence_is_atomic_and_digest_bound(tmp_path):
     """A saved report can be reloaded and tampering fails closed."""
-    rng = np.random.default_rng(12)
+    rng = numpy.random.default_rng(12)
     features = rng.normal(size=(40, 1))
     outcome = 2.0 + features[:, 0]
     estimand = EstimandSpec(

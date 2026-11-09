@@ -32,13 +32,13 @@ import enum
 import math
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from scipy import stats
 
 from scmle.contracts import qualification
 from scmle.core import randomness
-from scmle.data.admissibility import dag as dag_module
+from scmle.data.admissibility import dag
 
 MAX_DISCRETE_LEVELS = 10
 COMPONENT = "dag.ci"
@@ -114,7 +114,7 @@ class CITest:
     skipped_strata: int
 
 
-def residuals(values: np.ndarray, given: np.ndarray) -> np.ndarray:
+def residuals(values: numpy.ndarray, given: numpy.ndarray) -> numpy.ndarray:
     """Computes least-squares residuals on a set of columns and an intercept.
 
     Args:
@@ -124,13 +124,13 @@ def residuals(values: np.ndarray, given: np.ndarray) -> np.ndarray:
     Returns:
         The response minus its least-squares fit, one entry per row.
     """
-    design = np.column_stack([np.ones(len(values)), given])
-    solution = np.linalg.lstsq(design, values, rcond=None)
+    design = numpy.column_stack([numpy.ones(len(values)), given])
+    solution = numpy.linalg.lstsq(design, values, rcond=None)
     return values - design @ solution[0]
 
 
 def partial_correlation(
-    frame: pd.DataFrame, x: str, y: str, given: Sequence[str]
+    frame: pandas.DataFrame, x: str, y: str, given: Sequence[str]
 ) -> float:
     """Computes the sample partial correlation of two columns given others.
 
@@ -151,15 +151,15 @@ def partial_correlation(
     conditioning = data[:, 2:]
     rx = residuals(data[:, 0], conditioning)
     ry = residuals(data[:, 1], conditioning)
-    sx = float(np.sqrt(rx @ rx))
-    sy = float(np.sqrt(ry @ ry))
+    sx = float(numpy.sqrt(rx @ rx))
+    sy = float(numpy.sqrt(ry @ ry))
     if sx == 0.0 or sy == 0.0:
         raise ValueError("a variable has no spread given the conditioning set")
     return float(max(-1.0, min(1.0, (rx @ ry) / (sx * sy))))
 
 
 def fisher_z(
-    frame: pd.DataFrame, x: str, y: str, given: Sequence[str]
+    frame: pandas.DataFrame, x: str, y: str, given: Sequence[str]
 ) -> CITest:
     """Fisher's z test of zero partial correlation.
 
@@ -190,7 +190,7 @@ def fisher_z(
 
 
 def stratified_chi2(
-    frame: pd.DataFrame, x: str, y: str, given: Sequence[str]
+    frame: pandas.DataFrame, x: str, y: str, given: Sequence[str]
 ) -> CITest:
     """Chi-square test of independence summed over strata of `given`.
 
@@ -203,14 +203,14 @@ def stratified_chi2(
     Returns:
         The test. With no usable stratum the p-value is 1 and `df` is 0.
     """
-    keys = [frame[c] for c in given] or [pd.Series(0, index=frame.index)]
+    keys = [frame[c] for c in given] or [pandas.Series(0, index=frame.index)]
     total = 0.0
     df = 0
     skipped = 0
-    pooled = pd.crosstab(frame[x], frame[y])
+    pooled = pandas.crosstab(frame[x], frame[y])
     groups = frame.groupby(keys, sort=True, observed=True)
     for rows in (part[1] for part in groups):
-        table = pd.crosstab(rows[x], rows[y])
+        table = pandas.crosstab(rows[x], rows[y])
         if table.shape[0] < 2 or table.shape[1] < 2:
             skipped += 1
             continue
@@ -225,7 +225,7 @@ def stratified_chi2(
     )
 
 
-def is_discrete(series: pd.Series) -> bool:
+def is_discrete(series: pandas.Series) -> bool:
     """Decides whether a column is treated as categorical.
 
     Args:
@@ -234,15 +234,15 @@ def is_discrete(series: pd.Series) -> bool:
     Returns:
         True for categorical, boolean and non-numeric dtypes.
     """
-    if isinstance(series.dtype, pd.CategoricalDtype):
+    if isinstance(series.dtype, pandas.CategoricalDtype):
         return True
-    if pd.api.types.is_bool_dtype(series):
+    if pandas.api.types.is_bool_dtype(series):
         return True
-    return not pd.api.types.is_numeric_dtype(series)
+    return not pandas.api.types.is_numeric_dtype(series)
 
 
 def run_test(
-    frame: pd.DataFrame, x: str, y: str, given: Sequence[str]
+    frame: pandas.DataFrame, x: str, y: str, given: Sequence[str]
 ) -> CITest:
     """Runs Fisher's z on numeric data or the chi-square on categories.
 
@@ -276,7 +276,7 @@ def run_test(
 
 
 def implied_statements(
-    graph: dag_module.Dag,
+    graph: dag.Dag,
 ) -> tuple[list[Statement], list[str]]:
     """Lists the local Markov statements of the observed part of a graph.
 
@@ -361,8 +361,8 @@ class FalsificationReport:
 
 
 def falsify(
-    graph: dag_module.Dag,
-    frame: pd.DataFrame,
+    graph: dag.Dag,
+    frame: pandas.DataFrame,
     alpha: float = 0.05,
     run_seed: int = 0,
     set_id: qualification.SetId = qualification.SetId.EXPLORATION,
@@ -454,7 +454,7 @@ def describe(report: FalsificationReport) -> dict[str, Any]:
     """
     return {
         "dag_hash": report.dag_hash,
-        "status": dag_module.STATUS,
+        "status": dag.STATUS,
         "alpha": report.alpha,
         "per_test_level": report.level,
         "falsified": len(report.falsified),

@@ -10,14 +10,14 @@ not only by whether they are exact.
 from typing import Any
 from typing import Self
 
-import numpy as np
+import numpy
 from scipy import special
 from sklearn import base
 from sklearn import model_selection
 
 MIN_ROWS_FOR_HONEST_SCORES = 30
 CROSS_FITS = 3
-SCALE_GRID = np.geomspace(0.05, 5.0, 40)
+SCALE_GRID = numpy.geomspace(0.05, 5.0, 40)
 EPSILON = 1e-12
 
 
@@ -66,9 +66,9 @@ class CumulativeThresholdRegressor(base.RegressorMixin, base.BaseEstimator):
         Returns:
             This fitted model.
         """
-        ranks = np.asarray(target, dtype=float).round().astype(int)
+        ranks = numpy.asarray(target, dtype=float).round().astype(int)
         count = self.levels or int(ranks.max()) + 1
-        self.classes_ = np.arange(count)
+        self.classes_ = numpy.arange(count)
         self.regressor_ = base.clone(self.regressor).fit(features, ranks)
         if len(ranks) >= MIN_ROWS_FOR_HONEST_SCORES:
             folds = model_selection.KFold(
@@ -79,16 +79,18 @@ class CumulativeThresholdRegressor(base.RegressorMixin, base.BaseEstimator):
             )
         else:
             scores = self.regressor_.predict(features)
-        scores = np.asarray(scores, dtype=float)
-        cumulative = np.cumsum(np.bincount(ranks, minlength=count))[:-1]
-        shares = np.clip(cumulative / len(ranks), EPSILON, 1 - EPSILON)
-        self.thresholds_ = np.maximum.accumulate(np.quantile(scores, shares))
+        scores = numpy.asarray(scores, dtype=float)
+        cumulative = numpy.cumsum(numpy.bincount(ranks, minlength=count))[:-1]
+        shares = numpy.clip(cumulative / len(ranks), EPSILON, 1 - EPSILON)
+        self.thresholds_ = numpy.maximum.accumulate(
+            numpy.quantile(scores, shares)
+        )
         self.scale_ = self.best_scale(scores, ranks)
         return self
 
     def level_probabilities(
-        self, scores: np.ndarray, scale: float
-    ) -> np.ndarray:
+        self, scores: numpy.ndarray, scale: float
+    ) -> numpy.ndarray:
         """Probability of each level for latent `scores`.
 
         Args:
@@ -99,11 +101,11 @@ class CumulativeThresholdRegressor(base.RegressorMixin, base.BaseEstimator):
             Array of shape `(n_rows, levels)`, floored at a tiny positive value;
             rows are not renormalised.
         """
-        edges = np.concatenate([[-np.inf], self.thresholds_, [np.inf]])
+        edges = numpy.concatenate([[-numpy.inf], self.thresholds_, [numpy.inf]])
         below = special.expit((edges[None, :] - scores[:, None]) / scale)
-        return np.clip(np.diff(below, axis=1), EPSILON, None)
+        return numpy.clip(numpy.diff(below, axis=1), EPSILON, None)
 
-    def best_scale(self, scores: np.ndarray, ranks: np.ndarray) -> float:
+    def best_scale(self, scores: numpy.ndarray, ranks: numpy.ndarray) -> float:
         """The link width with the highest likelihood on the fitted scores.
 
         Args:
@@ -114,19 +116,19 @@ class CumulativeThresholdRegressor(base.RegressorMixin, base.BaseEstimator):
             The scale from a fixed grid, in multiples of the score spread, with
             the highest mean log-likelihood of the true levels.
         """
-        spread = float(np.std(scores)) or 1.0
-        best, best_value = spread, -np.inf
+        spread = float(numpy.std(scores)) or 1.0
+        best, best_value = spread, -numpy.inf
         for factor in SCALE_GRID:
             scale = factor * spread
             probabilities = self.level_probabilities(scores, scale)
             value = float(
-                np.log(probabilities[np.arange(len(ranks)), ranks]).mean()
+                numpy.log(probabilities[numpy.arange(len(ranks)), ranks]).mean()
             )
             if value > best_value:
                 best, best_value = scale, value
         return best
 
-    def predict_proba(self, features: Any) -> np.ndarray:
+    def predict_proba(self, features: Any) -> numpy.ndarray:
         """Level probabilities, columns in level order.
 
         Args:
@@ -135,11 +137,11 @@ class CumulativeThresholdRegressor(base.RegressorMixin, base.BaseEstimator):
         Returns:
             Array of shape `(n_rows, levels)` whose rows sum to one.
         """
-        scores = np.asarray(self.regressor_.predict(features), dtype=float)
+        scores = numpy.asarray(self.regressor_.predict(features), dtype=float)
         probabilities = self.level_probabilities(scores, self.scale_)
         return probabilities / probabilities.sum(axis=1, keepdims=True)
 
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """Level rank: the number of thresholds the latent score has passed.
 
         Args:
@@ -148,5 +150,5 @@ class CumulativeThresholdRegressor(base.RegressorMixin, base.BaseEstimator):
         Returns:
             Integer array of shape `(n_rows,)` with values in `0..levels-1`.
         """
-        scores = np.asarray(self.regressor_.predict(features), dtype=float)
-        return np.searchsorted(self.thresholds_, scores, side="right")
+        scores = numpy.asarray(self.regressor_.predict(features), dtype=float)
+        return numpy.searchsorted(self.thresholds_, scores, side="right")

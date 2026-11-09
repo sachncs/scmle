@@ -4,8 +4,8 @@ import dataclasses
 import json
 import pathlib
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 import support
 
@@ -80,7 +80,7 @@ def test_binary_end_to_end_artifacts_and_inference(binary_frame, tmp_path):
     exported = result.save(tmp_path / "exported")
     loaded = scmle.ModelBundle.load(exported, trusted=True)
     features = binary_frame.drop(columns="y")
-    np.testing.assert_allclose(
+    numpy.testing.assert_allclose(
         result.predict_proba(features), loaded.predict_proba(features)
     )
     assert result.predict(features.head(7)).shape == (7,)
@@ -132,7 +132,8 @@ def test_approved_plan_restricts_models(binary_frame, tmp_path):
 
 def test_group_and_temporal_runs(binary_frame, tmp_path):
     frame = binary_frame.assign(
-        g=np.arange(len(binary_frame)) % 50, t=np.arange(len(binary_frame))
+        g=numpy.arange(len(binary_frame)) % 50,
+        t=numpy.arange(len(binary_frame)),
     )
     assert (
         run(frame, tmp_path, group_column="g").evaluation["split_strategy"]
@@ -145,7 +146,7 @@ def test_group_and_temporal_runs(binary_frame, tmp_path):
 
 
 def test_blocked_run_records_terminal_state(binary_frame, tmp_path):
-    ambiguous = binary_frame.assign(y=np.arange(len(binary_frame)) % 5)
+    ambiguous = binary_frame.assign(y=numpy.arange(len(binary_frame)) % 5)
     with pytest.raises(errors.BlockedError) as caught:
         run(ambiguous, tmp_path)
     assert read_kinds(caught.value.details["run_dir"])[-1] == "state.BLOCKED"
@@ -178,9 +179,9 @@ def test_string_labelled_binary_target_supports_every_binary_metric(
     )
     result = run(labelled, tmp_path, metric=metric)
     assert result.evaluation["metric"] == metric
-    assert not np.isnan(result.evaluation["selected_cv_score"])
+    assert not numpy.isnan(result.evaluation["selected_cv_score"])
     assert not any(
-        np.isnan(v) for v in result.evaluation["test_metrics"].values()
+        numpy.isnan(v) for v in result.evaluation["test_metrics"].values()
     )
     assert set(result.predict(labelled.drop(columns="y"))) <= {"false", "true"}
 
@@ -215,7 +216,7 @@ def test_exported_bundle_can_be_signed_and_loaded_without_trust(
     exported = result.save(tmp_path / "signed", signing_key="shared-secret")
     loaded = scmle.ModelBundle.load(exported, signing_key="shared-secret")
     features = binary_frame.drop(columns="y")
-    np.testing.assert_array_equal(
+    numpy.testing.assert_array_equal(
         loaded.predict(features), result.predict(features)
     )
     with pytest.raises(Exception, match="unauthenticated"):
@@ -224,7 +225,8 @@ def test_exported_bundle_can_be_signed_and_loaded_without_trust(
 
 def test_confidence_intervals_follow_the_data_structure(binary_frame, tmp_path):
     frame = binary_frame.assign(
-        g=np.arange(len(binary_frame)) % 40, t=np.arange(len(binary_frame))
+        g=numpy.arange(len(binary_frame)) % 40,
+        t=numpy.arange(len(binary_frame)),
     )
     plain = run(frame, tmp_path / "p").diagnostics["metric_uncertainty"]
     grouped = run(frame, tmp_path / "g", group_column="g").diagnostics[
@@ -245,7 +247,7 @@ def test_confidence_intervals_follow_the_data_structure(binary_frame, tmp_path):
 
 def test_time_series_contracts_end_to_end(binary_frame, tmp_path):
     frame = binary_frame.assign(
-        t=np.arange(len(binary_frame)), outcome_code=binary_frame.y * 9.0
+        t=numpy.arange(len(binary_frame)), outcome_code=binary_frame.y * 9.0
     )
     project = support.make_project(
         frame,
@@ -376,14 +378,14 @@ def test_reliability_checks_run_and_reach_the_report(binary_frame, tmp_path):
 
 
 def test_regression_bundles_return_calibrated_intervals(tmp_path):
-    rng = np.random.default_rng(11)
-    frame = pd.DataFrame({"x": rng.normal(size=900)})
+    rng = numpy.random.default_rng(11)
+    frame = pandas.DataFrame({"x": rng.normal(size=900)})
     frame["y"] = 4 * frame.x + rng.normal(0, 1.0, 900)
     result = support.make_project(
         frame, "y", time_budget=300, output_dir=tmp_path
     ).run()
 
-    new = pd.DataFrame({"x": rng.normal(size=3000)})
+    new = pandas.DataFrame({"x": rng.normal(size=3000)})
     truth = 4 * new.x + rng.normal(0, 1.0, 3000)
     narrow = result.bundle.predict_interval(new, coverage=0.5)
     wide = result.bundle.predict_interval(new, coverage=0.95)
@@ -408,7 +410,7 @@ def test_classification_bundles_return_prediction_sets_that_survive_saving(
     rows = binary_frame.drop(columns="y")
 
     sets = reloaded.predict_set(rows, coverage=0.9)
-    covered = np.mean(
+    covered = numpy.mean(
         [label in s for label, s in zip(binary_frame["y"], sets, strict=True)]
     )
 
@@ -422,16 +424,16 @@ def test_classification_bundles_return_prediction_sets_that_survive_saving(
             for s, keep in zip(by_class, rows_of_class, strict=True)
             if keep
         ]
-        assert np.mean(inside) > 0.8
+        assert numpy.mean(inside) > 0.8
     with pytest.raises(errors.ArtifactError, match="regression"):
         reloaded.predict_interval(rows)
 
 
 def series_frame(rows=600, seed=8):
-    rng = np.random.default_rng(seed)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    frame = pandas.DataFrame(
         {
-            "when": pd.date_range("2024-01-01", periods=rows, freq="h"),
+            "when": pandas.date_range("2024-01-01", periods=rows, freq="h"),
             "demand": rng.normal(size=rows).cumsum(),
         }
     )
@@ -488,11 +490,11 @@ def test_a_delayed_column_is_used_only_through_its_lagged_copy(tmp_path):
 
 
 def test_datetime_features_train_and_predict_from_raw_timestamps(tmp_path):
-    rng = np.random.default_rng(14)
+    rng = numpy.random.default_rng(14)
     rows = 700
-    frame = pd.DataFrame(
+    frame = pandas.DataFrame(
         {
-            "seen": pd.date_range("2023-01-01", periods=rows, freq="7h"),
+            "seen": pandas.date_range("2023-01-01", periods=rows, freq="7h"),
             "x": rng.normal(size=rows),
         }
     )
@@ -510,14 +512,14 @@ def test_datetime_features_train_and_predict_from_raw_timestamps(tmp_path):
         .head(12)
         .assign(seen=lambda d: d["seen"].astype(str))
     )
-    np.testing.assert_array_equal(
+    numpy.testing.assert_array_equal(
         result.predict(as_text),
         result.predict(frame.drop(columns="y").head(12)),
     )
 
 
 def test_free_text_is_encoded_and_scored_from_raw_strings(tmp_path):
-    rng = np.random.default_rng(31)
+    rng = numpy.random.default_rng(31)
     good = [
         "great product works well",
         "love it fantastic quality",
@@ -530,7 +532,7 @@ def test_free_text_is_encoded_and_scored_from_raw_strings(tmp_path):
     ]
     rows = 600
     label = rng.integers(0, 2, rows)
-    frame = pd.DataFrame(
+    frame = pandas.DataFrame(
         {
             "review": [
                 f"{rng.choice(good if y else bad)} number {i} thanks"
@@ -546,7 +548,7 @@ def test_free_text_is_encoded_and_scored_from_raw_strings(tmp_path):
 
     assert "review" in result.profile.feature_plan.text
     assert result.evaluation["test_metrics"]["roc_auc"] > 0.95
-    fresh = pd.DataFrame(
+    fresh = pandas.DataFrame(
         {
             "review": ["great product recommend", "awful waste refund"],
             "price": [0.0, 0.0],

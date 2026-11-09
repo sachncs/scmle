@@ -36,14 +36,14 @@ from typing import Self
 import wave
 
 import joblib
-import numpy as np
+import numpy
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import f1_score
 from sklearn.metrics import log_loss
 
 from scmle import durability
-from scmle.contracts import data as data_contracts
+from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.contracts import events
 from scmle.contracts import modalities
@@ -58,8 +58,8 @@ from scmle.data.modalities import image
 from scmle.data.modalities import video
 from scmle.explainability import quality
 from scmle.governance import attestation
-from scmle.models import documents as document_models
-from scmle.models import images as image_models
+from scmle.models import documents
+from scmle.models import images
 
 MAX_REPEATED_EXPLANATION_SAMPLES = 128
 MAX_RAW_GRAPH_FEATURES = 64
@@ -115,7 +115,7 @@ class FeatureBatch:
 
     sample_ids: tuple[str, ...]
     feature_names: tuple[str, ...]
-    values: np.ndarray = dataclasses.field(repr=False)
+    values: numpy.ndarray = dataclasses.field(repr=False)
 
     def __post_init__(self) -> None:
         """Validates shape, finiteness, and immutable identity metadata.
@@ -125,14 +125,14 @@ class FeatureBatch:
                 or column counts do not match the IDs or names, a value is not
                 finite, sample IDs repeat, or a feature name is blank.
         """
-        matrix = np.asarray(self.values, dtype=np.float64)
+        matrix = numpy.asarray(self.values, dtype=numpy.float64)
         if matrix.ndim != 2:
             raise ValueError("feature values must be a two-dimensional matrix")
         if matrix.shape[0] != len(self.sample_ids):
             raise ValueError("feature rows must match sample IDs")
         if matrix.shape[1] != len(self.feature_names):
             raise ValueError("feature columns must match feature names")
-        if not np.isfinite(matrix).all():
+        if not numpy.isfinite(matrix).all():
             raise ValueError("feature values must be finite")
         if len(set(self.sample_ids)) != len(self.sample_ids):
             raise ValueError("sample IDs must be unique within a feature batch")
@@ -363,7 +363,7 @@ class ModalityPredictor:
             raise ValueError("new sample feature schema does not match package")
         return batch
 
-    def predict(self, samples: Sequence[Any]) -> np.ndarray:
+    def predict(self, samples: Sequence[Any]) -> numpy.ndarray:
         """Predicts labels after validating the signed feature contract.
 
         Args:
@@ -374,7 +374,7 @@ class ModalityPredictor:
         """
         return self.model.predict(self.features_for(samples).values)
 
-    def predict_proba(self, samples: Sequence[Any]) -> np.ndarray:
+    def predict_proba(self, samples: Sequence[Any]) -> numpy.ndarray:
         """Predicts class probabilities after feature-contract validation.
 
         Args:
@@ -1409,7 +1409,7 @@ class ModalityAdapter(ModalityCurationAdapter):
         sample: Any,
         model: LogisticRegression,
         feature_names: Sequence[str],
-        coefficients: np.ndarray,
+        coefficients: numpy.ndarray,
     ) -> dict[str, object]:
         """Builds explicit modality-specific explanation evidence.
 
@@ -1560,12 +1560,12 @@ class DocumentAdapter(ModalityAdapter):
             and "token_count".
         """
         profiles = document.DocumentDataset(tuple(samples)).profile()
-        rows = np.asarray(
+        rows = numpy.asarray(
             [
                 (profile.character_count, profile.token_count)
                 for profile in profiles
             ],
-            dtype=np.float64,
+            dtype=numpy.float64,
         )
         return FeatureBatch(
             tuple(self.sample_id(sample) for sample in samples),
@@ -1600,7 +1600,7 @@ class DocumentAdapter(ModalityAdapter):
         sample: Any,
         model: LogisticRegression,
         feature_names: Sequence[str],
-        coefficients: np.ndarray,
+        coefficients: numpy.ndarray,
     ) -> dict[str, object]:
         """Builds page and section provenance for a document explanation.
 
@@ -1668,7 +1668,7 @@ class DocumentAdapter(ModalityAdapter):
             limitations.
         """
         original_features = self.features((sample,)).values
-        original_decision = np.asarray(
+        original_decision = numpy.asarray(
             model.decision_function(original_features)
         )
         if original_decision.ndim == 1:
@@ -1676,7 +1676,9 @@ class DocumentAdapter(ModalityAdapter):
             original_score = float(original_decision[0])
         else:
             predicted = model.predict(original_features)[0]
-            selected_class = int(np.flatnonzero(model.classes_ == predicted)[0])
+            selected_class = int(
+                numpy.flatnonzero(model.classes_ == predicted)[0]
+            )
             original_score = float(original_decision[0, selected_class])
         spans: list[dict[str, object]] = []
         citations = sample.citations()
@@ -1699,7 +1701,7 @@ class DocumentAdapter(ModalityAdapter):
                 provenance=sample.provenance,
             )
             masked_features = self.features((masked_sample,)).values
-            masked_decision = np.asarray(
+            masked_decision = numpy.asarray(
                 model.decision_function(masked_features)
             )
             if masked_decision.ndim == 1:
@@ -1755,9 +1757,7 @@ class DocumentAdapter(ModalityAdapter):
         if not isinstance(observed, DocumentAdapter):
             raise TypeError("observed adapter must be a DocumentAdapter")
         current = self.dataset.curate()
-        report = document_models.DocumentMonitor(current).observe(
-            observed.dataset
-        )
+        report = documents.DocumentMonitor(current).observe(observed.dataset)
         return report.to_dict()
 
     def modality_notes(self) -> tuple[str, ...]:
@@ -1884,7 +1884,7 @@ class ImageAdapter(ModalityAdapter):
         sample: Any,
         model: LogisticRegression,
         feature_names: Sequence[str],
-        coefficients: np.ndarray,
+        coefficients: numpy.ndarray,
     ) -> dict[str, object]:
         """Builds bounded occlusion evidence on transformed RGB pixels.
 
@@ -1908,13 +1908,15 @@ class ImageAdapter(ModalityAdapter):
         features = self.features((sample,)).values
         if features.shape[1] != 16 * 16 * 3:
             raise ValueError("image lifecycle expects 16x16 RGB features")
-        decision = np.asarray(model.decision_function(features))
+        decision = numpy.asarray(model.decision_function(features))
         if decision.ndim == 1:
             selected_class = 0
             original_score = float(decision[0])
         else:
             predicted = model.predict(features)[0]
-            selected_class = int(np.flatnonzero(model.classes_ == predicted)[0])
+            selected_class = int(
+                numpy.flatnonzero(model.classes_ == predicted)[0]
+            )
             original_score = float(decision[0, selected_class])
         terms: list[tuple[str, float]] = []
         width = 16
@@ -1932,7 +1934,7 @@ class ImageAdapter(ModalityAdapter):
                 ]
                 occluded = features.copy()
                 occluded[0, indexes] = 0.0
-                occluded_decision = np.asarray(
+                occluded_decision = numpy.asarray(
                     model.decision_function(occluded)
                 )
                 if occluded_decision.ndim == 1:
@@ -2001,8 +2003,8 @@ class ImageAdapter(ModalityAdapter):
         if source_channels != 3:
             raise ValueError("decoded RGB image must have three channels")
         image_library = image.require_pillow("raw image explanation")
-        row_step = max(1, int(np.ceil(source_height / 4)))
-        column_step = max(1, int(np.ceil(source_width / 4)))
+        row_step = max(1, int(numpy.ceil(source_height / 4)))
+        column_step = max(1, int(numpy.ceil(source_width / 4)))
         terms: list[tuple[str, float]] = []
         for row in range(0, source_height, row_step):
             for column in range(0, source_width, column_step):
@@ -2014,9 +2016,10 @@ class ImageAdapter(ModalityAdapter):
                     (16, 16), image_library.Resampling.BILINEAR
                 )
                 features = (
-                    np.asarray(resized, dtype=np.float32).reshape(1, -1) / 255.0
+                    numpy.asarray(resized, dtype=numpy.float32).reshape(1, -1)
+                    / 255.0
                 )
-                decision = np.asarray(model.decision_function(features))
+                decision = numpy.asarray(model.decision_function(features))
                 if decision.ndim == 1:
                     masked_score = float(decision[0])
                 else:
@@ -2058,7 +2061,7 @@ class ImageAdapter(ModalityAdapter):
         """
         if not isinstance(observed, ImageAdapter):
             raise TypeError("observed adapter must be an ImageAdapter")
-        report = image_models.ImageMonitor(self.dataset.curate()).observe(
+        report = images.ImageMonitor(self.dataset.curate()).observe(
             observed.dataset
         )
         return report.to_dict()
@@ -2206,7 +2209,7 @@ class AudioAdapter(ModalityAdapter):
         sample: Any,
         model: LogisticRegression,
         feature_names: Sequence[str],
-        coefficients: np.ndarray,
+        coefficients: numpy.ndarray,
     ) -> dict[str, object]:
         """Builds bounded time-local score evidence for WAV samples.
 
@@ -2235,10 +2238,12 @@ class AudioAdapter(ModalityAdapter):
             }
         window_count = min(8, sample.metadata.frame_count)
         window_frames = max(
-            1, int(np.ceil(sample.metadata.frame_count / window_count))
+            1, int(numpy.ceil(sample.metadata.frame_count / window_count))
         )
         full_features = self.features((sample,)).values[0]
-        full_decision = np.asarray(model.decision_function(full_features[None]))
+        full_decision = numpy.asarray(
+            model.decision_function(full_features[None])
+        )
         full_score = float(full_decision.reshape(-1)[0])
         windows: list[dict[str, object]] = []
         for start_frame in range(0, sample.metadata.frame_count, window_frames):
@@ -2247,7 +2252,7 @@ class AudioAdapter(ModalityAdapter):
                 start_frame=start_frame,
             )
             values = prepared.to_numpy()[0]
-            decision = np.asarray(model.decision_function(values[None]))
+            decision = numpy.asarray(model.decision_function(values[None]))
             windows.append(
                 {
                     "start_seconds": start_frame / sample.metadata.sample_rate,
@@ -2327,25 +2332,25 @@ class AudioAdapter(ModalityAdapter):
         if not snr_db or len(snr_db) > 8:
             raise ValueError("snr_db must contain between one and eight values")
         if any(
-            not np.isfinite(value) or value < 0.0 or value > 120.0
+            not numpy.isfinite(value) or value < 0.0 or value > 120.0
             for value in snr_db
         ):
             raise ValueError("snr_db values must be finite and in [0, 120]")
         parameters, values = audio.wav_pcm_values(sample.encoded_bytes)
-        signal_rms = float(np.sqrt(np.mean(np.square(values))))
+        signal_rms = float(numpy.sqrt(numpy.mean(numpy.square(values))))
         if signal_rms <= 0.0:
             return {
                 "status": "not_available",
                 "method": "deterministic_additive_background_noise",
                 "reason": "source signal is silent",
             }
-        randomizer = np.random.default_rng(seed)
+        randomizer = numpy.random.default_rng(seed)
         scenarios: list[dict[str, object]] = []
         for requested_snr in snr_db:
             noise_rms = signal_rms / (10.0 ** (requested_snr / 20.0))
             noise = randomizer.normal(0.0, noise_rms, size=values.shape)
             mixed = values + noise
-            clipping_fraction = float(np.mean(np.abs(mixed) > 1.0))
+            clipping_fraction = float(numpy.mean(numpy.abs(mixed) > 1.0))
             payload = audio.wav_payload_from_pcm(parameters, mixed)
             perturbed = audio.AudioSample.from_bytes(
                 payload,
@@ -2356,11 +2361,11 @@ class AudioAdapter(ModalityAdapter):
             )
             features = self.features((perturbed,)).values
             score = float(
-                np.asarray(model.decision_function(features)).reshape(-1)[0]
+                numpy.asarray(model.decision_function(features)).reshape(-1)[0]
             )
             observed_noise = mixed - values
             observed_noise_rms = float(
-                np.sqrt(np.mean(np.square(observed_noise)))
+                numpy.sqrt(numpy.mean(numpy.square(observed_noise)))
             )
             observed_snr = 20.0 * math.log10(signal_rms / observed_noise_rms)
             scenarios.append(
@@ -2445,7 +2450,7 @@ class AudioAdapter(ModalityAdapter):
             )
             features = self.features((masked_sample,)).values
             score = float(
-                np.asarray(model.decision_function(features)).reshape(-1)[0]
+                numpy.asarray(model.decision_function(features)).reshape(-1)[0]
             )
             windows.append(
                 {
@@ -2678,7 +2683,7 @@ class VideoAdapter(ModalityAdapter):
         sample: Any,
         model: LogisticRegression,
         feature_names: Sequence[str],
-        coefficients: np.ndarray,
+        coefficients: numpy.ndarray,
     ) -> dict[str, object]:
         """Builds bounded temporal frame-statistics occlusion evidence.
 
@@ -2707,7 +2712,7 @@ class VideoAdapter(ModalityAdapter):
         prepared = self.features((sample,))
         values = prepared.values[0]
         full_score = float(
-            np.asarray(model.decision_function(values[None])).reshape(-1)[0]
+            numpy.asarray(model.decision_function(values[None])).reshape(-1)[0]
         )
         terms: list[dict[str, object]] = []
         slot_width = 5
@@ -2717,9 +2722,9 @@ class VideoAdapter(ModalityAdapter):
             start = slot * slot_width
             occluded[start : start + slot_width] = 0.0
             score = float(
-                np.asarray(model.decision_function(occluded[None])).reshape(-1)[
-                    0
-                ]
+                numpy.asarray(model.decision_function(occluded[None])).reshape(
+                    -1
+                )[0]
             )
             terms.append(
                 {
@@ -2785,10 +2790,10 @@ class VideoAdapter(ModalityAdapter):
                 payload: bytes,
                 frame_index: int,
                 target_frame_index: int = target_frame,
-            ) -> np.ndarray:
-                frame = np.asarray(decoder(payload, frame_index))
+            ) -> numpy.ndarray:
+                frame = numpy.asarray(decoder(payload, frame_index))
                 if frame_index == target_frame_index:
-                    return np.zeros_like(frame)
+                    return numpy.zeros_like(frame)
                 return frame
 
             prepared = video.VideoDataset((sample,)).prepare_frame_features(
@@ -2798,7 +2803,9 @@ class VideoAdapter(ModalityAdapter):
             )
             values = prepared.to_numpy()[0]
             score = float(
-                np.asarray(model.decision_function(values[None])).reshape(-1)[0]
+                numpy.asarray(model.decision_function(values[None])).reshape(
+                    -1
+                )[0]
             )
             windows.append(
                 {
@@ -2898,7 +2905,9 @@ class GraphAdapter(ModalityAdapter):
         """
         if not self.dataset.feature_names:
             raise ValueError("graph baseline requires declared node features")
-        rows = np.asarray([sample.features for sample in samples], dtype=float)
+        rows = numpy.asarray(
+            [sample.features for sample in samples], dtype=float
+        )
         return FeatureBatch(
             tuple(sample.node_id for sample in samples),
             self.dataset.feature_names,
@@ -3013,7 +3022,7 @@ class GraphAdapter(ModalityAdapter):
         sample: Any,
         model: LogisticRegression,
         feature_names: Sequence[str],
-        coefficients: np.ndarray,
+        coefficients: numpy.ndarray,
     ) -> dict[str, object]:
         """Builds one-hop graph context and node-feature evidence.
 
@@ -3038,14 +3047,16 @@ class GraphAdapter(ModalityAdapter):
         subgraph_node_ids = cast(list[str], subgraph["node_ids"])
         neighbors = subgraph_node_ids[1:]
         edges = cast(list[dict[str, object]], subgraph["edges"])
-        values = np.asarray(sample.features, dtype=np.float64)
-        decision = np.asarray(model.decision_function(values[None]))
+        values = numpy.asarray(sample.features, dtype=numpy.float64)
+        decision = numpy.asarray(model.decision_function(values[None]))
         if decision.ndim == 1:
             selected_class = 0
             original_score = float(decision[0])
         else:
             predicted = model.predict(values[None])[0]
-            selected_class = int(np.flatnonzero(model.classes_ == predicted)[0])
+            selected_class = int(
+                numpy.flatnonzero(model.classes_ == predicted)[0]
+            )
             original_score = float(decision[0, selected_class])
         feature_terms = sorted(
             (
@@ -3065,7 +3076,7 @@ class GraphAdapter(ModalityAdapter):
                 label=sample.label,
             )
             masked_features = self.features((masked_sample,)).values
-            masked_decision = np.asarray(
+            masked_decision = numpy.asarray(
                 model.decision_function(masked_features)
             )
             if masked_decision.ndim == 1:
@@ -3210,7 +3221,7 @@ class GeospatialAdapter(ModalityAdapter):
                 quality_findings.append(
                     curation.build_finding(
                         "quality.geospatial-boundary-leakage",
-                        data_contracts.FindingSeverity.WARNING,
+                        data.FindingSeverity.WARNING,
                         {
                             "dataset": self.dataset_hash,
                             "block_size": self.block_size,
@@ -3297,7 +3308,7 @@ class GeospatialAdapter(ModalityAdapter):
         sample: Any,
         model: LogisticRegression,
         feature_names: Sequence[str],
-        coefficients: np.ndarray,
+        coefficients: numpy.ndarray,
     ) -> dict[str, object]:
         """Builds CRS-bound geometry and feature-contribution evidence.
 
@@ -3325,16 +3336,18 @@ class GeospatialAdapter(ModalityAdapter):
             if item.feature_id == sample.feature_id
         )
         prepared = self.dataset.prepare_features()
-        values = np.asarray(
-            prepared.to_numpy()[feature_index], dtype=np.float64
+        values = numpy.asarray(
+            prepared.to_numpy()[feature_index], dtype=numpy.float64
         )
-        decision = np.asarray(model.decision_function(values[None]))
+        decision = numpy.asarray(model.decision_function(values[None]))
         if decision.ndim == 1:
             selected_class = 0
             original_score = float(decision[0])
         else:
             predicted = model.predict(values[None])[0]
-            selected_class = int(np.flatnonzero(model.classes_ == predicted)[0])
+            selected_class = int(
+                numpy.flatnonzero(model.classes_ == predicted)[0]
+            )
             original_score = float(decision[0, selected_class])
         feature_terms = sorted(
             (
@@ -3355,7 +3368,9 @@ class GeospatialAdapter(ModalityAdapter):
         ):
             masked_sample = sample.masked_geometry_axis(axis, baseline)
             masked_values = self.features((masked_sample,)).values
-            masked_decision = np.asarray(model.decision_function(masked_values))
+            masked_decision = numpy.asarray(
+                model.decision_function(masked_values)
+            )
             if masked_decision.ndim == 1:
                 masked_score = float(masked_decision[0])
             else:
@@ -3616,12 +3631,12 @@ class RasterAdapter(ModalityAdapter):
                     if value is not None
                 ),
             }
-        quality_findings: list[data_contracts.CurationFinding] = []
+        quality_findings: list[data.CurationFinding] = []
         if len(crs_values) > 1 or len(dimensions) > 1 or len(dtypes) > 1:
             quality_findings.append(
                 curation.build_finding(
                     "quality.raster-shape-or-crs-drift",
-                    data_contracts.FindingSeverity.WARNING,
+                    data.FindingSeverity.WARNING,
                     {"dataset": self.dataset_hash},
                     {
                         "dimensions": profile["dimensions"],
@@ -3637,7 +3652,7 @@ class RasterAdapter(ModalityAdapter):
             quality_findings.append(
                 curation.build_finding(
                     "quality.raster-nodata-unknown",
-                    data_contracts.FindingSeverity.WARNING,
+                    data.FindingSeverity.WARNING,
                     {"dataset": self.dataset_hash},
                     {"statuses": nodata_profile["statuses"]},
                     "Declare or measure nodata handling before interpreting "
@@ -3664,7 +3679,7 @@ class RasterAdapter(ModalityAdapter):
             hold a fifth of the rasters (at least one), with the sources of each
             under `groups`.
         """
-        generator = np.random.default_rng(seed)
+        generator = numpy.random.default_rng(seed)
         order = generator.permutation(len(self.dataset))
         test_count = max(1, len(self.dataset) // 5)
         validation_count = max(1, len(self.dataset) // 5)
@@ -3733,7 +3748,7 @@ class RasterAdapter(ModalityAdapter):
             return FeatureBatch(
                 tuple(sample.source for sample in samples),
                 names,
-                np.asarray(rows, dtype=np.float64),
+                numpy.asarray(rows, dtype=numpy.float64),
             )
         names = (
             "width",
@@ -3760,7 +3775,9 @@ class RasterAdapter(ModalityAdapter):
                 )
             )
         return FeatureBatch(
-            tuple(sample.source for sample in samples), names, np.asarray(rows)
+            tuple(sample.source for sample in samples),
+            names,
+            numpy.asarray(rows),
         )
 
     @staticmethod
@@ -3787,7 +3804,7 @@ class RasterAdapter(ModalityAdapter):
 
     @staticmethod
     def pixel_feature_values(
-        pixels: np.ndarray, band_count: int
+        pixels: numpy.ndarray, band_count: int
     ) -> tuple[float, ...]:
         """Computes finite per-band summary values for decoded pixels.
 
@@ -3804,7 +3821,7 @@ class RasterAdapter(ModalityAdapter):
             GeospatialValidationError: If the pixel shape does not match the
                 declared band count.
         """
-        values = np.asarray(pixels)
+        values = numpy.asarray(pixels)
         if values.ndim == 2:
             if band_count != 1:
                 raise geospatial.GeospatialValidationError(
@@ -3857,7 +3874,7 @@ class RasterAdapter(ModalityAdapter):
         sample: Any,
         model: LogisticRegression,
         feature_names: Sequence[str],
-        coefficients: np.ndarray,
+        coefficients: numpy.ndarray,
     ) -> dict[str, object]:
         """Builds bounded occlusion evidence for decoded raster pixels.
 
@@ -3893,8 +3910,8 @@ class RasterAdapter(ModalityAdapter):
                 ],
             }
         pixels = sample.decode(self.decoder, max_pixels=self.max_pixels)
-        original_values = np.asarray(
-            self.pixel_feature_values(pixels, sample.bands), dtype=np.float64
+        original_values = numpy.asarray(
+            self.pixel_feature_values(pixels, sample.bands), dtype=numpy.float64
         )
         if tuple(feature_names) != self.pixel_feature_names(sample.bands):
             raise ValueError("raster explanation feature schema does not match")
@@ -3903,17 +3920,19 @@ class RasterAdapter(ModalityAdapter):
                 "raster explanation coefficients do not match features"
             )
         original_features = original_values.reshape(1, -1)
-        decision = np.asarray(model.decision_function(original_features))
+        decision = numpy.asarray(model.decision_function(original_features))
         if decision.ndim == 1:
             selected_class = 0
             original_score = float(decision[0])
         else:
             predicted = model.predict(original_features)[0]
-            selected_class = int(np.flatnonzero(model.classes_ == predicted)[0])
+            selected_class = int(
+                numpy.flatnonzero(model.classes_ == predicted)[0]
+            )
             original_score = float(decision[0, selected_class])
         height, width = pixels.shape[:2]
-        row_step = max(1, int(np.ceil(height / 4)))
-        column_step = max(1, int(np.ceil(width / 4)))
+        row_step = max(1, int(numpy.ceil(height / 4)))
+        column_step = max(1, int(numpy.ceil(width / 4)))
         terms: list[tuple[str, float]] = []
         windows: list[dict[str, object]] = []
         for row in range(0, height, row_step):
@@ -3925,11 +3944,11 @@ class RasterAdapter(ModalityAdapter):
                     masked_pixels[row:end_row, column:end_column] = 0.0
                 else:
                     masked_pixels[row:end_row, column:end_column, :] = 0.0
-                masked_features = np.asarray(
+                masked_features = numpy.asarray(
                     self.pixel_feature_values(masked_pixels, sample.bands),
-                    dtype=np.float64,
+                    dtype=numpy.float64,
                 ).reshape(1, -1)
-                masked_decision = np.asarray(
+                masked_decision = numpy.asarray(
                     model.decision_function(masked_features)
                 )
                 if masked_decision.ndim == 1:
@@ -4057,7 +4076,7 @@ class LifecycleContext:
     signing_key: str | bytes
     seed: int
     observed_adapter: ModalityAdapter
-    manifest: data_contracts.ModalityManifest | None = None
+    manifest: data.ModalityManifest | None = None
     require_independent_ground_truth: bool = False
     resume_replay: bool = False
     stage_records: dict[modalities.LifecycleStage, dict[str, object]] = (
@@ -4434,14 +4453,16 @@ class DataExplainabilityStage(ModalityLifecycleStage):
         for index, name in enumerate(batch.feature_names):
             values = batch.values[:, index]
             statistics[name] = {
-                "min": float(np.min(values)),
-                "max": float(np.max(values)),
-                "mean": float(np.mean(values)),
-                "std": float(np.std(values)),
-                "q05": float(np.quantile(values, 0.05)),
-                "median": float(np.median(values)),
-                "q95": float(np.quantile(values, 0.95)),
-                "nonfinite_count": int(np.count_nonzero(~np.isfinite(values))),
+                "min": float(numpy.min(values)),
+                "max": float(numpy.max(values)),
+                "mean": float(numpy.mean(values)),
+                "std": float(numpy.std(values)),
+                "q05": float(numpy.quantile(values, 0.05)),
+                "median": float(numpy.median(values)),
+                "q95": float(numpy.quantile(values, 0.95)),
+                "nonfinite_count": int(
+                    numpy.count_nonzero(~numpy.isfinite(values))
+                ),
             }
         partition_samples = {
             "train": partitions.train,
@@ -4512,7 +4533,7 @@ class ModelExplainabilityStage(ModalityLifecycleStage):
             raise RuntimeError(
                 "model, partitions, and test features are required"
             )
-        strength = np.mean(np.abs(model.coef_), axis=0)
+        strength = numpy.mean(numpy.abs(model.coef_), axis=0)
         global_terms = sorted(
             (
                 (name, float(strength[index]))
@@ -4520,7 +4541,7 @@ class ModelExplainabilityStage(ModalityLifecycleStage):
             ),
             key=lambda item: (-item[1], item[0]),
         )[:10]
-        decision_values = np.asarray(model.decision_function(batch.values))
+        decision_values = numpy.asarray(model.decision_function(batch.values))
         reference_values = batch.values @ model.coef_.T + model.intercept_
         if reference_values.ndim == 2 and reference_values.shape[1] == 1:
             reference_values = reference_values[:, 0]
@@ -4536,7 +4557,7 @@ class ModelExplainabilityStage(ModalityLifecycleStage):
             reference_values.astype(float).reshape(-1).tolist(),
         )
         train_values = context.feature_batches["train"].values
-        feature_scales = np.maximum(np.std(train_values, axis=0), 1.0)
+        feature_scales = numpy.maximum(numpy.std(train_values, axis=0), 1.0)
         perturbation_size = feature_scales * 1e-6
         repeated_stabilities: list[float] = []
         local_report: dict[str, object] | None = None
@@ -4549,12 +4570,12 @@ class ModelExplainabilityStage(ModalityLifecycleStage):
         )
         for sample_index in range(evaluated_sample_count):
             sample_row = batch.values[sample_index]
-            sample_decision = np.asarray(
+            sample_decision = numpy.asarray(
                 model.decision_function(sample_row[None])
             )
             sample_class = 0
             if sample_decision.ndim > 1:
-                sample_class = int(np.argmax(sample_decision[0]))
+                sample_class = int(numpy.argmax(sample_decision[0]))
             sample_coefficients = model.coef_[sample_class]
             sample_report = quality.linear_contribution_report(
                 batch.sample_ids[sample_index],
@@ -4591,15 +4612,15 @@ class ModelExplainabilityStage(ModalityLifecycleStage):
                 perturbation_reports = sample_reports
                 perturbation_stability = sample_stability
                 stability_decision = sample_decision
-                nonzero = np.flatnonzero(
-                    np.abs(sample_row * sample_coefficients) > 1e-12
+                nonzero = numpy.flatnonzero(
+                    numpy.abs(sample_row * sample_coefficients) > 1e-12
                 )
                 if len(nonzero):
-                    perturbed = np.repeat(
+                    perturbed = numpy.repeat(
                         sample_row[None, :], len(nonzero), axis=0
                     )
-                    perturbed[np.arange(len(nonzero)), nonzero] = 0.0
-                    perturbed_decisions = np.asarray(
+                    perturbed[numpy.arange(len(nonzero)), nonzero] = 0.0
+                    perturbed_decisions = numpy.asarray(
                         model.decision_function(perturbed)
                     )
                     if perturbed_decisions.ndim == 1:
@@ -4615,8 +4636,9 @@ class ModelExplainabilityStage(ModalityLifecycleStage):
                         sample_row[nonzero] * sample_coefficients[nonzero]
                     )
                     stability = float(
-                        np.mean(
-                            np.sign(observed_change) == np.sign(expected_change)
+                        numpy.mean(
+                            numpy.sign(observed_change)
+                            == numpy.sign(expected_change)
                         )
                     )
         if local_report is None or not perturbation_reports:
@@ -4756,9 +4778,11 @@ class PackagingStage(ModalityLifecycleStage):
                     "the resumed adapter"
                 )
             if not (
-                np.array_equal(predictor.model.classes_, model.classes_)
-                and np.array_equal(predictor.model.coef_, model.coef_)
-                and np.array_equal(predictor.model.intercept_, model.intercept_)
+                numpy.array_equal(predictor.model.classes_, model.classes_)
+                and numpy.array_equal(predictor.model.coef_, model.coef_)
+                and numpy.array_equal(
+                    predictor.model.intercept_, model.intercept_
+                )
             ):
                 raise ValueError(
                     "checkpoint package model does not match deterministic "
@@ -5012,7 +5036,7 @@ class ModalityLifecycle:
         report_path: str | Path | None = None,
         performance_budget: performance.PerformanceBudget | None = None,
         performance_baseline: performance.PerformanceBaseline | None = None,
-        manifest: data_contracts.ModalityManifest | None = None,
+        manifest: data.ModalityManifest | None = None,
         require_independent_ground_truth: bool = False,
         cancellation_check: Callable[[], bool] | None = None,
         checkpoint_path: str | Path | None = None,
@@ -5561,8 +5585,8 @@ def load_package(
             "modality package classifier has fewer than two classes"
         )
     if (
-        not np.isfinite(loaded.coef_).all()
-        or not np.isfinite(loaded.intercept_).all()
+        not numpy.isfinite(loaded.coef_).all()
+        or not numpy.isfinite(loaded.intercept_).all()
     ):
         raise ValueError(
             "modality package classifier contains non-finite values"

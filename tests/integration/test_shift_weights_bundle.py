@@ -1,20 +1,20 @@
 """Shift weights attached to a bundle: weighted intervals, refusal, tamper."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 import support
 
 import scmle
-from scmle.artifacts import bundle as bundle_module
+from scmle.artifacts import bundle
 from scmle.contracts import errors
 from scmle.evaluation import shift_weights
 
 
 def world(rows, seed, centre=0.0):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     x = rng.normal(centre, 1.0, rows)
-    return pd.DataFrame({"x": x, "y": 2 * x + rng.normal(0, 0.5, rows)})
+    return pandas.DataFrame({"x": x, "y": 2 * x + rng.normal(0, 0.5, rows)})
 
 
 @pytest.fixture(scope="module")
@@ -64,7 +64,7 @@ def test_a_mild_shift_gives_weighted_intervals_that_round_trip(
     assert covered >= 0.85
     result.bundle.save(tmp_path / "copy")
     loaded = scmle.ModelBundle.load(tmp_path / "copy", trusted=True)
-    pd.testing.assert_frame_equal(
+    pandas.testing.assert_frame_equal(
         loaded.predict_interval(fresh[["x"]], coverage=0.9, shift=True), band
     )
 
@@ -75,7 +75,7 @@ def test_a_changed_weights_file_is_refused(result, tmp_path):
         rows[["x"]], world(400, 6, centre=0.3)[["x"]]
     )
     result.bundle.save(tmp_path / "copy")
-    path = tmp_path / "copy" / bundle_module.SHIFT_WEIGHTS_FILE
+    path = tmp_path / "copy" / bundle.SHIFT_WEIGHTS_FILE
     data = bytearray(path.read_bytes())
     data[len(data) // 2] ^= 0xFF
     path.write_bytes(bytes(data))

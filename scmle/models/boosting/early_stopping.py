@@ -11,7 +11,7 @@ import inspect
 from typing import Any
 from typing import Self
 
-import numpy as np
+import numpy
 from sklearn import base
 from sklearn import model_selection
 from sklearn import preprocessing
@@ -81,21 +81,21 @@ class HoldoutEarlyStopping(base.BaseEstimator):
         stratify = (
             target
             if base.is_classifier(self.estimator)
-            and np.min(np.unique(target, return_counts=True)[1]) >= 2
+            and numpy.min(numpy.unique(target, return_counts=True)[1]) >= 2
             else None
         )
         train, held = model_selection.train_test_split(
-            np.arange(len(target)),
+            numpy.arange(len(target)),
             test_size=self.fraction,
             random_state=self.random_state,
-            stratify=None if stratify is None else np.asarray(stratify),
+            stratify=None if stratify is None else numpy.asarray(stratify),
         )
         arguments = self.stopping_arguments(features, target, held)
         self.estimator_.fit(
             features[train]
             if hasattr(features, "tocsr")
             else self.take(features, train),
-            np.asarray(target)[train],
+            numpy.asarray(target)[train],
             **arguments,
             **fit_params,
         )
@@ -103,7 +103,7 @@ class HoldoutEarlyStopping(base.BaseEstimator):
         return self
 
     @staticmethod
-    def take(features: Any, rows: np.ndarray) -> Any:
+    def take(features: Any, rows: numpy.ndarray) -> Any:
         """Selects rows of a dense matrix or a frame.
 
         Args:
@@ -116,10 +116,10 @@ class HoldoutEarlyStopping(base.BaseEstimator):
         """
         if hasattr(features, "iloc"):
             return features.iloc[rows]
-        return np.asarray(features)[rows]
+        return numpy.asarray(features)[rows]
 
     def stopping_arguments(
-        self, features: Any, target: Any, held: np.ndarray
+        self, features: Any, target: Any, held: numpy.ndarray
     ) -> dict[str, Any]:
         """Builds the per-library `fit` arguments that enable stopping.
 
@@ -140,7 +140,7 @@ class HoldoutEarlyStopping(base.BaseEstimator):
             features[held]
             if hasattr(features, "tocsr")
             else self.take(features, held),
-            np.asarray(target)[held],
+            numpy.asarray(target)[held],
         )
         if self.library == "lightgbm":
             import lightgbm
@@ -169,12 +169,12 @@ class HoldoutEarlyStopping(base.BaseEstimator):
         """
         for name in ("best_iteration_", "best_iteration"):
             value = getattr(self.estimator_, name, None)
-            if isinstance(value, int | np.integer):
+            if isinstance(value, int | numpy.integer):
                 return int(value)
         getter = getattr(self.estimator_, "get_best_iteration", None)
         return int(getter()) if callable(getter) else None
 
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """Predicts with the stopped model, in the original labels.
 
         Args:
@@ -184,12 +184,12 @@ class HoldoutEarlyStopping(base.BaseEstimator):
             One prediction per row; class labels are mapped back to the original
             labels for classifiers.
         """
-        predicted = np.asarray(self.estimator_.predict(features))
+        predicted = numpy.asarray(self.estimator_.predict(features))
         if hasattr(self, "encoder_"):
             return self.encoder_.inverse_transform(predicted.astype(int))
         return predicted
 
-    def predict_proba(self, features: Any) -> np.ndarray:
+    def predict_proba(self, features: Any) -> numpy.ndarray:
         """Class probabilities of the stopped model.
 
         Args:
@@ -198,16 +198,16 @@ class HoldoutEarlyStopping(base.BaseEstimator):
         Returns:
             Array of shape `(n_rows, n_classes)`, columns in `classes_` order.
         """
-        return np.asarray(self.estimator_.predict_proba(features))
+        return numpy.asarray(self.estimator_.predict_proba(features))
 
 
 class EarlyStoppingClassifier(base.ClassifierMixin, HoldoutEarlyStopping):
     """Early-stopped boosting classifier."""
 
     @property
-    def classes_(self) -> np.ndarray:
+    def classes_(self) -> numpy.ndarray:
         """Class labels of the fitted model."""
-        return np.asarray(self.encoder_.classes_)
+        return numpy.asarray(self.encoder_.classes_)
 
 
 class EarlyStoppingRegressor(base.RegressorMixin, HoldoutEarlyStopping):

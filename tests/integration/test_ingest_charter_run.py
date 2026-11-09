@@ -4,8 +4,8 @@ import json
 import pathlib
 import sqlite3
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 import support
 
@@ -21,7 +21,7 @@ CUSTOMERS = 500
 
 
 def database(path):
-    rng = np.random.default_rng(0)
+    rng = numpy.random.default_rng(0)
     with sqlite3.connect(path) as connection:
         connection.execute(
             "CREATE TABLE customers (customer_id INTEGER PRIMARY KEY, "
@@ -113,12 +113,12 @@ def charter_file(tmp_path, block=True, entity=None, reconcile=None):
 
 
 def table(rate):
-    rng = np.random.default_rng(1)
+    rng = numpy.random.default_rng(1)
     y = (rate + rng.normal(scale=1.5, size=CUSTOMERS) > 4.0).astype(int)
-    return pd.DataFrame(
+    return pandas.DataFrame(
         {
-            "customer_id": np.arange(CUSTOMERS),
-            "moment": np.full(CUSTOMERS, 70.0),
+            "customer_id": numpy.arange(CUSTOMERS),
+            "moment": numpy.full(CUSTOMERS, 70.0),
             "y": y,
         }
     )
@@ -263,7 +263,9 @@ def test_the_resolved_entity_keeps_duplicates_on_one_side(tmp_path):
 
 def declared_totals(path, rows_off=0):
     with sqlite3.connect(path) as connection:
-        keys = pd.read_sql("SELECT order_id, amount FROM orders", connection)
+        keys = pandas.read_sql(
+            "SELECT order_id, amount FROM orders", connection
+        )
     return ingest.ReconcileSpec(
         (
             ingest.TableTotals(

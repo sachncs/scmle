@@ -23,7 +23,7 @@ from scipy import stats
 
 from scmle.contracts import qualification
 from scmle.core import randomness
-from scmle.data.charter import decision as charter_decision
+from scmle.data.charter import decision
 from scmle.data.charter import feasibility
 from scmle.decision import anytime
 
@@ -182,7 +182,7 @@ def srm_rejects(
 
 
 def simulate_stopping(
-    plan: charter_decision.RolloutPlan,
+    plan: decision.RolloutPlan,
     p_control: float,
     effect: float,
     runs: int,

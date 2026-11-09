@@ -13,8 +13,8 @@ from collections.abc import Sequence
 import dataclasses
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 QUANTILE_STEPS = 21
 MAX_CATEGORIES = 30
@@ -53,10 +53,10 @@ class CounterfactualSearch:
 
     def __init__(
         self,
-        progress: Callable[[pd.DataFrame], np.ndarray],
-        reached: Callable[[pd.DataFrame], np.ndarray],
-        predict: Callable[[pd.DataFrame], np.ndarray],
-        background: pd.DataFrame,
+        progress: Callable[[pandas.DataFrame], numpy.ndarray],
+        reached: Callable[[pandas.DataFrame], numpy.ndarray],
+        predict: Callable[[pandas.DataFrame], numpy.ndarray],
+        background: pandas.DataFrame,
         actionable: Sequence[str],
         max_changes: int = 3,
     ) -> None:
@@ -81,7 +81,7 @@ class CounterfactualSearch:
         self.scales = {c: self.scale_of(background[c]) for c in actionable}
 
     @staticmethod
-    def candidate_values(column: pd.Series) -> list[Any]:
+    def candidate_values(column: pandas.Series) -> list[Any]:
         """Values worth trying: quantiles for numbers, common categories.
 
         Args:
@@ -94,15 +94,15 @@ class CounterfactualSearch:
             Missing values are ignored.
         """
         present = column.dropna()
-        if pd.api.types.is_numeric_dtype(present) and not (
-            pd.api.types.is_bool_dtype(present)
+        if pandas.api.types.is_numeric_dtype(present) and not (
+            pandas.api.types.is_bool_dtype(present)
         ):
-            grid = np.quantile(present, np.linspace(0, 1, QUANTILE_STEPS))
+            grid = numpy.quantile(present, numpy.linspace(0, 1, QUANTILE_STEPS))
             return sorted({float(v) for v in grid})
         return present.value_counts().head(MAX_CATEGORIES).index.tolist()
 
     @staticmethod
-    def scale_of(column: pd.Series) -> float:
+    def scale_of(column: pandas.Series) -> float:
         """Interquartile range of a numeric column (1 for categories).
 
         Args:
@@ -114,10 +114,10 @@ class CounterfactualSearch:
             1.0 for any other column.
         """
         present = column.dropna()
-        if pd.api.types.is_numeric_dtype(present) and not (
-            pd.api.types.is_bool_dtype(present)
+        if pandas.api.types.is_numeric_dtype(present) and not (
+            pandas.api.types.is_bool_dtype(present)
         ):
-            low, high = np.quantile(present, [0.25, 0.75])
+            low, high = numpy.quantile(present, [0.25, 0.75])
             return float(max(high - low, present.std(), MIN_SCALE))
         return 1.0
 
@@ -133,7 +133,7 @@ class CounterfactualSearch:
             The absolute numeric change divided by the column's scale when
             `new` is a number (booleans excluded), otherwise 1.0.
         """
-        if isinstance(new, (int, float, np.number)) and not isinstance(
+        if isinstance(new, (int, float, numpy.number)) and not isinstance(
             new, bool
         ):
             return abs(float(new) - float(old)) / self.scales[column]
@@ -162,7 +162,7 @@ class CounterfactualSearch:
 
     def candidates(
         self, current: dict[str, Any], locked: set[str]
-    ) -> tuple[pd.DataFrame, list[tuple[str, Any]]]:
+    ) -> tuple[pandas.DataFrame, list[tuple[str, Any]]]:
         """Every one-column change from `current`, as a batch of rows.
 
         Args:
@@ -181,7 +181,7 @@ class CounterfactualSearch:
                 if value != current[column]:
                     rows.append({**current, column: value})
                     moves.append((column, value))
-        return pd.DataFrame(rows), moves
+        return pandas.DataFrame(rows), moves
 
     def search(self, row: Mapping[str, Any]) -> Counterfactual:
         """Finds a small change reaching the wanted outcome, if one exists.
@@ -197,25 +197,25 @@ class CounterfactualSearch:
         original = dict(row)
         current = dict(row)
         changed: dict[str, Any] = {}
-        while not self.reached(pd.DataFrame([current]))[0]:
+        while not self.reached(pandas.DataFrame([current]))[0]:
             if len(changed) >= self.max_changes:
                 break
             batch, moves = self.candidates(current, set(changed))
             if batch.empty:
                 break
             scores = self.progress(batch)
-            baseline = float(self.progress(pd.DataFrame([current]))[0])
-            order = np.argsort(-scores, kind="stable")
+            baseline = float(self.progress(pandas.DataFrame([current]))[0])
+            order = numpy.argsort(-scores, kind="stable")
             best = order[0]
             if scores[best] <= baseline:
                 break
             column, value = moves[best]
             current[column] = value
             changed[column] = value
-        found = bool(self.reached(pd.DataFrame([current]))[0])
+        found = bool(self.reached(pandas.DataFrame([current]))[0])
         if found:
             current, changed = self.prune(original, current, changed)
-        frame = pd.DataFrame([current])
+        frame = pandas.DataFrame([current])
         return Counterfactual(
             found=found,
             original=original,
@@ -249,7 +249,7 @@ class CounterfactualSearch:
         )
         for column in order:
             trial = {**current, column: original[column]}
-            if self.reached(pd.DataFrame([trial]))[0]:
+            if self.reached(pandas.DataFrame([trial]))[0]:
                 current = trial
                 del kept[column]
         return current, kept

@@ -1,6 +1,6 @@
 """Prediction from saved bundles through the public functions."""
 
-import numpy as np
+import numpy
 import pytest
 import support
 
@@ -17,7 +17,7 @@ def test_a_saved_bundle_predicts_without_the_project(binary_frame, tmp_path):
 
     labels = scmle.predict(tmp_path / "model", rows, trusted=True)
 
-    np.testing.assert_array_equal(labels, result.predict(rows))
+    numpy.testing.assert_array_equal(labels, result.predict(rows))
     model = scmle.load_model(tmp_path / "model", trusted=True)
     assert model.info.model_version == result.bundle.info.model_version
 

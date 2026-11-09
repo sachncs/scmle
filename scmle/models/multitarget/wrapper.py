@@ -3,8 +3,8 @@
 from typing import Any
 from typing import Self
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from sklearn import base
 from sklearn import pipeline
 
@@ -47,10 +47,10 @@ class MultiTargetEstimator(base.BaseEstimator):
         Returns:
             This fitted estimator.
         """
-        frame = pd.DataFrame(features)
-        matrix = np.column_stack(
+        frame = pandas.DataFrame(features)
+        matrix = numpy.column_stack(
             [
-                np.asarray(target),
+                numpy.asarray(target),
                 frame[list(self.target_columns[1:])].to_numpy(),
             ]
         )
@@ -60,7 +60,7 @@ class MultiTargetEstimator(base.BaseEstimator):
         self.model_ = steps[-1].fit(transformed, matrix)
         return self
 
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """Predictions, one column per target.
 
         Args:
@@ -75,7 +75,7 @@ class MultiTargetEstimator(base.BaseEstimator):
 class MultiLabelEstimator(base.ClassifierMixin, MultiTargetEstimator):
     """Multi-label flavour: also provides per-label probabilities."""
 
-    def predict_proba(self, features: Any) -> np.ndarray:
+    def predict_proba(self, features: Any) -> numpy.ndarray:
         """Probability of each label being present, one column per label.
 
         Args:

@@ -6,7 +6,7 @@ import math
 import pathlib
 from typing import Any
 
-import numpy as np
+import numpy
 
 from scmle.artifacts import reproducibility
 from scmle.evaluation import parameter_estimation
@@ -223,9 +223,9 @@ def test_load_run_reads_environment_lock(tmp_path):
 
 def test_load_run_digests_parameter_estimation(tmp_path):
     write_run(tmp_path)
-    rng = np.random.default_rng(0)
+    rng = numpy.random.default_rng(0)
     features = rng.normal(size=(60, 2))
-    outcome = features @ np.array([1.0, -0.5]) + rng.normal(size=60) * 0.1
+    outcome = features @ numpy.array([1.0, -0.5]) + rng.normal(size=60) * 0.1
     result = parameter_estimation.estimate_parameters(
         features,
         outcome,

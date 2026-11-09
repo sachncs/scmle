@@ -1,7 +1,7 @@
 """Regression discontinuity: recovery, coverage, diagnostics."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
 from scmle.data.identification import rd
@@ -14,13 +14,13 @@ def world(
     sort: float = 0.0,
     slope: float = 2.0,
     curve: float = 1.0,
-) -> pd.DataFrame:
-    rng = np.random.default_rng(seed)
+) -> pandas.DataFrame:
+    rng = numpy.random.default_rng(seed)
     x = rng.uniform(-1, 1, n)
     if sort:
         # units just below the cutoff move above it
         move = (x < 0) & (x > -sort) & (rng.uniform(size=n) < 0.7)
-        x = np.where(move, -x, x)
+        x = numpy.where(move, -x, x)
     y = (
         slope * x
         + curve * x**2
@@ -28,7 +28,7 @@ def world(
         + rng.normal(scale=0.5, size=n)
     )
     z = 0.5 * x + rng.normal(scale=0.3, size=n)
-    return pd.DataFrame({"x": x, "y": y, "z": z})
+    return pandas.DataFrame({"x": x, "y": y, "z": z})
 
 
 def test_the_jump_is_recovered_and_the_interval_covers():
@@ -49,10 +49,10 @@ def test_no_effect_world_does_not_exclude_zero_often():
 
 
 def test_a_known_polynomial_is_fitted_exactly_without_noise():
-    x = np.linspace(-1, 1, 400)
+    x = numpy.linspace(-1, 1, 400)
     y = 1.0 + 2.0 * x + 3.0 * x**2 + 5.0 * (x >= 0)
     out = rd.estimate(
-        pd.DataFrame({"x": x, "y": y}), "x", "y", 0.0, bandwidth=0.8
+        pandas.DataFrame({"x": x, "y": y}), "x", "y", 0.0, bandwidth=0.8
     )
     assert out.bias_corrected == pytest.approx(5.0, abs=1e-8)
     assert out.estimate == pytest.approx(5.0, abs=0.2)
@@ -80,4 +80,4 @@ def test_small_or_missing_data_is_refused():
     with pytest.raises(ValueError, match="each side"):
         rd.estimate(frame, "x", "y", 5.0)
     with pytest.raises(ValueError, match="missing"):
-        rd.estimate(frame.assign(y=np.nan), "x", "y", 0.0)
+        rd.estimate(frame.assign(y=numpy.nan), "x", "y", 0.0)

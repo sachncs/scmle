@@ -1,7 +1,7 @@
 """Treatment effects are estimated, ranked and caveated."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 import support
 
@@ -9,8 +9,8 @@ from scmle.contracts import errors
 
 
 def trial(rows=5000, seed=0, confounded=False):
-    rng = np.random.default_rng(seed)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    frame = pandas.DataFrame(
         {
             "age": rng.normal(size=rows),
             "tenure": rng.normal(size=rows),
@@ -50,7 +50,7 @@ def test_estimated_uplift_tracks_the_true_effect_in_a_randomized_trial(result):
 
     estimated = result.bundle.predict(fresh.drop(columns=["bought"]))
 
-    assert np.corrcoef(estimated, effect)[0, 1] > 0.5
+    assert numpy.corrcoef(estimated, effect)[0, 1] > 0.5
     assert result.evaluation["test_metrics"]["qini"] > 0.01
 
 

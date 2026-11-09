@@ -11,7 +11,7 @@ import abc
 from typing import Any
 from typing import Self
 
-import numpy as np
+import numpy
 from scipy import optimize
 from sklearn import base
 from sklearn import ensemble
@@ -22,8 +22,8 @@ MIN_BIN_EVENTS = 1
 
 
 def kaplan_meier(
-    duration: np.ndarray, event: np.ndarray
-) -> tuple[np.ndarray, np.ndarray]:
+    duration: numpy.ndarray, event: numpy.ndarray
+) -> tuple[numpy.ndarray, numpy.ndarray]:
     """Kaplan-Meier survival curve.
 
     Args:
@@ -33,10 +33,10 @@ def kaplan_meier(
     Returns:
         Distinct event times and the survival probability just after each.
     """
-    time = np.asarray(duration, dtype=float)
-    seen = np.asarray(event, dtype=bool)
-    moments = np.unique(time[seen])
-    survival = np.empty(len(moments))
+    time = numpy.asarray(duration, dtype=float)
+    seen = numpy.asarray(event, dtype=bool)
+    moments = numpy.unique(time[seen])
+    survival = numpy.empty(len(moments))
     level = 1.0
     for position, moment in enumerate(moments):
         at_risk = (time >= moment).sum()
@@ -47,8 +47,11 @@ def kaplan_meier(
 
 
 def step_lookup(
-    moments: np.ndarray, values: np.ndarray, times: np.ndarray, before: float
-) -> np.ndarray:
+    moments: numpy.ndarray,
+    values: numpy.ndarray,
+    times: numpy.ndarray,
+    before: float,
+) -> numpy.ndarray:
     """Value of a right-continuous step function at each time.
 
     Args:
@@ -60,8 +63,10 @@ def step_lookup(
     Returns:
         Array with one value per entry of `times`.
     """
-    position = np.searchsorted(moments, np.asarray(times, dtype=float), "right")
-    padded = np.concatenate([[before], values])
+    position = numpy.searchsorted(
+        moments, numpy.asarray(times, dtype=float), "right"
+    )
+    padded = numpy.concatenate([[before], values])
     return padded[position]
 
 
@@ -83,7 +88,7 @@ class SurvivalEstimator(base.RegressorMixin, base.BaseEstimator, abc.ABC):
         """
 
     @abc.abstractmethod
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """Risk score per row; larger means the event is expected sooner.
 
         Args:
@@ -94,7 +99,7 @@ class SurvivalEstimator(base.RegressorMixin, base.BaseEstimator, abc.ABC):
         """
 
     @abc.abstractmethod
-    def predict_survival(self, features: Any, times: Any) -> np.ndarray:
+    def predict_survival(self, features: Any, times: Any) -> numpy.ndarray:
         """Probability of no event yet, shape `(rows, len(times))`.
 
         Args:
@@ -126,11 +131,13 @@ class MarginalSurvival(SurvivalEstimator):
         Returns:
             This fitted estimator.
         """
-        seen = np.ones(len(duration)) if event is None else np.asarray(event)
-        self.moments_, self.curve_ = kaplan_meier(np.asarray(duration), seen)
+        seen = (
+            numpy.ones(len(duration)) if event is None else numpy.asarray(event)
+        )
+        self.moments_, self.curve_ = kaplan_meier(numpy.asarray(duration), seen)
         return self
 
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """Same risk for every row, so the ordering is no better than chance.
 
         Args:
@@ -139,9 +146,9 @@ class MarginalSurvival(SurvivalEstimator):
         Returns:
             Array of zeros of shape `(n_rows,)`.
         """
-        return np.zeros(features.shape[0])
+        return numpy.zeros(features.shape[0])
 
-    def predict_survival(self, features: Any, times: Any) -> np.ndarray:
+    def predict_survival(self, features: Any, times: Any) -> numpy.ndarray:
         """The population curve repeated for each row.
 
         Args:
@@ -151,8 +158,10 @@ class MarginalSurvival(SurvivalEstimator):
         Returns:
             Array of shape `(n_rows, len(times))` of survival probabilities.
         """
-        curve = step_lookup(self.moments_, self.curve_, np.asarray(times), 1.0)
-        return np.tile(curve, (features.shape[0], 1))
+        curve = step_lookup(
+            self.moments_, self.curve_, numpy.asarray(times), 1.0
+        )
+        return numpy.tile(curve, (features.shape[0], 1))
 
 
 class CoxRegressor(SurvivalEstimator):
@@ -189,18 +198,18 @@ class CoxRegressor(SurvivalEstimator):
         Returns:
             This fitted estimator.
         """
-        matrix = np.asarray(features, dtype=float)
-        time = np.asarray(duration, dtype=float)
+        matrix = numpy.asarray(features, dtype=float)
+        time = numpy.asarray(duration, dtype=float)
         seen = (
-            np.ones(len(time), dtype=bool)
+            numpy.ones(len(time), dtype=bool)
             if event is None
-            else np.asarray(event, dtype=bool)
+            else numpy.asarray(event, dtype=bool)
         )
-        order = np.argsort(time, kind="stable")
+        order = numpy.argsort(time, kind="stable")
         matrix, time, seen = matrix[order], time[order], seen[order]
-        first = np.searchsorted(time, time, side="left")
+        first = numpy.searchsorted(time, time, side="left")
 
-        def objective(beta: np.ndarray) -> tuple[float, np.ndarray]:
+        def objective(beta: numpy.ndarray) -> tuple[float, numpy.ndarray]:
             """Penalised negative log partial likelihood and its gradient.
 
             Args:
@@ -211,12 +220,12 @@ class CoxRegressor(SurvivalEstimator):
             """
             eta = matrix @ beta
             shift = eta.max()
-            weight = np.exp(eta - shift)
-            tail_weight = np.cumsum(weight[::-1])[::-1][first]
-            tail_matrix = np.cumsum((matrix * weight[:, None])[::-1], axis=0)[
-                ::-1
-            ][first]
-            log_tail = np.log(tail_weight) + shift
+            weight = numpy.exp(eta - shift)
+            tail_weight = numpy.cumsum(weight[::-1])[::-1][first]
+            tail_matrix = numpy.cumsum(
+                (matrix * weight[:, None])[::-1], axis=0
+            )[::-1][first]
+            log_tail = numpy.log(tail_weight) + shift
             value = -(eta[seen] - log_tail[seen]).sum()
             mean = tail_matrix[seen] / tail_weight[seen, None]
             gradient = -(matrix[seen] - mean).sum(axis=0)
@@ -227,25 +236,25 @@ class CoxRegressor(SurvivalEstimator):
 
         fitted = optimize.minimize(
             objective,
-            np.zeros(matrix.shape[1]),
+            numpy.zeros(matrix.shape[1]),
             jac=True,
             method="L-BFGS-B",
         )
         self.coefficients_ = fitted.x
         eta = matrix @ self.coefficients_
-        weight = np.exp(eta - eta.max())
-        tail_weight = np.cumsum(weight[::-1])[::-1][first]
-        self.moments_ = np.unique(time[seen])
+        weight = numpy.exp(eta - eta.max())
+        tail_weight = numpy.cumsum(weight[::-1])[::-1][first]
+        self.moments_ = numpy.unique(time[seen])
         increments = []
         for moment in self.moments_:
             happened = (seen & (time == moment)).sum()
-            at_risk = tail_weight[np.searchsorted(time, moment, "left")]
+            at_risk = tail_weight[numpy.searchsorted(time, moment, "left")]
             increments.append(happened / at_risk)
         self.scale_ = float(eta.max())
-        self.baseline_ = np.cumsum(increments)
+        self.baseline_ = numpy.cumsum(increments)
         return self
 
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """Linear predictor (log relative hazard).
 
         Args:
@@ -254,9 +263,9 @@ class CoxRegressor(SurvivalEstimator):
         Returns:
             Array of shape `(n_rows,)` of linear predictors.
         """
-        return np.asarray(features, dtype=float) @ self.coefficients_
+        return numpy.asarray(features, dtype=float) @ self.coefficients_
 
-    def predict_survival(self, features: Any, times: Any) -> np.ndarray:
+    def predict_survival(self, features: Any, times: Any) -> numpy.ndarray:
         """Survival `exp(-B(t) * exp(eta))` for each row and time.
 
         Here `B` is the cumulative baseline hazard (Breslow, a step function
@@ -273,10 +282,10 @@ class CoxRegressor(SurvivalEstimator):
             Array of shape `(n_rows, len(times))` of survival probabilities.
         """
         cumulative = step_lookup(
-            self.moments_, self.baseline_, np.asarray(times), 0.0
+            self.moments_, self.baseline_, numpy.asarray(times), 0.0
         )
-        relative = np.exp(self.predict(features) - self.scale_)
-        return np.exp(-np.outer(relative, cumulative))
+        relative = numpy.exp(self.predict(features) - self.scale_)
+        return numpy.exp(-numpy.outer(relative, cumulative))
 
 
 class DiscreteTimeBoosting(SurvivalEstimator):
@@ -318,7 +327,7 @@ class DiscreteTimeBoosting(SurvivalEstimator):
         self.max_leaf_nodes = max_leaf_nodes
         self.random_state = random_state
 
-    def interval_of(self, time: np.ndarray) -> np.ndarray:
+    def interval_of(self, time: numpy.ndarray) -> numpy.ndarray:
         """Index of the interval each time falls in.
 
         Args:
@@ -327,14 +336,14 @@ class DiscreteTimeBoosting(SurvivalEstimator):
         Returns:
             Integer array of interval indices, capped at the last interval.
         """
-        return np.minimum(
-            np.searchsorted(self.edges_, time, side="left"),
+        return numpy.minimum(
+            numpy.searchsorted(self.edges_, time, side="left"),
             len(self.edges_) - 1,
         )
 
     def expand(
-        self, matrix: np.ndarray, last: np.ndarray, hit: np.ndarray
-    ) -> tuple[np.ndarray, np.ndarray]:
+        self, matrix: numpy.ndarray, last: numpy.ndarray, hit: numpy.ndarray
+    ) -> tuple[numpy.ndarray, numpy.ndarray]:
         """One record per row and interval the row was at risk in.
 
         Args:
@@ -347,12 +356,12 @@ class DiscreteTimeBoosting(SurvivalEstimator):
             and the 0/1 label, which is 1 only in the interval of an event.
         """
         lengths = last + 1
-        rows = np.repeat(np.arange(len(matrix)), lengths)
-        offsets = np.arange(lengths.sum()) - np.repeat(
-            np.cumsum(lengths) - lengths, lengths
+        rows = numpy.repeat(numpy.arange(len(matrix)), lengths)
+        offsets = numpy.arange(lengths.sum()) - numpy.repeat(
+            numpy.cumsum(lengths) - lengths, lengths
         )
         labels = (hit[rows] & (offsets == last[rows])).astype(int)
-        return np.column_stack([matrix[rows], offsets]), labels
+        return numpy.column_stack([matrix[rows], offsets]), labels
 
     def fit(self, features: Any, duration: Any, event: Any = None) -> Self:
         """Builds the person-interval data and fits the hazard model.
@@ -369,24 +378,24 @@ class DiscreteTimeBoosting(SurvivalEstimator):
         Returns:
             This fitted estimator.
         """
-        matrix = np.asarray(features, dtype=float)
-        time = np.asarray(duration, dtype=float)
+        matrix = numpy.asarray(features, dtype=float)
+        time = numpy.asarray(duration, dtype=float)
         seen = (
-            np.ones(len(time), dtype=bool)
+            numpy.ones(len(time), dtype=bool)
             if event is None
-            else np.asarray(event, dtype=bool)
+            else numpy.asarray(event, dtype=bool)
         )
-        cuts = np.unique(
-            np.quantile(
+        cuts = numpy.unique(
+            numpy.quantile(
                 time[seen] if seen.any() else time,
-                np.linspace(0, 1, self.bins + 1)[1:],
+                numpy.linspace(0, 1, self.bins + 1)[1:],
             )
         )
         self.edges_ = cuts
         last = self.interval_of(time)
         average = float((last + 1).mean())
         if len(matrix) * average > MAX_EXPANDED_ROWS:
-            keep = np.random.default_rng(self.random_state).choice(
+            keep = numpy.random.default_rng(self.random_state).choice(
                 len(matrix),
                 max(int(MAX_EXPANDED_ROWS / average), 1),
                 replace=False,
@@ -400,7 +409,7 @@ class DiscreteTimeBoosting(SurvivalEstimator):
         ).fit(expanded, labels)
         return self
 
-    def hazards(self, features: Any) -> np.ndarray:
+    def hazards(self, features: Any) -> numpy.ndarray:
         """Hazard in each interval, shape `(rows, intervals)`.
 
         Args:
@@ -410,21 +419,21 @@ class DiscreteTimeBoosting(SurvivalEstimator):
             Array of shape `(n_rows, n_intervals)` of hazards; zeros when
             training saw no event.
         """
-        matrix = np.asarray(features, dtype=float)
+        matrix = numpy.asarray(features, dtype=float)
         count = len(self.edges_)
-        stacked = np.column_stack(
+        stacked = numpy.column_stack(
             [
-                np.repeat(matrix, count, axis=0),
-                np.tile(np.arange(count), len(matrix)),
+                numpy.repeat(matrix, count, axis=0),
+                numpy.tile(numpy.arange(count), len(matrix)),
             ]
         )
         if 1 not in self.model_.classes_:
-            return np.zeros((len(matrix), count))
+            return numpy.zeros((len(matrix), count))
         return self.model_.predict_proba(stacked)[:, 1].reshape(
             len(matrix), count
         )
 
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """Cumulative hazard over all intervals as the risk score.
 
         Args:
@@ -435,7 +444,7 @@ class DiscreteTimeBoosting(SurvivalEstimator):
         """
         return self.hazards(features).sum(axis=1)
 
-    def predict_survival(self, features: Any, times: Any) -> np.ndarray:
+    def predict_survival(self, features: Any, times: Any) -> numpy.ndarray:
         """Running product of one minus the hazard, read at each time.
 
         Args:
@@ -445,9 +454,9 @@ class DiscreteTimeBoosting(SurvivalEstimator):
         Returns:
             Array of shape `(n_rows, len(times))` of survival probabilities.
         """
-        curve = np.cumprod(1.0 - self.hazards(features), axis=1)
-        interval = np.searchsorted(
-            self.edges_, np.asarray(times, dtype=float), side="right"
+        curve = numpy.cumprod(1.0 - self.hazards(features), axis=1)
+        interval = numpy.searchsorted(
+            self.edges_, numpy.asarray(times, dtype=float), side="right"
         )
-        padded = np.column_stack([np.ones(len(curve)), curve])
+        padded = numpy.column_stack([numpy.ones(len(curve)), curve])
         return padded[:, interval]

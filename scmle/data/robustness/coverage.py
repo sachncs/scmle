@@ -16,7 +16,7 @@ from collections.abc import Mapping
 import dataclasses
 from typing import Any
 
-import pandas as pd
+import pandas
 from scipy import stats
 
 from scmle.data.robustness import shift
@@ -62,7 +62,7 @@ class LevelCoverage:
         return record
 
 
-def shares(column: pd.Series) -> dict[str, float]:
+def shares(column: pandas.Series) -> dict[str, float]:
     """Computes the level shares of a column.
 
     Missing values form their own level, named `MISSING_LEVEL`.
@@ -82,7 +82,7 @@ def shares(column: pd.Series) -> dict[str, float]:
 
 
 def subgroup_coverage(
-    sample: pd.Series,
+    sample: pandas.Series,
     deployment: Mapping[str, float] | None,
     alpha: float = ALPHA,
 ) -> tuple[LevelCoverage, ...]:

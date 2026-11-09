@@ -1,17 +1,17 @@
 """Integrated Brier score and dynamic AUC against hand computations."""
 
-import numpy as np
+import numpy
 import pytest
 
 from scmle.evaluation import survival
 
 
 def test_the_brier_score_matches_a_hand_computation_without_censoring():
-    duration = np.array([1.0, 2.0, 3.0])
-    event = np.ones(3)
-    times = np.array([1.5, 2.5])
+    duration = numpy.array([1.0, 2.0, 3.0])
+    event = numpy.ones(3)
+    times = numpy.array([1.5, 2.5])
     # Row 0 failed by both times, row 1 by 2.5, row 2 survived both.
-    predicted = np.array([[0.2, 0.1], [0.9, 0.3], [0.8, 0.6]])
+    predicted = numpy.array([[0.2, 0.1], [0.9, 0.3], [0.8, 0.6]])
 
     scores = survival.brier_scores(duration, event, predicted, times)
 
@@ -21,10 +21,10 @@ def test_the_brier_score_matches_a_hand_computation_without_censoring():
 
 
 def test_integrating_two_points_is_their_mean():
-    duration = np.array([1.0, 2.0, 3.0])
-    event = np.ones(3)
-    times = np.array([1.5, 2.5])
-    predicted = np.array([[0.2, 0.1], [0.9, 0.3], [0.8, 0.6]])
+    duration = numpy.array([1.0, 2.0, 3.0])
+    event = numpy.ones(3)
+    times = numpy.array([1.5, 2.5])
+    predicted = numpy.array([[0.2, 0.1], [0.9, 0.3], [0.8, 0.6]])
 
     value = survival.integrated_brier(duration, event, predicted, times)
 
@@ -33,24 +33,27 @@ def test_integrating_two_points_is_their_mean():
 
 
 def test_dynamic_auc_is_one_for_a_perfect_ordering_and_half_for_ties():
-    duration = np.array([1.0, 2.0, 3.0, 4.0])
-    event = np.ones(4)
-    times = np.array([2.5])
+    duration = numpy.array([1.0, 2.0, 3.0, 4.0])
+    event = numpy.ones(4)
+    times = numpy.array([2.5])
 
     assert survival.dynamic_auc(duration, event, -duration, times) == 1.0
-    assert survival.dynamic_auc(duration, event, np.zeros(4), times) == 0.5
+    assert survival.dynamic_auc(duration, event, numpy.zeros(4), times) == 0.5
 
 
 def test_a_better_model_has_a_lower_integrated_brier_score():
-    rng = np.random.default_rng(0)
-    rate = np.exp(rng.normal(size=600))
+    rng = numpy.random.default_rng(0)
+    rate = numpy.exp(rng.normal(size=600))
     happens = rng.exponential(1 / rate)
     stops = rng.exponential(2.0, 600)
-    duration, event = np.minimum(happens, stops), (happens <= stops).astype(int)
+    duration, event = (
+        numpy.minimum(happens, stops),
+        (happens <= stops).astype(int),
+    )
     times = survival.time_grid(duration, event)
 
-    informed = np.exp(-np.outer(rate, times))
-    ignorant = np.tile(np.exp(-np.mean(rate) * times), (600, 1))
+    informed = numpy.exp(-numpy.outer(rate, times))
+    ignorant = numpy.tile(numpy.exp(-numpy.mean(rate) * times), (600, 1))
 
     assert survival.integrated_brier(
         duration, event, informed, times
@@ -58,8 +61,8 @@ def test_a_better_model_has_a_lower_integrated_brier_score():
 
 
 def test_heavy_censoring_does_not_break_the_weights():
-    duration = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
-    event = np.array([1, 0, 0, 0, 0])
+    duration = numpy.array([1.0, 2.0, 3.0, 4.0, 5.0])
+    event = numpy.array([1, 0, 0, 0, 0])
 
     probability = survival.censoring_probability(
         survival.censoring_curve(duration, event), duration

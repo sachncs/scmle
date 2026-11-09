@@ -43,7 +43,7 @@ import dataclasses
 import math
 from typing import Any
 
-import numpy as np
+import numpy
 
 KINDS = ("none", "abrupt", "gradual", "covariate", "concept")
 LABELS = ("full", "mar", "mnar")
@@ -131,15 +131,15 @@ class Stream:
     """
 
     spec: StreamSpec
-    z: np.ndarray
-    loss: np.ndarray
-    risk: np.ndarray
-    pi: np.ndarray
-    selected: np.ndarray
-    audit: np.ndarray
-    arrival: np.ndarray
+    z: numpy.ndarray
+    loss: numpy.ndarray
+    risk: numpy.ndarray
+    pi: numpy.ndarray
+    selected: numpy.ndarray
+    audit: numpy.ndarray
+    arrival: numpy.ndarray
     change_point: int | None
-    true_pi: np.ndarray
+    true_pi: numpy.ndarray
 
     def mean_risk(self) -> float:
         """True mean loss rate over the whole stream.
@@ -150,7 +150,7 @@ class Stream:
         return float(self.risk.mean())
 
 
-def risk_path(spec: StreamSpec) -> np.ndarray:
+def risk_path(spec: StreamSpec) -> numpy.ndarray:
     """True loss rate of each batch.
 
     Args:
@@ -162,18 +162,20 @@ def risk_path(spec: StreamSpec) -> np.ndarray:
         `abrupt` and `concept`, and a linear ramp over `ramp` batches for
         `gradual`.
     """
-    index = np.arange(spec.batches)
-    path = np.full(spec.batches, spec.base, dtype=float)
+    index = numpy.arange(spec.batches)
+    path = numpy.full(spec.batches, spec.base, dtype=float)
     after = index >= spec.change
     if spec.kind == "abrupt" or spec.kind == "concept":
         path[after] = spec.base + spec.delta
     elif spec.kind == "gradual":
-        part = np.clip((index - spec.change + 1) / max(spec.ramp, 1), 0.0, 1.0)
+        part = numpy.clip(
+            (index - spec.change + 1) / max(spec.ramp, 1), 0.0, 1.0
+        )
         path = spec.base + spec.delta * part
     return path
 
 
-def covariate_path(spec: StreamSpec) -> np.ndarray:
+def covariate_path(spec: StreamSpec) -> numpy.ndarray:
     """Covariate mean of each batch.
 
     Args:
@@ -183,13 +185,13 @@ def covariate_path(spec: StreamSpec) -> np.ndarray:
         An array of length `batches`: zero, plus `shift` from the change
         point on for `covariate` streams.
     """
-    path = np.zeros(spec.batches)
+    path = numpy.zeros(spec.batches)
     if spec.kind == "covariate":
-        path[np.arange(spec.batches) >= spec.change] = spec.shift
+        path[numpy.arange(spec.batches) >= spec.change] = spec.shift
     return path
 
 
-def logistic(value: np.ndarray) -> np.ndarray:
+def logistic(value: numpy.ndarray) -> numpy.ndarray:
     """The logistic function.
 
     Args:
@@ -198,7 +200,7 @@ def logistic(value: np.ndarray) -> np.ndarray:
     Returns:
         `1 / (1 + exp(-value))`, elementwise.
     """
-    return 1.0 / (1.0 + np.exp(-value))
+    return 1.0 / (1.0 + numpy.exp(-value))
 
 
 def marginal_risk(base: float, dependence: float) -> float:
@@ -216,9 +218,9 @@ def marginal_risk(base: float, dependence: float) -> float:
     Returns:
         The mean per-case loss probability over a standard normal covariate.
     """
-    nodes, weights = np.polynomial.hermite_e.hermegauss(200)
-    chance = np.clip(base + dependence * (logistic(nodes) - 0.5), 0.0, 1.0)
-    return float(np.sum(weights * chance) / np.sum(weights))
+    nodes, weights = numpy.polynomial.hermite_e.hermegauss(200)
+    chance = numpy.clip(base + dependence * (logistic(nodes) - 0.5), 0.0, 1.0)
+    return float(numpy.sum(weights * chance) / numpy.sum(weights))
 
 
 def simulate(spec: StreamSpec) -> Stream:
@@ -230,32 +232,36 @@ def simulate(spec: StreamSpec) -> Stream:
     Returns:
         The stream with its truth.
     """
-    rng = np.random.default_rng(spec.seed)
+    rng = numpy.random.default_rng(spec.seed)
     shape = (spec.batches, spec.size)
     risk = risk_path(spec)
     z = covariate_path(spec)[:, None] + rng.standard_normal(shape)
-    chance = np.clip(
+    chance = numpy.clip(
         risk[:, None] + spec.dependence * (logistic(z) - 0.5), 0.0, 1.0
     )
     loss = (rng.random(shape) < chance).astype(float)
     audit = rng.random(shape) < spec.epsilon
     if spec.labels == "full":
-        true_pi = np.ones(shape)
-        logged = np.ones(shape)
+        true_pi = numpy.ones(shape)
+        logged = numpy.ones(shape)
     elif spec.labels == "mar":
-        rule = np.clip(logistic(1.5 * z - 0.5), spec.floor, 1.0)
+        rule = numpy.clip(logistic(1.5 * z - 0.5), spec.floor, 1.0)
         true_pi = 1.0 - (1.0 - rule) * (1.0 - spec.epsilon)
         logged = true_pi.copy()
     else:
-        rule = np.where(loss > 0, 0.9, 0.3)
+        rule = numpy.where(loss > 0, 0.9, 0.3)
         true_pi = 1.0 - (1.0 - rule) * (1.0 - spec.epsilon)
-        logged = np.full(shape, spec.epsilon)
+        logged = numpy.full(shape, spec.epsilon)
     selected = audit | (rng.random(shape) < true_pi)
     if spec.labels == "full":
-        selected = np.ones(shape, dtype=bool)
+        selected = numpy.ones(shape, dtype=bool)
     delay = spec.window + spec.slow * (loss > 0)
-    arrival = np.arange(spec.batches)[:, None] + delay + np.zeros(shape, int)
-    arrival = np.where(selected, arrival, spec.batches + spec.window + 10_000)
+    arrival = (
+        numpy.arange(spec.batches)[:, None] + delay + numpy.zeros(shape, int)
+    )
+    arrival = numpy.where(
+        selected, arrival, spec.batches + spec.window + 10_000
+    )
     change = None if spec.kind == "none" else spec.change
     return Stream(
         spec, z, loss, risk, logged, selected, audit, arrival, change, true_pi
@@ -274,10 +280,10 @@ class FeedbackStream:
         gamma: True strength of the loop (0 means no loop).
     """
 
-    z: np.ndarray
-    next_z: np.ndarray
-    bypass: np.ndarray
-    approved: np.ndarray
+    z: numpy.ndarray
+    next_z: numpy.ndarray
+    bypass: numpy.ndarray
+    approved: numpy.ndarray
     gamma: float
 
 
@@ -308,12 +314,12 @@ def feedback_stream(
     Returns:
         The simulated loop with arrays of shape `(batches, size)`.
     """
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     shape = (batches, size)
     skipped = rng.random(shape) < bypass
     z = rng.standard_normal(shape)
     coin = rng.random(shape) < 0.5
-    approved = np.where(skipped, coin, z > 0)
+    approved = numpy.where(skipped, coin, z > 0)
     next_z = z + gamma * approved + 0.5 * rng.standard_normal(shape)
     return FeedbackStream(z, next_z, skipped, approved, gamma)
 
@@ -329,9 +335,9 @@ class ChallengerSequence:
         challengers: Challenger losses, shape `(count, batches, size)`.
     """
 
-    advantage: np.ndarray
-    champion: np.ndarray
-    challengers: np.ndarray
+    advantage: numpy.ndarray
+    champion: numpy.ndarray
+    challengers: numpy.ndarray
 
 
 def challenger_sequence(
@@ -359,16 +365,16 @@ def challenger_sequence(
         The champion's and challengers' simulated losses with their true
         advantages.
     """
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     latent = rng.random((batches, size))
-    gains = np.asarray(advantages, dtype=float)
-    rates = np.clip(base - gains, 0.0, 1.0)
+    gains = numpy.asarray(advantages, dtype=float)
+    rates = numpy.clip(base - gains, 0.0, 1.0)
     champion = (latent < base).astype(float)
     challengers = (latent[None] < rates[:, None, None]).astype(float)
     return ChallengerSequence(gains, champion, challengers)
 
 
-def true_selective_risk(answered: np.ndarray, stream: Stream) -> float:
+def true_selective_risk(answered: numpy.ndarray, stream: Stream) -> float:
     """Realised loss rate over answered cases (the simulator's truth).
 
     Args:
@@ -402,7 +408,7 @@ def draw_calibration(count: int, r_star: float, seed: int) -> dict[str, Any]:
         A dict with the arrays `score` and `loss` (0 or 1) of length `count`
         and the target risk `r_star`.
     """
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     score = rng.random(count)
     loss = (rng.random(count) < 0.30 * (1.0 - score) ** 2).astype(float)
     return {"score": score, "loss": loss, "r_star": r_star}

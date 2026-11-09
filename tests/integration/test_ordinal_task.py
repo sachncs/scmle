@@ -1,7 +1,7 @@
 """Ordered labels are modelled, scored and predicted as ordered labels."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 import support
 
@@ -11,13 +11,13 @@ ORDER = ["low", "medium", "high", "extreme"]
 
 
 def frame(rows=1200, seed=0):
-    rng = np.random.default_rng(seed)
-    data = pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    data = pandas.DataFrame(
         {"a": rng.normal(size=rows), "b": rng.normal(size=rows)}
     )
     latent = 1.5 * data.a - data.b + rng.logistic(size=rows)
-    cuts = np.quantile(latent, [0.25, 0.5, 0.75])
-    data["level"] = np.array(ORDER)[np.searchsorted(cuts, latent)]
+    cuts = numpy.quantile(latent, [0.25, 0.5, 0.75])
+    data["level"] = numpy.array(ORDER)[numpy.searchsorted(cuts, latent)]
     return data
 
 
@@ -45,7 +45,7 @@ def test_the_model_beats_the_median_baseline_on_agreement(result):
 
 
 def test_predictions_are_the_users_labels_in_the_stated_order(result):
-    rows = pd.DataFrame({"a": [-3.0, 3.0], "b": [0.0, 0.0]})
+    rows = pandas.DataFrame({"a": [-3.0, 3.0], "b": [0.0, 0.0]})
 
     low, high = result.bundle.predict(rows)
 
@@ -56,7 +56,7 @@ def test_predictions_are_the_users_labels_in_the_stated_order(result):
 
 def test_probabilities_follow_the_label_order(result):
     probabilities = result.bundle.predict_proba(
-        pd.DataFrame({"a": [-3.0, 3.0], "b": [0.0, 0.0]})
+        pandas.DataFrame({"a": [-3.0, 3.0], "b": [0.0, 0.0]})
     )
 
     assert probabilities.shape == (2, 4)
@@ -102,9 +102,11 @@ def test_ordinal_modelling_misses_by_fewer_levels_than_plain_classes(
     truth = fresh.level.map(ORDER.index).to_numpy()
     features = fresh[["a", "b"]]
 
-    ordinal_guess = pd.Series(result.bundle.predict(features)).map(ORDER.index)
-    plain_guess = pd.Series(plain.bundle.predict(features)).map(ORDER.index)
+    ordinal_guess = pandas.Series(result.bundle.predict(features)).map(
+        ORDER.index
+    )
+    plain_guess = pandas.Series(plain.bundle.predict(features)).map(ORDER.index)
 
-    ordinal_error = np.abs(truth - ordinal_guess.to_numpy()).mean()
-    plain_error = np.abs(truth - plain_guess.to_numpy()).mean()
+    ordinal_error = numpy.abs(truth - ordinal_guess.to_numpy()).mean()
+    plain_error = numpy.abs(truth - plain_guess.to_numpy()).mean()
     assert ordinal_error < plain_error

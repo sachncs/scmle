@@ -2,13 +2,13 @@
 
 import typing
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
 from scmle.contracts import errors
 from scmle.contracts import tasks
-from scmle.data.charter import feasibility as feas
+from scmle.data.charter import feasibility
 from scmle.data.custody import carve
 from scmle.data.custody import pipeline
 from scmle.data.custody import sealed
@@ -27,8 +27,8 @@ def make_spec(**data):
 
 
 def make_frame(rows=2000, seed=0):
-    rng = np.random.default_rng(seed)
-    return pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    return pandas.DataFrame(
         {
             "x": rng.normal(size=rows),
             "z": rng.normal(size=rows),
@@ -71,13 +71,13 @@ def test_three_sets_partition_every_row_and_c_is_sealed():
     assert x | c | e | final == set(range(len(frame)))
     assert not (x & c) and not (x & final) and not (c & final)
     assert final == set(original.manifest.test_ids)
-    assert outcome.feasibility.verdict is feas.Verdict.FEASIBLE
+    assert outcome.feasibility.verdict is feasibility.Verdict.FEASIBLE
     assert manifest.scope == "confirmatory"
     assert set(vault.sets) == {"C"}
     held = vault.sets["C"]
     assert held.ids == manifest.confirmation_ids
     rows = held.open(held.issue_token(), actor="test")
-    assert np.allclose(
+    assert numpy.allclose(
         rows[0]["x"].to_numpy(), frame["x"].iloc[list(held.ids)].to_numpy()
     )
     vault.close()
@@ -90,7 +90,7 @@ def test_the_development_data_is_exploration_only():
     x = list(outcome.manifest.exploration_ids)
     assert len(outcome.split.dev_features) == len(x)
     assert outcome.split.manifest.train_ids == tuple(x)
-    assert np.allclose(
+    assert numpy.allclose(
         outcome.split.dev_features["x"].to_numpy(), frame["x"].iloc[x]
     )
     assert outcome.view.ids == tuple(x)
@@ -104,7 +104,7 @@ def test_too_few_rows_leave_no_confirmation_set():
     outcome, original, vault = run(frame)
     assert outcome.manifest.confirmation_ids == ()
     assert outcome.manifest.scope == "exploratory_unconfirmed"
-    assert outcome.feasibility.verdict is feas.Verdict.INFEASIBLE
+    assert outcome.feasibility.verdict is feasibility.Verdict.INFEASIBLE
     assert set(outcome.manifest.exploration_ids) == set(
         original.manifest.train_ids
     )
@@ -117,7 +117,7 @@ def test_an_underpowered_confirmation_set_is_kept_but_capped():
     charter = make_charter(min_effect=0.05, k_max=10)
     ran = run(frame, charter)
     outcome, vault = ran.outcome, ran.vault
-    assert outcome.feasibility.verdict is feas.Verdict.DOWNGRADE
+    assert outcome.feasibility.verdict is feasibility.Verdict.DOWNGRADE
     assert len(outcome.manifest.confirmation_ids) > 0
     assert outcome.manifest.scope == "exploratory_unconfirmed"
     vault.close()
@@ -135,7 +135,7 @@ def test_the_carve_is_reproducible_for_the_same_inputs():
 
 def test_the_group_column_keeps_groups_out_of_both_sets():
     frame = make_frame()
-    frame["g"] = np.arange(len(frame)) // 5
+    frame["g"] = numpy.arange(len(frame)) // 5
     spec = make_spec(group_column="g")
     split = splitters.SplitManager(spec, BINARY).split(frame)
     log = sealed.OpenLog()
@@ -200,13 +200,13 @@ def test_the_manifest_commits_to_the_row_content_of_each_set():
 
 
 def temporal_frame(phi, rows=1500):
-    rng = np.random.default_rng(4)
+    rng = numpy.random.default_rng(4)
     noise = rng.normal(size=rows)
-    target = np.zeros(rows)
+    target = numpy.zeros(rows)
     for i in range(1, rows):
         target[i] = phi * target[i - 1] + noise[i]
-    return pd.DataFrame(
-        {"t": np.arange(rows), "x": rng.normal(size=rows), "y": target}
+    return pandas.DataFrame(
+        {"t": numpy.arange(rows), "x": rng.normal(size=rows), "y": target}
     )
 
 

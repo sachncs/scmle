@@ -2,8 +2,8 @@
 
 import json
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 import support
 
@@ -15,8 +15,8 @@ from scmle.monitoring import monitor as monitor_module
 
 
 def make_frame(rows, seed, shift=0.0, relabel=False):
-    rng = np.random.default_rng(seed)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    frame = pandas.DataFrame(
         {
             "a": rng.normal(size=rows) + shift,
             "b": rng.normal(size=rows),
@@ -58,7 +58,7 @@ def test_a_shifted_feature_is_found_and_ranked_first(trained):
 
 def test_unseen_categories_trigger_investigation(trained):
     data = make_frame(500, 3).drop(columns="y")
-    data["c"] = np.where(np.arange(500) % 3 == 0, "brand_new", data["c"])
+    data["c"] = numpy.where(numpy.arange(500) % 3 == 0, "brand_new", data["c"])
     report = monitor_module.ModelMonitor(trained.bundle).assess(data)
     category = next(f for f in report.drift.features if f.feature == "c")
     assert category.unseen_rate > 0.2
@@ -68,7 +68,7 @@ def test_unseen_categories_trigger_investigation(trained):
 def test_delayed_labels_are_handled_explicitly(trained):
     data = make_frame(600, 4)
     outcomes = data["y"].astype(float).copy()
-    outcomes.iloc[100:] = np.nan  # labels still pending
+    outcomes.iloc[100:] = numpy.nan  # labels still pending
     monitor = monitor_module.ModelMonitor(trained.bundle)
     report = monitor.assess(data.drop(columns="y"), outcomes)
     performance = report.performance
@@ -78,7 +78,7 @@ def test_delayed_labels_are_handled_explicitly(trained):
     )
     assert performance.status in {"ok", "degraded"}
     few = outcomes.copy()
-    few.iloc[10:] = np.nan
+    few.iloc[10:] = numpy.nan
     sparse = monitor.assess(data.drop(columns="y"), few).performance
     assert sparse.status == "insufficient_labels" and sparse.metrics == {}
 
@@ -243,8 +243,8 @@ def test_comparison_resamples_whole_groups_and_time_blocks(
 
     monkeypatch.setattr(diagnostics, "resample_rows", spy)
     holdout = make_frame(300, 12)
-    holdout["entity"] = np.arange(300) % 20
-    holdout["when"] = pd.date_range("2024-01-01", periods=300, freq="D")
+    holdout["entity"] = numpy.arange(300) % 20
+    holdout["when"] = pandas.date_range("2024-01-01", periods=300, freq="D")
     features = holdout.drop(columns="y")
 
     clustered = copy.copy(trained.bundle)

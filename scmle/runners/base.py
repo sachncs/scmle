@@ -36,7 +36,7 @@ from typing import Any
 from scmle.contracts import errors
 from scmle.core import retry
 from scmle.data.store import objectstore
-from scmle.runners import checkpoint as checkpoint_module
+from scmle.runners import checkpoint
 from scmle.runners import roles
 
 MANIFEST_FORMAT = 1
@@ -802,7 +802,7 @@ class Runner(abc.ABC):
         Returns:
             The saved manifest.
         """
-        checkpoints = checkpoint_module.CheckpointStore(self.store, spec.run_id)
+        checkpoints = checkpoint.CheckpointStore(self.store, spec.run_id)
         manifest.checkpoints = [
             {"step": step, "sha256": found.sha256}
             for step in checkpoints.steps()

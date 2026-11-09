@@ -12,8 +12,8 @@ from collections.abc import Sequence
 import dataclasses
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from sklearn import base
 
 DEFAULT_CONFIDENCE = 0.9
@@ -47,8 +47,8 @@ class SelfTrainingOutcome:
 
 
 def confident_rows(
-    fitted: Any, unlabeled: pd.DataFrame, confidence: float
-) -> tuple[pd.DataFrame, pd.Series]:
+    fitted: Any, unlabeled: pandas.DataFrame, confidence: float
+) -> tuple[pandas.DataFrame, pandas.Series]:
     """Selects the unlabeled rows the classifier labels confidently.
 
     Args:
@@ -60,21 +60,21 @@ def confident_rows(
         The trusted rows and the labels the model gave them.
     """
     if unlabeled.empty:
-        return unlabeled, pd.Series(dtype=object)
-    probabilities = np.asarray(fitted.predict_proba(unlabeled))
+        return unlabeled, pandas.Series(dtype=object)
+    probabilities = numpy.asarray(fitted.predict_proba(unlabeled))
     top = probabilities.argmax(axis=1)
     keep = probabilities.max(axis=1) >= confidence
-    classes = np.asarray(fitted.classes_)
-    return unlabeled[keep], pd.Series(
+    classes = numpy.asarray(fitted.classes_)
+    return unlabeled[keep], pandas.Series(
         classes[top[keep]], index=unlabeled.index[keep]
     )
 
 
 def augmented_fit(
     plain: Any,
-    features: pd.DataFrame,
-    target: pd.Series,
-    unlabeled: pd.DataFrame,
+    features: pandas.DataFrame,
+    target: pandas.Series,
+    unlabeled: pandas.DataFrame,
     confidence: float,
 ) -> tuple[Any, int]:
     """Labels confident rows with a fitted model, then refits on both.
@@ -93,8 +93,8 @@ def augmented_fit(
     rows, labels = confident_rows(plain, unlabeled, confidence)
     if len(rows) < MIN_PSEUDO_ROWS:
         return plain, 0
-    both = pd.concat([features, rows], ignore_index=True)
-    labelled = pd.concat(
+    both = pandas.concat([features, rows], ignore_index=True)
+    labelled = pandas.concat(
         [target.reset_index(drop=True), labels.reset_index(drop=True)],
         ignore_index=True,
     )
@@ -103,10 +103,10 @@ def augmented_fit(
 
 def judge(
     template: Any,
-    features: pd.DataFrame,
-    target: pd.Series,
+    features: pandas.DataFrame,
+    target: pandas.Series,
     folds: Sequence[tuple[Sequence[int], Sequence[int]]],
-    unlabeled: pd.DataFrame,
+    unlabeled: pandas.DataFrame,
     scorer: Callable[..., float],
     confidence: float = DEFAULT_CONFIDENCE,
     should_stop: Callable[[], bool] = lambda: False,
@@ -133,8 +133,8 @@ def judge(
     for fit_positions, evaluate_positions in folds:
         if should_stop():
             return None
-        fit = np.asarray(fit_positions)
-        held = np.asarray(evaluate_positions)
+        fit = numpy.asarray(fit_positions)
+        held = numpy.asarray(evaluate_positions)
         plain = base.clone(template).fit(features.iloc[fit], target.iloc[fit])
         augmented, count = augmented_fit(
             plain,
@@ -152,7 +152,7 @@ def judge(
         added.append(count)
     if not gains:
         return None
-    gain = float(np.mean(gains))
+    gain = float(numpy.mean(gains))
     return SelfTrainingOutcome(
-        gain, len(gains), float(np.mean(added)), gain > 0
+        gain, len(gains), float(numpy.mean(added)), gain > 0
     )

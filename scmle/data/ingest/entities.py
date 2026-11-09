@@ -35,8 +35,8 @@ import math
 import re
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.contracts import qualification
 from scmle.core import randomness
@@ -208,7 +208,9 @@ class Pass:
 
 
 def candidate_pairs(
-    records: pd.DataFrame, passes: Sequence[Pass], max_block: int = MAX_BLOCK
+    records: pandas.DataFrame,
+    passes: Sequence[Pass],
+    max_block: int = MAX_BLOCK,
 ) -> tuple[list[Pair], int]:
     """Finds pairs of records sharing a block key in any pass.
 
@@ -242,8 +244,8 @@ def candidate_pairs(
 
 
 def compare(
-    records: pd.DataFrame, fields: Sequence[Field], pairs: Sequence[Pair]
-) -> np.ndarray:
+    records: pandas.DataFrame, fields: Sequence[Field], pairs: Sequence[Pair]
+) -> numpy.ndarray:
     """Compares every pair on every field.
 
     Args:
@@ -256,7 +258,7 @@ def compare(
         or `DISAGREE`, or `MISSING` where either value is empty.
     """
     columns = {f.name: [normalize(v) for v in records[f.name]] for f in fields}
-    out = np.full((len(pairs), len(fields)), MISSING, dtype=np.int8)
+    out = numpy.full((len(pairs), len(fields)), MISSING, dtype=numpy.int8)
     for row, (i, j) in enumerate(pairs):
         for col, field in enumerate(fields):
             a, b = columns[field.name][i], columns[field.name][j]
@@ -283,11 +285,11 @@ class Model:
     """
 
     prior: float
-    m: np.ndarray
-    u: np.ndarray
+    m: numpy.ndarray
+    u: numpy.ndarray
     iterations: int
 
-    def weights(self, levels: np.ndarray) -> np.ndarray:
+    def weights(self, levels: numpy.ndarray) -> numpy.ndarray:
         """Computes the log2 likelihood-ratio weight of each pair.
 
         Args:
@@ -297,17 +299,17 @@ class Model:
         Returns:
             One weight per pair; missing fields add 0.
         """
-        total = np.zeros(len(levels))
+        total = numpy.zeros(len(levels))
         for col in range(levels.shape[1]):
             seen = levels[:, col] != MISSING
-            level = np.where(seen, levels[:, col], 0)
-            ratio = np.log2(self.m[col][level] / self.u[col][level])
-            total += np.where(seen, ratio, 0.0)
+            level = numpy.where(seen, levels[:, col], 0)
+            ratio = numpy.log2(self.m[col][level] / self.u[col][level])
+            total += numpy.where(seen, ratio, 0.0)
         return total
 
 
 def fit_em(
-    levels: np.ndarray, iterations: int = 100, tol: float = 1e-8
+    levels: numpy.ndarray, iterations: int = 100, tol: float = 1e-8
 ) -> Model:
     """EM for the two-class conditional-independence model.
 
@@ -324,25 +326,25 @@ def fit_em(
         The fitted model, with the number of iterations run.
     """
     pairs, fields = levels.shape
-    m = np.tile([0.05, 0.15, 0.80], (fields, 1))
-    u = np.tile([0.90, 0.07, 0.03], (fields, 1))
+    m = numpy.tile([0.05, 0.15, 0.80], (fields, 1))
+    u = numpy.tile([0.90, 0.07, 0.03], (fields, 1))
     prior = 0.05
     floor = 1e-6
     done = 0
     for step in range(1, iterations + 1):
         done = step
-        log_m = np.full(pairs, math.log(prior))
-        log_u = np.full(pairs, math.log(1.0 - prior))
+        log_m = numpy.full(pairs, math.log(prior))
+        log_u = numpy.full(pairs, math.log(1.0 - prior))
         for col in range(fields):
             seen = levels[:, col] != MISSING
-            level = np.where(seen, levels[:, col], 0)
-            log_m += np.where(seen, np.log(m[col][level]), 0.0)
-            log_u += np.where(seen, np.log(u[col][level]), 0.0)
-        top = np.maximum(log_m, log_u)
-        gamma = np.exp(log_m - top) / (
-            np.exp(log_m - top) + np.exp(log_u - top)
+            level = numpy.where(seen, levels[:, col], 0)
+            log_m += numpy.where(seen, numpy.log(m[col][level]), 0.0)
+            log_u += numpy.where(seen, numpy.log(u[col][level]), 0.0)
+        top = numpy.maximum(log_m, log_u)
+        gamma = numpy.exp(log_m - top) / (
+            numpy.exp(log_m - top) + numpy.exp(log_u - top)
         )
-        new_prior = float(np.clip(gamma.mean(), floor, 1 - floor))
+        new_prior = float(numpy.clip(gamma.mean(), floor, 1 - floor))
         new_m, new_u = m.copy(), u.copy()
         for col in range(fields):
             seen = levels[:, col] != MISSING
@@ -353,12 +355,12 @@ def fit_em(
                 new_u[col][lv] = (
                     (1 - gamma[hit]).sum() / gu if gu > 0 else u[col][lv]
                 )
-        new_m = np.clip(new_m, floor, 1.0)
-        new_u = np.clip(new_u, floor, 1.0)
+        new_m = numpy.clip(new_m, floor, 1.0)
+        new_u = numpy.clip(new_u, floor, 1.0)
         shift = max(
             abs(new_prior - prior),
-            float(np.abs(new_m - m).max()),
-            float(np.abs(new_u - u).max()),
+            float(numpy.abs(new_m - m).max()),
+            float(numpy.abs(new_u - u).max()),
         )
         m, u, prior = new_m, new_u, new_prior
         if shift < tol:
@@ -452,7 +454,7 @@ class Estimate:
         }
 
 
-def geometric_bands(order: np.ndarray, bands: int) -> list[np.ndarray]:
+def geometric_bands(order: numpy.ndarray, bands: int) -> list[numpy.ndarray]:
     """Splits ascending-ordered pairs into bands that thin out at the top.
 
     The top band holds the highest `2^-(bands-1)` share of the pairs, the next
@@ -477,7 +479,7 @@ def geometric_bands(order: np.ndarray, bands: int) -> list[np.ndarray]:
 
 
 def stratified_estimate(
-    weights: np.ndarray,
+    weights: numpy.ndarray,
     pairs: Sequence[Pair],
     threshold: float,
     labeler: Labeler,
@@ -511,7 +513,7 @@ def stratified_estimate(
         percent interval, the per-band sample and the reviewer.
     """
     rng = randomness.component_rng(seed, "ingest.entities.clerical", 0)
-    order = np.argsort(weights, kind="stable")
+    order = numpy.argsort(weights, kind="stable")
     cuts = geometric_bands(order, bands)
     sizes, hits, taken, above = [], [], [], []
     summary = []
@@ -535,18 +537,18 @@ def stratified_estimate(
                 sum(labelled),
             )
         )
-    n = np.array(sizes, dtype=float)
-    k = np.array(hits, dtype=float)
-    t = np.array(taken, dtype=float)
-    mask = np.array(above)
+    n = numpy.array(sizes, dtype=float)
+    k = numpy.array(hits, dtype=float)
+    t = numpy.array(taken, dtype=float)
+    mask = numpy.array(above)
     rates = rng.beta(k + 0.5, t - k + 0.5, size=(draws, len(n)))
     matches = rates * n
     linked_true = matches[:, mask].sum(axis=1)
     linked = n[mask].sum()
     total_true = matches.sum(axis=1)
-    p = linked_true / linked if linked else np.zeros(draws)
-    r = np.divide(
-        linked_true, total_true, out=np.zeros(draws), where=total_true > 0
+    p = linked_true / linked if linked else numpy.zeros(draws)
+    r = numpy.divide(
+        linked_true, total_true, out=numpy.zeros(draws), where=total_true > 0
     )
     point_rate = (k + 0.5) / (t + 1.0)
     point_true = point_rate * n
@@ -554,8 +556,8 @@ def stratified_estimate(
     point_r = (
         point_true[mask].sum() / point_true.sum() if point_true.sum() else 0.0
     )
-    lo, hi = np.percentile(p, [2.5, 97.5])
-    rlo, rhi = np.percentile(r, [2.5, 97.5])
+    lo, hi = numpy.percentile(p, [2.5, 97.5])
+    rlo, rhi = numpy.percentile(r, [2.5, 97.5])
     return Estimate(
         (float(point_p), float(lo), float(hi)),
         (float(point_r), float(rlo), float(rhi)),
@@ -623,7 +625,7 @@ class Resolution:
 
 
 def resolve(
-    records: pd.DataFrame,
+    records: pandas.DataFrame,
     fields: Sequence[Field],
     passes: Sequence[Pass],
     labeler: Labeler | None = None,
@@ -663,8 +665,8 @@ def resolve(
     if not pairs:
         model = Model(
             0.0,
-            np.ones((len(fields), LEVELS)),
-            np.ones((len(fields), LEVELS)),
+            numpy.ones((len(fields), LEVELS)),
+            numpy.ones((len(fields), LEVELS)),
             0,
         )
         return Resolution(
@@ -697,7 +699,7 @@ def resolve(
         tier = qualification.Tier.ATTESTED
     else:
         posterior_odds = (
-            2.0 ** np.clip(weights, -60.0, 60.0)
+            2.0 ** numpy.clip(weights, -60.0, 60.0)
             * model.prior
             / (1.0 - model.prior)
         )
@@ -722,7 +724,7 @@ def resolve(
     )
 
 
-def lowest_weight(weights: np.ndarray, keep: np.ndarray) -> float:
+def lowest_weight(weights: numpy.ndarray, keep: numpy.ndarray) -> float:
     """Finds the smallest weight among selected pairs.
 
     Args:

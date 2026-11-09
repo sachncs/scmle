@@ -6,13 +6,13 @@ Regenerate with SCMLE_WRITE_GOLDEN=1 only after a reviewed change.
 
 from pathlib import Path
 
-import numpy as np
+import numpy
 import pytest
 
 from scmle.evaluation import conformal
 from scmle.evaluation import coverage
 from scmle.evaluation import ipcw
-from scmle.evaluation import proper_scores as scores
+from scmle.evaluation import proper_scores
 from scmle.evaluation import reconcile
 from tests.unit import golden
 
@@ -20,7 +20,7 @@ FIXTURE = Path(__file__).parents[1] / "fixtures" / "evaluation_golden.json"
 
 
 def case_conformal():
-    rng = np.random.default_rng(0)
+    rng = numpy.random.default_rng(0)
     predicted = rng.normal(size=300)
     observed = predicted + rng.normal(size=300)
     regression = conformal.ConformalCalibrator.for_regression(
@@ -29,38 +29,43 @@ def case_conformal():
     classes = ["a", "b", "c"]
     labels = rng.choice(classes, 300)
     logits = rng.normal(size=(300, 3))
-    probabilities = np.exp(logits) / np.exp(logits).sum(axis=1, keepdims=True)
+    probabilities = numpy.exp(logits) / numpy.exp(logits).sum(
+        axis=1, keepdims=True
+    )
     classification = conformal.ConformalCalibrator.for_classification(
         labels, probabilities, classes
     )
-    new = np.linspace(-1, 1, 5)
+    new = numpy.linspace(-1, 1, 5)
     return {
         "finite": [
             conformal.finite_sample_quantile(observed, c)
             for c in (0.5, 0.9, 0.999)
         ],
         "weighted": conformal.weighted_quantile(
-            np.arange(1.0, 9.0), np.array([1, 2, 1, 2, 1, 2, 1, 2.0]), 1.5, 0.7
+            numpy.arange(1.0, 9.0),
+            numpy.array([1, 2, 1, 2, 1, 2, 1, 2.0]),
+            1.5,
+            0.7,
         ),
         "margins": conformal.weighted_margins(
-            np.arange(1.0, 9.0),
-            np.array([1, 2, 1, 2, 1, 2, 1, 2.0]),
-            np.array([0.5, 1.5, 3.0]),
+            numpy.arange(1.0, 9.0),
+            numpy.array([1, 2, 1, 2, 1, 2, 1, 2.0]),
+            numpy.array([0.5, 1.5, 3.0]),
             0.7,
         ),
         "cv_plus": conformal.cv_plus_bounds(
-            np.arange(12.0).reshape(3, 4),
-            np.array([0, 1, 2, 3, 0, 1, 2, 3, 0, 1]),
-            np.arange(1.0, 11.0),
+            numpy.arange(12.0).reshape(3, 4),
+            numpy.array([0, 1, 2, 3, 0, 1, 2, 3, 0, 1]),
+            numpy.arange(1.0, 11.0),
             0.8,
         ),
         "one": conformal.one_row_per_entity(
-            ["a", "b", "a", "c", "b"], np.random.default_rng(1)
+            ["a", "b", "a", "c", "b"], numpy.random.default_rng(1)
         ),
         "margin": [regression.margin(c) for c in (0.5, 0.9)],
         "interval": regression.interval(new, 0.8),
         "weighted_interval": regression.weighted_interval(
-            new, np.ones(300), np.array([1, 2, 1, 2, 1.0]), 0.8
+            new, numpy.ones(300), numpy.array([1, 2, 1, 2, 1.0]), 0.8
         ),
         "class_margins": classification.class_margins(0.8),
         "thin": classification.thin_classes(0.99),
@@ -71,7 +76,7 @@ def case_conformal():
 
 
 def case_coverage():
-    rng = np.random.default_rng(2)
+    rng = numpy.random.default_rng(2)
     covered = rng.random(400) < 0.85
     widths = rng.random(400) + 1
     labels = rng.choice(["a", "b", "c"], 400)
@@ -98,37 +103,39 @@ def case_coverage():
 
 
 def case_scores():
-    rng = np.random.default_rng(3)
+    rng = numpy.random.default_rng(3)
     truth = rng.normal(size=50)
     median = truth + rng.normal(scale=0.5, size=50)
     low = median - 1
     high = median + 1
-    history = np.cumsum(rng.normal(size=60))
+    history = numpy.cumsum(rng.normal(size=60))
     levels = [0.1, 0.5, 0.9]
     return {
-        "pinball": [scores.pinball_loss(truth, median, q) for q in levels],
-        "interval": scores.interval_score(truth, low, high, 0.2),
-        "wis": scores.weighted_interval_score(
+        "pinball": [
+            proper_scores.pinball_loss(truth, median, q) for q in levels
+        ],
+        "interval": proper_scores.interval_score(truth, low, high, 0.2),
+        "wis": proper_scores.weighted_interval_score(
             truth, median, {0.2: (low, high), 0.5: (low - 1, high + 1)}
         ),
-        "crps": scores.crps_from_quantiles(
+        "crps": proper_scores.crps_from_quantiles(
             truth,
-            np.column_stack([median - 1, median, median + 1.5]),
+            numpy.column_stack([median - 1, median, median + 1.5]),
             levels,
         ),
-        "scale": [scores.insample_scale(history, s) for s in (1, 4)],
-        "mase": [scores.mase(truth, median, history, s) for s in (1, 4)],
+        "scale": [proper_scores.insample_scale(history, s) for s in (1, 4)],
+        "mase": [proper_scores.mase(truth, median, history, s) for s in (1, 4)],
     }
 
 
 def case_ipcw():
-    rng = np.random.default_rng(4)
+    rng = numpy.random.default_rng(4)
     n = 200
     x = rng.normal(size=(n, 2))
-    time = rng.exponential(1.0, n) * np.exp(-0.3 * x[:, 0])
+    time = rng.exponential(1.0, n) * numpy.exp(-0.3 * x[:, 0])
     censor = rng.exponential(1.5, n)
     event = (time <= censor).astype(float)
-    observed = np.minimum(time, censor)
+    observed = numpy.minimum(time, censor)
     risk = x[:, 0]
     marginal = ipcw.censoring_weights(observed, event)
     covariate = ipcw.censoring_weights(observed, event, x, floor=0.1)
@@ -146,8 +153,8 @@ def case_ipcw():
 
 
 def case_reconcile():
-    rng = np.random.default_rng(5)
-    summing = np.array(
+    rng = numpy.random.default_rng(5)
+    summing = numpy.array(
         [[1, 1, 1], [1, 1, 0], [0, 0, 1], [1, 0, 0], [0, 1, 0]], dtype=float
     )
     residuals = rng.normal(size=(40, 5)) @ rng.normal(size=(5, 5)) * 0.3
@@ -157,7 +164,7 @@ def case_reconcile():
         "bottom_up": reconcile.bottom_up(base[:, 2:], summing),
         "covariance": covariance,
         "mint": reconcile.mint(base, summing, covariance),
-        "mint_eye": reconcile.mint(base, summing, np.eye(5)),
+        "mint_eye": reconcile.mint(base, summing, numpy.eye(5)),
         "residual": [
             reconcile.coherence_residual(base, summing),
             reconcile.coherence_residual(

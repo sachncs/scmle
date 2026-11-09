@@ -29,11 +29,11 @@ import enum
 import json
 from typing import Any
 
-import pandas as pd
+import pandas
 
 from scmle.contracts import errors
 from scmle.data.store import objectstore
-from scmle.data.store import snapshot as snapshot_module
+from scmle.data.store import snapshot
 
 QUARANTINE_PREFIX = "quarantine"
 QUALITY_PREFIX = "quality"
@@ -171,8 +171,8 @@ class GateResult:
         report: The gate report.
     """
 
-    frame: pd.DataFrame
-    quarantined: pd.DataFrame
+    frame: pandas.DataFrame
+    quarantined: pandas.DataFrame
     report: GateReport
 
 
@@ -204,9 +204,9 @@ class Rule(abc.ABC):
     @abc.abstractmethod
     def evaluate(
         self,
-        frame: pd.DataFrame,
-        record: snapshot_module.SnapshotRecord,
-        contract: snapshot_module.DataContract,
+        frame: pandas.DataFrame,
+        record: snapshot.SnapshotRecord,
+        contract: snapshot.DataContract,
     ) -> Finding:
         """Checks the data.
 
@@ -233,7 +233,7 @@ class Rule(abc.ABC):
             self.name, self.policy, ok, 0 if ok else 1, False, (), detail
         )
 
-    def row_finding(self, bad: pd.Series, detail: str) -> Finding:
+    def row_finding(self, bad: pandas.Series, detail: str) -> Finding:
         """Builds a finding about the rows where `bad` is true.
 
         Args:
@@ -258,9 +258,9 @@ class SchemaRule(Rule):
 
     def evaluate(
         self,
-        frame: pd.DataFrame,
-        record: snapshot_module.SnapshotRecord,
-        contract: snapshot_module.DataContract,
+        frame: pandas.DataFrame,
+        record: snapshot.SnapshotRecord,
+        contract: snapshot.DataContract,
     ) -> Finding:
         """Compares the frame's schema with the contract's.
 
@@ -284,9 +284,9 @@ class FreshnessRule(Rule):
 
     def evaluate(
         self,
-        frame: pd.DataFrame,
-        record: snapshot_module.SnapshotRecord,
-        contract: snapshot_module.DataContract,
+        frame: pandas.DataFrame,
+        record: snapshot.SnapshotRecord,
+        contract: snapshot.DataContract,
     ) -> Finding:
         """Checks the snapshot's age against the contract's limit.
 
@@ -299,7 +299,7 @@ class FreshnessRule(Rule):
             A dataset-level finding that fails only when the record's freshness
             is `stale`; its detail gives the age and the limit.
         """
-        stale = record.freshness == snapshot_module.STALE
+        stale = record.freshness == snapshot.STALE
         return self.dataset_finding(
             not stale,
             f"{record.age_seconds:.0f}s old, limit {record.max_age_seconds}s",
@@ -323,9 +323,9 @@ class MinRowsRule(Rule):
 
     def evaluate(
         self,
-        frame: pd.DataFrame,
-        record: snapshot_module.SnapshotRecord,
-        contract: snapshot_module.DataContract,
+        frame: pandas.DataFrame,
+        record: snapshot.SnapshotRecord,
+        contract: snapshot.DataContract,
     ) -> Finding:
         """Checks the number of rows.
 
@@ -363,9 +363,9 @@ class NullFractionRule(Rule):
 
     def evaluate(
         self,
-        frame: pd.DataFrame,
-        record: snapshot_module.SnapshotRecord,
-        contract: snapshot_module.DataContract,
+        frame: pandas.DataFrame,
+        record: snapshot.SnapshotRecord,
+        contract: snapshot.DataContract,
     ) -> Finding:
         """Checks the fraction of nulls in the column.
 
@@ -407,9 +407,9 @@ class NoNullsRule(Rule):
 
     def evaluate(
         self,
-        frame: pd.DataFrame,
-        record: snapshot_module.SnapshotRecord,
-        contract: snapshot_module.DataContract,
+        frame: pandas.DataFrame,
+        record: snapshot.SnapshotRecord,
+        contract: snapshot.DataContract,
     ) -> Finding:
         """Checks that the column has no nulls.
 
@@ -437,9 +437,9 @@ class UniqueKeyRule(Rule):
 
     def evaluate(
         self,
-        frame: pd.DataFrame,
-        record: snapshot_module.SnapshotRecord,
-        contract: snapshot_module.DataContract,
+        frame: pandas.DataFrame,
+        record: snapshot.SnapshotRecord,
+        contract: snapshot.DataContract,
     ) -> Finding:
         """Checks that no key repeats.
 
@@ -490,9 +490,9 @@ class RangeRule(Rule):
 
     def evaluate(
         self,
-        frame: pd.DataFrame,
-        record: snapshot_module.SnapshotRecord,
-        contract: snapshot_module.DataContract,
+        frame: pandas.DataFrame,
+        record: snapshot.SnapshotRecord,
+        contract: snapshot.DataContract,
     ) -> Finding:
         """Checks that values lie within the bounds, which are inclusive.
 
@@ -511,8 +511,8 @@ class RangeRule(Rule):
         """
         if self.column not in frame.columns:
             return self.dataset_finding(False, f"no column {self.column}")
-        values = pd.to_numeric(frame[self.column], errors="coerce")
-        bad = pd.Series(False, index=values.index)
+        values = pandas.to_numeric(frame[self.column], errors="coerce")
+        bad = pandas.Series(False, index=values.index)
         if self.minimum is not None:
             bad |= values < self.minimum
         if self.maximum is not None:
@@ -544,9 +544,9 @@ class AllowedValuesRule(Rule):
 
     def evaluate(
         self,
-        frame: pd.DataFrame,
-        record: snapshot_module.SnapshotRecord,
-        contract: snapshot_module.DataContract,
+        frame: pandas.DataFrame,
+        record: snapshot.SnapshotRecord,
+        contract: snapshot.DataContract,
     ) -> Finding:
         """Checks that values belong to the declared set.
 
@@ -626,9 +626,9 @@ class QualityGate:
 
     def run(
         self,
-        frame: pd.DataFrame,
-        record: snapshot_module.SnapshotRecord,
-        contract: snapshot_module.DataContract,
+        frame: pandas.DataFrame,
+        record: snapshot.SnapshotRecord,
+        contract: snapshot.DataContract,
         stage: Stage,
     ) -> GateResult:
         """Checks the data for a stage.
@@ -747,8 +747,8 @@ class QualityGate:
     def persist(
         self,
         report: GateReport,
-        held: pd.DataFrame,
-        record: snapshot_module.SnapshotRecord,
+        held: pandas.DataFrame,
+        record: snapshot.SnapshotRecord,
         whole_snapshot: bool,
     ) -> None:
         """Writes the report, quarantined rows and the snapshot marker.

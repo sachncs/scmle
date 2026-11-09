@@ -1,11 +1,11 @@
 import json
 import socket
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
-from benchmarks.qualification import framing_certify as cert
+from benchmarks.qualification import framing_certify
 from scmle.data.charter import contracts
 from scmle.data.framing import costs
 from scmle.data.framing import draft
@@ -19,13 +19,13 @@ MODEL = costs.DecisionCostModel(
 
 
 def table(n=400, seed=0):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     y = (rng.random(n) < 0.3).astype(int)
-    return pd.DataFrame(
+    return pandas.DataFrame(
         {
-            "customer_id": np.arange(n),
-            "as_of": pd.date_range("2024-01-01", periods=n, freq="h"),
-            "resolved_at": pd.date_range("2024-03-01", periods=n, freq="h"),
+            "customer_id": numpy.arange(n),
+            "as_of": pandas.date_range("2024-01-01", periods=n, freq="h"),
+            "resolved_at": pandas.date_range("2024-03-01", periods=n, freq="h"),
             "region": rng.choice(["n", "s"], n),
             "churn": y,
             "current_rule": (rng.random(n) < 0.3).astype(int),
@@ -77,7 +77,7 @@ def test_unfillable_critical_slot_refuses_with_a_closed_question():
 
 def test_moment_after_target_time_is_a_blocking_check():
     frame = table()
-    frame["resolved_at"] = frame["as_of"] - pd.Timedelta(days=1)
+    frame["resolved_at"] = frame["as_of"] - pandas.Timedelta(days=1)
     result = draft.frame(
         request(frame, target_time_column="resolved_at"), frame
     )
@@ -117,9 +117,9 @@ def test_causal_wording_sets_the_kind_only():
 
 
 def test_cost_question_is_raised_only_when_it_changes_the_verdict():
-    assert cert.omission_asks(10_000, True, False)
-    assert not cert.omission_asks(10_000, False, False)
-    assert not cert.omission_asks(10_000, True, True)
+    assert framing_certify.omission_asks(10_000, True, False)
+    assert not framing_certify.omission_asks(10_000, False, False)
+    assert not framing_certify.omission_asks(10_000, True, True)
 
 
 def test_artifacts_are_written(tmp_path):
@@ -247,6 +247,6 @@ def test_replay_sampler_runs_out():
 
 
 def test_schema_gate_rejects_malformed_charter_records():
-    found = cert.fuzz_rows(1000)
+    found = framing_certify.fuzz_rows(1000)
     assert found["accepted"] == 0
     assert contracts.template()["unit"] == ""

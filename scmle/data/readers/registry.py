@@ -10,7 +10,7 @@ from typing import Any
 from typing import Self
 
 from scmle import durability
-from scmle.contracts import data as data_contracts
+from scmle.contracts import data
 from scmle.data.readers import connectors
 
 
@@ -74,7 +74,7 @@ class SourceSnapshot:
     @classmethod
     def from_manifest(
         cls,
-        manifest: data_contracts.DatasetManifest,
+        manifest: data.DatasetManifest,
         schema: Mapping[str, str],
         captured_at: str,
     ) -> Self:

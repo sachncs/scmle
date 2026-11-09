@@ -9,8 +9,8 @@ from itertools import combinations
 from typing import Any
 from typing import Self
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from scipy import stats
 from sklearn import base
 from sklearn import linear_model
@@ -53,7 +53,7 @@ class FeatureConstructor(base.TransformerMixin, base.BaseEstimator):
         self.columns = columns
         self.top = top
 
-    def fit(self, features: pd.DataFrame, target: Any = None) -> Self:
+    def fit(self, features: pandas.DataFrame, target: Any = None) -> Self:
         """Chooses the column pairs from the training fold.
 
         No pairs are chosen when there is no target, fewer than `MIN_ROWS`
@@ -69,21 +69,27 @@ class FeatureConstructor(base.TransformerMixin, base.BaseEstimator):
         self.pairs_: list[tuple[str, str]] = []
         usable = [c for c in self.columns if c in features.columns]
         if target is not None and len(features) >= MIN_ROWS and usable:
-            outcome = pd.Series(np.asarray(target)).astype("category").cat.codes
+            outcome = (
+                pandas.Series(numpy.asarray(target))
+                .astype("category")
+                .cat.codes
+            )
             scored = []
             for column in usable:
-                values = pd.to_numeric(features[column]).reset_index(drop=True)
+                values = pandas.to_numeric(features[column]).reset_index(
+                    drop=True
+                )
                 if values.nunique() < 2:
                     continue
                 rho = stats.spearmanr(values, outcome, nan_policy="omit")[0]
-                scored.append((abs(float(np.nan_to_num(rho))), column))
+                scored.append((abs(float(numpy.nan_to_num(rho))), column))
             scored.sort(key=lambda item: (-item[0], item[1]))
             chosen = [entry[1] for entry in scored[: self.top]]
             self.pairs_ = list(combinations(sorted(chosen), 2))
-        self.feature_names_in_ = np.asarray(features.columns, dtype=object)
+        self.feature_names_in_ = numpy.asarray(features.columns, dtype=object)
         return self
 
-    def transform(self, features: pd.DataFrame) -> pd.DataFrame:
+    def transform(self, features: pandas.DataFrame) -> pandas.DataFrame:
         """Returns the input with the constructed columns appended.
 
         A ratio is missing (NaN) where the denominator is below `EPSILON`
@@ -98,15 +104,17 @@ class FeatureConstructor(base.TransformerMixin, base.BaseEstimator):
         """
         built = {}
         for left, right in self.pairs_:
-            a = pd.to_numeric(features[left]).to_numpy(dtype=float)
-            b = pd.to_numeric(features[right]).to_numpy(dtype=float)
+            a = pandas.to_numeric(features[left]).to_numpy(dtype=float)
+            b = pandas.to_numeric(features[right]).to_numpy(dtype=float)
             built[f"{PREFIX}{left}__minus__{right}"] = a - b
-            safe = np.where(np.abs(b) < EPSILON, np.nan, b)
+            safe = numpy.where(numpy.abs(b) < EPSILON, numpy.nan, b)
             built[f"{PREFIX}{left}__over__{right}"] = a / safe
-        extra = pd.DataFrame(built, index=features.index)
-        return pd.concat([features, extra], axis=1)
+        extra = pandas.DataFrame(built, index=features.index)
+        return pandas.concat([features, extra], axis=1)
 
-    def get_feature_names_out(self, input_features: Any = None) -> np.ndarray:
+    def get_feature_names_out(
+        self, input_features: Any = None
+    ) -> numpy.ndarray:
         """Names of the output columns.
 
         Args:
@@ -125,7 +133,7 @@ class FeatureConstructor(base.TransformerMixin, base.BaseEstimator):
                 f"{PREFIX}{left}__minus__{right}",
                 f"{PREFIX}{left}__over__{right}",
             ]
-        return np.asarray(names, dtype=object)
+        return numpy.asarray(names, dtype=object)
 
 
 class SparseSelector(base.TransformerMixin, base.BaseEstimator):
@@ -178,7 +186,7 @@ class SparseSelector(base.TransformerMixin, base.BaseEstimator):
         model: Any
         if self.classification:
             # liblinear is fast but cannot fit three or more classes.
-            multiclass = len(np.unique(target)) > BINARY_CLASSES
+            multiclass = len(numpy.unique(target)) > BINARY_CLASSES
             model = linear_model.LogisticRegression(
                 l1_ratio=1.0,
                 solver="saga" if multiclass else "liblinear",
@@ -190,18 +198,20 @@ class SparseSelector(base.TransformerMixin, base.BaseEstimator):
                 alpha=self.alpha, random_state=self.random_state
             )
         model.fit(features, target)
-        weight = np.abs(np.atleast_2d(model.coef_)).max(axis=0)
+        weight = numpy.abs(numpy.atleast_2d(model.coef_)).max(axis=0)
         self.support_ = weight > ZERO
         if not self.support_.any():
             fallback = linear_model.Ridge(alpha=1.0).fit(
                 features,
-                np.asarray(
-                    pd.Series(np.asarray(target)).astype("category").cat.codes
+                numpy.asarray(
+                    pandas.Series(numpy.asarray(target))
+                    .astype("category")
+                    .cat.codes
                 )
                 if self.classification
                 else target,
             )
-            self.support_[int(np.argmax(np.abs(fallback.coef_)))] = True
+            self.support_[int(numpy.argmax(numpy.abs(fallback.coef_)))] = True
         self.n_features_in_ = len(self.support_)
         return self
 
@@ -216,7 +226,9 @@ class SparseSelector(base.TransformerMixin, base.BaseEstimator):
         """
         return features[:, self.support_]
 
-    def get_feature_names_out(self, input_features: Any = None) -> np.ndarray:
+    def get_feature_names_out(
+        self, input_features: Any = None
+    ) -> numpy.ndarray:
         """Names of the kept columns.
 
         Args:
@@ -225,5 +237,5 @@ class SparseSelector(base.TransformerMixin, base.BaseEstimator):
         Returns:
             The names of the columns kept in fit, as an object array.
         """
-        names = np.asarray(input_features, dtype=object)
+        names = numpy.asarray(input_features, dtype=object)
         return names[self.support_]

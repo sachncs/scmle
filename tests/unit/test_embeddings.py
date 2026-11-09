@@ -6,8 +6,8 @@ import subprocess
 import sys
 import textwrap
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 from sklearn import linear_model
 from sklearn import metrics
@@ -30,7 +30,7 @@ TEST_FOOD = ["pear", "mango", "loaf"]
 def labelled(vehicles, food, copies=10):
     texts = (vehicles + food) * copies
     labels = ([1] * len(vehicles) + [0] * len(food)) * copies
-    return pd.Series(texts), np.array(labels)
+    return pandas.Series(texts), numpy.array(labels)
 
 
 def test_the_framework_process_never_imports_torch():
@@ -62,8 +62,8 @@ def test_identical_strings_are_encoded_once():
 
     assert model.encoded_last_ == 0
     assert first.shape == again.shape == (80, model.width_)
-    np.testing.assert_allclose(first, again)
-    assert np.allclose(first[0], first[1])
+    numpy.testing.assert_allclose(first, again)
+    assert numpy.allclose(first[0], first[1])
 
 
 def test_embeddings_generalise_to_wording_tfidf_never_saw():
@@ -87,7 +87,7 @@ def test_embeddings_generalise_to_wording_tfidf_never_saw():
 
 def test_an_unavailable_model_falls_back_to_terms_and_says_so(caplog):
     caplog.set_level(logging.WARNING)
-    texts = pd.Series(["red apple pie", "blue car wash"] * 5)
+    texts = pandas.Series(["red apple pie", "blue car wash"] * 5)
 
     model = embedding.TextEmbedder("no-such-org/no-such-model").fit(texts)
 

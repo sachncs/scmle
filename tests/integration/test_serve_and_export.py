@@ -7,25 +7,27 @@ import types
 import urllib.error
 import urllib.request
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 import support
 
 from scmle import cli
 from scmle.artifacts import bundle as bundle_module
-from scmle.contracts import data as data_contracts
+from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.data.curation import preprocessing
 from scmle.inference import serving
-from scmle.models import registry as registry_module
+from scmle.models import registry
 
 
 @pytest.fixture(scope="module")
 def saved(tmp_path_factory):
-    rng = np.random.default_rng(0)
-    frame = pd.DataFrame({"a": rng.normal(size=400), "b": rng.normal(size=400)})
+    rng = numpy.random.default_rng(0)
+    frame = pandas.DataFrame(
+        {"a": rng.normal(size=400), "b": rng.normal(size=400)}
+    )
     frame["y"] = (frame.a + frame.b > 0).astype(int)
     root = tmp_path_factory.mktemp("served")
     result = support.make_project(
@@ -245,15 +247,15 @@ def test_the_serve_command_starts_a_server_for_a_trusted_bundle(
 @pytest.fixture(scope="module")
 def exportable(tmp_path_factory):
     """A saved bundle of a model family the ONNX converter supports."""
-    rng = np.random.default_rng(1)
-    frame = pd.DataFrame({"a": rng.normal(size=300), "b": rng.normal(size=300)})
+    rng = numpy.random.default_rng(1)
+    frame = pandas.DataFrame(
+        {"a": rng.normal(size=300), "b": rng.normal(size=300)}
+    )
     target = (frame.a + frame.b > 0).astype(int)
-    plan = data_contracts.FeaturePlan(("a", "b"), ())
+    plan = data.FeaturePlan(("a", "b"), ())
     fitted = preprocessing.build_pipeline(
         plan,
-        registry_module.ModelRegistry.with_builtins().get(
-            "logistic_regression"
-        ),
+        registry.ModelRegistry.with_builtins().get("logistic_regression"),
         tasks.TaskType.BINARY,
         0,
     ).fit(frame, target)

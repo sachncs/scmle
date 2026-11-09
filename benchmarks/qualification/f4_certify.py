@@ -33,8 +33,8 @@ import math
 from pathlib import Path
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from sklearn.datasets import load_breast_cancer
 
 from benchmarks.qualification import certify
@@ -65,7 +65,7 @@ GAP_RATE = 0.1
 VERSIONS = 3
 
 
-def breast_cancer() -> pd.DataFrame:
+def breast_cancer() -> pandas.DataFrame:
     """The table the leak plants go into.
 
     Returns:
@@ -75,7 +75,9 @@ def breast_cancer() -> pd.DataFrame:
     return load_breast_cancer(as_frame=True).frame.reset_index(drop=True)
 
 
-def plant_leak(frame: pd.DataFrame, defect: str, seed: int) -> pd.Series:
+def plant_leak(
+    frame: pandas.DataFrame, defect: str, seed: int
+) -> pandas.Series:
     """Adds one planted leak column and returns it.
 
     Args:
@@ -91,7 +93,7 @@ def plant_leak(frame: pd.DataFrame, defect: str, seed: int) -> pd.Series:
         values = frame[TARGET].to_numpy(dtype=float) + rng.normal(
             scale=THRESHOLD_NOISE, size=len(frame)
         )
-        return pd.Series(values, index=frame.index, name=defect)
+        return pandas.Series(values, index=frame.index, name=defect)
     kinds = {
         "leak_copy": ("copy", 0.1),
         "leak_noisy_copy": ("noisy_copy", NOISY_COPY_NOISE),
@@ -105,7 +107,7 @@ def plant_leak(frame: pd.DataFrame, defect: str, seed: int) -> pd.Series:
 
 
 def leak_detected(
-    feature: pd.Series, outcome: pd.Series, run_seed: int
+    feature: pandas.Series, outcome: pandas.Series, run_seed: int
 ) -> tuple[bool, float]:
     """(suspect, permutation p-value) of one feature.
 
@@ -121,7 +123,7 @@ def leak_detected(
     cfg = dataclasses.replace(leakage.CERTIFIED, run_seed=run_seed)
     result = leakage.assess_feature(
         feature,
-        pd.DataFrame(index=feature.index),
+        pandas.DataFrame(index=feature.index),
         outcome,
         "classification",
         cfg,
@@ -269,7 +271,7 @@ def certify_leakage(workers: int = 1) -> tuple[Any, dict[str, Any]]:
     return cert, measurements
 
 
-def asof_world(seed: int) -> tuple[pd.DataFrame, pd.DataFrame]:
+def asof_world(seed: int) -> tuple[pandas.DataFrame, pandas.DataFrame]:
     """A synthetic table and change log whose stored values are correct.
 
     Each of `LOG_ROWS` entities has `VERSIONS` log entries at increasing
@@ -284,25 +286,27 @@ def asof_world(seed: int) -> tuple[pd.DataFrame, pd.DataFrame]:
         value) and the change log (`key`, `written_at`, `value`).
     """
     rng = randomness.component_rng(seed, "f4.asof.world", 0)
-    keys = np.arange(LOG_ROWS)
-    times = np.sort(rng.uniform(0.0, 100.0, size=(LOG_ROWS, VERSIONS)), axis=1)
+    keys = numpy.arange(LOG_ROWS)
+    times = numpy.sort(
+        rng.uniform(0.0, 100.0, size=(LOG_ROWS, VERSIONS)), axis=1
+    )
     values = rng.integers(0, 10**6, size=(LOG_ROWS, VERSIONS))
     moment = rng.uniform(times[:, 0] + 1e-3, times[:, -1] - 1e-3)
-    log = pd.DataFrame(
+    log = pandas.DataFrame(
         {
-            "key": np.repeat(keys, VERSIONS),
+            "key": numpy.repeat(keys, VERSIONS),
             "written_at": times.ravel(),
             "value": values.ravel(),
         }
     )
-    rows = pd.DataFrame({"key": keys, "moment": moment})
+    rows = pandas.DataFrame({"key": keys, "moment": moment})
     index = (times <= moment[:, None]).sum(axis=1) - 1
     rows["stored"] = values[keys, index]
     rows["backfill"] = values[:, -1]
     return rows, log
 
 
-def asof_detector(log: pd.DataFrame) -> certify.Detector:
+def asof_detector(log: pandas.DataFrame) -> certify.Detector:
     """Row detector bound to a change log.
 
     Args:
@@ -313,7 +317,7 @@ def asof_detector(log: pd.DataFrame) -> certify.Detector:
         value reconstructed from the log.
     """
 
-    def detect(frame: pd.DataFrame) -> pd.Series:
+    def detect(frame: pandas.DataFrame) -> pandas.Series:
         """Flags rows whose stored value does not match the log.
 
         Args:
@@ -329,7 +333,7 @@ def asof_detector(log: pd.DataFrame) -> certify.Detector:
     return detect
 
 
-def overwrite_plan(rows: pd.DataFrame) -> certify.DefectPlan:
+def overwrite_plan(rows: pandas.DataFrame) -> certify.DefectPlan:
     """Plants overwrites by replacing stored values with the latest one.
 
     Args:
@@ -339,7 +343,7 @@ def overwrite_plan(rows: pd.DataFrame) -> certify.DefectPlan:
         The plan for the as-of reconstruction defect.
     """
 
-    def plant(frame: pd.DataFrame, seed: int) -> inject.Injection:
+    def plant(frame: pandas.DataFrame, seed: int) -> inject.Injection:
         """Overwrites a random tenth of the stored values.
 
         Args:
@@ -381,7 +385,7 @@ def certify_asof() -> certificates.DetectorCertificate:
     )
 
 
-def gap_frame(seed: int) -> pd.DataFrame:
+def gap_frame(seed: int) -> pandas.DataFrame:
     """Quantities that all reconcile, a third by a correct explanation.
 
     Args:
@@ -393,12 +397,12 @@ def gap_frame(seed: int) -> pd.DataFrame:
     """
     rng = randomness.component_rng(seed, "f4.gap.world", 0)
     source = rng.integers(1_000, 100_000, size=LOG_ROWS).astype(float)
-    explained = np.zeros(LOG_ROWS)
+    explained = numpy.zeros(LOG_ROWS)
     pick = rng.random(LOG_ROWS) < 1 / 3
-    explained[pick] = -np.round(
+    explained[pick] = -numpy.round(
         source[pick] * rng.uniform(0.01, 0.1, pick.sum())
     )
-    return pd.DataFrame(
+    return pandas.DataFrame(
         {
             "source": source,
             "extract": source + explained,
@@ -407,7 +411,7 @@ def gap_frame(seed: int) -> pd.DataFrame:
     )
 
 
-def gap_detector(frame: pd.DataFrame) -> pd.Series:
+def gap_detector(frame: pandas.DataFrame) -> pandas.Series:
     """Row detector: True where the reconciliation has an unexplained gap.
 
     Args:
@@ -442,7 +446,7 @@ def gap_detector(frame: pd.DataFrame) -> pd.Series:
             reconciliation.reconcile_item(item).status
             is reconciliation.Status.UNEXPLAINED
         )
-    return pd.Series(flags, index=frame.index, dtype=bool)
+    return pandas.Series(flags, index=frame.index, dtype=bool)
 
 
 def gap_plan() -> certify.DefectPlan:
@@ -452,7 +456,7 @@ def gap_plan() -> certify.DefectPlan:
         The plan for the reconciliation defect.
     """
 
-    def plant(frame: pd.DataFrame, seed: int) -> inject.Injection:
+    def plant(frame: pandas.DataFrame, seed: int) -> inject.Injection:
         """Cuts the extract of a random tenth of the rows.
 
         Args:
@@ -464,7 +468,7 @@ def gap_plan() -> certify.DefectPlan:
         """
         rng = randomness.component_rng(seed, "f4.gap.plant", 0)
         pick = rng.random(len(frame)) < GAP_RATE
-        cut = np.round(
+        cut = numpy.round(
             frame["source"].to_numpy() * rng.uniform(0.01, 0.1, len(frame))
         )
         out = frame.copy()

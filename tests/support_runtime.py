@@ -15,7 +15,7 @@ from scmle.deploy import contract
 from scmle.deploy import control
 from scmle.deploy import observation
 from scmle.governance import registry
-from tests import support_release as sr
+from tests import support_release
 
 OLD = "sha256:" + "a" * 64
 NEW = "sha256:" + "b" * 64
@@ -77,7 +77,7 @@ class MemoryPlane(control.ControlPlane):
                 observation.Traffic(name, percent)
                 for name, percent in self.served.items()
             ),
-            observed_at=sr.NOW,
+            observed_at=support_release.NOW,
             revisions=tuple(self.digests.items()),
         )
 
@@ -110,7 +110,7 @@ def make_registry(root, versions=(1, 2, 3), signed=True):
         record = registry.VersionRecord(
             model="churn",
             version=number,
-            registered_at=sr.NOW,
+            registered_at=support_release.NOW,
             metrics={},
             config={},
             run_id=f"run-{number}",
@@ -127,4 +127,6 @@ def make_registry(root, versions=(1, 2, 3), signed=True):
 
 
 def approval_for(number, **changes):
-    return sr.approval(version=number, content_id=str(number) * 64, **changes)
+    return support_release.approval(
+        version=number, content_id=str(number) * 64, **changes
+    )

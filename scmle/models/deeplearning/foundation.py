@@ -10,7 +10,7 @@ This module runs only inside the PyTorch worker process.
 import importlib
 from typing import Any
 
-import numpy as np
+import numpy
 from scipy import sparse
 
 MAX_ROWS = 10000
@@ -80,14 +80,14 @@ class TabPfnEngine:
             raise ValueError("TabPFN does not support sample weights")
         if sparse.issparse(features):
             features = features.toarray()
-        matrix = np.asarray(features, dtype=np.float32)
+        matrix = numpy.asarray(features, dtype=numpy.float32)
         if len(matrix) > MAX_ROWS or matrix.shape[1] > MAX_FEATURES:
             raise ValueError(
                 f"TabPFN supports up to {MAX_ROWS} rows and {MAX_FEATURES} "
                 f"features, got {matrix.shape}"
             )
         self.train_features_ = matrix
-        self.train_target_ = np.asarray(target)
+        self.train_target_ = numpy.asarray(target)
         self.model_ = self.build().fit(matrix, self.train_target_)
         return self
 
@@ -130,7 +130,7 @@ class TabPfnEngine:
         self.train_target_ = state["train_target_"]
         self.model_ = self.build().fit(self.train_features_, self.train_target_)
 
-    def rows(self, features: Any) -> np.ndarray:
+    def rows(self, features: Any) -> numpy.ndarray:
         """Float32 matrix of the rows to score.
 
         Args:
@@ -141,7 +141,7 @@ class TabPfnEngine:
         """
         if sparse.issparse(features):
             features = features.toarray()
-        return np.asarray(features, dtype=np.float32)
+        return numpy.asarray(features, dtype=numpy.float32)
 
 
 class ClassifierEngine(TabPfnEngine):
@@ -155,9 +155,9 @@ class ClassifierEngine(TabPfnEngine):
         Returns:
             Mapping with the fitted model's `classes_`.
         """
-        return {"classes_": np.asarray(self.model_.classes_)}
+        return {"classes_": numpy.asarray(self.model_.classes_)}
 
-    def predict_proba(self, features: Any) -> np.ndarray:
+    def predict_proba(self, features: Any) -> numpy.ndarray:
         """Class probabilities.
 
         Args:
@@ -166,9 +166,9 @@ class ClassifierEngine(TabPfnEngine):
         Returns:
             Array of shape `(n_rows, n_classes)`.
         """
-        return np.asarray(self.model_.predict_proba(self.rows(features)))
+        return numpy.asarray(self.model_.predict_proba(self.rows(features)))
 
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """Most probable class.
 
         Args:
@@ -177,7 +177,7 @@ class ClassifierEngine(TabPfnEngine):
         Returns:
             Array of shape `(n_rows,)` of class labels.
         """
-        return np.asarray(self.model_.predict(self.rows(features)))
+        return numpy.asarray(self.model_.predict(self.rows(features)))
 
 
 class RegressorEngine(TabPfnEngine):
@@ -185,7 +185,7 @@ class RegressorEngine(TabPfnEngine):
 
     class_name = "TabPFNRegressor"
 
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """Predicted values.
 
         Args:
@@ -194,4 +194,4 @@ class RegressorEngine(TabPfnEngine):
         Returns:
             Array of shape `(n_rows,)`.
         """
-        return np.asarray(self.model_.predict(self.rows(features)))
+        return numpy.asarray(self.model_.predict(self.rows(features)))

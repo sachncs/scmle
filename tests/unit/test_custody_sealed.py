@@ -2,7 +2,7 @@
 
 import json
 
-import pandas as pd
+import pandas
 import pytest
 
 from scmle.contracts import errors
@@ -12,8 +12,8 @@ from scmle.data.splitting import splitters
 
 def resident(values=(1.0, 2.0, 3.0)):
     return splitters.ResidentTestSet(
-        pd.DataFrame({"a": list(values)}),
-        pd.Series([0, 1, 0]),
+        pandas.DataFrame({"a": list(values)}),
+        pandas.Series([0, 1, 0]),
         (10, 11, 12),
     )
 
@@ -114,8 +114,8 @@ def test_the_vault_refuses_a_duplicate_set_name():
 
 def test_exploration_view_holds_no_reference_to_a_sealed_set():
     view = sealed.ExplorationView(
-        features=pd.DataFrame({"a": [1.0]}),
-        target=pd.Series([0]),
+        features=pandas.DataFrame({"a": [1.0]}),
+        target=pandas.Series([0]),
         ids=(0,),
         folds=(),
         manifest_sha256="f" * 64,

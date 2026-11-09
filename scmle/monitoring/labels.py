@@ -36,8 +36,8 @@ from collections.abc import Sequence
 import dataclasses
 import enum
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from scipy import stats
 
 from scmle.contracts import qualification
@@ -125,9 +125,9 @@ class BatchEstimate:
 
 
 def classify(
-    observed: np.ndarray,
-    propensity: np.ndarray | None,
-    audit: np.ndarray | None,
+    observed: numpy.ndarray,
+    propensity: numpy.ndarray | None,
+    audit: numpy.ndarray | None,
     epsilon: float,
 ) -> Mechanism:
     """Determines the label mechanism a batch supports.
@@ -143,22 +143,24 @@ def classify(
         propensity is logged and at least `epsilon`; `audit_slice` when an audit
         slice exists and `epsilon > 0`; otherwise `unverified`.
     """
-    if bool(np.all(observed)):
+    if bool(numpy.all(observed)):
         return Mechanism.COMPLETE
     if propensity is not None and epsilon > 0.0:
-        values = np.asarray(propensity, dtype=float)
-        if np.all(np.isfinite(values)) and np.all(values >= epsilon - 1e-12):
+        values = numpy.asarray(propensity, dtype=float)
+        if numpy.all(numpy.isfinite(values)) and numpy.all(
+            values >= epsilon - 1e-12
+        ):
             return Mechanism.LOGGED_PROPENSITY
-    if audit is not None and epsilon > 0.0 and bool(np.any(audit)):
+    if audit is not None and epsilon > 0.0 and bool(numpy.any(audit)):
         return Mechanism.AUDIT_SLICE
     return Mechanism.UNVERIFIED
 
 
 def estimate_batch(
-    loss: np.ndarray,
-    observed: np.ndarray,
-    propensity: np.ndarray | None,
-    audit: np.ndarray | None,
+    loss: numpy.ndarray,
+    observed: numpy.ndarray,
+    propensity: numpy.ndarray | None,
+    audit: numpy.ndarray | None,
     epsilon: float,
     bound: float = 1.0,
     signed: bool = False,
@@ -182,20 +184,20 @@ def estimate_batch(
     Raises:
         ValueError: On misaligned inputs, or a loss outside ``[0, bound]``.
     """
-    losses = np.asarray(loss, dtype=float)
-    seen = np.asarray(observed, dtype=bool)
+    losses = numpy.asarray(loss, dtype=float)
+    seen = numpy.asarray(observed, dtype=bool)
     if losses.shape != seen.shape or losses.size == 0:
         raise ValueError("loss and observed must be aligned and non-empty")
-    if propensity is not None and np.shape(propensity) != seen.shape:
+    if propensity is not None and numpy.shape(propensity) != seen.shape:
         raise ValueError("propensity must be aligned with the cases")
-    if audit is not None and np.shape(audit) != seen.shape:
+    if audit is not None and numpy.shape(audit) != seen.shape:
         raise ValueError("audit must be aligned with the cases")
     used = losses[seen]
     floor = -bound if signed else 0.0
     if (
-        np.any(~np.isfinite(used))
-        or np.any(used < floor)
-        or np.any(used > bound)
+        numpy.any(~numpy.isfinite(used))
+        or numpy.any(used < floor)
+        or numpy.any(used > bound)
     ):
         raise ValueError("observed losses must be finite and within [0, bound]")
     mechanism = classify(seen, propensity, audit, epsilon)
@@ -209,12 +211,14 @@ def estimate_batch(
         )
     scale = bound / epsilon
     if mechanism is Mechanism.LOGGED_PROPENSITY:
-        weights = 1.0 / np.asarray(propensity, dtype=float)
-        total = float(np.sum(np.where(seen, losses, 0.0) * weights * seen))
+        weights = 1.0 / numpy.asarray(propensity, dtype=float)
+        total = float(
+            numpy.sum(numpy.where(seen, losses, 0.0) * weights * seen)
+        )
         counted = int(seen.sum())
     else:
-        slice_mask = np.asarray(audit, dtype=bool) & seen
-        total = float(np.sum(np.where(slice_mask, losses, 0.0))) / epsilon
+        slice_mask = numpy.asarray(audit, dtype=bool) & seen
+        total = float(numpy.sum(numpy.where(slice_mask, losses, 0.0))) / epsilon
         counted = int(slice_mask.sum())
     mean = total / cases
     return BatchEstimate(
@@ -242,7 +246,7 @@ class RandomizationCheck:
 
 
 def check_randomization(
-    audit: np.ndarray, rate: float, alpha: float = 0.001
+    audit: numpy.ndarray, rate: float, alpha: float = 0.001
 ) -> RandomizationCheck:
     """Tests that the audit slice's draws have the declared rate.
 
@@ -262,7 +266,7 @@ def check_randomization(
     Raises:
         ValueError: If `rate` is not strictly between 0 and 1.
     """
-    flags = np.asarray(audit, dtype=bool)
+    flags = numpy.asarray(audit, dtype=bool)
     if not 0.0 < rate < 1.0:
         raise ValueError("rate must be strictly between 0 and 1")
     result = stats.binomtest(int(flags.sum()), int(flags.size), rate)
@@ -276,8 +280,8 @@ def check_randomization(
 
 
 def bypass_test(
-    bypass_features: pd.DataFrame,
-    model_features: pd.DataFrame,
+    bypass_features: pandas.DataFrame,
+    model_features: pandas.DataFrame,
     seed: int,
     permutations: int = 199,
     alpha: float = 0.05,

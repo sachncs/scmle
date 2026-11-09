@@ -14,8 +14,8 @@ import subprocess
 import sys
 import tomllib
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 import support
 
@@ -43,15 +43,15 @@ PACKAGE = ROOT / "scmle"
 
 
 def make_frame(rows=600, seed=0):
-    rng = np.random.default_rng(seed)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    frame = pandas.DataFrame(
         {
             "a": rng.normal(size=rows),
             "b": rng.normal(size=rows),
             "c": rng.choice(["x", "y", "z"], rows),
         }
     )
-    frame.loc[::17, "a"] = np.nan
+    frame.loc[::17, "a"] = numpy.nan
     signal = frame.a.fillna(0) + 0.5 * frame.b + (frame.c == "x")
     frame["y"] = (signal + rng.normal(scale=0.5, size=rows) > 0.5).astype(int)
     return frame
@@ -126,7 +126,7 @@ def test_l15_l17_user_states_objective_framework_plans_executes_validates_docume
 
 def test_l19_conservative_when_ambiguous_and_transparent(frame, tmp_path):
     """Blocks on ambiguity; every experiment and decision is recorded."""
-    ambiguous = frame.assign(y=np.arange(len(frame)) % 5)
+    ambiguous = frame.assign(y=numpy.arange(len(frame)) % 5)
     with pytest.raises(errors.BlockedError):
         support.make_project(ambiguous, "y", output_dir=tmp_path).run()
     result = support.make_project(frame, "y", output_dir=tmp_path / "ok").run()
@@ -413,12 +413,14 @@ def test_l210_l224_module_io_matrix_invariants(run, tmp_path):
     frame = make_frame(200)
     before = frame.copy()
     tabular.build_manifest(frame, "y")
-    pd.testing.assert_frame_equal(frame, before)  # ingestion: input immutable
+    pandas.testing.assert_frame_equal(
+        frame, before
+    )  # ingestion: input immutable
     spec = project.spec
     manifest = tabular.build_manifest(frame, "y")
     task = target_module.TaskResolver(spec).resolve(frame["y"])
     profiler.DatasetProfiler(spec).profile(frame, manifest, task)
-    pd.testing.assert_frame_equal(
+    pandas.testing.assert_frame_equal(
         frame, before
     )  # profiling: no fitted state, no mutation
     split = splitters.SplitManager(spec, task).split(frame)
@@ -434,7 +436,7 @@ def test_l210_l224_module_io_matrix_invariants(run, tmp_path):
         result.save(tmp_path / "b"), trusted=True
     )
     features = frame.drop(columns="y")
-    np.testing.assert_array_equal(
+    numpy.testing.assert_array_equal(
         bundle.predict(features), result.predict(features)
     )  # parity
     with pytest.raises(errors.SchemaError):
@@ -542,7 +544,7 @@ def test_l278_l288_orchestrator_support(frame, tmp_path):
     """Retries, cancellation, budget, checkpointing, restart, failures, ordering, parallelism, isolation."""
     import shutil
 
-    from scmle.core import orchestrator as orchestrator_module
+    from scmle.core import orchestrator
 
     project = support.make_project(
         frame, "y", time_budget=300, output_dir=tmp_path
@@ -559,7 +561,7 @@ def test_l278_l288_orchestrator_support(frame, tmp_path):
     assert list(
         (first.run_dir / "trials").glob("trial_*.json")
     )  # checkpointing
-    pending = orchestrator_module.Orchestrator(project.spec, frame)
+    pending = orchestrator.Orchestrator(project.spec, frame)
     pending.cancel()
     with pytest.raises(errors.CancelledError) as caught:  # cancellation
         pending.run(tmp_path / "c")
@@ -610,15 +612,15 @@ def test_l293_l307_fingerprint_dimensions(run):
     stats = result.profile.column_statistics["a"]
     assert {"outlier_rate", "std"} <= set(stats)  # scale, outliers
     assert result.profile.dataset_statistics["shape"]["effective_samples"] > 0
-    assert columns.entropy(pd.Series(list("aabb"))) == pytest.approx(
+    assert columns.entropy(pandas.Series(list("aabb"))) == pytest.approx(
         1.0
     )  # entropy
 
 
 def test_l309_statistics_preserve_uncertainty_about_leakage():
     """Strong association is a hypothesis, not a verdict."""
-    rng = np.random.default_rng(1)
-    frame = pd.DataFrame({"x": rng.normal(size=300)})
+    rng = numpy.random.default_rng(1)
+    frame = pandas.DataFrame({"x": rng.normal(size=300)})
     frame["y"] = (frame.x > 0).astype(int)
     result = support.make_project(frame, "y", leakage_policy="warn").plan()
     findings = " ".join(result.warnings)
@@ -628,8 +630,8 @@ def test_l309_statistics_preserve_uncertainty_about_leakage():
 
 def test_l311_l321_decision_policy_examples():
     """Candidate generation rules; the planner proposes, evaluation decides."""
-    rng = np.random.default_rng(2)
-    frame = pd.DataFrame({"x": rng.normal(size=300)})
+    rng = numpy.random.default_rng(2)
+    frame = pandas.DataFrame({"x": rng.normal(size=300)})
     frame["c"] = rng.choice([f"k{i}" for i in range(200)], 300)
     frame["y"] = (rng.random(300) < 0.05).astype(int)
     plan = scmle.MLProject(frame, "y", time_budget=60).plan()
@@ -754,7 +756,9 @@ def test_l374_l393_balancing_and_augmentation(frame):
     assert "fit" in resampling.ResamplingClassifier.__dict__
     # Regression does not reuse classification resampling.
     spec = tasks.ProjectSpec(data=tasks.DataSpec(uri="x", target="y"))
-    reg = pd.DataFrame({"x": np.arange(100.0), "y": np.arange(100.0) * 2})
+    reg = pandas.DataFrame(
+        {"x": numpy.arange(100.0), "y": numpy.arange(100.0) * 2}
+    )
     profile = profiler.DatasetProfiler(spec).profile(
         reg, tabular.build_manifest(reg, "y"), tasks.TaskType.REGRESSION
     )
@@ -809,7 +813,7 @@ def test_l399_l409_evaluation_contract(run):
 
 def test_l409_confidence_respects_independent_units(frame, tmp_path):
     """Uncertainty follows groups / time structure."""
-    framed = frame.assign(g=np.arange(len(frame)) % 30)
+    framed = frame.assign(g=numpy.arange(len(frame)) % 30)
     result = support.make_project(
         framed, "y", group_column="g", output_dir=tmp_path
     ).run()
@@ -888,7 +892,7 @@ def test_l439_deployment_scenario_splits(frame):
         frame.assign(t=range(len(frame))), "y", time_column="t"
     ).spec
     with_group = support.make_project(
-        frame.assign(g=np.arange(len(frame)) % 40), "y", group_column="g"
+        frame.assign(g=numpy.arange(len(frame)) % 40), "y", group_column="g"
     ).spec
     assert (
         splitters.resolve_strategy_name(with_time, tasks.TaskType.BINARY)
@@ -977,13 +981,13 @@ def test_l480_l496_inference_contract(run, frame, tmp_path):
     }  # unknown categories
     assert (
         result.bundle.validate(
-            features.head(3).assign(a=np.nan)
+            features.head(3).assign(a=numpy.nan)
         ).missing_value_counts["a"]
         == 3
     )
     renamed = features.rename(columns={"a": "alpha"})
     mapping = mapping_module.ColumnMapping({"alpha": "a"})
-    np.testing.assert_array_equal(
+    numpy.testing.assert_array_equal(
         result.bundle.predict(renamed, mapping),
         result.predict(features),
     )  # explicit mapping
@@ -1092,7 +1096,7 @@ def test_l610_l629_backlog_priorities(run):
     generator = synthesis.GaussianCopulaGenerator().fit(
         make_frame()[["a", "b"]]
     )
-    fake = generator.sample(30, np.random.default_rng(0))
+    fake = generator.sample(30, numpy.random.default_rng(0))
     assert fake.shape == (30, 2)  # augmentation
     assert knowledge.MetaLearner([]).recommend  # meta-learning
 
@@ -1137,7 +1141,7 @@ def test_l669_no_arbitrary_performance_promises():
 def test_l679_l735_v01_scope_matches_the_spec(frame, tmp_path):
     """In-scope items work; out-of-scope ones are optional extras."""
     multi = make_frame(300).assign(
-        y=lambda f: pd.cut(
+        y=lambda f: pandas.cut(
             f.a.fillna(0) + f.b, [-9, -0.5, 0.5, 9], labels=["l", "m", "h"]
         ).astype(str)
     )
@@ -1233,11 +1237,11 @@ def test_l765_l778_future_expansion_commitments(frame, tmp_path):
     neural = registry.get("neural_network")  # deep learning: a plugin family
     conformance.check_conformance(neural)
 
-    series = pd.DataFrame(
+    series = pandas.DataFrame(
         {
-            "t": pd.date_range("2024-01-01", periods=120),
-            "a": np.arange(120.0),
-            "y": np.arange(120) % 2,
+            "t": pandas.date_range("2024-01-01", periods=120),
+            "a": numpy.arange(120.0),
+            "y": numpy.arange(120) % 2,
         }
     )
     spec = tasks.ProjectSpec(
@@ -1255,7 +1259,7 @@ def test_l765_l778_future_expansion_commitments(frame, tmp_path):
     gaps = [min(held) - max(fit) for fit, held in split.manifest.folds]
     assert all(gap > 5 for gap in gaps)  # time-series: embargo is honoured
     profile = scmle.MLProject(
-        series.drop(columns="a").assign(b=np.arange(120.0) % 7),
+        series.drop(columns="a").assign(b=numpy.arange(120.0) % 7),
         "y",
         time_column="t",
     )
@@ -1263,7 +1267,7 @@ def test_l765_l778_future_expansion_commitments(frame, tmp_path):
     assert "t" not in profile.profile.feature_plan.features
 
     generator = synthesis.GaussianCopulaGenerator().fit(frame[["a", "b"]])
-    fake = generator.sample(40, np.random.default_rng(0))
+    fake = generator.sample(40, numpy.random.default_rng(0))
     report = synthesis.FidelityEvaluator().evaluate(frame[["a", "b"]], fake)
     assert fake.shape == (40, 2) and report.max_marginal_ks < 0.5
     assert issubclass(synthesis.GeneratorOverSampler, resampling.Resampler)
@@ -1277,7 +1281,7 @@ def test_l765_l778_future_expansion_commitments(frame, tmp_path):
     assert one.fingerprint() != two.fingerprint()  # versioned graph
     graph = feature_graph.FeatureGraphTransformer(tuple(one.nodes))
     out = graph.fit(frame[["b"]]).transform(frame[["b"]])
-    np.testing.assert_allclose(out["sq"], frame["b"] ** 2)
+    numpy.testing.assert_allclose(out["sq"], frame["b"] ** 2)
 
     vector = knowledge.fingerprint(
         scmle_profile(frame), tasks.TaskType.BINARY

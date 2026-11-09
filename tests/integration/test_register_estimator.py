@@ -2,8 +2,8 @@
 
 import pickle
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 from sklearn import base
 from sklearn import linear_model
@@ -19,11 +19,11 @@ class WrongLength(base.ClassifierMixin, base.BaseEstimator):
     """Breaks the contract: predictions are one row short."""
 
     def fit(self, features, target):
-        self.classes_ = np.unique(target)
+        self.classes_ = numpy.unique(target)
         return self
 
     def predict(self, features):
-        return np.zeros(len(features) - 1)
+        return numpy.zeros(len(features) - 1)
 
 
 @pytest.fixture(autouse=True)
@@ -34,8 +34,8 @@ def clean_registry():
 
 
 def frame(rows=500, seed=0):
-    rng = np.random.default_rng(seed)
-    data = pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    data = pandas.DataFrame(
         {"a": rng.normal(size=rows), "b": rng.normal(size=rows)}
     )
     data["y"] = (data.a + data.b + rng.normal(0, 0.5, rows) > 0).astype(int)
@@ -61,8 +61,10 @@ def test_a_registered_regressor_gets_a_search_space(tmp_path):
         "bayes_ridge", regressor=linear_model.BayesianRidge, search_space=space
     )
 
-    rng = np.random.default_rng(1)
-    data = pd.DataFrame({"a": rng.normal(size=400), "b": rng.normal(size=400)})
+    rng = numpy.random.default_rng(1)
+    data = pandas.DataFrame(
+        {"a": rng.normal(size=400), "b": rng.normal(size=400)}
+    )
     data["y"] = 3 * data.a - data.b + rng.normal(0, 0.1, 400)
     result = support.make_project(
         data,

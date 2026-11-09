@@ -29,8 +29,8 @@ from collections.abc import Callable
 import dataclasses
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from sklearn import base
 from sklearn import neighbors
 
@@ -97,7 +97,7 @@ class Decomposition:
 
 
 def noise_floor(
-    features: pd.DataFrame, target: pd.Series, classification: bool
+    features: pandas.DataFrame, target: pandas.Series, classification: bool
 ) -> float | None:
     """Estimates the irreducible error from nearest neighbours.
 
@@ -122,16 +122,16 @@ def noise_floor(
     if numeric.shape[1] == 0 or len(numeric) < MIN_NOISE_ROWS:
         return None
     matrix = numeric.fillna(numeric.median()).to_numpy(dtype=float)
-    spread = np.where(matrix.std(axis=0) > 0, matrix.std(axis=0), 1.0)
+    spread = numpy.where(matrix.std(axis=0) > 0, matrix.std(axis=0), 1.0)
     scaled = (matrix - matrix.mean(axis=0)) / spread
     neighbours = neighbors.NearestNeighbors(n_neighbors=2).fit(scaled)
     nearest = neighbours.kneighbors(scaled, return_distance=False)[:, 1]
     truth = target.to_numpy()
     if classification:
-        error = float(np.mean(truth != truth[nearest]))
-        return float((1.0 - np.sqrt(max(1.0 - 2.0 * error, 0.0))) / 2.0)
+        error = float(numpy.mean(truth != truth[nearest]))
+        return float((1.0 - numpy.sqrt(max(1.0 - 2.0 * error, 0.0))) / 2.0)
     gap = truth.astype(float) - truth[nearest].astype(float)
-    return float(np.mean(gap**2) / 2.0)
+    return float(numpy.mean(gap**2) / 2.0)
 
 
 def verdict_of(variance: float, bias: float) -> str:
@@ -156,8 +156,8 @@ def verdict_of(variance: float, bias: float) -> str:
 
 def collect(
     build: Callable[[], base.BaseEstimator],
-    features: pd.DataFrame,
-    target: pd.Series,
+    features: pandas.DataFrame,
+    target: pandas.Series,
     replicates: int,
     seed: int,
     should_stop: Callable[[], bool],
@@ -181,12 +181,12 @@ def collect(
     for draw in range(replicates):
         if should_stop():
             return None
-        drawn = np.random.default_rng([seed, draw]).integers(0, rows, rows)
-        held = np.setdiff1d(np.arange(rows), drawn)
+        drawn = numpy.random.default_rng([seed, draw]).integers(0, rows, rows)
+        held = numpy.setdiff1d(numpy.arange(rows), drawn)
         if len(held) == 0:
             continue
         model = build().fit(features.iloc[drawn], target.iloc[drawn])
-        guesses = np.asarray(model.predict(features.iloc[held]))
+        guesses = numpy.asarray(model.predict(features.iloc[held]))
         for position, guess in zip(held, guesses, strict=True):
             predictions[position].append(guess)
     return predictions
@@ -194,8 +194,8 @@ def collect(
 
 def decompose(
     build: Callable[[], base.BaseEstimator],
-    features: pd.DataFrame,
-    target: pd.Series,
+    features: pandas.DataFrame,
+    target: pandas.Series,
     classification: bool,
     replicates: int = 20,
     seed: int = 0,
@@ -228,23 +228,34 @@ def decompose(
             continue
         used += 1
         if classification:
-            labels, counts = np.unique(np.asarray(guesses), return_counts=True)
-            consensus = labels[int(np.argmax(counts))]
+            labels, counts = numpy.unique(
+                numpy.asarray(guesses), return_counts=True
+            )
+            consensus = labels[int(numpy.argmax(counts))]
             bias.append(float(consensus != truth[position]))
-            variance.append(float(np.mean(np.asarray(guesses) != consensus)))
-            total.append(float(np.mean(np.asarray(guesses) != truth[position])))
+            variance.append(
+                float(numpy.mean(numpy.asarray(guesses) != consensus))
+            )
+            total.append(
+                float(numpy.mean(numpy.asarray(guesses) != truth[position]))
+            )
         else:
-            values = np.asarray(guesses, dtype=float)
+            values = numpy.asarray(guesses, dtype=float)
             # The mean of m noisy refits overstates the squared distance to
             # the truth by var / m; remove that finite-replicate excess.
             excess = float(values.var(ddof=1)) / len(values)
             gap = (values.mean() - float(truth[position])) ** 2
             bias.append(float(gap - excess))
             variance.append(float(values.var()))
-            total.append(float(np.mean((values - float(truth[position])) ** 2)))
+            total.append(
+                float(numpy.mean((values - float(truth[position])) ** 2))
+            )
     if used == 0:
         return None
-    raw_bias, mean_variance = float(np.mean(bias)), float(np.mean(variance))
+    raw_bias, mean_variance = (
+        float(numpy.mean(bias)),
+        float(numpy.mean(variance)),
+    )
     noise = noise_floor(features, target, classification)
     mean_bias = raw_bias if noise is None else max(raw_bias - noise, 0.0)
     verdict = verdict_of(mean_variance, mean_bias)
@@ -256,7 +267,7 @@ def decompose(
         noise,
         mean_bias,
         mean_variance,
-        float(np.mean(total)),
+        float(numpy.mean(total)),
         mean_variance / (mean_variance + mean_bias)
         if mean_variance + mean_bias > 0
         else 0.5,

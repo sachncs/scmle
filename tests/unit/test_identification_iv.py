@@ -2,8 +2,8 @@
 
 import math
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
 from scmle.data.identification import iv
@@ -12,16 +12,16 @@ from scmle.data.identification import iv
 def world(
     n: int, seed: int, strength: float, beta: float = 2.0, direct: float = 0.0
 ):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     z = rng.standard_normal(n)
     u = rng.standard_normal(n)
     d = strength * z + u + rng.standard_normal(n)
     y = beta * d + direct * z + 1.5 * u + rng.standard_normal(n)
-    return pd.DataFrame({"z": z, "d": d, "y": y})
+    return pandas.DataFrame({"z": z, "d": d, "y": y})
 
 
 def test_the_wald_ratio_equals_the_closed_form_two_by_two_case():
-    frame = pd.DataFrame(
+    frame = pandas.DataFrame(
         {
             "z": [0, 0, 0, 0, 1, 1, 1, 1],
             "d": [0, 0, 1, 0, 1, 1, 0, 1],
@@ -42,14 +42,14 @@ def test_the_wald_ratio_equals_the_closed_form_two_by_two_case():
 
 
 def test_controls_are_partialled_out_with_an_intercept():
-    rng = np.random.default_rng(0)
+    rng = numpy.random.default_rng(0)
     n = 4000
     w = rng.standard_normal(n)
     z = 0.8 * w + rng.standard_normal(n)
     u = rng.standard_normal(n)
     d = z + 0.5 * w + u + rng.standard_normal(n)
     y = 2.0 * d + w + 1.5 * u + rng.standard_normal(n)
-    frame = pd.DataFrame({"z": z, "d": d, "y": y, "w": w})
+    frame = pandas.DataFrame({"z": z, "d": d, "y": y, "w": w})
     out = iv.estimate(frame, "d", "y", "z", ("w",))
     assert out.wald_low < 2.0 < out.wald_high
     assert (
@@ -88,24 +88,24 @@ def test_anderson_rubin_covers_when_the_instrument_is_weak():
 def test_the_ar_set_is_the_inverted_test():
     frame = world(400, 3, 0.15)
     out = iv.estimate(frame, "d", "y", "z")
-    grid = np.linspace(-6, 10, 801)
+    grid = numpy.linspace(-6, 10, 801)
     z, d, y = frame.z.to_numpy(), frame.d.to_numpy(), frame.y.to_numpy()
-    z, d, y = iv.residualise([z, d, y], np.empty((400, 0)))
+    z, d, y = iv.residualise([z, d, y], numpy.empty((400, 0)))
     szz = z @ z
     inside = []
     for b in grid:
         e = y - b * d
         pi = (z @ e) / szz
         r = e - pi * z
-        stat = pi**2 / (np.sum(z**2 * r**2) / szz**2)
+        stat = pi**2 / (numpy.sum(z**2 * r**2) / szz**2)
         inside.append(stat <= 3.841458820694124)
-    inside = np.array(inside)
+    inside = numpy.array(inside)
     if out.ar_kind == "bounded":
         mask = (grid >= out.ar_low) & (grid <= out.ar_high)
     elif out.ar_kind == "complement":
         mask = ~((grid > out.ar_low) & (grid < out.ar_high))
     else:
-        mask = np.ones_like(inside)
+        mask = numpy.ones_like(inside)
     assert (mask == inside).mean() > 0.99
 
 
@@ -121,7 +121,7 @@ def test_degenerate_inputs_are_refused():
     with pytest.raises(ValueError, match="first-stage"):
         iv.estimate(frame.assign(z=1.0), "d", "y", "z")
     with pytest.raises(ValueError, match="missing"):
-        iv.estimate(frame.assign(y=np.nan), "d", "y", "z")
+        iv.estimate(frame.assign(y=numpy.nan), "d", "y", "z")
 
 
 def test_excludes_follows_the_headline_set():

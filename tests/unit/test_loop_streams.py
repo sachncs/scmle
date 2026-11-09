@@ -1,4 +1,4 @@
-import numpy as np
+import numpy
 import pytest
 
 from benchmarks.qualification import streams
@@ -8,7 +8,7 @@ def test_stable_stream_has_no_change_point_and_known_risk():
     stream = streams.simulate(streams.StreamSpec(batches=400, size=100, seed=1))
     assert stream.change_point is None
     assert stream.loss.mean() == pytest.approx(0.10, abs=0.01)
-    assert np.all(stream.pi == 1.0)
+    assert numpy.all(stream.pi == 1.0)
 
 
 def test_abrupt_gradual_and_concept_risk_paths():
@@ -56,7 +56,7 @@ def test_mnar_labels_depend_on_the_loss_and_log_only_the_audit_rate():
     stream = streams.simulate(spec)
     naive = stream.loss[stream.selected].mean()
     assert naive > stream.loss.mean() + 0.05
-    assert np.all(stream.pi == 0.1)
+    assert numpy.all(stream.pi == 0.1)
     audit = stream.audit
     assert (
         stream.loss * audit / 0.1
@@ -67,19 +67,19 @@ def test_outcome_dependent_delay_late_losses():
     stream = streams.simulate(
         streams.StreamSpec(window=2, slow=3, batches=50, size=50, seed=5)
     )
-    base = np.arange(50)[:, None]
-    assert np.all(
+    base = numpy.arange(50)[:, None]
+    assert numpy.all(
         stream.arrival[stream.loss == 0]
         == (base + 2 + 0 * stream.loss)[stream.loss == 0]
     )
-    assert np.all((stream.arrival - base)[stream.loss == 1] == 5)
+    assert numpy.all((stream.arrival - base)[stream.loss == 1] == 5)
 
 
 def test_streams_are_reproducible_from_the_seed():
     first = streams.simulate(streams.StreamSpec(seed=9))
     second = streams.simulate(streams.StreamSpec(seed=9))
-    assert np.array_equal(first.loss, second.loss)
-    assert not np.array_equal(
+    assert numpy.array_equal(first.loss, second.loss)
+    assert not numpy.array_equal(
         first.loss, streams.simulate(streams.StreamSpec(seed=10)).loss
     )
 
@@ -118,7 +118,7 @@ def test_challengers_are_dependent_and_have_the_stated_advantage():
     sequence = streams.challenger_sequence(gains, 400, 100, 0.2, seed=2)
     rates = sequence.challengers.mean(axis=(1, 2))
     assert rates == pytest.approx([0.2, 0.15, 0.1], abs=0.01)
-    assert np.all(sequence.challengers[2] <= sequence.challengers[1])
+    assert numpy.all(sequence.challengers[2] <= sequence.challengers[1])
 
 
 def test_oracle_risk_matches_a_large_calibration_sample():

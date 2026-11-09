@@ -27,8 +27,8 @@ import dataclasses
 import datetime
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.contracts import errors
 from scmle.contracts import qualification
@@ -45,7 +45,7 @@ EVENT_COLUMN = "event_days"
 KNOWN_COLUMN = "known_days"
 RESERVED = (TARGET_COLUMN, CUTOFF_COLUMN, EVENT_COLUMN, KNOWN_COLUMN)
 SECONDS_PER_DAY = 86_400.0
-EPOCH = pd.Timestamp("1970-01-01")
+EPOCH = pandas.Timestamp("1970-01-01")
 TIER_ORDER = {
     qualification.Tier.UNVERIFIED: 0,
     qualification.Tier.ATTESTED: 1,
@@ -57,7 +57,7 @@ class NoAsOfRuleError(ValueError):
     """A table without history was read where an as-of rule is required."""
 
 
-def to_days(values: pd.Series) -> np.ndarray:
+def to_days(values: pandas.Series) -> numpy.ndarray:
     """Converts times to float days.
 
     Datetimes are measured from the Unix epoch, numbers are taken as given,
@@ -70,14 +70,14 @@ def to_days(values: pd.Series) -> np.ndarray:
     Returns:
         A float64 array of days, one per value, in the order of `values`.
     """
-    if pd.api.types.is_datetime64_any_dtype(values):
+    if pandas.api.types.is_datetime64_any_dtype(values):
         stamps = values
-    elif pd.api.types.is_numeric_dtype(values) and not (
-        pd.api.types.is_bool_dtype(values)
+    elif pandas.api.types.is_numeric_dtype(values) and not (
+        pandas.api.types.is_bool_dtype(values)
     ):
         return values.to_numpy(dtype="float64")
     else:
-        stamps = pd.to_datetime(values, errors="raise", utc=True)
+        stamps = pandas.to_datetime(values, errors="raise", utc=True)
     if getattr(stamps.dt, "tz", None) is not None:
         stamps = stamps.dt.tz_convert("UTC").dt.tz_localize(None)
     seconds = (stamps - EPOCH).dt.total_seconds()
@@ -170,7 +170,7 @@ class AsOfView:
 
     def __init__(
         self,
-        frame: pd.DataFrame,
+        frame: pandas.DataFrame,
         key: str,
         rule: TimeRule,
         event_time: str | None = None,
@@ -211,7 +211,7 @@ class AsOfView:
         self.columns = tuple(str(c) for c in frame.columns)
         self.reader = self.freeze(frame)
 
-    def freeze(self, frame: pd.DataFrame) -> Callable[[], pd.DataFrame]:
+    def freeze(self, frame: pandas.DataFrame) -> Callable[[], pandas.DataFrame]:
         """Prepares the rows once and returns a closure over them.
 
         Rows with a missing key are dropped, and the event and known times
@@ -234,20 +234,20 @@ class AsOfView:
         if self.event_time is not None:
             event = to_days(rows[self.event_time])
         else:
-            event = np.full(len(rows), np.nan)
+            event = numpy.full(len(rows), numpy.nan)
         rows[EVENT_COLUMN] = event
         if self.rule.mode == NON_VERSIONED:
-            known = np.full(len(rows), -np.inf)
+            known = numpy.full(len(rows), -numpy.inf)
         else:
             delay = self.rule.delta_rec_days
-            fallback = event + (np.inf if delay is None else delay)
+            fallback = event + (numpy.inf if delay is None else delay)
             if self.rule.mode == TRANSACTION:
                 if self.rule.known_column is None:
                     raise errors.ScmleError(
                         "transaction rule has no known column"
                     )
                 recorded = to_days(rows[self.rule.known_column])
-                known = np.where(np.isnan(recorded), fallback, recorded)
+                known = numpy.where(numpy.isnan(recorded), fallback, recorded)
             else:
                 known = fallback
         rows[KNOWN_COLUMN] = known
@@ -258,7 +258,7 @@ class AsOfView:
         """The evidence tier of this table's as-of rule."""
         return self.rule.tier()
 
-    def visible(self, targets: pd.DataFrame) -> pd.DataFrame:
+    def visible(self, targets: pandas.DataFrame) -> pandas.DataFrame:
         """Selects the rows readable by each target row.
 
         Args:

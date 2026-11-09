@@ -3,7 +3,7 @@
 import json
 import logging
 
-import numpy as np
+import numpy
 import pytest
 import support
 
@@ -64,7 +64,7 @@ def test_params_survive_in_leaderboard_and_bundle(binary_frame, tmp_path):
     )
     assert loaded.info.model_params == result.bundle.info.model_params
     features = binary_frame.drop(columns="y")
-    np.testing.assert_allclose(
+    numpy.testing.assert_allclose(
         result.predict_proba(features), loaded.predict_proba(features)
     )
 

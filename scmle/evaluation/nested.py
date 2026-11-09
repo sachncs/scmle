@@ -12,8 +12,8 @@ import dataclasses
 import random
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from sklearn import base
 from sklearn import model_selection
 
@@ -54,7 +54,9 @@ class NestedResult:
         return dataclasses.asdict(self)
 
 
-def inner_splitter(labels: pd.Series, classification: bool, seed: int) -> Any:
+def inner_splitter(
+    labels: pandas.Series, classification: bool, seed: int
+) -> Any:
     """Shuffled folds, stratified for classes.
 
     Args:
@@ -75,8 +77,8 @@ def inner_splitter(labels: pd.Series, classification: bool, seed: int) -> Any:
 
 def mean_cv_score(
     model: base.BaseEstimator,
-    features: pd.DataFrame,
-    target: pd.Series,
+    features: pandas.DataFrame,
+    target: pandas.Series,
     scorer: Callable[..., float],
     classification: bool,
     seed: int,
@@ -99,14 +101,14 @@ def mean_cv_score(
     for fit, held in folds.split(features, target):
         fitted = base.clone(model).fit(features.iloc[fit], target.iloc[fit])
         scores.append(scorer(fitted, features.iloc[held], target.iloc[held]))
-    return float(np.mean(scores))
+    return float(numpy.mean(scores))
 
 
 def nested_score(
     build: Callable[[dict[str, Any]], base.BaseEstimator],
     space: search.SearchSpace | None,
-    features: pd.DataFrame,
-    target: pd.Series,
+    features: pandas.DataFrame,
+    target: pandas.Series,
     outer_folds: list[tuple[Any, Any]],
     scorer: Callable[..., float],
     classification: bool,
@@ -137,8 +139,8 @@ def nested_score(
     for train, test in outer_folds:
         if should_stop():
             return None
-        x_train = features.iloc[np.asarray(train)]
-        y_train = target.iloc[np.asarray(train)]
+        x_train = features.iloc[numpy.asarray(train)]
+        y_train = target.iloc[numpy.asarray(train)]
         if len(x_train) < MIN_INNER_ROWS:
             continue
         candidates: list[dict[str, Any]] = [{}]
@@ -162,7 +164,7 @@ def nested_score(
         ]
         best_score, best_params = max(scored, key=lambda item: item[0])
         winner = build(best_params).fit(x_train, y_train)
-        held = np.asarray(test)
+        held = numpy.asarray(test)
         outer.append(
             float(scorer(winner, features.iloc[held], target.iloc[held]))
         )
@@ -172,8 +174,8 @@ def nested_score(
     return NestedResult(
         tuple(outer),
         tuple(inner),
-        float(np.mean(outer)),
-        float(np.mean(inner) - np.mean(outer)),
+        float(numpy.mean(outer)),
+        float(numpy.mean(inner) - numpy.mean(outer)),
         len(outer),
         len(candidates),
     )

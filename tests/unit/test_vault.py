@@ -3,7 +3,7 @@
 import os
 import sys
 
-import pandas as pd
+import pandas
 import pytest
 
 from scmle.contracts import errors
@@ -12,8 +12,8 @@ from scmle.governance import vault
 
 @pytest.fixture
 def sealed():
-    features = pd.DataFrame({"a": [1.0, 2.0, 3.0]})
-    target = pd.Series([0, 1, 0])
+    features = pandas.DataFrame({"a": [1.0, 2.0, 3.0]})
+    target = pandas.Series([0, 1, 0])
     locked = vault.SealedTestSet(features, target, (10, 11, 12))
     yield locked
     locked.close()
@@ -41,7 +41,7 @@ def test_this_process_keeps_only_the_ids(sealed):
     assert sealed.ids == (10, 11, 12) and len(sealed) == 3
     attributes = vars(sealed)
     assert not any(
-        isinstance(value, pd.DataFrame | pd.Series)
+        isinstance(value, pandas.DataFrame | pandas.Series)
         for value in attributes.values()
     )
 
@@ -63,7 +63,7 @@ def test_the_vault_process_ends_with_its_owner(sealed):
 
 def test_a_vault_that_is_gone_is_reported_not_hung():
     locked = vault.SealedTestSet(
-        pd.DataFrame({"a": [1.0]}), pd.Series([1]), (0,)
+        pandas.DataFrame({"a": [1.0]}), pandas.Series([1]), (0,)
     )
     locked.process.kill()
     locked.process.wait()

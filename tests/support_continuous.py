@@ -3,16 +3,16 @@
 import datetime
 import types
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
-from scmle.governance import deployment_ledger as dl
+from scmle.governance import deployment_ledger
 from scmle.governance import loop as loop_module
-from scmle.governance import release_state as rs
+from scmle.governance import release_state
 from scmle.operations import continuous
 from scmle.operations import signals
-from tests import support_release as sr
-from tests import support_runtime as rt
+from tests import support_release
+from tests import support_runtime
 
 HUMAN_KEY = "human-key"
 SYSTEM_KEY = "system-key"
@@ -41,14 +41,16 @@ def make_loop(tmp_path, **changes):
         tmp_path / "deploy",
         CHARTER,
         loop_module.LoopPolicy(**values),
-        verification_keys={dl.key_fingerprint(HUMAN_KEY): HUMAN_KEY},
+        verification_keys={
+            deployment_ledger.key_fingerprint(HUMAN_KEY): HUMAN_KEY
+        },
         system_keys=[SYSTEM_KEY],
         today=lambda: TODAY,
     )
 
 
 def reply_to(escalation, decision="approve"):
-    return dl.Attestation.create(
+    return deployment_ledger.Attestation.create(
         HUMAN_KEY,
         escalation_id=escalation.id,
         question_hash=escalation.question_hash,
@@ -69,7 +71,7 @@ class Stream:
     def __init__(self, loop, evaluation, seed=0, size=100):
         self.loop = loop
         self.evaluation = evaluation
-        self.rng = np.random.default_rng(seed)
+        self.rng = numpy.random.default_rng(seed)
         self.size = size
         self.index = 0
 
@@ -80,10 +82,12 @@ class Stream:
 
         def predict(error):
             wrong = self.rng.random(self.size) < error
-            return np.where(wrong, 1 - truth, truth)
+            return numpy.where(wrong, 1 - truth, truth)
 
-        frame = pd.DataFrame({"case_id": ids})
-        self.loop.observe(frame, np.zeros(self.size), ["approve"] * self.size)
+        frame = pandas.DataFrame({"case_id": ids})
+        self.loop.observe(
+            frame, numpy.zeros(self.size), ["approve"] * self.size
+        )
         made = dict(zip(ids, predict(champion_error), strict=True))
         theirs = {
             name: dict(zip(ids, predict(error), strict=True))
@@ -139,7 +143,7 @@ def degraded(tmp_path, **kwargs):
     ev = evaluation(tmp_path, loop, retrain=retrain, **kwargs)
     stream = Stream(loop, ev, seed=3)
     stream.run(15, 0.05)
-    assert not kinds(loop, dl.ALARM)
+    assert not kinds(loop, deployment_ledger.ALARM)
     stream.run(25, 0.40)
     return loop, ev, stream, called
 
@@ -157,18 +161,24 @@ def winning_challenger(tmp_path):
 
 
 def release_world(tmp_path):
-    store = rt.make_registry(tmp_path / "registry")
-    release = rs.ReleaseRegistry(store, None, rt.NO_WAIT)
-    release.approve(MODEL, 1, rt.approval_for(1), sr.KEY)
-    release.approve(MODEL, 2, rt.approval_for(2), sr.KEY)
-    plane = rt.MemoryPlane()
+    store = support_runtime.make_registry(tmp_path / "registry")
+    release = release_state.ReleaseRegistry(
+        store, None, support_runtime.NO_WAIT
+    )
+    release.approve(
+        MODEL, 1, support_runtime.approval_for(1), support_release.KEY
+    )
+    release.approve(
+        MODEL, 2, support_runtime.approval_for(2), support_release.KEY
+    )
+    plane = support_runtime.MemoryPlane()
     return release, plane, store
 
 
 def candidate_for(store, version=2, **changes):
     values = {
         "model": store.resolve(MODEL, version),
-        "approval": rt.approval_for(version),
+        "approval": support_runtime.approval_for(version),
     }
     values.update(changes)
-    return sr.candidate("staging", **values)
+    return support_release.candidate("staging", **values)

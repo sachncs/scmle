@@ -11,7 +11,7 @@ import joblib
 import pytest
 
 import scmle
-from scmle.artifacts import bundle as bundle_module
+from scmle.artifacts import bundle
 from scmle.contracts import errors
 from scmle.deploy import attest
 from scmle.deploy import base_image
@@ -248,9 +248,9 @@ def test_trusted_is_refused_in_production_everywhere(
     with pytest.raises(
         errors.ArtifactError, match="trusted loading is refused"
     ):
-        bundle_module.ModelBundle.load(folder, trusted=True)
+        bundle.ModelBundle.load(folder, trusted=True)
     monkeypatch.setenv("SCMLE_ENV", "staging")
-    assert bundle_module.ModelBundle.load(folder, trusted=True)
+    assert bundle.ModelBundle.load(folder, trusted=True)
 
 
 def test_verification_happens_before_anything_is_deserialized(
@@ -260,7 +260,7 @@ def test_verification_happens_before_anything_is_deserialized(
         raise AssertionError("deserialization before verification")
 
     monkeypatch.setattr(joblib, "load", forbidden)
-    monkeypatch.setattr(bundle_module.joblib, "load", forbidden)
+    monkeypatch.setattr(bundle.joblib, "load", forbidden)
     corrupted = copy_of(signed_service, tmp_path)
     with (corrupted / "model" / "pipeline.joblib").open("ab") as handle:
         handle.write(b"x")

@@ -1,15 +1,15 @@
 """Anytime-valid check that outcomes go missing alike in both arms."""
 
-import numpy as np
+import numpy
 import pytest
 
 from scmle.decision import missing
 
 
 def stream(seed, n, q, miss_control, miss_challenger):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     arm = (rng.uniform(size=n) < q).astype(float)
-    gone = rng.uniform(size=n) < np.where(
+    gone = rng.uniform(size=n) < numpy.where(
         arm == 1, miss_challenger, miss_control
     )
     return arm, ~gone
@@ -24,7 +24,7 @@ def test_equal_missingness_is_flagged_at_most_at_the_level_however_often_read():
     ]
     # Ville: the probability of ever crossing is at most the level; the
     # observed rate over 600 streams stays within three standard errors
-    assert np.mean(flags) <= 0.05 + 3 * np.sqrt(0.05 * 0.95 / 600)
+    assert numpy.mean(flags) <= 0.05 + 3 * numpy.sqrt(0.05 * 0.95 / 600)
 
 
 def test_unequal_missingness_is_detected():
@@ -34,7 +34,7 @@ def test_unequal_missingness_is_detected():
         )["differential"]
         for seed in range(100)
     ]
-    assert np.mean(found) >= 0.95
+    assert numpy.mean(found) >= 0.95
 
 
 def test_unequal_assignment_probability_is_respected():
@@ -56,9 +56,9 @@ def test_the_result_states_what_it_does_and_does_not_show():
 
 
 def test_nothing_missing_is_not_differential():
-    arm = np.array([0.0, 1.0, 1.0, 0.0])
+    arm = numpy.array([0.0, 1.0, 1.0, 0.0])
     result = missing.differential_missingness(
-        arm, np.ones(4, dtype=bool), 0.5, 0.05
+        arm, numpy.ones(4, dtype=bool), 0.5, 0.05
     )
     assert result["differential"] is False and result["missing_units"] == 0
     assert result["first_unit"] is None

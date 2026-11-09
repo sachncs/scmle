@@ -1,7 +1,7 @@
 """Tests for the SCMLE side of the comparison harness (no network)."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
 from benchmarks.sota import records
@@ -10,9 +10,9 @@ from benchmarks.sota import split
 
 
 def frames(rows=160):
-    rng = np.random.default_rng(0)
-    data = pd.DataFrame(rng.normal(size=(rows, 3)), columns=["a", "b", "c"])
-    data["y"] = np.where(data["a"] + rng.normal(size=rows) > 0, "p", "n")
+    rng = numpy.random.default_rng(0)
+    data = pandas.DataFrame(rng.normal(size=(rows, 3)), columns=["a", "b", "c"])
+    data["y"] = numpy.where(data["a"] + rng.normal(size=rows) > 0, "p", "n")
     return (
         data.iloc[:120].reset_index(drop=True),
         data.iloc[120:],

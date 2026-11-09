@@ -1,7 +1,7 @@
 """Quantile intervals cover as promised and widen where the data is noisy."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 import support
 
@@ -10,10 +10,12 @@ from scmle.contracts import errors
 
 
 def heteroscedastic(rows, seed):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     x = rng.uniform(0, 10, rows)
     noise = 0.2 + 0.6 * x
-    return pd.DataFrame({"x": x, "y": 2 * x + rng.normal(0, 1, rows) * noise})
+    return pandas.DataFrame(
+        {"x": x, "y": 2 * x + rng.normal(0, 1, rows) * noise}
+    )
 
 
 @pytest.fixture(scope="module")
@@ -38,7 +40,7 @@ def test_quantile_intervals_reach_the_requested_coverage(result):
 
 
 def test_quantile_intervals_are_wider_where_the_noise_is(result):
-    grid = pd.DataFrame({"x": [0.5, 9.5]})
+    grid = pandas.DataFrame({"x": [0.5, 9.5]})
 
     band = result.bundle.predict_interval(grid, coverage=0.9, method="quantile")
     width = (band.upper - band.lower).to_numpy()
@@ -47,7 +49,7 @@ def test_quantile_intervals_are_wider_where_the_noise_is(result):
 
 
 def test_the_default_method_keeps_one_width_everywhere(result):
-    grid = pd.DataFrame({"x": [0.5, 9.5]})
+    grid = pandas.DataFrame({"x": [0.5, 9.5]})
 
     band = result.bundle.predict_interval(grid, coverage=0.9)
     width = (band.upper - band.lower).to_numpy()
@@ -56,13 +58,13 @@ def test_the_default_method_keeps_one_width_everywhere(result):
 
 
 def test_quantile_intervals_survive_saving_and_loading(result, tmp_path):
-    grid = pd.DataFrame({"x": [1.0, 5.0, 9.0]})
+    grid = pandas.DataFrame({"x": [1.0, 5.0, 9.0]})
     expected = result.bundle.predict_interval(grid, method="quantile")
 
     result.bundle.save(tmp_path / "copy")
     loaded = scmle.ModelBundle.load(tmp_path / "copy", trusted=True)
 
-    pd.testing.assert_frame_equal(
+    pandas.testing.assert_frame_equal(
         loaded.predict_interval(grid, method="quantile"), expected
     )
 
@@ -70,5 +72,5 @@ def test_quantile_intervals_survive_saving_and_loading(result, tmp_path):
 def test_unknown_methods_are_refused(result):
     with pytest.raises(errors.ArtifactError, match="unknown interval method"):
         result.bundle.predict_interval(
-            pd.DataFrame({"x": [1.0]}), method="bootstrap"
+            pandas.DataFrame({"x": [1.0]}), method="bootstrap"
         )

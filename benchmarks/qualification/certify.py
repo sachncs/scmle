@@ -19,15 +19,15 @@ from collections.abc import Sequence
 import dataclasses
 import hashlib
 
-import pandas as pd
+import pandas
 
 from benchmarks.qualification import inject
 from scmle.contracts import qualification
 from scmle.core import randomness
 from scmle.data.detectors import certificates
 
-Detector = Callable[[pd.DataFrame], pd.Series]
-Planter = Callable[[pd.DataFrame, int], inject.Injection]
+Detector = Callable[[pandas.DataFrame], pandas.Series]
+Planter = Callable[[pandas.DataFrame, int], inject.Injection]
 CSV_FLOAT_FORMAT = "%.17g"
 
 
@@ -45,7 +45,7 @@ class DefectPlan:
     plant: Planter
 
 
-def frame_digest(frame: pd.DataFrame) -> str:
+def frame_digest(frame: pandas.DataFrame) -> str:
     """SHA-256 of a table's values, independent of library hash functions.
 
     Args:
@@ -58,7 +58,9 @@ def frame_digest(frame: pd.DataFrame) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def flags_for(detector: Detector, frame: pd.DataFrame, what: str) -> pd.Series:
+def flags_for(
+    detector: Detector, frame: pandas.DataFrame, what: str
+) -> pandas.Series:
     """Runs a detector and checks that it returned one boolean per row.
 
     Args:
@@ -74,7 +76,7 @@ def flags_for(detector: Detector, frame: pd.DataFrame, what: str) -> pd.Series:
     """
     flags = detector(frame)
     if (
-        not isinstance(flags, pd.Series)
+        not isinstance(flags, pandas.Series)
         or flags.dtype != bool
         or not flags.index.equals(frame.index)
     ):
@@ -89,7 +91,7 @@ def certify_detector(
     detector_id: str,
     detector: Detector,
     code_digest: str,
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     plans: Sequence[DefectPlan],
     seeds: Sequence[int],
     policy: certificates.CertificationPolicy,

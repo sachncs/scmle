@@ -3,14 +3,14 @@
 import dataclasses
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from sklearn import metrics as sk_metrics
 
 from scmle.contracts import metrics as metric_contracts
 
 
-def f1_macro_labels(truth: np.ndarray, guess: np.ndarray) -> float:
+def f1_macro_labels(truth: numpy.ndarray, guess: numpy.ndarray) -> float:
     """F-measure averaged over labels, each label counting equally.
 
     Args:
@@ -25,7 +25,7 @@ def f1_macro_labels(truth: np.ndarray, guess: np.ndarray) -> float:
     )
 
 
-def f1_micro_labels(truth: np.ndarray, guess: np.ndarray) -> float:
+def f1_micro_labels(truth: numpy.ndarray, guess: numpy.ndarray) -> float:
     """F-measure over all label decisions pooled.
 
     Args:
@@ -40,7 +40,7 @@ def f1_micro_labels(truth: np.ndarray, guess: np.ndarray) -> float:
     )
 
 
-def hamming(truth: np.ndarray, guess: np.ndarray) -> float:
+def hamming(truth: numpy.ndarray, guess: numpy.ndarray) -> float:
     """Share of label decisions that are wrong (lower is better).
 
     Args:
@@ -53,7 +53,7 @@ def hamming(truth: np.ndarray, guess: np.ndarray) -> float:
     return float(sk_metrics.hamming_loss(truth, guess))
 
 
-def subset_accuracy(truth: np.ndarray, guess: np.ndarray) -> float:
+def subset_accuracy(truth: numpy.ndarray, guess: numpy.ndarray) -> float:
     """Share of rows where every label is right.
 
     Args:
@@ -63,10 +63,12 @@ def subset_accuracy(truth: np.ndarray, guess: np.ndarray) -> float:
     Returns:
         The share of rows that match in every column.
     """
-    return float((np.asarray(truth) == np.asarray(guess)).all(axis=1).mean())
+    return float(
+        (numpy.asarray(truth) == numpy.asarray(guess)).all(axis=1).mean()
+    )
 
 
-def r2_mean(truth: np.ndarray, guess: np.ndarray) -> float:
+def r2_mean(truth: numpy.ndarray, guess: numpy.ndarray) -> float:
     """R-squared averaged over the target columns.
 
     Args:
@@ -81,7 +83,7 @@ def r2_mean(truth: np.ndarray, guess: np.ndarray) -> float:
     )
 
 
-def mae_mean_scaled(truth: np.ndarray, guess: np.ndarray) -> float:
+def mae_mean_scaled(truth: numpy.ndarray, guess: numpy.ndarray) -> float:
     """Mean absolute error with each column scaled by its spread.
 
     Args:
@@ -93,9 +95,9 @@ def mae_mean_scaled(truth: np.ndarray, guess: np.ndarray) -> float:
         (population) standard deviation of the observed column, which is
         taken as 1 if the column is constant.
     """
-    truth = np.asarray(truth, dtype=float)
-    spread = np.where(truth.std(axis=0) > 0, truth.std(axis=0), 1.0)
-    return float((np.abs(truth - np.asarray(guess)) / spread).mean())
+    truth = numpy.asarray(truth, dtype=float)
+    spread = numpy.where(truth.std(axis=0) > 0, truth.std(axis=0), 1.0)
+    return float((numpy.abs(truth - numpy.asarray(guess)) / spread).mean())
 
 
 FUNCTIONS = {
@@ -144,17 +146,17 @@ class MultiTargetMetric(metric_contracts.Metric):
 
         def score(
             estimator: Any,
-            features: pd.DataFrame,
-            target: pd.Series,
+            features: pandas.DataFrame,
+            target: pandas.Series,
             sample_weight: Any = None,
         ) -> float:
-            truth = np.column_stack(
+            truth = numpy.column_stack(
                 [
-                    np.asarray(target),
+                    numpy.asarray(target),
                     features[list(estimator.target_columns[1:])].to_numpy(),
                 ]
             )
-            guess = np.asarray(estimator.predict(features))
+            guess = numpy.asarray(estimator.predict(features))
             return sign * function(truth, guess)
 
         return score

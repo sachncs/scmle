@@ -2,8 +2,8 @@
 
 import logging
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 import scmle
 from scmle.contracts import errors
@@ -13,10 +13,10 @@ from scmle.core import state
 LOGGER = logging.getLogger(__name__)
 
 
-def make_dataset(rows: int = 500) -> pd.DataFrame:
+def make_dataset(rows: int = 500) -> pandas.DataFrame:
     """Builds a small binary-classification dataset."""
-    rng = np.random.default_rng(3)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(3)
+    frame = pandas.DataFrame(
         {"x": rng.normal(size=rows), "z": rng.normal(size=rows)}
     )
     frame["y"] = (frame.x + 0.5 * frame.z + rng.normal(size=rows) > 0).astype(

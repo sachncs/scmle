@@ -14,7 +14,7 @@ from scmle.operations import notify
 from scmle.operations import respond
 from scmle.operations import signals
 from scmle.security import audit
-from tests import support_ops as ops
+from tests import support_ops
 
 FIXTURES = pathlib.Path(__file__).resolve().parents[1] / "fixtures" / "ops"
 STAMP = "2026-11-05T10:00:00+00:00"
@@ -161,71 +161,84 @@ def test_traceparent_round_trips_and_bad_headers_get_a_new_id():
 
 
 def test_healthy_traffic_and_data_breach_nothing():
-    watch = ops.monitor()
-    ops.healthy_traffic(watch)
-    watch.observe_features(ops.START, ops.frame(300, seed=1))
-    watch.observe_outcomes(ops.START, [0.0] * 90 + [1.0] * 10)
-    rows = watch.evaluate(ops.START + 20)
+    watch = support_ops.monitor()
+    support_ops.healthy_traffic(watch)
+    watch.observe_features(support_ops.START, support_ops.frame(300, seed=1))
+    watch.observe_outcomes(support_ops.START, [0.0] * 90 + [1.0] * 10)
+    rows = watch.evaluate(support_ops.START + 20)
     assert not [r for r in rows if r.breached], [r.to_dict() for r in rows]
     assert classify.classify(rows).verdict is classify.Verdict.NONE
 
 
 def test_too_little_data_is_reported_not_called_healthy():
-    watch = ops.monitor(minimum=50)
-    ops.healthy_traffic(watch, count=10)
-    rows = watch.evaluate(ops.START + 5)
+    watch = support_ops.monitor(minimum=50)
+    support_ops.healthy_traffic(watch, count=10)
+    rows = watch.evaluate(support_ops.START + 5)
     assert all(r.status is signals.Status.INSUFFICIENT_DATA for r in rows)
     assert classify.classify(rows).verdict is classify.Verdict.INDETERMINATE
 
 
 def test_old_events_leave_the_window():
-    watch = ops.monitor(window=60.0)
-    ops.healthy_traffic(watch, status=500, count=100)
-    assert named(watch.evaluate(ops.START + 20), "server_error_rate").breached
-    later = named(watch.evaluate(ops.START + 500), "server_error_rate")
+    watch = support_ops.monitor(window=60.0)
+    support_ops.healthy_traffic(watch, status=500, count=100)
+    assert named(
+        watch.evaluate(support_ops.START + 20), "server_error_rate"
+    ).breached
+    later = named(watch.evaluate(support_ops.START + 500), "server_error_rate")
     assert later.status is signals.Status.INSUFFICIENT_DATA
 
 
 def named(rows, name):
-    return ops.named(rows, name)
+    return support_ops.named(rows, name)
 
 
 def test_feature_quality_and_drift_are_each_detected():
-    watch = ops.monitor()
-    watch.observe_features(ops.START, ops.frame(400, seed=2, shift=25.0))
-    rows = watch.evaluate(ops.START + 1)
+    watch = support_ops.monitor()
+    watch.observe_features(
+        support_ops.START, support_ops.frame(400, seed=2, shift=25.0)
+    )
+    rows = watch.evaluate(support_ops.START + 1)
     assert named(rows, "feature_psi_max").breached
     assert named(rows, "feature_psi_max").detail["worst"][0][0] in {
         "age",
         "balance",
     }
-    watch = ops.monitor()
-    watch.observe_features(ops.START, ops.frame(400, seed=3, missing=0.4))
-    rows = watch.evaluate(ops.START + 1)
+    watch = support_ops.monitor()
+    watch.observe_features(
+        support_ops.START, support_ops.frame(400, seed=3, missing=0.4)
+    )
+    rows = watch.evaluate(support_ops.START + 1)
     assert named(rows, "feature_missing_increase").breached
     assert named(rows, "feature_missing_increase").detail["features"] == ["age"]
-    watch = ops.monitor()
-    watch.observe_features(ops.START, ops.frame(400, seed=4, unseen=0.5))
-    assert named(watch.evaluate(ops.START + 1), "unseen_category_rate").breached
+    watch = support_ops.monitor()
+    watch.observe_features(
+        support_ops.START, support_ops.frame(400, seed=4, unseen=0.5)
+    )
+    assert named(
+        watch.evaluate(support_ops.START + 1), "unseen_category_rate"
+    ).breached
 
 
 def test_a_feature_missing_from_the_batch_counts_as_missing():
-    watch = ops.monitor()
+    watch = support_ops.monitor()
     watch.observe_features(
-        ops.START, ops.frame(300, seed=5).drop(columns=["balance"])
+        support_ops.START,
+        support_ops.frame(300, seed=5).drop(columns=["balance"]),
     )
-    row = named(watch.evaluate(ops.START + 1), "feature_missing_increase")
+    row = named(
+        watch.evaluate(support_ops.START + 1), "feature_missing_increase"
+    )
     assert row.breached and "balance" in row.detail["features"]
 
 
 def test_delayed_label_loss_breaches_above_reference_plus_tolerance():
-    watch = ops.monitor()
-    watch.observe_outcomes(ops.START, [1.0] * 40 + [0.0] * 60)
-    row = named(watch.evaluate(ops.START + 1), "windowed_loss")
+    watch = support_ops.monitor()
+    watch.observe_outcomes(support_ops.START, [1.0] * 40 + [0.0] * 60)
+    row = named(watch.evaluate(support_ops.START + 1), "windowed_loss")
     assert row.breached and row.value == pytest.approx(0.4)
     assert row.threshold == pytest.approx(0.15)
     with pytest.raises(ValueError):
-        watch.observe_outcomes(ops.START, [1.5])
+        watch.observe_outcomes(support_ops.START, [1.5])
     assert list(signals.zero_one_losses([1, 0, 1], [1, 1, 1])) == [0, 1, 0]
     with pytest.raises(ValueError):
         signals.zero_one_losses([1], [1, 2])
@@ -236,9 +249,13 @@ def test_sampling_keeps_a_share_and_is_deterministic():
     for ignored in range(2):
         watch = signals.SignalMonitor(
             signals.WindowPolicy(sample_rate=0.25, seed=7),
-            profile=ops.profile(),
+            profile=support_ops.profile(),
         )
-        kept.append(watch.observe_features(ops.START, ops.frame(4000, seed=1)))
+        kept.append(
+            watch.observe_features(
+                support_ops.START, support_ops.frame(4000, seed=1)
+            )
+        )
     assert kept[0] == kept[1] and 800 < kept[0] < 1200
     with pytest.raises(ValueError):
         signals.WindowPolicy(sample_rate=0.0)
@@ -247,10 +264,10 @@ def test_sampling_keeps_a_share_and_is_deterministic():
 
 
 def test_signals_become_metric_samples_for_export():
-    watch = ops.monitor()
-    ops.healthy_traffic(watch)
+    watch = support_ops.monitor()
+    support_ops.healthy_traffic(watch)
     samples = signals.as_metric_samples(
-        watch.evaluate(ops.START + 20), STAMP, {"model_version": "v1"}
+        watch.evaluate(support_ops.START + 20), STAMP, {"model_version": "v1"}
     )
     names = {s.name for s in samples}
     assert {"server_error_rate", "availability", "latency_p95_seconds"} <= names

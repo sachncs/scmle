@@ -12,13 +12,13 @@ import importlib.util
 import os
 import pathlib
 
-import numpy as np
+import numpy
 import pytest
 from scipy import sparse
 from sklearn import linear_model
 
 from scmle.contracts import tasks
-from scmle.models import registry as registry_module
+from scmle.models import registry
 from scmle.models.deeplearning import estimators
 from scmle.models.deeplearning import foundation
 from scmle.models.deeplearning import worker
@@ -49,8 +49,8 @@ class WorkerClassifier(estimators.TabPfnClassifier):
 
 
 def separable(rows=300):
-    rng = np.random.default_rng(0)
-    features = rng.normal(size=(rows, 3)).astype(np.float32)
+    rng = numpy.random.default_rng(0)
+    features = rng.normal(size=(rows, 3)).astype(numpy.float32)
     return features, (features[:, 0] > 0).astype(int)
 
 
@@ -61,7 +61,7 @@ def test_the_engine_stores_rows_and_rebuilds_from_its_state():
     restored.__setstate__(engine.__getstate__())
 
     assert list(engine.__getstate__()["classes_"]) == [0, 1]
-    np.testing.assert_allclose(
+    numpy.testing.assert_allclose(
         engine.predict_proba(features), restored.predict_proba(features)
     )
     assert (restored.predict(features) == labels).mean() > 0.9
@@ -78,7 +78,7 @@ def test_the_state_carries_settings_and_the_training_rows():
     assert (state["device"], state["random_state"]) == ("cpu", 3)
     assert state["n_estimators"] == 2
     assert state["train_features_"].shape == (60, 3)
-    assert state["train_features_"].dtype == np.float32
+    assert state["train_features_"].dtype == numpy.float32
 
 
 def test_sparse_rows_are_densified_for_fit_and_prediction():
@@ -87,18 +87,20 @@ def test_sparse_rows_are_densified_for_fit_and_prediction():
     engine = SklearnClassifierEngine().fit(sparse.csr_matrix(features), labels)
 
     assert engine.predict(sparse.csr_matrix(features)).shape == (120,)
-    assert engine.rows(sparse.csr_matrix(features)).dtype == np.float32
+    assert engine.rows(sparse.csr_matrix(features)).dtype == numpy.float32
 
 
 def test_data_beyond_tabpfns_row_and_feature_limits_is_refused():
-    too_wide = np.zeros((20, foundation.MAX_FEATURES + 1), dtype=np.float32)
-    too_long = np.zeros((foundation.MAX_ROWS + 1, 2), dtype=np.float32)
+    too_wide = numpy.zeros(
+        (20, foundation.MAX_FEATURES + 1), dtype=numpy.float32
+    )
+    too_long = numpy.zeros((foundation.MAX_ROWS + 1, 2), dtype=numpy.float32)
 
     with pytest.raises(ValueError, match="supports up to"):
-        SklearnClassifierEngine().fit(too_wide, np.zeros(20))
+        SklearnClassifierEngine().fit(too_wide, numpy.zeros(20))
     with pytest.raises(ValueError, match="supports up to"):
         SklearnClassifierEngine().fit(
-            too_long, np.zeros(foundation.MAX_ROWS + 1)
+            too_long, numpy.zeros(foundation.MAX_ROWS + 1)
         )
 
 
@@ -107,18 +109,18 @@ def test_sample_weights_are_refused_rather_than_silently_ignored():
 
     with pytest.raises(ValueError, match="does not support sample weights"):
         SklearnClassifierEngine().fit(
-            features, labels, sample_weight=np.ones(50)
+            features, labels, sample_weight=numpy.ones(50)
         )
 
 
 def test_the_regression_engine_predicts():
-    rng = np.random.default_rng(1)
-    features = rng.normal(size=(200, 2)).astype(np.float32)
+    rng = numpy.random.default_rng(1)
+    features = rng.normal(size=(200, 2)).astype(numpy.float32)
     target = features[:, 0] * 3
 
     engine = SklearnRegressorEngine().fit(features, target)
 
-    assert np.corrcoef(engine.predict(features), target)[0, 1] > 0.99
+    assert numpy.corrcoef(engine.predict(features), target)[0, 1] > 0.99
 
 
 def test_the_default_build_uses_the_named_tabpfn_class(monkeypatch):
@@ -142,7 +144,7 @@ def test_the_default_build_uses_the_named_tabpfn_class(monkeypatch):
 
 
 def test_the_adapter_is_rejected_without_the_package_and_explains_why():
-    adapter = registry_module.ModelRegistry.with_builtins().get("tabpfn")
+    adapter = registry.ModelRegistry.with_builtins().get("tabpfn")
 
     if adapter.is_available():
         pytest.skip("tabpfn is installed here")
@@ -157,7 +159,7 @@ def test_the_adapter_stays_extension_only_when_its_package_is_available(
     monkeypatch,
 ):
     """Installing TabPFN must not silently promote it into the beta."""
-    adapter = registry_module.ModelRegistry.with_builtins().get("tabpfn")
+    adapter = registry.ModelRegistry.with_builtins().get("tabpfn")
     monkeypatch.setattr(adapter, "is_available", lambda: True)
 
     reason = adapter.rejection_reason(tasks.TaskType.BINARY)
@@ -204,7 +206,7 @@ def test_real_tabpfn_classifies_through_the_engine():
     restored.__setstate__(engine.__getstate__())
 
     assert (engine.predict(features) == labels).mean() > 0.9
-    np.testing.assert_allclose(
+    numpy.testing.assert_allclose(
         engine.predict_proba(features),
         restored.predict_proba(features),
         atol=1e-3,
@@ -215,10 +217,10 @@ def test_real_tabpfn_regresses_through_the_engine():
     reason = real_tabpfn_ready()
     if reason:
         pytest.skip(reason)
-    rng = np.random.default_rng(1)
-    features = rng.normal(size=(200, 2)).astype(np.float32)
+    rng = numpy.random.default_rng(1)
+    features = rng.normal(size=(200, 2)).astype(numpy.float32)
     target = features[:, 0] * 3
 
     engine = foundation.RegressorEngine(device="cpu").fit(features, target)
 
-    assert np.corrcoef(engine.predict(features), target)[0, 1] > 0.95
+    assert numpy.corrcoef(engine.predict(features), target)[0, 1] > 0.95

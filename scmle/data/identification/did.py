@@ -31,8 +31,8 @@ import dataclasses
 import itertools
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from scipy import stats
 
 MIN_PERIODS = 3
@@ -123,8 +123,8 @@ class DidResult:
 
 
 def wide_panel(
-    frame: pd.DataFrame, unit: str, time: str, outcome: str
-) -> pd.DataFrame:
+    frame: pandas.DataFrame, unit: str, time: str, outcome: str
+) -> pandas.DataFrame:
     """Reshapes a balanced panel to one row per unit and column per period.
 
     Args:
@@ -147,7 +147,9 @@ def wide_panel(
     return table.sort_index(axis=1)
 
 
-def adoption_of(frame: pd.DataFrame, unit: str, adoption: str) -> pd.Series:
+def adoption_of(
+    frame: pandas.DataFrame, unit: str, adoption: str
+) -> pandas.Series:
     """Finds the first treated period of each unit.
 
     Args:
@@ -169,7 +171,7 @@ def adoption_of(frame: pd.DataFrame, unit: str, adoption: str) -> pd.Series:
 
 
 def estimate(
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     unit: str,
     time: str,
     adoption: str,
@@ -222,13 +224,13 @@ def estimate(
             if j != index[g] - 1
         }
     )
-    treated_vars: dict[int, dict[Any, np.ndarray]] = {}
-    control_vars: dict[int, np.ndarray] = {}
+    treated_vars: dict[int, dict[Any, numpy.ndarray]] = {}
+    control_vars: dict[int, numpy.ndarray] = {}
     for e in events:
         cells = [g for g in groups if 0 <= index[g] + e < len(periods)]
         total = sum(sizes[g] for g in cells)
         treated_vars[e] = {}
-        control = np.zeros(int(never.sum()))
+        control = numpy.zeros(int(never.sum()))
         for g in cells:
             base = index[g] - 1
             delta = y[:, index[g] + e] - y[:, base]
@@ -241,26 +243,26 @@ def estimate(
         mean_treated = sum(v.mean() for v in treated_vars[e].values())
         coefficients.append(float(mean_treated - control_vars[e].mean()))
     n_never = int(never.sum())
-    covariance = np.zeros((len(events), len(events)))
+    covariance = numpy.zeros((len(events), len(events)))
     for a, e in enumerate(events):
         for b, f in enumerate(events):
             value = 0.0
             for g in groups:
                 if g in treated_vars[e] and g in treated_vars[f]:
                     value += (
-                        np.cov(treated_vars[e][g], treated_vars[f][g])[0, 1]
+                        numpy.cov(treated_vars[e][g], treated_vars[f][g])[0, 1]
                         / sizes[g]
                         if sizes[g] > 1
                         else 0.0
                     )
-            value += np.cov(control_vars[e], control_vars[f])[0, 1] / n_never
+            value += numpy.cov(control_vars[e], control_vars[f])[0, 1] / n_never
             covariance[a, b] = value
     post_cells = [(g, j) for g in groups for j in range(index[g], len(periods))]
-    weights = np.array([sizes[cell[0]] for cell in post_cells], dtype=float)
+    weights = numpy.array([sizes[cell[0]] for cell in post_cells], dtype=float)
     weights /= weights.sum()
     theta_parts = []
-    treated_unit: dict[Any, np.ndarray] = {}
-    control_unit = np.zeros(n_never)
+    treated_unit: dict[Any, numpy.ndarray] = {}
+    control_unit = numpy.zeros(n_never)
     for (g, j), w in zip(post_cells, weights, strict=True):
         delta = y[:, j] - y[:, index[g] - 1]
         treated_unit[g] = treated_unit.get(g, 0.0) + w * delta[members[g]]
@@ -275,14 +277,14 @@ def estimate(
         )
         + control_unit.var(ddof=1) / n_never
     )
-    se = float(np.sqrt(variance))
+    se = float(numpy.sqrt(variance))
     z = float(stats.norm.ppf(0.5 + level / 2))
     pre = [k for k, e in enumerate(events) if e < -1]
     pretrend_p = None
     if pre:
-        beta = np.array([coefficients[k] for k in pre])
-        cov = covariance[np.ix_(pre, pre)]
-        stat = float(beta @ np.linalg.pinv(cov) @ beta)
+        beta = numpy.array([coefficients[k] for k in pre])
+        cov = covariance[numpy.ix_(pre, pre)]
+        stat = float(beta @ numpy.linalg.pinv(cov) @ beta)
         pretrend_p = float(stats.chi2.sf(stat, len(pre)))
     max_change = None
     pre_events = [e for e in events if e < 0]
@@ -295,7 +297,9 @@ def estimate(
         ]
         max_change = float(max(jumps))
     horizon = float(
-        np.average([j - index[g] + 1 for g, j in post_cells], weights=weights)
+        numpy.average(
+            [j - index[g] + 1 for g, j in post_cells], weights=weights
+        )
     )
     return DidResult(
         estimate=theta,
@@ -308,7 +312,7 @@ def estimate(
         events=tuple(int(e) for e in events),
         coefficients=tuple(coefficients),
         ses=tuple(
-            float(np.sqrt(max(covariance[k, k], 0.0)))
+            float(numpy.sqrt(max(covariance[k, k], 0.0)))
             for k in range(len(events))
         ),
         covariance=tuple(tuple(float(v) for v in row) for row in covariance),

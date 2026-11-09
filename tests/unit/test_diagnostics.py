@@ -1,25 +1,25 @@
 """Tests for post-selection diagnostics."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
-from scmle.contracts import data as data_contracts
+from scmle.contracts import data
 from scmle.contracts import tasks
 from scmle.data.curation import preprocessing
 from scmle.evaluation import diagnostics
 from scmle.evaluation import metrics
 from scmle.evaluation import suite as full_suite
 from scmle.explainability import importance
-from scmle.models import registry as registry_module
+from scmle.models import registry
 
-REGISTRY = registry_module.ModelRegistry.with_builtins()
-PLAN = data_contracts.FeaturePlan(("signal", "noise"), ("group",))
+REGISTRY = registry.ModelRegistry.with_builtins()
+PLAN = data.FeaturePlan(("signal", "noise"), ("group",))
 
 
 def make_inputs(task, seed=0, rows=600):
-    rng = np.random.default_rng(seed)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    frame = pandas.DataFrame(
         {
             "signal": rng.normal(size=rows),
             "noise": rng.normal(size=rows),
@@ -27,7 +27,7 @@ def make_inputs(task, seed=0, rows=600):
         }
     )
     if task is tasks.TaskType.REGRESSION:
-        target = pd.Series(
+        target = pandas.Series(
             3 * frame.signal + (frame.group == "a") + rng.normal(0, 0.2, rows)
         )
         adapter = REGISTRY.get("ridge")
@@ -35,7 +35,7 @@ def make_inputs(task, seed=0, rows=600):
         labels = (frame.signal + rng.normal(0, 0.5, rows) > 0).astype(int)
         if task is tasks.TaskType.MULTICLASS:
             labels = labels + (frame.signal > 1).astype(int)
-        target = pd.Series(labels)
+        target = pandas.Series(labels)
         adapter = REGISTRY.get("logistic_regression")
     split = rows // 2
     model = preprocessing.build_pipeline(PLAN, adapter, task, 0).fit(
@@ -59,7 +59,7 @@ def test_importance_ranks_the_signal_feature_first():
 def test_classification_report_matches_sklearn():
     inputs = make_inputs(tasks.TaskType.MULTICLASS)
     report = diagnostics.ClassificationReport().compute(inputs)
-    matrix = np.array(report["confusion_matrix"])
+    matrix = numpy.array(report["confusion_matrix"])
     assert matrix.sum() == len(inputs.target)
     assert sum(c["support"] for c in report["per_class"].values()) == len(
         inputs.target
@@ -183,18 +183,18 @@ def test_positive_label_comes_from_the_fitted_classes():
 
 def make_clustered_inputs(clusters=40, per_cluster=15, seed=0, grouped=True):
     """Rows within a cluster share a hidden effect, so they are not independent."""
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     rows = clusters * per_cluster
-    group = np.repeat(np.arange(clusters), per_cluster)
-    effect = np.repeat(rng.normal(scale=1.5, size=clusters), per_cluster)
-    frame = pd.DataFrame(
+    group = numpy.repeat(numpy.arange(clusters), per_cluster)
+    effect = numpy.repeat(rng.normal(scale=1.5, size=clusters), per_cluster)
+    frame = pandas.DataFrame(
         {
             "signal": rng.normal(size=rows) + effect,
             "noise": rng.normal(size=rows),
-            "group": np.where(group % 2 == 0, "a", "b"),
+            "group": numpy.where(group % 2 == 0, "a", "b"),
         }
     )
-    target = pd.Series(
+    target = pandas.Series(
         (effect + rng.normal(scale=0.6, size=rows) > 0).astype(int)
     )
     split = rows // 2
@@ -212,7 +212,9 @@ def make_clustered_inputs(clusters=40, per_cluster=15, seed=0, grouped=True):
         metric,
         PLAN,
         0,
-        groups=pd.Series(group[split:], index=held.index) if grouped else None,
+        groups=pandas.Series(group[split:], index=held.index)
+        if grouped
+        else None,
     )
 
 
@@ -257,16 +259,16 @@ def test_temporal_inputs_use_contiguous_blocks():
 
 
 def test_block_resamples_are_contiguous_runs():
-    rng = np.random.default_rng(0)
+    rng = numpy.random.default_rng(0)
     rows = diagnostics.resample_rows(100, None, True, rng)
     assert len(rows) == 100
-    steps = np.diff(rows)
+    steps = numpy.diff(rows)
     assert (steps == 1).mean() > 0.7  # mostly consecutive within blocks
 
 
 def test_group_resamples_keep_whole_groups_together():
-    rng = np.random.default_rng(1)
-    groups = pd.Series(np.repeat(np.arange(10), 5))
+    rng = numpy.random.default_rng(1)
+    groups = pandas.Series(numpy.repeat(numpy.arange(10), 5))
     rows = diagnostics.resample_rows(50, groups, False, rng)
     counts = groups.iloc[rows].value_counts()
     assert set(counts) <= {5, 10, 15, 20, 25}  # multiples of the group size
@@ -285,10 +287,10 @@ def test_cached_predictions_match_the_model():
     inputs = make_inputs(tasks.TaskType.BINARY)
     replay = diagnostics.ClassifierReplay(inputs.estimator, inputs.features)
     subset = inputs.features.iloc[[3, 1, 2]]
-    np.testing.assert_array_equal(
+    numpy.testing.assert_array_equal(
         replay.predict(subset), inputs.estimator.predict(subset)
     )
-    np.testing.assert_allclose(
+    numpy.testing.assert_allclose(
         replay.predict_proba(subset), inputs.estimator.predict_proba(subset)
     )
     bare = diagnostics.CachedPredictions(
@@ -300,7 +302,7 @@ def test_cached_predictions_match_the_model():
 
 
 def test_block_resamples_can_start_at_the_last_possible_position():
-    rng = np.random.default_rng(0)
+    rng = numpy.random.default_rng(0)
     firsts = {
         int(diagnostics.resample_rows(10, None, True, rng)[0])
         for draw in range(300)

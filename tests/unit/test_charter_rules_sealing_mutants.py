@@ -8,7 +8,7 @@ import pytest
 from scmle.data.charter import contracts
 from scmle.data.charter import rules
 from scmle.data.charter import sealing
-from scmle.data.ledger import budget as budget_module
+from scmle.data.ledger import budget
 from scmle.data.ledger import online_fdr
 from tests.unit.test_charter_contracts import make_charter
 
@@ -87,25 +87,25 @@ def test_an_amendment_that_loosens_any_one_of_the_three_is_refused():
 
 
 def test_an_amendment_may_tighten_alpha_or_wealth_but_not_loosen_either():
-    old = make_charter(error_budget=budget_module.ErrorBudget.create(0.05, 0.1))
+    old = make_charter(error_budget=budget.ErrorBudget.create(0.05, 0.1))
     for tighter in (
-        budget_module.ErrorBudget.create(0.04, 0.1),
-        budget_module.ErrorBudget.create(0.05, 0.05),
-        budget_module.ErrorBudget.create(0.04, 0.05),
+        budget.ErrorBudget.create(0.04, 0.1),
+        budget.ErrorBudget.create(0.05, 0.05),
+        budget.ErrorBudget.create(0.04, 0.05),
     ):
         sealing.check_amendment(old, make_charter(error_budget=tighter))
     for looser in (
-        budget_module.ErrorBudget.create(0.06, 0.1),
-        budget_module.ErrorBudget.create(0.05, 0.2),
+        budget.ErrorBudget.create(0.06, 0.1),
+        budget.ErrorBudget.create(0.05, 0.2),
     ):
         with pytest.raises(Exception, match="may only tighten"):
             sealing.check_amendment(old, make_charter(error_budget=looser))
 
 
 def test_an_amendment_that_changes_another_budget_field_is_refused():
-    old = make_charter(error_budget=budget_module.ErrorBudget.create(0.05, 0.1))
+    old = make_charter(error_budget=budget.ErrorBudget.create(0.05, 0.1))
     other = make_charter(
-        error_budget=budget_module.ErrorBudget.create(
+        error_budget=budget.ErrorBudget.create(
             0.05, 0.1, permutations_b=old.error_budget.permutations_b + 100
         )
     )

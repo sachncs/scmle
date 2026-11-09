@@ -2,21 +2,21 @@
 
 import dataclasses
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
-from scmle.contracts import data as data_contracts
+from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.data.curation import preprocessing
 from scmle.data.profiling import missingness
-from scmle.models import registry as registry_module
+from scmle.models import registry
 
 
 def sample(rows=1500, seed=0):
-    rng = np.random.default_rng(seed)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    frame = pandas.DataFrame(
         {
             "informative": rng.normal(size=rows),
             "random": rng.normal(size=rows),
@@ -24,10 +24,12 @@ def sample(rows=1500, seed=0):
             "complete": rng.normal(size=rows),
         }
     )
-    target = pd.Series(rng.integers(0, 2, rows))
-    frame.loc[(target == 1) & (rng.random(rows) < 0.5), "informative"] = np.nan
-    frame.loc[rng.random(rows) < 0.2, "random"] = np.nan
-    frame.loc[rng.choice(rows, 5, replace=False), "sparse"] = np.nan
+    target = pandas.Series(rng.integers(0, 2, rows))
+    frame.loc[(target == 1) & (rng.random(rows) < 0.5), "informative"] = (
+        numpy.nan
+    )
+    frame.loc[rng.random(rows) < 0.2, "random"] = numpy.nan
+    frame.loc[rng.choice(rows, 5, replace=False), "sparse"] = numpy.nan
     return frame, target
 
 
@@ -45,9 +47,9 @@ def test_gaps_that_follow_the_class_are_flagged_and_random_gaps_are_not():
 
 def test_numeric_targets_use_a_rank_test():
     frame = sample()[0]
-    value = frame["informative"].isna() * 3.0 + np.random.default_rng(1).normal(
-        size=len(frame)
-    )
+    value = frame["informative"].isna() * 3.0 + numpy.random.default_rng(
+        1
+    ).normal(size=len(frame))
 
     findings = missingness.assess(
         frame, ["informative", "random"], value, False
@@ -60,14 +62,14 @@ def test_numeric_targets_use_a_rank_test():
 
 
 def test_many_columns_raise_the_bar_for_significance():
-    rng = np.random.default_rng(3)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(3)
+    frame = pandas.DataFrame(
         {
-            f"c{i}": np.where(rng.random(800) < 0.3, np.nan, 1.0)
+            f"c{i}": numpy.where(rng.random(800) < 0.3, numpy.nan, 1.0)
             for i in range(40)
         }
     )
-    target = pd.Series(rng.integers(0, 2, 800))
+    target = pandas.Series(rng.integers(0, 2, 800))
 
     findings = missingness.assess(frame, list(frame), target, True)
 
@@ -77,15 +79,13 @@ def test_many_columns_raise_the_bar_for_significance():
 
 def test_indicators_are_added_only_for_flagged_columns():
     frame, target = sample()
-    plan = data_contracts.FeaturePlan(
+    plan = data.FeaturePlan(
         ("informative", "random", "complete"),
         (),
         informative_missing=("informative",),
     )
-    adapter = registry_module.ModelRegistry.with_builtins().get(
-        "logistic_regression"
-    )
-    options = data_contracts.PreprocessingOptions(
+    adapter = registry.ModelRegistry.with_builtins().get("logistic_regression")
+    options = data.PreprocessingOptions(
         scale=True, impute=True, missing="indicator"
     )
 
@@ -99,16 +99,16 @@ def test_indicators_are_added_only_for_flagged_columns():
 
 
 def test_monotonic_signs_that_missing_indicators_would_misalign_are_refused():
-    plan = data_contracts.FeaturePlan(
+    plan = data.FeaturePlan(
         ("informative", "random", "complete"),
         (),
         informative_missing=("informative",),
         monotonic={"random": 1},
     )
-    adapter = registry_module.ModelRegistry.with_builtins().get(
+    adapter = registry.ModelRegistry.with_builtins().get(
         "hist_gradient_boosting"
     )
-    options = data_contracts.PreprocessingOptions(
+    options = data.PreprocessingOptions(
         scale=False, impute=True, missing="indicator"
     )
 

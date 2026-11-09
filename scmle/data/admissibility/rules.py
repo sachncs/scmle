@@ -31,7 +31,7 @@ from typing import Any
 from typing import Self
 
 from scmle.contracts import qualification
-from scmle.data.admissibility import dag as dag_module
+from scmle.data.admissibility import dag
 from scmle.data.admissibility import provenance
 from scmle.data.detectors import certificates
 
@@ -239,7 +239,7 @@ def decide_predictive(
 
 def decide_causal(
     record: provenance.FieldProvenance,
-    graph: dag_module.Dag,
+    graph: dag.Dag,
     treatment: str,
     outcome: str,
     mode: Mode = Mode.STRICT,
@@ -399,7 +399,7 @@ def build_table(
     leakage_gate: (
         certificates.GateStatus | Mapping[str, certificates.GateStatus]
     ) = certificates.GateStatus.DESCRIPTIVE,
-    graph: dag_module.Dag | None = None,
+    graph: dag.Dag | None = None,
     treatment: str | None = None,
     outcome: str | None = None,
 ) -> AdmissibilityTable:

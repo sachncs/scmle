@@ -5,9 +5,9 @@ import json
 import pathlib
 from typing import Any
 
-import numpy as np
-import pandas as pd
-import pyarrow as pa
+import numpy
+import pandas
+import pyarrow
 
 from scmle.artifacts import bundle as bundle_module
 from scmle.contracts import data as data_contracts
@@ -58,7 +58,7 @@ class RunResult:
     )
     estimation: parameter_estimation.EstimationResult | None = None
 
-    def feature_importance(self) -> pd.DataFrame:
+    def feature_importance(self) -> pandas.DataFrame:
         """Returns permutation importance, most important feature first.
 
         Returns:
@@ -68,7 +68,7 @@ class RunResult:
             out. The frame is empty if the diagnostic was not produced.
         """
         report = self.diagnostics.get("permutation_importance", {})
-        return pd.DataFrame(report.get("features", []))
+        return pandas.DataFrame(report.get("features", []))
 
     def health_label(self, trial: experiments.TrialResult) -> str:
         """Gives the fit-health verdict of a trial.
@@ -87,7 +87,7 @@ class RunResult:
         )
         return "" if health is None else health.verdict
 
-    def leaderboard(self) -> pd.DataFrame:
+    def leaderboard(self) -> pandas.DataFrame:
         """Returns trials ranked best-first, failed/skipped trials last.
 
         Returns:
@@ -97,7 +97,7 @@ class RunResult:
             come first, ordered by mean score; the others follow in execution
             order.
         """
-        board = pd.DataFrame([t.to_dict() for t in self.trials])
+        board = pandas.DataFrame([t.to_dict() for t in self.trials])
         board["fit_health"] = [
             self.health_label(trial) for trial in self.trials
         ]
@@ -111,9 +111,9 @@ class RunResult:
             "score_mean",
             ascending=not self.evaluation["metric_greater_is_better"],
         )
-        return pd.concat([ranked, board[~succeeded]]).reset_index(drop=True)
+        return pandas.concat([ranked, board[~succeeded]]).reset_index(drop=True)
 
-    def leaderboard_arrow(self) -> pa.Table:
+    def leaderboard_arrow(self) -> pyarrow.Table:
         """Returns the leaderboard as an Arrow table.
 
         Returns:
@@ -146,7 +146,9 @@ class RunResult:
         """
         return self.bundle.save(directory, signing_key)
 
-    def predict(self, data: str | pathlib.Path | pd.DataFrame) -> np.ndarray:
+    def predict(
+        self, data: str | pathlib.Path | pandas.DataFrame
+    ) -> numpy.ndarray:
         """Predicts with the best model.
 
         Args:
@@ -158,8 +160,8 @@ class RunResult:
         return self.bundle.predict(data)
 
     def predict_proba(
-        self, data: str | pathlib.Path | pd.DataFrame
-    ) -> np.ndarray:
+        self, data: str | pathlib.Path | pandas.DataFrame
+    ) -> numpy.ndarray:
         """Predicts class probabilities with the best model.
 
         Args:
@@ -172,10 +174,10 @@ class RunResult:
 
     def explain(
         self,
-        data: str | pathlib.Path | pd.DataFrame,
-        background: str | pathlib.Path | pd.DataFrame,
+        data: str | pathlib.Path | pandas.DataFrame,
+        background: str | pathlib.Path | pandas.DataFrame,
         class_label: Any = None,
-    ) -> pd.DataFrame:
+    ) -> pandas.DataFrame:
         """Explains predictions of the best model against a background.
 
         Args:

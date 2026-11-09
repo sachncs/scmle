@@ -10,7 +10,7 @@ import abc
 import dataclasses
 import hashlib
 
-from scmle.contracts import data as data_contracts
+from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.contracts import experiments
 from scmle.contracts import models
@@ -49,7 +49,7 @@ class PlanningContext:
     """
 
     spec: tasks.ProjectSpec
-    profile: data_contracts.DatasetProfile
+    profile: data.DatasetProfile
     task: tasks.TaskType
     approved_models: tuple[str, ...] | None = None
     history: tuple[experiments.HistoricalRun, ...] = ()

@@ -55,13 +55,13 @@ from pathlib import Path
 import types
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.contracts import errors
 from scmle.contracts import qualification
 from scmle.contracts import signing
-from scmle.governance import deployment_ledger as ledger_module
+from scmle.governance import deployment_ledger
 from scmle.governance import escalation
 from scmle.governance import never_list
 from scmle.monitoring import labels
@@ -299,7 +299,7 @@ class ReplyOutcome:
     """
 
     tier: qualification.Tier
-    decision: ledger_module.ReplyDecision
+    decision: deployment_ledger.ReplyDecision
     safe_default_applies: bool
 
 
@@ -331,9 +331,9 @@ def json_ready(value: Any) -> Any:
         floats (also those inside arrays) as None. A non-finite numpy scalar
         is returned as the Python float, not None.
     """
-    if isinstance(value, np.ndarray):
+    if isinstance(value, numpy.ndarray):
         return [json_ready(item) for item in value.tolist()]
-    if isinstance(value, np.generic):
+    if isinstance(value, numpy.generic):
         return value.item()
     if isinstance(value, dict):
         return {str(k): json_ready(v) for k, v in value.items()}
@@ -350,7 +350,7 @@ class Loop:
     def __init__(
         self,
         directory: Path,
-        ledger: ledger_module.DeploymentLedger,
+        ledger: deployment_ledger.DeploymentLedger,
         policy: LoopPolicy,
         guard: never_list.Guard,
         hooks: Hooks,
@@ -447,30 +447,32 @@ class Loop:
         """
         directory = Path(deploy_dir)
         directory.mkdir(parents=True, exist_ok=True)
-        path = directory / ledger_module.FILE_NAME
-        fingerprints = [ledger_module.key_fingerprint(k) for k in system_keys]
+        path = directory / deployment_ledger.FILE_NAME
+        fingerprints = [
+            deployment_ledger.key_fingerprint(k) for k in system_keys
+        ]
         environment = signing.resolve_key(None)
         if environment is not None:
-            fingerprints.append(ledger_module.key_fingerprint(environment))
+            fingerprints.append(deployment_ledger.key_fingerprint(environment))
         keys = dict(verification_keys or {})
         if path.exists():
-            ledger = ledger_module.DeploymentLedger.load(path)
+            ledger = deployment_ledger.DeploymentLedger.load(path)
             header = ledger.header
             if header["charter_hash"] != charter.charter_hash:
-                raise ledger_module.DeploymentLedgerError(
+                raise deployment_ledger.DeploymentLedgerError(
                     "ledger belongs to a different charter"
                 )
             effective = dict(header["policy"])
             for row in ledger.rows:
                 body = row["body"]
-                if row["kind"] == ledger_module.OBSERVE_SUMMARY:
+                if row["kind"] == deployment_ledger.OBSERVE_SUMMARY:
                     effective.update(body.get("policy_amendment", {}))
             if effective != json_ready(policy.to_dict()):
-                raise ledger_module.DeploymentLedgerError(
+                raise deployment_ledger.DeploymentLedgerError(
                     "ledger was opened with a different policy"
                 )
         else:
-            ledger = ledger_module.DeploymentLedger.create(
+            ledger = deployment_ledger.DeploymentLedger.create(
                 path,
                 charter_hash=charter.charter_hash,
                 policy=json_ready(policy.to_dict()),
@@ -520,11 +522,11 @@ class Loop:
         Returns:
             The open loop.
         """
-        path = Path(deploy_dir) / ledger_module.FILE_NAME
-        ledger = ledger_module.DeploymentLedger.load(path)
+        path = Path(deploy_dir) / deployment_ledger.FILE_NAME
+        ledger = deployment_ledger.DeploymentLedger.load(path)
         effective = dict(ledger.header["policy"])
         for row in ledger.rows:
-            if row["kind"] == ledger_module.OBSERVE_SUMMARY:
+            if row["kind"] == deployment_ledger.OBSERVE_SUMMARY:
                 effective.update(row["body"].get("policy_amendment", {}))
         policy = LoopPolicy.from_dict(effective)
         charter = types.SimpleNamespace(
@@ -703,7 +705,7 @@ class Loop:
         """
         try:
             self.ledger.verify()
-        except ledger_module.DeploymentLedgerError:
+        except deployment_ledger.DeploymentLedgerError:
             self.halted_by_state = True
             self.halt_reason = HALT_LEDGER
             return False
@@ -760,12 +762,12 @@ class Loop:
             return None
         identity = f"esc-{len(self.ledger.rows)}"
         self.ledger.commit(
-            ledger_module.ESCALATION,
+            deployment_ledger.ESCALATION,
             {
-                "phase": ledger_module.PHASE_OPEN,
+                "phase": deployment_ledger.PHASE_OPEN,
                 "id": identity,
                 "question": question,
-                "question_hash": ledger_module.question_hash(question),
+                "question_hash": deployment_ledger.question_hash(question),
                 "evidence": list(evidence),
                 "proposed_default": proposed_default
                 or self.policy.safe_default,
@@ -788,9 +790,9 @@ class Loop:
         if self.ledger.halted:
             return
         self.ledger.commit(
-            ledger_module.HALT,
+            deployment_ledger.HALT,
             {
-                "phase": ledger_module.ENTER,
+                "phase": deployment_ledger.ENTER,
                 "reason": reason,
                 "batch": self.batch,
                 "detail": json_ready(dict(detail)),
@@ -812,7 +814,7 @@ class Loop:
             reason: Why the incident is opened.
         """
         self.ledger.commit(
-            ledger_module.INCIDENT,
+            deployment_ledger.INCIDENT,
             {"status": "open", "reason": reason, "batch": self.batch},
         )
 
@@ -820,7 +822,7 @@ class Loop:
 
     def observe(
         self,
-        batch: pd.DataFrame,
+        batch: pandas.DataFrame,
         predictions: Sequence[Any],
         decisions: Sequence[Any],
     ) -> Observation:
@@ -861,12 +863,14 @@ class Loop:
         novel = self.flag(frame, "novel")
         under = self.flag(frame, "under_covered")
         if "score" in frame:
-            score = np.asarray(frame["score"], dtype=float)
+            score = numpy.asarray(frame["score"], dtype=float)
         else:
-            sizes = frame["set_size"] if "set_size" in frame else np.ones(size)
+            sizes = (
+                frame["set_size"] if "set_size" in frame else numpy.ones(size)
+            )
             score = escalation.set_size_score(sizes, novel)
-        high = np.isin(
-            np.asarray(decisions, dtype=object),
+        high = numpy.isin(
+            numpy.asarray(decisions, dtype=object),
             list(self.policy.high_impact_actions),
         )
         blocked = (novel | under) & high
@@ -889,7 +893,7 @@ class Loop:
             "score": score,
             "status": routing.status.tolist(),
             "propensity": (
-                np.asarray(frame["propensity"], dtype=float)
+                numpy.asarray(frame["propensity"], dtype=float)
                 if "propensity" in frame
                 else None
             ),
@@ -903,7 +907,7 @@ class Loop:
         self.pending_batches.append(json_ready(record))
         self.novelty_test.update(float(novel.mean()))
         self.ledger.commit(
-            ledger_module.OBSERVE_SUMMARY,
+            deployment_ledger.OBSERVE_SUMMARY,
             {
                 "batch": self.batch,
                 "cases": size,
@@ -923,7 +927,7 @@ class Loop:
         return Observation(self.batch - 1, routing, actions)
 
     @staticmethod
-    def flag(frame: pd.DataFrame, name: str) -> np.ndarray:
+    def flag(frame: pandas.DataFrame, name: str) -> numpy.ndarray:
         """Returns a boolean column of the batch, or all False.
 
         Args:
@@ -934,16 +938,16 @@ class Loop:
             The column as a boolean array, or all False if it is absent.
         """
         if name in frame:
-            return np.asarray(frame[name], dtype=bool)
-        return np.zeros(len(frame), dtype=bool)
+            return numpy.asarray(frame[name], dtype=bool)
+        return numpy.zeros(len(frame), dtype=bool)
 
     # ---------------------------------------------------------------- mature
 
     def mature(
         self,
-        losses: Mapping[str, float] | pd.Series,
-        covered: Mapping[str, float] | pd.Series | None = None,
-        challengers: Mapping[str, Mapping[str, float] | pd.Series]
+        losses: Mapping[str, float] | pandas.Series,
+        covered: Mapping[str, float] | pandas.Series | None = None,
+        challengers: Mapping[str, Mapping[str, float] | pandas.Series]
         | None = None,
     ) -> int:
         """Stores outcomes that arrived; `step` uses them once the window ends.
@@ -998,10 +1002,10 @@ class Loop:
             The number of challengers now queued, including this one.
         """
         self.ledger.commit(
-            ledger_module.CHALLENGER_RESULT,
+            deployment_ledger.CHALLENGER_RESULT,
             {
                 "name": name,
-                "phase": ledger_module.REGISTERED,
+                "phase": deployment_ledger.REGISTERED,
                 "batch": self.batch,
             },
         )
@@ -1039,9 +1043,9 @@ class Loop:
     def estimate(
         self,
         record: dict[str, Any],
-        losses: np.ndarray,
-        observed: np.ndarray,
-        mask: np.ndarray | None = None,
+        losses: numpy.ndarray,
+        observed: numpy.ndarray,
+        mask: numpy.ndarray | None = None,
     ) -> labels.BatchEstimate:
         """Estimates the Horvitz-Thompson mean loss of a batch or a subset.
 
@@ -1055,14 +1059,16 @@ class Loop:
             The estimate of the mean loss with its label mechanism. Its mean
             is None if the mechanism is `unverified`.
         """
-        keep = np.ones(len(observed), dtype=bool) if mask is None else mask
+        keep = numpy.ones(len(observed), dtype=bool) if mask is None else mask
         propensity = record["propensity"]
         audit = record["audit"]
         return labels.estimate_batch(
             losses[keep],
             observed[keep],
-            None if propensity is None else np.asarray(propensity, float)[keep],
-            None if audit is None else np.asarray(audit, bool)[keep],
+            None
+            if propensity is None
+            else numpy.asarray(propensity, float)[keep],
+            None if audit is None else numpy.asarray(audit, bool)[keep],
             self.policy.epsilon,
             self.policy.loss_bound,
         )
@@ -1070,9 +1076,9 @@ class Loop:
     def estimate_signed(
         self,
         record: dict[str, Any],
-        values: np.ndarray,
-        observed: np.ndarray,
-        mask: np.ndarray,
+        values: numpy.ndarray,
+        observed: numpy.ndarray,
+        mask: numpy.ndarray,
     ) -> labels.BatchEstimate:
         """Like `estimate`, for values in ``[-loss_bound, loss_bound]``.
 
@@ -1091,8 +1097,10 @@ class Loop:
         return labels.estimate_batch(
             values[mask],
             observed[mask],
-            None if propensity is None else np.asarray(propensity, float)[mask],
-            None if audit is None else np.asarray(audit, bool)[mask],
+            None
+            if propensity is None
+            else numpy.asarray(propensity, float)[mask],
+            None if audit is None else numpy.asarray(audit, bool)[mask],
             self.policy.epsilon,
             self.policy.loss_bound,
             signed=True,
@@ -1136,7 +1144,7 @@ class Loop:
                 str(row["body"].get("reason", row["body"].get("rule", ""))),
             )
             for row in self.ledger.rows[first_row:]
-            if row["kind"] != ledger_module.OBSERVE_SUMMARY
+            if row["kind"] != deployment_ledger.OBSERVE_SUMMARY
         )
         self.write_label_mechanism()
         self.save_state()
@@ -1170,16 +1178,18 @@ class Loop:
         """
         ids = record["ids"]
         stored = record["labels"]
-        observed = np.array([i in stored for i in ids])
-        losses = np.array([stored.get(i, math.nan) for i in ids], dtype=float)
-        bypass = np.asarray(record["bypass"], dtype=bool)
-        status = np.asarray(record["status"])
+        observed = numpy.array([i in stored for i in ids])
+        losses = numpy.array(
+            [stored.get(i, math.nan) for i in ids], dtype=float
+        )
+        bypass = numpy.asarray(record["bypass"], dtype=bool)
+        status = numpy.asarray(record["status"])
         model_cases = ~bypass
         if int(observed[model_cases].sum()) < self.policy.min_matured:
             return False
         estimate = self.estimate(record, losses, observed, model_cases)
         self.mechanism = estimate.mechanism
-        naive = float(np.mean(losses[observed & model_cases]))
+        naive = float(numpy.mean(losses[observed & model_cases]))
         crossed = self.naive_alarm.update(naive)
         if crossed and not labels.permits_action(estimate.mechanism):
             self.naive_flag = True
@@ -1195,7 +1205,7 @@ class Loop:
                 self.selective.update(selective.mean)
         if self.coverage_test is not None and record["covered"]:
             values = list(record["covered"].values())
-            self.coverage_test.update(float(np.mean(values)))
+            self.coverage_test.update(float(numpy.mean(values)))
         self.update_challengers(record, ids, losses, observed, model_cases)
         return True
 
@@ -1203,9 +1213,9 @@ class Loop:
         self,
         record: dict[str, Any],
         ids: list[str],
-        losses: np.ndarray,
-        observed: np.ndarray,
-        model_cases: np.ndarray,
+        losses: numpy.ndarray,
+        observed: numpy.ndarray,
+        model_cases: numpy.ndarray,
     ) -> None:
         """Feeds the e-processes with Horvitz-Thompson paired differences.
 
@@ -1234,13 +1244,13 @@ class Loop:
                 holder = self.rollback_watch
             else:
                 continue
-            paired = np.array([i in other for i in ids])
+            paired = numpy.array([i in other for i in ids])
             if not paired[needed].all():
                 continue
-            second = np.array(
+            second = numpy.array(
                 [other.get(i, math.nan) for i in ids], dtype=float
             )
-            gap = np.where(needed, losses - second, 0.0)
+            gap = numpy.where(needed, losses - second, 0.0)
             estimate = self.estimate_signed(record, gap, observed, model_cases)
             if estimate.mean is None:
                 continue
@@ -1272,7 +1282,7 @@ class Loop:
         if self.naive_flag and not verified:
             self.naive_flag = False
             self.ledger.commit(
-                ledger_module.ALARM,
+                deployment_ledger.ALARM,
                 {"rule": "L1_naive", "reason": HALT_UNVERIFIED, "batch": batch},
             )
             self.enter_halt(HALT_UNVERIFIED, {"batch": batch})
@@ -1285,7 +1295,7 @@ class Loop:
             )
         if verified and bool(self.alarm.test.crossed):
             self.ledger.commit(
-                ledger_module.ALARM,
+                deployment_ledger.ALARM,
                 {
                     "rule": "L1",
                     "reason": "mean loss above reference plus tolerance",
@@ -1312,7 +1322,7 @@ class Loop:
             )
         if verified and bool(self.selective.test.crossed):
             self.ledger.commit(
-                ledger_module.ALARM,
+                deployment_ledger.ALARM,
                 {
                     "rule": "selective_risk",
                     "reason": HALT_SELECTIVE,
@@ -1373,7 +1383,7 @@ class Loop:
         body = {"reason": "L1 alarm", "batch": batch, "challenger": name}
         if skipped is not None:
             body["skipped"] = skipped
-        self.ledger.commit(ledger_module.RETRAIN, body)
+        self.ledger.commit(deployment_ledger.RETRAIN, body)
         if name is not None and name not in self.ledger.registered:
             self.register_challenger(name)
 
@@ -1393,7 +1403,7 @@ class Loop:
         if watch is None or not watch["process"].crossed:
             return None
         self.ledger.commit(
-            ledger_module.ROLLBACK_PROPOSAL,
+            deployment_ledger.ROLLBACK_PROPOSAL,
             {
                 "previous": watch["previous"],
                 "e_value": watch["process"].e_value,
@@ -1436,13 +1446,13 @@ class Loop:
                 break
             step = sequence.rule.step(
                 sequence.state,
-                ledger_module.sequential_tests.online_fdr.Evidence(e=value),
+                deployment_ledger.sequential_tests.online_fdr.Evidence(e=value),
             )
             self.ledger.commit(
-                ledger_module.CHALLENGER_RESULT,
+                deployment_ledger.CHALLENGER_RESULT,
                 {
                     "name": name,
-                    "phase": ledger_module.DECIDED,
+                    "phase": deployment_ledger.DECIDED,
                     "e_value": value,
                     "level": str(step.level),
                     "rejected": step.rejected,
@@ -1456,7 +1466,7 @@ class Loop:
             if step.rejected:
                 self.consecutive_rollbacks = 0
                 self.ledger.commit(
-                    ledger_module.PROMOTION_PROPOSAL,
+                    deployment_ledger.PROMOTION_PROPOSAL,
                     {
                         "name": name,
                         "e_value": value,
@@ -1492,9 +1502,9 @@ class Loop:
             opened = self.escalation_batch.setdefault(identity, self.batch)
             if self.batch - opened >= self.policy.reply_timeout:
                 self.ledger.commit(
-                    ledger_module.ESCALATION,
+                    deployment_ledger.ESCALATION,
                     {
-                        "phase": ledger_module.PHASE_TIMEOUT,
+                        "phase": deployment_ledger.PHASE_TIMEOUT,
                         "id": identity,
                         "applied": row["proposed_default"],
                         "tier": qualification.Tier.UNVERIFIED.value,
@@ -1509,7 +1519,7 @@ class Loop:
         score: Any,
         loss: Any,
         weights: Any = None,
-        confidence: np.ndarray | None = None,
+        confidence: numpy.ndarray | None = None,
     ) -> escalation.ThresholdResult:
         """Selects `tau` on matured calibration cases and applies it.
 
@@ -1549,9 +1559,9 @@ class Loop:
         released = False
         if self.ledger.halted and not result.everything_escalates:
             self.ledger.commit(
-                ledger_module.HALT,
+                deployment_ledger.HALT,
                 {
-                    "phase": ledger_module.RELEASE,
+                    "phase": deployment_ledger.RELEASE,
                     "recalibration": json_ready(result.to_dict()),
                     "batch": self.batch,
                 },
@@ -1566,7 +1576,7 @@ class Loop:
             )
         if not released:
             self.ledger.commit(
-                ledger_module.OBSERVE_SUMMARY,
+                deployment_ledger.OBSERVE_SUMMARY,
                 {
                     "calibration": json_ready(result.to_dict()),
                     "batch": self.batch,
@@ -1583,8 +1593,8 @@ class Loop:
 
     def check_feedback(
         self,
-        bypass_features: pd.DataFrame,
-        model_features: pd.DataFrame,
+        bypass_features: pandas.DataFrame,
+        model_features: pandas.DataFrame,
     ) -> qualification.Check:
         """Tests whether the model's decisions shift the next-period features.
 
@@ -1623,7 +1633,7 @@ class Loop:
             "batch": self.batch,
         }
         self.ledger.commit(
-            ledger_module.OBSERVE_SUMMARY,
+            deployment_ledger.OBSERVE_SUMMARY,
             {"feedback_test": json_ready(self.feedback)},
         )
         if verdict == "loop_detected":
@@ -1669,7 +1679,7 @@ class Loop:
     def reply(
         self,
         escalation_id: str,
-        attestation: ledger_module.Attestation,
+        attestation: deployment_ledger.Attestation,
         key: str | bytes | None = None,
     ) -> ReplyOutcome:
         """Records a person's signed reply to a pending escalation.
@@ -1717,16 +1727,19 @@ class Loop:
         )
         if verifier is None:
             raise ReplyRefused("no verification key for the reply's key id")
-        if ledger_module.key_fingerprint(verifier) in self.ledger.system_keys:
+        if (
+            deployment_ledger.key_fingerprint(verifier)
+            in self.ledger.system_keys
+        ):
             raise ReplyRefused("the verification key is one the system holds")
         if not attestation.verify(verifier):
             raise ReplyRefused("the reply's signature does not verify")
         today = self.today()
-        issued = ledger_module.parse_date(attestation.date, "date")
-        expires = ledger_module.parse_date(attestation.expires, "expires")
+        issued = deployment_ledger.parse_date(attestation.date, "date")
+        expires = deployment_ledger.parse_date(attestation.expires, "expires")
         if not issued <= today <= expires:
             raise ReplyRefused("the reply is expired or dated in the future")
-        self.ledger.commit(ledger_module.ATTESTATION, attestation.to_dict())
+        self.ledger.commit(deployment_ledger.ATTESTATION, attestation.to_dict())
         self.save_state()
         allowed = attestation.decision in never_list.ALLOWING
         return ReplyOutcome(
@@ -1985,7 +1998,7 @@ class Loop:
             )
         updated = dataclasses.replace(self.policy, **changes)
         self.ledger.commit(
-            ledger_module.OBSERVE_SUMMARY,
+            deployment_ledger.OBSERVE_SUMMARY,
             {
                 "policy_amendment": json_ready(changes),
                 "batch": self.batch,

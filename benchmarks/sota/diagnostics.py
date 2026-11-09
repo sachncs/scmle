@@ -16,7 +16,7 @@ import pathlib
 import sys
 from typing import Any
 
-import pandas as pd
+import pandas
 
 STATUSES = ("ok", "failed", "pruned", "skipped")
 
@@ -75,7 +75,7 @@ def summarize_run(run_dir: pathlib.Path) -> dict[str, Any]:
     budget = float(config["resources"]["time_budget_seconds"])
     events = read_events(run_dir)
     elapsed = seconds_between(events[0]["timestamp"], events[-1]["timestamp"])
-    board = pd.read_parquet(run_dir / "leaderboard.parquet")
+    board = pandas.read_parquet(run_dir / "leaderboard.parquet")
     counts = collections.Counter(board["status"])
     finished = board[board["status"] == "ok"]
     selected = board[board["selected"]]

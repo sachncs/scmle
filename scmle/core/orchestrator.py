@@ -15,7 +15,7 @@ import threading
 from typing import Any
 from typing import Self
 
-import pandas as pd
+import pandas
 
 from scmle.api import results
 from scmle.artifacts import store as store_module
@@ -27,14 +27,14 @@ from scmle.contracts import tasks
 from scmle.core import compiler
 from scmle.core import context as context_module
 from scmle.core import limits
-from scmle.core import policies as checkpoints_module
+from scmle.core import policies
 from scmle.core import resource_observation
 from scmle.core import scheduler
 from scmle.core import stages as stages_module
 from scmle.core import state
 from scmle.evaluation import metrics
 from scmle.evaluation import selection
-from scmle.experimentation import stores as tracking_stores
+from scmle.experimentation import stores
 from scmle.models import registry as registry_module
 
 
@@ -57,12 +57,12 @@ class Orchestrator:
     def __init__(
         self,
         spec: tasks.ProjectSpec,
-        frame: pd.DataFrame | None = None,
+        frame: pandas.DataFrame | None = None,
         registry: registry_module.ModelRegistry | None = None,
         policy: selection.SelectionPolicy | None = None,
         stages: tuple[stages_module.Stage, ...] | None = None,
-        tracker: tracking_stores.ExperimentStore | None = None,
-        checkpoints: tuple[checkpoints_module.PolicyCheckpoint, ...] = (),
+        tracker: stores.ExperimentStore | None = None,
+        checkpoints: tuple[policies.PolicyCheckpoint, ...] = (),
         capability_registry: capabilities.CapabilityRegistry | None = None,
     ) -> None:
         """Initializes the orchestrator.
@@ -145,7 +145,7 @@ class Orchestrator:
         )
 
     def load_history(
-        self, tracker: tracking_stores.ExperimentStore | None
+        self, tracker: stores.ExperimentStore | None
     ) -> tuple[experiments.HistoricalRun, ...]:
         """Reads past runs for meta-learning without creating a database.
 
@@ -160,7 +160,7 @@ class Orchestrator:
             path = self.tracking_path
             if path is None or not path.exists():
                 return ()
-            tracker = tracking_stores.SqliteExperimentStore(path)
+            tracker = stores.SqliteExperimentStore(path)
         return tuple(tracker.history())
 
     def apply_plan(self, approved: experiments.ExperimentPlan | None) -> None:
@@ -370,9 +370,7 @@ class Orchestrator:
         for checkpoint in self.checkpoints:
             if gate not in checkpoint.gates:
                 continue
-            verdict = checkpoint.review(
-                checkpoints_module.describe(gate, context)
-            )
+            verdict = checkpoint.review(policies.describe(gate, context))
             context.emit(
                 f"policy.{'approved' if verdict.approved else 'rejected'}",
                 verdict.reason,
@@ -413,7 +411,7 @@ class Orchestrator:
             ScmleError: If a stage fails; any other exception is wrapped in it.
         """
         log = events.EventLog(store.path("events.jsonl"))
-        tracker = self.tracker or tracking_stores.SqliteExperimentStore(
+        tracker = self.tracker or stores.SqliteExperimentStore(
             store.directory.parent / "experiments.sqlite"
         )
         tracker.start_run(

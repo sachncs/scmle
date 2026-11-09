@@ -4,8 +4,8 @@ import inspect
 from typing import Any
 from typing import Self
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from sklearn import base
 from sklearn import pipeline
 
@@ -102,14 +102,14 @@ class WeightedEstimator(base.BaseEstimator):
         Returns:
             This estimator, fitted. The fitted pipeline is `estimator_`.
         """
-        frame = pd.DataFrame(features).reset_index(drop=True)
-        labels = pd.Series(np.asarray(target))
+        frame = pandas.DataFrame(features).reset_index(drop=True)
+        labels = pandas.Series(numpy.asarray(target))
         weights = frame[self.column].to_numpy(dtype=float)
         candidate = base.clone(self.estimator)
         if self.accepts_weights(candidate):
             candidate.fit(frame, labels, model__sample_weight=weights)
         else:
-            generator = np.random.default_rng(self.random_state)
+            generator = numpy.random.default_rng(self.random_state)
             drawn = generator.choice(
                 len(frame), size=len(frame), p=weights / weights.sum()
             )
@@ -117,7 +117,7 @@ class WeightedEstimator(base.BaseEstimator):
         self.estimator_ = candidate
         return self
 
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """Predicts with the fitted pipeline.
 
         Args:
@@ -128,7 +128,7 @@ class WeightedEstimator(base.BaseEstimator):
         """
         return self.estimator_.predict(features)
 
-    def predict_survival(self, features: Any, times: Any) -> np.ndarray:
+    def predict_survival(self, features: Any, times: Any) -> numpy.ndarray:
         """Predicts survival curves with the fitted survival pipeline.
 
         Args:
@@ -159,7 +159,7 @@ class WeightedClassifier(base.ClassifierMixin, WeightedEstimator):
         self.classes_ = self.estimator_.classes_
         return self
 
-    def predict_proba(self, features: Any) -> np.ndarray:
+    def predict_proba(self, features: Any) -> numpy.ndarray:
         """Predicts class probabilities.
 
         Args:

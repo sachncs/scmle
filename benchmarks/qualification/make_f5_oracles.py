@@ -17,7 +17,7 @@ import json
 from pathlib import Path
 import sys
 
-import numpy as np
+import numpy
 
 CASES = ((0, 300, 3), (1, 500, 2), (2, 400, 4))
 
@@ -34,12 +34,14 @@ def build() -> dict[str, object]:
 
     cases = []
     for seed, rows, classes in CASES:
-        rng = np.random.default_rng(seed)
+        rng = numpy.random.default_rng(seed)
         truth = rng.integers(0, classes, rows)
-        logits = rng.normal(size=(rows, classes)) + 2.5 * np.eye(classes)[truth]
-        probs = np.exp(logits) / np.exp(logits).sum(axis=1, keepdims=True)
+        logits = (
+            rng.normal(size=(rows, classes)) + 2.5 * numpy.eye(classes)[truth]
+        )
+        probs = numpy.exp(logits) / numpy.exp(logits).sum(axis=1, keepdims=True)
         flip = rng.random(rows) < 0.1
-        given = np.where(flip, (truth + 1) % classes, truth)
+        given = numpy.where(flip, (truth + 1) % classes, truth)
         issues = find_label_issues(given, probs, filter_by="confident_learning")
         cases.append(
             {
@@ -52,7 +54,7 @@ def build() -> dict[str, object]:
     return {
         "tool": "cleanlab",
         "version": cleanlab.__version__,
-        "numpy": np.__version__,
+        "numpy": numpy.__version__,
         "cases": cases,
     }
 

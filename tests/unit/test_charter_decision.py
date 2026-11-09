@@ -134,7 +134,7 @@ def test_a_charter_without_the_layer_keeps_its_hash_and_format():
 def test_the_layer_changes_the_hash_round_trips_and_needs_format_five():
     import json
 
-    from scmle.data.charter import contracts as c
+    from scmle.data.charter import contracts
     from tests.unit.test_charter_contracts import make_charter
 
     base = make_charter(cost_model=with_cost_model())
@@ -142,7 +142,7 @@ def test_the_layer_changes_the_hash_round_trips_and_needs_format_five():
     assert charter.charter_hash != base.charter_hash
     assert charter.format_version == 5
     record = json.loads(json.dumps(charter.to_dict()))
-    assert c.AnalysisCharter.from_dict(record) == charter
+    assert contracts.AnalysisCharter.from_dict(record) == charter
     other = make_charter(
         cost_model=with_cost_model(),
         decision=d.DecisionLayer(

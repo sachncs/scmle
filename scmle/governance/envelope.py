@@ -40,7 +40,7 @@ import enum
 from typing import Any
 
 from scmle.contracts import errors
-from scmle.governance import deployment_ledger as ledger_module
+from scmle.governance import deployment_ledger
 from scmle.governance import never_list
 
 
@@ -70,7 +70,7 @@ class EnvelopeGuard:
 
     def __init__(
         self,
-        ledger: ledger_module.DeploymentLedger,
+        ledger: deployment_ledger.DeploymentLedger,
         today: Callable[[], datetime.date] = datetime.date.today,
         verification_keys: Mapping[str, str | bytes] | None = None,
     ) -> None:
@@ -96,7 +96,7 @@ class EnvelopeGuard:
         if self.on_write is not None:
             self.on_write()
 
-    def signature_ok(self, grant: ledger_module.Envelope) -> bool:
+    def signature_ok(self, grant: deployment_ledger.Envelope) -> bool:
         """Whether the signature verifies, when keys were supplied.
 
         Args:
@@ -111,7 +111,7 @@ class EnvelopeGuard:
         key = self.verification_keys.get(grant.key_id)
         return key is not None and grant.verify(key)
 
-    def grant(self, envelope: ledger_module.Envelope) -> dict[str, Any]:
+    def grant(self, envelope: deployment_ledger.Envelope) -> dict[str, Any]:
         """Writes a person's signed envelope to the ledger.
 
         The ledger refuses a taken identifier or a key the system holds (with
@@ -132,7 +132,7 @@ class EnvelopeGuard:
             raise EnvelopeRefused(
                 "grant", "the signature does not verify under a known key"
             )
-        row = self.ledger.commit(ledger_module.ENVELOPE, envelope.to_dict())
+        row = self.ledger.commit(deployment_ledger.ENVELOPE, envelope.to_dict())
         self.wrote()
         return row
 
@@ -150,7 +150,7 @@ class EnvelopeGuard:
             The ledger row recording the revocation.
         """
         row = self.ledger.commit(
-            ledger_module.ENVELOPE_REVOKED,
+            deployment_ledger.ENVELOPE_REVOKED,
             {"envelope_id": envelope_id, "reason": reason},
         )
         self.wrote()
@@ -198,11 +198,11 @@ class EnvelopeGuard:
         if action not in grant["limits"]:
             return f"does not cover {action}"
         today = self.today()
-        issued = ledger_module.parse_date(grant["date"], "date")
-        expires = ledger_module.parse_date(grant["expires"], "expires")
+        issued = deployment_ledger.parse_date(grant["date"], "date")
+        expires = deployment_ledger.parse_date(grant["expires"], "expires")
         if not issued <= today <= expires:
             return "not valid today"
-        if not self.signature_ok(ledger_module.Envelope.from_dict(grant)):
+        if not self.signature_ok(deployment_ledger.Envelope.from_dict(grant)):
             return "its signature does not verify"
         if self.remaining(identity).get(action, 0) < 1:
             return "its uses are spent"
@@ -238,7 +238,7 @@ class EnvelopeGuard:
             reason = self.refusal(identity, grant, action.value, scope)
             if reason is None:
                 self.ledger.commit(
-                    ledger_module.ENVELOPE_USED,
+                    deployment_ledger.ENVELOPE_USED,
                     {
                         "envelope_id": identity,
                         "action": action.value,

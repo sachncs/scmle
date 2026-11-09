@@ -89,7 +89,7 @@ from pathlib import Path
 import sys
 from typing import Any
 
-import numpy as np
+import numpy
 from scipy import stats
 from sklearn import ensemble
 from sklearn import linear_model
@@ -149,7 +149,7 @@ def wilson_lower(hits: int, rows: int) -> float:
     return certificates.wilson_interval(hits, rows, 0.95)[0]
 
 
-def mean_floor(values: np.ndarray, nominal: float = LEVEL) -> dict[str, Any]:
+def mean_floor(values: numpy.ndarray, nominal: float = LEVEL) -> dict[str, Any]:
     """Mean and the `nominal - 3 se` floor for replicate coverages.
 
     Args:
@@ -184,10 +184,10 @@ def gate_g1(replicates: int, base: int = 0) -> dict[str, Any]:
     n_cal = 500
     k = math.ceil((n_cal + 1) * LEVEL)
     beta = stats.beta(k, n_cal + 1 - k)
-    values = np.empty(replicates)
+    values = numpy.empty(replicates)
     for index in range(replicates):
-        rng = np.random.default_rng(base + index)
-        score = np.abs(rng.standard_normal(n_cal))
+        rng = numpy.random.default_rng(base + index)
+        score = numpy.abs(rng.standard_normal(n_cal))
         quantile_value = conformal.finite_sample_quantile(score, LEVEL)
         values[index] = 2 * stats.norm.cdf(quantile_value) - 1
     se = float(beta.std() / math.sqrt(replicates))
@@ -217,9 +217,9 @@ def cv_plus_replicate(
         The CV+ coverage and the coverage of the pooled-residual control, on
         2000 fresh test rows.
     """
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     n, d, test = 200, 3, 2000
-    beta = np.array([1.0, -1.0, 0.5])
+    beta = numpy.array([1.0, -1.0, 0.5])
     x = rng.standard_normal((n, d))
     y = x @ beta + rng.standard_normal(n)
     xt = rng.standard_normal((test, d))
@@ -237,18 +237,18 @@ def cv_plus_replicate(
         return linear_model.LinearRegression()
 
     models = []
-    residuals = np.empty(n)
+    residuals = numpy.empty(n)
     for k in range(folds):
         held = fold_of == k
         model = make().fit(x[~held], y[~held])
         models.append(model)
-        residuals[held] = np.abs(y[held] - model.predict(x[held]))
-    preds = np.column_stack([m.predict(xt) for m in models])
+        residuals[held] = numpy.abs(y[held] - model.predict(x[held]))
+    preds = numpy.column_stack([m.predict(xt) for m in models])
     low, high = conformal.cv_plus_bounds(preds, fold_of, residuals, LEVEL)
-    cv = float(np.mean((yt >= low) & (yt <= high)))
+    cv = float(numpy.mean((yt >= low) & (yt <= high)))
     refit = make().fit(x, y).predict(xt)
     margin = conformal.finite_sample_quantile(residuals, LEVEL)
-    pooled = float(np.mean(np.abs(yt - refit) <= margin))
+    pooled = float(numpy.mean(numpy.abs(yt - refit) <= margin))
     return cv, pooled
 
 
@@ -270,7 +270,7 @@ def gate_g2(replicates: int, base: int = 0) -> dict[str, Any]:
     ok = True
     for learner in ("knn1", "linear"):
         for folds in (10, 5):
-            pairs = np.array(
+            pairs = numpy.array(
                 [
                     cv_plus_replicate(base + i, folds, learner)
                     for i in range(runs)
@@ -300,7 +300,7 @@ def gate_g3(replicates: int, base: int = 0) -> dict[str, Any]:
     """
     n_fit, n_cal, n_test = 1000, 600, 4000
 
-    def draw(rng: np.random.Generator, n: int) -> tuple[np.ndarray, ...]:
+    def draw(rng: numpy.random.Generator, n: int) -> tuple[numpy.ndarray, ...]:
         """The world: noise sd rises from 0.5 to 2.5 across x.
 
         Args:
@@ -317,7 +317,7 @@ def gate_g3(replicates: int, base: int = 0) -> dict[str, Any]:
 
     rows = []
     for index in range(replicates):
-        rng = np.random.default_rng(base + index)
+        rng = numpy.random.default_rng(base + index)
         xf, yf, _ = draw(rng, n_fit)
         xc, yc, _ = draw(rng, n_cal)
         xt, yt, sdt = draw(rng, n_test)
@@ -331,19 +331,19 @@ def gate_g3(replicates: int, base: int = 0) -> dict[str, Any]:
         mean = ensemble.GradientBoostingRegressor(**kw).fit(xf, yf)
         band = quantile.QuantileBand.calibrate(
             yc.tolist(),
-            np.minimum(lo.predict(xc), hi.predict(xc)),
-            np.maximum(lo.predict(xc), hi.predict(xc)),
+            numpy.minimum(lo.predict(xc), hi.predict(xc)),
+            numpy.maximum(lo.predict(xc), hi.predict(xc)),
         )
         margin = band.margin(LEVEL)
         a, b = lo.predict(xt), hi.predict(xt)
-        cqr_in = (yt >= np.minimum(a, b) - margin) & (
-            yt <= np.maximum(a, b) + margin
+        cqr_in = (yt >= numpy.minimum(a, b) - margin) & (
+            yt <= numpy.maximum(a, b) + margin
         )
         resid = conformal.finite_sample_quantile(
-            np.abs(yc - mean.predict(xc)), LEVEL
+            numpy.abs(yc - mean.predict(xc)), LEVEL
         )
-        const_in = np.abs(yt - mean.predict(xt)) <= resid
-        top = sdt >= np.quantile(sdt, 0.9)
+        const_in = numpy.abs(yt - mean.predict(xt)) <= resid
+        top = sdt >= numpy.quantile(sdt, 0.9)
         rows.append(
             [
                 cqr_in.mean(),
@@ -352,7 +352,7 @@ def gate_g3(replicates: int, base: int = 0) -> dict[str, Any]:
                 const_in[top].mean(),
             ]
         )
-    data = np.array(rows)
+    data = numpy.array(rows)
     marginal = mean_floor(data[:, 0])
     top_cqr, top_const = float(data[:, 1].mean()), float(data[:, 3].mean())
     return {
@@ -365,7 +365,9 @@ def gate_g3(replicates: int, base: int = 0) -> dict[str, Any]:
     }
 
 
-def class_world(rng: np.random.Generator, n: int) -> tuple[np.ndarray, ...]:
+def class_world(
+    rng: numpy.random.Generator, n: int
+) -> tuple[numpy.ndarray, ...]:
     """Five classes (minority 2 percent) and a distorted posterior.
 
     Args:
@@ -376,14 +378,14 @@ def class_world(rng: np.random.Generator, n: int) -> tuple[np.ndarray, ...]:
         The class labels and the model's class probabilities, shape
         (n, 5).
     """
-    priors = np.array([0.4, 0.3, 0.2, 0.08, 0.02])
-    means = np.array([[0, 0], [2, 0], [0, 2], [2, 2], [1, 1.0]])
+    priors = numpy.array([0.4, 0.3, 0.2, 0.08, 0.02])
+    means = numpy.array([[0, 0], [2, 0], [0, 2], [2, 2], [1, 1.0]])
     labels = rng.choice(5, size=n, p=priors)
     x = means[labels] + rng.standard_normal((n, 2))
     logit = -0.5 * ((x[:, None, :] - means[None]) ** 2).sum(-1)
-    logit = logit * 0.6 + np.log(priors)[None]
+    logit = logit * 0.6 + numpy.log(priors)[None]
     logit -= logit.max(1, keepdims=True)
-    prob = np.exp(logit)
+    prob = numpy.exp(logit)
     return labels, prob / prob.sum(1, keepdims=True)
 
 
@@ -398,23 +400,23 @@ def gate_g4(replicates: int, base: int = 0) -> dict[str, Any]:
         Per class the coverage floor check for class-conditional sets and
         for the pooled control, and `passed`.
     """
-    hit = np.zeros((replicates, 5))
-    pooled = np.zeros((replicates, 5))
+    hit = numpy.zeros((replicates, 5))
+    pooled = numpy.zeros((replicates, 5))
     for index in range(replicates):
-        rng = np.random.default_rng(base + index)
+        rng = numpy.random.default_rng(base + index)
         cl, cp = class_world(rng, 2500)
         tl, tp = class_world(rng, 5000)
         calibrator = conformal.ConformalCalibrator.for_classification(
             cl.tolist(), cp, list(range(5))
         )
         for mode, store in (("class", hit), (None, pooled)):
-            keep = np.array(
+            keep = numpy.array(
                 [
                     [c in s for c in range(5)]
                     for s in calibrator.sets(tp, LEVEL, mode)
                 ]
             )
-            inside = keep[np.arange(len(tl)), tl]
+            inside = keep[numpy.arange(len(tl)), tl]
             for k in range(5):
                 store[index, k] = inside[tl == k].mean()
     floors = [mean_floor(hit[:, k]) for k in range(5)]
@@ -445,13 +447,13 @@ def gate_g5(replicates: int, base: int = 0) -> dict[str, Any]:
     size = 200
     flagged = 0
     for index in range(replicates):
-        rng = np.random.default_rng(base + index)
+        rng = numpy.random.default_rng(base + index)
         q = conformal.finite_sample_quantile(
-            np.abs(rng.standard_normal(1000)), LEVEL
+            numpy.abs(rng.standard_normal(1000)), LEVEL
         )
-        err = np.abs(rng.standard_normal(8 * size))
+        err = numpy.abs(rng.standard_normal(8 * size))
         report = coverage.slice_coverage(
-            err <= q, np.repeat(np.arange(8), size).tolist(), LEVEL
+            err <= q, numpy.repeat(numpy.arange(8), size).tolist(), LEVEL
         )
         flagged += bool(report["flagged"])
     bound = 0.05 + 2 * math.sqrt(0.05 * 0.95 / replicates)
@@ -459,14 +461,14 @@ def gate_g5(replicates: int, base: int = 0) -> dict[str, Any]:
     for rows in (30, 50, 100, 200, 400):
         hits = 0
         for index in range(replicates):
-            rng = np.random.default_rng(base + index)
+            rng = numpy.random.default_rng(base + index)
             q = conformal.finite_sample_quantile(
-                np.abs(rng.standard_normal(1000)), LEVEL
+                numpy.abs(rng.standard_normal(1000)), LEVEL
             )
-            err = np.abs(rng.standard_normal(8 * rows))
+            err = numpy.abs(rng.standard_normal(8 * rows))
             err[:rows] *= 3.0
             report = coverage.slice_coverage(
-                err <= q, np.repeat(np.arange(8), rows).tolist(), LEVEL
+                err <= q, numpy.repeat(numpy.arange(8), rows).tolist(), LEVEL
             )
             hits += "0" in report["flagged"]
         recall[str(rows)] = {
@@ -511,14 +513,14 @@ def gate_g5b(replicates: int, base: int = 0) -> dict[str, Any]:
         Returns:
             The names of the flagged slices.
         """
-        rng = np.random.default_rng(base + index)
+        rng = numpy.random.default_rng(base + index)
         q = conformal.finite_sample_quantile(
-            np.abs(rng.standard_normal(calibration)), LEVEL
+            numpy.abs(rng.standard_normal(calibration)), LEVEL
         )
-        err = np.abs(rng.standard_normal(8 * rows))
+        err = numpy.abs(rng.standard_normal(8 * rows))
         err[:rows] *= noise
         report = coverage.slice_flag(
-            err <= q, np.repeat(np.arange(8), rows).tolist(), LEVEL
+            err <= q, numpy.repeat(numpy.arange(8), rows).tolist(), LEVEL
         )
         return {str(name) for name in report["flagged"]}
 
@@ -568,9 +570,11 @@ def gate_g6(replicates: int, base: int = 0) -> dict[str, Any]:
         Results for the known and the estimated ratio, `passed` for the
         known ratio and `estimated_passed` for the estimated one.
     """
-    mu = np.array([1.0, 0.5, 0.5])
+    mu = numpy.array([1.0, 0.5, 0.5])
 
-    def world(rng: np.random.Generator, n: int, shift: bool) -> tuple[Any, Any]:
+    def world(
+        rng: numpy.random.Generator, n: int, shift: bool
+    ) -> tuple[Any, Any]:
         """Features and heteroscedastic errors, shifted or not.
 
         Args:
@@ -582,7 +586,7 @@ def gate_g6(replicates: int, base: int = 0) -> dict[str, Any]:
             The features and the errors.
         """
         x = rng.standard_normal((n, 3)) + (mu if shift else 0.0)
-        return x, np.exp(0.6 * x[:, 0]) * rng.standard_normal(n)
+        return x, numpy.exp(0.6 * x[:, 0]) * rng.standard_normal(n)
 
     def run(estimated: bool, runs: int) -> dict[str, Any]:
         """Coverage of weighted and unweighted conformal over replicates.
@@ -598,10 +602,10 @@ def gate_g6(replicates: int, base: int = 0) -> dict[str, Any]:
         """
         weighted, plain, sizes = [], [], []
         for index in range(runs):
-            rng = np.random.default_rng(base + index)
+            rng = numpy.random.default_rng(base + index)
             xc, ec = world(rng, 1000, False)
             xt, et = world(rng, 3000, True)
-            score = np.abs(ec)
+            score = numpy.abs(ec)
             if estimated:
                 unlabeled, _ = world(rng, 1000, True)
                 est = shift_weights.estimate_weights(xc, unlabeled)
@@ -609,22 +613,23 @@ def gate_g6(replicates: int, base: int = 0) -> dict[str, Any]:
                 wt = est.ratio(xt)
                 sizes.append(est.effective_size)
             else:
-                wc = np.exp(xc @ mu - mu @ mu / 2)
-                wt = np.exp(xt @ mu - mu @ mu / 2)
+                wc = numpy.exp(xc @ mu - mu @ mu / 2)
+                wt = numpy.exp(xt @ mu - mu @ mu / 2)
             margins = conformal.weighted_margins(score, wc, wt, LEVEL)
-            weighted.append(np.mean(np.abs(et) <= margins))
+            weighted.append(numpy.mean(numpy.abs(et) <= margins))
             plain.append(
-                np.mean(
-                    np.abs(et) <= conformal.finite_sample_quantile(score, LEVEL)
+                numpy.mean(
+                    numpy.abs(et)
+                    <= conformal.finite_sample_quantile(score, LEVEL)
                 )
             )
         out = {
             "replicates": runs,
-            "weighted": mean_floor(np.array(weighted)),
-            "unweighted": float(np.mean(plain)),
+            "weighted": mean_floor(numpy.array(weighted)),
+            "unweighted": float(numpy.mean(plain)),
         }
         if sizes:
-            out["effective_size_mean"] = float(np.mean(sizes))
+            out["effective_size_mean"] = float(numpy.mean(sizes))
         return out
 
     known = run(False, replicates)
@@ -651,7 +656,7 @@ def gate_g9(replicates: int, base: int = 0) -> dict[str, Any]:
         The mean squared-error difference, its 95 percent upper limit, the
         worst coherence residual and `passed`.
     """
-    summing = np.array(
+    summing = numpy.array(
         [
             [1, 1, 1, 1],
             [1, 1, 0, 0],
@@ -663,14 +668,14 @@ def gate_g9(replicates: int, base: int = 0) -> dict[str, Any]:
         ],
         dtype=float,
     )
-    rng0 = np.random.default_rng(12345)
+    rng0 = numpy.random.default_rng(12345)
     factor = rng0.standard_normal((7, 7)) * 0.5
-    truth_cov = factor @ factor.T + np.diag([0.2, 1, 1, 1.5, 1.5, 1.5, 1.5])
-    chol = np.linalg.cholesky(truth_cov)
-    diffs = np.empty(replicates)
+    truth_cov = factor @ factor.T + numpy.diag([0.2, 1, 1, 1.5, 1.5, 1.5, 1.5])
+    chol = numpy.linalg.cholesky(truth_cov)
+    diffs = numpy.empty(replicates)
     worst = 0.0
     for index in range(replicates):
-        rng = np.random.default_rng(base + index)
+        rng = numpy.random.default_rng(base + index)
         train = rng.standard_normal((150, 7)) @ chol.T
         w = reconcile.shrunk_covariance(train)
         bottom = rng.standard_normal((20, 4)) * 3
@@ -693,8 +698,8 @@ def gate_g9(replicates: int, base: int = 0) -> dict[str, Any]:
 
 
 def survival_world(
-    rng: np.random.Generator, n: int, censor: bool
-) -> tuple[np.ndarray, ...]:
+    rng: numpy.random.Generator, n: int, censor: bool
+) -> tuple[numpy.ndarray, ...]:
     """Weibull PH events; censoring rate depends on the covariates.
 
     Args:
@@ -707,17 +712,17 @@ def survival_world(
         times and the event indicators (all ones when not censored).
     """
     x = rng.standard_normal((n, 2))
-    risk = x @ np.array([0.8, -0.6])
-    event_time = (rng.exponential(size=n) / np.exp(risk)) ** (1 / 1.5)
+    risk = x @ numpy.array([0.8, -0.6])
+    event_time = (rng.exponential(size=n) / numpy.exp(risk)) ** (1 / 1.5)
     if not censor:
-        return x, risk, event_time, event_time, np.ones(n)
-    rate = 0.35 * np.exp(-1.2 * risk)
+        return x, risk, event_time, event_time, numpy.ones(n)
+    rate = 0.35 * numpy.exp(-1.2 * risk)
     cut = rng.exponential(size=n) / rate
     return (
         x,
         risk,
         event_time,
-        np.minimum(event_time, cut),
+        numpy.minimum(event_time, cut),
         (event_time <= cut).astype(float),
     )
 
@@ -734,23 +739,23 @@ def gate_g11i(replicates: int, base: int = 0) -> dict[str, Any]:
         covariate-censoring and of the marginal estimates, their standard
         errors, the mean floored share and `passed`.
     """
-    rng = np.random.default_rng(999_999)
+    rng = numpy.random.default_rng(999_999)
     _, risk, full, _, _ = survival_world(rng, 6000, False)
-    tau = float(np.quantile(full, 0.7))
-    flat = ipcw.CensoringWeights(np.ones(len(full)), 0.05, 0, False)
+    tau = float(numpy.quantile(full, 0.7))
+    flat = ipcw.CensoringWeights(numpy.ones(len(full)), 0.05, 0, False)
     truth = ipcw.truncated_concordance(
-        full, np.ones(len(full)), risk, tau, flat
+        full, numpy.ones(len(full)), risk, tau, flat
     )
     cox, marginal, share = [], [], []
     for index in range(replicates):
-        rng = np.random.default_rng(base + index)
+        rng = numpy.random.default_rng(base + index)
         x, risk, _, time, event = survival_world(rng, 1500, True)
         wc = ipcw.censoring_weights(time, event, x)
         wm = ipcw.censoring_weights(time, event, None)
         cox.append(ipcw.truncated_concordance(time, event, risk, tau, wc))
         marginal.append(ipcw.truncated_concordance(time, event, risk, tau, wm))
         share.append(wc.n_floored / len(time))
-    cox_a, marginal_a = np.array(cox), np.array(marginal)
+    cox_a, marginal_a = numpy.array(cox), numpy.array(marginal)
     se_cox = float(cox_a.std(ddof=1) / math.sqrt(replicates))
     se_marginal = float(marginal_a.std(ddof=1) / math.sqrt(replicates))
     cox_bias = float(cox_a.mean() - truth)
@@ -762,7 +767,7 @@ def gate_g11i(replicates: int, base: int = 0) -> dict[str, Any]:
         "covariate_censoring_bias": cox_bias,
         "marginal_km_bias": marginal_bias,
         "se": [se_cox, se_marginal],
-        "mean_floored_share": float(np.mean(share)),
+        "mean_floored_share": float(numpy.mean(share)),
         "passed": bool(
             abs(cox_bias) <= 3 * se_cox and abs(marginal_bias) > 3 * se_marginal
         ),
@@ -783,24 +788,24 @@ def gate_g13(replicates: int, base: int = 0) -> dict[str, Any]:
     entities, per = 30, 40
     entity_hits, row_hits = [], []
     for index in range(replicates):
-        rng = np.random.default_rng(base + index)
+        rng = numpy.random.default_rng(base + index)
         u = rng.standard_normal(entities)
-        resid = np.abs(u[:, None] + rng.standard_normal((entities, per)))
+        resid = numpy.abs(u[:, None] + rng.standard_normal((entities, per)))
         row_margin = conformal.finite_sample_quantile(resid.ravel(), LEVEL)
         pick = rng.integers(0, per, entities)
         entity_margin = conformal.finite_sample_quantile(
-            resid[np.arange(entities), pick], LEVEL
+            resid[numpy.arange(entities), pick], LEVEL
         )
-        new = np.abs(rng.standard_normal() + rng.standard_normal(4000))
-        entity_hits.append(np.mean(new <= entity_margin))
-        row_hits.append(np.mean(new <= row_margin))
-    entity = mean_floor(np.array(entity_hits))
+        new = numpy.abs(rng.standard_normal() + rng.standard_normal(4000))
+        entity_hits.append(numpy.mean(new <= entity_margin))
+        row_hits.append(numpy.mean(new <= row_margin))
+    entity = mean_floor(numpy.array(entity_hits))
     return {
         "replicates": replicates,
         "entities": entities,
         "rows_per_entity": per,
         "entity_wise": entity,
-        "row_wise": mean_floor(np.array(row_hits)),
+        "row_wise": mean_floor(numpy.array(row_hits)),
         "passed": bool(entity["meets_floor"]),
     }
 

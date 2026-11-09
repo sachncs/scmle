@@ -1,11 +1,11 @@
 """Shadow evaluation, A/B analysis and rollback with small real bundles."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
-from scmle.artifacts import bundle as bundle_module
-from scmle.contracts import data as data_contracts
+from scmle.artifacts import bundle
+from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.data.curation import preprocessing
@@ -15,14 +15,14 @@ from scmle.models import registry as models_module
 from scmle.monitoring import abtest
 from scmle.monitoring import shadow
 
-PLAN = data_contracts.FeaturePlan(("a", "b"), ())
+PLAN = data.FeaturePlan(("a", "b"), ())
 MODELS = models_module.ModelRegistry.with_builtins()
 APPROVAL_KEY = "promotion-review-key"
 
 
 def traffic(rows=600, seed=0, flip=False):
-    rng = np.random.default_rng(seed)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    frame = pandas.DataFrame(
         {"a": rng.normal(size=rows), "b": rng.normal(size=rows)}
     )
     signal = frame.a + 0.3 * frame.b + rng.normal(0, 0.5, rows)
@@ -35,7 +35,7 @@ def bundle_of(name, frame):
     fitted = preprocessing.build_pipeline(
         PLAN, MODELS.get(name), tasks.TaskType.BINARY, 0
     ).fit(features, frame.y)
-    return bundle_module.ModelBundle.create(
+    return bundle.ModelBundle.create(
         fitted, PLAN, features, "y", "binary_classification", "roc_auc", name
     )
 
@@ -94,10 +94,10 @@ def test_an_empty_shadow_has_nothing_to_report(good, weak):
 def arm_of(model, frame):
     features = frame.drop(columns="y")
     return abtest.Arm(
-        np.asarray(model.predict(features)),
+        numpy.asarray(model.predict(features)),
         frame.y.to_numpy(),
-        np.asarray(model.predict_proba(features)),
-        np.asarray(model.classes),
+        numpy.asarray(model.predict_proba(features)),
+        numpy.asarray(model.classes),
     )
 
 

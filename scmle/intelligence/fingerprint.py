@@ -9,8 +9,8 @@ import itertools
 import time
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from sklearn import dummy
 from sklearn import ensemble
 from sklearn import linear_model
@@ -36,7 +36,7 @@ DIFFICULTY_FOLDS = 3
 
 
 def redundant_pairs(
-    frame: pd.DataFrame, numeric: tuple[str, ...]
+    frame: pandas.DataFrame, numeric: tuple[str, ...]
 ) -> list[dict[str, Any]]:
     """Finds strongly correlated numeric feature pairs.
 
@@ -68,7 +68,7 @@ def redundant_pairs(
     return pairs[:MAX_REDUNDANT_PAIRS]
 
 
-def order_drift(frame: pd.DataFrame, numeric: tuple[str, ...]) -> float:
+def order_drift(frame: pandas.DataFrame, numeric: tuple[str, ...]) -> float:
     """Measures drift along row order.
 
     Compares the first and last third of the rows. A high value means the data's
@@ -94,7 +94,7 @@ def order_drift(frame: pd.DataFrame, numeric: tuple[str, ...]) -> float:
     return float(worst)
 
 
-def missingness_patterns(features: pd.DataFrame) -> dict[str, Any]:
+def missingness_patterns(features: pandas.DataFrame) -> dict[str, Any]:
     """Summarizes how values go missing together.
 
     Args:
@@ -117,7 +117,7 @@ def missingness_patterns(features: pd.DataFrame) -> dict[str, Any]:
     if holes.shape[1] > 1:
         corr = holes.astype(float).corr().abs().to_numpy()
         pairs = int(
-            ((corr > CO_MISSING) & ~np.eye(len(corr), dtype=bool)).sum() // 2
+            ((corr > CO_MISSING) & ~numpy.eye(len(corr), dtype=bool)).sum() // 2
         )
     return {
         "pattern_count": len(counts),
@@ -129,7 +129,7 @@ def missingness_patterns(features: pd.DataFrame) -> dict[str, Any]:
 
 
 def text_like_columns(
-    frame: pd.DataFrame, plan: data_contracts.FeaturePlan
+    frame: pandas.DataFrame, plan: data_contracts.FeaturePlan
 ) -> list[str]:
     """Finds categorical columns holding free text rather than short labels.
 
@@ -143,7 +143,7 @@ def text_like_columns(
     """
     found = []
     for name in (*plan.categorical, *plan.text, *plan.dropped):
-        if name not in frame.columns or pd.api.types.is_numeric_dtype(
+        if name not in frame.columns or pandas.api.types.is_numeric_dtype(
             frame[name]
         ):
             continue
@@ -153,7 +153,7 @@ def text_like_columns(
     return found
 
 
-def scale_range(frame: pd.DataFrame, numeric: tuple[str, ...]) -> float:
+def scale_range(frame: pandas.DataFrame, numeric: tuple[str, ...]) -> float:
     """Measures the orders of magnitude between the widest and narrowest column.
 
     Args:
@@ -171,11 +171,11 @@ def scale_range(frame: pd.DataFrame, numeric: tuple[str, ...]) -> float:
     ]
     if len(spreads) < 2:
         return 0.0
-    return float(np.log10(max(spreads) / min(spreads)))
+    return float(numpy.log10(max(spreads) / min(spreads)))
 
 
 def ml_difficulty(
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     spec: tasks.ProjectSpec,
     task: tasks.TaskType,
     plan: data_contracts.FeaturePlan,
@@ -242,14 +242,14 @@ def ml_difficulty(
             result = model_selection.cross_val_score(
                 model, features, target, cv=DIFFICULTY_FOLDS, scoring=scoring
             )
-            finite = np.asarray(result, dtype=float)
-            finite = finite[np.isfinite(finite)]
+            finite = numpy.asarray(result, dtype=float)
+            finite = finite[numpy.isfinite(finite)]
             if not finite.size:
                 return {
                     "available": False,
                     "reason": f"{name} baseline produced no finite scores",
                 }
-            scores[name] = float(np.mean(finite))
+            scores[name] = float(numpy.mean(finite))
     except ValueError as error:
         return {"available": False, "reason": str(error)[:200]}
     gain = scores["nonlinear"] - scores["linear"]
@@ -267,7 +267,9 @@ def ml_difficulty(
     }
 
 
-def structure(frame: pd.DataFrame, spec: tasks.ProjectSpec) -> dict[str, Any]:
+def structure(
+    frame: pandas.DataFrame, spec: tasks.ProjectSpec
+) -> dict[str, Any]:
     """Describes group and temporal structure.
 
     Args:
@@ -290,7 +292,7 @@ def structure(frame: pd.DataFrame, spec: tasks.ProjectSpec) -> dict[str, Any]:
             "repeated_entity_share": float((counts > 1).mean()),
         }
     if data.time_column:
-        times = pd.to_datetime(frame[data.time_column], errors="coerce")
+        times = pandas.to_datetime(frame[data.time_column], errors="coerce")
         valid = times.dropna()
         result["time"] = {
             "column": data.time_column,
@@ -303,7 +305,7 @@ def structure(frame: pd.DataFrame, spec: tasks.ProjectSpec) -> dict[str, Any]:
 
 
 def build_fingerprint(
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     spec: tasks.ProjectSpec,
     task: tasks.TaskType,
     plan: data_contracts.FeaturePlan,
@@ -360,7 +362,7 @@ def build_fingerprint(
     else:
         values = target.astype(float)
         target_block |= {
-            "skew": float(np.nan_to_num(values.agg("skew"))),
+            "skew": float(numpy.nan_to_num(values.agg("skew"))),
             "outlier_rate": columns.outlier_rate(values),
         }
     return {
@@ -389,7 +391,7 @@ def build_fingerprint(
                 default=0,
             ),
             "mean_outlier_rate": float(
-                np.mean(
+                numpy.mean(
                     [
                         column_statistics[c].get("outlier_rate", 0.0)
                         for c in plan.numeric
@@ -400,7 +402,7 @@ def build_fingerprint(
             else 0.0,
             "scale_orders_of_magnitude": scale_range(frame, plan.numeric),
             "mean_categorical_entropy_bits": float(
-                np.mean(
+                numpy.mean(
                     [
                         column_statistics[c]["entropy_bits"]
                         for c in plan.categorical

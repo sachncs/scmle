@@ -10,14 +10,14 @@ import abc
 from typing import Any
 from typing import ClassVar
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from sklearn import impute
 from sklearn import pipeline
 from sklearn import preprocessing
 from sklearn import tree as sk_tree
 
-from scmle.contracts import data as data_contracts
+from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.data.curation import embedding
@@ -38,7 +38,7 @@ MIN_PRESENT_ROWS = 20
 OUTLIER_IQR = 1.5
 
 
-def entropy(series: pd.Series) -> float:
+def entropy(series: pandas.Series) -> float:
     """Computes the Shannon entropy of a column's value distribution.
 
     Args:
@@ -50,10 +50,10 @@ def entropy(series: pd.Series) -> float:
     proportions = series.dropna().value_counts(normalize=True).to_numpy()
     if proportions.size == 0:
         return 0.0
-    return float(-(proportions * np.log2(proportions)).sum())
+    return float(-(proportions * numpy.log2(proportions)).sum())
 
 
-def outlier_rate(series: pd.Series) -> float:
+def outlier_rate(series: pandas.Series) -> float:
     """Computes the share of values outside Tukey's 1.5 x IQR fences.
 
     Args:
@@ -67,7 +67,7 @@ def outlier_rate(series: pd.Series) -> float:
     values = series.dropna().to_numpy(dtype=float)
     if len(values) < 4:
         return 0.0
-    q1, q3 = np.percentile(values, [25, 75])
+    q1, q3 = numpy.percentile(values, [25, 75])
     spread = q3 - q1
     if spread == 0:
         return 0.0
@@ -77,7 +77,7 @@ def outlier_rate(series: pd.Series) -> float:
     return float(outside.mean())
 
 
-def to_finite(series: pd.Series) -> pd.Series:
+def to_finite(series: pandas.Series) -> pandas.Series:
     """Coerces a column to float, mapping unparseable and infinite to NaN.
 
     Args:
@@ -87,11 +87,11 @@ def to_finite(series: pd.Series) -> pd.Series:
         A float series with the same index in which unparseable and
         infinite entries are NaN.
     """
-    numeric = pd.to_numeric(series, errors="coerce").astype(float)
-    return numeric.replace([np.inf, -np.inf], np.nan)
+    numeric = pandas.to_numeric(series, errors="coerce").astype(float)
+    return numeric.replace([numpy.inf, -numpy.inf], numpy.nan)
 
 
-def to_float(values: Any) -> np.ndarray:
+def to_float(values: Any) -> numpy.ndarray:
     """Coerces a 2-D block to float; unparseable and infinite become NaN.
 
     Args:
@@ -100,8 +100,8 @@ def to_float(values: Any) -> np.ndarray:
     Returns:
         A writable float array of the same shape as `values`.
     """
-    frame = pd.DataFrame(values).apply(to_finite)
-    return np.array(frame.to_numpy(), dtype=float, copy=True)
+    frame = pandas.DataFrame(values).apply(to_finite)
+    return numpy.array(frame.to_numpy(), dtype=float, copy=True)
 
 
 def experimental_impute() -> Any:
@@ -121,7 +121,7 @@ def experimental_impute() -> Any:
     )
 
 
-def to_text(values: Any) -> np.ndarray:
+def to_text(values: Any) -> numpy.ndarray:
     """Casts a one-column block to a 1-D array of strings ("" if missing).
 
     Args:
@@ -130,11 +130,11 @@ def to_text(values: Any) -> np.ndarray:
     Returns:
         A 1-D array of strings, one per row, with missing values as "".
     """
-    frame = pd.DataFrame(values)
+    frame = pandas.DataFrame(values)
     return frame.iloc[:, 0].fillna("").astype(str).to_numpy()
 
 
-def to_object(values: Any) -> np.ndarray:
+def to_object(values: Any) -> numpy.ndarray:
     """Casts a 2-D block to object dtype with NaN for missing entries.
 
     Args:
@@ -143,11 +143,11 @@ def to_object(values: Any) -> np.ndarray:
     Returns:
         An object array of the same shape as `values`, missing entries NaN.
     """
-    frame = pd.DataFrame(values).astype(object)
-    return frame.where(frame.notna(), np.nan).to_numpy()
+    frame = pandas.DataFrame(values).astype(object)
+    return frame.where(frame.notna(), numpy.nan).to_numpy()
 
 
-def purity_association(key: pd.Series, target: pd.Series) -> float:
+def purity_association(key: pandas.Series, target: pandas.Series) -> float:
     """Measures how well `key` groups determine the target class.
 
     Args:
@@ -167,7 +167,9 @@ def purity_association(key: pd.Series, target: pd.Series) -> float:
     return float((group_majority.sum() - majority) / (len(target) - majority))
 
 
-def threshold_association(values: pd.Series, labels: pd.Series) -> float:
+def threshold_association(
+    values: pandas.Series, labels: pandas.Series
+) -> float:
     """Class-separation gain of a small decision tree on one numeric feature.
 
     Fixed-width or quantile bins blur a sharp threshold (the bin that
@@ -205,7 +207,7 @@ class ColumnKind(abc.ABC):
     name: ClassVar[str]
 
     @abc.abstractmethod
-    def matches(self, series: pd.Series) -> bool:
+    def matches(self, series: pandas.Series) -> bool:
         """Reports whether `series` belongs to this kind.
 
         Args:
@@ -215,7 +217,7 @@ class ColumnKind(abc.ABC):
             True when the column is of this kind.
         """
 
-    def statistics(self, series: pd.Series) -> dict[str, Any]:
+    def statistics(self, series: pandas.Series) -> dict[str, Any]:
         """Returns descriptive statistics for the column.
 
         Args:
@@ -232,7 +234,7 @@ class ColumnKind(abc.ABC):
             "n_unique": int(series.nunique(dropna=True)),
         }
 
-    def exclusion_reason(self, series: pd.Series) -> str | None:
+    def exclusion_reason(self, series: pandas.Series) -> str | None:
         """Returns why the column cannot be a feature, if it cannot.
 
         Args:
@@ -243,9 +245,7 @@ class ColumnKind(abc.ABC):
         """
         return None
 
-    def transformer(
-        self, options: data_contracts.PreprocessingOptions
-    ) -> Any | None:
+    def transformer(self, options: data.PreprocessingOptions) -> Any | None:
         """Builds the preprocessing transformer, or None for non-features.
 
         Args:
@@ -258,7 +258,7 @@ class ColumnKind(abc.ABC):
         return None
 
     def association(
-        self, series: pd.Series, target: pd.Series, task: tasks.TaskType
+        self, series: pandas.Series, target: pandas.Series, task: tasks.TaskType
     ) -> float:
         """Returns a [0, 1] single-feature association with the target.
 
@@ -274,7 +274,7 @@ class ColumnKind(abc.ABC):
         return 0.0
 
     def missingness_association(
-        self, series: pd.Series, target: pd.Series, task: tasks.TaskType
+        self, series: pandas.Series, target: pandas.Series, task: tasks.TaskType
     ) -> float:
         """Measures how strongly *being missing* tells the target apart.
 
@@ -305,7 +305,7 @@ class ColumnKind(abc.ABC):
             corr = indicator.astype(float).corr(
                 target.astype(float), method="spearman"
             )
-            return float(abs(corr)) if pd.notna(corr) else 0.0
+            return float(abs(corr)) if pandas.notna(corr) else 0.0
         gain = purity_association(indicator, target)
         one_sided = (
             target[~indicator].nunique() == 1
@@ -314,8 +314,8 @@ class ColumnKind(abc.ABC):
         return max(gain, 1.0 if one_sided else 0.0)
 
     def usable_rows(
-        self, series: pd.Series, target: pd.Series
-    ) -> tuple[pd.Series, pd.Series] | None:
+        self, series: pandas.Series, target: pandas.Series
+    ) -> tuple[pandas.Series, pandas.Series] | None:
         """Aligns non-missing rows; None when too few rows to judge.
 
         Args:
@@ -338,7 +338,7 @@ class NumericKind(ColumnKind):
 
     name = "numeric"
 
-    def matches(self, series: pd.Series) -> bool:
+    def matches(self, series: pandas.Series) -> bool:
         """True for numeric and boolean dtypes.
 
         Args:
@@ -347,11 +347,11 @@ class NumericKind(ColumnKind):
         Returns:
             True when the dtype is numeric or boolean.
         """
-        return pd.api.types.is_numeric_dtype(
+        return pandas.api.types.is_numeric_dtype(
             series
-        ) or pd.api.types.is_bool_dtype(series)
+        ) or pandas.api.types.is_bool_dtype(series)
 
-    def statistics(self, series: pd.Series) -> dict[str, Any]:
+    def statistics(self, series: pandas.Series) -> dict[str, Any]:
         """Adds moments and range for non-boolean columns.
 
         Args:
@@ -363,12 +363,12 @@ class NumericKind(ColumnKind):
             `outlier_rate`.
         """
         stats = super().statistics(series)
-        if not pd.api.types.is_bool_dtype(series):
+        if not pandas.api.types.is_bool_dtype(series):
             finite = to_finite(series)
             names = ["skew", "mean", "std", "min", "max"]
             moments = finite.agg(names).to_dict()
             stats |= {
-                str(k): float(np.nan_to_num(v)) for k, v in moments.items()
+                str(k): float(numpy.nan_to_num(v)) for k, v in moments.items()
             }
             stats["outlier_rate"] = outlier_rate(finite)
         return stats
@@ -400,7 +400,7 @@ class NumericKind(ColumnKind):
         raise errors.ConfigError(f"unknown missing-value strategy '{strategy}'")
 
     def transformer(
-        self, options: data_contracts.PreprocessingOptions
+        self, options: data.PreprocessingOptions
     ) -> pipeline.Pipeline:
         """Casts, imputes, then optionally log-transforms, scales, crosses.
 
@@ -440,7 +440,7 @@ class NumericKind(ColumnKind):
         return pipeline.Pipeline(steps)
 
     def association(
-        self, series: pd.Series, target: pd.Series, task: tasks.TaskType
+        self, series: pandas.Series, target: pandas.Series, task: tasks.TaskType
     ) -> float:
         """Spearman for regression; class purity for classification.
 
@@ -464,7 +464,7 @@ class NumericKind(ColumnKind):
             corr = values.astype(float).corr(
                 labels.astype(float), method="spearman"
             )
-            return float(abs(corr)) if pd.notna(corr) else 0.0
+            return float(abs(corr)) if pandas.notna(corr) else 0.0
         if values.nunique() <= MAX_DIRECT_VALUES:
             return purity_association(values, labels)
         return threshold_association(values.astype(float), labels)
@@ -475,7 +475,7 @@ class DatetimeKind(ColumnKind):
 
     name = "datetime"
 
-    def matches(self, series: pd.Series) -> bool:
+    def matches(self, series: pandas.Series) -> bool:
         """True for datetime dtypes.
 
         Args:
@@ -484,9 +484,9 @@ class DatetimeKind(ColumnKind):
         Returns:
             True when the dtype is a datetime type.
         """
-        return pd.api.types.is_datetime64_any_dtype(series)
+        return pandas.api.types.is_datetime64_any_dtype(series)
 
-    def exclusion_reason(self, series: pd.Series) -> str | None:
+    def exclusion_reason(self, series: pandas.Series) -> str | None:
         """Datetimes are kept: the profiler expands them into features.
 
         Args:
@@ -503,7 +503,7 @@ class TextKind(ColumnKind):
 
     name = "text"
 
-    def matches(self, series: pd.Series) -> bool:
+    def matches(self, series: pandas.Series) -> bool:
         """Strings with several words per value and mostly unique values.
 
         Args:
@@ -516,18 +516,18 @@ class TextKind(ColumnKind):
             `TEXT_UNIQUE_RATIO` unique.
         """
         if not (
-            pd.api.types.is_object_dtype(series)
-            or pd.api.types.is_string_dtype(series)
+            pandas.api.types.is_object_dtype(series)
+            or pandas.api.types.is_string_dtype(series)
         ):
             return False
         values = series.dropna().astype(str).head(TEXT_SAMPLE)
         if len(values) < MIN_TEXT_ROWS:
             return False
-        words = float(np.mean([len(v.split()) for v in values]))
+        words = float(numpy.mean([len(v.split()) for v in values]))
         unique = values.nunique() / len(values)
         return bool(words >= MIN_TEXT_WORDS and unique > TEXT_UNIQUE_RATIO)
 
-    def statistics(self, series: pd.Series) -> dict[str, Any]:
+    def statistics(self, series: pandas.Series) -> dict[str, Any]:
         """Adds the typical number of words per value.
 
         Args:
@@ -539,11 +539,11 @@ class TextKind(ColumnKind):
         """
         stats = super().statistics(series)
         counts = [len(v.split()) for v in series.dropna().astype(str)]
-        stats["mean_words"] = float(np.mean(counts)) if counts else 0.0
+        stats["mean_words"] = float(numpy.mean(counts)) if counts else 0.0
         return stats
 
     def transformer(
-        self, options: data_contracts.PreprocessingOptions
+        self, options: data.PreprocessingOptions
     ) -> pipeline.Pipeline:
         """Casts to text, then TF-IDF terms (fold-local) or embeddings.
 
@@ -581,7 +581,7 @@ class CategoricalKind(ColumnKind):
 
     name = "categorical"
 
-    def matches(self, series: pd.Series) -> bool:
+    def matches(self, series: pandas.Series) -> bool:
         """Fallback kind; matches any column.
 
         Args:
@@ -592,7 +592,7 @@ class CategoricalKind(ColumnKind):
         """
         return True
 
-    def statistics(self, series: pd.Series) -> dict[str, Any]:
+    def statistics(self, series: pandas.Series) -> dict[str, Any]:
         """Adds the most frequent values.
 
         Args:
@@ -608,7 +608,7 @@ class CategoricalKind(ColumnKind):
         stats["entropy_bits"] = entropy(series)
         return stats
 
-    def exclusion_reason(self, series: pd.Series) -> str | None:
+    def exclusion_reason(self, series: pandas.Series) -> str | None:
         """Near-unique text columns are treated as identifiers.
 
         Args:
@@ -623,7 +623,7 @@ class CategoricalKind(ColumnKind):
         return None
 
     def transformer(
-        self, options: data_contracts.PreprocessingOptions
+        self, options: data.PreprocessingOptions
     ) -> pipeline.Pipeline:
         """Casts to object, imputes a token, one-hot encodes.
 
@@ -702,7 +702,7 @@ class CategoricalKind(ColumnKind):
         return None
 
     def association(
-        self, series: pd.Series, target: pd.Series, task: tasks.TaskType
+        self, series: pandas.Series, target: pandas.Series, task: tasks.TaskType
     ) -> float:
         """Class purity of category values (classification only).
 
@@ -733,7 +733,7 @@ KINDS: tuple[ColumnKind, ...] = (
 )
 
 
-def kind_of(series: pd.Series) -> ColumnKind:
+def kind_of(series: pandas.Series) -> ColumnKind:
     """Returns the first kind that matches `series`.
 
     Args:

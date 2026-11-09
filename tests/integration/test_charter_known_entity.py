@@ -4,13 +4,13 @@ entity the unit: its rows sit on both sides, the final test rows come last."""
 import json
 import pathlib
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 import support
 
 from scmle.contracts import errors
-from scmle.data.charter import contracts as c
+from scmle.data.charter import contracts
 from scmle.data.charter import sealing
 from tests.unit.test_charter_contracts import make_charter
 
@@ -18,18 +18,18 @@ KEY = "known-entity-key"
 
 
 def panel(entities=60, per=30, seed=0):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     level = rng.normal(0, 1.5, entities)
     rows = []
     for entity in range(entities):
         x = rng.normal(size=per)
         y = 2 * x + level[entity] + rng.normal(0, 0.5, per)
         rows.append(
-            pd.DataFrame(
-                {"entity": f"e{entity}", "t": np.arange(per), "x": x, "y": y}
+            pandas.DataFrame(
+                {"entity": f"e{entity}", "t": numpy.arange(per), "x": x, "y": y}
             )
         )
-    return pd.concat(rows, ignore_index=True)
+    return pandas.concat(rows, ignore_index=True)
 
 
 def charter_file(tmp_path, **overrides):
@@ -37,7 +37,7 @@ def charter_file(tmp_path, **overrides):
     values = {
         "min_effect": 0.5,
         "k_max": 3,
-        "unit_of_prediction": c.KNOWN_ENTITY_FUTURE,
+        "unit_of_prediction": contracts.KNOWN_ENTITY_FUTURE,
         **overrides,
     }
     sealing.write_charter(path, make_charter(**values), signing_key=KEY)

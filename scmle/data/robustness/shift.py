@@ -36,8 +36,8 @@ import math
 import sys
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from scipy import stats
 from scipy.spatial import distance
 from sklearn import ensemble
@@ -70,7 +70,7 @@ class Status(enum.StrEnum):
     UNVERIFIABLE = "unverifiable"
 
 
-def permutation_p_value(observed: float, null: np.ndarray) -> float:
+def permutation_p_value(observed: float, null: numpy.ndarray) -> float:
     """Computes ``(1 + #{null >= observed}) / (B + 1)``.
 
     A draw counts as at least as large as `observed` when it is within
@@ -83,13 +83,13 @@ def permutation_p_value(observed: float, null: np.ndarray) -> float:
     Returns:
         The permutation p-value, in (0, 1].
     """
-    draws = np.asarray(null, dtype=float)
-    hits = int(np.sum(draws >= observed - TIE_TOLERANCE))
+    draws = numpy.asarray(null, dtype=float)
+    hits = int(numpy.sum(draws >= observed - TIE_TOLERANCE))
     return (1.0 + hits) / (draws.size + 1.0)
 
 
 def auc_delong(
-    scores: np.ndarray, side: np.ndarray, confidence: float = 0.95
+    scores: numpy.ndarray, side: numpy.ndarray, confidence: float = 0.95
 ) -> tuple[float, tuple[float, float]]:
     """ROC AUC with the DeLong interval, from midranks.
 
@@ -107,14 +107,14 @@ def auc_delong(
     """
     if not 0.0 < confidence < 1.0:
         raise ValueError("confidence must be within (0, 1)")
-    values = np.asarray(scores, dtype=float)
-    labels = np.asarray(side)
+    values = numpy.asarray(scores, dtype=float)
+    labels = numpy.asarray(side)
     positive = values[labels == 1]
     negative = values[labels == 0]
     m, n = len(positive), len(negative)
     if min(m, n) < 2:
         raise ValueError("each class needs at least two rows")
-    pooled = stats.rankdata(np.r_[positive, negative])
+    pooled = stats.rankdata(numpy.r_[positive, negative])
     v10 = (pooled[:m] - stats.rankdata(positive)) / n
     v01 = 1.0 - (pooled[m:] - stats.rankdata(negative)) / m
     auc = float(v10.mean())
@@ -124,7 +124,9 @@ def auc_delong(
     return auc, (max(0.0, auc - half), min(1.0, auc + half))
 
 
-def pooled_codes(sample: pd.DataFrame, reference: pd.DataFrame) -> pd.DataFrame:
+def pooled_codes(
+    sample: pandas.DataFrame, reference: pandas.DataFrame
+) -> pandas.DataFrame:
     """Stacks the two tables into one numeric table.
 
     Args:
@@ -139,14 +141,16 @@ def pooled_codes(sample: pd.DataFrame, reference: pd.DataFrame) -> pd.DataFrame:
         missing value).
     """
     columns = list(sample.columns)
-    both = pd.concat([sample[columns], reference[columns]], ignore_index=True)
+    both = pandas.concat(
+        [sample[columns], reference[columns]], ignore_index=True
+    )
     for name in columns:
-        if not pd.api.types.is_numeric_dtype(both[name]):
+        if not pandas.api.types.is_numeric_dtype(both[name]):
             both[name] = both[name].astype("category").cat.codes
     return both.astype(float)
 
 
-def side_labels(sample_rows: int, reference_rows: int) -> np.ndarray:
+def side_labels(sample_rows: int, reference_rows: int) -> numpy.ndarray:
     """Labels the pooled rows by side.
 
     Args:
@@ -157,12 +161,12 @@ def side_labels(sample_rows: int, reference_rows: int) -> np.ndarray:
         A float array of length ``sample_rows + reference_rows``: 0 for each
         sample row, then 1 for each reference row.
     """
-    return np.r_[np.zeros(sample_rows), np.ones(reference_rows)]
+    return numpy.r_[numpy.zeros(sample_rows), numpy.ones(reference_rows)]
 
 
 def holdout_split(
-    side: np.ndarray, rng: np.random.Generator
-) -> tuple[np.ndarray, np.ndarray]:
+    side: numpy.ndarray, rng: numpy.random.Generator
+) -> tuple[numpy.ndarray, numpy.ndarray]:
     """Splits the pooled rows into train and test, stratified by side.
 
     Within each side the rows are shuffled and the first
@@ -178,11 +182,11 @@ def holdout_split(
     train: list[int] = []
     test: list[int] = []
     for label in (0.0, 1.0):
-        rows = rng.permutation(np.flatnonzero(side == label))
+        rows = rng.permutation(numpy.flatnonzero(side == label))
         cut = round(len(rows) * (1.0 - HOLDOUT))
         train.extend(rows[:cut].tolist())
         test.extend(rows[cut:].tolist())
-    return np.array(sorted(train)), np.array(sorted(test))
+    return numpy.array(sorted(train)), numpy.array(sorted(test))
 
 
 def decide(
@@ -207,14 +211,14 @@ def decide(
 
 
 def c2st(
-    sample: pd.DataFrame,
-    reference: pd.DataFrame,
+    sample: pandas.DataFrame,
+    reference: pandas.DataFrame,
     seed: int,
     *,
     permutations: int = PERMUTATIONS,
     alpha: float = ALPHA,
     delta: float = 0.0,
-    strata: np.ndarray | None = None,
+    strata: numpy.ndarray | None = None,
     gate: certificates.GateStatus = certificates.GateStatus.DESCRIPTIVE,
     on_shift: qualification.Decision = qualification.Decision.WARN,
 ) -> qualification.Check:
@@ -253,8 +257,8 @@ def c2st(
     scores = model.predict_proba(both.iloc[test])[:, 1]
     held = side[test]
     observed = float(metrics.roc_auc_score(held, scores))
-    labels = None if strata is None else np.asarray(strata)[test]
-    null = np.array(
+    labels = None if strata is None else numpy.asarray(strata)[test]
+    null = numpy.array(
         [
             metrics.roc_auc_score(
                 controls.permute_within(held, labels, rng), scores
@@ -281,7 +285,7 @@ def c2st(
     )
 
 
-def check_pair(sample: pd.DataFrame, reference: pd.DataFrame) -> None:
+def check_pair(sample: pandas.DataFrame, reference: pandas.DataFrame) -> None:
     """Requires the same columns and enough rows on both sides.
 
     Args:
@@ -298,7 +302,7 @@ def check_pair(sample: pd.DataFrame, reference: pd.DataFrame) -> None:
         raise ValueError(f"each side needs at least {MIN_ROWS} rows")
 
 
-def design_matrix(both: pd.DataFrame, rows: int) -> np.ndarray:
+def design_matrix(both: pandas.DataFrame, rows: int) -> numpy.ndarray:
     """Numeric design for the kernel: standardised, categories one-hot.
 
     Missing numbers are filled with the pooled median. Categorical columns
@@ -317,11 +321,13 @@ def design_matrix(both: pd.DataFrame, rows: int) -> np.ndarray:
     parts = []
     for name in both.columns:
         column = both[name]
-        if pd.api.types.is_numeric_dtype(column) and not (
-            pd.api.types.is_bool_dtype(column)
+        if pandas.api.types.is_numeric_dtype(column) and not (
+            pandas.api.types.is_bool_dtype(column)
         ):
             values = column.to_numpy(dtype=float)
-            filled = np.where(np.isfinite(values), values, np.nanmedian(values))
+            filled = numpy.where(
+                numpy.isfinite(values), values, numpy.nanmedian(values)
+            )
             spread = float(filled.std())
             parts.append(
                 ((filled - filled.mean()) / (spread if spread > 0 else 1.0))[
@@ -330,14 +336,14 @@ def design_matrix(both: pd.DataFrame, rows: int) -> np.ndarray:
             )
         elif column.nunique(dropna=False) <= MAX_ONE_HOT:
             parts.append(
-                pd.get_dummies(column.astype(str)).to_numpy(dtype=float)
+                pandas.get_dummies(column.astype(str)).to_numpy(dtype=float)
             )
     if not parts:
-        return np.zeros((rows, 1))
-    return np.hstack(parts)
+        return numpy.zeros((rows, 1))
+    return numpy.hstack(parts)
 
 
-def median_bandwidth(design: np.ndarray) -> float:
+def median_bandwidth(design: numpy.ndarray) -> float:
     """Computes the median-heuristic kernel bandwidth.
 
     Args:
@@ -348,11 +354,11 @@ def median_bandwidth(design: np.ndarray) -> float:
         median is zero or there are fewer than two rows.
     """
     pairwise = distance.pdist(design)
-    middle = float(np.median(pairwise)) if pairwise.size else 0.0
+    middle = float(numpy.median(pairwise)) if pairwise.size else 0.0
     return middle if middle > 0.0 else 1.0
 
 
-def gaussian_kernel(design: np.ndarray, bandwidth: float) -> np.ndarray:
+def gaussian_kernel(design: numpy.ndarray, bandwidth: float) -> numpy.ndarray:
     """Computes ``exp(-|a - b|^2 / (2 h^2))`` for every pair of rows.
 
     Args:
@@ -363,10 +369,12 @@ def gaussian_kernel(design: np.ndarray, bandwidth: float) -> np.ndarray:
         The symmetric kernel matrix, with ones on the diagonal.
     """
     squared = distance.cdist(design, design, "sqeuclidean")
-    return np.exp(-squared / (2.0 * bandwidth * bandwidth))
+    return numpy.exp(-squared / (2.0 * bandwidth * bandwidth))
 
 
-def mmd_statistics(kernel: np.ndarray, first: np.ndarray) -> np.ndarray:
+def mmd_statistics(
+    kernel: numpy.ndarray, first: numpy.ndarray
+) -> numpy.ndarray:
     """Unbiased squared MMD for each column of 0/1 membership indicators.
 
     Args:
@@ -377,7 +385,7 @@ def mmd_statistics(kernel: np.ndarray, first: np.ndarray) -> np.ndarray:
     Returns:
         A float array with one statistic per column of `first`.
     """
-    off = kernel - np.diag(np.diag(kernel))
+    off = kernel - numpy.diag(numpy.diag(kernel))
     second = 1.0 - first
     m = first.sum(axis=0)
     r = second.sum(axis=0)
@@ -388,13 +396,13 @@ def mmd_statistics(kernel: np.ndarray, first: np.ndarray) -> np.ndarray:
 
 
 def mmd_test(
-    sample: pd.DataFrame,
-    reference: pd.DataFrame,
+    sample: pandas.DataFrame,
+    reference: pandas.DataFrame,
     seed: int,
     *,
     permutations: int = PERMUTATIONS,
     alpha: float = ALPHA,
-    strata: np.ndarray | None = None,
+    strata: numpy.ndarray | None = None,
     gate: certificates.GateStatus = certificates.GateStatus.DESCRIPTIVE,
     on_shift: qualification.Decision = qualification.Decision.WARN,
 ) -> qualification.Check:
@@ -421,15 +429,15 @@ def mmd_test(
     """
     check_pair(sample, reference)
     rng = randomness.component_rng(seed, MMD_ID, 0)
-    first = np.sort(
+    first = numpy.sort(
         rng.choice(len(sample), min(len(sample), MAX_MMD_ROWS), replace=False)
     )
-    second = np.sort(
+    second = numpy.sort(
         rng.choice(
             len(reference), min(len(reference), MAX_MMD_ROWS), replace=False
         )
     )
-    both = pd.concat(
+    both = pandas.concat(
         [sample.iloc[first], reference.iloc[second]], ignore_index=True
     )
     design = design_matrix(both, len(both))
@@ -437,17 +445,17 @@ def mmd_test(
     labels = (
         None
         if strata is None
-        else np.r_[
-            np.asarray(strata)[first],
-            np.asarray(strata)[len(sample) + second],
+        else numpy.r_[
+            numpy.asarray(strata)[first],
+            numpy.asarray(strata)[len(sample) + second],
         ]
     )
-    indicator = np.r_[np.ones(len(first)), np.zeros(len(second))]
+    indicator = numpy.r_[numpy.ones(len(first)), numpy.zeros(len(second))]
     observed = float(mmd_statistics(kernel, indicator[:, None])[0])
-    null = np.empty(permutations)
+    null = numpy.empty(permutations)
     for start in range(0, permutations, CHUNK):
         stop = min(start + CHUNK, permutations)
-        block = np.column_stack(
+        block = numpy.column_stack(
             [
                 controls.permute_within(indicator, labels, rng)
                 for draw in range(start, stop)
@@ -506,7 +514,7 @@ class FeatureShift:
 
 
 def categorical_test(
-    left: pd.Series, right: pd.Series
+    left: pandas.Series, right: pandas.Series
 ) -> tuple[float, float, float, bool]:
     """Tests whether two samples share one categorical distribution.
 
@@ -519,7 +527,7 @@ def categorical_test(
         True when an expected count is below `LOW_EXPECTED`). With fewer
         than two distinct levels the result is (0, 1, 0, False).
     """
-    table = pd.concat(
+    table = pandas.concat(
         [
             left.astype(str).value_counts(),
             right.astype(str).value_counts(),
@@ -542,7 +550,7 @@ def categorical_test(
 
 
 def feature_tests(
-    sample: pd.DataFrame, reference: pd.DataFrame, alpha: float = ALPHA
+    sample: pandas.DataFrame, reference: pandas.DataFrame, alpha: float = ALPHA
 ) -> tuple[FeatureShift, ...]:
     """KS or chi-square per shared column, adjusted by Benjamini-Hochberg.
 
@@ -560,9 +568,9 @@ def feature_tests(
         if name not in reference.columns:
             continue
         left, right = sample[name], reference[name]
-        numeric = pd.api.types.is_numeric_dtype(
+        numeric = pandas.api.types.is_numeric_dtype(
             left
-        ) and not pd.api.types.is_bool_dtype(left)
+        ) and not pandas.api.types.is_bool_dtype(left)
         if numeric:
             a, b = left.dropna(), right.dropna()
             if len(a) == 0 or len(b) == 0:
@@ -654,8 +662,8 @@ def unverifiable(reason: str) -> ShiftResult:
 
 
 def assess(
-    sample: pd.DataFrame,
-    reference: pd.DataFrame | None,
+    sample: pandas.DataFrame,
+    reference: pandas.DataFrame | None,
     seed: int,
     *,
     permutations: int = PERMUTATIONS,

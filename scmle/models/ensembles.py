@@ -11,12 +11,12 @@ from collections.abc import Mapping
 from typing import Any
 from typing import Self
 
-import numpy as np
+import numpy
 from sklearn import base
 from sklearn import ensemble
 from sklearn import linear_model
 
-from scmle.contracts import data as data_contracts
+from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.contracts import models
 from scmle.contracts import tasks
@@ -57,7 +57,7 @@ class GreedyBlender(base.BaseEstimator, abc.ABC):
         self.members = members
         self.rounds = rounds
 
-    def outputs(self, meta: Any) -> np.ndarray:
+    def outputs(self, meta: Any) -> numpy.ndarray:
         """Splits the concatenated meta-features by member.
 
         Args:
@@ -66,13 +66,13 @@ class GreedyBlender(base.BaseEstimator, abc.ABC):
         Returns:
             Float array of shape (rows, members, columns per member).
         """
-        values = np.asarray(meta, dtype=float)
+        values = numpy.asarray(meta, dtype=float)
         return values.reshape(len(values), self.members, -1)
 
     @abc.abstractmethod
     def prepare(
-        self, stacked: np.ndarray, target: Any
-    ) -> tuple[np.ndarray, np.ndarray]:
+        self, stacked: numpy.ndarray, target: Any
+    ) -> tuple[numpy.ndarray, numpy.ndarray]:
         """Puts the member outputs and the truth in comparable shapes.
 
         Args:
@@ -85,7 +85,7 @@ class GreedyBlender(base.BaseEstimator, abc.ABC):
         """
 
     @abc.abstractmethod
-    def loss(self, blend: np.ndarray, truth: np.ndarray) -> float:
+    def loss(self, blend: numpy.ndarray, truth: numpy.ndarray) -> float:
         """Scores a blended prediction against the truth.
 
         Args:
@@ -108,21 +108,21 @@ class GreedyBlender(base.BaseEstimator, abc.ABC):
             This blender, with `weights_` set.
         """
         stacked, truth = self.prepare(self.outputs(meta), target)
-        counts = np.zeros(self.members)
-        running = np.zeros_like(stacked[:, 0, :])
+        counts = numpy.zeros(self.members)
+        running = numpy.zeros_like(stacked[:, 0, :])
         for step in range(self.rounds):
             blends = (running[:, None, :] * step + stacked) / (step + 1)
             losses = [
                 self.loss(blends[:, member, :], truth)
                 for member in range(self.members)
             ]
-            chosen = int(np.argmin(losses))
+            chosen = int(numpy.argmin(losses))
             counts[chosen] += 1
             running = blends[:, chosen, :]
         self.weights_ = counts / counts.sum()
         return self
 
-    def blend(self, meta: Any) -> np.ndarray:
+    def blend(self, meta: Any) -> numpy.ndarray:
         """Averages the members' outputs with the selected weights.
 
         Args:
@@ -133,9 +133,11 @@ class GreedyBlender(base.BaseEstimator, abc.ABC):
             average.
         """
         stacked = self.expand(self.outputs(meta))
-        return np.tensordot(self.weights_, stacked.transpose(1, 0, 2), axes=1)
+        return numpy.tensordot(
+            self.weights_, stacked.transpose(1, 0, 2), axes=1
+        )
 
-    def expand(self, stacked: np.ndarray) -> np.ndarray:
+    def expand(self, stacked: numpy.ndarray) -> numpy.ndarray:
         """Hook for turning single probability columns into two (binary).
 
         Args:
@@ -150,7 +152,7 @@ class GreedyBlender(base.BaseEstimator, abc.ABC):
 class ClassifierBlender(base.ClassifierMixin, GreedyBlender):
     """Greedy blend of members' class probabilities."""
 
-    def expand(self, stacked: np.ndarray) -> np.ndarray:
+    def expand(self, stacked: numpy.ndarray) -> numpy.ndarray:
         """Adds the negative-class column for binary members.
 
         Args:
@@ -161,12 +163,12 @@ class ClassifierBlender(base.ClassifierMixin, GreedyBlender):
             (P(negative), P(positive)); otherwise `stacked` unchanged.
         """
         if stacked.shape[2] == 1:
-            return np.concatenate([1.0 - stacked, stacked], axis=2)
+            return numpy.concatenate([1.0 - stacked, stacked], axis=2)
         return stacked
 
     def prepare(
-        self, stacked: np.ndarray, target: Any
-    ) -> tuple[np.ndarray, np.ndarray]:
+        self, stacked: numpy.ndarray, target: Any
+    ) -> tuple[numpy.ndarray, numpy.ndarray]:
         """Encodes the truth one-hot and expands binary member outputs.
 
         Args:
@@ -177,10 +179,10 @@ class ClassifierBlender(base.ClassifierMixin, GreedyBlender):
             The expanded member outputs, and the one-hot truth with one
             column per class in `classes_` order. Sets `classes_`.
         """
-        self.classes_, encoded = np.unique(target, return_inverse=True)
-        return self.expand(stacked), np.eye(len(self.classes_))[encoded]
+        self.classes_, encoded = numpy.unique(target, return_inverse=True)
+        return self.expand(stacked), numpy.eye(len(self.classes_))[encoded]
 
-    def loss(self, blend: np.ndarray, truth: np.ndarray) -> float:
+    def loss(self, blend: numpy.ndarray, truth: numpy.ndarray) -> float:
         """Computes the log loss.
 
         Args:
@@ -190,10 +192,10 @@ class ClassifierBlender(base.ClassifierMixin, GreedyBlender):
         Returns:
             Mean negative log probability of the true class.
         """
-        clipped = np.clip(blend, 1e-12, 1.0)
-        return float(-np.mean(np.sum(truth * np.log(clipped), axis=1)))
+        clipped = numpy.clip(blend, 1e-12, 1.0)
+        return float(-numpy.mean(numpy.sum(truth * numpy.log(clipped), axis=1)))
 
-    def predict_proba(self, meta: Any) -> np.ndarray:
+    def predict_proba(self, meta: Any) -> numpy.ndarray:
         """Predicts class probabilities.
 
         Args:
@@ -204,7 +206,7 @@ class ClassifierBlender(base.ClassifierMixin, GreedyBlender):
         """
         return self.blend(meta)
 
-    def predict(self, meta: Any) -> np.ndarray:
+    def predict(self, meta: Any) -> numpy.ndarray:
         """Predicts the most probable class.
 
         Args:
@@ -220,8 +222,8 @@ class RegressorBlender(base.RegressorMixin, GreedyBlender):
     """Greedy blend of members' predictions."""
 
     def prepare(
-        self, stacked: np.ndarray, target: Any
-    ) -> tuple[np.ndarray, np.ndarray]:
+        self, stacked: numpy.ndarray, target: Any
+    ) -> tuple[numpy.ndarray, numpy.ndarray]:
         """Reshapes the truth to a column vector.
 
         Args:
@@ -232,9 +234,9 @@ class RegressorBlender(base.RegressorMixin, GreedyBlender):
             The member outputs unchanged, and the truth as floats with shape
             (rows, 1).
         """
-        return stacked, np.asarray(target, dtype=float).reshape(-1, 1)
+        return stacked, numpy.asarray(target, dtype=float).reshape(-1, 1)
 
-    def loss(self, blend: np.ndarray, truth: np.ndarray) -> float:
+    def loss(self, blend: numpy.ndarray, truth: numpy.ndarray) -> float:
         """Computes the mean squared error.
 
         Args:
@@ -244,9 +246,9 @@ class RegressorBlender(base.RegressorMixin, GreedyBlender):
         Returns:
             Mean squared difference.
         """
-        return float(np.mean((blend - truth) ** 2))
+        return float(numpy.mean((blend - truth) ** 2))
 
-    def predict(self, meta: Any) -> np.ndarray:
+    def predict(self, meta: Any) -> numpy.ndarray:
         """Predicts the blended value.
 
         Args:
@@ -307,7 +309,7 @@ class StackingAdapter(models.ModelAdapter):
 
     def assemble(
         self,
-        plan: data_contracts.FeaturePlan,
+        plan: data.FeaturePlan,
         task: tasks.TaskType,
         seed: int,
         params: Mapping[str, Any] | None = None,

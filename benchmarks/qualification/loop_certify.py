@@ -72,8 +72,8 @@ import tempfile
 import types
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from benchmarks.qualification import streams
 from scmle.data.detectors import certificates
@@ -83,7 +83,7 @@ from scmle.governance import loop as loop_module
 from scmle.monitoring import labels
 from scmle.monitoring import monitor as monitor_module
 from scmle.monitoring import reference
-from scmle.monitoring import sequential_tests as seq
+from scmle.monitoring import sequential_tests
 
 STORE_PATH = Path(__file__).with_name("loop_certificates.json")
 DEV_SEED_BASE = 10_000
@@ -138,7 +138,9 @@ def lower_bound(hits: int, runs: int) -> float:
     return coverage.clopper_pearson(hits, runs, 0.90)[0]
 
 
-def batch_means(rng: np.random.Generator, risk: float, runs: int) -> np.ndarray:
+def batch_means(
+    rng: numpy.random.Generator, risk: float, runs: int
+) -> numpy.ndarray:
     """One batch mean loss per stream, for Bernoulli(risk) cases.
 
     Args:
@@ -152,7 +154,7 @@ def batch_means(rng: np.random.Generator, risk: float, runs: int) -> np.ndarray:
     return rng.binomial(BATCH, risk, runs) / BATCH
 
 
-def fixed_rule(batch_mean: np.ndarray) -> np.ndarray:
+def fixed_rule(batch_mean: numpy.ndarray) -> numpy.ndarray:
     """The existing rule: loss above `R_REF` by more than 10 percent.
 
     Args:
@@ -180,11 +182,13 @@ def gate_h1(replicates: int, base: int = 0) -> dict[str, Any]:
     """
     out: dict[str, Any] = {"replicates": replicates, "batches": T_FALSE_ALARM}
     for name, risk in (("stable", R_REF), ("boundary", R_REF + DELTA)):
-        rng = np.random.default_rng(base)
-        monitor = seq.MixtureTest(
-            np.full(replicates, (R_REF + DELTA)), seq.GREATER, ALPHA_ALARM
+        rng = numpy.random.default_rng(base)
+        monitor = sequential_tests.MixtureTest(
+            numpy.full(replicates, (R_REF + DELTA)),
+            sequential_tests.GREATER,
+            ALPHA_ALARM,
         )
-        fixed = np.zeros(replicates, dtype=bool)
+        fixed = numpy.zeros(replicates, dtype=bool)
         for _ in range(T_FALSE_ALARM):
             values = batch_means(rng, risk, replicates)
             monitor.update(values)
@@ -220,12 +224,14 @@ def detection(
         its lower bound, and the median delay of the sequential test and of
         the fixed rule (None when none was detected).
     """
-    rng = np.random.default_rng(base)
-    monitor = seq.MixtureTest(
-        np.full(replicates, R_REF + DELTA), seq.GREATER, ALPHA_ALARM
+    rng = numpy.random.default_rng(base)
+    monitor = sequential_tests.MixtureTest(
+        numpy.full(replicates, R_REF + DELTA),
+        sequential_tests.GREATER,
+        ALPHA_ALARM,
     )
-    first = np.full(replicates, -1)
-    fixed_first = np.full(replicates, -1)
+    first = numpy.full(replicates, -1)
+    fixed_first = numpy.full(replicates, -1)
     for step in range(pre + horizon):
         level = R_REF if step < pre else risk
         values = batch_means(rng, level, replicates)
@@ -243,10 +249,10 @@ def detection(
         "within_d_max": within / replicates,
         "within_d_max_lower": lower_bound(within, replicates),
         "median_delay": (
-            float(np.median(first[found])) if found.any() else None
+            float(numpy.median(first[found])) if found.any() else None
         ),
         "fixed_rule_median_delay": (
-            float(np.median(fixed_first[fixed_first >= 0]))
+            float(numpy.median(fixed_first[fixed_first >= 0]))
             if (fixed_first >= 0).any()
             else None
         ),
@@ -301,14 +307,16 @@ def gate_h3(replicates: int, base: int = 0) -> dict[str, Any]:
                 seed=base + index,
             )
         )
-        monitor = seq.MixtureTest(R_REF + DELTA, seq.GREATER, ALPHA_ALARM)
+        monitor = sequential_tests.MixtureTest(
+            R_REF + DELTA, sequential_tests.GREATER, ALPHA_ALARM
+        )
         for step in range(stream.spec.batches):
             monitor.update(float(stream.loss[step].mean()))
         trigger += int(monitor.ever_crossed)
-        edges = np.quantile(stream.z[:100].ravel(), np.linspace(0, 1, 11))
-        edges[0], edges[-1] = -np.inf, np.inf
-        expected = np.histogram(stream.z[:100].ravel(), edges)[0]
-        actual = np.histogram(stream.z[150:].ravel(), edges)[0]
+        edges = numpy.quantile(stream.z[:100].ravel(), numpy.linspace(0, 1, 11))
+        edges[0], edges[-1] = -numpy.inf, numpy.inf
+        expected = numpy.histogram(stream.z[:100].ravel(), edges)[0]
+        actual = numpy.histogram(stream.z[150:].ravel(), edges)[0]
         psi = reference.population_stability_index(
             expected / expected.sum(), actual / actual.sum()
         )
@@ -324,11 +332,11 @@ def gate_h3(replicates: int, base: int = 0) -> dict[str, Any]:
 
 
 def sequence_gaps(
-    rng: np.random.Generator,
-    advantages: np.ndarray,
+    rng: numpy.random.Generator,
+    advantages: numpy.ndarray,
     batches: int,
     base: float,
-) -> np.ndarray:
+) -> numpy.ndarray:
     """Batch mean gaps (champion minus challenger), shape `(count, batches)`.
 
     Every case has a shared latent `u`; the champion errs when `u < base`. A
@@ -351,14 +359,14 @@ def sequence_gaps(
     count = len(advantages)
     own = rng.random((count, batches, BATCH))
     shared = rng.random((count, batches, BATCH)) < 0.7
-    seen = np.where(shared, latent[None], own)
-    low = np.clip(base - advantages, 0.0, 1.0)[:, None, None]
+    seen = numpy.where(shared, latent[None], own)
+    low = numpy.clip(base - advantages, 0.0, 1.0)[:, None, None]
     champion = (latent < base).astype(float)[None]
     challenger = (seen < low).astype(float)
     return (champion - challenger).mean(axis=2)
 
 
-def eprocess_paths(gaps: np.ndarray) -> np.ndarray:
+def eprocess_paths(gaps: numpy.ndarray) -> numpy.ndarray:
     """Log-capital paths of a mixture betting test run on each row of gaps.
 
     Each gap is mapped from [-1, 1] to [0, 1] and tested against the null
@@ -371,17 +379,19 @@ def eprocess_paths(gaps: np.ndarray) -> np.ndarray:
         The log capital of each row's test after each batch, same shape.
     """
     count, batches = gaps.shape
-    test = seq.MixtureTest(
-        np.full(count, (DELTA_PROMO + 1.0) / 2.0), seq.GREATER, ALPHA_PROMO
+    test = sequential_tests.MixtureTest(
+        numpy.full(count, (DELTA_PROMO + 1.0) / 2.0),
+        sequential_tests.GREATER,
+        ALPHA_PROMO,
     )
-    paths = np.empty((count, batches))
+    paths = numpy.empty((count, batches))
     for step in range(batches):
         test.update((gaps[:, step] + 1.0) / 2.0)
         paths[:, step] = test.log_capital
     return paths
 
 
-def elond_decisions(paths: np.ndarray, horizon: int) -> np.ndarray:
+def elond_decisions(paths: numpy.ndarray, horizon: int) -> numpy.ndarray:
     """Replays the loop's rule: heads are decided in order by e-LOND.
 
     Args:
@@ -391,15 +401,15 @@ def elond_decisions(paths: np.ndarray, horizon: int) -> np.ndarray:
     Returns:
         A boolean array, True for each promoted challenger.
     """
-    sequence = seq.PromotionSequence("1/20")
-    rejected = np.zeros(paths.shape[0], dtype=bool)
+    sequence = sequential_tests.PromotionSequence("1/20")
+    rejected = numpy.zeros(paths.shape[0], dtype=bool)
     pointer = 0
     for index in range(paths.shape[0]):
         name = f"c{index}"
         sequence.register(name)
         level = float(sequence.rule.level(sequence.state))
         log_need = math.log(1.0 / level)
-        reached = np.flatnonzero(paths[index, pointer:] >= log_need)
+        reached = numpy.flatnonzero(paths[index, pointer:] >= log_need)
         moment = pointer + int(reached[0]) if reached.size else horizon - 1
         pointer = moment
         step = sequence.decide(
@@ -409,7 +419,9 @@ def elond_decisions(paths: np.ndarray, horizon: int) -> np.ndarray:
     return rejected
 
 
-def bootstrap_rule(gaps: np.ndarray, rng: np.random.Generator) -> np.ndarray:
+def bootstrap_rule(
+    gaps: numpy.ndarray, rng: numpy.random.Generator
+) -> numpy.ndarray:
     """The existing rule per review: promote if the bootstrap lower end > 0.
 
     Reviews every 10 batches; a challenger is promoted at its first review at
@@ -425,20 +437,20 @@ def bootstrap_rule(gaps: np.ndarray, rng: np.random.Generator) -> np.ndarray:
         A boolean array, True for each promoted challenger.
     """
     count, batches = gaps.shape
-    promoted = np.zeros(count, dtype=bool)
+    promoted = numpy.zeros(count, dtype=bool)
     for index in range(count):
         for review in range(10, batches + 1, 10):
-            cases = np.rint(gaps[index, :review] * BATCH).astype(int)
+            cases = numpy.rint(gaps[index, :review] * BATCH).astype(int)
             total = review * BATCH
-            plus = int(np.clip(cases, 0, None).sum())
-            minus = int(np.clip(-cases, 0, None).sum())
+            plus = int(numpy.clip(cases, 0, None).sum())
+            minus = int(numpy.clip(-cases, 0, None).sum())
             probabilities = (
-                np.array([plus, minus, total - plus - minus], dtype=float)
+                numpy.array([plus, minus, total - plus - minus], dtype=float)
                 / total
             )
             draws = rng.multinomial(total, probabilities, size=200)
             means = (draws[:, 0] - draws[:, 1]) / total
-            if np.quantile(means, 0.025) > DELTA_PROMO:
+            if numpy.quantile(means, 0.025) > DELTA_PROMO:
                 promoted[index] = True
                 break
     return promoted
@@ -462,12 +474,12 @@ def gate_h4(replicates: int, base: int = 0) -> dict[str, Any]:
     fdp_boot: list[float] = []
     power_boot: list[float] = []
     for index in range(replicates):
-        rng = np.random.default_rng(base + index)
+        rng = numpy.random.default_rng(base + index)
         truth = rng.random(count) < 0.2
-        advantages = np.where(truth, better, 0.0)
+        advantages = numpy.where(truth, better, 0.0)
         gaps = sequence_gaps(rng, advantages, batches, base_risk)
         decided = elond_decisions(eprocess_paths(gaps), batches)
-        boot = bootstrap_rule(gaps, np.random.default_rng(base + index + 7))
+        boot = bootstrap_rule(gaps, numpy.random.default_rng(base + index + 7))
         for rejected, fp, pw in (
             (decided, fdp, power),
             (boot, fdp_boot, power_boot),
@@ -481,8 +493,8 @@ def gate_h4(replicates: int, base: int = 0) -> dict[str, Any]:
             pw.append(
                 float((rejected & truth).sum()) / max(int(truth.sum()), 1)
             )
-    standard = float(np.std(fdp, ddof=1) / math.sqrt(replicates))
-    mean = float(np.mean(fdp))
+    standard = float(numpy.std(fdp, ddof=1) / math.sqrt(replicates))
+    mean = float(numpy.mean(fdp))
     return {
         "replicates": replicates,
         "challengers": count,
@@ -491,10 +503,10 @@ def gate_h4(replicates: int, base: int = 0) -> dict[str, Any]:
         "horizon_batches": batches,
         "elond_fdr": mean,
         "elond_se": standard,
-        "elond_power": float(np.mean(power)),
-        "bootstrap_fdr": float(np.mean(fdp_boot)),
-        "bootstrap_power": float(np.mean(power_boot)),
-        "bootstrap_exceeds_level": bool(np.mean(fdp_boot) > ALPHA_PROMO),
+        "elond_power": float(numpy.mean(power)),
+        "bootstrap_fdr": float(numpy.mean(fdp_boot)),
+        "bootstrap_power": float(numpy.mean(power_boot)),
+        "bootstrap_exceeds_level": bool(numpy.mean(fdp_boot) > ALPHA_PROMO),
         "passed": bool(mean <= ALPHA_PROMO + 3.0 * standard),
     }
 
@@ -512,11 +524,13 @@ def gate_h5(replicates: int, base: int = 0) -> dict[str, Any]:
     """
     rows: dict[str, Any] = {}
     for name, factor in (("0", 0.0), ("1", 1.0), ("2", 2.0)):
-        rng = np.random.default_rng(base)
-        process = seq.MixtureTest(
-            np.full(replicates, (DELTA_RB + 1.0) / 2.0), seq.GREATER, ALPHA_RB
+        rng = numpy.random.default_rng(base)
+        process = sequential_tests.MixtureTest(
+            numpy.full(replicates, (DELTA_RB + 1.0) / 2.0),
+            sequential_tests.GREATER,
+            ALPHA_RB,
         )
-        first = np.full(replicates, -1)
+        first = numpy.full(replicates, -1)
         for step in range(400):
             worse = factor * DELTA_RB
             gap = rng.binomial(BATCH, worse, replicates) / BATCH
@@ -527,7 +541,7 @@ def gate_h5(replicates: int, base: int = 0) -> dict[str, Any]:
         rows[name] = {
             "worse_by": factor * DELTA_RB,
             "rollback_rate": float(found.mean()),
-            "median_delay": float(np.median(first[found]))
+            "median_delay": float(numpy.median(first[found]))
             if found.any()
             else None,
         }
@@ -602,14 +616,14 @@ def run_mnar_loop(seed: int) -> dict[str, Any]:
             hooks=loop_module.Hooks(retrain=lambda: "x"),
         )
         for step in range(stream.spec.batches):
-            frame = pd.DataFrame(
+            frame = pandas.DataFrame(
                 {"case_id": [f"b{step}-{i}" for i in range(BATCH)]}
             )
             loop.observe(frame, [0.0] * BATCH, ["a"] * BATCH)
             arrived = {
                 f"b{b}-{p}": float(stream.loss[b, p])
                 for b in range(step + 1)
-                for p in np.flatnonzero(
+                for p in numpy.flatnonzero(
                     (stream.arrival[b] == step) & stream.selected[b]
                 )
             }
@@ -644,13 +658,13 @@ def gate_h6(replicates: int, base: int = 0) -> dict[str, Any]:
         stream = mar_stream(base + index)
         estimates, seen_loss, seen_n = [], 0.0, 0
         truth.append(streams.marginal_risk(R_REF, stream.spec.dependence))
-        sequence = seq.ConfidenceSequence(ALPHA_ALARM, 99)
+        sequence = sequential_tests.ConfidenceSequence(ALPHA_ALARM, 99)
         inside = True
         scale = 1.0 / 0.1
         for step in range(stream.spec.batches):
             observed = stream.selected[step]
             estimate = labels.estimate_batch(
-                np.where(observed, stream.loss[step], np.nan),
+                numpy.where(observed, stream.loss[step], numpy.nan),
                 observed,
                 stream.pi[step],
                 None,
@@ -662,13 +676,13 @@ def gate_h6(replicates: int, base: int = 0) -> dict[str, Any]:
             seen_n += int(observed.sum())
             low, high = sequence.update(estimate.mean / scale)
             inside &= low <= truth[-1] / scale <= high
-        weighted.append(float(np.mean(estimates)))
+        weighted.append(float(numpy.mean(estimates)))
         naive.append(seen_loss / seen_n)
         covered += int(inside)
-    diff = np.array(weighted) - np.array(truth)
+    diff = numpy.array(weighted) - numpy.array(truth)
     standard = float(diff.std(ddof=1) / math.sqrt(runs))
     bias = float(diff.mean())
-    naive_bias = float(np.mean(np.array(naive) - np.array(truth)))
+    naive_bias = float(numpy.mean(numpy.array(naive) - numpy.array(truth)))
     cover = covered / runs
     floor = 1.0 - ALPHA_ALARM - 3.0 * math.sqrt(0.05 * 0.95 / runs)
     mnar = [run_mnar_loop(base + i) for i in range(10)]
@@ -718,7 +732,9 @@ def gate_h7(replicates: int, base: int = 0) -> dict[str, Any]:
                 seed=base + index,
             )
         )
-        position = np.arange(now + 1)[:, None] + np.zeros_like(stream.loss)
+        position = numpy.arange(now + 1)[:, None] + numpy.zeros_like(
+            stream.loss
+        )
         horizon = window + slow
         recent = (position > now - 2 * horizon) & (position <= now)
         arrived = stream.arrival <= now
@@ -726,8 +742,8 @@ def gate_h7(replicates: int, base: int = 0) -> dict[str, Any]:
         by_prediction.append(
             float(stream.loss[position <= now - 2 * horizon].mean())
         )
-    prediction = np.array(by_prediction) - base_risk
-    arrival = np.array(by_arrival) - base_risk
+    prediction = numpy.array(by_prediction) - base_risk
+    arrival = numpy.array(by_arrival) - base_risk
     p_se = float(prediction.std(ddof=1) / math.sqrt(replicates))
     a_se = float(arrival.std(ddof=1) / math.sqrt(replicates))
     return {
@@ -767,7 +783,7 @@ def gate_h8(replicates: int, base: int = 0) -> dict[str, Any]:
             stream = streams.feedback_stream(
                 40, 100, gamma, bypass, base + index
             )
-            frame = pd.DataFrame({"z": stream.next_z.reshape(-1)})
+            frame = pandas.DataFrame({"z": stream.next_z.reshape(-1)})
             flags = stream.bypass.reshape(-1)
             check = labels.bypass_test(
                 frame[~flags].iloc[:300],
@@ -806,7 +822,7 @@ def gate_h9(replicates: int, base: int = 0) -> dict[str, Any]:
     """
     runs = min(replicates, 1000)
     violations, naive_violations, coverage_values, infinite = 0, 0, [], 0
-    grid = np.linspace(1.0, 0.0, escalation.DEFAULT_GRID)
+    grid = numpy.linspace(1.0, 0.0, escalation.DEFAULT_GRID)
     for index in range(runs):
         data = streams.draw_calibration(2000, R_STAR, base + index)
         result = escalation.select_threshold(
@@ -832,7 +848,7 @@ def gate_h9(replicates: int, base: int = 0) -> dict[str, Any]:
         "violation_bound": bound,
         "naive_best_cut_violation_rate": naive_violations / runs,
         "everything_escalates_rate": infinite / runs,
-        "mean_coverage_at_tau": float(np.mean(coverage_values)),
+        "mean_coverage_at_tau": float(numpy.mean(coverage_values)),
         "oracle_tau": oracle_tau,
         "oracle_coverage": 1.0 - oracle_tau,
         "passed": bool(rate <= bound),
@@ -853,11 +869,11 @@ def gate_h10(replicates: int, base: int = 0) -> dict[str, Any]:
     """
     rows: dict[str, Any] = {}
     for name, level in (("r_star_x_2", 2 * R_STAR), ("r_star_x_3", 3 * R_STAR)):
-        rng = np.random.default_rng(base)
-        monitor = seq.MixtureTest(
-            np.full(replicates, R_STAR), seq.GREATER, DELTA_CONF
+        rng = numpy.random.default_rng(base)
+        monitor = sequential_tests.MixtureTest(
+            numpy.full(replicates, R_STAR), sequential_tests.GREATER, DELTA_CONF
         )
-        first = np.full(replicates, -1)
+        first = numpy.full(replicates, -1)
         pre = 100
         for step in range(pre + 300):
             risk = 0.5 * R_STAR if step < pre else level
@@ -871,13 +887,15 @@ def gate_h10(replicates: int, base: int = 0) -> dict[str, Any]:
             "within_d_max": within / replicates,
             "within_d_max_lower": lower_bound(within, replicates),
             "median_delay_batches": (
-                float(np.median(first[found])) if found.any() else None
+                float(numpy.median(first[found])) if found.any() else None
             ),
             "excess_cases_before_halt": (
-                float(np.median(first[found]) * BATCH) if found.any() else None
+                float(numpy.median(first[found]) * BATCH)
+                if found.any()
+                else None
             ),
         }
-    escalate = escalation.route(np.ones(10), 0.5, 1.0, halted=True)
+    escalate = escalation.route(numpy.ones(10), 0.5, 1.0, halted=True)
     return {
         "replicates": replicates,
         "by_rise": rows,
@@ -910,23 +928,23 @@ def sources() -> dict[str, list[Any]]:
         Mapping of gate key to the functions its certificate covers.
     """
     return {
-        "H1": [seq.MixtureTest, fixed_rule, batch_means, gate_h1],
-        "H2": [seq.MixtureTest, fixed_rule, detection, gate_h2],
-        "H3": [seq.MixtureTest, streams.simulate, gate_h3],
+        "H1": [sequential_tests.MixtureTest, fixed_rule, batch_means, gate_h1],
+        "H2": [sequential_tests.MixtureTest, fixed_rule, detection, gate_h2],
+        "H3": [sequential_tests.MixtureTest, streams.simulate, gate_h3],
         "H4": [
-            seq.MixtureTest,
-            seq.PromotionSequence,
+            sequential_tests.MixtureTest,
+            sequential_tests.PromotionSequence,
             sequence_gaps,
             eprocess_paths,
             elond_decisions,
             bootstrap_rule,
             gate_h4,
         ],
-        "H5": [seq.MixtureTest, gate_h5],
+        "H5": [sequential_tests.MixtureTest, gate_h5],
         "H6": [
             labels.estimate_batch,
             labels.classify,
-            seq.ConfidenceSequence,
+            sequential_tests.ConfidenceSequence,
             streams.simulate,
             run_mnar_loop,
             loop_module.Loop.step,
@@ -946,7 +964,7 @@ def sources() -> dict[str, list[Any]]:
             streams.draw_calibration,
             gate_h9,
         ],
-        "H10": [seq.MixtureTest, escalation.route, gate_h10],
+        "H10": [sequential_tests.MixtureTest, escalation.route, gate_h10],
     }
 
 

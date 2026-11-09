@@ -14,7 +14,7 @@ from scmle.contracts import errors
 from scmle.contracts import models
 from scmle.contracts import tasks
 from scmle.core import limits
-from scmle.core import orchestrator as orchestrator_module
+from scmle.core import orchestrator
 from scmle.models import registry as registry_module
 
 
@@ -26,7 +26,7 @@ def run_with(frame, tmp_path, **resources):
         strategies=support.NO_STRATEGIES,
         ensemble=support.NO_ENSEMBLE,
     )
-    return orchestrator_module.Orchestrator(spec, frame).run(tmp_path)
+    return orchestrator.Orchestrator(spec, frame).run(tmp_path)
 
 
 def test_every_run_reports_how_limits_were_applied(binary_frame, tmp_path):

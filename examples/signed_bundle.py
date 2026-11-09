@@ -9,8 +9,8 @@ import logging
 import pathlib
 import tempfile
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 import scmle
 from scmle.contracts import errors
@@ -20,10 +20,10 @@ LOGGER = logging.getLogger(__name__)
 SIGNING_KEY = "example-only-key"  # in real use: $SCMLE_SIGNING_KEY
 
 
-def make_dataset(rows: int = 600) -> pd.DataFrame:
+def make_dataset(rows: int = 600) -> pandas.DataFrame:
     """Builds a small binary-classification dataset."""
-    rng = np.random.default_rng(1)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(1)
+    frame = pandas.DataFrame(
         {
             "age": rng.integers(18, 80, rows),
             "income": rng.normal(50, 15, rows),

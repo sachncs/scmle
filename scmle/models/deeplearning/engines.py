@@ -10,7 +10,7 @@ import importlib
 import math
 from typing import Any
 
-import numpy as np
+import numpy
 from scipy import sparse
 from sklearn import base
 
@@ -135,7 +135,7 @@ class TabularEngine(base.BaseEstimator, abc.ABC):
         self.random_state = random_state
 
     @abc.abstractmethod
-    def encode_target(self, target: Any) -> np.ndarray:
+    def encode_target(self, target: Any) -> numpy.ndarray:
         """Converts the target to the array the loss consumes.
 
         Args:
@@ -167,7 +167,7 @@ class TabularEngine(base.BaseEstimator, abc.ABC):
         """
 
     @abc.abstractmethod
-    def row_weights(self, targets: np.ndarray) -> np.ndarray:
+    def row_weights(self, targets: numpy.ndarray) -> numpy.ndarray:
         """Per-row weight implied by the estimator's own settings.
 
         Args:
@@ -192,7 +192,7 @@ class TabularEngine(base.BaseEstimator, abc.ABC):
         return self.device
 
     @staticmethod
-    def dense(features: Any) -> np.ndarray:
+    def dense(features: Any) -> numpy.ndarray:
         """Returns a float32 matrix, densifying sparse input.
 
         Args:
@@ -203,7 +203,7 @@ class TabularEngine(base.BaseEstimator, abc.ABC):
         """
         if sparse.issparse(features):
             features = features.toarray()
-        return np.asarray(features, dtype=np.float32)
+        return numpy.asarray(features, dtype=numpy.float32)
 
     def fit(
         self, features: Any, target: Any, sample_weight: Any = None
@@ -234,8 +234,10 @@ class TabularEngine(base.BaseEstimator, abc.ABC):
         encoded = self.encode_target(target)
         weights = self.row_weights(encoded)
         if sample_weight is not None:
-            weights = weights * np.asarray(sample_weight, dtype=np.float32)
-        order = np.random.default_rng(self.random_state).permutation(
+            weights = weights * numpy.asarray(
+                sample_weight, dtype=numpy.float32
+            )
+        order = numpy.random.default_rng(self.random_state).permutation(
             len(matrix)
         )
         held = (
@@ -251,7 +253,7 @@ class TabularEngine(base.BaseEstimator, abc.ABC):
         tensors = {
             "x": torch.from_numpy(matrix).to(device),
             "y": torch.from_numpy(encoded).to(device),
-            "w": torch.from_numpy(weights.astype(np.float32)).to(device),
+            "w": torch.from_numpy(weights.astype(numpy.float32)).to(device),
         }
         optimizer = self.new_optimizer(torch, network)
         second_order = self.optimizer == "lbfgs"
@@ -268,8 +270,8 @@ class TabularEngine(base.BaseEstimator, abc.ABC):
         total_steps = updates_per_epoch * self.epochs
         warmup_steps = updates_per_epoch * self.warmup_epochs
         monitor = training_helpers.TrainingMonitor()
-        generator = np.random.default_rng(self.random_state + 1)
-        best, best_state, stale, step = np.inf, None, 0, 0
+        generator = numpy.random.default_rng(self.random_state + 1)
+        best, best_state, stale, step = numpy.inf, None, 0, 0
         self.n_iter_ = 0
         for epoch in range(self.epochs):
             network.train()
@@ -516,7 +518,7 @@ class TabularEngine(base.BaseEstimator, abc.ABC):
         weights = tensors["w"][rows]
         return (losses * weights).sum() / weights.sum()
 
-    def raw_outputs(self, features: Any) -> np.ndarray:
+    def raw_outputs(self, features: Any) -> numpy.ndarray:
         """Member outputs for new rows, shape (rows, members, outputs).
 
         Single networks have one member. Evaluation mode, on the CPU.
@@ -535,7 +537,7 @@ class TabularEngine(base.BaseEstimator, abc.ABC):
                 outputs = outputs.unsqueeze(1)
             return outputs.numpy()
 
-    def explain(self, features: Any) -> np.ndarray:
+    def explain(self, features: Any) -> numpy.ndarray:
         """Returns local gradient-times-input attributions.
 
         Classification selects the predicted class logit for each row.
@@ -654,7 +656,7 @@ class ClassifierEngine(base.ClassifierMixin, TabularEngine):
         )
         self.class_weight = class_weight
 
-    def encode_target(self, target: Any) -> np.ndarray:
+    def encode_target(self, target: Any) -> numpy.ndarray:
         """Maps labels to 0..K-1 and remembers the classes.
 
         Args:
@@ -663,10 +665,10 @@ class ClassifierEngine(base.ClassifierMixin, TabularEngine):
         Returns:
             Integer codes into `classes_`, as int64.
         """
-        self.classes_, codes = np.unique(
-            np.asarray(target), return_inverse=True
+        self.classes_, codes = numpy.unique(
+            numpy.asarray(target), return_inverse=True
         )
-        return codes.astype(np.int64)
+        return codes.astype(numpy.int64)
 
     def output_units(self) -> int:
         """One unit per class.
@@ -698,7 +700,7 @@ class ClassifierEngine(base.ClassifierMixin, TabularEngine):
             return (1.0 - confidence) ** self.focal_gamma * entropy
         return entropy
 
-    def row_weights(self, targets: np.ndarray) -> np.ndarray:
+    def row_weights(self, targets: numpy.ndarray) -> numpy.ndarray:
         """Inverse class frequency when `class_weight` is `balanced`.
 
         Args:
@@ -707,14 +709,14 @@ class ClassifierEngine(base.ClassifierMixin, TabularEngine):
         Returns:
             Float32 array with one weight per row; all ones unless balanced.
         """
-        weights = np.ones(len(targets), dtype=np.float32)
+        weights = numpy.ones(len(targets), dtype=numpy.float32)
         if self.class_weight == "balanced":
-            counts = np.bincount(targets, minlength=len(self.classes_))
-            per_class = len(targets) / (len(counts) * np.maximum(counts, 1))
-            weights = per_class[targets].astype(np.float32)
+            counts = numpy.bincount(targets, minlength=len(self.classes_))
+            per_class = len(targets) / (len(counts) * numpy.maximum(counts, 1))
+            weights = per_class[targets].astype(numpy.float32)
         return weights
 
-    def predict_proba(self, features: Any) -> np.ndarray:
+    def predict_proba(self, features: Any) -> numpy.ndarray:
         """Class probabilities, columns ordered like `classes_`.
 
         Args:
@@ -726,11 +728,11 @@ class ClassifierEngine(base.ClassifierMixin, TabularEngine):
         """
         scores = self.raw_outputs(features)
         scores = scores - scores.max(axis=2, keepdims=True)
-        exp = np.exp(scores)
+        exp = numpy.exp(scores)
         probabilities = exp / exp.sum(axis=2, keepdims=True)
         return probabilities.mean(axis=1)
 
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """Most probable class.
 
         Args:
@@ -747,7 +749,7 @@ class RegressorEngine(base.RegressorMixin, TabularEngine):
 
     losses = ("default", "huber")
 
-    def encode_target(self, target: Any) -> np.ndarray:
+    def encode_target(self, target: Any) -> numpy.ndarray:
         """Standardizes the target and remembers its scale.
 
         Args:
@@ -757,11 +759,11 @@ class RegressorEngine(base.RegressorMixin, TabularEngine):
             The values minus their mean and divided by their standard deviation
             (1 when it is zero), as float32.
         """
-        values = np.asarray(target, dtype=np.float64)
+        values = numpy.asarray(target, dtype=numpy.float64)
         self.target_mean_ = float(values.mean())
         self.target_scale_ = float(values.std()) or 1.0
         return ((values - self.target_mean_) / self.target_scale_).astype(
-            np.float32
+            numpy.float32
         )
 
     def output_units(self) -> int:
@@ -792,7 +794,7 @@ class RegressorEngine(base.RegressorMixin, TabularEngine):
             )
         return (outputs.squeeze(-1) - targets) ** 2
 
-    def row_weights(self, targets: np.ndarray) -> np.ndarray:
+    def row_weights(self, targets: numpy.ndarray) -> numpy.ndarray:
         """Unit weights.
 
         Args:
@@ -801,9 +803,9 @@ class RegressorEngine(base.RegressorMixin, TabularEngine):
         Returns:
             Float32 array of ones, one per row.
         """
-        return np.ones(len(targets), dtype=np.float32)
+        return numpy.ones(len(targets), dtype=numpy.float32)
 
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """Predicted values in the original units.
 
         Args:

@@ -23,8 +23,8 @@ from pathlib import Path
 import tempfile
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from scipy import special
 from scipy import stats
 
@@ -449,8 +449,8 @@ class SequentialEstimationResult:
             len(row) != 2 for row in self.covariance
         ):
             raise ValueError("covariance must be a 2 by 2 matrix")
-        covariance = np.asarray(self.covariance, dtype=float)
-        if not np.isfinite(covariance).all() or not np.allclose(
+        covariance = numpy.asarray(self.covariance, dtype=float)
+        if not numpy.isfinite(covariance).all() or not numpy.allclose(
             covariance, covariance.T, rtol=1e-10, atol=1e-12
         ):
             raise ValueError("covariance must be finite and symmetric")
@@ -741,7 +741,7 @@ class SequentialIPWEstimator:
         self.estimand = estimand
         self.policy = policy or SequentialEstimationPolicy()
 
-    def fit(self, frame: pd.DataFrame) -> SequentialEstimationResult:
+    def fit(self, frame: pandas.DataFrame) -> SequentialEstimationResult:
         """Fits sequential stabilized weights and a sustained regime contrast.
 
         Args:
@@ -772,15 +772,15 @@ class SequentialIPWEstimator:
         )
         treatment = matrices["treatment"]
         outcome = matrices["outcome"][:, -1]
-        cumulative = np.ones(len(subject_values), dtype=float)
+        cumulative = numpy.ones(len(subject_values), dtype=float)
         period_diagnostics: list[SequentialPeriodDiagnostics] = []
         critical_value = float(
             stats.norm.ppf(0.5 + self.policy.confidence_level / 2.0)
         )
         for index, value in enumerate(period_values):
             current_treatment = treatment[:, index]
-            treated_rows = int(np.sum(current_treatment == 1.0))
-            control_rows = int(np.sum(current_treatment == 0.0))
+            treated_rows = int(numpy.sum(current_treatment == 1.0))
+            control_rows = int(numpy.sum(current_treatment == 0.0))
             if (
                 treated_rows < self.policy.minimum_arm_rows
                 or control_rows < self.policy.minimum_arm_rows
@@ -790,7 +790,7 @@ class SequentialIPWEstimator:
                 )
             history = treatment[:, :index]
             numerator_features = history
-            denominator_features = np.column_stack(
+            denominator_features = numpy.column_stack(
                 (
                     history,
                     matrices["baseline"],
@@ -806,27 +806,27 @@ class SequentialIPWEstimator:
             check_propensity_support(
                 denominator, value, self.policy.propensity_clip
             )
-            increment = np.where(
+            increment = numpy.where(
                 current_treatment == 1.0,
                 numerator / denominator,
                 (1.0 - numerator) / (1.0 - denominator),
             )
             cumulative *= increment
-            truncated = np.minimum(cumulative, self.policy.maximum_weight)
+            truncated = numpy.minimum(cumulative, self.policy.maximum_weight)
             period_diagnostic = SequentialPeriodDiagnostics(
                 period=period_label(value),
                 rows=len(subject_values),
                 treated_rows=treated_rows,
                 control_rows=control_rows,
-                denominator_propensity_min=float(np.min(denominator)),
-                denominator_propensity_max=float(np.max(denominator)),
-                numerator_propensity_min=float(np.min(numerator)),
-                numerator_propensity_max=float(np.max(numerator)),
+                denominator_propensity_min=float(numpy.min(denominator)),
+                denominator_propensity_max=float(numpy.max(denominator)),
+                numerator_propensity_min=float(numpy.min(numerator)),
+                numerator_propensity_max=float(numpy.max(numerator)),
                 fraction_weight_truncated=float(
-                    np.mean(cumulative > self.policy.maximum_weight)
+                    numpy.mean(cumulative > self.policy.maximum_weight)
                 ),
-                maximum_untruncated_weight=float(np.max(cumulative)),
-                maximum_weight=float(np.max(truncated)),
+                maximum_untruncated_weight=float(numpy.max(cumulative)),
+                maximum_weight=float(numpy.max(truncated)),
                 effective_sample_size=effective_sample_size(truncated),
             )
             if (
@@ -842,11 +842,11 @@ class SequentialIPWEstimator:
                     "numerator": numerator_iterations,
                     "denominator": denominator_iterations,
                 }
-        final_weights = np.minimum(cumulative, self.policy.maximum_weight)
-        target_mask = np.all(
+        final_weights = numpy.minimum(cumulative, self.policy.maximum_weight)
+        target_mask = numpy.all(
             treatment == self.estimand.target_treatment, axis=1
         )
-        comparator_mask = np.all(
+        comparator_mask = numpy.all(
             treatment == self.estimand.comparator_treatment, axis=1
         )
         target = build_regime_estimate(
@@ -968,10 +968,10 @@ class SequentialIPWEstimator:
 
 
 def prepare_sequential_frame(
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     estimand: SequentialEstimand,
     policy: SequentialEstimationPolicy,
-) -> tuple[pd.DataFrame, int, int, int]:
+) -> tuple[pandas.DataFrame, int, int, int]:
     """Validates and prepares a balanced long-format panel.
 
     Args:
@@ -996,7 +996,7 @@ def prepare_sequential_frame(
             period, too few subjects remain, or a baseline covariate varies
             within a subject.
     """
-    if not isinstance(frame, pd.DataFrame):
+    if not isinstance(frame, pandas.DataFrame):
         raise TypeError("frame must be a pandas DataFrame")
     if frame.empty:
         raise ValueError("sequential frame must not be empty")
@@ -1020,9 +1020,9 @@ def prepare_sequential_frame(
             "subject identities and time values must not be missing"
         )
     for name in (subject_name, time_name):
-        if pd.api.types.is_numeric_dtype(frame[name]):
+        if pandas.api.types.is_numeric_dtype(frame[name]):
             values = frame[name].to_numpy(dtype=float)
-            if not np.isfinite(values).all():
+            if not numpy.isfinite(values).all():
                 raise ValueError(f"column {name!r} contains non-finite values")
     if frame.duplicated([subject_name, time_name]).any():
         raise ValueError("duplicate subject-time rows are not allowed")
@@ -1048,11 +1048,11 @@ def prepare_sequential_frame(
         prepared = prepared.loc[keep_mask].copy()
     for name in value_columns:
         try:
-            prepared[name] = pd.to_numeric(prepared[name], errors="raise")
+            prepared[name] = pandas.to_numeric(prepared[name], errors="raise")
         except (TypeError, ValueError) as error:
             raise ValueError(f"column {name!r} must be numeric") from error
         values = prepared[name].to_numpy(dtype=float)
-        if not np.isfinite(values).all():
+        if not numpy.isfinite(values).all():
             raise ValueError(f"column {name!r} contains non-finite values")
     if prepared.empty:
         raise ValueError("missingness policy left no subjects")
@@ -1074,7 +1074,7 @@ def prepare_sequential_frame(
 
 
 def validate_time_order(
-    frame: pd.DataFrame, estimand: SequentialEstimand
+    frame: pandas.DataFrame, estimand: SequentialEstimand
 ) -> None:
     """Rejects repeated consecutive time values within a subject.
 
@@ -1108,7 +1108,7 @@ def validate_time_order(
         raise ValueError("time values have invalid ordering") from error
 
 
-def ordered_periods(frame: pd.DataFrame, time_column: str) -> list[Any]:
+def ordered_periods(frame: pandas.DataFrame, time_column: str) -> list[Any]:
     """Returns stable sorted period values.
 
     Args:
@@ -1127,7 +1127,7 @@ def ordered_periods(frame: pd.DataFrame, time_column: str) -> list[Any]:
         raise ValueError("time values have invalid ordering") from error
 
 
-def ordered_subjects(frame: pd.DataFrame, subject_column: str) -> list[Any]:
+def ordered_subjects(frame: pandas.DataFrame, subject_column: str) -> list[Any]:
     """Returns subject identities in a deterministic, type-aware order.
 
     Args:
@@ -1143,7 +1143,7 @@ def ordered_subjects(frame: pd.DataFrame, subject_column: str) -> list[Any]:
 
 
 def validate_baseline_covariates(
-    frame: pd.DataFrame, estimand: SequentialEstimand
+    frame: pandas.DataFrame, estimand: SequentialEstimand
 ) -> None:
     """Ensures declared baseline covariates are stable within subjects.
 
@@ -1164,11 +1164,11 @@ def validate_baseline_covariates(
 
 
 def build_matrices(
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     estimand: SequentialEstimand,
     period_values: Sequence[Any],
     subject_values: Sequence[Any],
-) -> dict[str, np.ndarray]:
+) -> dict[str, numpy.ndarray]:
     """Builds deterministic subject-by-period arrays from the long frame.
 
     Args:
@@ -1190,12 +1190,14 @@ def build_matrices(
     indexed = frame.set_index(
         [estimand.subject_identity, estimand.time_column], drop=False
     )
-    treatment = np.empty((len(subject_values), len(period_values)), dtype=float)
-    outcome = np.empty_like(treatment)
-    baseline = np.empty(
+    treatment = numpy.empty(
+        (len(subject_values), len(period_values)), dtype=float
+    )
+    outcome = numpy.empty_like(treatment)
+    baseline = numpy.empty(
         (len(subject_values), len(estimand.baseline_covariates))
     )
-    time_varying = np.empty(
+    time_varying = numpy.empty(
         (
             len(subject_values),
             len(period_values),
@@ -1204,7 +1206,7 @@ def build_matrices(
     )
     for subject_index, subject in enumerate(subject_values):
         first = indexed.loc[(subject, period_values[0])]
-        if isinstance(first, pd.DataFrame):
+        if isinstance(first, pandas.DataFrame):
             raise ValueError("subject-time index is not unique")
         baseline[subject_index] = first[
             list(estimand.baseline_covariates)
@@ -1227,10 +1229,10 @@ def build_matrices(
 
 
 def fit_propensity(
-    covariates: np.ndarray,
-    treatment: np.ndarray,
+    covariates: numpy.ndarray,
+    treatment: numpy.ndarray,
     policy: SequentialEstimationPolicy,
-) -> tuple[np.ndarray, int]:
+) -> tuple[numpy.ndarray, int]:
     """Fits a deterministic ridge-logistic propensity by bounded Newton steps.
 
     Args:
@@ -1253,31 +1255,31 @@ def fit_propensity(
         raise ValueError("covariates must be a two-dimensional matrix")
     if len(covariates) != len(treatment):
         raise ValueError("covariates and treatment must have matching rows")
-    design = np.column_stack((np.ones(len(treatment)), covariates))
-    coefficients = np.zeros(design.shape[1], dtype=float)
+    design = numpy.column_stack((numpy.ones(len(treatment)), covariates))
+    coefficients = numpy.zeros(design.shape[1], dtype=float)
     ridge = 1e-8
-    ridge_matrix = ridge * np.eye(design.shape[1])
+    ridge_matrix = ridge * numpy.eye(design.shape[1])
     for iteration in range(1, policy.max_iterations + 1):
         probabilities = special.expit(design @ coefficients)
-        variance = np.maximum(probabilities * (1.0 - probabilities), 1e-12)
+        variance = numpy.maximum(probabilities * (1.0 - probabilities), 1e-12)
         gradient = design.T @ (probabilities - treatment) + ridge * coefficients
         hessian = design.T @ (variance[:, None] * design) + ridge_matrix
         try:
-            step = np.linalg.solve(hessian, gradient)
-        except np.linalg.LinAlgError as error:
+            step = numpy.linalg.solve(hessian, gradient)
+        except numpy.linalg.LinAlgError as error:
             raise ValueError("propensity model is not identifiable") from error
-        if not np.isfinite(step).all():
+        if not numpy.isfinite(step).all():
             raise ValueError(
                 "propensity model produced non-finite coefficients"
             )
         coefficients -= step
-        if float(np.max(np.abs(step))) <= policy.tolerance:
+        if float(numpy.max(numpy.abs(step))) <= policy.tolerance:
             return special.expit(design @ coefficients), iteration
     raise ValueError("propensity model did not converge within policy bound")
 
 
 def check_propensity_support(
-    propensity: np.ndarray, period: Any, minimum: float
+    propensity: numpy.ndarray, period: Any, minimum: float
 ) -> None:
     """Rejects fitted propensities outside the declared positivity support.
 
@@ -1291,8 +1293,8 @@ def check_propensity_support(
         ValueError: If any probability is below `minimum` or above
             `1 - minimum`.
     """
-    lower = float(np.min(propensity))
-    upper = float(np.max(propensity))
+    lower = float(numpy.min(propensity))
+    upper = float(numpy.max(propensity))
     if lower < minimum or upper > 1.0 - minimum:
         raise ValueError(
             f"period {period!r} violates declared positivity support "
@@ -1300,7 +1302,7 @@ def check_propensity_support(
         )
 
 
-def effective_sample_size(weights: np.ndarray) -> float:
+def effective_sample_size(weights: numpy.ndarray) -> float:
     """Returns the Kish effective sample size for positive weights.
 
     Args:
@@ -1310,8 +1312,8 @@ def effective_sample_size(weights: np.ndarray) -> float:
         The squared sum of the weights divided by the sum of their squares,
         or 0.0 when the sum of squares is not positive.
     """
-    total = float(np.sum(weights))
-    squared = float(np.sum(weights**2))
+    total = float(numpy.sum(weights))
+    squared = float(numpy.sum(weights**2))
     if squared <= 0.0:
         return 0.0
     return total**2 / squared
@@ -1320,9 +1322,9 @@ def effective_sample_size(weights: np.ndarray) -> float:
 def build_regime_estimate(
     regime: str,
     treatment: int,
-    mask: np.ndarray,
-    weights: np.ndarray,
-    outcome: np.ndarray,
+    mask: numpy.ndarray,
+    weights: numpy.ndarray,
+    outcome: numpy.ndarray,
     policy: SequentialEstimationPolicy,
     critical_value: float,
 ) -> SequentialRegimeEstimate:
@@ -1353,7 +1355,7 @@ def build_regime_estimate(
         raise ValueError(
             f"regime {regime!r} has insufficient treatment-history support"
         )
-    weight_sum = float(np.sum(selected_weights))
+    weight_sum = float(numpy.sum(selected_weights))
     if weight_sum <= 0.0:
         raise ValueError(f"regime {regime!r} has no weighted support")
     ess = effective_sample_size(selected_weights)
@@ -1361,9 +1363,11 @@ def build_regime_estimate(
         raise ValueError(
             f"regime {regime!r} has insufficient effective sample size"
         )
-    estimate = float(np.sum(selected_weights * selected_outcome) / weight_sum)
+    estimate = float(
+        numpy.sum(selected_weights * selected_outcome) / weight_sum
+    )
     influence = selected_weights * (selected_outcome - estimate) / weight_sum
-    standard_error = math.sqrt(max(float(np.sum(influence**2)), 0.0))
+    standard_error = math.sqrt(max(float(numpy.sum(influence**2)), 0.0))
     return SequentialRegimeEstimate(
         regime=regime,
         treatment=treatment,
@@ -1380,13 +1384,13 @@ def build_regime_estimate(
 
 
 def regime_covariance(
-    target_mask: np.ndarray,
-    comparator_mask: np.ndarray,
-    weights: np.ndarray,
-    outcome: np.ndarray,
+    target_mask: numpy.ndarray,
+    comparator_mask: numpy.ndarray,
+    weights: numpy.ndarray,
+    outcome: numpy.ndarray,
     target: SequentialRegimeEstimate,
     comparator: SequentialRegimeEstimate,
-) -> np.ndarray:
+) -> numpy.ndarray:
     """Estimates subject-level covariance of two normalized regime means.
 
     Args:
@@ -1403,8 +1407,8 @@ def regime_covariance(
         A symmetric 2 by 2 array ordered target then comparator, holding
         sums over subjects of the products of the influence values.
     """
-    target_influence = np.zeros(len(outcome), dtype=float)
-    comparator_influence = np.zeros(len(outcome), dtype=float)
+    target_influence = numpy.zeros(len(outcome), dtype=float)
+    comparator_influence = numpy.zeros(len(outcome), dtype=float)
     target_influence[target_mask] = (
         weights[target_mask]
         * (outcome[target_mask] - target.estimate)
@@ -1415,15 +1419,15 @@ def regime_covariance(
         * (outcome[comparator_mask] - comparator.estimate)
         / comparator.weight_sum
     )
-    return np.asarray(
+    return numpy.asarray(
         [
             [
-                np.sum(target_influence**2),
-                np.sum(target_influence * comparator_influence),
+                numpy.sum(target_influence**2),
+                numpy.sum(target_influence * comparator_influence),
             ],
             [
-                np.sum(target_influence * comparator_influence),
-                np.sum(comparator_influence**2),
+                numpy.sum(target_influence * comparator_influence),
+                numpy.sum(comparator_influence**2),
             ],
         ],
         dtype=float,
@@ -1431,10 +1435,10 @@ def regime_covariance(
 
 
 def independent_reference(
-    target_mask: np.ndarray,
-    comparator_mask: np.ndarray,
-    weights: np.ndarray,
-    outcome: np.ndarray,
+    target_mask: numpy.ndarray,
+    comparator_mask: numpy.ndarray,
+    weights: numpy.ndarray,
+    outcome: numpy.ndarray,
     target: SequentialRegimeEstimate,
     comparator: SequentialRegimeEstimate,
     tolerance: float,
@@ -1506,14 +1510,14 @@ def period_label(value: Any) -> str:
         The ISO 8601 text for a timestamp, otherwise `str` of the value
         with NumPy scalars unwrapped first.
     """
-    if isinstance(value, pd.Timestamp):
+    if isinstance(value, pandas.Timestamp):
         return value.isoformat()
-    if isinstance(value, np.generic):
+    if isinstance(value, numpy.generic):
         value = value.item()
     return str(value)
 
 
-def fingerprint_frame(frame: pd.DataFrame) -> str:
+def fingerprint_frame(frame: pandas.DataFrame) -> str:
     """Returns a deterministic SHA-256 digest of the supplied frame.
 
     Args:
@@ -1528,7 +1532,9 @@ def fingerprint_frame(frame: pd.DataFrame) -> str:
     """
     try:
         values = (
-            pd.util.hash_pandas_object(frame, index=True).to_numpy().tobytes()
+            pandas.util.hash_pandas_object(frame, index=True)
+            .to_numpy()
+            .tobytes()
         )
     except (TypeError, ValueError) as error:
         raise ValueError(

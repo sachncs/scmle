@@ -46,12 +46,12 @@ import math
 import sys
 from typing import Any
 
-import numpy as np
+import numpy
 from scipy import stats
 
 from scmle.contracts import qualification
 from scmle.core import randomness
-from scmle.data.charter import contracts as charter_contracts
+from scmle.data.charter import contracts
 from scmle.data.detectors import certificates
 from scmle.data.ledger import bivariate
 from scmle.data.ledger import controls
@@ -126,8 +126,8 @@ DEFAULT_RULE = Rule()
 
 
 def applicable_choices(
-    choices: Sequence[charter_contracts.Choice],
-) -> tuple[tuple[charter_contracts.Choice, ...], tuple[str, ...]]:
+    choices: Sequence[contracts.Choice],
+) -> tuple[tuple[contracts.Choice, ...], tuple[str, ...]]:
     """The declared choices this estimator can act on, and what was dropped.
 
     Args:
@@ -137,7 +137,7 @@ def applicable_choices(
         (choices restricted to implemented options, plain-language notes
         about everything that was left out).
     """
-    kept: list[charter_contracts.Choice] = []
+    kept: list[contracts.Choice] = []
     notes: list[str] = []
     for choice in choices:
         known = IMPLEMENTED.get(choice.name)
@@ -160,19 +160,17 @@ def applicable_choices(
                 "implemented: choice not run"
             )
             continue
-        kept.append(
-            charter_contracts.Choice(choice.name, options, choice.default)
-        )
+        kept.append(contracts.Choice(choice.name, options, choice.default))
     return tuple(kept), tuple(notes)
 
 
 def prepare(
-    x: np.ndarray,
-    y: np.ndarray,
-    positions: np.ndarray,
+    x: numpy.ndarray,
+    y: numpy.ndarray,
+    positions: numpy.ndarray,
     rows: int,
     spec: multiverse.Specification,
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[numpy.ndarray, numpy.ndarray]:
     """Applies a specification to a (possibly resampled) feature and target.
 
     Args:
@@ -190,45 +188,45 @@ def prepare(
         finite, are removed from both.
     """
     inclusion = spec.option(INCLUSION, "all")
-    keep = np.ones(len(x), dtype=bool)
+    keep = numpy.ones(len(x), dtype=bool)
     if inclusion == "first_half":
         keep = positions < rows / 2.0
     elif inclusion == "second_half":
         keep = positions >= rows / 2.0
-    values = np.array(x[keep], dtype=float)
-    target = np.array(y[keep], dtype=float)
-    observed = values[np.isfinite(values)]
+    values = numpy.array(x[keep], dtype=float)
+    target = numpy.array(y[keep], dtype=float)
+    observed = values[numpy.isfinite(values)]
     rule = spec.option(OUTLIER_RULE, "none")
     if rule != "none" and observed.size:
         if rule == "winsorize":
-            low, high = np.percentile(observed, WINSOR_TAILS)
-            values = np.where(
-                np.isfinite(values), np.clip(values, low, high), values
+            low, high = numpy.percentile(observed, WINSOR_TAILS)
+            values = numpy.where(
+                numpy.isfinite(values), numpy.clip(values, low, high), values
             )
         else:
-            q1, q3 = np.percentile(observed, (25.0, 75.0))
+            q1, q3 = numpy.percentile(observed, (25.0, 75.0))
             fence = IQR_FENCE * (q3 - q1)
-            outside = np.isfinite(values) & (
+            outside = numpy.isfinite(values) & (
                 (values < q1 - fence) | (values > q3 + fence)
             )
             values, target = values[~outside], target[~outside]
     method = spec.option(IMPUTATION, "median")
-    missing = ~np.isfinite(values)
+    missing = ~numpy.isfinite(values)
     if method == "complete_case":
         values, target = values[~missing], target[~missing]
     elif missing.any():
         seen = values[~missing]
         fill = 0.0
         if method == "median" and seen.size:
-            fill = float(np.median(seen))
+            fill = float(numpy.median(seen))
         elif method == "mean" and seen.size:
             fill = float(seen.mean())
-        values = np.where(missing, fill, values)
-    ok = np.isfinite(target)
+        values = numpy.where(missing, fill, values)
+    ok = numpy.isfinite(target)
     return values[ok], target[ok]
 
 
-def rank_effect(x: np.ndarray, y: np.ndarray) -> float:
+def rank_effect(x: numpy.ndarray, y: numpy.ndarray) -> float:
     """Computes Spearman's rank correlation of two arrays.
 
     Args:
@@ -245,12 +243,12 @@ def rank_effect(x: np.ndarray, y: np.ndarray) -> float:
     ranks_x, ranks_y = stats.rankdata(x), stats.rankdata(y)
     if ranks_x.std() == 0.0 or ranks_y.std() == 0.0:
         return math.nan
-    return float(np.corrcoef(ranks_x, ranks_y)[0, 1])
+    return float(numpy.corrcoef(ranks_x, ranks_y)[0, 1])
 
 
 def resample(
-    rows: int, strata: np.ndarray | None, rng: np.random.Generator
-) -> np.ndarray:
+    rows: int, strata: numpy.ndarray | None, rng: numpy.random.Generator
+) -> numpy.ndarray:
     """Draws bootstrap row positions.
 
     Args:
@@ -266,11 +264,11 @@ def resample(
     """
     if strata is None:
         return rng.integers(0, rows, size=rows)
-    labels = np.asarray(strata)
-    names, inverse = np.unique(labels, return_inverse=True)
-    members = [np.flatnonzero(inverse == k) for k in range(len(names))]
+    labels = numpy.asarray(strata)
+    names, inverse = numpy.unique(labels, return_inverse=True)
+    members = [numpy.flatnonzero(inverse == k) for k in range(len(names))]
     drawn = rng.integers(0, len(names), size=len(names))
-    return np.concatenate([members[k] for k in drawn])
+    return numpy.concatenate([members[k] for k in drawn])
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -316,12 +314,12 @@ class SpecEffect:
 
 
 def estimate_spec(
-    x: np.ndarray,
-    y: np.ndarray,
+    x: numpy.ndarray,
+    y: numpy.ndarray,
     spec: multiverse.Specification,
     seed: int,
     finding: str,
-    strata: np.ndarray | None,
+    strata: numpy.ndarray | None,
     bootstrap: int,
 ) -> dict[str, float]:
     """Estimates one specification's effect and its bootstrap interval.
@@ -342,7 +340,7 @@ def estimate_spec(
         than two) give a defined effect.
     """
     rows = len(x)
-    positions = np.arange(rows)
+    positions = numpy.arange(rows)
     effect = rank_effect(*prepare(x, y, positions, rows, spec))
     out: dict[str, float] = {}
     if not math.isfinite(effect):
@@ -359,7 +357,7 @@ def estimate_spec(
     draws = [v for v in values if math.isfinite(v)]
     if len(draws) >= max(bootstrap // 2, 2):
         tail = (1.0 - CONFIDENCE) / 2.0 * 100.0
-        low, high = np.percentile(draws, (tail, 100.0 - tail))
+        low, high = numpy.percentile(draws, (tail, 100.0 - tail))
         out["low"], out["high"] = float(low), float(high)
     return out
 
@@ -396,18 +394,18 @@ def verdict(
             "(or the headline specification did not)",
             numbers,
         )
-    median = float(np.median(defined))
-    sign = float(np.sign(median))
+    median = float(numpy.median(defined))
+    sign = float(numpy.sign(median))
     sign_share = (
         0.0
         if sign == 0.0
-        else float(np.mean([np.sign(v) == sign for v in defined]))
+        else float(numpy.mean([numpy.sign(v) == sign for v in defined]))
     )
     size_ratio = (
         math.inf if headline == 0.0 else abs(median - headline) / abs(headline)
     )
     interval_share = float(
-        np.mean([e.excludes_zero for e in effects if e.effect is not None])
+        numpy.mean([e.excludes_zero for e in effects if e.effect is not None])
     )
     numbers = {
         "median": median,
@@ -463,7 +461,7 @@ def attribution(
     out: dict[str, dict[str, Any]] = {}
     if not rows:
         return out
-    values = np.array([e.effect for e in rows], dtype=float)
+    values = numpy.array([e.effect for e in rows], dtype=float)
     total = float(((values - values.mean()) ** 2).sum())
     for name in sorted({k for e in rows for k in e.choices}):
         groups: dict[str, list[float]] = {}
@@ -471,9 +469,10 @@ def attribution(
             groups.setdefault(e.choices[name], []).append(float(value))
         if len(groups) < 2:
             continue
-        means = {k: float(np.mean(v)) for k, v in sorted(groups.items())}
+        means = {k: float(numpy.mean(v)) for k, v in sorted(groups.items())}
         between = sum(
-            len(v) * (np.mean(v) - values.mean()) ** 2 for v in groups.values()
+            len(v) * (numpy.mean(v) - values.mean()) ** 2
+            for v in groups.values()
         )
         out[name] = {
             "option_means": means,
@@ -512,7 +511,7 @@ class CurveTest:
 
 
 def curve_statistics(
-    x: np.ndarray, y: np.ndarray, grid: multiverse.Grid
+    x: numpy.ndarray, y: numpy.ndarray, grid: multiverse.Grid
 ) -> tuple[float, float]:
     """Summarises the specification curve.
 
@@ -529,29 +528,29 @@ def curve_statistics(
         p <= `SIGNIFICANCE`). Both are 0 when no specification is usable.
     """
     rows = len(x)
-    positions = np.arange(rows)
+    positions = numpy.arange(rows)
     effects, flags = [], []
     for spec in grid.specs:
         px, py = prepare(x, y, positions, rows, spec)
-        if len(px) < MIN_PAIRS or np.ptp(px) == 0.0 or np.ptp(py) == 0.0:
+        if len(px) < MIN_PAIRS or numpy.ptp(px) == 0.0 or numpy.ptp(py) == 0.0:
             continue
         outcome = bivariate.spearman(px, py)
         effects.append(abs(outcome.effect))
         flags.append(outcome.p <= SIGNIFICANCE)
     if not effects:
         return 0.0, 0.0
-    return float(np.median(effects)), float(np.mean(flags))
+    return float(numpy.median(effects)), float(numpy.mean(flags))
 
 
 def curve_test(
-    x: np.ndarray,
-    y: np.ndarray,
+    x: numpy.ndarray,
+    y: numpy.ndarray,
     grid: multiverse.Grid,
     seed: int,
     finding: str,
     *,
     permutations: int,
-    strata: np.ndarray | None = None,
+    strata: numpy.ndarray | None = None,
 ) -> CurveTest:
     """Specification-curve test by permuting the target within strata.
 
@@ -647,14 +646,14 @@ class Stability:
 
 def assess_finding(
     name: str,
-    x: np.ndarray,
-    y: np.ndarray,
+    x: numpy.ndarray,
+    y: numpy.ndarray,
     grid: multiverse.Grid,
     seed: int,
     *,
     rule: Rule = DEFAULT_RULE,
     bootstrap: int = BOOTSTRAP,
-    strata: np.ndarray | None = None,
+    strata: numpy.ndarray | None = None,
     curve_permutations: int = 0,
     cache: multiverse.ResultCache | None = None,
     budget_seconds: float | None = None,
@@ -686,8 +685,8 @@ def assess_finding(
     Raises:
         ValueError: If `x` and `y` differ in length.
     """
-    values = np.asarray(x, dtype=float)
-    codes = np.asarray(y, dtype=float)
+    values = numpy.asarray(x, dtype=float)
+    codes = numpy.asarray(y, dtype=float)
     if len(values) != len(codes):
         raise ValueError("x and y must have one entry per row")
     options = {} if clock is None else {"clock": clock}

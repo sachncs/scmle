@@ -10,7 +10,7 @@ import hashlib
 import hmac
 import json
 
-import pandas as pd
+import pandas
 import pytest
 
 from scmle.contracts import errors
@@ -22,8 +22,8 @@ from scmle.governance import vault
 
 def resident(values=(1.0, 2.0, 3.0)):
     return splitters.ResidentTestSet(
-        pd.DataFrame({"a": list(values)}),
-        pd.Series([0, 1, 0], name="y"),
+        pandas.DataFrame({"a": list(values)}),
+        pandas.Series([0, 1, 0], name="y"),
         (10, 11, 12),
     )
 
@@ -150,8 +150,8 @@ def test_the_mac_error_names_the_entry(tmp_path):
 
 
 def test_the_vault_seals_in_process_only_when_asked_not_to_use_one():
-    frame = pd.DataFrame({"a": [1.0, 2.0, 3.0]})
-    target = pd.Series([0, 1, 0], name="y")
+    frame = pandas.DataFrame({"a": [1.0, 2.0, 3.0]})
+    target = pandas.Series([0, 1, 0], name="y")
     protocol = sealed.CustodyVault(sealed.OpenLog(), process=False)
     held = protocol.seal("C", frame, target, (4, 5, 6))
     assert isinstance(held.locked, splitters.ResidentTestSet)
@@ -191,7 +191,7 @@ def test_a_partial_binding_is_not_enough_for_a_committed_set():
 
 def test_the_vault_token_has_32_hex_digits_and_close_ends_the_process():
     locked = vault.SealedTestSet(
-        pd.DataFrame({"a": [1.0]}), pd.Series([1]), (0,)
+        pandas.DataFrame({"a": [1.0]}), pandas.Series([1]), (0,)
     )
     assert len(locked.token) == 32 and int(locked.token, 16) >= 0
     assert locked.process.poll() is None
@@ -201,7 +201,7 @@ def test_the_vault_token_has_32_hex_digits_and_close_ends_the_process():
 
 def test_vault_refusals_are_whole_messages():
     locked = vault.SealedTestSet(
-        pd.DataFrame({"a": [1.0]}), pd.Series([1]), (0,)
+        pandas.DataFrame({"a": [1.0]}), pandas.Series([1]), (0,)
     )
     try:
         assert refusal(lambda: locked.open("guess")) == (
@@ -217,7 +217,7 @@ def test_vault_refusals_are_whole_messages():
 
 def test_a_vault_that_is_gone_says_so_in_full():
     locked = vault.SealedTestSet(
-        pd.DataFrame({"a": [1.0]}), pd.Series([1]), (0,)
+        pandas.DataFrame({"a": [1.0]}), pandas.Series([1]), (0,)
     )
     locked.process.kill()
     locked.process.wait()
@@ -238,6 +238,6 @@ def test_merkle_pairs_are_adjacent_and_an_odd_leaf_is_carried_up():
 
 
 def test_row_hashes_reject_a_misaligned_row_instead_of_truncating():
-    frame = pd.DataFrame({"a": [1.0, 2.0]})
+    frame = pandas.DataFrame({"a": [1.0, 2.0]})
     assert len(merkle.row_hashes(frame, [0, 1])) == 2
     assert merkle.row_hashes(frame, [1])[0] == merkle.row_hash(1, [("a", 2.0)])

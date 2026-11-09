@@ -11,8 +11,8 @@ when an arm has too few rows to say.
 import dataclasses
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.contracts import tasks
 from scmle.evaluation import metrics
@@ -33,10 +33,10 @@ class Arm:
         classes: Class labels in probability-column order.
     """
 
-    predictions: np.ndarray
-    outcomes: np.ndarray
-    probabilities: np.ndarray | None = None
-    classes: np.ndarray | None = None
+    predictions: numpy.ndarray
+    outcomes: numpy.ndarray
+    probabilities: numpy.ndarray | None = None
+    classes: numpy.ndarray | None = None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -74,7 +74,7 @@ class ABResult:
 
 def score_arm(
     arm: Arm,
-    rows: np.ndarray,
+    rows: numpy.ndarray,
     metric: Any,
     task: tasks.TaskType,
 ) -> float:
@@ -89,7 +89,7 @@ def score_arm(
     Returns:
         The metric on those requests, in natural units.
     """
-    outcomes = pd.Series(arm.outcomes[rows])
+    outcomes = pandas.Series(arm.outcomes[rows])
     classification = task.is_classification
     stand_in = (
         replay.ClassifierPredictions(
@@ -105,7 +105,7 @@ def score_arm(
         positive = arm.classes[1]
     return float(
         metric.score(
-            stand_in, pd.DataFrame(index=outcomes.index), outcomes, positive
+            stand_in, pandas.DataFrame(index=outcomes.index), outcomes, positive
         )
     )
 
@@ -140,14 +140,14 @@ def compare_arms(
     metric = metrics.CATALOG.resolve(metric_name, task)
     sign = 1.0 if metric.greater_is_better else -1.0
     every = {
-        "control": np.arange(len(control.outcomes)),
-        "treatment": np.arange(len(treatment.outcomes)),
+        "control": numpy.arange(len(control.outcomes)),
+        "treatment": numpy.arange(len(treatment.outcomes)),
     }
     control_score = score_arm(control, every["control"], metric, task)
     treatment_score = score_arm(treatment, every["treatment"], metric, task)
     gains = []
     for draw in range(bootstraps):
-        rng = np.random.default_rng([seed, draw])
+        rng = numpy.random.default_rng([seed, draw])
         first = rng.integers(0, len(every["control"]), len(every["control"]))
         second = rng.integers(
             0, len(every["treatment"]), len(every["treatment"])
@@ -162,7 +162,7 @@ def compare_arms(
             )
         except ValueError:  # A resample missing a class.
             continue
-    low, high = np.percentile(gains, [2.5, 97.5])
+    low, high = numpy.percentile(gains, [2.5, 97.5])
     thin = min(len(every["control"]), len(every["treatment"])) < min_rows
     if thin:
         decision = "inconclusive"

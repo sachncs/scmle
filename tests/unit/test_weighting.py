@@ -1,7 +1,7 @@
 """Per-row weights reach the model and count by their size."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from sklearn import compose
 from sklearn import linear_model
 from sklearn import pipeline
@@ -12,12 +12,12 @@ from scmle.models import weighting
 
 def frame_with_conflict(rows=400):
     """Two halves with opposite labels for the same feature value."""
-    rng = np.random.default_rng(0)
+    rng = numpy.random.default_rng(0)
     x = rng.normal(size=rows)
-    first = np.arange(rows) < rows // 2
-    return pd.DataFrame({"x": x, "w": np.where(first, 1.0, 0.0)}), np.where(
-        first, 1.0 * x, -1.0 * x
-    )
+    first = numpy.arange(rows) < rows // 2
+    return pandas.DataFrame(
+        {"x": x, "w": numpy.where(first, 1.0, 0.0)}
+    ), numpy.where(first, 1.0 * x, -1.0 * x)
 
 
 def scaler():

@@ -17,15 +17,15 @@ Event codes are 0 for censored and 1, 2, ... for causes.
 from typing import Any
 from typing import Self
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.models.survival import estimators
 
 
 def cumulative_incidence(
     duration: Any, cause: Any
-) -> dict[int, tuple[np.ndarray, np.ndarray]]:
+) -> dict[int, tuple[numpy.ndarray, numpy.ndarray]]:
     """Aalen-Johansen cumulative incidence of each cause.
 
     Args:
@@ -35,10 +35,10 @@ def cumulative_incidence(
     Returns:
         Cause code to (event times, probability of that cause by each time).
     """
-    time = np.asarray(duration, dtype=float)
-    code = np.asarray(cause, dtype=int)
+    time = numpy.asarray(duration, dtype=float)
+    code = numpy.asarray(cause, dtype=int)
     causes = sorted(int(c) for c in set(code) if c != 0)
-    moments = np.unique(time[code != 0])
+    moments = numpy.unique(time[code != 0])
     survival = 1.0
     incidence = dict.fromkeys(causes, 0.0)
     curves: dict[int, list[float]] = {c: [] for c in causes}
@@ -51,7 +51,7 @@ def cumulative_incidence(
             incidence[c] += survival * happened / at_risk
             curves[c].append(incidence[c])
         survival *= 1.0 - total / at_risk
-    return {c: (moments, np.asarray(curves[c])) for c in causes}
+    return {c: (moments, numpy.asarray(curves[c])) for c in causes}
 
 
 class CauseSpecificCox:
@@ -85,7 +85,7 @@ class CauseSpecificCox:
         Raises:
             ValueError: If no event of any cause was observed.
         """
-        code = np.asarray(cause, dtype=int)
+        code = numpy.asarray(cause, dtype=int)
         self.causes_ = sorted(int(c) for c in set(code) if c != 0)
         if not self.causes_:
             raise ValueError("no event of any cause was observed")
@@ -98,8 +98,8 @@ class CauseSpecificCox:
         return self
 
     def cumulative_hazard(
-        self, features: Any, times: np.ndarray
-    ) -> dict[int, np.ndarray]:
+        self, features: Any, times: numpy.ndarray
+    ) -> dict[int, numpy.ndarray]:
         """Cumulative cause-specific hazard, rows by times.
 
         Args:
@@ -115,13 +115,13 @@ class CauseSpecificCox:
             base = estimators.step_lookup(
                 model.moments_, model.baseline_, times, 0.0
             )
-            relative = np.exp(model.predict(features) - model.scale_)
-            result[c] = np.outer(relative, base)
+            relative = numpy.exp(model.predict(features) - model.scale_)
+            result[c] = numpy.outer(relative, base)
         return result
 
     def predict_incidence(
         self, features: Any, times: Any, cause: int
-    ) -> np.ndarray:
+    ) -> numpy.ndarray:
         """Probability of `cause` by each time for each row (rows by times).
 
         Args:
@@ -138,31 +138,33 @@ class CauseSpecificCox:
         """
         if cause not in self.models_:
             raise ValueError(f"unknown cause {cause}; seen {self.causes_}")
-        grid = np.unique(
-            np.concatenate([m.moments_ for m in self.models_.values()])
+        grid = numpy.unique(
+            numpy.concatenate([m.moments_ for m in self.models_.values()])
         )
         hazards = self.cumulative_hazard(features, grid)
-        total = np.sum(list(hazards.values()), axis=0)
-        survival_before = np.exp(
-            -np.concatenate(
-                [np.zeros((total.shape[0], 1)), total[:, :-1]], axis=1
+        total = numpy.sum(list(hazards.values()), axis=0)
+        survival_before = numpy.exp(
+            -numpy.concatenate(
+                [numpy.zeros((total.shape[0], 1)), total[:, :-1]], axis=1
             )
         )
-        step = np.diff(
-            np.concatenate(
-                [np.zeros((total.shape[0], 1)), hazards[cause]], axis=1
+        step = numpy.diff(
+            numpy.concatenate(
+                [numpy.zeros((total.shape[0], 1)), hazards[cause]], axis=1
             ),
             axis=1,
         )
-        running = np.cumsum(step * survival_before, axis=1)
-        wanted = np.asarray(times, dtype=float)
-        position = np.searchsorted(grid, wanted, side="right") - 1
-        padded = np.concatenate(
-            [np.zeros((running.shape[0], 1)), running], axis=1
+        running = numpy.cumsum(step * survival_before, axis=1)
+        wanted = numpy.asarray(times, dtype=float)
+        position = numpy.searchsorted(grid, wanted, side="right") - 1
+        padded = numpy.concatenate(
+            [numpy.zeros((running.shape[0], 1)), running], axis=1
         )
         return padded[:, position + 1]
 
-    def predict(self, features: Any, horizon: float, cause: int) -> np.ndarray:
+    def predict(
+        self, features: Any, horizon: float, cause: int
+    ) -> numpy.ndarray:
         """Risk score: probability of `cause` by `horizon`.
 
         Args:
@@ -177,7 +179,7 @@ class CauseSpecificCox:
         return self.predict_incidence(features, [horizon], cause)[:, 0]
 
 
-def naive_complement(duration: Any, cause: Any, target: int) -> pd.Series:
+def naive_complement(duration: Any, cause: Any, target: int) -> pandas.Series:
     """Kaplan-Meier `1 - S` that wrongly treats other causes as censored.
 
     Provided to show the bias that `cumulative_incidence` removes.
@@ -191,8 +193,8 @@ def naive_complement(duration: Any, cause: Any, target: int) -> pd.Series:
         Series indexed by the event times of `target`, holding one minus the
         Kaplan-Meier survival just after each.
     """
-    code = np.asarray(cause, dtype=int)
+    code = numpy.asarray(cause, dtype=int)
     times, survival = estimators.kaplan_meier(
-        np.asarray(duration, dtype=float), code == target
+        numpy.asarray(duration, dtype=float), code == target
     )
-    return pd.Series(1.0 - survival, index=times)
+    return pandas.Series(1.0 - survival, index=times)

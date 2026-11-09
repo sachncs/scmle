@@ -10,7 +10,7 @@ import support
 from scmle.contracts import errors
 from scmle.contracts import models
 from scmle.contracts import tasks
-from scmle.core import orchestrator as orchestrator_module
+from scmle.core import orchestrator
 from scmle.core import stages as stages_module
 from scmle.models import registry as registry_module
 
@@ -109,9 +109,9 @@ def test_custom_stage_sequence_is_polymorphic(binary_frame, tmp_path):
 
     stages = (*stages_module.default_stages()[:-1], Recording())
     spec = support.make_project(binary_frame, "y").spec
-    result = orchestrator_module.Orchestrator(
-        spec, binary_frame, stages=stages
-    ).run(tmp_path)
+    result = orchestrator.Orchestrator(spec, binary_frame, stages=stages).run(
+        tmp_path
+    )
     assert Recording.calls == [result.selected_model]
 
 

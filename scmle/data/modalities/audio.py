@@ -15,9 +15,9 @@ import random
 from typing import Self
 import wave
 
-import numpy as np
+import numpy
 
-from scmle.contracts import data as data_contracts
+from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.data.modalities.curation import build_finding
 from scmle.data.modalities.curation import conflicting_label_groups
@@ -245,13 +245,13 @@ class AudioFeatures:
         """The number of samples and the number of features, as a pair."""
         return (len(self.sources), len(self.feature_names))
 
-    def to_numpy(self) -> np.ndarray:
+    def to_numpy(self) -> numpy.ndarray:
         """Returns a writable copy of the feature matrix.
 
         Returns:
             A float64 array of shape ``(samples, features)``.
         """
-        return np.asarray(self.values, dtype=np.float64).copy()
+        return numpy.asarray(self.values, dtype=numpy.float64).copy()
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -408,23 +408,23 @@ def wav_signal_features(
         )
     frame_count = len(raw) // frame_width
     if sample_width == 1:
-        samples = np.frombuffer(raw, dtype=np.uint8).astype(np.float64)
+        samples = numpy.frombuffer(raw, dtype=numpy.uint8).astype(numpy.float64)
         samples = (samples - 128.0) / 128.0
         scale = 1.0
     elif sample_width in (2, 4):
-        dtype = np.dtype("<i2" if sample_width == 2 else "<i4")
-        samples = np.frombuffer(raw, dtype=dtype).astype(np.float64)
+        dtype = numpy.dtype("<i2" if sample_width == 2 else "<i4")
+        samples = numpy.frombuffer(raw, dtype=dtype).astype(numpy.float64)
         scale = float(2 ** (sample_width * 8 - 1))
         samples /= scale
     elif sample_width == 3:
-        packed = np.frombuffer(raw, dtype=np.uint8).reshape(-1, 3)
+        packed = numpy.frombuffer(raw, dtype=numpy.uint8).reshape(-1, 3)
         unsigned = (
-            packed[:, 0].astype(np.int64)
-            | (packed[:, 1].astype(np.int64) << 8)
-            | (packed[:, 2].astype(np.int64) << 16)
+            packed[:, 0].astype(numpy.int64)
+            | (packed[:, 1].astype(numpy.int64) << 8)
+            | (packed[:, 2].astype(numpy.int64) << 16)
         )
         signed = unsigned - ((unsigned & 0x800000) << 1)
-        samples = signed.astype(np.float64)
+        samples = signed.astype(numpy.float64)
         scale = float(2**23)
         samples /= scale
     else:
@@ -434,22 +434,22 @@ def wav_signal_features(
         )
 
     matrix = samples.reshape(-1, channels)
-    absolute = np.abs(matrix)
-    frame_values = np.asarray(
+    absolute = numpy.abs(matrix)
+    frame_values = numpy.asarray(
         [
             float(matrix.mean()),
             float(absolute.mean()),
-            float(np.sqrt(np.mean(np.square(matrix)))),
+            float(numpy.sqrt(numpy.mean(numpy.square(matrix)))),
             float(absolute.max()),
-            float(np.mean(absolute >= 0.999)),
-            float(np.mean(absolute <= 0.01)),
+            float(numpy.mean(absolute >= 0.999)),
+            float(numpy.mean(absolute <= 0.01)),
             float(frame_count / sample_rate),
             float(frame_count),
             float(scale),
         ],
-        dtype=np.float64,
+        dtype=numpy.float64,
     )
-    if not np.isfinite(frame_values).all():
+    if not numpy.isfinite(frame_values).all():
         raise AudioValidationError(
             "WAV signal features must be finite",
             {"code": "non_finite_features"},
@@ -459,7 +459,7 @@ def wav_signal_features(
 
 def wav_pcm_values(
     encoded_bytes: bytes,
-) -> tuple[tuple[int, int, int, int, str, str], np.ndarray]:
+) -> tuple[tuple[int, int, int, int, str, str], numpy.ndarray]:
     """Decodes WAV PCM values and retain the writer parameters.
 
     Values are normalized to ``[-1, 1]`` and shaped as frames by channels.
@@ -507,28 +507,28 @@ def wav_pcm_values(
             {"code": "empty_audio_frames"},
         )
     if sample_width == 1:
-        samples = np.frombuffer(raw, dtype=np.uint8).astype(np.float64)
+        samples = numpy.frombuffer(raw, dtype=numpy.uint8).astype(numpy.float64)
         samples = (samples - 128.0) / 128.0
     elif sample_width in (2, 4):
-        dtype = np.dtype("<i2" if sample_width == 2 else "<i4")
-        samples = np.frombuffer(raw, dtype=dtype).astype(np.float64)
+        dtype = numpy.dtype("<i2" if sample_width == 2 else "<i4")
+        samples = numpy.frombuffer(raw, dtype=dtype).astype(numpy.float64)
         samples /= float(2 ** (sample_width * 8 - 1))
     elif sample_width == 3:
-        packed = np.frombuffer(raw, dtype=np.uint8).reshape(-1, 3)
+        packed = numpy.frombuffer(raw, dtype=numpy.uint8).reshape(-1, 3)
         unsigned = (
-            packed[:, 0].astype(np.int64)
-            | (packed[:, 1].astype(np.int64) << 8)
-            | (packed[:, 2].astype(np.int64) << 16)
+            packed[:, 0].astype(numpy.int64)
+            | (packed[:, 1].astype(numpy.int64) << 8)
+            | (packed[:, 2].astype(numpy.int64) << 16)
         )
         signed = unsigned - ((unsigned & 0x800000) << 1)
-        samples = signed.astype(np.float64) / float(2**23)
+        samples = signed.astype(numpy.float64) / float(2**23)
     else:
         raise AudioValidationError(
             "WAV sample width is unsupported",
             {"code": "unsupported_sample_width", "sample_width": sample_width},
         )
     values = samples.reshape(-1, channels)
-    if not np.isfinite(values).all():
+    if not numpy.isfinite(values).all():
         raise AudioValidationError(
             "WAV PCM values must be finite",
             {"code": "non_finite_pcm"},
@@ -537,7 +537,7 @@ def wav_pcm_values(
 
 
 def wav_payload_from_pcm(
-    parameters: tuple[int, int, int, int, str, str], values: np.ndarray
+    parameters: tuple[int, int, int, int, str, str], values: numpy.ndarray
 ) -> bytes:
     """Encodes normalized PCM values with the supplied WAV parameters.
 
@@ -557,25 +557,25 @@ def wav_payload_from_pcm(
         ValueError: If ``values`` is not a finite two-dimensional matrix.
         AudioValidationError: If the sample width is not 1, 2, 3 or 4.
     """
-    matrix = np.asarray(values, dtype=np.float64)
-    if matrix.ndim != 2 or not np.isfinite(matrix).all():
+    matrix = numpy.asarray(values, dtype=numpy.float64)
+    if matrix.ndim != 2 or not numpy.isfinite(matrix).all():
         raise ValueError("PCM values must be a finite frame-by-channel matrix")
     sample_width = parameters[1]
-    clipped = np.clip(matrix, -1.0, 1.0)
+    clipped = numpy.clip(matrix, -1.0, 1.0)
     if sample_width == 1:
-        encoded = np.rint(clipped * 127.0 + 128.0).astype(np.uint8)
+        encoded = numpy.rint(clipped * 127.0 + 128.0).astype(numpy.uint8)
     elif sample_width == 2:
-        encoded = np.rint(clipped * 32767.0).astype("<i2")
+        encoded = numpy.rint(clipped * 32767.0).astype("<i2")
     elif sample_width == 3:
-        integer = np.rint(clipped * (2**23 - 1)).astype(np.int32)
-        unsigned = integer.astype(np.int64) & 0xFFFFFF
-        encoded = np.empty((*integer.shape, 3), dtype=np.uint8)
+        integer = numpy.rint(clipped * (2**23 - 1)).astype(numpy.int32)
+        unsigned = integer.astype(numpy.int64) & 0xFFFFFF
+        encoded = numpy.empty((*integer.shape, 3), dtype=numpy.uint8)
         encoded[..., 0] = unsigned & 0xFF
         encoded[..., 1] = (unsigned >> 8) & 0xFF
         encoded[..., 2] = (unsigned >> 16) & 0xFF
         raw = encoded.tobytes()
     elif sample_width == 4:
-        encoded = np.rint(clipped * (2**31 - 1)).astype("<i4")
+        encoded = numpy.rint(clipped * (2**31 - 1)).astype("<i4")
     else:
         raise AudioValidationError(
             "WAV sample width is unsupported",
@@ -996,7 +996,7 @@ class AudioDataset:
             quality_findings.append(
                 build_finding(
                     "quality.audio-transcript-confidence-missing",
-                    data_contracts.FindingSeverity.WARNING,
+                    data.FindingSeverity.WARNING,
                     {
                         "sources": [
                             sample.source
@@ -1015,7 +1015,7 @@ class AudioDataset:
             quality_findings.append(
                 build_finding(
                     "quality.audio-format-drift",
-                    data_contracts.FindingSeverity.WARNING,
+                    data.FindingSeverity.WARNING,
                     {"sources": [profile.source for profile in profiles]},
                     {"formats": formats},
                     "Select an explicit codec normalization policy before "
@@ -1027,7 +1027,7 @@ class AudioDataset:
             quality_findings.append(
                 build_finding(
                     "quality.audio-shape-drift",
-                    data_contracts.FindingSeverity.WARNING,
+                    data.FindingSeverity.WARNING,
                     {"sources": [profile.source for profile in profiles]},
                     {
                         "sample_rates": sample_rates,
@@ -1043,7 +1043,7 @@ class AudioDataset:
             risk_findings.append(
                 build_finding(
                     "risk.audio-mixed-label-state",
-                    data_contracts.FindingSeverity.WARNING,
+                    data.FindingSeverity.WARNING,
                     {"dataset": self.content_hash},
                     {"label_counts": labels},
                     "Declare whether unlabeled clips are valid for the "
@@ -1055,7 +1055,7 @@ class AudioDataset:
             risk_findings.append(
                 build_finding(
                     "risk.audio-conflicting-duplicate-labels",
-                    data_contracts.FindingSeverity.ERROR,
+                    data.FindingSeverity.ERROR,
                     {"dataset": self.content_hash},
                     {"groups": list(conflicts)},
                     "Resolve the label conflict or explicitly exclude the "

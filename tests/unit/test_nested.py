@@ -1,7 +1,7 @@
 """Nested validation scores the whole tuning procedure on untouched rows."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from sklearn import linear_model
 from sklearn import metrics
 from sklearn import model_selection
@@ -14,10 +14,10 @@ SPACE = search.SearchSpace((search.FloatParameter("C", 1e-3, 100.0, log=True),))
 
 def noise(rows=300, seed=0):
     """Features unrelated to the labels: any score above chance is optimism."""
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     return (
-        pd.DataFrame(rng.normal(size=(rows, 20))),
-        pd.Series(rng.integers(0, 2, rows)),
+        pandas.DataFrame(rng.normal(size=(rows, 20))),
+        pandas.Series(rng.integers(0, 2, rows)),
     )
 
 
@@ -27,7 +27,7 @@ def build(params):
 
 def folds(rows):
     splitter = model_selection.KFold(4, shuffle=True, random_state=0)
-    return list(splitter.split(np.arange(rows)))
+    return list(splitter.split(numpy.arange(rows)))
 
 
 def test_the_honest_estimate_on_pure_noise_is_near_chance_and_optimism_shows():
@@ -51,7 +51,7 @@ def test_the_honest_estimate_on_pure_noise_is_near_chance_and_optimism_shows():
 
 def test_a_real_signal_survives_the_nested_check():
     features, target = noise()
-    features[0] = target * 2.0 + np.random.default_rng(1).normal(
+    features[0] = target * 2.0 + numpy.random.default_rng(1).normal(
         0, 0.5, len(target)
     )
 

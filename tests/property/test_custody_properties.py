@@ -3,27 +3,29 @@
 from hypothesis import example
 from hypothesis import given
 from hypothesis import settings
-from hypothesis import strategies as st
-import numpy as np
+from hypothesis import strategies
+import numpy
 from sklearn import model_selection
 
 from scmle.contracts import errors
 from scmle.data.custody import carve
 
 
-@st.composite
+@strategies.composite
 def scenarios(draw):
-    n = draw(st.integers(60, 400))
-    fraction = draw(st.floats(0.1, 0.5))
-    seed = draw(st.integers(0, 10_000))
-    kind = draw(st.sampled_from(["plain", "groups", "dups", "time", "both"]))
-    labels = draw(st.booleans())
-    embargo = draw(st.integers(0, 5))
+    n = draw(strategies.integers(60, 400))
+    fraction = draw(strategies.floats(0.1, 0.5))
+    seed = draw(strategies.integers(0, 10_000))
+    kind = draw(
+        strategies.sampled_from(["plain", "groups", "dups", "time", "both"])
+    )
+    labels = draw(strategies.booleans())
+    embargo = draw(strategies.integers(0, 5))
     return n, fraction, seed, kind, labels, embargo
 
 
 def inputs(n, kind, seed):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     groups = (
         rng.integers(0, max(n // 4, 2), n)
         if kind in {"groups", "both"}
@@ -31,11 +33,11 @@ def inputs(n, kind, seed):
     )
     duplicates = None
     if kind in {"dups", "both"}:
-        duplicates = np.full(n, -1)
+        duplicates = numpy.full(n, -1)
         pairs = rng.choice(n, size=min(40, n // 2), replace=False)
         for a, b in zip(pairs[::2], pairs[1::2], strict=False):
             duplicates[a] = duplicates[b] = a
-    times = np.arange(n) if kind in {"time", "both"} else None
+    times = numpy.arange(n) if kind in {"time", "both"} else None
     return groups, duplicates, times
 
 
@@ -45,8 +47,8 @@ def inputs(n, kind, seed):
 def test_sets_never_overlap_and_units_never_straddle(scenario):
     n, fraction, seed, kind, with_labels, embargo = scenario
     groups, duplicates, times = inputs(n, kind, seed)
-    labels = (np.arange(n) % 3 == 0).astype(int) if with_labels else None
-    dev = np.arange(n) + 7
+    labels = (numpy.arange(n) % 3 == 0).astype(int) if with_labels else None
+    dev = numpy.arange(n) + 7
     folds = list(
         model_selection.KFold(3, shuffle=True, random_state=0).split(dev)
     )
@@ -84,4 +86,4 @@ def test_sets_never_overlap_and_units_never_straddle(scenario):
             members = {i for i in dev if duplicates[position[int(i)]] == label}
             assert not (members & c and members & x)
     again = carve.carve_confirmation(dev, folds, **arguments)
-    assert np.array_equal(again.confirmation_ids, result.confirmation_ids)
+    assert numpy.array_equal(again.confirmation_ids, result.confirmation_ids)

@@ -22,8 +22,8 @@ import dataclasses
 import math
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from scipy import optimize
 
 
@@ -66,7 +66,7 @@ class SynthResult:
         return dataclasses.asdict(self)
 
 
-def fit_weights(target: np.ndarray, donors: np.ndarray) -> np.ndarray:
+def fit_weights(target: numpy.ndarray, donors: numpy.ndarray) -> numpy.ndarray:
     """Fits simplex-constrained least-squares donor weights.
 
     Args:
@@ -77,12 +77,12 @@ def fit_weights(target: np.ndarray, donors: np.ndarray) -> np.ndarray:
         Non-negative weights, one per donor column, that sum to one.
     """
     k = donors.shape[1]
-    start = np.full(k, 1.0 / k)
+    start = numpy.full(k, 1.0 / k)
 
-    def loss(w: np.ndarray) -> float:
-        return float(np.sum((target - donors @ w) ** 2))
+    def loss(w: numpy.ndarray) -> float:
+        return float(numpy.sum((target - donors @ w) ** 2))
 
-    def gradient(w: np.ndarray) -> np.ndarray:
+    def gradient(w: numpy.ndarray) -> numpy.ndarray:
         return -2.0 * donors.T @ (target - donors @ w)
 
     result = optimize.minimize(
@@ -94,13 +94,13 @@ def fit_weights(target: np.ndarray, donors: np.ndarray) -> np.ndarray:
         constraints=[{"type": "eq", "fun": lambda w: w.sum() - 1.0}],
         options={"maxiter": 500, "ftol": 1e-12},
     )
-    weights = np.clip(result.x, 0.0, None)
+    weights = numpy.clip(result.x, 0.0, None)
     return weights / weights.sum()
 
 
 def ratio_for(
-    pre: np.ndarray, post: np.ndarray, treated: int, pool: list[int]
-) -> tuple[float, float, float, np.ndarray, np.ndarray]:
+    pre: numpy.ndarray, post: numpy.ndarray, treated: int, pool: list[int]
+) -> tuple[float, float, float, numpy.ndarray, numpy.ndarray]:
     """Fits one unit on a donor pool and measures its prediction error.
 
     Args:
@@ -117,8 +117,8 @@ def ratio_for(
     w = fit_weights(pre[:, treated], pre[:, pool])
     pre_gap = pre[:, treated] - pre[:, pool] @ w
     post_gap = post[:, treated] - post[:, pool] @ w
-    pre_rmspe = math.sqrt(float(np.mean(pre_gap**2)))
-    post_rmspe = math.sqrt(float(np.mean(post_gap**2)))
+    pre_rmspe = math.sqrt(float(numpy.mean(pre_gap**2)))
+    post_rmspe = math.sqrt(float(numpy.mean(post_gap**2)))
     ratio = post_rmspe / pre_rmspe if pre_rmspe > 0 else math.inf
     return pre_rmspe, post_rmspe, ratio, post_gap, w
 
@@ -136,7 +136,7 @@ def min_donors(alpha: float) -> int:
 
 
 def estimate(
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     unit: str,
     time: str,
     outcome: str,

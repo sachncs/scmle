@@ -9,7 +9,7 @@ reordering a check never changes another check's draws.
 
 import hashlib
 
-import numpy as np
+import numpy
 
 from scmle.contracts import qualification
 
@@ -61,7 +61,7 @@ def name_words(component: str) -> tuple[int, ...]:
 
 def component_seed_sequence(
     run_seed: int, component: str, index: int = 0
-) -> np.random.SeedSequence:
+) -> numpy.random.SeedSequence:
     """Returns the seed sequence for one component of one run.
 
     Args:
@@ -73,14 +73,14 @@ def component_seed_sequence(
         A sequence that depends only on the three arguments.
     """
     name = validate_key(run_seed, component, index)
-    return np.random.SeedSequence(
+    return numpy.random.SeedSequence(
         entropy=run_seed, spawn_key=(*name_words(name), index)
     )
 
 
 def component_rng(
     run_seed: int, component: str, index: int = 0
-) -> np.random.Generator:
+) -> numpy.random.Generator:
     """Returns the random generator for one component of one run.
 
     Args:
@@ -91,7 +91,7 @@ def component_rng(
     Returns:
         A NumPy generator that depends only on the three arguments.
     """
-    return np.random.default_rng(
+    return numpy.random.default_rng(
         component_seed_sequence(run_seed, component, index)
     )
 

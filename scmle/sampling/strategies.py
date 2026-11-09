@@ -18,7 +18,7 @@ from sklearn import calibration
 from sklearn import compose
 from sklearn.utils import validation
 
-from scmle.contracts import data as data_contracts
+from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.contracts import experiments
 from scmle.contracts import models
@@ -54,7 +54,7 @@ class DataStrategy(abc.ABC):
 
     def applicability(
         self,
-        profile: data_contracts.DatasetProfile,
+        profile: data.DatasetProfile,
         task: tasks.TaskType,
         adapter: models.ModelAdapter,
     ) -> str | None:
@@ -75,7 +75,7 @@ class DataStrategy(abc.ABC):
     @abc.abstractmethod
     def build(
         self,
-        plan: data_contracts.FeaturePlan,
+        plan: data.FeaturePlan,
         adapter: models.ModelAdapter,
         task: tasks.TaskType,
         seed: int,
@@ -103,7 +103,7 @@ class DefaultStrategy(DataStrategy):
 
     def applicability(
         self,
-        profile: data_contracts.DatasetProfile,
+        profile: data.DatasetProfile,
         task: tasks.TaskType,
         adapter: models.ModelAdapter,
     ) -> str | None:
@@ -121,7 +121,7 @@ class DefaultStrategy(DataStrategy):
 
     def build(
         self,
-        plan: data_contracts.FeaturePlan,
+        plan: data.FeaturePlan,
         adapter: models.ModelAdapter,
         task: tasks.TaskType,
         seed: int,
@@ -147,7 +147,7 @@ class ImbalanceStrategy(DataStrategy):
 
     def applicability(
         self,
-        profile: data_contracts.DatasetProfile,
+        profile: data.DatasetProfile,
         task: tasks.TaskType,
         adapter: models.ModelAdapter,
     ) -> str | None:
@@ -183,7 +183,7 @@ class ClassWeightStrategy(ImbalanceStrategy):
 
     def applicability(
         self,
-        profile: data_contracts.DatasetProfile,
+        profile: data.DatasetProfile,
         task: tasks.TaskType,
         adapter: models.ModelAdapter,
     ) -> str | None:
@@ -206,7 +206,7 @@ class ClassWeightStrategy(ImbalanceStrategy):
 
     def build(
         self,
-        plan: data_contracts.FeaturePlan,
+        plan: data.FeaturePlan,
         adapter: models.ModelAdapter,
         task: tasks.TaskType,
         seed: int,
@@ -239,7 +239,7 @@ class ResamplingStrategy(ImbalanceStrategy):
 
     def build(
         self,
-        plan: data_contracts.FeaturePlan,
+        plan: data.FeaturePlan,
         adapter: models.ModelAdapter,
         task: tasks.TaskType,
         seed: int,
@@ -287,7 +287,7 @@ class CalibrationStrategy(DataStrategy):
 
     def applicability(
         self,
-        profile: data_contracts.DatasetProfile,
+        profile: data.DatasetProfile,
         task: tasks.TaskType,
         adapter: models.ModelAdapter,
     ) -> str | None:
@@ -314,7 +314,7 @@ class CalibrationStrategy(DataStrategy):
 
     def build(
         self,
-        plan: data_contracts.FeaturePlan,
+        plan: data.FeaturePlan,
         adapter: models.ModelAdapter,
         task: tasks.TaskType,
         seed: int,
@@ -376,7 +376,7 @@ class SmoteStrategy(ImbalanceStrategy):
 
     def applicability(
         self,
-        profile: data_contracts.DatasetProfile,
+        profile: data.DatasetProfile,
         task: tasks.TaskType,
         adapter: models.ModelAdapter,
     ) -> str | None:
@@ -403,7 +403,7 @@ class SmoteStrategy(ImbalanceStrategy):
 
     def build(
         self,
-        plan: data_contracts.FeaturePlan,
+        plan: data.FeaturePlan,
         adapter: models.ModelAdapter,
         task: tasks.TaskType,
         seed: int,
@@ -423,7 +423,7 @@ class SmoteStrategy(ImbalanceStrategy):
         """
         over_sampling = importlib.import_module("imblearn.over_sampling")
         sampler = getattr(over_sampling, self.sampler_name)(random_state=seed)
-        options = data_contracts.PreprocessingOptions(
+        options = data.PreprocessingOptions(
             scale=adapter.capabilities.needs_scaling
         )
         return resampling.PreprocessedResamplingClassifier(
@@ -476,7 +476,7 @@ class FeatureStrategy(DataStrategy):
 
     def build(
         self,
-        plan: data_contracts.FeaturePlan,
+        plan: data.FeaturePlan,
         adapter: models.ModelAdapter,
         task: tasks.TaskType,
         seed: int,
@@ -518,7 +518,7 @@ class LogSkewedStrategy(FeatureStrategy):
 
     def applicability(
         self,
-        profile: data_contracts.DatasetProfile,
+        profile: data.DatasetProfile,
         task: tasks.TaskType,
         adapter: models.ModelAdapter,
     ) -> str | None:
@@ -564,7 +564,7 @@ class RareTargetStrategy(DataStrategy):
 
     def applicability(
         self,
-        profile: data_contracts.DatasetProfile,
+        profile: data.DatasetProfile,
         task: tasks.TaskType,
         adapter: models.ModelAdapter,
     ) -> str | None:
@@ -600,7 +600,7 @@ class RareTargetStrategy(DataStrategy):
 
     def build(
         self,
-        plan: data_contracts.FeaturePlan,
+        plan: data.FeaturePlan,
         adapter: models.ModelAdapter,
         task: tasks.TaskType,
         seed: int,
@@ -635,7 +635,7 @@ class TargetEncodingStrategy(DataStrategy):
 
     def applicability(
         self,
-        profile: data_contracts.DatasetProfile,
+        profile: data.DatasetProfile,
         task: tasks.TaskType,
         adapter: models.ModelAdapter,
     ) -> str | None:
@@ -658,7 +658,7 @@ class TargetEncodingStrategy(DataStrategy):
 
     def build(
         self,
-        plan: data_contracts.FeaturePlan,
+        plan: data.FeaturePlan,
         adapter: models.ModelAdapter,
         task: tasks.TaskType,
         seed: int,
@@ -695,7 +695,7 @@ class InteractionStrategy(FeatureStrategy):
 
     def applicability(
         self,
-        profile: data_contracts.DatasetProfile,
+        profile: data.DatasetProfile,
         task: tasks.TaskType,
         adapter: models.ModelAdapter,
     ) -> str | None:
@@ -729,7 +729,7 @@ class ConstructFeaturesStrategy(FeatureStrategy):
 
     def applicability(
         self,
-        profile: data_contracts.DatasetProfile,
+        profile: data.DatasetProfile,
         task: tasks.TaskType,
         adapter: models.ModelAdapter,
     ) -> str | None:
@@ -760,7 +760,7 @@ class SelectFeaturesStrategy(FeatureStrategy):
 
     def applicability(
         self,
-        profile: data_contracts.DatasetProfile,
+        profile: data.DatasetProfile,
         task: tasks.TaskType,
         adapter: models.ModelAdapter,
     ) -> str | None:
@@ -790,7 +790,7 @@ class MissingValueStrategy(FeatureStrategy):
 
     def applicability(
         self,
-        profile: data_contracts.DatasetProfile,
+        profile: data.DatasetProfile,
         task: tasks.TaskType,
         adapter: models.ModelAdapter,
     ) -> str | None:
@@ -832,7 +832,7 @@ class MissingIndicatorStrategy(MissingValueStrategy):
 
     def applicability(
         self,
-        profile: data_contracts.DatasetProfile,
+        profile: data.DatasetProfile,
         task: tasks.TaskType,
         adapter: models.ModelAdapter,
     ) -> str | None:
@@ -872,7 +872,7 @@ class IterativeImputationStrategy(MissingValueStrategy):
 
     def applicability(
         self,
-        profile: data_contracts.DatasetProfile,
+        profile: data.DatasetProfile,
         task: tasks.TaskType,
         adapter: models.ModelAdapter,
     ) -> str | None:
@@ -908,7 +908,7 @@ class TargetTransformStrategy(DataStrategy):
 
     def applicability(
         self,
-        profile: data_contracts.DatasetProfile,
+        profile: data.DatasetProfile,
         task: tasks.TaskType,
         adapter: models.ModelAdapter,
     ) -> str | None:
@@ -939,7 +939,7 @@ class TargetTransformStrategy(DataStrategy):
 
     def build(
         self,
-        plan: data_contracts.FeaturePlan,
+        plan: data.FeaturePlan,
         adapter: models.ModelAdapter,
         task: tasks.TaskType,
         seed: int,

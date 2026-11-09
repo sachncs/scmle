@@ -10,42 +10,42 @@ from pathlib import Path
 from typing import Any
 
 import scmle
-from scmle.core import retry as core_retry
-from scmle.data.store import objectstore as store_objectstore
-from scmle.data.store import processing as store_processing
-from scmle.data.store import quality as store_quality
-from scmle.data.store import snapshot as store_snapshot
-from scmle.deploy import contract as deploy_contract
-from scmle.deploy import control as deploy_control
-from scmle.deploy import gate as deploy_gate
-from scmle.deploy import livetests as deploy_livetests
-from scmle.deploy import observation as deploy_observation
-from scmle.deploy import record as deploy_record
-from scmle.governance import release_state as governance_release_state
-from scmle.operations import classify as operations_classify
-from scmle.operations import continuous as operations_continuous
-from scmle.operations import notify as operations_notify
-from scmle.operations import recovery as operations_recovery
-from scmle.operations import signals as operations_signals
-from scmle.operations import spool as operations_spool
-from scmle.runners import base as runners_base
-from scmle.runners import checkpoint as runners_checkpoint
-from scmle.runners import local as runners_local
-from scmle.runners import reproducibility as runners_reproducibility
-from scmle.runners import roles as runners_roles
-from scmle.security import access as security_access
-from scmle.security import audit as security_audit
-from scmle.security import tokens as security_tokens
+from scmle.core import retry
+from scmle.data.store import objectstore
+from scmle.data.store import processing
+from scmle.data.store import quality
+from scmle.data.store import snapshot
+from scmle.deploy import contract
+from scmle.deploy import control
+from scmle.deploy import gate
+from scmle.deploy import livetests
+from scmle.deploy import observation
+from scmle.deploy import record
+from scmle.governance import release_state
+from scmle.operations import classify
+from scmle.operations import continuous
+from scmle.operations import notify
+from scmle.operations import recovery
+from scmle.operations import signals
+from scmle.operations import spool
+from scmle.runners import base
+from scmle.runners import checkpoint
+from scmle.runners import local
+from scmle.runners import reproducibility
+from scmle.runners import roles
+from scmle.security import access
+from scmle.security import audit
+from scmle.security import tokens
 import scmle.trail as trail
-from scmle.workflow import definition as workflow_definition
-from scmle.workflow import executor as workflow_executor
-from scmle.workflow import schedule as workflow_schedule
+from scmle.workflow import definition
+from scmle.workflow import executor
+from scmle.workflow import schedule
 
 # Extension surfaces: documented contracts below the top-level API. Their
 # signatures are pinned too, without changing any `scmle.__all__` entry.
 EXTENSION_SURFACES = {
     "scmle.deploy.contract": (
-        deploy_contract,
+        contract,
         (
             "Architecture",
             "BundleRef",
@@ -62,7 +62,7 @@ EXTENSION_SURFACES = {
         ),
     ),
     "scmle.deploy.control": (
-        deploy_control,
+        control,
         (
             "ConfirmPolicy",
             "ControlPlane",
@@ -73,7 +73,7 @@ EXTENSION_SURFACES = {
         ),
     ),
     "scmle.governance.release_state": (
-        governance_release_state,
+        release_state,
         (
             "Finding",
             "Outcome",
@@ -84,7 +84,7 @@ EXTENSION_SURFACES = {
         ),
     ),
     "scmle.deploy.gate": (
-        deploy_gate,
+        gate,
         (
             "Candidate",
             "GateDecision",
@@ -95,19 +95,19 @@ EXTENSION_SURFACES = {
         ),
     ),
     "scmle.deploy.record": (
-        deploy_record,
+        record,
         ("DeploymentRecord", "read_record", "write_record"),
     ),
     "scmle.deploy.livetests": (
-        deploy_livetests,
+        livetests,
         ("CheckResult", "Response", "Target", "http_fetch", "run_checks"),
     ),
     "scmle.deploy.observation": (
-        deploy_observation,
+        observation,
         ("Observation", "Traffic"),
     ),
     "scmle.security.tokens": (
-        security_tokens,
+        tokens,
         (
             "KeySet",
             "Principal",
@@ -119,7 +119,7 @@ EXTENSION_SURFACES = {
         ),
     ),
     "scmle.security.access": (
-        security_access,
+        access,
         (
             "AccessDenied",
             "Gateway",
@@ -128,9 +128,9 @@ EXTENSION_SURFACES = {
             "require_authentication_for",
         ),
     ),
-    "scmle.security.audit": (security_audit, ("AuditLog",)),
+    "scmle.security.audit": (audit, ("AuditLog",)),
     "scmle.core.retry": (
-        core_retry,
+        retry,
         (
             "RetryPolicy",
             "RetryExhaustedError",
@@ -139,7 +139,7 @@ EXTENSION_SURFACES = {
         ),
     ),
     "scmle.data.store.objectstore": (
-        store_objectstore,
+        objectstore,
         (
             "LocalObjectStore",
             "ObjectMeta",
@@ -149,11 +149,11 @@ EXTENSION_SURFACES = {
         ),
     ),
     "scmle.data.store.snapshot": (
-        store_snapshot,
+        snapshot,
         ("DataContract", "ReadLog", "SnapshotReader", "SnapshotRecord"),
     ),
     "scmle.data.store.quality": (
-        store_quality,
+        quality,
         (
             "GateReport",
             "Policy",
@@ -164,7 +164,7 @@ EXTENSION_SURFACES = {
         ),
     ),
     "scmle.runners.base": (
-        runners_base,
+        base,
         (
             "CostBudget",
             "CostRate",
@@ -175,18 +175,18 @@ EXTENSION_SURFACES = {
             "Runner",
         ),
     ),
-    "scmle.runners.local": (runners_local, ("LocalRunner",)),
+    "scmle.runners.local": (local, ("LocalRunner",)),
     "scmle.runners.roles": (
-        runners_roles,
+        roles,
         ("Role", "RoleStore", "check_distinct", "check_separation"),
     ),
-    "scmle.runners.checkpoint": (runners_checkpoint, ("CheckpointStore",)),
+    "scmle.runners.checkpoint": (checkpoint, ("CheckpointStore",)),
     "scmle.runners.reproducibility": (
-        runners_reproducibility,
+        reproducibility,
         ("Tolerances", "compare"),
     ),
     "scmle.workflow.definition": (
-        workflow_definition,
+        definition,
         (
             "CatchUp",
             "Schedule",
@@ -197,16 +197,16 @@ EXTENSION_SURFACES = {
         ),
     ),
     "scmle.workflow.executor": (
-        workflow_executor,
+        executor,
         ("ApprovalError", "LocalExecutor", "RunState", "StepContext"),
     ),
-    "scmle.workflow.schedule": (workflow_schedule, ("Scheduler", "TickReport")),
+    "scmle.workflow.schedule": (schedule, ("Scheduler", "TickReport")),
     "scmle.data.store.processing": (
-        store_processing,
+        processing,
         ("Checkpoint", "IncrementalProcessor", "RunResult"),
     ),
     "scmle.operations.signals": (
-        operations_signals,
+        signals,
         (
             "Category",
             "Signal",
@@ -217,11 +217,11 @@ EXTENSION_SURFACES = {
         ),
     ),
     "scmle.operations.classify": (
-        operations_classify,
+        classify,
         ("Classification", "Verdict", "classify"),
     ),
     "scmle.operations.continuous": (
-        operations_continuous,
+        continuous,
         (
             "ContinuousEvaluation",
             "MetricSpec",
@@ -233,11 +233,11 @@ EXTENSION_SURFACES = {
         ),
     ),
     "scmle.operations.recovery": (
-        operations_recovery,
+        recovery,
         ("Fault", "Measurement", "Objective", "Result", "Runner"),
     ),
     "scmle.operations.spool": (
-        operations_spool,
+        spool,
         ("FlushResult", "MetricsSpool"),
     ),
     "scmle.trail": (
@@ -245,7 +245,7 @@ EXTENSION_SURFACES = {
         ("Finding", "Report", "build", "render", "seal", "verify"),
     ),
     "scmle.operations.notify": (
-        operations_notify,
+        notify,
         (
             "Delivery",
             "Notifier",

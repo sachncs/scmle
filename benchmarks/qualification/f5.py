@@ -35,7 +35,7 @@ from collections.abc import Sequence
 import dataclasses
 from pathlib import Path
 
-import pandas as pd
+import pandas
 
 from benchmarks.qualification import certify
 from benchmarks.qualification import inject
@@ -65,7 +65,7 @@ CUT_GRID = (1e-4, 3e-4, 1e-3, 3e-3, 1e-2, 3e-2, 1e-1, 3e-1)
 CLASS_RATES = {0: 0.20, 1: 0.05}
 
 
-def label_detector(frame: pd.DataFrame) -> pd.Series:
+def label_detector(frame: pandas.DataFrame) -> pandas.Series:
     """Rows both label-noise detectors flag (the gating rule).
 
     Args:
@@ -76,12 +76,14 @@ def label_detector(frame: pd.DataFrame) -> pd.Series:
         label-noise report's suspects.
     """
     report = labels.detect(frame.drop(columns=[TARGET]), frame[TARGET], 0)
-    flags = pd.Series(False, index=frame.index)
+    flags = pandas.Series(False, index=frame.index)
     flags.iloc[list(report.suspects)] = True
     return flags
 
 
-def provenance_for(frame: pd.DataFrame) -> dict[str, outliers.FieldProvenance]:
+def provenance_for(
+    frame: pandas.DataFrame,
+) -> dict[str, outliers.FieldProvenance]:
     """Instrument ranges from the clean table, padded by `OUTLIER_PAD`.
 
     Args:
@@ -113,7 +115,7 @@ def renamed(plan: certify.DefectPlan, name: str) -> certify.DefectPlan:
         A plan that plants as `plan` does but labels the injection `name`.
     """
 
-    def plant(frame: pd.DataFrame, seed: int) -> inject.Injection:
+    def plant(frame: pandas.DataFrame, seed: int) -> inject.Injection:
         """Plants with the original plan, then renames the defect type.
 
         Args:
@@ -195,8 +197,8 @@ def row_plans() -> dict[str, list[certify.DefectPlan]]:
 
 
 def row_detectors(
-    frame: pd.DataFrame,
-) -> dict[str, Callable[[pd.DataFrame], pd.Series]]:
+    frame: pandas.DataFrame,
+) -> dict[str, Callable[[pandas.DataFrame], pandas.Series]]:
     """Maps detector id to a function from frame to one flag per row.
 
     Args:
@@ -215,7 +217,7 @@ def row_detectors(
 
 
 def certify_missingness(
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     seeds: Sequence[int] = MISSING_SEEDS,
     policy: certificates.CertificationPolicy = POLICY,
 ) -> certificates.DetectorCertificate:
@@ -277,7 +279,7 @@ def certify_missingness(
 
 
 def select_cut(
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     policy: certificates.CertificationPolicy = POLICY,
 ) -> float:
     """Largest grid cut whose clean-copy false-alarm bound meets the policy.
@@ -309,7 +311,7 @@ def select_cut(
 def certify_all(
     seeds: Sequence[int] = ROW_SEEDS,
     missing_seeds: Sequence[int] = MISSING_SEEDS,
-    frame: pd.DataFrame | None = None,
+    frame: pandas.DataFrame | None = None,
     only: Sequence[str] | None = None,
 ) -> certificates.CertificateStore:
     """Certifies the data detectors on the demo table.

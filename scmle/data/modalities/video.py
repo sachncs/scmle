@@ -11,9 +11,9 @@ import random
 from typing import Any
 from typing import Self
 
-import numpy as np
+import numpy
 
-from scmle.contracts import data as data_contracts
+from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.data.modalities.curation import build_finding
 from scmle.data.modalities.curation import conflicting_label_groups
@@ -202,7 +202,9 @@ class VideoFeatures:
             raise ValueError("feature rows must match video sources")
         if any(len(row) != len(self.feature_names) for row in self.values):
             raise ValueError("feature columns must match feature names")
-        if not np.isfinite(np.asarray(self.values, dtype=np.float64)).all():
+        if not numpy.isfinite(
+            numpy.asarray(self.values, dtype=numpy.float64)
+        ).all():
             raise ValueError("video features must be finite")
         sampled = tuple(
             tuple(int(index) for index in indices)
@@ -226,13 +228,13 @@ class VideoFeatures:
         """The number of videos and the number of features, as a pair."""
         return (len(self.sources), len(self.feature_names))
 
-    def to_numpy(self) -> np.ndarray:
+    def to_numpy(self) -> numpy.ndarray:
         """Returns a writable copy of the feature matrix.
 
         Returns:
             A float64 array of shape ``(videos, features)``.
         """
-        return np.asarray(self.values, dtype=np.float64).copy()
+        return numpy.asarray(self.values, dtype=numpy.float64).copy()
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -309,7 +311,7 @@ class VideoTemporalSplit:
 
 
 VideoProbe = Callable[[bytes], VideoMetadata]
-VideoFrameDecoder = Callable[[bytes, int], np.ndarray]
+VideoFrameDecoder = Callable[[bytes, int], numpy.ndarray]
 
 
 def canonical_source(source: str | pathlib.Path) -> str:
@@ -609,8 +611,8 @@ class VideoDataset:
                     sample.byte_size / metadata.frame_count,
                 )
             )
-        values = np.asarray(rows, dtype=np.float64)
-        if not np.isfinite(values).all():
+        values = numpy.asarray(rows, dtype=numpy.float64)
+        if not numpy.isfinite(values).all():
             raise VideoValidationError(
                 "video metadata features must be finite",
                 {"code": "non_finite_features"},
@@ -668,10 +670,12 @@ class VideoDataset:
         sampled_indices: list[tuple[int, ...]] = []
         for sample in self.samples:
             indices = self.frame_indices_for(sample, max_frames)
-            values = np.zeros(max_frames * len(slot_names), dtype=np.float64)
+            values = numpy.zeros(
+                max_frames * len(slot_names), dtype=numpy.float64
+            )
             for slot, frame_index in enumerate(indices):
                 try:
-                    frame = np.asarray(
+                    frame = numpy.asarray(
                         decoder(sample.encoded_bytes, frame_index)
                     )
                 except Exception as error:
@@ -723,8 +727,8 @@ class VideoDataset:
                             ],
                         },
                     )
-                numeric = np.asarray(frame, dtype=np.float64)
-                if not np.isfinite(numeric).all():
+                numeric = numpy.asarray(frame, dtype=numpy.float64)
+                if not numpy.isfinite(numeric).all():
                     raise VideoValidationError(
                         "decoded video frame contains non-finite values",
                         {
@@ -737,8 +741,8 @@ class VideoDataset:
                 values[start : start + len(slot_names)] = (
                     float(numeric.mean()),
                     float(numeric.std()),
-                    float(np.min(numeric)),
-                    float(np.max(numeric)),
+                    float(numpy.min(numeric)),
+                    float(numpy.max(numeric)),
                     1.0,
                 )
             rows.append(tuple(float(value) for value in values))
@@ -772,7 +776,7 @@ class VideoDataset:
         count = min(max_frames, sample.metadata.frame_count)
         return tuple(
             int(index)
-            for index in np.linspace(
+            for index in numpy.linspace(
                 0,
                 sample.metadata.frame_count - 1,
                 count,
@@ -943,7 +947,7 @@ class VideoDataset:
             quality_findings.append(
                 build_finding(
                     "quality.video-audio-sync-out-of-tolerance",
-                    data_contracts.FindingSeverity.ERROR,
+                    data.FindingSeverity.ERROR,
                     {"sources": out_of_tolerance},
                     {"count": len(out_of_tolerance)},
                     "Align audio and video or exclude synchronization-"
@@ -955,7 +959,7 @@ class VideoDataset:
             quality_findings.append(
                 build_finding(
                     "quality.video-audio-sync-unknown",
-                    data_contracts.FindingSeverity.WARNING,
+                    data.FindingSeverity.WARNING,
                     {"sources": unknown_synchronization},
                     {"count": len(unknown_synchronization)},
                     "Supply measured audio duration, offset, and tolerance "
@@ -967,7 +971,7 @@ class VideoDataset:
             quality_findings.append(
                 build_finding(
                     "quality.video-encoding-drift",
-                    data_contracts.FindingSeverity.WARNING,
+                    data.FindingSeverity.WARNING,
                     {"sources": [profile.source for profile in profiles]},
                     {"formats": formats, "codecs": codecs},
                     "Choose an explicit decoder and normalization policy "
@@ -979,7 +983,7 @@ class VideoDataset:
             quality_findings.append(
                 build_finding(
                     "quality.video-dimension-drift",
-                    data_contracts.FindingSeverity.WARNING,
+                    data.FindingSeverity.WARNING,
                     {"sources": [profile.source for profile in profiles]},
                     {"dimensions": [list(value) for value in dimensions]},
                     "Record frame resizing or bucketing as a versioned "
@@ -1026,7 +1030,7 @@ class VideoDataset:
             quality_findings.append(
                 build_finding(
                     "quality.video-mixed-temporal-state",
-                    data_contracts.FindingSeverity.WARNING,
+                    data.FindingSeverity.WARNING,
                     {"dataset": self.content_hash},
                     temporal_evidence,
                     "Supply observation times for every clip before using "
@@ -1038,7 +1042,7 @@ class VideoDataset:
             risk_findings.append(
                 build_finding(
                     "risk.video-mixed-label-state",
-                    data_contracts.FindingSeverity.WARNING,
+                    data.FindingSeverity.WARNING,
                     {"dataset": self.content_hash},
                     {"label_counts": labels},
                     "Declare whether unlabeled clips are valid for the "
@@ -1050,7 +1054,7 @@ class VideoDataset:
             risk_findings.append(
                 build_finding(
                     "risk.video-conflicting-duplicate-labels",
-                    data_contracts.FindingSeverity.ERROR,
+                    data.FindingSeverity.ERROR,
                     {"dataset": self.content_hash},
                     {"groups": list(conflicts)},
                     "Resolve the label conflict or explicitly exclude the "

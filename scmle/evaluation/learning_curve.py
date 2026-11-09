@@ -11,8 +11,8 @@ from collections.abc import Sequence
 import dataclasses
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from sklearn import base
 
 FRACTIONS = (0.2, 0.4, 0.6, 0.8, 1.0)
@@ -87,8 +87,8 @@ def judge(scores: Sequence[float]) -> tuple[str, float, float]:
 
 def compute(
     candidate: Any,
-    features: pd.DataFrame,
-    target: pd.Series,
+    features: pandas.DataFrame,
+    target: pandas.Series,
     fit_positions: Sequence[int],
     evaluate_positions: Sequence[int],
     scorer: Callable[..., float],
@@ -113,10 +113,10 @@ def compute(
         True, or fewer than `MIN_POINTS` fractions yielded a fit (a prefix
         that misses classes is skipped).
     """
-    fit = np.asarray(fit_positions)
+    fit = numpy.asarray(fit_positions)
     if len(fit) < MIN_TRAIN_ROWS:
         return None
-    held = np.asarray(evaluate_positions)
+    held = numpy.asarray(evaluate_positions)
     sizes, scores = [], []
     distinct = target.iloc[fit].nunique()
     needed = distinct if distinct <= MAX_CLASSES else 2

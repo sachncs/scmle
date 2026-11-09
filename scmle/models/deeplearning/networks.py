@@ -7,7 +7,7 @@ from typing import ClassVar
 
 from sklearn import pipeline
 
-from scmle.contracts import data as data_contracts
+from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.contracts import models
 from scmle.contracts import search
@@ -317,7 +317,7 @@ class TorchJepaAdapter(TorchAdapter):
 
     def assemble(
         self,
-        plan: data_contracts.FeaturePlan,
+        plan: data.FeaturePlan,
         task: tasks.TaskType,
         seed: int,
         params: Mapping[str, Any] | None = None,

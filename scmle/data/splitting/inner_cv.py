@@ -9,11 +9,11 @@ same structure the outer validation does.
 from collections.abc import Iterator
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from sklearn import model_selection
 
-from scmle.contracts import data as data_contracts
+from scmle.contracts import data
 
 
 class StructuredKFold(model_selection.BaseCrossValidator):
@@ -77,7 +77,7 @@ class StructuredKFold(model_selection.BaseCrossValidator):
 
     def split(
         self, features: Any, y: Any = None, groups: Any = None
-    ) -> Iterator[tuple[np.ndarray, np.ndarray]]:
+    ) -> Iterator[tuple[numpy.ndarray, numpy.ndarray]]:
         """Yields (train, validation) positions for each inner fold.
 
         Args:
@@ -91,19 +91,19 @@ class StructuredKFold(model_selection.BaseCrossValidator):
             A pair of integer arrays: the positions to fit on and the
             positions to validate on, one pair per inner fold.
         """
-        frame = features if isinstance(features, pd.DataFrame) else None
+        frame = features if isinstance(features, pandas.DataFrame) else None
         if frame is not None and self.group_column in frame.columns:
             keys = frame[self.group_column].astype(str).to_numpy()
             yield from model_selection.GroupKFold(self.n_splits).split(
                 frame, y, keys
             )
         elif frame is not None and self.time_column in frame.columns:
-            times = pd.to_datetime(frame[self.time_column], errors="coerce")
-            order = np.argsort(times.to_numpy(), kind="stable")
-            blocks = np.array_split(order, self.n_splits)
-            everyone = np.arange(len(frame))
+            times = pandas.to_datetime(frame[self.time_column], errors="coerce")
+            order = numpy.argsort(times.to_numpy(), kind="stable")
+            blocks = numpy.array_split(order, self.n_splits)
+            everyone = numpy.arange(len(frame))
             for block in blocks:
-                yield np.setdiff1d(everyone, block), np.sort(block)
+                yield numpy.setdiff1d(everyone, block), numpy.sort(block)
         elif self.classification and y is not None:
             yield from model_selection.StratifiedKFold(
                 self.n_splits, shuffle=True, random_state=self.seed
@@ -115,7 +115,7 @@ class StructuredKFold(model_selection.BaseCrossValidator):
 
 
 def for_plan(
-    plan: data_contracts.FeaturePlan,
+    plan: data.FeaturePlan,
     classification: bool,
     folds: int,
     seed: int,

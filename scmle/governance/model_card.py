@@ -6,7 +6,7 @@ import datetime
 from typing import Any
 
 from scmle.artifacts import bundle as bundle_module
-from scmle.contracts import data as data_contracts
+from scmle.contracts import data
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -66,8 +66,8 @@ class ModelCard:
     @classmethod
     def from_run(
         cls,
-        manifest: data_contracts.DatasetManifest,
-        profile: data_contracts.DatasetProfile,
+        manifest: data.DatasetManifest,
+        profile: data.DatasetProfile,
         bundle: bundle_module.ModelBundle,
         evaluation: Mapping[str, Any],
         model_fingerprint: str,

@@ -3,7 +3,7 @@
 from fractions import Fraction
 import math
 
-import numpy as np
+import numpy
 import pytest
 
 from scmle.data.charter import decision as charter
@@ -28,7 +28,7 @@ def make_plan(**overrides):
 
 
 def traffic(n, seed, lift=0.04, bounce_lift=0.0, base=0.10):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     arm = (rng.random(n) < 0.5).astype(float)
     primary = (rng.random(n) < base + lift * arm).astype(float)
     bounce = (rng.random(n) < 0.2 + bounce_lift * arm).astype(float)
@@ -131,7 +131,7 @@ def test_a_lower_is_worse_guardrail_is_read_in_the_other_direction():
     guard = charter.Guardrail("rating", 0.05, higher_is_worse=False)
     plan = make_plan(guardrails=(guard,), n_max=30000)
     arm, primary, ignored = traffic(30000, 4)
-    rng = np.random.default_rng(44)
+    rng = numpy.random.default_rng(44)
     worse = (rng.random(30000) < 0.8 - 0.10 * arm).astype(float)
     better = (rng.random(30000) < 0.8 + 0.0 * arm).astype(float)
     assert (
@@ -150,7 +150,7 @@ def test_a_lower_is_worse_guardrail_is_read_in_the_other_direction():
 
 def test_a_broken_allocation_halts_inference():
     plan = make_plan(n_max=20000)
-    rng = np.random.default_rng(5)
+    rng = numpy.random.default_rng(5)
     arm = (rng.random(20000) < 0.56).astype(float)
     primary = (rng.random(20000) < 0.10 + 0.04 * arm).astype(float)
     bounce = (rng.random(20000) < 0.2).astype(float)
@@ -174,7 +174,7 @@ def test_the_boundary_null_is_promoted_rarely_under_peeking():
     hits = 0
     runs = 150
     for seed in range(runs):
-        rng = np.random.default_rng(1000 + seed)
+        rng = numpy.random.default_rng(1000 + seed)
         arm = (rng.random(2500) < 0.5).astype(float)
         primary = (rng.random(2500) < 0.10 + 0.02 * arm).astype(float)
         decision = rollout.Rollout(plan, "e", 0.05).observe(arm, primary)
@@ -183,7 +183,7 @@ def test_the_boundary_null_is_promoted_rarely_under_peeking():
 
 
 def test_a_worse_champion_is_rolled_back_and_a_fine_one_is_kept():
-    rng = np.random.default_rng(6)
+    rng = numpy.random.default_rng(6)
     arm = (rng.random(30000) < 0.5).astype(float)
     losing = (rng.random(30000) < 0.20 - 0.05 * arm).astype(float)
     monitor = rollout.RollbackMonitor(0.01, 0.01)

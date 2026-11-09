@@ -1,16 +1,16 @@
 """Tests for fold-safe preprocessing pipelines."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 from sklearn import base
 
-from scmle.contracts import data as data_contracts
+from scmle.contracts import data
 from scmle.contracts import tasks
 from scmle.data.curation import preprocessing
 from scmle.models import registry as registry_module
 
-PLAN = data_contracts.FeaturePlan(("num", "flag"), ("cat",))
+PLAN = data.FeaturePlan(("num", "flag"), ("cat",))
 BINARY = tasks.TaskType.BINARY
 
 
@@ -20,17 +20,17 @@ def registry():
 
 
 def make_frame(rows=200, seed=0):
-    rng = np.random.default_rng(seed)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    frame = pandas.DataFrame(
         {
             "num": rng.normal(size=rows),
             "flag": rng.random(rows) < 0.5,
             "cat": rng.choice(["a", "b", "c"], rows),
         }
     )
-    frame.loc[::7, "num"] = np.nan
+    frame.loc[::7, "num"] = numpy.nan
     frame.loc[::11, "cat"] = None
-    target = pd.Series((frame["num"].fillna(0) > 0).astype(int))
+    target = pandas.Series((frame["num"].fillna(0) > 0).astype(int))
     return frame, target
 
 
@@ -90,14 +90,14 @@ def test_clone_is_unfitted_and_refit_is_deterministic(registry):
     ).fit(features, target)
     twin = base.clone(fitted)
     assert not hasattr(twin.named_steps["model"], "estimators_")
-    np.testing.assert_allclose(
+    numpy.testing.assert_allclose(
         twin.fit(features, target).predict_proba(features),
         fitted.predict_proba(features),
     )
 
 
 def test_plan_without_numeric_columns(registry):
-    plan = data_contracts.FeaturePlan((), ("cat",))
+    plan = data.FeaturePlan((), ("cat",))
     features, target = make_frame()
     pipe = preprocessing.build_pipeline(plan, registry.get("dummy"), BINARY, 0)
     assert pipe.fit(features, target).predict(features).shape == (200,)

@@ -1,6 +1,6 @@
 """The resolved entity becomes the split's group column."""
 
-import pandas as pd
+import pandas
 import pytest
 
 from scmle.contracts import errors
@@ -32,7 +32,7 @@ def duplicated_table():
     for index, (name, email) in enumerate(people):
         rows.append((index * 2, name, email))
         rows.append((index * 2 + 1, name.replace("a", "A", 1), email))
-    return pd.DataFrame(rows, columns=["customer_id", "name", "email"])
+    return pandas.DataFrame(rows, columns=["customer_id", "name", "email"])
 
 
 def test_duplicates_under_different_keys_share_a_group():

@@ -3,7 +3,7 @@
 import datetime
 import json
 
-import pandas as pd
+import pandas
 import pytest
 
 from scmle.contracts import errors
@@ -480,7 +480,7 @@ def test_processing_needs_key_columns():
 
 
 def test_the_frame_dtype_kinds_are_reader_independent():
-    frame = pd.DataFrame({"a": [1], "b": [1.5], "c": ["x"], "d": [True]})
+    frame = pandas.DataFrame({"a": [1], "b": [1.5], "c": ["x"], "d": [True]})
     assert snapshot.observed_schema(frame) == {
         "a": "int",
         "b": "float",

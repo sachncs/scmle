@@ -65,10 +65,10 @@ from pathlib import Path
 import sys
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
-from benchmarks.qualification import f10_generators as worlds
+from benchmarks.qualification import f10_generators
 from scmle.data.admissibility import dag as dag_module
 from scmle.data.charter import causal
 from scmle.data.detectors import certificates
@@ -82,7 +82,7 @@ from scmle.data.identification import run
 from scmle.data.identification import select
 from scmle.data.identification import sensitivity
 from scmle.data.identification import synth
-from scmle.data.ledger import budget as budget_module
+from scmle.data.ledger import budget
 
 STORE_PATH = Path(__file__).with_name("f10_certificates.json")
 DEV_SEED_BASE = 10_000
@@ -119,7 +119,7 @@ NOT_MEASURED = (
 )
 
 
-def stream(base: int, index: int, which: int = 0) -> np.random.Generator:
+def stream(base: int, index: int, which: int = 0) -> numpy.random.Generator:
     """Independent random stream for one replicate.
 
     Args:
@@ -130,7 +130,7 @@ def stream(base: int, index: int, which: int = 0) -> np.random.Generator:
     Returns:
         A generator seeded with `[base + index, which]`.
     """
-    return np.random.default_rng([base + index, which])
+    return numpy.random.default_rng([base + index, which])
 
 
 def rate(hits: int, n: int) -> dict[str, Any]:
@@ -171,7 +171,7 @@ def coverage_row(
     row = rate(sum(covered), len(covered))
     row["meets_floor"] = row["wilson"][0] >= COVERAGE_FLOOR
     if z is not None:
-        arr = np.array([v for v in z if math.isfinite(v)])
+        arr = numpy.array([v for v in z if math.isfinite(v)])
         row["mean_z"] = float(arr.mean())
         row["z_within_0.1"] = bool(abs(arr.mean()) <= 0.1)
     return row
@@ -291,7 +291,7 @@ def gate_selector(replicates: int, base: int = 0) -> dict[str, Any]:
     }
     names = list(select.STRATEGIES)
 
-    def build(rng: np.random.Generator, eligible: bool) -> causal.CausalSpec:
+    def build(rng: numpy.random.Generator, eligible: bool) -> causal.CausalSpec:
         """A charter for a random strategy, made ineligible when asked.
 
         Args:
@@ -372,10 +372,14 @@ def aipw_world(
         true effect 2.0.
     """
     covered, z = [], []
-    cols = tuple(f"x{j}" for j in range(worlds.COVARIATES))
+    cols = tuple(f"x{j}" for j in range(f10_generators.COVARIATES))
     for i in range(runs):
-        x = worlds.backdoor(stream(base, i, 0), 1000, nonlinear=nonlinear)
-        c = worlds.backdoor(stream(base, i, 1), 1500, nonlinear=nonlinear)
+        x = f10_generators.backdoor(
+            stream(base, i, 0), 1000, nonlinear=nonlinear
+        )
+        c = f10_generators.backdoor(
+            stream(base, i, 1), 1500, nonlinear=nonlinear
+        )
         nuisances = aipw.fit_nuisances(x, cols, "t", "y", i, learner)
         out = aipw.estimate(nuisances, c, "t", "y", estimand, LEVEL)
         covered.append(out.low <= 2.0 <= out.high)
@@ -420,7 +424,7 @@ def gate_coverage_randomized(replicates: int, base: int = 0) -> dict[str, Any]:
     """
     covered = []
     for i in range(replicates):
-        frame = worlds.randomized(stream(base, i), 800)
+        frame = f10_generators.randomized(stream(base, i), 800)
         out = aipw.difference_in_means(frame, "t", "y", LEVEL)
         covered.append(out.low <= 2.0 <= out.high)
     row = coverage_row(covered)
@@ -445,7 +449,9 @@ def gate_coverage_did(replicates: int, base: int = 0) -> dict[str, Any]:
     ):
         covered, z = [], []
         for i in range(runs):
-            frame = worlds.panel(stream(base, i), 100, 100, second_group=second)
+            frame = f10_generators.panel(
+                stream(base, i), 100, 100, second_group=second
+            )
             out = did.estimate(frame, "id", "t", "g", "y", LEVEL)
             covered.append(out.low <= 1.5 <= out.high)
             z.append((out.estimate - 1.5) / out.se)
@@ -469,7 +475,9 @@ def gate_coverage_iv(replicates: int, base: int = 0) -> dict[str, Any]:
     covered = []
     weak = 0
     for i in range(replicates):
-        out = iv.estimate(worlds.iv(stream(base, i), 500, 1.0), "d", "y", "z")
+        out = iv.estimate(
+            f10_generators.iv(stream(base, i), 500, 1.0), "d", "y", "z"
+        )
         covered.append(not out.excludes(2.0))
         weak += out.weak
     row = coverage_row(covered)
@@ -489,7 +497,7 @@ def gate_coverage_rd(replicates: int, base: int = 0) -> dict[str, Any]:
     covered, z = [], []
     for i in range(replicates):
         out = rd.estimate(
-            worlds.discontinuity(stream(base, i), 1500), "x", "y", 0.0
+            f10_generators.discontinuity(stream(base, i), 1500), "x", "y", 0.0
         )
         covered.append(out.low <= 1.0 <= out.high)
         z.append((out.bias_corrected - 1.0) / out.se)
@@ -510,11 +518,15 @@ def gate_iv_strength(replicates: int, base: int = 0) -> dict[str, Any]:
     """
     covered, flagged = [], 0
     for i in range(replicates):
-        out = iv.estimate(worlds.iv(stream(base, i), 300, 0.08), "d", "y", "z")
+        out = iv.estimate(
+            f10_generators.iv(stream(base, i), 300, 0.08), "d", "y", "z"
+        )
         covered.append(not out.excludes(2.0))
         flagged += out.weak
     strong = sum(
-        iv.estimate(worlds.iv(stream(base, i, 1), 500, 1.0), "d", "y", "z").weak
+        iv.estimate(
+            f10_generators.iv(stream(base, i, 1), 500, 1.0), "d", "y", "z"
+        ).weak
         for i in range(replicates)
     )
     cover = coverage_row(covered)
@@ -547,14 +559,19 @@ def gate_size_synth(replicates: int, base: int = 0) -> dict[str, Any]:
     runs = max(replicates // 4, 100)
     rejected = 0
     for i in range(runs):
-        frame = worlds.synthetic(stream(base, i), tau=0.0)
+        frame = f10_generators.synthetic(stream(base, i), tau=0.0)
         out = synth.estimate(frame, "u", "t", "y", 0, 12)
         rejected += out.p_value <= 0.05
     bound = 0.05 + 2 * math.sqrt(0.05 * 0.95 / runs)
     power_runs = 60
     detected = sum(
         synth.estimate(
-            worlds.synthetic(stream(base, i, 1), tau=3.0), "u", "t", "y", 0, 12
+            f10_generators.synthetic(stream(base, i, 1), tau=3.0),
+            "u",
+            "t",
+            "y",
+            0,
+            12,
         ).p_value
         <= 0.05
         for i in range(power_runs)
@@ -582,13 +599,13 @@ def gate_overlap(replicates: int, base: int = 0) -> dict[str, Any]:
         refusal rate and worst recall bound; and `passed`.
     """
     runs = max(replicates // 4, 100)
-    cols = tuple(f"x{j}" for j in range(worlds.COVARIATES))
+    cols = tuple(f"x{j}" for j in range(f10_generators.COVARIATES))
     curves: dict[str, dict[str, Any]] = {}
     for p_min in (0.5, 0.1, 0.02, 0.005):
         flagged, covered, ess, lowest = 0, [], [], []
         for i in range(runs):
-            x = worlds.backdoor(stream(base, i, 0), 1000, p_min=p_min)
-            c = worlds.backdoor(stream(base, i, 1), 1500, p_min=p_min)
+            x = f10_generators.backdoor(stream(base, i, 0), 1000, p_min=p_min)
+            c = f10_generators.backdoor(stream(base, i, 1), 1500, p_min=p_min)
             nuisances = aipw.fit_nuisances(x, cols, "t", "y", i)
             e = nuisances.predict(x)[0]
             t = x["t"].to_numpy()
@@ -601,8 +618,8 @@ def gate_overlap(replicates: int, base: int = 0) -> dict[str, Any]:
         curves[str(p_min)] = {
             "gate_fires": rate(flagged, runs),
             "coverage_when_untrimmed": rate(sum(covered), runs),
-            "mean_min_estimated_propensity": float(np.mean(lowest)),
-            "mean_ess_treated_over_n": float(np.mean(ess)),
+            "mean_min_estimated_propensity": float(numpy.mean(lowest)),
+            "mean_ess_treated_over_n": float(numpy.mean(ess)),
         }
     valid = [curves["0.5"]["gate_fires"], curves["0.1"]["gate_fires"]]
     bad = [curves["0.02"]["gate_fires"], curves["0.005"]["gate_fires"]]
@@ -631,7 +648,7 @@ def gate_battery_nco(replicates: int, base: int = 0) -> dict[str, Any]:
     Returns:
         The `alarm_gate` result over confounder strengths 0 to 0.8.
     """
-    cols = tuple(f"x{j}" for j in range(worlds.COVARIATES))
+    cols = tuple(f"x{j}" for j in range(f10_generators.COVARIATES))
 
     def detect(delta: float, rx: Any, rc: Any) -> bool:
         """Whether the negative-control test flags a world.
@@ -645,10 +662,10 @@ def gate_battery_nco(replicates: int, base: int = 0) -> dict[str, Any]:
             True if the falsification battery on the negative-control outcome
             fails.
         """
-        x = worlds.backdoor(
+        x = f10_generators.backdoor(
             rx, 1000, hidden_d=delta, hidden_y=delta, hidden_nco=delta
         )
-        c = worlds.backdoor(
+        c = f10_generators.backdoor(
             rc, 3000, hidden_d=delta, hidden_y=delta, hidden_nco=delta
         )
         nuisances = aipw.fit_nuisances(x, cols, "t", "nco")
@@ -683,7 +700,7 @@ def gate_battery_pretrend(replicates: int, base: int = 0) -> dict[str, Any]:
         Returns:
             True if the falsification battery on the pre-trend p-value fails.
         """
-        frame = worlds.panel(rx, 150, 150, drift=delta)
+        frame = f10_generators.panel(rx, 150, 150, drift=delta)
         out = did.estimate(frame, "id", "t", "g", "y")
         test = battery.Test("pretrend", "placebo", float(out.pretrend_p or 1.0))
         return not battery.run_battery([test], ALPHA_FALSIFY).passed
@@ -716,7 +733,7 @@ def gate_density_rd(replicates: int, base: int = 0) -> dict[str, Any]:
             True if the density p-value is below `ALPHA_FALSIFY`.
         """
         out = rd.estimate(
-            worlds.discontinuity(rx, 1500, sorting=delta), "x", "y", 0.0
+            f10_generators.discontinuity(rx, 1500, sorting=delta), "x", "y", 0.0
         )
         return out.density_p < ALPHA_FALSIFY
 
@@ -748,7 +765,7 @@ def gate_battery_rd(replicates: int, base: int = 0) -> dict[str, Any]:
             covariate balance fails.
         """
         out = rd.estimate(
-            worlds.discontinuity(rx, 1500, jump=delta),
+            f10_generators.discontinuity(rx, 1500, jump=delta),
             "x",
             "y",
             0.0,
@@ -770,8 +787,8 @@ def gate_battery_rd(replicates: int, base: int = 0) -> dict[str, Any]:
 
 # ------------------------------------------------------------- sensitivity
 def sensitivity_world(
-    rng: np.random.Generator, n: int, multiple: float
-) -> pd.DataFrame:
+    rng: numpy.random.Generator, n: int, multiple: float
+) -> pandas.DataFrame:
     """Hidden `u` at `multiple` times the strongest covariate's strength.
 
     Args:
@@ -799,7 +816,7 @@ def sensitivity_world(
         + 1.0 * multiple * u
         + rng.standard_normal(n)
     )
-    return pd.DataFrame(
+    return pandas.DataFrame(
         {"x0": x[:, 0], "x1": x[:, 1], "x2": x[:, 2], "d": d, "y": y}
     )
 
@@ -857,7 +874,7 @@ def gate_sensitivity_did(replicates: int, base: int = 0) -> dict[str, Any]:
     runs = max(replicates // 4, 100)
     covered_m1, covered_m0 = [], []
     for i in range(runs):
-        frame = worlds.panel(stream(base, i), 150, 150, drift=0.1)
+        frame = f10_generators.panel(stream(base, i), 150, 150, drift=0.1)
         out = did.estimate(frame, "id", "t", "g", "y")
         low, high = out.sensitivity(1.0)
         covered_m1.append(low <= 1.5 <= high)
@@ -899,13 +916,13 @@ def confirm_world(kind: str, runs: int, base: int) -> dict[str, Any]:
         edges=(
             *(
                 e
-                for j in range(worlds.COVARIATES)
+                for j in range(f10_generators.COVARIATES)
                 for e in ((f"x{j}", "t"), (f"x{j}", "y"), (f"x{j}", "nco"))
             ),
             ("t", "y"),
         ),
     )
-    columns = ",".join(f"x{j}" for j in range(worlds.COVARIATES))
+    columns = ",".join(f"x{j}" for j in range(f10_generators.COVARIATES))
     spec = causal.CausalSpec(
         treatment="t",
         outcome="y",
@@ -921,11 +938,11 @@ def confirm_world(kind: str, runs: int, base: int) -> dict[str, Any]:
         sensitivity=causal.SensitivitySpec("strongest_observed", 0.2),
     )
     named = dict.fromkeys(spec.assumptions, "certificate harness, 2026-11-04")
-    error_budget = budget_module.ErrorBudget.create(0.05, 0.1)
+    error_budget = budget.ErrorBudget.create(0.05, 0.1)
     confirmed = tiers_attested = 0
     for i in range(runs):
-        x = worlds.backdoor(stream(base, i, 0), 1200, **knobs)
-        c = worlds.backdoor(stream(base, i, 1), 3000, **knobs)
+        x = f10_generators.backdoor(stream(base, i, 0), 1200, **knobs)
+        c = f10_generators.backdoor(stream(base, i, 1), 3000, **knobs)
         out = run.identify(
             spec,
             x,
@@ -1007,7 +1024,7 @@ def runner_objects() -> dict[str, list[Any]]:
         helpers.
     """
     return {
-        name: [entry[0], worlds, alarm_gate, coverage_row, rate]
+        name: [entry[0], f10_generators, alarm_gate, coverage_row, rate]
         for name, entry in RUNNERS.items()
     }
 

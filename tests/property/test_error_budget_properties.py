@@ -6,7 +6,7 @@ import itertools
 from hypothesis import given
 from hypothesis import HealthCheck
 from hypothesis import settings
-from hypothesis import strategies as st
+from hypothesis import strategies
 import pytest
 
 from scmle.data.ledger import budget as b
@@ -17,12 +17,12 @@ SETTINGS = settings(
     suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large],
 )
 
-alphas = st.fractions(
+alphas = strategies.fractions(
     min_value=Fraction(1, 1000), max_value=Fraction(1, 2), max_denominator=1000
 )
-wealths = st.fractions(min_value=0, max_value=1, max_denominator=1000)
-amounts = st.fractions(min_value=0, max_value=1, max_denominator=1000)
-rules = st.sampled_from(list(b.MultiplicityRule))
+wealths = strategies.fractions(min_value=0, max_value=1, max_denominator=1000)
+amounts = strategies.fractions(min_value=0, max_value=1, max_denominator=1000)
+rules = strategies.sampled_from(list(b.MultiplicityRule))
 
 
 def budget_from(alpha, wealth):
@@ -35,7 +35,7 @@ def budget_from(alpha, wealth):
 
 
 @SETTINGS
-@given(alphas, wealths, st.lists(amounts, max_size=12))
+@given(alphas, wealths, strategies.lists(amounts, max_size=12))
 def test_wealth_never_goes_negative_and_spending_is_conserved(
     alpha, wealth, attempts
 ):
@@ -54,7 +54,7 @@ def test_wealth_never_goes_negative_and_spending_is_conserved(
 
 
 @SETTINGS
-@given(alphas, st.lists(amounts, min_size=1, max_size=5))
+@given(alphas, strategies.lists(amounts, min_size=1, max_size=5))
 def test_spend_is_order_independent(alpha, parts):
     total = sum(parts, Fraction(0))
     if total > 1:
@@ -94,9 +94,9 @@ def test_exploration_spending_never_touches_the_confirmation_budget(
 @given(
     alphas,
     wealths,
-    st.dictionaries(
-        st.text(alphabet="abcdefgh", min_size=1, max_size=3),
-        st.fractions(
+    strategies.dictionaries(
+        strategies.text(alphabet="abcdefgh", min_size=1, max_size=3),
+        strategies.fractions(
             min_value=Fraction(1, 100), max_value=10, max_denominator=100
         ),
         min_size=1,
@@ -114,7 +114,7 @@ def test_split_shares_sum_exactly_and_stay_valid(alpha, wealth, weights):
 
 
 @SETTINGS
-@given(alphas, st.integers(min_value=1, max_value=500), rules)
+@given(alphas, strategies.integers(min_value=1, max_value=500), rules)
 def test_confirmation_alpha_is_bounded_and_decreasing_in_n(alpha, n, rule):
     budget = budget_from(alpha, Fraction(1, 10))
     here = b.confirmation_alpha(budget, n, rule)
@@ -123,7 +123,7 @@ def test_confirmation_alpha_is_bounded_and_decreasing_in_n(alpha, n, rule):
 
 
 @SETTINGS
-@given(alphas, st.integers(min_value=1, max_value=500))
+@given(alphas, strategies.integers(min_value=1, max_value=500))
 def test_bonferroni_levels_add_back_to_alpha(alpha, n):
     budget = budget_from(alpha, Fraction(1, 10))
     level = b.confirmation_alpha(budget, n, b.MultiplicityRule.BONFERRONI)
@@ -131,7 +131,7 @@ def test_bonferroni_levels_add_back_to_alpha(alpha, n):
 
 
 @SETTINGS
-@given(alphas, st.integers(min_value=1, max_value=500))
+@given(alphas, strategies.integers(min_value=1, max_value=500))
 def test_benjamini_yekutieli_is_never_looser_than_benjamini_hochberg(alpha, n):
     budget = budget_from(alpha, Fraction(1, 10))
     bh = b.confirmation_alpha(budget, n, b.MultiplicityRule.BH)
@@ -140,7 +140,7 @@ def test_benjamini_yekutieli_is_never_looser_than_benjamini_hochberg(alpha, n):
 
 
 @SETTINGS
-@given(alphas, wealths, st.lists(amounts, max_size=6))
+@given(alphas, wealths, strategies.lists(amounts, max_size=6))
 def test_serialization_round_trips_exactly(alpha, wealth, attempts):
     budget = budget_from(alpha, wealth)
     for amount in attempts:

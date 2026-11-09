@@ -82,12 +82,12 @@ from typing import Any
 from typing import Self
 
 from scmle.contracts import signing
-from scmle.data.ledger import ledger as ledger_module
+from scmle.data.ledger import ledger
 from scmle.monitoring import sequential_tests
 
 FILE_NAME = "deployment_ledger.jsonl"
 LEDGER_VERSION = 1
-GENESIS = ledger_module.GENESIS
+GENESIS = ledger.GENESIS
 OPEN = "open"
 OBSERVE_SUMMARY = "observe_summary"
 ALARM = "alarm"
@@ -147,7 +147,7 @@ ENTER = "enter"
 RELEASE = "release"
 
 
-class DeploymentLedgerError(ledger_module.LedgerError):
+class DeploymentLedgerError(ledger.LedgerError):
     """The deployment ledger was misused or its contents are inconsistent."""
 
 
@@ -204,7 +204,7 @@ def question_hash(question: Mapping[str, Any]) -> str:
     Returns:
         The hex digest.
     """
-    return ledger_module.digest(question)
+    return ledger.digest(question)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -562,7 +562,7 @@ class DeploymentLedger:
                 "ledger_version": LEDGER_VERSION,
                 "charter_hash": charter_hash,
                 "policy": dict(policy),
-                "policy_hash": ledger_module.digest(policy),
+                "policy_hash": ledger.digest(policy),
                 "alpha_promo": alpha_promo,
                 "system_keys": sorted(system_keys),
             },
@@ -638,7 +638,7 @@ class DeploymentLedger:
             "body": dict(body),
             "prev": self.head,
         }
-        row = {**content, "hash": ledger_module.digest(content)}
+        row = {**content, "hash": ledger.digest(content)}
         self.ingest(row)
         if self.path is not None:
             self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -670,7 +670,7 @@ class DeploymentLedger:
         if (
             row["seq"] != len(self.rows)
             or row["prev"] != self.head
-            or row["hash"] != ledger_module.digest(content)
+            or row["hash"] != ledger.digest(content)
         ):
             raise DeploymentLedgerError(
                 f"ledger chain broken at row {len(self.rows)}"
@@ -728,7 +728,7 @@ class DeploymentLedger:
         """
         if body["ledger_version"] != LEDGER_VERSION:
             raise DeploymentLedgerError("unsupported ledger version")
-        if body["policy_hash"] != ledger_module.digest(body["policy"]):
+        if body["policy_hash"] != ledger.digest(body["policy"]):
             raise DeploymentLedgerError("policy does not match its hash")
         self.header = dict(body)
         self.system_keys = frozenset(body["system_keys"])

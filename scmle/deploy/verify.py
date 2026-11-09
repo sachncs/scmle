@@ -12,7 +12,7 @@ import dataclasses
 import json
 import pathlib
 
-from scmle.artifacts import bundle as bundle_module
+from scmle.artifacts import bundle
 from scmle.contracts import errors
 from scmle.contracts import signing
 from scmle.deploy import attest
@@ -118,9 +118,7 @@ def check_listed_files(model_directory: pathlib.Path) -> None:
     """
     try:
         manifest = json.loads(
-            (model_directory / bundle_module.MANIFEST_FILE).read_text(
-                encoding="utf-8"
-            )
+            (model_directory / bundle.MANIFEST_FILE).read_text(encoding="utf-8")
         )
         listed = manifest["files"]
     except (OSError, UnicodeError, json.JSONDecodeError, KeyError) as error:
@@ -129,7 +127,7 @@ def check_listed_files(model_directory: pathlib.Path) -> None:
         path = model_directory / name
         if not path.is_file():
             raise errors.ArtifactError(f"missing {name}")
-        if bundle_module.file_sha256(path) != recorded:
+        if bundle.file_sha256(path) != recorded:
             raise errors.ArtifactError(
                 f"checksum mismatch: {name} was modified or corrupted"
             )
@@ -165,7 +163,7 @@ def verify_service(
         key, production, environ.get(ALLOW_PUBLISHED_KEY) == "1"
     )
     digest = provenance.bundle_digest(model_directory)
-    signed = bundle_module.verify_signature(model_directory, key)
+    signed = bundle.verify_signature(model_directory, key)
     trusted = environ.get(TRUSTED) == "1"
     if not signed and (production or not trusted):
         raise errors.ArtifactError(

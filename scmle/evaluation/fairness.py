@@ -10,8 +10,8 @@ unfair depends on the application, so it flags rather than decides.
 
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.contracts import tasks
 from scmle.evaluation import diagnostics
@@ -46,8 +46,8 @@ class FairnessReport(diagnostics.Diagnostic):
         """
         if not inputs.sensitive_columns:
             return {"available": False, "reason": "no sensitive columns"}
-        predicted = np.asarray(inputs.estimator.predict(inputs.features))
-        truth = np.asarray(inputs.target)
+        predicted = numpy.asarray(inputs.estimator.predict(inputs.features))
+        truth = numpy.asarray(inputs.target)
         report = {}
         for column in inputs.sensitive_columns:
             groups = self.groups(inputs.features[column])
@@ -75,7 +75,7 @@ class FairnessReport(diagnostics.Diagnostic):
         return {"available": True, "columns": report, "flagged": flagged}
 
     @staticmethod
-    def groups(values: pd.Series) -> pd.Series:
+    def groups(values: pandas.Series) -> pandas.Series:
         """Group labels: levels for categories, quartile bands for numbers.
 
         Args:
@@ -86,16 +86,16 @@ class FairnessReport(diagnostics.Diagnostic):
             bands for a numeric column with more than `MAX_LEVELS` distinct
             values, otherwise the value itself. Missing values stay missing.
         """
-        if pd.api.types.is_numeric_dtype(values) and (
+        if pandas.api.types.is_numeric_dtype(values) and (
             values.nunique() > MAX_LEVELS
         ):
-            bands = pd.qcut(values, NUMERIC_BANDS, duplicates="drop")
+            bands = pandas.qcut(values, NUMERIC_BANDS, duplicates="drop")
             return bands.astype(str).where(values.notna())
         return values.astype(object).where(values.notna()).astype(str)
 
     def intersectional(
-        self, features: pd.DataFrame, columns: tuple[str, ...]
-    ) -> pd.Series | None:
+        self, features: pandas.DataFrame, columns: tuple[str, ...]
+    ) -> pandas.Series | None:
         """Builds bounded intersectional groups from every sensitive column.
 
         Numeric columns use the same deterministic bands as their standalone
@@ -114,7 +114,7 @@ class FairnessReport(diagnostics.Diagnostic):
         if len(columns) < 2:
             return None
         grouped = [self.groups(features[column]) for column in columns]
-        frame = pd.concat(grouped, axis=1)
+        frame = pandas.concat(grouped, axis=1)
         frame.columns = list(columns)
         valid = frame.notna().all(axis=1)
         labels = frame.astype(str).agg(" | ".join, axis=1)
@@ -122,9 +122,9 @@ class FairnessReport(diagnostics.Diagnostic):
 
     def binary(
         self,
-        groups: pd.Series,
-        truth: np.ndarray,
-        predicted: np.ndarray,
+        groups: pandas.Series,
+        truth: numpy.ndarray,
+        predicted: numpy.ndarray,
         positive: Any,
     ) -> dict[str, Any]:
         """Summarizes outcome and error rates, and their disparities, by group.
@@ -173,7 +173,7 @@ class FairnessReport(diagnostics.Diagnostic):
             }
         return self.binary_summary(stats, excluded)
 
-    def small_groups(self, groups: pd.Series) -> dict[str, int]:
+    def small_groups(self, groups: pandas.Series) -> dict[str, int]:
         """Returns groups excluded because their cell size is too small.
 
         Args:
@@ -260,7 +260,10 @@ class FairnessReport(diagnostics.Diagnostic):
         }
 
     def numeric(
-        self, groups: pd.Series, truth: np.ndarray, predicted: np.ndarray
+        self,
+        groups: pandas.Series,
+        truth: numpy.ndarray,
+        predicted: numpy.ndarray,
     ) -> dict[str, Any]:
         """Mean prediction, bias and RMSE per group (regression).
 
@@ -287,7 +290,7 @@ class FairnessReport(diagnostics.Diagnostic):
                 "rows": int(rows.sum()),
                 "mean_prediction": float(predicted[rows].mean()),
                 "bias": float(error[rows].mean()),
-                "rmse": float(np.sqrt(np.mean(error[rows] ** 2))),
+                "rmse": float(numpy.sqrt(numpy.mean(error[rows] ** 2))),
             }
         if len(stats) < 2:
             return {
@@ -297,7 +300,7 @@ class FairnessReport(diagnostics.Diagnostic):
                 "excluded_groups": excluded,
                 "power_warning": bool(excluded),
             }
-        spread = float(np.std(truth.astype(float))) or 1.0
+        spread = float(numpy.std(truth.astype(float))) or 1.0
         biases = [g["bias"] for g in stats.values()]
         gap = (max(biases) - min(biases)) / spread
         flags = (

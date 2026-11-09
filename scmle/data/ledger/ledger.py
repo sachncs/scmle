@@ -57,7 +57,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-import pandas as pd
+import pandas
 
 from scmle.contracts import errors
 from scmle.contracts import evidence as evidence_module
@@ -949,8 +949,8 @@ class Ledger:
     def test(
         self,
         hypothesis: Hypothesis,
-        features: pd.DataFrame,
-        target: pd.Series,
+        features: pandas.DataFrame,
+        target: pandas.Series,
     ) -> Result:
         """Runs a hypothesis' statistic on exploration data and records it.
 

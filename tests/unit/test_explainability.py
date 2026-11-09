@@ -3,13 +3,13 @@
 import dataclasses
 import time
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import test_diagnostics
 
 from scmle.contracts import tasks
 from scmle.evaluation import diagnostics
-from scmle.evaluation import suite as full_suite
+from scmle.evaluation import suite
 from scmle.explainability import dependence
 from scmle.explainability import importance
 from scmle.explainability import interaction
@@ -17,11 +17,11 @@ from scmle.explainability import local
 
 
 def test_occlusion_attributes_the_prediction_to_the_feature_that_drives_it():
-    rng = np.random.default_rng(0)
-    rows = pd.DataFrame(
+    rng = numpy.random.default_rng(0)
+    rows = pandas.DataFrame(
         {"signal": rng.normal(size=20), "noise": rng.normal(size=20)}
     )
-    background = pd.DataFrame(
+    background = pandas.DataFrame(
         {"signal": rng.normal(size=50), "noise": rng.normal(size=50)}
     )
     explainer = local.OcclusionExplainer(
@@ -30,10 +30,10 @@ def test_occlusion_attributes_the_prediction_to_the_feature_that_drives_it():
 
     table = explainer.explain(rows, background)
 
-    assert np.allclose(table["noise"], 0.0)
+    assert numpy.allclose(table["noise"], 0.0)
     expected = 3 * (rows["signal"] - background["signal"].mean())
-    assert np.allclose(table["signal"], expected)
-    assert np.allclose(table["prediction"], 3 * rows["signal"])
+    assert numpy.allclose(table["signal"], expected)
+    assert numpy.allclose(table["prediction"], 3 * rows["signal"])
 
 
 def test_partial_dependence_follows_the_driving_feature():
@@ -108,7 +108,7 @@ def test_a_suite_shares_its_time_allowance_among_diagnostics():
     inputs = test_diagnostics.make_inputs(tasks.TaskType.BINARY)
 
     reports = diagnostics.run_suite(
-        inputs, full_suite.full_suite(), total_seconds=0.0
+        inputs, suite.full_suite(), total_seconds=0.0
     )
 
     assert reports["permutation_importance"]["truncated"] is True

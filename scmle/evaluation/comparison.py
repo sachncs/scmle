@@ -11,7 +11,7 @@ from collections.abc import Sequence
 import dataclasses
 import math
 
-import numpy as np
+import numpy
 from scipy import stats
 
 MIN_FOLDS = 3
@@ -87,7 +87,7 @@ def compare_paired(
         raise ValueError("both candidates need scores on the same folds")
     if len(first) < MIN_FOLDS:
         raise ValueError(f"need at least {MIN_FOLDS} folds to compare")
-    differences = np.asarray(first, dtype=float) - np.asarray(
+    differences = numpy.asarray(first, dtype=float) - numpy.asarray(
         second, dtype=float
     )
     folds = len(differences)

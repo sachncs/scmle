@@ -12,8 +12,8 @@ dependencies is established only when the `cross-platform` and
 `tests/unit`) pass; it has not been observed from this machine.
 """
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.contracts import tasks
 from scmle.data.custody import pipeline
@@ -31,11 +31,11 @@ TEMPORAL_SHA256 = (
 
 
 def classification_frame(rows=1200):
-    rng = np.random.default_rng(2024)
-    return pd.DataFrame(
+    rng = numpy.random.default_rng(2024)
+    return pandas.DataFrame(
         {
-            "t": np.arange(rows),
-            "g": np.arange(rows) // 4,
+            "t": numpy.arange(rows),
+            "g": numpy.arange(rows) // 4,
             "x": rng.normal(size=rows),
             "z": rng.integers(0, 50, size=rows),
             "y": (rng.random(rows) < 0.3).astype(int),

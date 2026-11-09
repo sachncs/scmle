@@ -3,10 +3,10 @@
 import json
 import pathlib
 
-import pandas as pd
+import pandas
 import pytest
 
-from benchmarks.qualification import __main__ as cli
+from benchmarks.qualification import __main__
 from benchmarks.qualification import certify
 from benchmarks.qualification import inject
 from benchmarks.qualification import smoke
@@ -30,7 +30,7 @@ def under_mutation() -> bool:
     return "__mutmut_orig" in text
 
 
-def small_frame(rows: int = 120) -> pd.DataFrame:
+def small_frame(rows: int = 120) -> pandas.DataFrame:
     return standins.demo_frame().head(rows).reset_index(drop=True)
 
 
@@ -75,8 +75,8 @@ def test_a_detector_that_finds_the_plants_is_certified():
 
 
 def test_a_detector_that_finds_nothing_is_not_certified():
-    def silent(frame: pd.DataFrame) -> pd.Series:
-        return pd.Series(False, index=frame.index)
+    def silent(frame: pandas.DataFrame) -> pandas.Series:
+        return pandas.Series(False, index=frame.index)
 
     result = certify.certify_detector(
         "silent",
@@ -92,8 +92,8 @@ def test_a_detector_that_finds_nothing_is_not_certified():
 
 
 def test_a_detector_that_flags_everything_is_not_certified():
-    def alarmist(frame: pd.DataFrame) -> pd.Series:
-        return pd.Series(True, index=frame.index)
+    def alarmist(frame: pandas.DataFrame) -> pandas.Series:
+        return pandas.Series(True, index=frame.index)
 
     result = certify.certify_detector(
         "alarmist",
@@ -113,8 +113,8 @@ def test_a_detector_that_flags_everything_is_not_certified():
 @pytest.mark.parametrize(
     "bad",
     [
-        lambda frame: pd.Series(True, index=frame.index[:-1]),
-        lambda frame: pd.Series(1, index=frame.index),
+        lambda frame: pandas.Series(True, index=frame.index[:-1]),
+        lambda frame: pandas.Series(1, index=frame.index),
         lambda frame: [True] * len(frame),
     ],
 )
@@ -221,25 +221,25 @@ def test_the_smoke_gate_can_fail():
 def test_the_command_line_runs_smoke_check_and_writes_a_sample(
     tmp_path, capsys
 ):
-    assert cli.main(["--smoke"]) == 0
+    assert __main__.main(["--smoke"]) == 0
     printed = json.loads(capsys.readouterr().out)
     assert printed["ok"] is True
-    assert cli.main(["--check"]) == 0
+    assert __main__.main(["--check"]) == 0
     assert json.loads(capsys.readouterr().out)["ok"] is True
     target = tmp_path / "sample.json"
-    assert cli.main(["--write-sample", str(target)]) == 0
+    assert __main__.main(["--write-sample", str(target)]) == 0
     capsys.readouterr()
     written = certificates.CertificateStore.load(target)
     assert standins.sample_problems(written) == []
     with pytest.raises(SystemExit):
-        cli.main([])
+        __main__.main([])
 
 
 def test_check_fails_when_a_gating_detector_has_no_certificate(
     tmp_path, capsys, monkeypatch
 ):
-    monkeypatch.setitem(cli.GATING, "ghost", ("a" * 64, "label_flip"))
-    assert cli.main(["--check"]) == 1
+    monkeypatch.setitem(__main__.GATING, "ghost", ("a" * 64, "label_flip"))
+    assert __main__.main(["--check"]) == 1
     printed = json.loads(capsys.readouterr().out)
     assert printed["ok"] is False
     assert printed["missing"] == ["ghost"]

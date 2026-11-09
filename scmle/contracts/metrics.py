@@ -5,8 +5,8 @@ import dataclasses
 import inspect
 from typing import Any
 
-import pandas as pd
-from sklearn import metrics as sk_metrics
+import pandas
+from sklearn import metrics
 
 from scmle.contracts import models
 from scmle.contracts import tasks
@@ -59,13 +59,13 @@ class Metric:
         Returns:
             The stock scorer from `sklearn.metrics.get_scorer`.
         """
-        return sk_metrics.get_scorer(self.scorer_name)
+        return metrics.get_scorer(self.scorer_name)
 
     def score(
         self,
         estimator: models.Estimator,
-        features: pd.DataFrame,
-        target: pd.Series,
+        features: pandas.DataFrame,
+        target: pandas.Series,
         positive: Any = None,
         sample_weight: Any = None,
     ) -> float:
@@ -103,7 +103,7 @@ class PositiveLabelMetric(Metric):
         response_methods: Estimator methods supplying the prediction.
     """
 
-    score_function: Callable[..., float] = sk_metrics.f1_score
+    score_function: Callable[..., float] = metrics.f1_score
     response_methods: tuple[str, ...] = ("predict",)
 
     def scorer(self, positive: Any = None) -> Any:
@@ -118,7 +118,7 @@ class PositiveLabelMetric(Metric):
         """
         if positive is None:
             return super().scorer(None)
-        return sk_metrics.make_scorer(
+        return metrics.make_scorer(
             self.score_function,
             greater_is_better=self.greater_is_better,
             response_method=self.response_methods,
@@ -139,7 +139,7 @@ class FunctionMetric(Metric):
             `predict`, `predict_proba` or `decision_function`.
     """
 
-    score_function: Callable[..., float] = sk_metrics.accuracy_score
+    score_function: Callable[..., float] = metrics.accuracy_score
     response_method: str = "predict"
 
     def accepts_weights(self) -> bool:
@@ -161,7 +161,7 @@ class FunctionMetric(Metric):
         Returns:
             A scorer wrapping the user function.
         """
-        return sk_metrics.make_scorer(
+        return metrics.make_scorer(
             self.score_function,
             greater_is_better=self.greater_is_better,
             response_method=self.response_method,

@@ -6,8 +6,8 @@ import pathlib
 import tempfile
 import threading
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.core import retry
 from scmle.data.store import objectstore
@@ -23,8 +23,10 @@ OPTIONS = {
 
 
 def make_frame():
-    rng = np.random.default_rng(0)
-    frame = pd.DataFrame({"a": rng.normal(size=200), "b": rng.normal(size=200)})
+    rng = numpy.random.default_rng(0)
+    frame = pandas.DataFrame(
+        {"a": rng.normal(size=200), "b": rng.normal(size=200)}
+    )
     noise = rng.normal(scale=0.5, size=200)
     frame["y"] = ((frame.a + 0.5 * frame.b + noise) > 0).astype(int)
     return frame

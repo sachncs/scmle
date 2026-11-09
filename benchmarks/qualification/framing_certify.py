@@ -53,13 +53,13 @@ from pathlib import Path
 import time
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from scipy import stats
 
 from scmle.contracts import qualification
 from scmle.core import randomness
-from scmle.data.charter import contracts as charter_contracts
+from scmle.data.charter import contracts
 from scmle.data.charter import feasibility as charter_feasibility
 from scmle.data.detectors import certificates
 from scmle.data.framing import baseline
@@ -125,7 +125,7 @@ def power_floor(runs: int = RUNS) -> float:
 
 def world(
     seed: int, clusters: int, se_a: float, fp_a: float
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray, numpy.ndarray]:
     """One clustered world: outcomes, model actions, baseline, clusters.
 
     Args:
@@ -146,12 +146,12 @@ def world(
         size=clusters,
     )
     sizes = rng.integers(CLUSTER_SIZE // 2, CLUSTER_SIZE * 3 // 2 + 1, clusters)
-    group = np.repeat(np.arange(clusters), sizes)
+    group = numpy.repeat(numpy.arange(clusters), sizes)
     y = (rng.random(group.size) < prevalence[group]).astype(float)
-    a = (rng.random(group.size) < np.where(y == 1, se_a, fp_a)).astype(float)
+    a = (rng.random(group.size) < numpy.where(y == 1, se_a, fp_a)).astype(float)
     b = (
         rng.random(group.size)
-        < np.where(y == 1, BASE_SENSITIVITY, BASE_FALSE_POSITIVE)
+        < numpy.where(y == 1, BASE_SENSITIVITY, BASE_FALSE_POSITIVE)
     ).astype(float)
     return y, a, b, group
 
@@ -308,7 +308,9 @@ def power_rows(offset: int, runs: int) -> dict[str, Any]:
     }
 
 
-def label_world(planted: bool, seed: int) -> tuple[np.ndarray, np.ndarray]:
+def label_world(
+    planted: bool, seed: int
+) -> tuple[numpy.ndarray, numpy.ndarray]:
     """(observed, b) of one world.
 
     Args:
@@ -472,7 +474,9 @@ def feasibility_rows(offset: int, runs: int) -> dict[str, Any]:
     return out
 
 
-def omission_frame(seed: int, flips: bool) -> tuple[pd.DataFrame, np.ndarray]:
+def omission_frame(
+    seed: int, flips: bool
+) -> tuple[pandas.DataFrame, numpy.ndarray]:
     """Exploration rows and pilot actions; the gain may flip in the range.
 
     Args:
@@ -486,17 +490,17 @@ def omission_frame(seed: int, flips: bool) -> tuple[pd.DataFrame, np.ndarray]:
     n = 600
     y = (rng.random(n) < 0.3).astype(int)
     if flips:
-        pilot_rate = np.where(y == 1, 0.8, 0.45)
-        base_rate = np.where(y == 1, 0.55, 0.15)
+        pilot_rate = numpy.where(y == 1, 0.8, 0.45)
+        base_rate = numpy.where(y == 1, 0.55, 0.15)
     else:
-        pilot_rate = np.where(y == 1, 0.9, 0.05)
-        base_rate = np.where(y == 1, 0.5, 0.3)
+        pilot_rate = numpy.where(y == 1, 0.9, 0.05)
+        base_rate = numpy.where(y == 1, 0.5, 0.3)
     pilot = (rng.random(n) < pilot_rate).astype(int)
     baseline_column = (rng.random(n) < base_rate).astype(int)
-    frame = pd.DataFrame(
+    frame = pandas.DataFrame(
         {
-            "customer_id": np.arange(n),
-            "as_of": pd.date_range("2024-01-01", periods=n, freq="h"),
+            "customer_id": numpy.arange(n),
+            "as_of": pandas.date_range("2024-01-01", periods=n, freq="h"),
             "churn": y,
             "current_rule": baseline_column,
         }
@@ -584,7 +588,7 @@ def fuzz_rows(count: int = 1000) -> dict[str, Any]:
     Returns:
         The number tried and the number accepted.
     """
-    base = charter_contracts.template()
+    base = contracts.template()
     base["question"] = "q"
     base["estimand"].update(
         population="p",
@@ -595,7 +599,7 @@ def fuzz_rows(count: int = 1000) -> dict[str, Any]:
     )
     base["unit"] = "u"
     base["deployment_population"] = "d"
-    rng = np.random.default_rng(DEV_SEED_BASE)
+    rng = numpy.random.default_rng(DEV_SEED_BASE)
     accepted = 0
     for number in range(count):
         record = json.loads(json.dumps(base))
@@ -614,7 +618,7 @@ def fuzz_rows(count: int = 1000) -> dict[str, Any]:
         else:
             record["k_max"] = float(rng.choice([0, -3]))
         try:
-            charter_contracts.AnalysisCharter.from_dict(record)
+            contracts.AnalysisCharter.from_dict(record)
             accepted += 1
         except (ValueError, KeyError, TypeError):
             pass

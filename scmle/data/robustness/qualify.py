@@ -22,11 +22,11 @@ from collections.abc import Sequence
 import dataclasses
 from pathlib import Path
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
-from scmle.data.admissibility import qualify as admissibility
-from scmle.data.charter import contracts as charter_contracts
+from scmle.data.admissibility import qualify
+from scmle.data.charter import contracts
 from scmle.data.detectors import certificates
 from scmle.data.robustness import coverage
 from scmle.data.robustness import forward
@@ -66,7 +66,7 @@ class Robustness:
     """
 
     grid: multiverse.Grid | None
-    applicable: tuple[charter_contracts.Choice, ...]
+    applicable: tuple[contracts.Choice, ...]
     findings: tuple[stability.Stability, ...]
     stability_note: str
     notes: tuple[str, ...]
@@ -89,16 +89,16 @@ class Robustness:
 
 
 def run(
-    features: pd.DataFrame,
-    codes: pd.Series,
+    features: pandas.DataFrame,
+    codes: pandas.Series,
     *,
     survivors: Sequence[str],
     multiclass: bool,
-    choices: Sequence[charter_contracts.Choice],
+    choices: Sequence[contracts.Choice],
     seed: int,
     permutations: int,
-    strata: np.ndarray | None = None,
-    reference: pd.DataFrame | None = None,
+    strata: numpy.ndarray | None = None,
+    reference: pandas.DataFrame | None = None,
     candidates: Sequence[str] = (),
     sensitive: Sequence[str] = (),
     temporal: bool = False,
@@ -140,7 +140,7 @@ def run(
         is not run, and `stability_note` says why, for a multiclass target,
         no survivor or too few specifications.
     """
-    loaded = admissibility.load_store(F6_STORE, directory)
+    loaded = qualify.load_store(F6_STORE, directory)
     store = loaded.store
     stability_gate = stability.gate_status(store)
     rule_note = ""

@@ -12,7 +12,7 @@ import logging
 from typing import Any
 from typing import Self
 
-import numpy as np
+import numpy
 from sklearn import base
 
 from scmle.data.curation import transformers
@@ -59,9 +59,9 @@ class TextEmbedder(base.TransformerMixin, base.BaseEstimator):
         Returns:
             One string per element, in flattened order.
         """
-        return [str(v) for v in np.asarray(texts, dtype=object).ravel()]
+        return [str(v) for v in numpy.asarray(texts, dtype=object).ravel()]
 
-    def request(self, strings: list[str]) -> np.ndarray:
+    def request(self, strings: list[str]) -> numpy.ndarray:
         """Embeds unique strings in the worker and maps them back to rows.
 
         Sets `encoded_last_` to the number of strings the worker had to
@@ -78,7 +78,7 @@ class TextEmbedder(base.TransformerMixin, base.BaseEstimator):
         matrix, encoded = worker.client().request("embed", (self.model, unique))
         self.encoded_last_ = int(encoded)
         position = {text: index for index, text in enumerate(unique)}
-        return np.asarray(matrix)[[position[t] for t in strings]]
+        return numpy.asarray(matrix)[[position[t] for t in strings]]
 
     def fit(self, texts: Any, target: Any = None) -> Self:
         """Checks the model works; otherwise falls back to TF-IDF.
@@ -126,7 +126,9 @@ class TextEmbedder(base.TransformerMixin, base.BaseEstimator):
             return self.fallback_.transform(strings)
         return self.request(strings)
 
-    def get_feature_names_out(self, input_features: Any = None) -> np.ndarray:
+    def get_feature_names_out(
+        self, input_features: Any = None
+    ) -> numpy.ndarray:
         """Names of the output columns.
 
         Args:
@@ -138,4 +140,4 @@ class TextEmbedder(base.TransformerMixin, base.BaseEstimator):
         """
         if self.mode_ == "tfidf":
             return self.fallback_.get_feature_names_out()
-        return np.array([f"embedding_{i}" for i in range(self.width_)])
+        return numpy.array([f"embedding_{i}" for i in range(self.width_)])

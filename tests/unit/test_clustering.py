@@ -1,7 +1,7 @@
 """Clustering selection, stability and external validation."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 from sklearn import datasets
 
@@ -12,7 +12,7 @@ def blobs(centers=3, rows=300, spread=0.6, seed=0):
     values, truth = datasets.make_blobs(
         rows, centers=centers, cluster_std=spread, random_state=seed
     )
-    return pd.DataFrame(values, columns=["x", "y"]), truth
+    return pandas.DataFrame(values, columns=["x", "y"]), truth
 
 
 def test_three_separated_groups_are_found_and_judged_stable():
@@ -31,8 +31,8 @@ def test_three_separated_groups_are_found_and_judged_stable():
 
 
 def test_uniform_noise_has_no_stable_clusters():
-    rng = np.random.default_rng(1)
-    features = pd.DataFrame(rng.uniform(size=(400, 2)), columns=["x", "y"])
+    rng = numpy.random.default_rng(1)
+    features = pandas.DataFrame(rng.uniform(size=(400, 2)), columns=["x", "y"])
 
     report = clustering.find_clusters(
         features, counts=(3, 4), methods=("kmeans",), rounds=6

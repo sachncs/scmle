@@ -11,8 +11,8 @@ Bonferroni correction across columns.
 import dataclasses
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from scipy import stats
 
 MIN_MISSING_RATE = 0.02
@@ -53,7 +53,7 @@ class MissingnessFinding:
 
 
 def class_association(
-    gaps: pd.Series, target: pd.Series
+    gaps: pandas.Series, target: pandas.Series
 ) -> tuple[str, float, float]:
     """Tests gaps against class labels with a chi-square test.
 
@@ -65,18 +65,20 @@ def class_association(
         The test name, the p-value and Cramer's V (0.0 when the table has a
         single row or column).
     """
-    table = pd.crosstab(gaps, target)
+    table = pandas.crosstab(gaps, target)
     result = stats.chi2_contingency(table)
     size = table.to_numpy().sum()
     smaller = min(table.shape) - 1
     effect = (
-        float(np.sqrt(result.statistic / (size * smaller))) if smaller else 0.0
+        float(numpy.sqrt(result.statistic / (size * smaller)))
+        if smaller
+        else 0.0
     )
     return "chi-square", float(result.pvalue), effect
 
 
 def value_association(
-    gaps: pd.Series, target: pd.Series
+    gaps: pandas.Series, target: pandas.Series
 ) -> tuple[str, float, float]:
     """Tests gaps against a numeric target with a Mann-Whitney test.
 
@@ -96,9 +98,9 @@ def value_association(
 
 
 def assess(
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     columns: list[str],
-    target: pd.Series,
+    target: pandas.Series,
     classification: bool,
 ) -> list[MissingnessFinding]:
     """Tests every column whose gaps are numerous enough to judge.

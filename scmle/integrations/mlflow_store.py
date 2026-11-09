@@ -43,14 +43,14 @@ class MlflowExperimentStore(stores.ExperimentStore):
         """
         try:
             import mlflow
-            from mlflow import tracking as mlflow_tracking
+            from mlflow import tracking
         except ImportError as error:
             raise errors.ConfigError(
                 "MlflowExperimentStore needs the 'tracking' extra (mlflow)"
             ) from error
         if tracking_uri:
             mlflow.set_tracking_uri(tracking_uri)
-        self.client = mlflow_tracking.MlflowClient(tracking_uri)
+        self.client = tracking.MlflowClient(tracking_uri)
         existing = self.client.get_experiment_by_name(experiment)
         self.experiment_id = (
             existing.experiment_id

@@ -10,16 +10,16 @@ import json
 from pathlib import Path
 import types
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
 from benchmarks.qualification import streams
-from scmle.governance import deployment_ledger as dl
+from scmle.governance import deployment_ledger
 from scmle.governance import loop as loop_module
 from scmle.governance import never_list
 from tests.unit import golden
-from tests.unit import test_loop as base
+from tests.unit import test_loop
 
 FIXTURE = Path(__file__).parents[1] / "fixtures" / "loop_golden.json"
 
@@ -51,47 +51,49 @@ def record(loop, extra=None):
 
 
 def scenario_stable(tmp_path):
-    loop = base.open_loop(tmp_path)
-    result = base.feed(
-        loop, streams.simulate(base.spec(batches=40, seed=3, base=0.10))
+    loop = test_loop.open_loop(tmp_path)
+    result = test_loop.feed(
+        loop, streams.simulate(test_loop.spec(batches=40, seed=3, base=0.10))
     )
     return record(loop, [result.status, result.events])
 
 
 def scenario_abrupt(tmp_path):
-    loop = base.open_loop(
+    loop = test_loop.open_loop(
         tmp_path, hooks=loop_module.Hooks(retrain=lambda: "challenger-1")
     )
     stream = streams.simulate(
-        base.spec(kind="abrupt", batches=60, change=25, delta=0.25, seed=4)
+        test_loop.spec(kind="abrupt", batches=60, change=25, delta=0.25, seed=4)
     )
-    result = base.feed(loop, stream)
+    result = test_loop.feed(loop, stream)
     return record(loop, [result.status, result.events])
 
 
 def scenario_uncertified(tmp_path):
-    loop = base.open_loop(tmp_path, base.make_policy(alarm_gates_retrain=False))
-    stream = streams.simulate(
-        base.spec(kind="abrupt", batches=60, change=25, delta=0.3, seed=4)
+    loop = test_loop.open_loop(
+        tmp_path, test_loop.make_policy(alarm_gates_retrain=False)
     )
-    base.feed(loop, stream)
+    stream = streams.simulate(
+        test_loop.spec(kind="abrupt", batches=60, change=25, delta=0.3, seed=4)
+    )
+    test_loop.feed(loop, stream)
     return record(loop)
 
 
 def scenario_promotion(tmp_path):
-    loop = base.open_loop(
+    loop = test_loop.open_loop(
         tmp_path,
-        base.make_policy(
+        test_loop.make_policy(
             reference_risk=0.2,
             tolerance=0.3,
             challenger_budget=100,
             reply_timeout=1000,
         ),
     )
-    stream, sequence = base.paired([0.0, 0.12])
+    stream, sequence = test_loop.paired([0.0, 0.12])
     loop.register_challenger("null")
     loop.register_challenger("better")
-    base.feed(
+    test_loop.feed(
         loop,
         stream,
         challengers={
@@ -103,26 +105,32 @@ def scenario_promotion(tmp_path):
 
 
 def scenario_rollback(tmp_path):
-    loop = base.open_loop(
+    loop = test_loop.open_loop(
         tmp_path,
-        base.make_policy(reference_risk=0.2, tolerance=0.3, reply_timeout=1000),
+        test_loop.make_policy(
+            reference_risk=0.2, tolerance=0.3, reply_timeout=1000
+        ),
     )
     sequence = streams.challenger_sequence([-0.1], 120, 100, 0.2, 1)
-    stream = streams.simulate(base.spec(batches=120, size=100, seed=1))
+    stream = streams.simulate(test_loop.spec(batches=120, size=100, seed=1))
     object.__setattr__(stream, "loss", sequence.champion)
     loop.watch_rollback("previous")
-    base.feed(loop, stream, challengers={"previous": sequence.challengers[0]})
+    test_loop.feed(
+        loop, stream, challengers={"previous": sequence.challengers[0]}
+    )
     return record(loop)
 
 
 def scenario_halt(tmp_path):
-    loop = base.open_loop(
+    loop = test_loop.open_loop(
         tmp_path,
-        base.make_policy(reference_risk=0.5, tolerance=0.4, r_star=0.05),
+        test_loop.make_policy(reference_risk=0.5, tolerance=0.4, r_star=0.05),
     )
-    stream = streams.simulate(base.spec(base=0.3, batches=50, seed=8))
-    base.feed(loop, stream)
-    routed = loop.observe(base.batch_frame(stream, 0), np.zeros(50), ["a"] * 50)
+    stream = streams.simulate(test_loop.spec(base=0.3, batches=50, seed=8))
+    test_loop.feed(loop, stream)
+    routed = loop.observe(
+        test_loop.batch_frame(stream, 0), numpy.zeros(50), ["a"] * 50
+    )
     bad = streams.draw_calibration(30, 0.05, seed=1)
     loop.calibrate(bad["score"], bad["loss"])
     good = streams.draw_calibration(3000, 0.05, seed=2)
@@ -131,21 +139,23 @@ def scenario_halt(tmp_path):
 
 
 def scenario_routing(tmp_path):
-    loop = base.open_loop(
+    loop = test_loop.open_loop(
         tmp_path,
-        base.make_policy(high_impact_actions=("approve",), coverage_target=0.9),
+        test_loop.make_policy(
+            high_impact_actions=("approve",), coverage_target=0.9
+        ),
     )
-    stream = streams.simulate(base.spec(batches=30, seed=9))
+    stream = streams.simulate(test_loop.spec(batches=30, seed=9))
     routed = []
     for index in range(30):
-        frame = base.batch_frame(
+        frame = test_loop.batch_frame(
             stream,
             index,
-            novel=np.arange(50) < 20,
-            set_size=np.arange(50) % 4,
+            novel=numpy.arange(50) < 20,
+            set_size=numpy.arange(50) % 4,
         )
         routed.append(
-            loop.observe(frame, np.zeros(50), ["approve"] * 25 + ["x"] * 25)
+            loop.observe(frame, numpy.zeros(50), ["approve"] * 25 + ["x"] * 25)
         )
         ids = list(frame["case_id"])
         loop.mature(
@@ -157,10 +167,10 @@ def scenario_routing(tmp_path):
 
 
 def scenario_mnar(tmp_path):
-    loop = base.open_loop(
+    loop = test_loop.open_loop(
         tmp_path, hooks=loop_module.Hooks(retrain=lambda: "x")
     )
-    config = base.spec(
+    config = test_loop.spec(
         kind="abrupt",
         labels="mnar",
         batches=50,
@@ -171,14 +181,14 @@ def scenario_mnar(tmp_path):
     )
     stream = streams.simulate(config)
     for index in range(config.batches):
-        frame = base.batch_frame(stream, index).drop(
+        frame = test_loop.batch_frame(stream, index).drop(
             columns=["propensity", "audit"]
         )
-        loop.observe(frame, np.zeros(50), ["a"] * 50)
+        loop.observe(frame, numpy.zeros(50), ["a"] * 50)
         arrived = {
             f"b{b}-{p}": stream.loss[b, p]
             for b in range(index + 1)
-            for p in np.flatnonzero(
+            for p in numpy.flatnonzero(
                 (stream.arrival[b] == index) & stream.selected[b]
             )
         }
@@ -188,7 +198,7 @@ def scenario_mnar(tmp_path):
 
 
 def scenario_replies(tmp_path):
-    loop = base.open_loop(tmp_path, base.make_policy(reply_timeout=3))
+    loop = test_loop.open_loop(tmp_path, test_loop.make_policy(reply_timeout=3))
     registry = types.SimpleNamespace(promote=lambda *a, **k: "moved")
     outcomes = []
     for version in (3, 4):
@@ -197,9 +207,9 @@ def scenario_replies(tmp_path):
         except Exception as error:
             outcomes.append(type(error).__name__)
     first, second = loop.pending_escalations()
-    outcomes.append(loop.reply(first.id, base.reply_to(first)))
+    outcomes.append(loop.reply(first.id, test_loop.reply_to(first)))
     outcomes.append(
-        loop.reply(second.id, base.reply_to(second, decision="reject"))
+        loop.reply(second.id, test_loop.reply_to(second, decision="reject"))
     )
     outcomes.append(loop.move_champion(registry, "m", 3, None))
     with pytest.raises(never_list.AttestationRequired):
@@ -213,14 +223,16 @@ def scenario_replies(tmp_path):
         loop.rewrite_ledger(lambda: None, {"op": "truncate"})
     except Exception as error:
         outcomes.append(type(error).__name__)
-    base.feed(loop, streams.simulate(base.spec(batches=6, seed=1)), 0, 6)
+    test_loop.feed(
+        loop, streams.simulate(test_loop.spec(batches=6, seed=1)), 0, 6
+    )
     return record(loop, outcomes)
 
 
 def scenario_wiring(tmp_path):
-    loop = base.open_loop(tmp_path, base.make_policy(bypass_rate=0.3))
+    loop = test_loop.open_loop(tmp_path, test_loop.make_policy(bypass_rate=0.3))
     stream = streams.feedback_stream(100, 100, gamma=0.8, bypass=0.3, seed=1)
-    frame = pd.DataFrame({"z": stream.next_z.reshape(-1)})
+    frame = pandas.DataFrame({"z": stream.next_z.reshape(-1)})
     flags = stream.bypass.reshape(-1)
     check = loop.check_feedback(
         frame[flags].iloc[:300], frame[~flags].iloc[:300]
@@ -248,4 +260,6 @@ def test_the_loop_reproduces_its_recorded_ledger_and_state(name, tmp_path):
         FIXTURE, name, lambda: SCENARIOS[name](tmp_path)
     )
     assert actual == expected
-    assert dl.DeploymentLedger.load(tmp_path / "deploy" / dl.FILE_NAME)
+    assert deployment_ledger.DeploymentLedger.load(
+        tmp_path / "deploy" / deployment_ledger.FILE_NAME
+    )

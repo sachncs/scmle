@@ -38,9 +38,9 @@ import dataclasses
 from fractions import Fraction
 
 from scmle.contracts import qualification
-from scmle.data.ledger import budget as budget_module
+from scmle.data.ledger import budget
 
-Rule = budget_module.MultiplicityRule
+Rule = budget.MultiplicityRule
 DEFAULT_RULE = Rule.BY
 STATEMENTS = {
     Rule.BH: (

@@ -3,7 +3,7 @@
 import dataclasses
 import json
 
-import pandas as pd
+import pandas
 import pytest
 
 from scmle.contracts import data
@@ -79,7 +79,7 @@ def test_schema_compatibility_allows_additive_and_rejects_breaking_changes():
 
 
 def test_snapshot_from_frame_preserves_ordered_source_types():
-    frame = pd.DataFrame({"value": [1, 2], "label": [0, 1]})
+    frame = pandas.DataFrame({"value": [1, 2], "label": [0, 1]})
     manifest = make_manifest("snapshot-1", "data-1")
 
     source = registry.SourceSnapshot.from_manifest(

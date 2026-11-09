@@ -2,8 +2,8 @@
 
 import json
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
 from scmle.evaluation.longitudinal import LongitudinalEstimand
@@ -32,15 +32,15 @@ def make_estimand() -> LongitudinalEstimand:
     )
 
 
-def make_frame() -> pd.DataFrame:
+def make_frame() -> pandas.DataFrame:
     """Return a deterministic repeated-subject long-format fixture."""
-    rng = np.random.default_rng(17)
+    rng = numpy.random.default_rng(17)
     rows = []
     for subject_id in range(60):
         baseline_score = float(rng.normal())
         for time in range(3):
             probability = 1.0 / (
-                1.0 + np.exp(-(-0.15 + 0.6 * baseline_score + 0.15 * time))
+                1.0 + numpy.exp(-(-0.15 + 0.6 * baseline_score + 0.15 * time))
             )
             treatment = int(rng.random() < probability)
             outcome = (
@@ -59,7 +59,7 @@ def make_frame() -> pd.DataFrame:
                     "baseline_score": baseline_score,
                 }
             )
-    return pd.DataFrame(rows)
+    return pandas.DataFrame(rows)
 
 
 def test_period_specific_ipw_is_deterministic_and_auditable() -> None:
@@ -73,7 +73,7 @@ def test_period_specific_ipw_is_deterministic_and_auditable() -> None:
     assert first.to_dict() == second.to_dict()
     assert len(first.periods) == 3
     assert [period.period for period in first.periods] == ["0", "1", "2"]
-    assert np.asarray(first.covariance).shape == (3, 3)
+    assert numpy.asarray(first.covariance).shape == (3, 3)
     assert first.reference["passed"] is True
     assert first.diagnostics["method"] == (
         "period_specific_covariate_adjusted_hajek_ipw"
@@ -116,7 +116,7 @@ def test_invalid_longitudinal_inputs_are_rejected(
     """The input contract rejects malformed identities, support, and values."""
     frame = make_frame()
     if change == "missing_subject":
-        frame.loc[0, "subject_id"] = np.nan
+        frame.loc[0, "subject_id"] = numpy.nan
     elif change == "duplicate_time":
         frame.loc[1, "time"] = 0
     elif change == "non_binary":
@@ -124,7 +124,7 @@ def test_invalid_longitudinal_inputs_are_rejected(
     elif change == "invalid_order":
         frame.loc[1, "time"] = -1
     elif change == "non_finite":
-        frame.loc[0, "outcome"] = np.inf
+        frame.loc[0, "outcome"] = numpy.inf
     elif change == "insufficient_support":
         frame["treatment"] = 0
     else:
@@ -137,7 +137,7 @@ def test_invalid_longitudinal_inputs_are_rejected(
 def test_complete_case_policy_records_dropped_rows() -> None:
     """Complete-case deletion is explicit in row accounting and limitations."""
     frame = make_frame()
-    frame.loc[0, "outcome"] = np.nan
+    frame.loc[0, "outcome"] = numpy.nan
     policy = LongitudinalEstimationPolicy(missingness="complete_case")
 
     result = LongitudinalIPWEstimator(make_estimand(), policy).fit(frame)

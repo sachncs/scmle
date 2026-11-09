@@ -12,7 +12,7 @@ and it is reported that way.
 import dataclasses
 from typing import Any
 
-import numpy as np
+import numpy
 from sklearn import linear_model
 
 MIN_EFFECTIVE_SIZE = 50.0
@@ -37,14 +37,14 @@ class ShiftWeights:
         scale: Calibration rows over target rows, the odds correction.
     """
 
-    calibration: np.ndarray
-    target: np.ndarray
+    calibration: numpy.ndarray
+    target: numpy.ndarray
     effective_size: float
     clip: float
     discriminator: Any = None
     scale: float = 1.0
 
-    def ratio(self, features: np.ndarray) -> np.ndarray:
+    def ratio(self, features: numpy.ndarray) -> numpy.ndarray:
         """Returns the clipped likelihood ratio at new rows.
 
         Args:
@@ -55,13 +55,13 @@ class ShiftWeights:
             The size-corrected odds of the discriminator, at most `clip`.
         """
         probability = self.discriminator.predict_proba(
-            np.asarray(features, dtype=float)
+            numpy.asarray(features, dtype=float)
         )[:, 1]
-        odds = probability / np.maximum(1.0 - probability, 1e-12)
-        return np.minimum(odds * self.scale, self.clip)
+        odds = probability / numpy.maximum(1.0 - probability, 1e-12)
+        return numpy.minimum(odds * self.scale, self.clip)
 
 
-def effective_sample_size(weights: np.ndarray) -> float:
+def effective_sample_size(weights: numpy.ndarray) -> float:
     """Returns the Kish effective sample size `(sum w)^2 / sum w^2`.
 
     Args:
@@ -70,14 +70,14 @@ def effective_sample_size(weights: np.ndarray) -> float:
     Returns:
         The Kish effective sample size; 0.0 if all weights are zero.
     """
-    values = np.asarray(weights, dtype=float)
+    values = numpy.asarray(weights, dtype=float)
     squares = float((values**2).sum())
     return float(values.sum() ** 2 / squares) if squares > 0 else 0.0
 
 
 def estimate_weights(
-    calibration: np.ndarray,
-    target: np.ndarray,
+    calibration: numpy.ndarray,
+    target: numpy.ndarray,
     clip: float = DEFAULT_CLIP,
     minimum: float = MIN_EFFECTIVE_SIZE,
 ) -> ShiftWeights:
@@ -98,14 +98,14 @@ def estimate_weights(
         WeightRefusedError: When the effective sample size of the
             calibration weights is below `minimum`.
     """
-    first = np.asarray(calibration, dtype=float)
-    second = np.asarray(target, dtype=float)
-    matrix = np.vstack([first, second])
-    labels = np.r_[np.zeros(len(first)), np.ones(len(second))]
+    first = numpy.asarray(calibration, dtype=float)
+    second = numpy.asarray(target, dtype=float)
+    matrix = numpy.vstack([first, second])
+    labels = numpy.r_[numpy.zeros(len(first)), numpy.ones(len(second))]
     model = linear_model.LogisticRegression(max_iter=1000).fit(matrix, labels)
     probability = model.predict_proba(matrix)[:, 1]
-    odds = probability / np.maximum(1.0 - probability, 1e-12)
-    ratio = np.minimum(odds * len(first) / len(second), clip)
+    odds = probability / numpy.maximum(1.0 - probability, 1e-12)
+    ratio = numpy.minimum(odds * len(first) / len(second), clip)
     result = ShiftWeights(
         ratio[: len(first)],
         ratio[len(first) :],
@@ -134,7 +134,7 @@ class StoredShiftWeights:
     weights: ShiftWeights
     columns: tuple[str, ...]
 
-    def test_weights(self, frame: Any) -> np.ndarray:
+    def test_weights(self, frame: Any) -> numpy.ndarray:
         """Returns the likelihood ratios of new rows, read from `columns`.
 
         Args:

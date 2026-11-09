@@ -20,7 +20,7 @@ with scikit-survival.
 from collections.abc import Callable
 import dataclasses
 
-import numpy as np
+import numpy
 
 from scmle.models.survival import estimators
 
@@ -40,17 +40,17 @@ class CensoringWeights:
             positions, used for the pair weights of the concordance.
     """
 
-    weights: np.ndarray
+    weights: numpy.ndarray
     floor: float
     n_floored: int
     covariate_dependent: bool
-    survival_of: Callable[[float, np.ndarray], np.ndarray] | None = None
+    survival_of: Callable[[float, numpy.ndarray], numpy.ndarray] | None = None
 
 
 def censoring_weights(
-    duration: np.ndarray,
-    event: np.ndarray,
-    features: np.ndarray | None = None,
+    duration: numpy.ndarray,
+    event: numpy.ndarray,
+    features: numpy.ndarray | None = None,
     floor: float = MIN_CENSORING_PROBABILITY,
     penalty: float = 1e-3,
 ) -> CensoringWeights:
@@ -75,8 +75,8 @@ def censoring_weights(
     """
     if not 0.0 < floor < 1.0:
         raise ValueError("floor must lie strictly between 0 and 1")
-    time = np.asarray(duration, dtype=float)
-    seen = np.asarray(event, dtype=float)
+    time = numpy.asarray(duration, dtype=float)
+    seen = numpy.asarray(event, dtype=float)
     if len(time) != len(seen):
         raise ValueError("duration and event differ in length")
     censored = 1.0 - seen
@@ -84,34 +84,34 @@ def censoring_weights(
         curve = estimators.kaplan_meier(time, censored)
         raw = estimators.step_lookup(curve[0], curve[1], time, 1.0)
 
-        def marginal_at(moment: float, rows: np.ndarray) -> np.ndarray:
+        def marginal_at(moment: float, rows: numpy.ndarray) -> numpy.ndarray:
             level = estimators.step_lookup(
-                curve[0], curve[1], np.array([moment]), 1.0
+                curve[0], curve[1], numpy.array([moment]), 1.0
             )[0]
-            return np.full(len(rows), level)
+            return numpy.full(len(rows), level)
 
         survival_of = marginal_at
     else:
-        matrix = np.asarray(features, dtype=float)
+        matrix = numpy.asarray(features, dtype=float)
         if len(matrix) != len(time):
             raise ValueError("features and duration differ in length")
         model = estimators.CoxRegressor(penalty).fit(matrix, time, censored)
         cumulative = estimators.step_lookup(
             model.moments_, model.baseline_, time, 0.0
         )
-        relative = np.exp(model.predict(matrix) - model.scale_)
-        raw = np.exp(-cumulative * relative)
+        relative = numpy.exp(model.predict(matrix) - model.scale_)
+        raw = numpy.exp(-cumulative * relative)
 
-        def cox_at(moment: float, rows: np.ndarray) -> np.ndarray:
+        def cox_at(moment: float, rows: numpy.ndarray) -> numpy.ndarray:
             level = estimators.step_lookup(
-                model.moments_, model.baseline_, np.array([moment]), 0.0
+                model.moments_, model.baseline_, numpy.array([moment]), 0.0
             )[0]
-            return np.exp(-level * relative[rows])
+            return numpy.exp(-level * relative[rows])
 
         survival_of = cox_at
     floored = raw < floor
     return CensoringWeights(
-        1.0 / np.maximum(raw, floor),
+        1.0 / numpy.maximum(raw, floor),
         floor,
         int(floored.sum()),
         features is not None,
@@ -120,9 +120,9 @@ def censoring_weights(
 
 
 def truncated_concordance(
-    duration: np.ndarray,
-    event: np.ndarray,
-    risk: np.ndarray,
+    duration: numpy.ndarray,
+    event: numpy.ndarray,
+    risk: numpy.ndarray,
     tau: float,
     weights: CensoringWeights,
 ) -> float:
@@ -143,19 +143,19 @@ def truncated_concordance(
     Returns:
         The concordance, NaN when no pair is comparable.
     """
-    time = np.asarray(duration, dtype=float)
-    seen = np.asarray(event, dtype=bool) & (time < tau)
-    score = np.asarray(risk, dtype=float)
+    time = numpy.asarray(duration, dtype=float)
+    seen = numpy.asarray(event, dtype=bool) & (time < tau)
+    score = numpy.asarray(risk, dtype=float)
     numerator = 0.0
     denominator = 0.0
-    for index in np.flatnonzero(seen):
-        later = np.flatnonzero(time > time[index])
+    for index in numpy.flatnonzero(seen):
+        later = numpy.flatnonzero(time > time[index])
         if later.size == 0:
             continue
         if weights.survival_of is None:
-            partner = np.full(later.size, 1.0 / weights.weights[index])
+            partner = numpy.full(later.size, 1.0 / weights.weights[index])
         else:
-            partner = np.maximum(
+            partner = numpy.maximum(
                 weights.survival_of(float(time[index]), later), weights.floor
             )
         pair = weights.weights[index] / partner

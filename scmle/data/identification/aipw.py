@@ -30,8 +30,8 @@ import dataclasses
 import hashlib
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from scipy import stats
 from sklearn import ensemble
 from sklearn import linear_model
@@ -64,7 +64,9 @@ class Design:
     levels: tuple[tuple[str, tuple[str, ...]], ...]
 
     @classmethod
-    def build(cls, frame: pd.DataFrame, columns: tuple[str, ...]) -> "Design":
+    def build(
+        cls, frame: pandas.DataFrame, columns: tuple[str, ...]
+    ) -> "Design":
         """Reads the column kinds from `frame`.
 
         Args:
@@ -78,8 +80,8 @@ class Design:
         numeric = []
         levels = []
         for name in columns:
-            if pd.api.types.is_numeric_dtype(frame[name]) and not (
-                pd.api.types.is_bool_dtype(frame[name])
+            if pandas.api.types.is_numeric_dtype(frame[name]) and not (
+                pandas.api.types.is_bool_dtype(frame[name])
             ):
                 numeric.append(name)
             else:
@@ -87,7 +89,7 @@ class Design:
                 levels.append((name, tuple(seen)))
         return cls(tuple(numeric), tuple(levels))
 
-    def matrix(self, frame: pd.DataFrame) -> np.ndarray:
+    def matrix(self, frame: pandas.DataFrame) -> numpy.ndarray:
         """Encodes the rows of `frame` under this design.
 
         Args:
@@ -106,10 +108,10 @@ class Design:
         for name, seen in self.levels:
             column = frame[name].astype(str).to_numpy()
             parts.append(
-                np.column_stack([(column == v).astype(float) for v in seen])
+                numpy.column_stack([(column == v).astype(float) for v in seen])
             )
-        matrix = np.hstack(parts) if parts else np.empty((len(frame), 0))
-        if not np.isfinite(matrix).all():
+        matrix = numpy.hstack(parts) if parts else numpy.empty((len(frame), 0))
+        if not numpy.isfinite(matrix).all():
             raise ValueError("covariates must not hold missing values")
         return matrix
 
@@ -136,7 +138,7 @@ class Nuisances:
     learner: str
     digest: str
 
-    def predict(self, frame: pd.DataFrame) -> tuple[np.ndarray, ...]:
+    def predict(self, frame: pandas.DataFrame) -> tuple[numpy.ndarray, ...]:
         """Predicts the nuisances for the rows of `frame`.
 
         Args:
@@ -150,7 +152,7 @@ class Nuisances:
         matrix = self.scaler.transform(self.design.matrix(frame))
         e = self.propensity.predict_proba(matrix)[:, 1]
         return (
-            np.clip(e, CLIP, 1 - CLIP),
+            numpy.clip(e, CLIP, 1 - CLIP),
             self.control.predict(matrix),
             self.treated.predict(matrix),
         )
@@ -187,7 +189,7 @@ def make_learners(learner: str, seed: int) -> tuple[Any, Any]:
     raise ValueError(f"learner must be one of {LEARNERS}")
 
 
-def binary(values: pd.Series, name: str) -> np.ndarray:
+def binary(values: pandas.Series, name: str) -> numpy.ndarray:
     """Reads a binary column as a 0/1 float array.
 
     Args:
@@ -201,13 +203,13 @@ def binary(values: pd.Series, name: str) -> np.ndarray:
         ValueError: If a value is neither 0 nor 1.
     """
     array = values.to_numpy(dtype=float)
-    if not np.isin(array, (0.0, 1.0)).all():
+    if not numpy.isin(array, (0.0, 1.0)).all():
         raise ValueError(f"{name} must be binary (0 or 1)")
     return array
 
 
 def fit_nuisances(
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     covariates: tuple[str, ...],
     treatment: str,
     outcome: str,
@@ -236,22 +238,24 @@ def fit_nuisances(
     """
     t = binary(frame[treatment], treatment)
     y = frame[outcome].to_numpy(dtype=float)
-    if not np.isfinite(y).all():
+    if not numpy.isfinite(y).all():
         raise ValueError("the outcome must not hold missing values")
     if min(t.sum(), len(t) - t.sum()) < MIN_ARM:
         raise ValueError(f"each arm needs at least {MIN_ARM} rows")
     design = Design.build(frame, covariates)
     raw = design.matrix(frame)
     if raw.shape[1] == 0:
-        raw = np.zeros((len(frame), 1))
+        raw = numpy.zeros((len(frame), 1))
     scaler = preprocessing.StandardScaler().fit(raw)
     matrix = scaler.transform(raw)
     classifier = make_learners(learner, seed)[0].fit(matrix, t)
     control = make_learners(learner, seed)[1].fit(matrix[t == 0], y[t == 0])
     treated = make_learners(learner, seed)[1].fit(matrix[t == 1], y[t == 1])
     e = classifier.predict_proba(matrix)[:, 1]
-    probe = np.round(
-        np.concatenate([e, control.predict(matrix), treated.predict(matrix)]),
+    probe = numpy.round(
+        numpy.concatenate(
+            [e, control.predict(matrix), treated.predict(matrix)]
+        ),
         10,
     )
     digest = hashlib.sha256(probe.tobytes()).hexdigest()
@@ -260,7 +264,7 @@ def fit_nuisances(
     )
 
 
-def effective_sample_size(weights: np.ndarray) -> float:
+def effective_sample_size(weights: numpy.ndarray) -> float:
     """Computes the Kish effective sample size `(sum w)^2 / sum w^2`.
 
     Args:
@@ -270,12 +274,12 @@ def effective_sample_size(weights: np.ndarray) -> float:
         The squared sum of the weights over the sum of their squares, or 0.0
         when the sum of squares is not positive.
     """
-    return sequential.effective_sample_size(np.asarray(weights, dtype=float))
+    return sequential.effective_sample_size(numpy.asarray(weights, dtype=float))
 
 
 def weighted_smd(
-    matrix: np.ndarray, t: np.ndarray, e: np.ndarray
-) -> np.ndarray:
+    matrix: numpy.ndarray, t: numpy.ndarray, e: numpy.ndarray
+) -> numpy.ndarray:
     """Computes absolute standardized mean differences after IPW.
 
     Args:
@@ -289,21 +293,21 @@ def weighted_smd(
         of its arm) divided by the pooled unweighted standard deviation (0
         when that is zero).
     """
-    w = np.where(t == 1, 1.0 / e, 1.0 / (1.0 - e))
-    out = np.zeros(matrix.shape[1])
+    w = numpy.where(t == 1, 1.0 / e, 1.0 / (1.0 - e))
+    out = numpy.zeros(matrix.shape[1])
     for j in range(matrix.shape[1]):
         col = matrix[:, j]
-        m1 = np.average(col[t == 1], weights=w[t == 1])
-        m0 = np.average(col[t == 0], weights=w[t == 0])
-        pooled = np.sqrt((col[t == 1].var() + col[t == 0].var()) / 2)
+        m1 = numpy.average(col[t == 1], weights=w[t == 1])
+        m0 = numpy.average(col[t == 0], weights=w[t == 0])
+        pooled = numpy.sqrt((col[t == 1].var() + col[t == 0].var()) / 2)
         out[j] = abs(m1 - m0) / pooled if pooled > 0 else 0.0
     return out
 
 
 def overlap_report(
-    e: np.ndarray,
-    t: np.ndarray,
-    matrix: np.ndarray | None = None,
+    e: numpy.ndarray,
+    t: numpy.ndarray,
+    matrix: numpy.ndarray | None = None,
     eps: float = OVERLAP_EPS,
 ) -> dict[str, Any]:
     """Reports propensity range, extreme share, Kish ESS and weighted balance.
@@ -324,7 +328,7 @@ def overlap_report(
         when a matrix with at least one column is given.
     """
     outside = (e < eps) | (e > 1 - eps)
-    w = np.where(t == 1, 1.0 / e, 1.0 / (1.0 - e))
+    w = numpy.where(t == 1, 1.0 / e, 1.0 / (1.0 - e))
     report: dict[str, Any] = {
         "min_propensity": float(e.min()),
         "max_propensity": float(e.max()),
@@ -383,12 +387,12 @@ class AipwResult:
 
 def scores(
     estimand: str,
-    t: np.ndarray,
-    y: np.ndarray,
-    e: np.ndarray,
-    m0: np.ndarray,
-    m1: np.ndarray,
-) -> tuple[float, np.ndarray]:
+    t: numpy.ndarray,
+    y: numpy.ndarray,
+    e: numpy.ndarray,
+    m0: numpy.ndarray,
+    m1: numpy.ndarray,
+) -> tuple[float, numpy.ndarray]:
     """Computes the point estimate and the per-row influence values.
 
     Args:
@@ -420,7 +424,7 @@ def scores(
 
 def estimate(
     nuisances: Nuisances,
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     treatment: str,
     outcome: str,
     estimand: str = "ATE",
@@ -452,10 +456,12 @@ def estimate(
     """
     t = binary(frame[treatment], treatment)
     y = frame[outcome].to_numpy(dtype=float)
-    if not np.isfinite(y).all():
+    if not numpy.isfinite(y).all():
         raise ValueError("the outcome must not hold missing values")
     e, m0, m1 = nuisances.predict(frame)
-    keep = (e >= trim) & (e <= 1 - trim) if trim > 0 else np.ones(len(e), bool)
+    keep = (
+        (e >= trim) & (e <= 1 - trim) if trim > 0 else numpy.ones(len(e), bool)
+    )
     if keep.mean() < min_share:
         raise ValueError(
             f"trimming at {trim} keeps {keep.mean():.3f} of the rows, below "
@@ -466,7 +472,7 @@ def estimate(
     t, y, e, m0, m1 = (a[keep] for a in (t, y, e, m0, m1))
     theta, influence = scores(estimand, t, y, e, m0, m1)
     n = int(keep.sum())
-    se = float(np.sqrt(influence.var(ddof=1) / n))
+    se = float(numpy.sqrt(influence.var(ddof=1) / n))
     z = float(stats.norm.ppf(0.5 + level / 2))
     matrix = nuisances.scaler.transform(nuisances.design.matrix(frame))[keep]
     population = "the full population of the rows"
@@ -520,7 +526,7 @@ class DiffResult:
 
 
 def difference_in_means(
-    frame: pd.DataFrame, treatment: str, outcome: str, level: float = 0.95
+    frame: pandas.DataFrame, treatment: str, outcome: str, level: float = 0.95
 ) -> DiffResult:
     """Computes the treated minus control mean with the Neyman variance.
 
@@ -543,7 +549,7 @@ def difference_in_means(
     if min(len(y1), len(y0)) < 2:
         raise ValueError("each arm needs at least two rows")
     v1, v0 = y1.var(ddof=1) / len(y1), y0.var(ddof=1) / len(y0)
-    se = float(np.sqrt(v1 + v0))
+    se = float(numpy.sqrt(v1 + v0))
     df = (v1 + v0) ** 2 / (v1**2 / (len(y1) - 1) + v0**2 / (len(y0) - 1))
     quantile = float(stats.t.ppf(0.5 + level / 2, df))
     diff = float(y1.mean() - y0.mean())

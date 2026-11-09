@@ -12,7 +12,7 @@ guarantees and observational data do not.
 from typing import Any
 from typing import Self
 
-import numpy as np
+import numpy
 from sklearn import base
 from sklearn import ensemble
 
@@ -34,7 +34,7 @@ def outcome_model(classify: bool, seed: int) -> base.BaseEstimator:
     return ensemble.HistGradientBoostingRegressor(random_state=seed)
 
 
-def expected(model: Any, features: Any, classify: bool) -> np.ndarray:
+def expected(model: Any, features: Any, classify: bool) -> numpy.ndarray:
     """Expected outcome: probability of the positive label, or the value.
 
     Args:
@@ -48,16 +48,16 @@ def expected(model: Any, features: Any, classify: bool) -> np.ndarray:
         or the predicted value for a regressor.
     """
     if not classify:
-        return np.asarray(model.predict(features), dtype=float)
-    probabilities = np.asarray(model.predict_proba(features))
+        return numpy.asarray(model.predict(features), dtype=float)
+    probabilities = numpy.asarray(model.predict_proba(features))
     if probabilities.shape[1] == 1:
-        return np.full(probabilities.shape[0], float(model.classes_[0] == 1))
+        return numpy.full(probabilities.shape[0], float(model.classes_[0] == 1))
     return probabilities[:, list(model.classes_).index(1)]
 
 
 def split_arms(
     treatment: Any,
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[numpy.ndarray, numpy.ndarray]:
     """Boolean masks of the treated and control rows.
 
     Args:
@@ -67,7 +67,7 @@ def split_arms(
         The pair `(treated, control)` of boolean arrays, each of shape
         `(n_rows,)`; control is the complement of treated.
     """
-    flag = np.asarray(treatment).astype(int) == 1
+    flag = numpy.asarray(treatment).astype(int) == 1
     return flag, ~flag
 
 
@@ -104,9 +104,9 @@ class TwoModelLearner(base.BaseEstimator):
             This fitted learner.
         """
         treated, control = split_arms(
-            np.zeros(len(outcome)) if treatment is None else treatment
+            numpy.zeros(len(outcome)) if treatment is None else treatment
         )
-        values = np.asarray(outcome)
+        values = numpy.asarray(outcome)
         self.treated_ = outcome_model(self.classify, self.random_state).fit(
             features[treated] if treated.any() else features,
             values[treated] if treated.any() else values,
@@ -117,7 +117,7 @@ class TwoModelLearner(base.BaseEstimator):
         )
         return self
 
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """Estimated effect of treating each row.
 
         Args:
@@ -151,7 +151,7 @@ class SingleModelLearner(base.BaseEstimator):
         self.random_state = random_state
 
     @staticmethod
-    def stacked(features: Any, flag: float) -> np.ndarray:
+    def stacked(features: Any, flag: float) -> numpy.ndarray:
         """Features with a constant treatment column appended.
 
         Args:
@@ -161,8 +161,8 @@ class SingleModelLearner(base.BaseEstimator):
         Returns:
             Array of shape `(n_rows, n_features + 1)`.
         """
-        matrix = np.asarray(features)
-        return np.column_stack([matrix, np.full(matrix.shape[0], flag)])
+        matrix = numpy.asarray(features)
+        return numpy.column_stack([matrix, numpy.full(matrix.shape[0], flag)])
 
     def fit(self, features: Any, outcome: Any, treatment: Any = None) -> Self:
         """Fits one model on features plus the treatment indicator.
@@ -176,14 +176,14 @@ class SingleModelLearner(base.BaseEstimator):
         Returns:
             This fitted learner.
         """
-        flag = np.zeros(len(outcome)) if treatment is None else treatment
+        flag = numpy.zeros(len(outcome)) if treatment is None else treatment
         self.model_ = outcome_model(self.classify, self.random_state).fit(
-            np.column_stack([np.asarray(features), np.asarray(flag)]),
-            np.asarray(outcome),
+            numpy.column_stack([numpy.asarray(features), numpy.asarray(flag)]),
+            numpy.asarray(outcome),
         )
         return self
 
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """Prediction with treatment switched on minus switched off.
 
         Args:
@@ -237,10 +237,10 @@ class CrossLearner(base.BaseEstimator):
         Returns:
             This fitted learner.
         """
-        matrix = np.asarray(features)
-        values = np.asarray(outcome, dtype=float)
+        matrix = numpy.asarray(features)
+        values = numpy.asarray(outcome, dtype=float)
         treated, control = split_arms(
-            np.zeros(len(values)) if treatment is None else treatment
+            numpy.zeros(len(values)) if treatment is None else treatment
         )
         self.degenerate_ = not (treated.any() and control.any())
         if self.degenerate_:
@@ -264,7 +264,7 @@ class CrossLearner(base.BaseEstimator):
         self.share_ = float(treated.mean())
         return self
 
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """Blends the two effect models by the treated share.
 
         The treated-arm effect model is weighted by one minus the share and the
@@ -277,9 +277,9 @@ class CrossLearner(base.BaseEstimator):
             Array of shape `(n_rows,)` of estimated effects; all zeros when fit
             saw only one arm.
         """
-        matrix = np.asarray(features)
+        matrix = numpy.asarray(features)
         if self.degenerate_:
-            return np.zeros(matrix.shape[0])
+            return numpy.zeros(matrix.shape[0])
         return (1 - self.share_) * self.treated_effect_.predict(
             matrix
         ) + self.share_ * (self.control_effect_.predict(matrix))
@@ -302,7 +302,7 @@ class ZeroEffect(base.BaseEstimator):
         """
         return self
 
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """The same (zero) effect for every row.
 
         Args:
@@ -311,4 +311,4 @@ class ZeroEffect(base.BaseEstimator):
         Returns:
             Array of zeros of shape `(n_rows,)`.
         """
-        return np.zeros(features.shape[0])
+        return numpy.zeros(features.shape[0])

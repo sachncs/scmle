@@ -3,17 +3,17 @@
 import pathlib
 from typing import TypeAlias
 
-import pandas as pd
+import pandas
 
 from scmle.artifacts import reproducibility
 from scmle.data.readers import tabular
 from scmle.evaluation import sequential
 
-TabularInput: TypeAlias = pd.DataFrame | str | pathlib.Path
+TabularInput: TypeAlias = pandas.DataFrame | str | pathlib.Path
 SEQUENTIAL_ESTIMATION_ARTIFACT = "sequential_estimation.json"
 
 
-def resolve_tabular_input(data: TabularInput) -> pd.DataFrame:
+def resolve_tabular_input(data: TabularInput) -> pandas.DataFrame:
     """Resolves an in-memory frame or supported tabular file into a copy.
 
     Args:
@@ -27,7 +27,7 @@ def resolve_tabular_input(data: TabularInput) -> pd.DataFrame:
         TypeError: If ``data`` is not a DataFrame, string or path. An
             unsupported file suffix raises from the loader.
     """
-    if isinstance(data, pd.DataFrame):
+    if isinstance(data, pandas.DataFrame):
         return data.copy(deep=True)
     if isinstance(data, (str, pathlib.Path)):
         return tabular.DatasetLoader().load(pathlib.Path(data))
@@ -72,7 +72,7 @@ class SequentialEstimationProject:
         Raises:
             TypeError: If the input, estimand, or policy is unsupported.
         """
-        if not isinstance(data, (pd.DataFrame, str, pathlib.Path)):
+        if not isinstance(data, (pandas.DataFrame, str, pathlib.Path)):
             raise TypeError(
                 "data must be a pandas DataFrame or a path to a supported "
                 "tabular file"

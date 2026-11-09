@@ -10,7 +10,7 @@ import pytest
 from scmle.contracts import errors
 from scmle.security import remote
 from scmle.security import tokens
-from tests import support_identity as idp
+from tests import support_identity
 
 
 class Documents:
@@ -59,7 +59,7 @@ def provider(base, documents, keys=("k1",)):
         "jwks_uri": f"{base}/jwks.json",
     }
     documents.routes["/jwks.json"] = {
-        "keys": [idp.rsa_jwk(name, f"rs-{name}") for name in keys]
+        "keys": [support_identity.rsa_jwk(name, f"rs-{name}") for name in keys]
     }
 
 
@@ -103,7 +103,7 @@ def test_a_fetch_failure_or_a_non_json_body_is_a_config_error():
 
 
 def test_a_verifier_accepts_a_token_signed_by_a_fetched_key():
-    clock = idp.Clock()
+    clock = support_identity.Clock()
     documents = Documents()
     with serve(documents) as base:
         provider(base, documents)
@@ -111,14 +111,19 @@ def test_a_verifier_accepts_a_token_signed_by_a_fetched_key():
             f"{base}/jwks.json", clock=clock, allow_http=True
         )
         check = tokens.TokenVerifier(
-            keys, idp.ISSUER, idp.AUDIENCE, clock=clock
+            keys,
+            support_identity.ISSUER,
+            support_identity.AUDIENCE,
+            clock=clock,
         )
-        token = idp.rs256_token("k1", "rs-k1", idp.claims_at(clock.now))
+        token = support_identity.rs256_token(
+            "k1", "rs-k1", support_identity.claims_at(clock.now)
+        )
         assert check.verify(token).key_id == "rs-k1"
 
 
 def test_the_key_set_is_cached_until_the_ttl_and_then_refreshed():
-    clock = idp.Clock()
+    clock = support_identity.Clock()
     documents = Documents()
     with serve(documents) as base:
         provider(base, documents)
@@ -134,7 +139,7 @@ def test_the_key_set_is_cached_until_the_ttl_and_then_refreshed():
 
 
 def test_rotation_is_picked_up_for_an_unknown_kid_but_not_every_call():
-    clock = idp.Clock()
+    clock = support_identity.Clock()
     documents = Documents()
     with serve(documents) as base:
         provider(base, documents, keys=("k1",))
@@ -155,7 +160,7 @@ def test_rotation_is_picked_up_for_an_unknown_kid_but_not_every_call():
 
 
 def test_a_key_set_that_cannot_be_fetched_fails_closed_after_max_stale():
-    clock = idp.Clock()
+    clock = support_identity.Clock()
     documents = Documents()
     with serve(documents) as base:
         provider(base, documents)
@@ -191,7 +196,7 @@ def revoke(documents, **fields):
 
 
 def test_two_replicas_see_a_revocation_within_the_ttl():
-    clock = idp.Clock()
+    clock = support_identity.Clock()
     documents = Documents()
     with serve(documents) as base:
         provider(base, documents)
@@ -207,13 +212,15 @@ def test_two_replicas_see_a_revocation_within_the_ttl():
             replicas.append(
                 tokens.TokenVerifier(
                     keys,
-                    idp.ISSUER,
-                    idp.AUDIENCE,
+                    support_identity.ISSUER,
+                    support_identity.AUDIENCE,
                     revocations=lists,
                     clock=clock,
                 )
             )
-        token = idp.rs256_token("k1", "rs-k1", idp.claims_at(clock.now))
+        token = support_identity.rs256_token(
+            "k1", "rs-k1", support_identity.claims_at(clock.now)
+        )
         assert all(r.verify(token).subject == "alice" for r in replicas)
         revoke(documents, subjects=["alice"])
         assert all(r.verify(token) for r in replicas)  # cached, not yet seen
@@ -225,7 +232,7 @@ def test_two_replicas_see_a_revocation_within_the_ttl():
 
 
 def test_a_revocation_source_that_stays_down_stops_accepting_tokens():
-    clock = idp.Clock()
+    clock = support_identity.Clock()
     documents = Documents()
     with serve(documents) as base:
         provider(base, documents)
@@ -241,23 +248,33 @@ def test_a_revocation_source_that_stays_down_stops_accepting_tokens():
             allow_http=True,
         )
         check = tokens.TokenVerifier(
-            keys, idp.ISSUER, idp.AUDIENCE, revocations=lists, clock=clock
+            keys,
+            support_identity.ISSUER,
+            support_identity.AUDIENCE,
+            revocations=lists,
+            clock=clock,
         )
-        first = idp.rs256_token("k1", "rs-k1", idp.claims_at(clock.now))
+        first = support_identity.rs256_token(
+            "k1", "rs-k1", support_identity.claims_at(clock.now)
+        )
         assert check.verify(first).subject == "alice"  # the list is fetched
         documents.broken = True
         clock.now += 60  # stale but inside max_stale: still served
-        token = idp.rs256_token("k1", "rs-k1", idp.claims_at(clock.now))
+        token = support_identity.rs256_token(
+            "k1", "rs-k1", support_identity.claims_at(clock.now)
+        )
         assert check.verify(token).subject == "alice"
         clock.now += 200
-        fresh = idp.rs256_token("k1", "rs-k1", idp.claims_at(clock.now))
+        fresh = support_identity.rs256_token(
+            "k1", "rs-k1", support_identity.claims_at(clock.now)
+        )
         with pytest.raises(tokens.TokenError) as raised:
             check.verify(fresh)
         assert raised.value.reason == tokens.REVOCATION_UNAVAILABLE
 
 
 def test_a_malformed_revocation_document_is_refused():
-    clock = idp.Clock()
+    clock = support_identity.Clock()
     documents = Documents()
     with serve(documents) as base:
         documents.routes["/revoked.json"] = ["not", "an", "object"]

@@ -3,10 +3,10 @@
 import pathlib
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
-from scmle.artifacts import bundle as bundle_module
+from scmle.artifacts import bundle
 from scmle.inference import mapping as mapping_module
 
 
@@ -14,7 +14,7 @@ def load_model(
     directory: str | pathlib.Path,
     trusted: bool = False,
     signing_key: str | bytes | None = None,
-) -> bundle_module.ModelBundle:
+) -> bundle.ModelBundle:
     """Loads a saved model bundle.
 
     Bundles are pickle-based, so loading is refused unless the signature
@@ -31,18 +31,18 @@ def load_model(
     Returns:
         The bundle, after its checksums and signature checks.
     """
-    return bundle_module.ModelBundle.load(
+    return bundle.ModelBundle.load(
         directory, trusted=trusted, signing_key=signing_key
     )
 
 
 def predict(
     directory: str | pathlib.Path,
-    data: str | pathlib.Path | pd.DataFrame,
+    data: str | pathlib.Path | pandas.DataFrame,
     trusted: bool = False,
     signing_key: str | bytes | None = None,
     mapping: mapping_module.ColumnMapping | None = None,
-) -> np.ndarray:
+) -> numpy.ndarray:
     """Loads a bundle and predicts labels or values.
 
     Args:
@@ -62,7 +62,7 @@ def predict(
 
 def score(
     directory: str | pathlib.Path,
-    data: str | pathlib.Path | pd.DataFrame,
+    data: str | pathlib.Path | pandas.DataFrame,
     trusted: bool = False,
     signing_key: str | bytes | None = None,
     mapping: mapping_module.ColumnMapping | None = None,

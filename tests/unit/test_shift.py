@@ -2,7 +2,7 @@
 
 import dataclasses
 
-import numpy as np
+import numpy
 import test_diagnostics
 
 from scmle.contracts import tasks
@@ -21,7 +21,7 @@ def shifted_inputs(offset):
 
 def test_identical_distributions_are_indistinguishable():
     base = test_diagnostics.make_inputs(tasks.TaskType.BINARY, rows=1200)
-    rng = np.random.default_rng(5)
+    rng = numpy.random.default_rng(5)
     order = rng.permutation(len(base.features))
     half = len(order) // 2
     data = dataclasses.replace(
@@ -101,7 +101,7 @@ def test_without_a_shift_the_odds_stay_moderate_and_weights_are_possible():
 
 def no_shift():
     base = test_diagnostics.make_inputs(tasks.TaskType.BINARY, rows=1200)
-    rng = np.random.default_rng(5)
+    rng = numpy.random.default_rng(5)
     order = rng.permutation(len(base.features))
     half = len(order) // 2
     data = dataclasses.replace(

@@ -1,4 +1,4 @@
-import numpy as np
+import numpy
 
 from scmle.contracts import qualification
 from scmle.data.framing import provenance
@@ -42,10 +42,10 @@ def test_derivable_unknowns_are_not_asked():
 
 
 def test_gain_sign_verdict_flips_with_the_threshold():
-    rng = np.random.default_rng(5)
+    rng = numpy.random.default_rng(5)
     y = (rng.random(2000) < 0.3).astype(float)
-    a = (rng.random(2000) < np.where(y == 1, 0.8, 0.45)).astype(float)
-    b = (rng.random(2000) < np.where(y == 1, 0.55, 0.15)).astype(float)
+    a = (rng.random(2000) < numpy.where(y == 1, 0.8, 0.45)).astype(float)
+    b = (rng.random(2000) < numpy.where(y == 1, 0.55, 0.15)).astype(float)
     found = questions.tipping_point(
         questions.Unknown(
             "t", 0.05, 0.5, "x", questions.gain_sign_verdict(y, a, b)

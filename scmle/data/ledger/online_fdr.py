@@ -99,7 +99,7 @@ from typing import ClassVar
 from typing import Self
 
 from scmle.contracts import qualification
-from scmle.data.ledger import budget as budget_module
+from scmle.data.ledger import budget
 
 P_FLOOR = 1e-300
 DEFAULT_KAPPA = 0.5
@@ -306,7 +306,7 @@ def exact_alpha(value: Any, name: str) -> Fraction:
         ValueError: If the value is outside [0, 1]. A value that is not a
             finite number is refused by `budget.exact`.
     """
-    amount = budget_module.exact(value, name)
+    amount = budget.exact(value, name)
     if not 0 <= amount <= 1:
         raise ValueError(f"{name} must be within [0, 1]")
     return amount
@@ -714,7 +714,7 @@ class Saffron(PValueRule):
             ValueError: If `lam` is not strictly between 0 and 1.
         """
         super().__init__(alpha, discount, w0)
-        threshold = budget_module.exact(lam, "lambda")
+        threshold = budget.exact(lam, "lambda")
         if not 0 < threshold < 1:
             raise ValueError("lambda must be strictly between 0 and 1")
         self.lam = threshold
@@ -872,10 +872,10 @@ class RuleConfig:
         w0 = record["w0"]
         return cls(
             rule=record["rule"],
-            alpha=budget_module.parse_fraction(record["alpha"], "alpha"),
+            alpha=budget.parse_fraction(record["alpha"], "alpha"),
             horizon=record["horizon"],
-            w0=None if w0 is None else budget_module.parse_fraction(w0, "w0"),
-            lam=budget_module.parse_fraction(record["lambda"], "lambda"),
+            w0=None if w0 is None else budget.parse_fraction(w0, "w0"),
+            lam=budget.parse_fraction(record["lambda"], "lambda"),
             kappa=record["kappa"],
         )
 

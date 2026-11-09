@@ -6,7 +6,7 @@ import pytest
 
 from scmle import cli
 from scmle.contracts import errors
-from scmle.data.charter import contracts as c
+from scmle.data.charter import contracts
 from scmle.data.charter import sealing
 from tests.unit.test_charter_contracts import make_charter
 
@@ -115,7 +115,9 @@ def test_charter_is_a_plain_dict_when_unsigned(tmp_path):
     record = json.loads(path.read_text())
     assert record["charter_hash"] == make_charter().charter_hash
     assert "signature" not in record or record["signature"] is None
-    assert c.AnalysisCharter.from_dict(record["charter"]) == make_charter()
+    assert (
+        contracts.AnalysisCharter.from_dict(record["charter"]) == make_charter()
+    )
 
 
 def test_run_and_plan_accept_a_charter_option():

@@ -3,7 +3,7 @@
 import dataclasses
 import json
 
-import pandas as pd
+import pandas
 import pytest
 
 from scmle.contracts import errors
@@ -127,7 +127,9 @@ def test_scope_is_a_closed_set():
 
 
 def table():
-    return pd.DataFrame({"a": [float(i) for i in range(8)], "y": [0, 1] * 4})
+    return pandas.DataFrame(
+        {"a": [float(i) for i in range(8)], "y": [0, 1] * 4}
+    )
 
 
 def rooted(frame=None):

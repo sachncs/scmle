@@ -17,8 +17,8 @@ import itertools
 import sqlite3
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.core import randomness
 from scmle.data.ingest import profile
@@ -72,7 +72,7 @@ class Database:
             self.keeper.executemany(sql, rows)
         self.keeper.commit()
 
-    def frame(self, sql: str) -> pd.DataFrame:
+    def frame(self, sql: str) -> pandas.DataFrame:
         """Result of a query as a frame.
 
         Args:
@@ -81,7 +81,7 @@ class Database:
         Returns:
             The rows read through the keeper connection.
         """
-        return pd.read_sql_query(sql, self.keeper)
+        return pandas.read_sql_query(sql, self.keeper)
 
 
 COUNTER = itertools.count()
@@ -102,7 +102,7 @@ def new_database(tag: str) -> Database:
     return Database(keeper, address)
 
 
-def load(db: Database, table: str, frame: pd.DataFrame) -> None:
+def load(db: Database, table: str, frame: pandas.DataFrame) -> None:
     """Writes a frame as a table.
 
     Args:
@@ -182,7 +182,9 @@ def torn_world(
     load(
         db,
         "t",
-        pd.DataFrame({"id": np.arange(rows), "v": rng.integers(0, 1000, rows)}),
+        pandas.DataFrame(
+            {"id": numpy.arange(rows), "v": rng.integers(0, 1000, rows)}
+        ),
     )
     pick = int(rng.integers(0, rows // 2 if kind == "update_behind" else rows))
     if kind == "update_ahead":
@@ -223,7 +225,7 @@ class Extract:
     """
 
     db: Database
-    assembled: pd.DataFrame
+    assembled: pandas.DataFrame
     left_rows: int
     kind: str
 
@@ -247,9 +249,9 @@ def reconcile_world(seed: int, kind: str) -> Extract:
     load(
         db,
         "customers",
-        pd.DataFrame(
+        pandas.DataFrame(
             {
-                "id": np.arange(customers),
+                "id": numpy.arange(customers),
                 "region": rng.integers(0, 5, customers),
             }
         ),
@@ -258,9 +260,9 @@ def reconcile_world(seed: int, kind: str) -> Extract:
     load(
         db,
         "orders",
-        pd.DataFrame(
+        pandas.DataFrame(
             {
-                "id": np.arange(orders),
+                "id": numpy.arange(orders),
                 "customer_id": owner,
                 "amount": rng.integers(1, 500, orders).astype(float),
             }
@@ -310,8 +312,8 @@ class LateWorld:
         lag_days: Gap between a target's cutoff and the data it may read.
     """
 
-    targets: pd.DataFrame
-    child: pd.DataFrame
+    targets: pandas.DataFrame
+    child: pandas.DataFrame
     lag_days: float
 
 
@@ -326,9 +328,9 @@ def late_world(seed: int) -> LateWorld:
     """
     rng = randomness.component_rng(seed, "ingest.world.late", 0)
     entities = int(rng.integers(5, 15))
-    targets = pd.DataFrame(
+    targets = pandas.DataFrame(
         {
-            "cid": np.arange(entities),
+            "cid": numpy.arange(entities),
             "moment": rng.uniform(40, 90, entities).round(1),
         }
     )
@@ -340,7 +342,7 @@ def late_world(seed: int) -> LateWorld:
     backfill = rng.random(rows) < 0.05
     event[backfill] = rng.uniform(0, 30, int(backfill.sum())).round(1)
     delay[backfill] = rng.uniform(40, 120, int(backfill.sum()))
-    child = pd.DataFrame(
+    child = pandas.DataFrame(
         {
             "cid": rng.integers(0, entities, rows),
             "event_time": event,
@@ -391,7 +393,7 @@ def grain_world(seed: int, unit: str, shape: str) -> tuple[Database, str]:
     months = int(rng.integers(3, 8))
     db = new_database("grain")
     if shape == "customers":
-        frame = pd.DataFrame(
+        frame = pandas.DataFrame(
             {
                 "customer_id": rng.permutation(customers),
                 "segment": rng.integers(0, 4, customers),
@@ -401,11 +403,11 @@ def grain_world(seed: int, unit: str, shape: str) -> tuple[Database, str]:
         )
     elif shape == "customer_months":
         pairs = [(c, m) for c in range(customers) for m in range(months)]
-        frame = pd.DataFrame(pairs, columns=["customer_id", "month"])
+        frame = pandas.DataFrame(pairs, columns=["customer_id", "month"])
         frame["spend"] = rng.normal(size=len(frame))
     else:
         count = customers * months * 3
-        frame = pd.DataFrame(
+        frame = pandas.DataFrame(
             {
                 "order_id": rng.permutation(count),
                 "customer_id": rng.integers(0, customers, count),
@@ -451,7 +453,7 @@ def surrogate_world(seed: int) -> JoinWorld:
     truth: set[tuple[str, str, str]] = set()
     tables = []
     for name in names:
-        frame = pd.DataFrame({"id": np.arange(1, sizes[name] + 1)})
+        frame = pandas.DataFrame({"id": numpy.arange(1, sizes[name] + 1)})
         frame["rank"] = rng.integers(1, 30, len(frame))
         frame["level"] = rng.integers(1, 10, len(frame))
         if name in ("account", "user"):
@@ -459,7 +461,7 @@ def surrogate_world(seed: int) -> JoinWorld:
         load(db, name, frame)
         tables.append(name)
     fact = int(rng.integers(150, 400))
-    frame = pd.DataFrame({"id": np.arange(1, fact + 1)})
+    frame = pandas.DataFrame({"id": numpy.arange(1, fact + 1)})
     for parent in ("customer", "product", "store"):
         if rng.random() < 0.8:
             frame[f"{parent}_id"] = rng.integers(1, sizes[parent] + 1, fact)
@@ -544,7 +546,7 @@ LAST = [
 ]
 
 
-def typo(text: str, rng: np.random.Generator, rate: float) -> str:
+def typo(text: str, rng: numpy.random.Generator, rate: float) -> str:
     """Drops, swaps or doubles one character with probability `rate`.
 
     Args:
@@ -567,7 +569,7 @@ def typo(text: str, rng: np.random.Generator, rate: float) -> str:
     return text[:k] + text[k] + text[k:]
 
 
-def er_world(seed: int, entities: int = 300) -> pd.DataFrame:
+def er_world(seed: int, entities: int = 300) -> pandas.DataFrame:
     """People with one or two records, corrupted by typos and gaps.
 
     Synthetic and Febrl-like in spirit only: the corruption is ours, so the
@@ -604,6 +606,6 @@ def er_world(seed: int, entities: int = 300) -> pd.DataFrame:
                     typo(addr, rng, 0.3),
                 )
             )
-    return pd.DataFrame(
+    return pandas.DataFrame(
         rows, columns=["entity", "first", "last", "dob", "addr"]
     )

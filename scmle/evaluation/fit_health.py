@@ -11,7 +11,7 @@ import dataclasses
 import math
 from typing import Any
 
-import numpy as np
+import numpy
 
 OVERFIT_LOSS_SHARE = 0.25
 UNDERFIT_RELATIVE_GAIN = 0.05
@@ -70,10 +70,10 @@ def assess(
     Returns:
         The verdict with the numbers behind it.
     """
-    train = float(np.mean(train_scores)) - baseline_score
-    held_out = float(np.mean(validation_scores)) - baseline_score
+    train = float(numpy.mean(train_scores)) - baseline_score
+    held_out = float(numpy.mean(validation_scores)) - baseline_score
     spread = (
-        float(np.std(validation_scores, ddof=1))
+        float(numpy.std(validation_scores, ddof=1))
         if (len(validation_scores) > 1)
         else 0.0
     )
@@ -138,5 +138,5 @@ def assess_trial(
     return assess(
         [sign * s for s in trial.train_scores],
         [sign * s for s in trial.fold_scores],
-        sign * float(np.mean(baseline.fold_scores)),
+        sign * float(numpy.mean(baseline.fold_scores)),
     )

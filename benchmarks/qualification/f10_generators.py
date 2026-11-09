@@ -16,13 +16,13 @@ its seed. Knobs:
 
 import math
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 COVARIATES = 5
 
 
-def covariates(rng: np.random.Generator, n: int) -> np.ndarray:
+def covariates(rng: numpy.random.Generator, n: int) -> numpy.ndarray:
     """Correlated standard-normal covariates (AR(1) correlation 0.3).
 
     Args:
@@ -33,13 +33,13 @@ def covariates(rng: np.random.Generator, n: int) -> np.ndarray:
         An array of shape (n, `COVARIATES`) whose columns have correlation
         `0.3 ** |i - j|`.
     """
-    scale = 0.3 ** np.abs(
-        np.subtract.outer(range(COVARIATES), range(COVARIATES))
+    scale = 0.3 ** numpy.abs(
+        numpy.subtract.outer(range(COVARIATES), range(COVARIATES))
     )
-    return rng.standard_normal((n, COVARIATES)) @ np.linalg.cholesky(scale).T
+    return rng.standard_normal((n, COVARIATES)) @ numpy.linalg.cholesky(scale).T
 
 
-def outcome_surface(x: np.ndarray, nonlinear: bool) -> np.ndarray:
+def outcome_surface(x: numpy.ndarray, nonlinear: bool) -> numpy.ndarray:
     """Baseline outcome as a function of the covariates.
 
     Args:
@@ -52,12 +52,12 @@ def outcome_surface(x: np.ndarray, nonlinear: bool) -> np.ndarray:
         the first three columns.
     """
     if nonlinear:
-        return np.sin(x[:, 0]) + 0.5 * x[:, 1] ** 2 + 0.5 * x[:, 2]
+        return numpy.sin(x[:, 0]) + 0.5 * x[:, 1] ** 2 + 0.5 * x[:, 2]
     return 1.0 * x[:, 0] - 0.5 * x[:, 1] + 0.3 * x[:, 2]
 
 
 def backdoor(
-    rng: np.random.Generator,
+    rng: numpy.random.Generator,
     n: int,
     tau: float = 2.0,
     p_min: float = 0.1,
@@ -65,7 +65,7 @@ def backdoor(
     hidden_y: float = 0.0,
     hidden_nco: float | None = None,
     nonlinear: bool = False,
-) -> pd.DataFrame:
+) -> pandas.DataFrame:
     """Observational cross-section with a constant effect `tau`.
 
     The propensity is `expit(s x0 + hidden_d u)` with `x0` clipped to
@@ -93,21 +93,21 @@ def backdoor(
     x = covariates(rng, n)
     u = rng.standard_normal(n)
     strength = math.log((1 - p_min) / p_min) / 2 if p_min < 0.5 else 0.0
-    logit = strength * np.clip(x[:, 0], -2, 2) + 0.3 * x[:, 1] + hidden_d * u
-    t = (rng.uniform(size=n) < 1 / (1 + np.exp(-logit))).astype(float)
+    logit = strength * numpy.clip(x[:, 0], -2, 2) + 0.3 * x[:, 1] + hidden_d * u
+    t = (rng.uniform(size=n) < 1 / (1 + numpy.exp(-logit))).astype(float)
     base = outcome_surface(x, nonlinear)
     y = tau * t + base + hidden_y * u + rng.standard_normal(n)
     shared = hidden_y if hidden_nco is None else hidden_nco
     nco = base + shared * u + rng.standard_normal(n)
-    frame = pd.DataFrame(x, columns=[f"x{j}" for j in range(COVARIATES)])
+    frame = pandas.DataFrame(x, columns=[f"x{j}" for j in range(COVARIATES)])
     frame["t"], frame["y"], frame["nco"] = t, y, nco
-    frame["region"] = np.where(rng.uniform(size=n) < 0.5, "n", "s")
+    frame["region"] = numpy.where(rng.uniform(size=n) < 0.5, "n", "s")
     return frame
 
 
 def randomized(
-    rng: np.random.Generator, n: int, tau: float = 2.0
-) -> pd.DataFrame:
+    rng: numpy.random.Generator, n: int, tau: float = 2.0
+) -> pandas.DataFrame:
     """A randomized experiment with covariate-driven outcomes.
 
     Args:
@@ -122,18 +122,18 @@ def randomized(
     x = covariates(rng, n)
     t = (rng.uniform(size=n) < 0.5).astype(float)
     y = tau * t + outcome_surface(x, False) + rng.standard_normal(n)
-    frame = pd.DataFrame(x, columns=[f"x{j}" for j in range(COVARIATES)])
+    frame = pandas.DataFrame(x, columns=[f"x{j}" for j in range(COVARIATES)])
     frame["t"], frame["y"] = t, y
     return frame
 
 
 def iv(
-    rng: np.random.Generator,
+    rng: numpy.random.Generator,
     n: int,
     strength: float,
     beta: float = 2.0,
     direct: float = 0.0,
-) -> pd.DataFrame:
+) -> pandas.DataFrame:
     """Endogenous treatment with one instrument.
 
     Args:
@@ -151,11 +151,11 @@ def iv(
     u = rng.standard_normal(n)
     d = strength * z + u + rng.standard_normal(n)
     y = beta * d + direct * z + 1.5 * u + rng.standard_normal(n)
-    return pd.DataFrame({"z": z, "d": d, "y": y})
+    return pandas.DataFrame({"z": z, "d": d, "y": y})
 
 
 def panel(
-    rng: np.random.Generator,
+    rng: numpy.random.Generator,
     treated: int,
     never: int,
     periods: int = 6,
@@ -163,7 +163,7 @@ def panel(
     tau: float = 1.5,
     drift: float = 0.0,
     second_group: bool = False,
-) -> pd.DataFrame:
+) -> pandas.DataFrame:
     """Unit-by-period panel with a differential linear trend `drift`.
 
     Args:
@@ -199,16 +199,16 @@ def panel(
                         y += tau
                 rows.append((uid, t, g, y, nco))
             uid += 1
-    return pd.DataFrame(rows, columns=["id", "t", "g", "y", "nco"])
+    return pandas.DataFrame(rows, columns=["id", "t", "g", "y", "nco"])
 
 
 def discontinuity(
-    rng: np.random.Generator,
+    rng: numpy.random.Generator,
     n: int,
     tau: float = 1.0,
     sorting: float = 0.0,
     jump: float = 0.0,
-) -> pd.DataFrame:
+) -> pandas.DataFrame:
     """Sharp RD world.
 
     `sorting` is the share of units in a window just below the cutoff that
@@ -228,19 +228,19 @@ def discontinuity(
     x = rng.uniform(-1, 1, n)
     if sorting:
         move = (x < 0) & (x > -0.2) & (rng.uniform(size=n) < sorting)
-        x = np.where(move, -x, x)
+        x = numpy.where(move, -x, x)
     y = 2 * x + x**2 + tau * (x >= 0) + rng.normal(scale=0.5, size=n)
     z = 0.5 * x + jump * (x >= 0) + rng.normal(scale=0.3, size=n)
-    return pd.DataFrame({"x": x, "y": y, "z": z})
+    return pandas.DataFrame({"x": x, "y": y, "z": z})
 
 
 def synthetic(
-    rng: np.random.Generator,
+    rng: numpy.random.Generator,
     donors: int = 24,
     pre: int = 12,
     post: int = 4,
     tau: float = 0.0,
-) -> pd.DataFrame:
+) -> pandas.DataFrame:
     """Factor-model panel with one treated unit (unit 0).
 
     Args:
@@ -262,4 +262,4 @@ def synthetic(
             if u == 0 and t >= pre:
                 y += tau
             rows.append((u, t, y))
-    return pd.DataFrame(rows, columns=["u", "t", "y"])
+    return pandas.DataFrame(rows, columns=["u", "t", "y"])

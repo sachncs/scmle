@@ -1,9 +1,9 @@
 """Ranking metrics and estimators."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
-from sklearn import metrics as sk_metrics
+from sklearn import metrics
 
 from scmle.evaluation import ranking
 from scmle.models.ranking import estimators
@@ -11,33 +11,33 @@ from scmle.models.ranking import wrapper
 
 
 def corpus(queries=60, per_query=12, seed=0):
-    rng = np.random.default_rng(seed)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    frame = pandas.DataFrame(
         {
-            "query": np.repeat(np.arange(queries), per_query),
+            "query": numpy.repeat(numpy.arange(queries), per_query),
             "signal": rng.normal(size=queries * per_query),
             "noise": rng.normal(size=queries * per_query),
         }
     )
-    grade = np.clip(
-        np.round(frame.signal + rng.normal(0, 0.5, len(frame))), 0, 3
+    grade = numpy.clip(
+        numpy.round(frame.signal + rng.normal(0, 0.5, len(frame))), 0, 3
     )
     return frame, grade.astype(int)
 
 
 def test_ndcg_matches_scikit_learn_on_one_query():
-    truth = np.array([3, 2, 3, 0, 1, 2])
-    scores = np.array([0.1, 0.9, 0.8, 0.2, 0.3, 0.7])
+    truth = numpy.array([3, 2, 3, 0, 1, 2])
+    scores = numpy.array([0.1, 0.9, 0.8, 0.2, 0.3, 0.7])
 
-    ours = ranking.mean_ndcg(truth, scores, np.zeros(6), cutoff=5)
+    ours = ranking.mean_ndcg(truth, scores, numpy.zeros(6), cutoff=5)
 
-    expected = sk_metrics.ndcg_score(truth[None], scores[None], k=5)
+    expected = metrics.ndcg_score(truth[None], scores[None], k=5)
     assert ours == pytest.approx(expected)
 
 
 def test_a_perfect_order_scores_one_and_a_reversed_one_less():
-    truth = np.array([3, 2, 1, 0, 3, 2, 1, 0])
-    queries = np.array([0] * 4 + [1] * 4)
+    truth = numpy.array([3, 2, 1, 0, 3, 2, 1, 0])
+    queries = numpy.array([0] * 4 + [1] * 4)
 
     perfect = ranking.mean_ndcg(truth, truth.astype(float), queries)
     reversed_order = ranking.mean_ndcg(truth, -truth.astype(float), queries)
@@ -46,18 +46,18 @@ def test_a_perfect_order_scores_one_and_a_reversed_one_less():
 
 
 def test_queries_with_nothing_relevant_are_skipped():
-    truth = np.array([0, 0, 0, 1, 0, 0])
-    scores = np.array([1.0, 2.0, 3.0, 5.0, 1.0, 2.0])
-    queries = np.array([0, 0, 0, 1, 1, 1])
+    truth = numpy.array([0, 0, 0, 1, 0, 0])
+    scores = numpy.array([1.0, 2.0, 3.0, 5.0, 1.0, 2.0])
+    queries = numpy.array([0, 0, 0, 1, 1, 1])
 
     assert ranking.mean_ndcg(truth, scores, queries) == pytest.approx(1.0)
 
 
 def test_average_precision_counts_hits_by_position():
-    truth = np.array([1, 0, 1, 0])
-    scores = np.array([4.0, 3.0, 2.0, 1.0])
+    truth = numpy.array([1, 0, 1, 0])
+    scores = numpy.array([4.0, 3.0, 2.0, 1.0])
 
-    value = ranking.mean_average_precision(truth, scores, np.zeros(4))
+    value = ranking.mean_average_precision(truth, scores, numpy.zeros(4))
 
     assert value == pytest.approx((1 / 1 + 2 / 3) / 2)
 
@@ -109,7 +109,7 @@ def test_library_rankers_learn_the_ordering(library):
     )
     chance = ranking.mean_ndcg(
         grade,
-        np.random.default_rng(0).normal(size=len(grade)),
+        numpy.random.default_rng(0).normal(size=len(grade)),
         frame["query"],
         cutoff=3,
     )
@@ -117,9 +117,9 @@ def test_library_rankers_learn_the_ordering(library):
 
 
 def test_reciprocal_rank_is_one_over_the_first_relevant_position():
-    truth = np.array([0, 0, 1, 0, 1, 0, 0, 0])
-    scores = np.array([4.0, 3.0, 2.0, 1.0, 4.0, 3.0, 2.0, 1.0])
-    queries = np.array([0] * 4 + [1] * 4)
+    truth = numpy.array([0, 0, 1, 0, 1, 0, 0, 0])
+    scores = numpy.array([4.0, 3.0, 2.0, 1.0, 4.0, 3.0, 2.0, 1.0])
+    queries = numpy.array([0] * 4 + [1] * 4)
 
     value = ranking.mean_reciprocal_rank(truth, scores, queries)
 
@@ -127,9 +127,9 @@ def test_reciprocal_rank_is_one_over_the_first_relevant_position():
 
 
 def test_precision_and_recall_at_k_count_hits_in_the_top():
-    truth = np.array([1, 0, 1, 0, 1])
-    scores = np.array([5.0, 4.0, 3.0, 2.0, 1.0])
-    queries = np.zeros(5)
+    truth = numpy.array([1, 0, 1, 0, 1])
+    scores = numpy.array([5.0, 4.0, 3.0, 2.0, 1.0])
+    queries = numpy.zeros(5)
 
     assert ranking.precision_at(truth, scores, queries, cutoff=2) == 0.5
     assert ranking.recall_at(truth, scores, queries, cutoff=3) == pytest.approx(

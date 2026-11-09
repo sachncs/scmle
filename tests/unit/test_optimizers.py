@@ -2,7 +2,7 @@
 
 import importlib.util
 
-import numpy as np
+import numpy
 import pytest
 
 from scmle.contracts import errors
@@ -16,15 +16,15 @@ FAST = {"epochs": 60, "patience": 8}
 
 
 def separable(rows=400, seed=0):
-    rng = np.random.default_rng(seed)
-    features = rng.normal(size=(rows, 4)).astype(np.float32)
-    labels = np.where(features[:, 0] + features[:, 1] > 0, "yes", "no")
+    rng = numpy.random.default_rng(seed)
+    features = rng.normal(size=(rows, 4)).astype(numpy.float32)
+    labels = numpy.where(features[:, 0] + features[:, 1] > 0, "yes", "no")
     return features, labels
 
 
 def linear(rows=400, seed=1):
-    rng = np.random.default_rng(seed)
-    features = rng.normal(size=(rows, 3)).astype(np.float32)
+    rng = numpy.random.default_rng(seed)
+    features = rng.normal(size=(rows, 3)).astype(numpy.float32)
     return features, 4 + 3 * features[:, 0] - 2 * features[:, 1]
 
 
@@ -94,10 +94,12 @@ def test_huber_loss_resists_outliers_that_pull_the_squared_loss():
     ).fit(features, corrupted)
 
     clean = slice(20, None)
-    error_squared = np.abs(
+    error_squared = numpy.abs(
         squared.predict(features)[clean] - target[clean]
     ).mean()
-    error_huber = np.abs(huber.predict(features)[clean] - target[clean]).mean()
+    error_huber = numpy.abs(
+        huber.predict(features)[clean] - target[clean]
+    ).mean()
     assert error_huber < error_squared
 
 

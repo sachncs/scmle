@@ -1,6 +1,6 @@
 import math
 
-import numpy as np
+import numpy
 import pytest
 
 from scmle.data.charter import contracts
@@ -30,7 +30,7 @@ def reference_nb(y, a, t):
 def test_identity_over_random_cost_matrices():
     worst = 0.0
     for draw in range(10_000):
-        rng = np.random.default_rng(draw)
+        rng = numpy.random.default_rng(draw)
         c00, c11 = rng.normal(size=2)
         c_fp, c_fn = rng.uniform(0.1, 5.0, size=2)
         m = costs.DecisionCostModel(
@@ -68,7 +68,7 @@ def test_net_benefit_fixed_inputs_match_reference_and_hand_value():
 
 
 def test_decision_curve_rethresholds_and_matches_reference():
-    rng = np.random.default_rng(2)
+    rng = numpy.random.default_rng(2)
     y = (rng.random(200) < 0.3).astype(int)
     scores = rng.random(200)
     grid = [0.1, 0.2, 0.4]

@@ -12,7 +12,7 @@ from multiprocessing import connection
 import secrets
 from typing import Any
 
-import pandas as pd
+import pandas
 
 from scmle.contracts import errors
 from scmle.core import ipc
@@ -25,7 +25,7 @@ BIND = "bind"
 def serve(
     channel: connection.Connection,
     token: str,
-    rows: tuple[pd.DataFrame, pd.Series],
+    rows: tuple[pandas.DataFrame, pandas.Series],
 ) -> None:
     """Runs the vault loop: bind once, release the rows once.
 
@@ -96,7 +96,7 @@ class SealedTestSet(splitters.LockedTestSet):
     """
 
     def __init__(
-        self, features: pd.DataFrame, target: pd.Series, ids: Any
+        self, features: pandas.DataFrame, target: pandas.Series, ids: Any
     ) -> None:
         """Starts the vault and hands it the rows.
 
@@ -138,7 +138,7 @@ class SealedTestSet(splitters.LockedTestSet):
 
     def open(
         self, token: str, binding: str | None = None
-    ) -> tuple[pd.DataFrame, pd.Series]:
+    ) -> tuple[pandas.DataFrame, pandas.Series]:
         """Asks the vault for the rows, once.
 
         Args:

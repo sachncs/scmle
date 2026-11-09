@@ -1,6 +1,6 @@
 """Falsification battery: Holm control, false alarms and replication."""
 
-import numpy as np
+import numpy
 import pytest
 
 from scmle.data.identification import battery
@@ -25,13 +25,13 @@ def test_an_empty_battery_is_not_a_pass():
 def test_the_false_alarm_rate_is_at_most_alpha():
     alpha, runs, flagged = 0.05, 4000, 0
     for seed in range(runs):
-        draws = np.random.default_rng(seed).standard_normal(3)
+        draws = numpy.random.default_rng(seed).standard_normal(3)
         tests = [
             battery.wald_test(f"t{i}", "placebo", float(d), 1.0)
             for i, d in enumerate(draws)
         ]
         flagged += not battery.run_battery(tests, alpha).passed
-    assert flagged / runs <= alpha + 3 * np.sqrt(alpha * (1 - alpha) / runs)
+    assert flagged / runs <= alpha + 3 * numpy.sqrt(alpha * (1 - alpha) / runs)
 
 
 def test_replication_needs_agreement_in_sign_and_homogeneity():

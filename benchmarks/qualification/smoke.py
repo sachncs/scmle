@@ -10,8 +10,8 @@ from collections.abc import Callable
 import dataclasses
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from scipy import stats
 from sklearn.datasets import load_diabetes
 
@@ -82,7 +82,7 @@ class SmokeReport:
 
 
 def injection_cases(
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
 ) -> dict[str, Callable[[], inject.Injection]]:
     """One call per injector, on the demo table.
 
@@ -126,7 +126,9 @@ def injection_cases(
     }
 
 
-def mismatched_cells(original: pd.DataFrame, planted: inject.Injection) -> int:
+def mismatched_cells(
+    original: pandas.DataFrame, planted: inject.Injection
+) -> int:
     """Cells where the mask disagrees with the before/after diff.
 
     Args:
@@ -248,7 +250,9 @@ def check_size(runs: int, seed: int, sabotage: str | None) -> list[SmokeCheck]:
     ]
 
 
-def shift_pair(seed: int, delta: float) -> tuple[pd.DataFrame, pd.DataFrame]:
+def shift_pair(
+    seed: int, delta: float
+) -> tuple[pandas.DataFrame, pandas.DataFrame]:
     """Two Gaussian samples; the second is shifted by `delta` in one column.
 
     Args:
@@ -258,10 +262,10 @@ def shift_pair(seed: int, delta: float) -> tuple[pd.DataFrame, pd.DataFrame]:
     Returns:
         Two frames of `SHIFT_ROWS` rows with columns `a` and `b`.
     """
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     names = ["a", "b"]
-    first = pd.DataFrame(rng.normal(size=(SHIFT_ROWS, 2)), columns=names)
-    second = pd.DataFrame(rng.normal(size=(SHIFT_ROWS, 2)), columns=names)
+    first = pandas.DataFrame(rng.normal(size=(SHIFT_ROWS, 2)), columns=names)
+    second = pandas.DataFrame(rng.normal(size=(SHIFT_ROWS, 2)), columns=names)
     second["a"] += delta
     return first, second
 
@@ -278,10 +282,10 @@ def uniform_p_value(pvalues: list[float]) -> float:
     Returns:
         The Kolmogorov-Smirnov p-value of the jittered values.
     """
-    rng = np.random.default_rng(0)
+    rng = numpy.random.default_rng(0)
     cells = SHIFT_PERMUTATIONS + 1
     jittered = (
-        np.asarray(pvalues) * cells - rng.uniform(size=len(pvalues))
+        numpy.asarray(pvalues) * cells - rng.uniform(size=len(pvalues))
     ) / cells
     return float(stats.kstest(jittered, "uniform").pvalue)
 

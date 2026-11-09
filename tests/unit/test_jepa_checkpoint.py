@@ -2,7 +2,7 @@
 
 import importlib.util
 
-import numpy as np
+import numpy
 import pytest
 
 from scmle.models.deeplearning.jepa import JepaEstimator
@@ -13,10 +13,10 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def features() -> np.ndarray:
+def features() -> numpy.ndarray:
     """Return a small finite numeric table with repeatable values."""
-    rng = np.random.default_rng(17)
-    return rng.normal(size=(32, 5)).astype(np.float32)
+    rng = numpy.random.default_rng(17)
+    return rng.normal(size=(32, 5)).astype(numpy.float32)
 
 
 def estimator() -> JepaEstimator:
@@ -39,7 +39,7 @@ def test_checkpoint_round_trip_preserves_embeddings(tmp_path):
     checkpoint = original.save_checkpoint(tmp_path / "jepa.joblib")
     restored = JepaEstimator.load_checkpoint(checkpoint)
 
-    np.testing.assert_allclose(restored.transform(rows[:7]), before)
+    numpy.testing.assert_allclose(restored.transform(rows[:7]), before)
     assert restored.training_report_ == original.training_report_
 
 
@@ -49,7 +49,7 @@ def test_same_seed_reproduces_training_and_transform_output():
     first = estimator().fit(rows).transform(rows)
     second = estimator().fit(rows).transform(rows)
 
-    np.testing.assert_allclose(first, second, rtol=0.0, atol=0.0)
+    numpy.testing.assert_allclose(first, second, rtol=0.0, atol=0.0)
 
 
 def test_invalid_checkpoint_format_is_rejected(tmp_path):

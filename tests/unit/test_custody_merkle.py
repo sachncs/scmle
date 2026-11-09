@@ -2,16 +2,16 @@
 
 import hashlib
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.data.custody import merkle
 
 
 def table():
-    return pd.DataFrame(
+    return pandas.DataFrame(
         {
-            "a": [1.5, np.nan, 3.0, 4.25, 0.1],
+            "a": [1.5, numpy.nan, 3.0, 4.25, 0.1],
             "b": [1, 2, 3, 4, 5],
             "c": ["x", "y", None, "z", "w"],
             "d": [True, False, True, False, True],
@@ -21,16 +21,16 @@ def table():
 
 def test_canonical_text_is_typed_and_platform_independent():
     assert merkle.canonical(1.0) == "f:1.0"
-    assert merkle.canonical(np.float64(0.1)) == "f:0.1"
-    assert merkle.canonical(np.float32(0.5)) == "f:0.5"
-    assert merkle.canonical(np.int64(7)) == "i:7"
+    assert merkle.canonical(numpy.float64(0.1)) == "f:0.1"
+    assert merkle.canonical(numpy.float32(0.5)) == "f:0.5"
+    assert merkle.canonical(numpy.int64(7)) == "i:7"
     assert merkle.canonical(True) == "b:1"
-    assert merkle.canonical(np.bool_(False)) == "b:0"
+    assert merkle.canonical(numpy.bool_(False)) == "b:0"
     assert merkle.canonical(float("nan")) == "null"
     assert merkle.canonical(None) == "null"
-    assert merkle.canonical(pd.NaT) == "null"
+    assert merkle.canonical(pandas.NaT) == "null"
     assert merkle.canonical("1") == "s:1"
-    assert merkle.canonical(pd.Timestamp("2024-01-02 03:04:05")) == (
+    assert merkle.canonical(pandas.Timestamp("2024-01-02 03:04:05")) == (
         "t:2024-01-02T03:04:05"
     )
 
@@ -81,7 +81,7 @@ def test_a_different_set_of_ids_gives_a_different_root():
 
 
 def test_the_row_id_is_part_of_the_row():
-    same = pd.DataFrame({"a": [1.0, 1.0]})
+    same = pandas.DataFrame({"a": [1.0, 1.0]})
     assert merkle.frame_root(same, [0]) != merkle.frame_root(same, [1])
 
 

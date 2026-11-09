@@ -13,8 +13,8 @@ operating-system page cache and swap are outside what Python can inspect.
 
 import gc
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.contracts import tasks
 from scmle.data.custody import pipeline
@@ -28,12 +28,12 @@ STEP = 1.0009765625
 
 
 def canary_values(rows):
-    return BASE + np.arange(rows) * STEP
+    return BASE + numpy.arange(rows) * STEP
 
 
 def custody(rows=2000, process=True):
-    rng = np.random.default_rng(5)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(5)
+    frame = pandas.DataFrame(
         {
             "x": rng.normal(size=rows),
             CANARY: canary_values(rows),
@@ -72,11 +72,11 @@ def holders(values):
     found = []
     for item in gc.get_objects():
         try:
-            if isinstance(item, pd.DataFrame) and CANARY in item.columns:
+            if isinstance(item, pandas.DataFrame) and CANARY in item.columns:
                 column = item[CANARY].to_numpy()
-            elif isinstance(item, pd.Series):
+            elif isinstance(item, pandas.Series):
                 column = item.to_numpy()
-            elif isinstance(item, np.ndarray):
+            elif isinstance(item, numpy.ndarray):
                 column = item
             else:
                 continue
@@ -90,7 +90,7 @@ def holders(values):
 
 
 def test_the_scan_finds_a_canary_that_is_still_held():
-    frame = pd.DataFrame({CANARY: canary_values(50)})
+    frame = pandas.DataFrame({CANARY: canary_values(50)})
     assert "DataFrame" in holders({float(frame[CANARY].iloc[3])})
     del frame
     gc.collect()

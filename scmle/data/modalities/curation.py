@@ -8,7 +8,7 @@ import json
 from typing import Any
 from typing import Self
 
-from scmle.contracts import data as data_contracts
+from scmle.contracts import data
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -29,23 +29,23 @@ class ModalityCurationReport:
     dataset_hash: str
     sample_count: int
     profile: Mapping[str, Any]
-    quality_findings: tuple[data_contracts.CurationFinding, ...] = ()
-    risk_findings: tuple[data_contracts.CurationFinding, ...] = ()
+    quality_findings: tuple[data.CurationFinding, ...] = ()
+    risk_findings: tuple[data.CurationFinding, ...] = ()
     schema_version: int = 1
 
     @property
     def unresolved_blocking_findings(
         self,
-    ) -> tuple[data_contracts.CurationFinding, ...]:
+    ) -> tuple[data.CurationFinding, ...]:
         """The blocking findings without a safe review disposition.
 
         A disposition is safe when it is resolved, waived or a false
         positive. Quality findings come before risk findings.
         """
         safe_dispositions = {
-            data_contracts.FindingDisposition.RESOLVED,
-            data_contracts.FindingDisposition.WAIVED,
-            data_contracts.FindingDisposition.FALSE_POSITIVE,
+            data.FindingDisposition.RESOLVED,
+            data.FindingDisposition.WAIVED,
+            data.FindingDisposition.FALSE_POSITIVE,
         }
         return tuple(
             finding
@@ -117,7 +117,7 @@ class ModalityDatasetCard:
     limitations: tuple[str, ...]
     provenance: Mapping[str, str]
     privacy: Mapping[str, str]
-    manifest: data_contracts.ModalityManifest | None = None
+    manifest: data.ModalityManifest | None = None
     schema_version: int = 1
 
     def __post_init__(self) -> None:
@@ -171,7 +171,7 @@ class ModalityDatasetCard:
             ):
                 raise ValueError(f"{name} must contain non-empty values")
         if self.manifest is not None:
-            if not isinstance(self.manifest, data_contracts.ModalityManifest):
+            if not isinstance(self.manifest, data.ModalityManifest):
                 raise TypeError("manifest must be ModalityManifest")
             if self.manifest.content_hash != self.dataset_hash:
                 raise ValueError("manifest does not match dataset_hash")
@@ -186,7 +186,7 @@ class ModalityDatasetCard:
         modality: str,
         report: Mapping[str, Any],
         limitations: Iterable[str],
-        manifest: data_contracts.ModalityManifest | None = None,
+        manifest: data.ModalityManifest | None = None,
         task: str = "classification",
     ) -> Self:
         """Builds a card without inventing missing governance decisions.
@@ -224,7 +224,7 @@ class ModalityDatasetCard:
         if not isinstance(sample_count_value, int):
             raise ValueError("curation report must contain sample_count")
         if manifest is None:
-            manifest = data_contracts.ModalityManifest(
+            manifest = data.ModalityManifest(
                 dataset_id=f"{modality}-{dataset_hash_value[:16]}",
                 snapshot_id=dataset_hash_value,
                 modality=modality,
@@ -232,7 +232,7 @@ class ModalityDatasetCard:
                 sample_count=sample_count_value,
                 content_hash=dataset_hash_value,
                 findings=tuple(
-                    data_contracts.CurationFinding.from_dict(finding)
+                    data.CurationFinding.from_dict(finding)
                     for finding in (
                         *report.get("quality_findings", ()),
                         *report.get("risk_findings", ()),
@@ -383,12 +383,12 @@ def conflicting_label_groups(
 
 def build_finding(
     finding_id: str,
-    severity: data_contracts.FindingSeverity,
+    severity: data.FindingSeverity,
     scope: Mapping[str, Any],
     evidence: Mapping[str, Any],
     remediation: str,
     blocking: bool,
-) -> data_contracts.CurationFinding:
+) -> data.CurationFinding:
     """Builds one modality curation finding with a shared rule version.
 
     The finding has confidence 1.0, owner `data-curation`, no reviewer and
@@ -405,7 +405,7 @@ def build_finding(
     Returns:
         The new finding.
     """
-    return data_contracts.CurationFinding(
+    return data.CurationFinding(
         finding_id=finding_id,
         rule_version="multimodal-curation.v1",
         severity=severity,
@@ -415,7 +415,7 @@ def build_finding(
         remediation=remediation,
         owner="data-curation",
         reviewer=None,
-        disposition=data_contracts.FindingDisposition.OPEN,
+        disposition=data.FindingDisposition.OPEN,
         blocking=blocking,
     )
 

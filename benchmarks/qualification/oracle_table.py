@@ -28,7 +28,7 @@ from pathlib import Path
 import sys
 from typing import Any
 
-import numpy as np
+import numpy
 
 from benchmarks.qualification import oracles
 from scmle.data.detectors import certificates
@@ -93,7 +93,7 @@ def spearman(given: Mapping[str, Any]) -> Any:
     Returns:
         `pvalue` and `statistic` from `bivariate.spearman`.
     """
-    out = bivariate.spearman(np.array(given["x"]), np.array(given["y"]))
+    out = bivariate.spearman(numpy.array(given["x"]), numpy.array(given["y"]))
     return {"pvalue": out.p, "statistic": out.statistic}
 
 
@@ -108,8 +108,10 @@ def kruskal(given: Mapping[str, Any]) -> Any:
         sample with group labels.
     """
     groups = given["groups"]
-    x = np.concatenate([np.array(g) for g in groups])
-    labels = np.concatenate([np.full(len(g), i) for i, g in enumerate(groups)])
+    x = numpy.concatenate([numpy.array(g) for g in groups])
+    labels = numpy.concatenate(
+        [numpy.full(len(g), i) for i, g in enumerate(groups)]
+    )
     out = bivariate.kruskal(x, labels)
     return {"pvalue": out.p, "statistic": out.statistic}
 

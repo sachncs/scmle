@@ -1,7 +1,7 @@
 """The coverage claim on C: one registered, exact one-sided test."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from scipy import stats
 
 from scmle.data.ledger import confirm
@@ -58,7 +58,7 @@ def test_the_registration_hash_depends_on_the_claim_and_the_choice():
 
 class Calibrator:
     kind = "regression"
-    scores = tuple(np.linspace(0.0, 1.0, 100))
+    scores = tuple(numpy.linspace(0.0, 1.0, 100))
 
 
 class Band:
@@ -67,7 +67,7 @@ class Band:
 
     def predict_interval(self, features, coverage, method):
         centre = features["x"].to_numpy(dtype=float)
-        return pd.DataFrame(
+        return pandas.DataFrame(
             {
                 "prediction": centre,
                 "lower": centre - 1.0,
@@ -79,8 +79,8 @@ class Band:
 def test_the_runner_tests_the_released_rows_once():
     runner = coverage_confirm.build_runner(Band(), "regression", "c" * 64)
     assert runner is not None and len(runner.registered) == 1
-    rng = np.random.default_rng(0)
-    x = pd.DataFrame({"x": rng.normal(size=400)})
+    rng = numpy.random.default_rng(0)
+    x = pandas.DataFrame({"x": rng.normal(size=400)})
     y = x["x"] + rng.uniform(-1.0, 1.0, 400)  # always inside the band
     ran = runner.run(x, y)
     document = ran.documents[coverage_confirm.DOCUMENT]
@@ -100,8 +100,8 @@ def test_no_calibration_or_no_interval_task_gives_no_runner():
 
 
 def run_band_rows():
-    rng = np.random.default_rng(0)
-    x = pd.DataFrame({"x": rng.normal(size=400)})
+    rng = numpy.random.default_rng(0)
+    x = pandas.DataFrame({"x": rng.normal(size=400)})
     y = x["x"] + rng.uniform(-1.0, 1.0, 400)
     runner = coverage_confirm.build_runner(Band(), "regression", "c" * 64)
     return runner.run(x, y)

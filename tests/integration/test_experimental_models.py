@@ -3,8 +3,8 @@
 import dataclasses
 from importlib import util
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
 import scmle
@@ -73,7 +73,9 @@ def test_transformer_and_jepa_are_explicit_opt_in_candidates(monkeypatch):
         strategies=tasks.StrategySpec(top_models=0),
         ensemble=tasks.EnsembleSpec(size=0),
     )
-    frame = pd.DataFrame({"feature": np.arange(120.0), "y": np.arange(120) % 2})
+    frame = pandas.DataFrame(
+        {"feature": numpy.arange(120.0), "y": numpy.arange(120) % 2}
+    )
     project = orchestrator.Orchestrator(spec, frame, registry=registry)
     context = project.new_context()
     context.capability_registry.bind_runtime_environment(
@@ -132,16 +134,16 @@ def test_jepa_ignores_supervised_labels(monkeypatch):
 
     def capture_fit(instance, features, target, sample_weight=None):
         del features, sample_weight
-        received_targets.append(np.asarray(target))
+        received_targets.append(numpy.asarray(target))
         return instance
 
     monkeypatch.setattr(estimators.NetworkEstimator, "fit", capture_fit)
-    features = np.ones((8, 2))
-    labels = np.arange(8)
+    features = numpy.ones((8, 2))
+    labels = numpy.arange(8)
 
     jepa.JepaEstimator().fit(features, labels)
 
-    np.testing.assert_array_equal(received_targets[0], np.zeros(8))
+    numpy.testing.assert_array_equal(received_targets[0], numpy.zeros(8))
 
 
 def test_jepa_adapter_builds_a_serializable_pipeline_when_torch_is_available(
@@ -200,7 +202,7 @@ def test_explicit_deep_model_project_packages_and_predicts(
 
     assert result.selected_model == model_name
     assert len(result.predict(features)) == 12
-    np.testing.assert_array_equal(
+    numpy.testing.assert_array_equal(
         loaded.predict(features),
         result.predict(features),
     )

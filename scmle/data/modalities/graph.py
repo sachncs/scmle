@@ -18,10 +18,10 @@ import math
 from pathlib import Path
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
-from scmle.contracts import data as data_contracts
+from scmle.contracts import data
 from scmle.data.modalities.curation import build_finding
 from scmle.data.modalities.curation import label_counts
 from scmle.data.modalities.curation import ModalityCurationReport
@@ -449,13 +449,13 @@ class PreparedFeatures:
         """The number of nodes and the number of features, as a pair."""
         return (len(self.node_ids), len(self.feature_names))
 
-    def to_numpy(self) -> np.ndarray:
+    def to_numpy(self) -> numpy.ndarray:
         """Returns a writable copy of the prepared feature matrix.
 
         Returns:
             A float64 array of shape ``(nodes, features)``.
         """
-        return np.asarray(self.values, dtype=np.float64).copy()
+        return numpy.asarray(self.values, dtype=numpy.float64).copy()
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -778,7 +778,9 @@ class GraphData:
             ),
             degree_min=min(degree_values, default=0),
             degree_max=max(degree_values, default=0),
-            degree_mean=float(np.mean(degree_values)) if degree_values else 0.0,
+            degree_mean=float(numpy.mean(degree_values))
+            if degree_values
+            else 0.0,
         )
 
     def profile_edges(self) -> EdgeProfile:
@@ -799,7 +801,7 @@ class GraphData:
             ),
             weight_min=min(weights) if weights else None,
             weight_max=max(weights) if weights else None,
-            weight_mean=float(np.mean(weights)) if weights else None,
+            weight_mean=float(numpy.mean(weights)) if weights else None,
         )
 
     def edge_key_counts(self) -> dict[tuple[str, str, str, str], int]:
@@ -909,7 +911,7 @@ class GraphData:
             quality_findings.append(
                 build_finding(
                     "quality.graph-mixed-temporal-state",
-                    data_contracts.FindingSeverity.WARNING,
+                    data.FindingSeverity.WARNING,
                     {"source": self.source_uri},
                     {"temporal": profile_data["temporal"]},
                     "Supply event times for every edge or explicitly use a "
@@ -921,7 +923,7 @@ class GraphData:
             quality_findings.append(
                 build_finding(
                     "quality.graph-duplicate-edges",
-                    data_contracts.FindingSeverity.WARNING,
+                    data.FindingSeverity.WARNING,
                     {"source": self.source_uri},
                     {
                         "duplicate_edge_count": (
@@ -937,7 +939,7 @@ class GraphData:
             quality_findings.append(
                 build_finding(
                     "quality.graph-isolated-nodes",
-                    data_contracts.FindingSeverity.WARNING,
+                    data.FindingSeverity.WARNING,
                     {"source": self.source_uri},
                     {"isolated_node_count": profile.node.isolated_node_count},
                     "Confirm isolated nodes are valid for the intended task.",
@@ -948,7 +950,7 @@ class GraphData:
             quality_findings.append(
                 build_finding(
                     "quality.graph-no-declared-features",
-                    data_contracts.FindingSeverity.INFO,
+                    data.FindingSeverity.INFO,
                     {"source": self.source_uri},
                     {"node_count": profile.node.node_count},
                     "Declare node features or select a topology-only model "
@@ -960,7 +962,7 @@ class GraphData:
             risk_findings.append(
                 build_finding(
                     "risk.graph-mixed-label-state",
-                    data_contracts.FindingSeverity.WARNING,
+                    data.FindingSeverity.WARNING,
                     {"source": self.source_uri},
                     {"label_counts": labels},
                     "Declare whether unlabeled nodes are valid for the "
@@ -1088,8 +1090,12 @@ def read_edges(
     suffix = input_path.name.lower()
     if suffix.endswith(".csv"):
         try:
-            frame = pd.read_csv(input_path)
-        except (OSError, pd.errors.ParserError, UnicodeDecodeError) as error:
+            frame = pandas.read_csv(input_path)
+        except (
+            OSError,
+            pandas.errors.ParserError,
+            UnicodeDecodeError,
+        ) as error:
             raise GraphInputError(
                 f"failed to read CSV edges: {error}"
             ) from error
@@ -1180,10 +1186,10 @@ def edges_from_records(
             )
         source = record[source_column]
         target = record[target_column]
-        if pd.isna(source) or pd.isna(target):
+        if pandas.isna(source) or pandas.isna(target):
             raise GraphInputError(f"edge record {index} has a missing endpoint")
         weight_value = record.get(weight_column, 1.0)
-        if pd.isna(weight_value):
+        if pandas.isna(weight_value):
             raise GraphInputError(f"edge record {index} has an invalid weight")
         try:
             weight = float(weight_value)
@@ -1192,12 +1198,12 @@ def edges_from_records(
                 f"edge record {index} has a non-numeric weight"
             ) from error
         relation_value = record.get(relation_column, "default")
-        if pd.isna(relation_value):
+        if pandas.isna(relation_value):
             relation_value = "default"
         event_time = None
         if time_column is not None:
             time_value = record.get(time_column)
-            if time_value is not None and not pd.isna(time_value):
+            if time_value is not None and not pandas.isna(time_value):
                 try:
                     event_time = canonical_event_time(time_value)
                 except GraphTemporalError as error:
@@ -1256,8 +1262,8 @@ def inductive_node_split(
         raise ValueError("split fractions must be finite and non-negative")
     if not math.isclose(sum(fractions), 1.0, rel_tol=0.0, abs_tol=1e-9):
         raise ValueError("split fractions must sum to one")
-    node_ids = np.asarray(graph.node_ids, dtype=object)
-    generator = np.random.default_rng(seed)
+    node_ids = numpy.asarray(graph.node_ids, dtype=object)
+    generator = numpy.random.default_rng(seed)
     shuffled = node_ids[generator.permutation(len(node_ids))]
     positive_indices = [index for index, value in enumerate(fractions) if value]
     counts = [0, 0, 0]
@@ -1382,8 +1388,8 @@ def prepare_features(
     rows = [row[:width] for row in rows]
     names = names[:width]
     if rows and width:
-        matrix = np.asarray(rows, dtype=np.float64)
-        if not np.isfinite(matrix).all():
+        matrix = numpy.asarray(rows, dtype=numpy.float64)
+        if not numpy.isfinite(matrix).all():
             raise ValueError("prepared features must be finite")
         if standardize:
             means = matrix.mean(axis=0)

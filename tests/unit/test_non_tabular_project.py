@@ -5,7 +5,7 @@ import io
 from pathlib import Path
 import wave
 
-import numpy as np
+import numpy
 import pytest
 
 import scmle
@@ -72,7 +72,9 @@ def audio_adapter() -> modality_lifecycle.AudioAdapter:
         opened.setnchannels(1)
         opened.setsampwidth(2)
         opened.setframerate(8_000)
-        opened.writeframes(np.asarray([200, -200] * 8, dtype="<i2").tobytes())
+        opened.writeframes(
+            numpy.asarray([200, -200] * 8, dtype="<i2").tobytes()
+        )
     sample = audio.AudioSample.from_bytes(
         output.getvalue(), source="audio.wav", label="alpha", group_id="one"
     )

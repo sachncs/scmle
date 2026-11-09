@@ -2,21 +2,21 @@
 
 import math
 
-import numpy as np
+import numpy
 import pytest
 from scipy import stats
 
 from scmle.contracts import qualification
-from scmle.data.charter import contracts as c
+from scmle.data.charter import contracts
 from scmle.data.detectors import certificates
 from scmle.data.ledger import bivariate
 from scmle.data.robustness import multiverse
 from scmle.data.robustness import stability
 
 CHOICES = (
-    c.Choice("imputation", ("median", "complete_case"), "median"),
-    c.Choice("outlier_rule", ("none", "winsorize", "iqr_drop"), "none"),
-    c.Choice("inclusion", ("all", "first_half", "second_half"), "all"),
+    contracts.Choice("imputation", ("median", "complete_case"), "median"),
+    contracts.Choice("outlier_rule", ("none", "winsorize", "iqr_drop"), "none"),
+    contracts.Choice("inclusion", ("all", "first_half", "second_half"), "all"),
 )
 
 
@@ -25,10 +25,10 @@ def grid(seed=0, size=18):
 
 
 def data(rows=300, beta=0.6, seed=0, missing=0.1):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     x = rng.normal(size=rows)
     y = beta * x + rng.normal(size=rows)
-    x[rng.random(rows) < missing] = np.nan
+    x[rng.random(rows) < missing] = numpy.nan
     return x, y
 
 
@@ -47,22 +47,24 @@ def test_rank_effect_matches_scipy_spearman_and_the_ledger_statistic():
 
 
 def test_rank_effect_is_nan_when_undefined():
-    assert math.isnan(stability.rank_effect(np.arange(5.0), np.arange(5.0)))
-    assert math.isnan(stability.rank_effect(np.ones(20), np.arange(20.0)))
+    assert math.isnan(
+        stability.rank_effect(numpy.arange(5.0), numpy.arange(5.0))
+    )
+    assert math.isnan(stability.rank_effect(numpy.ones(20), numpy.arange(20.0)))
 
 
 def test_each_specification_does_what_it_says():
-    x = np.array([1.0, 2.0, 3.0, 4.0, 100.0, np.nan, np.nan, 5.0])
-    y = np.arange(8.0)
-    position = np.arange(8)
+    x = numpy.array([1.0, 2.0, 3.0, 4.0, 100.0, numpy.nan, numpy.nan, 5.0])
+    y = numpy.arange(8.0)
+    position = numpy.arange(8)
 
     def apply(**values):
         return stability.prepare(x, y, position, 8, spec_of(**values))
 
     median_x = apply(imputation="median")[0]
-    assert median_x[5] == np.median([1, 2, 3, 4, 100, 5])
+    assert median_x[5] == numpy.median([1, 2, 3, 4, 100, 5])
     mean_x = apply(imputation="mean")[0]
-    assert mean_x[5] == pytest.approx(np.mean([1, 2, 3, 4, 100, 5]))
+    assert mean_x[5] == pytest.approx(numpy.mean([1, 2, 3, 4, 100, 5]))
     zero_x = apply(imputation="zero")[0]
     assert zero_x[5] == 0.0
     complete_x, complete_y = apply(imputation="complete_case")
@@ -78,9 +80,9 @@ def test_each_specification_does_what_it_says():
 
 
 def test_inclusion_follows_the_original_positions_after_resampling():
-    x = np.arange(10.0)
-    y = np.arange(10.0)
-    pick = np.array([9, 9, 1, 8, 0])
+    x = numpy.arange(10.0)
+    y = numpy.arange(10.0)
+    pick = numpy.array([9, 9, 1, 8, 0])
     kept = stability.prepare(
         x[pick], y[pick], pick, 10, spec_of(inclusion="first_half")
     )[0]
@@ -88,18 +90,18 @@ def test_inclusion_follows_the_original_positions_after_resampling():
 
 
 def test_a_missing_target_drops_the_row():
-    x = np.arange(6.0)
-    y = np.array([0.0, 1.0, np.nan, 3.0, 4.0, 5.0])
-    kept = stability.prepare(x, y, np.arange(6), 6, spec_of())[1]
+    x = numpy.arange(6.0)
+    y = numpy.array([0.0, 1.0, numpy.nan, 3.0, 4.0, 5.0])
+    kept = stability.prepare(x, y, numpy.arange(6), 6, spec_of())[1]
     assert len(kept) == 5
 
 
 def test_only_implemented_choices_and_options_are_run_and_the_rest_noted():
     declared = (
-        c.Choice("imputation", ("median", "mice"), "median"),
-        c.Choice("encoding", ("one_hot", "target"), "one_hot"),
-        c.Choice("outlier_rule", ("none", "robust_z"), "robust_z"),
-        c.Choice("mnar_delta", ("0", "1"), "0"),
+        contracts.Choice("imputation", ("median", "mice"), "median"),
+        contracts.Choice("encoding", ("one_hot", "target"), "one_hot"),
+        contracts.Choice("outlier_rule", ("none", "robust_z"), "robust_z"),
+        contracts.Choice("mnar_delta", ("0", "1"), "0"),
     )
     kept, notes = stability.applicable_choices(declared)
     assert [(k.name, k.options) for k in kept] == [("imputation", ("median",))]
@@ -125,11 +127,11 @@ def test_a_strong_and_robust_effect_is_stable():
 
 
 def test_a_sign_that_flips_with_the_declared_choice_is_fragile():
-    rng = np.random.default_rng(3)
+    rng = numpy.random.default_rng(3)
     rows = 400
     x = rng.normal(size=rows)
-    half = np.arange(rows) < rows / 2
-    y = np.where(half, 1.0, -1.0) * x + 0.5 * rng.normal(size=rows)
+    half = numpy.arange(rows) < rows / 2
+    y = numpy.where(half, 1.0, -1.0) * x + 0.5 * rng.normal(size=rows)
     result = stability.assess_finding("x", x, y, grid(), 0, bootstrap=40)
     assert result.status == stability.FRAGILE
     assert "sign" in result.reason or "interval" in result.reason
@@ -139,7 +141,7 @@ def test_a_sign_that_flips_with_the_declared_choice_is_fragile():
 
 
 def test_a_fragile_finding_quarantines_only_when_the_detector_is_gating():
-    rng = np.random.default_rng(4)
+    rng = numpy.random.default_rng(4)
     x = rng.normal(size=300)
     y = rng.normal(size=300)
     gate = certificates.GateStatus.GATING
@@ -232,10 +234,10 @@ def test_the_time_budget_records_the_specifications_it_skipped():
 
 
 def test_cluster_bootstrap_draws_whole_groups():
-    labels = np.repeat(np.arange(5), 4)
-    rng = np.random.default_rng(0)
+    labels = numpy.repeat(numpy.arange(5), 4)
+    rng = numpy.random.default_rng(0)
     pick = stability.resample(20, labels, rng)
-    counts = np.bincount(labels[pick], minlength=5)
+    counts = numpy.bincount(labels[pick], minlength=5)
     assert set(counts) <= {0, 4, 8, 12, 16, 20}
     assert len(stability.resample(7, None, rng)) == 7
 
@@ -244,7 +246,7 @@ def test_the_curve_test_separates_a_real_effect_from_noise():
     x, y = data(rows=300, beta=0.8, seed=7)
     real = stability.curve_test(x, y, grid(), 0, "x", permutations=49)
     assert real.p_median <= 0.05 and real.p_share <= 0.05
-    rng = np.random.default_rng(8)
+    rng = numpy.random.default_rng(8)
     noise = stability.curve_test(
         rng.normal(size=300),
         rng.normal(size=300),

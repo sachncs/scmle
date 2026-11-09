@@ -10,12 +10,12 @@ import datetime
 import pathlib
 import types
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from benchmarks.qualification import streams
-from scmle.governance import deployment_ledger as dl
-from scmle.governance import loop as loop_module
+from scmle.governance import deployment_ledger
+from scmle.governance import loop
 from scmle.operations import controller as controller_module
 
 PERSON_KEY = "person-key"
@@ -23,23 +23,23 @@ SYSTEM_KEY = "system-key"
 SCOPE = "model-v1:stream-a"
 TODAY = datetime.date(2026, 11, 4)
 CHARTER = types.SimpleNamespace(charter_hash="a" * 64)
-KEYS = {dl.key_fingerprint(PERSON_KEY): PERSON_KEY}
+KEYS = {deployment_ledger.key_fingerprint(PERSON_KEY): PERSON_KEY}
 ALLOWED_KINDS = frozenset(
     {
-        dl.OPEN,
-        dl.OBSERVE_SUMMARY,
-        dl.ALARM,
-        dl.RETRAIN,
-        dl.CHALLENGER_RESULT,
-        dl.PROMOTION_PROPOSAL,
-        dl.ROLLBACK_PROPOSAL,
-        dl.ESCALATION,
-        dl.HALT,
-        dl.INCIDENT,
-        dl.ENVELOPE,
-        dl.ENVELOPE_USED,
-        dl.ENVELOPE_REVOKED,
-        dl.CONTROLLER,
+        deployment_ledger.OPEN,
+        deployment_ledger.OBSERVE_SUMMARY,
+        deployment_ledger.ALARM,
+        deployment_ledger.RETRAIN,
+        deployment_ledger.CHALLENGER_RESULT,
+        deployment_ledger.PROMOTION_PROPOSAL,
+        deployment_ledger.ROLLBACK_PROPOSAL,
+        deployment_ledger.ESCALATION,
+        deployment_ledger.HALT,
+        deployment_ledger.INCIDENT,
+        deployment_ledger.ENVELOPE,
+        deployment_ledger.ENVELOPE_USED,
+        deployment_ledger.ENVELOPE_REVOKED,
+        deployment_ledger.CONTROLLER,
     }
 )
 
@@ -57,7 +57,7 @@ def make_policy(**changes):
         "outcome_window": 0,
     }
     values.update(changes)
-    return loop_module.LoopPolicy(**values)
+    return loop.LoopPolicy(**values)
 
 
 def make_stream(**changes):
@@ -78,7 +78,7 @@ def envelope(limit=1, **changes):
         "expires": "2026-12-01",
     }
     fields.update(changes)
-    return dl.Envelope.create(PERSON_KEY, **fields)
+    return deployment_ledger.Envelope.create(PERSON_KEY, **fields)
 
 
 class World:
@@ -91,7 +91,7 @@ class World:
         self.inbox = self.root / "inbox"
         (self.inbox / "batches").mkdir(parents=True)
         (self.inbox / "labels").mkdir(parents=True)
-        loop_module.Loop.open(
+        loop.Loop.open(
             self.deploy,
             CHARTER,
             policy or make_policy(),
@@ -122,12 +122,12 @@ class World:
         """
         stream = self.stream
         size = stream.loss.shape[1]
-        batch = pd.DataFrame(
+        batch = pandas.DataFrame(
             {
                 "case_id": [f"b{index}-{i}" for i in range(size)],
                 "propensity": stream.pi[index],
                 "audit": stream.audit[index],
-                "prediction": np.zeros(size),
+                "prediction": numpy.zeros(size),
                 "decision": ["approve"] * size,
             }
         )
@@ -143,7 +143,7 @@ class World:
         rows = []
         for earlier in range(index + 1):
             hit = (stream.arrival[earlier] == index) & stream.selected[earlier]
-            for position in np.flatnonzero(hit):
+            for position in numpy.flatnonzero(hit):
                 row = {
                     "case_id": f"b{earlier}-{position}",
                     "loss": stream.loss[earlier, position],
@@ -153,7 +153,7 @@ class World:
                     row[f"challenger:{name}"] = matrix[earlier, position]
                 rows.append(row)
         if rows:
-            pd.DataFrame(rows).to_csv(
+            pandas.DataFrame(rows).to_csv(
                 self.inbox / "labels" / f"l{index:04d}.csv",
                 index=False,
                 lineterminator="\n",
@@ -166,7 +166,8 @@ def projection(ledger):
         (row["kind"], row["body"])
         for row in ledger.rows
         if not (
-            row["kind"] == dl.CONTROLLER and row["body"]["phase"] == dl.TICK
+            row["kind"] == deployment_ledger.CONTROLLER
+            and row["body"]["phase"] == deployment_ledger.TICK
         )
     ]
 

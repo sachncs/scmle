@@ -85,13 +85,13 @@ from pathlib import Path
 from typing import Any
 from typing import Protocol
 
-import pandas as pd
+import pandas
 
 from scmle.contracts import errors
 from scmle.contracts import qualification
 from scmle.core import randomness
 from scmle.data.ledger import bivariate
-from scmle.data.ledger import budget as budget_module
+from scmle.data.ledger import budget
 from scmle.data.ledger import ledger as ledger_module
 from scmle.data.ledger import multiplicity
 
@@ -161,7 +161,7 @@ class ConfirmationSource(Protocol):
         actor: str = ...,
         claims_hash: str | None = ...,
         ledger_hash: str | None = ...,
-    ) -> tuple[pd.DataFrame, pd.Series]:
+    ) -> tuple[pandas.DataFrame, pandas.Series]:
         """Releases the rows a single time.
 
         Args:
@@ -262,7 +262,7 @@ class ClaimRunner:
     """
 
     registered: tuple[RegisteredClaim, ...]
-    run: Callable[[pd.DataFrame, pd.Series], ClaimRun]
+    run: Callable[[pandas.DataFrame, pandas.Series], ClaimRun]
 
 
 def merge_runners(*runners: ClaimRunner | None) -> ClaimRunner | None:
@@ -294,7 +294,7 @@ def merge_runners(*runners: ClaimRunner | None) -> ClaimRunner | None:
     if len(set(names)) != len(names):
         raise ValueError("claim ids must be unique across runners")
 
-    def run_all(features: pd.DataFrame, target: pd.Series) -> ClaimRun:
+    def run_all(features: pandas.DataFrame, target: pandas.Series) -> ClaimRun:
         statuses: dict[str, str] = {}
         documents: dict[str, Mapping[str, Any]] = {}
         for runner in chosen:
@@ -375,7 +375,7 @@ class Confirmation:
             "reason": self.reason,
             "rule": self.rule,
             "guarantee": multiplicity.STATEMENTS[
-                budget_module.MultiplicityRule(self.rule)
+                budget.MultiplicityRule(self.rule)
             ],
             "alpha_confirm": str(self.alpha_confirm),
             "survivors_sha256": self.survivors_sha256,
@@ -420,7 +420,7 @@ class Confirmation:
 
 
 def assumptions(
-    rule: budget_module.MultiplicityRule, size: int, withdrawn: int = 0
+    rule: budget.MultiplicityRule, size: int, withdrawn: int = 0
 ) -> tuple[str, ...]:
     """Lists the assumptions a confirmed claim depends on.
 
@@ -512,7 +512,7 @@ def finish(
     reason: str,
     claims: tuple[qualification.Claim, ...],
     checks: tuple[qualification.Check, ...],
-    rule: budget_module.MultiplicityRule,
+    rule: budget.MultiplicityRule,
     alpha: Fraction,
     custody_head: str | None,
     stage_two: Mapping[str, Any] | None = None,
@@ -686,10 +686,10 @@ def stage_two_record(
 
 def run_confirmation(
     ledger: ledger_module.Ledger,
-    rows: tuple[pd.DataFrame, pd.Series],
-    rule: budget_module.MultiplicityRule,
+    rows: tuple[pandas.DataFrame, pandas.Series],
+    rule: budget.MultiplicityRule,
     alpha: Fraction,
-    encode: Callable[[pd.Series], Any],
+    encode: Callable[[pandas.Series], Any],
     stage_two: Mapping[str, Any] | None = None,
 ) -> tuple[tuple[qualification.Claim, ...], tuple[qualification.Check, ...]]:
     """Tests the survivors on the opened rows and builds checks and claims.
@@ -782,7 +782,7 @@ def run_confirmation(
     return tuple(claims), tuple(checks)
 
 
-def default_encoding(target: pd.Series) -> Any:
+def default_encoding(target: pandas.Series) -> Any:
     """Encodes the target as floats; classes are coded in sorted order.
 
     Args:
@@ -792,7 +792,7 @@ def default_encoding(target: pd.Series) -> Any:
         A float array: the values of a numeric target, or the code of each
         label otherwise (labels sorted as text), NaN where missing.
     """
-    if pd.api.types.is_numeric_dtype(target):
+    if pandas.api.types.is_numeric_dtype(target):
         return target.to_numpy(dtype=float)
     classes = sorted(target.dropna().unique(), key=str)
     codes = {label: float(i) for i, label in enumerate(classes)}
@@ -804,11 +804,11 @@ def confirm(
     source: ConfirmationSource | None,
     *,
     alpha_confirm: Fraction,
-    rule: budget_module.MultiplicityRule = multiplicity.DEFAULT_RULE,
+    rule: budget.MultiplicityRule = multiplicity.DEFAULT_RULE,
     policy: str = UNCONFIRMED,
     require_control: bool = True,
     custody_log: EventLog | None = None,
-    encode: Callable[[pd.Series], Any] = default_encoding,
+    encode: Callable[[pandas.Series], Any] = default_encoding,
     withdrawal: Withdrawal | None = None,
     claim_runner: ClaimRunner | None = None,
 ) -> Confirmation:

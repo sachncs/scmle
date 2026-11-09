@@ -1,7 +1,7 @@
 """Training, evaluation and performance sensitivity."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 from sklearn import ensemble
 from sklearn import linear_model
@@ -12,11 +12,11 @@ from scmle.evaluation import sensitivity
 
 
 def data(rows=400, seed=0):
-    rng = np.random.default_rng(seed)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    frame = pandas.DataFrame(
         {"a": rng.normal(size=rows), "b": rng.normal(size=rows)}
     )
-    target = pd.Series(
+    target = pandas.Series(
         (frame.a + 0.5 * frame.b + rng.normal(0, 0.8, rows) > 0).astype(int)
     )
     return frame, target
@@ -102,6 +102,6 @@ def test_too_few_rows_are_refused():
 
 
 def test_noise_on_a_single_row_column_leaves_it_finite():
-    frame = pd.DataFrame({"a": [1.0]})
-    out = sensitivity.noisy(frame, 0.5, np.random.default_rng(0))
-    assert np.isfinite(out["a"]).all()
+    frame = pandas.DataFrame({"a": [1.0]})
+    out = sensitivity.noisy(frame, 0.5, numpy.random.default_rng(0))
+    assert numpy.isfinite(out["a"]).all()

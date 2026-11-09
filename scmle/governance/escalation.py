@@ -51,7 +51,7 @@ import dataclasses
 import math
 from typing import Any
 
-import numpy as np
+import numpy
 from scipy import stats
 
 ANSWERED = "answered"
@@ -60,7 +60,7 @@ SAFE_DEFAULT = "safe_default"
 DEFAULT_GRID = 101
 
 
-def set_size_score(set_sizes: Any, novel: Any = None) -> np.ndarray:
+def set_size_score(set_sizes: Any, novel: Any = None) -> numpy.ndarray:
     """Scores ``g`` from conformal set sizes and a novelty flag.
 
     Args:
@@ -76,14 +76,14 @@ def set_size_score(set_sizes: Any, novel: Any = None) -> np.ndarray:
     Raises:
         ValueError: If `novel` does not have the shape of `set_sizes`.
     """
-    sizes = np.asarray(set_sizes, dtype=float)
-    usable = np.isfinite(sizes) & (sizes >= 1.0)
-    score = np.where(usable, 1.0 / np.where(usable, sizes, 1.0), 0.0)
+    sizes = numpy.asarray(set_sizes, dtype=float)
+    usable = numpy.isfinite(sizes) & (sizes >= 1.0)
+    score = numpy.where(usable, 1.0 / numpy.where(usable, sizes, 1.0), 0.0)
     if novel is not None:
-        flags = np.asarray(novel, dtype=bool)
+        flags = numpy.asarray(novel, dtype=bool)
         if flags.shape != score.shape:
             raise ValueError("novel must be aligned with set_sizes")
-        score = np.where(flags, 0.0, score)
+        score = numpy.where(flags, 0.0, score)
     return score
 
 
@@ -175,7 +175,7 @@ class ThresholdResult:
 
 def validate_calibration(
     score: Any, loss: Any, weights: Any = None
-) -> tuple[np.ndarray, np.ndarray, np.ndarray | None]:
+) -> tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray | None]:
     """Checks a calibration set and returns it as arrays.
 
     Args:
@@ -192,18 +192,22 @@ def validate_calibration(
             one-dimensional, a value is non-finite or out of range, or the
             weights are not positive and aligned.
     """
-    g = np.asarray(score, dtype=float)
-    l_values = np.asarray(loss, dtype=float)
+    g = numpy.asarray(score, dtype=float)
+    l_values = numpy.asarray(loss, dtype=float)
     if g.shape != l_values.shape or g.ndim != 1:
         raise ValueError("score and loss must be aligned one-dimensional")
-    if np.any(~np.isfinite(g)) or np.any(g < 0) or np.any(g > 1):
+    if numpy.any(~numpy.isfinite(g)) or numpy.any(g < 0) or numpy.any(g > 1):
         raise ValueError("score must be finite and within [0, 1]")
-    if np.any(~np.isfinite(l_values)) or np.any(l_values < 0):
+    if numpy.any(~numpy.isfinite(l_values)) or numpy.any(l_values < 0):
         raise ValueError("loss must be finite and non-negative")
     w = None
     if weights is not None:
-        w = np.asarray(weights, dtype=float)
-        if w.shape != g.shape or np.any(~np.isfinite(w)) or np.any(w <= 0):
+        w = numpy.asarray(weights, dtype=float)
+        if (
+            w.shape != g.shape
+            or numpy.any(~numpy.isfinite(w))
+            or numpy.any(w <= 0)
+        ):
             raise ValueError("weights must be positive and aligned")
     return g, l_values, w
 
@@ -254,11 +258,11 @@ def select_threshold(
         raise ValueError("r_star and delta must be strictly between 0 and 1")
     g, losses, w = validate_calibration(score, loss, weights)
     points = (
-        np.linspace(1.0, 0.0, DEFAULT_GRID)
+        numpy.linspace(1.0, 0.0, DEFAULT_GRID)
         if grid is None
-        else np.asarray(grid, dtype=float)
+        else numpy.asarray(grid, dtype=float)
     )
-    if points.size == 0 or np.any(np.diff(points) >= 0):
+    if points.size == 0 or numpy.any(numpy.diff(points) >= 0):
         raise ValueError("grid must be strictly decreasing")
     steps: list[Step] = []
     chosen = math.inf
@@ -322,9 +326,9 @@ class RiskCoverage:
             than two such thresholds.
     """
 
-    tau: np.ndarray
-    coverage: np.ndarray
-    risk: np.ndarray
+    tau: numpy.ndarray
+    coverage: numpy.ndarray
+    risk: numpy.ndarray
     aurc: float
 
     def to_dict(self) -> dict[str, Any]:
@@ -363,10 +367,10 @@ def risk_coverage(
     g, losses, w = validate_calibration(score, loss, weights)
     if g.size == 0:
         raise ValueError("calibration set is empty")
-    grid = np.linspace(1.0, 0.0, points)
-    weight = np.ones_like(g) if w is None else w
-    coverage = np.empty(points)
-    risk = np.empty(points)
+    grid = numpy.linspace(1.0, 0.0, points)
+    weight = numpy.ones_like(g) if w is None else w
+    coverage = numpy.empty(points)
+    risk = numpy.empty(points)
     total = float(weight.sum())
     for index, tau in enumerate(grid):
         answered = g >= tau
@@ -377,9 +381,9 @@ def risk_coverage(
             if mass > 0
             else math.nan
         )
-    valid = ~np.isnan(risk)
+    valid = ~numpy.isnan(risk)
     area = (
-        float(np.trapezoid(risk[valid], coverage[valid]))
+        float(numpy.trapezoid(risk[valid], coverage[valid]))
         if valid.sum() > 1
         else math.nan
     )
@@ -443,14 +447,14 @@ def chow_check(
     """
     if review_cost <= 0 or error_cost <= 0:
         raise ValueError("costs must be positive")
-    p = np.asarray(confidence, dtype=float)
-    g = np.asarray(score, dtype=float)
+    p = numpy.asarray(confidence, dtype=float)
+    g = numpy.asarray(score, dtype=float)
     if p.shape != g.shape:
         raise ValueError("confidence and score must be aligned")
     cut = review_cost / error_cost
     by_chow = (1.0 - p) > cut
     by_score = g < tau
-    share = float(np.mean(by_chow != by_score))
+    share = float(numpy.mean(by_chow != by_score))
     return ChowCheck(cut, share, share <= tolerance)
 
 
@@ -464,11 +468,11 @@ class Routing:
             safe default.
     """
 
-    status: np.ndarray
+    status: numpy.ndarray
     backlog: int
 
     @property
-    def answered(self) -> np.ndarray:
+    def answered(self) -> numpy.ndarray:
         """Cases the model answers."""
         return self.status == ANSWERED
 
@@ -505,17 +509,17 @@ def route(
     Raises:
         ValueError: If `c_max` is outside [0, 1].
     """
-    g = np.asarray(score, dtype=float)
+    g = numpy.asarray(score, dtype=float)
     if not 0.0 <= c_max <= 1.0:
         raise ValueError("c_max must be within [0, 1]")
-    keep = np.zeros(g.shape, dtype=bool) if halted else g >= tau
+    keep = numpy.zeros(g.shape, dtype=bool) if halted else g >= tau
     if blocked is not None:
-        keep &= ~np.asarray(blocked, dtype=bool)
-    status = np.where(keep, ANSWERED, ESCALATED).astype(object)
+        keep &= ~numpy.asarray(blocked, dtype=bool)
+    status = numpy.where(keep, ANSWERED, ESCALATED).astype(object)
     room = math.floor(c_max * g.size + 1e-9)
-    escalated = np.flatnonzero(~keep)
+    escalated = numpy.flatnonzero(~keep)
     if escalated.size > room:
-        order = escalated[np.argsort(g[escalated], kind="stable")]
+        order = escalated[numpy.argsort(g[escalated], kind="stable")]
         overflow = order[room:]
         status[overflow] = SAFE_DEFAULT
         return Routing(status.astype(str), int(overflow.size))

@@ -6,8 +6,8 @@ one random split of a single sample into two sides, with labels permuted
 within the blocks the split respects.
 """
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from scipy import stats
 
 from scmle.data.robustness import shift
@@ -17,42 +17,42 @@ RUNS = 200
 
 
 def iid_split(seed, rows=60):
-    rng = np.random.default_rng(seed)
-    both = pd.DataFrame(rng.normal(size=(2 * rows, 2)), columns=["a", "b"])
+    rng = numpy.random.default_rng(seed)
+    both = pandas.DataFrame(rng.normal(size=(2 * rows, 2)), columns=["a", "b"])
     return both.iloc[:rows], both.iloc[rows:].reset_index(drop=True), None
 
 
 def grouped_split(seed, groups=8, per=10):
     """Groups share a random effect; every group is split across sides."""
-    rng = np.random.default_rng(seed)
-    effect = np.repeat(rng.normal(scale=2.0, size=groups), 2 * per)
+    rng = numpy.random.default_rng(seed)
+    effect = numpy.repeat(rng.normal(scale=2.0, size=groups), 2 * per)
     data = effect[:, None] + rng.normal(size=(2 * per * groups, 2))
-    both = pd.DataFrame(data, columns=["a", "b"])
-    label = np.repeat(np.arange(groups), 2 * per)
-    side = np.zeros(len(both), dtype=bool)
+    both = pandas.DataFrame(data, columns=["a", "b"])
+    label = numpy.repeat(numpy.arange(groups), 2 * per)
+    side = numpy.zeros(len(both), dtype=bool)
     for g in range(groups):
-        rows = np.flatnonzero(label == g)
+        rows = numpy.flatnonzero(label == g)
         side[rng.permutation(rows)[:per]] = True
     left, right = both[side], both[~side]
-    strata = np.r_[label[side], label[~side]]
+    strata = numpy.r_[label[side], label[~side]]
     return left.reset_index(drop=True), right.reset_index(drop=True), strata
 
 
 def temporal_split(seed, blocks=8, per=10):
     """An autoregressive series; sides are interleaved inside time blocks."""
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     total = 2 * per * blocks
     noise = rng.normal(size=(total, 2))
-    series = np.zeros((total, 2))
+    series = numpy.zeros((total, 2))
     for t in range(1, total):
         series[t] = 0.9 * series[t - 1] + noise[t]
-    both = pd.DataFrame(series, columns=["a", "b"])
-    label = np.repeat(np.arange(blocks), 2 * per)
-    side = np.zeros(total, dtype=bool)
+    both = pandas.DataFrame(series, columns=["a", "b"])
+    label = numpy.repeat(numpy.arange(blocks), 2 * per)
+    side = numpy.zeros(total, dtype=bool)
     for b in range(blocks):
-        rows = np.flatnonzero(label == b)
+        rows = numpy.flatnonzero(label == b)
         side[rng.permutation(rows)[:per]] = True
-    strata = np.r_[label[side], label[~side]]
+    strata = numpy.r_[label[side], label[~side]]
     return (
         both[side].reset_index(drop=True),
         both[~side].reset_index(drop=True),
@@ -80,9 +80,9 @@ def ks_uniform_p(pvalues):
     """KS against the discrete grid (k / 100): use the continuous version
     on jittered ranks so the discreteness of 99 permutations is not read as
     non-uniformity."""
-    rng = np.random.default_rng(0)
+    rng = numpy.random.default_rng(0)
     jittered = (
-        np.asarray(pvalues) * 100 - rng.uniform(size=len(pvalues))
+        numpy.asarray(pvalues) * 100 - rng.uniform(size=len(pvalues))
     ) / 100
     return stats.kstest(jittered, "uniform").pvalue
 

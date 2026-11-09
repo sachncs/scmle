@@ -2,8 +2,8 @@
 
 import json
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
 from scmle.data.custody import sealed
@@ -17,15 +17,15 @@ from tests.unit.test_charter_contracts import make_charter
 
 
 def build(rows=500, seed=0, effect=0.7, kind="regression"):
-    rng = np.random.default_rng(seed)
-    frame = pd.DataFrame({f"f{i}": rng.normal(size=rows) for i in range(8)})
+    rng = numpy.random.default_rng(seed)
+    frame = pandas.DataFrame({f"f{i}": rng.normal(size=rows) for i in range(8)})
     frame["label"] = ["a", "b"] * (rows // 2)
     signal = effect * (frame["f0"] + frame["f1"]) + rng.normal(size=rows)
     if kind == "binary":
-        return frame.drop(columns="label"), pd.Series(
-            np.where(signal > 0, "yes", "no")
+        return frame.drop(columns="label"), pandas.Series(
+            numpy.where(signal > 0, "yes", "no")
         )
-    return frame.drop(columns="label"), pd.Series(signal)
+    return frame.drop(columns="label"), pandas.Series(signal)
 
 
 def source_for(features, target):
@@ -132,12 +132,14 @@ def test_binary_labels_are_coded_consistently_for_c():
 
 
 def test_multiclass_targets_use_the_kruskal_statistic():
-    rng = np.random.default_rng(4)
-    features = pd.DataFrame(
+    rng = numpy.random.default_rng(4)
+    features = pandas.DataFrame(
         {"a": rng.normal(size=600), "b": rng.normal(size=600)}
     )
-    target = pd.Series(
-        pd.cut(features["a"], [-9, -0.5, 0.5, 9], labels=["lo", "mid", "hi"])
+    target = pandas.Series(
+        pandas.cut(
+            features["a"], [-9, -0.5, 0.5, 9], labels=["lo", "mid", "hi"]
+        )
     ).astype(str)
     plan = explore.plan_exploration(features, explore.target_kind(target, True))
     assert {s.statistic for s in plan.specs} == {"kruskal"}
@@ -160,7 +162,7 @@ def test_structure_columns_and_non_numeric_features_are_not_candidates():
     features = build()[0]
     features["site"] = ["x", "y"] * (len(features) // 2)
     features["const"] = 1.0
-    features["entity"] = np.arange(len(features)) // 10
+    features["entity"] = numpy.arange(len(features)) // 10
     plan = explore.plan_exploration(features, explore.NUMERIC, ("entity",))
     assert dict(plan.skipped) == {
         "site": "not numeric: descriptive only",
@@ -171,7 +173,7 @@ def test_structure_columns_and_non_numeric_features_are_not_candidates():
 
 
 def test_strata_come_from_groups_then_time_blocks():
-    frame = pd.DataFrame(
+    frame = pandas.DataFrame(
         {"g": [1, 1, 2, 2, 3, 3], "t": [5.0, 1.0, 3.0, 2.0, 6.0, 4.0]}
     )
     groups = governed.strata_labels(frame, "g", "t")
@@ -185,7 +187,7 @@ def test_strata_come_from_groups_then_time_blocks():
 
 def test_a_grouped_target_control_reports_strata_scope():
     features, target = build(rows=300)
-    strata = np.repeat(np.arange(30), 10)
+    strata = numpy.repeat(numpy.arange(30), 10)
     run = governed.run_governed(
         charter=make_charter(),
         features=features,

@@ -33,8 +33,8 @@ beyond the diagnostics above.
 import dataclasses
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from scipy import stats
 
 GRID = (0.1, 0.15, 0.2, 0.3, 0.4, 0.5, 0.75, 1.0)
@@ -58,7 +58,9 @@ class Fit:
     n: int
 
 
-def local_fit(x: np.ndarray, y: np.ndarray, h: float, order: int) -> Fit | None:
+def local_fit(
+    x: numpy.ndarray, y: numpy.ndarray, h: float, order: int
+) -> Fit | None:
     """Fits a triangular-kernel polynomial and reads it at 0.
 
     Args:
@@ -72,16 +74,16 @@ def local_fit(x: np.ndarray, y: np.ndarray, h: float, order: int) -> Fit | None:
         or None when fewer than ``order + 3`` points have positive weight
         or the weighted Gram matrix is singular.
     """
-    weight = np.clip(1.0 - np.abs(x) / h, 0.0, None)
+    weight = numpy.clip(1.0 - numpy.abs(x) / h, 0.0, None)
     keep = weight > 0
     if keep.sum() < order + 3:
         return None
     xs, ys, ws = x[keep], y[keep], weight[keep]
-    design = np.vander(xs, order + 1, increasing=True)
+    design = numpy.vander(xs, order + 1, increasing=True)
     gram = design.T @ (design * ws[:, None])
     try:
-        bread = np.linalg.inv(gram)
-    except np.linalg.LinAlgError:
+        bread = numpy.linalg.inv(gram)
+    except numpy.linalg.LinAlgError:
         return None
     coef = bread @ (design.T @ (ws * ys))
     resid = ys - design @ coef
@@ -91,7 +93,7 @@ def local_fit(x: np.ndarray, y: np.ndarray, h: float, order: int) -> Fit | None:
     return Fit(float(coef[0]), variance, n)
 
 
-def cv_bandwidth(x: np.ndarray, y: np.ndarray) -> float:
+def cv_bandwidth(x: numpy.ndarray, y: numpy.ndarray) -> float:
     """Leave-out cross-validated bandwidth for one signed side of the cutoff.
 
     `x` holds distances from the cutoff, positive, nearest first after
@@ -107,16 +109,16 @@ def cv_bandwidth(x: np.ndarray, y: np.ndarray) -> float:
         smallest mean squared leave-out prediction error among those with at
         least five evaluation errors; the median of `x` if none has.
     """
-    order = np.argsort(x)
+    order = numpy.argsort(x)
     x, y = x[order], y[order]
     pool = max(len(x) // 2, 5)
-    picks = np.unique(np.linspace(2, pool - 1, CV_POINTS).astype(int))
-    best, best_error = float(np.quantile(x, 0.5)), np.inf
+    picks = numpy.unique(numpy.linspace(2, pool - 1, CV_POINTS).astype(int))
+    best, best_error = float(numpy.quantile(x, 0.5)), numpy.inf
     for fraction in GRID:
-        h = float(np.quantile(x, fraction))
+        h = float(numpy.quantile(x, fraction))
         errors = []
         for i in picks:
-            far = np.arange(len(x)) > i
+            far = numpy.arange(len(x)) > i
             if h <= 0 or far.sum() < 3:
                 continue
             near = far & (x - x[i] < h)
@@ -125,8 +127,8 @@ def cv_bandwidth(x: np.ndarray, y: np.ndarray) -> float:
             fit = local_fit(x[near] - x[i], y[near], h, 1)
             if fit is not None:
                 errors.append((y[i] - fit.intercept) ** 2)
-        if len(errors) >= 5 and np.mean(errors) < best_error:
-            best, best_error = h, float(np.mean(errors))
+        if len(errors) >= 5 and numpy.mean(errors) < best_error:
+            best, best_error = h, float(numpy.mean(errors))
     return best
 
 
@@ -176,8 +178,8 @@ class RdResult:
 
 
 def discontinuity(
-    x: np.ndarray,
-    y: np.ndarray,
+    x: numpy.ndarray,
+    y: numpy.ndarray,
     cutoff: float,
     h: float,
     level: float,
@@ -210,7 +212,7 @@ def discontinuity(
     conventional = pieces["right"][0].intercept - pieces["left"][0].intercept
     corrected = pieces["right"][1].intercept - pieces["left"][1].intercept
     se = float(
-        np.sqrt(pieces["right"][1].variance + pieces["left"][1].variance)
+        numpy.sqrt(pieces["right"][1].variance + pieces["left"][1].variance)
     )
     z = float(stats.norm.ppf(0.5 + level / 2))
     return {
@@ -224,7 +226,7 @@ def discontinuity(
 
 
 def estimate(
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     running: str,
     outcome: str,
     cutoff: float,
@@ -255,7 +257,7 @@ def estimate(
     """
     x = frame[running].to_numpy(dtype=float)
     y = frame[outcome].to_numpy(dtype=float)
-    if not (np.isfinite(x).all() and np.isfinite(y).all()):
+    if not (numpy.isfinite(x).all() and numpy.isfinite(y).all()):
         raise ValueError("RD columns must not hold missing values")
     left = x < cutoff
     if min(left.sum(), (~left).sum()) < MIN_SIDE:
@@ -276,7 +278,7 @@ def estimate(
     density_p = float(stats.binomtest(inside_right, total, 0.5).pvalue)
     placebos = {}
     for name, mask in (("left_median", left), ("right_median", ~left)):
-        point = float(np.median(x[mask]))
+        point = float(numpy.median(x[mask]))
         found = discontinuity(x[mask], y[mask], point, h, level)
         if found is not None:
             placebos[name] = {"cutoff": point, **found}

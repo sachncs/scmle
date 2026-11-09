@@ -2,15 +2,15 @@
 
 import json
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 import scmle
 
 
 def frame(rows=700, seed=0, flip_every=0, shift=0.0):
-    rng = np.random.default_rng(seed)
-    data = pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    data = pandas.DataFrame(
         {"a": rng.normal(size=rows) + shift, "b": rng.normal(size=rows)}
     )
     data["y"] = (data.a - shift + data.b > 0).astype(int)

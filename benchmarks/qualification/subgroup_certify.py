@@ -61,8 +61,8 @@ import sys
 import time
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.data.charter import causal
 from scmle.data.detectors import certificates
@@ -89,7 +89,7 @@ NOT_MEASURED = (
 )
 
 
-def stream(base: int, index: int, which: int = 0) -> np.random.Generator:
+def stream(base: int, index: int, which: int = 0) -> numpy.random.Generator:
     """Independent random stream for one replicate.
 
     Args:
@@ -100,7 +100,7 @@ def stream(base: int, index: int, which: int = 0) -> np.random.Generator:
     Returns:
         A generator seeded with `[base + index, which]`.
     """
-    return np.random.default_rng([base + index, which])
+    return numpy.random.default_rng([base + index, which])
 
 
 def names() -> tuple[str, ...]:
@@ -113,8 +113,8 @@ def names() -> tuple[str, ...]:
 
 
 def world(
-    rng: np.random.Generator, rows_per_level: int, effects: dict[str, float]
-) -> pd.DataFrame:
+    rng: numpy.random.Generator, rows_per_level: int, effects: dict[str, float]
+) -> pandas.DataFrame:
     """A randomized experiment whose effect differs by level of `g`.
 
     Args:
@@ -127,11 +127,11 @@ def world(
         1/2 and the outcome `y` (effect times treatment plus standard normal
         noise).
     """
-    group = np.repeat(names(), rows_per_level)
-    tau = np.array([effects.get(g, 0.0) for g in group])
+    group = numpy.repeat(names(), rows_per_level)
+    tau = numpy.array([effects.get(g, 0.0) for g in group])
     t = (rng.uniform(size=len(group)) < 0.5).astype(float)
     y = tau * t + rng.standard_normal(len(group))
-    return pd.DataFrame({"g": group, "t": t, "y": y})
+    return pandas.DataFrame({"g": group, "t": t, "y": y})
 
 
 def adapter_for() -> run.Adapter:
@@ -149,11 +149,11 @@ def adapter_for() -> run.Adapter:
         strategies=("randomized_diff",),
     )
     return run.ADAPTERS["randomized_diff"](
-        spec, pd.DataFrame({"t": [0.0], "y": [0.0]}), 0, "linear", 0.01
+        spec, pandas.DataFrame({"t": [0.0], "y": [0.0]}), 0, "linear", 0.01
     )
 
 
-def rejected_levels(frame: pd.DataFrame, adapter: run.Adapter) -> set[str]:
+def rejected_levels(frame: pandas.DataFrame, adapter: run.Adapter) -> set[str]:
     """Levels the Holm family rejects on one replicate.
 
     Args:

@@ -2,23 +2,23 @@
 
 import pathlib
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
 
 @pytest.fixture
 def binary_frame():
-    rng = np.random.default_rng(0)
+    rng = numpy.random.default_rng(0)
     rows = 500
-    frame = pd.DataFrame(
+    frame = pandas.DataFrame(
         {
             "a": rng.normal(size=rows),
             "b": rng.normal(size=rows),
             "c": rng.choice(list("xyz"), rows),
         }
     )
-    frame.loc[::13, "a"] = np.nan
+    frame.loc[::13, "a"] = numpy.nan
     signal = frame.a.fillna(0) + 0.5 * frame.b + (frame.c == "x")
     noise = rng.normal(scale=0.5, size=rows)
     frame["y"] = (signal + noise > 0.5).astype(int)
@@ -27,12 +27,12 @@ def binary_frame():
 
 @pytest.fixture
 def multiclass_frame():
-    rng = np.random.default_rng(1)
+    rng = numpy.random.default_rng(1)
     rows = 600
-    frame = pd.DataFrame(
+    frame = pandas.DataFrame(
         {"a": rng.normal(size=rows), "b": rng.normal(size=rows)}
     )
-    frame["y"] = pd.cut(
+    frame["y"] = pandas.cut(
         frame.a + frame.b, [-9, -0.7, 0.7, 9], labels=["lo", "mid", "hi"]
     ).astype(str)
     return frame
@@ -40,9 +40,9 @@ def multiclass_frame():
 
 @pytest.fixture
 def regression_frame():
-    rng = np.random.default_rng(2)
+    rng = numpy.random.default_rng(2)
     rows = 500
-    frame = pd.DataFrame(
+    frame = pandas.DataFrame(
         {
             "a": rng.normal(size=rows),
             "b": rng.normal(size=rows),
@@ -60,9 +60,9 @@ def regression_frame():
 
 @pytest.fixture
 def imbalanced_frame():
-    rng = np.random.default_rng(3)
+    rng = numpy.random.default_rng(3)
     rows = 900
-    frame = pd.DataFrame(
+    frame = pandas.DataFrame(
         {
             "spend": rng.exponential(5.0, rows),
             "age": rng.normal(40, 10, rows),
@@ -70,7 +70,7 @@ def imbalanced_frame():
         }
     )
     logit = 0.25 * frame.spend + 0.05 * (frame.age - 40) - 3.2
-    probability = 1 / (1 + np.exp(-logit))
+    probability = 1 / (1 + numpy.exp(-logit))
     frame["y"] = (rng.random(rows) < probability).astype(int)
     return frame
 

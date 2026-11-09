@@ -16,8 +16,8 @@ import time
 from typing import Any
 import uuid
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle import durability
 from scmle.artifacts import bundle as bundle_module
@@ -109,7 +109,7 @@ class PredictionLog:
     def log_predictions(
         self,
         bundle: bundle_module.ModelBundle,
-        data: pd.DataFrame,
+        data: pandas.DataFrame,
         event_ids: list[str] | None = None,
     ) -> list[PredictionEvent]:
         """Predicts with a bundle and logs every row.
@@ -153,7 +153,7 @@ class PredictionLog:
             raise
         try:
             payload = (
-                pd.util.hash_pandas_object(frame, index=False)
+                pandas.util.hash_pandas_object(frame, index=False)
                 .to_numpy(dtype="uint64")
                 .tobytes()
             )
@@ -177,7 +177,7 @@ class PredictionLog:
                 model_version=bundle.info.model_version,
                 timestamp=events.utc_timestamp(),
                 features={
-                    str(k): (None if pd.isna(v) else v)
+                    str(k): (None if pandas.isna(v) else v)
                     for k, v in frame.iloc[row].to_dict().items()
                 },
                 prediction=to_plain(predictions[row]),
@@ -351,7 +351,7 @@ class PredictionLog:
             logged.append(event)
         return logged
 
-    def load(self) -> tuple[pd.DataFrame, pd.Series, pd.Series]:
+    def load(self) -> tuple[pandas.DataFrame, pandas.Series, pandas.Series]:
         """Joins predictions with whatever outcomes have arrived.
 
         Returns:
@@ -368,13 +368,15 @@ class PredictionLog:
                 else:
                     outcomes[record["event_id"]] = record["actual"]
         ids = list(predictions)
-        features = pd.DataFrame(
+        features = pandas.DataFrame(
             [predictions[i]["features"] for i in ids], index=ids
         )
-        predicted = pd.Series(
+        predicted = pandas.Series(
             [predictions[i]["prediction"] for i in ids], index=ids
         )
-        actual = pd.Series([outcomes.get(i, np.nan) for i in ids], index=ids)
+        actual = pandas.Series(
+            [outcomes.get(i, numpy.nan) for i in ids], index=ids
+        )
         return features, predicted, actual
 
 

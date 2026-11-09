@@ -1,7 +1,7 @@
 """Tests for user-facing recommendations."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.contracts import data as data_contracts
 from scmle.contracts import tasks
@@ -24,8 +24,8 @@ def profile_of(frame, **spec_fields):
 
 
 def rare_frame(rows=800):
-    rng = np.random.default_rng(0)
-    frame = pd.DataFrame({"a": rng.normal(size=rows)})
+    rng = numpy.random.default_rng(0)
+    frame = pandas.DataFrame({"a": rng.normal(size=rows)})
     frame["y"] = (rng.random(rows) < 0.04).astype(int)
     return frame
 
@@ -53,8 +53,8 @@ def test_a_chosen_threshold_objective_is_not_suggested_again():
 
 
 def test_balanced_clean_data_gets_no_imbalance_or_missing_advice():
-    rng = np.random.default_rng(1)
-    frame = pd.DataFrame({"a": rng.normal(size=900)})
+    rng = numpy.random.default_rng(1)
+    frame = pandas.DataFrame({"a": rng.normal(size=900)})
     frame["y"] = (frame.a + rng.normal(size=900) > 0).astype(int)
     spec, profile = profile_of(frame)
 
@@ -65,7 +65,7 @@ def test_balanced_clean_data_gets_no_imbalance_or_missing_advice():
 
 def test_small_data_and_duplicates_are_flagged():
     frame = rare_frame(120)
-    frame = pd.concat([frame, frame.head(60)], ignore_index=True)
+    frame = pandas.concat([frame, frame.head(60)], ignore_index=True)
     spec, profile = profile_of(frame)
 
     topics = {r.topic for r in recommendations.recommend(profile, spec)}

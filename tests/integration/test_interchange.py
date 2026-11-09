@@ -1,8 +1,8 @@
 """Arrow-compatible interchange: Arrow, Polars and Feather in; Arrow out."""
 
-import numpy as np
-import pandas as pd
-import pyarrow as pa
+import numpy
+import pandas
+import pyarrow
 import pytest
 import support
 
@@ -18,12 +18,12 @@ def run(data, tmp_path, **kwargs):
 
 
 def test_arrow_table_is_a_first_class_input(binary_frame, tmp_path):
-    table = pa.Table.from_pandas(binary_frame, preserve_index=False)
+    table = pyarrow.Table.from_pandas(binary_frame, preserve_index=False)
     result = run(table, tmp_path)
     assert result.evaluation["test_metrics"]["roc_auc"] > 0.8
     features = binary_frame.drop(columns="y")
-    arrow_features = pa.Table.from_pandas(features, preserve_index=False)
-    np.testing.assert_array_equal(
+    arrow_features = pyarrow.Table.from_pandas(features, preserve_index=False)
+    numpy.testing.assert_array_equal(
         result.predict(arrow_features), result.predict(features)
     )
 
@@ -44,7 +44,9 @@ def test_polars_frames_and_lazyframes_are_accepted(binary_frame, tmp_path):
 def test_results_export_to_arrow(binary_frame, tmp_path):
     result = run(binary_frame, tmp_path)
     table = result.leaderboard_arrow()
-    assert isinstance(table, pa.Table) and table.num_rows == len(result.trials)
+    assert isinstance(table, pyarrow.Table) and table.num_rows == len(
+        result.trials
+    )
     assert "score_mean" in table.column_names
 
 
@@ -59,11 +61,11 @@ def test_feather_files_are_read_and_scored(binary_frame, tmp_path):
 
 
 def test_to_pandas_copies_and_rejects_non_tables():
-    frame = pd.DataFrame({"a": [1, 2]})
+    frame = pandas.DataFrame({"a": [1, 2]})
     copy = interchange.to_pandas(frame)
     copy.loc[0, "a"] = 99
     assert frame.loc[0, "a"] == 1
     with pytest.raises(errors.DataError):
         interchange.to_pandas(42)
     assert not interchange.is_tabular("some/path.csv")
-    assert interchange.is_tabular(pa.table({"a": [1]}))
+    assert interchange.is_tabular(pyarrow.table({"a": [1]}))

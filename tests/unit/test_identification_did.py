@@ -1,7 +1,7 @@
 """Difference in differences: hand-computed cells, coverage, sensitivity."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
 from scmle.data.identification import did
@@ -16,9 +16,9 @@ def panel(
     tau: float = 1.5,
     drift: float = 0.0,
     second: bool = False,
-) -> pd.DataFrame:
+) -> pandas.DataFrame:
     """Linear differential trend `drift` per period, effect `tau` after."""
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     rows = []
     groups = [(adopt, n_treated)] + ([(adopt + 1, n_treated)] if second else [])
     units = [(g, n) for g, n in groups] + [(None, n_never)]
@@ -33,9 +33,9 @@ def panel(
                     y += drift * t
                     if t >= g:
                         y += tau
-                rows.append((uid, t, g if g is not None else np.nan, y))
+                rows.append((uid, t, g if g is not None else numpy.nan, y))
         first += n
-    return pd.DataFrame(rows, columns=["id", "t", "g", "y"])
+    return pandas.DataFrame(rows, columns=["id", "t", "g", "y"])
 
 
 def test_a_hand_computed_three_period_panel():
@@ -49,8 +49,8 @@ def test_a_hand_computed_three_period_panel():
     }
     for unit, values in outcomes.items():
         for t, y in enumerate(values):
-            rows.append((unit, t, 2.0 if unit < 2 else np.nan, y))
-    frame = pd.DataFrame(rows, columns=["id", "t", "g", "y"])
+            rows.append((unit, t, 2.0 if unit < 2 else numpy.nan, y))
+    frame = pandas.DataFrame(rows, columns=["id", "t", "g", "y"])
     out = did.estimate(frame, "id", "t", "g", "y")
     # treated change t1 -> t2: (4, 4) mean 4; control (1, 0) mean 0.5.
     assert out.estimate == pytest.approx(3.5)
@@ -59,7 +59,7 @@ def test_a_hand_computed_three_period_panel():
     assert out.coefficients[k] == pytest.approx(0.0)
     assert out.groups == {"2.0": 2} and out.n_never == 2
     # variance: treated deltas (4, 4) -> 0; control deltas (1, 0) -> 0.5/2.
-    assert out.se == pytest.approx(np.sqrt(0.5 / 2))
+    assert out.se == pytest.approx(numpy.sqrt(0.5 / 2))
 
 
 def test_the_effect_is_recovered_and_the_interval_covers():

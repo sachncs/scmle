@@ -4,7 +4,7 @@ import importlib.util
 import io
 
 import joblib
-import numpy as np
+import numpy
 import pytest
 
 from scmle.contracts import tasks
@@ -22,9 +22,9 @@ FAST = {"epochs": 40, "patience": 5}
 
 
 def separable(rows=400, seed=0):
-    rng = np.random.default_rng(seed)
-    features = rng.normal(size=(rows, 4)).astype(np.float32)
-    labels = np.where(features[:, 0] + features[:, 1] > 0, "yes", "no")
+    rng = numpy.random.default_rng(seed)
+    features = rng.normal(size=(rows, 4)).astype(numpy.float32)
+    labels = numpy.where(features[:, 0] + features[:, 1] > 0, "yes", "no")
     return features, labels
 
 
@@ -41,14 +41,14 @@ def test_the_classifier_learns_and_keeps_string_labels():
 
     assert set(model.classes_) == {"no", "yes"}
     assert (model.predict(features) == labels).mean() > 0.9
-    np.testing.assert_allclose(
+    numpy.testing.assert_allclose(
         model.predict_proba(features).sum(axis=1), 1.0, rtol=1e-5
     )
 
 
 def test_the_regressor_recovers_a_linear_signal_in_original_units():
-    rng = np.random.default_rng(1)
-    features = rng.normal(size=(400, 3)).astype(np.float32)
+    rng = numpy.random.default_rng(1)
+    features = rng.normal(size=(400, 3)).astype(numpy.float32)
     target = 50 + 10 * features[:, 0] - 4 * features[:, 1]
 
     model = estimators.KerasRegressor(**FAST).fit(features, target)
@@ -59,7 +59,7 @@ def test_the_regressor_recovers_a_linear_signal_in_original_units():
 
 def test_sample_weights_reach_the_network():
     features, labels = separable()
-    weights = np.where(labels == "yes", 1.0, 0.0)
+    weights = numpy.where(labels == "yes", 1.0, 0.0)
 
     model = estimators.KerasClassifier(**FAST).fit(
         features, labels, sample_weight=weights
@@ -78,7 +78,7 @@ def test_a_pickled_model_predicts_the_same_in_a_new_session():
     buffer.seek(0)
     restored = joblib.load(buffer)
 
-    np.testing.assert_allclose(restored.predict_proba(features), expected)
+    numpy.testing.assert_allclose(restored.predict_proba(features), expected)
     assert restored.training_report_["verdict"] in {"ok", "stalled"}
 
 

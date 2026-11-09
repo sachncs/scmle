@@ -1,7 +1,7 @@
 """Tests for threshold optimization."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 from sklearn import base
 from sklearn import linear_model
@@ -10,10 +10,10 @@ from scmle.models import thresholds
 
 
 def labelled(rows=2000, positive_rate=0.1, seed=0):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     actual = rng.random(rows) < positive_rate
-    probability = np.clip(
-        np.where(actual, rng.beta(4, 2, rows), rng.beta(1.5, 6, rows)), 0, 1
+    probability = numpy.clip(
+        numpy.where(actual, rng.beta(4, 2, rows), rng.beta(1.5, 6, rows)), 0, 1
     )
     return probability, actual
 
@@ -41,8 +41,8 @@ def test_cost_objective_moves_the_threshold_with_the_costs():
 
 
 def test_objectives_on_known_decisions():
-    actual = np.array([True, True, False, False])
-    flagged = np.array([True, False, True, False])
+    actual = numpy.array([True, True, False, False])
+    flagged = numpy.array([True, False, True, False])
     assert thresholds.F1Objective().score(actual, flagged) == pytest.approx(0.5)
     assert thresholds.AccuracyObjective().score(actual, flagged) == 0.5
     assert thresholds.BalancedAccuracyObjective().score(actual, flagged) == 0.5
@@ -50,13 +50,14 @@ def test_objectives_on_known_decisions():
         actual, flagged
     ) == pytest.approx(-1.25)
     assert (
-        thresholds.F1Objective().score(actual, np.zeros(4, dtype=bool)) == 0.0
+        thresholds.F1Objective().score(actual, numpy.zeros(4, dtype=bool))
+        == 0.0
     )
 
 
 def test_ties_prefer_thresholds_near_one_half():
-    probability = np.array([0.1, 0.9])
-    actual = np.array([False, True])
+    probability = numpy.array([0.1, 0.9])
+    actual = numpy.array([False, True])
     best = thresholds.optimize_threshold(
         probability, actual, thresholds.AccuracyObjective()
     )[0]
@@ -64,24 +65,24 @@ def test_ties_prefer_thresholds_near_one_half():
 
 
 def test_threshold_classifier_applies_cutoff_and_keeps_probabilities():
-    rng = np.random.default_rng(1)
-    features = pd.DataFrame({"a": rng.normal(size=300)})
-    target = pd.Series(
-        np.where(features.a + rng.normal(size=300) > 0, "yes", "no")
+    rng = numpy.random.default_rng(1)
+    features = pandas.DataFrame({"a": rng.normal(size=300)})
+    target = pandas.Series(
+        numpy.where(features.a + rng.normal(size=300) > 0, "yes", "no")
     )
     model = thresholds.ThresholdClassifier(
         linear_model.LogisticRegression(), 0.8
     ).fit(features, target)
     proba = model.predict_proba(features)[:, 1]
-    expected = np.where(proba >= 0.8, "yes", "no")
-    np.testing.assert_array_equal(model.predict(features), expected)
+    expected = numpy.where(proba >= 0.8, "yes", "no")
+    numpy.testing.assert_array_equal(model.predict(features), expected)
     assert (model.predict(features) == "yes").mean() < 0.5
     assert list(model.classes_) == ["no", "yes"]
 
 
 def test_around_fitted_does_not_refit_and_clone_resets():
-    features = pd.DataFrame({"a": np.arange(100.0)})
-    target = pd.Series([0] * 50 + [1] * 50)
+    features = pandas.DataFrame({"a": numpy.arange(100.0)})
+    target = pandas.Series([0] * 50 + [1] * 50)
     fitted = linear_model.LogisticRegression().fit(features, target)
     wrapper = thresholds.ThresholdClassifier.around_fitted(fitted, 0.3)
     assert wrapper.estimator_ is fitted and wrapper.predict(features).shape == (
@@ -92,9 +93,9 @@ def test_around_fitted_does_not_refit_and_clone_resets():
 
 
 def test_out_of_fold_probabilities_cover_validation_rows_only_once():
-    rng = np.random.default_rng(2)
-    features = pd.DataFrame({"a": rng.normal(size=120)})
-    target = pd.Series((features.a > 0).astype(int))
+    rng = numpy.random.default_rng(2)
+    features = pandas.DataFrame({"a": rng.normal(size=120)})
+    target = pandas.Series((features.a > 0).astype(int))
     folds = [
         (list(range(0, 60)), list(range(60, 90))),
         (list(range(0, 90)), list(range(90, 120))),

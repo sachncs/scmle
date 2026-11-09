@@ -16,7 +16,7 @@ import pytest
 from scmle import cli
 from scmle.contracts import signing
 from scmle.trail import chain
-from scmle.trail import inputs as inputs_module
+from scmle.trail import inputs
 from scmle.trail import outcomes
 from scmle.trail import records
 from scmle.trail import show
@@ -274,7 +274,7 @@ def test_a_failed_quality_threshold_is_reported(folder):
     record = records.read_json(path)
     record["reviewer"]["thresholds"][0]["value"] = 10**6
     path.write_text(
-        json.dumps(inputs_module.sign_inputs(record, KEYS), indent=2) + "\n",
+        json.dumps(inputs.sign_inputs(record, KEYS), indent=2) + "\n",
         encoding="utf-8",
     )
     report = reseal(folder)
@@ -302,10 +302,10 @@ def test_inputs_structure_problems_are_listed():
     record = copy.deepcopy(
         records.read_json(EVIDENCE / "trail" / records.INPUTS)
     )
-    assert inputs_module.structure_problems(record) == []
+    assert inputs.structure_problems(record) == []
     record["stakeholder"].pop("expectation")
     record["reviewer"]["thresholds"][0]["op"] = "~"
-    found = inputs_module.structure_problems(record)
+    found = inputs.structure_problems(record)
     assert any("expectation" in item for item in found)
     assert any("operator" in item for item in found)
 

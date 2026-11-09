@@ -9,8 +9,8 @@ worth deploying if it beats both at the steps that matter.
 from collections.abc import Sequence
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.evaluation import forecast
 
@@ -32,13 +32,13 @@ def seasonal_lag(step: int, period: int) -> int:
 
 
 def seasonal_naive(
-    frame: pd.DataFrame,
-    positions: np.ndarray,
+    frame: pandas.DataFrame,
+    positions: numpy.ndarray,
     value: str,
     group: str | None,
     steps: int,
     period: int,
-) -> np.ndarray:
+) -> numpy.ndarray:
     """Seasonal-naive forecasts for the rows at `positions` of an ordered frame.
 
     Args:
@@ -61,10 +61,10 @@ def seasonal_naive(
         lag = seasonal_lag(step, period)
         shifted = series.shift(lag) if lag else frame[value]
         columns.append(shifted.to_numpy(float)[positions])
-    return np.column_stack(columns)
+    return numpy.column_stack(columns)
 
 
-def per_step_errors(truth: np.ndarray, guess: np.ndarray) -> list[float]:
+def per_step_errors(truth: numpy.ndarray, guess: numpy.ndarray) -> list[float]:
     """Mean absolute error at each step ahead.
 
     Args:
@@ -74,14 +74,14 @@ def per_step_errors(truth: np.ndarray, guess: np.ndarray) -> list[float]:
     Returns:
         One mean absolute error per step (column), in step order.
     """
-    return [float(v) for v in np.abs(truth - guess).mean(axis=0)]
+    return [float(v) for v in numpy.abs(truth - guess).mean(axis=0)]
 
 
 def report(
     estimator: Any,
-    features: pd.DataFrame,
-    primary: pd.Series,
-    seasonal: np.ndarray | None,
+    features: pandas.DataFrame,
+    primary: pandas.Series,
+    seasonal: numpy.ndarray | None,
 ) -> list[dict[str, float | None]]:
     """Per-step comparison of the model with the baselines on given rows.
 
@@ -102,7 +102,7 @@ def report(
     truth = forecast.truth_matrix(estimator, features, primary)
     steps = truth.shape[1]
     model = per_step_errors(
-        truth, np.asarray(estimator.predict(features), dtype=float)
+        truth, numpy.asarray(estimator.predict(features), dtype=float)
     )
     last = per_step_errors(
         truth, forecast.last_value(estimator, features, steps)
@@ -120,7 +120,7 @@ def report(
 
 
 def origins(
-    fitted: Sequence[tuple[Any, pd.DataFrame, pd.Series]],
+    fitted: Sequence[tuple[Any, pandas.DataFrame, pandas.Series]],
 ) -> list[dict[str, Any]]:
     """Per-origin step errors for models fitted on each fold's past.
 

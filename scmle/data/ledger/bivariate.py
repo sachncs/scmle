@@ -20,7 +20,7 @@ import dataclasses
 import hashlib
 import inspect
 
-import numpy as np
+import numpy
 from scipy import stats
 
 TWO_SIDED = "two-sided"
@@ -64,8 +64,8 @@ def untestable(n: int, note: str) -> Outcome:
 
 
 def complete_pairs(
-    x: np.ndarray, y: np.ndarray
-) -> tuple[np.ndarray, np.ndarray]:
+    x: numpy.ndarray, y: numpy.ndarray
+) -> tuple[numpy.ndarray, numpy.ndarray]:
     """Restricts both arrays to rows where neither value is missing.
 
     Args:
@@ -80,11 +80,11 @@ def complete_pairs(
         ValueError: If the arrays differ in shape or are not
             one-dimensional.
     """
-    xs = np.asarray(x, dtype=float)
-    ys = np.asarray(y, dtype=float)
+    xs = numpy.asarray(x, dtype=float)
+    ys = numpy.asarray(y, dtype=float)
     if xs.shape != ys.shape or xs.ndim != 1:
         raise ValueError("x and y must be one-dimensional and equally long")
-    keep = np.isfinite(xs) & np.isfinite(ys)
+    keep = numpy.isfinite(xs) & numpy.isfinite(ys)
     return xs[keep], ys[keep]
 
 
@@ -109,7 +109,7 @@ def tail_probability(t_value: float, freedom: int, direction: str) -> float:
 
 
 def spearman(
-    x: np.ndarray, y: np.ndarray, direction: str = TWO_SIDED
+    x: numpy.ndarray, y: numpy.ndarray, direction: str = TWO_SIDED
 ) -> Outcome:
     """Tests a Spearman rank correlation with the t approximation.
 
@@ -135,11 +135,11 @@ def spearman(
     n = len(xs)
     if n < MIN_PAIRS:
         return untestable(n, "fewer than three complete pairs")
-    if np.ptp(xs) == 0.0 or np.ptp(ys) == 0.0:
+    if numpy.ptp(xs) == 0.0 or numpy.ptp(ys) == 0.0:
         return untestable(n, "a variable is constant")
     rx = stats.rankdata(xs)
     ry = stats.rankdata(ys)
-    rho = float(np.corrcoef(rx, ry)[0, 1])
+    rho = float(numpy.corrcoef(rx, ry)[0, 1])
     rho = max(-1.0, min(1.0, rho))
     if abs(rho) >= 1.0:
         limit = {
@@ -148,13 +148,13 @@ def spearman(
             LESS: 0.0 if rho < 0 else 1.0,
         }
         return Outcome(limit[direction], rho, rho, n)
-    t_value = rho * float(np.sqrt((n - 2) / (1.0 - rho * rho)))
+    t_value = rho * float(numpy.sqrt((n - 2) / (1.0 - rho * rho)))
     p = min(1.0, max(0.0, tail_probability(t_value, n - 2, direction)))
     return Outcome(p, rho, rho, n)
 
 
 def kruskal(
-    x: np.ndarray, labels: np.ndarray, direction: str = TWO_SIDED
+    x: numpy.ndarray, labels: numpy.ndarray, direction: str = TWO_SIDED
 ) -> Outcome:
     """Runs the Kruskal-Wallis H test of a feature across target classes.
 
@@ -176,11 +176,11 @@ def kruskal(
         raise ValueError("kruskal supports only the two-sided alternative")
     xs, ls = complete_pairs(x, labels)
     n = len(xs)
-    groups = [xs[ls == code] for code in np.unique(ls)]
+    groups = [xs[ls == code] for code in numpy.unique(ls)]
     groups = [g for g in groups if len(g) > 0]
     if len(groups) < 2 or n < MIN_PAIRS:
         return untestable(n, "fewer than two classes or three rows")
-    if np.ptp(xs) == 0.0:
+    if numpy.ptp(xs) == 0.0:
         return untestable(n, "a variable is constant")
     result = stats.kruskal(*groups)
     h = float(result.statistic)
@@ -230,7 +230,10 @@ def lookup(statistic: str) -> Callable[..., Outcome]:
 
 
 def run_statistic(
-    statistic: str, x: np.ndarray, y: np.ndarray, direction: str = TWO_SIDED
+    statistic: str,
+    x: numpy.ndarray,
+    y: numpy.ndarray,
+    direction: str = TWO_SIDED,
 ) -> Outcome:
     """Runs a registered statistic.
 

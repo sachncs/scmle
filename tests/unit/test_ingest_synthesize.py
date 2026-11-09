@@ -5,11 +5,11 @@ import datetime
 import fractions
 import pathlib
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
-from benchmarks.qualification import ingest_checks as checks
+from benchmarks.qualification import ingest_checks
 from scmle.contracts import qualification
 from scmle.data.admissibility import provenance
 from scmle.data.ingest import asof_view
@@ -21,7 +21,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 
 def small_view(rule=None, permissive=False):
-    frame = pd.DataFrame(
+    frame = pandas.DataFrame(
         {
             "cid": [1, 1, 1, 2],
             "ev": [1.0, 5.0, 9.0, 3.0],
@@ -36,7 +36,7 @@ def small_view(rule=None, permissive=False):
 
 
 def asked(cutoff, key=1):
-    return pd.DataFrame(
+    return pandas.DataFrame(
         {
             "cid": [key],
             asof_view.TARGET_COLUMN: [0],
@@ -60,7 +60,7 @@ def test_event_delay_mode_uses_the_declared_delay():
 
 def test_non_versioned_table_is_refused_unless_permissive():
     rule = asof_view.TimeRule(asof_view.NON_VERSIONED)
-    frame = pd.DataFrame({"cid": [1], "segment": ["gold"]})
+    frame = pandas.DataFrame({"cid": [1], "segment": ["gold"]})
     view = asof_view.AsOfView(frame, "cid", rule, name="dim")
     with pytest.raises(asof_view.NoAsOfRuleError):
         view.visible(asked(10.0))
@@ -99,7 +99,7 @@ def test_time_rule_validation_and_tiers():
 
 
 def test_reserved_and_missing_columns_are_rejected():
-    frame = pd.DataFrame({"cid": [1], "ev": [1.0], "event_days": [3]})
+    frame = pandas.DataFrame({"cid": [1], "ev": [1.0], "event_days": [3]})
     with pytest.raises(ValueError):
         asof_view.AsOfView(
             frame,
@@ -109,7 +109,7 @@ def test_reserved_and_missing_columns_are_rejected():
         )
     with pytest.raises(ValueError):
         asof_view.AsOfView(
-            pd.DataFrame({"cid": [1]}),
+            pandas.DataFrame({"cid": [1]}),
             "cid",
             asof_view.TimeRule(asof_view.EVENT_DELAY, None, 0),
             "ev",
@@ -117,10 +117,10 @@ def test_reserved_and_missing_columns_are_rejected():
 
 
 def test_datetime_columns_become_days_and_null_keys_never_match():
-    frame = pd.DataFrame(
+    frame = pandas.DataFrame(
         {
             "cid": [1, None],
-            "ev": pd.to_datetime(["2024-01-01", "2024-01-02"], utc=True),
+            "ev": pandas.to_datetime(["2024-01-01", "2024-01-02"], utc=True),
         }
     )
     view = asof_view.AsOfView(
@@ -129,14 +129,14 @@ def test_datetime_columns_become_days_and_null_keys_never_match():
     seen = view.visible(asked(20_000.0, key=1))
     assert len(seen) == 1
     assert seen[asof_view.EVENT_COLUMN].iloc[0] == pytest.approx(19_723.0)
-    assert asof_view.to_days(pd.Series(["2024-01-01"]))[0] == pytest.approx(
+    assert asof_view.to_days(pandas.Series(["2024-01-01"]))[0] == pytest.approx(
         19_723.0
     )
 
 
 def test_scope_boundaries_match_the_reference_on_a_small_table():
     source = synthesize.Source(small_view(), "cid")
-    targets = pd.DataFrame({"cid": [1], "moment": [11.0]})
+    targets = pandas.DataFrame({"cid": [1], "moment": [11.0]})
     spec = synthesize.FeatureSpec("f", "aggregate", 0, "sum", "val", None)
     got = synthesize.evaluate(spec, targets, "moment", [source], [], 1.0)
     assert got.tolist() == [40.0]  # cutoff 10: values 10 and 30
@@ -144,29 +144,31 @@ def test_scope_boundaries_match_the_reference_on_a_small_table():
 
 @pytest.mark.parametrize("seed", range(150))
 def test_differential_against_the_naive_reference(seed):
-    assert checks.differential_equal(seed), seed
+    assert ingest_checks.differential_equal(seed), seed
 
 
 @pytest.mark.parametrize("seed", range(150))
 def test_metamorphic_rewriting_unknown_rows_changes_nothing(seed):
-    assert checks.metamorphic_unchanged(seed), seed
+    assert ingest_checks.metamorphic_unchanged(seed), seed
 
 
 def test_late_arrival_worlds_leak_for_the_baseline_and_not_for_the_view():
-    results = [checks.late_leaks(seed) for seed in range(40)]
+    results = [ingest_checks.late_leaks(seed) for seed in range(40)]
     assert all(r.view == 0 for r in results)
     assert sum(r.baseline > 0 for r in results) >= 35
 
 
 def test_synthesis_declares_family_size_and_drops_with_reasons():
-    rng = np.random.default_rng(0)
-    targets = pd.DataFrame({"cid": np.arange(30), "moment": np.full(30, 80.0)})
-    events = pd.DataFrame(
+    rng = numpy.random.default_rng(0)
+    targets = pandas.DataFrame(
+        {"cid": numpy.arange(30), "moment": numpy.full(30, 80.0)}
+    )
+    events = pandas.DataFrame(
         {
             "cid": rng.integers(0, 30, 400),
             "ev": rng.uniform(0, 100, 400),
             "amt": rng.normal(size=400),
-            "flat": np.ones(400),
+            "flat": numpy.ones(400),
         }
     )
     view = asof_view.AsOfView(
@@ -194,8 +196,8 @@ def test_synthesis_declares_family_size_and_drops_with_reasons():
 
 
 def test_mutable_dimension_is_excluded_by_default_and_unverified_when_opened():
-    targets = pd.DataFrame({"cid": [1, 2, 3], "moment": [10.0, 10.0, 10.0]})
-    dim = pd.DataFrame({"cid": [1, 2, 3], "segment": ["a", "b", "a"]})
+    targets = pandas.DataFrame({"cid": [1, 2, 3], "moment": [10.0, 10.0, 10.0]})
+    dim = pandas.DataFrame({"cid": [1, 2, 3], "segment": ["a", "b", "a"]})
     rule = asof_view.TimeRule(asof_view.NON_VERSIONED)
     closed = asof_view.AsOfView(dim, "cid", rule, name="dim")
     out = synthesize.synthesize(
@@ -233,10 +235,10 @@ def attested_rule(kind=asof_view.EVENT_DELAY):
 
 
 def test_feature_tier_is_the_weakest_source_tier():
-    targets = pd.DataFrame({"cid": [1, 2, 1], "moment": [10.0, 10.0, 2.0]})
+    targets = pandas.DataFrame({"cid": [1, 2, 1], "moment": [10.0, 10.0, 2.0]})
     strong = small_view(attested_rule(asof_view.TRANSACTION))
     weak = asof_view.AsOfView(
-        pd.DataFrame({"cid": [1, 2], "ev": [1.0, 1.0], "x": [1.0, 2.0]}),
+        pandas.DataFrame({"cid": [1, 2], "ev": [1.0, 1.0], "x": [1.0, 2.0]}),
         "cid",
         asof_view.TimeRule(asof_view.EVENT_DELAY, None, 0.0),
         "ev",
@@ -264,8 +266,8 @@ def test_feature_tier_is_the_weakest_source_tier():
 
 
 def test_nested_features_are_depth_two_and_registered():
-    schema = checks.random_schema(11)
-    source, items = checks.views(schema)
+    schema = ingest_checks.random_schema(11)
+    source, items = ingest_checks.views(schema)
     nest = synthesize.Nest(source, items, "oid")
     out = synthesize.synthesize(
         schema.targets, "moment", [source], [nest], schema.lag
@@ -274,9 +276,11 @@ def test_nested_features_are_depth_two_and_registered():
 
 
 def test_multiplicity_matches_registered_hypotheses_and_mismatch_fails():
-    targets = pd.DataFrame({"cid": np.arange(5), "moment": np.full(5, 50.0)})
-    rng = np.random.default_rng(1)
-    events = pd.DataFrame(
+    targets = pandas.DataFrame(
+        {"cid": numpy.arange(5), "moment": numpy.full(5, 50.0)}
+    )
+    rng = numpy.random.default_rng(1)
+    events = pandas.DataFrame(
         {
             "cid": rng.integers(0, 5, 60),
             "ev": rng.uniform(0, 40, 60),
@@ -372,7 +376,7 @@ def test_weakest_tier_and_unknown_inputs():
         synthesize.Source(small_view(), "cid", role="sibling")
     with pytest.raises(ValueError):
         synthesize.synthesize(
-            pd.DataFrame({"cid": [1], "moment": [1.0]}),
+            pandas.DataFrame({"cid": [1], "moment": [1.0]}),
             "moment",
             [synthesize.Source(small_view(), "cid")],
             lag_days=-1.0,

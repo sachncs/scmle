@@ -51,10 +51,10 @@ from scmle.contracts import errors
 from scmle.contracts import events
 from scmle.deploy import contract
 from scmle.deploy import control
-from scmle.deploy import observation as observation_module
+from scmle.deploy import observation
 from scmle.deploy import release
 from scmle.governance import deployment_ledger
-from scmle.governance import registry as registry_module
+from scmle.governance import registry
 
 STATE_FILE = "release_state.json"
 STATE_FORMAT = 1
@@ -166,7 +166,7 @@ class Outcome:
         }
 
 
-Health = Callable[[observation_module.Observation, int], list[str]]
+Health = Callable[[observation.Observation, int], list[str]]
 """``health(observation, percent)`` returns reasons to stop a rollout."""
 
 
@@ -175,7 +175,7 @@ class ReleaseRegistry:
 
     def __init__(
         self,
-        store: registry_module.ModelRegistryStore,
+        store: registry.ModelRegistryStore,
         ledger: deployment_ledger.DeploymentLedger | None = None,
         policy: control.ConfirmPolicy | None = None,
     ) -> None:
@@ -375,7 +375,7 @@ class ReleaseRegistry:
         self,
         model: str,
         version: int,
-        approval: registry_module.PromotionApproval,
+        approval: registry.PromotionApproval,
         signing_key: str | bytes | None = None,
     ) -> None:
         """Marks a version approved after checking its approval.
@@ -622,7 +622,7 @@ class ReleaseRegistry:
     @staticmethod
     def present(
         revision: str, image_digest: str
-    ) -> Callable[[observation_module.Observation], list[str]]:
+    ) -> Callable[[observation.Observation], list[str]]:
         """Builds a check that the revision exists and runs the digest.
 
         The check ignores the share of traffic and readiness.
@@ -637,7 +637,7 @@ class ReleaseRegistry:
             digest.
         """
 
-        def check(seen: observation_module.Observation) -> list[str]:
+        def check(seen: observation.Observation) -> list[str]:
             digest = seen.digest_of(revision)
             if digest is None:
                 return [f"revision {revision} is not reported"]
@@ -759,7 +759,7 @@ class ReleaseRegistry:
                 self.store.promote(
                     model,
                     version,
-                    registry_module.CHAMPION,
+                    registry.CHAMPION,
                     release.approval_from_dict(stored),
                     signing_key,
                 )
@@ -938,7 +938,7 @@ class ReleaseRegistry:
                     self.store.promote(
                         model,
                         target["version"],
-                        registry_module.CHAMPION,
+                        registry.CHAMPION,
                         release.approval_from_dict(stored),
                         signing_key,
                         guard_detail={
@@ -984,7 +984,7 @@ class ReleaseRegistry:
         self,
         model: str,
         environment: str,
-        seen: observation_module.Observation,
+        seen: observation.Observation,
     ) -> int:
         """Returns the version the registry says is deployed, if confirmed.
 
@@ -1041,7 +1041,7 @@ class ReleaseRegistry:
         self,
         model: str,
         environment: str,
-        seen: observation_module.Observation,
+        seen: observation.Observation,
     ) -> ReconcileReport:
         """Compares the registry and the ledger with a platform observation.
 
@@ -1125,7 +1125,7 @@ class ReleaseRegistry:
                 Finding("not_ready", "the platform does not report ready")
             )
         if environment == PRODUCTION_ENVIRONMENT:
-            champion = self.store.aliases(model).get(registry_module.CHAMPION)
+            champion = self.store.aliases(model).get(registry.CHAMPION)
             expected = None if recorded is None else recorded["version"]
             if champion is not None and champion != expected:
                 findings.append(

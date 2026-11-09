@@ -15,10 +15,10 @@ fixed before the first run:
   it does not halt the loop or act.
 """
 
-import numpy as np
+import numpy
 import pytest
 
-from scmle.governance import deployment_ledger as dl
+from scmle.governance import deployment_ledger
 from scmle.operations import controller as controller_module
 from tests.simulation import world as worlds
 
@@ -49,10 +49,12 @@ def run(world, ticks, controller, **deliveries):
 
 
 def check_properties(world, trainer=None, limit=0):
-    ledger = dl.DeploymentLedger.load(world.deploy / dl.FILE_NAME)  # on disk
+    ledger = deployment_ledger.DeploymentLedger.load(
+        world.deploy / deployment_ledger.FILE_NAME
+    )  # on disk
     assert {row["kind"] for row in ledger.rows} <= worlds.ALLOWED_KINDS
     assert not ledger.attestations and not ledger.used  # no person needed
-    uses = worlds.kinds(ledger, dl.ENVELOPE_USED)
+    uses = worlds.kinds(ledger, deployment_ledger.ENVELOPE_USED)
     assert len(uses) <= limit  # within the envelope
     if trainer is not None:
         assert trainer.calls == len(uses)  # trainings equal uses
@@ -83,7 +85,7 @@ def test_a_stable_world_raises_nothing(tmp_path):
     controller.envelopes.grant(worlds.envelope(limit=2))
     run(world, 40, controller)
     ledger = check_properties(world, trainer, limit=2)
-    assert not worlds.kinds(ledger, dl.ALARM)
+    assert not worlds.kinds(ledger, deployment_ledger.ALARM)
     assert trainer.calls == 0
     assert not controller.loop.pending_escalations()
 
@@ -96,12 +98,14 @@ def test_an_abrupt_rise_trains_one_challenger_inside_the_envelope(tmp_path):
     run(world, 80, controller)
     ledger = check_properties(world, trainer, limit=1)
     assert trainer.calls == 1
-    assert worlds.kinds(ledger, dl.RETRAIN)[0]["body"]["challenger"] == (
-        "challenger-1"
-    )
+    assert worlds.kinds(ledger, deployment_ledger.RETRAIN)[0]["body"][
+        "challenger"
+    ] == ("challenger-1")
     assert controller.envelopes.remaining("e1") == {"train_challenger": 0}
     alarms = [
-        r for r in worlds.kinds(ledger, dl.ALARM) if r["body"]["rule"] == "L1"
+        r
+        for r in worlds.kinds(ledger, deployment_ledger.ALARM)
+        if r["body"]["rule"] == "L1"
     ]
     assert alarms and alarms[0]["body"]["batch"] >= 30
 
@@ -187,7 +191,9 @@ def test_delayed_labels_alarm_only_after_they_arrive(tmp_path):
     run(world, 85, controller)
     ledger = check_properties(world, trainer, limit=1)
     alarms = [
-        r for r in worlds.kinds(ledger, dl.ALARM) if r["body"]["rule"] == "L1"
+        r
+        for r in worlds.kinds(ledger, deployment_ledger.ALARM)
+        if r["body"]["rule"] == "L1"
     ]
     assert alarms and alarms[0]["body"]["batch"] >= 30
 
@@ -234,10 +240,14 @@ def test_a_corrupted_batch_is_set_aside_and_the_rest_applied(tmp_path):
 
 def challenger_losses(stream, kind):
     """Paired losses of a challenger that is better or worse than the champion."""
-    rng = np.random.default_rng(11)
+    rng = numpy.random.default_rng(11)
     if kind == "better":
-        return np.where(rng.random(stream.loss.shape) < 0.8, 0.0, stream.loss)
-    return np.maximum(stream.loss, (rng.random(stream.loss.shape) < 0.3) * 1.0)
+        return numpy.where(
+            rng.random(stream.loss.shape) < 0.8, 0.0, stream.loss
+        )
+    return numpy.maximum(
+        stream.loss, (rng.random(stream.loss.shape) < 0.3) * 1.0
+    )
 
 
 @pytest.mark.parametrize("kind", ["better", "poisoned"])
@@ -252,13 +262,13 @@ def test_a_challenger_may_earn_a_proposal_but_never_a_promotion(tmp_path, kind):
         world.deliver(index, challenger=("candidate", matrix))
         controller.tick(world.inbox)
     ledger = check_properties(world, trainer, limit=1)
-    proposals = worlds.kinds(ledger, dl.PROMOTION_PROPOSAL)
+    proposals = worlds.kinds(ledger, deployment_ledger.PROMOTION_PROPOSAL)
     if kind == "poisoned":
         assert not proposals
     else:
         assert proposals
     assert not ledger.attestations and not ledger.used
-    assert not worlds.kinds(ledger, dl.DEPLOYMENT)
+    assert not worlds.kinds(ledger, deployment_ledger.DEPLOYMENT)
 
 
 # ------------------------------------------------------ kill and start again
@@ -317,4 +327,6 @@ def test_killed_at_any_checkpoint_it_ends_where_an_uninterrupted_run_ends(
             seen[kill],
         )
         assert controller.loop.batch == ticks
-        dl.DeploymentLedger.load(world.deploy / dl.FILE_NAME)
+        deployment_ledger.DeploymentLedger.load(
+            world.deploy / deployment_ledger.FILE_NAME
+        )

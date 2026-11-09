@@ -29,7 +29,7 @@ from numpy.typing import NDArray
 from scipy import stats
 
 from scmle.core import randomness
-from scmle.data.charter import decision as charter_decision
+from scmle.data.charter import decision
 from scmle.data.framing import costs
 from scmle.decision import netbenefit
 
@@ -206,7 +206,7 @@ def satisfaction_test(
     y: ArrayLike,
     acts: ArrayLike,
     groups: ArrayLike,
-    constraint: charter_decision.FairnessConstraint,
+    constraint: decision.FairnessConstraint,
     alpha: float = 0.05,
 ) -> SatisfactionTest:
     """Tests whether the frozen rule's group gap is at most `max_gap`.
@@ -297,7 +297,7 @@ def cluster_satisfaction_test(
     acts: ArrayLike,
     groups: ArrayLike,
     clusters: ArrayLike,
-    constraint: charter_decision.FairnessConstraint,
+    constraint: decision.FairnessConstraint,
     alpha: float = 0.05,
     draws: int = 1000,
     seed: int = 0,
@@ -451,7 +451,7 @@ def base_rates(
 
 
 def check_feasibility(
-    constraints: Sequence[charter_decision.FairnessConstraint],
+    constraints: Sequence[decision.FairnessConstraint],
     y: ArrayLike,
     groups: ArrayLike,
     alpha: float = 0.05,
@@ -576,7 +576,7 @@ def fit_group_thresholds(
     scores: ArrayLike,
     y: ArrayLike,
     groups: ArrayLike,
-    constraint: charter_decision.FairnessConstraint,
+    constraint: decision.FairnessConstraint,
     t: float,
     *,
     margin: float = 0.5,
@@ -662,7 +662,7 @@ def frontier(
     scores: ArrayLike,
     y: ArrayLike,
     groups: ArrayLike,
-    constraint: charter_decision.FairnessConstraint,
+    constraint: decision.FairnessConstraint,
     t: float,
     gaps: Sequence[float],
 ) -> list[dict[str, Any]]:

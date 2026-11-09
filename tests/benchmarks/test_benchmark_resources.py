@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-import pandas as pd
+import pandas
 import pytest
 
 from benchmarks import datasets
@@ -12,7 +12,7 @@ from benchmarks import run_benchmarks
 class BrokenDataset(datasets.BenchmarkDataset):
     """Dataset fixture whose source fails before any seed can complete."""
 
-    def fetch(self) -> pd.DataFrame:
+    def fetch(self) -> pandas.DataFrame:
         """Raise a deterministic source failure."""
         raise OSError("fixture source unavailable")
 

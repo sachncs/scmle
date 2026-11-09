@@ -5,7 +5,7 @@ from scmle.evaluation import fairness
 from scmle.evaluation import robustness
 from scmle.evaluation import shift
 from scmle.evaluation import slices
-from scmle.explainability import suite as explanation_suite
+from scmle.explainability import suite
 
 
 def full_suite() -> tuple[diagnostics.Diagnostic, ...]:
@@ -25,5 +25,5 @@ def full_suite() -> tuple[diagnostics.Diagnostic, ...]:
         fairness.FairnessReport(),
         robustness.RobustnessReport(),
         shift.AdversarialValidation(),
-        *explanation_suite.default_suite(),
+        *suite.default_suite(),
     )

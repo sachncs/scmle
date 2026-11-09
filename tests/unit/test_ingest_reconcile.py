@@ -2,13 +2,13 @@
 
 import pytest
 
-from benchmarks.qualification import ingest_worlds as worlds
+from benchmarks.qualification import ingest_worlds
 from scmle.data.detectors import certificates
 from scmle.data.ingest import reconcile
 
 
 def run(kind, seed=5, gate=certificates.GateStatus.DESCRIPTIVE):
-    extract = worlds.reconcile_world(seed, kind)
+    extract = ingest_worlds.reconcile_world(seed, kind)
     return reconcile.reconcile_extract(
         extract.db.source(),
         extract.assembled,
@@ -49,7 +49,7 @@ def test_gate_decides_whether_the_check_blocks():
 
 
 def test_zero_source_total_is_listed_not_passed():
-    extract = worlds.reconcile_world(1, "clean")
+    extract = ingest_worlds.reconcile_world(1, "clean")
     extract.db.execute("UPDATE orders SET amount = 0")
     report = reconcile.reconcile_extract(
         extract.db.source(), extract.assembled, "orders", ["amount"]
@@ -60,7 +60,7 @@ def test_zero_source_total_is_listed_not_passed():
 
 
 def test_feature_total_is_compared_with_a_source_aggregate():
-    extract = worlds.reconcile_world(2, "clean")
+    extract = ingest_worlds.reconcile_world(2, "clean")
     total = float(
         extract.db.frame("SELECT SUM(amount) AS s FROM orders")["s"][0]
     )

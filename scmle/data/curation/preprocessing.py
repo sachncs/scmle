@@ -12,7 +12,7 @@ from typing import Any
 from sklearn import compose
 from sklearn import pipeline
 
-from scmle.contracts import data as data_contracts
+from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.contracts import models
 from scmle.contracts import tasks
@@ -21,7 +21,7 @@ from scmle.data.validation import columns
 from scmle.features import feature_graph
 from scmle.models import weighting
 from scmle.models import wrappers
-from scmle.models.forecasting import estimators as forecast_estimators
+from scmle.models.forecasting import estimators
 from scmle.models.multitarget import wrapper as multitarget_wrapper
 from scmle.models.ranking import wrapper as ranking_wrapper
 from scmle.models.survival import wrapper as survival_wrapper
@@ -31,8 +31,8 @@ SPARSE_THRESHOLD = 0.3
 
 
 def build_preprocessor(
-    plan: data_contracts.FeaturePlan,
-    options: data_contracts.PreprocessingOptions,
+    plan: data.FeaturePlan,
+    options: data.PreprocessingOptions,
 ) -> compose.ColumnTransformer:
     """Builds the column transformer for a feature plan.
 
@@ -82,7 +82,7 @@ def build_preprocessor(
 
 
 def split_flagged(
-    plan: data_contracts.FeaturePlan, selected: list[str]
+    plan: data.FeaturePlan, selected: list[str]
 ) -> tuple[list[str], list[str]]:
     """Numeric columns whose gaps are informative, and the rest.
 
@@ -104,9 +104,7 @@ def split_flagged(
     return flagged, [c for c in selected if c not in flagged]
 
 
-def monotonic_signs(
-    plan: data_contracts.FeaturePlan, offset: int
-) -> tuple[int, ...]:
+def monotonic_signs(plan: data.FeaturePlan, offset: int) -> tuple[int, ...]:
     """Monotonic signs for the leading columns of the encoded matrix.
 
     The encoded matrix starts with the specially encoded high-cardinality
@@ -131,7 +129,7 @@ def monotonic_signs(
 
 
 def monotonic_layout_problem(
-    plan: data_contracts.FeaturePlan, select: bool, missing: str
+    plan: data.FeaturePlan, select: bool, missing: str
 ) -> str | None:
     """Why the monotonic signs cannot follow the encoded numeric columns.
 
@@ -160,8 +158,8 @@ def monotonic_layout_problem(
 
 
 def split_high_cardinality(
-    plan: data_contracts.FeaturePlan,
-    options: data_contracts.PreprocessingOptions,
+    plan: data.FeaturePlan,
+    options: data.PreprocessingOptions,
 ) -> tuple[str, ...]:
     """Columns that get a special encoder instead of one-hot encoding.
 
@@ -183,8 +181,8 @@ def split_high_cardinality(
 
 
 def build_front_end(
-    plan: data_contracts.FeaturePlan,
-    options: data_contracts.PreprocessingOptions,
+    plan: data.FeaturePlan,
+    options: data.PreprocessingOptions,
 ) -> Any:
     """Builds the preprocessing front end, with the feature graph if any.
 
@@ -208,8 +206,8 @@ def build_front_end(
 
 
 def default_options(
-    plan: data_contracts.FeaturePlan, adapter: models.ModelAdapter
-) -> data_contracts.PreprocessingOptions:
+    plan: data.FeaturePlan, adapter: models.ModelAdapter
+) -> data.PreprocessingOptions:
     """Preprocessing switches implied by an adapter's capabilities.
 
     Scaling for models that benefit from it, no imputation for models that
@@ -231,7 +229,7 @@ def default_options(
         and caps.native_categorical
         and adapter.categorical_params([0])
     )
-    return data_contracts.PreprocessingOptions(
+    return data.PreprocessingOptions(
         scale=caps.needs_scaling,
         impute=not caps.handles_missing,
         high_cardinality="ordinal" if native else "onehot",
@@ -242,12 +240,12 @@ def default_options(
 
 
 def build_pipeline(
-    plan: data_contracts.FeaturePlan,
+    plan: data.FeaturePlan,
     adapter: models.ModelAdapter,
     task: tasks.TaskType,
     seed: int,
     params: Mapping[str, Any] | None = None,
-    options: data_contracts.PreprocessingOptions | None = None,
+    options: data.PreprocessingOptions | None = None,
 ) -> Any:
     """Builds a complete, independently evaluable candidate pipeline.
 
@@ -268,7 +266,7 @@ def build_pipeline(
         params = {**(params or {}), "classify": plan.binary_outcome}
     assembled: Any
     if task is tasks.TaskType.FORECAST and adapter.name == "dummy":
-        assembled = forecast_estimators.LastValueForecaster(
+        assembled = estimators.LastValueForecaster(
             None, plan.target_columns, plan.value_column or ""
         )
     else:
@@ -319,7 +317,7 @@ def build_pipeline(
     if plan.event_column:
         built = survival_wrapper.EventAwareEstimator(built, plan.event_column)
     if task is tasks.TaskType.FORECAST:
-        built = forecast_estimators.ForecastEstimator(
+        built = estimators.ForecastEstimator(
             built, plan.target_columns, plan.value_column or ""
         )
     elif plan.target_columns:

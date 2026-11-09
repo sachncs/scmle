@@ -2,25 +2,25 @@
 
 from hypothesis import given
 from hypothesis import settings
-from hypothesis import strategies as st
-import numpy as np
-import pandas as pd
+from hypothesis import strategies
+import numpy
+import pandas
 import pytest
 
 from scmle.artifacts import bundle as bundle_module
-from scmle.contracts import data as data_contracts
+from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.data.curation import preprocessing
-from scmle.models import registry as registry_module
+from scmle.models import registry
 
-PLAN = data_contracts.FeaturePlan(("age", "income"), ("city",))
-REGISTRY = registry_module.ModelRegistry.with_builtins()
+PLAN = data.FeaturePlan(("age", "income"), ("city",))
+REGISTRY = registry.ModelRegistry.with_builtins()
 
 
 def people(rows=800, seed=0):
-    rng = np.random.default_rng(seed)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    frame = pandas.DataFrame(
         {
             "age": rng.integers(20, 70, rows).astype(float),
             "income": rng.normal(50, 15, rows),
@@ -28,7 +28,7 @@ def people(rows=800, seed=0):
         }
     )
     score = (frame.income - 50) / 15 + (frame.city == "north") * 1.0
-    frame["approved"] = np.where(
+    frame["approved"] = numpy.where(
         score + rng.normal(0, 0.3, rows) > 0.4, "yes", "no"
     )
     return frame
@@ -74,7 +74,7 @@ def test_a_denied_applicant_gets_a_small_change_that_flips_the_decision(
     assert found.found and found.prediction == "yes"
     assert 1 <= found.n_changed <= 2
     assert found.distance > 0
-    assert bundle.predict(pd.DataFrame([found.row]))[0] == "yes"
+    assert bundle.predict(pandas.DataFrame([found.row]))[0] == "yes"
 
 
 def test_every_change_in_the_answer_is_needed(classifier):
@@ -87,7 +87,7 @@ def test_every_change_in_the_answer_is_needed(classifier):
 
     for column in found.changed:
         reverted = {**found.row, column: row[column]}
-        assert bundle.predict(pd.DataFrame([reverted]))[0] != "yes"
+        assert bundle.predict(pandas.DataFrame([reverted]))[0] != "yes"
 
 
 def test_an_irrelevant_column_cannot_reach_the_outcome(classifier):
@@ -102,9 +102,11 @@ def test_an_irrelevant_column_cannot_reach_the_outcome(classifier):
 
 @settings(max_examples=25, deadline=None)
 @given(
-    index=st.integers(min_value=0, max_value=799),
-    chosen=st.lists(
-        st.sampled_from(["age", "income", "city"]), unique=True, min_size=1
+    index=strategies.integers(min_value=0, max_value=799),
+    chosen=strategies.lists(
+        strategies.sampled_from(["age", "income", "city"]),
+        unique=True,
+        min_size=1,
     ),
 )
 def test_columns_that_are_not_actionable_never_change(

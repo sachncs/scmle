@@ -3,8 +3,8 @@
 from typing import Any
 from typing import Self
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.models.multitarget import wrapper
 
@@ -74,7 +74,7 @@ class LastValueForecaster(wrapper.MultiOutputEstimator):
         """
         return self
 
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """The current value repeated for every step.
 
         Args:
@@ -85,7 +85,7 @@ class LastValueForecaster(wrapper.MultiOutputEstimator):
             Array of shape `(n_rows, len(target_columns))`; every column holds
             the row's current value.
         """
-        current = pd.to_numeric(
-            pd.DataFrame(features)[self.value_column], errors="coerce"
+        current = pandas.to_numeric(
+            pandas.DataFrame(features)[self.value_column], errors="coerce"
         ).to_numpy(dtype=float)
-        return np.tile(current[:, None], (1, len(self.target_columns)))
+        return numpy.tile(current[:, None], (1, len(self.target_columns)))

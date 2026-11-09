@@ -1,15 +1,15 @@
 """Hyperband tuning and Pareto selection in real runs."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import support
 
 from scmle.contracts import tasks
 
 
 def frame(rows=800, seed=0):
-    rng = np.random.default_rng(seed)
-    data = pd.DataFrame({f"x{i}": rng.normal(size=rows) for i in range(4)})
+    rng = numpy.random.default_rng(seed)
+    data = pandas.DataFrame({f"x{i}": rng.normal(size=rows) for i in range(4)})
     data["y"] = (data.x0 + data.x1**2 + rng.normal(0, 0.5, rows) > 0.5).astype(
         int
     )

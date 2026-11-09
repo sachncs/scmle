@@ -10,8 +10,8 @@ from typing import Any
 from typing import ClassVar
 from typing import Self
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from sklearn import base
 
 
@@ -26,8 +26,8 @@ class Resampler(abc.ABC):
 
     @abc.abstractmethod
     def resample(
-        self, features: pd.DataFrame, target: pd.Series, seed: int
-    ) -> tuple[pd.DataFrame, pd.Series]:
+        self, features: pandas.DataFrame, target: pandas.Series, seed: int
+    ) -> tuple[pandas.DataFrame, pandas.Series]:
         """Rebalances the training data for one fit operation.
 
         Args:
@@ -46,8 +46,8 @@ class IndexResampler(Resampler):
 
     @abc.abstractmethod
     def indices(
-        self, target: pd.Series, rng: np.random.Generator
-    ) -> np.ndarray:
+        self, target: pandas.Series, rng: numpy.random.Generator
+    ) -> numpy.ndarray:
         """Chooses row positions for a resampled training set.
 
         Args:
@@ -59,8 +59,8 @@ class IndexResampler(Resampler):
         """
 
     def resample(
-        self, features: pd.DataFrame, target: pd.Series, seed: int
-    ) -> tuple[pd.DataFrame, pd.Series]:
+        self, features: pandas.DataFrame, target: pandas.Series, seed: int
+    ) -> tuple[pandas.DataFrame, pandas.Series]:
         """Selects rows from the input according to ``indices``.
 
         Args:
@@ -71,7 +71,7 @@ class IndexResampler(Resampler):
         Returns:
             The selected features and labels, with a fresh index.
         """
-        chosen = self.indices(target, np.random.default_rng(seed))
+        chosen = self.indices(target, numpy.random.default_rng(seed))
         return (
             features.iloc[chosen].reset_index(drop=True),
             target.iloc[chosen].reset_index(drop=True),
@@ -84,8 +84,8 @@ class RandomOverSampler(IndexResampler):
     name = "random_oversample"
 
     def indices(
-        self, target: pd.Series, rng: np.random.Generator
-    ) -> np.ndarray:
+        self, target: pandas.Series, rng: numpy.random.Generator
+    ) -> numpy.ndarray:
         """Samples minority rows with replacement up to the majority count.
 
         Args:
@@ -96,7 +96,7 @@ class RandomOverSampler(IndexResampler):
             Every original position plus the extra sampled positions, in
             random order.
         """
-        positions = np.arange(len(target))
+        positions = numpy.arange(len(target))
         counts = target.value_counts()
         goal = int(counts.max())
         chosen = [positions]
@@ -106,7 +106,7 @@ class RandomOverSampler(IndexResampler):
                 chosen.append(
                     rng.choice(members, goal - int(count), replace=True)
                 )
-        return rng.permutation(np.concatenate(chosen))
+        return rng.permutation(numpy.concatenate(chosen))
 
 
 class RandomUnderSampler(IndexResampler):
@@ -115,8 +115,8 @@ class RandomUnderSampler(IndexResampler):
     name = "random_undersample"
 
     def indices(
-        self, target: pd.Series, rng: np.random.Generator
-    ) -> np.ndarray:
+        self, target: pandas.Series, rng: numpy.random.Generator
+    ) -> numpy.ndarray:
         """Samples each class without replacement down to the smallest.
 
         Args:
@@ -127,7 +127,7 @@ class RandomUnderSampler(IndexResampler):
             The sampled positions, in random order; every class contributes
             as many positions as the smallest class has rows.
         """
-        positions = np.arange(len(target))
+        positions = numpy.arange(len(target))
         goal = int(target.value_counts().min())
         chosen = [
             rng.choice(
@@ -135,7 +135,7 @@ class RandomUnderSampler(IndexResampler):
             )
             for label in target.unique()
         ]
-        return rng.permutation(np.concatenate(chosen))
+        return rng.permutation(numpy.concatenate(chosen))
 
 
 class JitterOverSampler(IndexResampler):
@@ -161,8 +161,8 @@ class JitterOverSampler(IndexResampler):
         self.scale = scale
 
     def indices(
-        self, target: pd.Series, rng: np.random.Generator
-    ) -> np.ndarray:
+        self, target: pandas.Series, rng: numpy.random.Generator
+    ) -> numpy.ndarray:
         """Chooses source rows exactly like plain oversampling.
 
         Args:
@@ -175,8 +175,8 @@ class JitterOverSampler(IndexResampler):
         return RandomOverSampler().indices(target, rng)
 
     def resample(
-        self, features: pd.DataFrame, target: pd.Series, seed: int
-    ) -> tuple[pd.DataFrame, pd.Series]:
+        self, features: pandas.DataFrame, target: pandas.Series, seed: int
+    ) -> tuple[pandas.DataFrame, pandas.Series]:
         """Oversample, then jitter every repeated (synthetic) copy.
 
         Args:
@@ -189,21 +189,21 @@ class JitterOverSampler(IndexResampler):
             (non-boolean) columns of repeated rows, and the matching labels,
             both with a fresh index.
         """
-        rng = np.random.default_rng(seed)
+        rng = numpy.random.default_rng(seed)
         chosen = self.indices(target, rng)
         sampled = features.iloc[chosen].reset_index(drop=True)
-        repeated = pd.Series(chosen).duplicated().to_numpy()
+        repeated = pandas.Series(chosen).duplicated().to_numpy()
         numeric = [
             column
             for column in features.columns
-            if pd.api.types.is_numeric_dtype(features[column])
-            and not pd.api.types.is_bool_dtype(features[column])
+            if pandas.api.types.is_numeric_dtype(features[column])
+            and not pandas.api.types.is_bool_dtype(features[column])
         ]
         for column in numeric:
-            spread = float(pd.to_numeric(features[column]).std() or 0.0)
+            spread = float(pandas.to_numeric(features[column]).std() or 0.0)
             noise = rng.normal(0.0, self.scale * spread, repeated.sum())
             values = (
-                sampled[column].to_numpy(dtype=float, na_value=np.nan).copy()
+                sampled[column].to_numpy(dtype=float, na_value=numpy.nan).copy()
             )
             values[repeated] = values[repeated] + noise
             sampled[column] = values
@@ -259,13 +259,13 @@ class PreprocessedResamplingClassifier(
         self.preprocessor_ = base.clone(self.preprocessor).fit(features, target)
         encoded = self.preprocessor_.transform(features)
         resampled, labels = base.clone(self.sampler).fit_resample(
-            encoded, np.asarray(target)
+            encoded, numpy.asarray(target)
         )
         self.estimator_ = base.clone(self.estimator).fit(resampled, labels)
         self.classes_ = self.estimator_.classes_
         return self
 
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """Predicts from the preprocessed rows (no resampling).
 
         Args:
@@ -276,7 +276,7 @@ class PreprocessedResamplingClassifier(
         """
         return self.estimator_.predict(self.preprocessor_.transform(features))
 
-    def predict_proba(self, features: Any) -> np.ndarray:
+    def predict_proba(self, features: Any) -> numpy.ndarray:
         """Predicts class probabilities (no resampling).
 
         Args:
@@ -329,8 +329,8 @@ class ResamplingClassifier(base.ClassifierMixin, base.BaseEstimator):
         Returns:
             The fitted wrapper.
         """
-        labels = pd.Series(np.asarray(target))
-        frame = pd.DataFrame(features).reset_index(drop=True)
+        labels = pandas.Series(numpy.asarray(target))
+        frame = pandas.DataFrame(features).reset_index(drop=True)
         resampled, resampled_target = self.resampler.resample(
             frame, labels, self.random_state
         )
@@ -340,7 +340,7 @@ class ResamplingClassifier(base.ClassifierMixin, base.BaseEstimator):
         self.classes_ = self.estimator_.classes_
         return self
 
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """Predicts with the fitted classifier (no resampling).
 
         Args:
@@ -351,7 +351,7 @@ class ResamplingClassifier(base.ClassifierMixin, base.BaseEstimator):
         """
         return self.estimator_.predict(features)
 
-    def predict_proba(self, features: Any) -> np.ndarray:
+    def predict_proba(self, features: Any) -> numpy.ndarray:
         """Predicts class probabilities (no resampling).
 
         Args:
@@ -398,7 +398,7 @@ class DensityWeightedRegressor(base.RegressorMixin, base.BaseEstimator):
         self.bins = bins
         self.max_weight = max_weight
 
-    def weights(self, target: np.ndarray) -> np.ndarray:
+    def weights(self, target: numpy.ndarray) -> numpy.ndarray:
         """Computes inverse-density weights.
 
         Args:
@@ -409,11 +409,13 @@ class DensityWeightedRegressor(base.RegressorMixin, base.BaseEstimator):
             targets in its equal-width bin, capped at `max_weight` times the
             smallest weight, and scaled to a mean of 1.
         """
-        edges = np.histogram_bin_edges(target, bins=self.bins)
-        index = np.clip(np.digitize(target, edges[1:-1]), 0, len(edges) - 2)
-        counts = np.bincount(index, minlength=len(edges) - 1).astype(float)
+        edges = numpy.histogram_bin_edges(target, bins=self.bins)
+        index = numpy.clip(
+            numpy.digitize(target, edges[1:-1]), 0, len(edges) - 2
+        )
+        counts = numpy.bincount(index, minlength=len(edges) - 1).astype(float)
         raw = 1.0 / counts[index]
-        raw = np.minimum(raw, raw.min() * self.max_weight)
+        raw = numpy.minimum(raw, raw.min() * self.max_weight)
         return raw * len(raw) / raw.sum()
 
     def fit(self, features: Any, target: Any) -> Self:
@@ -426,13 +428,13 @@ class DensityWeightedRegressor(base.RegressorMixin, base.BaseEstimator):
         Returns:
             The fitted wrapper.
         """
-        values = np.asarray(target, dtype=float)
+        values = numpy.asarray(target, dtype=float)
         self.estimator_ = base.clone(self.estimator).fit(
             features, values, model__sample_weight=self.weights(values)
         )
         return self
 
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """Predicts with the fitted pipeline.
 
         Args:

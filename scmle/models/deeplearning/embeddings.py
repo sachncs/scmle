@@ -10,7 +10,7 @@ import collections
 import importlib
 from typing import Any
 
-import numpy as np
+import numpy
 
 CACHE_STRINGS = 200_000
 BATCH = 64
@@ -37,11 +37,11 @@ class Embedder:
         module = importlib.import_module("sentence_transformers")
         self.name = name
         self.model = module.SentenceTransformer(name, device="cpu")
-        self.cache: collections.OrderedDict[str, np.ndarray] = (
+        self.cache: collections.OrderedDict[str, numpy.ndarray] = (
             collections.OrderedDict()
         )
 
-    def embed(self, texts: list[str]) -> tuple[np.ndarray, int]:
+    def embed(self, texts: list[str]) -> tuple[numpy.ndarray, int]:
         """Embeds texts, encoding only those not seen before.
 
         Args:
@@ -57,18 +57,18 @@ class Embedder:
                 missing, batch_size=BATCH, show_progress_bar=False
             )
             for text, vector in zip(missing, vectors, strict=True):
-                self.cache[text] = np.asarray(vector, dtype=np.float32)
+                self.cache[text] = numpy.asarray(vector, dtype=numpy.float32)
         for text in texts:
             self.cache.move_to_end(text)
         while len(self.cache) > CACHE_STRINGS:
             self.cache.popitem(last=False)
-        return np.vstack([self.cache[t] for t in texts]), len(missing)
+        return numpy.vstack([self.cache[t] for t in texts]), len(missing)
 
 
 MODELS: dict[str, Embedder] = {}
 
 
-def embed(name: str, texts: list[str]) -> tuple[np.ndarray, int]:
+def embed(name: str, texts: list[str]) -> tuple[numpy.ndarray, int]:
     """Embeds `texts` with the (cached) model called `name`.
 
     Args:

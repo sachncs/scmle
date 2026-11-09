@@ -1,14 +1,14 @@
 """Tests for automatic feature construction and selection."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.data.curation import selection
 
 
 def frame(rows=600, seed=0):
-    rng = np.random.default_rng(seed)
-    data = pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    data = pandas.DataFrame(
         {
             "price": rng.uniform(1, 10, rows),
             "quantity": rng.uniform(1, 10, rows),
@@ -35,7 +35,9 @@ def test_the_most_associated_columns_are_combined_and_original_kept():
         "auto__price__minus__quantity",
     }
     expected = data.price / data.quantity
-    np.testing.assert_allclose(built["auto__price__over__quantity"], expected)
+    numpy.testing.assert_allclose(
+        built["auto__price__over__quantity"], expected
+    )
 
 
 def test_division_by_zero_becomes_missing_not_infinite():
@@ -48,8 +50,8 @@ def test_division_by_zero_becomes_missing_not_infinite():
         .transform(data)
     )
 
-    assert np.isnan(built.loc[0, "auto__price__over__quantity"])
-    assert not np.isinf(built.select_dtypes("number").to_numpy()).any()
+    assert numpy.isnan(built.loc[0, "auto__price__over__quantity"])
+    assert not numpy.isinf(built.select_dtypes("number").to_numpy()).any()
 
 
 def test_construction_learns_only_from_the_training_fold():
@@ -76,10 +78,10 @@ def test_names_follow_the_transformed_columns():
 
 
 def test_the_sparse_selector_drops_noise_and_keeps_signal():
-    rng = np.random.default_rng(1)
+    rng = numpy.random.default_rng(1)
     signal = rng.normal(size=(800, 2))
     noise = rng.normal(size=(800, 6))
-    matrix = np.hstack([signal, noise])
+    matrix = numpy.hstack([signal, noise])
     target = (signal[:, 0] + signal[:, 1] > 0).astype(int)
 
     chooser = selection.SparseSelector(classification=True).fit(matrix, target)
@@ -89,7 +91,7 @@ def test_the_sparse_selector_drops_noise_and_keeps_signal():
 
 
 def test_regression_selection_and_the_never_empty_guarantee():
-    rng = np.random.default_rng(2)
+    rng = numpy.random.default_rng(2)
     matrix = rng.normal(size=(500, 5))
     target = 3 * matrix[:, 1] + rng.normal(0, 0.1, 500)
 
@@ -104,12 +106,12 @@ def test_regression_selection_and_the_never_empty_guarantee():
 
 def test_the_sparse_selector_handles_more_than_two_classes():
     """liblinear cannot fit multiclass, which failed whole trials."""
-    rng = np.random.default_rng(3)
+    rng = numpy.random.default_rng(3)
     matrix = rng.normal(size=(300, 6))
-    target = np.digitize(matrix[:, 0] + 0.1 * matrix[:, 1], [-0.5, 0.5])
+    target = numpy.digitize(matrix[:, 0] + 0.1 * matrix[:, 1], [-0.5, 0.5])
 
     chooser = selection.SparseSelector(classification=True).fit(matrix, target)
 
-    assert set(np.unique(target)) == {0, 1, 2}
+    assert set(numpy.unique(target)) == {0, 1, 2}
     assert chooser.support_[0]
     assert chooser.transform(matrix).shape[0] == 300

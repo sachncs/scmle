@@ -24,8 +24,8 @@ import dataclasses
 import math
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from scipy import stats
 
 MIN_COUNT = 5
@@ -95,7 +95,7 @@ class SentinelReport:
         return dataclasses.asdict(self)
 
 
-def grid_spacing(unique_values: np.ndarray) -> float:
+def grid_spacing(unique_values: numpy.ndarray) -> float:
     """Finds the grid spacing of a column.
 
     Args:
@@ -105,12 +105,14 @@ def grid_spacing(unique_values: np.ndarray) -> float:
         The median positive gap between neighbouring values, or 0.0 when
         there is none.
     """
-    gaps = np.diff(unique_values)
+    gaps = numpy.diff(unique_values)
     gaps = gaps[gaps > 0]
-    return float(np.median(gaps)) if gaps.size else 0.0
+    return float(numpy.median(gaps)) if gaps.size else 0.0
 
 
-def expected_share(others: np.ndarray, value: float, spacing: float) -> float:
+def expected_share(
+    others: numpy.ndarray, value: float, spacing: float
+) -> float:
     """Share of all draws a smooth density would put on `value`.
 
     Args:
@@ -121,7 +123,7 @@ def expected_share(others: np.ndarray, value: float, spacing: float) -> float:
     Returns:
         Local density times spacing, in [0, 1].
     """
-    distance = np.sort(np.abs(others - value))
+    distance = numpy.sort(numpy.abs(others - value))
     k = min(len(others), max(MIN_WINDOW, math.ceil(WINDOW_SHARE * len(others))))
     half = float(distance[k - 1])
     inside = int((distance <= half).sum())
@@ -136,7 +138,7 @@ def expected_share(others: np.ndarray, value: float, spacing: float) -> float:
 
 
 def numeric_spikes(
-    column: str, series: pd.Series, min_count: int = MIN_COUNT
+    column: str, series: pandas.Series, min_count: int = MIN_COUNT
 ) -> list[SentinelFinding]:
     """Finds candidate spikes of one numeric column.
 
@@ -151,10 +153,10 @@ def numeric_spikes(
         than `MIN_VALUES` finite values.
     """
     values = series.to_numpy(dtype=float)
-    values = values[np.isfinite(values)]
+    values = values[numpy.isfinite(values)]
     if len(values) < MIN_VALUES:
         return []
-    unique, counts = np.unique(values, return_counts=True)
+    unique, counts = numpy.unique(values, return_counts=True)
     found = []
     spacing = grid_spacing(unique[counts < min_count])
     if spacing == 0.0:
@@ -185,7 +187,7 @@ def numeric_spikes(
 
 
 def text_findings(
-    column: str, series: pd.Series, codes: Sequence[str]
+    column: str, series: pandas.Series, codes: Sequence[str]
 ) -> list[SentinelFinding]:
     """Finds dictionary matches in a text column.
 
@@ -215,7 +217,7 @@ def text_findings(
 
 
 def find_sentinels(
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     columns: Sequence[str] | None = None,
     text_codes: Sequence[str] = TEXT_CODES,
     numeric_codes: Sequence[float] = (),
@@ -244,9 +246,9 @@ def find_sentinels(
     findings: list[SentinelFinding] = []
     for name in names:
         series = frame[name]
-        if pd.api.types.is_bool_dtype(series):
+        if pandas.api.types.is_bool_dtype(series):
             continue
-        if pd.api.types.is_numeric_dtype(series):
+        if pandas.api.types.is_numeric_dtype(series):
             candidates += numeric_spikes(str(name), series)
             numbers = series.to_numpy(dtype=float)
             for code in declared:
@@ -262,7 +264,7 @@ def find_sentinels(
                             "declared_numeric",
                         )
                     )
-        elif pd.api.types.is_string_dtype(series) or series.dtype == object:
+        elif pandas.api.types.is_string_dtype(series) or series.dtype == object:
             findings += text_findings(str(name), series, text_codes)
     threshold = alpha / max(len(candidates), 1)
     seen = {(f.column, f.value) for f in findings}
@@ -277,7 +279,9 @@ def find_sentinels(
     return SentinelReport(tuple(findings), len(frame))
 
 
-def sentinel_mask(frame: pd.DataFrame, report: SentinelReport) -> pd.DataFrame:
+def sentinel_mask(
+    frame: pandas.DataFrame, report: SentinelReport
+) -> pandas.DataFrame:
     """Marks the cells that hold a reported code.
 
     Args:
@@ -288,7 +292,7 @@ def sentinel_mask(frame: pd.DataFrame, report: SentinelReport) -> pd.DataFrame:
         A boolean frame of the shape of `frame`, True where a cell holds a
         code reported for its column.
     """
-    mask = pd.DataFrame(False, index=frame.index, columns=frame.columns)
+    mask = pandas.DataFrame(False, index=frame.index, columns=frame.columns)
     for finding in report.findings:
         series = frame[finding.column]
         if finding.kind == "dictionary":
@@ -302,8 +306,8 @@ def sentinel_mask(frame: pd.DataFrame, report: SentinelReport) -> pd.DataFrame:
 
 
 def recode_missing(
-    frame: pd.DataFrame, report: SentinelReport
-) -> tuple[pd.DataFrame, list[dict[str, Any]]]:
+    frame: pandas.DataFrame, report: SentinelReport
+) -> tuple[pandas.DataFrame, list[dict[str, Any]]]:
     """Replaces reported codes by missing values and logs each recode.
 
     Args:
@@ -319,10 +323,10 @@ def recode_missing(
     for finding in report.findings:
         cells = mask[finding.column]
         column = out[finding.column]
-        if pd.api.types.is_integer_dtype(column):
+        if pandas.api.types.is_integer_dtype(column):
             column = column.astype("float64")
         column = column.copy()
-        column[cells.to_numpy()] = np.nan
+        column[cells.to_numpy()] = numpy.nan
         out[finding.column] = column
         log.append(
             {
@@ -335,7 +339,7 @@ def recode_missing(
     return out, log
 
 
-def sentinel_rows(frame: pd.DataFrame) -> pd.Series:
+def sentinel_rows(frame: pandas.DataFrame) -> pandas.Series:
     """Flags the rows that hold a sentinel code.
 
     Args:
@@ -346,7 +350,7 @@ def sentinel_rows(frame: pd.DataFrame) -> pd.Series:
         `find_sentinels` with its default settings.
     """
     report = find_sentinels(frame)
-    return pd.Series(
+    return pandas.Series(
         sentinel_mask(frame, report).any(axis=1).to_numpy(dtype=bool),
         index=frame.index,
     )

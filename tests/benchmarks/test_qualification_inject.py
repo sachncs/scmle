@@ -1,15 +1,17 @@
 """The defect injector plants known defects and reports exactly where."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
 from benchmarks.qualification import inject
 
 
-def table(rows: int = 400, classes: int = 2, seed: int = 11) -> pd.DataFrame:
-    rng = np.random.default_rng(seed)
-    return pd.DataFrame(
+def table(
+    rows: int = 400, classes: int = 2, seed: int = 11
+) -> pandas.DataFrame:
+    rng = numpy.random.default_rng(seed)
+    return pandas.DataFrame(
         {
             "x1": rng.normal(size=rows),
             "x2": rng.lognormal(size=rows),
@@ -20,7 +22,7 @@ def table(rows: int = 400, classes: int = 2, seed: int = 11) -> pd.DataFrame:
     )
 
 
-def assert_exact(original: pd.DataFrame, planted: inject.Injection) -> None:
+def assert_exact(original: pandas.DataFrame, planted: inject.Injection) -> None:
     """The mask equals an independent before/after diff, cell by cell."""
     diff = inject.changed_cells(original, planted.frame)
     assert list(planted.mask.columns) == list(planted.frame.columns)
@@ -88,7 +90,7 @@ def test_the_input_frame_is_never_modified(name):
     original = table()
     snapshot = original.copy(deep=True)
     CASES[name](original, 9)
-    pd.testing.assert_frame_equal(original, snapshot)
+    pandas.testing.assert_frame_equal(original, snapshot)
 
 
 @pytest.mark.parametrize("name", sorted(CASES))
@@ -129,7 +131,7 @@ def test_label_flips_keep_a_categorical_dtype():
     original = table()
     original["y"] = original["y"].astype("category")
     planted = inject.flip_labels(original, "y", 0.1, seed=1)
-    assert isinstance(planted.frame["y"].dtype, pd.CategoricalDtype)
+    assert isinstance(planted.frame["y"].dtype, pandas.CategoricalDtype)
     assert_exact(original, planted)
 
 
@@ -172,7 +174,7 @@ def test_mar_depends_on_the_driver_and_mnar_on_the_value_itself():
 
 def test_missingness_only_hits_observed_cells():
     original = table()
-    original.loc[:50, "x1"] = np.nan
+    original.loc[:50, "x1"] = numpy.nan
     planted = inject.inject_missing(original, ["x1"], 0.2, seed=6)
     assert not planted.mask.loc[:50, "x1"].any()
     assert_exact(original, planted)
@@ -199,7 +201,7 @@ def test_exact_duplicates_copy_source_rows_and_flag_only_the_copies():
     sources = planted.info["source_rows"]
     copies = planted.frame.loc[added].reset_index(drop=True)
     originals = original.loc[list(sources)].reset_index(drop=True)
-    pd.testing.assert_frame_equal(copies, originals)
+    pandas.testing.assert_frame_equal(copies, originals)
     assert planted.frame.iloc[: len(original)].equals(original)
 
 
@@ -219,7 +221,7 @@ def test_near_duplicates_jitter_floats_only_and_stay_close():
 
 
 def test_duplicates_need_a_default_index_and_floats_for_near_copies():
-    shifted = table().set_index(pd.Index(range(5, 405)))
+    shifted = table().set_index(pandas.Index(range(5, 405)))
     with pytest.raises(ValueError, match="RangeIndex"):
         inject.inject_duplicates(shifted, 0.1, seed=1)
     ints = table()[["n1", "y"]]
@@ -238,7 +240,7 @@ def test_outliers_move_cells_far_from_the_robust_centre():
         (original["x1"] - original["x1"].median()).abs().median()
     )
     moved = (planted.frame.loc[hit, "x1"] - original.loc[hit, "x1"]).abs()
-    assert np.allclose(moved, 10.0 * robust)
+    assert numpy.allclose(moved, 10.0 * robust)
 
 
 def test_outliers_reject_a_constant_column():
@@ -284,7 +286,7 @@ def test_covariate_shift_moves_a_chosen_share_of_rows_by_delta_sds():
     rows = planted.mask["x1"]
     assert int(rows.sum()) == round(0.25 * len(original))
     moved = planted.frame.loc[rows, "x1"] - original.loc[rows, "x1"]
-    assert np.allclose(moved, 2.0 * original["x1"].std())
+    assert numpy.allclose(moved, 2.0 * original["x1"].std())
     assert not planted.mask.drop(columns="x1").to_numpy().any()
 
 

@@ -2,7 +2,7 @@
 
 import html
 
-import pandas as pd
+import pandas
 
 from scmle.api import results
 
@@ -11,7 +11,7 @@ class HtmlReport:
     """Renders a self-contained HTML summary of a run."""
 
     def render(
-        self, result: results.RunResult, leaderboard: pd.DataFrame
+        self, result: results.RunResult, leaderboard: pandas.DataFrame
     ) -> str:
         """Builds the HTML page summarizing a run.
 

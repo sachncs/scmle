@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 
-import pandas as pd
+import pandas
 import pytest
 
 from benchmarks.qualification.ingest_naive import aggregate_feature
@@ -16,12 +16,12 @@ from benchmarks.qualification.ingest_naive import PRIMITIVES
 NAN = float("nan")
 
 
-def targets(moment: float = 10.0) -> pd.DataFrame:
-    return pd.DataFrame({"k": ["a"], "t": [moment]})
+def targets(moment: float = 10.0) -> pandas.DataFrame:
+    return pandas.DataFrame({"k": ["a"], "t": [moment]})
 
 
-def child(rows: list[tuple[str, float, float]]) -> pd.DataFrame:
-    return pd.DataFrame(rows, columns=["k", "ev", "v"])
+def child(rows: list[tuple[str, float, float]]) -> pandas.DataFrame:
+    return pandas.DataFrame(rows, columns=["k", "ev", "v"])
 
 
 BASE = child(
@@ -37,7 +37,7 @@ BASE = child(
 
 def run(
     name: str,
-    frame: pd.DataFrame = BASE,
+    frame: pandas.DataFrame = BASE,
     known: str | None = None,
     window: float | None = None,
     lag: float = 0.0,
@@ -170,21 +170,21 @@ def test_lookup() -> None:
 
 
 def test_multiple_targets_in_order() -> None:
-    tg = pd.DataFrame({"k": ["b", "a"], "t": [10.0, 5.0]})
+    tg = pandas.DataFrame({"k": ["b", "a"], "t": [10.0, 5.0]})
     got = aggregate_feature(
         tg, "k", "t", BASE, "k", "ev", None, "v", "sum", None, 0.0, 0.0
     )
     assert got == [100.0, 4.0]
 
 
-MID = pd.DataFrame(
+MID = pandas.DataFrame(
     {
         "k": ["a", "a", "a", "b"],
         "id": [1, 2, 3, 4],
         "ev": [2.0, 5.0, 9.0, 3.0],
     }
 )
-LEAF = pd.DataFrame(
+LEAF = pandas.DataFrame(
     {
         "link": [1, 1, 2, 4, 2],
         "ev": [1.0, 2.0, 5.0, 3.0, 9.5],

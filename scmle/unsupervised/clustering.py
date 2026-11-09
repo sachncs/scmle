@@ -14,8 +14,8 @@ and normalized mutual information against them.
 import dataclasses
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from sklearn import base
 from sklearn import cluster
 from sklearn import metrics
@@ -65,9 +65,9 @@ class ClusterReport:
     candidates: tuple[Candidate, ...]
     best: Candidate
     stable: bool
-    labels: np.ndarray
+    labels: numpy.ndarray
     sizes: dict[int, int]
-    profile: pd.DataFrame
+    profile: pandas.DataFrame
 
     def to_dict(self) -> dict[str, Any]:
         """Builds a JSON-ready record of the report.
@@ -109,7 +109,7 @@ def build(method: str, count: int, seed: int) -> base.BaseEstimator:
     raise ValueError(f"unknown method '{method}'; use one of {METHODS}")
 
 
-def assign(method: str, count: int, seed: int, matrix: np.ndarray) -> Any:
+def assign(method: str, count: int, seed: int, matrix: numpy.ndarray) -> Any:
     """Fits a clusterer and labels the rows.
 
     Args:
@@ -128,8 +128,8 @@ def assign(method: str, count: int, seed: int, matrix: np.ndarray) -> Any:
 def stability(
     method: str,
     count: int,
-    matrix: np.ndarray,
-    full: np.ndarray,
+    matrix: numpy.ndarray,
+    full: numpy.ndarray,
     rounds: int,
     seed: int,
 ) -> float:
@@ -150,22 +150,22 @@ def stability(
         The mean adjusted Rand index over the rounds (1.0 means identical
         groupings).
     """
-    generator = np.random.default_rng(seed)
+    generator = numpy.random.default_rng(seed)
     scores = []
     for round_index in range(rounds):
-        rows = np.unique(generator.choice(len(matrix), len(matrix)))
+        rows = numpy.unique(generator.choice(len(matrix), len(matrix)))
         labels = assign(method, count, seed + round_index + 1, matrix[rows])
         scores.append(metrics.adjusted_rand_score(full[rows], labels))
-    return float(np.mean(scores))
+    return float(numpy.mean(scores))
 
 
 def score_candidate(
     method: str,
     count: int,
-    matrix: np.ndarray,
+    matrix: numpy.ndarray,
     rounds: int,
     seed: int,
-) -> tuple[Candidate, np.ndarray]:
+) -> tuple[Candidate, numpy.ndarray]:
     """Fits and scores one method at one cluster count.
 
     Args:
@@ -198,7 +198,7 @@ def score_candidate(
 
 
 def find_clusters(
-    features: pd.DataFrame,
+    features: pandas.DataFrame,
     counts: range | tuple[int, ...] = range(2, 9),
     methods: tuple[str, ...] = METHODS,
     rounds: int = 10,
@@ -241,7 +241,8 @@ def find_clusters(
     labels = next(item[0][1] for item in scored if item[0][0] is best)
     profile = numeric.assign(cluster=labels).groupby("cluster").mean()
     sizes = {
-        int(str(k)): int(v) for k, v in pd.Series(labels).value_counts().items()
+        int(str(k)): int(v)
+        for k, v in pandas.Series(labels).value_counts().items()
     }
     return ClusterReport(candidates, best, bool(stable), labels, sizes, profile)
 

@@ -1,6 +1,6 @@
 """Tests for the stress-test diagnostic."""
 
-import numpy as np
+import numpy
 import test_diagnostics
 
 from scmle.contracts import tasks
@@ -30,7 +30,7 @@ def test_every_scenario_is_scored_and_noise_hurts_a_signal_model():
 def test_corruptions_leave_the_input_untouched_and_apply_as_described():
     data = inputs()
     original = data.features.copy()
-    rng = np.random.default_rng(0)
+    rng = numpy.random.default_rng(0)
 
     blanked = robustness.MissingValues(0.3).corrupt(data.features, data, rng)
     unseen = robustness.UnseenCategories(0.5).corrupt(data.features, data, rng)
@@ -52,6 +52,6 @@ def test_gaussian_noise_leaves_a_column_with_undefined_spread_unchanged():
     data = inputs()
     one = data.features.iloc[:1].copy()
     out = robustness.GaussianNoise(0.5).corrupt(
-        one, data, np.random.default_rng(0)
+        one, data, numpy.random.default_rng(0)
     )
-    assert np.isfinite(out["signal"]).all()
+    assert numpy.isfinite(out["signal"]).all()

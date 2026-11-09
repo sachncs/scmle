@@ -1,7 +1,7 @@
 """Subgroup hypotheses: registered with the claim, adjusted as one family."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.data.charter import causal
 from scmle.data.identification import run
@@ -13,16 +13,16 @@ from tests.unit.test_identification_run import NAMED
 
 def world(n, seed, effects):
     """Randomised-looking world whose effect differs by `group`."""
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     a, b = rng.standard_normal(n), rng.standard_normal(n)
     t = (rng.uniform(size=n) < 0.5).astype(float)
-    labels = np.array(sorted(effects))
+    labels = numpy.array(sorted(effects))
     group = labels[rng.integers(0, len(labels), n)]
-    tau = np.array([effects[g] for g in group])
+    tau = numpy.array([effects[g] for g in group])
     y = tau * t + a - 0.5 * b + rng.standard_normal(n)
-    region = np.where(rng.uniform(size=n) < 0.5, "n", "s")
+    region = numpy.where(rng.uniform(size=n) < 0.5, "n", "s")
     nco = a + rng.standard_normal(n)
-    return pd.DataFrame(
+    return pandas.DataFrame(
         {
             "a": a,
             "b": b,

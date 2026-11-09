@@ -11,12 +11,12 @@ Suspects are candidates for review, not proof of error.
 import dataclasses
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from sklearn import ensemble
 from sklearn import model_selection
 
-from scmle.contracts import data as data_contracts
+from scmle.contracts import data
 
 MIN_ROWS = 50
 FOLDS = 5
@@ -67,7 +67,7 @@ class LabelNoiseReport:
         rows_checked: int,
         seed: int,
         sample_limit: int,
-    ) -> data_contracts.QualityEvidence:
+    ) -> data.QualityEvidence:
         """Returns reproducible evidence for this label-noise check.
 
         Args:
@@ -112,7 +112,7 @@ class LabelNoiseReport:
 
 
 def find_label_noise(
-    features: pd.DataFrame, labels: pd.Series, seed: int = 0
+    features: pandas.DataFrame, labels: pandas.Series, seed: int = 0
 ) -> LabelNoiseReport:
     """Flags rows whose label a model that never saw them contradicts.
 
@@ -127,13 +127,13 @@ def find_label_noise(
     Raises:
         ValueError: With fewer than `MIN_ROWS` rows or a single class.
     """
-    values = np.asarray(labels)
-    classes, encoded = np.unique(values, return_inverse=True)
+    values = numpy.asarray(labels)
+    classes, encoded = numpy.unique(values, return_inverse=True)
     if len(values) < MIN_ROWS or len(classes) < 2:
         raise ValueError(
             f"label-noise detection needs {MIN_ROWS}+ rows and two classes"
         )
-    counts = list(np.bincount(np.asarray(encoded).ravel()))
+    counts = list(numpy.bincount(numpy.asarray(encoded).ravel()))
     folds = min(FOLDS, int(min(counts)))
     if folds < 2:
         raise ValueError("every class needs at least two rows")
@@ -150,8 +150,8 @@ def find_label_noise(
         ),
         method="predict_proba",
     )
-    own = probabilities[np.arange(len(encoded)), encoded]
-    thresholds = np.array(
+    own = probabilities[numpy.arange(len(encoded)), encoded]
+    thresholds = numpy.array(
         [
             probabilities[encoded == index, index].mean()
             for index in range(len(classes))
@@ -159,9 +159,11 @@ def find_label_noise(
     )
     best = probabilities.argmax(axis=1)
     flagged = (own < thresholds[encoded]) & (best != encoded)
-    flagged &= probabilities[np.arange(len(encoded)), best] >= thresholds[best]
-    order = np.flatnonzero(flagged)
-    order = order[np.argsort(-probabilities[order, best[order]])]
+    flagged &= (
+        probabilities[numpy.arange(len(encoded)), best] >= thresholds[best]
+    )
+    order = numpy.flatnonzero(flagged)
+    order = order[numpy.argsort(-probabilities[order, best[order]])]
     return LabelNoiseReport(
         suspects=tuple(int(index) for index in order),
         suggested=tuple(classes[best[order]].tolist()),
@@ -194,8 +196,8 @@ def label_noise_note(report: LabelNoiseReport, rows_checked: int) -> str | None:
 
 
 def assess_label_noise(
-    features: pd.DataFrame, labels: pd.Series, seed: int = 0
-) -> data_contracts.QualityObservation:
+    features: pandas.DataFrame, labels: pandas.Series, seed: int = 0
+) -> data.QualityObservation:
     """Runs bounded label-noise detection and retains its evidence.
 
     Args:
@@ -214,7 +216,7 @@ def assess_label_noise(
     try:
         report = find_label_noise(features, labels, seed)
     except ValueError as error:
-        return data_contracts.QualityObservation(
+        return data.QualityObservation(
             note=None,
             evidence={
                 "observation": "label_noise",
@@ -240,7 +242,7 @@ def assess_label_noise(
                 ],
             },
         )
-    return data_contracts.QualityObservation(
+    return data.QualityObservation(
         note=label_noise_note(report, rows_checked),
         evidence=report.quality_evidence(
             input_rows, rows_checked, seed, MAX_ROWS

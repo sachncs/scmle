@@ -9,7 +9,7 @@ import tempfile
 from typing import Any
 
 import joblib
-import numpy as np
+import numpy
 from sklearn import base
 from sklearn import utils
 
@@ -98,11 +98,11 @@ class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):
         del target
         return super().fit(
             features,
-            np.zeros(len(features), dtype=np.float32),
+            numpy.zeros(len(features), dtype=numpy.float32),
             sample_weight,
         )
 
-    def transform(self, features: Any) -> np.ndarray:
+    def transform(self, features: Any) -> numpy.ndarray:
         """Returns context-encoder embeddings for new rows.
 
         Args:

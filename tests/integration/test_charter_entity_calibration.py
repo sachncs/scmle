@@ -3,13 +3,13 @@
 import json
 import pathlib
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 import support
 
 from scmle.contracts import errors
-from scmle.data.charter import contracts as c
+from scmle.data.charter import contracts
 from scmle.data.charter import sealing
 from tests.unit.test_charter_contracts import make_charter
 
@@ -17,14 +17,14 @@ KEY = "integration-key"
 
 
 def panel(entities=120, per=6, seed=0):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     level = rng.normal(0, 1.5, entities)
     rows = []
     for entity in range(entities):
         x = rng.normal(size=per)
         y = 2 * x + level[entity] + rng.normal(0, 0.5, per)
-        rows.append(pd.DataFrame({"entity": f"e{entity}", "x": x, "y": y}))
-    return pd.concat(rows, ignore_index=True)
+        rows.append(pandas.DataFrame({"entity": f"e{entity}", "x": x, "y": y}))
+    return pandas.concat(rows, ignore_index=True)
 
 
 def charter_file(tmp_path, **overrides):
@@ -51,7 +51,7 @@ def events(run_dir):
 
 
 def test_a_new_entity_charter_calibrates_on_one_score_per_entity(tmp_path):
-    path = charter_file(tmp_path, unit_of_prediction=c.NEW_ENTITY)
+    path = charter_file(tmp_path, unit_of_prediction=contracts.NEW_ENTITY)
     result = run(tmp_path, path, group_column="entity")
     found = [
         e
@@ -76,6 +76,6 @@ def test_without_the_field_calibration_stays_row_wise(tmp_path):
 
 
 def test_a_new_entity_charter_without_a_group_column_is_refused(tmp_path):
-    path = charter_file(tmp_path, unit_of_prediction=c.NEW_ENTITY)
+    path = charter_file(tmp_path, unit_of_prediction=contracts.NEW_ENTITY)
     with pytest.raises(errors.ConfigError, match="group_column"):
         run(tmp_path, path)

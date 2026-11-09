@@ -3,14 +3,14 @@
 from collections.abc import Sequence
 from typing import Any
 
-import numpy as np
+import numpy
 
 BINS = 10
 
 
 def top_label_curve(
-    probabilities: np.ndarray,
-    labels: Sequence[Any] | np.ndarray,
+    probabilities: numpy.ndarray,
+    labels: Sequence[Any] | numpy.ndarray,
     classes: Sequence[Any],
     bins: int = BINS,
 ) -> tuple[float, list[dict[str, float]]]:
@@ -31,12 +31,12 @@ def top_label_curve(
         mapping per bin that holds rows, in bin order, with keys `bin`
         (index), `count`, `mean_confidence` and `accuracy`.
     """
-    matrix = np.asarray(probabilities, dtype=float)
-    guess = np.asarray(classes)[matrix.argmax(axis=1)]
+    matrix = numpy.asarray(probabilities, dtype=float)
+    guess = numpy.asarray(classes)[matrix.argmax(axis=1)]
     confidence = matrix.max(axis=1)
-    correct = (guess == np.asarray(labels)).astype(float)
-    edges = np.linspace(0.0, 1.0, bins + 1)
-    slot = np.clip(np.digitize(confidence, edges[1:-1]), 0, bins - 1)
+    correct = (guess == numpy.asarray(labels)).astype(float)
+    edges = numpy.linspace(0.0, 1.0, bins + 1)
+    slot = numpy.clip(numpy.digitize(confidence, edges[1:-1]), 0, bins - 1)
     error, curve = 0.0, []
     for index in range(bins):
         members = slot == index

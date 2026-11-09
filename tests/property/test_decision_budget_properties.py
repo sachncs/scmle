@@ -5,7 +5,7 @@ from fractions import Fraction
 from hypothesis import given
 from hypothesis import HealthCheck
 from hypothesis import settings
-from hypothesis import strategies as st
+from hypothesis import strategies
 import pytest
 
 from scmle.data.ledger import budget as b
@@ -15,14 +15,16 @@ SETTINGS = settings(
     deadline=None,
     suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large],
 )
-alphas = st.fractions(
+alphas = strategies.fractions(
     min_value=Fraction(1, 1000), max_value=Fraction(1, 2), max_denominator=1000
 )
-horizons = st.one_of(st.none(), st.integers(min_value=1, max_value=40))
+horizons = strategies.one_of(
+    strategies.none(), strategies.integers(min_value=1, max_value=40)
+)
 
 
 @SETTINGS
-@given(alphas, horizons, st.integers(min_value=0, max_value=60))
+@given(alphas, horizons, strategies.integers(min_value=0, max_value=60))
 def test_assigned_levels_never_exceed_the_promotion_level(
     alpha, horizon, count
 ):
@@ -38,7 +40,7 @@ def test_assigned_levels_never_exceed_the_promotion_level(
 
 
 @SETTINGS
-@given(alphas, st.integers(min_value=1, max_value=50))
+@given(alphas, strategies.integers(min_value=1, max_value=50))
 def test_the_open_ended_discount_sums_to_a_closed_form(alpha, count):
     budget = b.DecisionBudget(alpha, Fraction(1, 100))
     for index in range(count):
@@ -47,7 +49,7 @@ def test_the_open_ended_discount_sums_to_a_closed_form(alpha, count):
 
 
 @SETTINGS
-@given(alphas, st.integers(min_value=1, max_value=30))
+@given(alphas, strategies.integers(min_value=1, max_value=30))
 def test_a_round_trip_keeps_every_level_bit_for_bit(alpha, count):
     budget = b.DecisionBudget(alpha, Fraction(1, 100), horizon=30)
     for index in range(count):

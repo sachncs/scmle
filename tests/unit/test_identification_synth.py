@@ -1,7 +1,7 @@
 """Synthetic control: weights against a convex reference, p-values, refusal."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 from scipy import optimize
 
@@ -11,7 +11,7 @@ from scmle.data.identification import synth
 def panel(
     seed: int, donors: int = 24, tau: float = 3.0, pre: int = 12, post: int = 4
 ):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     factors = rng.standard_normal((pre + post, 2)).cumsum(axis=0) * 0.5
     loadings = rng.uniform(0, 1, (donors + 1, 2))
     rows = []
@@ -21,27 +21,27 @@ def panel(
             if u == 0 and t >= pre:
                 y += tau
             rows.append((u, t, y))
-    return pd.DataFrame(rows, columns=["u", "t", "y"]), pre
+    return pandas.DataFrame(rows, columns=["u", "t", "y"]), pre
 
 
 def test_weights_match_a_convex_program_reference():
-    rng = np.random.default_rng(0)
+    rng = numpy.random.default_rng(0)
     donors = rng.standard_normal((15, 6))
-    true = np.array([0.5, 0.3, 0.2, 0, 0, 0])
+    true = numpy.array([0.5, 0.3, 0.2, 0, 0, 0])
     target = donors @ true + rng.normal(scale=0.01, size=15)
     w = synth.fit_weights(target, donors)
     assert w.sum() == pytest.approx(1.0)
     assert (w >= 0).all()
     reference = optimize.minimize(
-        lambda v: np.sum((target - donors @ v) ** 2),
-        np.full(6, 1 / 6),
+        lambda v: numpy.sum((target - donors @ v) ** 2),
+        numpy.full(6, 1 / 6),
         method="trust-constr",
         bounds=[(0, 1)] * 6,
-        constraints=[optimize.LinearConstraint(np.ones((1, 6)), 1, 1)],
+        constraints=[optimize.LinearConstraint(numpy.ones((1, 6)), 1, 1)],
         options={"gtol": 1e-12, "xtol": 1e-12, "maxiter": 5000},
     ).x
-    assert np.allclose(w, reference, atol=1e-4)
-    assert np.allclose(w, true, atol=0.05)
+    assert numpy.allclose(w, reference, atol=1e-4)
+    assert numpy.allclose(w, true, atol=0.05)
 
 
 def test_a_clear_effect_gets_the_smallest_attainable_p_value():

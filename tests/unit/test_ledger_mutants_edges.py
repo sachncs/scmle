@@ -1,7 +1,7 @@
 """Edge cases that mutants of the ledger helpers survived."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
 from scmle.data.ledger import controls
@@ -20,14 +20,14 @@ def test_the_percentile_interval_reaches_the_ends_for_extreme_quantiles():
 
 
 def test_missing_labels_do_not_make_a_binary_target_multiclass():
-    target = pd.Series([0.0, 1.0, np.nan, 1.0, 0.0])
+    target = pandas.Series([0.0, 1.0, numpy.nan, 1.0, 0.0])
     assert explore.target_kind(target, True) == explore.BINARY
-    three = pd.Series([0.0, 1.0, 2.0, np.nan])
+    three = pandas.Series([0.0, 1.0, 2.0, numpy.nan])
     assert explore.target_kind(three, True) == explore.MULTICLASS
     assert explore.target_kind(target, False) == explore.NUMERIC
 
 
 def test_a_text_regression_target_is_refused_in_full():
     with pytest.raises(ValueError) as caught:
-        explore.encode_target(pd.Series(["a", "b"]), False)
+        explore.encode_target(pandas.Series(["a", "b"]), False)
     assert str(caught.value) == "a regression target must be numeric"

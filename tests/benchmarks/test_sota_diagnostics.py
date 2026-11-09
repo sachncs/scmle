@@ -1,7 +1,7 @@
 """Tests for the Step 2 run diagnostics, on a real tiny SCMLE run."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
 from benchmarks.sota import diagnostics
@@ -10,9 +10,9 @@ import scmle
 
 @pytest.fixture(scope="module")
 def summary(tmp_path_factory):
-    rng = np.random.default_rng(0)
-    data = pd.DataFrame(rng.normal(size=(200, 3)), columns=["a", "b", "c"])
-    data["y"] = np.where(data["a"] + rng.normal(size=200) > 0, "p", "n")
+    rng = numpy.random.default_rng(0)
+    data = pandas.DataFrame(rng.normal(size=(200, 3)), columns=["a", "b", "c"])
+    data["y"] = numpy.where(data["a"] + rng.normal(size=200) > 0, "p", "n")
     root = tmp_path_factory.mktemp("runs")
     result = scmle.MLProject(
         data, "y", time_budget=15, seed=3, output_dir=root

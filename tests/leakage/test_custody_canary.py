@@ -17,8 +17,8 @@ unrelated encoding, or only a function of several rows, would not be found.
 import json
 import pathlib
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import support
 
 from scmle.data.charter import sealing
@@ -31,9 +31,9 @@ HIGH = 9_000_000.0
 
 
 def canary_frame():
-    rng = np.random.default_rng(0)
+    rng = numpy.random.default_rng(0)
     rows = 500
-    frame = pd.DataFrame(
+    frame = pandas.DataFrame(
         {
             "a": rng.normal(size=rows),
             "b": rng.normal(size=rows),

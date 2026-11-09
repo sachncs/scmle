@@ -1,6 +1,6 @@
 """Tests for the bagging adapters."""
 
-import numpy as np
+import numpy
 import pytest
 from sklearn import ensemble
 
@@ -29,7 +29,7 @@ def test_the_bagger_wraps_the_base_model_and_applies_both_parameter_sets():
 
 
 def test_regression_uses_the_regression_bagger_and_trees_gain_from_bagging():
-    rng = np.random.default_rng(0)
+    rng = numpy.random.default_rng(0)
     features = rng.normal(size=(400, 3))
     target = features[:, 0] * 2 + rng.normal(0, 1.0, 400)
     adapter = bagging.BaggedTreeAdapter()
@@ -42,8 +42,12 @@ def test_regression_uses_the_regression_bagger_and_trees_gain_from_bagging():
         features[:300], target[:300]
     )
 
-    single_error = np.mean((single.predict(features[300:]) - target[300:]) ** 2)
-    bagged_error = np.mean((bagged.predict(features[300:]) - target[300:]) ** 2)
+    single_error = numpy.mean(
+        (single.predict(features[300:]) - target[300:]) ** 2
+    )
+    bagged_error = numpy.mean(
+        (bagged.predict(features[300:]) - target[300:]) ** 2
+    )
 
     assert isinstance(bagged, ensemble.BaggingRegressor)
     assert bagged_error < single_error

@@ -2,8 +2,8 @@
 
 import logging
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 import scmle
 from scmle.monitoring import monitor
@@ -11,10 +11,12 @@ from scmle.monitoring import monitor
 LOGGER = logging.getLogger(__name__)
 
 
-def make_dataset(rows: int, shift: float = 0.0, seed: int = 2) -> pd.DataFrame:
+def make_dataset(
+    rows: int, shift: float = 0.0, seed: int = 2
+) -> pandas.DataFrame:
     """Builds data whose `load` feature can be shifted to simulate drift."""
-    rng = np.random.default_rng(seed)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    frame = pandas.DataFrame(
         {
             "load": rng.normal(10 + shift, 2, rows),
             "temperature": rng.normal(20, 5, rows),

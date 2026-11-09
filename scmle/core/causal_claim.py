@@ -40,7 +40,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-import pandas as pd
+import pandas
 
 from scmle.contracts import errors
 from scmle.data.admissibility import dag as dag_module
@@ -48,9 +48,9 @@ from scmle.data.charter import causal
 from scmle.data.identification import attest
 from scmle.data.identification import run
 from scmle.data.identification import select
-from scmle.data.ledger import budget as budget_module
+from scmle.data.ledger import budget
 from scmle.data.ledger import confirm
-from scmle.data.ledger import ledger as ledger_module
+from scmle.data.ledger import ledger
 
 KIND = "causal_primary"
 CLAIM_ID = "causal_primary_theta_zero"
@@ -87,7 +87,7 @@ def registration(
     spec: causal.CausalSpec,
     plan: select.Plan,
     dag: dag_module.Dag | None,
-    error_budget: budget_module.ErrorBudget,
+    error_budget: budget.ErrorBudget,
     exploration_rows: int,
 ) -> confirm.RegisteredClaim:
     """Returns the claim as it is fixed before `C` is opened.
@@ -120,7 +120,7 @@ def registration(
         KIND,
         f"{spec.estimand} of {spec.treatment} on {spec.outcome} differs from "
         f"zero, by {plan.primary}, under the attested assumptions",
-        ledger_module.digest(body),
+        ledger.digest(body),
     )
 
 
@@ -184,9 +184,9 @@ def verified_attestors(
 
 def build_runner(
     spec: causal.CausalSpec,
-    x: pd.DataFrame,
+    x: pandas.DataFrame,
     target_name: str,
-    error_budget: budget_module.ErrorBudget,
+    error_budget: budget.ErrorBudget,
     *,
     dag: dag_module.Dag | None = None,
     attestors: Mapping[str, str] | None = None,
@@ -235,7 +235,9 @@ def build_runner(
         attestors = applied.accepted
         attestation_report = applied.to_dict()
 
-    def evaluate(features: pd.DataFrame, target: pd.Series) -> confirm.ClaimRun:
+    def evaluate(
+        features: pandas.DataFrame, target: pandas.Series
+    ) -> confirm.ClaimRun:
         released = features.copy()
         released[target_name] = target
         outcome = run.identify(

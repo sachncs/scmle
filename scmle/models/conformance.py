@@ -4,8 +4,8 @@ import io
 import random
 
 import joblib
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from scipy import sparse
 
 from scmle.contracts import errors
@@ -17,7 +17,7 @@ ROWS = 120
 
 def toy_problem(
     task: tasks.TaskType, seed: int = 0
-) -> tuple[pd.DataFrame, pd.Series | pd.DataFrame]:
+) -> tuple[pandas.DataFrame, pandas.Series | pandas.DataFrame]:
     """Builds a small learnable problem for `task`.
 
     Args:
@@ -29,47 +29,50 @@ def toy_problem(
         suited to `task`: a series for single-target tasks, or a two-column
         frame ("first", "second") for multilabel, multioutput and forecast.
     """
-    rng = np.random.default_rng(seed)
-    features = pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    features = pandas.DataFrame(
         {"a": rng.normal(size=ROWS), "b": rng.normal(size=ROWS)}
     )
-    target: pd.Series | pd.DataFrame
+    target: pandas.Series | pandas.DataFrame
     if task is tasks.TaskType.SURVIVAL:
-        target = pd.Series(rng.exponential(1.0, ROWS) + 0.01)
+        target = pandas.Series(rng.exponential(1.0, ROWS) + 0.01)
     elif task in (
         tasks.TaskType.MULTILABEL,
         tasks.TaskType.MULTIOUTPUT,
         tasks.TaskType.FORECAST,
     ):
-        target = pd.DataFrame(
+        target = pandas.DataFrame(
             {
                 "first": rng.integers(0, 2, ROWS),
                 "second": rng.integers(0, 2, ROWS),
             }
         ).astype(float)
     elif task is tasks.TaskType.UPLIFT:
-        target = pd.Series(rng.integers(0, 2, ROWS))
+        target = pandas.Series(rng.integers(0, 2, ROWS))
     elif task is tasks.TaskType.RANKING:
-        target = pd.Series(
-            np.clip(np.round(features["a"] + rng.normal(size=ROWS)), 0, 2)
+        target = pandas.Series(
+            numpy.clip(numpy.round(features["a"] + rng.normal(size=ROWS)), 0, 2)
         ).astype(float)
     elif task is tasks.TaskType.ORDINAL:
-        target = pd.Series(
-            np.clip(np.round(features["a"] + rng.normal(size=ROWS)), -1, 1) + 1
+        target = pandas.Series(
+            numpy.clip(
+                numpy.round(features["a"] + rng.normal(size=ROWS)), -1, 1
+            )
+            + 1
         ).astype(float)
     elif task is tasks.TaskType.REGRESSION:
         target = features["a"] * 2 + rng.normal(scale=0.1, size=ROWS)
     else:
         classes = 2 if task is tasks.TaskType.BINARY else 3
-        target = pd.Series(rng.integers(0, classes, ROWS))
+        target = pandas.Series(rng.integers(0, classes, ROWS))
     return features, target
 
 
 def check_declared_capabilities(
     adapter: models.ModelAdapter,
     task: tasks.TaskType,
-    features: pd.DataFrame,
-    target: pd.Series | pd.DataFrame,
+    features: pandas.DataFrame,
+    target: pandas.Series | pandas.DataFrame,
 ) -> None:
     """Verifies the capabilities the pipeline relies on actually work.
 
@@ -90,18 +93,18 @@ def check_declared_capabilities(
     name, caps = adapter.name, adapter.capabilities
     if caps.handles_missing:
         holes = features.copy()
-        holes.iloc[::7, 0] = np.nan
+        holes.iloc[::7, 0] = numpy.nan
         fitted = adapter.build(task, 0, adapter.conformance_params).fit(
             holes, target
         )
-        if len(np.asarray(fitted.predict(holes))) != len(holes):
+        if len(numpy.asarray(fitted.predict(holes))) != len(holes):
             raise errors.ConfigError(f"{name}: failed on missing values")
     if caps.sparse_input:
         matrix = sparse.csr_matrix(features.to_numpy())
         fitted = adapter.build(task, 0, adapter.conformance_params).fit(
             matrix, target
         )
-        if len(np.asarray(fitted.predict(matrix))) != len(features):
+        if len(numpy.asarray(fitted.predict(matrix))) != len(features):
             raise errors.ConfigError(f"{name}: failed on sparse input")
     if caps.native_categorical:
         extra = adapter.categorical_params([0])
@@ -111,10 +114,10 @@ def check_declared_capabilities(
                 "returns nothing"
             )
         codes = features.copy()
-        codes["a"] = np.arange(len(codes)) % 5
+        codes["a"] = numpy.arange(len(codes)) % 5
         params = {**(adapter.conformance_params or {}), **extra}
         fitted = adapter.build(task, 0, params).fit(codes, target)
-        if len(np.asarray(fitted.predict(codes))) != len(codes):
+        if len(numpy.asarray(fitted.predict(codes))) != len(codes):
             raise errors.ConfigError(f"{name}: failed with native categoricals")
     if caps.serializable:
         fitted = adapter.build(task, 0, adapter.conformance_params).fit(
@@ -124,9 +127,9 @@ def check_declared_capabilities(
         joblib.dump(fitted, buffer)
         buffer.seek(0)
         restored = joblib.load(buffer)
-        if not np.array_equal(
-            np.asarray(restored.predict(features)),
-            np.asarray(fitted.predict(features)),
+        if not numpy.array_equal(
+            numpy.asarray(restored.predict(features)),
+            numpy.asarray(fitted.predict(features)),
         ):
             raise errors.ConfigError(
                 f"{name}: declares serializable but predictions changed "
@@ -153,15 +156,15 @@ def check_conformance(adapter: models.ModelAdapter) -> None:
             if not hasattr(estimator, method):
                 raise errors.ConfigError(f"{name}: estimator lacks '{method}'")
         estimator.fit(features, target)
-        if len(np.asarray(estimator.predict(features))) != len(features):
+        if len(numpy.asarray(estimator.predict(features))) != len(features):
             raise errors.ConfigError(f"{name}: predict returned wrong length")
         if task.is_classification and adapter.capabilities.probabilities:
             if not hasattr(estimator, "predict_proba"):
                 raise errors.ConfigError(
                     f"{name}: declares probabilities but lacks predict_proba"
                 )
-            proba = np.asarray(estimator.predict_proba(features))
-            if not np.allclose(proba.sum(axis=1), 1.0, atol=1e-6):
+            proba = numpy.asarray(estimator.predict_proba(features))
+            if not numpy.allclose(proba.sum(axis=1), 1.0, atol=1e-6):
                 raise errors.ConfigError(
                     f"{name}: predict_proba rows must sum to 1"
                 )

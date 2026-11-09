@@ -2,8 +2,8 @@
 
 import types
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
 from scmle.evaluation import uplift
@@ -12,7 +12,7 @@ from scmle.models.uplift import estimators
 
 def experiment(rows=4000, seed=0):
     """A randomized trial whose effect depends on the first covariate."""
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     x = rng.normal(size=(rows, 3))
     arm = rng.integers(0, 2, rows)
     effect = 0.35 * (x[:, 0] > 0)
@@ -22,7 +22,7 @@ def experiment(rows=4000, seed=0):
 
 def test_a_perfect_ranking_has_a_positive_qini_and_a_random_one_does_not():
     d = experiment()
-    random_score = np.random.default_rng(1).normal(size=len(d.arm))
+    random_score = numpy.random.default_rng(1).normal(size=len(d.arm))
 
     good = uplift.qini_coefficient(d.outcome, d.arm, d.effect)
     chance = uplift.qini_coefficient(d.outcome, d.arm, random_score)
@@ -56,7 +56,7 @@ def test_meta_learners_recover_who_responds(learner):
     )
     estimated = model.predict(d.x[3000:])
 
-    assert np.corrcoef(estimated, d.effect[3000:])[0, 1] > 0.5
+    assert numpy.corrcoef(estimated, d.effect[3000:])[0, 1] > 0.5
 
 
 def test_the_zero_baseline_has_no_signal():
@@ -70,7 +70,7 @@ def test_the_zero_baseline_has_no_signal():
 def test_randomized_treatment_looks_randomized():
     d = experiment()
 
-    found = uplift.check_propensity(pd.DataFrame(d.x), d.arm)
+    found = uplift.check_propensity(pandas.DataFrame(d.x), d.arm)
 
     assert found.randomized and found.auc < 0.56
     assert found.balance_p_value is not None and found.balance_p_value > 0.05
@@ -79,10 +79,10 @@ def test_randomized_treatment_looks_randomized():
 
 def test_assignment_driven_by_covariates_is_flagged():
     d = experiment()
-    noise = np.random.default_rng(2).normal(0, 0.3, len(d.arm))
+    noise = numpy.random.default_rng(2).normal(0, 0.3, len(d.arm))
     chosen = ((d.x[:, 1] + noise) > 0).astype(int)
 
-    found = uplift.check_propensity(pd.DataFrame(d.x), chosen)
+    found = uplift.check_propensity(pandas.DataFrame(d.x), chosen)
 
     assert not found.randomized and found.auc > 0.8
     assert found.balance_p_value is not None and found.balance_p_value <= 0.05
@@ -91,11 +91,11 @@ def test_assignment_driven_by_covariates_is_flagged():
 
 def test_a_tiny_arm_is_reported_not_modelled():
     d = experiment()
-    sparse = (np.arange(len(d.arm)) < 20).astype(int)
+    sparse = (numpy.arange(len(d.arm)) < 20).astype(int)
 
-    found = uplift.check_propensity(pd.DataFrame(d.x), sparse)
+    found = uplift.check_propensity(pandas.DataFrame(d.x), sparse)
 
-    assert not found.randomized and np.isnan(found.auc)
+    assert not found.randomized and numpy.isnan(found.auc)
     assert found.balance_p_value is None
 
 
@@ -104,5 +104,5 @@ def test_average_effect_is_nan_without_warning_when_an_arm_is_empty():
 
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        assert np.isnan(uplift.average_effect(np.ones(4), np.ones(4)))
-        assert np.isnan(uplift.average_effect(np.ones(4), np.zeros(4)))
+        assert numpy.isnan(uplift.average_effect(numpy.ones(4), numpy.ones(4)))
+        assert numpy.isnan(uplift.average_effect(numpy.ones(4), numpy.zeros(4)))

@@ -20,12 +20,12 @@ import json
 from pathlib import Path
 from typing import Any
 
-import pandas as pd
+import pandas
 
 from scmle.contracts import errors
 from scmle.contracts import signing
 from scmle.data.splitting import splitters
-from scmle.governance import vault as vault_module
+from scmle.governance import vault
 
 GENESIS = "0" * 64
 ORCHESTRATOR = "orchestrator"
@@ -279,7 +279,7 @@ class SealedSet:
         actor: str = ORCHESTRATOR,
         claims_hash: str | None = None,
         ledger_hash: str | None = None,
-    ) -> tuple[pd.DataFrame, pd.Series]:
+    ) -> tuple[pandas.DataFrame, pandas.Series]:
         """Releases the rows a single time.
 
         Args:
@@ -356,8 +356,8 @@ class CustodyVault:
     def seal(
         self,
         set_id: str,
-        features: pd.DataFrame,
-        target: pd.Series,
+        features: pandas.DataFrame,
+        target: pandas.Series,
         ids: tuple[int, ...],
     ) -> SealedSet:
         """Locks the rows as a named set behind the custody protocol.
@@ -376,7 +376,7 @@ class CustodyVault:
             The sealed set wrapping the locked rows.
         """
         locked: splitters.LockedTestSet = (
-            vault_module.SealedTestSet(features, target, ids)
+            vault.SealedTestSet(features, target, ids)
             if self.process
             else splitters.ResidentTestSet(features, target, ids)
         )
@@ -402,8 +402,8 @@ class ExplorationView:
         manifest_sha256: Hash of the governing split manifest.
     """
 
-    features: pd.DataFrame
-    target: pd.Series
+    features: pandas.DataFrame
+    target: pandas.Series
     ids: tuple[int, ...]
     folds: tuple[tuple[tuple[int, ...], tuple[int, ...]], ...]
     manifest_sha256: str

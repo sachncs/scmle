@@ -24,11 +24,11 @@ import enum
 import threading
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.contracts import observability
-from scmle.monitoring import monitor as monitor_module
+from scmle.monitoring import monitor
 from scmle.monitoring import reference as reference_module
 
 INVALID_STATUSES = frozenset({400, 409, 413, 415, 422})
@@ -153,8 +153,8 @@ class SignalThresholds:
     latency_p95_seconds: float = 1.0
     invalid_request_rate: float = 0.05
     missing_rate_increase: float = 0.05
-    drift: monitor_module.MonitoringThresholds = dataclasses.field(
-        default_factory=monitor_module.MonitoringThresholds
+    drift: monitor.MonitoringThresholds = dataclasses.field(
+        default_factory=monitor.MonitoringThresholds
     )
     reference_loss: float = 0.1
     loss_tolerance: float = 0.05
@@ -241,9 +241,9 @@ class SignalMonitor:
         self.thresholds = thresholds
         self.profile = profile
         self.requests: deque[tuple[float, str, int, float]] = deque()
-        self.features: deque[tuple[float, pd.DataFrame]] = deque()
-        self.outcomes: deque[tuple[float, np.ndarray]] = deque()
-        self.sampler = np.random.default_rng(policy.seed)
+        self.features: deque[tuple[float, pandas.DataFrame]] = deque()
+        self.outcomes: deque[tuple[float, numpy.ndarray]] = deque()
+        self.sampler = numpy.random.default_rng(policy.seed)
         self.lock = threading.Lock()
 
     def record_request(
@@ -260,7 +260,7 @@ class SignalMonitor:
         with self.lock:
             self.requests.append((at, route, status, seconds))
 
-    def observe_features(self, at: float, frame: pd.DataFrame) -> int:
+    def observe_features(self, at: float, frame: pandas.DataFrame) -> int:
         """Keeps a sample of the rows of a scored batch; returns the count.
 
         Args:
@@ -281,7 +281,7 @@ class SignalMonitor:
         return len(kept)
 
     def observe_outcomes(
-        self, at: float, losses: Sequence[float] | np.ndarray
+        self, at: float, losses: Sequence[float] | numpy.ndarray
     ) -> None:
         """Records losses in [0, 1] of cases whose outcome has arrived.
 
@@ -294,11 +294,11 @@ class SignalMonitor:
         Raises:
             ValueError: If a loss is outside [0, 1] or not finite.
         """
-        values = np.asarray(list(losses), dtype=float)
+        values = numpy.asarray(list(losses), dtype=float)
         if values.size == 0:
             return
         if (
-            not np.all(np.isfinite(values))
+            not numpy.all(numpy.isfinite(values))
             or values.min() < 0
             or values.max() > 1
         ):
@@ -364,15 +364,15 @@ class SignalMonitor:
         size = len(requests)
         limits = self.thresholds
         minimum = self.policy.min_samples
-        statuses = np.array([r[2] for r in requests], dtype=int)
-        seconds = np.array([r[3] for r in requests], dtype=float)
-        server = float(np.mean(statuses >= 500)) if size else None
+        statuses = numpy.array([r[2] for r in requests], dtype=int)
+        seconds = numpy.array([r[3] for r in requests], dtype=float)
+        server = float(numpy.mean(statuses >= 500)) if size else None
         unavailable = (
-            float(np.mean((statuses >= 500) | (statuses == 429)))
+            float(numpy.mean((statuses >= 500) | (statuses == 429)))
             if size
             else None
         )
-        p95 = float(np.percentile(seconds, 95)) if size else None
+        p95 = float(numpy.percentile(seconds, 95)) if size else None
         return [
             judge(
                 "server_error_rate",
@@ -405,7 +405,7 @@ class SignalMonitor:
 
     def data_signals(
         self,
-        frames: list[pd.DataFrame],
+        frames: list[pandas.DataFrame],
         requests: list[tuple[float, str, int, float]],
     ) -> list[Signal]:
         """Judges rejected inputs, feature quality and drift.
@@ -428,7 +428,7 @@ class SignalMonitor:
         minimum = self.policy.min_samples
         size = len(requests)
         invalid = (
-            float(np.mean([r[2] in INVALID_STATUSES for r in requests]))
+            float(numpy.mean([r[2] in INVALID_STATUSES for r in requests]))
             if size
             else None
         )
@@ -445,7 +445,7 @@ class SignalMonitor:
         ]
         if self.profile is None:
             return found
-        rows = pd.concat(frames, ignore_index=True) if frames else None
+        rows = pandas.concat(frames, ignore_index=True) if frames else None
         count = 0 if rows is None else len(rows)
         missing: dict[str, float] = {}
         drift: dict[str, float] = {}
@@ -507,7 +507,9 @@ class SignalMonitor:
         ]
         return found
 
-    def performance_signals(self, outcomes: list[np.ndarray]) -> list[Signal]:
+    def performance_signals(
+        self, outcomes: list[numpy.ndarray]
+    ) -> list[Signal]:
         """Judges the mean loss of cases whose outcome arrived.
 
         Args:
@@ -518,7 +520,7 @@ class SignalMonitor:
             tolerance.
         """
         limits = self.thresholds
-        values = np.concatenate(outcomes) if outcomes else np.array([])
+        values = numpy.concatenate(outcomes) if outcomes else numpy.array([])
         mean = float(values.mean()) if values.size else None
         return [
             judge(
@@ -536,7 +538,7 @@ class SignalMonitor:
 
 def zero_one_losses(
     predictions: Sequence[Any], labels: Sequence[Any]
-) -> np.ndarray:
+) -> numpy.ndarray:
     """Loss 1 where a prediction differs from its label, else 0.
 
     Args:
@@ -551,7 +553,7 @@ def zero_one_losses(
     """
     if len(predictions) != len(labels):
         raise ValueError("predictions and labels must align")
-    return np.array(
+    return numpy.array(
         [
             0.0 if p == y else 1.0
             for p, y in zip(predictions, labels, strict=True)

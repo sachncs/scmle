@@ -4,7 +4,7 @@ import copy
 import importlib
 from typing import Any
 
-import numpy as np
+import numpy
 
 
 class JepaNetwork:
@@ -130,7 +130,7 @@ class JepaEngine:
         """
         del target, sample_weight
         try:
-            matrix = np.asarray(features, dtype=np.float32)
+            matrix = numpy.asarray(features, dtype=numpy.float32)
         except (TypeError, ValueError) as error:
             raise ValueError(
                 "tabular JEPA requires a numeric 2-D feature matrix"
@@ -141,46 +141,49 @@ class JepaEngine:
             raise ValueError("tabular JEPA needs at least 8 rows")
         if matrix.shape[1] < 1:
             raise ValueError("tabular JEPA needs at least one feature")
-        if not np.isfinite(matrix).all():
+        if not numpy.isfinite(matrix).all():
             raise ValueError("tabular JEPA requires finite numeric features")
         if (
-            not isinstance(self.hidden_size, (int, np.integer))
+            not isinstance(self.hidden_size, (int, numpy.integer))
             or isinstance(self.hidden_size, bool)
             or self.hidden_size < 1
-            or not isinstance(self.embedding_size, (int, np.integer))
+            or not isinstance(self.embedding_size, (int, numpy.integer))
             or isinstance(self.embedding_size, bool)
             or self.embedding_size < 1
         ):
             raise ValueError("JEPA layer sizes must be positive integers")
         if (
-            not np.isfinite(self.mask_probability)
+            not numpy.isfinite(self.mask_probability)
             or not 0.0 < self.mask_probability < 1.0
         ):
             raise ValueError(
                 "mask_probability must be finite and lie strictly between "
                 "0 and 1"
             )
-        if not np.isfinite(self.ema_decay) or not 0.0 < self.ema_decay < 1.0:
+        if not numpy.isfinite(self.ema_decay) or not 0.0 < self.ema_decay < 1.0:
             raise ValueError(
                 "ema_decay must be finite and lie strictly between 0 and 1"
             )
-        if not np.isfinite(self.learning_rate) or self.learning_rate <= 0.0:
+        if not numpy.isfinite(self.learning_rate) or self.learning_rate <= 0.0:
             raise ValueError("learning_rate must be finite and positive")
-        if not np.isfinite(self.weight_decay) or self.weight_decay < 0.0:
+        if not numpy.isfinite(self.weight_decay) or self.weight_decay < 0.0:
             raise ValueError("weight_decay must be finite and non-negative")
         if (
-            not isinstance(self.epochs, (int, np.integer))
+            not isinstance(self.epochs, (int, numpy.integer))
             or isinstance(self.epochs, bool)
             or self.epochs < 1
         ):
             raise ValueError("epochs must be a positive integer")
         if self.batch_size != "auto" and (
-            not isinstance(self.batch_size, (int, np.integer))
+            not isinstance(self.batch_size, (int, numpy.integer))
             or isinstance(self.batch_size, bool)
             or self.batch_size < 1
         ):
             raise ValueError("batch_size must be auto or a positive integer")
-        if not np.isfinite(self.variance_weight) or self.variance_weight < 0.0:
+        if (
+            not numpy.isfinite(self.variance_weight)
+            or self.variance_weight < 0.0
+        ):
             raise ValueError("variance_weight must be finite and non-negative")
         if (
             self.device != "auto"
@@ -259,7 +262,7 @@ class JepaEngine:
                             source, alpha=1.0 - self.ema_decay
                         )
                 epoch_losses.append(float(loss.detach().cpu()))
-            losses.append(float(np.mean(epoch_losses)))
+            losses.append(float(numpy.mean(epoch_losses)))
             epoch_number += 1
         network.module.eval().cpu()
         self.network_ = network
@@ -277,7 +280,7 @@ class JepaEngine:
         }
         return self
 
-    def encode(self, features: Any) -> np.ndarray:
+    def encode(self, features: Any) -> numpy.ndarray:
         """Encodes rows with the learned context encoder.
 
         Args:
@@ -292,7 +295,7 @@ class JepaEngine:
         """
         torch = importlib.import_module("torch")
         try:
-            matrix = np.asarray(features, dtype=np.float32)
+            matrix = numpy.asarray(features, dtype=numpy.float32)
         except (TypeError, ValueError) as error:
             raise ValueError(
                 "tabular JEPA requires a numeric 2-D feature matrix"
@@ -300,7 +303,7 @@ class JepaEngine:
         if (
             matrix.ndim != 2
             or matrix.shape[1] != self.input_width_
-            or not np.isfinite(matrix).all()
+            or not numpy.isfinite(matrix).all()
         ):
             raise ValueError(
                 "features must be finite and have shape "
@@ -311,7 +314,7 @@ class JepaEngine:
                 torch.from_numpy(matrix)
             ).numpy()
 
-    def explain(self, features: Any) -> np.ndarray:
+    def explain(self, features: Any) -> numpy.ndarray:
         """Returns embedding-energy gradient-times-input attributions.
 
         This explains local sensitivity of the learned representation. It is
@@ -329,7 +332,7 @@ class JepaEngine:
         """
         torch = importlib.import_module("torch")
         try:
-            matrix = np.asarray(features, dtype=np.float32)
+            matrix = numpy.asarray(features, dtype=numpy.float32)
         except (TypeError, ValueError) as error:
             raise ValueError(
                 "tabular JEPA requires a numeric 2-D feature matrix"
@@ -337,7 +340,7 @@ class JepaEngine:
         if (
             matrix.ndim != 2
             or matrix.shape[1] != self.input_width_
-            or not np.isfinite(matrix).all()
+            or not numpy.isfinite(matrix).all()
         ):
             raise ValueError(
                 "features must be finite and have shape "

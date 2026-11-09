@@ -17,7 +17,7 @@ from scmle.contracts import errors
 from scmle.contracts import signing
 from scmle.governance import deployment_ledger
 from scmle.governance import registry
-from scmle.trail import inputs as inputs_module
+from scmle.trail import inputs
 from scmle.trail import outcomes
 from scmle.trail import records
 from scmle.trail import reports
@@ -349,10 +349,10 @@ class Tracer:
     def stakeholder(self) -> None:
         """Derives the KPIs, acceptance criteria and approved expectation."""
         name = "stakeholder"
-        found = inputs_module.structure_problems(self.inputs)
+        found = inputs.structure_problems(self.inputs)
         for detail in found:
             self.problem(MISSING_LINK, name, f"inputs.json: {detail}")
-        problem = inputs_module.signature_problem(
+        problem = inputs.signature_problem(
             self.inputs, "stakeholder", self.keys.get("stakeholder")
         )
         if problem:
@@ -507,7 +507,7 @@ class Tracer:
     def quality(self) -> None:
         """Derives the domain thresholds, which the reviewer signs."""
         name = "quality"
-        problem = inputs_module.signature_problem(
+        problem = inputs.signature_problem(
             self.inputs, "reviewer", self.keys.get("reviewer")
         )
         if problem:

@@ -17,12 +17,12 @@ from pathlib import Path
 import re
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.contracts import errors
 from scmle.contracts import signing
-from scmle.data.charter import contracts as charter_contracts
+from scmle.data.charter import contracts
 from scmle.data.framing import baseline
 from scmle.data.framing import costs
 from scmle.data.framing import provenance
@@ -138,7 +138,7 @@ class FramingDraft:
     """
 
     status: str
-    charter: charter_contracts.AnalysisCharter | None
+    charter: contracts.AnalysisCharter | None
     fields: dict[str, provenance.FieldSource]
     checks: tuple[DataCheck, ...]
     questions: tuple[questions_module.HumanQuestion, ...]
@@ -220,7 +220,7 @@ def mentioned(text: str, columns: Sequence[str]) -> list[str]:
 
 
 def deterministic_slots(
-    request: FramingRequest, frame: pd.DataFrame
+    request: FramingRequest, frame: pandas.DataFrame
 ) -> dict[str, Any]:
     """Fills slots by rules from the request and the schema.
 
@@ -258,7 +258,7 @@ def deterministic_slots(
         c
         for c in columns
         if c in frame.columns
-        and pd.api.types.is_datetime64_any_dtype(frame[c])
+        and pandas.api.types.is_datetime64_any_dtype(frame[c])
         and c != request.source.target_time_column
     ]
     if len(stamps) == 1:
@@ -270,7 +270,7 @@ def deterministic_slots(
 
 
 def check_draft(
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     slots: Mapping[str, Any],
     source: SourceDescription,
 ) -> tuple[DataCheck, ...]:
@@ -310,8 +310,8 @@ def check_draft(
                 DataCheck("moment_exists", False, True, f"{moment} missing")
             )
         elif source.target_time_column in frame.columns:
-            start = pd.to_datetime(frame[moment], errors="coerce")
-            end = pd.to_datetime(
+            start = pandas.to_datetime(frame[moment], errors="coerce")
+            end = pandas.to_datetime(
                 frame[source.target_time_column], errors="coerce"
             )
             bad = int((start >= end).sum())
@@ -362,7 +362,7 @@ def assemble(
     slots: Mapping[str, Any],
     request: FramingRequest,
     cost_model: costs.DecisionCostModel | None,
-) -> tuple[charter_contracts.AnalysisCharter, list[str]]:
+) -> tuple[contracts.AnalysisCharter, list[str]]:
     """Builds the unsigned charter, filling blanks with placeholders.
 
     Args:
@@ -376,7 +376,7 @@ def assemble(
         A missing required slot raises `KeyError`, and a record the charter
         rejects raises `ValueError` or `ConfigError`.
     """
-    record = charter_contracts.template()
+    record = contracts.template()
     open_items: list[str] = []
 
     def pick(name: str, default: str) -> str:
@@ -411,7 +411,7 @@ def assemble(
         record["cost_model"] = cost_model.to_dict()
     else:
         open_items.append("cost_model")
-    return charter_contracts.AnalysisCharter.from_dict(record), open_items
+    return contracts.AnalysisCharter.from_dict(record), open_items
 
 
 def refused(
@@ -451,7 +451,7 @@ def refused(
 
 def frame(
     request: FramingRequest,
-    data_sample: pd.DataFrame,
+    data_sample: pandas.DataFrame,
     *,
     cost_model: costs.DecisionCostModel | None = None,
     baseline_column: str | None = None,
@@ -581,7 +581,7 @@ def frame(
         and cost_model
     ):
         profile = baseline.profile_on_exploration(
-            pd.to_numeric(data_sample[target], errors="coerce").to_numpy(),
+            pandas.to_numeric(data_sample[target], errors="coerce").to_numpy(),
             data_sample[baseline_column].to_numpy(),
             cost_model,
         )
@@ -592,7 +592,7 @@ def frame(
         and baseline_column in data_sample.columns
         and pilot_actions is not None
     ):
-        outcome = pd.to_numeric(data_sample[target], errors="coerce")
+        outcome = pandas.to_numeric(data_sample[target], errors="coerce")
         seen = outcome.notna().to_numpy()
         asked, robust = questions_module.ask(
             [
@@ -603,7 +603,7 @@ def frame(
                     "a threshold t = c_FP / (c_FP + c_FN) in (0, 1)",
                     questions_module.gain_sign_verdict(
                         outcome.to_numpy()[seen],
-                        np.asarray(pilot_actions)[seen],
+                        numpy.asarray(pilot_actions)[seen],
                         data_sample[baseline_column].to_numpy()[seen],
                     ),
                 )
@@ -671,7 +671,7 @@ def write_artifacts(draft: FramingDraft, directory: str | Path) -> list[str]:
 
 
 def link_report(
-    charter: charter_contracts.AnalysisCharter, columns: Sequence[str]
+    charter: contracts.AnalysisCharter, columns: Sequence[str]
 ) -> dict[str, Any]:
     """Reports whether the charter's words name real columns, descriptively.
 

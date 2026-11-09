@@ -14,7 +14,7 @@ import hashlib
 from typing import Any
 from typing import Self
 
-import pandas as pd
+import pandas
 
 from scmle.contracts import errors
 from scmle.contracts import evidence
@@ -181,7 +181,7 @@ class CustodyManifest:
             "final_test": self.final_test_ids,
         }
 
-    def verify_rows(self, frame: pd.DataFrame) -> None:
+    def verify_rows(self, frame: pandas.DataFrame) -> None:
         """Checks the content of the rows against the recorded roots.
 
         Args:

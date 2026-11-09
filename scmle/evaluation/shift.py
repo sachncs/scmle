@@ -8,10 +8,10 @@ most so the cause can be inspected.
 
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from sklearn import ensemble
-from sklearn import metrics as sk_metrics
+from sklearn import metrics
 from sklearn import model_selection
 
 from scmle.evaluation import diagnostics
@@ -48,11 +48,11 @@ class AdversarialValidation(diagnostics.Diagnostic):
         if reference is None:
             return {"available": False, "reason": "no reference rows"}
         columns = list(inputs.feature_plan.input_columns)
-        rng = np.random.default_rng(inputs.seed)
+        rng = numpy.random.default_rng(inputs.seed)
         old = self.sample(reference[columns], rng)
         new = self.sample(inputs.features[columns], rng)
-        frame = pd.concat([old, new], ignore_index=True)
-        labels = np.r_[np.zeros(len(old)), np.ones(len(new))]
+        frame = pandas.concat([old, new], ignore_index=True)
+        labels = numpy.r_[numpy.zeros(len(old)), numpy.ones(len(new))]
         encoded = self.encode(frame, inputs)
         scores = model_selection.cross_val_predict(
             ensemble.HistGradientBoostingClassifier(
@@ -65,7 +65,7 @@ class AdversarialValidation(diagnostics.Diagnostic):
             ),
             method="predict_proba",
         )[:, 1]
-        auc = float(sk_metrics.roc_auc_score(labels, scores))
+        auc = float(metrics.roc_auc_score(labels, scores))
         return {
             "available": True,
             "auc": auc,
@@ -76,7 +76,7 @@ class AdversarialValidation(diagnostics.Diagnostic):
         }
 
     @staticmethod
-    def odds(scores: np.ndarray, reference_rows: int) -> dict[str, Any]:
+    def odds(scores: numpy.ndarray, reference_rows: int) -> dict[str, Any]:
         """Returns the odds that weighted conformal would use.
 
         The out-of-fold probability `p` that a row is an evaluation row
@@ -101,16 +101,19 @@ class AdversarialValidation(diagnostics.Diagnostic):
         new_rows = len(scores) - reference_rows
         clip = shift_weights.DEFAULT_CLIP
         raw = (
-            scores / np.maximum(1.0 - scores, 1e-12) * reference_rows / new_rows
+            scores
+            / numpy.maximum(1.0 - scores, 1e-12)
+            * reference_rows
+            / new_rows
         )
-        ratio = np.minimum(raw, clip)
+        ratio = numpy.minimum(raw, clip)
 
         def describe(
-            values: np.ndarray, unclipped: np.ndarray
+            values: numpy.ndarray, unclipped: numpy.ndarray
         ) -> dict[str, Any]:
             return {
                 "mean": float(values.mean()),
-                "p95": float(np.quantile(values, 0.95)),
+                "p95": float(numpy.quantile(values, 0.95)),
                 "max": float(values.max()),
                 "clipped_share": float((unclipped > clip).mean()),
                 "effective_size": shift_weights.effective_sample_size(values),
@@ -137,7 +140,9 @@ class AdversarialValidation(diagnostics.Diagnostic):
         }
 
     @staticmethod
-    def sample(frame: pd.DataFrame, rng: np.random.Generator) -> pd.DataFrame:
+    def sample(
+        frame: pandas.DataFrame, rng: numpy.random.Generator
+    ) -> pandas.DataFrame:
         """Caps the rows used, keeping runtime bounded.
 
         Args:
@@ -151,12 +156,12 @@ class AdversarialValidation(diagnostics.Diagnostic):
         if len(frame) <= MAX_ROWS:
             return frame.reset_index(drop=True)
         chosen = rng.choice(len(frame), MAX_ROWS, replace=False)
-        return frame.iloc[np.sort(chosen)].reset_index(drop=True)
+        return frame.iloc[numpy.sort(chosen)].reset_index(drop=True)
 
     @staticmethod
     def encode(
-        frame: pd.DataFrame, inputs: diagnostics.DiagnosticInput
-    ) -> pd.DataFrame:
+        frame: pandas.DataFrame, inputs: diagnostics.DiagnosticInput
+    ) -> pandas.DataFrame:
         """Returns a numeric view: numbers as is, categories as codes.
 
         Args:
@@ -172,7 +177,7 @@ class AdversarialValidation(diagnostics.Diagnostic):
         for column in inputs.feature_plan.categorical:
             encoded[column] = encoded[column].astype("category").cat.codes
         for column in inputs.feature_plan.numeric:
-            encoded[column] = pd.to_numeric(encoded[column])
+            encoded[column] = pandas.to_numeric(encoded[column])
         return encoded
 
     @staticmethod
@@ -194,8 +199,8 @@ class AdversarialValidation(diagnostics.Diagnostic):
 
     @staticmethod
     def most_shifted(
-        old: pd.DataFrame,
-        new: pd.DataFrame,
+        old: pandas.DataFrame,
+        new: pandas.DataFrame,
         inputs: diagnostics.DiagnosticInput,
     ) -> list[dict[str, Any]]:
         """Ranks features by how separable the two sets are on that feature.
@@ -219,14 +224,14 @@ class AdversarialValidation(diagnostics.Diagnostic):
         """
         found = []
         for column in inputs.feature_plan.numeric:
-            values = pd.concat(
-                [pd.to_numeric(old[column]), pd.to_numeric(new[column])]
+            values = pandas.concat(
+                [pandas.to_numeric(old[column]), pandas.to_numeric(new[column])]
             )
-            labels = np.r_[np.zeros(len(old)), np.ones(len(new))]
+            labels = numpy.r_[numpy.zeros(len(old)), numpy.ones(len(new))]
             present = values.notna().to_numpy()
             if present.sum() < 2 or len(set(labels[present])) < 2:
                 continue
-            auc = sk_metrics.roc_auc_score(
+            auc = metrics.roc_auc_score(
                 labels[present], values.to_numpy()[present]
             )
             found.append((column, abs(float(auc) - 0.5) * 2))

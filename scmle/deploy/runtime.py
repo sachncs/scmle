@@ -19,7 +19,7 @@ import time
 from typing import Any
 import urllib.request
 
-from scmle.artifacts import bundle as bundle_module
+from scmle.artifacts import bundle
 from scmle.contracts import errors
 from scmle.deploy import verify
 from scmle.inference import guard
@@ -178,7 +178,7 @@ def make_loader(
         loads the model bundle.
     """
 
-    def loader(readiness: guard.Readiness) -> bundle_module.ModelBundle:
+    def loader(readiness: guard.Readiness) -> bundle.ModelBundle:
         """Verifies the folder, then loads the model.
 
         Args:
@@ -196,7 +196,7 @@ def make_loader(
             f"provenance={verified.provenance_verified}",
         )
         readiness.begin(guard.Phase.LOADING)
-        model = bundle_module.ModelBundle.load(
+        model = bundle.ModelBundle.load(
             folder / "model",
             trusted=verified.trusted,
             signing_key=environ.get(verify.SIGNING_KEY) or None,

@@ -16,8 +16,8 @@ data distribution alone.
 import dataclasses
 import enum
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.contracts import qualification
 from scmle.data.admissibility import provenance
@@ -25,8 +25,8 @@ from scmle.data.detectors import certificates
 
 DETECTOR_ID = "f4-asof-reconstruction"
 DEFECT_TYPE = "asof_overwrite"
-EPOCH = pd.Timestamp("1970-01-01")
-SECOND = pd.Timedelta(seconds=1)
+EPOCH = pandas.Timestamp("1970-01-01")
+SECOND = pandas.Timedelta(seconds=1)
 
 
 class RowStatus(enum.StrEnum):
@@ -37,7 +37,7 @@ class RowStatus(enum.StrEnum):
     NOT_YET_WRITTEN = "not_yet_written"
 
 
-def to_seconds(values: pd.Series) -> np.ndarray:
+def to_seconds(values: pandas.Series) -> numpy.ndarray:
     """Converts times to float seconds; datetimes count from the Unix epoch.
 
     Args:
@@ -53,24 +53,24 @@ def to_seconds(values: pd.Series) -> np.ndarray:
     """
     if values.isna().any():
         raise ValueError("times must not be missing")
-    if pd.api.types.is_datetime64_any_dtype(values):
+    if pandas.api.types.is_datetime64_any_dtype(values):
         naive = values.dt.tz_localize(None) if values.dt.tz else values
         return ((naive - EPOCH) / SECOND).to_numpy(dtype="float64")
-    if pd.api.types.is_numeric_dtype(values) and not (
-        pd.api.types.is_bool_dtype(values)
+    if pandas.api.types.is_numeric_dtype(values) and not (
+        pandas.api.types.is_bool_dtype(values)
     ):
         return values.to_numpy(dtype="float64")
     raise ValueError("times must be datetimes or numbers")
 
 
 def point_in_time(
-    rows: pd.DataFrame,
-    log: pd.DataFrame,
+    rows: pandas.DataFrame,
+    log: pandas.DataFrame,
     key: str,
     moment: str,
     written_at: str,
     value: str,
-) -> pd.DataFrame:
+) -> pandas.DataFrame:
     """Finds the latest logged value at or before each row's moment.
 
     Args:
@@ -89,27 +89,27 @@ def point_in_time(
         when none) and `has_entry`. Among entries for one key with the same
         write time, the one later in `log` wins.
     """
-    left = pd.DataFrame(
+    left = pandas.DataFrame(
         {
             "k": rows[key].to_numpy(),
             "t": to_seconds(rows[moment]),
-            "i": np.arange(len(rows)),
+            "i": numpy.arange(len(rows)),
         }
     )
     times = to_seconds(log[written_at])
-    right = pd.DataFrame(
+    right = pandas.DataFrame(
         {
             "k": log[key].to_numpy(),
             "t": times,
             "w": times,
             "v": log[value].to_numpy(),
-            "seq": np.arange(len(log)),
+            "seq": numpy.arange(len(log)),
         }
     )
     right = right.sort_values(["t", "seq"], kind="stable").drop_duplicates(
         ["k", "t"], keep="last"
     )
-    joined = pd.merge_asof(
+    joined = pandas.merge_asof(
         left.sort_values("t", kind="stable"),
         right[["k", "t", "w", "v"]],
         on="t",
@@ -117,7 +117,7 @@ def point_in_time(
         direction="backward",
         allow_exact_matches=True,
     ).sort_values("i")
-    return pd.DataFrame(
+    return pandas.DataFrame(
         {
             "reconstructed": joined["v"].to_numpy(),
             "known_at": joined["w"].to_numpy(dtype="float64"),
@@ -127,7 +127,9 @@ def point_in_time(
     )
 
 
-def agrees(stored: pd.Series, reconstructed: pd.Series) -> pd.Series:
+def agrees(
+    stored: pandas.Series, reconstructed: pandas.Series
+) -> pandas.Series:
     """Compares two series element-wise, treating two missing values as equal.
 
     Args:
@@ -141,13 +143,15 @@ def agrees(stored: pd.Series, reconstructed: pd.Series) -> pd.Series:
     left = stored.to_numpy(dtype=object)
     right = reconstructed.to_numpy(dtype=object)
     both_missing = stored.isna().to_numpy() & reconstructed.isna().to_numpy()
-    equal = np.array([a == b for a, b in zip(left, right, strict=True)])
-    return pd.Series(
+    equal = numpy.array([a == b for a, b in zip(left, right, strict=True)])
+    return pandas.Series(
         (equal | both_missing).astype(bool), index=stored.index, dtype=bool
     )
 
 
-def classify_rows(stored: pd.Series, joined: pd.DataFrame) -> pd.Series:
+def classify_rows(
+    stored: pandas.Series, joined: pandas.DataFrame
+) -> pandas.Series:
     """Classifies every row against the reconstruction.
 
     Args:
@@ -162,21 +166,21 @@ def classify_rows(stored: pd.Series, joined: pd.DataFrame) -> pd.Series:
     """
     match = agrees(stored, joined["reconstructed"])
     not_yet = (~joined["has_entry"]) & stored.notna()
-    status = pd.Series(RowStatus.OVERWRITTEN.value, index=stored.index)
+    status = pandas.Series(RowStatus.OVERWRITTEN.value, index=stored.index)
     status[match] = RowStatus.MATCH.value
     status[not_yet] = RowStatus.NOT_YET_WRITTEN.value
     return status
 
 
 def reconstruction_mismatch(
-    rows: pd.DataFrame,
-    log: pd.DataFrame,
+    rows: pandas.DataFrame,
+    log: pandas.DataFrame,
     key: str,
     moment: str,
     stored: str,
     written_at: str,
     value: str,
-) -> pd.Series:
+) -> pandas.Series:
     """Flags rows whose stored value is not the log value at the moment.
 
     Args:
@@ -194,7 +198,7 @@ def reconstruction_mismatch(
     """
     joined = point_in_time(rows, log, key, moment, written_at, value)
     status = classify_rows(rows[stored], joined)
-    return pd.Series(
+    return pandas.Series(
         (status != RowStatus.MATCH.value).to_numpy(),
         index=rows.index,
         dtype=bool,
@@ -216,7 +220,7 @@ class AsOfAudit:
     """
 
     field: str
-    status: pd.Series
+    status: pandas.Series
     log_check: provenance.LogCheck
     as_of: provenance.AsOf
     interval: tuple[float, float]
@@ -232,8 +236,8 @@ class AsOfAudit:
 
 
 def audit_field(
-    rows: pd.DataFrame,
-    log: pd.DataFrame,
+    rows: pandas.DataFrame,
+    log: pandas.DataFrame,
     key: str,
     moment: str,
     stored: str,

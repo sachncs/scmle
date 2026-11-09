@@ -1,6 +1,6 @@
 """The extract is reconciled to the totals the charter declared."""
 
-import pandas as pd
+import pandas
 import pytest
 
 from scmle.contracts import errors
@@ -9,7 +9,7 @@ from scmle.data.ingest import declared
 
 
 def orders():
-    return pd.DataFrame({"order_id": range(1, 101), "amount": [50.0] * 100})
+    return pandas.DataFrame({"order_id": range(1, 101), "amount": [50.0] * 100})
 
 
 def spec(**changes):

@@ -16,7 +16,7 @@ from typing import Any
 import uuid
 
 import joblib
-import numpy as np
+import numpy
 from scipy import sparse
 from sklearn import base
 from sklearn import utils
@@ -139,7 +139,7 @@ class NetworkEstimator(base.BaseEstimator):
         self.random_state = random_state
 
     @staticmethod
-    def dense(features: Any) -> np.ndarray:
+    def dense(features: Any) -> numpy.ndarray:
         """Returns a float32 matrix, densifying sparse input.
 
         Args:
@@ -150,7 +150,7 @@ class NetworkEstimator(base.BaseEstimator):
         """
         if sparse.issparse(features):
             features = features.toarray()
-        return np.asarray(features, dtype=np.float32)
+        return numpy.asarray(features, dtype=numpy.float32)
 
     def model_contract(self) -> contracts.ModelFamilyContract:
         """Returns the explicit model-family boundary for this estimator."""
@@ -212,7 +212,7 @@ class NetworkEstimator(base.BaseEstimator):
         weights = (
             None
             if sample_weight is None
-            else np.asarray(sample_weight, dtype=np.float32)
+            else numpy.asarray(sample_weight, dtype=numpy.float32)
         )
         matrix = self.model_contract().validate_features(features)
         state = worker.client().request(
@@ -221,7 +221,7 @@ class NetworkEstimator(base.BaseEstimator):
                 self.engine_path,
                 self.get_params(),
                 matrix,
-                np.asarray(target),
+                numpy.asarray(target),
                 weights,
             ),
         )
@@ -239,7 +239,7 @@ class NetworkEstimator(base.BaseEstimator):
             state: Fitted state returned by the worker.
         """
 
-    def call(self, method: str, features: Any) -> np.ndarray:
+    def call(self, method: str, features: Any) -> numpy.ndarray:
         """Runs an engine method in the worker on new rows.
 
         If the worker does not hold the fitted state it is sent once and the
@@ -268,7 +268,7 @@ class NetworkEstimator(base.BaseEstimator):
                 (self.engine_path, self.state_id_, state, method, matrix),
             )
             if not (isinstance(reply, str) and reply == NEED_STATE):
-                return np.asarray(reply)
+                return numpy.asarray(reply)
         raise worker.WorkerError("the worker could not load the model state")
 
     def explain(self, features: Any) -> contracts.FeatureExplanation:
@@ -521,7 +521,7 @@ class TorchClassifier(base.ClassifierMixin, NetworkEstimator):
         """
         self.classes_ = state["classes_"]
 
-    def predict_proba(self, features: Any) -> np.ndarray:
+    def predict_proba(self, features: Any) -> numpy.ndarray:
         """Class probabilities, columns ordered like `classes_`.
 
         Args:
@@ -532,7 +532,7 @@ class TorchClassifier(base.ClassifierMixin, NetworkEstimator):
         """
         return self.call("predict_proba", features)
 
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """Most probable class.
 
         Args:
@@ -549,7 +549,7 @@ class TorchRegressor(base.RegressorMixin, NetworkEstimator):
 
     engine_path = "scmle.models.deeplearning.engines.RegressorEngine"
 
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """Predicted values in the original units.
 
         Args:
@@ -606,7 +606,7 @@ class TabPfnEstimator(base.BaseEstimator):
                 self.engine_path,
                 self.get_params(),
                 matrix,
-                np.asarray(target),
+                numpy.asarray(target),
                 None,
             ),
         )
@@ -621,7 +621,7 @@ class TabPfnEstimator(base.BaseEstimator):
             state: Fitted state returned by the worker.
         """
 
-    def call(self, method: str, features: Any) -> np.ndarray:
+    def call(self, method: str, features: Any) -> numpy.ndarray:
         """Runs an engine method in the worker on new rows.
 
         If the worker does not hold the fitted state it is sent once and the
@@ -646,7 +646,7 @@ class TabPfnEstimator(base.BaseEstimator):
                 (self.engine_path, self.state_id_, state, method, matrix),
             )
             if not (isinstance(reply, str) and reply == NEED_STATE):
-                return np.asarray(reply)
+                return numpy.asarray(reply)
         raise worker.WorkerError("the worker could not load the model state")
 
 
@@ -663,7 +663,7 @@ class TabPfnClassifier(base.ClassifierMixin, TabPfnEstimator):
         """
         self.classes_ = state["classes_"]
 
-    def predict_proba(self, features: Any) -> np.ndarray:
+    def predict_proba(self, features: Any) -> numpy.ndarray:
         """Class probabilities.
 
         Args:
@@ -674,7 +674,7 @@ class TabPfnClassifier(base.ClassifierMixin, TabPfnEstimator):
         """
         return self.call("predict_proba", features)
 
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """Most probable class.
 
         Args:
@@ -691,7 +691,7 @@ class TabPfnRegressor(base.RegressorMixin, TabPfnEstimator):
 
     engine_path = "scmle.models.deeplearning.foundation.RegressorEngine"
 
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """Predicted values.
 
         Args:
@@ -769,7 +769,7 @@ class KerasClassifier(base.ClassifierMixin, KerasEstimator):
         """
         self.classes_ = state["classes_"]
 
-    def predict_proba(self, features: Any) -> np.ndarray:
+    def predict_proba(self, features: Any) -> numpy.ndarray:
         """Class probabilities.
 
         Args:
@@ -780,7 +780,7 @@ class KerasClassifier(base.ClassifierMixin, KerasEstimator):
         """
         return self.call("predict_proba", features)
 
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """Most probable class.
 
         Args:
@@ -797,7 +797,7 @@ class KerasRegressor(base.RegressorMixin, KerasEstimator):
 
     engine_path = "scmle.models.deeplearning.keras_engine.RegressorEngine"
 
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """Predicted values.
 
         Args:

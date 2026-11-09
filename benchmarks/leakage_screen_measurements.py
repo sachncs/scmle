@@ -28,7 +28,7 @@ from pathlib import Path
 import sys
 from typing import Any
 
-import pandas as pd
+import pandas
 from sklearn import datasets
 
 from benchmarks.qualification import f4_certify
@@ -48,7 +48,7 @@ PLANT_COLUMNS = 9
 TARGET = "target"
 
 
-def sklearn_table(loader: Any) -> pd.DataFrame:
+def sklearn_table(loader: Any) -> pandas.DataFrame:
     """A shipped scikit-learn table with its target column.
 
     Args:
@@ -60,7 +60,7 @@ def sklearn_table(loader: Any) -> pd.DataFrame:
     return loader(as_frame=True).frame.reset_index(drop=True)
 
 
-def screened(frame: pd.DataFrame, target: str) -> screen.ScreenReport:
+def screened(frame: pandas.DataFrame, target: str) -> screen.ScreenReport:
     """Runs the certified screen with the shipped certificates.
 
     Args:
@@ -110,7 +110,7 @@ def blocking_names(report: screen.ScreenReport) -> list[str]:
 
 
 def measure_table(
-    name: str, frame: pd.DataFrame, target: str, leaks: Sequence[str]
+    name: str, frame: pandas.DataFrame, target: str, leaks: Sequence[str]
 ) -> dict[str, Any]:
     """Screens one table and scores the flags against the provenance.
 
@@ -158,7 +158,7 @@ def titanic_tables() -> list[dict[str, Any]]:
         Two measurements: the full table, where `boat` and `body` are the
         true leaks, and the table without them, which has none.
     """
-    frame = pd.read_csv(TITANIC)
+    frame = pandas.read_csv(TITANIC)
     clean = frame.drop(columns=list(LEAKED_TITANIC))
     return [
         measure_table("titanic", frame, "survived", LEAKED_TITANIC),

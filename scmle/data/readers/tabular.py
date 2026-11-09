@@ -12,10 +12,10 @@ from urllib.parse import urlsplit
 from urllib.parse import urlunsplit
 from urllib.request import url2pathname
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
-from scmle.contracts import data as data_contracts
+from scmle.contracts import data
 from scmle.contracts import errors
 
 
@@ -29,7 +29,7 @@ class TableReader(abc.ABC):
     suffixes: ClassVar[tuple[str, ...]]
 
     @abc.abstractmethod
-    def load(self, path: pathlib.Path) -> pd.DataFrame:
+    def load(self, path: pathlib.Path) -> pandas.DataFrame:
         """Reads `path`.
 
         Args:
@@ -45,7 +45,7 @@ class CsvReader(TableReader):
 
     suffixes = (".csv", ".csv.gz", ".csv.bz2", ".csv.xz", ".csv.zip")
 
-    def load(self, path: pathlib.Path) -> pd.DataFrame:
+    def load(self, path: pathlib.Path) -> pandas.DataFrame:
         """Reads a CSV file.
 
         Args:
@@ -54,7 +54,7 @@ class CsvReader(TableReader):
         Returns:
             The parsed table.
         """
-        return pd.read_csv(path)
+        return pandas.read_csv(path)
 
 
 class TsvReader(TableReader):
@@ -62,7 +62,7 @@ class TsvReader(TableReader):
 
     suffixes = (".tsv", ".tab", ".tsv.gz", ".tab.gz")
 
-    def load(self, path: pathlib.Path) -> pd.DataFrame:
+    def load(self, path: pathlib.Path) -> pandas.DataFrame:
         """Reads a tab-separated table.
 
         Args:
@@ -71,7 +71,7 @@ class TsvReader(TableReader):
         Returns:
             The parsed table.
         """
-        return pd.read_csv(path, sep="\t")
+        return pandas.read_csv(path, sep="\t")
 
 
 class JsonReader(TableReader):
@@ -79,7 +79,7 @@ class JsonReader(TableReader):
 
     suffixes = (".json",)
 
-    def load(self, path: pathlib.Path) -> pd.DataFrame:
+    def load(self, path: pathlib.Path) -> pandas.DataFrame:
         """Reads JSON records into a table.
 
         Args:
@@ -88,7 +88,7 @@ class JsonReader(TableReader):
         Returns:
             The parsed table.
         """
-        return pd.read_json(path)
+        return pandas.read_json(path)
 
 
 class JsonLinesReader(TableReader):
@@ -96,7 +96,7 @@ class JsonLinesReader(TableReader):
 
     suffixes = (".jsonl", ".ndjson", ".jsonl.gz", ".ndjson.gz")
 
-    def load(self, path: pathlib.Path) -> pd.DataFrame:
+    def load(self, path: pathlib.Path) -> pandas.DataFrame:
         """Reads one JSON record per line.
 
         Args:
@@ -105,7 +105,7 @@ class JsonLinesReader(TableReader):
         Returns:
             The parsed table.
         """
-        return pd.read_json(path, lines=True)
+        return pandas.read_json(path, lines=True)
 
 
 class ExcelReader(TableReader):
@@ -113,7 +113,7 @@ class ExcelReader(TableReader):
 
     suffixes = (".xlsx", ".xlsm")
 
-    def load(self, path: pathlib.Path) -> pd.DataFrame:
+    def load(self, path: pathlib.Path) -> pandas.DataFrame:
         """Reads the first worksheet from an Excel workbook.
 
         Args:
@@ -126,7 +126,7 @@ class ExcelReader(TableReader):
             DataError: If the optional spreadsheet dependency is absent.
         """
         try:
-            return pd.read_excel(path)
+            return pandas.read_excel(path)
         except ImportError as error:
             raise errors.DataError(
                 "Excel input needs the optional 'spreadsheets' dependency; "
@@ -139,7 +139,7 @@ class ParquetReader(TableReader):
 
     suffixes = (".parquet", ".pq")
 
-    def load(self, path: pathlib.Path) -> pd.DataFrame:
+    def load(self, path: pathlib.Path) -> pandas.DataFrame:
         """Reads a Parquet file.
 
         Args:
@@ -148,7 +148,7 @@ class ParquetReader(TableReader):
         Returns:
             The parsed table.
         """
-        return pd.read_parquet(path)
+        return pandas.read_parquet(path)
 
 
 class FeatherReader(TableReader):
@@ -156,7 +156,7 @@ class FeatherReader(TableReader):
 
     suffixes = (".feather", ".arrow")
 
-    def load(self, path: pathlib.Path) -> pd.DataFrame:
+    def load(self, path: pathlib.Path) -> pandas.DataFrame:
         """Reads a Feather file.
 
         Args:
@@ -165,7 +165,7 @@ class FeatherReader(TableReader):
         Returns:
             The parsed table.
         """
-        return pd.read_feather(path)
+        return pandas.read_feather(path)
 
 
 class DatasetLoader:
@@ -221,7 +221,7 @@ class DatasetLoader:
             f"use one of {self.supported_suffixes()}"
         )
 
-    def load(self, uri: str | pathlib.Path) -> pd.DataFrame:
+    def load(self, uri: str | pathlib.Path) -> pandas.DataFrame:
         """Reads and sanity-checks a dataset.
 
         Args:
@@ -253,7 +253,7 @@ class DatasetLoader:
         return frame
 
 
-def read_table(uri: str | pathlib.Path) -> pd.DataFrame:
+def read_table(uri: str | pathlib.Path) -> pandas.DataFrame:
     """Reads a supported file dataset with the default loader.
 
     Args:
@@ -265,7 +265,7 @@ def read_table(uri: str | pathlib.Path) -> pd.DataFrame:
     return DatasetLoader().load(uri)
 
 
-def schema_hash(frame: pd.DataFrame) -> str:
+def schema_hash(frame: pandas.DataFrame) -> str:
     """Hashes the column names and dtypes of a frame.
 
     Args:
@@ -280,7 +280,7 @@ def schema_hash(frame: pd.DataFrame) -> str:
     return hashlib.sha256(payload.encode()).hexdigest()[:16]
 
 
-def data_hash(frame: pd.DataFrame) -> str:
+def data_hash(frame: pandas.DataFrame) -> str:
     """Hashes the row contents of a frame, ignoring the index.
 
     Args:
@@ -290,7 +290,7 @@ def data_hash(frame: pd.DataFrame) -> str:
         The first 16 hexadecimal characters of a SHA-256 digest over the
         per-row pandas hashes, in row order.
     """
-    rows = pd.util.hash_pandas_object(frame, index=False).to_numpy()
+    rows = pandas.util.hash_pandas_object(frame, index=False).to_numpy()
     return hashlib.sha256(rows.tobytes()).hexdigest()[:16]
 
 
@@ -373,7 +373,7 @@ def raw_source_hash(uri: str | pathlib.Path) -> str:
     return digest.hexdigest()
 
 
-def snapshot_identity(frame: pd.DataFrame, uri: str | pathlib.Path) -> str:
+def snapshot_identity(frame: pandas.DataFrame, uri: str | pathlib.Path) -> str:
     """Returns a full deterministic identity for a tabular snapshot.
 
     The identity includes the ordered schema, ordered row content, shape,
@@ -394,7 +394,7 @@ def snapshot_identity(frame: pd.DataFrame, uri: str | pathlib.Path) -> str:
         )
     )
     schema_digest = hashlib.sha256(schema.encode("utf-8")).hexdigest()
-    rows = pd.util.hash_pandas_object(frame, index=False).to_numpy(
+    rows = pandas.util.hash_pandas_object(frame, index=False).to_numpy(
         dtype="uint64"
     )
     content_digest = hashlib.sha256(
@@ -414,11 +414,11 @@ def snapshot_identity(frame: pd.DataFrame, uri: str | pathlib.Path) -> str:
 
 
 def build_manifest(
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     target: str,
     uri: str | pathlib.Path = "",
     modality: str = "tabular",
-) -> data_contracts.DatasetManifest:
+) -> data.DatasetManifest:
     """Builds the immutable identity of a dataset.
 
     Args:
@@ -445,7 +445,7 @@ def build_manifest(
     object_hashes = {"tabular-frame": content_hash}
     if raw_hash:
         object_hashes["raw-source"] = raw_hash
-    return data_contracts.DatasetManifest(
+    return data.DatasetManifest(
         dataset_id=f"ds_{content_hash[:8]}",
         schema_hash=schema_hash(frame),
         data_hash=content_hash,
@@ -455,10 +455,10 @@ def build_manifest(
         uri=str(uri),
         snapshot_id=identity,
         modality=modality,
-        source=data_contracts.SourceMetadata(
+        source=data.SourceMetadata(
             acquisition_method=uri_semantics(uri),
         ),
-        lineage=data_contracts.LineageMetadata(
+        lineage=data.LineageMetadata(
             source_snapshot=identity,
             object_hashes=object_hashes,
         ),
@@ -466,8 +466,8 @@ def build_manifest(
 
 
 def replace_infinities(
-    frame: pd.DataFrame,
-) -> tuple[pd.DataFrame, dict[str, int]]:
+    frame: pandas.DataFrame,
+) -> tuple[pandas.DataFrame, dict[str, int]]:
     """Maps +/-inf in numeric columns to NaN (they carry no usable value).
 
     Args:
@@ -479,7 +479,7 @@ def replace_infinities(
         affected columns (empty when the frame is clean).
     """
     numeric = frame.select_dtypes("number")
-    infinite = np.isinf(numeric.to_numpy(dtype=float, na_value=np.nan))
+    infinite = numpy.isinf(numeric.to_numpy(dtype=float, na_value=numpy.nan))
     counts = {
         str(column): int(count)
         for column, count in zip(
@@ -489,4 +489,4 @@ def replace_infinities(
     }
     if not counts:
         return frame, {}
-    return frame.replace([np.inf, -np.inf], np.nan), counts
+    return frame.replace([numpy.inf, -numpy.inf], numpy.nan), counts

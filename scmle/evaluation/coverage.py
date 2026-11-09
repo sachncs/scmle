@@ -17,7 +17,7 @@ from collections.abc import Sequence
 import math
 from typing import Any
 
-import numpy as np
+import numpy
 from scipy import stats
 
 DEFAULT_TOLERANCE = 0.02
@@ -77,7 +77,7 @@ def holm_rejections(p_values: Sequence[float], alpha: float) -> list[bool]:
         One flag per hypothesis, in input order: True if it is rejected.
     """
     count = len(p_values)
-    order = np.argsort(np.asarray(p_values, dtype=float), kind="stable")
+    order = numpy.argsort(numpy.asarray(p_values, dtype=float), kind="stable")
     rejected = [False] * count
     for step, index in enumerate(order):
         if p_values[int(index)] <= alpha / (count - step):
@@ -108,8 +108,8 @@ def undercoverage_p_value(covered: int, rows: int, nominal: float) -> float:
 
 
 def coverage_summary(
-    covered: np.ndarray,
-    widths: np.ndarray | None = None,
+    covered: numpy.ndarray,
+    widths: numpy.ndarray | None = None,
     nominal: float = 0.9,
     tolerance: float = DEFAULT_TOLERANCE,
     level: float = 0.95,
@@ -131,14 +131,14 @@ def coverage_summary(
         `meets_nominal` (whether the lower limit reaches
         `nominal - tolerance`; False with no rows).
     """
-    flags = np.asarray(covered, dtype=bool)
+    flags = numpy.asarray(covered, dtype=bool)
     rows = int(flags.size)
     hits = int(flags.sum())
     lower, upper = clopper_pearson(hits, rows, level)
     mean_width = None
     if widths is not None and len(widths):
-        finite = np.asarray(widths, dtype=float)
-        mean_width = None if np.isinf(finite).any() else float(finite.mean())
+        finite = numpy.asarray(widths, dtype=float)
+        mean_width = None if numpy.isinf(finite).any() else float(finite.mean())
     return {
         "nominal": nominal,
         "rows": rows,
@@ -154,7 +154,7 @@ def coverage_summary(
 
 
 def slice_coverage(
-    covered: np.ndarray,
+    covered: numpy.ndarray,
     labels: Sequence[Any],
     nominal: float = 0.9,
     familywise: float = DEFAULT_FAMILYWISE,
@@ -182,8 +182,8 @@ def slice_coverage(
         in sorted label order) and `flagged` (the flagged slice names).
         Labels are compared as text.
     """
-    flags = np.asarray(covered, dtype=bool)
-    names = np.asarray([str(label) for label in labels])
+    flags = numpy.asarray(covered, dtype=bool)
+    names = numpy.asarray([str(label) for label in labels])
     found: list[dict[str, Any]] = []
     skipped = 0
     for name in sorted(set(names)):
@@ -219,7 +219,7 @@ def slice_coverage(
 
 
 def slice_flag(
-    covered: np.ndarray,
+    covered: numpy.ndarray,
     labels: Sequence[Any],
     nominal: float = 0.9,
     margin: float = SLICE_MARGIN,
@@ -251,8 +251,8 @@ def slice_flag(
         its `rows`, `p_value` and `flagged`) and `flagged` (the flagged
         names). Labels are compared as text.
     """
-    flags = np.asarray(covered, dtype=bool)
-    names = np.asarray([str(label) for label in labels])
+    flags = numpy.asarray(covered, dtype=bool)
+    names = numpy.asarray([str(label) for label in labels])
     floor = nominal - margin
     found: dict[str, dict[str, Any]] = {}
     for name in sorted(set(names)):
@@ -282,7 +282,7 @@ def slice_flag(
 
 
 def class_coverage(
-    covered: np.ndarray,
+    covered: numpy.ndarray,
     true_labels: Sequence[Any],
     nominal: float = 0.9,
     level: float = 0.95,
@@ -299,8 +299,8 @@ def class_coverage(
         For each class (as text, sorted), the `coverage_summary` of its
         rows, with zero tolerance and no widths.
     """
-    flags = np.asarray(covered, dtype=bool)
-    names = np.asarray([str(label) for label in true_labels])
+    flags = numpy.asarray(covered, dtype=bool)
+    names = numpy.asarray([str(label) for label in true_labels])
     return {
         name: coverage_summary(flags[names == name], None, nominal, 0.0, level)
         for name in sorted(set(names))
@@ -339,8 +339,8 @@ def coverage_tier(
 
 
 def coverage_report(
-    covered: np.ndarray,
-    widths: np.ndarray | None,
+    covered: numpy.ndarray,
+    widths: numpy.ndarray | None,
     nominal: float,
     labels: Sequence[Any] | None = None,
     true_classes: Sequence[Any] | None = None,

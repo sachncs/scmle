@@ -1,15 +1,15 @@
 """Nested validation, prevalence notes and the equal-class warning."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import support
 
 from scmle.contracts import tasks
 
 
 def frame(rows=600, seed=0):
-    rng = np.random.default_rng(seed)
-    data = pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    data = pandas.DataFrame(
         {"a": rng.normal(size=rows), "b": rng.normal(size=rows)}
     )
     data["y"] = (data.a + rng.normal(0, 0.8, rows) > 0).astype(int)
@@ -41,7 +41,7 @@ def test_nested_validation_is_off_unless_asked(tmp_path):
 
 def test_perfectly_equal_classes_get_a_down_sampling_warning(tmp_path):
     data = frame(400)
-    data["y"] = np.tile([0, 1], 200)
+    data["y"] = numpy.tile([0, 1], 200)
 
     result = support.make_project(
         data, "y", time_budget=300, output_dir=tmp_path
@@ -54,9 +54,9 @@ def test_perfectly_equal_classes_get_a_down_sampling_warning(tmp_path):
 
 
 def test_the_bias_variance_report_names_the_dominant_error(tmp_path):
-    rng = np.random.default_rng(2)
-    data = pd.DataFrame({"x": rng.uniform(-3, 3, 800)})
-    data["y"] = np.sin(2 * data.x) + rng.normal(0, 0.3, 800)
+    rng = numpy.random.default_rng(2)
+    data = pandas.DataFrame({"x": rng.uniform(-3, 3, 800)})
+    data["y"] = numpy.sin(2 * data.x) + rng.normal(0, 0.3, 800)
 
     result = support.make_project(
         data,

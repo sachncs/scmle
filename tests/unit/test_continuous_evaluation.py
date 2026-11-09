@@ -10,16 +10,16 @@ import dataclasses
 import json
 import types
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
-from scmle.governance import deployment_ledger as dl
+from scmle.governance import deployment_ledger
 from scmle.operations import continuous
 from scmle.operations import signals
-from tests import support_ops as ops
-from tests import support_release as sr
-from tests import support_runtime as rt
+from tests import support_ops
+from tests import support_release
+from tests import support_runtime
 from tests.support_continuous import candidate_for
 from tests.support_continuous import degraded
 from tests.support_continuous import evaluation
@@ -54,7 +54,9 @@ SPECS = [
 
 def test_the_f13_alarm_escalates_for_investigation_and_trains_nothing(tmp_path):
     loop, ignored, ignored, called = degraded(tmp_path)
-    assert kinds(loop, dl.ALARM) and not kinds(loop, dl.RETRAIN)
+    assert kinds(loop, deployment_ledger.ALARM) and not kinds(
+        loop, deployment_ledger.RETRAIN
+    )
     assert not called and loop.policy.alarm_gates_retrain is False
     actions = [e.question["action"] for e in loop.pending_escalations()]
     assert "l1_alarm_investigate" in actions
@@ -80,11 +82,13 @@ def test_a_recommendation_reaches_a_person_and_trains_only_after_approval(
     assert called == [1]
     registered = [
         r
-        for r in kinds(loop, dl.CHALLENGER_RESULT)
-        if r["body"]["phase"] == dl.REGISTERED
+        for r in kinds(loop, deployment_ledger.CHALLENGER_RESULT)
+        if r["body"]["phase"] == deployment_ledger.REGISTERED
     ]
     assert registered[0]["body"]["name"] == "challenger-1"
-    assert kinds(loop, dl.RETRAIN)[0]["body"]["mode"] == "recommend"
+    assert (
+        kinds(loop, deployment_ledger.RETRAIN)[0]["body"]["mode"] == "recommend"
+    )
 
 
 def test_a_rejecting_reply_does_not_start_a_retrain(tmp_path):
@@ -108,7 +112,9 @@ def test_trigger_mode_trains_a_challenger_at_once_and_still_escalates(tmp_path):
         decision.action == "trigger" and decision.challenger == "challenger-1"
     )
     assert called == [1] and decision.escalation_id
-    assert kinds(loop, dl.RETRAIN)[0]["body"]["mode"] == "trigger"
+    assert (
+        kinds(loop, deployment_ledger.RETRAIN)[0]["body"]["mode"] == "trigger"
+    )
     assert loop.policy.alarm_gates_retrain is False
     assert "challenger-1" in loop.ledger.registered
 
@@ -202,8 +208,8 @@ def test_business_outcomes_become_bounded_losses_and_are_kept(tmp_path):
     loop = make_loop(tmp_path)
     ev = evaluation(tmp_path, loop)
     loop.observe(
-        pd.DataFrame({"case_id": ["a", "b", "c"]}),
-        np.zeros(3),
+        pandas.DataFrame({"case_id": ["a", "b", "c"]}),
+        numpy.zeros(3),
         ["approve"] * 3,
     )
     assert ev.feed_outcomes({"a": 0.0, "b": 50.0, "c": 400.0}, cap=100.0) == 3
@@ -228,10 +234,12 @@ def test_business_outcomes_become_bounded_losses_and_are_kept(tmp_path):
 
 def test_datasets_are_versioned_by_content_and_preserved(tmp_path):
     ev = evaluation(tmp_path, make_loop(tmp_path))
-    frame = ops.frame(50, seed=1)
+    frame = support_ops.frame(50, seed=1)
     first = ev.record_training("m1", frame, {"auc": 0.9}, "initial")
     again = ev.record_training("m1b", frame.copy(), {"auc": 0.9}, "same data")
-    other = ev.record_training("m2", ops.frame(50, seed=2), {"auc": 0.8}, "new")
+    other = ev.record_training(
+        "m2", support_ops.frame(50, seed=2), {"auc": 0.8}, "new"
+    )
     version = first["facts"]["dataset_version"]
     assert version == again["facts"]["dataset_version"]
     assert version != other["facts"]["dataset_version"]
@@ -252,8 +260,8 @@ def test_datasets_are_versioned_by_content_and_preserved(tmp_path):
 
 def test_the_history_chain_detects_edits(tmp_path):
     ev = evaluation(tmp_path, make_loop(tmp_path))
-    ev.record_training("m", ops.frame(20), {}, "r", preserve=False)
-    ev.record_training("n", ops.frame(21), {}, "r", preserve=False)
+    ev.record_training("m", support_ops.frame(20), {}, "r", preserve=False)
+    ev.record_training("n", support_ops.frame(21), {}, "r", preserve=False)
     path = ev.history.path
     text = path.read_text()
     path.write_text(text.replace('"rows": 20', '"rows": 99'))
@@ -276,8 +284,8 @@ def test_a_challenger_that_wins_is_proposed_by_the_loop_in_order(tmp_path):
     assert ev.history.of_kind("promotion_proposal")
     decided = [
         r["body"]
-        for r in kinds(loop, dl.CHALLENGER_RESULT)
-        if r["body"]["phase"] == dl.DECIDED
+        for r in kinds(loop, deployment_ledger.CHALLENGER_RESULT)
+        if r["body"]["phase"] == deployment_ledger.DECIDED
     ]
     assert decided[0]["rejected"] is True
     loop.ledger.verify()
@@ -289,7 +297,12 @@ def test_a_new_model_deploys_only_after_the_proposal_the_gate_and_the_approval(
     ignored, ev = winning_challenger(tmp_path)
     release, plane, store = release_world(tmp_path)
     assert release.promote(
-        MODEL, 1, plane, "staging", rt.OLD, signing_key=sr.KEY
+        MODEL,
+        1,
+        plane,
+        "staging",
+        support_runtime.OLD,
+        signing_key=support_release.KEY,
     ).done
     good = candidate_for(store)
     unsigned = dataclasses.replace(
@@ -306,14 +319,18 @@ def test_a_new_model_deploys_only_after_the_proposal_the_gate_and_the_approval(
         "approval": unapproved,
         "same approver": self_approved,
     }.items():
-        refused = ev.replace("challenger-1", release, plane, bad, sr.KEY)
+        refused = ev.replace(
+            "challenger-1", release, plane, bad, support_release.KEY
+        )
         assert not refused.done and refused.reasons, name
         assert release.environment(MODEL, "staging")["version"] == 1, name
-    no_proposal = ev.replace("someone-else", release, plane, good, sr.KEY)
+    no_proposal = ev.replace(
+        "someone-else", release, plane, good, support_release.KEY
+    )
     assert not no_proposal.done
     assert "no promotion proposal" in no_proposal.reasons[0]
     assert release.environment(MODEL, "staging")["version"] == 1
-    done = ev.replace("challenger-1", release, plane, good, sr.KEY)
+    done = ev.replace("challenger-1", release, plane, good, support_release.KEY)
     assert done.done and done.outcome.version == 2
     assert release.environment(MODEL, "staging")["version"] == 2
     assert release.reconcile(MODEL, "staging", plane.observe()).consistent
@@ -325,12 +342,14 @@ def test_a_new_model_deploys_only_after_the_proposal_the_gate_and_the_approval(
 def test_production_replacement_needs_the_signed_staging_record(tmp_path):
     ignored, ev = winning_challenger(tmp_path)
     release, plane, store = release_world(tmp_path)
-    prod = sr.candidate(
+    prod = support_release.candidate(
         "production",
         model=store.resolve(MODEL, 2),
-        approval=rt.approval_for(2),
+        approval=support_runtime.approval_for(2),
     )
-    refused = ev.replace("challenger-1", release, plane, prod, sr.KEY)
+    refused = ev.replace(
+        "challenger-1", release, plane, prod, support_release.KEY
+    )
     assert not refused.done
     assert any("staging deployment record" in r for r in refused.reasons)
 
@@ -338,9 +357,13 @@ def test_production_replacement_needs_the_signed_staging_record(tmp_path):
 def test_a_platform_that_does_not_confirm_leaves_the_registry_alone(tmp_path):
     ignored, ev = winning_challenger(tmp_path)
     release, ignored, store = release_world(tmp_path)
-    plane = rt.MemoryPlane(never_settles=True)
+    plane = support_runtime.MemoryPlane(never_settles=True)
     result = ev.replace(
-        "challenger-1", release, plane, candidate_for(store), sr.KEY
+        "challenger-1",
+        release,
+        plane,
+        candidate_for(store),
+        support_release.KEY,
     )
     assert not result.done and result.outcome is not None
     assert release.environment(MODEL, "staging") is None
@@ -357,7 +380,7 @@ def test_an_offline_comparison_that_keeps_the_champion_blocks_replacement(
         release,
         plane,
         candidate_for(store),
-        sr.KEY,
+        support_release.KEY,
         comparison=keep,
     )
     assert not result.done and "offline comparison" in result.reasons[0]
@@ -367,7 +390,7 @@ def test_an_offline_comparison_that_keeps_the_champion_blocks_replacement(
 
 
 def periods(seed=0, n=300, shift_conv=0.0, shift_latency=0.0):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     before = {
         "conversion": rng.binomial(1, 0.10, n).astype(float),
         "latency_ms": rng.normal(120, 20, n),
@@ -452,7 +475,7 @@ def test_holdback_assignment_rejects_a_fraction_outside_the_open_unit_interval()
 
 
 def test_a_concurrent_holdback_attributes_the_change_to_the_model():
-    rng = np.random.default_rng(0)
+    rng = numpy.random.default_rng(0)
     holdback = {
         "conversion": rng.binomial(1, 0.10, 400).astype(float),
         "latency_ms": rng.normal(120, 20, 400),
@@ -473,7 +496,7 @@ def test_a_concurrent_holdback_attributes_the_change_to_the_model():
 
 
 def test_a_holdback_of_the_wrong_size_is_flagged_and_blocks_a_helped_verdict():
-    rng = np.random.default_rng(1)
+    rng = numpy.random.default_rng(1)
     holdback = {
         "conversion": rng.binomial(1, 0.10, 100).astype(float),
         "latency_ms": rng.normal(120, 20, 100),

@@ -8,7 +8,7 @@ import subprocess
 import urllib.error
 import urllib.request
 
-import pandas as pd
+import pandas
 import pytest
 import yaml
 
@@ -143,7 +143,7 @@ def test_the_lock_matches_the_project_dependencies():
 
 def test_the_demo_data_matches_its_generator():
     assert make_demo_data.main(["--check"]) == 0
-    train = pd.read_csv(ROOT / "deploy" / "local" / "data" / "train.csv")
+    train = pandas.read_csv(ROOT / "deploy" / "local" / "data" / "train.csv")
     assert list(train.columns) == [
         "age",
         "balance",
@@ -259,13 +259,13 @@ def test_runtime_settings_read_the_environment_and_reject_garbage():
 
 
 def test_the_container_healthcheck_follows_readiness(tmp_path):
-    from scmle.artifacts import bundle as bundle_module
+    from scmle.artifacts import bundle
     from scmle.inference import parity
     from scmle.inference import serving
 
     golden = parity.load_golden(ROOT / "deploy" / "local" / "golden")
     folder = parity.reference_bundle(golden.spec).save(tmp_path / "bundle")
-    model = bundle_module.ModelBundle.load(folder, trusted=True)
+    model = bundle.ModelBundle.load(folder, trusted=True)
     adapter = serving.HttpServing(model, port=0)
     adapter.start()
     try:

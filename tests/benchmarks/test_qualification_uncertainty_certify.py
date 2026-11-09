@@ -3,26 +3,28 @@
 import json
 import math
 
-from benchmarks.qualification import uncertainty_certify as cert
+from benchmarks.qualification import uncertainty_certify
 from scmle.contracts import tasks
 from scmle.evaluation import task_gate
 
 
 def stored() -> dict:
-    return json.loads(cert.STORE_PATH.read_text(encoding="utf-8"))
+    return json.loads(
+        uncertainty_certify.STORE_PATH.read_text(encoding="utf-8")
+    )
 
 
 def test_certificates_match_the_current_code() -> None:
-    assert cert.problems() == []
+    assert uncertainty_certify.problems() == []
 
 
 def test_missing_and_stale_certificates_are_reported() -> None:
-    assert cert.problems({"gates": {}}) == [
-        f"{name}: no certificate" for name in cert.GATES
+    assert uncertainty_certify.problems({"gates": {}}) == [
+        f"{name}: no certificate" for name in uncertainty_certify.GATES
     ]
     document = stored()
     document["gates"]["G1"]["code_hash"] = "0" * 64
-    assert cert.problems(document) == [
+    assert uncertainty_certify.problems(document) == [
         "G1: stale (code changed since measurement)"
     ]
 
@@ -31,8 +33,8 @@ def test_certification_seeds_do_not_overlap_development_seeds() -> None:
     document = stored()
     for name, entry in document["gates"].items():
         assert entry["seeds"][0] == 0, name
-        assert entry["seeds"][1] < cert.DEV_SEED_BASE, name
-    assert document["dev_seed_base"] == cert.DEV_SEED_BASE
+        assert entry["seeds"][1] < uncertainty_certify.DEV_SEED_BASE, name
+    assert document["dev_seed_base"] == uncertainty_certify.DEV_SEED_BASE
 
 
 def test_gate_status_file_agrees_with_the_certificates() -> None:
@@ -55,12 +57,12 @@ def test_misses_are_published_not_hidden() -> None:
 
 
 def test_a_small_g1_run_has_the_expected_shape() -> None:
-    result = cert.gate_g1(40, cert.DEV_SEED_BASE)
+    result = uncertainty_certify.gate_g1(40, uncertainty_certify.DEV_SEED_BASE)
     assert result["design"]["beta"] == [451, 50]
     assert 0.89 < result["mean"] < 0.91
     assert math.isfinite(result["ks_p"])
 
 
 def test_a_small_g13_run_reports_both_calibrations() -> None:
-    result = cert.gate_g13(20, cert.DEV_SEED_BASE)
+    result = uncertainty_certify.gate_g13(20, uncertainty_certify.DEV_SEED_BASE)
     assert {"entity_wise", "row_wise"} <= set(result)

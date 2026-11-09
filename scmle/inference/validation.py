@@ -2,7 +2,7 @@
 
 from typing import Any
 
-import pandas as pd
+import pandas
 
 from scmle.contracts import artifacts
 from scmle.contracts import errors
@@ -21,7 +21,7 @@ class InputValidator:
         """
         self.schema = schema
 
-    def report(self, frame: pd.DataFrame) -> artifacts.SchemaReport:
+    def report(self, frame: pandas.DataFrame) -> artifacts.SchemaReport:
         """Describes how the data differs from the schema, without raising.
 
         Args:
@@ -57,7 +57,7 @@ class InputValidator:
             unseen_categories=unseen,
         )
 
-    def row_report(self, frame: pd.DataFrame) -> list[dict[str, Any]]:
+    def row_report(self, frame: pandas.DataFrame) -> list[dict[str, Any]]:
         """Describes each row: its null features and its unseen categories.
 
         Args:
@@ -71,7 +71,7 @@ class InputValidator:
         """
         wanted = [c for c in self.schema.features if c in frame.columns]
         null_mask = frame[wanted].isna() if wanted else frame.iloc[:, :0]
-        unseen_values: dict[str, pd.Series] = {}
+        unseen_values: dict[str, pandas.Series] = {}
         for column in self.schema.categorical:
             if column in frame.columns:
                 known = set(self.schema.known_categories[column])
@@ -95,7 +95,7 @@ class InputValidator:
             )
         return rows
 
-    def check(self, frame: pd.DataFrame) -> None:
+    def check(self, frame: pandas.DataFrame) -> None:
         """Raises when required columns are missing or numeric ones are bad.
 
         Unseen categories, nulls and extra columns do not raise.
@@ -115,7 +115,7 @@ class InputValidator:
             )
         bad = []
         for column in self.schema.numeric:
-            coerced = pd.to_numeric(frame[column], errors="coerce")
+            coerced = pandas.to_numeric(frame[column], errors="coerce")
             if (coerced.isna() & frame[column].notna()).any():
                 bad.append(column)
         if bad:

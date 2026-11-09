@@ -21,9 +21,9 @@ import json
 import re
 from typing import Any
 
-import pandas as pd
+import pandas
 
-from scmle.data.ingest import budget as budgets
+from scmle.data.ingest import budget
 from scmle.data.readers import connectors
 
 ORDER_BY = re.compile(r"\border\s+by\b", re.IGNORECASE)
@@ -86,7 +86,7 @@ class SqlSource:
     def __init__(
         self,
         connection_factory: Callable[[], Any],
-        meter: budgets.BudgetMeter | None = None,
+        meter: budget.BudgetMeter | None = None,
         uri: str = "sqlite://ingest",
         read_only_statement: str | None = None,
     ) -> None:
@@ -445,7 +445,7 @@ class ConsistentRead:
         attempts: Reads made, including torn ones.
     """
 
-    frame: pd.DataFrame
+    frame: pandas.DataFrame
     token: str | None
     verified: bool
     attempts: int
@@ -466,7 +466,7 @@ def has_total_order(query: str) -> bool:
 
 def read_once(
     connector: connectors.SourceConnector, batch_rows: int
-) -> pd.DataFrame:
+) -> pandas.DataFrame:
     """Reads every batch of a connector into one frame.
 
     Args:
@@ -486,7 +486,7 @@ def read_once(
         checkpoint = batch.checkpoint
         if not batch.has_more:
             break
-    return pd.DataFrame(rows, columns=names)
+    return pandas.DataFrame(rows, columns=names)
 
 
 def consistent_read(

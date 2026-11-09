@@ -21,9 +21,9 @@ import time
 import traceback
 from typing import Any
 
-import numpy as np
-import pandas as pd
-from sklearn import metrics as sk_metrics
+import numpy
+import pandas
+from sklearn import metrics
 
 from benchmarks.sota import records
 from benchmarks.sota import split
@@ -111,7 +111,7 @@ def seed_for(task_id: int, fold: int, repeat: int) -> int:
 
 def load_task(
     task_id: int, fold: int, repeat: int
-) -> tuple[pd.DataFrame, pd.DataFrame, str, str]:
+) -> tuple[pandas.DataFrame, pandas.DataFrame, str, str]:
     """Loads an OpenML task and its stored train / test rows.
 
     Args:
@@ -142,7 +142,7 @@ def load_task(
     )
 
 
-def score(result: Any, test: pd.DataFrame, target: str, kind: str) -> float:
+def score(result: Any, test: pandas.DataFrame, target: str, kind: str) -> float:
     """Scores the fitted project on the held-out test rows.
 
     Args:
@@ -158,22 +158,22 @@ def score(result: Any, test: pd.DataFrame, target: str, kind: str) -> float:
     truth = test[target]
     rows = test.drop(columns=[target])
     if kind == "regression":
-        predicted = np.asarray(result.predict(rows), dtype=float)
+        predicted = numpy.asarray(result.predict(rows), dtype=float)
         return float(
-            sk_metrics.root_mean_squared_error(truth.astype(float), predicted)
+            metrics.root_mean_squared_error(truth.astype(float), predicted)
         )
     classes = list(result.bundle.schema.classes)
-    proba = np.asarray(result.predict_proba(rows), dtype=float)
+    proba = numpy.asarray(result.predict_proba(rows), dtype=float)
     if kind == "binary":
-        return float(sk_metrics.roc_auc_score(truth == classes[1], proba[:, 1]))
-    return float(sk_metrics.log_loss(truth, proba, labels=classes))
+        return float(metrics.roc_auc_score(truth == classes[1], proba[:, 1]))
+    return float(metrics.log_loss(truth, proba, labels=classes))
 
 
 def run_frames(
     task_id: int,
     fold: int,
     repeat: int,
-    frames: tuple[pd.DataFrame, pd.DataFrame, str, str],
+    frames: tuple[pandas.DataFrame, pandas.DataFrame, str, str],
     budget_s: int,
     runs_dir: pathlib.Path,
     workers: int = 1,

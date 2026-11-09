@@ -8,8 +8,8 @@ slices with too few rows to score reliably are skipped and reported.
 
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.evaluation import diagnostics
 
@@ -81,7 +81,7 @@ class SliceReport(diagnostics.Diagnostic):
 
     def assignments(
         self, inputs: diagnostics.DiagnosticInput
-    ) -> list[tuple[str, pd.Series]]:
+    ) -> list[tuple[str, pandas.Series]]:
         """Returns slice labels for each feature used to slice the data.
 
         Args:
@@ -96,7 +96,7 @@ class SliceReport(diagnostics.Diagnostic):
             used for rank-based metrics.
         """
         plan = inputs.feature_plan
-        found: list[tuple[str, pd.Series]] = []
+        found: list[tuple[str, pandas.Series]] = []
         for column in plan.categorical:
             values = inputs.features[column].astype(object)
             if 1 < values.nunique() <= MAX_LEVELS:
@@ -105,14 +105,16 @@ class SliceReport(diagnostics.Diagnostic):
         # band restricts the range, not because the model is worse there.
         numeric = [] if inputs.metric.name in RANKING_METRICS else plan.numeric
         for column in numeric:
-            values = pd.to_numeric(inputs.features[column])
+            values = pandas.to_numeric(inputs.features[column])
             if values.nunique() > BANDS:
-                bands = pd.qcut(values, BANDS, duplicates="drop").astype(str)
+                bands = pandas.qcut(values, BANDS, duplicates="drop").astype(
+                    str
+                )
                 found.append((column, bands.where(values.notna())))
         return found[:MAX_FEATURES]
 
     def slice_score(
-        self, inputs: diagnostics.DiagnosticInput, rows: np.ndarray
+        self, inputs: diagnostics.DiagnosticInput, rows: numpy.ndarray
     ) -> float | None:
         """Scores one slice, or None when it cannot be scored reliably.
 

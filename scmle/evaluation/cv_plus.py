@@ -24,8 +24,8 @@ import io
 from typing import Any
 
 import joblib
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.evaluation import conformal
 
@@ -35,7 +35,7 @@ MIN_ROWS_FOR_SPLIT = 1000
 
 def partition_folds(
     held_out: Sequence[Sequence[int]], rows: int
-) -> np.ndarray | None:
+) -> numpy.ndarray | None:
     """Fold index of each held-out row when no row is held out twice.
 
     Args:
@@ -56,7 +56,7 @@ def partition_folds(
                 return None
             seen.add(position)
             order.append(index)
-    return np.asarray(order, dtype=int)
+    return numpy.asarray(order, dtype=int)
 
 
 POOLED = "pooled_out_of_fold"
@@ -77,7 +77,7 @@ class ScorePlan:
     """
 
     mode: str
-    folds: np.ndarray | None
+    folds: numpy.ndarray | None
     reason: str | None
 
 
@@ -151,8 +151,8 @@ class CvPlusEnsemble:
     """
 
     models: tuple[Any, ...]
-    fold_of_row: np.ndarray
-    residuals: np.ndarray
+    fold_of_row: numpy.ndarray
+    residuals: numpy.ndarray
 
     def __post_init__(self) -> None:
         """Checks the array lengths, the row count and the fold references.
@@ -177,9 +177,9 @@ class CvPlusEnsemble:
 
     def interval(
         self,
-        features: pd.DataFrame,
+        features: pandas.DataFrame,
         coverage: float = conformal.DEFAULT_COVERAGE,
-    ) -> tuple[np.ndarray, np.ndarray]:
+    ) -> tuple[numpy.ndarray, numpy.ndarray]:
         """Lower and upper CV+ limits at new rows.
 
         The guarantee of the paper is a coverage of at least `1 - 2a` for
@@ -196,8 +196,11 @@ class CvPlusEnsemble:
             the calibration rows. A coverage outside (0, 1) makes
             `conformal.cv_plus_bounds` raise ValueError.
         """
-        predictions = np.column_stack(
-            [np.asarray(m.predict(features), dtype=float) for m in self.models]
+        predictions = numpy.column_stack(
+            [
+                numpy.asarray(m.predict(features), dtype=float)
+                for m in self.models
+            ]
         )
         return conformal.cv_plus_bounds(
             predictions, self.fold_of_row, self.residuals, coverage

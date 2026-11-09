@@ -8,7 +8,7 @@ import pytest
 from scmle import cli
 from scmle.deploy import livetests
 from scmle.deploy import provenance
-from tests import support_release as sr
+from tests import support_release
 
 
 @pytest.fixture
@@ -21,7 +21,7 @@ def release(tmp_path):
         json.dumps({"files": {"model.pkl": "ab" * 32}, "model_version": "3"}),
         encoding="utf-8",
     )
-    version = dataclasses.asdict(sr.version())
+    version = dataclasses.asdict(support_release.version())
     (root / "registry" / "registry.json").write_text(
         json.dumps(
             {"models": {"churn": {"versions": {"3": version}, "aliases": {}}}}
@@ -30,7 +30,7 @@ def release(tmp_path):
     )
     digest = provenance.bundle_digest(bundle)
     (root / "approval.json").write_text(
-        json.dumps(sr.approval().to_dict()), encoding="utf-8"
+        json.dumps(support_release.approval().to_dict()), encoding="utf-8"
     )
     (root / "scan.json").write_text(
         json.dumps(
@@ -38,26 +38,28 @@ def release(tmp_path):
         ),
         encoding="utf-8",
     )
-    checks = sr.run_live(sr.recorded(digest), model_digest=digest)
+    checks = support_release.run_live(
+        support_release.recorded(digest), model_digest=digest
+    )
     (root / "checks.json").write_text(
         json.dumps([c.to_dict() for c in checks]), encoding="utf-8"
     )
     (root / "observation.json").write_text(
-        json.dumps(sr.seen().to_dict()), encoding="utf-8"
+        json.dumps(support_release.seen().to_dict()), encoding="utf-8"
     )
-    (root / "key").write_text(sr.KEY + "\n", encoding="utf-8")
+    (root / "key").write_text(support_release.KEY + "\n", encoding="utf-8")
     manifest = {
         "environment": "staging",
         "provider": "aws",
-        "source_commit": sr.COMMIT,
+        "source_commit": support_release.COMMIT,
         "registry": "registry",
         "model": "churn",
         "version": 3,
-        "container_digest": sr.CONTAINER,
-        "config_digest": sr.CONFIG,
+        "container_digest": support_release.CONTAINER,
+        "config_digest": support_release.CONFIG,
         "requested_by": "author",
         "approver": "release-manager",
-        "approved_at": sr.NOW,
+        "approved_at": support_release.NOW,
         "approval": "approval.json",
         "scan_report": "scan.json",
         "checks": "checks.json",
@@ -200,8 +202,10 @@ def test_production_with_the_staging_record_is_certified(release, capsys):
     output = root / "staging-record.json"
     assert gate(root, "certify", "--output", str(output)) == cli.EXIT_OK
     capsys.readouterr()
-    production = sr.run_live(
-        sr.recorded(digest), environment="production", model_digest=digest
+    production = support_release.run_live(
+        support_release.recorded(digest),
+        environment="production",
+        model_digest=digest,
     )
     (root / "checks.json").write_text(
         json.dumps([c.to_dict() for c in production]), encoding="utf-8"
@@ -222,9 +226,11 @@ def test_live_writes_results_and_fails_when_a_check_fails(
 ):
     root, ignored, digest = release
     (root / "token").write_text("good-token\n", encoding="utf-8")
-    document = sr.recorded(digest)
+    document = support_release.recorded(digest)
     monkeypatch.setattr(
-        livetests, "http_fetch", lambda url, timeout: sr.fetch_from(document)
+        livetests,
+        "http_fetch",
+        lambda url, timeout: support_release.fetch_from(document),
     )
     base = [
         "deploy",
@@ -236,9 +242,9 @@ def test_live_writes_results_and_fails_when_a_check_fails(
         "--environment",
         "staging",
         "--commit",
-        sr.COMMIT,
+        support_release.COMMIT,
         "--container-digest",
-        sr.CONTAINER,
+        support_release.CONTAINER,
         "--model-digest",
         digest,
         "--output",

@@ -6,7 +6,7 @@ SCMLE_WRITE_GOLDEN=1 only after a reviewed change of behaviour.
 
 from pathlib import Path
 
-import numpy as np
+import numpy
 import pytest
 
 from benchmarks.qualification import streams
@@ -18,7 +18,7 @@ FIXTURE = Path(__file__).parents[1] / "fixtures" / "escalation_golden.json"
 
 def case_threshold():
     data = streams.draw_calibration(1500, 0.05, seed=3)
-    weights = np.linspace(0.5, 2.0, 1500)
+    weights = numpy.linspace(0.5, 2.0, 1500)
     small = streams.draw_calibration(40, 0.05, seed=4)
     return {
         "plain": escalation.select_threshold(
@@ -49,7 +49,7 @@ def case_threshold():
 
 
 def case_scores_and_routes():
-    rng = np.random.default_rng(1)
+    rng = numpy.random.default_rng(1)
     score = rng.random(40)
     return {
         "score": escalation.set_size_score(

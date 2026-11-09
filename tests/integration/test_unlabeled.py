@@ -1,7 +1,7 @@
 """Rows without a target are refused, ignored or put to use on request."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 import support
 
@@ -9,12 +9,12 @@ from scmle.contracts import errors
 
 
 def partly_labeled(rows=900, unlabeled=300, seed=0):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     x = rng.normal(size=rows)
     other = rng.normal(size=rows)
     y = (x + 0.5 * other + rng.normal(0, 0.6, rows) > 0).astype(float)
-    frame = pd.DataFrame({"x": x, "other": other, "y": y})
-    frame.loc[rng.choice(rows, unlabeled, replace=False), "y"] = np.nan
+    frame = pandas.DataFrame({"x": x, "other": other, "y": y})
+    frame.loc[rng.choice(rows, unlabeled, replace=False), "y"] = numpy.nan
     return frame
 
 
@@ -53,7 +53,7 @@ def test_pseudo_labeling_is_judged_and_recorded(tmp_path):
 def test_regression_cannot_be_pseudo_labeled(tmp_path):
     frame = partly_labeled()
     frame["y"] = frame["x"] * 2 + frame["y"].fillna(0)
-    frame.loc[:200, "y"] = np.nan
+    frame.loc[:200, "y"] = numpy.nan
 
     with pytest.raises(errors.ConfigError, match="classification only"):
         run(tmp_path, frame, unlabeled="pseudo_label", task="regression")
@@ -61,7 +61,7 @@ def test_regression_cannot_be_pseudo_labeled(tmp_path):
 
 def test_labeling_candidates_are_the_rows_near_the_decision_boundary(tmp_path):
     result = run(tmp_path, partly_labeled(), unlabeled="ignore")
-    pool = pd.DataFrame(
+    pool = pandas.DataFrame(
         {"x": [-4.0, 0.0, 4.0, 0.05], "other": [0.0, 0.0, 0.0, 0.0]}
     )
 

@@ -16,9 +16,9 @@ from typing import Any
 from typing import cast
 from typing import Literal
 
-import numpy as np
+import numpy
 
-from scmle.contracts import data as data_contracts
+from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.contracts import modalities
 from scmle.contracts import performance
@@ -133,7 +133,7 @@ class NonTabularModelResult:
         """The immutable training snapshot identity."""
         return self.report.dataset_hash
 
-    def predict(self, samples: Sequence[Any]) -> np.ndarray:
+    def predict(self, samples: Sequence[Any]) -> numpy.ndarray:
         """Predicts labels after validating the stored representation schema.
 
         Args:
@@ -144,7 +144,7 @@ class NonTabularModelResult:
         """
         return self.predictor.predict(samples)
 
-    def predict_proba(self, samples: Sequence[Any]) -> np.ndarray:
+    def predict_proba(self, samples: Sequence[Any]) -> numpy.ndarray:
         """Returns probabilities after validating the stored schema.
 
         Args:
@@ -354,7 +354,7 @@ class NonTabularModelProject:
         observed_adapter: modality_lifecycle.ModalityAdapter | None = None,
         performance_budget: performance.PerformanceBudget | None = None,
         performance_baseline: performance.PerformanceBaseline | None = None,
-        manifest: data_contracts.ModalityManifest | None = None,
+        manifest: data.ModalityManifest | None = None,
         require_independent_ground_truth: bool = False,
         cancellation: modality_lifecycle.LifecycleCancellation | None = None,
         checkpoint_path: str | Path | None = None,

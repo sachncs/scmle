@@ -1,7 +1,7 @@
 """Label-noise detection and representativeness against a reference."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
 from scmle.data.profiling import label_noise
@@ -13,16 +13,16 @@ def population(rows=600, seed=0):
 
 
 def labelled(rows=600, seed=0):
-    rng = np.random.default_rng(seed)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    frame = pandas.DataFrame(
         {"a": rng.normal(size=rows), "b": rng.normal(size=rows)}
     )
-    return frame, pd.Series((frame.a + frame.b > 0).astype(int))
+    return frame, pandas.Series((frame.a + frame.b > 0).astype(int))
 
 
 def test_flipped_labels_are_found_first():
     features, labels = labelled()
-    flipped = np.arange(0, 600, 20)
+    flipped = numpy.arange(0, 600, 20)
     noisy = labels.copy()
     noisy.iloc[flipped] = 1 - noisy.iloc[flipped]
 
@@ -47,7 +47,7 @@ def test_label_noise_needs_data_and_two_classes():
         label_noise.find_label_noise(features, labels)
     features = population()
     with pytest.raises(ValueError, match="two classes"):
-        label_noise.find_label_noise(features, pd.Series(np.zeros(600)))
+        label_noise.find_label_noise(features, pandas.Series(numpy.zeros(600)))
 
 
 def test_label_noise_observation_retains_reproducible_evidence():
@@ -93,8 +93,8 @@ def test_a_skewed_sample_is_flagged_with_the_shifted_column():
 
 
 def test_categorical_gaps_and_mismatched_columns():
-    sample = pd.DataFrame({"c": ["x"] * 80 + ["y"] * 20})
-    reference = pd.DataFrame({"c": ["x"] * 40 + ["y"] * 60})
+    sample = pandas.DataFrame({"c": ["x"] * 80 + ["y"] * 20})
+    reference = pandas.DataFrame({"c": ["x"] * 40 + ["y"] * 60})
     report = representativeness.compare_to_reference(sample, reference)
     assert report.gaps[0].statistic == pytest.approx(0.4)
     with pytest.raises(ValueError, match="same columns"):

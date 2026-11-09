@@ -10,17 +10,17 @@ import time
 import urllib.error
 import urllib.request
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
 from scmle import cli
 from scmle.artifacts import bundle as bundle_module
-from scmle.contracts import data as data_contracts
+from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.data.curation import preprocessing
-from scmle.models import registry as registry_module
+from scmle.models import registry
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 
@@ -28,15 +28,15 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 @pytest.fixture(scope="module")
 def boosted(tmp_path_factory):
     """A bundle of the model family the ONNX converter refuses."""
-    rng = np.random.default_rng(0)
-    frame = pd.DataFrame({"a": rng.normal(size=400), "b": rng.normal(size=400)})
+    rng = numpy.random.default_rng(0)
+    frame = pandas.DataFrame(
+        {"a": rng.normal(size=400), "b": rng.normal(size=400)}
+    )
     target = (frame.a + frame.b > 0).astype(int)
-    plan = data_contracts.FeaturePlan(("a", "b"), ())
+    plan = data.FeaturePlan(("a", "b"), ())
     fitted = preprocessing.build_pipeline(
         plan,
-        registry_module.ModelRegistry.with_builtins().get(
-            "hist_gradient_boosting"
-        ),
+        registry.ModelRegistry.with_builtins().get("hist_gradient_boosting"),
         tasks.TaskType.BINARY,
         0,
     ).fit(frame, target)

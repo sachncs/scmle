@@ -4,8 +4,8 @@ import dataclasses
 import json
 import pathlib
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 import support
 
@@ -28,13 +28,13 @@ ASSUMPTIONS = (
 )
 
 
-def causal_frame() -> pd.DataFrame:
-    rng = np.random.default_rng(0)
+def causal_frame() -> pandas.DataFrame:
+    rng = numpy.random.default_rng(0)
     rows = 600
     x1, x2 = rng.normal(size=rows), rng.normal(size=rows)
-    t = (rng.uniform(size=rows) < 1 / (1 + np.exp(-0.5 * x1))).astype(int)
+    t = (rng.uniform(size=rows) < 1 / (1 + numpy.exp(-0.5 * x1))).astype(int)
     y = 2.0 * t + x1 - 0.5 * x2 + rng.normal(size=rows)
-    return pd.DataFrame({"x1": x1, "x2": x2, "t": t, "y": y})
+    return pandas.DataFrame({"x1": x1, "x2": x2, "t": t, "y": y})
 
 
 def charter_file(
@@ -214,7 +214,7 @@ def test_subgroup_hypotheses_are_registered_and_reported_in_the_causal_files(
     tmp_path,
 ):
     frame = causal_frame()
-    frame["seg"] = np.where(frame["x1"] > 0, "hi", "lo")
+    frame["seg"] = numpy.where(frame["x1"] > 0, "hi", "lo")
     plain = run(tmp_path / "plain", ASSUMPTIONS, frame=frame)
     split = run(
         tmp_path / "split",

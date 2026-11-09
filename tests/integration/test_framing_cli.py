@@ -2,8 +2,8 @@
 
 import json
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle import cli
 from scmle.data.charter import sealing
@@ -21,11 +21,11 @@ MODEL = {
 
 
 def inputs(tmp_path, columns=None):
-    rng = np.random.default_rng(0)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(0)
+    frame = pandas.DataFrame(
         {
-            "customer_id": np.arange(300),
-            "as_of": pd.date_range("2024-01-01", periods=300, freq="h"),
+            "customer_id": numpy.arange(300),
+            "as_of": pandas.date_range("2024-01-01", periods=300, freq="h"),
             "churn": (rng.random(300) < 0.3).astype(int),
         }
     )

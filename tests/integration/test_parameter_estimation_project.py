@@ -4,12 +4,12 @@ import hashlib
 import json
 import shutil
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
 import scmle
-from scmle.artifacts import bundle as bundle_module
+from scmle.artifacts import bundle
 from scmle.contracts import errors
 from scmle.evaluation.parameter_estimation import EstimandSpec
 from scmle.evaluation.parameter_estimation import EstimationPolicy
@@ -17,13 +17,15 @@ from scmle.evaluation.parameter_estimation import EstimationResult
 from scmle.inference.evidence import InferenceEvidenceLinker
 
 
-def estimation_frame() -> pd.DataFrame:
+def estimation_frame() -> pandas.DataFrame:
     """Return a deterministic tabular dataset for project evidence tests."""
-    rng = np.random.default_rng(21)
+    rng = numpy.random.default_rng(21)
     signal = rng.normal(size=80)
-    site = np.repeat(["a", "b", "c", "d"], 20)
+    site = numpy.repeat(["a", "b", "c", "d"], 20)
     outcome = 1.25 + 2.0 * signal + rng.normal(scale=0.1, size=80)
-    return pd.DataFrame({"signal": signal, "outcome": outcome, "site": site})
+    return pandas.DataFrame(
+        {"signal": signal, "outcome": outcome, "site": site}
+    )
 
 
 def declared_estimand() -> EstimandSpec:
@@ -89,7 +91,7 @@ def test_project_run_persists_separate_estimation_evidence(tmp_path):
     parameter_node = graph.nodes["parameter-estimation"]
     assert parameter_node.digest == restored.digest()
     assert parameter_node.attributes["artifact"] == "parameter_estimation.json"
-    assert graph.nodes["evaluation"].digest == bundle_module.file_sha256(
+    assert graph.nodes["evaluation"].digest == bundle.file_sha256(
         result.run_dir / "evaluation.json"
     )
     assert graph.path_exists("snapshot", "parameter-estimation")
@@ -114,7 +116,7 @@ def test_project_run_persists_separate_estimation_evidence(tmp_path):
 def test_project_dispatches_and_serializes_bayesian_ate(tmp_path):
     """The generic project track binds a causal Bayesian declaration."""
     frame = estimation_frame().assign(
-        treatment=np.arange(80, dtype=float) % 2.0,
+        treatment=numpy.arange(80, dtype=float) % 2.0,
     )
     estimand = EstimandSpec(
         name="treatment_effect",
@@ -336,7 +338,7 @@ def test_incompatible_likelihood_fails_before_model_selection(tmp_path):
 
 def test_ipw_declaration_binds_the_project_treatment_column(tmp_path):
     """IPW cannot infer or silently substitute a treatment column."""
-    frame = estimation_frame().assign(treatment=(np.arange(80) % 2))
+    frame = estimation_frame().assign(treatment=(numpy.arange(80) % 2))
     estimand = EstimandSpec(
         name="treatment_effect",
         outcome="outcome",
@@ -383,7 +385,7 @@ def test_project_rejects_missing_cluster_and_missingness_columns(tmp_path):
         project.estimate_parameters()
 
     missing_frame = estimation_frame()
-    missing_frame.loc[0, "signal"] = np.nan
+    missing_frame.loc[0, "signal"] = numpy.nan
     project = scmle.MLProject(
         missing_frame,
         "outcome",
@@ -398,7 +400,7 @@ def test_project_rejects_missing_cluster_and_missingness_columns(tmp_path):
 def test_complete_case_binds_missingness_and_run_artifact_to_result(tmp_path):
     """The result exposes the digest-verified, complete persisted report."""
     frame = estimation_frame()
-    frame.loc[0, "signal"] = np.nan
+    frame.loc[0, "signal"] = numpy.nan
     project = scmle.MLProject(
         frame,
         "outcome",

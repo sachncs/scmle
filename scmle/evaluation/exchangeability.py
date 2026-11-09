@@ -20,7 +20,7 @@ expected and is not evidence of a broken run.
 from collections.abc import Sequence
 from typing import Any
 
-import numpy as np
+import numpy
 from scipy import stats
 
 from scmle.evaluation import conformal
@@ -36,8 +36,8 @@ NOTE = (
 
 
 def compare(
-    calibration: Sequence[float] | np.ndarray,
-    released: Sequence[float] | np.ndarray,
+    calibration: Sequence[float] | numpy.ndarray,
+    released: Sequence[float] | numpy.ndarray,
 ) -> dict[str, Any]:
     """Compares two score samples.
 
@@ -50,8 +50,8 @@ def compare(
         `status` `described` (or `not_tested` when either sample has fewer
         than `MIN_ROWS` rows).
     """
-    first = np.asarray(calibration, dtype=float)
-    second = np.asarray(released, dtype=float)
+    first = numpy.asarray(calibration, dtype=float)
+    second = numpy.asarray(released, dtype=float)
     counts = {
         "calibration_rows": int(first.size),
         "released_rows": int(second.size),
@@ -77,7 +77,7 @@ def compare(
     }
 
 
-def released_scores(bundle: Any, features: Any, target: Any) -> np.ndarray:
+def released_scores(bundle: Any, features: Any, target: Any) -> numpy.ndarray:
     """Nonconformity scores of the released rows under the bundle's model.
 
     Absolute error for regression and one minus the probability of the true
@@ -96,14 +96,14 @@ def released_scores(bundle: Any, features: Any, target: Any) -> np.ndarray:
         band = bundle.predict_interval(
             features, coverage=conformal.DEFAULT_COVERAGE, method="residual"
         )
-        return np.abs(
-            np.asarray(target, dtype=float)
+        return numpy.abs(
+            numpy.asarray(target, dtype=float)
             - band["prediction"].to_numpy(dtype=float)
         )
-    probabilities = np.asarray(bundle.predict_proba(features), dtype=float)
+    probabilities = numpy.asarray(bundle.predict_proba(features), dtype=float)
     position = {label: i for i, label in enumerate(calibrator.classes)}
     columns = [position[label] for label in list(target)]
-    return 1.0 - probabilities[np.arange(len(columns)), columns]
+    return 1.0 - probabilities[numpy.arange(len(columns)), columns]
 
 
 def describe(bundle: Any, features: Any, target: Any) -> dict[str, Any]:

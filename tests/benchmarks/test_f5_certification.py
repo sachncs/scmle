@@ -2,7 +2,7 @@
 
 import pytest
 
-from benchmarks.qualification import __main__ as cli
+from benchmarks.qualification import __main__
 from benchmarks.qualification import f5
 from benchmarks.qualification import standins
 from scmle.data.detectors import certificates
@@ -90,5 +90,5 @@ def test_cut_selection_and_the_shipped_default():
 
 
 def test_check_command_passes_on_committed_files(capsys):
-    assert cli.check_certificates() == 0
+    assert __main__.check_certificates() == 0
     assert '"f5_problems": []' in capsys.readouterr().out

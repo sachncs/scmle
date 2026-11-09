@@ -7,7 +7,7 @@ import pytest
 
 from scmle.contracts import errors
 from scmle.data.charter import causal
-from scmle.data.charter import contracts as c
+from scmle.data.charter import contracts
 from scmle.data.charter import sealing
 from tests.unit.test_charter_contracts import make_charter
 from tests.unit.test_charter_rules import FROZEN_HASH
@@ -52,7 +52,7 @@ def test_a_charter_without_the_block_keeps_its_hash():
 def test_the_block_round_trips_and_needs_format_four():
     charter = causal_charter()
     record = json.loads(json.dumps(charter.to_dict()))
-    assert c.AnalysisCharter.from_dict(record) == charter
+    assert contracts.AnalysisCharter.from_dict(record) == charter
     assert charter.format_version == 4
 
 
@@ -172,7 +172,7 @@ def test_subgroups_need_format_nine_and_round_trip():
     assert charter.format_version == 9
     assert charter.charter_hash != causal_charter().charter_hash
     record = json.loads(json.dumps(charter.to_dict()))
-    assert c.AnalysisCharter.from_dict(record) == charter
+    assert contracts.AnalysisCharter.from_dict(record) == charter
 
 
 def test_subgroups_in_an_older_format_are_refused(tmp_path):
@@ -216,7 +216,7 @@ def test_attestors_need_format_nine_and_round_trip():
     assert charter.format_version == 9
     assert charter.charter_hash != causal_charter().charter_hash
     record = json.loads(json.dumps(charter.to_dict()))
-    assert c.AnalysisCharter.from_dict(record) == charter
+    assert contracts.AnalysisCharter.from_dict(record) == charter
     block = charter.estimand.to_dict()["causal"]
     assert block["attestations"] == "signed.json"
 

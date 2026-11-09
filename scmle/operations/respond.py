@@ -25,10 +25,10 @@ import time
 from typing import Any
 
 from scmle import durability
-from scmle.operations import classify as classify_module
+from scmle.operations import classify
 from scmle.operations import logs
 from scmle.operations import notify
-from scmle.operations import signals as signals_module
+from scmle.operations import signals
 from scmle.security import audit as audit_module
 
 DESK = "operations-desk"
@@ -50,7 +50,7 @@ class Response:
     """
 
     incident_id: str | None
-    classification: classify_module.Classification
+    classification: classify.Classification
     deliveries: tuple[notify.Delivery, ...]
     telemetry_digest: str
     audit_head: str
@@ -106,9 +106,7 @@ class ResponseDesk:
         """The file of retained windows."""
         return self.directory / TELEMETRY_FILE
 
-    def retain(
-        self, at: float, signal_rows: Sequence[signals_module.Signal]
-    ) -> str:
+    def retain(self, at: float, signal_rows: Sequence[signals.Signal]) -> str:
         """Appends a window's signals to the telemetry file.
 
         The line is JSON with the time (rounded to milliseconds), model
@@ -174,7 +172,7 @@ class ResponseDesk:
 
     def handle(
         self,
-        signal_rows: Sequence[signals_module.Signal],
+        signal_rows: Sequence[signals.Signal],
         trace_id: str | None = None,
     ) -> Response:
         """Processes one window of signals.
@@ -197,8 +195,8 @@ class ResponseDesk:
         now = self.clock()
         trace = trace_id or logs.new_trace_id()
         digest = self.retain(now, signal_rows)
-        found = classify_module.classify(signal_rows)
-        if found.verdict is classify_module.Verdict.NONE:
+        found = classify.classify(signal_rows)
+        if found.verdict is classify.Verdict.NONE:
             return Response(None, found, (), digest, self.audit.ledger.head)
         stamp = time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime(now))
         incident_id = (
@@ -208,7 +206,7 @@ class ResponseDesk:
             ).hexdigest()[:12]
         )
         deliveries = self.notifier.notify(
-            classify_module.notification(
+            classify.notification(
                 found,
                 incident_id,
                 self.model_version,

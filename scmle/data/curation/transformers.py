@@ -3,10 +3,10 @@
 from typing import Any
 from typing import Self
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from sklearn import base
-from sklearn.feature_extraction import text as sk_text
+from sklearn.feature_extraction import text
 
 DEFAULT_SKEW_THRESHOLD = 1.0
 
@@ -40,14 +40,16 @@ class SkewedLogTransformer(base.TransformerMixin, base.BaseEstimator):
         Returns:
             The fitted transformer.
         """
-        frame = pd.DataFrame(np.asarray(features, dtype=float))
+        frame = pandas.DataFrame(numpy.asarray(features, dtype=float))
         skew = frame.skew().fillna(0.0).to_numpy()
         non_negative = (frame.min() >= 0).to_numpy()
-        self.columns_ = np.flatnonzero(non_negative & (skew > self.threshold))
+        self.columns_ = numpy.flatnonzero(
+            non_negative & (skew > self.threshold)
+        )
         self.n_features_in_ = frame.shape[1]
         return self
 
-    def transform(self, features: Any) -> np.ndarray:
+    def transform(self, features: Any) -> numpy.ndarray:
         """Log-transforms the selected columns (negatives clip to zero).
 
         Args:
@@ -57,14 +59,16 @@ class SkewedLogTransformer(base.TransformerMixin, base.BaseEstimator):
             A float copy of the input with `log1p` applied to the columns
             chosen in fit.
         """
-        values = np.array(features, dtype=float, copy=True)
+        values = numpy.array(features, dtype=float, copy=True)
         if self.columns_.size:
-            values[:, self.columns_] = np.log1p(
-                np.clip(values[:, self.columns_], 0.0, None)
+            values[:, self.columns_] = numpy.log1p(
+                numpy.clip(values[:, self.columns_], 0.0, None)
             )
         return values
 
-    def get_feature_names_out(self, input_features: Any = None) -> np.ndarray:
+    def get_feature_names_out(
+        self, input_features: Any = None
+    ) -> numpy.ndarray:
         """Returns the unchanged feature names.
 
         Args:
@@ -73,7 +77,7 @@ class SkewedLogTransformer(base.TransformerMixin, base.BaseEstimator):
         Returns:
             The input names as an object array.
         """
-        return np.asarray(input_features, dtype=object)
+        return numpy.asarray(input_features, dtype=object)
 
 
 class TextVectorizer(base.TransformerMixin, base.BaseEstimator):
@@ -106,7 +110,7 @@ class TextVectorizer(base.TransformerMixin, base.BaseEstimator):
         Returns:
             The fitted transformer.
         """
-        self.vectorizer_ = sk_text.TfidfVectorizer(
+        self.vectorizer_ = text.TfidfVectorizer(
             max_features=self.max_terms,
             ngram_range=(1, 2),
             min_df=2,
@@ -114,11 +118,11 @@ class TextVectorizer(base.TransformerMixin, base.BaseEstimator):
             strip_accents="unicode",
         )
         try:
-            self.vectorizer_.fit(np.asarray(texts, dtype=str))
+            self.vectorizer_.fit(numpy.asarray(texts, dtype=str))
         except ValueError:  # Empty vocabulary: no term occurs twice.
-            self.vectorizer_ = sk_text.TfidfVectorizer(
+            self.vectorizer_ = text.TfidfVectorizer(
                 max_features=self.max_terms, strip_accents="unicode"
-            ).fit(np.asarray(texts, dtype=str))
+            ).fit(numpy.asarray(texts, dtype=str))
         return self
 
     def transform(self, texts: Any) -> Any:
@@ -130,9 +134,11 @@ class TextVectorizer(base.TransformerMixin, base.BaseEstimator):
         Returns:
             A sparse matrix with one row per text and one column per term.
         """
-        return self.vectorizer_.transform(np.asarray(texts, dtype=str))
+        return self.vectorizer_.transform(numpy.asarray(texts, dtype=str))
 
-    def get_feature_names_out(self, input_features: Any = None) -> np.ndarray:
+    def get_feature_names_out(
+        self, input_features: Any = None
+    ) -> numpy.ndarray:
         """Terms of the vocabulary.
 
         Args:
@@ -168,11 +174,11 @@ class AsinhTarget(base.TransformerMixin, base.BaseEstimator):
         Returns:
             The fitted transformer; the scale is 1 if the target is constant.
         """
-        spread = float(np.std(np.asarray(target, dtype=float)))
+        spread = float(numpy.std(numpy.asarray(target, dtype=float)))
         self.scale_ = spread if spread > 0 else 1.0
         return self
 
-    def transform(self, target: Any) -> np.ndarray:
+    def transform(self, target: Any) -> numpy.ndarray:
         """Compresses the tails with the scaled inverse hyperbolic sine.
 
         Args:
@@ -181,9 +187,9 @@ class AsinhTarget(base.TransformerMixin, base.BaseEstimator):
         Returns:
             `arcsinh(target / scale_)` as a float array of the same shape.
         """
-        return np.arcsinh(np.asarray(target, dtype=float) / self.scale_)
+        return numpy.arcsinh(numpy.asarray(target, dtype=float) / self.scale_)
 
-    def inverse_transform(self, target: Any) -> np.ndarray:
+    def inverse_transform(self, target: Any) -> numpy.ndarray:
         """Maps predictions back to the original units.
 
         Args:
@@ -193,7 +199,7 @@ class AsinhTarget(base.TransformerMixin, base.BaseEstimator):
         Returns:
             `sinh(target) * scale_` as a float array of the same shape.
         """
-        clipped = np.clip(
-            np.asarray(target, dtype=float), -self.LIMIT, self.LIMIT
+        clipped = numpy.clip(
+            numpy.asarray(target, dtype=float), -self.LIMIT, self.LIMIT
         )
-        return np.sinh(clipped) * self.scale_
+        return numpy.sinh(clipped) * self.scale_

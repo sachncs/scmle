@@ -40,7 +40,7 @@ from scmle.contracts import qualification
 from scmle.core import randomness
 from scmle.data.detectors import certificates
 from scmle.data.ledger import confirm
-from scmle.data.ledger import ledger as ledger_module
+from scmle.data.ledger import ledger
 from scmle.data.robustness import qualify
 from scmle.data.robustness import shift
 from scmle.data.robustness import stability
@@ -154,7 +154,7 @@ class StabilityStage:
     note: str = ""
 
     def __call__(
-        self, survivors: Sequence[ledger_module.Hypothesis]
+        self, survivors: Sequence[ledger.Hypothesis]
     ) -> confirm.Withdrawal:
         """Assesses the survivors on `X` and withdraws the fragile ones.
 

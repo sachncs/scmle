@@ -22,8 +22,8 @@ from typing import Any
 from typing import cast
 from typing import Literal
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from scipy import linalg
 from scipy import optimize
 from scipy import special
@@ -177,23 +177,23 @@ class BayesianPrior:
         """
         if not self.mean:
             raise ValueError("Bayesian prior needs a coefficient mean")
-        prior_mean = np.asarray(self.mean, dtype=float)
-        prior_precision = np.asarray(self.precision, dtype=float)
+        prior_mean = numpy.asarray(self.mean, dtype=float)
+        prior_precision = numpy.asarray(self.precision, dtype=float)
         if prior_mean.ndim != 1:
             raise ValueError("Bayesian prior mean must be one-dimensional")
         if prior_precision.shape != (len(self.mean), len(self.mean)):
             raise ValueError("Bayesian prior precision must be square")
-        if not np.isfinite(prior_mean).all():
+        if not numpy.isfinite(prior_mean).all():
             raise ValueError("Bayesian prior mean must be finite")
-        if not np.isfinite(prior_precision).all():
+        if not numpy.isfinite(prior_precision).all():
             raise ValueError("Bayesian prior precision must be finite")
-        if not np.allclose(
+        if not numpy.allclose(
             prior_precision, prior_precision.T, rtol=1e-10, atol=1e-12
         ):
             raise ValueError("Bayesian prior precision must be symmetric")
         try:
-            np.linalg.cholesky(prior_precision)
-        except np.linalg.LinAlgError as error:
+            numpy.linalg.cholesky(prior_precision)
+        except numpy.linalg.LinAlgError as error:
             raise ValueError(
                 "Bayesian prior precision must be positive definite"
             ) from error
@@ -673,10 +673,10 @@ class EstimationResult:
             len(row) != expected for row in self.covariance
         ):
             raise ValueError("covariance must be square over all parameters")
-        covariance = np.asarray(self.covariance, dtype=float)
-        if not np.isfinite(covariance).all():
+        covariance = numpy.asarray(self.covariance, dtype=float)
+        if not numpy.isfinite(covariance).all():
             raise ValueError("covariance must contain finite values")
-        if not np.allclose(covariance, covariance.T, rtol=1e-10, atol=1e-12):
+        if not numpy.allclose(covariance, covariance.T, rtol=1e-10, atol=1e-12):
             raise ValueError("covariance must be symmetric")
         for name, value in (
             ("rows_input", self.rows_input),
@@ -917,8 +917,8 @@ def estimate_parameters(
     Raises:
         ValueError: If the data, policy, or estimator assumptions are invalid.
     """
-    matrix = np.asarray(features, dtype=float)
-    values = np.asarray(outcome, dtype=float)
+    matrix = numpy.asarray(features, dtype=float)
+    values = numpy.asarray(outcome, dtype=float)
     validate_matrix(matrix, len(estimand.feature_names), "features")
     validate_vector(values, "outcome")
     input_clusters = validate_clusters(clusters, len(values))
@@ -963,9 +963,9 @@ def estimate_parameters(
     matrix, values, kept, dropped = prepare_rows(
         matrix, values, policy.missing, input_clusters
     )
-    if policy.estimator == "logistic" and not set(np.unique(values)).issubset(
-        {0.0, 1.0}
-    ):
+    if policy.estimator == "logistic" and not set(
+        numpy.unique(values)
+    ).issubset({0.0, 1.0}):
         raise ValueError("logistic outcome must contain only 0 and 1")
     if (
         policy.estimator in {"bayesian_linear", "bayesian_ate"}
@@ -985,7 +985,7 @@ def estimate_parameters(
         if not 0 <= policy.treatment_position < matrix.shape[1]:
             raise ValueError("treatment_position is outside the feature matrix")
     cluster_values = kept if input_clusters is not None else None
-    design = np.column_stack((np.ones(matrix.shape[0]), matrix))
+    design = numpy.column_stack((numpy.ones(matrix.shape[0]), matrix))
     names = ("intercept", *estimand.feature_names)
     if policy.estimator == "linear":
         coefficients, diagnostics = fit_linear(
@@ -1003,16 +1003,17 @@ def estimate_parameters(
             0.5 + policy.confidence_level / 2.0, degrees_of_freedom
         )
         p_values = 2.0 * stats.t.sf(
-            np.abs(
-                coefficients / np.maximum(np.sqrt(np.diag(covariance)), 1e-15)
+            numpy.abs(
+                coefficients
+                / numpy.maximum(numpy.sqrt(numpy.diag(covariance)), 1e-15)
             ),
             degrees_of_freedom,
         )
         diagnostics = {
             **diagnostics,
             "likelihood": likelihood,
-            "residual_sum_of_squares": float(np.sum(residuals**2)),
-            "rmse": float(np.sqrt(np.mean(residuals**2))),
+            "residual_sum_of_squares": float(numpy.sum(residuals**2)),
+            "rmse": float(numpy.sqrt(numpy.mean(residuals**2))),
             "degrees_of_freedom": degrees_of_freedom,
         }
     elif policy.estimator == "logistic":
@@ -1027,8 +1028,9 @@ def estimate_parameters(
         likelihood = "bernoulli"
         pivot = stats.norm.ppf(0.5 + policy.confidence_level / 2.0)
         p_values = 2.0 * stats.norm.sf(
-            np.abs(
-                coefficients / np.maximum(np.sqrt(np.diag(covariance)), 1e-15)
+            numpy.abs(
+                coefficients
+                / numpy.maximum(numpy.sqrt(numpy.diag(covariance)), 1e-15)
             )
         )
         diagnostics = {**diagnostics, "likelihood": likelihood}
@@ -1043,12 +1045,12 @@ def estimate_parameters(
                 raise ValueError("bayesian_ate requires treatment_position")
             treatment_position = int(treatment_position)
             treatment = matrix[:, treatment_position]
-            if not set(np.unique(treatment)).issubset({0.0, 1.0}):
+            if not set(numpy.unique(treatment)).issubset({0.0, 1.0}):
                 raise ValueError(
                     "bayesian_ate treatment must contain only 0 and 1"
                 )
-            treated_rows = int(np.sum(treatment == 1.0))
-            control_rows = int(np.sum(treatment == 0.0))
+            treated_rows = int(numpy.sum(treatment == 1.0))
+            control_rows = int(numpy.sum(treatment == 0.0))
             if treated_rows < 2 or control_rows < 2:
                 raise ValueError(
                     "bayesian_ate needs at least two rows per treatment arm"
@@ -1092,18 +1094,20 @@ def estimate_parameters(
                 design, values, policy.prior, coefficients, policy
             )
         likelihood = "gaussian"
-        posterior_scale = np.asarray(diagnostics["posterior_scale"])
+        posterior_scale = numpy.asarray(diagnostics["posterior_scale"])
         posterior_degrees = diagnostics["posterior_degrees_of_freedom"]
         pivot = stats.t.ppf(
             0.5 + policy.confidence_level / 2.0, posterior_degrees
         )
         p_values = 2.0 * stats.t.sf(
-            np.abs(coefficients)
-            / np.maximum(np.sqrt(np.diag(posterior_scale)), 1e-15),
+            numpy.abs(coefficients)
+            / numpy.maximum(numpy.sqrt(numpy.diag(posterior_scale)), 1e-15),
             posterior_degrees,
         )
-        standard_errors = np.sqrt(np.maximum(np.diag(covariance), 0.0))
-        interval_errors = np.sqrt(np.maximum(np.diag(posterior_scale), 0.0))
+        standard_errors = numpy.sqrt(numpy.maximum(numpy.diag(covariance), 0.0))
+        interval_errors = numpy.sqrt(
+            numpy.maximum(numpy.diag(posterior_scale), 0.0)
+        )
         diagnostics = {
             **diagnostics,
             "likelihood": likelihood,
@@ -1160,10 +1164,10 @@ def estimate_parameters(
         names = ("ate",)
         pivot = stats.norm.ppf(0.5 + policy.confidence_level / 2.0)
         p_values = 2.0 * stats.norm.sf(
-            np.abs(coefficients)
-            / np.maximum(np.sqrt(np.diag(covariance)), 1e-15)
+            numpy.abs(coefficients)
+            / numpy.maximum(numpy.sqrt(numpy.diag(covariance)), 1e-15)
         )
-        standard_errors = np.sqrt(np.maximum(np.diag(covariance), 0.0))
+        standard_errors = numpy.sqrt(numpy.maximum(numpy.diag(covariance), 0.0))
         interval_errors = standard_errors
         diagnostics = {**diagnostics, "likelihood": likelihood}
     elif policy.estimator == "continuous_ipw_ate":
@@ -1189,10 +1193,10 @@ def estimate_parameters(
         likelihood = "gaussian"
         pivot = stats.norm.ppf(0.5 + policy.confidence_level / 2.0)
         p_values = 2.0 * stats.norm.sf(
-            np.abs(coefficients)
-            / np.maximum(np.sqrt(np.diag(covariance)), 1e-15)
+            numpy.abs(coefficients)
+            / numpy.maximum(numpy.sqrt(numpy.diag(covariance)), 1e-15)
         )
-        standard_errors = np.sqrt(np.maximum(np.diag(covariance), 0.0))
+        standard_errors = numpy.sqrt(numpy.maximum(numpy.diag(covariance), 0.0))
         interval_errors = standard_errors
         diagnostics = {
             **diagnostics,
@@ -1270,12 +1274,13 @@ def estimate_parameters(
             0.5 + policy.confidence_level / 2.0, degrees_of_freedom
         )
         p_values = 2.0 * stats.t.sf(
-            np.abs(
-                coefficients / np.maximum(np.sqrt(np.diag(covariance)), 1e-15)
+            numpy.abs(
+                coefficients
+                / numpy.maximum(numpy.sqrt(numpy.diag(covariance)), 1e-15)
             ),
             degrees_of_freedom,
         )
-        standard_errors = np.sqrt(np.maximum(np.diag(covariance), 0.0))
+        standard_errors = numpy.sqrt(numpy.maximum(numpy.diag(covariance), 0.0))
         interval_errors = standard_errors
         diagnostics = {
             **diagnostics,
@@ -1298,7 +1303,7 @@ def estimate_parameters(
         )
 
     if policy.estimator not in {"bayesian_linear", "bayesian_ate"}:
-        standard_errors = np.sqrt(np.maximum(np.diag(covariance), 0.0))
+        standard_errors = numpy.sqrt(numpy.maximum(numpy.diag(covariance), 0.0))
         interval_errors = standard_errors
 
     parameters = tuple(
@@ -1374,20 +1379,20 @@ def raw_input_fingerprint(
         The SHA-256 hex digest over the shape, dtype and values of each
         input.
     """
-    matrix = np.asarray(features, dtype=float)
-    values = np.asarray(outcome, dtype=float).reshape(-1)
+    matrix = numpy.asarray(features, dtype=float)
+    values = numpy.asarray(outcome, dtype=float).reshape(-1)
     digest = hashlib.sha256()
     update_input_digest(digest, "features", matrix)
     update_input_digest(digest, "outcome", values)
     if clusters is None:
         digest.update(b"clusters:none")
     else:
-        cluster_values = np.asarray(clusters, dtype=object)
+        cluster_values = numpy.asarray(clusters, dtype=object)
         update_input_digest(digest, "clusters", cluster_values)
     return digest.hexdigest()
 
 
-def update_input_digest(digest: Any, name: str, values: np.ndarray) -> None:
+def update_input_digest(digest: Any, name: str, values: numpy.ndarray) -> None:
     """Adds one shape-, dtype-, and value-bound input to a digest.
 
     Args:
@@ -1395,7 +1400,7 @@ def update_input_digest(digest: Any, name: str, values: np.ndarray) -> None:
         name: Label bound into the descriptor of this input.
         values: Array whose shape, dtype and contents are hashed.
     """
-    array = np.asarray(values)
+    array = numpy.asarray(values)
     descriptor = json.dumps(
         {
             "name": name,
@@ -1408,13 +1413,13 @@ def update_input_digest(digest: Any, name: str, values: np.ndarray) -> None:
     digest.update(len(descriptor).to_bytes(8, "big"))
     digest.update(descriptor)
     if array.dtype.kind in "biufc":
-        canonical = np.ascontiguousarray(
+        canonical = numpy.ascontiguousarray(
             array.astype(array.dtype.newbyteorder("<"), copy=False)
         )
         values_bytes = canonical.tobytes()
     else:
-        value_hashes = pd.util.hash_pandas_object(
-            pd.Series(array.reshape(-1)), index=False
+        value_hashes = pandas.util.hash_pandas_object(
+            pandas.Series(array.reshape(-1)), index=False
         ).to_numpy(dtype="<u8")
         type_names = [
             f"{type(value).__module__}.{type(value).__qualname__}"
@@ -1431,7 +1436,7 @@ def update_input_digest(digest: Any, name: str, values: np.ndarray) -> None:
     digest.update(values_bytes)
 
 
-def validate_matrix(matrix: np.ndarray, columns: int, name: str) -> None:
+def validate_matrix(matrix: numpy.ndarray, columns: int, name: str) -> None:
     """Validates a numeric two-dimensional matrix.
 
     Args:
@@ -1449,7 +1454,7 @@ def validate_matrix(matrix: np.ndarray, columns: int, name: str) -> None:
         raise ValueError("estimation needs more rows than parameters")
 
 
-def validate_vector(values: np.ndarray, name: str) -> None:
+def validate_vector(values: numpy.ndarray, name: str) -> None:
     """Checks that a vector is one-dimensional without altering it.
 
     Args:
@@ -1465,7 +1470,7 @@ def validate_vector(values: np.ndarray, name: str) -> None:
 
 def validate_clusters(
     clusters: Sequence[Any] | None, rows: int
-) -> np.ndarray | None:
+) -> numpy.ndarray | None:
     """Validates cluster-label shape before missingness processing.
 
     Args:
@@ -1482,7 +1487,7 @@ def validate_clusters(
     """
     if clusters is None:
         return None
-    cluster_values = np.asarray(clusters, dtype=object)
+    cluster_values = numpy.asarray(clusters, dtype=object)
     if cluster_values.ndim != 1:
         raise ValueError("clusters must have shape (rows,)")
     if len(cluster_values) != rows:
@@ -1491,7 +1496,7 @@ def validate_clusters(
 
 
 def validate_covariance(
-    covariance: np.ndarray, dimension: int
+    covariance: numpy.ndarray, dimension: int
 ) -> dict[str, Any]:
     """Validates covariance shape and reports rank and numerical conditioning.
 
@@ -1509,20 +1514,20 @@ def validate_covariance(
         ValueError: If the matrix is not `dimension` by `dimension`, has a
             non-finite entry, or is not symmetric.
     """
-    matrix = np.asarray(covariance, dtype=float)
+    matrix = numpy.asarray(covariance, dtype=float)
     expected_shape = (dimension, dimension)
     if matrix.shape != expected_shape:
         raise ValueError(
             f"covariance must have shape ({dimension}, {dimension})"
         )
-    if not np.isfinite(matrix).all():
+    if not numpy.isfinite(matrix).all():
         raise ValueError("covariance must contain finite values")
-    if not np.allclose(matrix, matrix.T, rtol=1e-10, atol=1e-12):
+    if not numpy.allclose(matrix, matrix.T, rtol=1e-10, atol=1e-12):
         raise ValueError("covariance must be symmetric")
-    singular_values = np.linalg.svd(matrix, compute_uv=False)
+    singular_values = numpy.linalg.svd(matrix, compute_uv=False)
     scale = float(singular_values[0]) if singular_values.size else 0.0
-    rank_tolerance = np.finfo(float).eps * max(expected_shape) * scale
-    rank = int(np.sum(singular_values > rank_tolerance))
+    rank_tolerance = numpy.finfo(float).eps * max(expected_shape) * scale
+    rank = int(numpy.sum(singular_values > rank_tolerance))
     smallest_singular_value = (
         float(singular_values[-1]) if singular_values.size else 0.0
     )
@@ -1550,11 +1555,11 @@ def validate_covariance(
 
 
 def prepare_rows(
-    matrix: np.ndarray,
-    values: np.ndarray,
+    matrix: numpy.ndarray,
+    values: numpy.ndarray,
     missing: MissingPolicy,
     clusters: Any | None,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray | None, int]:
+) -> tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray | None, int]:
     """Applies the declared missingness policy and keeps cluster labels aligned.
 
     Args:
@@ -1575,12 +1580,12 @@ def prepare_rows(
             and the policy is ``reject``, or if no more than the number of
             columns plus one complete rows remain.
     """
-    valid = np.isfinite(matrix).all(axis=1) & np.isfinite(values)
+    valid = numpy.isfinite(matrix).all(axis=1) & numpy.isfinite(values)
     if clusters is not None:
-        cluster_array = np.asarray(clusters, dtype=object)
-        cluster_missing = pd.isna(cluster_array)
-        if not isinstance(cluster_missing, np.ndarray):
-            cluster_missing = np.asarray(cluster_missing)
+        cluster_array = numpy.asarray(clusters, dtype=object)
+        cluster_missing = pandas.isna(cluster_array)
+        if not isinstance(cluster_missing, numpy.ndarray):
+            cluster_missing = numpy.asarray(cluster_missing)
         if cluster_missing.ndim != 1:
             raise ValueError("cluster labels must be scalar values")
         valid &= ~cluster_missing.astype(bool)
@@ -1600,11 +1605,11 @@ def prepare_rows(
 
 
 def fit_linear(
-    design: np.ndarray,
-    values: np.ndarray,
+    design: numpy.ndarray,
+    values: numpy.ndarray,
     max_iterations: int,
     tolerance: float,
-) -> tuple[np.ndarray, dict[str, Any]]:
+) -> tuple[numpy.ndarray, dict[str, Any]]:
     """Solves the Gaussian likelihood using a full-rank normal equation.
 
     Args:
@@ -1622,19 +1627,19 @@ def fit_linear(
     """
     del max_iterations, tolerance
     gram = design.T @ design
-    if np.linalg.matrix_rank(gram) != gram.shape[0]:
+    if numpy.linalg.matrix_rank(gram) != gram.shape[0]:
         raise ValueError("linear design matrix is rank deficient")
-    coefficients = np.linalg.solve(gram, design.T @ values)
+    coefficients = numpy.linalg.solve(gram, design.T @ values)
     return coefficients, {"converged": True, "iterations": 1}
 
 
 def fit_continuous_ipw_effect(
-    matrix: np.ndarray,
-    values: np.ndarray,
+    matrix: numpy.ndarray,
+    values: numpy.ndarray,
     treatment_position: int,
     policy: EstimationPolicy,
-    clusters: np.ndarray | None,
-) -> tuple[np.ndarray, np.ndarray, dict[str, Any]]:
+    clusters: numpy.ndarray | None,
+) -> tuple[numpy.ndarray, numpy.ndarray, dict[str, Any]]:
     """Estimates a linear continuous-treatment effect with GPS weights.
 
     The generalized propensity score is a conditional Gaussian treatment
@@ -1660,23 +1665,25 @@ def fit_continuous_ipw_effect(
             regression is not identifiable.
     """
     treatment = matrix[:, treatment_position]
-    unique_treatment = np.unique(treatment)
+    unique_treatment = numpy.unique(treatment)
     if len(unique_treatment) < 4:
         raise ValueError(
             "continuous_ipw_ate needs at least four distinct treatment values"
         )
-    marginal_scale = float(np.std(treatment, ddof=1))
+    marginal_scale = float(numpy.std(treatment, ddof=1))
     if not math.isfinite(marginal_scale) or marginal_scale <= 1e-12:
         raise ValueError("continuous_ipw_ate needs positive treatment variance")
 
-    confounders = np.delete(matrix, treatment_position, axis=1)
-    density_design = np.column_stack((np.ones(len(confounders)), confounders))
-    if np.linalg.matrix_rank(density_design) != density_design.shape[1]:
+    confounders = numpy.delete(matrix, treatment_position, axis=1)
+    density_design = numpy.column_stack(
+        (numpy.ones(len(confounders)), confounders)
+    )
+    if numpy.linalg.matrix_rank(density_design) != density_design.shape[1]:
         raise ValueError(
             "continuous treatment density design matrix is rank deficient"
         )
-    density_coefficients, residual_sum, rank, singular_values = np.linalg.lstsq(
-        density_design, treatment, rcond=None
+    density_coefficients, residual_sum, rank, singular_values = (
+        numpy.linalg.lstsq(density_design, treatment, rcond=None)
     )
     del residual_sum, singular_values
     if rank != density_design.shape[1]:
@@ -1692,41 +1699,43 @@ def fit_continuous_ipw_effect(
             "freedom"
         )
     conditional_scale = float(
-        np.sqrt(np.sum(density_residuals**2) / residual_degrees)
+        numpy.sqrt(numpy.sum(density_residuals**2) / residual_degrees)
     )
     if not math.isfinite(conditional_scale) or conditional_scale <= 1e-12:
         raise ValueError(
             "continuous treatment density has non-positive residual scale"
         )
     log_marginal_density = stats.norm.logpdf(
-        treatment, loc=float(np.mean(treatment)), scale=marginal_scale
+        treatment, loc=float(numpy.mean(treatment)), scale=marginal_scale
     )
     log_conditional_density = stats.norm.logpdf(
         treatment, loc=conditional_mean, scale=conditional_scale
     )
     log_weight = log_marginal_density - log_conditional_density
-    raw_weights = np.exp(np.clip(log_weight, -745.0, 709.0))
-    if not np.isfinite(raw_weights).all() or np.any(raw_weights <= 0.0):
+    raw_weights = numpy.exp(numpy.clip(log_weight, -745.0, 709.0))
+    if not numpy.isfinite(raw_weights).all() or numpy.any(raw_weights <= 0.0):
         raise ValueError("continuous treatment density weights are invalid")
-    weights = np.minimum(raw_weights, policy.continuous_weight_cap)
+    weights = numpy.minimum(raw_weights, policy.continuous_weight_cap)
     capped = raw_weights > policy.continuous_weight_cap
-    effective_sample_size = float(np.sum(weights) ** 2 / np.sum(weights**2))
+    effective_sample_size = float(
+        numpy.sum(weights) ** 2 / numpy.sum(weights**2)
+    )
     if effective_sample_size < 2.0:
         raise ValueError(
             "continuous treatment weights leave fewer than two effective "
             "observations"
         )
 
-    dose_design = np.column_stack((np.ones(len(treatment)), treatment))
-    weighted_design = dose_design * np.sqrt(weights)[:, None]
-    weighted_outcome = values * np.sqrt(weights)
-    if np.linalg.matrix_rank(weighted_design) != weighted_design.shape[1]:
+    dose_design = numpy.column_stack((numpy.ones(len(treatment)), treatment))
+    weighted_design = dose_design * numpy.sqrt(weights)[:, None]
+    weighted_outcome = values * numpy.sqrt(weights)
+    if numpy.linalg.matrix_rank(weighted_design) != weighted_design.shape[1]:
         raise ValueError("weighted dose-response design is rank deficient")
-    coefficients = np.linalg.solve(
+    coefficients = numpy.linalg.solve(
         weighted_design.T @ weighted_design,
         weighted_design.T @ weighted_outcome,
     )
-    weighted_residuals = (values - dose_design @ coefficients) * np.sqrt(
+    weighted_residuals = (values - dose_design @ coefficients) * numpy.sqrt(
         weights
     )
     covariance = covariance_matrix(
@@ -1738,36 +1747,36 @@ def fit_continuous_ipw_effect(
     )
     overlap = {
         "status": "diagnosed_not_proven",
-        "treatment_min": float(np.min(treatment)),
-        "treatment_max": float(np.max(treatment)),
+        "treatment_min": float(numpy.min(treatment)),
+        "treatment_max": float(numpy.max(treatment)),
         "unique_treatment_values": len(unique_treatment),
-        "marginal_treatment_mean": float(np.mean(treatment)),
+        "marginal_treatment_mean": float(numpy.mean(treatment)),
         "marginal_treatment_sd": marginal_scale,
         "conditional_treatment_residual_sd": conditional_scale,
         "conditional_standardized_residual_quantiles": [
             float(item)
-            for item in np.quantile(
-                np.abs(density_residuals) / conditional_scale,
+            for item in numpy.quantile(
+                numpy.abs(density_residuals) / conditional_scale,
                 (0.5, 0.9, 0.99, 1.0),
             )
         ],
         "conditional_density_min": float(
-            np.min(np.exp(log_conditional_density))
+            numpy.min(numpy.exp(log_conditional_density))
         ),
         "conditional_density_max": float(
-            np.max(np.exp(log_conditional_density))
+            numpy.max(numpy.exp(log_conditional_density))
         ),
     }
     weight_diagnostics = {
-        "raw_min": float(np.min(raw_weights)),
-        "raw_max": float(np.max(raw_weights)),
-        "capped_min": float(np.min(weights)),
-        "capped_max": float(np.max(weights)),
+        "raw_min": float(numpy.min(raw_weights)),
+        "raw_max": float(numpy.max(raw_weights)),
+        "capped_min": float(numpy.min(weights)),
+        "capped_max": float(numpy.max(weights)),
         "cap": policy.continuous_weight_cap,
-        "fraction_capped": float(np.mean(capped)),
+        "fraction_capped": float(numpy.mean(capped)),
         "quantiles": [
             float(item)
-            for item in np.quantile(weights, (0.0, 0.5, 0.9, 0.99, 1.0))
+            for item in numpy.quantile(weights, (0.0, 0.5, 0.9, 0.99, 1.0))
         ],
         "effective_sample_size": effective_sample_size,
         "effective_sample_fraction": effective_sample_size / len(weights),
@@ -1827,12 +1836,12 @@ def fit_continuous_ipw_effect(
 
 
 def reference_continuous_ipw_effect(
-    matrix: np.ndarray,
-    values: np.ndarray,
+    matrix: numpy.ndarray,
+    values: numpy.ndarray,
     treatment_position: int,
     policy: EstimationPolicy,
-    coefficients: np.ndarray,
-    clusters: np.ndarray | None,
+    coefficients: numpy.ndarray,
+    clusters: numpy.ndarray | None,
 ) -> dict[str, Any]:
     """Recomputes the GPS-weighted dose-response with dense linear algebra.
 
@@ -1858,32 +1867,34 @@ def reference_continuous_ipw_effect(
         definite.
     """
     treatment = matrix[:, treatment_position]
-    confounders = np.delete(matrix, treatment_position, axis=1)
-    density_design = np.column_stack((np.ones(len(confounders)), confounders))
-    density_coefficients = np.linalg.lstsq(
+    confounders = numpy.delete(matrix, treatment_position, axis=1)
+    density_design = numpy.column_stack(
+        (numpy.ones(len(confounders)), confounders)
+    )
+    density_coefficients = numpy.linalg.lstsq(
         density_design, treatment, rcond=None
     )[0]
     conditional_mean = density_design @ density_coefficients
     residual_degrees = len(treatment) - density_design.shape[1]
     conditional_scale = float(
-        np.sqrt(
-            np.sum((treatment - conditional_mean) ** 2)
+        numpy.sqrt(
+            numpy.sum((treatment - conditional_mean) ** 2)
             / max(residual_degrees, 1)
         )
     )
-    marginal_scale = float(np.std(treatment, ddof=1))
+    marginal_scale = float(numpy.std(treatment, ddof=1))
     log_weights = stats.norm.logpdf(
-        treatment, np.mean(treatment), marginal_scale
+        treatment, numpy.mean(treatment), marginal_scale
     ) - stats.norm.logpdf(treatment, conditional_mean, conditional_scale)
-    weights = np.minimum(
-        np.exp(np.clip(log_weights, -745.0, 709.0)),
+    weights = numpy.minimum(
+        numpy.exp(numpy.clip(log_weights, -745.0, 709.0)),
         policy.continuous_weight_cap,
     )
-    dose_design = np.column_stack((np.ones(len(treatment)), treatment))
+    dose_design = numpy.column_stack((numpy.ones(len(treatment)), treatment))
     information = dose_design.T @ (weights[:, None] * dose_design)
     right_hand_side = dose_design.T @ (weights * values)
     reference = linalg.solve(information, right_hand_side, assume_a="pos")
-    difference = float(np.max(np.abs(reference - coefficients)))
+    difference = float(numpy.max(numpy.abs(reference - coefficients)))
     return {
         "method": "scipy.linalg.solve:dense_stabilized_gps_regression",
         "max_absolute_difference": difference,
@@ -1894,7 +1905,7 @@ def reference_continuous_ipw_effect(
 
 
 def cluster_uncertainty_diagnostics(
-    clusters: np.ndarray | None,
+    clusters: numpy.ndarray | None,
 ) -> dict[str, Any]:
     """Returns explicit sampling-unit diagnostics for clustered covariance.
 
@@ -1922,26 +1933,28 @@ def cluster_uncertainty_diagnostics(
         ) from error
     if len(labels) < 2:
         raise ValueError("clustered covariance needs at least two clusters")
-    sizes = [int(np.sum(clusters == label)) for label in labels]
+    sizes = [int(numpy.sum(clusters == label)) for label in labels]
     return {
         "method": "finite_sample_cluster_robust_sandwich",
         "cluster_count": len(labels),
         "cluster_sizes": sizes,
         "minimum_cluster_size": min(sizes),
         "maximum_cluster_size": max(sizes),
-        "singleton_cluster_fraction": float(np.mean(np.asarray(sizes) == 1)),
+        "singleton_cluster_fraction": float(
+            numpy.mean(numpy.asarray(sizes) == 1)
+        ),
         "independent_sampling_unit": "declared_cluster_label",
         "small_cluster_caution": len(labels) < 30,
     }
 
 
 def fit_ipw_ate(
-    matrix: np.ndarray,
-    values: np.ndarray,
+    matrix: numpy.ndarray,
+    values: numpy.ndarray,
     treatment_position: int | None,
     policy: EstimationPolicy,
-    clusters: np.ndarray | None,
-) -> tuple[np.ndarray, np.ndarray, dict[str, Any], np.ndarray]:
+    clusters: numpy.ndarray | None,
+) -> tuple[numpy.ndarray, numpy.ndarray, dict[str, Any], numpy.ndarray]:
     """Estimates a binary-treatment Hájek inverse-probability ATE.
 
     Args:
@@ -1965,15 +1978,15 @@ def fit_ipw_ate(
     if treatment_position is None:
         raise ValueError("ipw_ate requires treatment_position")
     treatment = matrix[:, treatment_position]
-    if not set(np.unique(treatment)).issubset({0.0, 1.0}):
+    if not set(numpy.unique(treatment)).issubset({0.0, 1.0}):
         raise ValueError("ipw_ate treatment must contain only 0 and 1")
-    treated_count = int(np.sum(treatment == 1.0))
-    control_count = int(np.sum(treatment == 0.0))
+    treated_count = int(numpy.sum(treatment == 1.0))
+    control_count = int(numpy.sum(treatment == 0.0))
     if treated_count < 2 or control_count < 2:
         raise ValueError("ipw_ate needs at least two rows per treatment arm")
-    confounders = np.delete(matrix, treatment_position, axis=1)
-    propensity_design = np.column_stack(
-        (np.ones(confounders.shape[0]), confounders)
+    confounders = numpy.delete(matrix, treatment_position, axis=1)
+    propensity_design = numpy.column_stack(
+        (numpy.ones(confounders.shape[0]), confounders)
     )
     propensity_coefficients, raw_propensity, propensity_diagnostics = (
         fit_logistic(
@@ -1984,7 +1997,7 @@ def fit_ipw_ate(
         )
     )
     del propensity_coefficients
-    propensity = np.clip(
+    propensity = numpy.clip(
         raw_propensity, policy.propensity_clip, 1.0 - policy.propensity_clip
     )
     ate, variance, evidence = hajek_ipw_statistics(
@@ -1994,7 +2007,7 @@ def fit_ipw_ate(
         clusters,
         policy.covariance,
     )
-    clipped = np.abs(raw_propensity - propensity) > 1e-12
+    clipped = numpy.abs(raw_propensity - propensity) > 1e-12
     diagnostics = {
         "converged": True,
         "iterations": propensity_diagnostics["iterations"],
@@ -2017,12 +2030,12 @@ def fit_ipw_ate(
         },
         "positivity": {
             "status": "diagnosed_not_proven",
-            "raw_min": float(np.min(raw_propensity)),
-            "raw_max": float(np.max(raw_propensity)),
-            "clipped_min": float(np.min(propensity)),
-            "clipped_max": float(np.max(propensity)),
+            "raw_min": float(numpy.min(raw_propensity)),
+            "raw_max": float(numpy.max(raw_propensity)),
+            "clipped_min": float(numpy.min(propensity)),
+            "clipped_max": float(numpy.max(propensity)),
             "clip_threshold": policy.propensity_clip,
-            "fraction_clipped": float(np.mean(clipped)),
+            "fraction_clipped": float(numpy.mean(clipped)),
         },
         "effective_sample_size": evidence["effective_sample_size"],
         "treatment_means": evidence["treatment_means"],
@@ -2035,20 +2048,22 @@ def fit_ipw_ate(
     if policy.covariance == "clustered":
         diagnostics.update(evidence["uncertainty"]["cluster_diagnostics"])
     return (
-        np.asarray([ate]),
-        np.asarray([[variance]]),
+        numpy.asarray([ate]),
+        numpy.asarray([[variance]]),
         diagnostics,
         propensity_design,
     )
 
 
 def fit_aipw_ate(
-    matrix: np.ndarray,
-    values: np.ndarray,
+    matrix: numpy.ndarray,
+    values: numpy.ndarray,
     treatment_position: int | None,
     policy: EstimationPolicy,
-    clusters: np.ndarray | None,
-) -> tuple[np.ndarray, np.ndarray, dict[str, Any], dict[str, np.ndarray]]:
+    clusters: numpy.ndarray | None,
+) -> tuple[
+    numpy.ndarray, numpy.ndarray, dict[str, Any], dict[str, numpy.ndarray]
+]:
     """Estimates a binary-treatment ATE with an augmented IPW score.
 
     With one fold, nuisance models are fitted on the full sample and scored
@@ -2079,16 +2094,16 @@ def fit_aipw_ate(
     if treatment_position is None:
         raise ValueError("aipw_ate requires treatment_position")
     treatment = matrix[:, treatment_position]
-    if not set(np.unique(treatment)).issubset({0.0, 1.0}):
+    if not set(numpy.unique(treatment)).issubset({0.0, 1.0}):
         raise ValueError("aipw_ate treatment must contain only 0 and 1")
-    treated_count = int(np.sum(treatment == 1.0))
-    control_count = int(np.sum(treatment == 0.0))
+    treated_count = int(numpy.sum(treatment == 1.0))
+    control_count = int(numpy.sum(treatment == 0.0))
     if treated_count < 2 or control_count < 2:
         raise ValueError("aipw_ate needs at least two rows per treatment arm")
 
-    confounders = np.delete(matrix, treatment_position, axis=1)
-    nuisance_design = np.column_stack(
-        (np.ones(confounders.shape[0]), confounders)
+    confounders = numpy.delete(matrix, treatment_position, axis=1)
+    nuisance_design = numpy.column_stack(
+        (numpy.ones(confounders.shape[0]), confounders)
     )
     fold_count = policy.cross_fitting_folds
     if fold_count == 1:
@@ -2105,7 +2120,7 @@ def fit_aipw_ate(
             nuisance_design,
             policy,
         )
-        fold_assignments = np.zeros(len(values), dtype=int)
+        fold_assignments = numpy.zeros(len(values), dtype=int)
         cross_fitting = {
             "status": "disabled",
             "fold_count": 1,
@@ -2119,10 +2134,10 @@ def fit_aipw_ate(
         support = validate_cross_fitting_support(
             treatment, fold_assignments, fold_count
         )
-        propensity = np.empty(len(values), dtype=float)
-        raw_propensity = np.empty(len(values), dtype=float)
-        outcome_control = np.empty(len(values), dtype=float)
-        outcome_treated = np.empty(len(values), dtype=float)
+        propensity = numpy.empty(len(values), dtype=float)
+        raw_propensity = numpy.empty(len(values), dtype=float)
+        outcome_control = numpy.empty(len(values), dtype=float)
+        outcome_treated = numpy.empty(len(values), dtype=float)
         fold_diagnostics: list[dict[str, Any]] = []
         for fold in range(fold_count):
             training = fold_assignments != fold
@@ -2147,8 +2162,8 @@ def fit_aipw_ate(
             fold_diagnostics.append(
                 {
                     "fold": fold,
-                    "training_rows": int(np.sum(training)),
-                    "validation_rows": int(np.sum(validation)),
+                    "training_rows": int(numpy.sum(training)),
+                    "validation_rows": int(numpy.sum(validation)),
                     "propensity_iterations": fold_nuisance_diagnostics[
                         "propensity_iterations"
                     ],
@@ -2172,11 +2187,11 @@ def fit_aipw_ate(
             "fold_assignments": fold_assignments.tolist(),
             "support": support,
             "training_rows_by_fold": {
-                str(fold): int(np.sum(fold_assignments != fold))
+                str(fold): int(numpy.sum(fold_assignments != fold))
                 for fold in range(fold_count)
             },
             "validation_rows_by_fold": {
-                str(fold): int(np.sum(fold_assignments == fold))
+                str(fold): int(numpy.sum(fold_assignments == fold))
                 for fold in range(fold_count)
             },
             "nuisance_fits": fold_diagnostics,
@@ -2188,12 +2203,12 @@ def fit_aipw_ate(
         + treatment * (values - outcome_treated) / propensity
         - (1.0 - treatment) * (values - outcome_control) / (1.0 - propensity)
     )
-    ate = float(np.mean(score))
+    ate = float(numpy.mean(score))
     influence = score - ate
     variance, uncertainty = influence_variance(
         influence, policy.covariance, clusters
     )
-    clipped = np.abs(raw_propensity - propensity) > 1e-12
+    clipped = numpy.abs(raw_propensity - propensity) > 1e-12
     diagnostics = {
         "converged": True,
         "iterations": nuisance_diagnostics["propensity_iterations"],
@@ -2233,12 +2248,12 @@ def fit_aipw_ate(
         },
         "positivity": {
             "status": "diagnosed_not_proven",
-            "raw_min": float(np.min(raw_propensity)),
-            "raw_max": float(np.max(raw_propensity)),
-            "clipped_min": float(np.min(propensity)),
-            "clipped_max": float(np.max(propensity)),
+            "raw_min": float(numpy.min(raw_propensity)),
+            "raw_max": float(numpy.max(raw_propensity)),
+            "clipped_min": float(numpy.min(propensity)),
+            "clipped_max": float(numpy.max(propensity)),
             "clip_threshold": policy.propensity_clip,
-            "fraction_clipped": float(np.mean(clipped)),
+            "fraction_clipped": float(numpy.mean(clipped)),
         },
         "influence_function": {
             "method": "centered_augmented_ipw_score",
@@ -2249,8 +2264,8 @@ def fit_aipw_ate(
     if policy.covariance == "clustered":
         diagnostics.update(uncertainty["cluster_diagnostics"])
     return (
-        np.asarray([ate]),
-        np.asarray([[variance]]),
+        numpy.asarray([ate]),
+        numpy.asarray([[variance]]),
         diagnostics,
         {
             "nuisance_design": nuisance_design,
@@ -2263,16 +2278,16 @@ def fit_aipw_ate(
 
 
 def fit_aipw_nuisance_models(
-    training_design: np.ndarray,
-    training_treatment: np.ndarray,
-    training_values: np.ndarray,
-    evaluation_design: np.ndarray,
+    training_design: numpy.ndarray,
+    training_treatment: numpy.ndarray,
+    training_values: numpy.ndarray,
+    evaluation_design: numpy.ndarray,
     policy: EstimationPolicy,
 ) -> tuple[
-    np.ndarray,
-    np.ndarray,
-    np.ndarray,
-    np.ndarray,
+    numpy.ndarray,
+    numpy.ndarray,
+    numpy.ndarray,
+    numpy.ndarray,
     dict[str, Any],
 ]:
     """Fits AIPW nuisance models on training rows and predicts evaluation rows.
@@ -2297,7 +2312,7 @@ def fit_aipw_nuisance_models(
     """
     treated = training_treatment == 1.0
     control = training_treatment == 0.0
-    if int(np.sum(treated)) < 2 or int(np.sum(control)) < 2:
+    if int(numpy.sum(treated)) < 2 or int(numpy.sum(control)) < 2:
         raise ValueError(
             "aipw_ate each training fold needs at least two rows per "
             "treatment arm"
@@ -2316,7 +2331,7 @@ def fit_aipw_nuisance_models(
     evaluation_raw_propensity = special.expit(
         evaluation_design @ propensity_coefficients
     )
-    propensity = np.clip(
+    propensity = numpy.clip(
         evaluation_raw_propensity,
         policy.propensity_clip,
         1.0 - policy.propensity_clip,
@@ -2324,14 +2339,14 @@ def fit_aipw_nuisance_models(
     treated_design = training_design[treated]
     control_design = training_design[control]
     if (
-        np.linalg.matrix_rank(treated_design) != treated_design.shape[1]
-        or np.linalg.matrix_rank(control_design) != control_design.shape[1]
+        numpy.linalg.matrix_rank(treated_design) != treated_design.shape[1]
+        or numpy.linalg.matrix_rank(control_design) != control_design.shape[1]
     ):
         raise ValueError("aipw_ate outcome design is not identifiable")
-    treated_coefficients = np.linalg.lstsq(
+    treated_coefficients = numpy.linalg.lstsq(
         treated_design, training_values[treated], rcond=None
     )[0]
-    control_coefficients = np.linalg.lstsq(
+    control_coefficients = numpy.linalg.lstsq(
         control_design, training_values[control], rcond=None
     )[0]
     outcome_control = evaluation_design @ control_coefficients
@@ -2346,13 +2361,13 @@ def fit_aipw_nuisance_models(
             "propensity_log_likelihood": propensity_diagnostics[
                 "log_likelihood"
             ],
-            "treated_rank": int(np.linalg.matrix_rank(treated_design)),
-            "control_rank": int(np.linalg.matrix_rank(control_design)),
+            "treated_rank": int(numpy.linalg.matrix_rank(treated_design)),
+            "control_rank": int(numpy.linalg.matrix_rank(control_design)),
         },
     )
 
 
-def deterministic_fold_assignments(rows: int, fold_count: int) -> np.ndarray:
+def deterministic_fold_assignments(rows: int, fold_count: int) -> numpy.ndarray:
     """Assigns rows to balanced folds using a deterministic row-order rule.
 
     Args:
@@ -2370,12 +2385,12 @@ def deterministic_fold_assignments(rows: int, fold_count: int) -> np.ndarray:
         raise ValueError("cross-fitting needs at least two folds")
     if fold_count > rows:
         raise ValueError("cross_fitting_folds must not exceed rows")
-    return np.arange(rows, dtype=int) % fold_count
+    return numpy.arange(rows, dtype=int) % fold_count
 
 
 def validate_cross_fitting_support(
-    treatment: np.ndarray,
-    fold_assignments: np.ndarray,
+    treatment: numpy.ndarray,
+    fold_assignments: numpy.ndarray,
     fold_count: int,
 ) -> list[dict[str, int]]:
     """Validates treatment support in every training and validation fold.
@@ -2397,10 +2412,10 @@ def validate_cross_fitting_support(
     for fold in range(fold_count):
         validation = fold_assignments == fold
         training = ~validation
-        validation_treated = int(np.sum(treatment[validation] == 1.0))
-        validation_control = int(np.sum(treatment[validation] == 0.0))
-        training_treated = int(np.sum(treatment[training] == 1.0))
-        training_control = int(np.sum(treatment[training] == 0.0))
+        validation_treated = int(numpy.sum(treatment[validation] == 1.0))
+        validation_control = int(numpy.sum(treatment[validation] == 0.0))
+        training_treated = int(numpy.sum(treatment[training] == 1.0))
+        training_control = int(numpy.sum(treatment[training] == 0.0))
         if validation_treated < 1 or validation_control < 1:
             raise ValueError(
                 "aipw_ate cross-fitting needs both treatment arms in every "
@@ -2448,9 +2463,9 @@ def aipw_limitations(cross_fitted: bool) -> list[str]:
 
 
 def influence_variance(
-    influence: np.ndarray,
+    influence: numpy.ndarray,
     covariance: CovarianceKind,
-    clusters: np.ndarray | None,
+    clusters: numpy.ndarray | None,
 ) -> tuple[float, dict[str, Any]]:
     """Computes IID or finite-sample clustered influence uncertainty.
 
@@ -2478,17 +2493,17 @@ def influence_variance(
             clusters; or if the clustered variance is not finite and
             non-negative.
     """
-    centered_influence = np.asarray(influence, dtype=float)
+    centered_influence = numpy.asarray(influence, dtype=float)
     if centered_influence.ndim != 1:
         raise ValueError("influence scores must have shape (rows,)")
     if len(centered_influence) < 2:
         raise ValueError("influence uncertainty needs at least two rows")
-    if not np.isfinite(centered_influence).all():
+    if not numpy.isfinite(centered_influence).all():
         raise ValueError("influence scores must contain only finite values")
-    centered_influence = centered_influence - np.mean(centered_influence)
+    centered_influence = centered_influence - numpy.mean(centered_influence)
     if covariance == "iid":
         variance = float(
-            np.sum(centered_influence**2)
+            numpy.sum(centered_influence**2)
             / (len(centered_influence) - 1)
             / len(centered_influence)
         )
@@ -2520,14 +2535,16 @@ def influence_variance(
     cluster_sizes = []
     for label in labels:
         membership = cluster_values == label
-        cluster_sums.append(float(np.sum(centered_influence[membership])))
-        cluster_sizes.append(int(np.sum(membership)))
-    cluster_sum_array = np.asarray(cluster_sums, dtype=float)
+        cluster_sums.append(float(numpy.sum(centered_influence[membership])))
+        cluster_sizes.append(int(numpy.sum(membership)))
+    cluster_sum_array = numpy.asarray(cluster_sums, dtype=float)
     row_count = len(centered_influence)
     correction = (len(labels) / (len(labels) - 1)) * (
         (row_count - 1) / row_count
     )
-    variance = float(correction * np.sum(cluster_sum_array**2) / row_count**2)
+    variance = float(
+        correction * numpy.sum(cluster_sum_array**2) / row_count**2
+    )
     if not math.isfinite(variance) or variance < 0.0:
         raise ValueError("clustered influence variance must be finite")
     return variance, {
@@ -2542,10 +2559,10 @@ def influence_variance(
 
 
 def hajek_ipw_statistics(
-    treatment: np.ndarray,
-    values: np.ndarray,
-    propensity: np.ndarray,
-    clusters: np.ndarray | None = None,
+    treatment: numpy.ndarray,
+    values: numpy.ndarray,
+    propensity: numpy.ndarray,
+    clusters: numpy.ndarray | None = None,
     covariance: CovarianceKind = "iid",
 ) -> tuple[float, float, dict[str, Any]]:
     """Computes normalized IPW means and an influence-function variance.
@@ -2568,19 +2585,27 @@ def hajek_ipw_statistics(
     """
     treated_weights = treatment / propensity
     control_weights = (1.0 - treatment) / (1.0 - propensity)
-    treated_denominator = float(np.sum(treated_weights))
-    control_denominator = float(np.sum(control_weights))
+    treated_denominator = float(numpy.sum(treated_weights))
+    control_denominator = float(numpy.sum(control_weights))
     if treated_denominator <= 0.0 or control_denominator <= 0.0:
         raise ValueError("ipw_ate treatment weights must have positive support")
-    treated_mean = float(np.sum(treated_weights * values) / treated_denominator)
-    control_mean = float(np.sum(control_weights * values) / control_denominator)
+    treated_mean = float(
+        numpy.sum(treated_weights * values) / treated_denominator
+    )
+    control_mean = float(
+        numpy.sum(control_weights * values) / control_denominator
+    )
     influence = treated_weights * (values - treated_mean) - control_weights * (
         values - control_mean
     )
     variance, uncertainty = influence_variance(influence, covariance, clusters)
     effective_sample_size = {
-        "treated": float(treated_denominator**2 / np.sum(treated_weights**2)),
-        "control": float(control_denominator**2 / np.sum(control_weights**2)),
+        "treated": float(
+            treated_denominator**2 / numpy.sum(treated_weights**2)
+        ),
+        "control": float(
+            control_denominator**2 / numpy.sum(control_weights**2)
+        ),
     }
     return (
         treated_mean - control_mean,
@@ -2598,10 +2623,10 @@ def hajek_ipw_statistics(
 
 
 def fit_bayesian_linear(
-    design: np.ndarray,
-    values: np.ndarray,
+    design: numpy.ndarray,
+    values: numpy.ndarray,
     prior: BayesianPrior,
-) -> tuple[np.ndarray, np.ndarray, dict[str, Any]]:
+) -> tuple[numpy.ndarray, numpy.ndarray, dict[str, Any]]:
     """Computes a conjugate Gaussian posterior from an explicit prior.
 
     Args:
@@ -2622,8 +2647,8 @@ def fit_bayesian_linear(
             degrees of freedom.
     """
     validate_bayesian_prior_shape(prior, design.shape[1])
-    prior_mean = np.asarray(prior.mean, dtype=float)
-    prior_precision = np.asarray(prior.precision, dtype=float)
+    prior_mean = numpy.asarray(prior.mean, dtype=float)
+    prior_precision = numpy.asarray(prior.precision, dtype=float)
     posterior_precision = prior_precision + design.T @ design
     try:
         factor = linalg.cho_factor(posterior_precision, check_finite=True)
@@ -2631,9 +2656,9 @@ def fit_bayesian_linear(
             factor, prior_precision @ prior_mean + design.T @ values
         )
         posterior_precision_inverse = linalg.cho_solve(
-            factor, np.eye(design.shape[1])
+            factor, numpy.eye(design.shape[1])
         )
-    except np.linalg.LinAlgError as error:
+    except numpy.linalg.LinAlgError as error:
         raise ValueError(
             "Bayesian posterior precision is not identifiable"
         ) from error
@@ -2686,8 +2711,8 @@ def validate_bayesian_prior_shape(prior: BayesianPrior, dimension: int) -> None:
         ValueError: If the prior mean is not of length `dimension` or the
             precision is not `dimension` by `dimension`.
     """
-    mean_shape = np.asarray(prior.mean, dtype=float).shape
-    precision_shape = np.asarray(prior.precision, dtype=float).shape
+    mean_shape = numpy.asarray(prior.mean, dtype=float).shape
+    precision_shape = numpy.asarray(prior.precision, dtype=float).shape
     expected_shape = (dimension, dimension)
     if mean_shape != (dimension,) or precision_shape != expected_shape:
         raise ValueError(
@@ -2696,17 +2721,17 @@ def validate_bayesian_prior_shape(prior: BayesianPrior, dimension: int) -> None:
 
 
 def fit_hierarchical_linear(
-    design: np.ndarray,
-    values: np.ndarray,
-    clusters: np.ndarray,
+    design: numpy.ndarray,
+    values: numpy.ndarray,
+    clusters: numpy.ndarray,
     policy: EstimationPolicy,
 ) -> tuple[
-    np.ndarray,
-    np.ndarray,
+    numpy.ndarray,
+    numpy.ndarray,
     dict[str, Any],
     float,
     float,
-    np.ndarray,
+    numpy.ndarray,
 ]:
     """Fits a bounded two-stage hierarchical linear model.
 
@@ -2745,9 +2770,9 @@ def fit_hierarchical_linear(
         ) from error
     if len(labels) < 2:
         raise ValueError("hierarchical_linear needs at least two clusters")
-    if np.linalg.matrix_rank(design) != design.shape[1]:
+    if numpy.linalg.matrix_rank(design) != design.shape[1]:
         raise ValueError("hierarchical design matrix is rank deficient")
-    initial_coefficients = np.linalg.lstsq(design, values, rcond=None)[0]
+    initial_coefficients = numpy.linalg.lstsq(design, values, rcond=None)[0]
     initial_residuals = values - design @ initial_coefficients
     cluster_means = []
     cluster_sizes = []
@@ -2755,10 +2780,10 @@ def fit_hierarchical_linear(
     for label in labels:
         group = clusters == label
         group_residuals = initial_residuals[group]
-        cluster_means.append(float(np.mean(group_residuals)))
-        cluster_sizes.append(int(np.sum(group)))
-        centered = group_residuals - np.mean(group_residuals)
-        within_sum_of_squares += float(np.sum(centered**2))
+        cluster_means.append(float(numpy.mean(group_residuals)))
+        cluster_sizes.append(int(numpy.sum(group)))
+        centered = group_residuals - numpy.mean(group_residuals)
+        within_sum_of_squares += float(numpy.sum(centered**2))
     residual_variance = within_sum_of_squares / max(
         len(values) - len(labels), 1
     )
@@ -2766,9 +2791,9 @@ def fit_hierarchical_linear(
         raise ValueError(
             "hierarchical_linear needs positive within-cluster variance"
         )
-    between_variance = float(np.var(cluster_means, ddof=1))
+    between_variance = float(numpy.var(cluster_means, ddof=1))
     finite_sample_adjustment = residual_variance * float(
-        np.mean(1.0 / np.asarray(cluster_sizes, dtype=float))
+        numpy.mean(1.0 / numpy.asarray(cluster_sizes, dtype=float))
     )
     random_intercept_variance = max(
         0.0, between_variance - finite_sample_adjustment
@@ -2792,9 +2817,9 @@ def fit_hierarchical_linear(
         random_intercept_variance,
     )
     try:
-        coefficients = np.linalg.solve(information, right_hand_side)
-        covariance = np.linalg.solve(information, np.eye(design.shape[1]))
-    except np.linalg.LinAlgError as error:
+        coefficients = numpy.linalg.solve(information, right_hand_side)
+        covariance = numpy.linalg.solve(information, numpy.eye(design.shape[1]))
+    except numpy.linalg.LinAlgError as error:
         raise ValueError(
             "hierarchical GLS system is not identifiable"
         ) from error
@@ -2802,8 +2827,8 @@ def fit_hierarchical_linear(
     fitted_residuals = values - design @ coefficients
     for label in labels:
         group = clusters == label
-        count = int(np.sum(group))
-        group_sum = float(np.sum(fitted_residuals[group]))
+        count = int(numpy.sum(group))
+        group_sum = float(numpy.sum(fitted_residuals[group]))
         shrinkage = random_intercept_variance / (
             residual_variance + count * random_intercept_variance
         )
@@ -2824,8 +2849,8 @@ def fit_hierarchical_linear(
             "estimated" if random_intercept_variance > 0.0 else "boundary_zero"
         ),
         "random_intercept_effect": {
-            "mean_absolute_blup": float(np.mean(np.abs(random_effects))),
-            "max_absolute_blup": float(np.max(np.abs(random_effects))),
+            "mean_absolute_blup": float(numpy.mean(numpy.abs(random_effects))),
+            "max_absolute_blup": float(numpy.max(numpy.abs(random_effects))),
         },
         "variance_component_method": "moment_estimate_from_initial_ols",
         "uncertainty_method": ("conditional_on_moment_variance_components"),
@@ -2837,22 +2862,24 @@ def fit_hierarchical_linear(
         diagnostics,
         residual_variance,
         random_intercept_variance,
-        np.array([[random_intercept_variance, 0.0], [0.0, 0.0]], dtype=float),
+        numpy.array(
+            [[random_intercept_variance, 0.0], [0.0, 0.0]], dtype=float
+        ),
     )
 
 
 def fit_hierarchical_random_slope(
-    design: np.ndarray,
-    values: np.ndarray,
-    clusters: np.ndarray,
+    design: numpy.ndarray,
+    values: numpy.ndarray,
+    clusters: numpy.ndarray,
     policy: EstimationPolicy,
 ) -> tuple[
-    np.ndarray,
-    np.ndarray,
+    numpy.ndarray,
+    numpy.ndarray,
     dict[str, Any],
     float,
     float,
-    np.ndarray,
+    numpy.ndarray,
 ]:
     """Fits one random slope with a random intercept by moments or REML.
 
@@ -2886,9 +2913,9 @@ def fit_hierarchical_random_slope(
         ) from error
     if len(labels) < 2:
         raise ValueError("hierarchical_linear needs at least two clusters")
-    if np.linalg.matrix_rank(design) != design.shape[1]:
+    if numpy.linalg.matrix_rank(design) != design.shape[1]:
         raise ValueError("hierarchical design matrix is rank deficient")
-    initial_coefficients = np.linalg.lstsq(design, values, rcond=None)[0]
+    initial_coefficients = numpy.linalg.lstsq(design, values, rcond=None)[0]
     initial_residuals = values - design @ initial_coefficients
     random_effect_estimates = []
     random_effect_inverse_matrices = []
@@ -2897,29 +2924,29 @@ def fit_hierarchical_random_slope(
     for label in labels:
         group = clusters == label
         group_design = design[group]
-        random_effect_design = np.column_stack(
+        random_effect_design = numpy.column_stack(
             (
-                np.ones(int(np.sum(group))),
+                numpy.ones(int(numpy.sum(group))),
                 group_design[:, random_slope_position + 1],
             )
         )
-        if np.linalg.matrix_rank(random_effect_design) != 2:
+        if numpy.linalg.matrix_rank(random_effect_design) != 2:
             raise ValueError(
                 "each hierarchical cluster needs within-cluster variation "
                 "for the declared random slope"
             )
-        inverse_matrix = np.linalg.solve(
+        inverse_matrix = numpy.linalg.solve(
             random_effect_design.T @ random_effect_design,
-            np.eye(2),
+            numpy.eye(2),
         )
         group_residuals = initial_residuals[group]
         random_effect_estimates.append(
             inverse_matrix @ random_effect_design.T @ group_residuals
         )
         random_effect_inverse_matrices.append(inverse_matrix)
-        cluster_sizes.append(int(np.sum(group)))
-        centered = group_residuals - np.mean(group_residuals)
-        within_sum_of_squares += float(np.sum(centered**2))
+        cluster_sizes.append(int(numpy.sum(group)))
+        centered = group_residuals - numpy.mean(group_residuals)
+        within_sum_of_squares += float(numpy.sum(centered**2))
     residual_variance = within_sum_of_squares / max(
         len(values) - len(labels), 1
     )
@@ -2927,13 +2954,13 @@ def fit_hierarchical_random_slope(
         raise ValueError(
             "hierarchical_linear needs positive within-cluster variance"
         )
-    effects = np.asarray(random_effect_estimates, dtype=float)
+    effects = numpy.asarray(random_effect_estimates, dtype=float)
     centered_effects = effects - effects.mean(axis=0)
     effect_covariance = (
         centered_effects.T @ centered_effects / (len(labels) - 1)
     )
-    effect_covariance -= residual_variance * np.mean(
-        np.asarray(random_effect_inverse_matrices), axis=0
+    effect_covariance -= residual_variance * numpy.mean(
+        numpy.asarray(random_effect_inverse_matrices), axis=0
     )
     random_effect_covariance = project_random_effect_covariance(
         effect_covariance
@@ -2960,9 +2987,9 @@ def fit_hierarchical_random_slope(
         random_effect_covariance,
     )
     try:
-        coefficients = np.linalg.solve(information, right_hand_side)
-        covariance = np.linalg.solve(information, np.eye(design.shape[1]))
-    except np.linalg.LinAlgError as error:
+        coefficients = numpy.linalg.solve(information, right_hand_side)
+        covariance = numpy.linalg.solve(information, numpy.eye(design.shape[1]))
+    except numpy.linalg.LinAlgError as error:
         raise ValueError(
             "hierarchical GLS system is not identifiable"
         ) from error
@@ -2984,7 +3011,9 @@ def fit_hierarchical_random_slope(
     )
 
 
-def project_random_effect_covariance(covariance: np.ndarray) -> np.ndarray:
+def project_random_effect_covariance(
+    covariance: numpy.ndarray,
+) -> numpy.ndarray:
     """Projects a moment covariance to the positive-semidefinite cone.
 
     Args:
@@ -2994,21 +3023,21 @@ def project_random_effect_covariance(covariance: np.ndarray) -> np.ndarray:
         The symmetrized matrix with negative eigenvalues replaced by zero.
     """
     symmetric = (covariance + covariance.T) / 2.0
-    eigenvalues, eigenvectors = np.linalg.eigh(symmetric)
-    projected = eigenvectors @ np.diag(np.maximum(eigenvalues, 0.0))
+    eigenvalues, eigenvectors = numpy.linalg.eigh(symmetric)
+    projected = eigenvectors @ numpy.diag(numpy.maximum(eigenvalues, 0.0))
     projected = projected @ eigenvectors.T
     return (projected + projected.T) / 2.0
 
 
 def hierarchical_random_slope_gls_system(
-    design: np.ndarray,
-    values: np.ndarray,
-    clusters: np.ndarray,
+    design: numpy.ndarray,
+    values: numpy.ndarray,
+    clusters: numpy.ndarray,
     labels: tuple[Any, ...],
     random_slope_position: int,
     residual_variance: float,
-    random_effect_covariance: np.ndarray,
-) -> tuple[np.ndarray, np.ndarray]:
+    random_effect_covariance: numpy.ndarray,
+) -> tuple[numpy.ndarray, numpy.ndarray]:
     """Builds the GLS system for one random slope and intercept.
 
     Args:
@@ -3027,14 +3056,14 @@ def hierarchical_random_slope_gls_system(
         definite raises the ValueError of
         `hierarchical_random_effect_precision`.
     """
-    information = np.zeros((design.shape[1], design.shape[1]))
-    right_hand_side = np.zeros(design.shape[1])
+    information = numpy.zeros((design.shape[1], design.shape[1]))
+    right_hand_side = numpy.zeros(design.shape[1])
     for label in labels:
         group = clusters == label
         group_design = design[group]
-        random_effect_design = np.column_stack(
+        random_effect_design = numpy.column_stack(
             (
-                np.ones(group_design.shape[0]),
+                numpy.ones(group_design.shape[0]),
                 group_design[:, random_slope_position + 1],
             )
         )
@@ -3049,10 +3078,10 @@ def hierarchical_random_slope_gls_system(
 
 
 def hierarchical_random_effect_precision(
-    random_effect_design: np.ndarray,
+    random_effect_design: numpy.ndarray,
     residual_variance: float,
-    random_effect_covariance: np.ndarray,
-) -> np.ndarray:
+    random_effect_covariance: numpy.ndarray,
+) -> numpy.ndarray:
     """Returns dense precision for one random-effect covariance block.
 
     Args:
@@ -3068,14 +3097,14 @@ def hierarchical_random_effect_precision(
     """
     count = random_effect_design.shape[0]
     covariance = (
-        residual_variance * np.eye(count)
+        residual_variance * numpy.eye(count)
         + random_effect_design
         @ random_effect_covariance
         @ random_effect_design.T
     )
     try:
-        return linalg.solve(covariance, np.eye(count), assume_a="pos")
-    except np.linalg.LinAlgError as error:
+        return linalg.solve(covariance, numpy.eye(count), assume_a="pos")
+    except numpy.linalg.LinAlgError as error:
         raise ValueError(
             "hierarchical random-effect covariance is not positive definite"
         ) from error
@@ -3085,7 +3114,7 @@ def hierarchical_random_slope_diagnostics(
     labels: tuple[Any, ...],
     random_slope_position: int,
     residual_variance: float,
-    random_effect_covariance: np.ndarray,
+    random_effect_covariance: numpy.ndarray,
     cluster_sizes: list[int],
     method: str,
 ) -> dict[str, Any]:
@@ -3158,22 +3187,22 @@ def hierarchical_random_slope_diagnostics(
 
 
 def fit_hierarchical_random_slope_reml(
-    design: np.ndarray,
-    values: np.ndarray,
-    clusters: np.ndarray,
+    design: numpy.ndarray,
+    values: numpy.ndarray,
+    clusters: numpy.ndarray,
     labels: tuple[Any, ...],
     random_slope_position: int,
     initial_residual_variance: float,
-    initial_random_effect_covariance: np.ndarray,
+    initial_random_effect_covariance: numpy.ndarray,
     cluster_sizes: list[int],
     policy: EstimationPolicy,
 ) -> tuple[
-    np.ndarray,
-    np.ndarray,
+    numpy.ndarray,
+    numpy.ndarray,
     dict[str, Any],
     float,
     float,
-    np.ndarray,
+    numpy.ndarray,
 ]:
     """Fits the one-random-slope model with bounded profile REML.
 
@@ -3208,8 +3237,8 @@ def fit_hierarchical_random_slope_reml(
         intercept_variance = initial_residual_variance
     if slope_variance <= 0.0:
         slope_variance = initial_residual_variance
-    initial_variances = np.clip(
-        np.asarray(
+    initial_variances = numpy.clip(
+        numpy.asarray(
             [
                 initial_residual_variance,
                 intercept_variance,
@@ -3226,9 +3255,9 @@ def fit_hierarchical_random_slope_reml(
         if scale > 0.0
         else 0.0
     )
-    initial_correlation = float(np.clip(initial_correlation, -0.999, 0.999))
-    initial_parameters = np.concatenate(
-        (np.log(initial_variances), [np.arctanh(initial_correlation)])
+    initial_correlation = float(numpy.clip(initial_correlation, -0.999, 0.999))
+    initial_parameters = numpy.concatenate(
+        (numpy.log(initial_variances), [numpy.arctanh(initial_correlation)])
     )
     log_bounds = (
         (math.log(lower_bound), math.log(upper_bound)),
@@ -3249,8 +3278,8 @@ def fit_hierarchical_random_slope_reml(
         },
     )
     validate_reml_optimizer_result(optimizer_result, log_bounds, dimension=4)
-    point = np.asarray(optimizer_result.x, dtype=float)
-    variance_components = np.exp(point[:3])
+    point = numpy.asarray(optimizer_result.x, dtype=float)
+    variance_components = numpy.exp(point[:3])
     residual_variance = float(variance_components[0])
     random_effect_covariance = random_slope_covariance_from_reml_point(
         variance_components, float(point[3])
@@ -3265,9 +3294,9 @@ def fit_hierarchical_random_slope_reml(
         random_effect_covariance,
     )
     try:
-        coefficients = np.linalg.solve(information, right_hand_side)
-        covariance = np.linalg.solve(information, np.eye(design.shape[1]))
-    except np.linalg.LinAlgError as error:
+        coefficients = numpy.linalg.solve(information, right_hand_side)
+        covariance = numpy.linalg.solve(information, numpy.eye(design.shape[1]))
+    except numpy.linalg.LinAlgError as error:
         raise ValueError(
             "hierarchical REML GLS system is not identifiable"
         ) from error
@@ -3279,7 +3308,7 @@ def fit_hierarchical_random_slope_reml(
         cluster_sizes,
         method="bounded_reml_gls",
     )
-    jacobian = np.asarray(optimizer_result.jac, dtype=float)
+    jacobian = numpy.asarray(optimizer_result.jac, dtype=float)
     diagnostics.update(
         {
             "reml_objective": float(optimizer_result.fun),
@@ -3289,7 +3318,7 @@ def fit_hierarchical_random_slope_reml(
                 "status": int(optimizer_result.status),
                 "message": str(optimizer_result.message),
                 "function_evaluations": int(optimizer_result.nfev),
-                "gradient_norm": float(np.linalg.norm(jacobian)),
+                "gradient_norm": float(numpy.linalg.norm(jacobian)),
                 "variance_bounds": [lower_bound, upper_bound],
                 "correlation_bounds": [-0.999999, 0.999999],
             },
@@ -3306,9 +3335,9 @@ def fit_hierarchical_random_slope_reml(
 
 
 def random_slope_covariance_from_reml_point(
-    variance_components: np.ndarray,
+    variance_components: numpy.ndarray,
     correlation_parameter: float,
-) -> np.ndarray:
+) -> numpy.ndarray:
     """Constructs a random-effect covariance from a REML parameter point.
 
     Args:
@@ -3324,7 +3353,7 @@ def random_slope_covariance_from_reml_point(
     correlation = 0.999999 * math.tanh(correlation_parameter)
     intercept_variance, slope_variance = variance_components[1:]
     covariance = correlation * math.sqrt(intercept_variance * slope_variance)
-    return np.asarray(
+    return numpy.asarray(
         [
             [intercept_variance, covariance],
             [covariance, slope_variance],
@@ -3334,10 +3363,10 @@ def random_slope_covariance_from_reml_point(
 
 
 def random_slope_reml_profile_objective(
-    parameters: np.ndarray,
-    design: np.ndarray,
-    values: np.ndarray,
-    clusters: np.ndarray,
+    parameters: numpy.ndarray,
+    design: numpy.ndarray,
+    values: numpy.ndarray,
+    clusters: numpy.ndarray,
     labels: tuple[Any, ...],
     random_slope_position: int,
 ) -> float:
@@ -3363,13 +3392,13 @@ def random_slope_reml_profile_objective(
             the GLS system building rejects a covariance block (see
             `hierarchical_random_effect_precision`).
     """
-    point = np.asarray(parameters, dtype=float)
+    point = numpy.asarray(parameters, dtype=float)
     if point.shape != (4,):
         raise ValueError(
             "random-slope REML needs four bounded covariance parameters"
         )
-    variance_components = np.exp(point[:3])
-    if not np.isfinite(variance_components).all() or np.any(
+    variance_components = numpy.exp(point[:3])
+    if not numpy.isfinite(variance_components).all() or numpy.any(
         variance_components <= 0.0
     ):
         return float("inf")
@@ -3386,12 +3415,12 @@ def random_slope_reml_profile_objective(
         residual_variance,
         random_effect_covariance,
     )
-    sign, logdet_information = np.linalg.slogdet(information)
+    sign, logdet_information = numpy.linalg.slogdet(information)
     if sign <= 0.0 or not math.isfinite(float(logdet_information)):
         return float("inf")
     try:
-        coefficients = np.linalg.solve(information, right_hand_side)
-    except np.linalg.LinAlgError:
+        coefficients = numpy.linalg.solve(information, right_hand_side)
+    except numpy.linalg.LinAlgError:
         return float("inf")
     residuals = values - design @ coefficients
     quadratic = 0.0
@@ -3399,22 +3428,22 @@ def random_slope_reml_profile_objective(
     for label in labels:
         group = clusters == label
         group_design = design[group]
-        random_effect_design = np.column_stack(
+        random_effect_design = numpy.column_stack(
             (
-                np.ones(group_design.shape[0]),
+                numpy.ones(group_design.shape[0]),
                 group_design[:, random_slope_position + 1],
             )
         )
         covariance = (
-            residual_variance * np.eye(int(np.sum(group)))
+            residual_variance * numpy.eye(int(numpy.sum(group)))
             + random_effect_design
             @ random_effect_covariance
             @ random_effect_design.T
         )
-        sign_covariance, logdet = np.linalg.slogdet(covariance)
+        sign_covariance, logdet = numpy.linalg.slogdet(covariance)
         if sign_covariance <= 0.0:
             return float("inf")
-        precision = linalg.solve(covariance, np.eye(covariance.shape[0]))
+        precision = linalg.solve(covariance, numpy.eye(covariance.shape[0]))
         group_residuals = residuals[group]
         quadratic += float(group_residuals @ precision @ group_residuals)
         logdet_covariance += float(logdet)
@@ -3432,20 +3461,20 @@ def random_slope_reml_profile_objective(
 
 
 def fit_hierarchical_reml(
-    design: np.ndarray,
-    values: np.ndarray,
-    clusters: np.ndarray,
+    design: numpy.ndarray,
+    values: numpy.ndarray,
+    clusters: numpy.ndarray,
     labels: tuple[Any, ...],
     initial_residual_variance: float,
     initial_random_intercept_variance: float,
     policy: EstimationPolicy,
 ) -> tuple[
-    np.ndarray,
-    np.ndarray,
+    numpy.ndarray,
+    numpy.ndarray,
     dict[str, Any],
     float,
     float,
-    np.ndarray,
+    numpy.ndarray,
 ]:
     """Fits a bounded random-intercept model with profile REML.
 
@@ -3472,8 +3501,8 @@ def fit_hierarchical_reml(
             identifiable.
     """
     lower_bound, upper_bound = policy.reml_variance_bounds
-    initial_variances = np.clip(
-        np.asarray(
+    initial_variances = numpy.clip(
+        numpy.asarray(
             [initial_residual_variance, initial_random_intercept_variance],
             dtype=float,
         ),
@@ -3486,7 +3515,7 @@ def fit_hierarchical_reml(
     )
     optimizer_result = optimize.minimize(
         reml_profile_objective,
-        np.log(initial_variances),
+        numpy.log(initial_variances),
         args=(design, values, clusters, labels),
         method="L-BFGS-B",
         bounds=log_bounds,
@@ -3497,7 +3526,9 @@ def fit_hierarchical_reml(
         },
     )
     validate_reml_optimizer_result(optimizer_result, log_bounds)
-    variance_components = np.exp(np.asarray(optimizer_result.x, dtype=float))
+    variance_components = numpy.exp(
+        numpy.asarray(optimizer_result.x, dtype=float)
+    )
     residual_variance = float(variance_components[0])
     random_intercept_variance = float(variance_components[1])
     information, right_hand_side = hierarchical_gls_system(
@@ -3509,9 +3540,9 @@ def fit_hierarchical_reml(
         random_intercept_variance,
     )
     try:
-        coefficients = np.linalg.solve(information, right_hand_side)
-        covariance = np.linalg.solve(information, np.eye(design.shape[1]))
-    except np.linalg.LinAlgError as error:
+        coefficients = numpy.linalg.solve(information, right_hand_side)
+        covariance = numpy.linalg.solve(information, numpy.eye(design.shape[1]))
+    except numpy.linalg.LinAlgError as error:
         raise ValueError(
             "hierarchical REML GLS system is not identifiable"
         ) from error
@@ -3520,15 +3551,15 @@ def fit_hierarchical_reml(
     cluster_sizes = []
     for label in labels:
         group = clusters == label
-        count = int(np.sum(group))
+        count = int(numpy.sum(group))
         cluster_sizes.append(count)
-        group_sum = float(np.sum(fitted_residuals[group]))
+        group_sum = float(numpy.sum(fitted_residuals[group]))
         shrinkage = random_intercept_variance / (
             residual_variance + count * random_intercept_variance
         )
         random_effects.append(shrinkage * group_sum)
     total_variance = residual_variance + random_intercept_variance
-    jacobian = np.asarray(optimizer_result.jac, dtype=float)
+    jacobian = numpy.asarray(optimizer_result.jac, dtype=float)
     diagnostics = {
         "converged": True,
         "iterations": int(optimizer_result.nit),
@@ -3544,8 +3575,8 @@ def fit_hierarchical_reml(
             "estimated" if random_intercept_variance > 0.0 else "boundary_zero"
         ),
         "random_intercept_effect": {
-            "mean_absolute_blup": float(np.mean(np.abs(random_effects))),
-            "max_absolute_blup": float(np.max(np.abs(random_effects))),
+            "mean_absolute_blup": float(numpy.mean(numpy.abs(random_effects))),
+            "max_absolute_blup": float(numpy.max(numpy.abs(random_effects))),
         },
         "variance_component_method": "profile_reml_with_l_bfgs_b",
         "variance_component_uncertainty": "not_propagated",
@@ -3562,7 +3593,7 @@ def fit_hierarchical_reml(
             "status": int(optimizer_result.status),
             "message": str(optimizer_result.message),
             "function_evaluations": int(optimizer_result.nfev),
-            "gradient_norm": float(np.linalg.norm(jacobian)),
+            "gradient_norm": float(numpy.linalg.norm(jacobian)),
             "variance_bounds": [lower_bound, upper_bound],
         },
     }
@@ -3572,15 +3603,17 @@ def fit_hierarchical_reml(
         diagnostics,
         residual_variance,
         random_intercept_variance,
-        np.array([[random_intercept_variance, 0.0], [0.0, 0.0]], dtype=float),
+        numpy.array(
+            [[random_intercept_variance, 0.0], [0.0, 0.0]], dtype=float
+        ),
     )
 
 
 def reml_profile_objective(
-    log_variances: np.ndarray,
-    design: np.ndarray,
-    values: np.ndarray,
-    clusters: np.ndarray,
+    log_variances: numpy.ndarray,
+    design: numpy.ndarray,
+    values: numpy.ndarray,
+    clusters: numpy.ndarray,
     labels: tuple[Any, ...],
 ) -> float:
     """Returns the negative profile REML objective in log-variance space.
@@ -3601,10 +3634,10 @@ def reml_profile_objective(
     Raises:
         ValueError: If `log_variances` does not have exactly two values.
     """
-    if np.asarray(log_variances).shape != (2,):
+    if numpy.asarray(log_variances).shape != (2,):
         raise ValueError("REML needs residual and random-intercept variances")
-    variances = np.exp(np.asarray(log_variances, dtype=float))
-    if not np.isfinite(variances).all() or np.any(variances <= 0.0):
+    variances = numpy.exp(numpy.asarray(log_variances, dtype=float))
+    if not numpy.isfinite(variances).all() or numpy.any(variances <= 0.0):
         return float("inf")
     residual_variance, random_intercept_variance = variances
     information, right_hand_side = hierarchical_gls_system(
@@ -3615,23 +3648,23 @@ def reml_profile_objective(
         float(residual_variance),
         float(random_intercept_variance),
     )
-    sign, logdet_information = np.linalg.slogdet(information)
+    sign, logdet_information = numpy.linalg.slogdet(information)
     if sign <= 0.0 or not math.isfinite(float(logdet_information)):
         return float("inf")
     try:
-        coefficients = np.linalg.solve(information, right_hand_side)
-    except np.linalg.LinAlgError:
+        coefficients = numpy.linalg.solve(information, right_hand_side)
+    except numpy.linalg.LinAlgError:
         return float("inf")
     residuals = values - design @ coefficients
     quadratic = 0.0
     logdet_covariance = 0.0
     for label in labels:
         group = clusters == label
-        count = int(np.sum(group))
+        count = int(numpy.sum(group))
         group_residuals = residuals[group]
-        group_sum = float(np.sum(group_residuals))
+        group_sum = float(numpy.sum(group_residuals))
         quadratic += float(
-            np.sum(group_residuals**2) / residual_variance
+            numpy.sum(group_residuals**2) / residual_variance
             - random_intercept_variance
             * group_sum**2
             / (
@@ -3680,23 +3713,23 @@ def validate_reml_optimizer_result(
             f"{getattr(optimizer_result, 'message', 'unknown failure')}"
         )
     status = getattr(optimizer_result, "status", None)
-    if isinstance(status, bool) or not isinstance(status, (int, np.integer)):
+    if isinstance(status, bool) or not isinstance(status, (int, numpy.integer)):
         raise ValueError("REML optimizer returned an invalid status")
     iterations = getattr(optimizer_result, "nit", None)
     evaluations = getattr(optimizer_result, "nfev", None)
     if (
         isinstance(iterations, bool)
-        or not isinstance(iterations, (int, np.integer))
+        or not isinstance(iterations, (int, numpy.integer))
         or iterations < 0
         or isinstance(evaluations, bool)
-        or not isinstance(evaluations, (int, np.integer))
+        or not isinstance(evaluations, (int, numpy.integer))
         or evaluations < 0
     ):
         raise ValueError(
             "REML optimizer returned invalid iteration diagnostics"
         )
-    point = np.asarray(getattr(optimizer_result, "x", ()), dtype=float)
-    if point.shape != (dimension,) or not np.isfinite(point).all():
+    point = numpy.asarray(getattr(optimizer_result, "x", ()), dtype=float)
+    if point.shape != (dimension,) or not numpy.isfinite(point).all():
         raise ValueError("REML optimizer returned invalid variance components")
     for value, bounds in zip(point, log_bounds, strict=True):
         if value < bounds[0] or value > bounds[1]:
@@ -3704,19 +3737,19 @@ def validate_reml_optimizer_result(
     objective = float(getattr(optimizer_result, "fun", float("nan")))
     if not math.isfinite(objective):
         raise ValueError("REML optimizer returned an invalid objective")
-    gradient = np.asarray(getattr(optimizer_result, "jac", ()), dtype=float)
-    if gradient.shape != (dimension,) or not np.isfinite(gradient).all():
+    gradient = numpy.asarray(getattr(optimizer_result, "jac", ()), dtype=float)
+    if gradient.shape != (dimension,) or not numpy.isfinite(gradient).all():
         raise ValueError("REML optimizer returned invalid gradient diagnostics")
 
 
 def hierarchical_gls_system(
-    design: np.ndarray,
-    values: np.ndarray,
-    clusters: np.ndarray,
+    design: numpy.ndarray,
+    values: numpy.ndarray,
+    clusters: numpy.ndarray,
     labels: tuple[Any, ...],
     residual_variance: float,
     random_intercept_variance: float,
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[numpy.ndarray, numpy.ndarray]:
     """Builds the block-diagonal precision system for random intercepts.
 
     Args:
@@ -3732,14 +3765,14 @@ def hierarchical_gls_system(
         The GLS information matrix and right-hand-side vector summed over
         clusters.
     """
-    information = np.zeros((design.shape[1], design.shape[1]))
-    right_hand_side = np.zeros(design.shape[1])
+    information = numpy.zeros((design.shape[1], design.shape[1]))
+    right_hand_side = numpy.zeros(design.shape[1])
     for label in labels:
         group = clusters == label
         group_design = design[group]
         group_values = values[group]
         count = group_design.shape[0]
-        precision = np.eye(count) / residual_variance
+        precision = numpy.eye(count) / residual_variance
         if random_intercept_variance > 0.0:
             precision -= (
                 random_intercept_variance
@@ -3747,18 +3780,18 @@ def hierarchical_gls_system(
                     residual_variance
                     * (residual_variance + count * random_intercept_variance)
                 )
-            ) * np.ones((count, count))
+            ) * numpy.ones((count, count))
         information += group_design.T @ precision @ group_design
         right_hand_side += group_design.T @ precision @ group_values
     return information, right_hand_side
 
 
 def fit_logistic(
-    design: np.ndarray,
-    values: np.ndarray,
+    design: numpy.ndarray,
+    values: numpy.ndarray,
     max_iterations: int,
     tolerance: float,
-) -> tuple[np.ndarray, np.ndarray, dict[str, Any]]:
+) -> tuple[numpy.ndarray, numpy.ndarray, dict[str, Any]]:
     """Fits a Bernoulli likelihood with deterministic Newton iterations.
 
     Args:
@@ -3776,20 +3809,22 @@ def fit_logistic(
         ValueError: If the Hessian is singular or the iteration does not
             converge within `max_iterations`.
     """
-    coefficients = np.zeros(design.shape[1], dtype=float)
+    coefficients = numpy.zeros(design.shape[1], dtype=float)
     for iteration in range(1, max_iterations + 1):
         probabilities = special.expit(design @ coefficients)
-        weights = np.maximum(probabilities * (1.0 - probabilities), 1e-12)
+        weights = numpy.maximum(probabilities * (1.0 - probabilities), 1e-12)
         hessian = design.T @ (weights[:, None] * design)
         try:
-            step = np.linalg.solve(hessian, design.T @ (values - probabilities))
-        except np.linalg.LinAlgError as error:
+            step = numpy.linalg.solve(
+                hessian, design.T @ (values - probabilities)
+            )
+        except numpy.linalg.LinAlgError as error:
             raise ValueError(
                 "logistic design matrix is not identifiable"
             ) from error
         coefficients += step
-        if np.linalg.norm(step) <= tolerance * (
-            1.0 + np.linalg.norm(coefficients)
+        if numpy.linalg.norm(step) <= tolerance * (
+            1.0 + numpy.linalg.norm(coefficients)
         ):
             probabilities = special.expit(design @ coefficients)
             log_likelihood = bernoulli_log_likelihood(values, probabilities)
@@ -3806,12 +3841,12 @@ def fit_logistic(
 
 
 def covariance_matrix(
-    design: np.ndarray,
-    residuals: np.ndarray,
+    design: numpy.ndarray,
+    residuals: numpy.ndarray,
     covariance: CovarianceKind,
-    clusters: np.ndarray | None,
-    probabilities: np.ndarray | None,
-) -> np.ndarray:
+    clusters: numpy.ndarray | None,
+    probabilities: numpy.ndarray | None,
+) -> numpy.ndarray:
     """Computes iid, HC3, or cluster-robust sandwich covariance.
 
     A singular design makes the matrix inversion raise numpy's
@@ -3834,23 +3869,23 @@ def covariance_matrix(
             with fewer than two clusters.
     """
     if probabilities is None:
-        bread = np.linalg.inv(design.T @ design)
+        bread = numpy.linalg.inv(design.T @ design)
         scale = float(
-            np.sum(residuals**2) / max(len(residuals) - design.shape[1], 1)
+            numpy.sum(residuals**2) / max(len(residuals) - design.shape[1], 1)
         )
         if covariance == "iid":
             return scale * bread
-        leverage = np.sum((design @ bread) * design, axis=1)
-        adjusted = residuals / np.maximum(1.0 - leverage, 1e-12)
+        leverage = numpy.sum((design @ bread) * design, axis=1)
+        adjusted = residuals / numpy.maximum(1.0 - leverage, 1e-12)
     else:
-        weights = np.maximum(probabilities * (1.0 - probabilities), 1e-12)
-        bread = np.linalg.inv(design.T @ (weights[:, None] * design))
+        weights = numpy.maximum(probabilities * (1.0 - probabilities), 1e-12)
+        bread = numpy.linalg.inv(design.T @ (weights[:, None] * design))
         if covariance == "iid":
             return bread
-        leverage = np.sum(
+        leverage = numpy.sum(
             (design @ bread) * (weights[:, None] * design), axis=1
         )
-        adjusted = residuals / np.maximum(1.0 - leverage, 1e-12)
+        adjusted = residuals / numpy.maximum(1.0 - leverage, 1e-12)
     if covariance == "hc3":
         scores = design * adjusted[:, None]
         return bread @ (scores.T @ scores) @ bread
@@ -3863,7 +3898,7 @@ def covariance_matrix(
         groups.append(design[group].T @ adjusted[group])
     if len(groups) < 2:
         raise ValueError("clustered covariance needs at least two clusters")
-    meat = sum(np.outer(score, score) for score in groups)
+    meat = sum(numpy.outer(score, score) for score in groups)
     correction = (len(groups) / (len(groups) - 1)) * (
         (len(design) - 1) / max(len(design) - design.shape[1], 1)
     )
@@ -3871,9 +3906,9 @@ def covariance_matrix(
 
 
 def reference_linear(
-    design: np.ndarray,
-    values: np.ndarray,
-    coefficients: np.ndarray,
+    design: numpy.ndarray,
+    values: numpy.ndarray,
+    coefficients: numpy.ndarray,
     policy: EstimationPolicy,
 ) -> dict[str, Any]:
     """Independently verifies the linear solution with least squares.
@@ -3888,8 +3923,8 @@ def reference_linear(
         A dictionary with the method name, the largest absolute coefficient
         difference, and ``passed``, True when it is within the tolerance.
     """
-    reference = np.linalg.lstsq(design, values, rcond=None)[0]
-    difference = float(np.max(np.abs(reference - coefficients)))
+    reference = numpy.linalg.lstsq(design, values, rcond=None)[0]
+    difference = float(numpy.max(numpy.abs(reference - coefficients)))
     return {
         "method": "numpy.linalg.lstsq",
         "max_absolute_difference": difference,
@@ -3898,12 +3933,12 @@ def reference_linear(
 
 
 def reference_ipw_ate(
-    propensity_design: np.ndarray,
-    values: np.ndarray,
-    treatment: np.ndarray,
-    coefficients: np.ndarray,
+    propensity_design: numpy.ndarray,
+    values: numpy.ndarray,
+    treatment: numpy.ndarray,
+    coefficients: numpy.ndarray,
     policy: EstimationPolicy,
-    clusters: np.ndarray | None,
+    clusters: numpy.ndarray | None,
 ) -> dict[str, Any]:
     """Recomputes IPW propensities with an independent BFGS calculation.
 
@@ -3923,7 +3958,7 @@ def reference_ipw_ate(
         ten times the tolerance), and the optimizer message.
     """
 
-    def objective(candidate: np.ndarray) -> tuple[float, np.ndarray]:
+    def objective(candidate: numpy.ndarray) -> tuple[float, numpy.ndarray]:
         """Returns the negative Bernoulli log-likelihood and its gradient.
 
         Args:
@@ -3935,18 +3970,20 @@ def reference_ipw_ate(
         """
         logits = propensity_design @ candidate
         probabilities = special.expit(logits)
-        value = -float(np.sum(treatment * logits - np.logaddexp(0.0, logits)))
+        value = -float(
+            numpy.sum(treatment * logits - numpy.logaddexp(0.0, logits))
+        )
         gradient = propensity_design.T @ (probabilities - treatment)
         return value, gradient
 
     result = optimize.minimize(
         lambda candidate: objective(candidate)[0],
-        np.zeros(propensity_design.shape[1]),
+        numpy.zeros(propensity_design.shape[1]),
         jac=lambda candidate: objective(candidate)[1],
         method="BFGS",
         options={"gtol": policy.reference_tolerance, "maxiter": 1000},
     )
-    reference_propensity = np.clip(
+    reference_propensity = numpy.clip(
         special.expit(propensity_design @ result.x),
         policy.propensity_clip,
         1.0 - policy.propensity_clip,
@@ -3981,11 +4018,11 @@ def reference_ipw_ate(
 
 
 def reference_aipw_ate(
-    inputs: Mapping[str, np.ndarray],
-    values: np.ndarray,
-    coefficients: np.ndarray,
+    inputs: Mapping[str, numpy.ndarray],
+    values: numpy.ndarray,
+    coefficients: numpy.ndarray,
     policy: EstimationPolicy,
-    clusters: np.ndarray | None,
+    clusters: numpy.ndarray | None,
 ) -> dict[str, Any]:
     """Recomputes the augmented IPW score with an independent reference.
 
@@ -4014,7 +4051,7 @@ def reference_aipw_ate(
     treatment = inputs["treatment"]
     confounder_design = nuisance_design
 
-    def objective(candidate: np.ndarray) -> tuple[float, np.ndarray]:
+    def objective(candidate: numpy.ndarray) -> tuple[float, numpy.ndarray]:
         """Returns the negative Bernoulli log-likelihood and its gradient.
 
         Args:
@@ -4026,28 +4063,30 @@ def reference_aipw_ate(
         """
         logits = confounder_design @ candidate
         probabilities = special.expit(logits)
-        value = -float(np.sum(treatment * logits - np.logaddexp(0.0, logits)))
+        value = -float(
+            numpy.sum(treatment * logits - numpy.logaddexp(0.0, logits))
+        )
         gradient = confounder_design.T @ (probabilities - treatment)
         return value, gradient
 
     propensity_fit = optimize.minimize(
         lambda candidate: objective(candidate)[0],
-        np.zeros(confounder_design.shape[1]),
+        numpy.zeros(confounder_design.shape[1]),
         jac=lambda candidate: objective(candidate)[1],
         method="BFGS",
         options={"gtol": policy.reference_tolerance, "maxiter": 1000},
     )
-    propensity = np.clip(
+    propensity = numpy.clip(
         special.expit(confounder_design @ propensity_fit.x),
         policy.propensity_clip,
         1.0 - policy.propensity_clip,
     )
     treated = treatment == 1.0
     control = ~treated
-    treated_coefficients = np.linalg.lstsq(
+    treated_coefficients = numpy.linalg.lstsq(
         nuisance_design[treated], values[treated], rcond=None
     )[0]
-    control_coefficients = np.linalg.lstsq(
+    control_coefficients = numpy.linalg.lstsq(
         nuisance_design[control], values[control], rcond=None
     )[0]
     outcome_treated = nuisance_design @ treated_coefficients
@@ -4058,7 +4097,7 @@ def reference_aipw_ate(
         + treatment * (values - outcome_treated) / propensity
         - (1.0 - treatment) * (values - outcome_control) / (1.0 - propensity)
     )
-    reference_ate = float(np.mean(score))
+    reference_ate = float(numpy.mean(score))
     reference_variance, reference_uncertainty = influence_variance(
         score - reference_ate,
         policy.covariance,
@@ -4084,11 +4123,11 @@ def reference_aipw_ate(
 
 
 def reference_cross_fitted_aipw_ate(
-    inputs: Mapping[str, np.ndarray],
-    values: np.ndarray,
-    coefficients: np.ndarray,
+    inputs: Mapping[str, numpy.ndarray],
+    values: numpy.ndarray,
+    coefficients: numpy.ndarray,
     policy: EstimationPolicy,
-    clusters: np.ndarray | None,
+    clusters: numpy.ndarray | None,
 ) -> dict[str, Any]:
     """Independently recomputes each cross-fitted AIPW validation score.
 
@@ -4111,10 +4150,10 @@ def reference_cross_fitted_aipw_ate(
     """
     nuisance_design = inputs["nuisance_design"]
     treatment = inputs["treatment"]
-    fold_assignments = np.asarray(inputs["fold_assignments"], dtype=int)
+    fold_assignments = numpy.asarray(inputs["fold_assignments"], dtype=int)
     if len(fold_assignments) != len(values):
         raise ValueError("cross-fitting reference fold assignments are invalid")
-    reference_scores = np.empty(len(values), dtype=float)
+    reference_scores = numpy.empty(len(values), dtype=float)
     fold_records: list[dict[str, Any]] = []
     for fold in range(policy.cross_fitting_folds):
         training = fold_assignments != fold
@@ -4127,10 +4166,10 @@ def reference_cross_fitted_aipw_ate(
         control = training_treatment == 0.0
 
         def objective(
-            candidate: np.ndarray,
-            design: np.ndarray = training_design,
-            observed: np.ndarray = training_treatment,
-        ) -> tuple[float, np.ndarray]:
+            candidate: numpy.ndarray,
+            design: numpy.ndarray = training_design,
+            observed: numpy.ndarray = training_treatment,
+        ) -> tuple[float, numpy.ndarray]:
             """Returns the negative Bernoulli log-likelihood and gradient.
 
             Args:
@@ -4145,19 +4184,19 @@ def reference_cross_fitted_aipw_ate(
             logits = design @ candidate
             probabilities = special.expit(logits)
             value = -float(
-                np.sum(observed * logits - np.logaddexp(0.0, logits))
+                numpy.sum(observed * logits - numpy.logaddexp(0.0, logits))
             )
             gradient = design.T @ (probabilities - observed)
             return value, gradient
 
         propensity_fit = optimize.minimize(
             lambda candidate: objective(candidate)[0],
-            np.zeros(training_design.shape[1]),
+            numpy.zeros(training_design.shape[1]),
             jac=lambda candidate: objective(candidate)[1],
             method="BFGS",
             options={"gtol": policy.reference_tolerance, "maxiter": 1000},
         )
-        propensity = np.clip(
+        propensity = numpy.clip(
             special.expit(validation_design @ propensity_fit.x),
             policy.propensity_clip,
             1.0 - policy.propensity_clip,
@@ -4165,16 +4204,17 @@ def reference_cross_fitted_aipw_ate(
         treated_design = training_design[treated]
         control_design = training_design[control]
         if (
-            np.linalg.matrix_rank(treated_design) != treated_design.shape[1]
-            or np.linalg.matrix_rank(control_design) != control_design.shape[1]
+            numpy.linalg.matrix_rank(treated_design) != treated_design.shape[1]
+            or numpy.linalg.matrix_rank(control_design)
+            != control_design.shape[1]
         ):
             raise ValueError(
                 "aipw_ate reference outcome design is not identifiable"
             )
-        treated_coefficients = np.linalg.lstsq(
+        treated_coefficients = numpy.linalg.lstsq(
             treated_design, training_values[treated], rcond=None
         )[0]
-        control_coefficients = np.linalg.lstsq(
+        control_coefficients = numpy.linalg.lstsq(
             control_design, training_values[control], rcond=None
         )[0]
         outcome_treated = validation_design @ treated_coefficients
@@ -4196,7 +4236,7 @@ def reference_cross_fitted_aipw_ate(
                 "message": str(propensity_fit.message),
             }
         )
-    reference_ate = float(np.mean(reference_scores))
+    reference_ate = float(numpy.mean(reference_scores))
     reference_variance, reference_uncertainty = influence_variance(
         reference_scores - reference_ate,
         policy.covariance,
@@ -4222,12 +4262,12 @@ def reference_cross_fitted_aipw_ate(
 
 
 def reference_hierarchical_linear(
-    design: np.ndarray,
-    values: np.ndarray,
-    clusters: np.ndarray,
+    design: numpy.ndarray,
+    values: numpy.ndarray,
+    clusters: numpy.ndarray,
     residual_variance: float,
     random_intercept_variance: float,
-    coefficients: np.ndarray,
+    coefficients: numpy.ndarray,
     policy: EstimationPolicy,
 ) -> dict[str, Any]:
     """Verifies hierarchical GLS with explicit group covariance matrices.
@@ -4256,20 +4296,20 @@ def reference_hierarchical_linear(
         raise ValueError(
             "hierarchical cluster labels must be hashable"
         ) from error
-    information = np.zeros((design.shape[1], design.shape[1]))
-    right_hand_side = np.zeros(design.shape[1])
+    information = numpy.zeros((design.shape[1], design.shape[1]))
+    right_hand_side = numpy.zeros(design.shape[1])
     for label in labels:
         group = clusters == label
-        count = int(np.sum(group))
-        covariance = residual_variance * np.eye(count) + (
-            random_intercept_variance * np.ones((count, count))
+        count = int(numpy.sum(group))
+        covariance = residual_variance * numpy.eye(count) + (
+            random_intercept_variance * numpy.ones((count, count))
         )
-        precision = linalg.solve(covariance, np.eye(count), assume_a="pos")
+        precision = linalg.solve(covariance, numpy.eye(count), assume_a="pos")
         group_design = design[group]
         information += group_design.T @ precision @ group_design
         right_hand_side += group_design.T @ precision @ values[group]
     reference = linalg.solve(information, right_hand_side, assume_a="pos")
-    difference = float(np.max(np.abs(reference - coefficients)))
+    difference = float(numpy.max(numpy.abs(reference - coefficients)))
     return {
         "method": "scipy.linalg.solve:explicit_random_intercept_covariance",
         "max_absolute_difference": difference,
@@ -4278,12 +4318,12 @@ def reference_hierarchical_linear(
 
 
 def reference_hierarchical_reml(
-    design: np.ndarray,
-    values: np.ndarray,
-    clusters: np.ndarray,
+    design: numpy.ndarray,
+    values: numpy.ndarray,
+    clusters: numpy.ndarray,
     residual_variance: float,
     random_intercept_variance: float,
-    coefficients: np.ndarray,
+    coefficients: numpy.ndarray,
     objective: float,
     policy: EstimationPolicy,
 ) -> dict[str, Any]:
@@ -4320,21 +4360,21 @@ def reference_hierarchical_reml(
         ) from error
     covariance_blocks = []
     for label in labels:
-        count = int(np.sum(clusters == label))
+        count = int(numpy.sum(clusters == label))
         covariance_blocks.append(
-            residual_variance * np.eye(count)
-            + random_intercept_variance * np.ones((count, count))
+            residual_variance * numpy.eye(count)
+            + random_intercept_variance * numpy.ones((count, count))
         )
     covariance = linalg.block_diag(*covariance_blocks)
-    precision = linalg.solve(covariance, np.eye(len(values)), assume_a="pos")
+    precision = linalg.solve(covariance, numpy.eye(len(values)), assume_a="pos")
     information = design.T @ precision @ design
     right_hand_side = design.T @ precision @ values
     reference_coefficients = linalg.solve(
         information, right_hand_side, assume_a="pos"
     )
     residuals = values - design @ reference_coefficients
-    sign_covariance, logdet_covariance = np.linalg.slogdet(covariance)
-    sign_information, logdet_information = np.linalg.slogdet(information)
+    sign_covariance, logdet_covariance = numpy.linalg.slogdet(covariance)
+    sign_information, logdet_information = numpy.linalg.slogdet(information)
     if sign_covariance <= 0.0 or sign_information <= 0.0:
         raise ValueError("reference REML covariance is not positive definite")
     reference_objective = 0.5 * (
@@ -4344,7 +4384,7 @@ def reference_hierarchical_reml(
         + (len(values) - design.shape[1]) * math.log(2.0 * math.pi)
     )
     coefficient_difference = float(
-        np.max(np.abs(reference_coefficients - coefficients))
+        numpy.max(numpy.abs(reference_coefficients - coefficients))
     )
     objective_difference = float(abs(reference_objective - objective))
     return {
@@ -4359,13 +4399,13 @@ def reference_hierarchical_reml(
 
 
 def reference_hierarchical_random_slope(
-    design: np.ndarray,
-    values: np.ndarray,
-    clusters: np.ndarray,
+    design: numpy.ndarray,
+    values: numpy.ndarray,
+    clusters: numpy.ndarray,
     random_slope_position: int,
     residual_variance: float,
-    random_effect_covariance: np.ndarray,
-    coefficients: np.ndarray,
+    random_effect_covariance: numpy.ndarray,
+    coefficients: numpy.ndarray,
     policy: EstimationPolicy,
 ) -> dict[str, Any]:
     """Verifies one-random-slope GLS with an independent dense calculation.
@@ -4396,29 +4436,29 @@ def reference_hierarchical_random_slope(
         raise ValueError(
             "hierarchical cluster labels must be hashable"
         ) from error
-    information = np.zeros((design.shape[1], design.shape[1]))
-    right_hand_side = np.zeros(design.shape[1])
+    information = numpy.zeros((design.shape[1], design.shape[1]))
+    right_hand_side = numpy.zeros(design.shape[1])
     for label in labels:
         group = clusters == label
         group_design = design[group]
         count = group_design.shape[0]
-        random_effect_design = np.column_stack(
+        random_effect_design = numpy.column_stack(
             (
-                np.ones(count),
+                numpy.ones(count),
                 group_design[:, random_slope_position + 1],
             )
         )
         covariance = (
-            residual_variance * np.eye(count)
+            residual_variance * numpy.eye(count)
             + random_effect_design
             @ random_effect_covariance
             @ random_effect_design.T
         )
-        precision = linalg.solve(covariance, np.eye(count), assume_a="pos")
+        precision = linalg.solve(covariance, numpy.eye(count), assume_a="pos")
         information += group_design.T @ precision @ group_design
         right_hand_side += group_design.T @ precision @ values[group]
     reference = linalg.solve(information, right_hand_side, assume_a="pos")
-    difference = float(np.max(np.abs(reference - coefficients)))
+    difference = float(numpy.max(numpy.abs(reference - coefficients)))
     return {
         "method": "scipy.linalg.solve:dense_random_intercept_slope_covariance",
         "random_slope_position": random_slope_position,
@@ -4429,13 +4469,13 @@ def reference_hierarchical_random_slope(
 
 
 def reference_hierarchical_random_slope_reml(
-    design: np.ndarray,
-    values: np.ndarray,
-    clusters: np.ndarray,
+    design: numpy.ndarray,
+    values: numpy.ndarray,
+    clusters: numpy.ndarray,
     random_slope_position: int,
     residual_variance: float,
-    random_effect_covariance: np.ndarray,
-    coefficients: np.ndarray,
+    random_effect_covariance: numpy.ndarray,
+    coefficients: numpy.ndarray,
     objective: float,
     policy: EstimationPolicy,
 ) -> dict[str, Any]:
@@ -4477,25 +4517,25 @@ def reference_hierarchical_random_slope_reml(
         group = clusters == label
         group_design = design[group]
         count = group_design.shape[0]
-        random_effect_design = np.column_stack(
-            (np.ones(count), group_design[:, random_slope_position + 1])
+        random_effect_design = numpy.column_stack(
+            (numpy.ones(count), group_design[:, random_slope_position + 1])
         )
         covariance_blocks.append(
-            residual_variance * np.eye(count)
+            residual_variance * numpy.eye(count)
             + random_effect_design
             @ random_effect_covariance
             @ random_effect_design.T
         )
     covariance = linalg.block_diag(*covariance_blocks)
-    precision = linalg.solve(covariance, np.eye(len(values)), assume_a="pos")
+    precision = linalg.solve(covariance, numpy.eye(len(values)), assume_a="pos")
     information = design.T @ precision @ design
     right_hand_side = design.T @ precision @ values
     reference_coefficients = linalg.solve(
         information, right_hand_side, assume_a="pos"
     )
     residuals = values - design @ reference_coefficients
-    sign_covariance, logdet_covariance = np.linalg.slogdet(covariance)
-    sign_information, logdet_information = np.linalg.slogdet(information)
+    sign_covariance, logdet_covariance = numpy.linalg.slogdet(covariance)
+    sign_information, logdet_information = numpy.linalg.slogdet(information)
     if sign_covariance <= 0.0 or sign_information <= 0.0:
         raise ValueError("reference REML covariance is not positive definite")
     reference_objective = 0.5 * (
@@ -4505,7 +4545,7 @@ def reference_hierarchical_random_slope_reml(
         + (len(values) - design.shape[1]) * math.log(2.0 * math.pi)
     )
     coefficient_difference = float(
-        np.max(np.abs(reference_coefficients - coefficients))
+        numpy.max(numpy.abs(reference_coefficients - coefficients))
     )
     objective_difference = float(abs(reference_objective - objective))
     return {
@@ -4522,10 +4562,10 @@ def reference_hierarchical_random_slope_reml(
 
 
 def reference_bayesian_linear(
-    design: np.ndarray,
-    values: np.ndarray,
+    design: numpy.ndarray,
+    values: numpy.ndarray,
     prior: BayesianPrior,
-    coefficients: np.ndarray,
+    coefficients: numpy.ndarray,
     policy: EstimationPolicy,
 ) -> dict[str, Any]:
     """Verifies the conjugate posterior mean with an independent solver.
@@ -4542,15 +4582,15 @@ def reference_bayesian_linear(
         from `coefficients`, and ``passed``, True when it is within the
         tolerance.
     """
-    prior_mean = np.asarray(prior.mean, dtype=float)
-    prior_precision = np.asarray(prior.precision, dtype=float)
+    prior_mean = numpy.asarray(prior.mean, dtype=float)
+    prior_precision = numpy.asarray(prior.precision, dtype=float)
     posterior_precision = prior_precision + design.T @ design
     reference = linalg.solve(
         posterior_precision,
         prior_precision @ prior_mean + design.T @ values,
         assume_a="pos",
     )
-    difference = float(np.max(np.abs(reference - coefficients)))
+    difference = float(numpy.max(numpy.abs(reference - coefficients)))
     return {
         "method": "scipy.linalg.solve:positive_definite",
         "max_absolute_difference": difference,
@@ -4559,10 +4599,10 @@ def reference_bayesian_linear(
 
 
 def reference_bayesian_ate(
-    design: np.ndarray,
-    values: np.ndarray,
+    design: numpy.ndarray,
+    values: numpy.ndarray,
     prior: BayesianPrior,
-    coefficients: np.ndarray,
+    coefficients: numpy.ndarray,
     policy: EstimationPolicy,
 ) -> dict[str, Any]:
     """Independently verifies the causal posterior mean and ATE coefficient.
@@ -4585,15 +4625,15 @@ def reference_bayesian_ate(
             policy has no treatment position.
     """
     validate_bayesian_prior_shape(prior, design.shape[1])
-    prior_mean = np.asarray(prior.mean, dtype=float)
-    prior_precision = np.asarray(prior.precision, dtype=float)
+    prior_mean = numpy.asarray(prior.mean, dtype=float)
+    prior_precision = numpy.asarray(prior.precision, dtype=float)
     posterior_precision = prior_precision + design.T @ design
     reference = linalg.solve(
         posterior_precision,
         prior_precision @ prior_mean + design.T @ values,
         assume_a="pos",
     )
-    difference = float(np.max(np.abs(reference - coefficients)))
+    difference = float(numpy.max(numpy.abs(reference - coefficients)))
     treatment_index = policy.treatment_position
     if treatment_index is None:
         raise ValueError("bayesian_ate requires treatment_position")
@@ -4608,9 +4648,9 @@ def reference_bayesian_ate(
 
 
 def reference_logistic(
-    design: np.ndarray,
-    values: np.ndarray,
-    coefficients: np.ndarray,
+    design: numpy.ndarray,
+    values: numpy.ndarray,
+    coefficients: numpy.ndarray,
     policy: EstimationPolicy,
 ) -> dict[str, Any]:
     """Independently verifies logistic coefficients with scipy optimization.
@@ -4629,7 +4669,7 @@ def reference_logistic(
         message.
     """
 
-    def objective(candidate: np.ndarray) -> tuple[float, np.ndarray]:
+    def objective(candidate: numpy.ndarray) -> tuple[float, numpy.ndarray]:
         """Returns the negative Bernoulli log-likelihood and its gradient.
 
         Args:
@@ -4651,7 +4691,7 @@ def reference_logistic(
         method="BFGS",
         options={"gtol": policy.reference_tolerance, "maxiter": 1000},
     )
-    difference = float(np.max(np.abs(result.x - coefficients)))
+    difference = float(numpy.max(numpy.abs(result.x - coefficients)))
     return {
         "method": "scipy.optimize.minimize:BFGS",
         "converged": bool(result.success),
@@ -4664,7 +4704,7 @@ def reference_logistic(
 
 
 def bernoulli_log_likelihood(
-    values: np.ndarray, probabilities: np.ndarray
+    values: numpy.ndarray, probabilities: numpy.ndarray
 ) -> float:
     """Returns a numerically stable Bernoulli log likelihood.
 
@@ -4676,20 +4716,20 @@ def bernoulli_log_likelihood(
     Returns:
         The summed log-likelihood.
     """
-    logits = np.log(np.maximum(probabilities, 1e-15))
-    complements = np.log(np.maximum(1.0 - probabilities, 1e-15))
-    return float(np.sum(values * logits + (1.0 - values) * complements))
+    logits = numpy.log(numpy.maximum(probabilities, 1e-15))
+    complements = numpy.log(numpy.maximum(1.0 - probabilities, 1e-15))
+    return float(numpy.sum(values * logits + (1.0 - values) * complements))
 
 
 def sensitivity_report(
-    matrix: np.ndarray,
-    values: np.ndarray,
+    matrix: numpy.ndarray,
+    values: numpy.ndarray,
     policy: EstimationPolicy,
-    design: np.ndarray,
-    coefficients: np.ndarray,
+    design: numpy.ndarray,
+    coefficients: numpy.ndarray,
     shift_reference: Any | None,
     estimand: EstimandSpec,
-    clusters: np.ndarray | None,
+    clusters: numpy.ndarray | None,
     prior: BayesianPrior | None = None,
 ) -> dict[str, Any]:
     """Records declared sensitivity coverage without inventing causal claims.
@@ -4742,23 +4782,23 @@ def sensitivity_report(
     }
     if prior is not None:
         validate_bayesian_prior_shape(prior, design.shape[1])
-        baseline = np.asarray(coefficients, dtype=float)
+        baseline = numpy.asarray(coefficients, dtype=float)
         alternatives = []
-        prior_mean = np.asarray(prior.mean, dtype=float)
-        prior_precision = np.asarray(prior.precision, dtype=float)
+        prior_mean = numpy.asarray(prior.mean, dtype=float)
+        prior_precision = numpy.asarray(prior.precision, dtype=float)
         for label, precision_factor in (
             ("weakened_precision", 0.01),
             ("strengthened_precision", 100.0),
         ):
             alternative_precision = prior_precision * precision_factor
-            alternative = np.linalg.solve(
+            alternative = numpy.linalg.solve(
                 alternative_precision + design.T @ design,
                 alternative_precision @ prior_mean + design.T @ values,
             )
             alternative_record = {
                 "name": label,
                 "max_absolute_coefficient_change": float(
-                    np.max(np.abs(alternative - baseline))
+                    numpy.max(numpy.abs(alternative - baseline))
                 ),
             }
             if policy.estimator == "bayesian_ate":
@@ -4775,20 +4815,20 @@ def sensitivity_report(
             "alternatives": alternatives,
         }
     if shift_reference is not None:
-        reference = np.asarray(shift_reference, dtype=float)
+        reference = numpy.asarray(shift_reference, dtype=float)
         validate_matrix(reference, matrix.shape[1], "shift_reference")
-        if not np.isfinite(reference).all():
+        if not numpy.isfinite(reference).all():
             raise ValueError("shift_reference must contain only finite values")
-        pooled = np.sqrt((matrix.var(axis=0) + reference.var(axis=0)) / 2.0)
-        difference = np.abs(reference.mean(axis=0) - matrix.mean(axis=0)) / (
-            np.maximum(pooled, 1e-12)
+        pooled = numpy.sqrt((matrix.var(axis=0) + reference.var(axis=0)) / 2.0)
+        difference = numpy.abs(reference.mean(axis=0) - matrix.mean(axis=0)) / (
+            numpy.maximum(pooled, 1e-12)
         )
         report["distribution_shift"] = {
             "status": "evaluated",
             "standardized_mean_difference": [
                 float(item) for item in difference
             ],
-            "max_standardized_mean_difference": float(np.max(difference)),
+            "max_standardized_mean_difference": float(numpy.max(difference)),
         }
     if policy.bootstrap_replicates and policy.estimator in {
         "ipw_ate",
@@ -4818,8 +4858,8 @@ def sensitivity_report(
             clusters,
         )
     elif policy.bootstrap_replicates:
-        rng = np.random.default_rng(policy.seed)
-        estimates: list[np.ndarray] = []
+        rng = numpy.random.default_rng(policy.seed)
+        estimates: list[numpy.ndarray] = []
         bootstrap_replicate = 0
         while bootstrap_replicate < policy.bootstrap_replicates:
             sample = rng.integers(0, len(values), size=len(values))
@@ -4836,25 +4876,25 @@ def sensitivity_report(
                 estimate = logistic_fit[0]
             estimates.append(estimate)
             bootstrap_replicate += 1
-        bootstrap = np.asarray(estimates)
+        bootstrap = numpy.asarray(estimates)
         alpha = (1.0 - policy.confidence_level) / 2.0
         report["sampling"]["bootstrap_intervals"] = [
-            [float(item) for item in np.quantile(bootstrap, alpha, axis=0)],
+            [float(item) for item in numpy.quantile(bootstrap, alpha, axis=0)],
             [
                 float(item)
-                for item in np.quantile(bootstrap, 1.0 - alpha, axis=0)
+                for item in numpy.quantile(bootstrap, 1.0 - alpha, axis=0)
             ],
         ]
     return report
 
 
 def hierarchical_bootstrap_sensitivity(
-    matrix: np.ndarray,
-    values: np.ndarray,
+    matrix: numpy.ndarray,
+    values: numpy.ndarray,
     estimand: EstimandSpec,
     policy: EstimationPolicy,
-    coefficients: np.ndarray,
-    clusters: np.ndarray,
+    coefficients: numpy.ndarray,
+    clusters: numpy.ndarray,
 ) -> dict[str, Any]:
     """Estimates grouped-parameter sensitivity by resampling whole clusters.
 
@@ -4881,9 +4921,9 @@ def hierarchical_bootstrap_sensitivity(
             or the cluster labels are unhashable or form fewer than two
             clusters.
     """
-    rng = np.random.default_rng(policy.seed)
+    rng = numpy.random.default_rng(policy.seed)
     bootstrap_policy = dataclasses.replace(policy, bootstrap_replicates=0)
-    estimates: list[np.ndarray] = []
+    estimates: list[numpy.ndarray] = []
     failures: list[dict[str, Any]] = []
     draws: list[dict[str, Any]] = []
     if policy.random_slope_position is None:
@@ -4924,15 +4964,15 @@ def hierarchical_bootstrap_sensitivity(
                 bootstrap_policy,
                 clusters=sampled_clusters.tolist(),
             )
-            estimate = np.asarray(
+            estimate = numpy.asarray(
                 [parameter.estimate for parameter in result.parameters],
                 dtype=float,
             )
-            if estimate.shape != np.asarray(coefficients).shape:
+            if estimate.shape != numpy.asarray(coefficients).shape:
                 raise ValueError(
                     "bootstrap replicate returned an unexpected parameter shape"
                 )
-            if not np.isfinite(estimate).all():
+            if not numpy.isfinite(estimate).all():
                 raise ValueError(
                     "bootstrap replicate returned non-finite estimates"
                 )
@@ -4943,7 +4983,7 @@ def hierarchical_bootstrap_sensitivity(
             estimates.append(estimate)
         except (
             FloatingPointError,
-            np.linalg.LinAlgError,
+            numpy.linalg.LinAlgError,
             OverflowError,
             ValueError,
         ) as error:
@@ -4962,7 +5002,7 @@ def hierarchical_bootstrap_sensitivity(
             f"received {len(estimates)} of {policy.bootstrap_replicates}"
         )
 
-    bootstrap = np.asarray(estimates)
+    bootstrap = numpy.asarray(estimates)
     alpha = (1.0 - policy.confidence_level) / 2.0
     return {
         "status": "partial" if failures else "available",
@@ -4987,21 +5027,21 @@ def hierarchical_bootstrap_sensitivity(
         },
         "limitations": limitations,
         "bootstrap_intervals": [
-            [float(item) for item in np.quantile(bootstrap, alpha, axis=0)],
+            [float(item) for item in numpy.quantile(bootstrap, alpha, axis=0)],
             [
                 float(item)
-                for item in np.quantile(bootstrap, 1.0 - alpha, axis=0)
+                for item in numpy.quantile(bootstrap, 1.0 - alpha, axis=0)
             ],
         ],
     }
 
 
 def draw_hierarchical_bootstrap_sample(
-    matrix: np.ndarray,
-    values: np.ndarray,
-    clusters: np.ndarray,
-    rng: np.random.Generator,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict[str, Any]]:
+    matrix: numpy.ndarray,
+    values: numpy.ndarray,
+    clusters: numpy.ndarray,
+    rng: numpy.random.Generator,
+) -> tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray, dict[str, Any]]:
     """Draws whole clusters and assigns fresh identities to selected copies.
 
     Args:
@@ -5029,11 +5069,11 @@ def draw_hierarchical_bootstrap_sample(
         )
     source_indices = rng.integers(0, len(labels), size=len(labels))
     row_groups = [
-        np.flatnonzero(clusters == labels[index]) for index in source_indices
+        numpy.flatnonzero(clusters == labels[index]) for index in source_indices
     ]
-    indices = np.concatenate(row_groups)
-    sampled_clusters = np.repeat(
-        np.arange(len(row_groups), dtype=object),
+    indices = numpy.concatenate(row_groups)
+    sampled_clusters = numpy.repeat(
+        numpy.arange(len(row_groups), dtype=object),
         [len(group) for group in row_groups],
     )
     return (
@@ -5046,19 +5086,19 @@ def draw_hierarchical_bootstrap_sample(
             "source_unit_count": len(labels),
             "sample_digest": bootstrap_sample_digest(source_indices),
             "fresh_cluster_identity_digest": bootstrap_sample_digest(
-                np.arange(len(row_groups), dtype=np.int64)
+                numpy.arange(len(row_groups), dtype=numpy.int64)
             ),
         },
     )
 
 
 def causal_bootstrap_sensitivity(
-    matrix: np.ndarray,
-    values: np.ndarray,
+    matrix: numpy.ndarray,
+    values: numpy.ndarray,
     estimand: EstimandSpec,
     policy: EstimationPolicy,
-    coefficients: np.ndarray,
-    clusters: np.ndarray | None,
+    coefficients: numpy.ndarray,
+    clusters: numpy.ndarray | None,
 ) -> dict[str, Any]:
     """Estimates causal sampling sensitivity with nonparametric bootstrap.
 
@@ -5084,9 +5124,9 @@ def causal_bootstrap_sensitivity(
             independently reference-checked replicates, or clustered labels
             are unhashable or form fewer than two clusters.
     """
-    rng = np.random.default_rng(policy.seed)
+    rng = numpy.random.default_rng(policy.seed)
     bootstrap_policy = dataclasses.replace(policy, bootstrap_replicates=0)
-    estimates: list[np.ndarray] = []
+    estimates: list[numpy.ndarray] = []
     failures: list[dict[str, Any]] = []
     draws: list[dict[str, Any]] = []
     resampling_unit = "cluster" if clusters is not None else "row"
@@ -5118,15 +5158,15 @@ def causal_bootstrap_sensitivity(
                 bootstrap_policy,
                 clusters=bootstrap_clusters,
             )
-            estimate = np.asarray(
+            estimate = numpy.asarray(
                 [parameter.estimate for parameter in result.parameters],
                 dtype=float,
             )
-            if estimate.shape != np.asarray(coefficients).shape:
+            if estimate.shape != numpy.asarray(coefficients).shape:
                 raise ValueError(
                     "bootstrap replicate returned an unexpected parameter shape"
                 )
-            if not np.isfinite(estimate).all():
+            if not numpy.isfinite(estimate).all():
                 raise ValueError(
                     "bootstrap replicate returned non-finite estimates"
                 )
@@ -5137,7 +5177,7 @@ def causal_bootstrap_sensitivity(
             estimates.append(estimate)
         except (
             FloatingPointError,
-            np.linalg.LinAlgError,
+            numpy.linalg.LinAlgError,
             OverflowError,
             ValueError,
         ) as error:
@@ -5156,7 +5196,7 @@ def causal_bootstrap_sensitivity(
             f"received {len(estimates)} of {policy.bootstrap_replicates}"
         )
 
-    bootstrap = np.asarray(estimates)
+    bootstrap = numpy.asarray(estimates)
     alpha = (1.0 - policy.confidence_level) / 2.0
     status = "partial" if failures else "available"
     return {
@@ -5179,21 +5219,21 @@ def causal_bootstrap_sensitivity(
             "point-estimate reference check",
         },
         "bootstrap_intervals": [
-            [float(item) for item in np.quantile(bootstrap, alpha, axis=0)],
+            [float(item) for item in numpy.quantile(bootstrap, alpha, axis=0)],
             [
                 float(item)
-                for item in np.quantile(bootstrap, 1.0 - alpha, axis=0)
+                for item in numpy.quantile(bootstrap, 1.0 - alpha, axis=0)
             ],
         ],
     }
 
 
 def draw_causal_bootstrap_sample(
-    matrix: np.ndarray,
-    values: np.ndarray,
-    clusters: np.ndarray | None,
-    rng: np.random.Generator,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray | None, dict[str, Any]]:
+    matrix: numpy.ndarray,
+    values: numpy.ndarray,
+    clusters: numpy.ndarray | None,
+    rng: numpy.random.Generator,
+) -> tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray | None, dict[str, Any]]:
     """Draws one causal bootstrap sample and its auditable unit evidence.
 
     Args:
@@ -5237,11 +5277,11 @@ def draw_causal_bootstrap_sample(
         )
     source_indices = rng.integers(0, len(labels), size=len(labels))
     row_groups = [
-        np.flatnonzero(clusters == labels[index]) for index in source_indices
+        numpy.flatnonzero(clusters == labels[index]) for index in source_indices
     ]
-    indices = np.concatenate(row_groups)
-    sampled_clusters = np.repeat(
-        np.arange(len(row_groups), dtype=object),
+    indices = numpy.concatenate(row_groups)
+    sampled_clusters = numpy.repeat(
+        numpy.arange(len(row_groups), dtype=object),
         [len(group) for group in row_groups],
     )
     return (
@@ -5257,7 +5297,7 @@ def draw_causal_bootstrap_sample(
     )
 
 
-def bootstrap_sample_digest(indices: np.ndarray) -> str:
+def bootstrap_sample_digest(indices: numpy.ndarray) -> str:
     """Returns a digest of bootstrap draw indices without exposing raw rows.
 
     Args:
@@ -5267,7 +5307,7 @@ def bootstrap_sample_digest(indices: np.ndarray) -> str:
         The SHA-256 hex digest of the indices as little-endian 64-bit
         integers.
     """
-    canonical = np.asarray(indices, dtype="<i8").tobytes()
+    canonical = numpy.asarray(indices, dtype="<i8").tobytes()
     return hashlib.sha256(canonical).hexdigest()
 
 

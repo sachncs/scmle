@@ -22,12 +22,14 @@ covariance.
 Not implemented: top-down, ensembles of reconcilers, non-negativity.
 """
 
-import numpy as np
+import numpy
 
 DIAGONAL_FLOOR = 1e-12
 
 
-def bottom_up(bottom_forecasts: np.ndarray, summing: np.ndarray) -> np.ndarray:
+def bottom_up(
+    bottom_forecasts: numpy.ndarray, summing: numpy.ndarray
+) -> numpy.ndarray:
     """Coherent forecasts by summing the bottom-level forecasts.
 
     Args:
@@ -37,10 +39,12 @@ def bottom_up(bottom_forecasts: np.ndarray, summing: np.ndarray) -> np.ndarray:
     Returns:
         `(steps, n)` coherent forecasts of all series.
     """
-    return np.asarray(bottom_forecasts, dtype=float) @ np.asarray(summing).T
+    return (
+        numpy.asarray(bottom_forecasts, dtype=float) @ numpy.asarray(summing).T
+    )
 
 
-def shrunk_covariance(residuals: np.ndarray) -> np.ndarray:
+def shrunk_covariance(residuals: numpy.ndarray) -> numpy.ndarray:
     """Covariance of residuals with off-diagonals shrunk toward zero.
 
     Args:
@@ -55,29 +59,31 @@ def shrunk_covariance(residuals: np.ndarray) -> np.ndarray:
         positive definite only if the shrunk correlation matrix is, which
         is not guaranteed for little shrinkage with fewer rows than series.
     """
-    values = np.asarray(residuals, dtype=float)
+    values = numpy.asarray(residuals, dtype=float)
     rows, count = values.shape
     centred = values - values.mean(axis=0)
     variance = (centred**2).sum(axis=0) / max(rows - 1, 1)
-    scale = np.sqrt(np.maximum(variance, DIAGONAL_FLOOR))
+    scale = numpy.sqrt(numpy.maximum(variance, DIAGONAL_FLOOR))
     standard = centred / scale
     correlation = standard.T @ standard / max(rows - 1, 1)
     products = standard[:, :, None] * standard[:, None, :]
     spread = products.var(axis=0, ddof=1) * rows / max(rows - 1, 1) ** 2
-    off = ~np.eye(count, dtype=bool)
+    off = ~numpy.eye(count, dtype=bool)
     squared = float((correlation[off] ** 2).sum())
     intensity = (
         1.0
         if squared <= 0
         else min(1.0, max(0.0, float(spread[off].sum()) / squared))
     )
-    shrunk = np.where(off, (1.0 - intensity) * correlation, 1.0)
+    shrunk = numpy.where(off, (1.0 - intensity) * correlation, 1.0)
     return shrunk * scale[:, None] * scale[None, :]
 
 
 def mint(
-    base_forecasts: np.ndarray, summing: np.ndarray, covariance: np.ndarray
-) -> np.ndarray:
+    base_forecasts: numpy.ndarray,
+    summing: numpy.ndarray,
+    covariance: numpy.ndarray,
+) -> numpy.ndarray:
     """Coherent forecasts by trace minimisation.
 
     Args:
@@ -91,13 +97,15 @@ def mint(
     Raises:
         numpy.linalg.LinAlgError: If `covariance` or `S' W^-1 S` is singular.
     """
-    s = np.asarray(summing, dtype=float)
-    inverse = np.linalg.inv(np.asarray(covariance, dtype=float))
-    gain = np.linalg.solve(s.T @ inverse @ s, s.T @ inverse)
-    return np.asarray(base_forecasts, dtype=float) @ (s @ gain).T
+    s = numpy.asarray(summing, dtype=float)
+    inverse = numpy.linalg.inv(numpy.asarray(covariance, dtype=float))
+    gain = numpy.linalg.solve(s.T @ inverse @ s, s.T @ inverse)
+    return numpy.asarray(base_forecasts, dtype=float) @ (s @ gain).T
 
 
-def coherence_residual(forecasts: np.ndarray, summing: np.ndarray) -> float:
+def coherence_residual(
+    forecasts: numpy.ndarray, summing: numpy.ndarray
+) -> float:
     """Largest gap between each series and the sum of its bottom series.
 
     The bottom series are taken to be the last `m` columns of `forecasts`
@@ -112,7 +120,7 @@ def coherence_residual(forecasts: np.ndarray, summing: np.ndarray) -> float:
         The largest absolute difference between a forecast and the sum of
         the bottom forecasts that make it up, over all steps and series.
     """
-    s = np.asarray(summing, dtype=float)
-    values = np.asarray(forecasts, dtype=float)
+    s = numpy.asarray(summing, dtype=float)
+    values = numpy.asarray(forecasts, dtype=float)
     bottom = values[:, -s.shape[1] :]
-    return float(np.abs(values - bottom @ s.T).max())
+    return float(numpy.abs(values - bottom @ s.T).max())

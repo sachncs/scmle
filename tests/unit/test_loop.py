@@ -4,13 +4,13 @@ import math
 import os
 import types
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
 from benchmarks.qualification import streams
 from scmle.contracts import qualification
-from scmle.governance import deployment_ledger as dl
+from scmle.governance import deployment_ledger
 from scmle.governance import loop as loop_module
 from scmle.governance import never_list
 
@@ -46,7 +46,9 @@ def open_loop(tmp_path, policy=None, hooks=None, **kwargs):
         CHARTER,
         policy or make_policy(),
         hooks=hooks,
-        verification_keys={dl.key_fingerprint(HUMAN_KEY): HUMAN_KEY},
+        verification_keys={
+            deployment_ledger.key_fingerprint(HUMAN_KEY): HUMAN_KEY
+        },
         system_keys=[SYSTEM_KEY],
         today=lambda: TODAY,
         **kwargs,
@@ -55,7 +57,7 @@ def open_loop(tmp_path, policy=None, hooks=None, **kwargs):
 
 def batch_frame(stream, index, **extra):
     size = stream.loss.shape[1]
-    frame = pd.DataFrame(
+    frame = pandas.DataFrame(
         {
             "case_id": [f"b{index}-{i}" for i in range(size)],
             "propensity": stream.pi[index],
@@ -74,12 +76,12 @@ def feed(loop, stream, first=0, last=None, challengers=None, **extra):
     for index in range(first, last):
         frame = batch_frame(stream, index, **extra)
         size = len(frame)
-        loop.observe(frame, np.zeros(size), ["approve"] * size)
+        loop.observe(frame, numpy.zeros(size), ["approve"] * size)
         arrived = {}
         losses = {}
         for batch in range(index + 1):
             hit = (stream.arrival[batch] == index) & stream.selected[batch]
-            for position in np.flatnonzero(hit):
+            for position in numpy.flatnonzero(hit):
                 losses[f"b{batch}-{position}"] = stream.loss[batch, position]
         arrived = losses
         paired = {}
@@ -114,7 +116,7 @@ def reply_to(escalation, key=HUMAN_KEY, **changes):
         "expires": "2026-12-01",
     }
     fields.update(changes)
-    return dl.Attestation.create(key, **fields)
+    return deployment_ledger.Attestation.create(key, **fields)
 
 
 # ---------------------------------------------------------------- opening
@@ -122,7 +124,7 @@ def reply_to(escalation, key=HUMAN_KEY, **changes):
 
 def test_open_creates_the_ledger_and_reopens_the_same_loop(tmp_path):
     loop = open_loop(tmp_path)
-    assert (tmp_path / "deploy" / dl.FILE_NAME).exists()
+    assert (tmp_path / "deploy" / deployment_ledger.FILE_NAME).exists()
     again = open_loop(tmp_path)
     assert again.ledger.head == loop.ledger.head
 
@@ -130,9 +132,11 @@ def test_open_creates_the_ledger_and_reopens_the_same_loop(tmp_path):
 def test_a_different_charter_or_policy_is_refused(tmp_path):
     open_loop(tmp_path)
     other = types.SimpleNamespace(charter_hash="b" * 64)
-    with pytest.raises(dl.DeploymentLedgerError, match="charter"):
+    with pytest.raises(
+        deployment_ledger.DeploymentLedgerError, match="charter"
+    ):
         loop_module.Loop.open(tmp_path / "deploy", other, make_policy())
-    with pytest.raises(dl.DeploymentLedgerError, match="policy"):
+    with pytest.raises(deployment_ledger.DeploymentLedgerError, match="policy"):
         open_loop(tmp_path, make_policy(r_star=0.04))
 
 
@@ -157,7 +161,7 @@ def test_state_that_does_not_match_the_ledger_starts_halted(tmp_path):
     assert again.halted
     assert again.halt_reason == loop_module.HALT_STATE
     routed = again.observe(
-        batch_frame(stream, 0), np.zeros(50), ["approve"] * 50
+        batch_frame(stream, 0), numpy.zeros(50), ["approve"] * 50
     )
     assert routed.routing.coverage == 0.0
 
@@ -168,9 +172,11 @@ def test_state_that_does_not_match_the_ledger_starts_halted(tmp_path):
 def test_cases_are_routed_by_score_and_capacity(tmp_path):
     loop = open_loop(tmp_path, make_policy(c_max=0.2))
     stream = streams.simulate(spec(batches=1, seed=2))
-    sizes = np.where(np.arange(50) < 20, 3, 1)
+    sizes = numpy.where(numpy.arange(50) < 20, 3, 1)
     outcome = loop.observe(
-        batch_frame(stream, 0, set_size=sizes), np.zeros(50), ["approve"] * 50
+        batch_frame(stream, 0, set_size=sizes),
+        numpy.zeros(50),
+        ["approve"] * 50,
     )
     status = outcome.routing.status.tolist()
     assert status.count("answered") == 30
@@ -178,14 +184,14 @@ def test_cases_are_routed_by_score_and_capacity(tmp_path):
     assert status.count("safe_default") == 10
     assert outcome.actions.count("defer") == 10
     assert outcome.actions.count("escalate") == 10
-    summary = rows(loop, dl.OBSERVE_SUMMARY)[-1]["body"]
+    summary = rows(loop, deployment_ledger.OBSERVE_SUMMARY)[-1]["body"]
     assert (summary["answered"], summary["safe_default"]) == (30, 10)
 
 
 def test_everything_escalates_until_the_first_calibration(tmp_path):
     loop = open_loop(tmp_path, make_policy(initial_tau=None, c_max=1.0))
     stream = streams.simulate(spec(batches=1, seed=2))
-    outcome = loop.observe(batch_frame(stream, 0), np.zeros(50), ["a"] * 50)
+    outcome = loop.observe(batch_frame(stream, 0), numpy.zeros(50), ["a"] * 50)
     assert outcome.routing.coverage == 0.0
     data = streams.draw_calibration(3000, 0.05, seed=1)
     result = loop.calibrate(data["score"], data["loss"])
@@ -198,7 +204,7 @@ def test_observe_validates_alignment(tmp_path):
     loop = open_loop(tmp_path)
     stream = streams.simulate(spec(batches=1, seed=2))
     with pytest.raises(ValueError, match="align"):
-        loop.observe(batch_frame(stream, 0), np.zeros(3), ["a"] * 50)
+        loop.observe(batch_frame(stream, 0), numpy.zeros(3), ["a"] * 50)
 
 
 def test_out_of_support_high_impact_cases_are_not_answered(tmp_path):
@@ -206,16 +212,19 @@ def test_out_of_support_high_impact_cases_are_not_answered(tmp_path):
         tmp_path, make_policy(high_impact_actions=("deny",), c_max=1.0)
     )
     stream = streams.simulate(spec(batches=1, seed=2))
-    novel = np.arange(50) < 5
+    novel = numpy.arange(50) < 5
     decisions = ["deny"] * 25 + ["approve"] * 25
     outcome = loop.observe(
-        batch_frame(stream, 0, novel=novel), np.zeros(50), decisions
+        batch_frame(stream, 0, novel=novel), numpy.zeros(50), decisions
     )
     assert outcome.routing.status[:5].tolist() == ["escalated"] * 5
     assert outcome.routing.status[5:].tolist() == ["answered"] * 45
     assert outcome.actions[:5] == ("escalate",) * 5
     assert (
-        rows(loop, dl.OBSERVE_SUMMARY)[-1]["body"]["blocked_high_impact"] == 5
+        rows(loop, deployment_ledger.OBSERVE_SUMMARY)[-1]["body"][
+            "blocked_high_impact"
+        ]
+        == 5
     )
 
 
@@ -228,7 +237,9 @@ def test_a_stable_stream_raises_no_alarm_and_no_retrain(tmp_path):
     result = feed(loop, stream)
     assert result.status != loop_module.HALTED
     assert loop.mechanism.value == "complete"
-    assert not rows(loop, dl.ALARM) and not rows(loop, dl.RETRAIN)
+    assert not rows(loop, deployment_ledger.ALARM) and not rows(
+        loop, deployment_ledger.RETRAIN
+    )
 
 
 def test_an_abrupt_rise_alarms_retrains_and_registers_the_challenger(tmp_path):
@@ -243,14 +254,21 @@ def test_an_abrupt_rise_alarms_retrains_and_registers_the_challenger(tmp_path):
         spec(kind="abrupt", batches=80, change=30, delta=0.25, seed=4)
     )
     feed(loop, stream)
-    alarms = [r for r in rows(loop, dl.ALARM) if r["body"]["rule"] == "L1"]
+    alarms = [
+        r
+        for r in rows(loop, deployment_ledger.ALARM)
+        if r["body"]["rule"] == "L1"
+    ]
     assert alarms and alarms[0]["body"]["batch"] >= 30
     assert calls
-    assert rows(loop, dl.RETRAIN)[0]["body"]["challenger"] == "challenger-1"
+    assert (
+        rows(loop, deployment_ledger.RETRAIN)[0]["body"]["challenger"]
+        == "challenger-1"
+    )
     registered = [
         r
-        for r in rows(loop, dl.CHALLENGER_RESULT)
-        if r["body"]["phase"] == dl.REGISTERED
+        for r in rows(loop, deployment_ledger.CHALLENGER_RESULT)
+        if r["body"]["phase"] == deployment_ledger.REGISTERED
     ]
     assert registered[0]["body"]["name"] == "challenger-1"
 
@@ -261,7 +279,7 @@ def test_covariate_drift_alone_does_not_retrain(tmp_path):
         spec(kind="covariate", batches=80, change=30, seed=5)
     )
     feed(loop, stream)
-    assert not rows(loop, dl.RETRAIN)
+    assert not rows(loop, deployment_ledger.RETRAIN)
 
 
 def test_mnar_without_an_audit_slice_never_retrains_and_halts_on_an_alarm(
@@ -281,18 +299,18 @@ def test_mnar_without_an_audit_slice_never_retrains_and_halts_on_an_alarm(
     result = None
     for index in range(config.batches):
         frame = batch_frame(stream, index).drop(columns=["propensity", "audit"])
-        loop.observe(frame, np.zeros(50), ["a"] * 50)
+        loop.observe(frame, numpy.zeros(50), ["a"] * 50)
         arrived = {
             f"b{b}-{p}": stream.loss[b, p]
             for b in range(index + 1)
-            for p in np.flatnonzero(
+            for p in numpy.flatnonzero(
                 (stream.arrival[b] == index) & stream.selected[b]
             )
         }
         loop.mature(arrived)
         result = loop.step()
-    assert not rows(loop, dl.RETRAIN)
-    assert not rows(loop, dl.CHALLENGER_RESULT)
+    assert not rows(loop, deployment_ledger.RETRAIN)
+    assert not rows(loop, deployment_ledger.CHALLENGER_RESULT)
     assert loop.mechanism.value == "unverified"
     assert result.mechanism.value == "unverified"
     assert loop.ledger.halted
@@ -322,7 +340,7 @@ def test_mar_with_logged_propensity_still_acts(tmp_path):
         seed=7,
     )
     feed(loop, streams.simulate(config))
-    assert rows(loop, dl.RETRAIN)
+    assert rows(loop, deployment_ledger.RETRAIN)
     assert loop.mechanism.value == "logged_propensity"
 
 
@@ -359,17 +377,17 @@ def test_a_better_challenger_yields_a_promotion_proposal_in_order(tmp_path):
     )
     decided = {
         r["body"]["name"]: r["body"]
-        for r in rows(loop, dl.CHALLENGER_RESULT)
-        if r["body"]["phase"] == dl.DECIDED
+        for r in rows(loop, deployment_ledger.CHALLENGER_RESULT)
+        if r["body"]["phase"] == deployment_ledger.DECIDED
     }
     assert decided["better"]["rejected"] is True
     assert decided["null"]["rejected"] is False
-    proposals = rows(loop, dl.PROMOTION_PROPOSAL)
+    proposals = rows(loop, deployment_ledger.PROMOTION_PROPOSAL)
     assert [p["body"]["name"] for p in proposals] == ["better"]
     order = [
         r["body"]["name"]
-        for r in rows(loop, dl.CHALLENGER_RESULT)
-        if r["body"]["phase"] == dl.DECIDED
+        for r in rows(loop, deployment_ledger.CHALLENGER_RESULT)
+        if r["body"]["phase"] == deployment_ledger.DECIDED
     ]
     assert order == ["null", "better"]
     loop.ledger.verify()
@@ -388,7 +406,7 @@ def test_a_challenger_without_evidence_escalates_at_the_label_budget(tmp_path):
     stream, sequence = paired([0.0])
     loop.register_challenger("same")
     feed(loop, stream, challengers={"same": sequence.challengers[0]})
-    assert not rows(loop, dl.PROMOTION_PROPOSAL)
+    assert not rows(loop, deployment_ledger.PROMOTION_PROPOSAL)
     assert any(
         e.question["action"] == "challenger_evidence_insufficient"
         for e in loop.pending_escalations()
@@ -402,7 +420,7 @@ def test_a_worse_new_champion_creates_a_rollback_proposal_and_tightens_tau(
     stream, sequence = paired([0.12])
     loop.watch_rollback("previous")
     feed(loop, stream, challengers={"previous": sequence.challengers[0]})
-    assert len(rows(loop, dl.ROLLBACK_PROPOSAL)) == 1
+    assert len(rows(loop, deployment_ledger.ROLLBACK_PROPOSAL)) == 1
     assert loop.tau == pytest.approx(0.55)
     assert loop.rollback_watch is None
 
@@ -432,7 +450,7 @@ def test_selective_risk_above_target_halts_and_coverage_goes_to_zero(tmp_path):
     feed(loop, stream)
     assert loop.ledger.halted
     assert loop.halt_reason == loop_module.HALT_SELECTIVE
-    after = loop.observe(batch_frame(stream, 0), np.zeros(50), ["a"] * 50)
+    after = loop.observe(batch_frame(stream, 0), numpy.zeros(50), ["a"] * 50)
     assert after.routing.coverage == 0.0
     assert any(
         e.question["action"] == "halt_selective_risk"
@@ -471,8 +489,8 @@ def test_coverage_and_novelty_triggers_escalate(tmp_path):
     )
     stream = streams.simulate(spec(batches=40, seed=9))
     for index in range(40):
-        frame = batch_frame(stream, index, novel=np.arange(50) < 20)
-        loop.observe(frame, np.zeros(50), ["a"] * 50)
+        frame = batch_frame(stream, index, novel=numpy.arange(50) < 20)
+        loop.observe(frame, numpy.zeros(50), ["a"] * 50)
         ids = list(frame["case_id"])
         loop.mature(
             dict.fromkeys(ids, 0.0),
@@ -544,7 +562,7 @@ def test_signature_key_and_system_key_checks(tmp_path):
     forged = reply_to(esc).to_dict()
     forged["statement"] = "changed after signing"
     with pytest.raises(loop_module.ReplyRefused, match="signature"):
-        loop.reply(esc.id, dl.Attestation.from_dict(forged))
+        loop.reply(esc.id, deployment_ledger.Attestation.from_dict(forged))
     with pytest.raises(loop_module.ReplyRefused, match="not a pending"):
         loop.reply("esc-0", reply_to(esc))
 
@@ -558,8 +576,8 @@ def test_unanswered_escalations_time_out_with_the_safe_default(tmp_path):
     assert loop.pending_escalations() == []
     closing = [
         r
-        for r in rows(loop, dl.ESCALATION)
-        if r["body"]["phase"] == dl.PHASE_TIMEOUT
+        for r in rows(loop, deployment_ledger.ESCALATION)
+        if r["body"]["phase"] == deployment_ledger.PHASE_TIMEOUT
     ]
     assert closing and closing[0]["body"]["tier"] == "unverified"
 
@@ -568,7 +586,7 @@ def test_a_tampered_ledger_halts_the_loop(tmp_path):
     loop = open_loop(tmp_path)
     stream = streams.simulate(spec(batches=4, seed=1))
     feed(loop, stream, 0, 3)
-    path = tmp_path / "deploy" / dl.FILE_NAME
+    path = tmp_path / "deploy" / deployment_ledger.FILE_NAME
     lines = path.read_text().splitlines()
     path.write_text("\n".join([lines[0], *lines[2:]]) + "\n")
     result = loop.step()
@@ -576,7 +594,7 @@ def test_a_tampered_ledger_halts_the_loop(tmp_path):
     assert loop.halt_reason == loop_module.HALT_LEDGER
     assert (
         loop.observe(
-            batch_frame(stream, 0), np.zeros(50), ["a"] * 50
+            batch_frame(stream, 0), numpy.zeros(50), ["a"] * 50
         ).routing.coverage
         == 0.0
     )
@@ -630,16 +648,16 @@ def test_never_list_action_without_attestation_raises_and_escalates(
 ):
     loop = attested_loop(tmp_path)
     calls = []
-    before = len(rows(loop, dl.ESCALATION))
+    before = len(rows(loop, deployment_ledger.ESCALATION))
     with pytest.raises(never_list.AttestationRequired) as caught:
         NEVER_CASES[name](loop, calls)
     assert calls == []
-    assert len(rows(loop, dl.ESCALATION)) == before + 1
+    assert len(rows(loop, deployment_ledger.ESCALATION)) == before + 1
     assert caught.value.escalation_id == loop.pending_escalations()[-1].id
     # asking again does not pile up a second identical escalation
     with pytest.raises(never_list.AttestationRequired):
         NEVER_CASES[name](loop, calls)
-    assert len(rows(loop, dl.ESCALATION)) == before + 1
+    assert len(rows(loop, deployment_ledger.ESCALATION)) == before + 1
 
 
 def test_high_impact_answer_is_blocked_in_routing_and_guarded_as_an_action(
@@ -708,7 +726,9 @@ def test_an_expired_attestation_no_longer_allows(tmp_path):
         tmp_path / "d",
         CHARTER,
         make_policy(),
-        verification_keys={dl.key_fingerprint(HUMAN_KEY): HUMAN_KEY},
+        verification_keys={
+            deployment_ledger.key_fingerprint(HUMAN_KEY): HUMAN_KEY
+        },
         system_keys=[SYSTEM_KEY],
         today=lambda: clock["today"],
     )
@@ -728,7 +748,9 @@ def single_use_loop(tmp_path):
         tmp_path / "d",
         CHARTER,
         make_policy(),
-        verification_keys={dl.key_fingerprint(HUMAN_KEY): HUMAN_KEY},
+        verification_keys={
+            deployment_ledger.key_fingerprint(HUMAN_KEY): HUMAN_KEY
+        },
         system_keys=[SYSTEM_KEY],
         today=lambda: TODAY,
         single_use_attestations=True,
@@ -743,7 +765,7 @@ def test_a_single_use_attestation_allows_one_action_and_is_ledgered(tmp_path):
     esc = loop.pending_escalations()[0]
     loop.reply(esc.id, reply_to(esc))
     assert loop.move_champion(registry, "m", 3, None) == "moved"
-    assert len(rows(loop, dl.ATTESTATION_USED)) == 1
+    assert len(rows(loop, deployment_ledger.ATTESTATION_USED)) == 1
     with pytest.raises(never_list.AttestationRequired):
         loop.move_champion(registry, "m", 3, None)
     # asking again needs a new escalation and a new reply
@@ -756,7 +778,7 @@ def test_the_default_keeps_an_attestation_valid_until_it_expires(tmp_path):
     registry = types.SimpleNamespace(promote=lambda *a, **k: "moved")
     assert loop.move_champion(registry, "m", 3, None) == "moved"
     assert loop.move_champion(registry, "m", 3, None) == "moved"
-    assert rows(loop, dl.ATTESTATION_USED) == []
+    assert rows(loop, deployment_ledger.ATTESTATION_USED) == []
 
 
 def test_a_used_marker_survives_reopening_the_ledger(tmp_path):
@@ -776,8 +798,10 @@ def test_a_used_marker_survives_reopening_the_ledger(tmp_path):
 
 def test_a_used_marker_for_an_unanswered_escalation_is_refused(tmp_path):
     loop = single_use_loop(tmp_path)
-    with pytest.raises(dl.DeploymentLedgerError):
-        loop.ledger.commit(dl.ATTESTATION_USED, {"escalation_id": "esc-9"})
+    with pytest.raises(deployment_ledger.DeploymentLedgerError):
+        loop.ledger.commit(
+            deployment_ledger.ATTESTATION_USED, {"escalation_id": "esc-9"}
+        )
 
 
 def test_an_uncertified_alarm_escalates_instead_of_retraining(tmp_path):
@@ -791,7 +815,11 @@ def test_an_uncertified_alarm_escalates_instead_of_retraining(tmp_path):
         spec(kind="abrupt", batches=80, change=30, delta=0.25, seed=4)
     )
     feed(loop, stream)
-    assert rows(loop, dl.ALARM) and not rows(loop, dl.RETRAIN) and not calls
+    assert (
+        rows(loop, deployment_ledger.ALARM)
+        and not rows(loop, deployment_ledger.RETRAIN)
+        and not calls
+    )
     assert any(
         e.question["action"] == "l1_alarm_investigate"
         for e in loop.pending_escalations()

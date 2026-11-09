@@ -5,16 +5,16 @@ import hashlib
 import sqlite3
 from urllib.parse import urlsplit
 
-import pandas as pd
+import pandas
 import pytest
 
 from scmle.data.readers import connectors
 
 
 @pytest.fixture
-def frame() -> pd.DataFrame:
+def frame() -> pandas.DataFrame:
     """Returns a small deterministic source table."""
-    return pd.DataFrame({"id": [1, 2, 3, 4], "label": ["a", "b", "c", "d"]})
+    return pandas.DataFrame({"id": [1, 2, 3, 4], "label": ["a", "b", "c", "d"]})
 
 
 def test_source_connector_is_an_abstract_public_contract():
@@ -141,9 +141,9 @@ def test_object_store_connector_accepts_a_caller_owned_versioned_decoder():
     """A custom decoder admits formats outside the built-in tabular set."""
     calls = []
 
-    def decode(uri: str, payload: bytes) -> pd.DataFrame:
+    def decode(uri: str, payload: bytes) -> pandas.DataFrame:
         calls.append((uri, payload))
-        return pd.DataFrame({"payload_length": [len(payload)]})
+        return pandas.DataFrame({"payload_length": [len(payload)]})
 
     connector = connectors.ObjectStoreConnector(
         "s3://bucket/sample.custom",
@@ -168,14 +168,14 @@ def test_object_store_connector_requires_decoder_identity_for_custom_formats():
         connectors.ObjectStoreConnector(
             "s3://bucket/sample.custom",
             lambda uri: b"custom-format",
-            decoder=lambda uri, payload: pd.DataFrame({"value": [1]}),
+            decoder=lambda uri, payload: pandas.DataFrame({"value": [1]}),
         )
 
 
 def test_object_store_connector_reports_decoder_contract_failures():
     """Decoder errors are structured rather than leaked as implementation detail."""
 
-    def fail(uri: str, payload: bytes) -> pd.DataFrame:
+    def fail(uri: str, payload: bytes) -> pandas.DataFrame:
         raise RuntimeError("bad payload")
 
     failing = connectors.ObjectStoreConnector(

@@ -1,7 +1,7 @@
 """Meta-learning from the experiment history, end to end."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import support
 
 import scmle
@@ -9,8 +9,8 @@ from scmle.experimentation import stores
 
 
 def make_frame(rows, seed):
-    rng = np.random.default_rng(seed)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    frame = pandas.DataFrame(
         {"a": rng.normal(size=rows), "b": rng.normal(size=rows)}
     )
     frame["y"] = (frame.a + frame.b + rng.normal(size=rows) > 0).astype(int)

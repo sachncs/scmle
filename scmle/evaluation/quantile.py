@@ -13,8 +13,8 @@ from collections.abc import Sequence
 import dataclasses
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.evaluation import conformal
 
@@ -23,8 +23,8 @@ UPPER_LEVEL = 0.95
 
 
 def predicted_band(
-    lower_model: Any, upper_model: Any, features: pd.DataFrame
-) -> tuple[np.ndarray, np.ndarray]:
+    lower_model: Any, upper_model: Any, features: pandas.DataFrame
+) -> tuple[numpy.ndarray, numpy.ndarray]:
     """Uncalibrated band with the lower edge never above the upper.
 
     Separately fitted quantile models can cross; the edges are swapped back.
@@ -38,9 +38,9 @@ def predicted_band(
         The lower and upper edges: the elementwise minimum and maximum of
         the two predictions.
     """
-    low = np.asarray(lower_model.predict(features), dtype=float)
-    high = np.asarray(upper_model.predict(features), dtype=float)
-    return np.minimum(low, high), np.maximum(low, high)
+    low = numpy.asarray(lower_model.predict(features), dtype=float)
+    high = numpy.asarray(upper_model.predict(features), dtype=float)
+    return numpy.minimum(low, high), numpy.maximum(low, high)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -77,10 +77,10 @@ class QuantileBand:
             ValueError: If there are fewer rows than
                 `ConformalCalibrator.checked` requires.
         """
-        values = np.asarray(observed, dtype=float)
-        low = np.asarray(lower, dtype=float)
-        high = np.asarray(upper, dtype=float)
-        misses = np.maximum(low - values, values - high)
+        values = numpy.asarray(observed, dtype=float)
+        low = numpy.asarray(lower, dtype=float)
+        high = numpy.asarray(upper, dtype=float)
+        misses = numpy.maximum(low - values, values - high)
         return cls(conformal.ConformalCalibrator.checked(misses))
 
     def margin(self, coverage: float) -> float:
@@ -99,7 +99,7 @@ class QuantileBand:
         if not 0.0 < coverage < 1.0:
             raise ValueError("coverage must lie strictly between 0 and 1")
         return conformal.finite_sample_quantile(
-            np.asarray(self.scores), coverage
+            numpy.asarray(self.scores), coverage
         )
 
 
@@ -118,8 +118,8 @@ class QuantileIntervals:
     band: QuantileBand
 
     def interval(
-        self, features: pd.DataFrame, coverage: float
-    ) -> tuple[np.ndarray, np.ndarray]:
+        self, features: pandas.DataFrame, coverage: float
+    ) -> tuple[numpy.ndarray, numpy.ndarray]:
         """Calibrated lower and upper bounds for each row.
 
         Args:
@@ -137,7 +137,7 @@ class QuantileIntervals:
 
     def coverage_curve(
         self,
-        features: pd.DataFrame,
+        features: pandas.DataFrame,
         target: Any,
         levels: Sequence[float],
     ) -> list[dict[str, float]]:
@@ -151,7 +151,7 @@ class QuantileIntervals:
         Returns:
             For each level: nominal and empirical coverage, mean width.
         """
-        values = np.asarray(target, dtype=float)
+        values = numpy.asarray(target, dtype=float)
         curve = []
         for level in levels:
             low, high = self.interval(features, level)
@@ -159,14 +159,16 @@ class QuantileIntervals:
                 {
                     "nominal": float(level),
                     "empirical": float(
-                        np.mean((values >= low) & (values <= high))
+                        numpy.mean((values >= low) & (values <= high))
                     ),
-                    "mean_width": float(np.mean(high - low)),
+                    "mean_width": float(numpy.mean(high - low)),
                 }
             )
         return curve
 
-    def raw_band(self, features: pd.DataFrame) -> tuple[np.ndarray, np.ndarray]:
+    def raw_band(
+        self, features: pandas.DataFrame
+    ) -> tuple[numpy.ndarray, numpy.ndarray]:
         """The model band before calibration.
 
         Args:

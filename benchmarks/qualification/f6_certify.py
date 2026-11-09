@@ -67,15 +67,15 @@ from pathlib import Path
 import time
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from scipy import stats
 from sklearn.datasets import load_breast_cancer
 
 from benchmarks.qualification import certify
 from scmle.contracts import qualification
 from scmle.core import randomness
-from scmle.data.charter import contracts as charter_contracts
+from scmle.data.charter import contracts
 from scmle.data.detectors import certificates
 from scmle.data.robustness import multiverse
 from scmle.data.robustness import shift
@@ -105,15 +105,9 @@ EXTREME_OUTCOME = 3.0
 BOOTSTRAP = 100
 SOURCE_COLUMN = "mean texture"
 GRID_CHOICES = (
-    charter_contracts.Choice(
-        "imputation", ("median", "complete_case"), "median"
-    ),
-    charter_contracts.Choice(
-        "outlier_rule", ("none", "winsorize", "iqr_drop"), "none"
-    ),
-    charter_contracts.Choice(
-        "inclusion", ("all", "first_half", "second_half"), "all"
-    ),
+    contracts.Choice("imputation", ("median", "complete_case"), "median"),
+    contracts.Choice("outlier_rule", ("none", "winsorize", "iqr_drop"), "none"),
+    contracts.Choice("inclusion", ("all", "first_half", "second_half"), "all"),
 )
 CLEAN = "stable"
 FRAGILE_KINDS = (stability.DEFECT_OUTLIER, stability.DEFECT_REVERSAL)
@@ -144,7 +138,7 @@ def shift_delta() -> float:
 
 def shift_samples(
     planted: bool, seed: int
-) -> tuple[pd.DataFrame, pd.DataFrame]:
+) -> tuple[pandas.DataFrame, pandas.DataFrame]:
     """Two samples, the second shifted in its first column when planted.
 
     Args:
@@ -157,10 +151,10 @@ def shift_samples(
     """
     rng = randomness.component_rng(seed, "f6.shift.world", int(planted))
     names = [f"x{k}" for k in range(SHIFT_COLUMNS)]
-    first = pd.DataFrame(
+    first = pandas.DataFrame(
         rng.normal(size=(SHIFT_ROWS, SHIFT_COLUMNS)), columns=names
     )
-    second = pd.DataFrame(
+    second = pandas.DataFrame(
         rng.normal(size=(SHIFT_ROWS, SHIFT_COLUMNS)), columns=names
     )
     if planted:
@@ -189,7 +183,7 @@ def shift_replicate(test: str, planted: bool, seed: int) -> tuple[bool, float]:
     )
 
 
-def source_values() -> np.ndarray:
+def source_values() -> numpy.ndarray:
     """Standardised values of the real source column.
 
     Returns:
@@ -201,7 +195,9 @@ def source_values() -> np.ndarray:
     return (values - values.mean()) / values.std()
 
 
-def stability_world(kind: str, seed: int) -> tuple[np.ndarray, np.ndarray]:
+def stability_world(
+    kind: str, seed: int
+) -> tuple[numpy.ndarray, numpy.ndarray]:
     """One semi-synthetic finding: the feature with holes, and the target.
 
     Args:
@@ -225,7 +221,9 @@ def stability_world(kind: str, seed: int) -> tuple[np.ndarray, np.ndarray]:
     elif kind == stability.DEFECT_NULL:
         y = noise
     elif kind == stability.DEFECT_REVERSAL:
-        sign = np.where(np.arange(STABILITY_ROWS) < STABILITY_ROWS / 2, 1, -1)
+        sign = numpy.where(
+            numpy.arange(STABILITY_ROWS) < STABILITY_ROWS / 2, 1, -1
+        )
         y = REVERSAL_BETA * sign * x + noise
     elif kind == stability.DEFECT_OUTLIER:
         count = round(EXTREME_SHARE * STABILITY_ROWS)
@@ -236,7 +234,7 @@ def stability_world(kind: str, seed: int) -> tuple[np.ndarray, np.ndarray]:
         y[rows] = side * EXTREME_OUTCOME + 0.5 * noise[rows]
     else:
         raise ValueError(f"unknown kind: {kind}")
-    x[rng.random(STABILITY_ROWS) < MISSING_RATE] = np.nan
+    x[rng.random(STABILITY_ROWS) < MISSING_RATE] = numpy.nan
     return x, y
 
 
@@ -403,7 +401,7 @@ def stability_certificate(
                 ),
             )
         )
-    pool = pd.Series(source_values()).to_frame("value")
+    pool = pandas.Series(source_values()).to_frame("value")
     cert = certificates.certify(
         stability.DETECTOR_ID,
         stability.code_digest(),

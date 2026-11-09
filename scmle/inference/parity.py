@@ -15,8 +15,8 @@ from typing import Any
 import urllib.error
 import urllib.request
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
@@ -25,10 +25,10 @@ from sklearn.preprocessing import FunctionTransformer
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.preprocessing import StandardScaler
 
-from scmle.artifacts import bundle as bundle_module
-from scmle.contracts import data as data_contracts
+from scmle.artifacts import bundle
+from scmle.contracts import data
 from scmle.contracts import errors
-from scmle.contracts import serving as serving_contract
+from scmle.contracts import serving
 
 MISSING_CATEGORY = "__missing__"
 
@@ -164,7 +164,7 @@ def to_float(frame: Any) -> Any:
     Returns:
         A data frame of floats, NaN where a value is not numeric.
     """
-    return pd.DataFrame(frame).apply(pd.to_numeric, errors="coerce")
+    return pandas.DataFrame(frame).apply(pandas.to_numeric, errors="coerce")
 
 
 def to_object(frame: Any) -> Any:
@@ -176,10 +176,10 @@ def to_object(frame: Any) -> Any:
     Returns:
         A data frame with object dtype.
     """
-    return pd.DataFrame(frame).astype(object)
+    return pandas.DataFrame(frame).astype(object)
 
 
-def reference_bundle(spec: dict[str, Any]) -> bundle_module.ModelBundle:
+def reference_bundle(spec: dict[str, Any]) -> bundle.ModelBundle:
     """Builds the hand-written model as a bundle.
 
     The pipeline has the structure of a trained one (median imputation,
@@ -204,7 +204,7 @@ def reference_bundle(spec: dict[str, Any]) -> bundle_module.ModelBundle:
     numeric = list(spec["numeric"])
     categorical = list(spec["categorical"])
     categories = list(spec["categories"])
-    frame = pd.DataFrame(
+    frame = pandas.DataFrame(
         {
             **{name: [0.0, 1.0] for name in numeric},
             categorical[0]: categories[:2],
@@ -250,12 +250,12 @@ def reference_bundle(spec: dict[str, Any]) -> bundle_module.ModelBundle:
     pipeline = Pipeline([("prep", prep), ("model", LogisticRegression())])
     pipeline.fit(frame, [0, 1])
     numeric_steps = prep.named_transformers_["numeric"]
-    numeric_steps["impute"].statistics_ = np.array(
+    numeric_steps["impute"].statistics_ = numpy.array(
         [spec["median"][name] for name in numeric]
     )
     scaler = numeric_steps["scale"]
-    scaler.mean_ = np.array([spec["mean"][name] for name in numeric])
-    scaler.scale_ = np.array([spec["scale"][name] for name in numeric])
+    scaler.mean_ = numpy.array([spec["mean"][name] for name in numeric])
+    scaler.scale_ = numpy.array([spec["scale"][name] for name in numeric])
     scaler.var_ = scaler.scale_**2
     encoder = prep.named_transformers_["categorical"]["encode"]
     if [str(item) for item in encoder.categories_[0]] != sorted(categories):
@@ -266,11 +266,11 @@ def reference_bundle(spec: dict[str, Any]) -> bundle_module.ModelBundle:
         for item in sorted(categories)
     ]
     model = pipeline.named_steps["model"]
-    model.coef_ = np.array([weights])
-    model.intercept_ = np.array([spec["intercept"]])
-    model.classes_ = np.array(spec["classes"])
-    plan = data_contracts.FeaturePlan(tuple(numeric), tuple(categorical))
-    return bundle_module.ModelBundle.create(
+    model.coef_ = numpy.array([weights])
+    model.intercept_ = numpy.array([spec["intercept"]])
+    model.classes_ = numpy.array(spec["classes"])
+    plan = data.FeaturePlan(tuple(numeric), tuple(categorical))
+    return bundle.ModelBundle.create(
         pipeline,
         plan,
         frame,
@@ -310,7 +310,7 @@ def expected_outputs(
         chosen = record.get(category_name)
         if chosen in categories:
             logit += spec["coefficients"][f"{category_name}={chosen}"]
-        probabilities.append(1.0 / (1.0 + float(np.exp(-logit))))
+        probabilities.append(1.0 / (1.0 + float(numpy.exp(-logit))))
     return {
         "classes": list(spec["classes"]),
         "labels": [int(p > 0.5) for p in probabilities],
@@ -425,7 +425,7 @@ def check_remote(
     report = compare(
         expected, body["predictions"], body["probabilities"], tolerance
     ).to_dict()
-    missing = [key for key in serving_contract.RESPONSE_KEYS if key not in body]
+    missing = [key for key in serving.RESPONSE_KEYS if key not in body]
     if missing:
         report["passed"] = False
         report["mismatches"].append(f"response lacks {missing}")

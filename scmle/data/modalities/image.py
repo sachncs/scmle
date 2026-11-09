@@ -17,9 +17,9 @@ from types import MappingProxyType
 from typing import Any
 from typing import Self
 
-import numpy as np
+import numpy
 
-from scmle.contracts import data as data_contracts
+from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.data.modalities.curation import build_finding
 from scmle.data.modalities.curation import conflicting_label_groups
@@ -29,11 +29,11 @@ from scmle.data.modalities.curation import ModalityCurationReport
 
 PillowModule: Any = None
 try:
-    from PIL import Image as ImportedImage
+    from PIL import Image
 except ImportError:
     pass
 else:
-    PillowModule = ImportedImage
+    PillowModule = Image
 
 
 PILLOW_AVAILABLE = PillowModule is not None
@@ -554,7 +554,7 @@ class ImageSample:
         ):
             raise ValueError("hash_size must be an integer between 2 and 32")
         pixels = self.decode("L", (hash_size, hash_size))[..., 0]
-        quantized = np.asarray(pixels, dtype=np.uint8) // 16
+        quantized = numpy.asarray(pixels, dtype=numpy.uint8) // 16
         return "".join(f"{int(value):x}" for value in quantized.flat)
 
     @staticmethod
@@ -586,7 +586,7 @@ class ImageSample:
         self,
         mode: str | None = None,
         target_size: tuple[int, int] | None = None,
-    ) -> np.ndarray:
+    ) -> numpy.ndarray:
         """Decodes pixels into a deterministic ``uint8`` NumPy array.
 
         Args:
@@ -616,7 +616,7 @@ class ImageSample:
                 if target_size is not None:
                     resampling = image_library.Resampling.BILINEAR
                     converted = converted.resize(target_size, resampling)
-                pixels = np.asarray(converted, dtype=np.uint8)
+                pixels = numpy.asarray(converted, dtype=numpy.uint8)
         except Exception as error:
             raise ImageValidationError(
                 f"could not decode validated image: {error}",
@@ -625,8 +625,8 @@ class ImageSample:
                 details={"exception": type(error).__name__},
             ) from error
         if pixels.ndim == 2:
-            pixels = pixels[..., np.newaxis]
-        return np.ascontiguousarray(pixels)
+            pixels = pixels[..., numpy.newaxis]
+        return numpy.ascontiguousarray(pixels)
 
     def to_dict(self) -> dict[str, Any]:
         """Returns JSON-compatible metadata without embedding image bytes.
@@ -963,14 +963,14 @@ class ImageDataset:
                 mean_pixel=(0.0, 0.0, 0.0),
                 pixel_std=(0.0, 0.0, 0.0),
             )
-        means: list[np.ndarray] = []
-        variances: list[np.ndarray] = []
+        means: list[numpy.ndarray] = []
+        variances: list[numpy.ndarray] = []
         for sample in profiled:
-            pixels = sample.decode("RGB", profile_size).astype(np.float64)
+            pixels = sample.decode("RGB", profile_size).astype(numpy.float64)
             means.append(pixels.mean(axis=(0, 1)))
             variances.append(pixels.var(axis=(0, 1)))
-        mean = np.mean(np.stack(means), axis=0)
-        variance = np.mean(np.stack(variances), axis=0)
+        mean = numpy.mean(numpy.stack(means), axis=0)
+        variance = numpy.mean(numpy.stack(variances), axis=0)
         modes = tuple(
             sorted(
                 (mode, sum(sample.mode == mode for sample in profiled))
@@ -998,12 +998,14 @@ class ImageDataset:
             channels=channels,
             width_min=min(sample.width for sample in profiled),
             width_max=max(sample.width for sample in profiled),
-            width_mean=float(np.mean([sample.width for sample in profiled])),
+            width_mean=float(numpy.mean([sample.width for sample in profiled])),
             height_min=min(sample.height for sample in profiled),
             height_max=max(sample.height for sample in profiled),
-            height_mean=float(np.mean([sample.height for sample in profiled])),
+            height_mean=float(
+                numpy.mean([sample.height for sample in profiled])
+            ),
             mean_pixel=tuple(float(value) for value in mean),
-            pixel_std=tuple(float(value) for value in np.sqrt(variance)),
+            pixel_std=tuple(float(value) for value in numpy.sqrt(variance)),
         )
 
     def curate(
@@ -1076,7 +1078,7 @@ class ImageDataset:
             quality_findings.append(
                 build_finding(
                     "quality.image-empty-dataset",
-                    data_contracts.FindingSeverity.CRITICAL,
+                    data.FindingSeverity.CRITICAL,
                     {"dataset": "empty"},
                     {"sample_count": 0},
                     "Provide at least one validated image before training.",
@@ -1087,7 +1089,7 @@ class ImageDataset:
             quality_findings.append(
                 build_finding(
                     "quality.image-duplicate-content",
-                    data_contracts.FindingSeverity.WARNING,
+                    data.FindingSeverity.WARNING,
                     {"dataset": "profiled_samples"},
                     {"duplicate_count": profile.duplicate_count},
                     "Review duplicate content and prevent split contamination.",
@@ -1098,7 +1100,7 @@ class ImageDataset:
             quality_findings.append(
                 build_finding(
                     "quality.image-near-duplicate-content",
-                    data_contracts.FindingSeverity.WARNING,
+                    data.FindingSeverity.WARNING,
                     {"dataset": "profiled_samples"},
                     {
                         "group_count": len(near_duplicate_groups),
@@ -1115,7 +1117,7 @@ class ImageDataset:
             risk_findings.append(
                 build_finding(
                     "risk.image-conflicting-duplicate-labels",
-                    data_contracts.FindingSeverity.ERROR,
+                    data.FindingSeverity.ERROR,
                     {"dataset": "all_samples"},
                     {"groups": list(conflicts)},
                     "Resolve the label conflict or explicitly exclude the "
@@ -1127,7 +1129,7 @@ class ImageDataset:
             risk_findings.append(
                 build_finding(
                     "risk.image-sensitive-metadata",
-                    data_contracts.FindingSeverity.ERROR,
+                    data.FindingSeverity.ERROR,
                     {"dataset": "all_samples"},
                     {"tags": sensitive_metadata},
                     "Review, redact, or explicitly approve image metadata "
@@ -1139,7 +1141,7 @@ class ImageDataset:
             quality_findings.append(
                 build_finding(
                     "quality.image-profile-truncated",
-                    data_contracts.FindingSeverity.INFO,
+                    data.FindingSeverity.INFO,
                     {"dataset": "profiled_samples"},
                     {
                         "max_samples": max_samples,
@@ -1154,7 +1156,7 @@ class ImageDataset:
             risk_findings.append(
                 build_finding(
                     "risk.image-mixed-label-state",
-                    data_contracts.FindingSeverity.WARNING,
+                    data.FindingSeverity.WARNING,
                     {"dataset": "all_samples"},
                     {"label_counts": labels},
                     "Declare whether unlabeled images are valid for the "
@@ -1176,7 +1178,7 @@ class ImageDataset:
         target_size: tuple[int, int] = (16, 16),
         mode: str = "RGB",
         normalize: bool = True,
-    ) -> np.ndarray:
+    ) -> numpy.ndarray:
         """Flattens resized pixels for a numeric baseline adapter.
 
         The result has one row per sample. Columns keep Pillow/NumPy
@@ -1198,15 +1200,15 @@ class ImageDataset:
         channels = 1 if mode == "L" else len(mode)
         feature_count = target_size[0] * target_size[1] * channels
         if not self.samples:
-            dtype = np.float32 if normalize else np.uint8
-            return np.empty((0, feature_count), dtype=dtype)
+            dtype = numpy.float32 if normalize else numpy.uint8
+            return numpy.empty((0, feature_count), dtype=dtype)
         rows = [
             sample.decode(mode, target_size).reshape(-1)
             for sample in self.samples
         ]
-        features = np.stack(rows)
+        features = numpy.stack(rows)
         if normalize:
-            return features.astype(np.float32) / 255.0
+            return features.astype(numpy.float32) / 255.0
         return features
 
     def split(

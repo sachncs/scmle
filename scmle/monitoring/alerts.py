@@ -11,7 +11,7 @@ from pathlib import Path
 import time
 from typing import Any
 from urllib import error as url_error
-from urllib import parse as url_parse
+from urllib import parse
 from urllib import request as url_request
 
 from scmle import durability
@@ -282,7 +282,7 @@ class WebhookAlertSink(AlertSink):
                 timeout is not positive, `max_attempts` is below 1 or the
                 backoff is negative.
         """
-        parsed = url_parse.urlparse(url)
+        parsed = parse.urlparse(url)
         if parsed.scheme != "https":
             local = parsed.hostname in {"127.0.0.1", "localhost", "::1"}
             if not (

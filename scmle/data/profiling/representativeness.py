@@ -10,14 +10,14 @@ Kolmogorov-Smirnov tests and category-share gaps point at where.
 import dataclasses
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from scipy import stats
 from sklearn import ensemble
 from sklearn import metrics
 from sklearn import model_selection
 
-from scmle.contracts import data as data_contracts
+from scmle.contracts import data
 
 MIN_ROWS = 50
 UNREPRESENTATIVE_AUC = 0.65
@@ -70,7 +70,7 @@ class RepresentativenessReport:
         checked_reference_rows: int,
         seed: int,
         shared_columns: tuple[str, ...],
-    ) -> data_contracts.QualityEvidence:
+    ) -> data.QualityEvidence:
         """Returns reproducible evidence for this comparison.
 
         Args:
@@ -127,7 +127,7 @@ class RepresentativenessReport:
         }
 
 
-def column_gap(sample: pd.Series, reference: pd.Series) -> ColumnGap:
+def column_gap(sample: pandas.Series, reference: pandas.Series) -> ColumnGap:
     """Measures how one column differs between sample and reference.
 
     Args:
@@ -139,7 +139,7 @@ def column_gap(sample: pd.Series, reference: pd.Series) -> ColumnGap:
         and p-value (missing values dropped). Otherwise the largest
         absolute difference in category share, with no p-value.
     """
-    if pd.api.types.is_numeric_dtype(sample):
+    if pandas.api.types.is_numeric_dtype(sample):
         result = stats.ks_2samp(sample.dropna(), reference.dropna())
         return ColumnGap(
             str(sample.name), float(result.statistic), float(result.pvalue)
@@ -151,7 +151,7 @@ def column_gap(sample: pd.Series, reference: pd.Series) -> ColumnGap:
 
 
 def compare_to_reference(
-    sample: pd.DataFrame, reference: pd.DataFrame, seed: int = 0
+    sample: pandas.DataFrame, reference: pandas.DataFrame, seed: int = 0
 ) -> RepresentativenessReport:
     """Measures how distinguishable the sample is from the reference.
 
@@ -171,11 +171,13 @@ def compare_to_reference(
     if min(len(sample), len(reference)) < MIN_ROWS:
         raise ValueError(f"each side needs at least {MIN_ROWS} rows")
     columns = list(sample.columns)
-    both = pd.concat([sample[columns], reference[columns]], ignore_index=True)
+    both = pandas.concat(
+        [sample[columns], reference[columns]], ignore_index=True
+    )
     for name in columns:
-        if not pd.api.types.is_numeric_dtype(both[name]):
+        if not pandas.api.types.is_numeric_dtype(both[name]):
             both[name] = both[name].astype("category").cat.codes
-    side = np.r_[np.zeros(len(sample)), np.ones(len(reference))]
+    side = numpy.r_[numpy.zeros(len(sample)), numpy.ones(len(reference))]
     scores = model_selection.cross_val_predict(
         ensemble.HistGradientBoostingClassifier(random_state=seed),
         both,
@@ -218,8 +220,8 @@ def representativeness_report_note(
 
 
 def assess_representativeness(
-    sample: pd.DataFrame, reference: pd.DataFrame, seed: int = 0
-) -> data_contracts.QualityObservation:
+    sample: pandas.DataFrame, reference: pandas.DataFrame, seed: int = 0
+) -> data.QualityObservation:
     """Compares bounded samples and retains the complete quality evidence.
 
     Args:
@@ -234,7 +236,7 @@ def assess_representativeness(
     reference_rows = len(reference)
     shared = tuple(name for name in sample.columns if name in reference.columns)
     if not shared:
-        return data_contracts.QualityObservation(
+        return data.QualityObservation(
             note="representativeness: the reference shares no feature columns",
             evidence={
                 "observation": "representativeness",
@@ -266,7 +268,7 @@ def assess_representativeness(
     try:
         report = compare_to_reference(checked_sample, checked_reference, seed)
     except ValueError as error:
-        return data_contracts.QualityObservation(
+        return data.QualityObservation(
             note=None,
             evidence={
                 "observation": "representativeness",
@@ -298,7 +300,7 @@ def assess_representativeness(
                 ],
             },
         )
-    return data_contracts.QualityObservation(
+    return data.QualityObservation(
         note=representativeness_report_note(report),
         evidence=report.quality_evidence(
             sample_rows,

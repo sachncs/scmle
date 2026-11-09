@@ -23,7 +23,7 @@ import urllib.parse
 import urllib.request
 
 from scmle.contracts import errors
-from scmle.contracts import serving as serving_contract
+from scmle.contracts import serving
 from scmle.inference import parity
 
 CHECK_NAMES = ("health", "schema", "inference", "security")
@@ -338,7 +338,7 @@ def check_inference(
     if reply.status != 200:
         problems.append(f"/predict answered {reply.status}")
         return finish("inference", target, wire, problems)
-    missing = [k for k in serving_contract.RESPONSE_KEYS if k not in body]
+    missing = [k for k in serving.RESPONSE_KEYS if k not in body]
     if missing:
         problems.append(f"response lacks {missing}")
     else:

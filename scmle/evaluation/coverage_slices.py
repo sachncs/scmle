@@ -28,8 +28,8 @@ import json
 from pathlib import Path
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.data.detectors import certificates
 from scmle.evaluation import coverage
@@ -131,8 +131,8 @@ def flag_gate(path: Path | None = None) -> FlagGate:
 
 
 def labels_for(
-    values: pd.Series, reference: pd.Series | None = None
-) -> pd.Series | None:
+    values: pandas.Series, reference: pandas.Series | None = None
+) -> pandas.Series | None:
     """Slice label of each row, or None when the column cannot be sliced.
 
     Args:
@@ -148,29 +148,29 @@ def labels_for(
         and is not numeric-banded.
     """
     seen = reference if reference is not None else values
-    if pd.api.types.is_numeric_dtype(seen) and not pd.api.types.is_bool_dtype(
+    if pandas.api.types.is_numeric_dtype(
         seen
-    ):
-        clean = pd.to_numeric(seen, errors="coerce").dropna()
+    ) and not pandas.api.types.is_bool_dtype(seen):
+        clean = pandas.to_numeric(seen, errors="coerce").dropna()
         if clean.nunique() > MAX_LEVELS:
-            edges = np.unique(
-                np.quantile(clean, np.linspace(0, 1, BANDS + 1)[1:-1])
+            edges = numpy.unique(
+                numpy.quantile(clean, numpy.linspace(0, 1, BANDS + 1)[1:-1])
             )
-            numbers = pd.to_numeric(values, errors="coerce").to_numpy(float)
-            bands = np.searchsorted(edges, numbers, side="right") + 1
+            numbers = pandas.to_numeric(values, errors="coerce").to_numpy(float)
+            bands = numpy.searchsorted(edges, numbers, side="right") + 1
             labels = [
-                f"band {band}" if not np.isnan(n) else "missing"
+                f"band {band}" if not numpy.isnan(n) else "missing"
                 for band, n in zip(bands, numbers, strict=True)
             ]
-            return pd.Series(labels, index=values.index)
+            return pandas.Series(labels, index=values.index)
     if seen.nunique() > MAX_LEVELS or values.nunique() > MAX_LEVELS:
         return None
     return values.astype(str)
 
 
 def summary(
-    inside: np.ndarray,
-    sizes: np.ndarray,
+    inside: numpy.ndarray,
+    sizes: numpy.ndarray,
     labels: Sequence[Any],
     nominal: float,
     level: float = 0.95,
@@ -198,9 +198,9 @@ def summary(
     gate = flag_gate() if gate is None else gate
     flags_found = coverage.slice_flag(inside, labels, nominal)
     gating = gate.status == GATING
-    flags = np.asarray(inside, dtype=bool)
-    widths = np.asarray(sizes, dtype=float)
-    names = np.asarray([str(v) for v in labels])
+    flags = numpy.asarray(inside, dtype=bool)
+    widths = numpy.asarray(sizes, dtype=float)
+    names = numpy.asarray([str(v) for v in labels])
     found: list[dict[str, Any]] = []
     skipped = 0
     for name in sorted(set(names)):
@@ -221,7 +221,7 @@ def summary(
                 "lower": lower,
                 "upper": upper,
                 "mean_size": None
-                if np.isinf(chosen).any()
+                if numpy.isinf(chosen).any()
                 else float(chosen.mean()),
                 "flag": bool(flags_found["slices"][name]["flagged"]),
                 "flag_p_value": flags_found["slices"][name]["p_value"],

@@ -21,8 +21,8 @@ import dataclasses
 import math
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from scipy import stats
 from sklearn import neighbors
 
@@ -67,7 +67,9 @@ class DuplicateReport:
         return dataclasses.asdict(self)
 
 
-def exact_flags(frame: pd.DataFrame, columns: Sequence[str]) -> np.ndarray:
+def exact_flags(
+    frame: pandas.DataFrame, columns: Sequence[str]
+) -> numpy.ndarray:
     """Flags every row after the first of its exact-duplicate group.
 
     Args:
@@ -78,7 +80,7 @@ def exact_flags(frame: pd.DataFrame, columns: Sequence[str]) -> np.ndarray:
         A boolean per row, True for a row that repeats an earlier row.
     """
     ids = groups.duplicate_groups(frame, list(columns))
-    flags = np.zeros(len(frame), dtype=bool)
+    flags = numpy.zeros(len(frame), dtype=bool)
     seen: set[int] = set()
     for position, group in enumerate(ids):
         if group == groups.NOT_DUPLICATED:
@@ -89,7 +91,9 @@ def exact_flags(frame: pd.DataFrame, columns: Sequence[str]) -> np.ndarray:
     return flags
 
 
-def standardized_block(values: pd.DataFrame, spread: pd.Series) -> np.ndarray:
+def standardized_block(
+    values: pandas.DataFrame, spread: pandas.Series
+) -> numpy.ndarray:
     """Scales a numeric block by column spread, filling gaps with the mean.
 
     Args:
@@ -101,15 +105,15 @@ def standardized_block(values: pd.DataFrame, spread: pd.Series) -> np.ndarray:
         divided by `spread`.
     """
     block = values.to_numpy(dtype=float, copy=True)
-    block[~np.isfinite(block)] = np.nan
-    centre = np.nanmean(block, axis=0)
-    block = np.where(np.isnan(block), centre, block)
-    return np.asarray(block / spread.to_numpy(dtype=float))
+    block[~numpy.isfinite(block)] = numpy.nan
+    centre = numpy.nanmean(block, axis=0)
+    block = numpy.where(numpy.isnan(block), centre, block)
+    return numpy.asarray(block / spread.to_numpy(dtype=float))
 
 
 def near_flags(
-    frame: pd.DataFrame, columns: Sequence[str], cut: float = DEFAULT_CUT
-) -> np.ndarray:
+    frame: pandas.DataFrame, columns: Sequence[str], cut: float = DEFAULT_CUT
+) -> numpy.ndarray:
     """True for rows within `cut` of an earlier row in the same block.
 
     Args:
@@ -126,12 +130,12 @@ def near_flags(
     """
     if not math.isfinite(cut) or cut <= 0.0:
         raise ValueError("cut must be positive and finite")
-    flags = np.zeros(len(frame), dtype=bool)
+    flags = numpy.zeros(len(frame), dtype=bool)
     numeric = [
         c
         for c in columns
-        if pd.api.types.is_numeric_dtype(frame[c])
-        and not pd.api.types.is_bool_dtype(frame[c])
+        if pandas.api.types.is_numeric_dtype(frame[c])
+        and not pandas.api.types.is_bool_dtype(frame[c])
     ]
     other = [c for c in columns if c not in numeric]
     if not numeric:
@@ -141,24 +145,26 @@ def near_flags(
     if other:
         text = frame[other].astype(str).fillna("<missing>")
         keys = text.agg("\x1f".join, axis=1).to_numpy()
-        labels = pd.factorize(keys)[0]
+        labels = pandas.factorize(keys)[0]
     else:
-        labels = np.zeros(len(frame), dtype=int)
+        labels = numpy.zeros(len(frame), dtype=int)
     radius = cut * math.sqrt(len(numeric))
-    for label in np.unique(labels):
-        members = np.flatnonzero(labels == label)
+    for label in numpy.unique(labels):
+        members = numpy.flatnonzero(labels == label)
         if len(members) < MIN_BLOCK:
             continue
         tree = neighbors.NearestNeighbors(radius=radius).fit(block[members])
         near = tree.radius_neighbors(block[members], return_distance=False)
         for local, row_neighbours in zip(members, near, strict=True):
             earlier = members[row_neighbours]
-            if np.any(earlier < local):
+            if numpy.any(earlier < local):
                 flags[local] = True
     return flags
 
 
-def duplicate_flags(frame: pd.DataFrame, cut: float = DEFAULT_CUT) -> pd.Series:
+def duplicate_flags(
+    frame: pandas.DataFrame, cut: float = DEFAULT_CUT
+) -> pandas.Series:
     """Flags rows that repeat an earlier row exactly or within the near cut.
 
     A `cut` that is not positive and finite raises `ValueError`.
@@ -174,7 +180,7 @@ def duplicate_flags(frame: pd.DataFrame, cut: float = DEFAULT_CUT) -> pd.Series:
     """
     columns = list(frame.columns)
     flags = exact_flags(frame, columns) | near_flags(frame, columns, cut)
-    return pd.Series(flags, index=frame.index)
+    return pandas.Series(flags, index=frame.index)
 
 
 def clopper_pearson(
@@ -195,7 +201,7 @@ def clopper_pearson(
 
 
 def assess_duplicates(
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     columns: Sequence[str] | None = None,
     target: str | None = None,
     cut: float = DEFAULT_CUT,
@@ -219,9 +225,9 @@ def assess_duplicates(
     members = ids[ids != groups.NOT_DUPLICATED]
     conflicts = 0
     if target is not None:
-        for group in np.unique(members):
+        for group in numpy.unique(members):
             labels = frame[target].to_numpy()[ids == group]
-            if len(pd.unique(pd.Series(labels))) > 1:
+            if len(pandas.unique(pandas.Series(labels))) > 1:
                 conflicts += 1
     extra = int(exact.sum())
     return DuplicateReport(
@@ -232,5 +238,5 @@ def assess_duplicates(
         near_extra=int(near.sum()),
         cut=cut,
         label_conflicts=conflicts,
-        groups=len(np.unique(members)),
+        groups=len(numpy.unique(members)),
     )

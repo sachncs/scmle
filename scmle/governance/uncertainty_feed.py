@@ -21,8 +21,8 @@ from collections.abc import Mapping
 from collections.abc import Sequence
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.contracts import errors
 from scmle.governance import deployment_ledger
@@ -64,7 +64,7 @@ class UncertaintyFeed:
 
     def observe(
         self,
-        features: pd.DataFrame,
+        features: pandas.DataFrame,
         predictions: Sequence[Any],
         decisions: Sequence[Any],
         case_ids: Sequence[str],
@@ -95,15 +95,15 @@ class UncertaintyFeed:
         sizes = [max(len(item), 1) for item in found]
         novelty = getattr(self.bundle, "novelty", None)
         novel = (
-            np.asarray(
+            numpy.asarray(
                 novelty.score(features)["out_of_distribution"], dtype=bool
             )
             if novelty is not None
-            else np.zeros(len(features), dtype=bool)
+            else numpy.zeros(len(features), dtype=bool)
         )
         for identity, item in zip(case_ids, found, strict=True):
             self.sets[str(identity)] = list(item)
-        frame = pd.DataFrame(
+        frame = pandas.DataFrame(
             {
                 "case_id": [str(i) for i in case_ids],
                 "set_size": sizes,

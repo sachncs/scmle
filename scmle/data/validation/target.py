@@ -1,6 +1,6 @@
 """Target validation: resolving the task from the actual target values."""
 
-import pandas as pd
+import pandas
 
 from scmle.contracts import errors
 from scmle.contracts import tasks
@@ -11,7 +11,7 @@ AMBIGUOUS_MAX_VALUES = 10
 AMBIGUOUS_MAX_RATIO = 0.05
 
 
-def is_numeric_target(target: pd.Series) -> bool:
+def is_numeric_target(target: pandas.Series) -> bool:
     """Reports whether the target is numeric and not boolean.
 
     Args:
@@ -20,16 +20,16 @@ def is_numeric_target(target: pd.Series) -> bool:
     Returns:
         True for a numeric, non-boolean dtype.
     """
-    return pd.api.types.is_numeric_dtype(
+    return pandas.api.types.is_numeric_dtype(
         target
-    ) and not pd.api.types.is_bool_dtype(target)
+    ) and not pandas.api.types.is_bool_dtype(target)
 
 
 MIN_EVENTS = 10
 MIN_ARM_ROWS = 20
 
 
-def check_events(frame: pd.DataFrame, column: str | None) -> None:
+def check_events(frame: pandas.DataFrame, column: str | None) -> None:
     """Requires a complete 0/1 event column with enough observed events.
 
     Args:
@@ -43,7 +43,7 @@ def check_events(frame: pd.DataFrame, column: str | None) -> None:
     """
     if column is None or column not in frame.columns:
         raise errors.BlockedError(f"event column '{column}' not found")
-    values = pd.to_numeric(frame[column], errors="coerce")
+    values = pandas.to_numeric(frame[column], errors="coerce")
     if values.isna().any() or not set(values.unique()) <= {0, 1}:
         raise errors.BlockedError(
             f"event column '{column}' must hold 0 (censored) or 1 (event) in "
@@ -57,8 +57,8 @@ def check_events(frame: pd.DataFrame, column: str | None) -> None:
 
 
 def encode_ordinal(
-    frame: pd.DataFrame, column: str, order: list[str | int]
-) -> pd.DataFrame:
+    frame: pandas.DataFrame, column: str, order: list[str | int]
+) -> pandas.DataFrame:
     """Copies `frame`, replacing ordinal labels by integer ranks.
 
     Args:
@@ -75,7 +75,7 @@ def encode_ordinal(
     return encoded
 
 
-def check_treatment(frame: pd.DataFrame, column: str | None) -> None:
+def check_treatment(frame: pandas.DataFrame, column: str | None) -> None:
     """Requires a complete 0/1 treatment column with both arms present.
 
     Args:
@@ -88,7 +88,7 @@ def check_treatment(frame: pd.DataFrame, column: str | None) -> None:
     """
     if column is None or column not in frame.columns:
         raise errors.BlockedError(f"treatment column '{column}' not found")
-    values = pd.to_numeric(frame[column], errors="coerce")
+    values = pandas.to_numeric(frame[column], errors="coerce")
     if values.isna().any() or not values.isin([0, 1]).all():
         raise errors.BlockedError(
             f"treatment column '{column}' must hold 0 (control) or 1 "
@@ -101,7 +101,7 @@ def check_treatment(frame: pd.DataFrame, column: str | None) -> None:
 
 
 def check_targets(
-    frame: pd.DataFrame, columns: list[str], task: tasks.TaskType
+    frame: pandas.DataFrame, columns: list[str], task: tasks.TaskType
 ) -> None:
     """Requires every target column to exist, be complete and fit the task.
 
@@ -151,7 +151,7 @@ class TaskResolver:
         self.request = spec.task
         self.order = list(spec.data.ordinal_order)
 
-    def resolve(self, target: pd.Series) -> tasks.TaskType:
+    def resolve(self, target: pandas.Series) -> tasks.TaskType:
         """Returns the concrete task type.
 
         Args:
@@ -186,7 +186,7 @@ class TaskResolver:
             return self.resolve_auto(target)
         return self.resolve_classification(target)
 
-    def resolve_survival(self, target: pd.Series) -> tasks.TaskType:
+    def resolve_survival(self, target: pandas.Series) -> tasks.TaskType:
         """Validates a survival request: durations must be positive numbers.
 
         Args:
@@ -205,7 +205,7 @@ class TaskResolver:
             )
         return tasks.TaskType.SURVIVAL
 
-    def resolve_uplift(self, target: pd.Series) -> tasks.TaskType:
+    def resolve_uplift(self, target: pandas.Series) -> tasks.TaskType:
         """The outcome must be numeric (0/1 labels or a quantity).
 
         Args:
@@ -221,7 +221,7 @@ class TaskResolver:
             raise errors.BlockedError("uplift needs a numeric outcome")
         return tasks.TaskType.UPLIFT
 
-    def resolve_ranking(self, target: pd.Series) -> tasks.TaskType:
+    def resolve_ranking(self, target: pandas.Series) -> tasks.TaskType:
         """Resolves a ranking target, requiring non-negative whole grades.
 
         Args:
@@ -234,7 +234,7 @@ class TaskResolver:
             BlockedError: If any grade is missing, unparseable, negative or
                 not a whole number.
         """
-        values = pd.to_numeric(target, errors="coerce")
+        values = pandas.to_numeric(target, errors="coerce")
         if values.isna().any() or (values < 0).any() or (values % 1 != 0).any():
             raise errors.BlockedError(
                 "ranking needs a relevance target of non-negative whole "
@@ -242,7 +242,7 @@ class TaskResolver:
             )
         return tasks.TaskType.RANKING
 
-    def resolve_ordinal(self, target: pd.Series) -> tasks.TaskType:
+    def resolve_ordinal(self, target: pandas.Series) -> tasks.TaskType:
         """Requires the listed order to match the labels in the data.
 
         Args:
@@ -269,7 +269,7 @@ class TaskResolver:
             )
         return tasks.TaskType.ORDINAL
 
-    def resolve_regression(self, target: pd.Series) -> tasks.TaskType:
+    def resolve_regression(self, target: pandas.Series) -> tasks.TaskType:
         """Validates an explicit regression request.
 
         Args:
@@ -287,7 +287,7 @@ class TaskResolver:
             )
         return tasks.TaskType.REGRESSION
 
-    def resolve_classification(self, target: pd.Series) -> tasks.TaskType:
+    def resolve_classification(self, target: pandas.Series) -> tasks.TaskType:
         """Validates an explicit (possibly generic) classification request.
 
         Args:
@@ -319,7 +319,7 @@ class TaskResolver:
             )
         return tasks.TaskType.BINARY if binary else tasks.TaskType.MULTICLASS
 
-    def resolve_auto(self, target: pd.Series) -> tasks.TaskType:
+    def resolve_auto(self, target: pandas.Series) -> tasks.TaskType:
         """Infers the task; blocks when the choice is genuinely ambiguous.
 
         Args:

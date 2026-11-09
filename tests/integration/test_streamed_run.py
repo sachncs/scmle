@@ -2,8 +2,8 @@
 
 import json
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
@@ -17,7 +17,7 @@ def big_file(tmp_path_factory):
     path = tmp_path_factory.mktemp("big") / "big.parquet"
     writer = None
     for part in range(4):
-        rng = np.random.default_rng(part)
+        rng = numpy.random.default_rng(part)
         size = ROWS // 4
         x = rng.normal(size=(size, 5))
         y = (x[:, 0] + 0.7 * x[:, 1] + rng.normal(0, 0.5, size) > 0).astype(int)
@@ -104,8 +104,8 @@ def test_out_of_core_refuses_options_that_need_the_whole_table(
 
 
 def test_a_small_file_is_read_normally_even_with_a_budget(tmp_path):
-    frame = pd.DataFrame(
-        {"a": np.random.default_rng(1).normal(size=600)}
+    frame = pandas.DataFrame(
+        {"a": numpy.random.default_rng(1).normal(size=600)}
     ).assign(y=lambda f: (f.a > 0).astype(int))
     path = tmp_path / "small.parquet"
     frame.to_parquet(path)
@@ -123,8 +123,8 @@ def test_a_small_file_is_read_normally_even_with_a_budget(tmp_path):
 
 
 def test_streaming_models_are_not_candidates_for_ordinary_runs(tmp_path):
-    frame = pd.DataFrame(
-        {"a": np.random.default_rng(3).normal(size=400)}
+    frame = pandas.DataFrame(
+        {"a": numpy.random.default_rng(3).normal(size=400)}
     ).assign(y=lambda f: (f.a > 0).astype(int))
 
     plan = support.make_project(

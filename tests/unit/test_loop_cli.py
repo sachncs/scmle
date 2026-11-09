@@ -1,11 +1,11 @@
 import json
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle import cli
-from scmle.governance import deployment_ledger as dl
-from scmle.governance import loop as loop_module
+from scmle.governance import deployment_ledger
+from scmle.governance import loop
 
 KEY = "person-key"
 
@@ -15,7 +15,7 @@ def run(*arguments):
 
 
 def policy_file(tmp_path):
-    policy = loop_module.LoopPolicy(
+    policy = loop.LoopPolicy(
         reference_risk=0.1,
         tolerance=0.05,
         r_star=0.6,
@@ -43,10 +43,10 @@ def test_the_cli_runs_a_batch_through_step_and_a_reply(tmp_path, capsys):
         )
         == 0
     )
-    batch = pd.DataFrame(
+    batch = pandas.DataFrame(
         {
             "case_id": [f"c{i}" for i in range(20)],
-            "prediction": np.zeros(20),
+            "prediction": numpy.zeros(20),
             "decision": ["approve"] * 20,
         }
     )
@@ -56,9 +56,9 @@ def test_the_cli_runs_a_batch_through_step_and_a_reply(tmp_path, capsys):
         run("loop", "observe", deploy, "--batch", tmp_path / "batch.csv") == 0
     )
     assert json.loads(capsys.readouterr().out)["routing"] == {"answered": 20}
-    pd.DataFrame({"case_id": batch["case_id"], "loss": np.zeros(20)}).to_csv(
-        tmp_path / "labels.csv", index=False
-    )
+    pandas.DataFrame(
+        {"case_id": batch["case_id"], "loss": numpy.zeros(20)}
+    ).to_csv(tmp_path / "labels.csv", index=False)
     assert (
         run("loop", "mature", deploy, "--labels", tmp_path / "labels.csv") == 0
     )
@@ -68,13 +68,13 @@ def test_the_cli_runs_a_batch_through_step_and_a_reply(tmp_path, capsys):
     assert run("loop", "verify", deploy) == 0
     assert json.loads(capsys.readouterr().out)["ok"] is True
 
-    resumed = loop_module.Loop.resume(deploy)
+    resumed = loop.Loop.resume(deploy)
     resumed.escalate("needs_a_person", {"why": "test"})
     capsys.readouterr()
     assert run("loop", "pending", deploy) == 0
     pending = json.loads(capsys.readouterr().out)
     assert [p["question"]["action"] for p in pending] == ["needs_a_person"]
-    answer = dl.Attestation.create(
+    answer = deployment_ledger.Attestation.create(
         KEY,
         escalation_id=pending[0]["id"],
         question_hash=pending[0]["question_hash"],
@@ -118,8 +118,8 @@ def test_a_refused_reply_and_a_broken_ledger_fail(tmp_path, capsys):
         "--charter-hash",
         "a" * 64,
     )
-    loop_module.Loop.resume(deploy).escalate("needs_a_person", {})
-    answer = dl.Attestation.create(
+    loop.Loop.resume(deploy).escalate("needs_a_person", {})
+    answer = deployment_ledger.Attestation.create(
         KEY,
         escalation_id="esc-1",
         question_hash="0" * 64,
@@ -145,13 +145,13 @@ def test_a_refused_reply_and_a_broken_ledger_fail(tmp_path, capsys):
         tmp_path / "k.txt",
     )
     assert code == 1
-    path = deploy / dl.FILE_NAME
+    path = deploy / deployment_ledger.FILE_NAME
     lines = path.read_text().splitlines()
     path.write_text("\n".join([lines[0], lines[0], *lines[1:]]) + "\n")
     assert run("loop", "verify", deploy) == 1
 
 
 def test_a_policy_file_needs_only_the_reference_risk():
-    policy = loop_module.LoopPolicy.from_dict({"reference_risk": 0.1})
+    policy = loop.LoopPolicy.from_dict({"reference_risk": 0.1})
     assert policy.high_impact_actions == ()
     assert policy.reference_risk == 0.1

@@ -9,7 +9,7 @@ import abc
 import dataclasses
 from typing import Any
 
-from scmle.contracts import data as data_contracts
+from scmle.contracts import data
 from scmle.contracts import tasks
 
 SMALL_DATA_ROWS = 500
@@ -46,7 +46,7 @@ class RecommendationRule(abc.ABC):
 
     @abc.abstractmethod
     def advise(
-        self, profile: data_contracts.DatasetProfile, spec: tasks.ProjectSpec
+        self, profile: data.DatasetProfile, spec: tasks.ProjectSpec
     ) -> list[Recommendation]:
         """Returns the recommendations that apply, possibly none.
 
@@ -63,7 +63,7 @@ class ImbalanceAdvice(RecommendationRule):
     """Suggests decision and metric choices for rare positive classes."""
 
     def advise(
-        self, profile: data_contracts.DatasetProfile, spec: tasks.ProjectSpec
+        self, profile: data.DatasetProfile, spec: tasks.ProjectSpec
     ) -> list[Recommendation]:
         """Advises on a severely imbalanced binary target.
 
@@ -107,7 +107,7 @@ class MissingnessAdvice(RecommendationRule):
     """Flags columns that are mostly missing."""
 
     def advise(
-        self, profile: data_contracts.DatasetProfile, spec: tasks.ProjectSpec
+        self, profile: data.DatasetProfile, spec: tasks.ProjectSpec
     ) -> list[Recommendation]:
         """Advises on heavy missingness.
 
@@ -143,7 +143,7 @@ class LeakageAdvice(RecommendationRule):
     """Points at leakage hypotheses raised by the profile."""
 
     def advise(
-        self, profile: data_contracts.DatasetProfile, spec: tasks.ProjectSpec
+        self, profile: data.DatasetProfile, spec: tasks.ProjectSpec
     ) -> list[Recommendation]:
         """Advises when leakage hypotheses exist and are not blocking.
 
@@ -184,7 +184,7 @@ class DuplicateAdvice(RecommendationRule):
     """Flags heavily duplicated rows."""
 
     def advise(
-        self, profile: data_contracts.DatasetProfile, spec: tasks.ProjectSpec
+        self, profile: data.DatasetProfile, spec: tasks.ProjectSpec
     ) -> list[Recommendation]:
         """Advises when many rows are exact duplicates.
 
@@ -219,7 +219,7 @@ class SmallDataAdvice(RecommendationRule):
     """Warns that estimates from few rows are noisy."""
 
     def advise(
-        self, profile: data_contracts.DatasetProfile, spec: tasks.ProjectSpec
+        self, profile: data.DatasetProfile, spec: tasks.ProjectSpec
     ) -> list[Recommendation]:
         """Advises on small development sets.
 
@@ -261,7 +261,7 @@ def default_rules() -> tuple[RecommendationRule, ...]:
 
 
 def recommend(
-    profile: data_contracts.DatasetProfile,
+    profile: data.DatasetProfile,
     spec: tasks.ProjectSpec,
     rules: tuple[RecommendationRule, ...] | None = None,
 ) -> tuple[Recommendation, ...]:

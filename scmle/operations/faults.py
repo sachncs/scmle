@@ -29,9 +29,9 @@ import threading
 import time
 from typing import Any
 
-import numpy as np
+import numpy
 
-from scmle.artifacts import bundle as bundle_module
+from scmle.artifacts import bundle
 from scmle.contracts import errors
 from scmle.contracts import observability
 from scmle.core import limits
@@ -42,7 +42,7 @@ from scmle.deploy import mocks
 from scmle.deploy import observation
 from scmle.deploy import provenance
 from scmle.governance import deployment_ledger
-from scmle.governance import registry as registry_module
+from scmle.governance import registry
 from scmle.governance import release_state
 from scmle.inference import parity
 from scmle.operations import classify
@@ -339,7 +339,7 @@ def corrupt_copy(service: pathlib.Path, target: pathlib.Path) -> pathlib.Path:
         `target`.
     """
     shutil.copytree(service, target)
-    with (target / "model" / bundle_module.MODEL_FILE).open("ab") as handle:
+    with (target / "model" / bundle.MODEL_FILE).open("ab") as handle:
         handle.write(b"tampered")
     return target
 
@@ -353,7 +353,7 @@ def model_file_digest(service: pathlib.Path) -> str:
     Returns:
         The digest of the folder's model file.
     """
-    path = service / "model" / bundle_module.MODEL_FILE
+    path = service / "model" / bundle.MODEL_FILE
     return provenance.sha256_digest(path.read_bytes())
 
 
@@ -444,7 +444,7 @@ def state_writer_trials(fleet: Fleet, base: pathlib.Path) -> dict[str, Any]:
         acknowledged one), ``unreadable_files`` (trials whose file could not
         be read back) and ``read_seconds_max`` (the longest read time).
     """
-    rng = np.random.default_rng(7)
+    rng = numpy.random.default_rng(7)
     lost = 0
     torn = 0
     seconds = []
@@ -1258,12 +1258,12 @@ class ProcessPlane(control.ControlPlane):
 
 
 def register(
-    store: registry_module.ModelRegistryStore,
+    store: registry.ModelRegistryStore,
     release: release_state.ReleaseRegistry,
     spec: dict[str, Any],
     work: pathlib.Path,
     label: str,
-) -> registry_module.VersionRecord:
+) -> registry.VersionRecord:
     """Registers and approves one signed bundle.
 
     Args:
@@ -1307,7 +1307,7 @@ def bad_release() -> recovery.Result:
     base = work_folder("release")
     result = recovery.Result("bad_release", environment="local processes")
     try:
-        store = registry_module.ModelRegistryStore(base / "registry")
+        store = registry.ModelRegistryStore(base / "registry")
         ledger = deployment_ledger.DeploymentLedger.create(
             None, charter_hash="recovery", policy={}, alpha_promo="1/20"
         )
@@ -1336,7 +1336,7 @@ def bad_release() -> recovery.Result:
         )
         wrong = predict(plane.base())[1].get("predictions")
         # delayed labels: the truth is what the good model says, with 5% noise
-        rng = np.random.default_rng(3)
+        rng = numpy.random.default_rng(3)
         watch = signals.SignalMonitor(
             signals.WindowPolicy(window_seconds=1000.0, min_samples=30),
             signals.SignalThresholds(reference_loss=0.05, loss_tolerance=0.05),
@@ -1541,7 +1541,7 @@ def audit_continuity() -> recovery.Result:
         "audit_log_continuity", environment="local subprocess"
     )
     try:
-        rng = np.random.default_rng(11)
+        rng = numpy.random.default_rng(11)
         lost = 0
         broken = 0
         reload_seconds = []

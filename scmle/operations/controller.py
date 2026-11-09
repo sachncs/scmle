@@ -42,10 +42,10 @@ import hashlib
 import pathlib
 from typing import Any
 
-import pandas as pd
+import pandas
 
-from scmle.governance import deployment_ledger as ledger_module
-from scmle.governance import envelope as envelope_module
+from scmle.governance import deployment_ledger
+from scmle.governance import envelope
 from scmle.governance import loop as loop_module
 
 BATCHES = "batches"
@@ -172,7 +172,7 @@ class Controller:
             system_keys=system_keys,
             today=today,
         )
-        self.envelopes = envelope_module.EnvelopeGuard(
+        self.envelopes = envelope.EnvelopeGuard(
             self.loop.ledger, today, verification_keys
         )
         self.envelopes.on_write = self.loop.save_state
@@ -191,11 +191,11 @@ class Controller:
         loop = self.loop
         try:
             used = self.envelopes.authorize(
-                envelope_module.EnvelopeAction.TRAIN_CHALLENGER,
+                envelope.EnvelopeAction.TRAIN_CHALLENGER,
                 loop.policy.scope,
                 {"batch": loop.batch - 1},
             )
-        except envelope_module.EnvelopeRefused as refused:
+        except envelope.EnvelopeRefused as refused:
             loop.escalate("retrain_not_authorized", {"reason": refused.reason})
             return None
         if self.retrain is None:
@@ -218,7 +218,7 @@ class Controller:
         Args:
             body: The row content.
         """
-        self.loop.ledger.commit(ledger_module.CONTROLLER, dict(body))
+        self.loop.ledger.commit(deployment_ledger.CONTROLLER, dict(body))
         self.loop.save_state()
 
     def mark(self, label: str) -> None:
@@ -245,8 +245,8 @@ class Controller:
         for row in reversed(self.loop.ledger.rows):
             body = row["body"]
             if (
-                row["kind"] != ledger_module.CONTROLLER
-                or body["phase"] != ledger_module.TICK
+                row["kind"] != deployment_ledger.CONTROLLER
+                or body["phase"] != deployment_ledger.TICK
             ):
                 continue
             if not test(body):
@@ -269,7 +269,7 @@ class Controller:
         """
         self.journal(
             {
-                "phase": ledger_module.REJECTED,
+                "phase": deployment_ledger.REJECTED,
                 "what": KIND[what],
                 "digest": digest,
                 "file": path.name,
@@ -281,7 +281,7 @@ class Controller:
         )
 
     @staticmethod
-    def read(path: pathlib.Path, required: tuple[str, ...]) -> pd.DataFrame:
+    def read(path: pathlib.Path, required: tuple[str, ...]) -> pandas.DataFrame:
         """A CSV with the required columns and at least one row.
 
         Args:
@@ -296,7 +296,7 @@ class Controller:
                 An unreadable or unparseable file raises the error of the CSV
                 reader or of the file system instead.
         """
-        frame = pd.read_csv(path)
+        frame = pandas.read_csv(path)
         for name in required:
             if name not in frame.columns:
                 raise ValueError(f"missing column {name!r}")
@@ -387,12 +387,12 @@ class Controller:
                 self.read(path, ("prediction", "decision"))
             else:
                 self.read(path, ("case_id", "loss"))
-        except (ValueError, OSError, pd.errors.ParserError) as error:
+        except (ValueError, OSError, pandas.errors.ParserError) as error:
             self.reject(what, path, digest, str(error))
             return 0
         self.journal(
             {
-                "phase": ledger_module.INTENT,
+                "phase": deployment_ledger.INTENT,
                 "what": KIND[what],
                 "digest": digest,
                 "file": path.name,
@@ -404,7 +404,7 @@ class Controller:
         self.mark(f"applied-by-loop:{path.name}")
         self.journal(
             {
-                "phase": ledger_module.APPLIED,
+                "phase": deployment_ledger.APPLIED,
                 "what": KIND[what],
                 "digest": digest,
             }
@@ -435,7 +435,7 @@ class Controller:
             batch = intent["what"] == KIND[BATCHES]
             what = BATCHES if batch else LABELS
             done = {
-                "phase": ledger_module.APPLIED,
+                "phase": deployment_ledger.APPLIED,
                 "what": intent["what"],
                 "digest": digest,
             }
@@ -523,7 +523,7 @@ class Controller:
         )
         self.journal(
             {
-                "phase": ledger_module.TICK,
+                "phase": deployment_ledger.TICK,
                 "observed": observed,
                 "matured": matured,
                 "rejected": len(rejected),

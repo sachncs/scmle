@@ -2,8 +2,8 @@
 
 import pickle
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 from sklearn import base
 
@@ -29,7 +29,7 @@ def transform(nodes, frame, fit_frame=None):
 
 
 def test_rowwise_ops_compute_expected_values():
-    frame = pd.DataFrame({"a": [1.0, 4.0, 9.0], "b": [2.0, 0.0, 3.0]})
+    frame = pandas.DataFrame({"a": [1.0, 4.0, 9.0], "b": [2.0, 0.0, 3.0]})
     result = transform(
         [
             node("sq", "sqrt", ["a"]),
@@ -48,16 +48,18 @@ def test_rowwise_ops_compute_expected_values():
     assert result["sum"].tolist() == [3.0, 4.0, 12.0]
     assert result["diff"].tolist() == [-1.0, 4.0, 6.0]
     assert result["prod"].tolist() == [2.0, 0.0, 27.0]
-    assert result["ratio"].iloc[0] == 0.5 and np.isnan(result["ratio"].iloc[1])
-    assert result["l1p"].iloc[0] == pytest.approx(np.log(2))
+    assert result["ratio"].iloc[0] == 0.5 and numpy.isnan(
+        result["ratio"].iloc[1]
+    )
+    assert result["l1p"].iloc[0] == pytest.approx(numpy.log(2))
     assert (
         result["sqr"].tolist() == [4.0, 0.0, 9.0] and result["miss"].sum() == 0
     )
 
 
 def test_fitted_ops_learn_from_the_training_fold_only():
-    train = pd.DataFrame({"x": np.arange(100.0)})
-    later = pd.DataFrame({"x": [1000.0, -1000.0, 50.0]})
+    train = pandas.DataFrame({"x": numpy.arange(100.0)})
+    later = pandas.DataFrame({"x": [1000.0, -1000.0, 50.0]})
     transformer = feature_graph.FeatureGraphTransformer(
         (
             node("clipped", "clip", ["x"], lower=0.1, upper=0.9),
@@ -65,11 +67,11 @@ def test_fitted_ops_learn_from_the_training_fold_only():
             node("bucket", "bin", ["x"], bins=4),
         )
     ).fit(train)
-    low, high = np.quantile(np.arange(100.0), [0.1, 0.9])
+    low, high = numpy.quantile(numpy.arange(100.0), [0.1, 0.9])
     result = transformer.transform(later)
     assert result["clipped"].tolist() == [high, low, 50.0]
     assert result["z"].iloc[2] == pytest.approx(
-        (50 - 49.5) / np.arange(100.0).std(ddof=1)
+        (50 - 49.5) / numpy.arange(100.0).std(ddof=1)
     )
     assert result["bucket"].tolist() == [
         3.0,
@@ -80,17 +82,17 @@ def test_fitted_ops_learn_from_the_training_fold_only():
 
 
 def test_bin_keeps_missing_values_missing():
-    train = pd.DataFrame({"x": [1.0, 2.0, 3.0, 4.0]})
+    train = pandas.DataFrame({"x": [1.0, 2.0, 3.0, 4.0]})
     result = transform(
         [node("b", "bin", ["x"], bins=2)],
-        pd.DataFrame({"x": [np.nan, 1.0]}),
+        pandas.DataFrame({"x": [numpy.nan, 1.0]}),
         train,
     )
-    assert np.isnan(result["b"].iloc[0]) and result["b"].iloc[1] == 0.0
+    assert numpy.isnan(result["b"].iloc[0]) and result["b"].iloc[1] == 0.0
 
 
 def test_datepart_extracts_components_and_tolerates_bad_dates():
-    frame = pd.DataFrame(
+    frame = pandas.DataFrame(
         {"when": ["2024-03-15 14:30:00", "2025-12-01 03:00:00", "garbage"]}
     )
     result = transform(
@@ -103,11 +105,11 @@ def test_datepart_extracts_components_and_tolerates_bad_dates():
     )
     assert result["month"].iloc[:2].tolist() == [3.0, 12.0]
     assert result["hour"].iloc[:2].tolist() == [14.0, 3.0]
-    assert result["dow"].iloc[0] == 4.0 and np.isnan(result["month"].iloc[2])
+    assert result["dow"].iloc[0] == 4.0 and numpy.isnan(result["month"].iloc[2])
 
 
 def test_nodes_can_depend_on_earlier_nodes():
-    frame = pd.DataFrame({"a": [1.0, 2.0, 3.0], "b": [3.0, 2.0, 1.0]})
+    frame = pandas.DataFrame({"a": [1.0, 2.0, 3.0], "b": [3.0, 2.0, 1.0]})
     result = transform(
         [node("s", "sum", ["a", "b"]), node("big", "square", ["s"])], frame
     )
@@ -120,19 +122,21 @@ def test_transformer_is_a_well_behaved_estimator():
     )
     twin = base.clone(transformer)
     assert twin.nodes == transformer.nodes and not hasattr(twin, "states_")
-    fitted = transformer.fit(pd.DataFrame({"a": [1.0, 2.0]}))
+    fitted = transformer.fit(pandas.DataFrame({"a": [1.0, 2.0]}))
     restored = pickle.loads(pickle.dumps(fitted))
-    pd.testing.assert_frame_equal(
-        restored.transform(pd.DataFrame({"a": [3.0]})),
-        fitted.transform(pd.DataFrame({"a": [3.0]})),
+    pandas.testing.assert_frame_equal(
+        restored.transform(pandas.DataFrame({"a": [3.0]})),
+        fitted.transform(pandas.DataFrame({"a": [3.0]})),
     )
 
 
 def series_frame():
-    return pd.DataFrame(
+    return pandas.DataFrame(
         {
             "grp": ["a", "a", "a", "b", "b", "b"],
-            "t": pd.to_datetime(["2024-01-03", "2024-01-01", "2024-01-02"] * 2),
+            "t": pandas.to_datetime(
+                ["2024-01-03", "2024-01-01", "2024-01-02"] * 2
+            ),
             "v": [30.0, 10.0, 20.0, 3.0, 1.0, 2.0],
         }
     )
@@ -154,7 +158,7 @@ def test_series_features_are_computed_per_group_in_time_order():
     )
     ordered = result.sort_values(["grp", "t"])
     assert ordered["prev"].tolist()[:3] == [
-        pytest.approx(np.nan, nan_ok=True),
+        pytest.approx(numpy.nan, nan_ok=True),
         10.0,
         20.0,
     ]
@@ -177,7 +181,7 @@ def test_series_features_never_use_future_rows():
         frame,
     )
     perturbed = frame.copy()
-    perturbed.loc[perturbed.t == pd.Timestamp("2024-01-03"), "v"] *= (
+    perturbed.loc[perturbed.t == pandas.Timestamp("2024-01-03"), "v"] *= (
         1000  # the latest rows
     )
     after = build_series(
@@ -187,9 +191,9 @@ def test_series_features_never_use_future_rows():
         ],
         perturbed,
     )
-    earlier = frame.t < pd.Timestamp("2024-01-03")
+    earlier = frame.t < pandas.Timestamp("2024-01-03")
     # Changing the newest value cannot alter any feature of earlier rows.
-    pd.testing.assert_frame_equal(result[earlier], after[earlier])
+    pandas.testing.assert_frame_equal(result[earlier], after[earlier])
 
 
 def test_series_output_keeps_the_original_row_order_and_index():
@@ -199,18 +203,23 @@ def test_series_output_keeps_the_original_row_order_and_index():
     assert list(result.index) == [10, 11, 12, 13, 14, 15]
     assert (
         result.loc[10, "prev"] == 20.0
-        or np.isnan(result.loc[10, "prev"]) is False
+        or numpy.isnan(result.loc[10, "prev"]) is False
     )
 
 
 def test_series_without_groups_forms_one_series():
-    frame = pd.DataFrame(
-        {"t": pd.date_range("2024-01-01", periods=4), "v": [1.0, 2.0, 4.0, 8.0]}
+    frame = pandas.DataFrame(
+        {
+            "t": pandas.date_range("2024-01-01", periods=4),
+            "v": [1.0, 2.0, 4.0, 8.0],
+        }
     )
     result = feature_graph.SeriesFeatureBuilder(
         [node("prev", "lag", ["v"])], None, "t"
     ).apply(frame)
-    assert np.isnan(result["prev"].iloc[0]) and result["prev"].tolist()[1:] == [
+    assert numpy.isnan(result["prev"].iloc[0]) and result["prev"].tolist()[
+        1:
+    ] == [
         1.0,
         2.0,
         4.0,

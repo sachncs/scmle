@@ -8,7 +8,7 @@ import textwrap
 
 import pytest
 
-from scmle.contracts import models as model_contracts
+from scmle.contracts import models
 from scmle.core import policies
 from scmle.core import scheduler
 from scmle.core import stages
@@ -117,7 +117,7 @@ def test_abstract_bases_cannot_be_instantiated():
         splitters.SplitStrategy,
         strategies.DataStrategy,
         resampling.IndexResampler,
-        model_contracts.ModelAdapter,
+        models.ModelAdapter,
         stores.ExperimentStore,
     ):
         assert inspect.isabstract(base)

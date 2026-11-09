@@ -21,7 +21,7 @@ import dataclasses
 import sys
 from typing import Any
 
-import pandas as pd
+import pandas
 
 from scmle.contracts import qualification
 from scmle.data.admissibility import reconciliation
@@ -101,7 +101,7 @@ class ExtractReconciliation:
 
 def reconcile_extract(
     source: profile.SqlSource,
-    assembled: pd.DataFrame,
+    assembled: pandas.DataFrame,
     base_table: str,
     measures: Sequence[str] = (),
     joins: Sequence[JoinCheck] = (),

@@ -2,8 +2,8 @@
 
 import json
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 import support
 
@@ -14,17 +14,17 @@ PERIOD = 7
 
 
 def series(rows=700, seed=0, name="shop"):
-    rng = np.random.default_rng(seed)
-    steps = np.arange(rows)
+    rng = numpy.random.default_rng(seed)
+    steps = numpy.arange(rows)
     value = (
         20
         + 0.03 * steps
-        + 4 * np.sin(2 * np.pi * steps / PERIOD)
+        + 4 * numpy.sin(2 * numpy.pi * steps / PERIOD)
         + rng.normal(0, 0.4, rows)
     )
-    return pd.DataFrame(
+    return pandas.DataFrame(
         {
-            "date": pd.date_range("2022-01-01", periods=rows, freq="D"),
+            "date": pandas.date_range("2022-01-01", periods=rows, freq="D"),
             "sales": value,
         }
     ).assign(shop=name)
@@ -82,7 +82,7 @@ def test_training_targets_never_reach_into_the_locked_period(result):
     first_test = usable["date"].iloc[manifest["test_ids"]].min()
 
     assert result.evaluation["split_strategy"] == "temporal"
-    assert last_training + pd.Timedelta(days=HORIZON) < first_test
+    assert last_training + pandas.Timedelta(days=HORIZON) < first_test
 
 
 def test_a_series_never_seen_in_training_is_forecast_from_its_history(result):
@@ -93,8 +93,10 @@ def test_a_series_never_seen_in_training_is_forecast_from_its_history(result):
 
     assert list(forecast["step"]) == [1, 2, 3, 4]
     assert list(forecast["date"]) == list(future["date"])
-    error = np.abs(forecast["forecast"].to_numpy() - future["sales"].to_numpy())
-    naive = np.abs(history["sales"].iloc[-1] - future["sales"].to_numpy())
+    error = numpy.abs(
+        forecast["forecast"].to_numpy() - future["sales"].to_numpy()
+    )
+    naive = numpy.abs(history["sales"].iloc[-1] - future["sales"].to_numpy())
     assert error.mean() < naive.mean()
 
 
@@ -121,7 +123,7 @@ def test_forecasts_need_a_time_column_and_a_horizon(tmp_path):
 
 
 def test_many_series_are_forecast_together(tmp_path):
-    frame = pd.concat(
+    frame = pandas.concat(
         [series(400, seed=1, name="a"), series(400, seed=2, name="b")]
     )
 

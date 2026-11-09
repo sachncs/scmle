@@ -13,12 +13,12 @@ import dataclasses
 from typing import Any
 from typing import Self
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from sklearn import ensemble
 from sklearn import pipeline
 
-from scmle.contracts import data as data_contracts
+from scmle.contracts import data
 from scmle.data.curation import preprocessing
 
 TRAIN_ROWS = 20000
@@ -48,7 +48,7 @@ class NoveltyDetector:
     @classmethod
     def fit(
         cls,
-        features: pd.DataFrame,
+        features: pandas.DataFrame,
         numeric: tuple[str, ...],
         categorical: tuple[str, ...],
         seed: int = 0,
@@ -69,8 +69,8 @@ class NoveltyDetector:
         """
         if not (numeric or categorical):
             return None
-        plan = data_contracts.FeaturePlan(numeric, categorical)
-        options = data_contracts.PreprocessingOptions(scale=True)
+        plan = data.FeaturePlan(numeric, categorical)
+        options = data.PreprocessingOptions(scale=True)
         encoder = preprocessing.build_preprocessor(plan, options)
         model = pipeline.Pipeline(
             [
@@ -90,13 +90,13 @@ class NoveltyDetector:
         scores = model.score_samples(sample)
         return cls(
             model,
-            float(np.quantile(scores, TAIL)),
+            float(numpy.quantile(scores, TAIL)),
             cls.far_out_fences(features, numeric),
         )
 
     @staticmethod
     def far_out_fences(
-        features: pd.DataFrame, numeric: tuple[str, ...]
+        features: pandas.DataFrame, numeric: tuple[str, ...]
     ) -> dict[str, tuple[float, float]]:
         """Computes the Tukey far-out fences of each numeric feature.
 
@@ -112,7 +112,7 @@ class NoveltyDetector:
         fences = {}
         for column in numeric:
             values = (
-                pd.to_numeric(features[column], errors="coerce")
+                pandas.to_numeric(features[column], errors="coerce")
                 .astype(float)
                 .dropna()
             )
@@ -126,7 +126,7 @@ class NoveltyDetector:
             )
         return fences
 
-    def score(self, features: pd.DataFrame) -> pd.DataFrame:
+    def score(self, features: pandas.DataFrame) -> pandas.DataFrame:
         """Scores new rows.
 
         Args:
@@ -141,14 +141,14 @@ class NoveltyDetector:
             out of range). `novelty_score` is the negated raw score.
         """
         raw = self.model.score_samples(features)
-        outside = pd.DataFrame(index=features.index)
+        outside = pandas.DataFrame(index=features.index)
         for column, (low, high) in self.fences.items():
-            values = pd.to_numeric(features[column], errors="coerce")
+            values = pandas.to_numeric(features[column], errors="coerce")
             outside[column] = (values < low) | (values > high)
         out_of_range = (
-            outside.any(axis=1) if len(outside.columns) else raw < -np.inf
+            outside.any(axis=1) if len(outside.columns) else raw < -numpy.inf
         )
-        return pd.DataFrame(
+        return pandas.DataFrame(
             {
                 "novelty_score": -raw,
                 "out_of_range_features": [

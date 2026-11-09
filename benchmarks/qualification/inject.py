@@ -19,8 +19,8 @@ import dataclasses
 import math
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.contracts import qualification
 from scmle.core import randomness
@@ -48,21 +48,21 @@ class Injection:
         info: Parameters and ground truth beyond the mask.
     """
 
-    frame: pd.DataFrame
-    mask: pd.DataFrame
+    frame: pandas.DataFrame
+    mask: pandas.DataFrame
     defect_type: str
     seed_path: qualification.SeedPath
     info: Mapping[str, Any]
 
     @property
-    def row_mask(self) -> pd.Series:
+    def row_mask(self) -> pandas.Series:
         """Rows that hold at least one planted cell."""
         return self.mask.any(axis=1)
 
 
 def changed_cells(
-    original: pd.DataFrame, mutated: pd.DataFrame
-) -> pd.DataFrame:
+    original: pandas.DataFrame, mutated: pandas.DataFrame
+) -> pandas.DataFrame:
     """Independent before/after diff used to check a mask.
 
     Args:
@@ -76,7 +76,7 @@ def changed_cells(
     """
     index = mutated.index
     known = index.isin(original.index)
-    result = pd.DataFrame(False, index=index, columns=mutated.columns)
+    result = pandas.DataFrame(False, index=index, columns=mutated.columns)
     for name in mutated.columns:
         if name not in original.columns:
             result[name] = True
@@ -86,14 +86,14 @@ def changed_cells(
         left = before.to_numpy(dtype=object)
         right = after.to_numpy(dtype=object)
         both_missing = before.isna().to_numpy() & after.isna().to_numpy()
-        equal = np.array(
+        equal = numpy.array(
             [a == b for a, b in zip(left, right, strict=True)], dtype=bool
         )
         result[name] = ~((equal | both_missing) & known)
     return result
 
 
-def check_frame(frame: pd.DataFrame) -> None:
+def check_frame(frame: pandas.DataFrame) -> None:
     """Requires a non-empty table with unique rows and column names.
 
     Args:
@@ -103,13 +103,13 @@ def check_frame(frame: pd.DataFrame) -> None:
         ValueError: If it is not a non-empty DataFrame, or its column names
             or index labels repeat.
     """
-    if not isinstance(frame, pd.DataFrame) or frame.empty:
+    if not isinstance(frame, pandas.DataFrame) or frame.empty:
         raise ValueError("frame must be a non-empty DataFrame")
     if not frame.columns.is_unique or not frame.index.is_unique:
         raise ValueError("frame needs unique column names and index labels")
 
 
-def check_columns(frame: pd.DataFrame, columns: Sequence[str]) -> list[str]:
+def check_columns(frame: pandas.DataFrame, columns: Sequence[str]) -> list[str]:
     """Returns `columns` as a list, requiring that they exist.
 
     Args:
@@ -170,7 +170,7 @@ def cell_count(rate: float, available: int, what: str) -> int:
     return chosen
 
 
-def is_numeric(series: pd.Series) -> bool:
+def is_numeric(series: pandas.Series) -> bool:
     """Whether a column is numeric and not boolean.
 
     Args:
@@ -180,12 +180,12 @@ def is_numeric(series: pd.Series) -> bool:
         True for a numeric, non-boolean dtype.
     """
     return bool(
-        pd.api.types.is_numeric_dtype(series)
-        and not pd.api.types.is_bool_dtype(series)
+        pandas.api.types.is_numeric_dtype(series)
+        and not pandas.api.types.is_bool_dtype(series)
     )
 
 
-def require_numeric(frame: pd.DataFrame, columns: Sequence[str]) -> None:
+def require_numeric(frame: pandas.DataFrame, columns: Sequence[str]) -> None:
     """Requires every named column to be numeric.
 
     Args:
@@ -200,7 +200,7 @@ def require_numeric(frame: pd.DataFrame, columns: Sequence[str]) -> None:
         raise ValueError(f"columns must be numeric: {bad}")
 
 
-def stream(seed: int, family: str, index: int) -> np.random.Generator:
+def stream(seed: int, family: str, index: int) -> numpy.random.Generator:
     """Random stream for one injector call.
 
     Args:
@@ -214,7 +214,7 @@ def stream(seed: int, family: str, index: int) -> np.random.Generator:
     return randomness.component_rng(seed, f"inject.{family}", index)
 
 
-def blank_mask(frame: pd.DataFrame) -> pd.DataFrame:
+def blank_mask(frame: pandas.DataFrame) -> pandas.DataFrame:
     """An all-False mask shaped like `frame`.
 
     Args:
@@ -223,10 +223,10 @@ def blank_mask(frame: pd.DataFrame) -> pd.DataFrame:
     Returns:
         A boolean frame of False values.
     """
-    return pd.DataFrame(False, index=frame.index, columns=frame.columns)
+    return pandas.DataFrame(False, index=frame.index, columns=frame.columns)
 
 
-def mark(mask: pd.DataFrame, column: str, positions: np.ndarray) -> None:
+def mark(mask: pandas.DataFrame, column: str, positions: numpy.ndarray) -> None:
     """Sets mask cells at row `positions` of `column`.
 
     Args:
@@ -240,8 +240,8 @@ def mark(mask: pd.DataFrame, column: str, positions: np.ndarray) -> None:
 
 
 def finish(
-    frame: pd.DataFrame,
-    mask: pd.DataFrame,
+    frame: pandas.DataFrame,
+    mask: pandas.DataFrame,
     defect_type: str,
     family: str,
     seed: int,
@@ -272,8 +272,8 @@ def finish(
 
 
 def other_classes(
-    rng: np.random.Generator, current: np.ndarray, n_classes: int
-) -> np.ndarray:
+    rng: numpy.random.Generator, current: numpy.ndarray, n_classes: int
+) -> numpy.ndarray:
     """Uniformly random class indices that differ from `current`.
 
     Args:
@@ -289,7 +289,7 @@ def other_classes(
 
 
 def flip_labels(
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     target: str,
     rate: float,
     seed: int,
@@ -320,11 +320,11 @@ def flip_labels(
     if mode not in LABEL_MODES:
         raise ValueError(f"mode must be one of {LABEL_MODES}")
     series = frame[target]
-    classes = list(pd.unique(series.dropna()))
+    classes = list(pandas.unique(series.dropna()))
     if len(classes) < 2:
         raise ValueError("flipping needs at least two classes")
     rng = stream(seed, "label_flip", index)
-    labelled = np.flatnonzero(series.notna().to_numpy())
+    labelled = numpy.flatnonzero(series.notna().to_numpy())
     if mode == "symmetric":
         check_rate(rate)
         chosen = rng.choice(
@@ -342,11 +342,11 @@ def flip_labels(
             members = labelled[(series.iloc[labelled] == label).to_numpy()]
             count = min(round(share * len(members)), len(members))
             picks.append(rng.choice(members, count, replace=False))
-        chosen = np.concatenate(picks)
+        chosen = numpy.concatenate(picks)
         if len(chosen) < 1:
             raise ValueError("class rates are too small: no label flipped")
-    chosen = np.sort(chosen)
-    codes = pd.Index(classes).get_indexer(series.iloc[chosen])
+    chosen = numpy.sort(chosen)
+    codes = pandas.Index(classes).get_indexer(series.iloc[chosen])
     new_codes = other_classes(rng, codes, len(classes))
     flipped = series.copy()
     flipped.iloc[chosen] = [classes[code] for code in new_codes]
@@ -365,7 +365,7 @@ def flip_labels(
     )
 
 
-def standardized(values: pd.Series) -> np.ndarray:
+def standardized(values: pandas.Series) -> numpy.ndarray:
     """Z-scores with missing values set to zero.
 
     Args:
@@ -387,8 +387,8 @@ def standardized(values: pd.Series) -> np.ndarray:
 
 
 def calibrated_probabilities(
-    z: np.ndarray, strength: float, rate: float
-) -> np.ndarray:
+    z: numpy.ndarray, strength: float, rate: float
+) -> numpy.ndarray:
     """Logistic selection probabilities whose mean equals `rate`.
 
     Args:
@@ -403,16 +403,18 @@ def calibrated_probabilities(
     low, high = -LOGIT_BRACKET, LOGIT_BRACKET
     for _ in range(BISECTION_STEPS):
         middle = (low + high) / 2.0
-        mean = float(np.mean(1.0 / (1.0 + np.exp(-(strength * z + middle)))))
+        mean = float(
+            numpy.mean(1.0 / (1.0 + numpy.exp(-(strength * z + middle))))
+        )
         if mean < rate:
             low = middle
         else:
             high = middle
-    return 1.0 / (1.0 + np.exp(-(strength * z + (low + high) / 2.0)))
+    return 1.0 / (1.0 + numpy.exp(-(strength * z + (low + high) / 2.0)))
 
 
 def inject_missing(
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     columns: Sequence[str],
     rate: float,
     seed: int,
@@ -467,7 +469,7 @@ def inject_missing(
     out = frame.copy()
     mask = blank_mask(out)
     for name in names:
-        observed = np.flatnonzero(frame[name].notna().to_numpy())
+        observed = numpy.flatnonzero(frame[name].notna().to_numpy())
         if mechanism == "mcar":
             chosen = rng.choice(
                 observed,
@@ -481,12 +483,12 @@ def inject_missing(
             chosen = observed[rng.random(len(observed)) < probability]
             if len(chosen) < 1:
                 raise ValueError("no cell was selected; raise the rate")
-        chosen = np.sort(chosen)
+        chosen = numpy.sort(chosen)
         series = out[name]
-        if pd.api.types.is_integer_dtype(series):
+        if pandas.api.types.is_integer_dtype(series):
             series = series.astype("float64")
         series = series.copy()
-        series.iloc[chosen] = np.nan
+        series.iloc[chosen] = numpy.nan
         out[name] = series
         mark(mask, name, chosen)
     return finish(
@@ -507,7 +509,7 @@ def inject_missing(
 
 
 def inject_sentinels(
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     columns: Sequence[str],
     rate: float,
     seed: int,
@@ -546,23 +548,26 @@ def inject_sentinels(
     for name in names:
         series = out[name]
         if is_numeric(series):
-            if pd.api.types.is_unsigned_integer_dtype(series) and sentinel < 0:
+            if (
+                pandas.api.types.is_unsigned_integer_dtype(series)
+                and sentinel < 0
+            ):
                 raise ValueError(
                     f"'{name}' is unsigned; use a non-negative code"
                 )
             code: Any = (
                 int(sentinel)
-                if pd.api.types.is_integer_dtype(series)
+                if pandas.api.types.is_integer_dtype(series)
                 else float(sentinel)
             )
-        elif pd.api.types.is_string_dtype(series) or series.dtype == object:
+        elif pandas.api.types.is_string_dtype(series) or series.dtype == object:
             code = text_sentinel
         else:
             raise ValueError(f"'{name}' has an unsupported type for sentinels")
-        candidates = np.flatnonzero(
+        candidates = numpy.flatnonzero(
             (series.notna() & (series != code)).to_numpy()
         )
-        chosen = np.sort(
+        chosen = numpy.sort(
             rng.choice(
                 candidates,
                 cell_count(rate, len(candidates), "cell"),
@@ -584,7 +589,7 @@ def inject_sentinels(
     )
 
 
-def has_default_index(frame: pd.DataFrame) -> bool:
+def has_default_index(frame: pandas.DataFrame) -> bool:
     """Whether the index is exactly 0..n-1.
 
     Args:
@@ -595,14 +600,14 @@ def has_default_index(frame: pd.DataFrame) -> bool:
     """
     index = frame.index
     return (
-        isinstance(index, pd.RangeIndex)
+        isinstance(index, pandas.RangeIndex)
         and index.start == 0
         and index.step == 1
     )
 
 
 def inject_duplicates(
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     rate: float,
     seed: int,
     index: int = 0,
@@ -644,7 +649,7 @@ def inject_duplicates(
         floats = [
             name
             for name in frame.columns
-            if pd.api.types.is_float_dtype(frame[name])
+            if pandas.api.types.is_float_dtype(frame[name])
         ]
         if not floats:
             raise ValueError("near duplicates need float columns")
@@ -655,7 +660,7 @@ def inject_duplicates(
             noise = rng.normal(size=count)
             noise[noise == 0.0] = 1.0
             copies[name] = copies[name] + noise * jitter * spread
-    out = pd.concat([frame, copies], ignore_index=True)
+    out = pandas.concat([frame, copies], ignore_index=True)
     mask = blank_mask(out)
     mask.iloc[rows:, :] = True
     return finish(
@@ -669,7 +674,7 @@ def inject_duplicates(
     )
 
 
-def robust_scale(values: np.ndarray) -> float:
+def robust_scale(values: numpy.ndarray) -> float:
     """Normal-consistent median absolute deviation; std if that is zero.
 
     Args:
@@ -679,15 +684,15 @@ def robust_scale(values: np.ndarray) -> float:
         The scaled median absolute deviation, or the standard deviation when
         the deviation is zero.
     """
-    centre = float(np.median(values))
-    mad = MAD_SCALE * float(np.median(np.abs(values - centre)))
+    centre = float(numpy.median(values))
+    mad = MAD_SCALE * float(numpy.median(numpy.abs(values - centre)))
     if mad > 0.0:
         return mad
-    return float(np.std(values))
+    return float(numpy.std(values))
 
 
 def inject_outliers(
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     columns: Sequence[str],
     rate: float,
     seed: int,
@@ -725,11 +730,11 @@ def inject_outliers(
     mask = blank_mask(out)
     for name in names:
         values = out[name].astype("float64")
-        observed = np.flatnonzero(values.notna().to_numpy())
+        observed = numpy.flatnonzero(values.notna().to_numpy())
         spread = robust_scale(values.to_numpy()[observed])
         if not math.isfinite(spread) or spread == 0.0:
             raise ValueError(f"'{name}' has no spread")
-        chosen = np.sort(
+        chosen = numpy.sort(
             rng.choice(
                 observed,
                 cell_count(rate, len(observed), "cell"),
@@ -739,7 +744,7 @@ def inject_outliers(
         sign = rng.choice([-1.0, 1.0], size=len(chosen))
         array = values.to_numpy(dtype=float, copy=True)
         array[chosen] = array[chosen] + sign * distance * spread
-        out[name] = pd.Series(array, index=values.index)
+        out[name] = pandas.Series(array, index=values.index)
         mark(mask, name, chosen)
     return finish(
         out,
@@ -752,7 +757,7 @@ def inject_outliers(
     )
 
 
-def is_classification(series: pd.Series) -> bool:
+def is_classification(series: pandas.Series) -> bool:
     """Whether a target should be treated as class labels.
 
     Args:
@@ -766,7 +771,7 @@ def is_classification(series: pd.Series) -> bool:
 
 
 def inject_leak(
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     target: str,
     kind: str,
     seed: int,
@@ -818,16 +823,16 @@ def inject_leak(
         if is_classification(series):
             if not 0.0 < level < 1.0:
                 raise ValueError("noise must be within (0, 1) for classes")
-            classes = list(pd.unique(series.dropna()))
+            classes = list(pandas.unique(series.dropna()))
             if len(classes) < 2:
                 raise ValueError("a noisy label copy needs two classes")
-            codes = pd.Index(classes).get_indexer(series)
+            codes = pandas.Index(classes).get_indexer(series)
             flip = rng.random(len(series)) < level
             flip &= codes >= 0
             new_codes = codes.copy()
             new_codes[flip] = other_classes(rng, codes[flip], len(classes))
             added = series.copy()
-            added.iloc[np.flatnonzero(flip)] = [
+            added.iloc[numpy.flatnonzero(flip)] = [
                 classes[code] for code in new_codes[flip]
             ]
         else:
@@ -841,16 +846,16 @@ def inject_leak(
             )
         info["noise"] = level
     else:
-        classes = list(pd.unique(series.dropna()))
+        classes = list(pandas.unique(series.dropna()))
         if len(classes) < 2:
             raise ValueError("missing_for_class needs at least two classes")
         blank = classes[0] if missing_class is None else missing_class
         if blank not in classes:
             raise ValueError(f"class {blank!r} is not in the target")
-        added = pd.Series(
+        added = pandas.Series(
             rng.normal(size=len(series)), index=series.index, dtype="float64"
         )
-        added[(series == blank).to_numpy()] = np.nan
+        added[(series == blank).to_numpy()] = numpy.nan
         info["missing_class"] = blank
     out = frame.copy()
     out[column] = added
@@ -860,7 +865,7 @@ def inject_leak(
 
 
 def shift_covariates(
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     columns: Sequence[str],
     fraction: float,
     delta: float,
@@ -894,7 +899,7 @@ def shift_covariates(
     if shift == 0.0:
         raise ValueError("delta must be nonzero")
     rng = stream(seed, "covariate_shift", index)
-    rows = np.sort(
+    rows = numpy.sort(
         rng.choice(
             len(frame), cell_count(fraction, len(frame), "row"), replace=False
         )
@@ -909,7 +914,7 @@ def shift_covariates(
         observed = rows[values.iloc[rows].notna().to_numpy()]
         array = values.to_numpy(dtype=float, copy=True)
         array[observed] = array[observed] + shift * spread
-        out[name] = pd.Series(array, index=values.index)
+        out[name] = pandas.Series(array, index=values.index)
         mark(mask, name, observed)
     return finish(
         out,

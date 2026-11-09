@@ -5,15 +5,15 @@ import json
 import pytest
 
 from scmle.contracts import qualification
-from scmle.data.charter import contracts as c
+from scmle.data.charter import contracts
 from scmle.data.robustness import multiverse
 from tests.unit.test_charter_contracts import make_charter
 
 
 def choices():
     return (
-        c.Choice("imputation", ("median", "mean", "zero"), "median"),
-        c.Choice("outlier_rule", ("none", "winsorize"), "none"),
+        contracts.Choice("imputation", ("median", "mean", "zero"), "median"),
+        contracts.Choice("outlier_rule", ("none", "winsorize"), "none"),
     )
 
 
@@ -63,7 +63,9 @@ def test_a_specification_added_later_changes_both_hashes_and_the_tier():
     base = make_charter()
     amended = make_charter(
         multiverse=(
-            c.Choice("imputation", ("median", "mice", "mean"), "median"),
+            contracts.Choice(
+                "imputation", ("median", "mice", "mean"), "median"
+            ),
         )
     )
     assert base.charter_hash != amended.charter_hash

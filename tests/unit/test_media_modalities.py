@@ -6,7 +6,7 @@ import hashlib
 import io
 import wave
 
-import numpy as np
+import numpy
 import pytest
 
 from scmle.data.modalities import audio
@@ -508,10 +508,10 @@ def test_video_frame_features_use_a_bounded_explicit_decoder():
     )
     calls: list[int] = []
 
-    def decoder(payload: bytes, frame_index: int) -> np.ndarray:
+    def decoder(payload: bytes, frame_index: int) -> numpy.ndarray:
         assert payload == sample.encoded_bytes
         calls.append(frame_index)
-        return np.full((2, 2, 3), frame_index, dtype=np.uint8)
+        return numpy.full((2, 2, 3), frame_index, dtype=numpy.uint8)
 
     prepared = video.VideoDataset((sample,)).prepare_frame_features(
         decoder, max_frames=3, max_frame_pixels=32
@@ -535,7 +535,7 @@ def test_video_frame_features_reject_oversized_decoded_frames():
 
     with pytest.raises(video.VideoValidationError, match="pixel limit"):
         video.VideoDataset((sample,)).prepare_frame_features(
-            lambda payload, frame_index: np.zeros((8, 8), dtype=np.uint8),
+            lambda payload, frame_index: numpy.zeros((8, 8), dtype=numpy.uint8),
             max_frame_pixels=16,
         )
 
@@ -1153,7 +1153,7 @@ def test_raster_decoder_is_bounded_and_shape_checked():
     )
 
     pixels = raster.decode(
-        lambda value: np.full((3, 2, 2), value[0], dtype=np.uint8),
+        lambda value: numpy.full((3, 2, 2), value[0], dtype=numpy.uint8),
         max_pixels=12,
     )
 
@@ -1161,14 +1161,14 @@ def test_raster_decoder_is_bounded_and_shape_checked():
     assert not pixels.flags.writeable
     assert (
         raster.measured_nodata_fraction(
-            lambda value: np.full((3, 2, 2), value[0], dtype=np.uint8)
+            lambda value: numpy.full((3, 2, 2), value[0], dtype=numpy.uint8)
         )
         == 0.0
     )
 
     with pytest.raises(geospatial.GeospatialValidationError, match="limit"):
         raster.decode(
-            lambda value: np.zeros((3, 2, 2), dtype=np.uint8),
+            lambda value: numpy.zeros((3, 2, 2), dtype=numpy.uint8),
             max_pixels=11,
         )
 
@@ -1191,4 +1191,4 @@ def test_raster_decoder_rejects_metadata_mismatch():
     with pytest.raises(
         geospatial.GeospatialValidationError, match="dimensions"
     ):
-        raster.decode(lambda value: np.zeros((2, 2), dtype=np.uint8))
+        raster.decode(lambda value: numpy.zeros((2, 2), dtype=numpy.uint8))

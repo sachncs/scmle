@@ -38,13 +38,13 @@ import math
 from typing import Any
 from typing import Self
 
-import numpy as np
+import numpy
 
 MIN_CALIBRATION_ROWS = 20
 DEFAULT_COVERAGE = 0.9
 
 
-def finite_sample_quantile(scores: np.ndarray, coverage: float) -> float:
+def finite_sample_quantile(scores: numpy.ndarray, coverage: float) -> float:
     """Conformal quantile of nonconformity scores.
 
     Args:
@@ -60,12 +60,12 @@ def finite_sample_quantile(scores: np.ndarray, coverage: float) -> float:
     rank = math.ceil((count + 1) * coverage)
     if rank > count:
         return math.inf
-    return float(np.sort(scores)[rank - 1])
+    return float(numpy.sort(scores)[rank - 1])
 
 
 def weighted_quantile(
-    scores: np.ndarray,
-    weights: np.ndarray,
+    scores: numpy.ndarray,
+    weights: numpy.ndarray,
     test_weight: float,
     coverage: float,
 ) -> float:
@@ -90,8 +90,8 @@ def weighted_quantile(
     Raises:
         ValueError: On a length mismatch or a negative weight.
     """
-    values = np.asarray(scores, dtype=float)
-    mass = np.asarray(weights, dtype=float)
+    values = numpy.asarray(scores, dtype=float)
+    mass = numpy.asarray(weights, dtype=float)
     if len(values) != len(mass):
         raise ValueError("scores and weights must have the same length")
     if (mass < 0).any() or test_weight < 0:
@@ -99,20 +99,20 @@ def weighted_quantile(
     total = float(mass.sum()) + float(test_weight)
     if total <= 0:
         return math.inf
-    order = np.argsort(values, kind="stable")
-    cumulative = np.cumsum(mass[order]) / total
-    reached = np.flatnonzero(cumulative >= coverage - 1e-12)
+    order = numpy.argsort(values, kind="stable")
+    cumulative = numpy.cumsum(mass[order]) / total
+    reached = numpy.flatnonzero(cumulative >= coverage - 1e-12)
     if reached.size == 0:
         return math.inf
     return float(values[order][reached[0]])
 
 
 def weighted_margins(
-    scores: np.ndarray,
-    weights: np.ndarray,
-    test_weights: np.ndarray,
+    scores: numpy.ndarray,
+    weights: numpy.ndarray,
+    test_weights: numpy.ndarray,
     coverage: float,
-) -> np.ndarray:
+) -> numpy.ndarray:
     """`weighted_quantile` for many test weights at once.
 
     Equal to calling `weighted_quantile` once per test weight (the tests
@@ -134,32 +134,32 @@ def weighted_margins(
         ValueError: If `scores` and `weights` differ in length, or any weight
             is negative.
     """
-    values = np.asarray(scores, dtype=float)
-    mass = np.asarray(weights, dtype=float)
-    ratios = np.asarray(test_weights, dtype=float)
+    values = numpy.asarray(scores, dtype=float)
+    mass = numpy.asarray(weights, dtype=float)
+    ratios = numpy.asarray(test_weights, dtype=float)
     if len(values) != len(mass):
         raise ValueError("scores and weights must have the same length")
     if (mass < 0).any() or (ratios < 0).any():
         raise ValueError("weights must be non-negative")
-    order = np.argsort(values, kind="stable")
+    order = numpy.argsort(values, kind="stable")
     ordered = values[order]
-    cumulative = np.cumsum(mass[order])
+    cumulative = numpy.cumsum(mass[order])
     needed = coverage * (cumulative[-1] + ratios) - 1e-12 * (
         cumulative[-1] + ratios
     )
-    position = np.searchsorted(cumulative, needed, side="left")
-    margins = np.full(len(ratios), math.inf)
+    position = numpy.searchsorted(cumulative, needed, side="left")
+    margins = numpy.full(len(ratios), math.inf)
     reachable = position < len(ordered)
     margins[reachable] = ordered[position[reachable]]
     return margins
 
 
 def cv_plus_bounds(
-    fold_predictions: np.ndarray,
-    fold_of_row: np.ndarray,
-    residuals: np.ndarray,
+    fold_predictions: numpy.ndarray,
+    fold_of_row: numpy.ndarray,
+    residuals: numpy.ndarray,
     coverage: float = DEFAULT_COVERAGE,
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[numpy.ndarray, numpy.ndarray]:
     """CV+ prediction intervals from the K fold models.
 
     With `a = 1 - coverage`, the upper limit is the
@@ -185,9 +185,9 @@ def cv_plus_bounds(
     """
     if not 0.0 < coverage < 1.0:
         raise ValueError("coverage must lie strictly between 0 and 1")
-    predictions = np.atleast_2d(np.asarray(fold_predictions, dtype=float))
-    folds = np.asarray(fold_of_row, dtype=int)
-    errors = np.asarray(residuals, dtype=float)
+    predictions = numpy.atleast_2d(numpy.asarray(fold_predictions, dtype=float))
+    folds = numpy.asarray(fold_of_row, dtype=int)
+    errors = numpy.asarray(residuals, dtype=float)
     if len(folds) != len(errors):
         raise ValueError("fold_of_row and residuals must have equal length")
     if folds.size and (folds.min() < 0 or folds.max() >= predictions.shape[1]):
@@ -197,17 +197,17 @@ def cv_plus_bounds(
     upper_rank = math.ceil(coverage * (count + 1))
     lower_rank = math.floor((1.0 - coverage) * (count + 1))
     rows = len(predictions)
-    upper = np.full(rows, math.inf)
-    lower = np.full(rows, -math.inf)
+    upper = numpy.full(rows, math.inf)
+    lower = numpy.full(rows, -math.inf)
     if 1 <= upper_rank <= count:
-        upper = np.sort(centres + errors, axis=1)[:, upper_rank - 1]
+        upper = numpy.sort(centres + errors, axis=1)[:, upper_rank - 1]
     if 1 <= lower_rank <= count:
-        lower = np.sort(centres - errors, axis=1)[:, lower_rank - 1]
+        lower = numpy.sort(centres - errors, axis=1)[:, lower_rank - 1]
     return lower, upper
 
 
 def one_row_per_entity(
-    entities: Sequence[Any], rng: np.random.Generator
+    entities: Sequence[Any], rng: numpy.random.Generator
 ) -> list[int]:
     """Positions of one randomly chosen row of each entity, in entity order.
 
@@ -269,14 +269,14 @@ class ConformalCalibrator:
         Fewer than `MIN_CALIBRATION_ROWS` rows are rejected by `checked`
         with a `ValueError`.
         """
-        errors = np.abs(np.asarray(observed) - np.asarray(predicted))
+        errors = numpy.abs(numpy.asarray(observed) - numpy.asarray(predicted))
         return cls("regression", cls.checked(errors))
 
     @classmethod
     def for_classification(
         cls,
         labels: Sequence[Any],
-        probabilities: np.ndarray,
+        probabilities: numpy.ndarray,
         classes: Sequence[Any],
     ) -> Self:
         """Calibrates from out-of-sample class probabilities.
@@ -298,8 +298,8 @@ class ConformalCalibrator:
         position = {label: index for index, label in enumerate(classes)}
         if any(label not in position for label in labels):
             raise ValueError("labels outside the known classes")
-        true_probability = np.asarray(probabilities)[
-            np.arange(len(labels)), [position[label] for label in labels]
+        true_probability = numpy.asarray(probabilities)[
+            numpy.arange(len(labels)), [position[label] for label in labels]
         ]
         scores = cls.checked(1.0 - true_probability)
         by_class = tuple(
@@ -313,7 +313,7 @@ class ConformalCalibrator:
         return cls("classification", scores, tuple(classes), by_class)
 
     @staticmethod
-    def checked(scores: np.ndarray) -> tuple[float, ...]:
+    def checked(scores: numpy.ndarray) -> tuple[float, ...]:
         """Validates calibration input and freezes it.
 
         Args:
@@ -347,13 +347,13 @@ class ConformalCalibrator:
         """
         if not 0.0 < coverage < 1.0:
             raise ValueError("coverage must lie strictly between 0 and 1")
-        return finite_sample_quantile(np.asarray(self.scores), coverage)
+        return finite_sample_quantile(numpy.asarray(self.scores), coverage)
 
     def interval(
         self,
-        predictions: Sequence[float] | np.ndarray,
+        predictions: Sequence[float] | numpy.ndarray,
         coverage: float = DEFAULT_COVERAGE,
-    ) -> tuple[np.ndarray, np.ndarray]:
+    ) -> tuple[numpy.ndarray, numpy.ndarray]:
         """Prediction intervals for a regression model.
 
         Args:
@@ -370,7 +370,7 @@ class ConformalCalibrator:
         """
         if self.kind != "regression":
             raise ValueError("intervals need a regression calibrator")
-        values = np.asarray(predictions, dtype=float)
+        values = numpy.asarray(predictions, dtype=float)
         margin = self.margin(coverage)
         return values - margin, values + margin
 
@@ -396,7 +396,7 @@ class ConformalCalibrator:
         if self.kind != "classification" or not self.class_scores:
             raise ValueError("this calibrator has no per-class scores")
         return tuple(
-            finite_sample_quantile(np.asarray(scores), coverage)
+            finite_sample_quantile(numpy.asarray(scores), coverage)
             for scores in self.class_scores
         )
 
@@ -421,11 +421,11 @@ class ConformalCalibrator:
 
     def weighted_interval(
         self,
-        predictions: Sequence[float] | np.ndarray,
-        calibration_weights: Sequence[float] | np.ndarray,
-        test_weights: Sequence[float] | np.ndarray,
+        predictions: Sequence[float] | numpy.ndarray,
+        calibration_weights: Sequence[float] | numpy.ndarray,
+        test_weights: Sequence[float] | numpy.ndarray,
         coverage: float = DEFAULT_COVERAGE,
-    ) -> tuple[np.ndarray, np.ndarray]:
+    ) -> tuple[numpy.ndarray, numpy.ndarray]:
         """Intervals under covariate shift (weighted conformal).
 
         Args:
@@ -447,13 +447,13 @@ class ConformalCalibrator:
         """
         if self.kind != "regression":
             raise ValueError("intervals need a regression calibrator")
-        values = np.asarray(predictions, dtype=float)
-        ratios = np.asarray(test_weights, dtype=float)
+        values = numpy.asarray(predictions, dtype=float)
+        ratios = numpy.asarray(test_weights, dtype=float)
         if len(values) != len(ratios):
             raise ValueError("predictions and test_weights differ in length")
         margins = weighted_margins(
-            np.asarray(self.scores),
-            np.asarray(calibration_weights),
+            numpy.asarray(self.scores),
+            numpy.asarray(calibration_weights),
             ratios,
             coverage,
         )
@@ -461,7 +461,7 @@ class ConformalCalibrator:
 
     def sets(
         self,
-        probabilities: np.ndarray,
+        probabilities: numpy.ndarray,
         coverage: float = DEFAULT_COVERAGE,
         conditional: str | None = None,
     ) -> list[list[Any]]:
@@ -486,12 +486,12 @@ class ConformalCalibrator:
             raise ValueError("sets need a classification calibrator")
         if conditional not in (None, "class"):
             raise ValueError("conditional must be None or 'class'")
-        margin: float | np.ndarray = (
-            np.asarray(self.class_margins(coverage))
+        margin: float | numpy.ndarray = (
+            numpy.asarray(self.class_margins(coverage))
             if conditional == "class"
             else self.margin(coverage)
         )
-        keep = 1.0 - np.asarray(probabilities) <= margin
+        keep = 1.0 - numpy.asarray(probabilities) <= margin
         return [
             [
                 label

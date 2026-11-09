@@ -9,8 +9,8 @@ accepted wherever data is, and results can be exported as Arrow tables.
 import pathlib
 from typing import Any
 
-import pandas as pd
-import pyarrow as pa
+import pandas
+import pyarrow
 
 from scmle.contracts import errors
 
@@ -28,14 +28,14 @@ def is_tabular(data: Any) -> bool:
         protocol, `to_pandas()` or `collect()`; False otherwise.
     """
     return (
-        isinstance(data, pd.DataFrame)
+        isinstance(data, pandas.DataFrame)
         or hasattr(data, ARROW_STREAM)
         or hasattr(data, "to_pandas")
         or hasattr(data, "collect")
     )
 
 
-def to_pandas(data: Any) -> pd.DataFrame:
+def to_pandas(data: Any) -> pandas.DataFrame:
     """Converts any supported in-memory table to a pandas DataFrame.
 
     Args:
@@ -48,14 +48,14 @@ def to_pandas(data: Any) -> pd.DataFrame:
     Raises:
         DataError: If the object is not tabular.
     """
-    if isinstance(data, pd.DataFrame):
+    if isinstance(data, pandas.DataFrame):
         return data.copy()
     if hasattr(data, "collect"):  # Polars LazyFrame and similar.
         data = data.collect()
-    if isinstance(data, pa.Table):
+    if isinstance(data, pyarrow.Table):
         return data.to_pandas()
     if hasattr(data, ARROW_STREAM):
-        return pa.table(data).to_pandas()
+        return pyarrow.table(data).to_pandas()
     if hasattr(data, "to_pandas"):
         return data.to_pandas()
     if isinstance(data, (str, pathlib.Path)):
@@ -63,7 +63,7 @@ def to_pandas(data: Any) -> pd.DataFrame:
     raise errors.DataError(f"unsupported table type {type(data).__name__}")
 
 
-def to_arrow(frame: pd.DataFrame) -> pa.Table:
+def to_arrow(frame: pandas.DataFrame) -> pyarrow.Table:
     """Exports a frame as an Arrow table (zero-copy where possible).
 
     Args:
@@ -72,4 +72,4 @@ def to_arrow(frame: pd.DataFrame) -> pa.Table:
     Returns:
         An Arrow table with the frame's columns; the index is not included.
     """
-    return pa.Table.from_pandas(frame, preserve_index=False)
+    return pyarrow.Table.from_pandas(frame, preserve_index=False)

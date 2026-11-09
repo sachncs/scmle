@@ -18,7 +18,7 @@ import random
 import re
 from typing import Any
 
-from scmle.contracts import data as data_contracts
+from scmle.contracts import data
 from scmle.contracts import errors
 
 
@@ -420,8 +420,8 @@ class DocumentCurationReport:
     language_counts: dict[str, int]
     format_counts: dict[str, int]
     label_counts: dict[str, int]
-    quality_findings: tuple[data_contracts.CurationFinding, ...]
-    risk_findings: tuple[data_contracts.CurationFinding, ...]
+    quality_findings: tuple[data.CurationFinding, ...]
+    risk_findings: tuple[data.CurationFinding, ...]
     max_characters: int
     max_tokens: int
     layout_coverage: float = 0.0
@@ -439,16 +439,16 @@ class DocumentCurationReport:
     @property
     def unresolved_blocking_findings(
         self,
-    ) -> tuple[data_contracts.CurationFinding, ...]:
+    ) -> tuple[data.CurationFinding, ...]:
         """The blocking findings without a safe review disposition.
 
         A disposition is safe when it is resolved, waived or a false
         positive. Quality findings come before risk findings.
         """
         safe_dispositions = {
-            data_contracts.FindingDisposition.RESOLVED,
-            data_contracts.FindingDisposition.WAIVED,
-            data_contracts.FindingDisposition.FALSE_POSITIVE,
+            data.FindingDisposition.RESOLVED,
+            data.FindingDisposition.WAIVED,
+            data.FindingDisposition.FALSE_POSITIVE,
         }
         return tuple(
             finding
@@ -837,8 +837,8 @@ class DocumentDataset:
             format_counts[sample.format.value] += 1
             label_counts[label_key(sample.label)] += 1
 
-        quality_findings: list[data_contracts.CurationFinding] = []
-        risk_findings: list[data_contracts.CurationFinding] = []
+        quality_findings: list[data.CurationFinding] = []
+        risk_findings: list[data.CurationFinding] = []
         layouts = [
             sample.layout
             for sample in self.samples
@@ -863,12 +863,12 @@ class DocumentDataset:
 
         def create_finding(
             finding_id: str,
-            severity: data_contracts.FindingSeverity,
+            severity: data.FindingSeverity,
             scope: dict[str, Any],
             evidence: dict[str, Any],
             remediation: str,
             blocking: bool,
-        ) -> data_contracts.CurationFinding:
+        ) -> data.CurationFinding:
             """Creates a document-specific finding with one stable rule.
 
             Args:
@@ -883,7 +883,7 @@ class DocumentDataset:
                 An open finding with confidence 1.0 and owner
                 ``data-curation``.
             """
-            return data_contracts.CurationFinding(
+            return data.CurationFinding(
                 finding_id=finding_id,
                 rule_version="document-curation.v1",
                 severity=severity,
@@ -893,7 +893,7 @@ class DocumentDataset:
                 remediation=remediation,
                 owner="data-curation",
                 reviewer=None,
-                disposition=data_contracts.FindingDisposition.OPEN,
+                disposition=data.FindingDisposition.OPEN,
                 blocking=blocking,
             )
 
@@ -901,7 +901,7 @@ class DocumentDataset:
             quality_findings.append(
                 create_finding(
                     "quality.document-ocr-confidence-missing",
-                    data_contracts.FindingSeverity.WARNING,
+                    data.FindingSeverity.WARNING,
                     {
                         "document_ids": [
                             sample.document_id
@@ -920,7 +920,7 @@ class DocumentDataset:
             quality_findings.append(
                 create_finding(
                     "quality.duplicate-document-content",
-                    data_contracts.FindingSeverity.WARNING,
+                    data.FindingSeverity.WARNING,
                     {"groups": [list(group) for group in duplicate_groups]},
                     {"group_count": len(duplicate_groups)},
                     "Confirm duplicates are intentional or deduplicate "
@@ -933,7 +933,7 @@ class DocumentDataset:
             risk_findings.append(
                 create_finding(
                     "risk.document-sensitive-content",
-                    data_contracts.FindingSeverity.ERROR,
+                    data.FindingSeverity.ERROR,
                     {"document_ids": sorted(sensitive_document_ids)},
                     {"match_counts": dict(sorted(sensitive_counts.items()))},
                     "Redact or explicitly govern detected sensitive content "
@@ -949,7 +949,7 @@ class DocumentDataset:
             quality_findings.append(
                 create_finding(
                     "quality.profile-truncated",
-                    data_contracts.FindingSeverity.INFO,
+                    data.FindingSeverity.INFO,
                     {"document_ids": list(truncated_ids)},
                     {
                         "max_characters": max_characters,
@@ -970,7 +970,7 @@ class DocumentDataset:
             quality_findings.append(
                 create_finding(
                     "quality.unknown-language",
-                    data_contracts.FindingSeverity.WARNING,
+                    data.FindingSeverity.WARNING,
                     {"document_ids": list(unknown_ids)},
                     {"count": len(unknown_ids)},
                     "Confirm language coverage and configure an appropriate "
@@ -988,7 +988,7 @@ class DocumentDataset:
                 risk_findings.append(
                     create_finding(
                         "risk.conflicting-duplicate-labels",
-                        data_contracts.FindingSeverity.ERROR,
+                        data.FindingSeverity.ERROR,
                         {"document_ids": list(group)},
                         {"labels": sorted(labels)},
                         "Resolve the label conflict or explicitly exclude "
@@ -1003,7 +1003,7 @@ class DocumentDataset:
             risk_findings.append(
                 create_finding(
                     "risk.mixed-label-state",
-                    data_contracts.FindingSeverity.WARNING,
+                    data.FindingSeverity.WARNING,
                     {"dataset": self.content_hash},
                     {"label_counts": dict(label_counts)},
                     "Declare whether unlabeled samples are valid for the "
@@ -1027,7 +1027,7 @@ class DocumentDataset:
             quality_findings.append(
                 create_finding(
                     "quality.document-source-traceability-incomplete",
-                    data_contracts.FindingSeverity.WARNING,
+                    data.FindingSeverity.WARNING,
                     {
                         "document_ids": [
                             sample.document_id for sample in partially_traceable

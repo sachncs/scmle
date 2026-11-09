@@ -11,11 +11,11 @@ from scmle.core import retry
 from scmle.data.store import objectstore
 from scmle.runners import base
 from scmle.runners import local
-from scmle.workflow import definition as wd
+from scmle.workflow import definition
 from scmle.workflow import executor as ex
 from scmle.workflow import handlers
 from scmle.workflow import schedule as sched
-from tests import support_runners as sr
+from tests import support_runners
 
 KEYS = {"ml-owner": "owner-signing-key-0001", "second": "second-key-0002"}
 
@@ -45,7 +45,7 @@ def fast():
 def pipeline(**changes):
     values = {"approvers": ("ml-owner", "second")}
     values.update(changes)
-    flow = wd.standard_workflow(**values)
+    flow = definition.standard_workflow(**values)
     steps = tuple(
         dataclasses.replace(
             step,
@@ -55,7 +55,7 @@ def pipeline(**changes):
         )
         for step in flow.steps
     )
-    return wd.Workflow(
+    return definition.Workflow(
         flow.name,
         flow.version,
         steps,
@@ -88,7 +88,7 @@ class Recorder:
         return {
             s.name: self.handler(s.name)
             for s in workflow.steps
-            if s.kind is not wd.StepKind.APPROVAL
+            if s.kind is not definition.StepKind.APPROVAL
         }
 
     def names(self):
@@ -119,7 +119,7 @@ def approve(executor, record, who="ml-owner", decision="approve"):
 
 
 def test_the_standard_pipeline_is_valid_and_ordered():
-    flow = wd.standard_workflow()
+    flow = definition.standard_workflow()
     assert flow.order() == (
         "ingest",
         "train",
@@ -136,44 +136,54 @@ def test_the_standard_pipeline_is_valid_and_ordered():
         ("batch_predict",),
     )
     assert flow.has_approval_upstream("batch_predict")
-    assert flow.digest() == wd.standard_workflow().digest()
-    assert flow.digest() != wd.standard_workflow(version="2").digest()
+    assert flow.digest() == definition.standard_workflow().digest()
+    assert flow.digest() != definition.standard_workflow(version="2").digest()
 
 
 def test_invalid_definitions_are_refused():
-    s = wd.StepKind
+    s = definition.StepKind
     with pytest.raises(errors.ConfigError, match="cycle"):
-        wd.Workflow(
+        definition.Workflow(
             "w",
             "1",
             (
-                wd.Step("a", s.INGEST, ("b",)),
-                wd.Step("b", s.TRAIN, ("a",)),
+                definition.Step("a", s.INGEST, ("b",)),
+                definition.Step("b", s.TRAIN, ("a",)),
             ),
         )
     with pytest.raises(errors.ConfigError, match="unknown"):
-        wd.Workflow("w", "1", (wd.Step("a", s.INGEST, ("zzz",)),))
+        definition.Workflow(
+            "w", "1", (definition.Step("a", s.INGEST, ("zzz",)),)
+        )
     with pytest.raises(errors.ConfigError, match="unique"):
-        wd.Workflow("w", "1", (wd.Step("a", s.INGEST), wd.Step("a", s.TRAIN)))
+        definition.Workflow(
+            "w",
+            "1",
+            (definition.Step("a", s.INGEST), definition.Step("a", s.TRAIN)),
+        )
     with pytest.raises(errors.ConfigError, match="approved action"):
-        wd.Workflow(
+        definition.Workflow(
             "w",
             "1",
             (
-                wd.Step("a", s.TRAIN),
-                wd.Step("b", s.BATCH_PREDICT, ("a",), effect=wd.APPROVED),
+                definition.Step("a", s.TRAIN),
+                definition.Step(
+                    "b", s.BATCH_PREDICT, ("a",), effect=definition.APPROVED
+                ),
             ),
         )
     with pytest.raises(errors.ConfigError, match="approvers"):
-        wd.Step("approve", s.APPROVAL)
+        definition.Step("approve", s.APPROVAL)
     with pytest.raises(errors.ConfigError):
-        wd.Step("bad name", s.TRAIN)
+        definition.Step("bad name", s.TRAIN)
     with pytest.raises(errors.ConfigError):
-        wd.Step("a", s.TRAIN, ("a",))
+        definition.Step("a", s.TRAIN, ("a",))
     with pytest.raises(errors.ConfigError):
-        wd.Schedule(0)
+        definition.Schedule(0)
     with pytest.raises(errors.ConfigError):
-        wd.Workflow("w", "1", (wd.Step("a", s.TRAIN),), max_concurrent_runs=0)
+        definition.Workflow(
+            "w", "1", (definition.Step("a", s.TRAIN),), max_concurrent_runs=0
+        )
 
 
 # ---- executor -------------------------------------------------------------
@@ -327,10 +337,10 @@ def test_a_crashed_executor_is_taken_over_after_its_lease(store):
     executor = executor_for(store, flow, recorder, clock, lease_seconds=300.0)
 
     def dies(context):
-        raise sr.Killed()
+        raise support_runners.Killed()
 
     recorder.behaviour["train"] = dies
-    with pytest.raises(sr.Killed):
+    with pytest.raises(support_runners.Killed):
         executor.start("req-1", "alice")
     run_id = ex.run_id_for(flow, "req-1")
     # A killed process cannot release its lease.
@@ -389,9 +399,14 @@ def test_a_step_over_its_own_budget_fails(store):
     clock = Clock()
     recorder = Recorder(clock)
     steps = [
-        wd.Step("ingest", wd.StepKind.INGEST, cost_budget=1.0, retries=fast()),
+        definition.Step(
+            "ingest",
+            definition.StepKind.INGEST,
+            cost_budget=1.0,
+            retries=fast(),
+        ),
     ]
-    flow = wd.Workflow("solo", "1", tuple(steps))
+    flow = definition.Workflow("solo", "1", tuple(steps))
     recorder.behaviour["ingest"] = lambda context: context.spend(2.0)
     record = executor_for(store, flow, recorder, clock).start("x", "a")
     assert record["state"] == "failed"
@@ -403,15 +418,19 @@ def test_a_step_over_its_own_budget_fails(store):
 
 def test_independent_steps_run_in_parallel_and_a_group_limit_holds(store):
     clock = Clock()
-    s = wd.StepKind
-    flow = wd.Workflow(
+    s = definition.StepKind
+    flow = definition.Workflow(
         "par",
         "1",
         (
-            wd.Step("a", s.INGEST, retries=fast()),
-            wd.Step("b", s.INGEST, retries=fast()),
-            wd.Step("c", s.TRAIN, concurrency_group="gpu", retries=fast()),
-            wd.Step("d", s.TRAIN, concurrency_group="gpu", retries=fast()),
+            definition.Step("a", s.INGEST, retries=fast()),
+            definition.Step("b", s.INGEST, retries=fast()),
+            definition.Step(
+                "c", s.TRAIN, concurrency_group="gpu", retries=fast()
+            ),
+            definition.Step(
+                "d", s.TRAIN, concurrency_group="gpu", retries=fast()
+            ),
         ),
         max_parallel=4,
     )
@@ -497,7 +516,9 @@ def test_a_changed_definition_cannot_continue_an_old_run(store):
     first = executor_for(store, pipeline(), recorder, clock)
     record = first.start("req-1", "alice")
     changed = pipeline()
-    changed = wd.Workflow(changed.name, "2", changed.steps, changed.schedule)
+    changed = definition.Workflow(
+        changed.name, "2", changed.steps, changed.schedule
+    )
     assert ex.run_id_for(changed, "req-1") != record["run_id"]
     other = executor_for(store, changed, recorder, clock)
     with pytest.raises(errors.ConfigError, match="different workflow"):
@@ -506,23 +527,25 @@ def test_a_changed_definition_cannot_continue_an_old_run(store):
 
 def test_every_non_approval_step_needs_a_handler(store):
     with pytest.raises(errors.ConfigError, match="no handler"):
-        ex.LocalExecutor(wd.standard_workflow(), store, {})
+        ex.LocalExecutor(definition.standard_workflow(), store, {})
 
 
 # ---- schedule -------------------------------------------------------------
 
 
 def scheduled(policy, name=None, **options):
-    schedule = wd.Schedule(3600.0, 0.0, policy, **options)
+    schedule = definition.Schedule(3600.0, 0.0, policy, **options)
     flow = pipeline()
-    return wd.Workflow(name or flow.name, flow.version, flow.steps, schedule)
+    return definition.Workflow(
+        name or flow.name, flow.version, flow.steps, schedule
+    )
 
 
 def test_missed_slots_follow_the_declared_policy(store):
     for policy, expected_runs, expected_missed in (
-        (wd.CatchUp.RUN_ALL, 5, 0),
-        (wd.CatchUp.LATEST_ONLY, 1, 4),
-        (wd.CatchUp.SKIP, 0, 5),
+        (definition.CatchUp.RUN_ALL, 5, 0),
+        (definition.CatchUp.LATEST_ONLY, 1, 4),
+        (definition.CatchUp.SKIP, 0, 5),
     ):
         flow = scheduled(policy, f"wf-{policy.value}")
         clock = Clock(5 * 3600.0 + 2000.0)
@@ -534,7 +557,7 @@ def test_missed_slots_follow_the_declared_policy(store):
         assert len(report.missed) == expected_missed, policy
         slots = [slot for slot, ignored in report.ran]
         assert slots == sorted(slots)
-    current = scheduled(wd.CatchUp.SKIP, "wf-current")
+    current = scheduled(definition.CatchUp.SKIP, "wf-current")
     clock = Clock(5 * 3600.0 + 10.0)
     executor = executor_for(store, current, Recorder(clock), clock)
     scheduler = sched.Scheduler(current, store)
@@ -545,7 +568,7 @@ def test_missed_slots_follow_the_declared_policy(store):
 
 
 def test_the_first_tick_does_not_backfill_and_a_second_tick_is_quiet(store):
-    flow = scheduled(wd.CatchUp.RUN_ALL)
+    flow = scheduled(definition.CatchUp.RUN_ALL)
     clock = Clock(10 * 3600.0 + 1.0)
     recorder = Recorder(clock)
     executor = executor_for(store, flow, recorder, clock)
@@ -561,7 +584,7 @@ def test_the_first_tick_does_not_backfill_and_a_second_tick_is_quiet(store):
 
 
 def test_a_scheduler_that_lost_its_state_does_not_repeat_finished_slots(store):
-    flow = scheduled(wd.CatchUp.LATEST_ONLY)
+    flow = scheduled(definition.CatchUp.LATEST_ONLY)
     clock = Clock(3600.0 + 1.0)
     recorder = Recorder(clock)
     executor = executor_for(store, flow, recorder, clock)
@@ -573,7 +596,7 @@ def test_a_scheduler_that_lost_its_state_does_not_repeat_finished_slots(store):
 
 
 def test_a_slot_that_cannot_start_is_deferred_and_stays_due(store):
-    flow = scheduled(wd.CatchUp.LATEST_ONLY)
+    flow = scheduled(definition.CatchUp.LATEST_ONLY)
     clock = Clock(3600.0 + 1.0)
     recorder = Recorder(clock)
     executor = executor_for(store, flow, recorder, clock)
@@ -602,11 +625,11 @@ def test_a_schedule_is_required():
 
 def test_a_training_step_runs_through_a_runner_and_resumes_inside_it(tmp_path):
     clock = Clock()
-    fake = sr.FakeClock()
+    fake = support_runners.FakeClock()
     durable = objectstore.LocalObjectStore(tmp_path / "jobs")
     runner = local.LocalRunner(
         durable,
-        sr.toy_workload(fake),
+        support_runners.toy_workload(fake),
         serving_identity="serve",
         clock=base.Clock(fake.now, fake.sleep),
         poll_seconds=1.0,

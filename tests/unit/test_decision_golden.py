@@ -7,10 +7,10 @@ with SCMLE_WRITE_GOLDEN=1 only after a reviewed change of behaviour.
 from fractions import Fraction
 from pathlib import Path
 
-import numpy as np
+import numpy
 import pytest
 
-from scmle.data.charter import decision as charter
+from scmle.data.charter import decision
 from scmle.data.framing import costs
 from scmle.decision import anytime
 from scmle.decision import constraints
@@ -34,14 +34,14 @@ def plan(**overrides):
         "n_max": 6000,
         "alpha_promote": Fraction(1, 50),
         "alpha_rollback": Fraction(1, 100),
-        "guardrails": (charter.Guardrail("bounce", margin=0.05),),
+        "guardrails": (decision.Guardrail("bounce", margin=0.05),),
     }
     values.update(overrides)
-    return charter.RolloutPlan(**values)
+    return decision.RolloutPlan(**values)
 
 
 def traffic(n, seed, lift=0.04, bounce_lift=0.0, base=0.10):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     arm = (rng.random(n) < 0.5).astype(float)
     primary = (rng.random(n) < base + lift * arm).astype(float)
     bounce = (rng.random(n) < 0.2 + bounce_lift * arm).astype(float)
@@ -62,48 +62,48 @@ def cost_model():
 
 
 def score_world(n, seed):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     p = rng.beta(1, 6, n)
     y = (rng.random(n) < p).astype(float)
     return p, y
 
 
 def fairness(criterion="equal_opportunity", gap=0.05):
-    return charter.FairnessConstraint(
+    return decision.FairnessConstraint(
         "sex", criterion, gap, "group_thresholds", "counsel"
     )
 
 
 def fair_world(n, seed, shift=0.6):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     groups = rng.integers(0, 2, n)
     y = (rng.random(n) < 0.3).astype(float)
     centre = y * 1.5 - groups * shift * y
-    score = 1 / (1 + np.exp(-(rng.normal(centre - 0.75, 1.0))))
+    score = 1 / (1 + numpy.exp(-(rng.normal(centre - 0.75, 1.0))))
     return score, y, groups
 
 
 def bandit(n, seed):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     x = rng.normal(size=(n, 1))
-    mu1 = np.clip(0.5 + 0.25 * np.tanh(x[:, 0]), 0.05, 0.95)
-    behaviour = np.column_stack([1 - mu1, mu1])
+    mu1 = numpy.clip(0.5 + 0.25 * numpy.tanh(x[:, 0]), 0.05, 0.95)
+    behaviour = numpy.column_stack([1 - mu1, mu1])
     action = (rng.random(n) < mu1).astype(int)
-    mean = np.column_stack([0.3 + 0 * x[:, 0], 0.3 + 0.2 * (x[:, 0] > 0)])
-    reward = (rng.random(n) < mean[np.arange(n), action]).astype(float)
+    mean = numpy.column_stack([0.3 + 0 * x[:, 0], 0.3 + 0.2 * (x[:, 0] > 0)])
+    reward = (rng.random(n) < mean[numpy.arange(n), action]).astype(float)
     treat = (x[:, 0] > 0).astype(float)
-    target = np.column_stack([1 - treat, treat])
+    target = numpy.column_stack([1 - treat, treat])
     log = ope.LoggedBandit(action, reward, behaviour, target, mean)
     return x, log
 
 
 def case_anytime():
     stream = anytime.Stream(0.0, 1.0, 0.4)
-    values = np.random.default_rng(1).random(40) * 0.5 + 0.3
+    values = numpy.random.default_rng(1).random(40) * 0.5 + 0.3
     process = anytime.EProcess(stream)
     process.update(values[:25])
     process.update(values[25:])
-    arm = (np.arange(40) % 2).astype(float)
+    arm = (numpy.arange(40) % 2).astype(float)
     return {
         "grid": anytime.bet_grid(0.4, 5),
         "wealth": anytime.log_wealth(values[:6], 0.4, 4),
@@ -163,7 +163,7 @@ def case_rollout():
     arm2, primary2, guards2 = traffic(6000, 3, bounce_lift=0.08)
     harm = rollout.Rollout(plan(), "e2", 0.02).observe(arm2, primary2, guards2)
     monitor = rollout.RollbackMonitor(0.01, 0.05)
-    rng = np.random.default_rng(5)
+    rng = numpy.random.default_rng(5)
     outcomes = [
         monitor.observe(
             (rng.random(200) < 0.3).astype(float),
@@ -178,7 +178,7 @@ def case_rollout():
         "hash": rollout.row_hash({"a": 1, "b": [1, 2]}),
         "stream": rollout.metric_stream(plan(), None),
         "stream_guard": rollout.metric_stream(
-            plan(), charter.Guardrail("bounce", margin=0.05)
+            plan(), decision.Guardrail("bounce", margin=0.05)
         ),
     }
 
@@ -195,7 +195,7 @@ def case_threshold():
         "cross": threshold.cross_fitted(p**0.6, y, 1)[:20],
         "choice": threshold.choose_threshold(p, y, model, replicates=60),
         "choice_skew": threshold.choose_threshold(
-            np.clip(p**0.5, 0, 1), y, model, replicates=60
+            numpy.clip(p**0.5, 0, 1), y, model, replicates=60
         ),
     }
 
@@ -230,14 +230,14 @@ def case_ope():
     for name in ope.ESTIMATORS:
         out[name] = ope.estimate_value(log, name)
         out[name + "_clip"] = ope.estimate_value(log, name, clip=3.0)
-    baseline = np.column_stack([np.ones(1500), np.zeros(1500)])
+    baseline = numpy.column_stack([numpy.ones(1500), numpy.zeros(1500)])
     out["diff"] = ope.difference_value(log, baseline)
     out["weights"] = ope.weights(log, 2.0)
     out["terms"] = ope.terms(log, "dr", None)
     out["support"] = ope.support_violations(log, 0.4)
-    out["mean"] = ope.mean_interval(np.arange(10.0), None, 0.9)
+    out["mean"] = ope.mean_interval(numpy.arange(10.0), None, 0.9)
     out["mean_c"] = ope.mean_interval(
-        np.arange(12.0), np.repeat(np.arange(4), 3), 0.9
+        numpy.arange(12.0), numpy.repeat(numpy.arange(4), 3), 0.9
     )
     out["policy"] = ope.fit_threshold_policy(log, x[:, 0], penalty=0.01)
     model = ope.fit_outcome_model(x, log.actions, log.rewards, 2)
@@ -258,11 +258,11 @@ def case_netbenefit():
             acts,
             (0.02, 0.15),
             incumbent=(p > 0.2).astype(float),
-            clusters=np.arange(1500) // 5,
+            clusters=numpy.arange(1500) // 5,
             replicates=60,
         ),
         "span": netbenefit.useful_span(
-            np.array([0.1, 0.2, 0.3]), np.array([False, True, True])
+            numpy.array([0.1, 0.2, 0.3]), numpy.array([False, True, True])
         ),
         "factorize": netbenefit.factorize(["a", "b", "a"]),
     }

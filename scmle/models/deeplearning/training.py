@@ -8,7 +8,7 @@ import dataclasses
 import math
 from typing import Any
 
-import numpy as np
+import numpy
 
 AUTO = "auto"
 MIN_BATCH = 32
@@ -127,9 +127,9 @@ class TrainingMonitor:
             A verdict (`ok`, `diverged`, `exploding`, `vanishing` or
             `stalled`) with the statistics behind it.
         """
-        norms = np.asarray(self.norms)
-        median = float(np.median(norms)) if norms.size else 0.0
-        peak = float(np.max(norms)) if norms.size else 0.0
+        norms = numpy.asarray(self.norms)
+        median = float(numpy.median(norms)) if norms.size else 0.0
+        peak = float(numpy.max(norms)) if norms.size else 0.0
         improvement = 0.0
         if len(self.losses) > 1 and abs(self.losses[0]) > 0:
             improvement = (self.losses[0] - self.losses[-1]) / abs(

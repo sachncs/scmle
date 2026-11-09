@@ -6,10 +6,10 @@ from pathlib import Path
 import subprocess
 import sys
 
-import numpy as np
+import numpy
 import pytest
 
-from scmle.contracts import qualification as q
+from scmle.contracts import qualification
 from scmle.core import randomness
 
 ROOT = Path(__file__).parents[2]
@@ -63,7 +63,7 @@ def test_distinct_components_are_uncorrelated():
     left = randomness.component_rng(11, "alpha").standard_normal(size)
     right = randomness.component_rng(11, "beta").standard_normal(size)
     # Under independence |r| has sd 1/sqrt(n) ~ 0.007; 0.05 is ~7 sd.
-    assert abs(float(np.corrcoef(left, right)[0, 1])) < 0.05
+    assert abs(float(numpy.corrcoef(left, right)[0, 1])) < 0.05
 
 
 def test_component_names_are_hashed_stably_not_with_python_hash():
@@ -145,4 +145,4 @@ def test_check_lists_are_bit_identical_across_processes():
         "beta",
         "gamma",
     ]
-    assert all(q.Check.from_dict(record) for record in records)
+    assert all(qualification.Check.from_dict(record) for record in records)

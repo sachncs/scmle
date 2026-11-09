@@ -15,7 +15,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-import numpy as np
+import numpy
 
 DIGITS = 9
 
@@ -29,9 +29,9 @@ def snapshot(value: Any) -> Any:
         }
     if isinstance(value, enum.Enum):
         return str(value.value)
-    if isinstance(value, np.ndarray):
+    if isinstance(value, numpy.ndarray):
         return [snapshot(item) for item in value.tolist()]
-    if isinstance(value, np.generic):
+    if isinstance(value, numpy.generic):
         return snapshot(value.item())
     if isinstance(value, bool) or value is None or isinstance(value, str):
         return value

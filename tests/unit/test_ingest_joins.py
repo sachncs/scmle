@@ -1,9 +1,9 @@
 """Join discovery by exact inclusion with conservative acceptance."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
-from benchmarks.qualification import ingest_worlds as worlds
+from benchmarks.qualification import ingest_worlds
 from scmle.data.ingest import budget
 from scmle.data.ingest import grain
 from scmle.data.ingest import joins
@@ -23,17 +23,19 @@ def graph_of(db, tables, declared=(), eps_fk=0.0):
 
 
 def two_tables(child_col="customer_id", child_values=None, parents=40):
-    db = worlds.new_database("j")
-    worlds.load(db, "customer", pd.DataFrame({"id": np.arange(1, parents + 1)}))
+    db = ingest_worlds.new_database("j")
+    ingest_worlds.load(
+        db, "customer", pandas.DataFrame({"id": numpy.arange(1, parents + 1)})
+    )
     values = (
         child_values
         if child_values is not None
-        else np.arange(1, 101) % parents + 1
+        else numpy.arange(1, 101) % parents + 1
     )
-    worlds.load(
+    ingest_worlds.load(
         db,
         "fact",
-        pd.DataFrame({"id": np.arange(100), child_col: values}),
+        pandas.DataFrame({"id": numpy.arange(100), child_col: values}),
     )
     return db
 
@@ -61,7 +63,7 @@ def test_coincidental_inclusion_stays_a_candidate():
 
 
 def test_partial_containment_is_candidate_or_absent():
-    values = np.arange(1, 101) % 60 + 1  # 41..60 have no parent
+    values = numpy.arange(1, 101) % 60 + 1  # 41..60 have no parent
     db = two_tables(child_values=values)
     strict = graph_of(db, ["customer", "fact"], eps_fk=0.0)[3]
     assert find(strict, "customer_id") == []
@@ -77,7 +79,7 @@ def test_declared_key_is_accepted_and_violation_is_flagged():
     graph = graph_of(db, ["customer", "fact"], declared)[3]
     link = find(graph, "qty")[0]
     assert link.declared and link.decision == joins.ACCEPTED
-    bad = two_tables(child_values=np.arange(1, 101) + 30)
+    bad = two_tables(child_values=numpy.arange(1, 101) + 30)
     broken = (joins.DeclaredKey("fact", ("customer_id",), "customer", ("id",)),)
     graph = graph_of(bad, ["customer", "fact"], broken)[3]
     link = find(graph, "customer_id")[0]
@@ -85,17 +87,19 @@ def test_declared_key_is_accepted_and_violation_is_flagged():
 
 
 def test_twin_parents_are_resolved_by_table_name_or_asked():
-    db = worlds.new_database("twin")
+    db = ingest_worlds.new_database("twin")
     for name in ("user", "account"):
-        worlds.load(db, name, pd.DataFrame({"id": np.arange(1, 51)}))
-    worlds.load(
+        ingest_worlds.load(
+            db, name, pandas.DataFrame({"id": numpy.arange(1, 51)})
+        )
+    ingest_worlds.load(
         db,
         "fact",
-        pd.DataFrame(
+        pandas.DataFrame(
             {
-                "id": np.arange(100),
-                "user_id": np.arange(100) % 50 + 1,
-                "owner_id": np.arange(100) % 50 + 1,
+                "id": numpy.arange(100),
+                "user_id": numpy.arange(100) % 50 + 1,
+                "owner_id": numpy.arange(100) % 50 + 1,
             }
         ),
     )
@@ -111,9 +115,13 @@ def test_twin_parents_are_resolved_by_table_name_or_asked():
 
 
 def test_many_to_many_is_reported_and_never_accepted():
-    db = worlds.new_database("m2m")
-    worlds.load(db, "a", pd.DataFrame({"id": range(30), "tag": [0, 1, 2] * 10}))
-    worlds.load(db, "b", pd.DataFrame({"id": range(30), "tag": [0, 1, 2] * 10}))
+    db = ingest_worlds.new_database("m2m")
+    ingest_worlds.load(
+        db, "a", pandas.DataFrame({"id": range(30), "tag": [0, 1, 2] * 10})
+    )
+    ingest_worlds.load(
+        db, "b", pandas.DataFrame({"id": range(30), "tag": [0, 1, 2] * 10})
+    )
     source, catalog, scans, graph = graph_of(db, ["a", "b"])
     found = joins.many_to_many(source, catalog, scans)
     assert [link.cardinality for link in found] == [joins.MANY_TO_MANY]
@@ -122,12 +130,12 @@ def test_many_to_many_is_reported_and_never_accepted():
 
 
 def many_to_many_world():
-    db = worlds.new_database("m2m-budget")
+    db = ingest_worlds.new_database("m2m-budget")
     for name in ("a", "b", "c"):
-        worlds.load(
+        ingest_worlds.load(
             db,
             name,
-            pd.DataFrame({"id": range(30), "tag": [0, 1, 2] * 10}),
+            pandas.DataFrame({"id": range(30), "tag": [0, 1, 2] * 10}),
         )
     return db
 
@@ -163,7 +171,7 @@ def test_many_to_many_without_a_meter_or_with_room_is_unchanged():
 
 
 def test_paths_go_up_and_down_to_depth_two_without_revisiting():
-    jw = worlds.surrogate_world(4)
+    jw = ingest_worlds.surrogate_world(4)
     source = jw.db.source()
     catalog = profile.profile_catalog(source, jw.tables)
     scans = {t.name: grain.infer_keys(source, t) for t in catalog.tables}
@@ -190,7 +198,7 @@ def test_paths_go_up_and_down_to_depth_two_without_revisiting():
 def test_surrogate_worlds_have_no_spurious_accepts():
     spurious = 0
     for seed in range(30):
-        jw = worlds.surrogate_world(seed)
+        jw = ingest_worlds.surrogate_world(seed)
         graph = graph_of(jw.db, jw.tables)[3]
         spurious += sum(
             (link.child, link.child_columns[0], link.parent) not in jw.truth

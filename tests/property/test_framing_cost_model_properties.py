@@ -1,7 +1,7 @@
 from hypothesis import given
 from hypothesis import settings
-from hypothesis import strategies as st
-import numpy as np
+from hypothesis import strategies
+import numpy
 
 from scmle.data.framing import costs
 
@@ -10,11 +10,11 @@ HUMAN = (costs.CostSource.HUMAN,) * 4
 
 @settings(max_examples=200, deadline=None)
 @given(
-    st.integers(0, 10_000),
-    st.floats(0.1, 5.0),
-    st.floats(0.1, 5.0),
-    st.floats(-3.0, 3.0),
-    st.floats(-3.0, 3.0),
+    strategies.integers(0, 10_000),
+    strategies.floats(0.1, 5.0),
+    strategies.floats(0.1, 5.0),
+    strategies.floats(-3.0, 3.0),
+    strategies.floats(-3.0, 3.0),
 )
 def test_cost_is_constant_minus_scaled_net_benefit(seed, fp, fn, c00, c11):
     model = costs.DecisionCostModel(
@@ -27,7 +27,7 @@ def test_cost_is_constant_minus_scaled_net_benefit(seed, fp, fn, c00, c11):
         HUMAN,
         costs.CostSource.HUMAN,
     )
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     y = (rng.random(30) < 0.4).astype(float)
     a = (rng.random(30) < 0.5).astype(float)
     direct = costs.expected_cost(y, a, model)
@@ -38,11 +38,14 @@ def test_cost_is_constant_minus_scaled_net_benefit(seed, fp, fn, c00, c11):
 
 
 @settings(max_examples=100, deadline=None)
-@given(st.integers(0, 10_000), st.floats(0.01, 0.99))
+@given(strategies.integers(0, 10_000), strategies.floats(0.01, 0.99))
 def test_treat_all_equals_all_ones_rule(seed, t):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     y = (rng.random(25) < 0.5).astype(float)
     assert (
-        abs(costs.net_benefit_all(y, t) - costs.net_benefit(y, np.ones(25), t))
+        abs(
+            costs.net_benefit_all(y, t)
+            - costs.net_benefit(y, numpy.ones(25), t)
+        )
         <= 1e-12
     )

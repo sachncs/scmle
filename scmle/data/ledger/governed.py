@@ -25,11 +25,11 @@ import json
 from pathlib import Path
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.contracts import qualification
-from scmle.data.ledger import budget as budget_module
+from scmle.data.ledger import budget
 from scmle.data.ledger import confirm
 from scmle.data.ledger import controls
 from scmle.data.ledger import explore
@@ -95,11 +95,11 @@ class GovernedRun:
 
 
 def strata_labels(
-    features: pd.DataFrame,
+    features: pandas.DataFrame,
     group_column: str | None,
     time_column: str | None,
     blocks: int = DEFAULT_BLOCKS,
-) -> np.ndarray | None:
+) -> numpy.ndarray | None:
     """Builds the labels within which the target may be permuted.
 
     Groups win over time: rows of one entity stay together. With only a time
@@ -126,7 +126,7 @@ def strata_labels(
     if group_column and group_column in features.columns:
         return features[group_column].astype(str).to_numpy()
     if time_column and time_column in features.columns:
-        order = pd.to_numeric(features[time_column], errors="coerce")
+        order = pandas.to_numeric(features[time_column], errors="coerce")
         size = max(2, len(features) // max(blocks, 1))
         return controls.block_labels(order.to_numpy(dtype=float), size)
     return None
@@ -165,17 +165,15 @@ class Explored:
 def run_governed(
     *,
     charter: Any,
-    features: pd.DataFrame,
-    target: pd.Series,
+    features: pandas.DataFrame,
+    target: pandas.Series,
     classification: bool,
     source: confirm.ConfirmationSource | None,
     run_dir: str | Path | None,
     exclude: tuple[str, ...] = (),
-    strata: np.ndarray | None = None,
+    strata: numpy.ndarray | None = None,
     rule: str = online_fdr.DEFAULT_RULE,
-    confirmation_rule: budget_module.MultiplicityRule = (
-        multiplicity.DEFAULT_RULE
-    ),
+    confirmation_rule: budget.MultiplicityRule = (multiplicity.DEFAULT_RULE),
     policy: str = confirm.UNCONFIRMED,
     diagnostics: Sequence[tuple[str, qualification.Check]] = (),
     second_stage: Callable[
@@ -241,12 +239,12 @@ def run_governed(
 def explore_governed(
     *,
     charter: Any,
-    features: pd.DataFrame,
-    target: pd.Series,
+    features: pandas.DataFrame,
+    target: pandas.Series,
     classification: bool,
     run_dir: str | Path | None,
     exclude: tuple[str, ...] = (),
-    strata: np.ndarray | None = None,
+    strata: numpy.ndarray | None = None,
     rule: str = online_fdr.DEFAULT_RULE,
     policy: str = confirm.UNCONFIRMED,
     diagnostics: Sequence[tuple[str, qualification.Check]] = (),
@@ -320,7 +318,7 @@ def explore_governed(
     results = explore.run_exploration(ledger, features, codes, plan)
     observed = sum(1 for r in results if r.rejected)
 
-    def discoveries(frame: pd.DataFrame, shuffled: pd.Series) -> int:
+    def discoveries(frame: pandas.DataFrame, shuffled: pandas.Series) -> int:
         return explore.count_discoveries(config, plan, frame, shuffled)
 
     control = controls.permuted_target_control(
@@ -355,9 +353,7 @@ def confirm_explored(
     explored: Explored,
     *,
     source: confirm.ConfirmationSource | None,
-    confirmation_rule: budget_module.MultiplicityRule = (
-        multiplicity.DEFAULT_RULE
-    ),
+    confirmation_rule: budget.MultiplicityRule = (multiplicity.DEFAULT_RULE),
     policy: str = confirm.UNCONFIRMED,
     claim_runner: confirm.ClaimRunner | None = None,
 ) -> GovernedRun:

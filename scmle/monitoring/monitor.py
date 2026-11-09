@@ -4,14 +4,14 @@ import abc
 import dataclasses
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.artifacts import bundle as bundle_module
 from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.evaluation import metrics
-from scmle.monitoring import reference as reference_module
+from scmle.monitoring import reference
 
 STABLE = "stable"
 MODERATE = "moderate"
@@ -389,10 +389,10 @@ class ModelMonitor:
                 "this bundle has no monitoring reference profile"
             )
         self.bundle = bundle
-        self.reference: reference_module.ReferenceProfile = bundle.reference
+        self.reference: reference.ReferenceProfile = bundle.reference
         self.thresholds = thresholds or MonitoringThresholds()
 
-    def model_output(self, frame: pd.DataFrame) -> pd.Series:
+    def model_output(self, frame: pandas.DataFrame) -> pandas.Series:
         """Computes the output the reference describes.
 
         Args:
@@ -403,10 +403,10 @@ class ModelMonitor:
             predictions.
         """
         if self.bundle.schema.task == tasks.TaskType.BINARY.value:
-            return pd.Series(self.bundle.predict_proba(frame)[:, 1])
-        return pd.Series(self.bundle.predict(frame))
+            return pandas.Series(self.bundle.predict_proba(frame)[:, 1])
+        return pandas.Series(self.bundle.predict(frame))
 
-    def drift(self, data: pd.DataFrame) -> DriftReport:
+    def drift(self, data: pandas.DataFrame) -> DriftReport:
         """Measures feature and output drift of a batch.
 
         Args:
@@ -444,10 +444,10 @@ class ModelMonitor:
 
     def performance(
         self,
-        data: pd.DataFrame,
-        outcomes: pd.Series,
-        propensity: pd.Series | None = None,
-        maturity: pd.Series | None = None,
+        data: pandas.DataFrame,
+        outcomes: pandas.Series,
+        propensity: pandas.Series | None = None,
+        maturity: pandas.Series | None = None,
     ) -> PerformanceReport:
         """Scores the model on rows whose outcome is already known.
 
@@ -500,10 +500,10 @@ class ModelMonitor:
         features = frame.reset_index(drop=True)[known].reset_index(drop=True)
         if propensity is not None:
             chosen = propensity.reset_index(drop=True)[known].to_numpy(float)
-            if not np.all((chosen > 0.0) & (chosen <= 1.0)):
+            if not numpy.all((chosen > 0.0) & (chosen <= 1.0)):
                 raise ValueError("propensity must be above 0 and at most 1")
             weight = 1.0 / chosen
-            rows_drawn = np.random.default_rng(0).choice(
+            rows_drawn = numpy.random.default_rng(0).choice(
                 labeled, size=labeled, p=weight / weight.sum()
             )
             target = target.iloc[rows_drawn].reset_index(drop=True)
@@ -514,7 +514,7 @@ class ModelMonitor:
         change = {}
         for name, value in scores.items():
             expected = reference_metrics.get(name)
-            if expected is None or np.isnan(value) or expected == 0:
+            if expected is None or numpy.isnan(value) or expected == 0:
                 continue
             sign = 1 if metrics.CATALOG.metrics[name].greater_is_better else -1
             change[name] = sign * (value - expected) / abs(expected)
@@ -534,7 +534,7 @@ class ModelMonitor:
         )
 
     def assess(
-        self, data: pd.DataFrame, outcomes: pd.Series | None = None
+        self, data: pandas.DataFrame, outcomes: pandas.Series | None = None
     ) -> MonitoringReport:
         """Produces the full monitoring report for a batch.
 

@@ -1,16 +1,16 @@
 """Calibration and coverage reports written by a run."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import support
 
 
 def three_class_frame(rows=900, seed=0):
-    rng = np.random.default_rng(seed)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    frame = pandas.DataFrame(
         {"a": rng.normal(size=rows), "b": rng.normal(size=rows)}
     )
-    scores = np.column_stack([frame.a, frame.b, -frame.a]) + rng.normal(
+    scores = numpy.column_stack([frame.a, frame.b, -frame.a]) + rng.normal(
         0, 1.0, (rows, 3)
     )
     frame["y"] = scores.argmax(axis=1)
@@ -18,9 +18,11 @@ def three_class_frame(rows=900, seed=0):
 
 
 def noisy_line(rows=2500, seed=0):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     x = rng.uniform(0, 10, rows)
-    return pd.DataFrame({"x": x, "y": 3 * x + rng.normal(0, 1 + 0.4 * x, rows)})
+    return pandas.DataFrame(
+        {"x": x, "y": 3 * x + rng.normal(0, 1 + 0.4 * x, rows)}
+    )
 
 
 def test_a_multiclass_run_reports_its_reliability(tmp_path):
@@ -48,5 +50,7 @@ def test_quantile_coverage_tracks_the_nominal_level_on_locked_rows(tmp_path):
 
     assert len(curve) >= 3
     for point in curve:
-        spread = 3 * np.sqrt(point["nominal"] * (1 - point["nominal"]) / tests)
+        spread = 3 * numpy.sqrt(
+            point["nominal"] * (1 - point["nominal"]) / tests
+        )
         assert abs(point["empirical"] - point["nominal"]) <= spread + 0.03

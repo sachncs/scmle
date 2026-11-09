@@ -1,7 +1,7 @@
 """Tests for the planner and its rules."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
 from scmle.contracts import errors
@@ -10,14 +10,14 @@ from scmle.contracts import tasks
 from scmle.data.profiling import profiler
 from scmle.data.readers import tabular
 from scmle.intelligence import planner as planner_module
-from scmle.models import registry as registry_module
+from scmle.models import registry
 
 BINARY = tasks.TaskType.BINARY
 
 
 @pytest.fixture(scope="module")
 def planner():
-    return planner_module.Planner(registry_module.ModelRegistry.with_builtins())
+    return planner_module.Planner(registry.ModelRegistry.with_builtins())
 
 
 def make_plan(planner, frame, budget=1800, approved=None, task=BINARY, **extra):
@@ -38,8 +38,8 @@ def make_plan(planner, frame, budget=1800, approved=None, task=BINARY, **extra):
 
 @pytest.fixture
 def frame():
-    rng = np.random.default_rng(0)
-    return pd.DataFrame(
+    rng = numpy.random.default_rng(0)
+    return pandas.DataFrame(
         {"x": rng.normal(size=300), "y": rng.integers(0, 2, 300)}
     )
 
@@ -72,7 +72,7 @@ def test_small_budget_prefers_fast_models(planner, frame):
 
 
 def test_imbalance_strategies_are_planned_not_deferred(planner, frame):
-    skewed = pd.concat([frame[frame.y == 0], frame[frame.y == 1].head(8)])
+    skewed = pandas.concat([frame[frame.y == 0], frame[frame.y == 1].head(8)])
     plan = make_plan(planner, skewed)
     included = {
         d.technique: d.reason
@@ -136,7 +136,7 @@ def test_custom_rule_chain_is_honoured(frame):
             return [a for a in candidates if a.name == "dummy"]
 
     custom = planner_module.Planner(
-        registry_module.ModelRegistry.with_builtins(), rules=(KeepOnlyDummy(),)
+        registry.ModelRegistry.with_builtins(), rules=(KeepOnlyDummy(),)
     )
     assert make_plan(custom, frame).candidate_models == ("dummy",)
 
@@ -147,15 +147,17 @@ def test_no_candidates_is_an_error(frame):
             return []
 
     empty = planner_module.Planner(
-        registry_module.ModelRegistry.with_builtins(), rules=(DropAll(),)
+        registry.ModelRegistry.with_builtins(), rules=(DropAll(),)
     )
     with pytest.raises(errors.ConfigError, match="no candidate"):
         make_plan(empty, frame)
 
 
 def test_memory_characteristics_drive_rejection_under_a_tight_limit(planner):
-    rng = np.random.default_rng(0)
-    frame = pd.DataFrame({f"f{i}": rng.normal(size=4000) for i in range(30)})
+    rng = numpy.random.default_rng(0)
+    frame = pandas.DataFrame(
+        {f"f{i}": rng.normal(size=4000) for i in range(30)}
+    )
     frame["y"] = rng.integers(0, 2, 4000)
     base_gb = 4000 * 30 * 8 / 1024**3
     limit = base_gb * 3.5  # fits factor <= 3, not the 6x forests or 4x kernels
@@ -179,9 +181,7 @@ def test_memory_characteristics_drive_rejection_under_a_tight_limit(planner):
 
 
 def test_every_adapter_declares_a_positive_memory_factor():
-    for (
-        adapter
-    ) in registry_module.ModelRegistry.with_builtins().adapters.values():
+    for adapter in registry.ModelRegistry.with_builtins().adapters.values():
         assert adapter.capabilities.memory_factor >= 1.0, adapter.name
 
 

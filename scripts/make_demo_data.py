@@ -16,14 +16,14 @@ import argparse
 from pathlib import Path
 import sys
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 DEFAULT_DIRECTORY = Path("deploy/local/data")
 PLANS = ["basic", "pro", "team"]
 
 
-def make_frame(rows: int, seed: int, reverse: bool = False) -> pd.DataFrame:
+def make_frame(rows: int, seed: int, reverse: bool = False) -> pandas.DataFrame:
     """Customers with a churn label that depends on their features.
 
     Args:
@@ -35,8 +35,8 @@ def make_frame(rows: int, seed: int, reverse: bool = False) -> pd.DataFrame:
         A frame with age, balance, tenure in months, plan and the 0/1
         `churned` label.
     """
-    rng = np.random.default_rng(seed)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    frame = pandas.DataFrame(
         {
             "age": rng.integers(18, 80, rows).astype(float),
             "balance": rng.gamma(2.0, 800.0, rows).round(2),
@@ -56,7 +56,7 @@ def make_frame(rows: int, seed: int, reverse: bool = False) -> pd.DataFrame:
     return frame
 
 
-def datasets() -> dict[str, pd.DataFrame]:
+def datasets() -> dict[str, pandas.DataFrame]:
     """The four demo tables by file name.
 
     Returns:
@@ -70,7 +70,7 @@ def datasets() -> dict[str, pd.DataFrame]:
     }
 
 
-def render(frame: pd.DataFrame) -> str:
+def render(frame: pandas.DataFrame) -> str:
     """The exact CSV text of a table.
 
     Args:

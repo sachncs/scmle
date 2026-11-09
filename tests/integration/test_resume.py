@@ -15,7 +15,7 @@ from scmle.contracts import models
 from scmle.contracts import tasks
 from scmle.core import orchestrator as orchestrator_module
 from scmle.experimentation import stores
-from scmle.experimentation import trials as trials_module
+from scmle.experimentation import trials
 from scmle.models import registry as registry_module
 
 BINARY = frozenset({tasks.TaskType.BINARY})
@@ -120,9 +120,9 @@ def test_resume_of_tuned_run_recomputes_nothing(
     (original.run_dir / "evaluation.json").unlink()
     shutil.rmtree(original.run_dir / "model")
     calls = []
-    real = trials_module.evaluate_payload
+    real = trials.evaluate_payload
     monkeypatch.setattr(
-        trials_module,
+        trials,
         "evaluate_payload",
         lambda *a, **k: calls.append(1) or real(*a, **k),
     )
@@ -175,16 +175,16 @@ def test_tracking_database_records_runs_trials_and_lineage(
         config["data"]["target"] == "y" and config["validation"]["seed"] == 42
     )
     lineage = json.loads(row["artifacts"])
-    from scmle.artifacts import bundle as bundle_module
+    from scmle.artifacts import bundle
 
     assert {
         "config.json",
         "evaluation.json",
-        f"model/{bundle_module.MANIFEST_FILE}",
+        f"model/{bundle.MANIFEST_FILE}",
     } <= set(lineage)
 
     for name, digest in lineage.items():
-        assert bundle_module.file_sha256(first.run_dir / name) == digest
+        assert bundle.file_sha256(first.run_dir / name) == digest
 
 
 def test_custom_tracker_is_honoured(binary_frame, tmp_path):

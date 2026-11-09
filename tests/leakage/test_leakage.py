@@ -2,8 +2,8 @@
 
 import json
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 import support
 
@@ -13,9 +13,11 @@ from scmle.contracts import tasks
 
 
 def test_pure_noise_is_not_inflated_by_the_pipeline(tmp_path):
-    rng = np.random.default_rng(5)
+    rng = numpy.random.default_rng(5)
     rows = 600
-    frame = pd.DataFrame({f"f{i}": rng.normal(size=rows) for i in range(10)})
+    frame = pandas.DataFrame(
+        {f"f{i}": rng.normal(size=rows) for i in range(10)}
+    )
     frame["cat"] = rng.choice(list("abcdefgh"), rows)
     frame["y"] = rng.integers(0, 2, rows)
     result = support.make_project(
@@ -43,13 +45,13 @@ def test_leaked_feature_is_flagged_and_can_block(binary_frame, tmp_path):
 def test_a_noisy_copy_and_a_value_recorded_for_one_class_also_block(
     binary_frame, tmp_path
 ):
-    rng = np.random.default_rng(8)
+    rng = numpy.random.default_rng(8)
     flip = rng.random(len(binary_frame)) < 0.02
     noisy = binary_frame.assign(
-        noisy=np.where(flip, 1 - binary_frame.y, binary_frame.y)
+        noisy=numpy.where(flip, 1 - binary_frame.y, binary_frame.y)
     )
     recorded = binary_frame.assign(
-        boat=np.where(binary_frame.y == 1, rng.normal(size=500), np.nan)
+        boat=numpy.where(binary_frame.y == 1, rng.normal(size=500), numpy.nan)
     )
     for frame in (noisy, recorded):
         with pytest.raises(errors.BlockedError, match="leakage"):
@@ -68,9 +70,9 @@ def test_strong_legitimate_signal_is_not_blocked(binary_frame, tmp_path):
 
 
 def test_an_uncertified_target_warns_but_does_not_block(tmp_path):
-    rng = np.random.default_rng(2)
+    rng = numpy.random.default_rng(2)
     rows = 400
-    frame = pd.DataFrame({"a": rng.normal(size=rows)})
+    frame = pandas.DataFrame({"a": rng.normal(size=rows)})
     frame["y"] = rng.normal(size=rows)
     frame["leak"] = frame.y * 2.0
     result = support.make_project(
@@ -86,7 +88,7 @@ def test_an_uncertified_target_warns_but_does_not_block(tmp_path):
 
 
 def test_groups_never_straddle_the_test_boundary(binary_frame, tmp_path):
-    frame = binary_frame.assign(g=np.arange(len(binary_frame)) % 40)
+    frame = binary_frame.assign(g=numpy.arange(len(binary_frame)) % 40)
     result = support.make_project(
         frame, "y", group_column="g", output_dir=tmp_path
     ).run()
@@ -128,10 +130,10 @@ def test_search_is_invariant_to_test_labels_and_test_features(
     manifest = json.loads(
         (first.run_dir / "validation_manifest.json").read_text()
     )
-    test_ids = np.array(manifest["test_ids"])
+    test_ids = numpy.array(manifest["test_ids"])
 
     altered = imbalanced_frame.copy()
-    rng = np.random.default_rng(99)
+    rng = numpy.random.default_rng(99)
     altered.loc[test_ids, "y"] = rng.permutation(
         altered.loc[test_ids, "y"].to_numpy()
     )
@@ -183,7 +185,7 @@ def test_profile_and_feature_plan_never_see_the_locked_test_rows(
     test_positions = list(split.manifest.test_ids)
 
     altered = binary_frame.copy()
-    altered.loc[altered.index[test_positions], "a"] = np.nan  # all missing
+    altered.loc[altered.index[test_positions], "a"] = numpy.nan  # all missing
     altered.loc[altered.index[test_positions], "b"] = 1e9  # absurd values
     altered.loc[altered.index[test_positions], "c"] = "never-seen"
     other = support.make_project(altered, "y", output_dir=tmp_path / "b")
@@ -211,7 +213,9 @@ def test_a_leak_present_only_in_the_test_rows_is_not_a_profile_finding(
         binary_frame
     )
     test_positions = list(split.manifest.test_ids)
-    leaky = binary_frame.assign(late=np.random.default_rng(1).normal(size=500))
+    leaky = binary_frame.assign(
+        late=numpy.random.default_rng(1).normal(size=500)
+    )
     leaky.loc[leaky.index[test_positions], "late"] = (
         leaky.loc[leaky.index[test_positions], "y"] * 5.0
     )
@@ -225,10 +229,10 @@ def test_hard_enforcement_moves_the_test_rows_out_of_reach(
 ):
     from scmle.core import limits
 
-    rng = np.random.default_rng(21)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(21)
+    frame = pandas.DataFrame(
         {
-            "sentinel": np.arange(400, dtype=float),
+            "sentinel": numpy.arange(400, dtype=float),
             "x": rng.normal(size=400),
         }
     )

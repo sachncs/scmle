@@ -14,12 +14,12 @@ import platform
 import time
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from sklearn import base
 import threadpoolctl
 
-from scmle.contracts import data as data_contracts
+from scmle.contracts import data
 from scmle.contracts import experiments
 from scmle.contracts import metrics as metric_contracts
 from scmle.contracts import models
@@ -75,13 +75,13 @@ class TrialPayload:
     job: TrialJob
     adapter: models.ModelAdapter
     strategy: strategies.DataStrategy
-    feature_plan: data_contracts.FeaturePlan
+    feature_plan: data.FeaturePlan
     task: tasks.TaskType
     seed: int
     metric: metric_contracts.Metric
     positive_label: Any
-    features: pd.DataFrame
-    target: pd.Series
+    features: pandas.DataFrame
+    target: pandas.Series
     folds: Sequence[tuple[list[int], list[int]]]
     thread_limit: int | None
     ceiling_seconds: float | None = None
@@ -92,7 +92,7 @@ class TrialPayload:
 TRAIN_SCORE_ROWS = 2000
 
 
-def access_record(row_ids: pd.Index) -> dict[str, Any]:
+def access_record(row_ids: pandas.Index) -> dict[str, Any]:
     """Summarizes the rows a fit or scoring call received.
 
     Args:
@@ -127,8 +127,8 @@ def runtime_requirements(adapter: models.ModelAdapter) -> dict[str, Any]:
 
 
 def fold_weights(
-    payload: TrialPayload, positions: np.ndarray
-) -> dict[str, np.ndarray]:
+    payload: TrialPayload, positions: numpy.ndarray
+) -> dict[str, numpy.ndarray]:
     """Builds scorer keyword arguments carrying the rows' weights.
 
     Args:
@@ -187,8 +187,8 @@ def evaluate_payload(payload: TrialPayload) -> experiments.TrialResult:
         raw_train_scores = []
         with threadpoolctl.threadpool_limits(limits=payload.thread_limit):
             for fit_list, evaluate_list in folds:
-                fit = np.asarray(fit_list)
-                evaluate = np.asarray(evaluate_list)
+                fit = numpy.asarray(fit_list)
+                evaluate = numpy.asarray(evaluate_list)
                 candidate = base.clone(pipeline)
                 candidate.fit(
                     payload.features.iloc[fit], payload.target.iloc[fit]
@@ -223,8 +223,8 @@ def evaluate_payload(payload: TrialPayload) -> experiments.TrialResult:
         result.train_scores = [
             metric.to_natural(float(s)) for s in raw_train_scores
         ]
-        result.score_mean = float(np.mean(scores))
-        result.score_std = float(np.std(scores))
+        result.score_mean = float(numpy.mean(scores))
+        result.score_std = float(numpy.std(scores))
         result.status = experiments.TrialStatus.OK
     except Exception as error:  # Isolation: any model failure is data.
         result.error = f"{type(error).__name__}: {error}"
@@ -442,8 +442,8 @@ class TrialRunner:
             job.model_name,
             experiments.TrialStatus.OK,
             checkpoint.metric,
-            float(np.mean(scores)),
-            float(np.std(scores)),
+            float(numpy.mean(scores)),
+            float(numpy.std(scores)),
             list(scores),
             checkpoint.fit_seconds,
             params=dict(checkpoint.params),

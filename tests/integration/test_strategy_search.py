@@ -2,8 +2,8 @@
 
 import json
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 import support
 
@@ -91,7 +91,7 @@ def test_adopted_strategy_is_used_for_the_final_model(
     loaded = scmle.ModelBundle.load(
         result.save(tmp_path / "exported"), trusted=True
     )
-    np.testing.assert_allclose(
+    numpy.testing.assert_allclose(
         result.predict_proba(features), loaded.predict_proba(features)
     )
     assert loaded.info.strategy == result.evaluation["selected_strategy"]
@@ -129,7 +129,7 @@ def test_strategies_can_be_forced_to_win_and_are_then_used(
 def test_balanced_data_skips_imbalance_strategies_with_logged_reasons(
     binary_frame, tmp_path
 ):
-    frame = binary_frame.assign(y=np.arange(len(binary_frame)) % 2)
+    frame = binary_frame.assign(y=numpy.arange(len(binary_frame)) % 2)
     result = run(frame, tmp_path)
     tried = {t.strategy for t in result.trials}
     assert not tried & {
@@ -173,7 +173,7 @@ def test_strategy_run_resumes_without_recomputation(
 ):
     import shutil
 
-    from scmle.experimentation import trials as trials_module
+    from scmle.experimentation import trials
 
     original = run(
         imbalanced_frame,
@@ -183,9 +183,9 @@ def test_strategy_run_resumes_without_recomputation(
     (original.run_dir / "evaluation.json").unlink()
     shutil.rmtree(original.run_dir / "model")
     calls = []
-    real = trials_module.evaluate_payload
+    real = trials.evaluate_payload
     monkeypatch.setattr(
-        trials_module,
+        trials,
         "evaluate_payload",
         lambda p: calls.append(p.job.trial_id) or real(p),
     )
@@ -216,8 +216,8 @@ def test_leaderboard_marks_exactly_the_selected_trial(
 
 
 def numeric_imbalanced(rows=900, seed=11):
-    rng = np.random.default_rng(seed)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    frame = pandas.DataFrame(
         {"a": rng.normal(size=rows), "b": rng.normal(size=rows)}
     )
     frame["y"] = (rng.random(rows) < 0.07).astype(int)

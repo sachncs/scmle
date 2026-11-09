@@ -2,8 +2,8 @@
 
 import json
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
 import scmle
@@ -12,12 +12,12 @@ from scmle.evaluation import reweighing
 
 
 def biased(rows=1600, seed=0):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     group = rng.choice(["a", "b"], rows, p=[0.6, 0.4])
     signal = rng.normal(size=rows)
     # Group b receives fewer positives for the same signal.
     label = signal - 0.9 * (group == "b") + rng.normal(0, 0.5, rows) > 0
-    return pd.DataFrame(
+    return pandas.DataFrame(
         {"group": group, "signal": signal, "y": label.astype(int)}
     )
 
@@ -28,7 +28,7 @@ def test_weights_make_group_and_label_independent():
     weighted = frame.assign(w=weights)
 
     rates = weighted.groupby("group").apply(
-        lambda part: np.average(part.y, weights=part.w), include_groups=False
+        lambda part: numpy.average(part.y, weights=part.w), include_groups=False
     )
 
     assert rates.max() - rates.min() < 1e-9
@@ -39,7 +39,9 @@ def test_weights_make_group_and_label_independent():
 
 def test_bad_inputs_are_refused():
     with pytest.raises(ValueError, match="same non-zero length"):
-        reweighing.reweighing_weights(pd.Series(["a"]), pd.Series([1, 0]))
+        reweighing.reweighing_weights(
+            pandas.Series(["a"]), pandas.Series([1, 0])
+        )
 
 
 def test_a_project_trained_on_the_weights_selects_more_evenly():
@@ -56,7 +58,7 @@ def test_a_project_trained_on_the_weights_selects_more_evenly():
             sensitive_columns=["group"],
         ).run()
         scored = result.predict(frame.drop(columns="y"))
-        rates = pd.Series(scored).groupby(frame.group.to_numpy()).mean()
+        rates = pandas.Series(scored).groupby(frame.group.to_numpy()).mean()
         return float(rates.max() - rates.min())
 
     assert gap("w") < gap(None)
@@ -75,7 +77,7 @@ def test_the_fairness_option_reweights_development_rows_automatically():
             fairness=tasks.FairnessSpec(mitigation=mitigation),
         ).run()
         scored = result.predict(frame.drop(columns="y"))
-        rates = pd.Series(scored).groupby(frame.group.to_numpy()).mean()
+        rates = pandas.Series(scored).groupby(frame.group.to_numpy()).mean()
         return result, float(rates.max() - rates.min())
 
     reweighed, narrow = run("reweighing")

@@ -26,8 +26,8 @@ import dataclasses
 import math
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from scipy import stats
 from sklearn.datasets import load_diabetes
 
@@ -43,7 +43,7 @@ POWER_FLOOR = 0.80
 KS_DRAWS = 5000
 KS_FLOOR = 1e-3
 CONTROL_B = 20
-WorldDraw = tuple[np.ndarray, np.ndarray, np.ndarray]
+WorldDraw = tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -77,18 +77,18 @@ class RankTester:
         norm: Euclidean norm of each centred rank column.
     """
 
-    def __init__(self, features: np.ndarray) -> None:
+    def __init__(self, features: numpy.ndarray) -> None:
         """Ranks every column once.
 
         Args:
             features: Matrix of shape (rows, columns) without missing values.
         """
         self.n = features.shape[0]
-        ranks = np.apply_along_axis(stats.rankdata, 0, features)
+        ranks = numpy.apply_along_axis(stats.rankdata, 0, features)
         self.centered = ranks - ranks.mean(axis=0)
-        self.norm = np.sqrt((self.centered**2).sum(axis=0))
+        self.norm = numpy.sqrt((self.centered**2).sum(axis=0))
 
-    def pvalues(self, target: np.ndarray) -> np.ndarray:
+    def pvalues(self, target: numpy.ndarray) -> numpy.ndarray:
         """Two-sided p-value of each column against `target`.
 
         Args:
@@ -101,12 +101,16 @@ class RankTester:
         ry = stats.rankdata(target)
         ry = ry - ry.mean()
         rho = (self.centered.T @ ry) / (self.norm * math.sqrt((ry**2).sum()))
-        rho = np.clip(rho, -1.0, 1.0)
-        t_value = rho * np.sqrt((self.n - 2) / np.maximum(1e-300, 1 - rho**2))
-        return np.asarray(2.0 * stats.t.sf(np.abs(t_value), self.n - 2))
+        rho = numpy.clip(rho, -1.0, 1.0)
+        t_value = rho * numpy.sqrt(
+            (self.n - 2) / numpy.maximum(1e-300, 1 - rho**2)
+        )
+        return numpy.asarray(2.0 * stats.t.sf(numpy.abs(t_value), self.n - 2))
 
 
-def rejections(config: online_fdr.RuleConfig, p: np.ndarray) -> np.ndarray:
+def rejections(
+    config: online_fdr.RuleConfig, p: numpy.ndarray
+) -> numpy.ndarray:
     """Rejection flags of the online rule over p-values, in order.
 
     Args:
@@ -118,7 +122,7 @@ def rejections(config: online_fdr.RuleConfig, p: np.ndarray) -> np.ndarray:
     """
     rule = config.build()
     state = rule.initial()
-    out = np.zeros(len(p), dtype=bool)
+    out = numpy.zeros(len(p), dtype=bool)
     for index, value in enumerate(p):
         step = rule.step(state, online_fdr.Evidence(p=float(value)))
         out[index] = step.rejected
@@ -140,8 +144,8 @@ def band(alpha: float, runs: int) -> float:
 
 
 def equicorrelated(
-    rng: np.random.Generator, rows: int, columns: int, rho: float
-) -> np.ndarray:
+    rng: numpy.random.Generator, rows: int, columns: int, rho: float
+) -> numpy.ndarray:
     """Gaussian columns with pairwise correlation `rho` (a common factor).
 
     Args:
@@ -155,7 +159,7 @@ def equicorrelated(
     """
     shared = rng.normal(size=(rows, 1))
     own = rng.normal(size=(rows, columns))
-    return np.asarray(math.sqrt(rho) * shared + math.sqrt(1 - rho) * own)
+    return numpy.asarray(math.sqrt(rho) * shared + math.sqrt(1 - rho) * own)
 
 
 def check_tester(seed: int) -> Finding:
@@ -168,12 +172,12 @@ def check_tester(seed: int) -> Finding:
         A finding that holds when the largest relative difference of the
         p-values is below 1e-9.
     """
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     x = rng.normal(size=(120, 6))
     y = rng.normal(size=120) + x[:, 0]
     fast = RankTester(x).pvalues(y)
-    slow = np.array([bivariate.spearman(x[:, j], y).p for j in range(6)])
-    gap = float(np.max(np.abs(fast - slow) / np.maximum(slow, 1e-300)))
+    slow = numpy.array([bivariate.spearman(x[:, j], y).p for j in range(6)])
+    gap = float(numpy.max(numpy.abs(fast - slow) / numpy.maximum(slow, 1e-300)))
     return Finding(
         "vectorized Spearman equals bivariate.spearman",
         gap < 1e-9,
@@ -182,7 +186,7 @@ def check_tester(seed: int) -> Finding:
     )
 
 
-def fdp(flags: np.ndarray, planted: np.ndarray) -> float:
+def fdp(flags: numpy.ndarray, planted: numpy.ndarray) -> float:
     """False-discovery proportion; zero when nothing is rejected.
 
     Args:
@@ -209,7 +213,7 @@ class FdrWorld:
 
     name: str
     independent: bool
-    make: Callable[[int], tuple[RankTester, np.ndarray, np.ndarray]]
+    make: Callable[[int], tuple[RankTester, numpy.ndarray, numpy.ndarray]]
 
 
 def iid_null(seed: int, rows: int = 200, columns: int = 20) -> FdrWorld:
@@ -224,7 +228,7 @@ def iid_null(seed: int, rows: int = 200, columns: int = 20) -> FdrWorld:
         The world; every hypothesis is a true null.
     """
 
-    def make(run: int) -> tuple[RankTester, np.ndarray, np.ndarray]:
+    def make(run: int) -> tuple[RankTester, numpy.ndarray, numpy.ndarray]:
         """Draws world number `run`.
 
         Args:
@@ -236,7 +240,7 @@ def iid_null(seed: int, rows: int = 200, columns: int = 20) -> FdrWorld:
         """
         rng = randomness.component_rng(seed, "ledger_checks.iid_null", run)
         x = rng.normal(size=(rows, columns))
-        return RankTester(x), rng.normal(size=rows), np.zeros(columns, bool)
+        return RankTester(x), rng.normal(size=rows), numpy.zeros(columns, bool)
 
     return FdrWorld("independent global null", True, make)
 
@@ -254,9 +258,9 @@ def diabetes_null(seed: int) -> FdrWorld:
     features = data.data.to_numpy(dtype=float)
     outcome = data.target.to_numpy(dtype=float)
     tester = RankTester(features)
-    planted = np.zeros(features.shape[1], bool)
+    planted = numpy.zeros(features.shape[1], bool)
 
-    def make(run: int) -> tuple[RankTester, np.ndarray, np.ndarray]:
+    def make(run: int) -> tuple[RankTester, numpy.ndarray, numpy.ndarray]:
         """Draws world number `run`.
 
         Args:
@@ -302,7 +306,7 @@ def mixed_world(
     """
     columns = nulls + signals
 
-    def make(run: int) -> tuple[RankTester, np.ndarray, np.ndarray]:
+    def make(run: int) -> tuple[RankTester, numpy.ndarray, numpy.ndarray]:
         """Draws world number `run`.
 
         Args:
@@ -318,11 +322,11 @@ def mixed_world(
         else:
             null_block = rng.normal(size=(rows, nulls))
         signal_block = rng.normal(size=(rows, signals))
-        x = np.concatenate([null_block, signal_block], axis=1)
+        x = numpy.concatenate([null_block, signal_block], axis=1)
         order = randomness.component_rng(seed, "ledger_checks.order", 0)
         position = order.permutation(columns)
         x = x[:, position]
-        planted = (np.arange(columns) >= nulls)[position]
+        planted = (numpy.arange(columns) >= nulls)[position]
         y = effect * signal_block.sum(axis=1) + rng.normal(size=rows)
         return RankTester(x), y, planted
 
@@ -353,7 +357,7 @@ def empirical_fdr(
         proportions.append(fdp(flags, planted))
         discovered += int(flags.any())
         total += int(flags.sum())
-    return float(np.mean(proportions)), discovered / runs, total / runs
+    return float(numpy.mean(proportions)), discovered / runs, total / runs
 
 
 def check_fdr(runs: int, seed: int) -> list[Finding]:
@@ -507,7 +511,7 @@ def check_uniformity(seed: int) -> list[Finding]:
         for _ in range(KS_DRAWS)
     ]
     result = stats.kstest(draws, "uniform")
-    share = float(np.mean(np.array(draws) <= 0.05))
+    share = float(numpy.mean(numpy.array(draws) <= 0.05))
     return [
         Finding(
             "null p-values are uniform",
@@ -520,8 +524,8 @@ def check_uniformity(seed: int) -> list[Finding]:
 
 
 def grouped_world(
-    rng: np.random.Generator, groups: int, per_group: int, columns: int
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    rng: numpy.random.Generator, groups: int, per_group: int, columns: int
+) -> tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]:
     """Group effects in features and outcome, no relation between them.
 
     Args:
@@ -533,7 +537,7 @@ def grouped_world(
     Returns:
         The features, the outcome and the group label of each row.
     """
-    labels = np.repeat(np.arange(groups), per_group)
+    labels = numpy.repeat(numpy.arange(groups), per_group)
     rows = groups * per_group
     x = rng.normal(size=(groups, columns))[labels] + 0.5 * rng.normal(
         size=(rows, columns)
@@ -543,7 +547,7 @@ def grouped_world(
 
 
 def drift_world(
-    rng: np.random.Generator, rows: int, columns: int, blocks: int = 20
+    rng: numpy.random.Generator, rows: int, columns: int, blocks: int = 20
 ) -> WorldDraw:
     """Independent random walks: a spurious regression between slow drifts.
 
@@ -563,17 +567,18 @@ def drift_world(
     Returns:
         The feature walks, the outcome walk and the block label of each row.
     """
-    x = np.cumsum(rng.normal(size=(rows, columns)), axis=0)
-    y = np.cumsum(rng.normal(size=rows))
+    x = numpy.cumsum(rng.normal(size=(rows, columns)), axis=0)
+    y = numpy.cumsum(rng.normal(size=rows))
     labels = controls.block_labels(
-        np.arange(rows, dtype=float), max(2, rows // blocks)
+        numpy.arange(rows, dtype=float), max(2, rows // blocks)
     )
     return x, y, labels
 
 
 def control_exceed_rate(
     make: Callable[
-        [np.random.Generator], tuple[np.ndarray, np.ndarray, np.ndarray]
+        [numpy.random.Generator],
+        tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray],
     ],
     scope: str,
     repeats: int,
@@ -600,8 +605,8 @@ def control_exceed_rate(
         tester = RankTester(x)
 
         def count(
-            frame: pd.DataFrame,
-            shuffled: pd.Series,
+            frame: pandas.DataFrame,
+            shuffled: pandas.Series,
             tester: RankTester = tester,
         ) -> int:
             """Discoveries of the online rule on a shuffled outcome.
@@ -622,8 +627,8 @@ def control_exceed_rate(
         strata = None if scope == "global" else labels
         result = controls.permuted_target_control(
             count,
-            pd.DataFrame(x),
-            pd.Series(y),
+            pandas.DataFrame(x),
+            pandas.Series(y),
             observed=observed,
             b=CONTROL_B,
             seed=seed + repeat,
@@ -645,7 +650,7 @@ def check_controls(repeats: int, seed: int) -> list[Finding]:
     """
     limit = band(ALPHA, repeats)
 
-    def null(rng: np.random.Generator) -> WorldDraw:
+    def null(rng: numpy.random.Generator) -> WorldDraw:
         """A global-null world.
 
         Args:
@@ -655,9 +660,9 @@ def check_controls(repeats: int, seed: int) -> list[Finding]:
             150 rows of 15 features, an independent outcome and one stratum.
         """
         x = rng.normal(size=(150, 15))
-        return x, rng.normal(size=150), np.zeros(150, int)
+        return x, rng.normal(size=150), numpy.zeros(150, int)
 
-    def planted(rng: np.random.Generator) -> WorldDraw:
+    def planted(rng: numpy.random.Generator) -> WorldDraw:
         """A world with four planted effects.
 
         Args:
@@ -669,9 +674,9 @@ def check_controls(repeats: int, seed: int) -> list[Finding]:
         """
         x = rng.normal(size=(200, 15))
         y = x[:, :4].sum(axis=1) * 0.6 + rng.normal(size=200)
-        return x, y, np.zeros(200, int)
+        return x, y, numpy.zeros(200, int)
 
-    def grouped(rng: np.random.Generator) -> WorldDraw:
+    def grouped(rng: numpy.random.Generator) -> WorldDraw:
         """A grouped world with no feature-outcome relation.
 
         Args:
@@ -734,7 +739,7 @@ def check_controls(repeats: int, seed: int) -> list[Finding]:
     return findings
 
 
-def drift_world_make(rng: np.random.Generator) -> WorldDraw:
+def drift_world_make(rng: numpy.random.Generator) -> WorldDraw:
     """Random-walk world with 15 independent walks, 20 blocks.
 
     Args:
@@ -746,7 +751,7 @@ def drift_world_make(rng: np.random.Generator) -> WorldDraw:
     return drift_world(rng, 300, 15, blocks=20)
 
 
-def coarse_drift_world_make(rng: np.random.Generator) -> WorldDraw:
+def coarse_drift_world_make(rng: numpy.random.Generator) -> WorldDraw:
     """The same world cut into only 10 blocks (reported, not enforced).
 
     Args:

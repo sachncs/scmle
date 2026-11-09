@@ -4,8 +4,8 @@ import datetime
 import hashlib
 import json
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
 import scmle
@@ -14,10 +14,10 @@ from scmle.data import catalog
 
 def test_dataframe_observation_is_deterministic_and_reviewable():
     """Tabular evidence records quality state without fitting a model."""
-    frame = pd.DataFrame(
+    frame = pandas.DataFrame(
         {
             "id": [1, 1, 2],
-            "value": [10.0, 10.0, np.nan],
+            "value": [10.0, 10.0, numpy.nan],
             "label": ["keep", "keep", None],
         }
     )
@@ -64,7 +64,7 @@ def test_dataframe_observation_is_deterministic_and_reviewable():
     [
         ({"feature": [1, 2], "target": [0, 1]}, "column_mapping", (2, 2)),
         ([{"feature": 1}, {"feature": 2}], "record_sequence", (2, 1)),
-        (np.asarray([[1, 2], [3, 4]]), "numpy_array", (2, 2)),
+        (numpy.asarray([[1, 2], [3, 4]]), "numpy_array", (2, 2)),
         ([1, 2, 3], "sequence", (3, 1)),
     ],
 )
@@ -262,8 +262,8 @@ def test_contract_components_reject_invalid_accounting():
 
 def test_scalar_series_and_nested_value_observers_cover_type_boundaries():
     """Common scalar and nested values remain deterministic and JSON-native."""
-    series = pd.Series([1, 2], name="score")
-    scalar = catalog.DatasetCatalog.from_data(np.asarray(4))
+    series = pandas.Series([1, 2], name="score")
+    scalar = catalog.DatasetCatalog.from_data(numpy.asarray(4))
     dated = catalog.DatasetCatalog.from_data(datetime.date(2026, 10, 23))
     series_result = catalog.DatasetCatalog.from_data(series)
 
@@ -271,7 +271,7 @@ def test_scalar_series_and_nested_value_observers_cover_type_boundaries():
     assert scalar.shape == () and scalar.sample_count == 1
     assert dated.data_kind == "scalar"
     assert catalog.canonical_value(b"x")["bytes_length"] == 1
-    assert catalog.canonical_value(np.int64(4)) == 4
+    assert catalog.canonical_value(numpy.int64(4)) == 4
     assert catalog.canonical_value(datetime.date(2026, 10, 23)) == (
         "2026-10-23"
     )
@@ -280,8 +280,8 @@ def test_scalar_series_and_nested_value_observers_cover_type_boundaries():
     assert catalog.canonical_value({1, 2}) == [1, 2]
     assert catalog.canonical_value(float("nan")) == {"non_finite": "nan"}
     assert catalog.canonical_value(float("-inf")) == {"non_finite": "-inf"}
-    assert catalog.canonical_value(np.asarray([1, 2])) == [1, 2]
-    assert catalog.canonical_value(pd.NA) is None
+    assert catalog.canonical_value(numpy.asarray([1, 2])) == [1, 2]
+    assert catalog.canonical_value(pandas.NA) is None
     with pytest.raises(TypeError, match="deterministically catalog"):
         catalog.canonical_value(object())
 
@@ -289,7 +289,7 @@ def test_scalar_series_and_nested_value_observers_cover_type_boundaries():
 def test_label_and_source_boundaries_are_explicit():
     """Unavailable and ambiguous labels become reviewable evidence."""
     unavailable = catalog.DatasetCatalog.from_data([1, 2], label_column="label")
-    duplicate_columns = pd.DataFrame([[1, 2]], columns=["label", "label"])
+    duplicate_columns = pandas.DataFrame([[1, 2]], columns=["label", "label"])
     ambiguous = catalog.DatasetCatalog.from_data(
         duplicate_columns, label_column="label"
     )
@@ -311,7 +311,7 @@ def test_raw_and_opaque_identity_overrides_are_validated():
         b"payload", content_identity=identity, label_column="label"
     )
     high_dimensional = catalog.DatasetCatalog.from_data(
-        np.zeros((2, 2, 2)), content_identity=identity
+        numpy.zeros((2, 2, 2)), content_identity=identity
     )
 
     assert raw.content_identity == "sha256:" + identity

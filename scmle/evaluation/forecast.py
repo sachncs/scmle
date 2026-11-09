@@ -15,17 +15,17 @@ from `ForecastMetric.scale`.
 import dataclasses
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
-from scmle.contracts import metrics as metric_contracts
+from scmle.contracts import metrics
 
 SCALE_FLOOR = 1e-12
 
 
 def truth_matrix(
-    estimator: Any, features: pd.DataFrame, primary: pd.Series
-) -> np.ndarray:
+    estimator: Any, features: pandas.DataFrame, primary: pandas.Series
+) -> numpy.ndarray:
     """All future-value targets: the primary one plus the other columns.
 
     Args:
@@ -38,14 +38,14 @@ def truth_matrix(
         A float matrix `(rows, steps)`.
     """
     others = list(estimator.target_columns[1:])
-    return np.column_stack(
-        [np.asarray(primary, dtype=float), features[others].to_numpy(float)]
+    return numpy.column_stack(
+        [numpy.asarray(primary, dtype=float), features[others].to_numpy(float)]
     )
 
 
 def last_value(
-    estimator: Any, features: pd.DataFrame, steps: int
-) -> np.ndarray:
+    estimator: Any, features: pandas.DataFrame, steps: int
+) -> numpy.ndarray:
     """The no-change forecast: the current value repeated `steps` times.
 
     Args:
@@ -56,13 +56,13 @@ def last_value(
     Returns:
         A float matrix `(rows, steps)`; non-numeric values become NaN.
     """
-    current = pd.to_numeric(
+    current = pandas.to_numeric(
         features[estimator.value_column], errors="coerce"
     ).to_numpy(float)
-    return np.tile(current[:, None], (1, steps))
+    return numpy.tile(current[:, None], (1, steps))
 
 
-def mean_absolute_error(truth: np.ndarray, guess: np.ndarray) -> float:
+def mean_absolute_error(truth: numpy.ndarray, guess: numpy.ndarray) -> float:
     """Average absolute miss over rows and horizon steps.
 
     Args:
@@ -72,10 +72,12 @@ def mean_absolute_error(truth: np.ndarray, guess: np.ndarray) -> float:
     Returns:
         The mean absolute error.
     """
-    return float(np.abs(truth - guess).mean())
+    return float(numpy.abs(truth - guess).mean())
 
 
-def mase(truth: np.ndarray, guess: np.ndarray, naive: np.ndarray) -> float:
+def mase(
+    truth: numpy.ndarray, guess: numpy.ndarray, naive: numpy.ndarray
+) -> float:
     """Error relative to the no-change forecast (below 1 beats it).
 
     Args:
@@ -91,7 +93,7 @@ def mase(truth: np.ndarray, guess: np.ndarray, naive: np.ndarray) -> float:
     return mean_absolute_error(truth, guess) / max(scale, SCALE_FLOOR)
 
 
-def smape(truth: np.ndarray, guess: np.ndarray) -> float:
+def smape(truth: numpy.ndarray, guess: numpy.ndarray) -> float:
     """Symmetric mean absolute percentage error, in [0, 2].
 
     Args:
@@ -103,13 +105,13 @@ def smape(truth: np.ndarray, guess: np.ndarray) -> float:
         `(|truth| + |guess|) / 2`, with the divisor floored at
         `SCALE_FLOOR`. The result is a fraction, not a percentage.
     """
-    gap = np.abs(truth - guess)
-    size = (np.abs(truth) + np.abs(guess)) / 2
-    return float(np.mean(gap / np.maximum(size, SCALE_FLOOR)))
+    gap = numpy.abs(truth - guess)
+    size = (numpy.abs(truth) + numpy.abs(guess)) / 2
+    return float(numpy.mean(gap / numpy.maximum(size, SCALE_FLOOR)))
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ForecastMetric(metric_contracts.Metric):
+class ForecastMetric(metrics.Metric):
     """A forecasting metric over all horizon steps.
 
     Attributes:
@@ -153,12 +155,12 @@ class ForecastMetric(metric_contracts.Metric):
 
         def score(
             estimator: Any,
-            features: pd.DataFrame,
-            target: pd.Series,
+            features: pandas.DataFrame,
+            target: pandas.Series,
             sample_weight: Any = None,
         ) -> float:
             truth = truth_matrix(estimator, features, target)
-            guess = np.asarray(estimator.predict(features), dtype=float)
+            guess = numpy.asarray(estimator.predict(features), dtype=float)
             if kind == "mae":
                 return sign * mean_absolute_error(truth, guess)
             if kind == "smape":

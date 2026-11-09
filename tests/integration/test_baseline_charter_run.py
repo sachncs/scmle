@@ -3,8 +3,8 @@
 import json
 import pathlib
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 import support
 
@@ -20,12 +20,12 @@ KEY = "baseline-key"
 
 
 def frame(seed=0, rows=1100, groups=140, selective=False):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     x1, x2 = rng.normal(size=rows), rng.normal(size=rows)
-    p = 1 / (1 + np.exp(-(1.5 * x1 + 0.5 * x2 - 1.0)))
+    p = 1 / (1 + numpy.exp(-(1.5 * x1 + 0.5 * x2 - 1.0)))
     y = (rng.uniform(size=rows) < p).astype(float)
     current = (rng.uniform(size=rows) < 0.5).astype(float)
-    table = pd.DataFrame(
+    table = pandas.DataFrame(
         {
             "x1": x1,
             "x2": x2,
@@ -36,7 +36,7 @@ def frame(seed=0, rows=1100, groups=140, selective=False):
     )
     if selective:
         hidden = (current == 0) & (rng.uniform(size=rows) < 0.6)
-        table.loc[hidden, "y"] = np.nan
+        table.loc[hidden, "y"] = numpy.nan
     return table
 
 

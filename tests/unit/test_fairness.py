@@ -2,41 +2,43 @@
 
 import dataclasses
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from sklearn import base
 
-from scmle.contracts import data as data_contracts
+from scmle.contracts import data
 from scmle.contracts import tasks
 from scmle.evaluation import diagnostics
 from scmle.evaluation import fairness
 from scmle.evaluation import metrics
 
-PLAN = data_contracts.FeaturePlan(("score",), ("group",))
+PLAN = data.FeaturePlan(("score",), ("group",))
 
 
 class Rule(base.ClassifierMixin, base.BaseEstimator):
     """Approves everyone in group a, only high scorers elsewhere."""
 
-    classes_ = np.array([0, 1])
+    classes_ = numpy.array([0, 1])
 
     def fit(self, features, target):
         return self
 
     def predict(self, features):
         favoured = features["group"].to_numpy() == "a"
-        return np.where(favoured | (features["score"].to_numpy() > 1.0), 1, 0)
+        return numpy.where(
+            favoured | (features["score"].to_numpy() > 1.0), 1, 0
+        )
 
 
 def make_inputs(biased=True, rows=1200):
-    rng = np.random.default_rng(0)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(0)
+    frame = pandas.DataFrame(
         {
             "score": rng.normal(size=rows),
             "group": rng.choice(["a", "b"], rows),
         }
     )
-    target = pd.Series(
+    target = pandas.Series(
         (frame.score + rng.normal(0, 0.5, rows) > 0.5).astype(int)
     )
     estimator = Rule()
@@ -115,12 +117,12 @@ def test_intersectional_groups_are_reported_and_bounded():
 
 
 def test_regression_reports_bias_per_group():
-    rng = np.random.default_rng(3)
+    rng = numpy.random.default_rng(3)
     rows = 800
-    frame = pd.DataFrame(
+    frame = pandas.DataFrame(
         {"x": rng.normal(size=rows), "group": rng.choice(["a", "b"], rows)}
     )
-    truth = pd.Series(frame.x * 2 + (frame.group == "b") * 3)
+    truth = pandas.Series(frame.x * 2 + (frame.group == "b") * 3)
 
     class Ignorant(base.RegressorMixin, base.BaseEstimator):
         def fit(self, features, target):
@@ -135,7 +137,7 @@ def test_regression_reports_bias_per_group():
         truth,
         tasks.TaskType.REGRESSION,
         metrics.CATALOG.resolve("rmse", tasks.TaskType.REGRESSION),
-        data_contracts.FeaturePlan(("x",), ("group",)),
+        data.FeaturePlan(("x",), ("group",)),
         0,
         sensitive_columns=("group",),
     )
@@ -150,12 +152,12 @@ def test_regression_reports_bias_per_group():
 
 
 def test_regression_intersectional_groups_use_the_same_small_cell_guard():
-    rng = np.random.default_rng(4)
+    rng = numpy.random.default_rng(4)
     rows = 800
-    frame = pd.DataFrame(
+    frame = pandas.DataFrame(
         {"x": rng.normal(size=rows), "group": rng.choice(["a", "b"], rows)}
     )
-    truth = pd.Series(frame.x * 2 + (frame.group == "b") * 3)
+    truth = pandas.Series(frame.x * 2 + (frame.group == "b") * 3)
 
     class Ignorant(base.RegressorMixin, base.BaseEstimator):
         def fit(self, features, target):
@@ -170,7 +172,7 @@ def test_regression_intersectional_groups_use_the_same_small_cell_guard():
         truth,
         tasks.TaskType.REGRESSION,
         metrics.CATALOG.resolve("rmse", tasks.TaskType.REGRESSION),
-        data_contracts.FeaturePlan(("x",), ("group",)),
+        data.FeaturePlan(("x",), ("group",)),
         0,
         sensitive_columns=("group", "x"),
     )

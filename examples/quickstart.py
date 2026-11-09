@@ -2,18 +2,18 @@
 
 import logging
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 import scmle
 
 LOGGER = logging.getLogger(__name__)
 
 
-def make_dataset(rows: int = 800) -> pd.DataFrame:
+def make_dataset(rows: int = 800) -> pandas.DataFrame:
     """Builds a small binary-classification dataset."""
-    rng = np.random.default_rng(0)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(0)
+    frame = pandas.DataFrame(
         {
             "tenure": rng.integers(1, 72, rows),
             "monthly_spend": rng.normal(60, 20, rows),

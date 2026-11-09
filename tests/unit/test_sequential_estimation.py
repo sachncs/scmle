@@ -3,8 +3,8 @@
 import dataclasses
 import json
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
 from scmle.evaluation.sequential import SequentialEstimand
@@ -37,9 +37,9 @@ def make_estimand() -> SequentialEstimand:
     )
 
 
-def make_frame() -> pd.DataFrame:
+def make_frame() -> pandas.DataFrame:
     """Return a deterministic panel with treatment-confounded state."""
-    rng = np.random.default_rng(31)
+    rng = numpy.random.default_rng(31)
     rows = []
     for subject_id in range(180):
         baseline_score = float(rng.normal(scale=0.8))
@@ -56,7 +56,7 @@ def make_frame() -> pd.DataFrame:
                 + 0.3 * state
                 + 0.25 * previous_treatment
             )
-            probability = 1.0 / (1.0 + np.exp(-logit))
+            probability = 1.0 / (1.0 + numpy.exp(-logit))
             treatment = int(rng.random() < probability)
             outcome = (
                 1.0
@@ -77,7 +77,7 @@ def make_frame() -> pd.DataFrame:
                 }
             )
             previous_treatment = treatment
-    return pd.DataFrame(rows)
+    return pandas.DataFrame(rows)
 
 
 def make_policy() -> SequentialEstimationPolicy:
@@ -148,7 +148,7 @@ def test_unsorted_rows_are_ordered_by_subject_and_period() -> None:
 def test_complete_case_drops_subjects_as_whole_sequences() -> None:
     """Missingness cannot silently create intermittent follow-up."""
     frame = make_frame()
-    frame.loc[frame["subject_id"] == 0, "state"] = np.nan
+    frame.loc[frame["subject_id"] == 0, "state"] = numpy.nan
     policy = dataclasses.replace(make_policy(), missingness="complete_case")
 
     result = SequentialIPWEstimator(make_estimand(), policy).fit(frame)

@@ -15,8 +15,8 @@ from collections.abc import Sequence
 import dataclasses
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.data.ledger import bivariate
 from scmle.data.ledger import ledger as ledger_module
@@ -43,7 +43,7 @@ class Plan:
     target_kind: str
 
 
-def target_kind(target: pd.Series, classification: bool) -> str:
+def target_kind(target: pandas.Series, classification: bool) -> str:
     """Decides how the target is treated.
 
     Args:
@@ -61,10 +61,10 @@ def target_kind(target: pd.Series, classification: bool) -> str:
 
 
 def encode_target(
-    target: pd.Series,
+    target: pandas.Series,
     classification: bool,
     classes: Sequence[Any] | None = None,
-) -> pd.Series:
+) -> pandas.Series:
     """Encodes the target as floats: class codes for classification.
 
     Codes follow the sorted order of the classes, compared as text (or
@@ -95,13 +95,13 @@ def encode_target(
         )
         codes = {label: float(i) for i, label in enumerate(order)}
         return target.map(codes).astype(float)
-    if not pd.api.types.is_numeric_dtype(target):
+    if not pandas.api.types.is_numeric_dtype(target):
         raise ValueError("a regression target must be numeric")
     return target.astype(float)
 
 
 def plan_exploration(
-    features: pd.DataFrame, kind: str, exclude: tuple[str, ...] = ()
+    features: pandas.DataFrame, kind: str, exclude: tuple[str, ...] = ()
 ) -> Plan:
     """Chooses the hypotheses from the feature columns and the target kind.
 
@@ -124,12 +124,12 @@ def plan_exploration(
             skipped.append((str(name), "structure column, not a candidate"))
             continue
         column = features[name]
-        if not pd.api.types.is_numeric_dtype(column):
+        if not pandas.api.types.is_numeric_dtype(column):
             skipped.append((str(name), "not numeric: descriptive only"))
             continue
         values = column.to_numpy(dtype=float)
-        finite = values[np.isfinite(values)]
-        if len(finite) == 0 or float(np.ptp(finite)) == 0.0:
+        finite = values[numpy.isfinite(values)]
+        if len(finite) == 0 or float(numpy.ptp(finite)) == 0.0:
             skipped.append((str(name), "constant or entirely missing"))
             continue
         specs.append(
@@ -150,8 +150,8 @@ def plan_exploration(
 
 def run_exploration(
     ledger: ledger_module.Ledger,
-    features: pd.DataFrame,
-    codes: pd.Series,
+    features: pandas.DataFrame,
+    codes: pandas.Series,
     plan: Plan,
 ) -> tuple[ledger_module.Result, ...]:
     """Registers every planned hypothesis, then tests them in order.
@@ -172,8 +172,8 @@ def run_exploration(
 def count_discoveries(
     config: online_fdr.RuleConfig,
     plan: Plan,
-    features: pd.DataFrame,
-    codes: pd.Series,
+    features: pandas.DataFrame,
+    codes: pandas.Series,
 ) -> int:
     """Counts the rejections of the whole exploration on the given data.
 

@@ -1,7 +1,7 @@
 """Tests for the dataset fingerprint dimensions."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
 from scmle.contracts import tasks
@@ -20,23 +20,25 @@ def profile_of(frame, task=tasks.TaskType.BINARY, **data_overrides):
 
 
 def test_entropy_of_known_distributions():
-    assert columns.entropy(pd.Series(["a", "b"] * 50)) == pytest.approx(1.0)
-    assert columns.entropy(pd.Series(["a"] * 10)) == pytest.approx(0.0)
-    assert columns.entropy(pd.Series(list("abcd") * 5)) == pytest.approx(2.0)
-    assert columns.entropy(pd.Series([], dtype=object)) == 0.0
+    assert columns.entropy(pandas.Series(["a", "b"] * 50)) == pytest.approx(1.0)
+    assert columns.entropy(pandas.Series(["a"] * 10)) == pytest.approx(0.0)
+    assert columns.entropy(pandas.Series(list("abcd") * 5)) == pytest.approx(
+        2.0
+    )
+    assert columns.entropy(pandas.Series([], dtype=object)) == 0.0
 
 
 def test_outlier_rate_uses_tukey_fences():
-    values = pd.Series([*range(1, 101), 10_000.0, -10_000.0])
+    values = pandas.Series([*range(1, 101), 10_000.0, -10_000.0])
     assert columns.outlier_rate(values) == pytest.approx(2 / 102)
-    assert columns.outlier_rate(pd.Series([5.0] * 20)) == 0.0
-    assert columns.outlier_rate(pd.Series([1.0, 2.0])) == 0.0
+    assert columns.outlier_rate(pandas.Series([5.0] * 20)) == 0.0
+    assert columns.outlier_rate(pandas.Series([1.0, 2.0])) == 0.0
 
 
 def test_redundant_pairs_detects_near_duplicates_only():
-    rng = np.random.default_rng(0)
+    rng = numpy.random.default_rng(0)
     base = rng.normal(size=500)
-    frame = pd.DataFrame(
+    frame = pandas.DataFrame(
         {
             "a": base,
             "b": base * 3 + rng.normal(scale=0.01, size=500),
@@ -50,10 +52,10 @@ def test_redundant_pairs_detects_near_duplicates_only():
 
 
 def test_order_drift_flags_trending_data_not_stationary_data():
-    rng = np.random.default_rng(1)
-    stationary = pd.DataFrame({"x": rng.normal(size=600)})
-    trending = pd.DataFrame(
-        {"x": rng.normal(size=600) + np.linspace(0, 6, 600)}
+    rng = numpy.random.default_rng(1)
+    stationary = pandas.DataFrame({"x": rng.normal(size=600)})
+    trending = pandas.DataFrame(
+        {"x": rng.normal(size=600) + numpy.linspace(0, 6, 600)}
     )
     assert fingerprint.order_drift(stationary, ("x",)) < 0.1
     assert fingerprint.order_drift(trending, ("x",)) > 0.25
@@ -61,20 +63,20 @@ def test_order_drift_flags_trending_data_not_stationary_data():
 
 
 def frame_with_everything(rows=600):
-    rng = np.random.default_rng(2)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(2)
+    frame = pandas.DataFrame(
         {
             "num": rng.normal(size=rows),
             "twin": 0.0,
             "cat": rng.choice(["a", "b", "c", "d"], rows),
             "grp": rng.integers(0, 30, rows),
-            "when": pd.date_range("2024-01-01", periods=rows, freq="h"),
+            "when": pandas.date_range("2024-01-01", periods=rows, freq="h"),
         }
     )
     frame["twin"] = frame["num"] * 2
-    frame.loc[::10, "num"] = np.nan
+    frame.loc[::10, "num"] = numpy.nan
     frame["y"] = (rng.random(rows) < 0.2).astype(int)
-    return pd.concat([frame, frame.head(30)], ignore_index=True)
+    return pandas.concat([frame, frame.head(30)], ignore_index=True)
 
 
 def test_fingerprint_covers_every_dimension():
@@ -127,9 +129,9 @@ def test_fingerprint_covers_every_dimension():
 
 
 def test_regression_target_fingerprint():
-    rng = np.random.default_rng(3)
-    frame = pd.DataFrame({"x": rng.normal(size=300)})
-    frame["y"] = np.exp(frame.x * 2)
+    rng = numpy.random.default_rng(3)
+    frame = pandas.DataFrame({"x": rng.normal(size=300)})
+    frame["y"] = numpy.exp(frame.x * 2)
     result = profile_of(frame, tasks.TaskType.REGRESSION).dataset_statistics
     assert result["target"]["skew"] > 1 and result["target"]["outlier_rate"] > 0
     assert "structure" in result and result["structure"] == {}
@@ -142,9 +144,9 @@ def test_profile_serializes_the_fingerprint():
 
 
 def test_ml_difficulty_reports_baselines_and_headroom():
-    rng = np.random.default_rng(0)
+    rng = numpy.random.default_rng(0)
     rows = 800
-    frame = pd.DataFrame(
+    frame = pandas.DataFrame(
         {"a": rng.normal(size=rows), "b": rng.normal(size=rows)}
     )
     frame["y"] = (frame.a * frame.b > 0).astype(int)  # purely non-linear
@@ -160,11 +162,11 @@ def test_ml_difficulty_fails_closed_when_scores_are_all_undefined(
     monkeypatch,
 ):
     """An undefined baseline is reported instead of becoming NaN."""
-    frame = pd.DataFrame({"x": range(30), "y": [0, 1] * 15})
+    frame = pandas.DataFrame({"x": range(30), "y": [0, 1] * 15})
 
     def undefined_scores(*args, **kwargs):
         del args, kwargs
-        return np.array([np.nan, np.nan])
+        return numpy.array([numpy.nan, numpy.nan])
 
     monkeypatch.setattr(
         fingerprint.model_selection, "cross_val_score", undefined_scores
@@ -187,9 +189,9 @@ def test_ml_difficulty_fails_closed_when_scores_are_all_undefined(
 
 
 def test_missingness_patterns_types_and_scale_are_described():
-    rng = np.random.default_rng(1)
+    rng = numpy.random.default_rng(1)
     rows = 600
-    frame = pd.DataFrame(
+    frame = pandas.DataFrame(
         {
             "small": rng.normal(size=rows),
             "huge": rng.normal(size=rows) * 1e6,
@@ -197,8 +199,8 @@ def test_missingness_patterns_types_and_scale_are_described():
             "note": [f"free text comment number {i} " * 3 for i in range(rows)],
         }
     )
-    blank = np.arange(rows) % 7 == 0
-    frame.loc[blank, ["small", "other"]] = np.nan  # they go missing together
+    blank = numpy.arange(rows) % 7 == 0
+    frame.loc[blank, ["small", "other"]] = numpy.nan  # they go missing together
     frame["y"] = (rng.random(rows) < 0.5).astype(int)
     result = profile_of(frame).dataset_statistics
     patterns = result["missingness"]["patterns"]

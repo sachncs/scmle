@@ -10,8 +10,8 @@ A good model's curve rises above the straight line a random ranking gives.
 import dataclasses
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from sklearn import linear_model
 from sklearn import metrics as sk_metrics
 from sklearn import model_selection
@@ -30,8 +30,8 @@ ASSUMPTION = (
 
 
 def qini_curve(
-    outcome: np.ndarray, treatment: np.ndarray, score: np.ndarray
-) -> tuple[np.ndarray, np.ndarray]:
+    outcome: numpy.ndarray, treatment: numpy.ndarray, score: numpy.ndarray
+) -> tuple[numpy.ndarray, numpy.ndarray]:
     """Computes the cumulative incremental outcome along the uplift ranking.
 
     Args:
@@ -45,19 +45,21 @@ def qini_curve(
         outcomes rescaled to the treated group's size (the control term is
         0 until a control row has been walked).
     """
-    order = np.argsort(-np.asarray(score, dtype=float), kind="stable")
-    y = np.asarray(outcome, dtype=float)[order]
-    t = np.asarray(treatment).astype(int)[order]
-    treated = np.cumsum(t)
-    control = np.cumsum(1 - t)
-    gain_treated = np.cumsum(y * t)
-    gain_control = np.cumsum(y * (1 - t))
-    scale = np.divide(treated, control, out=np.zeros(len(y)), where=control > 0)
-    return np.arange(1, len(y) + 1), gain_treated - gain_control * scale
+    order = numpy.argsort(-numpy.asarray(score, dtype=float), kind="stable")
+    y = numpy.asarray(outcome, dtype=float)[order]
+    t = numpy.asarray(treatment).astype(int)[order]
+    treated = numpy.cumsum(t)
+    control = numpy.cumsum(1 - t)
+    gain_treated = numpy.cumsum(y * t)
+    gain_control = numpy.cumsum(y * (1 - t))
+    scale = numpy.divide(
+        treated, control, out=numpy.zeros(len(y)), where=control > 0
+    )
+    return numpy.arange(1, len(y) + 1), gain_treated - gain_control * scale
 
 
 def qini_coefficient(
-    outcome: np.ndarray, treatment: np.ndarray, score: np.ndarray
+    outcome: numpy.ndarray, treatment: numpy.ndarray, score: numpy.ndarray
 ) -> float:
     """Computes the area between the Qini curve and the random-ranking line.
 
@@ -76,13 +78,13 @@ def qini_coefficient(
     if len(rows) < 2:
         return float("nan")
     line = rows / rows[-1] * curve[-1]
-    return float(np.trapezoid(curve - line, rows) / (rows[-1] ** 2))
+    return float(numpy.trapezoid(curve - line, rows) / (rows[-1] ** 2))
 
 
 def uplift_at(
-    outcome: np.ndarray,
-    treatment: np.ndarray,
-    score: np.ndarray,
+    outcome: numpy.ndarray,
+    treatment: numpy.ndarray,
+    score: numpy.ndarray,
     share: float = TOP_SHARE,
 ) -> float:
     """Computes treated-minus-control outcome in the top `share` of the ranking.
@@ -98,15 +100,17 @@ def uplift_at(
         top rows (at least one row); NaN if either arm is absent there.
     """
     count = max(int(len(score) * share), 1)
-    top = np.argsort(-np.asarray(score, dtype=float), kind="stable")[:count]
-    y = np.asarray(outcome, dtype=float)[top]
-    t = np.asarray(treatment).astype(int)[top]
+    top = numpy.argsort(-numpy.asarray(score, dtype=float), kind="stable")[
+        :count
+    ]
+    y = numpy.asarray(outcome, dtype=float)[top]
+    t = numpy.asarray(treatment).astype(int)[top]
     if t.sum() == 0 or (1 - t).sum() == 0:
         return float("nan")
     return float(y[t == 1].mean() - y[t == 0].mean())
 
 
-def average_effect(outcome: np.ndarray, treatment: np.ndarray) -> float:
+def average_effect(outcome: numpy.ndarray, treatment: numpy.ndarray) -> float:
     """Computes the overall treated-minus-control difference in the outcome.
 
     Args:
@@ -117,8 +121,8 @@ def average_effect(outcome: np.ndarray, treatment: np.ndarray) -> float:
         The mean outcome of the treated minus that of the controls; NaN
         if either arm is empty.
     """
-    y = np.asarray(outcome, dtype=float)
-    t = np.asarray(treatment).astype(int)
+    y = numpy.asarray(outcome, dtype=float)
+    t = numpy.asarray(treatment).astype(int)
     if not (t == 1).any() or not (t == 0).any():
         return float("nan")
     return float(y[t == 1].mean() - y[t == 0].mean())
@@ -160,7 +164,7 @@ class Propensity:
 
 
 def check_propensity(
-    features: pd.DataFrame, treatment: np.ndarray, seed: int = 0
+    features: pandas.DataFrame, treatment: numpy.ndarray, seed: int = 0
 ) -> Propensity:
     """Judges from the covariates whether treatment looks randomized.
 
@@ -177,7 +181,7 @@ def check_propensity(
         `MIN_ARM_SHARE` of the rows gives a NaN AUC and not randomized; no
         numeric covariates gives AUC 0.5 and randomized.
     """
-    arm = np.asarray(treatment).astype(int)
+    arm = numpy.asarray(treatment).astype(int)
     share = float(arm.mean())
     if share < MIN_ARM_SHARE or share > 1 - MIN_ARM_SHARE:
         return Propensity(
@@ -192,7 +196,7 @@ def check_propensity(
     scores = model_selection.cross_val_predict(
         linear_model.LogisticRegression(max_iter=500),
         (numeric - numeric.mean(0))
-        / np.where(numeric.std(0) > 0, numeric.std(0), 1),
+        / numpy.where(numeric.std(0) > 0, numeric.std(0), 1),
         arm,
         cv=model_selection.StratifiedKFold(3, shuffle=True, random_state=seed),
         method="predict_proba",
@@ -253,13 +257,13 @@ class UpliftMetric(metric_contracts.Metric):
 
         def score(
             estimator: Any,
-            features: pd.DataFrame,
-            target: pd.Series,
+            features: pandas.DataFrame,
+            target: pandas.Series,
             sample_weight: Any = None,
         ) -> float:
             arm = features[estimator.treatment_column].to_numpy(dtype=int)
-            predicted = np.asarray(estimator.predict(features), dtype=float)
-            outcome = np.asarray(target, dtype=float)
+            predicted = numpy.asarray(estimator.predict(features), dtype=float)
+            outcome = numpy.asarray(target, dtype=float)
             if kind == "qini":
                 return qini_coefficient(outcome, arm, predicted)
             return uplift_at(outcome, arm, predicted)

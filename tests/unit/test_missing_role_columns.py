@@ -1,7 +1,7 @@
 """Missing role columns and missing run directories give clear errors."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
 import scmle
@@ -10,12 +10,12 @@ from scmle.contracts import errors
 
 
 def frame():
-    generator = np.random.default_rng(0)
-    return pd.DataFrame(
+    generator = numpy.random.default_rng(0)
+    return pandas.DataFrame(
         {
             "a": generator.normal(size=120),
             "b": generator.normal(size=120),
-            "y": np.tile([0, 1], 60),
+            "y": numpy.tile([0, 1], 60),
         }
     )
 

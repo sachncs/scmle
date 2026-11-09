@@ -17,9 +17,9 @@ from typing import Any
 from typing import cast
 from typing import Self
 
-import numpy as np
+import numpy
 
-from scmle.contracts import data as data_contracts
+from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.data.modalities.curation import build_finding
 from scmle.data.modalities.curation import label_counts
@@ -37,7 +37,7 @@ GEOMETRY_TYPES = frozenset(
     }
 )
 
-RasterDecoder = Callable[[bytes], np.ndarray]
+RasterDecoder = Callable[[bytes], numpy.ndarray]
 
 
 class GeospatialValidationError(errors.DataError):
@@ -196,7 +196,7 @@ def geometry_coordinates(geometry: Mapping[str, Any]) -> tuple[float, ...]:
 
 
 def moran_statistic(
-    values: np.ndarray, edges: Sequence[tuple[int, int]]
+    values: numpy.ndarray, edges: Sequence[tuple[int, int]]
 ) -> float:
     """Calculates global Moran's I for an undirected binary graph.
 
@@ -214,13 +214,13 @@ def moran_statistic(
             observations, are not finite, have no variation, or if no edges
             are given.
     """
-    numeric = np.asarray(values, dtype=np.float64)
+    numeric = numpy.asarray(values, dtype=numpy.float64)
     if numeric.ndim != 1 or len(numeric) < 3:
         raise ValueError("values must contain at least three observations")
-    if not np.isfinite(numeric).all():
+    if not numpy.isfinite(numeric).all():
         raise ValueError("values must be finite")
     centered = numeric - numeric.mean()
-    denominator = float(np.dot(centered, centered))
+    denominator = float(numpy.dot(centered, centered))
     if denominator == 0.0:
         raise ValueError("values must contain more than one unique value")
     weight_total = 2 * len(edges)
@@ -891,14 +891,14 @@ class GeospatialFeatures:
         """The matrix shape as (number of geometries, number of features)."""
         return (len(self.feature_ids), len(self.feature_names))
 
-    def to_numpy(self) -> np.ndarray:
+    def to_numpy(self) -> numpy.ndarray:
         """Returns a writable copy of the numeric feature matrix.
 
         Returns:
             A float64 array with one row per geometry and one column per
             feature name.
         """
-        return np.asarray(self.values, dtype=np.float64).copy()
+        return numpy.asarray(self.values, dtype=numpy.float64).copy()
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -1081,7 +1081,7 @@ class GeospatialDataset:
             quality_findings.append(
                 build_finding(
                     "quality.geospatial-mixed-temporal-state",
-                    data_contracts.FindingSeverity.WARNING,
+                    data.FindingSeverity.WARNING,
                     {"source": self.source},
                     {"temporal": profile_data["temporal"]},
                     "Supply observation times for every feature or explicitly "
@@ -1115,7 +1115,7 @@ class GeospatialDataset:
             quality_findings.append(
                 build_finding(
                     "quality.geospatial-missing-crs",
-                    data_contracts.FindingSeverity.ERROR,
+                    data.FindingSeverity.ERROR,
                     {"source": self.source},
                     {"feature_count": len(self.features)},
                     "Declare the source CRS before spatial transforms or "
@@ -1127,7 +1127,7 @@ class GeospatialDataset:
             quality_findings.append(
                 build_finding(
                     "quality.geospatial-mixed-geometry",
-                    data_contracts.FindingSeverity.WARNING,
+                    data.FindingSeverity.WARNING,
                     {"source": self.source},
                     {"geometry_types": list(profile.geometry_types)},
                     "Choose a geometry normalization or task-specific "
@@ -1139,7 +1139,7 @@ class GeospatialDataset:
             risk_findings.append(
                 build_finding(
                     "risk.geospatial-mixed-label-state",
-                    data_contracts.FindingSeverity.WARNING,
+                    data.FindingSeverity.WARNING,
                     {"source": self.source},
                     {"label_counts": labels},
                     "Declare whether unlabeled features are valid for the "
@@ -1185,15 +1185,17 @@ class GeospatialDataset:
             )
         if not 1 <= neighbor_count < len(self.features):
             raise ValueError("neighbor_count must be in [1, feature_count)")
-        centroids = np.asarray(
+        centroids = numpy.asarray(
             [feature.centroid for feature in self.features],
-            dtype=np.float64,
+            dtype=numpy.float64,
         )
         edges: set[tuple[int, int]] = set()
         for first in range(len(centroids)):
             distances = [
                 (
-                    float(np.sum((centroids[first] - centroids[second]) ** 2)),
+                    float(
+                        numpy.sum((centroids[first] - centroids[second]) ** 2)
+                    ),
                     second,
                 )
                 for second in range(len(centroids))
@@ -1292,7 +1294,7 @@ class GeospatialDataset:
                             "exception": type(error).__name__,
                         },
                     ) from error
-                if not isinstance(result, (bool, np.bool_)):
+                if not isinstance(result, (bool, numpy.bool_)):
                     raise GeospatialValidationError(
                         "spatial join predicate must return a boolean",
                         {
@@ -1499,7 +1501,7 @@ class GeospatialDataset:
                 "spatial autocorrelation requires numeric values",
                 {"code": "numeric_values_required"},
             )
-        numeric = np.asarray(raw_values, dtype=np.float64)
+        numeric = numpy.asarray(raw_values, dtype=numpy.float64)
         edges = self.spatial_neighbors(effective_neighbor_count)
         try:
             statistic = moran_statistic(numeric, edges)
@@ -1510,7 +1512,7 @@ class GeospatialDataset:
 
         p_value: float | None = None
         if permutations:
-            randomizer = np.random.default_rng(seed)
+            randomizer = numpy.random.default_rng(seed)
             exceedances = 0
             permutation_index = 0
             while permutation_index < permutations:
@@ -1578,8 +1580,8 @@ class GeospatialDataset:
                     float(len(coordinates)),
                 )
             )
-        values = np.asarray(rows, dtype=np.float64)
-        if not np.isfinite(values).all():
+        values = numpy.asarray(rows, dtype=numpy.float64)
+        if not numpy.isfinite(values).all():
             raise GeospatialValidationError(
                 "geospatial features must be finite",
                 {"code": "non_finite_features"},
@@ -2050,7 +2052,7 @@ class RasterSample:
         self,
         decoder: RasterDecoder,
         max_pixels: int = 4_000_000,
-    ) -> np.ndarray:
+    ) -> numpy.ndarray:
         """Decodes bounded numeric pixels through a caller-owned decoder.
 
         The core package does not select a raster codec. The caller owns the
@@ -2079,7 +2081,7 @@ class RasterSample:
         if max_pixels < 1:
             raise ValueError("max_pixels must be positive")
         try:
-            decoded = np.asarray(decoder(self.encoded_bytes))
+            decoded = numpy.asarray(decoder(self.encoded_bytes))
         except Exception as error:
             raise GeospatialValidationError(
                 "raster decoding failed",
@@ -2117,15 +2119,15 @@ class RasterSample:
                     "observed": list(decoded.shape),
                 },
             )
-        if not np.issubdtype(decoded.dtype, np.number) or np.issubdtype(
-            decoded.dtype, np.complexfloating
-        ):
+        if not numpy.issubdtype(
+            decoded.dtype, numpy.number
+        ) or numpy.issubdtype(decoded.dtype, numpy.complexfloating):
             raise GeospatialValidationError(
                 "decoded raster pixels must be real numeric values",
                 {"code": "invalid_pixel_type", "source": self.source},
             )
-        values = np.asarray(decoded, dtype=np.float64).copy()
-        if not np.isfinite(values).all():
+        values = numpy.asarray(decoded, dtype=numpy.float64).copy()
+        if not numpy.isfinite(values).all():
             raise GeospatialValidationError(
                 "decoded raster pixels must be finite",
                 {"code": "non_finite_pixels", "source": self.source},
@@ -2152,7 +2154,7 @@ class RasterSample:
         if self.nodata_value is None:
             return None
         pixels = self.decode(decoder, max_pixels=max_pixels)
-        return float(np.equal(pixels, self.nodata_value).mean())
+        return float(numpy.equal(pixels, self.nodata_value).mean())
 
 
 __all__ = [

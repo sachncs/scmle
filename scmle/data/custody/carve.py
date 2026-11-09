@@ -17,8 +17,8 @@ import dataclasses
 import hashlib
 import math
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.contracts import errors
 from scmle.core import randomness
@@ -41,10 +41,10 @@ class Carve:
         notes: What was done and why.
     """
 
-    exploration_ids: np.ndarray
-    confirmation_ids: np.ndarray
-    embargo_ids: np.ndarray
-    folds: list[tuple[np.ndarray, np.ndarray]]
+    exploration_ids: numpy.ndarray
+    confirmation_ids: numpy.ndarray
+    embargo_ids: numpy.ndarray
+    folds: list[tuple[numpy.ndarray, numpy.ndarray]]
     notes: tuple[str, ...]
 
 
@@ -66,8 +66,8 @@ def derived_seed(charter_hash: str, data_hash: str, seed: int) -> int:
 
 
 def unit_labels(
-    size: int, groups: np.ndarray | None, duplicates: np.ndarray | None
-) -> np.ndarray:
+    size: int, groups: numpy.ndarray | None, duplicates: numpy.ndarray | None
+) -> numpy.ndarray:
     """Labels each row with its unit: the smallest row index in its unit.
 
     Rows sharing a group value or a duplicate-group id are merged
@@ -83,7 +83,7 @@ def unit_labels(
     Returns:
         An integer array of length `size`: the unit label of each row.
     """
-    parent = np.arange(size)
+    parent = numpy.arange(size)
 
     def find(index: int) -> int:
         """Finds the root of a row's unit, compressing the path.
@@ -113,9 +113,9 @@ def unit_labels(
     for keys, none in ((groups, None), (duplicates, NO_DUPLICATE)):
         if keys is None:
             continue
-        codes = pd.factorize(np.asarray(keys))[0]
+        codes = pandas.factorize(numpy.asarray(keys))[0]
         if none is not None:
-            codes = np.where(np.asarray(keys) == none, -1, codes)
+            codes = numpy.where(numpy.asarray(keys) == none, -1, codes)
         first: dict[int, int] = {}
         for index, raw in enumerate(codes):
             code = int(raw)
@@ -125,15 +125,15 @@ def unit_labels(
                 union(first[code], index)
             else:
                 first[code] = index
-    return np.array([find(i) for i in range(size)])
+    return numpy.array([find(i) for i in range(size)])
 
 
 def pick_units(
-    units: np.ndarray,
-    strata: np.ndarray,
+    units: numpy.ndarray,
+    strata: numpy.ndarray,
     fraction: float,
-    rng: np.random.Generator,
-) -> np.ndarray:
+    rng: numpy.random.Generator,
+) -> numpy.ndarray:
     """Marks rows of randomly chosen whole units, stratum by stratum.
 
     In each stratum units are taken in random order until about `fraction` of
@@ -148,10 +148,10 @@ def pick_units(
     Returns:
         A boolean mask over the rows, True for the marked rows.
     """
-    chosen = np.zeros(len(units), dtype=bool)
+    chosen = numpy.zeros(len(units), dtype=bool)
     for stratum in sorted(set(strata.tolist())):
         in_stratum = strata == stratum
-        stratum_units = np.unique(units[in_stratum])
+        stratum_units = numpy.unique(units[in_stratum])
         target = round(fraction * int(in_stratum.sum()))
         rows_taken = 0
         for units_taken, unit in enumerate(rng.permutation(stratum_units)):
@@ -164,8 +164,11 @@ def pick_units(
 
 
 def pick_blocks(
-    times: np.ndarray, fraction: float, embargo: int, rng: np.random.Generator
-) -> tuple[np.ndarray, np.ndarray]:
+    times: numpy.ndarray,
+    fraction: float,
+    embargo: int,
+    rng: numpy.random.Generator,
+) -> tuple[numpy.ndarray, numpy.ndarray]:
     """Marks contiguous time blocks as `C`.
 
     Args:
@@ -180,11 +183,11 @@ def pick_blocks(
         stable time order.
     """
     size = len(times)
-    order = np.argsort(times, kind="stable")
+    order = numpy.argsort(times, kind="stable")
     block = max(4 * embargo, math.ceil(size / BLOCKS), 1)
     starts = list(range(0, size, block))
     target = round(fraction * size)
-    in_c = np.zeros(size, dtype=bool)
+    in_c = numpy.zeros(size, dtype=bool)
     taken = 0
     for index in rng.permutation(len(starts)):
         if taken >= target or taken >= size - block:
@@ -195,7 +198,9 @@ def pick_blocks(
     return in_c, order
 
 
-def close_over_units(in_c: np.ndarray, units: np.ndarray) -> np.ndarray:
+def close_over_units(
+    in_c: numpy.ndarray, units: numpy.ndarray
+) -> numpy.ndarray:
     """Moves any unit split between C and the rest wholly out of C.
 
     Args:
@@ -205,14 +210,16 @@ def close_over_units(in_c: np.ndarray, units: np.ndarray) -> np.ndarray:
     Returns:
         The same `in_c` array after the update.
     """
-    for unit in np.unique(units[in_c]):
+    for unit in numpy.unique(units[in_c]):
         members = units == unit
         if not in_c[members].all():
             in_c[members] = False
     return in_c
 
 
-def embargo_mask(in_c: np.ndarray, order: np.ndarray, rows: int) -> np.ndarray:
+def embargo_mask(
+    in_c: numpy.ndarray, order: numpy.ndarray, rows: int
+) -> numpy.ndarray:
     """Finds rows within `rows` places (in time order) of a `C` row.
 
     Args:
@@ -225,16 +232,16 @@ def embargo_mask(in_c: np.ndarray, order: np.ndarray, rows: int) -> np.ndarray:
         themselves. All False when `rows` is 0 or `C` is empty.
     """
     if rows == 0 or not in_c.any():
-        return np.zeros(len(in_c), dtype=bool)
+        return numpy.zeros(len(in_c), dtype=bool)
     flags = in_c[order].astype(int)
-    spread = np.convolve(flags, np.ones(2 * rows + 1, dtype=int), "full")
+    spread = numpy.convolve(flags, numpy.ones(2 * rows + 1, dtype=int), "full")
     near = spread[rows : rows + len(flags)] > 0
-    mask = np.zeros(len(in_c), dtype=bool)
+    mask = numpy.zeros(len(in_c), dtype=bool)
     mask[order] = near & ~in_c[order]
     return mask
 
 
-def autocorrelation(values: np.ndarray, max_lag: int) -> np.ndarray:
+def autocorrelation(values: numpy.ndarray, max_lag: int) -> numpy.ndarray:
     """Computes the sample autocorrelation (biased, mean-removed).
 
     Args:
@@ -245,12 +252,12 @@ def autocorrelation(values: np.ndarray, max_lag: int) -> np.ndarray:
         An array of length `max_lag` with the autocorrelation at lags
         1 to `max_lag`; zeros for a constant series.
     """
-    series = np.asarray(values, dtype=float)
+    series = numpy.asarray(values, dtype=float)
     series = series - series.mean()
     variance = float(series @ series)
     if variance == 0.0:
-        return np.zeros(max_lag)
-    return np.array(
+        return numpy.zeros(max_lag)
+    return numpy.array(
         [
             float(series[:-lag] @ series[lag:]) / variance
             for lag in range(1, max_lag + 1)
@@ -258,7 +265,7 @@ def autocorrelation(values: np.ndarray, max_lag: int) -> np.ndarray:
     )
 
 
-def acf_embargo(values: np.ndarray, max_lag: int | None = None) -> int:
+def acf_embargo(values: numpy.ndarray, max_lag: int | None = None) -> int:
     """Embargo length from the measured serial dependence of a series.
 
     `values` must be in time order. The embargo is the number of leading
@@ -284,15 +291,15 @@ def acf_embargo(values: np.ndarray, max_lag: int | None = None) -> int:
         return 0
     limit = min(size // 4 if max_lag is None else max_lag, size // 2, 1000)
     band = 1.96 / math.sqrt(size)
-    inside = np.abs(autocorrelation(values, limit)) <= band
-    return int(np.argmax(inside)) if inside.any() else limit
+    inside = numpy.abs(autocorrelation(values, limit)) <= band
+    return int(numpy.argmax(inside)) if inside.any() else limit
 
 
 def restrict_folds(
-    folds: list[tuple[np.ndarray, np.ndarray]],
-    dev_ids: np.ndarray,
-    exploration_ids: np.ndarray,
-) -> list[tuple[np.ndarray, np.ndarray]]:
+    folds: list[tuple[numpy.ndarray, numpy.ndarray]],
+    dev_ids: numpy.ndarray,
+    exploration_ids: numpy.ndarray,
+) -> list[tuple[numpy.ndarray, numpy.ndarray]]:
     """Re-expresses folds over the exploration rows only.
 
     Every exploration row stays in the same validation fold it had before;
@@ -310,7 +317,7 @@ def restrict_folds(
         ConfigError: If a validation fold would be left empty.
     """
     position = {int(row): index for index, row in enumerate(exploration_ids)}
-    mapping = np.array([position.get(int(row), -1) for row in dev_ids])
+    mapping = numpy.array([position.get(int(row), -1) for row in dev_ids])
     restricted = []
     for fit, held in folds:
         kept_fit, kept_held = mapping[fit], mapping[held]
@@ -326,7 +333,7 @@ def restrict_folds(
 def check_inputs(
     size: int,
     fraction: float,
-    arrays: dict[str, np.ndarray | None],
+    arrays: dict[str, numpy.ndarray | None],
 ) -> None:
     """Validates the fraction and that every array is aligned.
 
@@ -347,17 +354,17 @@ def check_inputs(
 
 
 def carve_confirmation(
-    dev_ids: np.ndarray,
-    folds: list[tuple[np.ndarray, np.ndarray]],
+    dev_ids: numpy.ndarray,
+    folds: list[tuple[numpy.ndarray, numpy.ndarray]],
     *,
     fraction: float,
     seed: int,
     charter_hash: str,
     data_hash: str,
-    labels: np.ndarray | None = None,
-    groups: np.ndarray | None = None,
-    times: np.ndarray | None = None,
-    duplicates: np.ndarray | None = None,
+    labels: numpy.ndarray | None = None,
+    groups: numpy.ndarray | None = None,
+    times: numpy.ndarray | None = None,
+    duplicates: numpy.ndarray | None = None,
     embargo_rows: int = 0,
 ) -> Carve:
     """Divides the development rows into `X`, `C` and the embargo.
@@ -389,7 +396,7 @@ def carve_confirmation(
         units exist or nothing was drawn, `C` and the embargo are empty,
         every development row is in `X` and a note says so.
     """
-    dev_ids = np.asarray(dev_ids)
+    dev_ids = numpy.asarray(dev_ids)
     size = len(dev_ids)
     check_inputs(
         size,
@@ -406,10 +413,10 @@ def carve_confirmation(
     )
     units = unit_labels(size, groups, duplicates)
     notes: list[str] = []
-    order = np.arange(size)
+    order = numpy.arange(size)
     if times is not None:
         in_c, order = pick_blocks(
-            np.asarray(times), fraction, embargo_rows, rng
+            numpy.asarray(times), fraction, embargo_rows, rng
         )
         in_c = close_over_units(in_c, units)
         embargo = embargo_mask(in_c, order, embargo_rows)
@@ -419,14 +426,16 @@ def carve_confirmation(
         )
     else:
         strata = (
-            np.asarray(labels).astype(str)
+            numpy.asarray(labels).astype(str)
             if labels is not None
-            else np.full(size, "all")
+            else numpy.full(size, "all")
         )
-        first = pd.Series(strata).groupby(units).transform("first").to_numpy()
+        first = (
+            pandas.Series(strata).groupby(units).transform("first").to_numpy()
+        )
         in_c = pick_units(units, first, fraction, rng)
-        embargo = np.zeros(size, dtype=bool)
-    if len(np.unique(units)) < 2 or not in_c.any():
+        embargo = numpy.zeros(size, dtype=bool)
+    if len(numpy.unique(units)) < 2 or not in_c.any():
         notes.append("no confirmation set carved: too few units to separate")
         in_c[:] = False
         embargo[:] = False

@@ -10,7 +10,7 @@ from collections.abc import Sequence
 import math
 from typing import Any
 
-import pandas as pd
+import pandas
 
 PRIMITIVES = (
     "count",
@@ -46,7 +46,7 @@ def is_missing(value: Any) -> bool:
         return False
 
 
-def records(frame: pd.DataFrame) -> list[Mapping[str, Any]]:
+def records(frame: pandas.DataFrame) -> list[Mapping[str, Any]]:
     """Returns the frame rows as dicts keyed by column name.
 
     Args:
@@ -244,10 +244,10 @@ def primitive(
 
 
 def aggregate_feature(
-    targets: pd.DataFrame,
+    targets: pandas.DataFrame,
     key_col: str,
     moment_col: str,
-    child: pd.DataFrame,
+    child: pandas.DataFrame,
     child_key_col: str,
     event_col: str,
     known_col: str | None,
@@ -305,15 +305,15 @@ def aggregate_feature(
 
 
 def nested_feature(
-    targets: pd.DataFrame,
+    targets: pandas.DataFrame,
     key_col: str,
     moment_col: str,
-    mid: pd.DataFrame,
+    mid: pandas.DataFrame,
     mid_key_col: str,
     mid_id_col: str,
     mid_event_col: str,
     mid_known_col: str | None,
-    leaf: pd.DataFrame,
+    leaf: pandas.DataFrame,
     leaf_link_col: str,
     leaf_event_col: str,
     leaf_known_col: str | None,
@@ -411,10 +411,10 @@ def nested_feature(
 
 
 def lookup_feature(
-    targets: pd.DataFrame,
+    targets: pandas.DataFrame,
     key_col: str,
     moment_col: str,
-    parent: pd.DataFrame,
+    parent: pandas.DataFrame,
     parent_key_col: str,
     event_col: str,
     known_col: str | None,

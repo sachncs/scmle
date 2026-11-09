@@ -3,16 +3,16 @@
 import dataclasses
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
-from scmle.contracts import metrics as metric_contracts
+from scmle.contracts import metrics
 
 MAX_CONCORDANCE_ROWS = 4000
 
 
 def concordance_index(
-    duration: np.ndarray, event: np.ndarray, risk: np.ndarray
+    duration: numpy.ndarray, event: numpy.ndarray, risk: numpy.ndarray
 ) -> float:
     """Harrell's concordance index.
 
@@ -30,15 +30,17 @@ def concordance_index(
         The index, or NaN when no pair is comparable. Large inputs are
         evenly thinned to `MAX_CONCORDANCE_ROWS` rows.
     """
-    time = np.asarray(duration, dtype=float)
-    seen = np.asarray(event, dtype=bool)
-    score = np.asarray(risk, dtype=float)
+    time = numpy.asarray(duration, dtype=float)
+    seen = numpy.asarray(event, dtype=bool)
+    score = numpy.asarray(risk, dtype=float)
     if len(time) > MAX_CONCORDANCE_ROWS:
-        keep = np.linspace(0, len(time) - 1, MAX_CONCORDANCE_ROWS).astype(int)
+        keep = numpy.linspace(0, len(time) - 1, MAX_CONCORDANCE_ROWS).astype(
+            int
+        )
         time, seen, score = time[keep], seen[keep], score[keep]
     concordant = 0.0
     comparable = 0.0
-    for index in np.flatnonzero(seen):
+    for index in numpy.flatnonzero(seen):
         later = time > time[index]
         count = int(later.sum())
         if count == 0:
@@ -50,7 +52,7 @@ def concordance_index(
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ConcordanceMetric(metric_contracts.Metric):
+class ConcordanceMetric(metrics.Metric):
     """Harrell's concordance index as a catalog metric.
 
     The scorer reads the event indicator from the frame the estimator was
@@ -79,14 +81,14 @@ class ConcordanceMetric(metric_contracts.Metric):
 
         def score(
             estimator: Any,
-            features: pd.DataFrame,
-            target: pd.Series,
+            features: pandas.DataFrame,
+            target: pandas.Series,
             sample_weight: Any = None,
         ) -> float:
             return concordance_index(
-                np.asarray(target, dtype=float),
+                numpy.asarray(target, dtype=float),
                 features[estimator.event_column].to_numpy(dtype=float),
-                np.asarray(estimator.predict(features), dtype=float),
+                numpy.asarray(estimator.predict(features), dtype=float),
             )
 
         return score

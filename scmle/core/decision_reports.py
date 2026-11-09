@@ -42,13 +42,13 @@ import json
 from pathlib import Path
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.contracts import signing
-from scmle.data.charter import contracts as charter_contracts
+from scmle.data.charter import contracts
 from scmle.data.charter import decision as charter_decision
-from scmle.data.ledger import ledger as ledger_module
+from scmle.data.ledger import ledger
 from scmle.decision import constraints
 from scmle.decision import design
 from scmle.decision import ope
@@ -83,7 +83,7 @@ def file_digest(path: Path) -> str | None:
     body = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(body, dict):
         raise ValueError(f"{path.name} is not a JSON object")
-    return ledger_module.digest(body)
+    return ledger.digest(body)
 
 
 def file_digests(folder: str | Path) -> dict[str, str | None]:
@@ -101,10 +101,10 @@ def file_digests(folder: str | Path) -> dict[str, str | None]:
 
 def policy_value(
     layer: charter_decision.DecisionLayer,
-    actions: np.ndarray,
-    outcome: np.ndarray,
-    logged: np.ndarray | None,
-    propensity: np.ndarray | None,
+    actions: numpy.ndarray,
+    outcome: numpy.ndarray,
+    logged: numpy.ndarray | None,
+    propensity: numpy.ndarray | None,
 ) -> dict[str, Any]:
     """Off-policy value of the frozen rule, or why there is none.
 
@@ -131,22 +131,25 @@ def policy_value(
             "data.propensity_column are both needed; propensities are never "
             "estimated here",
         }
-    p = np.asarray(propensity, dtype=float)
-    a = np.asarray(logged, dtype=float)
+    p = numpy.asarray(propensity, dtype=float)
+    a = numpy.asarray(logged, dtype=float)
     if (
-        not np.isfinite(p).all()
+        not numpy.isfinite(p).all()
         or ((p <= 0) | (p >= 1)).any()
-        or not np.isin(a, (0.0, 1.0)).all()
+        or not numpy.isin(a, (0.0, 1.0)).all()
     ):
         return {
             "status": NOT_ASSESSABLE,
             "reason": "propensities must lie strictly between 0 and 1 and the "
             "logged action must be 0 or 1",
         }
-    behaviour = np.column_stack([1.0 - p, p])
-    target = np.column_stack([1.0 - actions, actions])
+    behaviour = numpy.column_stack([1.0 - p, p])
+    target = numpy.column_stack([1.0 - actions, actions])
     log = ope.LoggedBandit(
-        a.astype(np.intp), np.asarray(outcome, dtype=float), behaviour, target
+        a.astype(numpy.intp),
+        numpy.asarray(outcome, dtype=float),
+        behaviour,
+        target,
     )
     rules = layer.model.off_policy
     found = ope.estimate_value(
@@ -169,9 +172,9 @@ def policy_value(
 
 def fairness(
     layer: charter_decision.DecisionLayer,
-    features: pd.DataFrame,
-    outcome: np.ndarray,
-    actions: np.ndarray,
+    features: pandas.DataFrame,
+    outcome: numpy.ndarray,
+    actions: numpy.ndarray,
     alpha: float,
 ) -> list[dict[str, Any]]:
     """The satisfaction test for each declared constraint.
@@ -206,7 +209,7 @@ def fairness(
 
 
 def rollout_design(
-    charter: charter_contracts.AnalysisCharter, base_rate: float
+    charter: contracts.AnalysisCharter, base_rate: float
 ) -> tuple[dict[str, Any], rollout.DecisionLog] | None:
     """The rollout plan's design record and its one-row decision log.
 
@@ -265,7 +268,7 @@ def rollout_design(
 
 
 def decision_report(
-    charter: charter_contracts.AnalysisCharter,
+    charter: contracts.AnalysisCharter,
     decision: Mapping[str, Any] | None,
     net_benefit: Mapping[str, Any] | None,
     value: Mapping[str, Any],

@@ -1,6 +1,6 @@
 """Thresholding with a calibration gate, and net benefit with a band."""
 
-import numpy as np
+import numpy
 import pytest
 
 from scmle.data.framing import costs
@@ -22,10 +22,10 @@ def model(fp=5.0, fn=100.0, lo=0.02, hi=0.15):
 
 
 def world(n, seed, skew=1.0):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     p = rng.beta(1, 6, n)
     y = (rng.random(n) < p).astype(float)
-    return np.clip(p**skew, 0, 1), y
+    return numpy.clip(p**skew, 0, 1), y
 
 
 def test_the_bayes_threshold_is_the_closed_form():
@@ -35,7 +35,7 @@ def test_the_bayes_threshold_is_the_closed_form():
 
 
 def test_the_net_benefit_identity_holds_on_random_tables():
-    rng = np.random.default_rng(0)
+    rng = numpy.random.default_rng(0)
     for ignored in range(20):
         y = (rng.random(300) < rng.uniform(0.1, 0.6)).astype(float)
         a = (rng.random(300) < 0.4).astype(float)
@@ -96,9 +96,9 @@ def test_a_cost_that_is_not_human_lowers_the_tier():
 
 
 def test_platt_scaling_recovers_a_planted_map():
-    rng = np.random.default_rng(4)
+    rng = numpy.random.default_rng(4)
     raw = rng.uniform(0.02, 0.98, 20000)
-    truth = 1 / (1 + np.exp(-(0.4 + 1.5 * np.log(raw / (1 - raw)))))
+    truth = 1 / (1 + numpy.exp(-(0.4 + 1.5 * numpy.log(raw / (1 - raw)))))
     y = (rng.random(raw.size) < truth).astype(float)
     fitted = threshold.fit_recalibrator(raw, y)
     assert fitted.intercept == pytest.approx(0.4, abs=0.08)
@@ -115,10 +115,10 @@ def test_the_calibration_check_refuses_small_or_bad_inputs():
 
 
 def test_cluster_intervals_are_wider_than_independent_ones():
-    rng = np.random.default_rng(5)
-    clusters = np.repeat(np.arange(100), 20)
-    effect = np.repeat(rng.normal(0, 0.15, 100), 20)
-    p = np.clip(0.2 + effect, 0.01, 0.99)
+    rng = numpy.random.default_rng(5)
+    clusters = numpy.repeat(numpy.arange(100), 20)
+    effect = numpy.repeat(rng.normal(0, 0.15, 100), 20)
+    p = numpy.clip(0.2 + effect, 0.01, 0.99)
     y = (rng.random(2000) < p).astype(float)
     acts = (p > 0.2).astype(float)
     m = model()
@@ -128,10 +128,10 @@ def test_cluster_intervals_are_wider_than_independent_ones():
 
 
 def test_a_useful_rule_is_called_useful_and_a_random_one_is_not():
-    rng = np.random.default_rng(6)
+    rng = numpy.random.default_rng(6)
     n = 6000
     y = (rng.random(n) < 0.2).astype(float)
-    good = np.where(y == 1, rng.random(n) < 0.9, rng.random(n) < 0.1).astype(
+    good = numpy.where(y == 1, rng.random(n) < 0.9, rng.random(n) < 0.1).astype(
         float
     )
     rule = netbenefit.net_benefit_band(y, good, (0.1, 0.4), seed=1)
@@ -147,7 +147,7 @@ def test_a_useful_rule_is_called_useful_and_a_random_one_is_not():
 
 
 def test_the_band_matches_point_net_benefit_and_includes_the_incumbent():
-    rng = np.random.default_rng(7)
+    rng = numpy.random.default_rng(7)
     y = (rng.random(2000) < 0.3).astype(float)
     a = (rng.random(2000) < 0.4).astype(float)
     b = (rng.random(2000) < 0.5).astype(float)
@@ -167,9 +167,9 @@ def test_the_band_matches_point_net_benefit_and_includes_the_incumbent():
 
 
 def test_clusters_widen_the_band():
-    rng = np.random.default_rng(8)
-    clusters = np.repeat(np.arange(100), 20)
-    base = np.repeat(rng.uniform(0.05, 0.6, 100), 20)
+    rng = numpy.random.default_rng(8)
+    clusters = numpy.repeat(numpy.arange(100), 20)
+    base = numpy.repeat(rng.uniform(0.05, 0.6, 100), 20)
     y = (rng.random(2000) < base).astype(float)
     a = (rng.random(2000) < 0.3 + 0.4 * base).astype(float)
     flat = netbenefit.net_benefit_band(y, a, (0.1, 0.3), seed=3)
@@ -185,7 +185,7 @@ def test_clusters_widen_the_band():
 
 
 def test_the_final_table_is_evaluated_once_for_the_registered_rule():
-    y = np.array([1.0, 0.0] * 100)
+    y = numpy.array([1.0, 0.0] * 100)
     a = y.copy()
     guard = netbenefit.FinalNetBenefit("abc")
     with pytest.raises(netbenefit.SecondEvaluationError, match="differs"):
@@ -208,6 +208,6 @@ def test_the_final_table_is_evaluated_once_for_the_registered_rule():
     ],
 )
 def test_bad_band_inputs_are_refused(args):
-    y = np.array([1.0, 0.0] * 20)
+    y = numpy.array([1.0, 0.0] * 20)
     with pytest.raises(ValueError):
         netbenefit.net_benefit_band(y, y, **args)

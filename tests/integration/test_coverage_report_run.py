@@ -3,20 +3,20 @@
 import json
 import pathlib
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 import support
 
 import scmle
-from scmle.artifacts import bundle as bundle_module
+from scmle.artifacts import bundle
 from scmle.contracts import errors
 
 
 def regression_frame(rows=400, seed=0):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     x = rng.uniform(0, 10, rows)
-    return pd.DataFrame({"x": x, "y": 2 * x + rng.normal(0, 1, rows)})
+    return pandas.DataFrame({"x": x, "y": 2 * x + rng.normal(0, 1, rows)})
 
 
 @pytest.fixture(scope="module")
@@ -46,7 +46,7 @@ def test_the_report_is_saved_with_the_bundle_and_checksummed(
     regression.bundle.save(tmp_path / "copy")
     loaded = scmle.ModelBundle.load(tmp_path / "copy", trusted=True)
     assert loaded.coverage_report == regression.bundle.coverage_report
-    path = tmp_path / "copy" / bundle_module.COVERAGE_FILE
+    path = tmp_path / "copy" / bundle.COVERAGE_FILE
     path.write_text(path.read_text().replace("0.9", "0.8", 1))
     with pytest.raises(errors.ArtifactError, match="coverage report"):
         scmle.ModelBundle.load(tmp_path / "copy", trusted=True)

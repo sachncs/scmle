@@ -13,7 +13,7 @@ from typing import Any
 from typing import ClassVar
 from typing import Protocol
 
-from scmle.contracts import data as data_contracts
+from scmle.contracts import data
 from scmle.contracts import search
 from scmle.contracts import tasks
 
@@ -162,7 +162,7 @@ class ModelAdapter(abc.ABC):
 
     def assemble(
         self,
-        plan: data_contracts.FeaturePlan,
+        plan: data.FeaturePlan,
         task: tasks.TaskType,
         seed: int,
         params: Mapping[str, Any] | None = None,

@@ -3,17 +3,17 @@
 import dataclasses
 import importlib.util
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
 from scmle.artifacts import bundle as bundle_module
-from scmle.contracts import data as data_contracts
+from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.data.curation import preprocessing
 from scmle.inference import onnx_export
-from scmle.models import registry as registry_module
+from scmle.models import registry
 
 pytestmark = pytest.mark.skipif(
     importlib.util.find_spec("skl2onnx") is None
@@ -21,20 +21,20 @@ pytestmark = pytest.mark.skipif(
     reason="the onnx extra is not installed",
 )
 
-PLAN = data_contracts.FeaturePlan(("num", "num2"), ("cat",))
-REGISTRY = registry_module.ModelRegistry.with_builtins()
+PLAN = data.FeaturePlan(("num", "num2"), ("cat",))
+REGISTRY = registry.ModelRegistry.with_builtins()
 
 
 def frame(rows=400, seed=0):
-    rng = np.random.default_rng(seed)
-    features = pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    features = pandas.DataFrame(
         {
             "num": rng.normal(size=rows),
             "num2": rng.normal(size=rows),
             "cat": rng.choice(["a", "b", "c"], rows),
         }
     )
-    features.loc[::17, "num"] = np.nan
+    features.loc[::17, "num"] = numpy.nan
     return features
 
 
@@ -43,8 +43,10 @@ def make_bundle(name, task, features=None):
     if task is tasks.TaskType.REGRESSION:
         target = features.num2 * 3 + (features.cat == "a") * 2
     else:
-        target = pd.Series(
-            np.where(features.num2 + (features.cat == "a") > 0.5, "yes", "no")
+        target = pandas.Series(
+            numpy.where(
+                features.num2 + (features.cat == "a") > 0.5, "yes", "no"
+            )
         )
     fitted = preprocessing.build_pipeline(
         PLAN, REGISTRY.get(name), task, 0
@@ -88,7 +90,7 @@ def test_a_regressor_matches_on_scaled_values(tmp_path):
     path = bundle.export_onnx(tmp_path / "m.onnx", check=features)
 
     scorer = onnx_export.OnnxScorer(bundle, path)
-    np.testing.assert_allclose(
+    numpy.testing.assert_allclose(
         scorer.predict(features),
         bundle.predict(features),
         rtol=1e-3,
@@ -102,7 +104,7 @@ def test_the_scorer_returns_probabilities_in_class_order(tmp_path):
 
     scorer = onnx_export.OnnxScorer(bundle, path)
 
-    np.testing.assert_allclose(
+    numpy.testing.assert_allclose(
         scorer.predict_proba(features),
         bundle.predict_proba(features),
         atol=1e-4,
@@ -186,14 +188,14 @@ def test_nan_outputs_do_not_pass_the_parity_check(monkeypatch, tmp_path):
 
     class Pipeline:
         def predict(self, rows):
-            return np.zeros(len(rows))
+            return numpy.zeros(len(rows))
 
     class Session:
         def __init__(self, path):
             pass
 
         def run(self, names, inputs):
-            return [np.full(3, np.nan)]
+            return [numpy.full(3, numpy.nan)]
 
     bundle = types.SimpleNamespace(
         classes=None,
@@ -208,5 +210,5 @@ def test_nan_outputs_do_not_pass_the_parity_check(monkeypatch, tmp_path):
     monkeypatch.setattr(onnx_export, "feed", lambda b, rows: {})
     with pytest.raises(errors.ArtifactError, match="differs"):
         onnx_export.verify(
-            bundle, tmp_path / "m.onnx", pd.DataFrame({"a": [1, 2, 3]})
+            bundle, tmp_path / "m.onnx", pandas.DataFrame({"a": [1, 2, 3]})
         )

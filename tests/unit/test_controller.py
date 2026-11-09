@@ -5,7 +5,7 @@ import json
 import pytest
 
 from scmle import cli
-from scmle.governance import deployment_ledger as dl
+from scmle.governance import deployment_ledger
 from scmle.operations import controller as controller_module
 from tests.simulation import world as worlds
 
@@ -35,7 +35,7 @@ def test_applying_is_journalled_as_intent_then_applied(world):
     phases = [
         (row["body"]["phase"], row["body"].get("what"))
         for row in controller.loop.ledger.rows
-        if row["kind"] == dl.CONTROLLER
+        if row["kind"] == deployment_ledger.CONTROLLER
     ]
     assert phases == [
         ("intent", "batch"),
@@ -112,7 +112,9 @@ def test_a_state_that_trails_the_ledger_halts_instead_of_guessing(world):
     world.deliver(0)
     controller = world.controller()
     controller.tick(world.inbox)
-    controller.loop.ledger.commit(dl.CONTROLLER, {"phase": dl.TICK})
+    controller.loop.ledger.commit(
+        deployment_ledger.CONTROLLER, {"phase": deployment_ledger.TICK}
+    )
     world.deliver(1)
     result = world.controller().tick(world.inbox)
     assert result.status == controller_module.HALTED

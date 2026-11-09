@@ -33,7 +33,7 @@ from typing import Any
 import numpy as np
 from numpy.typing import ArrayLike
 from numpy.typing import NDArray
-import pandas as pd
+import pandas
 
 from scmle.contracts import errors
 from scmle.data.charter import decision as charter_decision
@@ -42,7 +42,7 @@ from scmle.decision import design
 from scmle.decision import rollout
 from scmle.governance import deployment_ledger
 from scmle.governance import lifecycle
-from scmle.governance import registry as registry_module
+from scmle.governance import registry
 
 
 class RolloutHook:
@@ -79,7 +79,7 @@ class RolloutHook:
         self.experiment: rollout.Rollout | None = None
         self.experiment_id: str | None = None
         self.decision: rollout.Decision | None = None
-        self.challenger: registry_module.VersionRecord | None = None
+        self.challenger: registry.VersionRecord | None = None
         self.monitor: rollout.RollbackMonitor | None = None
         self.champion_id: str | None = None
         self.units = 0
@@ -112,7 +112,7 @@ class RolloutHook:
 
     def review(
         self,
-        fresh: pd.DataFrame,
+        fresh: pandas.DataFrame,
         target: str,
         retrain: bool = True,
         project_options: dict[str, Any] | None = None,
@@ -139,10 +139,10 @@ class RolloutHook:
 
     def check_rollback(
         self,
-        fresh: pd.DataFrame,
+        fresh: pandas.DataFrame,
         target: str,
         policy: lifecycle.RollbackPolicy | None = None,
-        approval: registry_module.PromotionApproval | None = None,
+        approval: registry.PromotionApproval | None = None,
         signing_key: str | bytes | None = None,
     ) -> lifecycle.RollbackOutcome:
         """Runs `LifecycleManager.check_rollback` as a logged diagnostic.
@@ -197,7 +197,7 @@ class RolloutHook:
             The level assigned from the decision budget.
         """
         challenger = self.manager.registry.resolve(
-            self.manager.model, registry_module.CHALLENGER
+            self.manager.model, registry.CHALLENGER
         )
         budget, level = budget_module.assign_experiment(
             self.budget, experiment_id
@@ -309,9 +309,9 @@ class RolloutHook:
 
     def promote(
         self,
-        approval: registry_module.PromotionApproval,
+        approval: registry.PromotionApproval,
         signing_key: str | bytes | None = None,
-    ) -> registry_module.VersionRecord:
+    ) -> registry.VersionRecord:
         """Moves the champion alias after a `promote` decision, with approval.
 
         Without a valid independent approval the registry refuses with an
@@ -401,7 +401,7 @@ class RolloutHook:
 
     def roll_back(
         self,
-        approval: registry_module.PromotionApproval,
+        approval: registry.PromotionApproval,
         signing_key: str | bytes | None = None,
     ) -> int:
         """Restores the previous champion after a rollback decision.

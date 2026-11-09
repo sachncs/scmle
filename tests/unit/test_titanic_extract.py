@@ -4,7 +4,7 @@ import hashlib
 import json
 from pathlib import Path
 
-import pandas as pd
+import pandas
 import pytest
 
 from benchmarks.qualification import corpora
@@ -17,7 +17,7 @@ ENTRY = "titanic-boat-body"
 
 @pytest.fixture(scope="module")
 def frame():
-    return pd.read_csv(FIXTURE)
+    return pandas.read_csv(FIXTURE)
 
 
 @pytest.fixture(scope="module")

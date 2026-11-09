@@ -7,9 +7,9 @@ past results never leak into their own evaluation.
 
 import math
 
-import numpy as np
+import numpy
 
-from scmle.contracts import data as data_contracts
+from scmle.contracts import data
 from scmle.contracts import experiments
 from scmle.contracts import tasks
 
@@ -25,7 +25,7 @@ NEIGHBORS = 5
 
 
 def fingerprint(
-    profile: data_contracts.DatasetProfile, task: tasks.TaskType
+    profile: data.DatasetProfile, task: tasks.TaskType
 ) -> dict[str, float]:
     """Summarizes a dataset as a small numeric vector.
 
@@ -44,7 +44,7 @@ def fingerprint(
     ]
     imbalance = profile.target_summary.get("imbalance_ratio", 1.0)
     missing_rate = (
-        float(np.mean([stats[c]["missing_rate"] for c in features]))
+        float(numpy.mean([stats[c]["missing_rate"] for c in features]))
         if features
         else 0.0
     )
@@ -54,7 +54,7 @@ def fingerprint(
         "categorical_share": len(plan.categorical) / max(len(features), 1),
         "missing_rate": missing_rate,
         "log_imbalance": math.log10(max(imbalance, 1.0)),
-        "mean_abs_skew": float(np.mean(numeric_skews))
+        "mean_abs_skew": float(numpy.mean(numeric_skews))
         if numeric_skews
         else 0.0,
     }
@@ -126,12 +126,12 @@ class MetaLearner:
         pool = self.eligible(task, dataset_id, data_hash)
         if not pool:
             return []
-        matrix = np.array([[r.fingerprint[f] for f in FIELDS] for r in pool])
-        target = np.array([current[f] for f in FIELDS])
-        scale = np.vstack([matrix, target]).std(axis=0)
+        matrix = numpy.array([[r.fingerprint[f] for f in FIELDS] for r in pool])
+        target = numpy.array([current[f] for f in FIELDS])
+        scale = numpy.vstack([matrix, target]).std(axis=0)
         scale[scale == 0] = 1.0
-        distances = np.linalg.norm((matrix - target) / scale, axis=1)
-        order = np.argsort(distances)[: self.neighbors]
+        distances = numpy.linalg.norm((matrix - target) / scale, axis=1)
+        order = numpy.argsort(distances)[: self.neighbors]
         weights: dict[str, float] = {}
         for index in order:
             model = pool[index].selected_model

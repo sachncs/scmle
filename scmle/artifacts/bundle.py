@@ -22,7 +22,7 @@ from typing import Any
 from typing import Self
 
 import joblib
-import numpy as np
+import numpy
 import pandas as pd
 import sklearn
 from sklearn import calibration
@@ -30,18 +30,18 @@ from sklearn import frozen
 
 import scmle
 from scmle import durability
-from scmle.contracts import artifacts as artifact_contracts
+from scmle.contracts import artifacts
 from scmle.contracts import data as data_contracts
 from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.data.readers import interchange
 from scmle.data.readers import tabular
 from scmle.evaluation import conformal as conformal_module
-from scmle.evaluation import cv_plus as cv_plus_module
+from scmle.evaluation import cv_plus
 from scmle.evaluation import dirichlet
 from scmle.evaluation import quantile as quantile_module
 from scmle.evaluation import reliability
-from scmle.evaluation import shift_weights as shift_weights_module
+from scmle.evaluation import shift_weights
 from scmle.explainability import counterfactual as counterfactual_module
 from scmle.explainability import local
 from scmle.features import feature_graph
@@ -122,7 +122,9 @@ def installed_versions() -> dict[str, str]:
 
 
 def brier(
-    probabilities: np.ndarray, labels: np.ndarray, classes: tuple[Any, ...]
+    probabilities: numpy.ndarray,
+    labels: numpy.ndarray,
+    classes: tuple[Any, ...],
 ) -> float:
     """Computes the multiclass Brier score of predicted probabilities.
 
@@ -135,8 +137,8 @@ def brier(
         The mean over samples of the squared differences to the one-hot truth,
         summed over classes (0 is perfect).
     """
-    truth = (labels[:, None] == np.asarray(classes)[None, :]).astype(float)
-    return float(np.mean(np.sum((probabilities - truth) ** 2, axis=1)))
+    truth = (labels[:, None] == numpy.asarray(classes)[None, :]).astype(float)
+    return float(numpy.mean(numpy.sum((probabilities - truth) ** 2, axis=1)))
 
 
 def file_sha256(path: pathlib.Path) -> str:
@@ -384,7 +386,7 @@ class ModelBundle:
     def __init__(
         self,
         pipeline: Any,
-        schema: artifact_contracts.BundleSchema,
+        schema: artifacts.BundleSchema,
         info: BundleInfo,
         reference: reference_module.ReferenceProfile | None = None,
         history: pd.DataFrame | None = None,
@@ -421,12 +423,10 @@ class ModelBundle:
         self.quantile = quantile
         # The fold models behind `predict_interval(method="cv_plus")`; set
         # by the run or by `load`, kept out of the constructor signature.
-        self.cv_plus: cv_plus_module.CvPlusEnsemble | None = None
+        self.cv_plus: cv_plus.CvPlusEnsemble | None = None
         # Calibration weights for covariate shift, attached on demand by
         # `attach_shift_weights`.
-        self.shift_weights: shift_weights_module.StoredShiftWeights | None = (
-            None
-        )
+        self.shift_weights: shift_weights.StoredShiftWeights | None = None
         # Measured coverage of the stored intervals or sets on the final test
         # rows (`coverage_run.run_report`), set by the run.
         self.coverage_report: dict[str, Any] | None = None
@@ -500,7 +500,7 @@ class ModelBundle:
             for column in categorical
         }
         classes = getattr(pipeline, "classes_", None)
-        schema = artifact_contracts.BundleSchema(
+        schema = artifacts.BundleSchema(
             target=target,
             task=task,
             numeric=numeric,
@@ -513,7 +513,7 @@ class ModelBundle:
             if class_labels is not None
             else None
             if classes is None
-            else tuple(np.asarray(classes).tolist()),
+            else tuple(numpy.asarray(classes).tolist()),
             extra_inputs=extra,
             series=tuple(n.model_dump(mode="json") for n in plan.series),
             series_columns=series_columns,
@@ -569,18 +569,18 @@ class ModelBundle:
                 `$SCMLE_ENV` is `production`.
         """
         reloaded = ModelBundle.load(directory, trusted=True)
-        before = np.asarray(self.predict(sample))
-        after = np.asarray(reloaded.predict(sample))
+        before = numpy.asarray(self.predict(sample))
+        after = numpy.asarray(reloaded.predict(sample))
         if before.dtype.kind in "fiu":
-            worst = float(np.max(np.abs(before - after), initial=0.0))
+            worst = float(numpy.max(numpy.abs(before - after), initial=0.0))
         else:
-            worst = float(np.sum(before != after))
+            worst = float(numpy.sum(before != after))
         if self.schema.classes is not None:
             worst = max(
                 worst,
                 float(
-                    np.max(
-                        np.abs(
+                    numpy.max(
+                        numpy.abs(
                             self.predict_proba(sample)
                             - reloaded.predict_proba(sample)
                         ),
@@ -624,7 +624,7 @@ class ModelBundle:
         report = self.validate(frame)
         predictions = self.predict(frame)
         result: dict[str, Any] = {
-            "predictions": np.asarray(predictions).tolist(),
+            "predictions": numpy.asarray(predictions).tolist(),
             "model_version": self.info.model_version,
             "schema_valid": report.valid,
             "diagnostics": {
@@ -710,7 +710,7 @@ class ModelBundle:
                 "dirichlet calibration needs three or more classes"
             )
         frame = self.prepare_frame(data)
-        labels = np.asarray(target)
+        labels = numpy.asarray(target)
         before = self.pipeline.predict_proba(frame)
         if method == "dirichlet":
             calibrator: Any = dirichlet.DirichletCalibrator(self.pipeline).fit(
@@ -1002,7 +1002,7 @@ class ModelBundle:
             manifest = json.loads(
                 (root / MANIFEST_FILE).read_text(encoding="utf-8")
             )
-            schema = artifact_contracts.BundleSchema.from_dict(
+            schema = artifacts.BundleSchema.from_dict(
                 json.loads((root / SCHEMA_FILE).read_text(encoding="utf-8"))
             )
         except FileNotFoundError as error:
@@ -1216,7 +1216,7 @@ class ModelBundle:
         self,
         data: str | pathlib.Path | pd.DataFrame,
         mapping: mapping_module.ColumnMapping | None = None,
-    ) -> artifact_contracts.SchemaReport:
+    ) -> artifacts.SchemaReport:
         """Checks input against the schema without predicting.
 
         Args:
@@ -1270,7 +1270,7 @@ class ModelBundle:
         self,
         data: str | pathlib.Path | pd.DataFrame,
         mapping: mapping_module.ColumnMapping | None = None,
-    ) -> np.ndarray:
+    ) -> numpy.ndarray:
         """Predicts labels or values through the full fitted pipeline.
 
         Args:
@@ -1284,10 +1284,10 @@ class ModelBundle:
         """
         predictions = self.pipeline.predict(self.prepare_frame(data, mapping))
         if self.schema.targets:
-            return np.asarray(predictions)
+            return numpy.asarray(predictions)
         if self.schema.task == tasks.TaskType.ORDINAL.value:
-            labels = np.asarray(self.schema.classes, dtype=object)
-            return labels[np.asarray(predictions).astype(int)]
+            labels = numpy.asarray(self.schema.classes, dtype=object)
+            return labels[numpy.asarray(predictions).astype(int)]
         return predictions
 
     def predict_frame(
@@ -1317,7 +1317,7 @@ class ModelBundle:
         self,
         data: str | pathlib.Path | pd.DataFrame,
         mapping: mapping_module.ColumnMapping | None = None,
-    ) -> np.ndarray:
+    ) -> numpy.ndarray:
         """Predicts class probabilities.
 
         Args:
@@ -1388,7 +1388,7 @@ class ModelBundle:
             column = classes.index(class_label)
             estimator = self.calibrator or self.pipeline
 
-            def score(frame: pd.DataFrame) -> np.ndarray:
+            def score(frame: pd.DataFrame) -> numpy.ndarray:
                 """Scores rows for the explained output.
 
                 Args:
@@ -1398,7 +1398,7 @@ class ModelBundle:
                     The probability of the explained class (calibrated if a
                     calibrator is attached).
                 """
-                return np.asarray(estimator.predict_proba(frame))[:, column]
+                return numpy.asarray(estimator.predict_proba(frame))[:, column]
 
         return local.OcclusionExplainer(score, self.schema.features).explain(
             rows, reference
@@ -1450,12 +1450,14 @@ class ModelBundle:
                 )
             frame = self.prepare_frame(data, mapping)
             lower, upper = self.quantile.interval(frame, coverage)
-            predictions = np.asarray(self.pipeline.predict(frame), dtype=float)
+            predictions = numpy.asarray(
+                self.pipeline.predict(frame), dtype=float
+            )
             return pd.DataFrame(
                 {
                     "prediction": predictions,
-                    "lower": np.minimum(lower, predictions),
-                    "upper": np.maximum(upper, predictions),
+                    "lower": numpy.minimum(lower, predictions),
+                    "upper": numpy.maximum(upper, predictions),
                 }
             )
         if method == "cv_plus":
@@ -1463,12 +1465,14 @@ class ModelBundle:
                 raise errors.ArtifactError(
                     "this bundle has no CV+ fold models; the run stores them "
                     "for regression with fewer than "
-                    f"{cv_plus_module.MIN_ROWS_FOR_SPLIT} calibration rows "
+                    f"{cv_plus.MIN_ROWS_FOR_SPLIT} calibration rows "
                     "held out once each (see the cv_plus.skipped event)"
                 )
             frame = self.prepare_frame(data, mapping)
             lower, upper = self.cv_plus.interval(frame, coverage)
-            predictions = np.asarray(self.pipeline.predict(frame), dtype=float)
+            predictions = numpy.asarray(
+                self.pipeline.predict(frame), dtype=float
+            )
             return pd.DataFrame(
                 {"prediction": predictions, "lower": lower, "upper": upper}
             )
@@ -1480,7 +1484,7 @@ class ModelBundle:
         calibrator = self.require_conformal("regression")
         if shift:
             return self.shifted_interval(calibrator, data, coverage, mapping)
-        predictions = np.asarray(self.predict(data, mapping), dtype=float)
+        predictions = numpy.asarray(self.predict(data, mapping), dtype=float)
         lower, upper = calibrator.interval(predictions, coverage)
         return pd.DataFrame(
             {"prediction": predictions, "lower": lower, "upper": upper}
@@ -1491,8 +1495,8 @@ class ModelBundle:
         calibration_rows: pd.DataFrame,
         target_rows: pd.DataFrame,
         columns: Sequence[str] | None = None,
-        clip: float = shift_weights_module.DEFAULT_CLIP,
-    ) -> shift_weights_module.StoredShiftWeights:
+        clip: float = shift_weights.DEFAULT_CLIP,
+    ) -> shift_weights.StoredShiftWeights:
         """Estimates and stores likelihood ratios for weighted conformal.
 
         A discriminator is fitted between the calibration rows and the target
@@ -1540,14 +1544,12 @@ class ModelBundle:
             raise errors.ArtifactError(
                 "shift weights need numeric feature columns of the schema"
             )
-        found = shift_weights_module.estimate_weights(
+        found = shift_weights.estimate_weights(
             calibration_rows[list(chosen)].to_numpy(float),
             target_rows[list(chosen)].to_numpy(float),
             clip,
         )
-        self.shift_weights = shift_weights_module.StoredShiftWeights(
-            found, chosen
-        )
+        self.shift_weights = shift_weights.StoredShiftWeights(found, chosen)
         return self.shift_weights
 
     def shifted_interval(
@@ -1576,7 +1578,7 @@ class ModelBundle:
                 "this bundle has no shift weights; call attach_shift_weights"
             )
         frame = self.prepare_frame(data, mapping)
-        predictions = np.asarray(self.pipeline.predict(frame), dtype=float)
+        predictions = numpy.asarray(self.pipeline.predict(frame), dtype=float)
         lower, upper = calibrator.weighted_interval(
             predictions,
             self.shift_weights.weights.calibration,
@@ -1638,7 +1640,7 @@ class ModelBundle:
                 )
             column = list(self.schema.classes).index(desired)
 
-            def progress(rows: pd.DataFrame) -> np.ndarray:
+            def progress(rows: pd.DataFrame) -> numpy.ndarray:
                 """Measures how close rows are to the wanted class.
 
                 Args:
@@ -1647,9 +1649,9 @@ class ModelBundle:
                 Returns:
                     The predicted probability of the wanted class.
                 """
-                return np.asarray(self.predict_proba(rows))[:, column]
+                return numpy.asarray(self.predict_proba(rows))[:, column]
 
-            def reached(rows: pd.DataFrame) -> np.ndarray:
+            def reached(rows: pd.DataFrame) -> numpy.ndarray:
                 """Tests whether rows are predicted as the wanted class.
 
                 Args:
@@ -1658,12 +1660,12 @@ class ModelBundle:
                 Returns:
                     A boolean per row.
                 """
-                return np.asarray(self.predict(rows)) == desired
+                return numpy.asarray(self.predict(rows)) == desired
 
         else:
             low, high = desired
 
-            def progress(rows: pd.DataFrame) -> np.ndarray:
+            def progress(rows: pd.DataFrame) -> numpy.ndarray:
                 """Measures how close rows are to the wanted range.
 
                 Args:
@@ -1673,12 +1675,13 @@ class ModelBundle:
                     Minus the distance of each prediction from the wanted range
                     (0 inside it).
                 """
-                values = np.asarray(self.predict(rows), dtype=float)
+                values = numpy.asarray(self.predict(rows), dtype=float)
                 return -(
-                    np.maximum(low - values, 0) + np.maximum(values - high, 0)
+                    numpy.maximum(low - values, 0)
+                    + numpy.maximum(values - high, 0)
                 )
 
-            def reached(rows: pd.DataFrame) -> np.ndarray:
+            def reached(rows: pd.DataFrame) -> numpy.ndarray:
                 """Tests whether rows have a prediction inside the wanted range.
 
                 Args:
@@ -1687,7 +1690,7 @@ class ModelBundle:
                 Returns:
                     A boolean per row.
                 """
-                values = np.asarray(self.predict(rows), dtype=float)
+                values = numpy.asarray(self.predict(rows), dtype=float)
                 return (values >= low) & (values <= high)
 
         search = counterfactual_module.CounterfactualSearch(
@@ -1772,7 +1775,7 @@ class ModelBundle:
         data: str | pathlib.Path | pd.DataFrame,
         times: Any,
         mapping: mapping_module.ColumnMapping | None = None,
-    ) -> np.ndarray:
+    ) -> numpy.ndarray:
         """Returns the probability of no event yet at each time (survival).
 
         Args:
@@ -1789,9 +1792,9 @@ class ModelBundle:
         if self.schema.task != tasks.TaskType.SURVIVAL.value:
             raise errors.ArtifactError("this bundle is not a survival model")
         frame = self.prepare_frame(data, mapping)
-        return np.asarray(
+        return numpy.asarray(
             self.pipeline.predict_survival(
-                frame, np.asarray(times, dtype=float)
+                frame, numpy.asarray(times, dtype=float)
             )
         )
 
@@ -1842,21 +1845,21 @@ class ModelBundle:
         stamps = pd.to_datetime(frame[clock], errors="coerce")
         numeric_clock = stamps.isna().any()
         order = frame[clock].to_numpy() if numeric_clock else stamps.to_numpy()
-        positions = np.arange(len(frame))
+        positions = numpy.arange(len(frame))
         by_entity = (
             frame[entity].astype(str).to_numpy()
             if entity
-            else np.zeros(len(frame), dtype=int)
+            else numpy.zeros(len(frame), dtype=int)
         )
         latest = {}
-        for position in positions[np.argsort(order, kind="stable")]:
+        for position in positions[numpy.argsort(order, kind="stable")]:
             latest[by_entity[position]] = position
-        chosen = np.array(sorted(latest.values()))
-        predicted = np.asarray(self.pipeline.predict(prepared.iloc[chosen]))[
+        chosen = numpy.array(sorted(latest.values()))
+        predicted = numpy.asarray(self.pipeline.predict(prepared.iloc[chosen]))[
             :, :wanted
         ]
-        distinct = np.unique(order)
-        gaps = np.sort(np.diff(distinct))
+        distinct = numpy.unique(order)
+        gaps = numpy.sort(numpy.diff(distinct))
         step_size = gaps[len(gaps) // 2] if len(gaps) else None
         rows = []
         for row, position in enumerate(chosen):
@@ -1946,8 +1949,8 @@ class ModelBundle:
         """
         frame = self.prepare_frame(data, mapping)
         if self.classes is not None:
-            ordered = np.sort(
-                np.asarray(self.pipeline.predict_proba(frame)), axis=1
+            ordered = numpy.sort(
+                numpy.asarray(self.pipeline.predict_proba(frame)), axis=1
             )
             top = ordered[:, -1]
             runner_up = ordered[:, -2] if ordered.shape[1] > 1 else 0.0
@@ -1959,7 +1962,7 @@ class ModelBundle:
                 )
             lower, upper = self.quantile.raw_band(frame)
             uncertainty = upper - lower
-        order = np.argsort(-uncertainty, kind="stable")[:count]
+        order = numpy.argsort(-uncertainty, kind="stable")[:count]
         return pd.DataFrame(
             {"position": order, "uncertainty": uncertainty[order]}
         )

@@ -3,8 +3,8 @@
 import abc
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.evaluation import diagnostics
 
@@ -24,10 +24,10 @@ class Stressor(abc.ABC):
     @abc.abstractmethod
     def corrupt(
         self,
-        features: pd.DataFrame,
+        features: pandas.DataFrame,
         inputs: diagnostics.DiagnosticInput,
-        rng: np.random.Generator,
-    ) -> pd.DataFrame:
+        rng: numpy.random.Generator,
+    ) -> pandas.DataFrame:
         """Returns a degraded copy of the features.
 
         Args:
@@ -56,10 +56,10 @@ class MissingValues(Stressor):
 
     def corrupt(
         self,
-        features: pd.DataFrame,
+        features: pandas.DataFrame,
         inputs: diagnostics.DiagnosticInput,
-        rng: np.random.Generator,
-    ) -> pd.DataFrame:
+        rng: numpy.random.Generator,
+    ) -> pandas.DataFrame:
         """Sets random cells of the input columns to missing.
 
         Args:
@@ -75,10 +75,10 @@ class MissingValues(Stressor):
         for column in inputs.feature_plan.input_columns:
             mask = rng.random(len(damaged)) < self.rate
             damaged[column] = (
-                damaged[column].astype(object).where(~mask, np.nan)
+                damaged[column].astype(object).where(~mask, numpy.nan)
             )
             if column in inputs.feature_plan.numeric:
-                damaged[column] = pd.to_numeric(damaged[column])
+                damaged[column] = pandas.to_numeric(damaged[column])
         return damaged
 
 
@@ -97,10 +97,10 @@ class GaussianNoise(Stressor):
 
     def corrupt(
         self,
-        features: pd.DataFrame,
+        features: pandas.DataFrame,
         inputs: diagnostics.DiagnosticInput,
-        rng: np.random.Generator,
-    ) -> pd.DataFrame:
+        rng: numpy.random.Generator,
+    ) -> pandas.DataFrame:
         """Perturbs the numeric columns.
 
         Args:
@@ -115,10 +115,10 @@ class GaussianNoise(Stressor):
         """
         damaged = features.copy()
         for column in inputs.feature_plan.numeric:
-            spread = float(pd.to_numeric(damaged[column]).std())
-            if not np.isfinite(spread):
+            spread = float(pandas.to_numeric(damaged[column]).std())
+            if not numpy.isfinite(spread):
                 spread = 0.0
-            damaged[column] = pd.to_numeric(damaged[column]) + rng.normal(
+            damaged[column] = pandas.to_numeric(damaged[column]) + rng.normal(
                 0.0, self.scale * spread, len(damaged)
             )
         return damaged
@@ -138,10 +138,10 @@ class UnseenCategories(Stressor):
 
     def corrupt(
         self,
-        features: pd.DataFrame,
+        features: pandas.DataFrame,
         inputs: diagnostics.DiagnosticInput,
-        rng: np.random.Generator,
-    ) -> pd.DataFrame:
+        rng: numpy.random.Generator,
+    ) -> pandas.DataFrame:
         """Overwrites random categorical cells with an unseen level.
 
         Args:
@@ -213,7 +213,7 @@ class RobustnessReport(diagnostics.Diagnostic):
             inputs.target,
             inputs.positive_label,
         )
-        rng = np.random.default_rng(inputs.seed)
+        rng = numpy.random.default_rng(inputs.seed)
         scenarios = {}
         for stressor in self.stressors:
             stressed = stressor.corrupt(inputs.features, inputs, rng)

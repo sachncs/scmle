@@ -1,6 +1,6 @@
 """Survival estimators and the concordance index."""
 
-import numpy as np
+import numpy
 import pytest
 
 from scmle.evaluation import concordance
@@ -8,39 +8,39 @@ from scmle.models.survival import estimators
 
 
 def cohort(rows=1200, seed=0):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     features = rng.normal(size=(rows, 3))
-    rate = np.exp(1.0 * features[:, 0] - 0.7 * features[:, 1])
+    rate = numpy.exp(1.0 * features[:, 0] - 0.7 * features[:, 1])
     happens = rng.exponential(1 / rate)
     stops = rng.exponential(1.5, rows)
     return (
         features,
-        np.minimum(happens, stops),
+        numpy.minimum(happens, stops),
         (happens <= stops).astype(int),
     )
 
 
 def test_concordance_is_one_for_a_perfect_ordering_and_half_for_ties():
-    time = np.array([1.0, 2.0, 3.0, 4.0])
-    event = np.ones(4)
+    time = numpy.array([1.0, 2.0, 3.0, 4.0])
+    event = numpy.ones(4)
 
     assert concordance.concordance_index(time, event, -time) == 1.0
     assert concordance.concordance_index(time, event, time) == 0.0
-    assert concordance.concordance_index(time, event, np.zeros(4)) == 0.5
+    assert concordance.concordance_index(time, event, numpy.zeros(4)) == 0.5
 
 
 def test_pairs_whose_earlier_row_was_censored_are_not_comparable():
-    time = np.array([1.0, 2.0])
-    event = np.array([0, 1])
+    time = numpy.array([1.0, 2.0])
+    event = numpy.array([0, 1])
 
-    value = concordance.concordance_index(time, event, np.array([1.0, 0.0]))
+    value = concordance.concordance_index(time, event, numpy.array([1.0, 0.0]))
 
-    assert np.isnan(value)
+    assert numpy.isnan(value)
 
 
 def test_kaplan_meier_matches_a_hand_computation():
     moments, curve = estimators.kaplan_meier(
-        np.array([1.0, 2.0, 3.0, 4.0]), np.array([1, 0, 1, 1])
+        numpy.array([1.0, 2.0, 3.0, 4.0]), numpy.array([1, 0, 1, 1])
     )
 
     assert list(moments) == [1.0, 3.0, 4.0]
@@ -61,7 +61,7 @@ def test_models_order_held_out_risk_and_give_falling_curves(model):
 
     assert concordance.concordance_index(time[900:], event[900:], risk) > 0.7
     assert curves.shape == (10, 4)
-    assert (np.diff(curves, axis=1) <= 1e-9).all()
+    assert (numpy.diff(curves, axis=1) <= 1e-9).all()
     assert ((curves >= 0) & (curves <= 1)).all()
 
 

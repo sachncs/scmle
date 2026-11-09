@@ -25,17 +25,17 @@ from collections.abc import Mapping
 import hashlib
 from typing import Any
 
-import pandas as pd
+import pandas
 
 from scmle.contracts import errors
-from scmle.data.charter import ingest as charter_ingest
+from scmle.data.charter import ingest
 from scmle.data.ingest import profile
 from scmle.data.ingest import reconcile as source_reconcile
 
 FILE = "extract_reconciliation.json"
 
 
-def key_checksum(values: pd.Series) -> str:
+def key_checksum(values: pandas.Series) -> str:
     """SHA-256 of the sorted values as text, joined by newlines.
 
     The order of the rows does not matter; a changed, missing or repeated
@@ -77,7 +77,7 @@ def check(
     }
 
 
-def column_of(frame: pd.DataFrame, view: str, column: str) -> pd.Series:
+def column_of(frame: pandas.DataFrame, view: str, column: str) -> pandas.Series:
     """Takes a column of a view.
 
     Args:
@@ -100,8 +100,8 @@ def column_of(frame: pd.DataFrame, view: str, column: str) -> pd.Series:
 
 
 def reconcile(
-    frames: Mapping[str, pd.DataFrame],
-    spec: charter_ingest.ReconcileSpec,
+    frames: Mapping[str, pandas.DataFrame],
+    spec: ingest.ReconcileSpec,
     tolerance: float,
 ) -> dict[str, Any]:
     """Compares every declared total with the extracted view.
@@ -137,7 +137,7 @@ def reconcile(
             )
         for total in table.sums:
             found = float(
-                pd.to_numeric(
+                pandas.to_numeric(
                     column_of(frame, table.view, total.column), errors="coerce"
                 ).sum()
             )
@@ -197,9 +197,9 @@ def source_check(
 
 def source_totals(
     view: str,
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     table: str,
-    totals: charter_ingest.TableTotals,
+    totals: ingest.TableTotals,
     source: profile.SqlSource,
     tolerance: float,
 ) -> list[dict]:
@@ -227,9 +227,9 @@ def source_totals(
         declared, the key checksum.
     """
     measures = [total.column for total in totals.sums]
-    numeric = pd.DataFrame(
+    numeric = pandas.DataFrame(
         {
-            m: pd.to_numeric(column_of(frame, view, m), errors="coerce")
+            m: pandas.to_numeric(column_of(frame, view, m), errors="coerce")
             for m in measures
         },
         index=frame.index,
@@ -264,7 +264,9 @@ def source_totals(
                 t=profile.quote(table),
             )
         )
-        their_sum = key_checksum(pd.Series([row[0] for row in values or []]))
+        their_sum = key_checksum(
+            pandas.Series([row[0] for row in values or []])
+        )
         my_sum = key_checksum(column)
         checks.append(
             {
@@ -280,9 +282,9 @@ def source_totals(
 
 
 def reconcile_source(
-    frames: Mapping[str, pd.DataFrame],
+    frames: Mapping[str, pandas.DataFrame],
     tables: Mapping[str, str],
-    spec: charter_ingest.ReconcileSpec,
+    spec: ingest.ReconcileSpec,
     factory: Callable[[], Any],
     tolerance: float,
 ) -> list[dict]:

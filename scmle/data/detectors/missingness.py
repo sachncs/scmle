@@ -31,14 +31,14 @@ from collections.abc import Sequence
 import dataclasses
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from scipy import stats
 from sklearn import impute
 from sklearn import model_selection
 
 from scmle.core import randomness
-from scmle.data.profiling import missingness as screen
+from scmle.data.profiling import missingness
 
 MAX_ROWS = 5000
 MAX_COLUMNS = 40
@@ -66,8 +66,8 @@ class EmResult:
         converged: Whether the change fell below the tolerance.
     """
 
-    mean: np.ndarray
-    covariance: np.ndarray
+    mean: numpy.ndarray
+    covariance: numpy.ndarray
     iterations: int
     converged: bool
 
@@ -146,7 +146,7 @@ class MissingnessReport:
         return dataclasses.asdict(self)
 
 
-def numeric_columns(frame: pd.DataFrame) -> list[Any]:
+def numeric_columns(frame: pandas.DataFrame) -> list[Any]:
     """Finds the numeric, non-boolean columns that are not constant.
 
     Args:
@@ -158,9 +158,9 @@ def numeric_columns(frame: pd.DataFrame) -> list[Any]:
     names: list[Any] = []
     for name in frame.columns:
         column = frame[name]
-        if not pd.api.types.is_numeric_dtype(column):
+        if not pandas.api.types.is_numeric_dtype(column):
             continue
-        if pd.api.types.is_bool_dtype(column):
+        if pandas.api.types.is_bool_dtype(column):
             continue
         if column.nunique(dropna=True) < 2:
             continue
@@ -168,7 +168,7 @@ def numeric_columns(frame: pd.DataFrame) -> list[Any]:
     return names
 
 
-def pattern_table(frame: pd.DataFrame) -> pd.DataFrame:
+def pattern_table(frame: pandas.DataFrame) -> pandas.DataFrame:
     """Counts of each missingness pattern, most frequent first.
 
     Args:
@@ -183,7 +183,7 @@ def pattern_table(frame: pd.DataFrame) -> pd.DataFrame:
 
 
 def em_normal(
-    values: np.ndarray,
+    values: numpy.ndarray,
     max_iter: int = EM_MAX_ITER,
     tolerance: float = EM_TOLERANCE,
 ) -> EmResult:
@@ -209,32 +209,32 @@ def em_normal(
     if values.ndim != 2:
         raise ValueError("values must be two-dimensional")
     n, p = values.shape
-    seen = ~np.isnan(values)
+    seen = ~numpy.isnan(values)
     if not seen.any(axis=0).all():
         raise ValueError("every column needs at least one observed value")
-    mean = np.nanmean(values, axis=0)
-    variance = np.nanvar(values, axis=0)
-    covariance = np.diag(np.where(variance > 0, variance, 1.0))
+    mean = numpy.nanmean(values, axis=0)
+    variance = numpy.nanvar(values, axis=0)
+    covariance = numpy.diag(numpy.where(variance > 0, variance, 1.0))
     groups = row_patterns(seen)
     converged = False
     iterations = 0
     for step in range(1, max_iter + 1):
         iterations = step
-        total = np.zeros(p)
-        second = np.zeros((p, p))
+        total = numpy.zeros(p)
+        second = numpy.zeros((p, p))
         for observed, rows in groups:
             filled, extra = expect_block(
-                values[np.ix_(rows, observed)], observed, mean, covariance, p
+                values[numpy.ix_(rows, observed)], observed, mean, covariance, p
             )
             total += filled.sum(axis=0)
             second += filled.T @ filled + len(rows) * extra
         new_mean = total / n
-        new_cov = second / n - np.outer(new_mean, new_mean)
-        new_cov = (new_cov + new_cov.T) / 2.0 + RIDGE * np.eye(p)
-        scale = max(float(np.abs(new_cov).max()), 1.0)
+        new_cov = second / n - numpy.outer(new_mean, new_mean)
+        new_cov = (new_cov + new_cov.T) / 2.0 + RIDGE * numpy.eye(p)
+        scale = max(float(numpy.abs(new_cov).max()), 1.0)
         change = max(
-            float(np.abs(new_mean - mean).max()),
-            float(np.abs(new_cov - covariance).max()),
+            float(numpy.abs(new_mean - mean).max()),
+            float(numpy.abs(new_cov - covariance).max()),
         )
         mean, covariance = new_mean, new_cov
         if change <= tolerance * scale:
@@ -243,7 +243,9 @@ def em_normal(
     return EmResult(mean, covariance, iterations, converged)
 
 
-def row_patterns(seen: np.ndarray) -> list[tuple[np.ndarray, np.ndarray]]:
+def row_patterns(
+    seen: numpy.ndarray,
+) -> list[tuple[numpy.ndarray, numpy.ndarray]]:
     """Groups row positions by which columns are observed.
 
     Args:
@@ -258,18 +260,18 @@ def row_patterns(seen: np.ndarray) -> list[tuple[np.ndarray, np.ndarray]]:
         keys.setdefault(flags.tobytes(), []).append(row)
     groups = []
     for rows in keys.values():
-        observed = np.flatnonzero(seen[rows[0]])
-        groups.append((observed, np.array(rows)))
+        observed = numpy.flatnonzero(seen[rows[0]])
+        groups.append((observed, numpy.array(rows)))
     return groups
 
 
 def expect_block(
-    block: np.ndarray,
-    observed: np.ndarray,
-    mean: np.ndarray,
-    covariance: np.ndarray,
+    block: numpy.ndarray,
+    observed: numpy.ndarray,
+    mean: numpy.ndarray,
+    covariance: numpy.ndarray,
     p: int,
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[numpy.ndarray, numpy.ndarray]:
     """Runs the E-step for rows sharing one missingness pattern.
 
     Args:
@@ -285,26 +287,26 @@ def expect_block(
         entries, shape (p, p), which is zero outside them.
     """
     rows = block.shape[0]
-    filled = np.tile(mean, (rows, 1))
-    extra = np.zeros((p, p))
+    filled = numpy.tile(mean, (rows, 1))
+    extra = numpy.zeros((p, p))
     if len(observed) == 0:
         extra[:, :] = covariance
         return filled, extra
     filled[:, observed] = block
-    hidden = np.setdiff1d(np.arange(p), observed)
+    hidden = numpy.setdiff1d(numpy.arange(p), observed)
     if len(hidden) == 0:
         return filled, extra
-    s_oo = covariance[np.ix_(observed, observed)]
-    s_ho = covariance[np.ix_(hidden, observed)]
-    slope = np.linalg.solve(s_oo, s_ho.T).T
+    s_oo = covariance[numpy.ix_(observed, observed)]
+    s_ho = covariance[numpy.ix_(hidden, observed)]
+    slope = numpy.linalg.solve(s_oo, s_ho.T).T
     filled[:, hidden] = mean[hidden] + (block - mean[observed]) @ slope.T
-    extra[np.ix_(hidden, hidden)] = (
-        covariance[np.ix_(hidden, hidden)] - slope @ s_ho.T
+    extra[numpy.ix_(hidden, hidden)] = (
+        covariance[numpy.ix_(hidden, hidden)] - slope @ s_ho.T
     )
     return filled, extra
 
 
-def little_statistic(values: np.ndarray, fit: EmResult) -> tuple[float, int]:
+def little_statistic(values: numpy.ndarray, fit: EmResult) -> tuple[float, int]:
     """Little's d2 and its degrees of freedom for given ML estimates.
 
     d2 = sum over patterns j of n_j (ybar_j - mu_j)' S_j^{-1} (ybar_j - mu_j),
@@ -318,21 +320,23 @@ def little_statistic(values: np.ndarray, fit: EmResult) -> tuple[float, int]:
     Returns:
         The statistic d2 and its degrees of freedom.
     """
-    seen = ~np.isnan(values)
+    seen = ~numpy.isnan(values)
     p = values.shape[1]
     statistic = 0.0
     observed_total = 0
     for observed, rows in row_patterns(seen):
         if len(observed) == 0:
             continue
-        gap = values[np.ix_(rows, observed)].mean(axis=0) - fit.mean[observed]
-        s_oo = fit.covariance[np.ix_(observed, observed)]
-        statistic += len(rows) * float(gap @ np.linalg.solve(s_oo, gap))
+        gap = (
+            values[numpy.ix_(rows, observed)].mean(axis=0) - fit.mean[observed]
+        )
+        s_oo = fit.covariance[numpy.ix_(observed, observed)]
+        statistic += len(rows) * float(gap @ numpy.linalg.solve(s_oo, gap))
         observed_total += len(observed)
     return statistic, observed_total - p
 
 
-def normal_scores(values: np.ndarray) -> np.ndarray:
+def normal_scores(values: numpy.ndarray) -> numpy.ndarray:
     """Rank-based inverse-normal scores per column, NaN kept.
 
     A monotone transform of the observed values leaves the missingness
@@ -346,17 +350,17 @@ def normal_scores(values: np.ndarray) -> np.ndarray:
         An array of the same shape holding the inverse-normal score of each
         observed value's rank within its column, NaN where missing.
     """
-    out = np.full_like(values, np.nan, dtype=float)
+    out = numpy.full_like(values, numpy.nan, dtype=float)
     for j in range(values.shape[1]):
         column = values[:, j]
-        seen = ~np.isnan(column)
+        seen = ~numpy.isnan(column)
         ranks = stats.rankdata(column[seen])
         out[seen, j] = stats.norm.ppf((ranks - 0.5) / seen.sum())
     return out
 
 
 def little_mcar_test(
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     columns: Sequence[Any] | None = None,
     transform: str = "normal_scores",
 ) -> LittleResult | None:
@@ -381,12 +385,12 @@ def little_mcar_test(
         raise ValueError("transform must be 'normal_scores' or 'none'")
     names = list(columns) if columns is not None else numeric_columns(frame)
     for name in names:
-        if not pd.api.types.is_numeric_dtype(frame[name]):
+        if not pandas.api.types.is_numeric_dtype(frame[name]):
             raise ValueError(f"column '{name}' is not numeric")
     values = frame[names].to_numpy(dtype=float, copy=True)
-    values[~np.isfinite(values)] = np.nan
-    values = values[~np.isnan(values).all(axis=1)]
-    if len(names) < 2 or not np.isnan(values).any():
+    values[~numpy.isfinite(values)] = numpy.nan
+    values = values[~numpy.isnan(values).all(axis=1)]
+    if len(names) < 2 or not numpy.isnan(values).any():
         return None
     if transform == "normal_scores":
         values = normal_scores(values)
@@ -398,14 +402,14 @@ def little_mcar_test(
         statistic=statistic,
         df=df,
         p_value=float(stats.chi2.sf(statistic, df)),
-        patterns=len(row_patterns(~np.isnan(values))),
+        patterns=len(row_patterns(~numpy.isnan(values))),
         rows=len(values),
         columns=tuple(str(n) for n in names),
         converged=fit.converged,
     )
 
 
-def auc_from_ranks(scores: np.ndarray, positive: np.ndarray) -> float:
+def auc_from_ranks(scores: numpy.ndarray, positive: numpy.ndarray) -> float:
     """Computes the area under the ROC curve via the rank-sum identity.
 
     Args:
@@ -424,8 +428,8 @@ def auc_from_ranks(scores: np.ndarray, positive: np.ndarray) -> float:
 
 
 def oof_linear_scores(
-    design: np.ndarray, target: np.ndarray, folds: list[np.ndarray]
-) -> np.ndarray:
+    design: numpy.ndarray, target: numpy.ndarray, folds: list[numpy.ndarray]
+) -> numpy.ndarray:
     """Computes out-of-fold least-squares scores of a 0/1 target.
 
     Args:
@@ -436,16 +440,18 @@ def oof_linear_scores(
     Returns:
         For each row, the prediction of a model fitted on the other folds.
     """
-    scores = np.zeros(len(target))
+    scores = numpy.zeros(len(target))
     for held in folds:
-        fit = np.setdiff1d(np.arange(len(target)), held)
-        coefficients = np.linalg.lstsq(design[fit], target[fit], rcond=None)[0]
+        fit = numpy.setdiff1d(numpy.arange(len(target)), held)
+        coefficients = numpy.linalg.lstsq(design[fit], target[fit], rcond=None)[
+            0
+        ]
         scores[held] = design[held] @ coefficients
     return scores
 
 
 def indicator_model_test(
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     column: str,
     seed: int = 0,
     permutations: int = PERMUTATIONS,
@@ -480,14 +486,14 @@ def indicator_model_test(
     if not others or missing < MIN_MISSING or len(flag) - missing < MIN_ROWS:
         return None
     block = frame[others].to_numpy(dtype=float, copy=True)
-    block[~np.isfinite(block)] = np.nan
-    block = np.where(np.isnan(block), np.nanmean(block, axis=0), block)
+    block[~numpy.isfinite(block)] = numpy.nan
+    block = numpy.where(numpy.isnan(block), numpy.nanmean(block, axis=0), block)
     spread = block.std(axis=0)
-    block = (block - block.mean(axis=0)) / np.where(spread > 0, spread, 1.0)
-    design = np.column_stack([np.ones(len(block)), block])
+    block = (block - block.mean(axis=0)) / numpy.where(spread > 0, spread, 1.0)
+    design = numpy.column_stack([numpy.ones(len(block)), block])
     rng = randomness.component_rng(seed, f"detectors.indicator.{column}", 0)
     order = rng.permutation(len(flag))
-    parts = [np.sort(part) for part in np.array_split(order, folds)]
+    parts = [numpy.sort(part) for part in numpy.array_split(order, folds)]
     target = flag.astype(float)
     observed = auc_from_ranks(oof_linear_scores(design, target, parts), flag)
     beaten = 0
@@ -506,7 +512,7 @@ def indicator_model_test(
 
 
 def assess_mechanism(
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     seed: int = 0,
     alpha: float = ALPHA,
     permutations: int = PERMUTATIONS,
@@ -533,7 +539,7 @@ def assess_mechanism(
     input_rows = len(frame)
     if input_rows > MAX_ROWS:
         rng = randomness.component_rng(seed, "detectors.missingness.cap", 0)
-        keep = np.sort(rng.choice(input_rows, MAX_ROWS, replace=False))
+        keep = numpy.sort(rng.choice(input_rows, MAX_ROWS, replace=False))
         frame = frame.iloc[keep]
         skipped.append(f"rows sampled to {MAX_ROWS} of {input_rows}")
     numeric = numeric_columns(frame)
@@ -575,9 +581,9 @@ def assess_mechanism(
 
 
 def informative_columns(
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     columns: list[str],
-    target: pd.Series,
+    target: pandas.Series,
     classification: bool,
 ) -> list[str]:
     """Finds the columns whose gaps are associated with the target.
@@ -595,7 +601,7 @@ def informative_columns(
     Returns:
         The names of the columns the screen finds informative.
     """
-    findings = screen.assess(frame, columns, target, classification)
+    findings = missingness.assess(frame, columns, target, classification)
     return [f.column for f in findings if f.informative]
 
 
@@ -622,9 +628,9 @@ class TippingPoint:
 
 
 def tipping_point(
-    observed: np.ndarray,
+    observed: numpy.ndarray,
     n_missing: int,
-    conclusion: Callable[[np.ndarray], bool],
+    conclusion: Callable[[numpy.ndarray], bool],
     low: float,
     high: float,
     steps: int = 201,
@@ -650,26 +656,26 @@ def tipping_point(
     Raises:
         ValueError: On an empty sample, bad range or too few steps.
     """
-    values = np.asarray(observed, dtype=float)
+    values = numpy.asarray(observed, dtype=float)
     if values.size == 0 or n_missing < 1:
         raise ValueError("need observed values and at least one missing")
     if not low < high or steps < 2:
         raise ValueError("need low < high and steps >= 2")
     centre = float(values.mean())
-    filler = np.full(n_missing, centre)
-    baseline = bool(conclusion(np.concatenate([values, filler])))
-    grid = np.linspace(low, high, steps)
+    filler = numpy.full(n_missing, centre)
+    baseline = bool(conclusion(numpy.concatenate([values, filler])))
+    grid = numpy.linspace(low, high, steps)
     flips = [
         float(d)
         for d in grid
-        if bool(conclusion(np.concatenate([values, filler + d]))) != baseline
+        if bool(conclusion(numpy.concatenate([values, filler + d]))) != baseline
     ]
     flip = min(flips, key=abs) if flips else None
     return TippingPoint(low, high, flip, flip is not None, baseline, steps)
 
 
 def mean_tipping_delta(
-    observed: np.ndarray, n_missing: int, null_value: float
+    observed: numpy.ndarray, n_missing: int, null_value: float
 ) -> float:
     """Computes the delta at which the completed mean equals `null_value`.
 
@@ -686,15 +692,15 @@ def mean_tipping_delta(
         The shift of the imputed values at which the completed mean equals
         `null_value`.
     """
-    values = np.asarray(observed, dtype=float)
+    values = numpy.asarray(observed, dtype=float)
     n, k = values.size, n_missing
     centre = float(values.mean())
     return float(null_value * (n + k) / k - values.sum() / k - centre)
 
 
 def draw_holdout(
-    train: np.ndarray, seed: int, fold: int, share: float
-) -> tuple[np.ndarray, np.ndarray]:
+    train: numpy.ndarray, seed: int, fold: int, share: float
+) -> tuple[numpy.ndarray, numpy.ndarray]:
     """Picks observed cells of `train` to hide for scoring.
 
     Args:
@@ -707,7 +713,7 @@ def draw_holdout(
         The row positions and the column positions of the chosen cells.
     """
     rng = randomness.component_rng(seed, "detectors.imputation.holdout", fold)
-    rows, cols = np.nonzero(~np.isnan(train))
+    rows, cols = numpy.nonzero(~numpy.isnan(train))
     chosen = rng.random(len(rows)) < share
     return rows[chosen], cols[chosen]
 
@@ -732,8 +738,8 @@ def make_imputer(strategy: str) -> Any:
 
 
 def fold_imputers(
-    values: np.ndarray, strategy: str, seed: int, folds: int = FOLDS
-) -> list[tuple[np.ndarray, np.ndarray, Any]]:
+    values: numpy.ndarray, strategy: str, seed: int, folds: int = FOLDS
+) -> list[tuple[numpy.ndarray, numpy.ndarray, Any]]:
     """Fits one imputer per fold on that fold's training rows only.
 
     Args:
@@ -757,7 +763,7 @@ def fold_imputers(
     ]
 
 
-def fit_one(values: np.ndarray, strategy: str, train: np.ndarray) -> Any:
+def fit_one(values: numpy.ndarray, strategy: str, train: numpy.ndarray) -> Any:
     """Fits an imputer on the rows `train` of `values` and nothing else.
 
     Args:
@@ -774,7 +780,7 @@ def fit_one(values: np.ndarray, strategy: str, train: np.ndarray) -> Any:
 
 
 def imputation_errors(
-    values: np.ndarray,
+    values: numpy.ndarray,
     seed: int = 0,
     folds: int = FOLDS,
     share: float = HOLDOUT_SHARE,
@@ -800,8 +806,8 @@ def imputation_errors(
     """
     if not 0.0 < share < 1.0:
         raise ValueError("share must be within (0, 1)")
-    spread = np.nanstd(values, axis=0)
-    spread = np.where(spread > 0, spread, 1.0)
+    spread = numpy.nanstd(values, axis=0)
+    spread = numpy.where(spread > 0, spread, 1.0)
     errors: dict[str, float] = {}
     for strategy in STRATEGIES:
         scores = []
@@ -814,16 +820,16 @@ def imputation_errors(
             if len(rows) == 0:
                 continue
             truth = block[rows, cols].copy()
-            block[rows, cols] = np.nan
+            block[rows, cols] = numpy.nan
             filled = imputer.transform(block)
             diff = (filled[rows, cols] - truth) / spread[cols]
-            scores.append(float(np.sqrt(np.mean(diff**2))))
-        errors[strategy] = float(np.mean(scores)) if scores else float("nan")
+            scores.append(float(numpy.sqrt(numpy.mean(diff**2))))
+        errors[strategy] = float(numpy.mean(scores)) if scores else float("nan")
     return errors
 
 
 def select_imputer(
-    values: np.ndarray, seed: int = 0, folds: int = FOLDS
+    values: numpy.ndarray, seed: int = 0, folds: int = FOLDS
 ) -> str:
     """Selects the imputation strategy with the smallest held-out error.
 
@@ -840,7 +846,7 @@ def select_imputer(
         ValueError: If no strategy has a finite error.
     """
     errors = imputation_errors(values, seed, folds)
-    finite = {k: v for k, v in errors.items() if np.isfinite(v)}
+    finite = {k: v for k, v in errors.items() if numpy.isfinite(v)}
     if not finite:
         raise ValueError("no strategy could be scored")
     return min(STRATEGIES, key=lambda s: finite.get(s, float("inf")))

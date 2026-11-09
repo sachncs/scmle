@@ -12,8 +12,8 @@ import importlib
 import pathlib
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from sklearn import impute
 from sklearn import pipeline
 from sklearn import preprocessing
@@ -186,7 +186,7 @@ def passthrough(step: Any) -> Any:
     Returns:
         A fitted identity function transformer.
     """
-    return preprocessing.FunctionTransformer().fit(np.zeros((1, 1)))
+    return preprocessing.FunctionTransformer().fit(numpy.zeros((1, 1)))
 
 
 def without_casts(model: Any) -> Any:
@@ -313,7 +313,7 @@ def export(bundle: Any, path: str | pathlib.Path) -> pathlib.Path:
     return destination
 
 
-def decode(bundle: Any, session: Any, labels: np.ndarray) -> np.ndarray:
+def decode(bundle: Any, session: Any, labels: numpy.ndarray) -> numpy.ndarray:
     """Maps integer class codes back to labels when the graph was trained so.
 
     Args:
@@ -327,13 +327,13 @@ def decode(bundle: Any, session: Any, labels: np.ndarray) -> np.ndarray:
     """
     meta = session.get_modelmeta().custom_metadata_map
     if meta.get(CODES_KEY) == "1":
-        return np.asarray(bundle.classes, dtype=object)[
-            np.asarray(labels).astype(int)
+        return numpy.asarray(bundle.classes, dtype=object)[
+            numpy.asarray(labels).astype(int)
         ]
-    return np.asarray(labels)
+    return numpy.asarray(labels)
 
 
-def feed(bundle: Any, frame: pd.DataFrame) -> dict[str, np.ndarray]:
+def feed(bundle: Any, frame: pandas.DataFrame) -> dict[str, numpy.ndarray]:
     """Builds the exported graph's inputs from a validated frame.
 
     Args:
@@ -349,8 +349,8 @@ def feed(bundle: Any, frame: pd.DataFrame) -> dict[str, np.ndarray]:
     prepared = bundle.prepare_frame(frame)
     schema = bundle.schema
     inputs = {
-        c: pd.to_numeric(prepared[c], errors="coerce")
-        .to_numpy(np.float32)
+        c: pandas.to_numeric(prepared[c], errors="coerce")
+        .to_numpy(numpy.float32)
         .reshape(-1, 1)
         for c in schema.numeric
     }
@@ -369,7 +369,7 @@ def feed(bundle: Any, frame: pd.DataFrame) -> dict[str, np.ndarray]:
 def verify(
     bundle: Any,
     path: str | pathlib.Path,
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     tolerance: float = DEFAULT_TOLERANCE,
 ) -> dict[str, float]:
     """Compares the exported graph with the in-process pipeline.
@@ -394,19 +394,22 @@ def verify(
     outputs = session.run(None, feed(bundle, frame))
     prepared = bundle.prepare_frame(frame)
     if bundle.classes is not None:
-        expected = np.asarray(bundle.pipeline.predict_proba(prepared))
-        difference = float(np.abs(np.asarray(outputs[1]) - expected).max())
+        expected = numpy.asarray(bundle.pipeline.predict_proba(prepared))
+        difference = float(
+            numpy.abs(numpy.asarray(outputs[1]) - expected).max()
+        )
         agreement = float(
-            np.mean(
+            numpy.mean(
                 decode(bundle, session, outputs[0]).astype(str)
-                == np.asarray(bundle.pipeline.predict(prepared)).astype(str)
+                == numpy.asarray(bundle.pipeline.predict(prepared)).astype(str)
             )
         )
     else:
-        expected = np.asarray(bundle.pipeline.predict(prepared), dtype=float)
-        scale = max(float(np.abs(expected).max()), 1.0)
+        expected = numpy.asarray(bundle.pipeline.predict(prepared), dtype=float)
+        scale = max(float(numpy.abs(expected).max()), 1.0)
         difference = float(
-            np.abs(np.asarray(outputs[0]).ravel() - expected).max() / scale
+            numpy.abs(numpy.asarray(outputs[0]).ravel() - expected).max()
+            / scale
         )
         agreement = 1.0
     if not difference <= tolerance:
@@ -434,7 +437,7 @@ class OnnxScorer:
         self.bundle = bundle
         self.session = runtime.InferenceSession(str(path))
 
-    def predict(self, frame: pd.DataFrame) -> np.ndarray:
+    def predict(self, frame: pandas.DataFrame) -> numpy.ndarray:
         """Predicts class labels (classification) or values (regression).
 
         Args:
@@ -446,7 +449,7 @@ class OnnxScorer:
         outputs = self.session.run(None, feed(self.bundle, frame))
         return decode(self.bundle, self.session, outputs[0]).ravel()
 
-    def predict_proba(self, frame: pd.DataFrame) -> np.ndarray:
+    def predict_proba(self, frame: pandas.DataFrame) -> numpy.ndarray:
         """Predicts class probabilities; classification graphs only.
 
         Args:
@@ -455,4 +458,6 @@ class OnnxScorer:
         Returns:
             An array of shape (rows, classes).
         """
-        return np.asarray(self.session.run(None, feed(self.bundle, frame))[1])
+        return numpy.asarray(
+            self.session.run(None, feed(self.bundle, frame))[1]
+        )

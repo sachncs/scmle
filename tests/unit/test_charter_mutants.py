@@ -11,7 +11,7 @@ import pytest
 
 from scmle.data.admissibility import attestations
 from scmle.data.admissibility import provenance
-from scmle.data.charter import contracts as c
+from scmle.data.charter import contracts
 from scmle.data.framing import costs
 from tests.unit.test_admissibility_attestations import attest
 from tests.unit.test_charter_contracts import make_charter
@@ -37,7 +37,7 @@ ESTIMAND = {
     "population": "p",
     "target": "t",
     "prediction_moment": "m",
-    "intercurrent_events": (c.IntercurrentEvent("e", "s"),),
+    "intercurrent_events": (contracts.IntercurrentEvent("e", "s"),),
     "summary_measure": "auc",
 }
 
@@ -45,7 +45,7 @@ ESTIMAND = {
 @pytest.mark.parametrize("field", ["event", "strategy"])
 def test_intercurrent_event_fields_are_named(field):
     values = {"event": "e", "strategy": "s", field: " "}
-    assert message(partial(c.IntercurrentEvent, **values)) == (
+    assert message(partial(contracts.IntercurrentEvent, **values)) == (
         f"{field} must not be empty"
     )
 
@@ -55,7 +55,7 @@ def test_intercurrent_event_fields_are_named(field):
 )
 def test_estimand_text_fields_are_named(field):
     values = {**ESTIMAND, field: ""}
-    assert message(partial(c.AnalysisEstimand, **values)) == (
+    assert message(partial(contracts.AnalysisEstimand, **values)) == (
         f"{field} must not be empty"
     )
 
@@ -64,13 +64,17 @@ def test_estimand_events_must_be_a_non_empty_tuple():
     assert (
         message(
             partial(
-                c.AnalysisEstimand, **{**ESTIMAND, "intercurrent_events": []}
+                contracts.AnalysisEstimand,
+                **{**ESTIMAND, "intercurrent_events": []},
             )
         )
         == "intercurrent_events must be a tuple"
     )
     assert message(
-        partial(c.AnalysisEstimand, **{**ESTIMAND, "intercurrent_events": ()})
+        partial(
+            contracts.AnalysisEstimand,
+            **{**ESTIMAND, "intercurrent_events": ()},
+        )
     ) == (
         "intercurrent_events must not be empty: state a strategy "
         "for each event, or declare 'none' as not applicable"
@@ -82,47 +86,52 @@ def test_decision_row_fields_are_named(field):
     values = {
         "check_id": "leakage.skill",
         "trigger": "t",
-        "action": c.DecisionAction.QUARANTINE_COLUMN,
+        "action": contracts.DecisionAction.QUARANTINE_COLUMN,
         field: " ",
     }
-    assert message(partial(c.DecisionRow, **values)) == (
+    assert message(partial(contracts.DecisionRow, **values)) == (
         f"{field} must not be empty"
     )
 
 
 def test_set_sizes_bounds_and_messages():
-    c.SetSizes(confirmation_fraction=c.MAX_CONFIRMATION_FRACTION)
+    contracts.SetSizes(
+        confirmation_fraction=contracts.MAX_CONFIRMATION_FRACTION
+    )
     bound = (
         "confirmation_fraction must be in (0, "
-        f"{c.MAX_CONFIRMATION_FRACTION}] so exploration keeps a majority"
+        f"{contracts.MAX_CONFIRMATION_FRACTION}] so exploration keeps a majority"
     )
-    for bad in (0.0, c.MAX_CONFIRMATION_FRACTION + 0.01, -0.1):
-        assert message(partial(c.SetSizes, confirmation_fraction=bad)) == bound
-    assert message(partial(c.SetSizes, confirmation_fraction=float("nan"))) == (
-        "confirmation_fraction must be a finite number"
-    )
-    assert message(partial(c.SetSizes, 0.25, -1)) == (
+    for bad in (0.0, contracts.MAX_CONFIRMATION_FRACTION + 0.01, -0.1):
+        assert (
+            message(partial(contracts.SetSizes, confirmation_fraction=bad))
+            == bound
+        )
+    assert message(
+        partial(contracts.SetSizes, confirmation_fraction=float("nan"))
+    ) == ("confirmation_fraction must be a finite number")
+    assert message(partial(contracts.SetSizes, 0.25, -1)) == (
         "embargo_rows must be non-negative"
     )
 
 
 def test_choice_messages():
-    assert message(partial(c.Choice, " ", ("a",), "a")) == (
+    assert message(partial(contracts.Choice, " ", ("a",), "a")) == (
         "name must not be empty"
     )
-    assert message(partial(c.Choice, "n", ["a"], "a")) == (
+    assert message(partial(contracts.Choice, "n", ["a"], "a")) == (
         "options must be a tuple"
     )
-    assert message(partial(c.Choice, "n", (), "a")) == (
+    assert message(partial(contracts.Choice, "n", (), "a")) == (
         "options must be non-empty and distinct"
     )
-    assert message(partial(c.Choice, "n", ("a", "a"), "a")) == (
+    assert message(partial(contracts.Choice, "n", ("a", "a"), "a")) == (
         "options must be non-empty and distinct"
     )
-    assert message(partial(c.Choice, "n", ("a", "b"), "z")) == (
+    assert message(partial(contracts.Choice, "n", ("a", "b"), "z")) == (
         "default must be one of the options"
     )
-    c.Choice("n", ("a", "b"), "b")
+    contracts.Choice("n", ("a", "b"), "b")
 
 
 @pytest.mark.parametrize(
@@ -155,7 +164,7 @@ def test_a_single_trial_and_a_seed_of_zero_are_allowed():
 
 
 def test_the_template_is_pinned():
-    template = c.template()
+    template = contracts.template()
     assert json.loads(json.dumps(template)) == template
     assert template["estimand"]["kind"] == "predictive"
     assert template["sets"] == {
@@ -200,9 +209,11 @@ def test_the_template_is_pinned():
 def test_a_charter_with_and_without_a_cost_model_round_trips():
     plain = make_charter()
     assert plain.cost_model is None
-    assert c.AnalysisCharter.from_dict(plain.to_dict()).cost_model is None
+    assert (
+        contracts.AnalysisCharter.from_dict(plain.to_dict()).cost_model is None
+    )
     priced = make_charter(cost_model=cost_model())
-    again = c.AnalysisCharter.from_dict(priced.to_dict())
+    again = contracts.AnalysisCharter.from_dict(priced.to_dict())
     assert again.cost_model == cost_model()
     assert again == priced
 
@@ -287,7 +298,7 @@ def test_load_errors_are_whole_messages(tmp_path):
 
 
 def test_every_text_slot_of_the_template_is_empty_and_named():
-    estimand = c.template()["estimand"]
+    estimand = contracts.template()["estimand"]
     for key in ("population", "target", "prediction_moment", "summary_measure"):
         assert estimand[key] == "", key
 

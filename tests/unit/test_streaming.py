@@ -7,8 +7,8 @@ import subprocess
 import sys
 import textwrap
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
@@ -20,7 +20,7 @@ from scmle.data.readers import streaming
 
 def write_parquet(path, rows, columns=6, chunk=100_000, seed=0):
     """Writes a Parquet file chunk by chunk, so the writer never holds it all."""
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     writer = None
     for start in range(0, rows, chunk):
         size = min(chunk, rows - start)
@@ -36,7 +36,7 @@ def write_parquet(path, rows, columns=6, chunk=100_000, seed=0):
 
 
 def test_the_split_side_depends_only_on_the_position_and_the_seed():
-    positions = np.arange(10_000)
+    positions = numpy.arange(10_000)
 
     first = streaming.side_of(positions, 0.2, 3)
     again = streaming.side_of(positions, 0.2, 3)
@@ -61,7 +61,7 @@ def test_the_sample_does_not_depend_on_the_batch_size(tmp_path):
     )[0]
     small = streaming.sample_pass(Sized(path), 3_000, 800, 0.2, 5)[0]
 
-    pd.testing.assert_frame_equal(
+    pandas.testing.assert_frame_equal(
         plain.sort_values("x0").reset_index(drop=True),
         small.sort_values("x0").reset_index(drop=True),
     )
@@ -132,13 +132,15 @@ def test_unsupported_formats_and_missing_files_are_refused(tmp_path):
 
 
 def test_json_lines_is_streamed_in_batches(tmp_path):
-    frame = pd.DataFrame({"a": range(12), "y": [0, 1] * 6})
+    frame = pandas.DataFrame({"a": range(12), "y": [0, 1] * 6})
     path = tmp_path / "data.jsonl"
     frame.to_json(path, orient="records", lines=True)
     source = streaming.source_for(path)
     batches = list(source.batches(rows=5))
     assert [len(batch) for batch in batches] == [5, 5, 2]
-    pd.testing.assert_frame_equal(pd.concat(batches, ignore_index=True), frame)
+    pandas.testing.assert_frame_equal(
+        pandas.concat(batches, ignore_index=True), frame
+    )
 
 
 def test_sample_sizes_follow_the_memory_budget():
@@ -150,7 +152,7 @@ def test_sample_sizes_follow_the_memory_budget():
 
 def write_stream_csv(path):
     """Write a small timestamped source for durable streaming tests."""
-    frame = pd.DataFrame(
+    frame = pandas.DataFrame(
         {
             "event_id": ["a", "b", "c", "d"],
             "event_time": [
@@ -437,7 +439,7 @@ def test_stream_ledger_refuses_a_changed_source_snapshot(tmp_path):
     batch = ledger.read_batch(rows=2)
     ledger.commit_with_writer(batch, lambda frame, key: None)
 
-    changed = pd.read_csv(path)
+    changed = pandas.read_csv(path)
     changed.loc[0, "value"] = 99
     changed.to_csv(path, index=False)
 

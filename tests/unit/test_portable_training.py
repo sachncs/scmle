@@ -13,7 +13,7 @@ from scmle.runners import entrypoint
 from scmle.runners import local
 from scmle.runners import reproducibility
 from scmle.runners import roles
-from tests import support_runners as sr
+from tests import support_runners
 
 TRAIN = "scmle-training"
 SERVE = "scmle-serving"
@@ -43,7 +43,7 @@ def spec_for(run_id="run-1", **changes):
 
 
 def local_runner(store, clock, workload=None, **options):
-    workload = workload or sr.toy_workload(clock)
+    workload = workload or support_runners.toy_workload(clock)
     return local.LocalRunner(
         store,
         workload,
@@ -55,14 +55,14 @@ def local_runner(store, clock, workload=None, **options):
 
 
 def reference_result(tmp_path):
-    clock = sr.FakeClock()
+    clock = support_runners.FakeClock()
     store = objectstore.LocalObjectStore(tmp_path / "reference")
     local_runner(store, clock).run(spec_for("reference"))
     return json.loads(store.get("runs/reference/result.json")[0])
 
 
 def test_a_run_writes_spec_checkpoints_result_and_manifest(store):
-    clock = sr.FakeClock()
+    clock = support_runners.FakeClock()
     manifest = local_runner(store, clock).run(spec_for())
     assert manifest.state == "succeeded" and len(manifest.attempts) == 1
     assert [c["step"] for c in manifest.checkpoints] == [1, 2, 3, 4, 5, 6]
@@ -78,12 +78,12 @@ def test_a_run_writes_spec_checkpoints_result_and_manifest(store):
 def test_an_interrupted_job_resumes_from_its_checkpoint_and_matches_the_reference(
     store, tmp_path
 ):
-    clock = sr.FakeClock()
+    clock = support_runners.FakeClock()
     seen = []
     runner = local_runner(
         store,
         clock,
-        sr.toy_workload(clock, log=seen),
+        support_runners.toy_workload(clock, log=seen),
         interruptions=lambda attempt, step: attempt == 1 and step == 3,
     )
     manifest = runner.run(spec_for())
@@ -96,7 +96,7 @@ def test_an_interrupted_job_resumes_from_its_checkpoint_and_matches_the_referenc
 
 
 def test_retries_are_bounded(store):
-    clock = sr.FakeClock()
+    clock = support_runners.FakeClock()
     runner = local_runner(store, clock, interruptions=lambda a, s: True)
     manifest = runner.run(spec_for())
     assert manifest.state == "retries_exhausted"
@@ -105,7 +105,7 @@ def test_retries_are_bounded(store):
 
 
 def test_transient_failures_retry_and_permanent_ones_do_not(store):
-    clock = sr.FakeClock()
+    clock = support_runners.FakeClock()
     calls = []
 
     def flaky(context):
@@ -126,7 +126,7 @@ def test_transient_failures_retry_and_permanent_ones_do_not(store):
 
 
 def test_a_run_that_ends_without_a_result_is_a_failure(store):
-    clock = sr.FakeClock()
+    clock = support_runners.FakeClock()
     manifest = local_runner(store, clock, lambda context: None).run(
         spec_for("silent")
     )
@@ -134,8 +134,8 @@ def test_a_run_that_ends_without_a_result_is_a_failure(store):
 
 
 def test_the_cost_budget_stops_a_runaway_job(store):
-    clock = sr.FakeClock()
-    slow = sr.toy_workload(clock, steps=1000)
+    clock = support_runners.FakeClock()
+    slow = support_runners.toy_workload(clock, steps=1000)
     budget = base.CostBudget(0.2, RATE)
     manifest = local_runner(store, clock, slow).run(
         spec_for("runaway", budget=budget)
@@ -153,7 +153,7 @@ def test_the_cost_budget_stops_a_runaway_job(store):
 
 
 def test_the_budget_accumulates_across_attempts(store):
-    clock = sr.FakeClock()
+    clock = support_runners.FakeClock()
     runner = local_runner(
         store,
         clock,
@@ -171,7 +171,7 @@ def test_the_budget_accumulates_across_attempts(store):
 
 
 def test_a_timeout_is_final(store):
-    clock = sr.FakeClock()
+    clock = support_runners.FakeClock()
     manifest = local_runner(store, clock).run(
         spec_for("slow", timeout_seconds=100.0)
     )
@@ -181,9 +181,11 @@ def test_a_timeout_is_final(store):
 def test_a_finished_run_id_is_idempotent_and_a_different_spec_is_refused(
     store,
 ):
-    clock = sr.FakeClock()
+    clock = support_runners.FakeClock()
     log = []
-    runner = local_runner(store, clock, sr.toy_workload(clock, log=log))
+    runner = local_runner(
+        store, clock, support_runners.toy_workload(clock, log=log)
+    )
     first = runner.run(spec_for())
     again = runner.run(spec_for())
     assert log == [(1, 0)] and again.state == first.state
@@ -193,7 +195,7 @@ def test_a_finished_run_id_is_idempotent_and_a_different_spec_is_refused(
 
 
 def test_a_crashed_supervisor_continues_the_numbering(store):
-    clock = sr.FakeClock()
+    clock = support_runners.FakeClock()
     runner = local_runner(store, clock)
     spec = spec_for("resumed")
     manifest = runner.register(spec)
@@ -210,7 +212,7 @@ def test_a_crashed_supervisor_continues_the_numbering(store):
 
 
 def test_training_cannot_run_as_serving_or_touch_released_bundles(store):
-    clock = sr.FakeClock()
+    clock = support_runners.FakeClock()
     runner = local_runner(store, clock)
     with pytest.raises(errors.ConfigError, match="serving identity"):
         runner.run(spec_for("bad", identity=SERVE))
@@ -287,7 +289,7 @@ def test_checkpoints_skip_a_damaged_newest_one(store):
 
 def test_the_entrypoint_checks_the_spec_digest_and_the_store_scheme(tmp_path):
     store = make_store(tmp_path)
-    clock = sr.FakeClock()
+    clock = support_runners.FakeClock()
     runner = local_runner(store, clock)
     spec = spec_for("entry")
     runner.register(spec)
@@ -296,13 +298,16 @@ def test_the_entrypoint_checks_the_spec_digest_and_the_store_scheme(tmp_path):
         context.finish({"metrics": {"ok": 1}})
 
     env = {"SCMLE_RUN_ID": "entry", "SCMLE_SPEC_DIGEST": spec.digest()}
-    assert sr.run_container(store, env, work) == 0
+    assert support_runners.run_container(store, env, work) == 0
     assert json.loads(store.get("runs/entry/result.json")[0]) == {
         "metrics": {"ok": 1}
     }
     wrong = {**env, "SCMLE_SPEC_DIGEST": "0" * 64}
-    assert sr.run_container(store, wrong, work) == 1
-    assert sr.run_container(store, {"SCMLE_RUN_ID": "nope"}, work) == 1
+    assert support_runners.run_container(store, wrong, work) == 1
+    assert (
+        support_runners.run_container(store, {"SCMLE_RUN_ID": "nope"}, work)
+        == 1
+    )
     assert entrypoint.open_store(tmp_path.as_uri()).scheme == "file"
     with pytest.raises(errors.ConfigError):
         entrypoint.open_store("ftp://host/x")

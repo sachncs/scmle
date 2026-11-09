@@ -24,8 +24,8 @@ import time
 import traceback
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from sklearn import ensemble
 from sklearn import multioutput
 
@@ -35,7 +35,7 @@ from scmle.evaluation import multitarget
 from scmle.evaluation import ordinal
 from scmle.evaluation import ranking
 from scmle.evaluation import uplift
-from scmle.models.survival import estimators as survival_estimators
+from scmle.models.survival import estimators
 
 LOGGER = logging.getLogger(__name__)
 RDATASETS = "https://vincentarelbundock.github.io/Rdatasets/csv/"
@@ -80,12 +80,12 @@ class Row:
         gap = self.framework - self.baseline
         if not self.higher_is_better:
             gap = -gap
-        if np.isnan(gap):
+        if numpy.isnan(gap):
             return "n/a"
         return "ahead" if gap > 0 else "behind" if gap < 0 else "level"
 
 
-def cached(name: str, make: Callable[[], pd.DataFrame]) -> pd.DataFrame:
+def cached(name: str, make: Callable[[], pandas.DataFrame]) -> pandas.DataFrame:
     """Downloads a table once and keeps it as Parquet.
 
     Args:
@@ -99,10 +99,10 @@ def cached(name: str, make: Callable[[], pd.DataFrame]) -> pd.DataFrame:
     path = CACHE / f"{name}.parquet"
     if not path.exists():
         make().to_parquet(path)
-    return pd.read_parquet(path)
+    return pandas.read_parquet(path)
 
 
-def rdataset(path: str) -> pd.DataFrame:
+def rdataset(path: str) -> pandas.DataFrame:
     """A table from the Rdatasets collection.
 
     Args:
@@ -114,13 +114,13 @@ def rdataset(path: str) -> pd.DataFrame:
     """
     return cached(
         path.replace("/", "_"),
-        lambda: pd.read_csv(RDATASETS + path).drop(
+        lambda: pandas.read_csv(RDATASETS + path).drop(
             columns=["rownames"], errors="ignore"
         ),
     )
 
 
-def openml(name: str, version: int | str = "active") -> pd.DataFrame:
+def openml(name: str, version: int | str = "active") -> pandas.DataFrame:
     """A table from OpenML.
 
     Args:
@@ -138,7 +138,7 @@ def openml(name: str, version: int | str = "active") -> pd.DataFrame:
     )
 
 
-def split_ids(result: scmle.RunResult) -> tuple[np.ndarray, np.ndarray]:
+def split_ids(result: scmle.RunResult) -> tuple[numpy.ndarray, numpy.ndarray]:
     """Development and locked row positions of a finished run.
 
     Args:
@@ -151,10 +151,10 @@ def split_ids(result: scmle.RunResult) -> tuple[np.ndarray, np.ndarray]:
     manifest = json.loads(
         (result.run_dir / "validation_manifest.json").read_text()
     )
-    return np.array(manifest["train_ids"]), np.array(manifest["test_ids"])
+    return numpy.array(manifest["train_ids"]), numpy.array(manifest["test_ids"])
 
 
-def encode(frame: pd.DataFrame) -> pd.DataFrame:
+def encode(frame: pandas.DataFrame) -> pandas.DataFrame:
     """Numeric matrix for baselines: dummies, missing filled with medians.
 
     Args:
@@ -164,12 +164,12 @@ def encode(frame: pd.DataFrame) -> pd.DataFrame:
         The frame with categorical columns one-hot encoded as floats and each
         missing value replaced by its column median.
     """
-    coded = pd.get_dummies(frame, dtype=float)
+    coded = pandas.get_dummies(frame, dtype=float)
     return coded.fillna(coded.median())
 
 
 def project(
-    frame: pd.DataFrame, target: Any, root: pathlib.Path, **kw: Any
+    frame: pandas.DataFrame, target: Any, root: pathlib.Path, **kw: Any
 ) -> scmle.MLProject:
     """A project with the suite's shared settings.
 
@@ -194,7 +194,7 @@ BUDGET = 150
 
 def forecast_case(
     name: str,
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     value: str,
     clock: str,
     period: int,
@@ -227,11 +227,11 @@ def forecast_case(
         folds=3,
     ).run()
     steps = result.evaluation["forecast_backtest"]["steps"]
-    model = float(np.mean([s["model_mae"] for s in steps]))
+    model = float(numpy.mean([s["model_mae"] for s in steps]))
     naive = {
-        "last value": float(np.mean([s["last_value_mae"] for s in steps])),
+        "last value": float(numpy.mean([s["last_value_mae"] for s in steps])),
         "seasonal naive": float(
-            np.mean([s["seasonal_naive_mae"] for s in steps])
+            numpy.mean([s["seasonal_naive_mae"] for s in steps])
         ),
     }
     best = min(naive, key=lambda kind: naive[kind])
@@ -252,7 +252,7 @@ def forecast_case(
 
 def survival_case(
     name: str,
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     duration: str,
     event: str,
     root: pathlib.Path,
@@ -280,7 +280,7 @@ def survival_case(
     matrix = (matrix - matrix.iloc[train].mean()) / matrix.iloc[
         train
     ].std().replace(0, 1)
-    cox = survival_estimators.CoxRegressor().fit(
+    cox = estimators.CoxRegressor().fit(
         matrix.iloc[train].to_numpy(),
         frame[duration].iloc[train].to_numpy(),
         frame[event].iloc[train].to_numpy(),
@@ -305,7 +305,7 @@ def survival_case(
 
 
 def ordinal_case(
-    name: str, frame: pd.DataFrame, target: str, root: pathlib.Path
+    name: str, frame: pandas.DataFrame, target: str, root: pathlib.Path
 ) -> Row:
     """Ordered labels against a plain multiclass boosted classifier.
 
@@ -347,7 +347,7 @@ def ordinal_case(
 
 
 def multilabel_case(
-    name: str, frame: pd.DataFrame, labels: list[str], root: pathlib.Path
+    name: str, frame: pandas.DataFrame, labels: list[str], root: pathlib.Path
 ) -> Row:
     """Several labels against one boosted classifier per label.
 
@@ -393,7 +393,7 @@ def multilabel_case(
 
 
 def multioutput_case(
-    name: str, frame: pd.DataFrame, targets: list[str], root: pathlib.Path
+    name: str, frame: pandas.DataFrame, targets: list[str], root: pathlib.Path
 ) -> Row:
     """Several numbers against one boosted regressor per target.
 
@@ -431,7 +431,7 @@ def multioutput_case(
 
 def uplift_case(
     name: str,
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     outcome: str,
     treatment: str,
     root: pathlib.Path,
@@ -457,9 +457,9 @@ def uplift_case(
     test = split_ids(result)[1]
     arm = frame[treatment].to_numpy()[test]
     y = frame[outcome].to_numpy(float)[test]
-    generator = np.random.default_rng(0)
+    generator = numpy.random.default_rng(0)
     chance = float(
-        np.mean(
+        numpy.mean(
             [
                 uplift.qini_coefficient(y, arm, generator.normal(size=len(y)))
                 for __ in range(50)
@@ -493,7 +493,7 @@ def ranking_case(root: pathlib.Path) -> Row:
     """
     from huggingface_hub import hf_hub_download
 
-    def load() -> pd.DataFrame:
+    def load() -> pandas.DataFrame:
         """Reads the first 700 queries of the MSLR-WEB10k validation file.
 
         The file is downloaded into `CACHE` unless it is already there.
@@ -507,16 +507,16 @@ def ranking_case(root: pathlib.Path) -> Row:
             repo_type="dataset",
             local_dir=str(CACHE),
         )
-        raw = pd.read_parquet(path).head(700)
+        raw = pandas.read_parquet(path).head(700)
         rows = []
         for query, labels, features in zip(
             raw["query"], raw["labels"], raw["features"], strict=True
         ):
-            block = pd.DataFrame(np.vstack(features)).add_prefix("f")
-            block.insert(0, "relevance", np.asarray(labels))
+            block = pandas.DataFrame(numpy.vstack(features)).add_prefix("f")
+            block.insert(0, "relevance", numpy.asarray(labels))
             block.insert(0, "query", query)
             rows.append(block)
-        return pd.concat(rows, ignore_index=True)
+        return pandas.concat(rows, ignore_index=True)
 
     frame = cached("mslr_700", load)
     result = project(
@@ -578,8 +578,8 @@ def streaming_case(root: pathlib.Path) -> Row:
     # same hashed locked rows.
     from scmle.data.readers import streaming
 
-    frame = pd.read_parquet(path)
-    side = streaming.side_of(np.arange(len(frame)), 0.2, 42)
+    frame = pandas.read_parquet(path)
+    side = streaming.side_of(numpy.arange(len(frame)), 0.2, 42)
     features = frame.drop(columns=["Cover_Type"])
     model = ensemble.HistGradientBoostingClassifier(random_state=0).fit(
         features[side == 0], frame["Cover_Type"][side == 0]
@@ -615,7 +615,7 @@ def text_case(root: pathlib.Path) -> Row:
         the TF-IDF text encoder.
     """
 
-    def load() -> pd.DataFrame:
+    def load() -> pandas.DataFrame:
         """Downloads the SMS spam table.
 
         Returns:
@@ -629,7 +629,7 @@ def text_case(root: pathlib.Path) -> Row:
             repo_type="dataset",
             local_dir=str(CACHE),
         )
-        return pd.read_parquet(path)
+        return pandas.read_parquet(path)
 
     frame = cached("sms_spam", load).rename(
         columns={"sms": "text", "label": "spam"}
@@ -679,7 +679,7 @@ def build_cases(root: pathlib.Path) -> dict[str, Callable[[], Row]]:
         """
         return root / name
 
-    def air() -> pd.DataFrame:
+    def air() -> pandas.DataFrame:
         """The AirPassengers series.
 
         Returns:
@@ -801,14 +801,14 @@ def build_cases(root: pathlib.Path) -> dict[str, Callable[[], Row]]:
     return cases
 
 
-def criteo() -> pd.DataFrame:
+def criteo() -> pandas.DataFrame:
     """A 3% random sample of the Criteo uplift table.
 
     Returns:
         The sampled table without the `conversion` and `exposure` columns.
     """
 
-    def load() -> pd.DataFrame:
+    def load() -> pandas.DataFrame:
         """Streams the compressed Criteo file and samples each chunk.
 
         Returns:
@@ -820,9 +820,9 @@ def criteo() -> pd.DataFrame:
             "main/criteo-research-uplift-v2.1.csv.gz"
         )
         parts = []
-        for chunk in pd.read_csv(url, chunksize=1_000_000):
+        for chunk in pandas.read_csv(url, chunksize=1_000_000):
             parts.append(chunk.sample(frac=0.03, random_state=0))
-        return pd.concat(parts, ignore_index=True).drop(
+        return pandas.concat(parts, ignore_index=True).drop(
             columns=["conversion", "exposure"]
         )
 

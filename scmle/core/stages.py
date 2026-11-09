@@ -16,8 +16,8 @@ import time
 from typing import Any
 from typing import ClassVar
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from sklearn import base
 
 import scmle
@@ -44,41 +44,41 @@ from scmle.core import randomness
 from scmle.core import state as run_state
 from scmle.data.admissibility import attestations
 from scmle.data.admissibility import qualify
-from scmle.data.charter import contracts as charter_contracts
-from scmle.data.charter import ingest as charter_ingest
-from scmle.data.charter import sealing as charter_sealing
+from scmle.data.charter import contracts
+from scmle.data.charter import ingest
+from scmle.data.charter import sealing
 from scmle.data.curation import forecasting
 from scmle.data.curation import preprocessing
 from scmle.data.custody import pipeline as custody_pipeline
 from scmle.data.custody import sealed as custody_sealed
 from scmle.data.framing import baseline as framing_baseline
 from scmle.data.framing import claim as framing_claim
-from scmle.data.framing import draft as framing_draft
+from scmle.data.framing import draft
 from scmle.data.identification import run as identification_run
 from scmle.data.ledger import budget as ledger_budget
-from scmle.data.ledger import confirm as ledger_confirm
-from scmle.data.ledger import explore as ledger_explore
-from scmle.data.ledger import governed as ledger_governed
+from scmle.data.ledger import confirm
+from scmle.data.ledger import explore
+from scmle.data.ledger import governed
 from scmle.data.profiling import label_noise
 from scmle.data.profiling import profiler
 from scmle.data.profiling import representativeness
 from scmle.data.readers import registry as source_registry
 from scmle.data.readers import streaming
 from scmle.data.readers import tabular
-from scmle.data.robustness import html_report as robustness_html
-from scmle.data.robustness import prefilter as robustness_prefilter
+from scmle.data.robustness import html_report
+from scmle.data.robustness import prefilter
 from scmle.data.robustness import qualify as robustness_qualify
 from scmle.data.robustness import report as robustness_report
 from scmle.data.robustness import stability as robustness_stability
 from scmle.data.splitting import splitters
 from scmle.data.validation import target as target_module
-from scmle.decision import netbenefit as decision_netbenefit
+from scmle.decision import netbenefit
 from scmle.decision import threshold as decision_threshold
 from scmle.evaluation import backtest
 from scmle.evaluation import bias_variance
 from scmle.evaluation import confidence
 from scmle.evaluation import conformal
-from scmle.evaluation import coverage as coverage_module
+from scmle.evaluation import coverage
 from scmle.evaluation import coverage_confirm
 from scmle.evaluation import coverage_run
 from scmle.evaluation import coverage_slices
@@ -200,7 +200,7 @@ class IngestStage(Stage):
 
     def read_stream(
         self, context: context_module.RunContext, data: tasks.DataSpec
-    ) -> pd.DataFrame:
+    ) -> pandas.DataFrame:
         """Reads the file in one pass, keeping a sample of both sides.
 
         A hash of each row's position assigns it to the locked or the
@@ -313,7 +313,7 @@ class IngestStage(Stage):
         )
 
     def persist_source_snapshot(
-        self, context: context_module.RunContext, frame: pd.DataFrame
+        self, context: context_module.RunContext, frame: pandas.DataFrame
     ) -> None:
         """Records the source identity and refuses incompatible schema changes.
 
@@ -418,17 +418,17 @@ class PendingLedger:
             calibration exist, so the coverage claim can be tested on it.
     """
 
-    explored: ledger_governed.Explored
+    explored: governed.Explored
     task: tasks.TaskType
-    charter: charter_contracts.AnalysisCharter
+    charter: contracts.AnalysisCharter
     view: Any
     structure: tuple[str, ...]
     graph: Any
     found: qualify.Qualification
     stage: Any
     signed: bool
-    baseline: ledger_confirm.ClaimRunner | None
-    causal: ledger_confirm.ClaimRunner | None
+    baseline: confirm.ClaimRunner | None
+    causal: confirm.ClaimRunner | None
     subject: Any = None
     holds_for_coverage: bool = False
 
@@ -459,8 +459,8 @@ class ProfileStage(Stage):
         return "profile dataset"
 
     def set_aside_unlabeled(
-        self, context: context_module.RunContext, frame: pd.DataFrame
-    ) -> pd.DataFrame:
+        self, context: context_module.RunContext, frame: pandas.DataFrame
+    ) -> pandas.DataFrame:
         """Applies the `unlabeled` policy to rows with a missing target.
 
         Args:
@@ -711,8 +711,8 @@ class ProfileStage(Stage):
         self.run_claim_ledger(context, task)
 
     def synthesize_features(
-        self, context: context_module.RunContext, frame: pd.DataFrame
-    ) -> pd.DataFrame:
+        self, context: context_module.RunContext, frame: pandas.DataFrame
+    ) -> pandas.DataFrame:
         """Adds the synthesized features before the data are split.
 
         Does nothing unless the data spec names an `ingest_plan`, which needs
@@ -737,9 +737,7 @@ class ProfileStage(Stage):
         data = context.spec.data
         path = context.spec.charter_path
         block = (
-            charter_sealing.read_verified(str(path)).charter.ingest
-            if path
-            else None
+            sealing.read_verified(str(path)).charter.ingest if path else None
         )
         if not data.ingest_plan:
             if block is not None:
@@ -763,7 +761,7 @@ class ProfileStage(Stage):
             raise errors.ConfigError(
                 f"synthesized features collide with columns: {clash}"
             )
-        merged = pd.concat(
+        merged = pandas.concat(
             [frame.reset_index(drop=True), result.features], axis=1
         )
         if block.entity is not None:
@@ -783,9 +781,9 @@ class ProfileStage(Stage):
     def assign_entity_groups(
         self,
         context: context_module.RunContext,
-        entity: charter_ingest.EntitySpec,
-        frame: pd.DataFrame,
-    ) -> pd.DataFrame:
+        entity: ingest.EntitySpec,
+        frame: pandas.DataFrame,
+    ) -> pandas.DataFrame:
         """Makes the resolved entity the split's group column.
 
         Args:
@@ -859,7 +857,7 @@ class ProfileStage(Stage):
             )
             return
         spec = context.spec
-        verified = charter_sealing.read_verified(str(spec.charter_path))
+        verified = sealing.read_verified(str(spec.charter_path))
         charter = verified.charter
         data = spec.data
         view = outcome.view
@@ -875,7 +873,7 @@ class ProfileStage(Stage):
             context, task, charter, view, structure, graph
         )
         rules = charter.rules
-        stage = robustness_prefilter.StabilityStage(
+        stage = prefilter.StabilityStage(
             lambda columns: self.run_robustness(
                 context, task, charter, view, columns, structure
             ),
@@ -888,14 +886,14 @@ class ProfileStage(Stage):
             context, task, charter, view, structure, signed=verified.signed
         )
         causal = self.causal_runner(context, charter, view, graph, found)
-        explored = ledger_governed.explore_governed(
+        explored = governed.explore_governed(
             charter=charter,
             features=view.features,
             target=view.target,
             classification=task.is_classification,
             run_dir=run_dir,
             exclude=structure + tuple(found.quarantined),
-            strata=ledger_governed.strata_labels(
+            strata=governed.strata_labels(
                 view.features, data.group_column, data.time_column
             ),
             rule=chartered_rule(
@@ -951,7 +949,7 @@ class ProfileStage(Stage):
         context: context_module.RunContext,
         pending: "PendingLedger",
         subject: framing_claim.Rule | None = None,
-        extra: ledger_confirm.ClaimRunner | None = None,
+        extra: confirm.ClaimRunner | None = None,
     ) -> None:
         """Registers the claims, opens `C` once and writes the reports.
 
@@ -978,9 +976,9 @@ class ProfileStage(Stage):
                 signed=pending.signed,
                 subject=subject,
             )
-        runner = ledger_confirm.merge_runners(baseline, pending.causal, extra)
+        runner = confirm.merge_runners(baseline, pending.causal, extra)
         vault = require(context.custody_vault, "custody vault")
-        run = ledger_governed.confirm_explored(
+        run = governed.confirm_explored(
             pending.explored,
             source=vault.sets.get("C"),
             confirmation_rule=ledger_budget.MultiplicityRule(
@@ -1024,13 +1022,13 @@ class ProfileStage(Stage):
         self,
         context: context_module.RunContext,
         task: tasks.TaskType,
-        charter: charter_contracts.AnalysisCharter,
+        charter: contracts.AnalysisCharter,
         view: Any,
         structure: tuple[str, ...],
         *,
         signed: bool,
         subject: framing_claim.Rule | None = None,
-    ) -> ledger_confirm.ClaimRunner | None:
+    ) -> confirm.ClaimRunner | None:
         """Freezes the baseline rule on `X` and registers the claim.
 
         Runs when the data spec names `baseline_column`. The rule is fitted
@@ -1078,7 +1076,7 @@ class ProfileStage(Stage):
                 f"baseline column '{column}' is not in the exploration rows"
             )
         classes = sorted(view.target.dropna().unique(), key=str)
-        outcome = ledger_explore.encode_target(view.target, True, classes)
+        outcome = explore.encode_target(view.target, True, classes)
         plan = require(context.profile, "profile").feature_plan
         numeric = [
             c
@@ -1093,11 +1091,13 @@ class ProfileStage(Stage):
             charter.seed,
         )
         decisions = view.features[column].to_numpy(dtype=float)
-        seen = np.ones(len(decisions), dtype=bool)
+        seen = numpy.ones(len(decisions), dtype=bool)
         if context.unlabeled is not None and column in context.unlabeled:
             extra = context.unlabeled[column].to_numpy(dtype=float)
-            decisions = np.concatenate([decisions, extra])
-            seen = np.concatenate([seen, np.zeros(len(extra), dtype=bool)])
+            decisions = numpy.concatenate([decisions, extra])
+            seen = numpy.concatenate(
+                [seen, numpy.zeros(len(extra), dtype=bool)]
+            )
         selection = framing_baseline.selective_labels(seen, decisions)
         ceiling, why = framing_claim.source_ceiling(
             data.framing_draft, charter.charter_hash, model, signed=signed
@@ -1119,7 +1119,7 @@ class ProfileStage(Stage):
     def check_ingest_family(
         self,
         context: context_module.RunContext,
-        run: ledger_governed.GovernedRun,
+        run: governed.GovernedRun,
         found: qualify.Qualification,
     ) -> None:
         """Requires the ledger to hold exactly the declared synthesized family.
@@ -1154,8 +1154,8 @@ class ProfileStage(Stage):
     def write_registered_claims(
         self,
         context: context_module.RunContext,
-        run: ledger_governed.GovernedRun,
-        runner: ledger_confirm.ClaimRunner | None,
+        run: governed.GovernedRun,
+        runner: confirm.ClaimRunner | None,
     ) -> None:
         """Writes the report files of the registered claims.
 
@@ -1181,7 +1181,7 @@ class ProfileStage(Stage):
         ):
             documents[framing_claim.DOCUMENT] = {
                 "schema_version": 1,
-                "status": ledger_confirm.NOT_EVALUATED,
+                "status": confirm.NOT_EVALUATED,
                 "issued": False,
                 "reasons": [
                     "the confirmation set was not available to test the claim"
@@ -1200,7 +1200,7 @@ class ProfileStage(Stage):
         self,
         context: context_module.RunContext,
         task: tasks.TaskType,
-        charter: charter_contracts.AnalysisCharter,
+        charter: contracts.AnalysisCharter,
         view: Any,
         survivors: tuple[str, ...],
         structure: tuple[str, ...],
@@ -1227,10 +1227,8 @@ class ProfileStage(Stage):
         profile = require(context.profile, "profile")
         plan = profile.feature_plan
         candidates = [*plan.numeric, *plan.categorical]
-        codes = ledger_explore.encode_target(
-            view.target, task.is_classification
-        )
-        kind = ledger_explore.target_kind(view.target, task.is_classification)
+        codes = explore.encode_target(view.target, task.is_classification)
+        kind = explore.target_kind(view.target, task.is_classification)
         reference = (
             tabular.read_table(data.reference_uri)
             if data.reference_uri
@@ -1241,11 +1239,11 @@ class ProfileStage(Stage):
             view.features,
             codes,
             survivors=list(survivors),
-            multiclass=kind == ledger_explore.MULTICLASS,
+            multiclass=kind == explore.MULTICLASS,
             choices=charter.multiverse,
             seed=charter.seed,
             permutations=charter.error_budget.permutations_b,
-            strata=ledger_governed.strata_labels(
+            strata=governed.strata_labels(
                 view.features, data.group_column, data.time_column
             ),
             reference=reference,
@@ -1264,9 +1262,9 @@ class ProfileStage(Stage):
     def assess_robustness(
         self,
         context: context_module.RunContext,
-        charter: charter_contracts.AnalysisCharter,
-        run: ledger_governed.GovernedRun,
-        stage: robustness_prefilter.StabilityStage,
+        charter: contracts.AnalysisCharter,
+        run: governed.GovernedRun,
+        stage: prefilter.StabilityStage,
     ) -> None:
         """Writes the stability and shift reports and the EDA page.
 
@@ -1303,7 +1301,7 @@ class ProfileStage(Stage):
         context.write_json("shift_report.json", shift_document)
         context.write_text(
             "eda_report.html",
-            robustness_html.render(stability_document, shift_document),
+            html_report.render(stability_document, shift_document),
         )
         context.emit(
             "robustness.completed",
@@ -1324,7 +1322,7 @@ class ProfileStage(Stage):
     def assess_framing(
         self,
         context: context_module.RunContext,
-        charter: charter_contracts.AnalysisCharter,
+        charter: contracts.AnalysisCharter,
         view: Any,
     ) -> None:
         """Checks that the charter's words name real columns.
@@ -1342,7 +1340,7 @@ class ProfileStage(Stage):
         """
         data = context.spec.data
         columns = [*view.features.columns, data.target]
-        document = framing_draft.link_report(charter, columns)
+        document = draft.link_report(charter, columns)
         context.write_json("framing_link.json", document)
         context.emit(
             "framing.completed",
@@ -1354,11 +1352,11 @@ class ProfileStage(Stage):
     def causal_runner(
         self,
         context: context_module.RunContext,
-        charter: charter_contracts.AnalysisCharter,
+        charter: contracts.AnalysisCharter,
         view: Any,
         graph: Any,
         found: qualify.Qualification,
-    ) -> ledger_confirm.ClaimRunner | None:
+    ) -> confirm.ClaimRunner | None:
         """Registers the primary causal hypothesis for the one opening.
 
         The strategy is chosen from the charter and the declared DAG alone.
@@ -1398,9 +1396,9 @@ class ProfileStage(Stage):
     def assess_identification(
         self,
         context: context_module.RunContext,
-        charter: charter_contracts.AnalysisCharter,
+        charter: contracts.AnalysisCharter,
         view: Any,
-        run: ledger_governed.GovernedRun,
+        run: governed.GovernedRun,
         graph: Any,
         found: qualify.Qualification,
     ) -> None:
@@ -1469,7 +1467,7 @@ class ProfileStage(Stage):
         self,
         context: context_module.RunContext,
         task: tasks.TaskType,
-        charter: charter_contracts.AnalysisCharter,
+        charter: contracts.AnalysisCharter,
         view: Any,
         structure: tuple[str, ...],
         graph: Any = None,
@@ -1615,7 +1613,7 @@ class ProfileStage(Stage):
     def add_quality_notes(
         spec: tasks.ProjectSpec,
         task: tasks.TaskType,
-        development: pd.DataFrame,
+        development: pandas.DataFrame,
         profile: data_contracts.DatasetProfile,
     ) -> data_contracts.DatasetProfile:
         """Appends label-noise and representativeness findings.
@@ -1742,7 +1740,7 @@ class ProfileStage(Stage):
         self,
         context: context_module.RunContext,
         task: tasks.TaskType,
-        frame: pd.DataFrame,
+        frame: pandas.DataFrame,
         split: splitters.SplitResult,
     ) -> splitters.SplitResult:
         """Carves and seals the confirmation set under the charter.
@@ -1772,10 +1770,10 @@ class ProfileStage(Stage):
                 and the data spec has no group column.
         """
         path = str(context.spec.charter_path)
-        verified = charter_sealing.read_verified(path)
+        verified = sealing.read_verified(path)
         charter = verified.charter
         if (
-            charter.unit_of_prediction == charter_contracts.NEW_ENTITY
+            charter.unit_of_prediction == contracts.NEW_ENTITY
             and not context.spec.data.group_column
         ):
             raise errors.ConfigError(
@@ -1794,7 +1792,7 @@ class ProfileStage(Stage):
             context.manifest.data_hash
             if context.manifest is not None
             else hashlib.sha256(
-                pd.util.hash_pandas_object(frame).to_numpy().tobytes()
+                pandas.util.hash_pandas_object(frame).to_numpy().tobytes()
             ).hexdigest()
         )
         outcome = custody_pipeline.apply_custody(
@@ -1808,9 +1806,7 @@ class ProfileStage(Stage):
         )
         context.custody = outcome
         context.custody_vault = vault_set
-        context.write_json(
-            "analysis_charter.json", charter_contracts.load_json(path)
-        )
+        context.write_json("analysis_charter.json", contracts.load_json(path))
         context.write_json("error_budget.json", charter.error_budget.to_dict())
         context.write_json("feasibility.json", outcome.feasibility.to_dict())
         context.write_json("split_manifest.json", outcome.manifest.to_dict())
@@ -1839,7 +1835,7 @@ class ProfileStage(Stage):
     def check_known_entity(
         self,
         context: context_module.RunContext,
-        charter: charter_contracts.AnalysisCharter,
+        charter: contracts.AnalysisCharter,
         split: splitters.SplitResult,
     ) -> None:
         """Requires the data a known-entity-future charter needs.
@@ -1860,7 +1856,7 @@ class ProfileStage(Stage):
             ConfigError: If a column is missing or the split strategy is not
                 time-ordered.
         """
-        if charter.unit_of_prediction != charter_contracts.KNOWN_ENTITY_FUTURE:
+        if charter.unit_of_prediction != contracts.KNOWN_ENTITY_FUTURE:
             return
         data = context.spec.data
         for role, column in (
@@ -1892,7 +1888,7 @@ class ProfileStage(Stage):
         self,
         context: context_module.RunContext,
         task: tasks.TaskType,
-        frame: pd.DataFrame,
+        frame: pandas.DataFrame,
     ) -> splitters.SplitResult:
         """Splits the dataset and records the manifest.
 
@@ -1916,7 +1912,7 @@ class ProfileStage(Stage):
             # no locked rows, but the seasonal baseline needs their history.
             context.seasonal_baseline = backtest.seasonal_naive(
                 frame,
-                np.asarray(split.manifest.test_ids),
+                numpy.asarray(split.manifest.test_ids),
                 data.value_column or "",
                 data.group_column,
                 len(data.targets),
@@ -2630,8 +2626,8 @@ def pareto_report(
 
 
 def reference_scores(
-    fitted: Any, features: pd.DataFrame, task: tasks.TaskType
-) -> pd.Series:
+    fitted: Any, features: pandas.DataFrame, task: tasks.TaskType
+) -> pandas.Series:
     """Returns model outputs on held-out rows, the output-drift reference.
 
     Args:
@@ -2644,15 +2640,15 @@ def reference_scores(
         predictions, taking the first column if they are two-dimensional.
     """
     if task is tasks.TaskType.BINARY:
-        return pd.Series(fitted.predict_proba(features)[:, 1], name="score")
-    predicted = np.asarray(fitted.predict(features))
+        return pandas.Series(fitted.predict_proba(features)[:, 1], name="score")
+    predicted = numpy.asarray(fitted.predict(features))
     if predicted.ndim == 2:
         predicted = predicted[:, 0]  # The primary target stands for all.
-    return pd.Series(predicted, name="prediction")
+    return pandas.Series(predicted, name="prediction")
 
 
 def coverage_on_confirmation(
-    charter: charter_contracts.AnalysisCharter, task: tasks.TaskType
+    charter: contracts.AnalysisCharter, task: tasks.TaskType
 ) -> bool:
     """Returns whether the charter asks for the coverage claim on `C`.
 
@@ -2687,12 +2683,12 @@ def declared_slice_columns(
     path = context.spec.charter_path
     if not path:
         return ()
-    block = charter_sealing.read_verified(str(path)).charter.uncertainty
+    block = sealing.read_verified(str(path)).charter.uncertainty
     return () if block is None else block.slice_columns
 
 
 def slice_labels(
-    context: context_module.RunContext, features: pd.DataFrame
+    context: context_module.RunContext, features: pandas.DataFrame
 ) -> dict[str, Any]:
     """Returns each final test row's slice label for every declared column.
 
@@ -2724,7 +2720,7 @@ def slice_labels(
 
 def chartered_decision_model(
     context: context_module.RunContext,
-) -> charter_contracts.AnalysisCharter | None:
+) -> contracts.AnalysisCharter | None:
     """Returns the charter when it declares a decision layer, else None.
 
     Args:
@@ -2737,7 +2733,7 @@ def chartered_decision_model(
     path = context.spec.charter_path
     if path is None:
         return None
-    charter = charter_sealing.read_verified(str(path)).charter
+    charter = sealing.read_verified(str(path)).charter
     if charter.decision is None or charter.cost_model is None:
         return None
     return charter
@@ -2745,9 +2741,9 @@ def chartered_decision_model(
 
 def chartered_threshold(
     fitted: Any,
-    probabilities: np.ndarray,
-    actual: np.ndarray,
-    charter: charter_contracts.AnalysisCharter,
+    probabilities: numpy.ndarray,
+    actual: numpy.ndarray,
+    charter: contracts.AnalysisCharter,
     seed: int,
     rows: int,
 ) -> tuple[Any, dict[str, Any]]:
@@ -2807,8 +2803,8 @@ def chartered_threshold(
 def chartered_net_benefit(
     context: context_module.RunContext,
     pipeline: Any,
-    features: pd.DataFrame,
-    target: pd.Series,
+    features: pandas.DataFrame,
+    target: pandas.Series,
     decision: dict[str, Any] | None,
 ) -> dict[str, Any] | None:
     """Returns the net benefit of the frozen rule on the locked test set.
@@ -2850,11 +2846,11 @@ def chartered_net_benefit(
         if split.manifest.strategy == "group" and context.spec.data.group_column
         else None
     )
-    guard = decision_netbenefit.FinalNetBenefit(decision["f11"]["rule_hash"])
+    guard = netbenefit.FinalNetBenefit(decision["f11"]["rule_hash"])
     report = guard.evaluate(
         decision["f11"]["rule_hash"],
         (target == positive).to_numpy(dtype=float),
-        (np.asarray(pipeline.predict(features)) == positive).astype(float),
+        (numpy.asarray(pipeline.predict(features)) == positive).astype(float),
         (model.t_lo, model.t_hi),
         clusters=clusters,
         alpha=float(charter.error_budget.confirmation.alpha_confirm),
@@ -3105,7 +3101,7 @@ class FinalEvaluationStage(Stage):
         classes = getattr(pipeline, "classes_", None)
         offset, rows_seen = 0, 0
         for batch in source.batches():
-            positions = np.arange(offset, offset + len(batch))
+            positions = numpy.arange(offset, offset + len(batch))
             offset += len(batch)
             side = streaming.side_of(positions, fraction, seed)
             part = batch[side == streaming.DEVELOPMENT]
@@ -3149,7 +3145,7 @@ class FinalEvaluationStage(Stage):
         labels, guesses, scores = [], [], []
         offset = 0
         for batch in source.batches():
-            positions = np.arange(offset, offset + len(batch))
+            positions = numpy.arange(offset, offset + len(batch))
             offset += len(batch)
             side = streaming.side_of(positions, fraction, seed)
             part = batch[side == streaming.LOCKED]
@@ -3157,22 +3153,22 @@ class FinalEvaluationStage(Stage):
                 continue
             features = part.drop(columns=[data.target])
             labels.append(part[data.target].to_numpy())
-            guesses.append(np.asarray(pipeline.predict(features)))
+            guesses.append(numpy.asarray(pipeline.predict(features)))
             if task.is_classification:
-                scores.append(np.asarray(pipeline.predict_proba(features)))
-        truth = pd.Series(np.concatenate(labels))
+                scores.append(numpy.asarray(pipeline.predict_proba(features)))
+        truth = pandas.Series(numpy.concatenate(labels))
         replay_class = (
             replay.ClassifierPredictions
             if task.is_classification
             else replay.RegressorPredictions
         )
         stand_in = replay_class(
-            np.concatenate(guesses),
-            np.vstack(scores) if scores else None,
+            numpy.concatenate(guesses),
+            numpy.vstack(scores) if scores else None,
             getattr(pipeline, "classes_", None),
         )
         metrics = context.catalog.evaluate(
-            stand_in, pd.DataFrame(index=truth.index), truth, task
+            stand_in, pandas.DataFrame(index=truth.index), truth, task
         )
         return {
             "rows": len(truth),
@@ -3184,8 +3180,8 @@ class FinalEvaluationStage(Stage):
         self,
         context: context_module.RunContext,
         fitted: Any,
-        features: pd.DataFrame,
-        outcome: pd.Series,
+        features: pandas.DataFrame,
+        outcome: pandas.Series,
     ) -> dict[str, Any] | None:
         """Returns treatment-effect evidence on the released rows, with caveat.
 
@@ -3204,9 +3200,9 @@ class FinalEvaluationStage(Stage):
         if require(context.task, "task") is not tasks.TaskType.UPLIFT:
             return None
         arm = features[context.spec.data.treatment_column].to_numpy(dtype=int)
-        predicted = np.asarray(fitted.predict(features), dtype=float)
+        predicted = numpy.asarray(fitted.predict(features), dtype=float)
         rows, curve = uplift.qini_curve(outcome.to_numpy(float), arm, predicted)
-        keep = np.unique(np.linspace(0, len(rows) - 1, 50).astype(int))
+        keep = numpy.unique(numpy.linspace(0, len(rows) - 1, 50).astype(int))
         return {
             "assumption": uplift.ASSUMPTION,
             "propensity": context.propensity,
@@ -3225,8 +3221,8 @@ class FinalEvaluationStage(Stage):
         context: context_module.RunContext,
         before: Any,
         after: Any,
-        features: pd.DataFrame,
-        target: pd.Series,
+        features: pandas.DataFrame,
+        target: pandas.Series,
     ) -> None:
         """Adds the gap and accuracy on the released rows to the evidence.
 
@@ -3250,7 +3246,7 @@ class FinalEvaluationStage(Stage):
         positive = after.classes_[1]
         actual = (target == positive).to_numpy()
         flags = {
-            name: np.asarray(model.predict(features)) == positive
+            name: numpy.asarray(model.predict(features)) == positive
             for name, model in (("before", before), ("after", after))
         }
         criterion = record["criterion"]
@@ -3351,13 +3347,13 @@ class FinalEvaluationStage(Stage):
         split = require(context.split, "split")
         charter_hash = None
         if context.spec.charter_path:
-            charter_hash = charter_sealing.read_verified(
+            charter_hash = sealing.read_verified(
                 str(context.spec.charter_path)
             ).charter_hash
         claim = coverage_run.claim_document(
             task=require(context.task, "task").value,
             levels=COVERAGE_LEVELS,
-            tolerance=coverage_module.DEFAULT_TOLERANCE,
+            tolerance=coverage.DEFAULT_TOLERANCE,
             split_fingerprint=split.manifest.fingerprint,
             charter_hash=charter_hash,
             slice_columns=declared_slice_columns(context),
@@ -3407,8 +3403,8 @@ class FinalEvaluationStage(Stage):
         self,
         context: context_module.RunContext,
         pipeline: Any,
-        features: pd.DataFrame,
-        target: pd.Series,
+        features: pandas.DataFrame,
+        target: pandas.Series,
         decision: dict[str, Any] | None,
         net_benefit: dict[str, Any] | None,
     ) -> None:
@@ -3438,9 +3434,9 @@ class FinalEvaluationStage(Stage):
         data = context.spec.data
         positive = pipeline.classes_[1]
         outcome = (target == positive).to_numpy(dtype=float)
-        actions = (np.asarray(pipeline.predict(features)) == positive).astype(
-            float
-        )
+        actions = (
+            numpy.asarray(pipeline.predict(features)) == positive
+        ).astype(float)
         logged = (
             features[data.logged_action_column].to_numpy(dtype=float)
             if data.logged_action_column
@@ -3464,7 +3460,7 @@ class FinalEvaluationStage(Stage):
         )
         design_record = None
         built = decision_reports.rollout_design(
-            charter, float(np.mean(outcome)) if len(outcome) else 0.0
+            charter, float(numpy.mean(outcome)) if len(outcome) else 0.0
         )
         report = decision_reports.decision_report(
             charter,
@@ -3639,8 +3635,12 @@ class FinalEvaluationStage(Stage):
             "fit_health": self.selected_health(context, selected),
             "cv_confidence": confidence.cv_interval(
                 selected.fold_scores,
-                float(np.mean([len(fold[0]) for fold in split.manifest.folds])),
-                float(np.mean([len(fold[1]) for fold in split.manifest.folds])),
+                float(
+                    numpy.mean([len(fold[0]) for fold in split.manifest.folds])
+                ),
+                float(
+                    numpy.mean([len(fold[1]) for fold in split.manifest.folds])
+                ),
                 split.manifest.strategy,
             ),
             "baseline_cv_score": baseline.score_mean if baseline else None,
@@ -4190,8 +4190,8 @@ class PackageStage(Stage):
             if reason:
                 self.note_conformal_skipped(context, reason)
                 return None
-            fit = np.asarray(fit_positions)
-            evaluate = np.asarray(evaluate_positions)
+            fit = numpy.asarray(fit_positions)
+            evaluate = numpy.asarray(evaluate_positions)
             candidate = base.clone(template).fit(
                 split.dev_features.iloc[fit], split.dev_target.iloc[fit]
             )
@@ -4241,14 +4241,14 @@ class PackageStage(Stage):
                 context,
                 bundle,
                 fold_models,
-                np.asarray(held_labels, dtype=float),
-                np.asarray(held_scores, dtype=float),
+                numpy.asarray(held_labels, dtype=float),
+                numpy.asarray(held_scores, dtype=float),
             )
             return conformal.ConformalCalibrator.for_regression(
                 held_labels, held_scores
             )
         return conformal.ConformalCalibrator.for_classification(
-            held_labels, np.asarray(held_scores), classes
+            held_labels, numpy.asarray(held_scores), classes
         )
 
     def entity_calibration_column(
@@ -4270,8 +4270,8 @@ class PackageStage(Stage):
         path = context.spec.charter_path
         if not path:
             return None
-        charter = charter_sealing.read_verified(str(path)).charter
-        if charter.unit_of_prediction != charter_contracts.NEW_ENTITY:
+        charter = sealing.read_verified(str(path)).charter
+        if charter.unit_of_prediction != contracts.NEW_ENTITY:
             return None
         return context.spec.data.group_column
 
@@ -4280,8 +4280,8 @@ class PackageStage(Stage):
         context: context_module.RunContext,
         bundle: bundle_module.ModelBundle,
         models: list[Any],
-        observed: np.ndarray,
-        predicted: np.ndarray,
+        observed: numpy.ndarray,
+        predicted: numpy.ndarray,
     ) -> None:
         """Stores the fold models for CV+ intervals when the rule applies.
 
@@ -4320,7 +4320,7 @@ class PackageStage(Stage):
             )
             return
         bundle.cv_plus = cv_plus.CvPlusEnsemble(
-            tuple(models), plan.folds, np.abs(observed - predicted)
+            tuple(models), plan.folds, numpy.abs(observed - predicted)
         )
 
     def complete_held_ledger(
@@ -4376,7 +4376,7 @@ class PackageStage(Stage):
         """
         path = context.spec.charter_path
         if path:
-            block = charter_sealing.read_verified(str(path)).charter.uncertainty
+            block = sealing.read_verified(str(path)).charter.uncertainty
             if block is not None and block.cv_plus_max_bytes is not None:
                 return block.cv_plus_max_bytes
         return cv_plus.MAX_BYTES
@@ -4423,8 +4423,8 @@ class PackageStage(Stage):
         for fit_positions, evaluate_positions in split.manifest.folds:
             if context.resource_governor.skip_reason(first=False):
                 return None
-            fit = np.asarray(fit_positions)
-            evaluate = np.asarray(evaluate_positions)
+            fit = numpy.asarray(fit_positions)
+            evaluate = numpy.asarray(evaluate_positions)
             train_x = split.dev_features.iloc[fit]
             train_y = split.dev_target.iloc[fit]
             low, high = quantile.predicted_band(
@@ -4635,8 +4635,8 @@ class PackageStage(Stage):
         for fit_positions, evaluate_positions in split.manifest.folds:
             if context.resource_governor.skip_reason(first=False):
                 return None
-            fit = np.asarray(fit_positions)
-            held = np.asarray(evaluate_positions)
+            fit = numpy.asarray(fit_positions)
+            held = numpy.asarray(evaluate_positions)
             model = base.clone(template).fit(
                 split.dev_features.iloc[fit], split.dev_target.iloc[fit]
             )

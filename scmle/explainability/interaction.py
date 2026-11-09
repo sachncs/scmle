@@ -2,8 +2,8 @@
 
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.evaluation import diagnostics
 
@@ -62,7 +62,7 @@ class PairwiseInteraction(diagnostics.Diagnostic):
             }
         medians = {
             column: float(
-                pd.to_numeric(sample[column], errors="coerce").median()
+                pandas.to_numeric(sample[column], errors="coerce").median()
             )
             for column in numeric
         }
@@ -91,7 +91,7 @@ class PairwiseInteraction(diagnostics.Diagnostic):
                     {
                         "features": [left, right],
                         "mean_absolute_interaction": float(
-                            np.mean(np.abs(interaction))
+                            numpy.mean(numpy.abs(interaction))
                         ),
                     }
                 )
@@ -136,8 +136,8 @@ class PairwiseInteraction(diagnostics.Diagnostic):
 
     @staticmethod
     def score(
-        inputs: diagnostics.DiagnosticInput, frame: pd.DataFrame
-    ) -> np.ndarray:
+        inputs: diagnostics.DiagnosticInput, frame: pandas.DataFrame
+    ) -> numpy.ndarray:
         """Returns one comparable model-output score per row.
 
         Args:
@@ -149,8 +149,8 @@ class PairwiseInteraction(diagnostics.Diagnostic):
             binary tasks, or the largest class probability otherwise.
         """
         if inputs.task in diagnostics.REGRESSION_ONLY:
-            return np.asarray(inputs.estimator.predict(frame), dtype=float)
-        probabilities = np.asarray(inputs.estimator.predict_proba(frame))
+            return numpy.asarray(inputs.estimator.predict(frame), dtype=float)
+        probabilities = numpy.asarray(inputs.estimator.predict_proba(frame))
         if inputs.task in diagnostics.BINARY_ONLY:
             return probabilities[:, 1]
         return probabilities.max(axis=1)

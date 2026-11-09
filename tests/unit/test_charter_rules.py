@@ -6,7 +6,7 @@ import json
 import pytest
 
 from scmle.contracts import errors
-from scmle.data.charter import contracts as c
+from scmle.data.charter import contracts
 from scmle.data.charter import rules as rules_module
 from scmle.data.charter import sealing
 from tests.unit.test_charter_contracts import make_charter
@@ -86,7 +86,7 @@ def test_editing_a_rule_in_a_signed_file_is_detected(tmp_path):
 def test_a_wrapper_from_a_newer_format_is_refused(tmp_path):
     path = sealing.write_charter(tmp_path / "c.json", chartered(), KEY)
     document = json.loads(path.read_text())
-    document["format"] = c.FORMAT_VERSION + 1
+    document["format"] = contracts.FORMAT_VERSION + 1
     path.write_text(json.dumps(document))
     with pytest.raises(errors.ConfigError, match="format"):
         sealing.read_verified(path, signing_key=KEY)

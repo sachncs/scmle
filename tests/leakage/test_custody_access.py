@@ -9,8 +9,8 @@ import json
 import pickle
 import typing
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.contracts import errors
 from scmle.contracts import tasks
@@ -25,19 +25,19 @@ SENTINEL = "sentinel"
 
 
 class Built(typing.NamedTuple):
-    frame: pd.DataFrame
+    frame: pandas.DataFrame
     outcome: pipeline.CustodyOutcome
     vault: sealed.CustodyVault
     log: sealed.OpenLog
 
 
 def build():
-    rng = np.random.default_rng(11)
+    rng = numpy.random.default_rng(11)
     rows = 2000
-    frame = pd.DataFrame(
+    frame = pandas.DataFrame(
         {
             "x": rng.normal(size=rows),
-            SENTINEL: np.arange(rows, dtype=float) + 0.123456,
+            SENTINEL: numpy.arange(rows, dtype=float) + 0.123456,
             "y": (rng.random(rows) < 0.3).astype(int),
         }
     )
@@ -74,7 +74,7 @@ def reachable(root, limit=200_000):
             stack.extend(item.values())
         elif isinstance(item, list | tuple | set | frozenset):
             stack.extend(item)
-        elif isinstance(item, pd.DataFrame | pd.Series):
+        elif isinstance(item, pandas.DataFrame | pandas.Series):
             continue
         else:
             stack.extend(getattr(item, "__dict__", {}).values())

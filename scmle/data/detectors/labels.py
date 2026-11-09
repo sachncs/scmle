@@ -32,8 +32,8 @@ import dataclasses
 import math
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from scipy import stats
 from sklearn import ensemble
 from sklearn import model_selection
@@ -109,7 +109,9 @@ class LabelReport:
         return dataclasses.asdict(self)
 
 
-def encode(labels: Sequence[Any] | pd.Series) -> tuple[np.ndarray, np.ndarray]:
+def encode(
+    labels: Sequence[Any] | pandas.Series,
+) -> tuple[numpy.ndarray, numpy.ndarray]:
     """Encodes a label vector as integer codes.
 
     Args:
@@ -119,8 +121,8 @@ def encode(labels: Sequence[Any] | pd.Series) -> tuple[np.ndarray, np.ndarray]:
         The sorted distinct class values, and the integer code of each row
         (an index into the class values).
     """
-    classes, codes = np.unique(np.asarray(labels), return_inverse=True)
-    return classes, np.asarray(codes).ravel()
+    classes, codes = numpy.unique(numpy.asarray(labels), return_inverse=True)
+    return classes, numpy.asarray(codes).ravel()
 
 
 def model(
@@ -145,8 +147,8 @@ def model(
 
 
 def out_of_fold_probabilities(
-    features: pd.DataFrame, codes: np.ndarray, seed: int
-) -> np.ndarray:
+    features: pandas.DataFrame, codes: numpy.ndarray, seed: int
+) -> numpy.ndarray:
     """Computes class probabilities from models that never saw the row.
 
     Args:
@@ -161,12 +163,12 @@ def out_of_fold_probabilities(
     Raises:
         ValueError: With too few rows, one class, or a class of one row.
     """
-    counts = np.bincount(codes)
+    counts = numpy.bincount(codes)
     if len(codes) < MIN_ROWS or len(counts) < 2:
         raise ValueError(
             f"label-noise detection needs {MIN_ROWS}+ rows and two classes"
         )
-    folds = min(FOLDS, int(np.min(counts)))
+    folds = min(FOLDS, int(numpy.min(counts)))
     if folds < 2:
         raise ValueError("every class needs at least two rows")
     return model_selection.cross_val_predict(
@@ -183,8 +185,8 @@ def out_of_fold_probabilities(
 
 
 def class_thresholds(
-    probabilities: np.ndarray, codes: np.ndarray
-) -> np.ndarray:
+    probabilities: numpy.ndarray, codes: numpy.ndarray
+) -> numpy.ndarray:
     """Computes the confident-learning thresholds.
 
     Args:
@@ -195,7 +197,7 @@ def class_thresholds(
         For each class j, the mean probability of class j over the rows
         labelled j.
     """
-    return np.array(
+    return numpy.array(
         [
             probabilities[codes == j, j].mean()
             for j in range(probabilities.shape[1])
@@ -204,8 +206,8 @@ def class_thresholds(
 
 
 def confident_assignment(
-    probabilities: np.ndarray, thresholds: np.ndarray
-) -> np.ndarray:
+    probabilities: numpy.ndarray, thresholds: numpy.ndarray
+) -> numpy.ndarray:
     """Finds the class each row is confidently counted into, or -1.
 
     Among classes whose probability reaches their threshold, the one with the
@@ -220,14 +222,14 @@ def confident_assignment(
         threshold.
     """
     eligible = probabilities >= thresholds
-    masked = np.where(eligible, probabilities, -np.inf)
+    masked = numpy.where(eligible, probabilities, -numpy.inf)
     best = masked.argmax(axis=1)
-    return np.where(eligible.any(axis=1), best, -1)
+    return numpy.where(eligible.any(axis=1), best, -1)
 
 
 def confident_learning_flags(
-    probabilities: np.ndarray, codes: np.ndarray
-) -> tuple[np.ndarray, np.ndarray]:
+    probabilities: numpy.ndarray, codes: numpy.ndarray
+) -> tuple[numpy.ndarray, numpy.ndarray]:
     """Rows in the off-diagonal cells of the confident joint.
 
     Args:
@@ -243,8 +245,8 @@ def confident_learning_flags(
 
 
 def mean_margins(
-    features: pd.DataFrame, codes: np.ndarray, seed: int
-) -> np.ndarray:
+    features: pandas.DataFrame, codes: numpy.ndarray, seed: int
+) -> numpy.ndarray:
     """Computes the area under the margin over boosting stages.
 
     Args:
@@ -257,24 +259,24 @@ def mean_margins(
         given label minus the best other score.
     """
     fitted = model(seed, MARGIN_LEAVES).fit(features, codes)
-    total = np.zeros(len(codes))
+    total = numpy.zeros(len(codes))
     stages = 0
-    rows = np.arange(len(codes))
+    rows = numpy.arange(len(codes))
     for scores in fitted.staged_decision_function(features):
-        scores = np.asarray(scores)
+        scores = numpy.asarray(scores)
         if scores.ndim == 1:
-            scores = np.column_stack([-scores / 2.0, scores / 2.0])
+            scores = numpy.column_stack([-scores / 2.0, scores / 2.0])
         own = scores[rows, codes]
         rest = scores.copy()
-        rest[rows, codes] = -np.inf
+        rest[rows, codes] = -numpy.inf
         total += own - rest.max(axis=1)
         stages += 1
     return total / stages
 
 
 def margin_flags(
-    features: pd.DataFrame, codes: np.ndarray, seed: int
-) -> np.ndarray:
+    features: pandas.DataFrame, codes: numpy.ndarray, seed: int
+) -> numpy.ndarray:
     """Rows whose given label loses on average over the boosting stages.
 
     The model is fitted on all rows with their given labels and kept small
@@ -295,9 +297,9 @@ def margin_flags(
 
 
 def ppi_mean(
-    predicted_unlabeled: np.ndarray,
-    predicted_labeled: np.ndarray,
-    truth_labeled: np.ndarray,
+    predicted_unlabeled: numpy.ndarray,
+    predicted_labeled: numpy.ndarray,
+    truth_labeled: numpy.ndarray,
     confidence: float = SAMPLING_CONFIDENCE,
 ) -> tuple[float, tuple[float, float]]:
     """Prediction-powered confidence interval for a mean.
@@ -321,9 +323,9 @@ def ppi_mean(
             rows, if the audited predictions and truth differ in length, or
             if `confidence` is not strictly between 0 and 1.
     """
-    f_big = np.asarray(predicted_unlabeled, dtype=float)
-    f_small = np.asarray(predicted_labeled, dtype=float)
-    y_small = np.asarray(truth_labeled, dtype=float)
+    f_big = numpy.asarray(predicted_unlabeled, dtype=float)
+    f_small = numpy.asarray(predicted_labeled, dtype=float)
+    y_small = numpy.asarray(truth_labeled, dtype=float)
     n, big = len(f_small), len(f_big)
     if n < 2 or big < 2 or len(y_small) != n:
         raise ValueError("need 2+ audited and 2+ unaudited rows")
@@ -337,8 +339,8 @@ def ppi_mean(
 
 
 def noise_rate(
-    flags: np.ndarray,
-    audit: pd.Series | None = None,
+    flags: numpy.ndarray,
+    audit: pandas.Series | None = None,
     confidence: float = SAMPLING_CONFIDENCE,
 ) -> NoiseRate:
     """Noise-rate interval from detector flags and an optional audit.
@@ -359,13 +361,13 @@ def noise_rate(
     Raises:
         ValueError: If the audit positions are not unique.
     """
-    flags = np.asarray(flags, dtype=bool)
+    flags = numpy.asarray(flags, dtype=bool)
     n = len(flags)
     if audit is not None and 2 <= len(audit) <= n - 2:
-        positions = np.asarray(audit.index, dtype=int)
-        if len(np.unique(positions)) != len(positions):
+        positions = numpy.asarray(audit.index, dtype=int)
+        if len(numpy.unique(positions)) != len(positions):
             raise ValueError("audit positions must be unique")
-        mask = np.zeros(n, dtype=bool)
+        mask = numpy.zeros(n, dtype=bool)
         mask[positions] = True
         estimate, (low, high) = ppi_mean(
             flags[~mask].astype(float),
@@ -417,10 +419,10 @@ def hoeffding_bound(
 
 
 def detect(
-    features: pd.DataFrame,
-    labels: pd.Series,
+    features: pandas.DataFrame,
+    labels: pandas.Series,
     seed: int = 0,
-    audit: pd.Series | None = None,
+    audit: pandas.Series | None = None,
 ) -> LabelReport:
     """Runs both detectors and reports where they agree.
 
@@ -441,25 +443,27 @@ def detect(
 
     """
     input_rows = len(features)
-    positions = np.arange(input_rows)
+    positions = numpy.arange(input_rows)
     if input_rows > MAX_ROWS:
         rng = randomness.component_rng(seed, "labels.cap", 0)
         audited = (
-            np.asarray(audit.index, dtype=int) if audit is not None else None
+            numpy.asarray(audit.index, dtype=int) if audit is not None else None
         )
         others = (
-            positions if audited is None else np.setdiff1d(positions, audited)
+            positions
+            if audited is None
+            else numpy.setdiff1d(positions, audited)
         )
         room = MAX_ROWS - (0 if audited is None else len(audited))
         take = rng.choice(others, max(room, 0), replace=False)
-        positions = np.sort(
-            take if audited is None else np.concatenate([take, audited])
+        positions = numpy.sort(
+            take if audited is None else numpy.concatenate([take, audited])
         )
         features = features.iloc[positions]
         labels = labels.iloc[positions]
         if audit is not None:
             remap = {int(p): i for i, p in enumerate(positions)}
-            audit = pd.Series(
+            audit = pandas.Series(
                 audit.to_numpy(),
                 index=[remap[int(p)] for p in audit.index],
             )
@@ -472,9 +476,9 @@ def detect(
     agreement = 1.0 if union == 0 else float(both.sum()) / union
     capped = input_rows > len(features)
     return LabelReport(
-        confident_learning=tuple(int(i) for i in np.flatnonzero(cl_flags)),
-        margin=tuple(int(i) for i in np.flatnonzero(aum_flags)),
-        suspects=tuple(int(i) for i in np.flatnonzero(both)),
+        confident_learning=tuple(int(i) for i in numpy.flatnonzero(cl_flags)),
+        margin=tuple(int(i) for i in numpy.flatnonzero(aum_flags)),
+        suspects=tuple(int(i) for i in numpy.flatnonzero(both)),
         agreement=agreement,
         rows_checked=len(features),
         input_rows=input_rows,

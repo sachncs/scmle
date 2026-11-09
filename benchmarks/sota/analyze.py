@@ -21,7 +21,7 @@ import statistics
 import sys
 from typing import Any
 
-import numpy as np
+import numpy
 from scipy import stats
 
 from benchmarks.sota import records
@@ -146,12 +146,12 @@ def bootstrap_gap(
         percentiles of the bootstrap gap.
     """
     seed = int(hashlib.sha256(BOOTSTRAP_SEED.encode()).hexdigest()[:8], 16)
-    rng = np.random.default_rng(seed)
-    a, b = np.asarray(reference), np.asarray(ours)
+    rng = numpy.random.default_rng(seed)
+    a, b = numpy.asarray(reference), numpy.asarray(ours)
     picks = rng.integers(0, len(a), size=(RESAMPLES, len(a)))
-    gaps = np.median(a[picks], axis=1) - np.median(b[picks], axis=1)
-    low, high = np.percentile(gaps, [2.5, 97.5])
-    return float(np.median(a) - np.median(b)), float(low), float(high)
+    gaps = numpy.median(a[picks], axis=1) - numpy.median(b[picks], axis=1)
+    low, high = numpy.percentile(gaps, [2.5, 97.5])
+    return float(numpy.median(a) - numpy.median(b)), float(low), float(high)
 
 
 def holm(pvalues: dict[tuple[str, str], float]) -> dict[tuple[str, str], bool]:
@@ -197,8 +197,10 @@ def comparison_tests(
         out["friedman"] = {"statistic": float(statistic), "p": float(p)}
     pvalues: dict[tuple[str, str], float] = {}
     for first, second in itertools.combinations(systems, 2):
-        differences = np.asarray(columns[first]) - np.asarray(columns[second])
-        if np.allclose(differences, 0):
+        differences = numpy.asarray(columns[first]) - numpy.asarray(
+            columns[second]
+        )
+        if numpy.allclose(differences, 0):
             pvalues[(first, second)] = 1.0
         else:
             pvalues[(first, second)] = float(

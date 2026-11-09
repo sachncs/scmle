@@ -1,7 +1,7 @@
 """Bootstrap bias and variance of known model families."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 from sklearn import dummy
 from sklearn import linear_model
@@ -11,10 +11,10 @@ from scmle.evaluation import bias_variance
 
 
 def curve(rows=400, seed=0, noise=0.3):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     x = rng.uniform(-3, 3, rows)
-    return pd.DataFrame({"x": x}), pd.Series(
-        np.sin(2 * x) + rng.normal(0, noise, rows)
+    return pandas.DataFrame({"x": x}), pandas.Series(
+        numpy.sin(2 * x) + rng.normal(0, noise, rows)
     )
 
 
@@ -65,9 +65,11 @@ def test_the_parts_roughly_add_up_to_the_error_of_single_fits():
 
 
 def test_classification_uses_zero_one_error():
-    rng = np.random.default_rng(1)
-    features = pd.DataFrame({"x": rng.normal(size=300)})
-    target = pd.Series((features.x + rng.normal(0, 0.8, 300) > 0).astype(int))
+    rng = numpy.random.default_rng(1)
+    features = pandas.DataFrame({"x": rng.normal(size=300)})
+    target = pandas.Series(
+        (features.x + rng.normal(0, 0.8, 300) > 0).astype(int)
+    )
 
     stump = bias_variance.decompose(
         lambda: tree.DecisionTreeClassifier(max_depth=1),

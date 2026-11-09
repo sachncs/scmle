@@ -2,8 +2,8 @@
 
 import math
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 from scipy import stats
 from sklearn.datasets import load_diabetes
@@ -11,23 +11,23 @@ from sklearn.datasets import load_diabetes
 from benchmarks.qualification import simulate
 
 
-def real_features() -> pd.DataFrame:
+def real_features() -> pandas.DataFrame:
     """A real feature matrix that ships with scikit-learn (no download)."""
     return load_diabetes(as_frame=True).data
 
 
-def correlated(rows: int = 6000, seed: int = 3) -> pd.DataFrame:
-    rng = np.random.default_rng(seed)
+def correlated(rows: int = 6000, seed: int = 3) -> pandas.DataFrame:
+    rng = numpy.random.default_rng(seed)
     base = rng.normal(size=(rows, 1))
     noise = rng.normal(size=(rows, 4))
     values = 0.6 * base + 0.8 * noise
-    return pd.DataFrame(values, columns=["a", "b", "c", "d"])
+    return pandas.DataFrame(values, columns=["a", "b", "c", "d"])
 
 
 def slope(world: simulate.World, column: str) -> float:
     z = (world.features - world.features.mean()) / world.features.std()
-    design = np.column_stack([np.ones(len(z)), z.to_numpy()])
-    solution = np.linalg.lstsq(
+    design = numpy.column_stack([numpy.ones(len(z)), z.to_numpy()])
+    solution = numpy.linalg.lstsq(
         design, world.outcome.to_numpy(float), rcond=None
     )[0]
     return float(solution[1 + list(z.columns).index(column)])
@@ -36,7 +36,7 @@ def slope(world: simulate.World, column: str) -> float:
 def test_a_planted_world_keeps_the_features_and_recovers_the_effects():
     features = correlated()
     world = simulate.planted_world(features, {"a": 0.5, "c": -0.3}, seed=1)
-    pd.testing.assert_frame_equal(world.features, features)
+    pandas.testing.assert_frame_equal(world.features, features)
     assert world.kind == "alternative"
     assert world.signal_columns == ("a", "c")
     assert world.null_columns == ("b", "d")
@@ -58,7 +58,7 @@ def test_a_binary_world_draws_bernoulli_outcomes_from_the_logit():
     world = simulate.planted_world(features, {"a": 1.5}, seed=2, task="binary")
     assert set(world.outcome.unique()) == {0, 1}
     z = (features["a"] - features["a"].mean()) / features["a"].std()
-    expected = float((1.0 / (1.0 + np.exp(-1.5 * z))).mean())
+    expected = float((1.0 / (1.0 + numpy.exp(-1.5 * z))).mean())
     assert float(world.outcome.mean()) == pytest.approx(expected, abs=0.02)
     assert world.outcome[z > 1].mean() > world.outcome[z < -1].mean() + 0.4
 
@@ -68,7 +68,7 @@ def test_worlds_are_reproducible_and_seed_dependent():
     first = simulate.planted_world(features, {"a": 0.5}, seed=4)
     again = simulate.planted_world(features, {"a": 0.5}, seed=4)
     other = simulate.planted_world(features, {"a": 0.5}, seed=5)
-    pd.testing.assert_series_equal(first.outcome, again.outcome)
+    pandas.testing.assert_series_equal(first.outcome, again.outcome)
     assert not first.outcome.equals(other.outcome)
     assert first.seed_path[0] == 4
 
@@ -82,7 +82,7 @@ def test_worlds_are_reproducible_and_seed_dependent():
         lambda f: simulate.planted_world(f, {"a": 0.5}, seed=1, task="other"),
         lambda f: simulate.planted_world(f, {"a": 0.5}, seed=1, noise_sd=0.0),
         lambda f: simulate.planted_world(
-            f.assign(a=np.nan), {"b": 0.5}, seed=1
+            f.assign(a=numpy.nan), {"b": 0.5}, seed=1
         ),
         lambda f: simulate.planted_world(f.assign(s="x"), {"b": 0.5}, seed=1),
         lambda f: simulate.planted_world(f.assign(a=1.0), {"b": 0.5}, seed=1),
@@ -114,11 +114,11 @@ def test_a_null_world_keeps_features_and_the_outcome_multiset():
     world = simulate.null_world(features, outcome, seed=1)
     assert world.kind == "null"
     assert world.signal_columns == ()
-    pd.testing.assert_frame_equal(world.features, features)
-    pd.testing.assert_frame_equal(
+    pandas.testing.assert_frame_equal(world.features, features)
+    pandas.testing.assert_frame_equal(
         world.features.corr(), features.corr(), check_exact=True
     )
-    assert np.array_equal(np.sort(world.outcome), np.sort(outcome))
+    assert numpy.array_equal(numpy.sort(world.outcome), numpy.sort(outcome))
     assert not world.outcome.equals(outcome)
     bad = stats.pearsonr(features["bmi"], outcome).statistic
     kept = stats.pearsonr(features["bmi"], world.outcome).statistic
@@ -127,8 +127,8 @@ def test_a_null_world_keeps_features_and_the_outcome_multiset():
 
 def test_null_worlds_can_permute_within_groups_and_time_blocks():
     features = correlated(rows=300)
-    outcome = pd.Series(np.arange(300, dtype=float))
-    groups = pd.Series(np.repeat(np.arange(30), 10))
+    outcome = pandas.Series(numpy.arange(300, dtype=float))
+    groups = pandas.Series(numpy.repeat(numpy.arange(30), 10))
     world = simulate.null_world(features, outcome, seed=2, groups=groups)
     for rows in groups.groupby(groups).groups.values():
         assert sorted(world.outcome.loc[rows]) == sorted(outcome.loc[rows])
@@ -151,11 +151,11 @@ def test_null_worlds_can_permute_within_groups_and_time_blocks():
 
 
 def test_permuting_within_groups_keeps_a_group_level_association():
-    rng = np.random.default_rng(0)
-    groups = pd.Series(np.repeat(np.arange(60), 20))
+    rng = numpy.random.default_rng(0)
+    groups = pandas.Series(numpy.repeat(numpy.arange(60), 20))
     level = rng.normal(size=60)[groups]
-    features = pd.DataFrame({"x": level + 0.3 * rng.normal(size=1200)})
-    outcome = pd.Series(level + 0.3 * rng.normal(size=1200))
+    features = pandas.DataFrame({"x": level + 0.3 * rng.normal(size=1200)})
+    outcome = pandas.Series(level + 0.3 * rng.normal(size=1200))
     original = stats.pearsonr(features["x"], outcome).statistic
     within = simulate.null_world(features, outcome, seed=1, groups=groups)
     globally = simulate.null_world(features, outcome, seed=1)

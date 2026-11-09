@@ -30,7 +30,7 @@ from scmle.contracts import qualification
 from scmle.core import randomness
 from scmle.data.framing import costs
 from scmle.decision import netbenefit
-from scmle.models import thresholds as grid_thresholds
+from scmle.models import thresholds
 
 BINS = 10
 FOLDS = 5
@@ -470,10 +470,10 @@ def choose_threshold(
         if recheck.calibrated and platt.slope > 0:
             rule = ThresholdRule(target, "recalibrated", platt)
         else:
-            cut, ignored = grid_thresholds.optimize_threshold(
+            cut, ignored = thresholds.optimize_threshold(
                 risk,
                 labels.astype(bool),
-                grid_thresholds.CostObjective(model.c_fp, model.c_fn),
+                thresholds.CostObjective(model.c_fp, model.c_fn),
             )
             rule = ThresholdRule(cut, "grid")
     acts = rule.act(risk)

@@ -3,8 +3,8 @@
 import dataclasses
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from sklearn import metrics as sk_metrics
 
 from scmle.contracts import metrics as metric_contracts
@@ -13,7 +13,7 @@ CUTOFF = 10
 MIN_DOCUMENTS = 2
 
 
-def query_groups(queries: Any) -> list[np.ndarray]:
+def query_groups(queries: Any) -> list[numpy.ndarray]:
     """Row positions of each query.
 
     Args:
@@ -23,13 +23,15 @@ def query_groups(queries: Any) -> list[np.ndarray]:
         One array of row positions per distinct query (labels compared as
         text), in order of first appearance.
     """
-    codes, uniques = pd.factorize(pd.Series(np.asarray(queries)).astype(str))
-    return [np.flatnonzero(codes == code) for code in range(len(uniques))]
+    codes, uniques = pandas.factorize(
+        pandas.Series(numpy.asarray(queries)).astype(str)
+    )
+    return [numpy.flatnonzero(codes == code) for code in range(len(uniques))]
 
 
 def mean_ndcg(
-    relevance: np.ndarray,
-    scores: np.ndarray,
+    relevance: numpy.ndarray,
+    scores: numpy.ndarray,
     queries: Any,
     cutoff: int = CUTOFF,
 ) -> float:
@@ -49,25 +51,25 @@ def mean_ndcg(
     """
     values = []
     for rows in query_groups(queries):
-        truth = np.asarray(relevance, dtype=float)[rows]
+        truth = numpy.asarray(relevance, dtype=float)[rows]
         if len(rows) < MIN_DOCUMENTS or truth.max() <= 0:
             continue
         values.append(
             sk_metrics.ndcg_score(
                 truth[None, :],
-                np.asarray(scores, dtype=float)[rows][None, :],
+                numpy.asarray(scores, dtype=float)[rows][None, :],
                 k=cutoff,
             )
         )
-    return float(np.mean(values)) if values else float("nan")
+    return float(numpy.mean(values)) if values else float("nan")
 
 
 def per_query_ndcg(
-    relevance: np.ndarray,
-    scores: np.ndarray,
+    relevance: numpy.ndarray,
+    scores: numpy.ndarray,
     queries: Any,
     cutoff: int = CUTOFF,
-) -> tuple[np.ndarray, int]:
+) -> tuple[numpy.ndarray, int]:
     """NDCG of every scorable query and the number of excluded queries.
 
     A query with nothing relevant (or a single document) is excluded and
@@ -86,23 +88,23 @@ def per_query_ndcg(
     values = []
     excluded = 0
     for rows in query_groups(queries):
-        truth = np.asarray(relevance, dtype=float)[rows]
+        truth = numpy.asarray(relevance, dtype=float)[rows]
         if len(rows) < MIN_DOCUMENTS or truth.max() <= 0:
             excluded += 1
             continue
         values.append(
             sk_metrics.ndcg_score(
                 truth[None, :],
-                np.asarray(scores, dtype=float)[rows][None, :],
+                numpy.asarray(scores, dtype=float)[rows][None, :],
                 k=cutoff,
             )
         )
-    return np.asarray(values, dtype=float), excluded
+    return numpy.asarray(values, dtype=float), excluded
 
 
 def query_bootstrap_ndcg(
-    relevance: np.ndarray,
-    scores: np.ndarray,
+    relevance: numpy.ndarray,
+    scores: numpy.ndarray,
     queries: Any,
     cutoff: int = CUTOFF,
     replicates: int = 1000,
@@ -138,22 +140,22 @@ def query_bootstrap_ndcg(
             "queries": 0,
             "excluded": excluded,
         }
-    generator = np.random.default_rng(seed)
+    generator = numpy.random.default_rng(seed)
     draws = generator.integers(0, values.size, size=(replicates, values.size))
     means = values[draws].mean(axis=1)
     tail = (1.0 - level) / 2.0
     return {
         "mean": float(values.mean()),
-        "lower": float(np.quantile(means, tail)),
-        "upper": float(np.quantile(means, 1.0 - tail)),
+        "lower": float(numpy.quantile(means, tail)),
+        "upper": float(numpy.quantile(means, 1.0 - tail)),
         "queries": int(values.size),
         "excluded": excluded,
     }
 
 
 def mean_average_precision(
-    relevance: np.ndarray,
-    scores: np.ndarray,
+    relevance: numpy.ndarray,
+    scores: numpy.ndarray,
     queries: Any,
     cutoff: int = CUTOFF,
 ) -> float:
@@ -171,23 +173,23 @@ def mean_average_precision(
     """
     values = []
     for rows in query_groups(queries):
-        truth = np.asarray(relevance, dtype=float)[rows] > 0
+        truth = numpy.asarray(relevance, dtype=float)[rows] > 0
         if len(rows) < MIN_DOCUMENTS or not truth.any():
             continue
-        order = np.argsort(
-            -np.asarray(scores, dtype=float)[rows], kind="stable"
+        order = numpy.argsort(
+            -numpy.asarray(scores, dtype=float)[rows], kind="stable"
         )
         hits = truth[order][:cutoff]
-        precision = np.cumsum(hits) / (np.arange(len(hits)) + 1)
+        precision = numpy.cumsum(hits) / (numpy.arange(len(hits)) + 1)
         values.append(
             float((precision * hits).sum() / min(truth.sum(), cutoff))
         )
-    return float(np.mean(values)) if values else float("nan")
+    return float(numpy.mean(values)) if values else float("nan")
 
 
 def ranked_hits(
-    relevance: np.ndarray, scores: np.ndarray, rows: np.ndarray
-) -> np.ndarray:
+    relevance: numpy.ndarray, scores: numpy.ndarray, rows: numpy.ndarray
+) -> numpy.ndarray:
     """Relevance (above zero) of one query's documents in score order.
 
     Args:
@@ -199,13 +201,15 @@ def ranked_hits(
         A boolean array, highest score first (ties in row order): True where
         the grade is above zero.
     """
-    truth = np.asarray(relevance, dtype=float)[rows] > 0
-    order = np.argsort(-np.asarray(scores, dtype=float)[rows], kind="stable")
+    truth = numpy.asarray(relevance, dtype=float)[rows] > 0
+    order = numpy.argsort(
+        -numpy.asarray(scores, dtype=float)[rows], kind="stable"
+    )
     return truth[order]
 
 
 def mean_reciprocal_rank(
-    relevance: np.ndarray, scores: np.ndarray, queries: Any
+    relevance: numpy.ndarray, scores: numpy.ndarray, queries: Any
 ) -> float:
     """Average of one over the rank of the first relevant document.
 
@@ -223,13 +227,13 @@ def mean_reciprocal_rank(
         hits = ranked_hits(relevance, scores, rows)
         if len(rows) < MIN_DOCUMENTS or not hits.any():
             continue
-        values.append(1.0 / (int(np.argmax(hits)) + 1))
-    return float(np.mean(values)) if values else float("nan")
+        values.append(1.0 / (int(numpy.argmax(hits)) + 1))
+    return float(numpy.mean(values)) if values else float("nan")
 
 
 def precision_at(
-    relevance: np.ndarray,
-    scores: np.ndarray,
+    relevance: numpy.ndarray,
+    scores: numpy.ndarray,
     queries: Any,
     cutoff: int = CUTOFF,
 ) -> float:
@@ -254,12 +258,12 @@ def precision_at(
         if len(rows) < MIN_DOCUMENTS or not hits.any():
             continue
         values.append(float(hits[:cutoff].sum() / min(cutoff, len(hits))))
-    return float(np.mean(values)) if values else float("nan")
+    return float(numpy.mean(values)) if values else float("nan")
 
 
 def recall_at(
-    relevance: np.ndarray,
-    scores: np.ndarray,
+    relevance: numpy.ndarray,
+    scores: numpy.ndarray,
     queries: Any,
     cutoff: int = CUTOFF,
 ) -> float:
@@ -282,7 +286,7 @@ def recall_at(
             continue
         found = int(hits[:cutoff].sum())
         values.append(found / int(hits.sum()))
-    return float(np.mean(values)) if values else float("nan")
+    return float(numpy.mean(values)) if values else float("nan")
 
 
 FUNCTIONS = {
@@ -331,13 +335,13 @@ class RankingMetric(metric_contracts.Metric):
 
         def score(
             estimator: Any,
-            features: pd.DataFrame,
-            target: pd.Series,
+            features: pandas.DataFrame,
+            target: pandas.Series,
             sample_weight: Any = None,
         ) -> float:
             return function(
-                np.asarray(target, dtype=float),
-                np.asarray(estimator.predict(features), dtype=float),
+                numpy.asarray(target, dtype=float),
+                numpy.asarray(estimator.predict(features), dtype=float),
                 features[estimator.query_column],
             )
 

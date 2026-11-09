@@ -5,7 +5,7 @@ import io
 import json
 import logging
 
-import pandas as pd
+import pandas
 
 from scmle import cli
 from scmle.data.catalog import DatasetCatalog
@@ -58,7 +58,7 @@ def test_plan_run_predict_roundtrip(binary_frame, tmp_path, caplog):
     )
     assert refused == cli.EXIT_FAILED
     assert "unauthenticated" in caplog.text
-    predictions = pd.read_csv(output)
+    predictions = pandas.read_csv(output)
     assert code == 0 and len(predictions) == len(binary_frame)
     assert {"prediction", "proba_0", "proba_1"} <= set(predictions.columns)
 
@@ -110,7 +110,7 @@ def test_catalog_command_catalogs_tabular_data_and_writes_verified_artifact(
 ):
     """The command emits the public catalog contract and persists it."""
     data = tmp_path / "events.csv"
-    pd.DataFrame(
+    pandas.DataFrame(
         {"value": [1, 2, 2], "label": ["keep", "drop", "drop"]}
     ).to_csv(data, index=False)
     output = tmp_path / "catalog.json"
@@ -141,7 +141,7 @@ def test_catalog_command_catalogs_tabular_data_and_writes_verified_artifact(
 def test_catalog_command_does_not_infer_a_label_column(tmp_path, capsys):
     """A table without an explicit label stays unsupervised evidence."""
     data = tmp_path / "events.csv"
-    pd.DataFrame({"value": [1, 2], "label": ["keep", "drop"]}).to_csv(
+    pandas.DataFrame({"value": [1, 2], "label": ["keep", "drop"]}).to_csv(
         data, index=False
     )
 
@@ -235,7 +235,7 @@ def test_predict_with_explicit_renames(binary_frame, tmp_path, monkeypatch):
 
     monkeypatch.setattr(cli.durability, "write_atomically", record_write)
     code = cli.main([*base, "--rename", "A_value=a", "--case-insensitive"])
-    assert code == 0 and len(pd.read_csv(output)) == len(binary_frame)
+    assert code == 0 and len(pandas.read_csv(output)) == len(binary_frame)
     assert writes and writes[0][0] == output
 
 

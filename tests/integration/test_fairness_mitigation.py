@@ -2,8 +2,8 @@
 
 import json
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 import support
 
@@ -11,14 +11,14 @@ from scmle.contracts import tasks
 
 
 def biased(rows=3000, seed=0, shift=1.0):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     group = rng.choice(["a", "b"], rows)
     skill = rng.normal(size=rows)
-    score = skill + np.where(group == "b", -shift, 0.0)
-    data = pd.DataFrame(
+    score = skill + numpy.where(group == "b", -shift, 0.0)
+    data = pandas.DataFrame(
         {
             "group": group,
-            "skill": skill + np.where(group == "b", -shift, 0.0),
+            "skill": skill + numpy.where(group == "b", -shift, 0.0),
             "noise": rng.normal(size=rows),
         }
     )

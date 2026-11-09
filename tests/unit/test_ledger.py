@@ -3,8 +3,8 @@
 from fractions import Fraction
 import json
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
 from scmle.contracts import errors
@@ -19,15 +19,15 @@ F = Fraction
 
 
 def data(rows=300, seed=0):
-    rng = np.random.default_rng(seed)
-    features = pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    features = pandas.DataFrame(
         {
             "signal": rng.normal(size=rows),
             "other": rng.normal(size=rows),
             "noise": rng.normal(size=rows),
         }
     )
-    target = pd.Series(
+    target = pandas.Series(
         features["signal"] * 0.9
         + features["other"] * 0.0
         + rng.normal(size=rows)

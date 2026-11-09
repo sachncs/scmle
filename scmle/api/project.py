@@ -10,11 +10,11 @@ import tempfile
 from typing import Any
 from typing import Literal
 
-import pandas as pd
+import pandas
 
 from scmle import durability
 from scmle.api import results
-from scmle.artifacts import bundle as bundle_module
+from scmle.artifacts import bundle
 from scmle.artifacts import reproducibility
 from scmle.contracts import data as data_contracts
 from scmle.contracts import errors
@@ -25,13 +25,13 @@ from scmle.contracts import performance
 from scmle.contracts import tasks
 from scmle.core import context as context_module
 from scmle.core import orchestrator as orchestrator_module
-from scmle.core import policies as checkpoints_module
+from scmle.core import policies
 from scmle.data.readers import connectors
 from scmle.data.readers import interchange
 from scmle.data.readers import tabular
 from scmle.evaluation import parameter_estimation
 from scmle.governance import attestation
-from scmle.inference import evidence as inference_evidence
+from scmle.inference import evidence
 from scmle.intelligence import recommendations as recommendations_module
 from scmle.models import modality_lifecycle
 
@@ -300,7 +300,7 @@ def bind_parameter_estimation_evidence(
             node. A missing or corrupt graph file raises from the loader.
     """
     graph_path = run_directory / "evidence_graph.json"
-    graph = inference_evidence.InferenceEvidenceLinker.load(graph_path)
+    graph = evidence.InferenceEvidenceLinker.load(graph_path)
     evaluation_node = graph.nodes.get("evaluation")
     snapshot_node = graph.nodes.get("snapshot")
     if evaluation_node is None or snapshot_node is None:
@@ -316,7 +316,7 @@ def bind_parameter_estimation_evidence(
         lineage.EvidenceNode(
             "evaluation",
             lineage.EvidenceNodeKind.EVALUATION,
-            bundle_module.file_sha256(run_directory / "evaluation.json"),
+            bundle.file_sha256(run_directory / "evaluation.json"),
             {"artifact": "evaluation.json"},
         )
     )
@@ -342,9 +342,7 @@ def bind_parameter_estimation_evidence(
     )
     record = updated.to_dict()
     record["graph_digest"] = updated.digest()
-    inference_evidence.InferenceEvidenceLinker.write_atomically(
-        graph_path, record
-    )
+    evidence.InferenceEvidenceLinker.write_atomically(graph_path, record)
 
 
 def persist_parameter_estimation_evidence(
@@ -624,7 +622,7 @@ class MLProject:
         propensity_column: str | None = None,
         logged_action_column: str | None = None,
         ingest_plan: str | pathlib.Path | None = None,
-        checkpoints: tuple[checkpoints_module.PolicyCheckpoint, ...] = (),
+        checkpoints: tuple[policies.PolicyCheckpoint, ...] = (),
         output_dir: str | pathlib.Path = "runs",
     ) -> None:
         """Defines a project.
@@ -961,7 +959,7 @@ class MLProject:
     def resume(
         cls,
         run_directory: str | pathlib.Path,
-        data: pd.DataFrame | None = None,
+        data: pandas.DataFrame | None = None,
     ) -> results.RunResult:
         """Continues an interrupted run from its saved configuration.
 
@@ -1000,7 +998,7 @@ class MLProject:
     def verify_replay(
         cls,
         run_directory: str | pathlib.Path,
-        data: pd.DataFrame | None = None,
+        data: pandas.DataFrame | None = None,
         output_dir: str | pathlib.Path | None = None,
     ) -> reproducibility.ReplayVerdict:
         """Re-executes a finished run's configuration and compares the runs.

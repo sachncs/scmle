@@ -1,6 +1,6 @@
 """Off-policy evaluation: unbiasedness, gates and policy fitting."""
 
-import numpy as np
+import numpy
 import pytest
 
 from scmle.decision import ope
@@ -8,16 +8,16 @@ from scmle.decision import ope
 
 def bandit(n, seed, eps=0.5, shift=0.0):
     """Two actions; true value of the target is known analytically."""
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     x = rng.normal(size=(n, 1))
-    mu1 = np.clip(0.5 + eps * np.tanh(x[:, 0]) * 0.5 + shift, 0.05, 0.95)
-    behaviour = np.column_stack([1 - mu1, mu1])
+    mu1 = numpy.clip(0.5 + eps * numpy.tanh(x[:, 0]) * 0.5 + shift, 0.05, 0.95)
+    behaviour = numpy.column_stack([1 - mu1, mu1])
     action = (rng.random(n) < mu1).astype(int)
-    mean = np.column_stack([0.3 + 0 * x[:, 0], 0.3 + 0.2 * (x[:, 0] > 0)])
-    reward = (rng.random(n) < mean[np.arange(n), action]).astype(float)
+    mean = numpy.column_stack([0.3 + 0 * x[:, 0], 0.3 + 0.2 * (x[:, 0] > 0)])
+    reward = (rng.random(n) < mean[numpy.arange(n), action]).astype(float)
     treat = (x[:, 0] > 0).astype(float)
-    target = np.column_stack([1 - treat, treat])
-    truth = float(np.mean((target * mean).sum(axis=1)))
+    target = numpy.column_stack([1 - treat, treat])
+    truth = float(numpy.mean((target * mean).sum(axis=1)))
     return x, action, reward, behaviour, target, mean, truth
 
 
@@ -43,7 +43,11 @@ def test_the_doubly_robust_value_is_exact_with_a_perfect_outcome_model():
     perfect = ope.estimate_value(log, "dr")
     assert perfect.value == pytest.approx(truth, abs=0.03)
     wrong = ope.LoggedBandit(
-        log.actions, log.rewards, log.behaviour, log.target, np.zeros((2000, 2))
+        log.actions,
+        log.rewards,
+        log.behaviour,
+        log.target,
+        numpy.zeros((2000, 2)),
     )
     # a wrong q falls back on the importance weights and stays unbiased
     assert ope.estimate_value(wrong, "dr").value == pytest.approx(
@@ -57,7 +61,7 @@ def test_a_support_violation_is_refused_with_the_reason():
     behaviour[:, 1] = 0.0
     behaviour[:, 0] = 1.0
     bad = ope.LoggedBandit(
-        np.zeros(3000, dtype=int),
+        numpy.zeros(3000, dtype=int),
         log.rewards,
         behaviour,
         log.target,
@@ -96,7 +100,7 @@ def test_observational_logs_are_not_confirmed():
 
 def test_a_difference_uses_the_paired_influence_function():
     log = build(60000, 5)[0]
-    never = np.column_stack([np.ones(60000), np.zeros(60000)])
+    never = numpy.column_stack([numpy.ones(60000), numpy.zeros(60000)])
     diff = ope.difference_value(log, never, "dr")
     single = ope.estimate_value(log, "dr")
     base = ope.estimate_value(
@@ -112,9 +116,9 @@ def test_a_difference_uses_the_paired_influence_function():
 
 def test_clustered_intervals_are_wider_when_clusters_share_noise():
     log, ignored = build(3000, 6)
-    labels = np.repeat(np.arange(30), 100)
-    shared = log.rewards + np.repeat(
-        np.random.default_rng(0).normal(0, 0.3, 30), 100
+    labels = numpy.repeat(numpy.arange(30), 100)
+    shared = log.rewards + numpy.repeat(
+        numpy.random.default_rng(0).normal(0, 0.3, 30), 100
     )
     base = ope.LoggedBandit(
         log.actions, shared, log.behaviour, log.target, log.outcome_model
@@ -142,33 +146,33 @@ def test_outcome_model_and_threshold_policy_fitting():
     policy = ope.fit_threshold_policy(log, tau, penalty=0.03)
     assert abs(policy.cut) < 0.6
     probs = policy.probabilities(tau)
-    assert probs.shape == (8000, 2) and np.allclose(probs.sum(axis=1), 1)
+    assert probs.shape == (8000, 2) and numpy.allclose(probs.sum(axis=1), 1)
     costly = ope.fit_threshold_policy(log, tau, penalty=5.0)
     assert costly.probabilities(tau)[:, 1].sum() == 0
     with pytest.raises(ValueError):
-        ope.fit_outcome_model(x, np.zeros(8000, dtype=int), reward, 2)
+        ope.fit_outcome_model(x, numpy.zeros(8000, dtype=int), reward, 2)
 
 
 @pytest.mark.parametrize(
     "build_log",
     [
         lambda: ope.LoggedBandit(
-            np.array([0, 2]),
-            np.zeros(2),
-            np.full((2, 2), 0.5),
-            np.full((2, 2), 0.5),
+            numpy.array([0, 2]),
+            numpy.zeros(2),
+            numpy.full((2, 2), 0.5),
+            numpy.full((2, 2), 0.5),
         ),
         lambda: ope.LoggedBandit(
-            np.array([0, 1]),
-            np.zeros(2),
-            np.full((2, 2), 0.7),
-            np.full((2, 2), 0.5),
+            numpy.array([0, 1]),
+            numpy.zeros(2),
+            numpy.full((2, 2), 0.7),
+            numpy.full((2, 2), 0.5),
         ),
         lambda: ope.LoggedBandit(
-            np.array([0, 1]),
-            np.zeros(3),
-            np.full((2, 2), 0.5),
-            np.full((2, 2), 0.5),
+            numpy.array([0, 1]),
+            numpy.zeros(3),
+            numpy.full((2, 2), 0.5),
+            numpy.full((2, 2), 0.5),
         ),
     ],
 )

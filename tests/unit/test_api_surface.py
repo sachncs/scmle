@@ -2,7 +2,7 @@
 
 from importlib import metadata
 
-import pandas as pd
+import pandas
 
 import scmle
 from scmle.governance import vault
@@ -95,7 +95,7 @@ def test_plan_closes_the_preview_test_set(monkeypatch):
 
     monkeypatch.setattr(vault.SealedTestSet, "close", record_close)
     project = scmle.MLProject(
-        data=pd.DataFrame({"feature": list(range(80)), "y": [0, 1] * 40}),
+        data=pandas.DataFrame({"feature": list(range(80)), "y": [0, 1] * 40}),
         target="y",
         time_budget=30,
     )

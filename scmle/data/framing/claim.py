@@ -45,8 +45,8 @@ from pathlib import Path
 from typing import Any
 from typing import Protocol
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from sklearn import linear_model
 
 from scmle.contracts import errors
@@ -56,7 +56,7 @@ from scmle.data.framing import costs
 from scmle.data.framing import provenance
 from scmle.data.ledger import confirm
 from scmle.data.ledger import explore
-from scmle.data.ledger import ledger as ledger_module
+from scmle.data.ledger import ledger
 
 DOCUMENT = "baseline_report.json"
 SELECTED = "selected_model"
@@ -108,7 +108,7 @@ class FrozenRule:
             "cut": self.cut,
         }
 
-    def matrix(self, features: pd.DataFrame) -> np.ndarray:
+    def matrix(self, features: pandas.DataFrame) -> numpy.ndarray:
         """Builds the standardised design matrix for any rows.
 
         Args:
@@ -121,13 +121,13 @@ class FrozenRule:
         """
         raw = (
             features[list(self.columns)]
-            .apply(pd.to_numeric, errors="coerce")
+            .apply(pandas.to_numeric, errors="coerce")
             .to_numpy(dtype=float)
         )
-        raw = np.where(np.isnan(raw), np.asarray(self.medians), raw)
-        return (raw - np.asarray(self.means)) / np.asarray(self.scales)
+        raw = numpy.where(numpy.isnan(raw), numpy.asarray(self.medians), raw)
+        return (raw - numpy.asarray(self.means)) / numpy.asarray(self.scales)
 
-    def actions(self, features: pd.DataFrame) -> np.ndarray:
+    def actions(self, features: pandas.DataFrame) -> numpy.ndarray:
         """Computes the actions of the rule on any rows.
 
         Args:
@@ -137,8 +137,8 @@ class FrozenRule:
             1.0 for each row whose predicted probability reaches `cut`,
             otherwise 0.0.
         """
-        score = self.matrix(features) @ np.asarray(self.coefficients)
-        probability = 1.0 / (1.0 + np.exp(-(score + self.intercept)))
+        score = self.matrix(features) @ numpy.asarray(self.coefficients)
+        probability = 1.0 / (1.0 + numpy.exp(-(score + self.intercept)))
         return (probability >= self.cut).astype(float)
 
 
@@ -152,7 +152,7 @@ class Rule(Protocol):
             A JSON-ready mapping that identifies the rule.
         """
 
-    def actions(self, features: pd.DataFrame) -> np.ndarray:
+    def actions(self, features: pandas.DataFrame) -> numpy.ndarray:
         """Computes the actions of the rule on any rows.
 
         Args:
@@ -196,12 +196,10 @@ class SelectedModelRule:
         document = jsonable(
             {"kind": SELECTED, **self.identity, "cut": self.cut}
         )
-        document["selection_sha256"] = ledger_module.digest(
-            jsonable(self.identity)
-        )
+        document["selection_sha256"] = ledger.digest(jsonable(self.identity))
         return document
 
-    def actions(self, features: pd.DataFrame) -> np.ndarray:
+    def actions(self, features: pandas.DataFrame) -> numpy.ndarray:
         """Computes the actions of the selected model on any rows.
 
         Args:
@@ -213,14 +211,14 @@ class SelectedModelRule:
         """
         classes = list(self.pipeline.classes_)
         column = classes.index(self.positive)
-        probability = np.asarray(self.pipeline.predict_proba(features))[
+        probability = numpy.asarray(self.pipeline.predict_proba(features))[
             :, column
         ]
         return (probability >= self.cut).astype(float)
 
 
 def freeze_rule(
-    features: pd.DataFrame,
+    features: pandas.DataFrame,
     outcome: Sequence[float],
     columns: Sequence[str],
     cut: float,
@@ -250,24 +248,24 @@ def freeze_rule(
             "the baseline claim needs at least one numeric feature to freeze "
             "a rule on the exploration rows"
         )
-    y = np.asarray(outcome, dtype=float)
-    seen = ~np.isnan(y)
-    if len(np.unique(y[seen])) < 2:
+    y = numpy.asarray(outcome, dtype=float)
+    seen = ~numpy.isnan(y)
+    if len(numpy.unique(y[seen])) < 2:
         raise errors.ConfigError(
             "the baseline claim needs both outcome classes in the exploration "
             "rows"
         )
     raw = (
         features.loc[:, list(names)]
-        .apply(pd.to_numeric, errors="coerce")
+        .apply(pandas.to_numeric, errors="coerce")
         .to_numpy(dtype=float)
     )
-    medians = np.nanmedian(raw, axis=0)
-    medians = np.where(np.isnan(medians), 0.0, medians)
-    filled = np.where(np.isnan(raw), medians, raw)
+    medians = numpy.nanmedian(raw, axis=0)
+    medians = numpy.where(numpy.isnan(medians), 0.0, medians)
+    filled = numpy.where(numpy.isnan(raw), medians, raw)
     means = filled.mean(axis=0)
     scales = filled.std(axis=0)
-    scales = np.where(scales == 0.0, 1.0, scales)
+    scales = numpy.where(scales == 0.0, 1.0, scales)
     model = linear_model.LogisticRegression(
         C=RIDGE, max_iter=1000, random_state=seed
     )
@@ -413,7 +411,9 @@ def build_runner(
         registration.registration_hash,
     )
 
-    def run(features: pd.DataFrame, target: pd.Series) -> confirm.ClaimRun:
+    def run(
+        features: pandas.DataFrame, target: pandas.Series
+    ) -> confirm.ClaimRun:
         """Tests the registered claim on the rows released for confirmation.
 
         Args:
@@ -430,7 +430,7 @@ def build_runner(
             clusters = (
                 features[group_column].astype(str).to_numpy()
                 if group_column and group_column in features.columns
-                else np.arange(len(features))
+                else numpy.arange(len(features))
             )
             report = guard.evaluate(
                 y,
@@ -448,7 +448,7 @@ def build_runner(
             document["reference_rule"] = reference.describe()
             if not selection["flagged"]:
                 document["reference_agreement"] = float(
-                    np.mean(
+                    numpy.mean(
                         reference.actions(features) == rule.actions(features)
                     )
                 )

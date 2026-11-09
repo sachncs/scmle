@@ -16,8 +16,8 @@ All three draw only from `randomness.component_rng`.
 
 import dataclasses
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from benchmarks.qualification import ingest_naive
 from benchmarks.qualification import ingest_worlds
@@ -50,9 +50,9 @@ class Schema:
         nested: Whether the feature is nested through the items.
     """
 
-    targets: pd.DataFrame
-    orders: pd.DataFrame
-    items: pd.DataFrame
+    targets: pandas.DataFrame
+    orders: pandas.DataFrame
+    items: pandas.DataFrame
     known: bool
     leaf_known: bool
     delta: float
@@ -77,7 +77,7 @@ def random_schema(seed: int, name: str = "ingest.check.schema") -> Schema:
     rng = randomness.component_rng(seed, name, 0)
     n_targets = int(rng.integers(3, 12))
     keys = int(rng.integers(2, 6))
-    targets = pd.DataFrame(
+    targets = pandas.DataFrame(
         {
             "cid": rng.integers(0, keys, n_targets),
             "moment": rng.choice(
@@ -86,29 +86,29 @@ def random_schema(seed: int, name: str = "ingest.check.schema") -> Schema:
         }
     )
     rows = int(rng.integers(0, 40))
-    event = np.round(rng.uniform(0, 100, rows), int(rng.integers(0, 2)))
+    event = numpy.round(rng.uniform(0, 100, rows), int(rng.integers(0, 2)))
     value = rng.normal(size=rows).round(int(rng.integers(0, 3)))
-    value[rng.random(rows) < 0.15] = np.nan
+    value[rng.random(rows) < 0.15] = numpy.nan
     recorded = event + rng.exponential(2.0, rows).round(1)
-    recorded[rng.random(rows) < 0.1] = np.nan
-    orders = pd.DataFrame(
+    recorded[rng.random(rows) < 0.1] = numpy.nan
+    orders = pandas.DataFrame(
         {
             "cid": rng.integers(0, keys, rows),
-            "oid": np.arange(rows),
+            "oid": numpy.arange(rows),
             "ev": event,
             "rec": recorded,
             "val": value,
         }
     )
     leaf_rows = int(rng.integers(0, 60))
-    leaf_event = np.round(
+    leaf_event = numpy.round(
         rng.uniform(0, 100, leaf_rows), int(rng.integers(0, 2))
     )
     leaf_value = rng.normal(size=leaf_rows).round(2)
-    leaf_value[rng.random(leaf_rows) < 0.15] = np.nan
+    leaf_value[rng.random(leaf_rows) < 0.15] = numpy.nan
     leaf_recorded = leaf_event + rng.exponential(3.0, leaf_rows).round(1)
-    leaf_recorded[rng.random(leaf_rows) < 0.1] = np.nan
-    items = pd.DataFrame(
+    leaf_recorded[rng.random(leaf_rows) < 0.1] = numpy.nan
+    items = pandas.DataFrame(
         {
             "oid": rng.integers(0, max(rows, 1), leaf_rows),
             "ev": leaf_event,
@@ -168,7 +168,7 @@ def views(schema: Schema) -> tuple[synthesize.Source, asof_view.AsOfView]:
     return synthesize.Source(orders, "cid"), items
 
 
-def fast_feature(schema: Schema) -> pd.Series:
+def fast_feature(schema: Schema) -> pandas.Series:
     """The feature computed by the code under test.
 
     Args:
@@ -252,7 +252,7 @@ def naive_feature(schema: Schema) -> list[float]:
     )
 
 
-def same(left: np.ndarray, right: np.ndarray) -> bool:
+def same(left: numpy.ndarray, right: numpy.ndarray) -> bool:
     """Equal within the floating tolerance, NaN equal to NaN.
 
     Args:
@@ -263,7 +263,7 @@ def same(left: np.ndarray, right: np.ndarray) -> bool:
         True if every pair is within a relative and absolute `RTOL`.
     """
     return bool(
-        np.allclose(
+        numpy.allclose(
             left.astype(float),
             right.astype(float),
             rtol=RTOL,
@@ -284,7 +284,7 @@ def differential_equal(seed: int) -> bool:
     """
     schema = random_schema(seed)
     fast = fast_feature(schema).to_numpy()
-    return same(fast, np.array(naive_feature(schema)))
+    return same(fast, numpy.array(naive_feature(schema)))
 
 
 def metamorphic_unchanged(seed: int) -> bool:
@@ -311,13 +311,13 @@ def metamorphic_unchanged(seed: int) -> bool:
     for frame in (schema.orders, schema.items):
         recorded = frame["rec"].to_numpy()
         fallback = frame["ev"].to_numpy() + schema.delta
-        known = np.where(np.isnan(recorded), fallback, recorded)
+        known = numpy.where(numpy.isnan(recorded), fallback, recorded)
         later = known > cutoff
         count = int(later.sum())
         frame.loc[later, "val"] = rng.normal(size=count) * 1000.0
         # With no recorded time the rule reads the event time, so that one
         # stays; every other field of an unknown row is free to change.
-        free = later & ~np.isnan(recorded)
+        free = later & ~numpy.isnan(recorded)
         frame.loc[free, "ev"] = rng.uniform(-50, 200, int(free.sum()))
         if "cid" in frame.columns:
             frame.loc[later, "cid"] = rng.integers(0, 6, count)
@@ -349,10 +349,10 @@ def late_leaks(seed: int) -> Leaks:
     """
     world = ingest_worlds.late_world(seed)
     cutoff = world.targets["moment"].to_numpy() - world.lag_days
-    asked = pd.DataFrame(
+    asked = pandas.DataFrame(
         {
             "cid": world.targets["cid"].to_numpy(),
-            asof_view.TARGET_COLUMN: np.arange(len(world.targets)),
+            asof_view.TARGET_COLUMN: numpy.arange(len(world.targets)),
             asof_view.CUTOFF_COLUMN: cutoff,
         }
     )

@@ -1,7 +1,7 @@
 """Tests for training-fold resampling."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 from sklearn import base
 from sklearn import linear_model
@@ -11,11 +11,11 @@ from scmle.sampling import resampling
 
 
 def imbalanced(rows=400, minority=40, seed=0):
-    rng = np.random.default_rng(seed)
-    features = pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    features = pandas.DataFrame(
         {"a": rng.normal(size=rows), "b": rng.normal(size=rows)}
     )
-    target = pd.Series([1] * minority + [0] * (rows - minority))
+    target = pandas.Series([1] * minority + [0] * (rows - minority))
     features.loc[target == 1, "a"] += 2.0
     return features, target
 
@@ -40,8 +40,8 @@ def test_undersampling_equalizes_classes_without_duplicates():
 
 
 def test_multiclass_resampling_reaches_the_extreme_class_size():
-    features = pd.DataFrame({"a": np.arange(60.0)})
-    target = pd.Series([0] * 40 + [1] * 15 + [2] * 5)
+    features = pandas.DataFrame({"a": numpy.arange(60.0)})
+    target = pandas.Series([0] * 40 + [1] * 15 + [2] * 5)
     over = resampling.RandomOverSampler().resample(features, target, 0)[1]
     under = resampling.RandomUnderSampler().resample(features, target, 0)[1]
     assert set(over.value_counts()) == {40} and set(under.value_counts()) == {5}
@@ -52,7 +52,7 @@ def test_resampling_is_seeded():
     first = resampling.RandomOverSampler().resample(features, target, 3)[0]
     second = resampling.RandomOverSampler().resample(features, target, 3)[0]
     other = resampling.RandomOverSampler().resample(features, target, 4)[0]
-    pd.testing.assert_frame_equal(first, second)
+    pandas.testing.assert_frame_equal(first, second)
     assert not first.equals(other)
 
 
@@ -62,7 +62,7 @@ def test_validation_fold_keeps_its_original_distribution():
 
     class Spy(linear_model.LogisticRegression):
         def fit(self, features, labels, **kwargs):
-            seen.append(pd.Series(labels).value_counts().to_dict())
+            seen.append(pandas.Series(labels).value_counts().to_dict())
             return super().fit(features, labels, **kwargs)
 
     model = resampling.ResamplingClassifier(

@@ -18,8 +18,8 @@ import threading
 import time
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 from sklearn import naive_bayes
 import support
@@ -85,10 +85,10 @@ def failures_of(count: int, work: Callable[[int], Any]) -> list[BaseException]:
     return run_together(count, work)[1]
 
 
-def frame(rows: int = 200, seed: int = 0) -> pd.DataFrame:
+def frame(rows: int = 200, seed: int = 0) -> pandas.DataFrame:
     """A small separable binary problem."""
-    rng = np.random.default_rng(seed)
-    data = pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    data = pandas.DataFrame(
         {"a": rng.normal(size=rows), "b": rng.normal(size=rows)}
     )
     data["y"] = (data.a + data.b + rng.normal(0, 0.5, rows) > 0).astype(int)
@@ -174,7 +174,7 @@ def test_register_unregister_and_lookup_never_raise():
 
 def score(truth, predicted):
     """A module-level metric function."""
-    return float(np.mean(np.asarray(truth) == np.asarray(predicted)))
+    return float(numpy.mean(numpy.asarray(truth) == numpy.asarray(predicted)))
 
 
 def test_concurrent_register_metric_and_lookup():
@@ -268,7 +268,7 @@ def test_parallel_projects_match_sequential_runs(tmp_path, sequential_results):
         want_model, want_test, want_predicted = sequential_results[index]
         assert model == want_model
         assert test == pytest.approx(want_test)
-        np.testing.assert_array_equal(predicted, want_predicted)
+        numpy.testing.assert_array_equal(predicted, want_predicted)
     run_dirs = {str(outcome[3]) for outcome in outcomes}
     assert len(run_dirs) == 2
     with sqlite3.connect(shared / "experiments.sqlite") as connection:
@@ -318,8 +318,8 @@ def test_concurrent_predict_on_one_bundle_matches_sequential(trained):
     assert not failures
     for index, rounds in enumerate(outcomes):
         for labels, probabilities in rounds:
-            np.testing.assert_array_equal(labels, want[index])
-            np.testing.assert_allclose(probabilities, want_proba[index])
+            numpy.testing.assert_array_equal(labels, want[index])
+            numpy.testing.assert_allclose(probabilities, want_proba[index])
 
 
 def test_concurrent_load_model_and_predict(trained, tmp_path):
@@ -335,8 +335,8 @@ def test_concurrent_load_model_and_predict(trained, tmp_path):
 
     assert not failures
     for first, second in outcomes:
-        np.testing.assert_array_equal(first, want)
-        np.testing.assert_array_equal(second, want)
+        numpy.testing.assert_array_equal(first, want)
+        numpy.testing.assert_array_equal(second, want)
 
 
 # --- stores ---------------------------------------------------------------
@@ -700,7 +700,9 @@ def test_bundle_remember_does_not_lose_rows():
     def work(index):
         for number in range(30):
             row = index * 1000 + number
-            bundle.remember(pd.DataFrame({"g": [row], "t": [row], "v": [row]}))
+            bundle.remember(
+                pandas.DataFrame({"g": [row], "t": [row], "v": [row]})
+            )
 
     failures = failures_of(THREADS, work)
 

@@ -59,8 +59,8 @@ import math
 import sys
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from scipy import stats
 from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import GroupKFold
@@ -90,7 +90,7 @@ SKILL = "leakage.skill"
 CONDITIONAL = "leakage.conditional"
 MISSING = "leakage.missingness"
 
-Splits = list[tuple[np.ndarray, np.ndarray]]
+Splits = list[tuple[numpy.ndarray, numpy.ndarray]]
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -161,7 +161,7 @@ class LeakageConfig:
         qualification.count(self.run_seed, "run_seed")
 
 
-def design(series: pd.Series) -> np.ndarray:
+def design(series: pandas.Series) -> numpy.ndarray:
     """Builds the numeric design of one feature, keeping missing values as NaN.
 
     A numeric feature is one column (trees send NaN down a learned branch).
@@ -175,18 +175,18 @@ def design(series: pd.Series) -> np.ndarray:
         A float64 array with one row per entry of `series`: one column for
         a numeric (non-boolean) feature, otherwise one column per level.
     """
-    if pd.api.types.is_numeric_dtype(series) and not pd.api.types.is_bool_dtype(
+    if pandas.api.types.is_numeric_dtype(
         series
-    ):
+    ) and not pandas.api.types.is_bool_dtype(series):
         return series.to_numpy(dtype="float64").reshape(-1, 1)
     labels = series.astype("object").where(series.notna(), "<missing>")
     labels = labels.astype(str)
     top = labels.value_counts().index[:MAX_LEVELS]
     pooled = labels.where(labels.isin(top), "<other>")
-    return pd.get_dummies(pooled).to_numpy(dtype="float64")
+    return pandas.get_dummies(pooled).to_numpy(dtype="float64")
 
 
-def encode_target(y: pd.Series, task: str) -> np.ndarray:
+def encode_target(y: pandas.Series, task: str) -> numpy.ndarray:
     """Encodes the target as class codes or floats.
 
     Args:
@@ -206,18 +206,18 @@ def encode_target(y: pd.Series, task: str) -> np.ndarray:
         raise ValueError("the target must not have missing values")
     if task == "regression":
         return y.to_numpy(dtype="float64")
-    codes, uniques = pd.factorize(y, sort=True)
+    codes, uniques = pandas.factorize(y, sort=True)
     if len(uniques) < 2:
         raise ValueError("a classification target needs two classes")
     return codes.astype("int64")
 
 
 def permute_within(
-    values: np.ndarray,
-    rng: np.random.Generator,
-    groups: np.ndarray | None,
+    values: numpy.ndarray,
+    rng: numpy.random.Generator,
+    groups: numpy.ndarray | None,
     block_size: int | None,
-) -> np.ndarray:
+) -> numpy.ndarray:
     """Draws a row permutation, global, within groups, or within time blocks.
 
     Args:
@@ -233,14 +233,14 @@ def permute_within(
         `block_size`, only within their block of consecutive rows.
     """
     n = len(values)
-    out = np.arange(n)
+    out = numpy.arange(n)
     if groups is not None:
-        for label in pd.unique(groups):
-            where = np.flatnonzero(groups == label)
+        for label in pandas.unique(groups):
+            where = numpy.flatnonzero(groups == label)
             out[where] = where[rng.permutation(len(where))]
     elif block_size is not None:
         for start in range(0, n, block_size):
-            where = np.arange(start, min(start + block_size, n))
+            where = numpy.arange(start, min(start + block_size, n))
             out[where] = where[rng.permutation(len(where))]
     else:
         out = rng.permutation(n)
@@ -248,10 +248,10 @@ def permute_within(
 
 
 def make_splits(
-    y: np.ndarray,
+    y: numpy.ndarray,
     task: str,
     folds: int,
-    groups: np.ndarray | None,
+    groups: numpy.ndarray | None,
     block_size: int | None,
     seed: int,
 ) -> Splits:
@@ -272,9 +272,9 @@ def make_splits(
         Without groups or blocks the folds are shuffled, and stratified by
         class for classification.
     """
-    rows = np.arange(len(y))
+    rows = numpy.arange(len(y))
     if groups is not None:
-        k = min(folds, len(pd.unique(groups)))
+        k = min(folds, len(pandas.unique(groups)))
         return list(GroupKFold(n_splits=k).split(rows, y, groups))
     if block_size is not None:
         return list(KFold(n_splits=folds).split(rows))
@@ -288,13 +288,13 @@ def make_splits(
 
 
 def out_of_fold(
-    x: np.ndarray,
-    y: np.ndarray,
+    x: numpy.ndarray,
+    y: numpy.ndarray,
     task: str,
     splits: Splits,
     cfg: LeakageConfig,
     seed: int,
-) -> np.ndarray:
+) -> numpy.ndarray:
     """Predicts every row from a small tree fitted on the other folds.
 
     Args:
@@ -313,7 +313,7 @@ def out_of_fold(
     """
     n_classes = int(y.max()) + 1 if task == "classification" else 0
     shape = (len(y), n_classes) if task == "classification" else (len(y),)
-    out = np.zeros(shape)
+    out = numpy.zeros(shape)
     for train, test in splits:
         if task == "classification":
             clf = DecisionTreeClassifier(
@@ -321,7 +321,7 @@ def out_of_fold(
                 min_samples_leaf=cfg.min_samples_leaf,
                 random_state=seed,
             ).fit(x[train], y[train])
-            out[np.ix_(test, clf.classes_)] = clf.predict_proba(x[test])
+            out[numpy.ix_(test, clf.classes_)] = clf.predict_proba(x[test])
         else:
             reg = DecisionTreeRegressor(
                 max_leaf_nodes=cfg.max_leaf_nodes,
@@ -332,7 +332,7 @@ def out_of_fold(
     return out
 
 
-def binary_auc(truth: np.ndarray, score: np.ndarray) -> float:
+def binary_auc(truth: numpy.ndarray, score: numpy.ndarray) -> float:
     """Computes the ROC AUC by the rank-sum formula, with ties averaged.
 
     Args:
@@ -354,7 +354,7 @@ def binary_auc(truth: np.ndarray, score: np.ndarray) -> float:
     return float((ranks[positive].sum() - n1 * (n1 + 1) / 2.0) / (n1 * n0))
 
 
-def skill_of(pred: np.ndarray, y: np.ndarray, task: str) -> float:
+def skill_of(pred: numpy.ndarray, y: numpy.ndarray, task: str) -> float:
     """Measures the skill of out-of-fold predictions: AUC or R^2.
 
     Args:
@@ -390,14 +390,14 @@ def skill_of(pred: np.ndarray, y: np.ndarray, task: str) -> float:
 
 
 def cross_fit_skill(
-    x: np.ndarray,
-    y: np.ndarray,
+    x: numpy.ndarray,
+    y: numpy.ndarray,
     task: str,
     cfg: LeakageConfig,
-    groups: np.ndarray | None,
+    groups: numpy.ndarray | None,
     block_size: int | None,
     seed: int,
-) -> tuple[float, np.ndarray]:
+) -> tuple[float, numpy.ndarray]:
     """Computes the out-of-fold skill of a feature.
 
     Args:
@@ -419,11 +419,11 @@ def cross_fit_skill(
 
 
 def bootstrap_skill(
-    pred: np.ndarray,
-    y: np.ndarray,
+    pred: numpy.ndarray,
+    y: numpy.ndarray,
     task: str,
-    members: list[np.ndarray] | None,
-    rng: np.random.Generator,
+    members: list[numpy.ndarray] | None,
+    rng: numpy.random.Generator,
 ) -> float | None:
     """Computes the skill on one bootstrap resample.
 
@@ -442,7 +442,7 @@ def bootstrap_skill(
     n = len(y)
     if members is not None:
         picks = rng.integers(0, len(members), size=len(members))
-        index = np.concatenate([members[i] for i in picks])
+        index = numpy.concatenate([members[i] for i in picks])
     else:
         index = rng.integers(0, n, size=n)
     try:
@@ -452,12 +452,12 @@ def bootstrap_skill(
 
 
 def lower_bound(
-    pred: np.ndarray,
-    y: np.ndarray,
+    pred: numpy.ndarray,
+    y: numpy.ndarray,
     task: str,
     cfg: LeakageConfig,
-    groups: np.ndarray | None,
-    rng: np.random.Generator,
+    groups: numpy.ndarray | None,
+    rng: numpy.random.Generator,
 ) -> float:
     """Computes a one-sided lower confidence bound on the skill by bootstrap.
 
@@ -476,9 +476,9 @@ def lower_bound(
     Returns:
         The `1 - confidence` quantile of the bootstrap skills, or -inf.
     """
-    labels = pd.unique(groups) if groups is not None else None
+    labels = pandas.unique(groups) if groups is not None else None
     members = (
-        [np.flatnonzero(groups == g) for g in labels]
+        [numpy.flatnonzero(groups == g) for g in labels]
         if groups is not None and labels is not None
         else None
     )
@@ -489,7 +489,7 @@ def lower_bound(
     values = [v for v in draws if v is not None]
     if not values:
         return -math.inf
-    return float(np.quantile(values, 1.0 - cfg.confidence))
+    return float(numpy.quantile(values, 1.0 - cfg.confidence))
 
 
 def permutation_p(observed: float, null: Sequence[float]) -> float:
@@ -506,7 +506,7 @@ def permutation_p(observed: float, null: Sequence[float]) -> float:
     return (1.0 + exceed) / (len(null) + 1.0)
 
 
-def enough_rows(y: np.ndarray, task: str, cfg: LeakageConfig) -> bool:
+def enough_rows(y: numpy.ndarray, task: str, cfg: LeakageConfig) -> bool:
     """Decides whether there are enough rows for the tests to have any power.
 
     Args:
@@ -522,7 +522,7 @@ def enough_rows(y: np.ndarray, task: str, cfg: LeakageConfig) -> bool:
     if len(y) < cfg.min_rows:
         return False
     if task == "classification":
-        return min(np.bincount(y).tolist()) >= cfg.folds
+        return min(numpy.bincount(y).tolist()) >= cfg.folds
     return True
 
 
@@ -578,11 +578,11 @@ def decision_for(
 
 
 def skill_test(
-    feature: pd.Series,
-    target: pd.Series,
+    feature: pandas.Series,
+    target: pandas.Series,
     task: str,
     cfg: LeakageConfig,
-    groups: pd.Series | None = None,
+    groups: pandas.Series | None = None,
     block_size: int | None = None,
     gate: certificates.GateStatus = certificates.GateStatus.DESCRIPTIVE,
     set_id: qualification.SetId = qualification.SetId.EXPLORATION,
@@ -658,7 +658,7 @@ def skill_test(
         statistic=skill,
         p_value=p_value,
         interval=(bound, max(skill, bound)) if math.isfinite(bound) else None,
-        effect=skill - float(np.mean(null)),
+        effect=skill - float(numpy.mean(null)),
         n=len(y),
         decision=decision_for(suspect, not powered, gate),
         set_id=set_id,
@@ -668,7 +668,7 @@ def skill_test(
     return SkillTest(
         name,
         skill,
-        float(np.mean(null)),
+        float(numpy.mean(null)),
         bound,
         p_value,
         len(y),
@@ -679,8 +679,8 @@ def skill_test(
 
 
 def strata_labels(
-    feature: pd.Series, others: pd.DataFrame, cfg: LeakageConfig
-) -> np.ndarray:
+    feature: pandas.Series, others: pandas.DataFrame, cfg: LeakageConfig
+) -> numpy.ndarray:
     """Strata for the conditional permutation: leaves of a small tree.
 
     The tree predicts the feature from the other features (a crude estimate
@@ -701,20 +701,22 @@ def strata_labels(
         `n_strata` distinct values).
     """
     if others.shape[1] == 0:
-        return np.zeros(len(feature), dtype="int64")
-    z = np.hstack([design(others[c]) for c in others.columns])
-    if pd.api.types.is_numeric_dtype(feature) and not (
-        pd.api.types.is_bool_dtype(feature)
+        return numpy.zeros(len(feature), dtype="int64")
+    z = numpy.hstack([design(others[c]) for c in others.columns])
+    if pandas.api.types.is_numeric_dtype(feature) and not (
+        pandas.api.types.is_bool_dtype(feature)
     ):
         values = feature.to_numpy(dtype="float64")
-        filled = np.where(np.isnan(values), np.nanmedian(values), values)
+        filled = numpy.where(
+            numpy.isnan(values), numpy.nanmedian(values), values
+        )
         tree: Any = DecisionTreeRegressor(
             max_leaf_nodes=cfg.n_strata,
             min_samples_leaf=cfg.min_samples_leaf,
             random_state=0,
         ).fit(z, filled)
     else:
-        codes = pd.factorize(feature.astype("object"))[0]
+        codes = pandas.factorize(feature.astype("object"))[0]
         tree = DecisionTreeClassifier(
             max_leaf_nodes=cfg.n_strata,
             min_samples_leaf=cfg.min_samples_leaf,
@@ -725,8 +727,8 @@ def strata_labels(
 
 
 def within_strata(
-    n: int, members: list[np.ndarray], rng: np.random.Generator
-) -> np.ndarray:
+    n: int, members: list[numpy.ndarray], rng: numpy.random.Generator
+) -> numpy.ndarray:
     """Draws a row order that permutes rows within each stratum.
 
     Args:
@@ -737,7 +739,7 @@ def within_strata(
     Returns:
         Integer positions; rows move only within their stratum.
     """
-    order = np.arange(n)
+    order = numpy.arange(n)
     for where in members:
         order[where] = where[rng.permutation(len(where))]
     return order
@@ -768,12 +770,12 @@ class ConditionalTest:
 
 
 def conditional_test(
-    feature: pd.Series,
-    others: pd.DataFrame,
-    target: pd.Series,
+    feature: pandas.Series,
+    others: pandas.DataFrame,
+    target: pandas.Series,
     task: str,
     cfg: LeakageConfig,
-    groups: pd.Series | None = None,
+    groups: pandas.Series | None = None,
     block_size: int | None = None,
     set_id: qualification.SetId = qualification.SetId.EXPLORATION,
 ) -> ConditionalTest:
@@ -806,7 +808,7 @@ def conditional_test(
     seed = randomness.derive_int_seed(cfg.run_seed, path, 0)
     skill = cross_fit_skill(x, y, task, cfg, group_values, block_size, seed)[0]
     labels = strata_labels(feature, others, cfg)
-    members = [np.flatnonzero(labels == v) for v in np.unique(labels)]
+    members = [numpy.flatnonzero(labels == v) for v in numpy.unique(labels)]
     rng = randomness.component_rng(cfg.run_seed, path, 1)
     null = [
         cross_fit_skill(
@@ -831,7 +833,7 @@ def conditional_test(
         statistic=skill,
         p_value=p_value,
         interval=None,
-        effect=skill - float(np.mean(null)),
+        effect=skill - float(numpy.mean(null)),
         n=len(y),
         decision=(
             qualification.Decision.WARN
@@ -843,11 +845,17 @@ def conditional_test(
         tier=qualification.Tier.UNVERIFIED,
     )
     return ConditionalTest(
-        name, skill, float(np.mean(null)), p_value, len(members), keeps, check
+        name,
+        skill,
+        float(numpy.mean(null)),
+        p_value,
+        len(members),
+        keeps,
+        check,
     )
 
 
-def cramers_v(table: np.ndarray) -> float:
+def cramers_v(table: numpy.ndarray) -> float:
     """Computes Cramer's V of a contingency table (no bias correction).
 
     Args:
@@ -865,7 +873,7 @@ def cramers_v(table: np.ndarray) -> float:
     return math.sqrt(statistic / (total * smaller))
 
 
-def binned_target(target: pd.Series, task: str) -> pd.Series:
+def binned_target(target: pandas.Series, task: str) -> pandas.Series:
     """Bins the target for the missingness test.
 
     Args:
@@ -878,7 +886,7 @@ def binned_target(target: pd.Series, task: str) -> pd.Series:
     """
     if task == "classification":
         return target.astype("object")
-    return pd.qcut(target, TARGET_BINS, duplicates="drop").astype("object")
+    return pandas.qcut(target, TARGET_BINS, duplicates="drop").astype("object")
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -908,8 +916,8 @@ class MissingnessTest:
 
 
 def missingness_test(
-    feature: pd.Series,
-    target: pd.Series,
+    feature: pandas.Series,
+    target: pandas.Series,
     task: str,
     cfg: LeakageConfig,
     gate: certificates.GateStatus = certificates.GateStatus.DESCRIPTIVE,
@@ -941,7 +949,7 @@ def missingness_test(
     if missing.all() or not missing.any():
         return None
     classes = binned_target(target, task)
-    table = pd.crosstab(missing, classes).to_numpy()
+    table = pandas.crosstab(missing, classes).to_numpy()
     if table.shape[1] < 2:
         return None
     if table.shape == (2, 2) and (
@@ -1011,12 +1019,12 @@ class FeatureAssessment:
 
 
 def assess_feature(
-    feature: pd.Series,
-    others: pd.DataFrame,
-    target: pd.Series,
+    feature: pandas.Series,
+    others: pandas.DataFrame,
+    target: pandas.Series,
     task: str,
     cfg: LeakageConfig,
-    groups: pd.Series | None = None,
+    groups: pandas.Series | None = None,
     block_size: int | None = None,
     gate: certificates.GateStatus = certificates.GateStatus.DESCRIPTIVE,
     set_id: qualification.SetId = qualification.SetId.EXPLORATION,
@@ -1123,12 +1131,12 @@ class LeakageReport:
 
 
 def scan(
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     target: str,
     task: str,
     cfg: LeakageConfig,
     features: Sequence[Hashable] | None = None,
-    groups: pd.Series | None = None,
+    groups: pandas.Series | None = None,
     block_size: int | None = None,
     gate: certificates.GateStatus = certificates.GateStatus.DESCRIPTIVE,
     set_id: qualification.SetId = qualification.SetId.EXPLORATION,

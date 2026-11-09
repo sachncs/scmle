@@ -4,7 +4,7 @@ from fractions import Fraction
 import json
 import types
 
-import numpy as np
+import numpy
 import pytest
 from test_decision_rollout import make_plan
 from test_decision_rollout import traffic
@@ -14,18 +14,18 @@ from test_lifecycle_extras import bundle_of
 from test_lifecycle_extras import traffic as rows
 
 from scmle.contracts import errors
-from scmle.data.ledger import budget as budget_module
+from scmle.data.ledger import budget
 from scmle.decision import rollout
 from scmle.governance import deployment_ledger
 from scmle.governance import lifecycle
-from scmle.governance import registry as registry_module
+from scmle.governance import registry
 from scmle.governance import rollout_hook
 
 
 def staged(tmp_path):
     good = bundle_of("logistic_regression", rows())
     other = bundle_of("logistic_regression", rows(seed=1))
-    store = registry_module.ModelRegistryStore(tmp_path / "registry")
+    store = registry.ModelRegistryStore(tmp_path / "registry")
     manager = lifecycle.LifecycleManager(store, "m", str(tmp_path / "work"))
     first = store.register("m", good.save(tmp_path / "e1"), trusted=True)
     store.promote(
@@ -35,7 +35,7 @@ def staged(tmp_path):
         signing_key=APPROVAL_KEY,
     )
     second = store.register("m", other.save(tmp_path / "e2"), trusted=True)
-    store.promote("m", second.version, registry_module.CHALLENGER)
+    store.promote("m", second.version, registry.CHALLENGER)
     return store, manager, second
 
 
@@ -176,7 +176,7 @@ def test_a_rollback_decision_restores_the_previous_champion(tmp_path):
     arm, primary, guards = traffic(40000, 5, lift=0.05)
     hook.observe(arm, primary, guards)
     hook.promote(approval_for(challenger), signing_key=APPROVAL_KEY)
-    rng = np.random.default_rng(6)
+    rng = numpy.random.default_rng(6)
     n = 20000
     watch_arm = (rng.random(n) < 0.5).astype(float)
     outcome = (rng.random(n) < 0.30 - 0.15 * watch_arm).astype(float)
@@ -214,7 +214,7 @@ def test_the_budget_survives_in_the_ledger_rows(tmp_path):
     hook = env.hook
     hook.start("exp-1")
     row = next(r for r in ledger.rows if r["kind"] == "rollout_experiment")
-    restored = budget_module.DecisionBudget.from_dict(row["body"]["budget"])
+    restored = budget.DecisionBudget.from_dict(row["body"]["budget"])
     assert restored == hook.budget
 
 
@@ -222,7 +222,7 @@ def broken_champion(tmp_path):
     """A registry whose new champion is clearly worse than the previous."""
     good = bundle_of("logistic_regression", rows())
     broken = bundle_of("logistic_regression", rows(seed=0, flip=True))
-    store = registry_module.ModelRegistryStore(tmp_path / "registry")
+    store = registry.ModelRegistryStore(tmp_path / "registry")
     manager = lifecycle.LifecycleManager(store, "m", str(tmp_path / "work"))
     for index, model in enumerate((good, broken), start=1):
         record = store.register(
@@ -238,7 +238,7 @@ def broken_champion(tmp_path):
 
 
 def audit_rows(store, action):
-    lines = (store.root / registry_module.AUDIT_FILE).read_text().splitlines()
+    lines = (store.root / registry.AUDIT_FILE).read_text().splitlines()
     found = [json.loads(line) for line in lines]
     return [r for r in found if r["action"] == action]
 
@@ -301,7 +301,7 @@ def test_the_hook_is_the_only_decider_of_promotion_and_rollback(tmp_path):
     with pytest.raises(errors.ScmleError, match="rollback"):
         hook.roll_back(approval_for(store.resolve("m", 1)), APPROVAL_KEY)
 
-    rng = np.random.default_rng(6)
+    rng = numpy.random.default_rng(6)
     watch_arm = (rng.random(20000) < 0.5).astype(float)
     outcome = (rng.random(20000) < 0.30 - 0.15 * watch_arm).astype(float)
     assert hook.watch(watch_arm, outcome) == rollout.ROLLBACK

@@ -21,8 +21,8 @@ import datetime
 import hashlib
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.contracts import errors
 from scmle.contracts import qualification
@@ -183,8 +183,8 @@ def candidate_columns(source: Source) -> tuple[list[str], list[str]]:
     for name in view.columns:
         if name in skip or name.lower() == "id" or name.lower().endswith("_id"):
             continue
-        if pd.api.types.is_numeric_dtype(frame[name]) and not (
-            pd.api.types.is_bool_dtype(frame[name])
+        if pandas.api.types.is_numeric_dtype(frame[name]) and not (
+            pandas.api.types.is_bool_dtype(frame[name])
         ):
             numeric.append(name)
         else:
@@ -292,8 +292,8 @@ def propose(
 
 
 def target_frame(
-    targets: pd.DataFrame, key: str, moment: str, lag_days: float, view: Any
-) -> pd.DataFrame:
+    targets: pandas.DataFrame, key: str, moment: str, lag_days: float, view: Any
+) -> pandas.DataFrame:
     """Builds the target frame a view is asked about.
 
     Args:
@@ -308,22 +308,22 @@ def target_frame(
         position) and `CUTOFF_COLUMN` (moment minus lag, in days).
     """
     cutoff = asof_view.to_days(targets[moment]) - lag_days
-    return pd.DataFrame(
+    return pandas.DataFrame(
         {
             view.key: targets[key].to_numpy(),
-            asof_view.TARGET_COLUMN: np.arange(len(targets)),
+            asof_view.TARGET_COLUMN: numpy.arange(len(targets)),
             asof_view.CUTOFF_COLUMN: cutoff,
         }
     )
 
 
 def reduce_rows(
-    rows: pd.DataFrame,
+    rows: pandas.DataFrame,
     primitive: str,
     value: str | None,
     window: float | None,
     count: int,
-) -> pd.Series:
+) -> pandas.Series:
     """One primitive per target row over visible rows.
 
     Args:
@@ -350,7 +350,7 @@ def reduce_rows(
             rows[asof_view.EVENT_COLUMN]
             > rows[asof_view.CUTOFF_COLUMN] - window
         ]
-    index = pd.RangeIndex(count)
+    index = pandas.RangeIndex(count)
     label = asof_view.TARGET_COLUMN
     if primitive == COUNT:
         return (
@@ -392,7 +392,7 @@ def reduce_rows(
     raise ValueError(f"unknown primitive: {primitive}")
 
 
-def slope(rows: pd.DataFrame, value: str) -> pd.Series:
+def slope(rows: pandas.DataFrame, value: str) -> pandas.Series:
     """Fits the OLS slope of a value on event time per target row.
 
     Args:
@@ -420,12 +420,12 @@ def slope(rows: pd.DataFrame, value: str) -> pd.Series:
 
 def evaluate(
     spec: FeatureSpec,
-    targets: pd.DataFrame,
+    targets: pandas.DataFrame,
     moment: str,
     sources: Sequence[Source],
     nests: Sequence[Nest],
     lag_days: float,
-) -> pd.Series:
+) -> pandas.Series:
     """Computes one feature for every target row.
 
     Args:
@@ -460,10 +460,10 @@ def evaluate(
             > rows[asof_view.CUTOFF_COLUMN] - spec.window_days
         ]
     pairs = rows.reset_index(drop=True)
-    pair_targets = pd.DataFrame(
+    pair_targets = pandas.DataFrame(
         {
             nest.leaf.key: pairs[nest.mid_id].to_numpy(),
-            asof_view.TARGET_COLUMN: np.arange(len(pairs)),
+            asof_view.TARGET_COLUMN: numpy.arange(len(pairs)),
             asof_view.CUTOFF_COLUMN: pairs[asof_view.CUTOFF_COLUMN].to_numpy(),
         }
     )
@@ -506,7 +506,7 @@ class FeatureSet:
             feature meets the target.
     """
 
-    frame: pd.DataFrame
+    frame: pandas.DataFrame
     manifest: tuple[dict[str, Any], ...]
     declared_family_size: int
 
@@ -532,7 +532,7 @@ class FeatureSet:
         }
 
 
-def fingerprint(column: pd.Series) -> str:
+def fingerprint(column: pandas.Series) -> str:
     """Digests a feature column.
 
     Args:
@@ -545,12 +545,12 @@ def fingerprint(column: pd.Series) -> str:
     if values.dtype == object:
         text = repr(list(values)).encode("utf-8")
     else:
-        text = np.nan_to_num(values.astype(float), nan=-1.2345e300).tobytes()
+        text = numpy.nan_to_num(values.astype(float), nan=-1.2345e300).tobytes()
     return hashlib.sha256(text).hexdigest()
 
 
 def synthesize(
-    targets: pd.DataFrame,
+    targets: pandas.DataFrame,
     moment: str,
     sources: Sequence[Source],
     nests: Sequence[Nest] = (),
@@ -585,7 +585,7 @@ def synthesize(
     if lag_days < 0:
         raise ValueError("lag_days must be non-negative")
     specs = propose(sources, nests, windows)
-    columns: dict[str, pd.Series] = {}
+    columns: dict[str, pandas.Series] = {}
     manifest: list[dict[str, Any]] = []
     seen: dict[str, str] = {}
     for position, spec in enumerate(specs):
@@ -633,7 +633,7 @@ def synthesize(
         seen[digest] = spec.name
         record["kept"] = True
         columns[spec.name] = values
-    frame = pd.DataFrame(columns, index=targets.index)
+    frame = pandas.DataFrame(columns, index=targets.index)
     return FeatureSet(frame, tuple(manifest), len(columns))
 
 

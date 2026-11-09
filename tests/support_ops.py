@@ -1,7 +1,7 @@
 """Synthetic traffic, references and signal windows for operations tests."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.monitoring import reference
 from scmle.operations import signals
@@ -11,16 +11,16 @@ START = 1_000_000.0
 
 def frame(rows=400, seed=0, shift=0.0, missing=0.0, unseen=0.0):
     """Features shaped like the golden model's: two numbers and a plan."""
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     age = rng.normal(40.0 + shift, 10.0, rows)
     balance = rng.lognormal(7.0, 0.5, rows) * (1.0 + shift / 40.0)
     plan = rng.choice(["basic", "pro"], rows)
     if unseen:
-        plan = np.where(rng.random(rows) < unseen, "enterprise", plan)
-    out = pd.DataFrame({"age": age, "balance": balance, "plan": plan})
+        plan = numpy.where(rng.random(rows) < unseen, "enterprise", plan)
+    out = pandas.DataFrame({"age": age, "balance": balance, "plan": plan})
     if missing:
         hole = rng.random(rows) < missing
-        out.loc[hole, "age"] = np.nan
+        out.loc[hole, "age"] = numpy.nan
     return out
 
 

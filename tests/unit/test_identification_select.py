@@ -3,7 +3,7 @@
 import ast
 import inspect
 
-import numpy as np
+import numpy
 import pytest
 
 from scmle.data.admissibility import dag as dag_module
@@ -116,7 +116,9 @@ def test_a_declared_dag_checks_the_adjustment_set():
     assert not select.select(declared).verdict("backdoor_aipw").eligible
 
 
-def random_spec(rng: np.random.Generator, eligible: bool) -> causal.CausalSpec:
+def random_spec(
+    rng: numpy.random.Generator, eligible: bool
+) -> causal.CausalSpec:
     """A charter that matches one strategy, or one that matches none."""
     names = list(select.STRATEGIES)
     name = names[int(rng.integers(len(names)))]
@@ -147,12 +149,12 @@ def random_spec(rng: np.random.Generator, eligible: bool) -> causal.CausalSpec:
 
 def test_ineligible_charters_all_refuse_and_eligible_ones_do_not():
     for trial in range(200):
-        rng = np.random.default_rng(trial)
+        rng = numpy.random.default_rng(trial)
         plan = select.select(random_spec(rng, eligible=False))
         assert plan.status == select.NOT_IDENTIFIED
         assert plan.to_dict()["estimate"] is None
     for trial in range(200):
-        rng = np.random.default_rng(1000 + trial)
+        rng = numpy.random.default_rng(1000 + trial)
         plan = select.select(random_spec(rng, eligible=True))
         assert plan.status == select.IDENTIFIED
 

@@ -1,13 +1,13 @@
 """Iterative stratification keeps rare labels in every subset."""
 
-import numpy as np
+import numpy
 
 from scmle.data.splitting import iterative
 
 
 def labels(rows=1000, seed=0):
-    rng = np.random.default_rng(seed)
-    rates = np.array([0.5, 0.3, 0.1, 0.05, 0.02])
+    rng = numpy.random.default_rng(seed)
+    rates = numpy.array([0.5, 0.3, 0.1, 0.05, 0.02])
     return (rng.random((rows, len(rates))) < rates).astype(int)
 
 
@@ -20,7 +20,7 @@ def test_every_subset_gets_its_share_of_every_label():
         rows = assigned == subset
         assert abs(rows.sum() - 200) <= 2
         expected = matrix.sum(axis=0) / 5
-        assert np.all(np.abs(matrix[rows].sum(axis=0) - expected) <= 2)
+        assert numpy.all(numpy.abs(matrix[rows].sum(axis=0) - expected) <= 2)
 
 
 def test_every_row_is_assigned_exactly_once():
@@ -40,7 +40,7 @@ def test_the_result_depends_only_on_the_seed():
 
 
 def test_rows_with_no_label_are_still_placed():
-    matrix = np.zeros((50, 3), dtype=int)
+    matrix = numpy.zeros((50, 3), dtype=int)
 
     assigned = iterative.iterative_assignment(matrix, [0.5, 0.5], seed=0)
 

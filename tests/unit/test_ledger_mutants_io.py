@@ -8,8 +8,8 @@ from fractions import Fraction
 import json
 import re
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
 from scmle.contracts import errors
@@ -17,8 +17,8 @@ from scmle.contracts import qualification
 from scmle.core import randomness
 from scmle.data.custody import sealed
 from scmle.data.ledger import bivariate
-from scmle.data.ledger import budget as b
-from scmle.data.ledger import confirm as cf
+from scmle.data.ledger import budget
+from scmle.data.ledger import confirm
 from scmle.data.ledger import controls
 from scmle.data.ledger import explore
 from scmle.data.ledger import governed
@@ -46,11 +46,11 @@ def fresh(path=None, alpha=TEN_PERCENT, rule=online_fdr.ELOND):
 
 
 def signal_data(rows=300, seed=0):
-    rng = np.random.default_rng(seed)
-    features = pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    features = pandas.DataFrame(
         {"s": rng.normal(size=rows), "n": rng.normal(size=rows)}
     )
-    return features, pd.Series(0.9 * features["s"] + rng.normal(size=rows))
+    return features, pandas.Series(0.9 * features["s"] + rng.normal(size=rows))
 
 
 def spec(column, name=None, direction=bivariate.TWO_SIDED):
@@ -241,10 +241,10 @@ def explored_ledger(alpha=TEN_PERCENT, control_observed=5):
 def test_the_claims_file_is_indented_sorted_json_in_a_new_folder(tmp_path):
     ledger = explored_ledger()
     features, target = signal_data(400, 2)
-    result = cf.confirm(
+    result = confirm.confirm(
         ledger, source_for(features, target), alpha_confirm=F(1, 20)
     )
-    path = tmp_path / "new" / "folder" / cf.CLAIMS_FILE
+    path = tmp_path / "new" / "folder" / confirm.CLAIMS_FILE
     result.write(path)
     assert path.read_text(encoding="utf-8") == (
         json.dumps(result.to_dict(), indent=2, sort_keys=True) + "\n"
@@ -252,7 +252,7 @@ def test_the_claims_file_is_indented_sorted_json_in_a_new_folder(tmp_path):
 
 
 def test_assumptions_are_stated_in_full():
-    texts = cf.assumptions(b.MultiplicityRule.BY, 3)
+    texts = confirm.assumptions(budget.MultiplicityRule.BY, 3)
     assert texts == (
         "FDR <= alpha * m0 / m under arbitrary dependence (rule by, family "
         "of 3 survivors fixed before C was opened)",
@@ -271,19 +271,19 @@ def test_policy_messages_are_exact():
         "the Thresholdout reusable holdout is not implemented; use the "
         "'unconfirmed' failure policy",
     ):
-        cf.check_policy(cf.THRESHOLDOUT)
+        confirm.check_policy(confirm.THRESHOLDOUT)
     with raises(
         errors.ConfigError,
         "failure policy must be one of ('unconfirmed', 'thresholdout')",
     ):
-        cf.check_policy("retry")
-    cf.check_policy(cf.UNCONFIRMED)
+        confirm.check_policy("retry")
+    confirm.check_policy(confirm.UNCONFIRMED)
 
 
 def test_unconfirmed_claims_keep_the_exploration_effect_and_say_why():
     ledger = explored_ledger(control_observed=0)
-    result = cf.confirm(ledger, None, alpha_confirm=F(1, 20))
-    assert result.outcome == cf.FLOOR_NOT_EXCEEDED
+    result = confirm.confirm(ledger, None, alpha_confirm=F(1, 20))
+    assert result.outcome == confirm.FLOOR_NOT_EXCEEDED
     claim = result.claims[0]
     expected = ledger.results[claim.claim_id].check.effect
     assert claim.effect == expected and claim.effect != 0.0
@@ -297,13 +297,13 @@ def test_reasons_and_event_names_are_exact():
     ledger = explored_ledger()
     features, target = signal_data(400, 2)
     source = source_for(features, target)
-    result = cf.confirm(ledger, source, alpha_confirm=F(1, 20))
+    result = confirm.confirm(ledger, source, alpha_confirm=F(1, 20))
     assert result.reason == "1 of 1 survivors confirmed on C by by at 0.05"
     frozen = source.log.entries[1]
     assert (frozen["set"], frozen["event"], frozen["actor"]) == (
         "C",
         "selection_frozen",
-        cf.ACTOR,
+        confirm.ACTOR,
     )
     assert frozen["detail"]["rule"] == "by"
     assert frozen["detail"]["survivors"] == 1
@@ -313,7 +313,7 @@ def test_reasons_and_event_names_are_exact():
     assert check.seed_path == randomness.seed_path(7, "confirm.spearman", 0)
     # A repeat is denied on set C with a reason.
     with pytest.raises(errors.LeakageError):
-        cf.confirm(ledger, source, alpha_confirm=F(1, 20))
+        confirm.confirm(ledger, source, alpha_confirm=F(1, 20))
     denied = source.log.entries[-1]
     assert (denied["set"], denied["event"]) == ("C", "denied")
     assert denied["detail"] == {"reason": "confirmation was already performed"}
@@ -322,8 +322,10 @@ def test_reasons_and_event_names_are_exact():
 def test_non_rejected_survivors_pass_and_stay_unverified():
     ledger = explored_ledger()
     features, target = signal_data(400, 2)
-    features["s"] = np.random.default_rng(9).normal(size=400)  # no effect on C
-    result = cf.confirm(
+    features["s"] = numpy.random.default_rng(9).normal(
+        size=400
+    )  # no effect on C
+    result = confirm.confirm(
         ledger, source_for(features, target), alpha_confirm=F(1, 20)
     )
     check = result.checks[0]
@@ -337,11 +339,11 @@ def test_no_survivors_reason_and_crash_reasons():
     quiet = fresh(None, F(1, 100))
     explore.run_exploration(
         quiet,
-        features.assign(s=np.random.default_rng(0).normal(size=300)),
+        features.assign(s=numpy.random.default_rng(0).normal(size=300)),
         target,
         explore.plan_exploration(features, explore.NUMERIC),
     )
-    result = cf.confirm(
+    result = confirm.confirm(
         quiet,
         source_for(*signal_data(300, 4)),
         alpha_confirm=F(1, 20),
@@ -351,7 +353,7 @@ def test_no_survivors_reason_and_crash_reasons():
         "no hypothesis survived exploration; C was not opened"
     )
     ledger = explored_ledger()
-    result = cf.confirm(
+    result = confirm.confirm(
         ledger,
         source_for(*signal_data(300, 4)),
         alpha_confirm=F(1, 20),
@@ -371,7 +373,7 @@ def test_no_survivors_reason_and_crash_reasons():
         def open(self, token, actor="x", claims_hash=None, ledger_hash=None):
             raise OSError("gone")
 
-    result = cf.confirm(explored_ledger(), Dies(), alpha_confirm=F(1, 20))
+    result = confirm.confirm(explored_ledger(), Dies(), alpha_confirm=F(1, 20))
     assert result.reason.startswith(
         "the confirmation failed while opening C (OSError: gone)"
     )
@@ -384,14 +386,14 @@ def test_a_custody_log_without_entries_gives_no_head():
 
     ledger = explored_ledger()
     features, target = signal_data(400, 2)
-    result = cf.confirm(
+    result = confirm.confirm(
         ledger,
         source_for(features, target),
         alpha_confirm=F(1, 20),
         custody_log=Appender(),
     )
     assert result.custody_head is None
-    assert cf.head_of(object()) is None
+    assert confirm.head_of(object()) is None
 
 
 def test_hypotheses_without_a_column_or_with_a_direction_run_on_c():
@@ -407,7 +409,7 @@ def test_hypotheses_without_a_column_or_with_a_direction_run_on_c():
         controls.summarize("permuted_target", "strata", 5, (0,) * 20).to_dict()
     )
     cfeatures, ctarget = signal_data(400, 2)
-    result = cf.confirm(
+    result = confirm.confirm(
         ledger, source_for(cfeatures, ctarget), alpha_confirm=F(1, 20)
     )
     expected = bivariate.spearman(cfeatures["s"].to_numpy(), ctarget.to_numpy())
@@ -419,8 +421,8 @@ def test_hypotheses_without_a_column_or_with_a_direction_run_on_c():
 
 
 def test_class_codes_sort_by_text_like_in_exploration():
-    labels = pd.Series([2, 10] * 5, dtype=object)
-    codes = cf.default_encoding(labels)
+    labels = pandas.Series([2, 10] * 5, dtype=object)
+    codes = confirm.default_encoding(labels)
     assert list(codes[:2]) == [1.0, 0.0]  # "10" sorts before "2"
     assert list(explore.encode_target(labels, True)[:2]) == [1.0, 0.0]
     assert list(explore.encode_target(labels, True, classes=(2, 10))[:2]) == [
@@ -433,12 +435,12 @@ def test_class_codes_sort_by_text_like_in_exploration():
 
 
 def test_the_plan_keeps_going_after_a_skipped_column_and_names_the_null():
-    frame = pd.DataFrame(
+    frame = pandas.DataFrame(
         {
             "entity": [1.0, 2.0, 3.0, 4.0],
             "text": ["a", "b", "c", "d"],
-            "empty": [np.nan] * 4,
-            "one": [1.0, np.nan, np.nan, np.nan],
+            "empty": [numpy.nan] * 4,
+            "one": [1.0, numpy.nan, numpy.nan, numpy.nan],
             "x": [0.1, 0.4, 0.2, 0.9],
             "y": [3.0, 1.0, 2.0, 0.0],
         }
@@ -467,15 +469,20 @@ def test_the_plan_keeps_going_after_a_skipped_column_and_names_the_null():
 
 
 def test_target_kinds():
-    assert explore.target_kind(pd.Series([0, 1, 1]), True) == explore.BINARY
-    assert explore.target_kind(pd.Series([0, 1, 2]), True) == explore.MULTICLASS
-    assert explore.target_kind(pd.Series([0, 1, 2]), False) == explore.NUMERIC
+    assert explore.target_kind(pandas.Series([0, 1, 1]), True) == explore.BINARY
+    assert (
+        explore.target_kind(pandas.Series([0, 1, 2]), True)
+        == explore.MULTICLASS
+    )
+    assert (
+        explore.target_kind(pandas.Series([0, 1, 2]), False) == explore.NUMERIC
+    )
 
 
 def build(rows=500, seed=0):
-    rng = np.random.default_rng(seed)
-    frame = pd.DataFrame({f"f{i}": rng.normal(size=rows) for i in range(6)})
-    return frame, pd.Series(
+    rng = numpy.random.default_rng(seed)
+    frame = pandas.DataFrame({f"f{i}": rng.normal(size=rows) for i in range(6)})
+    return frame, pandas.Series(
         0.8 * (frame["f0"] + frame["f1"]) + rng.normal(size=rows)
     )
 
@@ -492,7 +499,7 @@ def test_a_governed_run_reports_exact_counts_and_artifacts(tmp_path):
         run_dir=tmp_path,
         exclude=("f5",),
         rule=online_fdr.LORD_PLUS_PLUS,
-        confirmation_rule=b.MultiplicityRule.BH,
+        confirmation_rule=budget.MultiplicityRule.BH,
     )
     summary = run.summary()
     assert summary["rule"] == "lord++" and run.confirmation.rule == "bh"
@@ -509,14 +516,14 @@ def test_a_governed_run_reports_exact_counts_and_artifacts(tmp_path):
 
 
 def test_strata_labels_edge_cases():
-    frame = pd.DataFrame({"t": [5.0, 1.0, 3.0, 2.0, 6.0, 4.0]})
+    frame = pandas.DataFrame({"t": [5.0, 1.0, 3.0, 2.0, 6.0, 4.0]})
     two = governed.strata_labels(frame, None, "t", blocks=2)
     assert sorted(set(two)) == [0, 1]
-    assert list(np.bincount(two)) == [3, 3]
+    assert list(numpy.bincount(two)) == [3, 3]
     one = governed.strata_labels(frame, None, "t", blocks=1)
     assert set(one) == {0}
     assert governed.strata_labels(frame, None, "absent") is None
-    messy = pd.DataFrame({"t": ["2020", "oops", "2022", "2021"]})
+    messy = pandas.DataFrame({"t": ["2020", "oops", "2022", "2021"]})
     labels = governed.strata_labels(messy, None, "t", blocks=2)
     assert len(labels) == 4
 
@@ -525,11 +532,11 @@ def test_strata_labels_edge_cases():
 
 
 def two_signal_ledger():
-    rng = np.random.default_rng(5)
-    features = pd.DataFrame(
+    rng = numpy.random.default_rng(5)
+    features = pandas.DataFrame(
         {"a": rng.normal(size=600), "b": rng.normal(size=600)}
     )
-    target = pd.Series(features["a"] + features["b"] + rng.normal(size=600))
+    target = pandas.Series(features["a"] + features["b"] + rng.normal(size=600))
     ledger = fresh(None, F(1, 10))
     explore.run_exploration(
         ledger,
@@ -547,12 +554,12 @@ def test_unconfirmed_outcomes_carry_empty_checks_the_level_and_reasons():
     for kwargs, outcome, reason in (
         (
             {"require_control": True},
-            cf.NO_CONFIRMATION_SET,
+            confirm.NO_CONFIRMATION_SET,
             "no confirmation set exists for this run",
         ),
     ):
         ledger = two_signal_ledger()
-        result = cf.confirm(ledger, None, alpha_confirm=F(1, 20), **kwargs)
+        result = confirm.confirm(ledger, None, alpha_confirm=F(1, 20), **kwargs)
         assert result.outcome == outcome and result.reason == reason
         assert result.checks == () and result.alpha_confirm == F(1, 20)
         assert result.custody_head is None
@@ -564,15 +571,15 @@ def test_unconfirmed_outcomes_carry_empty_checks_the_level_and_reasons():
         target,
         explore.plan_exploration(features, explore.NUMERIC),
     )
-    result = cf.confirm(bare, None, alpha_confirm=F(1, 20))
-    assert result.outcome == cf.NO_CONTROL
+    result = confirm.confirm(bare, None, alpha_confirm=F(1, 20))
+    assert result.outcome == confirm.NO_CONTROL
     assert (
         result.reason
         == "no negative control was recorded; no claim is promoted"
     )
     assert result.checks == () and result.alpha_confirm == F(1, 20)
     failed = explored_ledger(control_observed=0)
-    result = cf.confirm(failed, None, alpha_confirm=F(1, 20))
+    result = confirm.confirm(failed, None, alpha_confirm=F(1, 20))
     assert result.checks == () and result.alpha_confirm == F(1, 20)
     assert result.custody_head is None
 
@@ -581,7 +588,7 @@ def test_a_crash_records_the_custody_head_and_the_level():
     ledger = two_signal_ledger()
     features, target = signal_data(300, 4)
     source = source_for(features, target)
-    result = cf.confirm(
+    result = confirm.confirm(
         ledger, source, alpha_confirm=F(1, 20), encode=lambda y: 1 / 0
     )
     assert result.custody_head == source.log.entries[-1]["hash"]
@@ -598,19 +605,21 @@ def test_a_crash_records_the_custody_head_and_the_level():
             raise OSError("gone")
 
     dying = Dies()
-    result = cf.confirm(two_signal_ledger(), dying, alpha_confirm=F(1, 20))
+    result = confirm.confirm(two_signal_ledger(), dying, alpha_confirm=F(1, 20))
     assert result.custody_head == dying.log.entries[-1]["hash"]
     assert result.checks == () and result.alpha_confirm == F(1, 20)
 
 
 def test_every_check_on_c_has_its_own_seed_index():
     ledger = two_signal_ledger()
-    rng = np.random.default_rng(8)
-    cfeatures = pd.DataFrame(
+    rng = numpy.random.default_rng(8)
+    cfeatures = pandas.DataFrame(
         {"a": rng.normal(size=400), "b": rng.normal(size=400)}
     )
-    ctarget = pd.Series(cfeatures["a"] + cfeatures["b"] + rng.normal(size=400))
-    result = cf.confirm(
+    ctarget = pandas.Series(
+        cfeatures["a"] + cfeatures["b"] + rng.normal(size=400)
+    )
+    result = confirm.confirm(
         ledger, source_for(cfeatures, ctarget), alpha_confirm=F(1, 20)
     )
     assert [c.seed_path for c in result.checks] == [
@@ -662,12 +671,14 @@ def test_an_in_memory_governed_ledger_records_the_charter():
 
 
 def test_a_governed_multiclass_run_uses_kruskal_for_every_hypothesis():
-    rng = np.random.default_rng(4)
-    features = pd.DataFrame(
+    rng = numpy.random.default_rng(4)
+    features = pandas.DataFrame(
         {"a": rng.normal(size=600), "b": rng.normal(size=600)}
     )
-    target = pd.Series(
-        pd.cut(features["a"], [-9, -0.5, 0.5, 9], labels=["lo", "mid", "hi"])
+    target = pandas.Series(
+        pandas.cut(
+            features["a"], [-9, -0.5, 0.5, 9], labels=["lo", "mid", "hi"]
+        )
     ).astype(str)
     run = governed.run_governed(
         charter=make_charter(),

@@ -5,7 +5,7 @@ import json
 import pytest
 
 from scmle.contracts import errors
-from scmle.data.charter import contracts as c
+from scmle.data.charter import contracts
 from scmle.data.charter import ingest
 from scmle.data.charter import sealing
 from tests.unit.test_charter_contracts import make_charter
@@ -21,7 +21,9 @@ def test_a_charter_without_the_block_keeps_its_hash_and_format():
     assert "ingest" not in charter.to_dict()
     assert charter.format_version == 2
     record = json.loads(json.dumps(charter.to_dict()))
-    assert c.AnalysisCharter.from_dict(record).charter_hash == PINNED_HASH
+    assert (
+        contracts.AnalysisCharter.from_dict(record).charter_hash == PINNED_HASH
+    )
 
 
 def test_a_signed_older_charter_still_verifies(tmp_path):
@@ -35,7 +37,7 @@ def test_the_block_changes_the_hash_round_trips_and_needs_format_seven():
     assert charter.charter_hash != PINNED_HASH
     assert charter.format_version == 7
     record = json.loads(json.dumps(charter.to_dict()))
-    assert c.AnalysisCharter.from_dict(record) == charter
+    assert contracts.AnalysisCharter.from_dict(record) == charter
 
 
 def test_the_block_in_an_older_format_is_refused(tmp_path):
@@ -100,7 +102,7 @@ def test_the_entity_block_needs_format_eight_and_round_trips():
     assert charter.format_version == 8
     assert charter.charter_hash != FORMAT_SEVEN_HASH
     record = json.loads(json.dumps(charter.to_dict()))
-    assert c.AnalysisCharter.from_dict(record) == charter
+    assert contracts.AnalysisCharter.from_dict(record) == charter
 
 
 def test_the_entity_block_in_format_seven_is_refused(tmp_path):
@@ -154,7 +156,7 @@ def test_the_reconcile_block_needs_format_eight_and_round_trips():
     assert charter.format_version == 8
     assert charter.charter_hash != FORMAT_SEVEN_HASH
     record = json.loads(json.dumps(charter.to_dict()))
-    assert c.AnalysisCharter.from_dict(record) == charter
+    assert contracts.AnalysisCharter.from_dict(record) == charter
     plain = make_charter(ingest=ingest.IngestSpec(feature_budget=50, lag=1.0))
     assert "reconcile" not in plain.to_dict()["ingest"]
     assert plain.charter_hash == FORMAT_SEVEN_HASH

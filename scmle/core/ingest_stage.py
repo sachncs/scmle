@@ -52,13 +52,13 @@ import re
 import tempfile
 from typing import Any
 
-import pandas as pd
+import pandas
 
 from scmle.contracts import errors
 from scmle.data.admissibility import provenance
-from scmle.data.charter import ingest as charter_ingest
+from scmle.data.charter import ingest
 from scmle.data.ingest import asof_view
-from scmle.data.ingest import budget as budgets
+from scmle.data.ingest import budget
 from scmle.data.ingest import declared
 from scmle.data.ingest import entities
 from scmle.data.ingest import plan as ingest_plan
@@ -90,7 +90,7 @@ class IngestResult:
             `proposed` features, for the run event.
     """
 
-    features: pd.DataFrame
+    features: pandas.DataFrame
     declared: int
     records: tuple[provenance.FieldProvenance, ...]
     documents: dict[str, dict[str, Any]]
@@ -143,7 +143,7 @@ def identifier(value: Any, what: str) -> str:
 
 
 def rule_of(
-    record: dict[str, Any], spec: charter_ingest.IngestSpec
+    record: dict[str, Any], spec: ingest.IngestSpec
 ) -> asof_view.TimeRule:
     """The time rule a view declares.
 
@@ -166,7 +166,7 @@ def rule_of(
     )
 
 
-def read_frame(entry: dict[str, Any], factory: Any) -> pd.DataFrame:
+def read_frame(entry: dict[str, Any], factory: Any) -> pandas.DataFrame:
     """One table, read once with a snapshot check.
 
     A read that sees the table change on every attempt fails with the
@@ -195,8 +195,8 @@ def read_frame(entry: dict[str, Any], factory: Any) -> pd.DataFrame:
 def read_view(
     entry: dict[str, Any],
     factory: Any,
-    spec: charter_ingest.IngestSpec,
-    frame: pd.DataFrame | None = None,
+    spec: ingest.IngestSpec,
+    frame: pandas.DataFrame | None = None,
 ) -> asof_view.AsOfView:
     """One table as an as-of view; `frame` is the extract if already read.
 
@@ -225,8 +225,8 @@ def read_view(
 
 def run(
     plan_document: dict[str, Any],
-    spec: charter_ingest.IngestSpec,
-    frame: pd.DataFrame,
+    spec: ingest.IngestSpec,
+    frame: pandas.DataFrame,
     run_dir: Path | None,
 ) -> IngestResult:
     """Runs the ingest plan, then synthesizes features for the rows of `frame`.
@@ -266,7 +266,7 @@ def run(
             plan_document.get("declared", [])
         ),
     )
-    limits = budgets.IngestBudget(
+    limits = budget.IngestBudget(
         spec.max_queries,
         spec.max_rows_scanned,
         spec.max_seconds,
@@ -370,8 +370,8 @@ def run(
 
 
 def resolve_entities(
-    frame: pd.DataFrame, spec: charter_ingest.EntitySpec
-) -> tuple[pd.Series, dict[str, Any]]:
+    frame: pandas.DataFrame, spec: ingest.EntitySpec
+) -> tuple[pandas.Series, dict[str, Any]]:
     """Group id per row of the run table, from the charter's entity block.
 
     Without a clerical sample the result is `unverified`: the links serve only
@@ -402,7 +402,7 @@ def resolve_entities(
         [entities.Field(f.name, f.fuzzy) for f in spec.fields],
         [entities.Pass(p.field, p.kind, p.size) for p in spec.passes],
     )
-    groups = pd.Series(found.groups, index=frame.index, name=spec.column)
+    groups = pandas.Series(found.groups, index=frame.index, name=spec.column)
     return groups, {**found.to_dict(), "group_column": spec.column}
 
 

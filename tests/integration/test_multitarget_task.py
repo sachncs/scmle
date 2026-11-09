@@ -1,7 +1,7 @@
 """Several labels or quantities are predicted, scored and split together."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 import support
 
@@ -9,8 +9,8 @@ from scmle.contracts import errors
 
 
 def labelled(rows=1500, seed=0):
-    rng = np.random.default_rng(seed)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    frame = pandas.DataFrame(
         {"a": rng.normal(size=rows), "b": rng.normal(size=rows)}
     )
     frame["common"] = (frame.a + rng.normal(0, 0.5, rows) > 0).astype(int)
@@ -22,8 +22,8 @@ def labelled(rows=1500, seed=0):
 
 
 def quantities(rows=800, seed=1):
-    rng = np.random.default_rng(seed)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    frame = pandas.DataFrame(
         {"a": rng.normal(size=rows), "b": rng.normal(size=rows)}
     )
     frame["first"] = 3 * frame.a + rng.normal(0, 0.3, rows)
@@ -69,7 +69,7 @@ def test_a_multilabel_bundle_predicts_one_column_per_label(multilabel):
 
     assert list(frame.columns) == LABELS
     assert frame.shape == (30, 3)
-    assert set(np.unique(frame.to_numpy())) <= {0, 1}
+    assert set(numpy.unique(frame.to_numpy())) <= {0, 1}
     assert multilabel.bundle.predict_proba(rows).shape == (30, 3)
 
 
@@ -92,7 +92,7 @@ def test_folds_keep_every_label_when_the_data_allow(multilabel):
     manifest = json.loads(
         (multilabel.run_dir / "validation_manifest.json").read_text()
     )
-    dev = np.array(manifest["train_ids"])
+    dev = numpy.array(manifest["train_ids"])
     for fold in manifest["folds"]:
         for label in LABELS:
             assert frame[label].to_numpy()[dev[fold["val"]]].sum() > 0
@@ -111,7 +111,7 @@ def test_multioutput_predicts_every_quantity_with_a_good_fit(multioutput):
     assert list(predicted.columns) == ["first", "second"]
     assert multioutput.evaluation["test_metrics"]["r2_mean"] > 0.8
     for column in ("first", "second"):
-        assert np.corrcoef(predicted[column], fresh[column])[0, 1] > 0.9
+        assert numpy.corrcoef(predicted[column], fresh[column])[0, 1] > 0.9
 
 
 def test_bad_target_sets_are_refused(tmp_path):

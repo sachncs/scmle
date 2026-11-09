@@ -2,8 +2,8 @@
 
 import json
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 import support
 
@@ -11,17 +11,17 @@ from scmle.contracts import errors
 
 
 def corpus(queries=150, per_query=15, seed=0):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     rows = queries * per_query
-    frame = pd.DataFrame(
+    frame = pandas.DataFrame(
         {
-            "query": np.repeat([f"q{i}" for i in range(queries)], per_query),
+            "query": numpy.repeat([f"q{i}" for i in range(queries)], per_query),
             "match": rng.normal(size=rows),
             "price": rng.normal(size=rows),
         }
     )
-    frame["grade"] = np.clip(
-        np.round(1.2 * frame.match + rng.normal(0, 0.6, rows)), 0, 3
+    frame["grade"] = numpy.clip(
+        numpy.round(1.2 * frame.match + rng.normal(0, 0.6, rows)), 0, 3
     ).astype(int)
     return frame
 

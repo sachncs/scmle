@@ -7,7 +7,7 @@ predictions back, so every metric works unchanged.
 
 from typing import Any
 
-import numpy as np
+import numpy
 from sklearn import base
 
 
@@ -22,9 +22,9 @@ class PredictionReplay(base.BaseEstimator):
 
     def __init__(
         self,
-        predictions: np.ndarray,
-        probabilities: np.ndarray | None = None,
-        classes: np.ndarray | None = None,
+        predictions: numpy.ndarray,
+        probabilities: numpy.ndarray | None = None,
+        classes: numpy.ndarray | None = None,
     ) -> None:
         """Stores the arrays.
 
@@ -37,7 +37,7 @@ class PredictionReplay(base.BaseEstimator):
         self.probabilities = probabilities
         self.classes_ = classes
 
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """Returns the stored predictions.
 
         Args:
@@ -48,7 +48,7 @@ class PredictionReplay(base.BaseEstimator):
         """
         return self.predictions
 
-    def predict_proba(self, features: Any) -> np.ndarray:
+    def predict_proba(self, features: Any) -> numpy.ndarray:
         """Returns the stored probabilities.
 
         Args:

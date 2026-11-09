@@ -18,8 +18,8 @@ from typing import Self
 from urllib.parse import urlsplit
 from urllib.parse import urlunsplit
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle import durability
 
@@ -919,14 +919,14 @@ def is_sequence_value(value: Any) -> bool:
         True for sequences and NumPy arrays other than strings, bytes,
         byte arrays, and mappings.
     """
-    return isinstance(value, (Sequence, np.ndarray)) and not isinstance(
+    return isinstance(value, (Sequence, numpy.ndarray)) and not isinstance(
         value, (str, bytes, bytearray, Mapping)
     )
 
 
 def frame_for_data(
     data: Any,
-) -> tuple[pd.DataFrame | None, str, tuple[int, ...]]:
+) -> tuple[pandas.DataFrame | None, str, tuple[int, ...]]:
     """Converts supported record-shaped data to a bounded observation frame.
 
     Args:
@@ -942,13 +942,13 @@ def frame_for_data(
     Raises:
         ValueError: If a mapping of columns has columns of unequal length.
     """
-    if isinstance(data, pd.DataFrame):
+    if isinstance(data, pandas.DataFrame):
         return (
             data,
             "pandas_dataframe",
             tuple(int(value) for value in data.shape),
         )
-    if isinstance(data, pd.Series):
+    if isinstance(data, pandas.Series):
         name = str(data.name) if data.name is not None else "value"
         frame = data.to_frame(name=name)
         return (
@@ -956,16 +956,16 @@ def frame_for_data(
             "pandas_series",
             tuple(int(value) for value in frame.shape),
         )
-    if isinstance(data, np.ndarray):
+    if isinstance(data, numpy.ndarray):
         if data.ndim == 0:
-            frame = pd.DataFrame({"value": [data.item()]})
+            frame = pandas.DataFrame({"value": [data.item()]})
             return frame, "numpy_scalar", ()
         shape = tuple(int(value) for value in data.shape)
         if data.ndim == 1:
-            frame = pd.DataFrame({"value": data})
+            frame = pandas.DataFrame({"value": data})
             return frame, "numpy_array", shape
         if data.ndim == 2:
-            frame = pd.DataFrame(
+            frame = pandas.DataFrame(
                 data, columns=[str(value) for value in range(data.shape[1])]
             )
             return frame, "numpy_array", shape
@@ -976,13 +976,13 @@ def frame_for_data(
             lengths = {len(value) for value in values}
             if len(lengths) != 1:
                 raise ValueError("mapping columns must have equal lengths")
-            frame = pd.DataFrame(data)
+            frame = pandas.DataFrame(data)
             return (
                 frame,
                 "column_mapping",
                 tuple(int(value) for value in frame.shape),
             )
-        frame = pd.DataFrame([dict(data)])
+        frame = pandas.DataFrame([dict(data)])
         return (
             frame,
             "record_mapping",
@@ -992,16 +992,16 @@ def frame_for_data(
         return None, "bytes", (len(data),)
     if isinstance(data, (list, tuple)):
         if data and all(isinstance(value, Mapping) for value in data):
-            frame = pd.DataFrame.from_records(data)
+            frame = pandas.DataFrame.from_records(data)
             return (
                 frame,
                 "record_sequence",
                 tuple(int(value) for value in frame.shape),
             )
-        frame = pd.DataFrame({"value": list(data)})
+        frame = pandas.DataFrame({"value": list(data)})
         return frame, "sequence", tuple(int(value) for value in frame.shape)
     if isinstance(data, (str, int, float, bool, datetime.date)) or data is None:
-        frame = pd.DataFrame({"value": [data]})
+        frame = pandas.DataFrame({"value": [data]})
         return frame, "scalar", ()
     return None, type(data).__name__, ()
 
@@ -1024,7 +1024,7 @@ def canonical_value(value: Any) -> Any:
         TypeError: If the value is of a type that cannot be converted
             deterministically.
     """
-    if value is None or value is pd.NA:
+    if value is None or value is pandas.NA:
         return None
     if isinstance(value, (bytes, bytearray, memoryview)):
         raw = bytes(value)
@@ -1032,7 +1032,7 @@ def canonical_value(value: Any) -> Any:
             "bytes_length": len(raw),
             "bytes_sha256": hashlib.sha256(raw).hexdigest(),
         }
-    if isinstance(value, np.generic):
+    if isinstance(value, numpy.generic):
         return canonical_value(value.item())
     if isinstance(value, (datetime.datetime, datetime.date, datetime.time)):
         return value.isoformat()
@@ -1053,19 +1053,19 @@ def canonical_value(value: Any) -> Any:
             return {"non_finite": "nan"}
         if math.isinf(value):
             return {"non_finite": "-inf" if value < 0 else "inf"}
-    missing = pd.isna(value)
-    if isinstance(missing, (bool, np.bool_)) and bool(missing):
+    missing = pandas.isna(value)
+    if isinstance(missing, (bool, numpy.bool_)) and bool(missing):
         return None
     if isinstance(value, (str, int, float, bool)):
         return value
-    if isinstance(value, np.ndarray):
+    if isinstance(value, numpy.ndarray):
         return [canonical_value(item) for item in value.tolist()]
     raise TypeError(
         f"cannot deterministically catalog value of type {type(value).__name__}"
     )
 
 
-def schema_for_frame(frame: pd.DataFrame) -> tuple[DatasetField, ...]:
+def schema_for_frame(frame: pandas.DataFrame) -> tuple[DatasetField, ...]:
     """Returns ordered field metadata, preserving duplicate column positions.
 
     Args:
@@ -1082,7 +1082,7 @@ def schema_for_frame(frame: pd.DataFrame) -> tuple[DatasetField, ...]:
     )
 
 
-def missingness_for_frame(frame: pd.DataFrame) -> MissingnessSummary:
+def missingness_for_frame(frame: pandas.DataFrame) -> MissingnessSummary:
     """Measures missingness over a frame without imputing or modifying it.
 
     Args:
@@ -1111,7 +1111,7 @@ def missingness_for_frame(frame: pd.DataFrame) -> MissingnessSummary:
     )
 
 
-def duplicates_for_frame(frame: pd.DataFrame) -> DuplicateSummary:
+def duplicates_for_frame(frame: pandas.DataFrame) -> DuplicateSummary:
     """Measures duplicate rows and preserves unsupported cases as evidence.
 
     Args:
@@ -1143,7 +1143,7 @@ def duplicates_for_frame(frame: pd.DataFrame) -> DuplicateSummary:
 
 
 def label_for_frame(
-    frame: pd.DataFrame | None, label_column: str | None
+    frame: pandas.DataFrame | None, label_column: str | None
 ) -> tuple[LabelSummary, tuple[str, ...], tuple[str, ...]]:
     """Summarize only an explicitly named label column.
 
@@ -1205,7 +1205,7 @@ def label_for_frame(
 
 
 def frame_content(
-    frame: pd.DataFrame, data_kind: str, shape: tuple[int, ...]
+    frame: pandas.DataFrame, data_kind: str, shape: tuple[int, ...]
 ) -> dict[str, Any]:
     """Returns canonical content for a frame-backed observation.
 

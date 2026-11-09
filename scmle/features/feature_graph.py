@@ -19,8 +19,8 @@ from typing import Any
 from typing import ClassVar
 from typing import Self
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from sklearn import base
 
 from scmle.contracts import errors
@@ -28,11 +28,11 @@ from scmle.contracts import tasks
 from scmle.data.validation import columns
 
 MAX_ARITY = 64
-Inputs = list[pd.Series]
+Inputs = list[pandas.Series]
 Params = Mapping[str, Any]
 
 
-EPOCH = pd.Timestamp("1970-01-01")
+EPOCH = pandas.Timestamp("1970-01-01")
 
 
 class FeatureOp(abc.ABC):
@@ -100,7 +100,9 @@ class FeatureOp(abc.ABC):
         return None
 
     @abc.abstractmethod
-    def apply(self, inputs: Inputs, params: Params, state: Any) -> pd.Series:
+    def apply(
+        self, inputs: Inputs, params: Params, state: Any
+    ) -> pandas.Series:
         """Computes the derived column.
 
         Args:
@@ -113,7 +115,7 @@ class FeatureOp(abc.ABC):
         """
 
 
-def numeric(series: pd.Series) -> pd.Series:
+def numeric(series: pandas.Series) -> pandas.Series:
     """Coerces to float; unparseable and infinite values become NaN.
 
     Args:
@@ -130,7 +132,9 @@ class Log1p(FeatureOp):
 
     name = "log1p"
 
-    def apply(self, inputs: Inputs, params: Params, state: Any) -> pd.Series:
+    def apply(
+        self, inputs: Inputs, params: Params, state: Any
+    ) -> pandas.Series:
         """Log-transform the input after clipping it at zero.
 
         Args:
@@ -141,7 +145,7 @@ class Log1p(FeatureOp):
         Returns:
             `log(1 + max(x, 0))` per row.
         """
-        return np.log1p(numeric(inputs[0]).clip(lower=0))
+        return numpy.log1p(numeric(inputs[0]).clip(lower=0))
 
 
 class Sqrt(FeatureOp):
@@ -149,7 +153,9 @@ class Sqrt(FeatureOp):
 
     name = "sqrt"
 
-    def apply(self, inputs: Inputs, params: Params, state: Any) -> pd.Series:
+    def apply(
+        self, inputs: Inputs, params: Params, state: Any
+    ) -> pandas.Series:
         """Takes the square root of the input after clipping it at zero.
 
         Args:
@@ -160,7 +166,7 @@ class Sqrt(FeatureOp):
         Returns:
             `sqrt(max(x, 0))` per row.
         """
-        return np.sqrt(numeric(inputs[0]).clip(lower=0))
+        return numpy.sqrt(numeric(inputs[0]).clip(lower=0))
 
 
 class Square(FeatureOp):
@@ -168,7 +174,9 @@ class Square(FeatureOp):
 
     name = "square"
 
-    def apply(self, inputs: Inputs, params: Params, state: Any) -> pd.Series:
+    def apply(
+        self, inputs: Inputs, params: Params, state: Any
+    ) -> pandas.Series:
         """Squares the input.
 
         Args:
@@ -187,7 +195,9 @@ class Absolute(FeatureOp):
 
     name = "abs"
 
-    def apply(self, inputs: Inputs, params: Params, state: Any) -> pd.Series:
+    def apply(
+        self, inputs: Inputs, params: Params, state: Any
+    ) -> pandas.Series:
         """Takes the absolute value of the input.
 
         Args:
@@ -206,7 +216,9 @@ class IsMissing(FeatureOp):
 
     name = "is_missing"
 
-    def apply(self, inputs: Inputs, params: Params, state: Any) -> pd.Series:
+    def apply(
+        self, inputs: Inputs, params: Params, state: Any
+    ) -> pandas.Series:
         """Flags missing values; works for any dtype.
 
         Args:
@@ -227,7 +239,9 @@ class Sum(FeatureOp):
     min_inputs = 2
     max_inputs = MAX_ARITY
 
-    def apply(self, inputs: Inputs, params: Params, state: Any) -> pd.Series:
+    def apply(
+        self, inputs: Inputs, params: Params, state: Any
+    ) -> pandas.Series:
         """Adds the inputs.
 
         Args:
@@ -248,7 +262,9 @@ class Difference(FeatureOp):
     min_inputs = 2
     max_inputs = 2
 
-    def apply(self, inputs: Inputs, params: Params, state: Any) -> pd.Series:
+    def apply(
+        self, inputs: Inputs, params: Params, state: Any
+    ) -> pandas.Series:
         """Subtracts the second input from the first.
 
         Args:
@@ -269,7 +285,9 @@ class Product(FeatureOp):
     min_inputs = 2
     max_inputs = MAX_ARITY
 
-    def apply(self, inputs: Inputs, params: Params, state: Any) -> pd.Series:
+    def apply(
+        self, inputs: Inputs, params: Params, state: Any
+    ) -> pandas.Series:
         """Multiplys the inputs.
 
         Args:
@@ -293,7 +311,9 @@ class Ratio(FeatureOp):
     min_inputs = 2
     max_inputs = 2
 
-    def apply(self, inputs: Inputs, params: Params, state: Any) -> pd.Series:
+    def apply(
+        self, inputs: Inputs, params: Params, state: Any
+    ) -> pandas.Series:
         """Divides the first input by the second.
 
         Args:
@@ -304,7 +324,7 @@ class Ratio(FeatureOp):
         Returns:
             `a / b` per row, NaN where `b` is zero.
         """
-        denominator = numeric(inputs[1]).replace(0.0, np.nan)
+        denominator = numeric(inputs[1]).replace(0.0, numpy.nan)
         return numeric(inputs[0]) / denominator
 
 
@@ -327,11 +347,13 @@ class Clip(FeatureOp):
         """
         values = numeric(inputs[0]).dropna()
         if values.empty:
-            return (-np.inf, np.inf)
-        low, high = np.quantile(values, [params["lower"], params["upper"]])
+            return (-numpy.inf, numpy.inf)
+        low, high = numpy.quantile(values, [params["lower"], params["upper"]])
         return float(low), float(high)
 
-    def apply(self, inputs: Inputs, params: Params, state: Any) -> pd.Series:
+    def apply(
+        self, inputs: Inputs, params: Params, state: Any
+    ) -> pandas.Series:
         """Clips to the learned bounds.
 
         Args:
@@ -365,7 +387,9 @@ class Standardize(FeatureOp):
         spread = float(values.std()) if len(values) > 1 else 0.0
         return (float(values.mean()) if len(values) else 0.0, spread or 1.0)
 
-    def apply(self, inputs: Inputs, params: Params, state: Any) -> pd.Series:
+    def apply(
+        self, inputs: Inputs, params: Params, state: Any
+    ) -> pandas.Series:
         """Standardizes with the learned statistics.
 
         Args:
@@ -398,13 +422,15 @@ class Bin(FeatureOp):
         """
         values = numeric(inputs[0]).dropna().to_numpy()
         if values.size == 0:
-            return np.array([])
-        edges = np.quantile(
-            values, np.linspace(0, 1, int(params["bins"]) + 1)[1:-1]
+            return numpy.array([])
+        edges = numpy.quantile(
+            values, numpy.linspace(0, 1, int(params["bins"]) + 1)[1:-1]
         )
-        return np.unique(edges)
+        return numpy.unique(edges)
 
-    def apply(self, inputs: Inputs, params: Params, state: Any) -> pd.Series:
+    def apply(
+        self, inputs: Inputs, params: Params, state: Any
+    ) -> pandas.Series:
         """Assigns each value to its bin.
 
         Args:
@@ -416,11 +442,11 @@ class Bin(FeatureOp):
             The ordinal bin code per row as a float; NaN stays NaN.
         """
         values = numeric(inputs[0])
-        codes = np.searchsorted(state, values.to_numpy(), side="right").astype(
-            float
-        )
-        return pd.Series(
-            np.where(values.isna(), np.nan, codes), index=values.index
+        codes = numpy.searchsorted(
+            state, values.to_numpy(), side="right"
+        ).astype(float)
+        return pandas.Series(
+            numpy.where(values.isna(), numpy.nan, codes), index=values.index
         )
 
 
@@ -461,7 +487,9 @@ class DatePart(FeatureOp):
                 f"{sorted(self.parts)}, got '{part}'"
             )
 
-    def apply(self, inputs: Inputs, params: Params, state: Any) -> pd.Series:
+    def apply(
+        self, inputs: Inputs, params: Params, state: Any
+    ) -> pandas.Series:
         """Extracts the requested part of the datetime.
 
         Args:
@@ -473,9 +501,9 @@ class DatePart(FeatureOp):
             The part as a float per row (days since 1970-01-01 for
             `timestamp`); NaN where the date cannot be parsed.
         """
-        stamps = pd.to_datetime(inputs[0], errors="coerce")
+        stamps = pandas.to_datetime(inputs[0], errors="coerce")
         if params["part"] == "timestamp":
-            return (stamps - EPOCH) / pd.Timedelta(days=1)
+            return (stamps - EPOCH) / pandas.Timedelta(days=1)
         return getattr(stamps.dt, params["part"]).astype(float)
 
 
@@ -484,7 +512,9 @@ class OrderedOp(FeatureOp):
 
     ordered = True
 
-    def apply(self, inputs: Inputs, params: Params, state: Any) -> pd.Series:
+    def apply(
+        self, inputs: Inputs, params: Params, state: Any
+    ) -> pandas.Series:
         """Rejects row-wise application of an ordered operation.
 
         Ordered operations run through `SeriesFeatureBuilder` only.
@@ -500,7 +530,7 @@ class OrderedOp(FeatureOp):
         raise errors.ConfigError(f"{self.name} is an ordered operation")
 
     @abc.abstractmethod
-    def compute(self, grouped: Any, params: Mapping[str, Any]) -> pd.Series:
+    def compute(self, grouped: Any, params: Mapping[str, Any]) -> pandas.Series:
         """Computes the feature from values already sorted by time per group.
 
         Args:
@@ -545,7 +575,7 @@ class Lag(OrderedOp):
         if int(self.resolved(node)["k"]) < 1:
             raise errors.ConfigError(f"node '{node.name}': lag k must be >= 1")
 
-    def compute(self, grouped: Any, params: Params) -> pd.Series:
+    def compute(self, grouped: Any, params: Params) -> pandas.Series:
         """Shifts the values forward in time.
 
         Args:
@@ -589,7 +619,7 @@ class Diff(OrderedOp):
         if int(self.resolved(node)["k"]) < 1:
             raise errors.ConfigError(f"node '{node.name}': diff k must be >= 1")
 
-    def compute(self, grouped: Any, params: Params) -> pd.Series:
+    def compute(self, grouped: Any, params: Params) -> pandas.Series:
         """Subtracts the lagged value from the current one.
 
         Args:
@@ -620,7 +650,7 @@ class RollingMean(OrderedOp):
     name = "rolling_mean"
     defaults = {"window": 3}
 
-    def compute(self, grouped: Any, params: Params) -> pd.Series:
+    def compute(self, grouped: Any, params: Params) -> pandas.Series:
         """Computes the trailing mean.
 
         Args:
@@ -653,7 +683,7 @@ class RollingStd(OrderedOp):
     name = "rolling_std"
     defaults = {"window": 3}
 
-    def compute(self, grouped: Any, params: Params) -> pd.Series:
+    def compute(self, grouped: Any, params: Params) -> pandas.Series:
         """Computes the trailing standard deviation.
 
         Args:
@@ -686,7 +716,7 @@ class ExpandingMean(OrderedOp):
 
     name = "expanding_mean"
 
-    def compute(self, grouped: Any, params: Params) -> pd.Series:
+    def compute(self, grouped: Any, params: Params) -> pandas.Series:
         """Computes the running mean.
 
         Args:
@@ -855,7 +885,7 @@ class SeriesFeatureBuilder:
         nodes: list[tasks.FeatureNode],
         group_column: str | None,
         time_column: str | None,
-        history: pd.DataFrame | None = None,
+        history: pandas.DataFrame | None = None,
     ) -> None:
         """Initializes the builder.
 
@@ -904,7 +934,7 @@ class SeriesFeatureBuilder:
             total += needed
         return total
 
-    def entity_keys(self, frame: pd.DataFrame) -> np.ndarray:
+    def entity_keys(self, frame: pandas.DataFrame) -> numpy.ndarray:
         """Computes the entity key of every row.
 
         Args:
@@ -915,9 +945,9 @@ class SeriesFeatureBuilder:
         """
         if self.group_column:
             return frame[self.group_column].astype(str).to_numpy()
-        return np.zeros(len(frame), dtype=int)
+        return numpy.zeros(len(frame), dtype=int)
 
-    def build_history(self, frame: pd.DataFrame) -> pd.DataFrame:
+    def build_history(self, frame: pandas.DataFrame) -> pandas.DataFrame:
         """Keeps the rows later predictions can still need.
 
         Args:
@@ -931,24 +961,26 @@ class SeriesFeatureBuilder:
         """
         columns = self.history_columns
         subset = frame[columns].copy()
-        times = pd.to_datetime(subset[self.time_column], errors="coerce")
+        times = pandas.to_datetime(subset[self.time_column], errors="coerce")
         subset = subset[times.notna().to_numpy()]
         times = times[times.notna()]
         keys = self.entity_keys(subset)
-        order = np.lexsort((np.arange(len(subset)), times.to_numpy(), keys))
+        order = numpy.lexsort(
+            (numpy.arange(len(subset)), times.to_numpy(), keys)
+        )
         ordered = subset.iloc[order].reset_index(drop=True)
         ordered_keys = keys[order]
         rows = self.history_rows
         if rows is None or ordered.empty:
             return ordered
         rank_from_end = (
-            pd.Series(np.arange(len(ordered)))
+            pandas.Series(numpy.arange(len(ordered)))
             .groupby(ordered_keys)
             .transform(lambda s: s.max() - s)
         )
         return ordered[(rank_from_end < rows).to_numpy()].reset_index(drop=True)
 
-    def apply(self, frame: pd.DataFrame) -> pd.DataFrame:
+    def apply(self, frame: pandas.DataFrame) -> pandas.DataFrame:
         """Appends the ordered features to a frame.
 
         Args:
@@ -967,7 +999,7 @@ class SeriesFeatureBuilder:
             return self.compute(frame)
         return self.compute_with_history(frame)
 
-    def compute_with_history(self, frame: pd.DataFrame) -> pd.DataFrame:
+    def compute_with_history(self, frame: pandas.DataFrame) -> pandas.DataFrame:
         """Appends the features, adding stored history before the batch.
 
         Only history strictly earlier than an entity's first row in `frame`
@@ -989,29 +1021,31 @@ class SeriesFeatureBuilder:
                 f"time column '{self.time_column}' is required to compute "
                 "series features"
             )
-        times = pd.to_datetime(frame[self.time_column], errors="coerce")
+        times = pandas.to_datetime(frame[self.time_column], errors="coerce")
         if times.isna().any():
             raise errors.ConfigError(
                 f"time column '{self.time_column}' has unparseable values"
             )
         earliest = (
-            pd.Series(times.to_numpy()).groupby(self.entity_keys(frame)).min()
+            pandas.Series(times.to_numpy())
+            .groupby(self.entity_keys(frame))
+            .min()
         )
         history = self.history if self.history is not None else frame.iloc[:0]
-        past_times = pd.to_datetime(history[self.time_column])
-        limits = pd.Series(self.entity_keys(history)).map(earliest)
+        past_times = pandas.to_datetime(history[self.time_column])
+        limits = pandas.Series(self.entity_keys(history)).map(earliest)
         keep = (past_times.to_numpy() < limits.to_numpy()) & limits.notna()
-        past = history[np.asarray(keep)][
+        past = history[numpy.asarray(keep)][
             [c for c in self.history_columns if c in frame.columns]
         ]
-        combined = pd.concat([past, frame], ignore_index=True)
+        combined = pandas.concat([past, frame], ignore_index=True)
         computed = self.compute(combined).iloc[len(past) :]
         result = frame.copy()
         for node in self.nodes:
             result[node.name] = computed[node.name].to_numpy()
         return result
 
-    def compute(self, frame: pd.DataFrame) -> pd.DataFrame:
+    def compute(self, frame: pandas.DataFrame) -> pandas.DataFrame:
         """Appends the features using only the rows of `frame`.
 
         Args:
@@ -1032,7 +1066,7 @@ class SeriesFeatureBuilder:
                 "series features"
             )
         result = frame.copy()
-        times = pd.to_datetime(result[self.time_column], errors="coerce")
+        times = pandas.to_datetime(result[self.time_column], errors="coerce")
         if times.isna().any():
             raise errors.ConfigError(
                 f"time column '{self.time_column}' has unparseable values"
@@ -1040,20 +1074,20 @@ class SeriesFeatureBuilder:
         groups = (
             result[self.group_column].astype(str).to_numpy()
             if self.group_column
-            else np.zeros(len(result), dtype=int)
+            else numpy.zeros(len(result), dtype=int)
         )
-        position = np.arange(len(result))
-        order = np.lexsort((position, times.to_numpy(), groups))
+        position = numpy.arange(len(result))
+        order = numpy.lexsort((position, times.to_numpy(), groups))
         sorted_groups = groups[order]
         for node in self.nodes:
             values = numeric(result[node.inputs[0]]).to_numpy()[order]
-            grouped = pd.Series(values).groupby(sorted_groups)
+            grouped = pandas.Series(values).groupby(sorted_groups)
             op = get_op(node.op)
             if not isinstance(op, OrderedOp):
                 raise errors.ConfigError(f"{node.op} is not an ordered op")
             computed = op.compute(grouped, op.resolved(node))
-            restored = np.empty(len(result))
-            restored[order] = np.asarray(computed, dtype=float)
+            restored = numpy.empty(len(result))
+            restored[order] = numpy.asarray(computed, dtype=float)
             result[node.name] = restored
         return result
 
@@ -1088,7 +1122,7 @@ class FeatureGraphTransformer(base.TransformerMixin, base.BaseEstimator):
         Returns:
             The fitted transformer.
         """
-        frame = pd.DataFrame(features).copy()
+        frame = pandas.DataFrame(features).copy()
         self.states_: dict[str, Any] = {}
         for node in self.nodes:
             op = get_op(node.op)
@@ -1098,7 +1132,7 @@ class FeatureGraphTransformer(base.TransformerMixin, base.BaseEstimator):
             frame[node.name] = op.apply(inputs, params, self.states_[node.name])
         return self
 
-    def transform(self, features: Any) -> pd.DataFrame:
+    def transform(self, features: Any) -> pandas.DataFrame:
         """Appends the derived columns using the learned state.
 
         Args:
@@ -1107,7 +1141,7 @@ class FeatureGraphTransformer(base.TransformerMixin, base.BaseEstimator):
         Returns:
             A copy of the rows with one column per node.
         """
-        frame = pd.DataFrame(features).copy()
+        frame = pandas.DataFrame(features).copy()
         for node in self.nodes:
             op = get_op(node.op)
             params = op.resolved(node)

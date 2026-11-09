@@ -11,7 +11,7 @@ the interval is flagged as optimistic.
 import math
 from typing import Any
 
-import numpy as np
+import numpy
 from scipy import stats
 
 LEVEL = 0.95
@@ -40,7 +40,7 @@ def cv_interval(
         list, `folds` and a `note` on how far to trust it. With fewer
         folds, only `available` (False) and a `reason`.
     """
-    scores = np.asarray(fold_scores, dtype=float)
+    scores = numpy.asarray(fold_scores, dtype=float)
     folds = len(scores)
     if folds < 2:
         return {"available": False, "reason": "needs at least two folds"}

@@ -5,7 +5,7 @@ import math
 
 import pytest
 
-from scmle.contracts import qualification as q
+from scmle.contracts import qualification
 
 
 def make_check(**overrides):
@@ -17,25 +17,27 @@ def make_check(**overrides):
         "interval": None,
         "effect": 0.2,
         "n": 500,
-        "decision": q.Decision.WARN,
-        "set_id": q.SetId.EXPLORATION,
+        "decision": qualification.Decision.WARN,
+        "set_id": qualification.SetId.EXPLORATION,
         "seed_path": (7, "missingness.age", 0),
-        "tier": q.Tier.UNVERIFIED,
+        "tier": qualification.Tier.UNVERIFIED,
     }
     values.update(overrides)
-    return q.Check(**values)
+    return qualification.Check(**values)
 
 
 def test_check_round_trips_through_json():
     check = make_check()
-    restored = q.Check.from_dict(json.loads(json.dumps(check.to_dict())))
+    restored = qualification.Check.from_dict(
+        json.loads(json.dumps(check.to_dict()))
+    )
     assert restored == check
     assert restored.seed_path == (7, "missingness.age", 0)
 
 
 def test_check_accepts_an_interval_instead_of_a_p_value():
     check = make_check(p_value=None, interval=(0.1, 0.4))
-    assert q.Check.from_dict(check.to_dict()) == check
+    assert qualification.Check.from_dict(check.to_dict()) == check
 
 
 def test_check_needs_a_p_value_or_an_interval():
@@ -73,32 +75,39 @@ def test_check_rejects_negative_n_and_blank_text():
 
 @pytest.mark.parametrize(
     "set_id",
-    [q.SetId.EXPLORATION, q.SetId.FORWARD, q.SetId.ALL],
+    [
+        qualification.SetId.EXPLORATION,
+        qualification.SetId.FORWARD,
+        qualification.SetId.ALL,
+    ],
 )
 def test_confirmed_tier_requires_the_confirmation_set(set_id):
     with pytest.raises(ValueError, match="confirmed"):
-        make_check(set_id=set_id, tier=q.Tier.CONFIRMED)
+        make_check(set_id=set_id, tier=qualification.Tier.CONFIRMED)
 
 
 def test_confirmed_tier_is_allowed_on_the_confirmation_set():
-    check = make_check(set_id=q.SetId.CONFIRMATION, tier=q.Tier.CONFIRMED)
-    assert check.tier is q.Tier.CONFIRMED
+    check = make_check(
+        set_id=qualification.SetId.CONFIRMATION,
+        tier=qualification.Tier.CONFIRMED,
+    )
+    assert check.tier is qualification.Tier.CONFIRMED
 
 
 def test_unknown_enum_values_are_rejected_when_loading():
     record = make_check().to_dict()
     record["decision"] = "maybe"
     with pytest.raises(ValueError):
-        q.Check.from_dict(record)
+        qualification.Check.from_dict(record)
 
 
 def test_loading_rejects_unknown_and_missing_fields():
     record = make_check().to_dict()
     with pytest.raises(ValueError, match="unexpected"):
-        q.Check.from_dict({**record, "extra": 1})
+        qualification.Check.from_dict({**record, "extra": 1})
     del record["effect"]
     with pytest.raises(ValueError, match="missing"):
-        q.Check.from_dict(record)
+        qualification.Check.from_dict(record)
 
 
 def make_claim(**overrides):
@@ -108,16 +117,18 @@ def make_claim(**overrides):
         "check_ids": ("assoc.age",),
         "adjusted_p_value": 0.003,
         "effect": 0.3,
-        "tier": q.Tier.CONFIRMED,
+        "tier": qualification.Tier.CONFIRMED,
         "assumptions": ("confirmation set opened once",),
     }
     values.update(overrides)
-    return q.Claim(**values)
+    return qualification.Claim(**values)
 
 
 def test_claim_round_trips_through_json():
     claim = make_claim()
-    restored = q.Claim.from_dict(json.loads(json.dumps(claim.to_dict())))
+    restored = qualification.Claim.from_dict(
+        json.loads(json.dumps(claim.to_dict()))
+    )
     assert restored == claim
 
 
@@ -126,7 +137,9 @@ def test_claim_needs_checks_and_a_p_value_to_be_confirmed():
         make_claim(check_ids=())
     with pytest.raises(ValueError, match="confirmed"):
         make_claim(adjusted_p_value=None)
-    unconfirmed = make_claim(adjusted_p_value=None, tier=q.Tier.UNVERIFIED)
+    unconfirmed = make_claim(
+        adjusted_p_value=None, tier=qualification.Tier.UNVERIFIED
+    )
     assert unconfirmed.adjusted_p_value is None
 
 
@@ -147,14 +160,14 @@ def make_certificate(**overrides):
         "seed_path": (7, "certificate.label_noise", 0),
     }
     values.update(overrides)
-    return q.Certificate(**values)
+    return qualification.Certificate(**values)
 
 
 def test_certificate_rates_and_round_trip():
     certificate = make_certificate()
     assert certificate.recall == pytest.approx(0.8)
     assert certificate.false_alarm_rate == pytest.approx(0.02)
-    restored = q.Certificate.from_dict(
+    restored = qualification.Certificate.from_dict(
         json.loads(json.dumps(certificate.to_dict()))
     )
     assert restored == certificate

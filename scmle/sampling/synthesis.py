@@ -15,8 +15,8 @@ from typing import Any
 from typing import ClassVar
 from typing import Self
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from scipy import special
 
 from scmle.sampling import resampling
@@ -35,7 +35,7 @@ class SyntheticGenerator(abc.ABC):
     name: ClassVar[str]
 
     @abc.abstractmethod
-    def fit(self, features: pd.DataFrame) -> Self:
+    def fit(self, features: pandas.DataFrame) -> Self:
         """Learns the distribution from real rows (training data only).
 
         Args:
@@ -46,7 +46,9 @@ class SyntheticGenerator(abc.ABC):
         """
 
     @abc.abstractmethod
-    def sample(self, rows: int, rng: np.random.Generator) -> pd.DataFrame:
+    def sample(
+        self, rows: int, rng: numpy.random.Generator
+    ) -> pandas.DataFrame:
         """Draws synthetic rows with the training columns.
 
         Args:
@@ -73,7 +75,7 @@ class GaussianCopulaGenerator(SyntheticGenerator):
 
     name = "gaussian_copula"
 
-    def fit(self, features: pd.DataFrame) -> Self:
+    def fit(self, features: pandas.DataFrame) -> Self:
         """Estimates the marginals and the normal-score correlation.
 
         Args:
@@ -86,8 +88,8 @@ class GaussianCopulaGenerator(SyntheticGenerator):
         self.numeric = [
             c
             for c in features.columns
-            if pd.api.types.is_numeric_dtype(features[c])
-            and not pd.api.types.is_bool_dtype(features[c])
+            if pandas.api.types.is_numeric_dtype(features[c])
+            and not pandas.api.types.is_bool_dtype(features[c])
         ]
         self.categorical = [
             c for c in features.columns if c not in self.numeric
@@ -95,7 +97,7 @@ class GaussianCopulaGenerator(SyntheticGenerator):
         self.dtypes = features.dtypes.to_dict()
         self.missing_rates = features.isna().mean().to_dict()
         self.sorted_values = {
-            c: np.sort(features[c].dropna().to_numpy(dtype=float))
+            c: numpy.sort(features[c].dropna().to_numpy(dtype=float))
             for c in self.numeric
         }
         self.frequencies = {
@@ -105,7 +107,7 @@ class GaussianCopulaGenerator(SyntheticGenerator):
         self.correlation = self.estimate_correlation(features)
         return self
 
-    def estimate_correlation(self, features: pd.DataFrame) -> np.ndarray:
+    def estimate_correlation(self, features: pandas.DataFrame) -> numpy.ndarray:
         """Estimates the correlation of the numeric columns' normal scores.
 
         Args:
@@ -118,24 +120,26 @@ class GaussianCopulaGenerator(SyntheticGenerator):
             columns.
         """
         if not self.numeric:
-            return np.zeros((0, 0))
-        scores = pd.DataFrame(index=features.index)
+            return numpy.zeros((0, 0))
+        scores = pandas.DataFrame(index=features.index)
         for column in self.numeric:
             ranks = features[column].rank(method="average")
             valid = features[column].notna()
             count = int(valid.sum())
-            scores[column] = np.where(
-                valid, special.ndtri((ranks - 0.5) / max(count, 1)), np.nan
+            scores[column] = numpy.where(
+                valid, special.ndtri((ranks - 0.5) / max(count, 1)), numpy.nan
             )
         correlation = scores.corr().fillna(0.0).to_numpy().copy()
-        np.fill_diagonal(correlation, 1.0)
-        values, vectors = np.linalg.eigh(correlation)
-        values = np.clip(values, RIDGE, None)
+        numpy.fill_diagonal(correlation, 1.0)
+        values, vectors = numpy.linalg.eigh(correlation)
+        values = numpy.clip(values, RIDGE, None)
         repaired = (vectors * values) @ vectors.T
-        scale = np.sqrt(np.diag(repaired))
-        return repaired / np.outer(scale, scale)
+        scale = numpy.sqrt(numpy.diag(repaired))
+        return repaired / numpy.outer(scale, scale)
 
-    def sample(self, rows: int, rng: np.random.Generator) -> pd.DataFrame:
+    def sample(
+        self, rows: int, rng: numpy.random.Generator
+    ) -> pandas.DataFrame:
         """Draws synthetic rows through the copula.
 
         Args:
@@ -150,32 +154,32 @@ class GaussianCopulaGenerator(SyntheticGenerator):
         output: dict[str, Any] = {}
         if self.numeric:
             normal = rng.multivariate_normal(
-                np.zeros(len(self.numeric)), self.correlation, size=rows
+                numpy.zeros(len(self.numeric)), self.correlation, size=rows
             )
             uniform = special.ndtr(normal)
             for index, column in enumerate(self.numeric):
                 values = self.sorted_values[column]
                 if len(values) == 0:
-                    output[column] = np.full(rows, np.nan)
+                    output[column] = numpy.full(rows, numpy.nan)
                     continue
-                grid = np.linspace(0.0, 1.0, len(values))
-                output[column] = np.interp(uniform[:, index], grid, values)
+                grid = numpy.linspace(0.0, 1.0, len(values))
+                output[column] = numpy.interp(uniform[:, index], grid, values)
         for column in self.categorical:
             freq = self.frequencies[column]
             if len(freq) == 0:
-                output[column] = np.full(rows, np.nan, dtype=object)
+                output[column] = numpy.full(rows, numpy.nan, dtype=object)
             else:
                 output[column] = rng.choice(
                     freq.index.to_numpy(dtype=object),
                     size=rows,
                     p=(freq / freq.sum()).to_numpy(),
                 )
-        frame = pd.DataFrame(output)[list(self.dtypes)]
+        frame = pandas.DataFrame(output)[list(self.dtypes)]
         for key, rate in self.missing_rates.items():
             if rate > 0:
-                frame.loc[rng.random(rows) < rate, key] = np.nan
+                frame.loc[rng.random(rows) < rate, key] = numpy.nan
         for key, dtype in self.dtypes.items():
-            if key in self.numeric and pd.api.types.is_integer_dtype(dtype):
+            if key in self.numeric and pandas.api.types.is_integer_dtype(dtype):
                 frame[key] = frame[key].round().astype("Float64")
         return frame
 
@@ -191,8 +195,8 @@ class GeneratorOverSampler(resampling.Resampler):
     generator_class: type[SyntheticGenerator] = GaussianCopulaGenerator
 
     def resample(
-        self, features: pd.DataFrame, target: pd.Series, seed: int
-    ) -> tuple[pd.DataFrame, pd.Series]:
+        self, features: pandas.DataFrame, target: pandas.Series, seed: int
+    ) -> tuple[pandas.DataFrame, pandas.Series]:
         """Adds synthetic rows until every class matches the largest.
 
         Classes with fewer than `MIN_FIT_ROWS` rows are left as they are.
@@ -206,7 +210,7 @@ class GeneratorOverSampler(resampling.Resampler):
             The original plus synthetic features and labels, shuffled, with
             a fresh index.
         """
-        rng = np.random.default_rng(seed)
+        rng = numpy.random.default_rng(seed)
         counts = target.value_counts()
         goal = int(counts.max())
         parts, labels = [features], [target]
@@ -220,9 +224,9 @@ class GeneratorOverSampler(resampling.Resampler):
             parts.append(
                 synthetic.astype(features.dtypes.to_dict(), errors="ignore")
             )
-            labels.append(pd.Series([label] * missing))
-        combined = pd.concat(parts, ignore_index=True)
-        combined_target = pd.concat(labels, ignore_index=True)
+            labels.append(pandas.Series([label] * missing))
+        combined = pandas.concat(parts, ignore_index=True)
+        combined_target = pandas.concat(labels, ignore_index=True)
         order = rng.permutation(len(combined))
         return combined.iloc[order].reset_index(
             drop=True
@@ -260,7 +264,7 @@ class FidelityEvaluator:
     """Scores synthetic data against the real data it imitates."""
 
     def evaluate(
-        self, real: pd.DataFrame, synthetic: pd.DataFrame
+        self, real: pandas.DataFrame, synthetic: pandas.DataFrame
     ) -> FidelityReport:
         """Compares marginals, dependence structure and verbatim copying.
 
@@ -274,23 +278,24 @@ class FidelityEvaluator:
         numeric = [
             str(c)
             for c in real.columns
-            if pd.api.types.is_numeric_dtype(real[c])
-            and not pd.api.types.is_bool_dtype(real[c])
+            if pandas.api.types.is_numeric_dtype(real[c])
+            and not pandas.api.types.is_bool_dtype(real[c])
         ]
         categorical = [str(c) for c in real.columns if c not in numeric]
         ks = 0.0
         for column in numeric:
-            a = np.sort(real[column].dropna().to_numpy(dtype=float))
-            b = np.sort(synthetic[column].dropna().to_numpy(dtype=float))
+            a = numpy.sort(real[column].dropna().to_numpy(dtype=float))
+            b = numpy.sort(synthetic[column].dropna().to_numpy(dtype=float))
             if len(a) and len(b):
-                grid = np.union1d(a, b)
+                grid = numpy.union1d(a, b)
                 ks = max(
                     ks,
                     float(
-                        np.max(
-                            np.abs(
-                                np.searchsorted(a, grid, side="right") / len(a)
-                                - np.searchsorted(b, grid, side="right")
+                        numpy.max(
+                            numpy.abs(
+                                numpy.searchsorted(a, grid, side="right")
+                                / len(a)
+                                - numpy.searchsorted(b, grid, side="right")
                                 / len(b)
                             )
                         )
@@ -305,7 +310,7 @@ class FidelityEvaluator:
                 tv,
                 float(
                     0.5
-                    * np.abs(
+                    * numpy.abs(
                         p.reindex(levels, fill_value=0)
                         - q.reindex(levels, fill_value=0)
                     ).sum()
@@ -322,7 +327,7 @@ class FidelityEvaluator:
                 .corr(method="spearman")
                 .to_numpy()
             )
-            error = float(np.nanmax(np.abs(real_corr - fake_corr)))
+            error = float(numpy.nanmax(numpy.abs(real_corr - fake_corr)))
         real_keys = set(map(tuple, real.astype(str).to_numpy().tolist()))
         copies = sum(
             tuple(row) in real_keys

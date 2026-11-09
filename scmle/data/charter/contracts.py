@@ -31,7 +31,7 @@ from scmle.data.charter import ingest as ingest_module
 from scmle.data.charter import rules as rules_module
 from scmle.data.charter import uncertainty as uncertainty_module
 from scmle.data.framing import costs
-from scmle.data.ledger import budget as budget_module
+from scmle.data.ledger import budget
 
 FORMAT_VERSION = 11
 OLDEST_READABLE_FORMAT = 1
@@ -485,7 +485,7 @@ class AnalysisCharter:
     min_effect: float
     k_max: int
     power: float
-    error_budget: budget_module.ErrorBudget
+    error_budget: budget.ErrorBudget
     multiverse: tuple[Choice, ...]
     seed: int
     cost_model: costs.DecisionCostModel | None = None
@@ -701,9 +701,7 @@ class AnalysisCharter:
             min_effect=record["min_effect"],
             k_max=record["k_max"],
             power=record["power"],
-            error_budget=budget_module.ErrorBudget.from_dict(
-                record["error_budget"]
-            ),
+            error_budget=budget.ErrorBudget.from_dict(record["error_budget"]),
             multiverse=tuple(Choice.from_dict(c) for c in record["multiverse"]),
             seed=record["seed"],
             cost_model=(
@@ -765,7 +763,7 @@ def template() -> dict[str, Any]:
         "min_effect": 0.2,
         "k_max": 10,
         "power": 0.8,
-        "error_budget": budget_module.ErrorBudget.create(0.05, 0.1).to_dict(),
+        "error_budget": budget.ErrorBudget.create(0.05, 0.1).to_dict(),
         "multiverse": [],
         "seed": 0,
     }

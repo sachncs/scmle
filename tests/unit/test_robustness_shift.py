@@ -1,7 +1,7 @@
 """Two-sample shift tests: differential checks against scipy and sklearn."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 from scipy import spatial
 from scipy import stats
@@ -15,10 +15,10 @@ GATING = certificates.GateStatus.GATING
 
 
 def frames(rows=120, shift_by=0.0, seed=0, columns=4):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     names = [f"f{k}" for k in range(columns)]
-    left = pd.DataFrame(rng.normal(size=(rows, columns)), columns=names)
-    right = pd.DataFrame(rng.normal(size=(rows, columns)), columns=names)
+    left = pandas.DataFrame(rng.normal(size=(rows, columns)), columns=names)
+    right = pandas.DataFrame(rng.normal(size=(rows, columns)), columns=names)
     right["f0"] += shift_by
     return left, right
 
@@ -43,8 +43,8 @@ def brute_force_delong_variance(scores, side):
 
 
 def test_the_auc_matches_sklearn_and_the_pairwise_definition_with_ties():
-    rng = np.random.default_rng(1)
-    scores = np.round(rng.normal(size=80), 1)
+    rng = numpy.random.default_rng(1)
+    scores = numpy.round(rng.normal(size=80), 1)
     side = rng.integers(0, 2, 80)
     auc, interval = shift.auc_delong(scores, side)
     assert auc == pytest.approx(metrics.roc_auc_score(side, scores))
@@ -53,76 +53,76 @@ def test_the_auc_matches_sklearn_and_the_pairwise_definition_with_ties():
 
 
 def test_the_delong_variance_matches_the_pairwise_definition():
-    rng = np.random.default_rng(2)
-    scores = np.round(rng.normal(size=90), 1) + np.arange(90) % 2 * 0.4
-    side = np.arange(90) % 2
+    rng = numpy.random.default_rng(2)
+    scores = numpy.round(rng.normal(size=90), 1) + numpy.arange(90) % 2 * 0.4
+    side = numpy.arange(90) % 2
     low, high = shift.auc_delong(scores, side, confidence=0.9)[1]
     variance = brute_force_delong_variance(scores, side)
     z = stats.norm.ppf(0.95)
-    assert high - low == pytest.approx(2 * z * np.sqrt(variance))
+    assert high - low == pytest.approx(2 * z * numpy.sqrt(variance))
 
 
 def test_delong_rejects_a_class_with_one_row_and_a_bad_level():
     with pytest.raises(ValueError, match="two rows"):
-        shift.auc_delong(np.array([0.1, 0.2, 0.3]), np.array([1, 0, 0]))
+        shift.auc_delong(numpy.array([0.1, 0.2, 0.3]), numpy.array([1, 0, 0]))
     with pytest.raises(ValueError, match="confidence"):
-        shift.auc_delong(np.arange(4.0), np.array([0, 1, 0, 1]), 1.0)
+        shift.auc_delong(numpy.arange(4.0), numpy.array([0, 1, 0, 1]), 1.0)
 
 
 def test_a_perfect_separation_gives_a_degenerate_interval():
-    auc, interval = shift.auc_delong(np.arange(10.0), np.arange(10) // 5)
+    auc, interval = shift.auc_delong(numpy.arange(10.0), numpy.arange(10) // 5)
     assert auc == 1.0 and interval == (1.0, 1.0)
 
 
 def test_the_permutation_p_value_is_the_add_one_formula():
-    null = np.array([0.1, 0.2, 0.3, 0.4])
+    null = numpy.array([0.1, 0.2, 0.3, 0.4])
     assert shift.permutation_p_value(0.3, null) == pytest.approx(3 / 5)
     assert shift.permutation_p_value(9.0, null) == pytest.approx(1 / 5)
 
 
 def test_the_mmd_statistic_matches_the_definition_from_pairwise_distances():
     left, right = frames(rows=40, shift_by=0.5, columns=3)
-    both = pd.concat([left, right], ignore_index=True)
+    both = pandas.concat([left, right], ignore_index=True)
     design = shift.design_matrix(both, len(both))
     bandwidth = shift.median_bandwidth(design)
     kernel = shift.gaussian_kernel(design, bandwidth)
-    expected = np.exp(
+    expected = numpy.exp(
         -spatial.distance.cdist(design, design, "sqeuclidean")
         / (2 * bandwidth**2)
     )
-    assert np.allclose(kernel, expected)
-    indicator = np.r_[np.ones(40), np.zeros(40)]
+    assert numpy.allclose(kernel, expected)
+    indicator = numpy.r_[numpy.ones(40), numpy.zeros(40)]
     got = shift.mmd_statistics(kernel, indicator[:, None])[0]
     xx = expected[:40, :40]
     yy = expected[40:, 40:]
     xy = expected[:40, 40:]
     direct = (
-        (xx.sum() - np.trace(xx)) / (40 * 39)
-        + (yy.sum() - np.trace(yy)) / (40 * 39)
+        (xx.sum() - numpy.trace(xx)) / (40 * 39)
+        + (yy.sum() - numpy.trace(yy)) / (40 * 39)
         - 2 * xy.mean()
     )
     assert got == pytest.approx(direct)
 
 
 def test_the_median_heuristic_is_the_median_pairwise_distance():
-    rng = np.random.default_rng(3)
+    rng = numpy.random.default_rng(3)
     design = rng.normal(size=(30, 2))
     assert shift.median_bandwidth(design) == pytest.approx(
-        np.median(spatial.distance.pdist(design))
+        numpy.median(spatial.distance.pdist(design))
     )
-    assert shift.median_bandwidth(np.zeros((5, 2))) == 1.0
+    assert shift.median_bandwidth(numpy.zeros((5, 2))) == 1.0
 
 
 def test_the_mmd_permutation_p_value_agrees_with_scipy_permutation_test():
     left, right = frames(rows=60, shift_by=0.9, columns=2, seed=5)
     mine = shift.mmd_test(left, right, 0, permutations=499)
-    both = pd.concat([left, right], ignore_index=True)
+    both = pandas.concat([left, right], ignore_index=True)
     design = shift.design_matrix(both, len(both))
     kernel = shift.gaussian_kernel(design, shift.median_bandwidth(design))
-    index = np.arange(len(both), dtype=float)
+    index = numpy.arange(len(both), dtype=float)
 
     def statistic(first, second):
-        labels = np.isin(index, first).astype(float)
+        labels = numpy.isin(index, first).astype(float)
         return shift.mmd_statistics(kernel, labels[:, None])[0]
 
     reference = stats.permutation_test(
@@ -131,7 +131,7 @@ def test_the_mmd_permutation_p_value_agrees_with_scipy_permutation_test():
         permutation_type="independent",
         n_resamples=999,
         alternative="greater",
-        rng=np.random.default_rng(0),
+        rng=numpy.random.default_rng(0),
     )
     assert mine.statistic == pytest.approx(reference.statistic)
     assert abs(mine.p_value - reference.pvalue) < 0.04
@@ -185,7 +185,7 @@ def test_delta_requires_the_auc_lower_bound_to_clear_the_margin():
 
 def test_strata_permute_labels_within_blocks_only():
     left, right = frames(rows=100, seed=2)
-    strata = np.r_[np.arange(100) % 10, np.arange(100) % 10]
+    strata = numpy.r_[numpy.arange(100) % 10, numpy.arange(100) % 10]
     check = shift.c2st(left, right, 0, permutations=49, strata=strata)
     other = shift.mmd_test(left, right, 0, permutations=49, strata=strata)
     assert 0 < check.p_value <= 1 and 0 < other.p_value <= 1
@@ -200,14 +200,14 @@ def test_mismatched_columns_and_small_samples_are_refused():
 
 
 def test_categorical_and_missing_values_are_handled():
-    rng = np.random.default_rng(4)
+    rng = numpy.random.default_rng(4)
     rows = 150
 
     def table(weights):
-        return pd.DataFrame(
+        return pandas.DataFrame(
             {
-                "n": np.where(
-                    rng.random(rows) < 0.1, np.nan, rng.normal(size=rows)
+                "n": numpy.where(
+                    rng.random(rows) < 0.1, numpy.nan, rng.normal(size=rows)
                 ),
                 "c": rng.choice(["a", "b", "c"], rows, p=weights),
             }
@@ -220,20 +220,20 @@ def test_categorical_and_missing_values_are_handled():
 
 def test_feature_tests_match_scipy_and_adjust_with_bh():
     left, right = frames(rows=200, shift_by=0.7, seed=9)
-    left["g"] = np.where(np.arange(200) % 2 == 0, "u", "v")
-    right["g"] = np.where(np.arange(200) % 3 == 0, "u", "v")
+    left["g"] = numpy.where(numpy.arange(200) % 2 == 0, "u", "v")
+    right["g"] = numpy.where(numpy.arange(200) % 3 == 0, "u", "v")
     rows = {r.column: r for r in shift.feature_tests(left, right)}
     ks = stats.ks_2samp(left["f0"], right["f0"])
     assert rows["f0"].statistic == pytest.approx(ks.statistic)
     assert rows["f0"].p_value == pytest.approx(ks.pvalue)
-    table = pd.crosstab(
-        pd.concat([left["g"], right["g"]]),
-        np.r_[np.zeros(200), np.ones(200)],
+    table = pandas.crosstab(
+        pandas.concat([left["g"], right["g"]]),
+        numpy.r_[numpy.zeros(200), numpy.ones(200)],
     ).to_numpy()
     chi = stats.chi2_contingency(table, correction=False)
     assert rows["g"].statistic == pytest.approx(chi.statistic)
     assert rows["g"].p_value == pytest.approx(chi.pvalue)
-    assert rows["g"].effect == pytest.approx(np.sqrt(chi.statistic / 400))
+    assert rows["g"].effect == pytest.approx(numpy.sqrt(chi.statistic / 400))
     adjusted = stats.false_discovery_control(
         [r.p_value for r in rows.values()], method="bh"
     )
@@ -244,8 +244,8 @@ def test_feature_tests_match_scipy_and_adjust_with_bh():
 
 
 def test_a_column_with_one_level_and_an_empty_column_have_p_one():
-    left = pd.DataFrame({"c": ["a"] * 60, "n": [np.nan] * 60})
-    right = pd.DataFrame({"c": ["a"] * 60, "n": [np.nan] * 60})
+    left = pandas.DataFrame({"c": ["a"] * 60, "n": [numpy.nan] * 60})
+    right = pandas.DataFrame({"c": ["a"] * 60, "n": [numpy.nan] * 60})
     rows = {r.column: r for r in shift.feature_tests(left, right)}
     assert rows["c"].p_value == 1.0 and rows["n"].p_value == 1.0
 

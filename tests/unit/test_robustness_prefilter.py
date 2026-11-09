@@ -2,8 +2,8 @@
 
 import json
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.data.detectors import certificates
 from scmle.data.ledger import confirm
@@ -21,15 +21,15 @@ SEED = 1
 
 def world(seed, rows=500):
     """A stable effect (s), an outlier-driven one (o) and noise (n)."""
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     s, o = rng.normal(size=rows), rng.normal(size=rows)
     y = 0.6 * s + rng.normal(size=rows)
     hit = rng.choice(rows, 25, replace=False)
     side = rng.choice([-1.0, 1.0], 25)
     o[hit] = side * 8
     y[hit] = side * 6 + 0.5 * rng.normal(size=25)
-    frame = pd.DataFrame({"s": s, "o": o, "n": rng.normal(size=rows)})
-    return frame, pd.Series(y)
+    frame = pandas.DataFrame({"s": s, "o": o, "n": rng.normal(size=rows)})
+    return frame, pandas.Series(y)
 
 
 def stage_for(features, target, requested, reference=None, rule=None, **extra):

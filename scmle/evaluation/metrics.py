@@ -8,7 +8,7 @@ from collections.abc import Callable
 import threading
 from typing import Any
 
-import pandas as pd
+import pandas
 from sklearn import metrics as sk_metrics
 
 from scmle.contracts import errors
@@ -36,7 +36,7 @@ UPLIFT = tasks.TaskType.UPLIFT
 CLASSIFICATION = frozenset({BINARY, MULTICLASS})
 
 
-def positive_label(target: pd.Series, task: tasks.TaskType) -> Any:
+def positive_label(target: pandas.Series, task: tasks.TaskType) -> Any:
     """Returns the positive class of a binary target (None otherwise).
 
     Follows scikit-learn's convention: the second class in sorted order
@@ -308,8 +308,8 @@ class MetricCatalog:
     def evaluate(
         self,
         estimator: models.Estimator,
-        features: pd.DataFrame,
-        target: pd.Series,
+        features: pandas.DataFrame,
+        target: pandas.Series,
         task: tasks.TaskType,
         sample_weight: Any = None,
     ) -> dict[str, float]:

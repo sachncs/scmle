@@ -22,7 +22,7 @@ from typing import Any
 
 import numpy as np
 from numpy.typing import ArrayLike
-import pandas as pd
+import pandas
 
 from scmle.core import randomness
 
@@ -36,7 +36,7 @@ NOTE = (
 
 
 def balance_test(
-    features: pd.DataFrame,
+    features: pandas.DataFrame,
     treatment: ArrayLike,
     seed: int = 0,
     permutations: int = PERMUTATIONS,

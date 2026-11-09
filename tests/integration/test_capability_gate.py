@@ -2,8 +2,8 @@
 
 import dataclasses
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
 from scmle.contracts import capabilities
@@ -16,10 +16,10 @@ from scmle.models.deeplearning import networks
 from scmle.models.sklearn import classical
 
 
-def binary_frame() -> pd.DataFrame:
+def binary_frame() -> pandas.DataFrame:
     """Builds a deterministic tabular fixture."""
-    rng = np.random.default_rng(7)
-    return pd.DataFrame(
+    rng = numpy.random.default_rng(7)
+    return pandas.DataFrame(
         {
             "feature": rng.normal(size=120),
             "y": rng.integers(0, 2, size=120),

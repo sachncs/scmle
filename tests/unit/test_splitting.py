@@ -1,7 +1,7 @@
 """Tests for split strategies, manifest and the locked test set."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
 from scmle.contracts import errors
@@ -24,13 +24,13 @@ def split(frame, spec=None, task=BINARY):
 
 @pytest.fixture
 def frame():
-    rng = np.random.default_rng(0)
+    rng = numpy.random.default_rng(0)
     rows = 400
-    return pd.DataFrame(
+    return pandas.DataFrame(
         {
             "x": rng.normal(size=rows),
             "g": rng.integers(0, 40, rows),
-            "t": pd.date_range("2024-01-01", periods=rows, freq="h"),
+            "t": pandas.date_range("2024-01-01", periods=rows, freq="h"),
             "y": (rng.random(rows) < 0.2).astype(int),
         }
     )
@@ -204,12 +204,12 @@ def test_embargo_requires_a_time_column_and_enough_rows(frame):
 
 
 def group_classification_frame(groups=30, per_group=10, seed=0):
-    rng = np.random.default_rng(seed)
-    unit = np.repeat(np.arange(groups), per_group)
+    rng = numpy.random.default_rng(seed)
+    unit = numpy.repeat(numpy.arange(groups), per_group)
     positive_groups = rng.choice(groups, groups // 3, replace=False)
-    label = np.isin(unit, positive_groups).astype(int)
+    label = numpy.isin(unit, positive_groups).astype(int)
     flip = rng.random(len(label)) < 0.1
-    frame = pd.DataFrame(
+    frame = pandas.DataFrame(
         {"unit": unit, "a": rng.normal(size=len(unit)), "y": label ^ flip}
     )
     return frame
@@ -243,11 +243,11 @@ def test_group_validation_blocks_when_classes_hide_in_one_group():
 
 def test_temporal_folds_are_listed_latest_window_first():
     rows = 200
-    frame = pd.DataFrame(
+    frame = pandas.DataFrame(
         {
-            "t": pd.date_range("2024-01-01", periods=rows),
-            "a": np.arange(rows, dtype=float),
-            "y": np.arange(rows) % 2,
+            "t": pandas.date_range("2024-01-01", periods=rows),
+            "a": numpy.arange(rows, dtype=float),
+            "y": numpy.arange(rows) % 2,
         }
     )
     spec = tasks.ProjectSpec(
@@ -273,8 +273,10 @@ def test_rolling_windows_slide_forward_and_always_validate_on_the_future(frame):
         rolling_spec(folds=4, horizon_rows=30, window_rows=100),
     )
     manifest = result.manifest
-    times = pd.to_datetime(frame["t"]).iloc[list(manifest.train_ids)].to_numpy()
-    order = np.argsort(times, kind="stable")
+    times = (
+        pandas.to_datetime(frame["t"]).iloc[list(manifest.train_ids)].to_numpy()
+    )
+    order = numpy.argsort(times, kind="stable")
 
     assert manifest.strategy == "rolling" and len(manifest.folds) == 4
     for train, held in manifest.folds:
@@ -358,14 +360,14 @@ def test_feature_delays_need_a_time_column_and_forbid_reading_the_raw_column():
 
 
 def test_a_table_too_small_for_its_classes_gets_advice():
-    tiny = pd.DataFrame({"x": [1.0, 2.0, 3.0, 4.0], "y": [0, 1, 0, 1]})
+    tiny = pandas.DataFrame({"x": [1.0, 2.0, 3.0, 4.0], "y": [0, 1, 0, 1]})
     with pytest.raises(errors.DataError, match="Provide at least"):
         split(tiny)
 
 
 def test_a_table_just_large_enough_still_splits():
-    rng = np.random.default_rng(1)
-    enough = pd.DataFrame({"x": rng.normal(size=60), "y": [0, 1] * 30})
+    rng = numpy.random.default_rng(1)
+    enough = pandas.DataFrame({"x": rng.normal(size=60), "y": [0, 1] * 30})
     result = split(enough)
     assert len(result.dev_features) < 60
     assert result.dev_target.nunique() == 2

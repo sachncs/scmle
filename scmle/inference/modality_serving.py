@@ -16,11 +16,11 @@ import threading
 from typing import Any
 import uuid
 
-import numpy as np
+import numpy
 
 from scmle.contracts import errors
 from scmle.contracts import modalities
-from scmle.contracts import serving as serving_contract
+from scmle.contracts import serving
 from scmle.inference import guard
 from scmle.models import modality_lifecycle
 from scmle.security import access
@@ -211,14 +211,14 @@ class ModalityHttpServing:
             predictions = self.predictor.predict(samples)
             probabilities = self.predictor.predict_proba(samples)
         return {
-            "schema_version": serving_contract.SCHEMA_VERSION,
+            "schema_version": serving.SCHEMA_VERSION,
             "model_version": self.artifact_digest,
             "artifact_digest": self.artifact_digest,
             "modality": modalities.modality_value(
                 self.predictor.adapter.modality
             ),
-            "predictions": np.asarray(predictions).tolist(),
-            "probabilities": np.asarray(probabilities).tolist(),
+            "predictions": numpy.asarray(predictions).tolist(),
+            "probabilities": numpy.asarray(probabilities).tolist(),
             "sample_count": len(samples),
             "package_verified": True,
             "lifecycle_report_verified": (
@@ -384,7 +384,7 @@ class ModalityHttpServing:
                     self.send_json(
                         200,
                         {
-                            "schema_version": serving_contract.SCHEMA_VERSION,
+                            "schema_version": serving.SCHEMA_VERSION,
                             "modality": (
                                 modalities.modality_value(
                                     adapter.predictor.adapter.modality

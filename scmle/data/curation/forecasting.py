@@ -6,7 +6,7 @@ entity, so row `t` is paired with what happened at `t+1 .. t+horizon`. Rows
 near the end of a series, whose future is unknown, are dropped from training.
 """
 
-import pandas as pd
+import pandas
 
 from scmle.contracts import tasks
 
@@ -26,7 +26,9 @@ def target_names(value: str, horizon: int) -> list[str]:
     ]
 
 
-def add_targets(frame: pd.DataFrame, data: tasks.DataSpec) -> pd.DataFrame:
+def add_targets(
+    frame: pandas.DataFrame, data: tasks.DataSpec
+) -> pandas.DataFrame:
     """Sorts the series and adds the future-value target columns.
 
     Args:

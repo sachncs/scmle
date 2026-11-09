@@ -1,6 +1,6 @@
 """Stacking ensembles, end to end."""
 
-import numpy as np
+import numpy
 import pytest
 import support
 
@@ -80,7 +80,7 @@ def test_a_winning_stack_is_selected_refit_and_packaged(
         loaded = scmle.ModelBundle.load(
             result.save(tmp_path / "bundle"), trusted=True
         )
-        np.testing.assert_allclose(
+        numpy.testing.assert_allclose(
             result.predict(features), loaded.predict(features)
         )
 
@@ -114,15 +114,15 @@ def test_stack_resumes_without_recomputation(
 ):
     import shutil
 
-    from scmle.experimentation import trials as trials_module
+    from scmle.experimentation import trials
 
     original = run(binary_frame, tmp_path)
     (original.run_dir / "evaluation.json").unlink()
     shutil.rmtree(original.run_dir / "model")
     calls = []
-    real = trials_module.evaluate_payload
+    real = trials.evaluate_payload
     monkeypatch.setattr(
-        trials_module,
+        trials,
         "evaluate_payload",
         lambda p: calls.append(p.job.trial_id) or real(p),
     )

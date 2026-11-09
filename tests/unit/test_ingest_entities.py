@@ -1,9 +1,9 @@
 """Entity resolution: blocking, EM, clerical sample, link-then-group."""
 
-import numpy as np
+import numpy
 import pytest
 
-from benchmarks.qualification import ingest_worlds as worlds
+from benchmarks.qualification import ingest_worlds
 from scmle.contracts import qualification
 from scmle.data.ingest import entities
 
@@ -34,7 +34,7 @@ def test_string_comparators_against_known_values():
 
 
 def test_blocking_passes_union_and_skip_oversized_blocks():
-    frame = worlds.er_world(1, 40)
+    frame = ingest_worlds.er_world(1, 40)
     pairs, skipped = entities.candidate_pairs(frame, PASSES)
     assert pairs == sorted(set(pairs))
     assert skipped == 0
@@ -45,7 +45,7 @@ def test_blocking_passes_union_and_skip_oversized_blocks():
 
 
 def test_resolution_with_labels_reports_pair_completeness_and_recall():
-    frame = worlds.er_world(2, 250)
+    frame = ingest_worlds.er_world(2, 250)
     truth = frame["entity"].to_numpy()
     result = entities.resolve(
         frame,
@@ -68,7 +68,7 @@ def test_resolution_with_labels_reports_pair_completeness_and_recall():
 
 
 def test_unlabelled_resolution_is_unverified_and_groups_more_not_less():
-    frame = worlds.er_world(3, 200)
+    frame = ingest_worlds.er_world(3, 200)
     truth = frame["entity"].to_numpy()
     result = entities.resolve(frame, FIELDS, PASSES)
     assert result.tier is qualification.Tier.UNVERIFIED
@@ -78,7 +78,7 @@ def test_unlabelled_resolution_is_unverified_and_groups_more_not_less():
 
 
 def test_resolution_is_deterministic():
-    frame = worlds.er_world(4, 120)
+    frame = ingest_worlds.er_world(4, 120)
     first = entities.resolve(frame, FIELDS, PASSES)
     second = entities.resolve(frame, FIELDS, PASSES)
     assert first.groups == second.groups
@@ -86,13 +86,13 @@ def test_resolution_is_deterministic():
 
 
 def test_labeler_needs_a_named_reviewer():
-    frame = worlds.er_world(5, 30)
+    frame = ingest_worlds.er_world(5, 30)
     with pytest.raises(ValueError):
         entities.resolve(frame, FIELDS, PASSES, labeler=lambda i, j: True)
 
 
 def test_no_blocked_pairs_gives_singletons():
-    frame = worlds.er_world(6, 20)
+    frame = ingest_worlds.er_world(6, 20)
     frame["uid"] = range(len(frame))
     result = entities.resolve(frame, FIELDS, [entities.Pass("uid")])
     assert result.groups == list(range(len(frame)))
@@ -100,13 +100,13 @@ def test_no_blocked_pairs_gives_singletons():
 
 
 def test_em_recovers_separated_classes():
-    rng = np.random.default_rng(0)
+    rng = numpy.random.default_rng(0)
     match = rng.random(4000) < 0.1
-    levels = np.where(
+    levels = numpy.where(
         match[:, None],
         rng.choice([0, 1, 2], (4000, 3), p=[0.05, 0.15, 0.8]),
         rng.choice([0, 1, 2], (4000, 3), p=[0.9, 0.07, 0.03]),
-    ).astype(np.int8)
+    ).astype(numpy.int8)
     model = entities.fit_em(levels)
     weights = model.weights(levels)
     assert model.prior == pytest.approx(0.1, abs=0.03)

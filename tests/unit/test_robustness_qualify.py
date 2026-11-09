@@ -3,33 +3,33 @@
 import copy
 import json
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
-from scmle.data.charter import contracts as c
+from scmle.data.charter import contracts
 from scmle.data.detectors import certificates
 from scmle.data.robustness import qualify
 from scmle.data.robustness import report
 from scmle.data.robustness import stability
 
 RICH = (
-    c.Choice("imputation", ("median", "complete_case"), "median"),
-    c.Choice("outlier_rule", ("none", "winsorize", "iqr_drop"), "none"),
-    c.Choice("inclusion", ("all", "first_half", "second_half"), "all"),
+    contracts.Choice("imputation", ("median", "complete_case"), "median"),
+    contracts.Choice("outlier_rule", ("none", "winsorize", "iqr_drop"), "none"),
+    contracts.Choice("inclusion", ("all", "first_half", "second_half"), "all"),
 )
 
 
 def world(rows=300, seed=0):
-    rng = np.random.default_rng(seed)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    frame = pandas.DataFrame(
         {
             "a": rng.normal(size=rows),
             "b": rng.normal(size=rows),
             "g": rng.choice(["u", "v"], rows),
         }
     )
-    codes = pd.Series(frame["a"] * 0.8 + rng.normal(size=rows), name="y")
+    codes = pandas.Series(frame["a"] * 0.8 + rng.normal(size=rows), name="y")
     return frame, codes
 
 
@@ -80,7 +80,7 @@ def test_nothing_to_vary_or_nothing_found_gives_a_reason_not_a_verdict(
     tmp_path,
 ):
     frame, codes = world()
-    default = (c.Choice("imputation", ("median", "mice"), "median"),)
+    default = (contracts.Choice("imputation", ("median", "mice"), "median"),)
     few = run(frame, codes, tmp_path, choices=default)
     assert few.findings == () and "specification" in few.stability_note
     assert any("mice" in note for note in few.notes)
@@ -96,10 +96,10 @@ def test_only_the_first_findings_are_assessed_and_the_cap_is_said(
     monkeypatch.setattr(qualify, "MAX_FINDINGS", 3)
     frame, codes = world(rows=120)
     names = [f"n{k}" for k in range(qualify.MAX_FINDINGS + 2)]
-    rng = np.random.default_rng(3)
-    wide = pd.concat(
+    rng = numpy.random.default_rng(3)
+    wide = pandas.concat(
         [
-            pd.DataFrame(rng.normal(size=(120, len(names))), columns=names),
+            pandas.DataFrame(rng.normal(size=(120, len(names))), columns=names),
             frame,
         ],
         axis=1,

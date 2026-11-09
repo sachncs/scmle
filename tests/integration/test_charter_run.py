@@ -136,11 +136,11 @@ def test_a_tampered_charter_stops_the_run_before_profiling(
 
 
 def test_too_few_rows_run_unconfirmed_instead_of_failing(tmp_path):
-    import numpy as np
-    import pandas as pd
+    import numpy
+    import pandas
 
-    rng = np.random.default_rng(1)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(1)
+    frame = pandas.DataFrame(
         {"a": rng.normal(size=120), "y": (rng.random(120) < 0.4).astype(int)}
     )
     result = run(frame, tmp_path, write_charter(tmp_path))

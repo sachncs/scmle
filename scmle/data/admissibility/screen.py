@@ -88,8 +88,8 @@ from pathlib import Path
 import sys
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from scipy import stats
 
 from scmle.core import randomness
@@ -136,10 +136,10 @@ WORDS = {
 }
 
 Splits = leakage.Splits
-Statistic = Callable[[np.ndarray], np.ndarray]
+Statistic = Callable[[numpy.ndarray], numpy.ndarray]
 
 
-def basis(series: pd.Series, knots: int = KNOTS) -> np.ndarray:
+def basis(series: pandas.Series, knots: int = KNOTS) -> numpy.ndarray:
     """Builds the design matrix of one column for the cross-fitted smoother.
 
     A numeric column with more than `knots` distinct values becomes a
@@ -161,40 +161,44 @@ def basis(series: pd.Series, knots: int = KNOTS) -> np.ndarray:
         A float64 array with one row per entry of `series` and one column
         per retained basis function or indicator.
     """
-    numeric = pd.api.types.is_numeric_dtype(
+    numeric = pandas.api.types.is_numeric_dtype(
         series
-    ) and not pd.api.types.is_bool_dtype(series)
+    ) and not pandas.api.types.is_bool_dtype(series)
     if numeric:
         values = series.to_numpy(dtype="float64")
-        absent = np.isnan(values)
+        absent = numpy.isnan(values)
         finite = values[~absent]
-        if len(np.unique(finite)) > knots:
-            cuts = np.unique(np.quantile(finite, np.linspace(0, 1, knots + 1)))
-            where = np.clip(np.searchsorted(cuts, values, "right") - 1, 0, None)
-            where = np.minimum(where, len(cuts) - 2)
+        if len(numpy.unique(finite)) > knots:
+            cuts = numpy.unique(
+                numpy.quantile(finite, numpy.linspace(0, 1, knots + 1))
+            )
+            where = numpy.clip(
+                numpy.searchsorted(cuts, values, "right") - 1, 0, None
+            )
+            where = numpy.minimum(where, len(cuts) - 2)
             width = cuts[where + 1] - cuts[where]
-            weight = np.where(absent, 0.0, (values - cuts[where]) / width)
-            weight = np.clip(weight, 0.0, 1.0)
-            phi = np.zeros((len(values), len(cuts) + 1))
-            rows = np.arange(len(values))
+            weight = numpy.where(absent, 0.0, (values - cuts[where]) / width)
+            weight = numpy.clip(weight, 0.0, 1.0)
+            phi = numpy.zeros((len(values), len(cuts) + 1))
+            rows = numpy.arange(len(values))
             live = ~absent
             phi[rows[live], where[live]] = 1.0 - weight[live]
             phi[rows[live], where[live] + 1] = weight[live]
             phi[absent, -1] = 1.0
             return phi[:, phi.any(axis=0)]
-        raw = np.where(absent, np.nan, values)
-        labels = pd.Series(raw).astype("object")
+        raw = numpy.where(absent, numpy.nan, values)
+        labels = pandas.Series(raw).astype("object")
     else:
         labels = series.reset_index(drop=True).astype("object")
     labels = labels.where(labels.notna(), "<missing>").astype(str)
     top = labels.value_counts().index[: leakage.MAX_LEVELS]
     pooled = labels.where(labels.isin(top), "<other>")
-    return pd.get_dummies(pooled).to_numpy(dtype="float64")
+    return pandas.get_dummies(pooled).to_numpy(dtype="float64")
 
 
 def strata_of(
-    n: int, groups: np.ndarray | None, block_size: int | None
-) -> np.ndarray:
+    n: int, groups: numpy.ndarray | None, block_size: int | None
+) -> numpy.ndarray:
     """Assigns each row its permutation stratum: group, time block, or one.
 
     Args:
@@ -207,15 +211,17 @@ def strata_of(
         `block_size` is given.
     """
     if groups is not None:
-        return pd.factorize(pd.Series(groups).astype(str))[0].astype("int64")
+        return pandas.factorize(pandas.Series(groups).astype(str))[0].astype(
+            "int64"
+        )
     if block_size is not None:
-        return (np.arange(n) // block_size).astype("int64")
-    return np.zeros(n, dtype="int64")
+        return (numpy.arange(n) // block_size).astype("int64")
+    return numpy.zeros(n, dtype="int64")
 
 
 def batch_permutations(
-    strata: np.ndarray, count: int, rng: np.random.Generator
-) -> np.ndarray:
+    strata: numpy.ndarray, count: int, rng: numpy.random.Generator
+) -> numpy.ndarray:
     """Draws `count` permutations of the rows, each within its stratum.
 
     Entry `p[b, i]` of the result is the position whose outcome row `i`
@@ -231,10 +237,10 @@ def batch_permutations(
         An integer array of shape (count, n), one permutation per row.
     """
     n = len(strata)
-    base = np.argsort(strata, kind="stable")
+    base = numpy.argsort(strata, kind="stable")
     keys = rng.random((count, n)) + strata[None, :]
-    order = np.argsort(keys, axis=1)
-    out = np.empty_like(order)
+    order = numpy.argsort(keys, axis=1)
+    out = numpy.empty_like(order)
     out[:, base] = order
     return out
 
@@ -242,7 +248,7 @@ def batch_permutations(
 def fold_splits(
     n: int,
     folds: int,
-    groups: np.ndarray | None,
+    groups: numpy.ndarray | None,
     block_size: int | None,
     seed: int,
 ) -> Splits:
@@ -262,11 +268,13 @@ def fold_splits(
         A list of (train positions, test positions) pairs, one per fold.
     """
     return leakage.make_splits(
-        np.zeros(n), "regression", folds, groups, block_size, seed
+        numpy.zeros(n), "regression", folds, groups, block_size, seed
     )
 
 
-def oof_fit(values: np.ndarray, phi: np.ndarray, splits: Splits) -> np.ndarray:
+def oof_fit(
+    values: numpy.ndarray, phi: numpy.ndarray, splits: Splits
+) -> numpy.ndarray:
     """Out-of-fold ridge fits of each row of `values` on the design `phi`.
 
     The fit is linear in `values` for fixed `phi` and folds, so a batch of
@@ -290,24 +298,26 @@ def oof_fit(values: np.ndarray, phi: np.ndarray, splits: Splits) -> np.ndarray:
     total_sum = values.sum(axis=1)
     total_gram = phi.T @ phi
     total_cols = phi.sum(axis=0)
-    out = np.empty_like(values)
+    out = numpy.empty_like(values)
     for split in splits:
         test = split[1]
         part = values[:, test]
         design = phi[test]
         size = n - len(test)
         mean = (total_sum - part.sum(axis=1)) / size
-        gram = total_gram - design.T @ design + RIDGE * np.eye(p)
+        gram = total_gram - design.T @ design + RIDGE * numpy.eye(p)
         cols = total_cols - design.sum(axis=0)
         cross = total_cross - part @ design - mean[:, None] * cols[None, :]
-        beta = np.linalg.solve(gram, cross.T).T
+        beta = numpy.linalg.solve(gram, cross.T).T
         out[:, test] = mean[:, None] + beta @ design.T
     return out
 
 
 def fold_concordance(
-    score: np.ndarray, positive: np.ndarray, tests: Sequence[np.ndarray]
-) -> tuple[np.ndarray, np.ndarray]:
+    score: numpy.ndarray,
+    positive: numpy.ndarray,
+    tests: Sequence[numpy.ndarray],
+) -> tuple[numpy.ndarray, numpy.ndarray]:
     """Counts concordant pairs and pairs, per row, within folds only.
 
     Pairs are formed inside each held-out fold, never across folds. Across
@@ -327,8 +337,8 @@ def fold_concordance(
         concordant (positive, negative) pairs, ties counting one half, and
         the number of such pairs, summed over the folds.
     """
-    wins = np.zeros(score.shape[0])
-    pairs = np.zeros(score.shape[0])
+    wins = numpy.zeros(score.shape[0])
+    pairs = numpy.zeros(score.shape[0])
     for test in tests:
         flags = positive[:, test]
         n1 = flags.sum(axis=1)
@@ -340,8 +350,10 @@ def fold_concordance(
 
 
 def auc_rows(
-    score: np.ndarray, positive: np.ndarray, tests: Sequence[np.ndarray]
-) -> np.ndarray:
+    score: numpy.ndarray,
+    positive: numpy.ndarray,
+    tests: Sequence[numpy.ndarray],
+) -> numpy.ndarray:
     """Computes the within-fold ROC AUC of each version of the scores.
 
     Args:
@@ -353,7 +365,7 @@ def auc_rows(
         A length-B array of AUC values; NaN where no fold has both classes.
     """
     wins, pairs = fold_concordance(score, positive, tests)
-    with np.errstate(invalid="ignore", divide="ignore"):
+    with numpy.errstate(invalid="ignore", divide="ignore"):
         return wins / pairs
 
 
@@ -370,14 +382,14 @@ class Problem:
             a classification).
     """
 
-    y: np.ndarray
+    y: numpy.ndarray
     task: str
     classes: int
     splits: Splits
     total_squares: float
 
 
-def skill_statistic(problem: Problem, phi: np.ndarray) -> Statistic:
+def skill_statistic(problem: Problem, phi: numpy.ndarray) -> Statistic:
     """Builds the skill statistic of a column for batches of permuted outcomes.
 
     Args:
@@ -392,7 +404,7 @@ def skill_statistic(problem: Problem, phi: np.ndarray) -> Statistic:
     """
     tests = [split[1] for split in problem.splits]
 
-    def compute(labels: np.ndarray) -> np.ndarray:
+    def compute(labels: numpy.ndarray) -> numpy.ndarray:
         if problem.task == "regression":
             pred = oof_fit(labels, phi, problem.splits)
             squares = ((labels - pred) ** 2).sum(axis=1)
@@ -403,12 +415,14 @@ def skill_statistic(problem: Problem, phi: np.ndarray) -> Statistic:
             positive = labels == k
             pred = oof_fit(positive.astype("float64"), phi, problem.splits)
             scores.append(auc_rows(pred, positive, tests))
-        return np.mean(scores, axis=0)
+        return numpy.mean(scores, axis=0)
 
     return compute
 
 
-def observed_predictions(problem: Problem, phi: np.ndarray) -> list[np.ndarray]:
+def observed_predictions(
+    problem: Problem, phi: numpy.ndarray
+) -> list[numpy.ndarray]:
     """Out-of-fold predictions of the observed outcome.
 
     One array per scored target: the outcome for a regression, the indicator
@@ -433,9 +447,9 @@ def observed_predictions(problem: Problem, phi: np.ndarray) -> list[np.ndarray]:
 
 def sample_skill(
     problem: Problem,
-    predictions: Sequence[np.ndarray],
-    index: np.ndarray,
-    fold_of: np.ndarray,
+    predictions: Sequence[numpy.ndarray],
+    index: numpy.ndarray,
+    fold_of: numpy.ndarray,
 ) -> float | None:
     """Computes the skill on a bootstrap sample of rows.
 
@@ -457,7 +471,7 @@ def sample_skill(
             return None
         return 1.0 - float(((y - predictions[0][index]) ** 2).sum()) / total
     folds = fold_of[index]
-    tests = [np.flatnonzero(folds == f) for f in np.unique(folds)]
+    tests = [numpy.flatnonzero(folds == f) for f in numpy.unique(folds)]
     wanted = [1] if problem.classes == 2 else range(problem.classes)
     scores = []
     for pred, k in zip(predictions, wanted, strict=True):
@@ -467,15 +481,15 @@ def sample_skill(
         if pairs[0] == 0:
             return None
         scores.append(wins[0] / pairs[0])
-    return float(np.mean(scores))
+    return float(numpy.mean(scores))
 
 
 def skill_bound(
     problem: Problem,
-    phi: np.ndarray,
+    phi: numpy.ndarray,
     cfg: leakage.LeakageConfig,
-    groups: np.ndarray | None,
-    rng: np.random.Generator,
+    groups: numpy.ndarray | None,
+    rng: numpy.random.Generator,
 ) -> float:
     """One-sided lower confidence bound of the skill by bootstrap.
 
@@ -495,11 +509,11 @@ def skill_bound(
         The `1 - confidence` quantile of the bootstrap skills, or -inf.
     """
     predictions = observed_predictions(problem, phi)
-    fold_of = np.empty(len(problem.y), dtype="int64")
+    fold_of = numpy.empty(len(problem.y), dtype="int64")
     for number, split in enumerate(problem.splits):
         fold_of[split[1]] = number
     members = (
-        [np.flatnonzero(groups == g) for g in pd.unique(groups)]
+        [numpy.flatnonzero(groups == g) for g in pandas.unique(groups)]
         if groups is not None
         else None
     )
@@ -509,7 +523,7 @@ def skill_bound(
         del draw
         if members is not None:
             picks = rng.integers(0, len(members), size=len(members))
-            index = np.concatenate([members[i] for i in picks])
+            index = numpy.concatenate([members[i] for i in picks])
         else:
             index = rng.integers(0, n, size=n)
         value = sample_skill(problem, predictions, index, fold_of)
@@ -517,12 +531,12 @@ def skill_bound(
             values.append(value)
     if not values:
         return -math.inf
-    return float(np.quantile(values, 1.0 - cfg.confidence))
+    return float(numpy.quantile(values, 1.0 - cfg.confidence))
 
 
 def chi_square_rows(
-    missing: np.ndarray, labels: np.ndarray, totals: np.ndarray
-) -> np.ndarray:
+    missing: numpy.ndarray, labels: numpy.ndarray, totals: numpy.ndarray
+) -> numpy.ndarray:
     """Computes the Pearson chi-square of the 2 x K (missing by class) table.
 
     Both the missing and the present rows, and every class, must be
@@ -541,7 +555,7 @@ def chi_square_rows(
     n_missing = float(missing.sum())
     n_present = n - n_missing
     flags = missing.astype("float64")
-    chi = np.zeros(labels.shape[0])
+    chi = numpy.zeros(labels.shape[0])
     for k, total in enumerate(totals):
         a = (labels == k) @ flags
         chi += (a - n_missing * total / n) ** 2 / (n_missing * total / n)
@@ -551,7 +565,9 @@ def chi_square_rows(
     return chi
 
 
-def missingness_statistic(missing: np.ndarray, totals: np.ndarray) -> Statistic:
+def missingness_statistic(
+    missing: numpy.ndarray, totals: numpy.ndarray
+) -> Statistic:
     """Builds the Cramer's V statistic of missingness against the outcome.
 
     Args:
@@ -564,13 +580,13 @@ def missingness_statistic(missing: np.ndarray, totals: np.ndarray) -> Statistic:
     """
     n = len(missing)
 
-    def compute(labels: np.ndarray) -> np.ndarray:
-        return np.sqrt(chi_square_rows(missing, labels, totals) / n)
+    def compute(labels: numpy.ndarray) -> numpy.ndarray:
+        return numpy.sqrt(chi_square_rows(missing, labels, totals) / n)
 
     return compute
 
 
-def purity_statistic(recorded: np.ndarray) -> Statistic:
+def purity_statistic(recorded: numpy.ndarray) -> Statistic:
     """Builds the record-purity statistic.
 
     Args:
@@ -585,19 +601,19 @@ def purity_statistic(recorded: np.ndarray) -> Statistic:
     flags = recorded.astype("float64")
     count = float(flags.sum())
 
-    def compute(labels: np.ndarray) -> np.ndarray:
+    def compute(labels: numpy.ndarray) -> numpy.ndarray:
         k = int(labels.max()) + 1
         shares = [(labels == c) @ flags / count for c in range(k)]
-        return np.max(shares, axis=0)
+        return numpy.max(shares, axis=0)
 
     return compute
 
 
 def purity_bound(
-    recorded: np.ndarray,
-    classes: np.ndarray,
+    recorded: numpy.ndarray,
+    classes: numpy.ndarray,
     cfg: leakage.LeakageConfig,
-    groups: np.ndarray | None,
+    groups: numpy.ndarray | None,
 ) -> float:
     """One-sided Clopper-Pearson lower bound of the commonest class's share.
 
@@ -616,11 +632,11 @@ def purity_bound(
         successes is zero.
     """
     labels = classes[recorded]
-    counts = np.bincount(labels)
-    share = float(np.max(counts)) / len(labels)
+    counts = numpy.bincount(labels)
+    share = float(numpy.max(counts)) / len(labels)
     trials = len(labels)
     if groups is not None:
-        trials = min(trials, len(pd.unique(groups[recorded])))
+        trials = min(trials, len(pandas.unique(groups[recorded])))
     wins = round(share * trials)
     if wins == 0:
         return 0.0
@@ -628,12 +644,12 @@ def purity_bound(
 
 
 def bootstrap_v(
-    missing: np.ndarray,
-    classes: np.ndarray,
+    missing: numpy.ndarray,
+    classes: numpy.ndarray,
     n_classes: int,
     cfg: leakage.LeakageConfig,
-    groups: np.ndarray | None,
-    rng: np.random.Generator,
+    groups: numpy.ndarray | None,
+    rng: numpy.random.Generator,
 ) -> float:
     """One-sided lower confidence bound of Cramer's V by bootstrap.
 
@@ -654,7 +670,7 @@ def bootstrap_v(
         -inf.
     """
     members = (
-        [np.flatnonzero(groups == g) for g in pd.unique(groups)]
+        [numpy.flatnonzero(groups == g) for g in pandas.unique(groups)]
         if groups is not None
         else None
     )
@@ -664,21 +680,21 @@ def bootstrap_v(
         del draw
         if members is not None:
             picks = rng.integers(0, len(members), size=len(members))
-            index = np.concatenate([members[i] for i in picks])
+            index = numpy.concatenate([members[i] for i in picks])
         else:
             index = rng.integers(0, n, size=n)
         sample = missing[index]
         if sample.all() or not sample.any():
             continue
         labels = classes[index]
-        totals = np.bincount(labels, minlength=n_classes).astype("float64")
+        totals = numpy.bincount(labels, minlength=n_classes).astype("float64")
         if (totals == 0).any():
             continue
         chi = chi_square_rows(sample, labels[None, :], totals)[0]
         values.append(math.sqrt(chi / len(sample)))
     if not values:
         return -math.inf
-    return float(np.quantile(values, 1.0 - cfg.confidence))
+    return float(numpy.quantile(values, 1.0 - cfg.confidence))
 
 
 @dataclasses.dataclass(slots=True)
@@ -727,9 +743,9 @@ def required_permutations(family: int, alpha: Fraction) -> int:
 
 def draw_permutations(
     pending: Sequence[Pending],
-    labels: np.ndarray,
-    binned: np.ndarray,
-    strata: np.ndarray,
+    labels: numpy.ndarray,
+    binned: numpy.ndarray,
+    strata: numpy.ndarray,
     total: int,
     alpha: Fraction,
     seed: int,
@@ -954,10 +970,10 @@ class ScreenReport:
 
 def subsample(
     n: int,
-    groups: np.ndarray | None,
+    groups: numpy.ndarray | None,
     block_size: int | None,
     seed: int,
-) -> tuple[np.ndarray, int | None]:
+) -> tuple[numpy.ndarray, int | None]:
     """Row positions to use, at most about `MAX_ROWS`, and the block size.
 
     The choice does not look at the outcome. Groups are kept whole, time
@@ -977,23 +993,23 @@ def subsample(
         k-th row is kept and the block size shrinks by k (not below 2).
     """
     if n <= MAX_ROWS:
-        return np.arange(n), block_size
+        return numpy.arange(n), block_size
     rng = randomness.component_rng(seed, "leakage.screen.rows", 0)
     if groups is not None:
-        labels = pd.unique(groups)
-        chosen: list[np.ndarray] = []
+        labels = pandas.unique(groups)
+        chosen: list[numpy.ndarray] = []
         size = 0
         for label in labels[rng.permutation(len(labels))]:
-            where = np.flatnonzero(groups == label)
+            where = numpy.flatnonzero(groups == label)
             chosen.append(where)
             size += len(where)
             if size >= MAX_ROWS:
                 break
-        return np.sort(np.concatenate(chosen)), block_size
+        return numpy.sort(numpy.concatenate(chosen)), block_size
     if block_size is not None:
         stride = math.ceil(n / MAX_ROWS)
-        return np.arange(0, n, stride), max(2, block_size // stride)
-    return np.sort(rng.choice(n, MAX_ROWS, replace=False)), block_size
+        return numpy.arange(0, n, stride), max(2, block_size // stride)
+    return numpy.sort(rng.choice(n, MAX_ROWS, replace=False)), block_size
 
 
 def gate_statuses(
@@ -1090,7 +1106,7 @@ def work_cap(time_budget_seconds: float | None) -> int | None:
 
 
 def screen_table(
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     target: str,
     task: str,
     features: Sequence[Hashable],
@@ -1135,7 +1151,7 @@ def screen_table(
         else None
     )
     block_size = None
-    order: np.ndarray = np.arange(len(frame))
+    order: numpy.ndarray = numpy.arange(len(frame))
     if groups is None and time_column and time_column in frame.columns:
         order = frame[time_column].argsort(kind="stable").to_numpy()
         block_size = max(2, len(frame) // TIME_BLOCKS)
@@ -1212,10 +1228,10 @@ def empty_report(
 
 
 def build_problem(
-    target: pd.Series,
+    target: pandas.Series,
     task: str,
     cfg: leakage.LeakageConfig,
-    groups: np.ndarray | None,
+    groups: numpy.ndarray | None,
     block_size: int | None,
 ) -> Problem:
     """Encodes the outcome and fixes the folds.
@@ -1245,12 +1261,12 @@ def build_problem(
 
 
 def scan_frame(
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     target: str,
     task: str,
     cfg: leakage.LeakageConfig,
     names: Sequence[Hashable],
-    groups: np.ndarray | None,
+    groups: numpy.ndarray | None,
     block_size: int | None,
     gates: Mapping[str, certificates.GateStatus],
     time_budget_seconds: float | None = None,
@@ -1288,10 +1304,10 @@ def scan_frame(
     strata = strata_of(n, groups, block_size)
     structured = groups is not None or block_size is not None
     classes = leakage.binned_target(frame[target], task)
-    class_codes = pd.factorize(classes, sort=True)[0].astype("int64")
-    totals = np.bincount(class_codes).astype("float64")
+    class_codes = pandas.factorize(classes, sort=True)[0].astype("int64")
+    totals = numpy.bincount(class_codes).astype("float64")
     pending: list[Pending] = []
-    columns: dict[str, np.ndarray] = {}
+    columns: dict[str, numpy.ndarray] = {}
     for name in names:
         series = frame[name]
         phi = basis(series)
@@ -1434,12 +1450,12 @@ def scan_frame(
 
 
 def screen(
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     target: str,
     task: str,
     cfg: leakage.LeakageConfig,
     features: Sequence[Hashable] | None = None,
-    groups: pd.Series | None = None,
+    groups: pandas.Series | None = None,
     block_size: int | None = None,
     store: certificates.CertificateStore | None = None,
     time_budget_seconds: float | None = None,

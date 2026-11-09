@@ -2,8 +2,8 @@
 
 import json
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 import support
 
@@ -19,8 +19,8 @@ LARGE_BUDGET = 900
 
 
 def wide(seed=0, rows=300, columns=10, classes=3):
-    rng = np.random.default_rng(seed)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    frame = pandas.DataFrame(
         {f"x{i}": rng.normal(size=rows) for i in range(columns)}
     )
     frame["y"] = rng.choice([f"c{k}" for k in range(classes)], rows)

@@ -8,14 +8,16 @@ group, and a post-processing pass moves each group wholly to one side.
 
 from collections import Counter
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 DECIMALS = 6
 NOT_DUPLICATED = -1
 
 
-def duplicate_groups(frame: pd.DataFrame, columns: list[str]) -> np.ndarray:
+def duplicate_groups(
+    frame: pandas.DataFrame, columns: list[str]
+) -> numpy.ndarray:
     """Labels each row with the id of its duplicate group.
 
     Args:
@@ -28,17 +30,17 @@ def duplicate_groups(frame: pd.DataFrame, columns: list[str]) -> np.ndarray:
         An empty `columns` list marks every row `NOT_DUPLICATED`.
     """
     if not columns:
-        return np.full(len(frame), NOT_DUPLICATED)
+        return numpy.full(len(frame), NOT_DUPLICATED)
     keyed = frame[columns].copy()
     for column in keyed.columns:
-        if pd.api.types.is_float_dtype(keyed[column]):
+        if pandas.api.types.is_float_dtype(keyed[column]):
             keyed[column] = keyed[column].round(DECIMALS)
-        elif not pd.api.types.is_numeric_dtype(keyed[column]):
+        elif not pandas.api.types.is_numeric_dtype(keyed[column]):
             keyed[column] = keyed[column].astype(str)
-    hashes = pd.util.hash_pandas_object(keyed, index=False).to_numpy()
-    codes, uniques = pd.factorize(hashes)
-    sizes = np.bincount(codes, minlength=len(uniques))
-    return np.where(sizes[codes] > 1, codes, NOT_DUPLICATED)
+    hashes = pandas.util.hash_pandas_object(keyed, index=False).to_numpy()
+    codes, uniques = pandas.factorize(hashes)
+    sizes = numpy.bincount(codes, minlength=len(uniques))
+    return numpy.where(sizes[codes] > 1, codes, NOT_DUPLICATED)
 
 
 def majority(values: list[int]) -> int:
@@ -59,11 +61,13 @@ def majority(values: list[int]) -> int:
 
 
 def keep_together(
-    dev_ids: np.ndarray,
-    test_ids: np.ndarray,
-    folds: list[tuple[np.ndarray, np.ndarray]],
-    groups: np.ndarray,
-) -> tuple[np.ndarray, np.ndarray, list[tuple[np.ndarray, np.ndarray]], int]:
+    dev_ids: numpy.ndarray,
+    test_ids: numpy.ndarray,
+    folds: list[tuple[numpy.ndarray, numpy.ndarray]],
+    groups: numpy.ndarray,
+) -> tuple[
+    numpy.ndarray, numpy.ndarray, list[tuple[numpy.ndarray, numpy.ndarray]], int
+]:
     """Moves each duplicate group wholly into development or the test.
 
     A group goes where most of its rows already sit (development on a tie).
@@ -89,8 +93,8 @@ def keep_together(
         target = majority([side[row] for row in rows])
         for row in rows:
             side[row] = target
-    new_dev = np.array(sorted(r for r, s in side.items() if s == 0))
-    new_test = np.array(sorted(r for r, s in side.items() if s == 1))
+    new_dev = numpy.array(sorted(r for r, s in side.items() if s == 0))
+    new_test = numpy.array(sorted(r for r, s in side.items() if s == 1))
     held_in: dict[int, int] = {}
     for index, fold in enumerate(folds):
         for position in fold[1]:
@@ -106,10 +110,10 @@ def keep_together(
     rebuilt = []
     for index in range(len(folds)):
         held_rows = {row for row, fold in held_in.items() if fold == index}
-        held = np.array(
+        held = numpy.array(
             [p for p, row in enumerate(new_dev) if int(row) in held_rows]
         )
-        fit = np.array(
+        fit = numpy.array(
             [p for p, row in enumerate(new_dev) if int(row) not in held_rows]
         )
         rebuilt.append((fit, held))

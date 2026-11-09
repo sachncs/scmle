@@ -26,8 +26,8 @@ from collections.abc import Mapping
 import dataclasses
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from sklearn import ensemble
 
 from scmle.core import randomness
@@ -55,7 +55,7 @@ class FieldProvenance:
     extremes_possible: bool | None = None
 
 
-Contract = Callable[[pd.DataFrame], pd.Series]
+Contract = Callable[[pandas.DataFrame], pandas.Series]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -69,9 +69,9 @@ class TriageResult:
         tier: `attested` if any provenance was used, else `unverified`.
     """
 
-    classes: pd.Series
-    scores: pd.Series
-    candidates: pd.Series
+    classes: pandas.Series
+    scores: pandas.Series
+    candidates: pandas.Series
     tier: str
 
     def counts(self) -> dict[str, int]:
@@ -84,7 +84,7 @@ class TriageResult:
         return {name: int(counted.get(name, 0)) for name in CLASSES}
 
 
-def robust_z(series: pd.Series) -> pd.Series:
+def robust_z(series: pandas.Series) -> pandas.Series:
     """Computes the absolute robust z-score of a series.
 
     Args:
@@ -97,12 +97,12 @@ def robust_z(series: pd.Series) -> pd.Series:
     values = series.astype(float)
     centre = float(values.median())
     mad = MAD_SCALE * float((values - centre).abs().median())
-    if not np.isfinite(mad) or mad == 0.0:
-        return pd.Series(0.0, index=series.index)
+    if not numpy.isfinite(mad) or mad == 0.0:
+        return pandas.Series(0.0, index=series.index)
     return ((values - centre).abs() / mad).fillna(0.0)
 
 
-def row_scores(frame: pd.DataFrame, columns: list[str]) -> pd.Series:
+def row_scores(frame: pandas.DataFrame, columns: list[str]) -> pandas.Series:
     """Computes the maximum robust z-score per row over `columns`.
 
     Args:
@@ -113,14 +113,14 @@ def row_scores(frame: pd.DataFrame, columns: list[str]) -> pd.Series:
         The largest score of each row, or zeros when `columns` is empty.
     """
     if not columns:
-        return pd.Series(0.0, index=frame.index)
-    table = pd.concat([robust_z(frame[c]) for c in columns], axis=1)
+        return pandas.Series(0.0, index=frame.index)
+    table = pandas.concat([robust_z(frame[c]) for c in columns], axis=1)
     return table.max(axis=1)
 
 
 def isolation_rank(
-    frame: pd.DataFrame, columns: list[str], seed: int
-) -> pd.Series:
+    frame: pandas.DataFrame, columns: list[str], seed: int
+) -> pandas.Series:
     """Scores rows with an Isolation Forest, for ordering.
 
     Missing values are filled with the column median.
@@ -138,10 +138,12 @@ def isolation_rank(
     forest = ensemble.IsolationForest(
         random_state=randomness.derive_int_seed(seed, "outliers.forest", 0)
     ).fit(block)
-    return pd.Series(-forest.score_samples(block), index=frame.index)
+    return pandas.Series(-forest.score_samples(block), index=frame.index)
 
 
-def outside(series: pd.Series, bounds: tuple[float, float]) -> pd.Series:
+def outside(
+    series: pandas.Series, bounds: tuple[float, float]
+) -> pandas.Series:
     """Flags values that lie outside inclusive bounds.
 
     Args:
@@ -158,7 +160,7 @@ def outside(series: pd.Series, bounds: tuple[float, float]) -> pd.Series:
 
 
 def triage(
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     provenance: Mapping[str, FieldProvenance] | None = None,
     contracts: Mapping[str, Contract] | None = None,
     cutoff: float = CANDIDATE_Z,
@@ -185,14 +187,14 @@ def triage(
     numeric = [
         str(c)
         for c in frame.columns
-        if pd.api.types.is_numeric_dtype(frame[c])
-        and not pd.api.types.is_bool_dtype(frame[c])
+        if pandas.api.types.is_numeric_dtype(frame[c])
+        and not pandas.api.types.is_bool_dtype(frame[c])
     ]
     scores = row_scores(frame, numeric)
     candidate = scores >= cutoff
-    error = pd.Series(False, index=frame.index)
-    population = pd.Series(False, index=frame.index)
-    permitted = pd.Series(False, index=frame.index)
+    error = pandas.Series(False, index=frame.index)
+    population = pandas.Series(False, index=frame.index)
+    permitted = pandas.Series(False, index=frame.index)
     for name, info in known.items():
         if name not in frame.columns:
             raise ValueError(f"provenance names unknown column '{name}'")
@@ -205,10 +207,10 @@ def triage(
             permitted |= z >= cutoff
     for check in (contracts or {}).values():
         violated = check(frame)
-        if not isinstance(violated, pd.Series) or violated.dtype != bool:
+        if not isinstance(violated, pandas.Series) or violated.dtype != bool:
             raise ValueError("a contract must return a boolean Series")
         error |= violated.reindex(frame.index, fill_value=False)
-    classes = pd.Series("none", index=frame.index, dtype=object)
+    classes = pandas.Series("none", index=frame.index, dtype=object)
     classes[candidate] = "unclassified"
     classes[candidate & permitted & ~error & ~population] = "real_extreme"
     classes[population] = "population"
@@ -218,10 +220,10 @@ def triage(
 
 
 def error_flags(
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     provenance: Mapping[str, FieldProvenance],
     contracts: Mapping[str, Contract] | None = None,
-) -> pd.Series:
+) -> pandas.Series:
     """Flags the rows classed `error` by provenance.
 
     Args:
@@ -234,7 +236,7 @@ def error_flags(
         A boolean per row on the index of `frame`.
     """
     result = triage(frame, provenance, contracts)
-    return pd.Series(
+    return pandas.Series(
         (result.classes == "error").to_numpy(dtype=bool), index=frame.index
     )
 

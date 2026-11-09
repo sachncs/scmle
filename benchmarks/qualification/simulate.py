@@ -22,8 +22,8 @@ import dataclasses
 import math
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from scipy import stats
 
 from scmle.contracts import qualification
@@ -50,8 +50,8 @@ class World:
         seed_path: (run seed, component, index) of the random stream.
     """
 
-    features: pd.DataFrame
-    outcome: pd.Series
+    features: pandas.DataFrame
+    outcome: pandas.Series
     kind: str
     effects: Mapping[str, float]
     seed_path: qualification.SeedPath
@@ -67,7 +67,7 @@ class World:
         return tuple(c for c in self.features.columns if self.effects[c] == 0)
 
 
-def check_features(features: pd.DataFrame) -> None:
+def check_features(features: pandas.DataFrame) -> None:
     """Requires finite numeric columns that each have spread.
 
     Args:
@@ -77,24 +77,24 @@ def check_features(features: pd.DataFrame) -> None:
         ValueError: On an empty frame, a non-numeric or boolean column, a
             missing or infinite value, a constant column or a repeated name.
     """
-    if not isinstance(features, pd.DataFrame) or features.empty:
+    if not isinstance(features, pandas.DataFrame) or features.empty:
         raise ValueError("features must be a non-empty DataFrame")
     if not features.columns.is_unique:
         raise ValueError("feature names must be unique")
     for name in features.columns:
         column = features[name]
-        if not pd.api.types.is_numeric_dtype(
+        if not pandas.api.types.is_numeric_dtype(
             column
-        ) or pd.api.types.is_bool_dtype(column):
+        ) or pandas.api.types.is_bool_dtype(column):
             raise ValueError(f"feature '{name}' must be numeric")
         values = column.to_numpy(dtype=float)
-        if not np.isfinite(values).all():
+        if not numpy.isfinite(values).all():
             raise ValueError(f"feature '{name}' must be finite")
-        if float(np.std(values)) == 0.0:
+        if float(numpy.std(values)) == 0.0:
             raise ValueError(f"feature '{name}' has no spread")
 
 
-def standardize(features: pd.DataFrame) -> pd.DataFrame:
+def standardize(features: pandas.DataFrame) -> pandas.DataFrame:
     """Z-scores each column (sample standard deviation).
 
     Args:
@@ -108,7 +108,7 @@ def standardize(features: pd.DataFrame) -> pd.DataFrame:
 
 
 def planted_world(
-    features: pd.DataFrame,
+    features: pandas.DataFrame,
     effects: Mapping[str, float],
     seed: int,
     index: int = 0,
@@ -152,15 +152,15 @@ def planted_world(
         raise ValueError("an alternative world needs a nonzero effect")
     rng = randomness.component_rng(seed, "simulate.planted", index)
     z = standardize(features)
-    linear = z.to_numpy() @ np.array(list(full.values()))
+    linear = z.to_numpy() @ numpy.array(list(full.values()))
     if task == "regression":
         values = linear + sigma * rng.normal(size=len(features))
     else:
-        probability = 1.0 / (1.0 + np.exp(-linear))
+        probability = 1.0 / (1.0 + numpy.exp(-linear))
         values = (rng.random(len(features)) < probability).astype(int)
     return World(
         features=features,
-        outcome=pd.Series(values, index=features.index, name="y"),
+        outcome=pandas.Series(values, index=features.index, name="y"),
         kind="alternative",
         effects=full,
         seed_path=randomness.seed_path(seed, "simulate.planted", index),
@@ -198,7 +198,7 @@ def random_effects(
     if magnitude <= 0.0:
         raise ValueError("size must be positive")
     rng = randomness.component_rng(seed, "simulate.effects", index)
-    chosen = np.sort(rng.choice(len(names), n_signal, replace=False))
+    chosen = numpy.sort(rng.choice(len(names), n_signal, replace=False))
     signs = rng.choice([-1.0, 1.0], size=n_signal)
     return {
         names[i]: float(s) * magnitude
@@ -207,11 +207,11 @@ def random_effects(
 
 
 def permuted(
-    values: np.ndarray,
-    rng: np.random.Generator,
-    groups: pd.Series | None,
+    values: numpy.ndarray,
+    rng: numpy.random.Generator,
+    groups: pandas.Series | None,
     block_size: int | None,
-) -> np.ndarray:
+) -> numpy.ndarray:
     """Permutes `values` globally, within groups or within time blocks.
 
     Args:
@@ -232,7 +232,9 @@ def permuted(
             out[positions] = values[rng.permutation(positions)]
     elif block_size is not None:
         for start in range(0, len(values), block_size):
-            positions = np.arange(start, min(start + block_size, len(values)))
+            positions = numpy.arange(
+                start, min(start + block_size, len(values))
+            )
             out[positions] = values[rng.permutation(positions)]
     else:
         out = values[rng.permutation(len(values))]
@@ -240,7 +242,7 @@ def permuted(
 
 
 def check_permutation_scope(
-    rows: int, groups: pd.Series | None, block_size: int | None
+    rows: int, groups: pandas.Series | None, block_size: int | None
 ) -> None:
     """Validates the grouping arguments of a null world.
 
@@ -263,11 +265,11 @@ def check_permutation_scope(
 
 
 def null_world(
-    features: pd.DataFrame,
-    outcome: pd.Series,
+    features: pandas.DataFrame,
+    outcome: pandas.Series,
     seed: int,
     index: int = 0,
-    groups: pd.Series | None = None,
+    groups: pandas.Series | None = None,
     block_size: int | None = None,
 ) -> World:
     """A world with no feature-outcome relation beyond the kept structure.
@@ -293,11 +295,11 @@ def null_world(
 
 
 def build_null(
-    features: pd.DataFrame,
-    outcome: pd.Series,
+    features: pandas.DataFrame,
+    outcome: pandas.Series,
     seed: int,
     index: int,
-    groups: pd.Series | None,
+    groups: pandas.Series | None,
     block_size: int | None,
 ) -> World:
     """Builds a null world from already validated features.
@@ -324,7 +326,7 @@ def build_null(
     values = permuted(outcome.to_numpy(), rng, groups, block_size)
     return World(
         features=features,
-        outcome=pd.Series(values, index=features.index, name=outcome.name),
+        outcome=pandas.Series(values, index=features.index, name=outcome.name),
         kind="null",
         effects=dict.fromkeys(features.columns, 0.0),
         seed_path=randomness.seed_path(seed, "simulate.null", index),
@@ -332,11 +334,11 @@ def build_null(
 
 
 def null_worlds(
-    features: pd.DataFrame,
-    outcome: pd.Series,
+    features: pandas.DataFrame,
+    outcome: pandas.Series,
     runs: int,
     seed: int,
-    groups: pd.Series | None = None,
+    groups: pandas.Series | None = None,
     block_size: int | None = None,
 ) -> Iterator[World]:
     """Yields `runs` independent null worlds (stream index 0..runs-1).
@@ -439,7 +441,7 @@ def rejection_rate(
 
 def power_curve(
     test: Callable[[World], float],
-    features: pd.DataFrame,
+    features: pandas.DataFrame,
     column: str,
     grid: Sequence[float],
     runs: int,
@@ -487,7 +489,7 @@ def power_curve(
     return curve
 
 
-def coefficient_pvalues(world: World) -> pd.Series:
+def coefficient_pvalues(world: World) -> pandas.Series:
     """Two-sided p-values of the OLS coefficient of each feature.
 
     The planted truth is conditional: a null column has a zero coefficient
@@ -508,17 +510,17 @@ def coefficient_pvalues(world: World) -> pd.Series:
     rows, columns = z.shape
     if rows <= columns + 1:
         raise ValueError("coefficient tests need more rows than columns + 1")
-    design = np.column_stack([np.ones(rows), z])
+    design = numpy.column_stack([numpy.ones(rows), z])
     outcome = world.outcome.to_numpy(dtype=float)
-    solution, *_ = np.linalg.lstsq(design, outcome, rcond=None)
+    solution, *_ = numpy.linalg.lstsq(design, outcome, rcond=None)
     residual = outcome - design @ solution
     freedom = rows - columns - 1
     variance = float(residual @ residual) / freedom
-    covariance = variance * np.linalg.inv(design.T @ design)
-    errors = np.sqrt(np.diag(covariance))[1:]
+    covariance = variance * numpy.linalg.inv(design.T @ design)
+    errors = numpy.sqrt(numpy.diag(covariance))[1:]
     t_values = solution[1:] / errors
-    p_values = 2.0 * stats.t.sf(np.abs(t_values), freedom)
-    return pd.Series(p_values, index=world.features.columns)
+    p_values = 2.0 * stats.t.sf(numpy.abs(t_values), freedom)
+    return pandas.Series(p_values, index=world.features.columns)
 
 
 def false_discovery_proportion(
@@ -597,7 +599,7 @@ def summarize_false_discoveries(
         raise ValueError("no proportions to summarize")
     if not 0.0 < confidence < 1.0:
         raise ValueError("confidence must be within (0, 1)")
-    values: Any = np.array(
+    values: Any = numpy.array(
         [qualification.probability(p, "proportion") for p in proportions]
     )
     mean = float(values.mean())

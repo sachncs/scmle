@@ -4,8 +4,8 @@ import dataclasses
 import json
 import pathlib
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 import support
 
@@ -21,11 +21,11 @@ def node(name, op, inputs, **params):
 
 
 def graph_frame(rows=700, seed=0):
-    rng = np.random.default_rng(seed)
-    price = np.exp(rng.normal(3, 1, rows))
-    area = np.exp(rng.normal(4, 0.5, rows))
-    when = pd.date_range("2024-01-01", periods=rows, freq="6h")
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    price = numpy.exp(rng.normal(3, 1, rows))
+    area = numpy.exp(rng.normal(4, 0.5, rows))
+    when = pandas.date_range("2024-01-01", periods=rows, freq="6h")
+    frame = pandas.DataFrame(
         {
             "price": price,
             "area": area,
@@ -35,8 +35,8 @@ def graph_frame(rows=700, seed=0):
     )
     unit = price / area  # the signal is a *ratio*, invisible to simple models
     frame["y"] = (
-        np.log(unit) + 0.3 * (when.month % 2) + rng.normal(0, 0.3, rows)
-        > np.log(unit).mean()
+        numpy.log(unit) + 0.3 * (when.month % 2) + rng.normal(0, 0.3, rows)
+        > numpy.log(unit).mean()
     ).astype(int)
     return frame
 
@@ -69,11 +69,11 @@ def run(frame, tmp_path, graph=GRAPH, models=None, **kwargs):
 
 def interaction_frame(rows=800, seed=3):
     """The label is the sign of x1 * x2: invisible to any linear model."""
-    rng = np.random.default_rng(seed)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    frame = pandas.DataFrame(
         {"x1": rng.normal(size=rows), "x2": rng.normal(size=rows)}
     )
-    frame["when"] = pd.date_range("2024-01-01", periods=rows, freq="h")
+    frame["when"] = pandas.date_range("2024-01-01", periods=rows, freq="h")
     frame["y"] = (frame.x1 * frame.x2 + rng.normal(0, 0.1, rows) > 0).astype(
         int
     )
@@ -119,7 +119,7 @@ def test_bundle_with_a_graph_roundtrips_and_records_its_fingerprint(tmp_path):
         result.save(tmp_path / "export"), trusted=True
     )
     raw = frame.drop(columns=["y"])
-    np.testing.assert_allclose(
+    numpy.testing.assert_allclose(
         loaded.predict_proba(raw), result.predict_proba(raw)
     )
     assert loaded.schema.graph_fingerprint == GRAPH.fingerprint()
@@ -146,10 +146,10 @@ def test_fitted_nodes_are_learned_from_training_rows_only(tmp_path):
     if not hasattr(final, "named_steps") or "graph" not in final.named_steps:
         pytest.skip("final estimator hides the graph step")
     states = final.named_steps["graph"].states_
-    low, high = np.quantile(development["price"], [0.02, 0.98])
+    low, high = numpy.quantile(development["price"], [0.02, 0.98])
     assert states["price_clip"] == pytest.approx((low, high))
-    assert not np.allclose(
-        states["price_clip"], np.quantile(frame["price"], [0.02, 0.98])
+    assert not numpy.allclose(
+        states["price_clip"], numpy.quantile(frame["price"], [0.02, 0.98])
     )
 
 
@@ -183,7 +183,7 @@ def test_invalid_graphs_are_refused_before_training(tmp_path):
 
 
 def series_frame(entities=25, steps=40, seed=1):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     rows = []
     for entity in range(entities):
         level = rng.normal(0, 1)
@@ -192,13 +192,16 @@ def series_frame(entities=25, steps=40, seed=1):
             rows.append(
                 {
                     "unit": f"u{entity}",
-                    "day": pd.Timestamp("2024-01-01") + pd.Timedelta(days=step),
+                    "day": pandas.Timestamp("2024-01-01")
+                    + pandas.Timedelta(days=step),
                     "load": level,
                     "extra": rng.normal(),
                 }
             )
     frame = (
-        pd.DataFrame(rows).sample(frac=1, random_state=0).reset_index(drop=True)
+        pandas.DataFrame(rows)
+        .sample(frac=1, random_state=0)
+        .reset_index(drop=True)
     )
     ordered = frame.sort_values(["unit", "day"])
     next_load = ordered.groupby("unit")["load"].shift(
@@ -260,7 +263,7 @@ def test_time_series_features_are_generated_within_groups_and_scored_with_histor
     full_view = result.bundle.prepare_frame(batch)
     cut_view = result.bundle.prepare_frame(truncated)
     shared = cut_view.index
-    pd.testing.assert_frame_equal(cut_view, full_view.loc[shared])
+    pandas.testing.assert_frame_equal(cut_view, full_view.loc[shared])
 
 
 def test_search_is_invariant_to_future_target_rewrites_with_a_graph(tmp_path):
@@ -270,7 +273,7 @@ def test_search_is_invariant_to_future_target_rewrites_with_a_graph(tmp_path):
         (first.run_dir / "validation_manifest.json").read_text()
     )
     altered = frame.copy()
-    rng = np.random.default_rng(5)
+    rng = numpy.random.default_rng(5)
     test_rows = frame.index[manifest["test_ids"]]
     altered.loc[test_rows, "y"] = rng.permutation(
         altered.loc[test_rows, "y"].to_numpy()
@@ -292,14 +295,14 @@ def test_a_single_new_record_gets_lag_and_rolling_values_from_stored_history(
     last, history = unit.iloc[[-1]], unit.iloc[:-1]
     # A new day after everything the model saw: the record arrives alone.
     new = last.copy()
-    new["day"] = last.day + pd.Timedelta(days=1)
+    new["day"] = last.day + pandas.Timedelta(days=1)
     new["load"] = 0.5
     alone = result.bundle.prepare_frame(new)
     assert alone[["load_prev", "load_change", "load_avg3"]].notna().all().all()
     # It equals the features computed with the full history in the batch.
-    together = result.bundle.prepare_frame(pd.concat([unit, new]))
+    together = result.bundle.prepare_frame(pandas.concat([unit, new]))
     expected = together.iloc[[-1]]
-    pd.testing.assert_frame_equal(
+    pandas.testing.assert_frame_equal(
         alone.reset_index(drop=True), expected.reset_index(drop=True)
     )
     assert alone["load_prev"].iloc[0] == pytest.approx(last["load"].iloc[0])
@@ -308,16 +311,16 @@ def test_a_single_new_record_gets_lag_and_rolling_values_from_stored_history(
 
 def test_history_survives_save_and_load_and_tampering_is_detected(tmp_path):
     result = run_series(series_frame(), tmp_path / "run")
-    from scmle.artifacts import bundle as bundle_module
+    from scmle.artifacts import bundle
 
     directory = tmp_path / "saved"
     result.bundle.save(directory)
-    assert (directory / bundle_module.HISTORY_FILE).exists()
-    loaded = bundle_module.ModelBundle.load(directory, trusted=True)
-    pd.testing.assert_frame_equal(loaded.history, result.bundle.history)
-    (directory / bundle_module.HISTORY_FILE).write_bytes(b"tampered")
+    assert (directory / bundle.HISTORY_FILE).exists()
+    loaded = bundle.ModelBundle.load(directory, trusted=True)
+    pandas.testing.assert_frame_equal(loaded.history, result.bundle.history)
+    (directory / bundle.HISTORY_FILE).write_bytes(b"tampered")
     with pytest.raises(errors.ArtifactError, match="series history"):
-        bundle_module.ModelBundle.load(directory, trusted=True)
+        bundle.ModelBundle.load(directory, trusted=True)
 
 
 def test_serving_remembers_records_so_the_next_single_record_sees_them(
@@ -330,11 +333,11 @@ def test_serving_remembers_records_so_the_next_single_record_sees_them(
     raw = series_frame().drop(columns=["y"])
     last_day = raw.day.max()
     first = raw[raw.unit == "u1"].iloc[[0]].copy()
-    first["day"] = last_day + pd.Timedelta(days=1)
+    first["day"] = last_day + pandas.Timedelta(days=1)
     first["load"] = 7.0
     adapter.respond(first.to_dict(orient="records"))
     second = first.copy()
-    second["day"] = last_day + pd.Timedelta(days=2)
+    second["day"] = last_day + pandas.Timedelta(days=2)
     second["load"] = 1.0
     view = result.bundle.prepare_frame(second)
     assert view["load_prev"].iloc[0] == pytest.approx(7.0)

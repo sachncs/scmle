@@ -3,10 +3,10 @@
 import itertools
 import json
 
-import numpy as np
+import numpy
 import pytest
 
-from scmle.data.admissibility import dag as d
+from scmle.data.admissibility import dag
 
 
 def simple_paths(edges, nodes, start, end):
@@ -74,7 +74,7 @@ def brute_backdoor(nodes, edges, t, y, z):
 
 
 def random_dag(seed, n=6, density=0.35):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     names = [f"v{i}" for i in range(n)]
     order = list(rng.permutation(n))
     edges = [
@@ -89,7 +89,7 @@ def random_dag(seed, n=6, density=0.35):
 @pytest.mark.parametrize("seed", range(60))
 def test_d_separation_matches_path_enumeration(seed):
     names, edges = random_dag(seed)
-    graph = d.Dag.build(edges, "test", extra_nodes=names)
+    graph = dag.Dag.build(edges, "test", extra_nodes=names)
     for x, y in itertools.combinations(names, 2):
         others = [n for n in names if n not in (x, y)]
         for size in range(len(others) + 1):
@@ -102,7 +102,7 @@ def test_d_separation_matches_path_enumeration(seed):
 @pytest.mark.parametrize("seed", range(60))
 def test_backdoor_criterion_matches_the_definition(seed):
     names, edges = random_dag(seed, n=6, density=0.45)
-    graph = d.Dag.build(edges, "test", extra_nodes=names)
+    graph = dag.Dag.build(edges, "test", extra_nodes=names)
     t, y = names[0], names[1]
     others = [n for n in names if n not in (t, y)]
     for size in range(len(others) + 1):
@@ -114,7 +114,7 @@ def test_backdoor_criterion_matches_the_definition(seed):
 
 def test_textbook_confounder_mediator_collider():
     # C -> T, C -> Y, T -> M -> Y, T -> K <- Y
-    graph = d.Dag.build(
+    graph = dag.Dag.build(
         [
             ("C", "T"),
             ("C", "Y"),
@@ -134,7 +134,7 @@ def test_textbook_confounder_mediator_collider():
 
 
 def test_m_bias_collider_is_not_adjusted_for_and_empty_set_is_valid():
-    graph = d.Dag.build(
+    graph = dag.Dag.build(
         [("U1", "T"), ("U1", "Z"), ("U2", "Z"), ("U2", "Y"), ("T", "Y")],
         "expert",
         latent=["U1", "U2"],
@@ -145,22 +145,22 @@ def test_m_bias_collider_is_not_adjusted_for_and_empty_set_is_valid():
 
 
 def test_no_adjustment_set_when_the_confounder_is_latent():
-    graph = d.Dag.build(
+    graph = dag.Dag.build(
         [("U", "T"), ("U", "Y"), ("T", "Y")], "expert", latent=["U"]
     )
     assert graph.adjustment_set("T", "Y") is None
 
 
 def test_search_is_bounded():
-    count = d.MAX_SEARCH_CANDIDATES + 1
+    count = dag.MAX_SEARCH_CANDIDATES + 1
     edges = [(f"c{i}", "Y") for i in range(count)]
-    graph = d.Dag.build([*edges, ("T", "Y")], "expert")
+    graph = dag.Dag.build([*edges, ("T", "Y")], "expert")
     with pytest.raises(ValueError, match="candidate"):
         graph.adjustment_set("T", "Y")
 
 
 def test_ancestors_descendants_parents_children():
-    graph = d.Dag.build([("a", "b"), ("b", "c"), ("a", "c")], "t")
+    graph = dag.Dag.build([("a", "b"), ("b", "c"), ("a", "c")], "t")
     assert graph.parents("c") == {"a", "b"}
     assert graph.children("a") == {"b", "c"}
     assert graph.descendants("a") == {"b", "c"}
@@ -171,21 +171,21 @@ def test_ancestors_descendants_parents_children():
 
 def test_validation_rejects_cycles_loops_and_unsorted_input():
     with pytest.raises(ValueError, match="cycle"):
-        d.Dag.build([("a", "b"), ("b", "a")], "t")
+        dag.Dag.build([("a", "b"), ("b", "a")], "t")
     with pytest.raises(ValueError, match="self loops"):
-        d.Dag.build([("a", "a")], "t")
+        dag.Dag.build([("a", "a")], "t")
     with pytest.raises(ValueError, match="sorted"):
-        d.Dag(("b", "a"), (), (), "t", "none")
+        dag.Dag(("b", "a"), (), (), "t", "none")
     with pytest.raises(ValueError, match="unknown node"):
-        d.Dag(("a",), (("a", "z"),), (), "t", "none")
+        dag.Dag(("a",), (("a", "z"),), (), "t", "none")
     with pytest.raises(ValueError, match="latent"):
-        d.Dag(("a",), (), ("q",), "t", "none")
+        dag.Dag(("a",), (), ("q",), "t", "none")
     with pytest.raises(ValueError, match="source"):
-        d.Dag.build([("a", "b")], " ")
+        dag.Dag.build([("a", "b")], " ")
 
 
 def test_separation_rejects_overlapping_or_unknown_sets():
-    graph = d.Dag.build([("a", "b")], "t")
+    graph = dag.Dag.build([("a", "b")], "t")
     with pytest.raises(ValueError, match="disjoint"):
         graph.d_separated(["a"], ["a"], [])
     with pytest.raises(ValueError, match="not in the graph"):
@@ -197,43 +197,45 @@ def test_separation_rejects_overlapping_or_unknown_sets():
 
 
 def test_hash_is_stable_and_every_field_changes_it():
-    base = d.Dag.build([("a", "b")], "expert", "none")
-    assert base.digest() == d.Dag.build([("a", "b")], "expert", "none").digest()
+    base = dag.Dag.build([("a", "b")], "expert", "none")
+    assert (
+        base.digest() == dag.Dag.build([("a", "b")], "expert", "none").digest()
+    )
     assert len(base.digest()) == 64
     variants = [
-        d.Dag.build([("a", "b"), ("b", "c")], "expert", "none"),
-        d.Dag.build([("b", "a")], "expert", "none"),
-        d.Dag.build([("a", "b")], "llm", "none"),
-        d.Dag.build([("a", "b")], "expert", "draft a DAG"),
-        d.Dag.build([("a", "b")], "expert", "none", latent=["a"]),
-        d.Dag.build([("a", "b")], "expert", "none", extra_nodes=["z"]),
+        dag.Dag.build([("a", "b"), ("b", "c")], "expert", "none"),
+        dag.Dag.build([("b", "a")], "expert", "none"),
+        dag.Dag.build([("a", "b")], "llm", "none"),
+        dag.Dag.build([("a", "b")], "expert", "draft a DAG"),
+        dag.Dag.build([("a", "b")], "expert", "none", latent=["a"]),
+        dag.Dag.build([("a", "b")], "expert", "none", extra_nodes=["z"]),
     ]
     digests = {v.digest() for v in variants} | {base.digest()}
     assert len(digests) == len(variants) + 1
 
 
 def test_artifact_round_trips_and_detects_edits():
-    graph = d.Dag.build([("a", "b")], "llm draft", "prompt text")
+    graph = dag.Dag.build([("a", "b")], "llm draft", "prompt text")
     doc = json.loads(json.dumps(graph.artifact()))
     assert doc["status"] == "hypothesis"
     assert doc["hash"] == graph.digest()
-    assert d.Dag.from_artifact(doc) == graph
+    assert dag.Dag.from_artifact(doc) == graph
     edited = {**doc, "edges": [["a", "b"], ["b", "a"]]}
     with pytest.raises(ValueError):
-        d.Dag.from_artifact(edited)
+        dag.Dag.from_artifact(edited)
     tampered = {**doc, "source": "someone else"}
     with pytest.raises(ValueError, match="hash"):
-        d.Dag.from_artifact(tampered)
+        dag.Dag.from_artifact(tampered)
     with pytest.raises(ValueError, match="hypothesis"):
-        d.Dag.from_artifact({**doc, "status": "confirmed"})
+        dag.Dag.from_artifact({**doc, "status": "confirmed"})
     with pytest.raises(ValueError, match="unexpected or missing"):
-        d.Dag.from_artifact({k: v for k, v in doc.items() if k != "prompt"})
+        dag.Dag.from_artifact({k: v for k, v in doc.items() if k != "prompt"})
     with pytest.raises(ValueError, match="format_version"):
-        d.Dag.from_artifact({**doc, "format_version": 2})
+        dag.Dag.from_artifact({**doc, "format_version": 2})
 
 
 def test_a_search_of_exactly_the_maximum_size_is_allowed():
-    edges = [(f"c{i}", "Y") for i in range(d.MAX_SEARCH_CANDIDATES)]
-    graph = d.Dag.build([*edges, ("T", "Y")], "expert")
-    assert len(graph.candidates("T", "Y")) == d.MAX_SEARCH_CANDIDATES
+    edges = [(f"c{i}", "Y") for i in range(dag.MAX_SEARCH_CANDIDATES)]
+    graph = dag.Dag.build([*edges, ("T", "Y")], "expert")
+    assert len(graph.candidates("T", "Y")) == dag.MAX_SEARCH_CANDIDATES
     assert graph.adjustment_set("T", "Y") == ()

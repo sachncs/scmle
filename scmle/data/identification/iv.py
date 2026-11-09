@@ -30,8 +30,8 @@ import dataclasses
 import math
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from scipy import stats
 
 F_THRESHOLD = 10.0
@@ -115,8 +115,8 @@ class IvResult:
 
 
 def residualise(
-    columns: list[np.ndarray], controls: np.ndarray
-) -> list[np.ndarray]:
+    columns: list[numpy.ndarray], controls: numpy.ndarray
+) -> list[numpy.ndarray]:
     """Residualises each column on the controls (with an intercept).
 
     Args:
@@ -127,16 +127,16 @@ def residualise(
     Returns:
         The residuals of each column, in the order given.
     """
-    design = np.column_stack([np.ones(len(controls)), controls])
+    design = numpy.column_stack([numpy.ones(len(controls)), controls])
     out = []
     for column in columns:
-        coef = np.linalg.lstsq(design, column, rcond=None)[0]
+        coef = numpy.linalg.lstsq(design, column, rcond=None)[0]
         out.append(column - design @ coef)
     return out
 
 
 def anderson_rubin(
-    z: np.ndarray, y: np.ndarray, d: np.ndarray, level: float
+    z: numpy.ndarray, y: numpy.ndarray, d: numpy.ndarray, level: float
 ) -> tuple[str, float, float]:
     """Computes the Anderson-Rubin set for one instrument.
 
@@ -155,9 +155,9 @@ def anderson_rubin(
     szz = float(z @ z)
     pi_y, pi_d = float(z @ y) / szz, float(z @ d) / szz
     r_y, r_d = y - pi_y * z, d - pi_d * z
-    v_yy = float(np.sum(z**2 * r_y**2)) / szz**2
-    v_dd = float(np.sum(z**2 * r_d**2)) / szz**2
-    v_yd = float(np.sum(z**2 * r_y * r_d)) / szz**2
+    v_yy = float(numpy.sum(z**2 * r_y**2)) / szz**2
+    v_dd = float(numpy.sum(z**2 * r_d**2)) / szz**2
+    v_yd = float(numpy.sum(z**2 * r_y * r_d)) / szz**2
     c = float(stats.chi2.ppf(level, 1))
     a = pi_d**2 - c * v_dd
     b = -2.0 * (pi_y * pi_d - c * v_yd)
@@ -179,7 +179,7 @@ def anderson_rubin(
 
 
 def estimate(
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     treatment: str,
     outcome: str,
     instrument: str,
@@ -210,11 +210,11 @@ def estimate(
     """
     names = [treatment, outcome, instrument, *controls]
     data = frame[names].to_numpy(dtype=float)
-    if not np.isfinite(data).all():
+    if not numpy.isfinite(data).all():
         raise ValueError("IV columns must not hold missing values")
     n = len(data)
     d, y, z = data[:, 0], data[:, 1], data[:, 2]
-    w = data[:, 3:] if controls else np.empty((n, 0))
+    w = data[:, 3:] if controls else numpy.empty((n, 0))
     d, y, z = residualise([d, y, z], w)
     szd, szz = float(z @ d), float(z @ z)
     if szz <= 1e-12 or abs(szd) <= 1e-12:
@@ -222,10 +222,10 @@ def estimate(
     scale = n / (n - 2 - w.shape[1])
     beta = float(z @ y) / szd
     u = y - beta * d
-    se = math.sqrt(scale * float(np.sum(z**2 * u**2))) / abs(szd)
+    se = math.sqrt(scale * float(numpy.sum(z**2 * u**2))) / abs(szd)
     pi = szd / szz
     v = d - pi * z
-    f_stat = pi**2 / (scale * float(np.sum(z**2 * v**2)) / szz**2)
+    f_stat = pi**2 / (scale * float(numpy.sum(z**2 * v**2)) / szz**2)
     quantile = float(stats.norm.ppf(0.5 + level / 2))
     wald = (beta - quantile * se, beta + quantile * se)
     kind, ar_low, ar_high = anderson_rubin(z, y, d, level)

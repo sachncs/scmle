@@ -23,7 +23,7 @@ At least two strata are required.
 import dataclasses
 from typing import Any
 
-import numpy as np
+import numpy
 from scipy import stats
 
 from scmle.evaluation import coverage
@@ -200,8 +200,8 @@ def replicate(
     """
     if len(strata) < MIN_STRATA:
         raise ValueError(f"replication needs at least {MIN_STRATA} strata")
-    est = np.array([v[0] for v in strata.values()])
-    se = np.array([v[1] for v in strata.values()])
+    est = numpy.array([v[0] for v in strata.values()])
+    se = numpy.array([v[1] for v in strata.values()])
     if not (se > 0).all():
         raise ValueError("stratum standard errors must be positive")
     weight = 1.0 / se**2
@@ -209,7 +209,7 @@ def replicate(
     q = float((weight * (est - center) ** 2).sum())
     p = float(stats.chi2.sf(q, len(est) - 1))
     sign = 1 if pooled >= 0 else -1
-    same = bool((np.sign(est) == sign).all())
+    same = bool((numpy.sign(est) == sign).all())
     return Replication(
         dict(strata), sign, same, q, p, alpha, same and p >= alpha
     )

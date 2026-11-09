@@ -3,8 +3,8 @@
 import datetime
 import json
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
 from scmle.contracts import qualification
@@ -20,10 +20,10 @@ TODAY = datetime.date(2026, 6, 1)
 
 
 def table(rows=500, seed=0):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     a = rng.normal(size=rows)
-    y = pd.Series((a + rng.normal(size=rows) > 0).astype(int), name="y")
-    return pd.DataFrame({"a": a, "copy": y.to_numpy() * 1.0}), y
+    y = pandas.Series((a + rng.normal(size=rows) > 0).astype(int), name="y")
+    return pandas.DataFrame({"a": a, "copy": y.to_numpy() * 1.0}), y
 
 
 def attest(column="copy", scope=SCOPE, date="2026-01-01", expires="2026-12-31"):

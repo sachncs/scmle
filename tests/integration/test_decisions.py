@@ -1,6 +1,6 @@
 """Threshold optimization and probability calibration, end to end."""
 
-import numpy as np
+import numpy
 import support
 
 import scmle
@@ -34,7 +34,7 @@ def test_threshold_is_optimized_on_validation_and_frozen_into_the_bundle(
     features = imbalanced_frame.drop(columns="y")
     probability = result.predict_proba(features)[:, 1]
     expected = (probability >= chosen["threshold"]).astype(int)
-    np.testing.assert_array_equal(result.predict(features), expected)
+    numpy.testing.assert_array_equal(result.predict(features), expected)
     assert result.evaluation["test_set_opened"] is True
 
 

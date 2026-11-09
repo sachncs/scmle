@@ -11,7 +11,7 @@ the map near identity when calibration rows are few.
 from typing import Any
 from typing import Self
 
-import numpy as np
+import numpy
 from sklearn import base
 from sklearn import linear_model
 
@@ -37,7 +37,7 @@ class DirichletCalibrator(base.BaseEstimator, base.ClassifierMixin):
         self.estimator = estimator
         self.regularization = regularization
 
-    def log_probabilities(self, features: Any) -> np.ndarray:
+    def log_probabilities(self, features: Any) -> numpy.ndarray:
         """Log of the wrapped model's probabilities, floored.
 
         Args:
@@ -47,8 +47,8 @@ class DirichletCalibrator(base.BaseEstimator, base.ClassifierMixin):
             The natural log of each class probability, with probabilities
             clipped to `[FLOOR, 1]` first; shape `(rows, classes)`.
         """
-        probabilities = np.asarray(self.estimator.predict_proba(features))
-        return np.log(np.clip(probabilities, FLOOR, 1.0))
+        probabilities = numpy.asarray(self.estimator.predict_proba(features))
+        return numpy.log(numpy.clip(probabilities, FLOOR, 1.0))
 
     def fit(self, features: Any, labels: Any) -> Self:
         """Fits a multinomial logistic map on the wrapped log-probabilities.
@@ -65,11 +65,11 @@ class DirichletCalibrator(base.BaseEstimator, base.ClassifierMixin):
         """
         self.map_ = linear_model.LogisticRegression(
             C=1.0 / max(self.regularization, 1e-9), max_iter=1000
-        ).fit(self.log_probabilities(features), np.asarray(labels))
+        ).fit(self.log_probabilities(features), numpy.asarray(labels))
         self.classes_ = self.map_.classes_
         return self
 
-    def predict_proba(self, features: Any) -> np.ndarray:
+    def predict_proba(self, features: Any) -> numpy.ndarray:
         """Calibrated class probabilities.
 
         Args:
@@ -81,7 +81,7 @@ class DirichletCalibrator(base.BaseEstimator, base.ClassifierMixin):
         """
         return self.map_.predict_proba(self.log_probabilities(features))
 
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """Most probable class after calibration.
 
         Args:

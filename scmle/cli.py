@@ -16,35 +16,35 @@ import threading
 import types
 from typing import ClassVar
 
-import pandas as pd
+import pandas
 
 from scmle import DatasetCatalog
 from scmle import durability
 from scmle.api import project
-from scmle.artifacts import bundle as bundle_module
+from scmle.artifacts import bundle
 from scmle.artifacts import claims_audit
 from scmle.contracts import errors
 from scmle.contracts import signing
 from scmle.contracts import tasks
 from scmle.core import config
-from scmle.data.charter import contracts as charter_contracts
-from scmle.data.charter import feasibility as charter_feasibility
-from scmle.data.charter import sealing as charter_sealing
-from scmle.data.framing import costs as framing_costs
-from scmle.data.framing import draft as framing_draft
-from scmle.data.framing import refusal as framing_refusal
-from scmle.data.ingest import budget as ingest_budget
-from scmle.data.ingest import grain as ingest_grain
+from scmle.data.charter import contracts
+from scmle.data.charter import feasibility
+from scmle.data.charter import sealing
+from scmle.data.framing import costs
+from scmle.data.framing import draft
+from scmle.data.framing import refusal
+from scmle.data.ingest import budget
+from scmle.data.ingest import grain
 from scmle.data.ingest import plan as ingest_plan
 from scmle.data.readers import tabular
-from scmle.deploy import gate as deploy_gate
+from scmle.deploy import gate
 from scmle.deploy import livetests
 from scmle.deploy import record as deploy_record
-from scmle.deploy import release as deploy_release
+from scmle.deploy import release
 from scmle.governance import deployment_ledger
 from scmle.governance import envelope as envelope_module
 from scmle.governance import loop as loop_module
-from scmle.governance import registry as registry_module
+from scmle.governance import registry
 from scmle.governance import release_state
 from scmle.inference import mapping as mapping_module
 from scmle.inference import parity
@@ -52,8 +52,8 @@ from scmle.inference import serving
 from scmle.operations import controller as controller_module
 from scmle.optimization import optimizers
 from scmle.security import access
-from scmle.trail import builder as trail_build
-from scmle.trail import chain as trail_chain
+from scmle.trail import builder
+from scmle.trail import chain
 from scmle.trail import show as trail_show
 
 LOGGER = logging.getLogger(__name__)
@@ -516,7 +516,7 @@ class CatalogCommand(Command):
         if args.input == "-":
             raw_location = "-"
         if raw_location is not None:
-            catalog_input: bytes | pd.DataFrame = self.read_raw_bytes(
+            catalog_input: bytes | pandas.DataFrame = self.read_raw_bytes(
                 raw_location
             )
             source = args.source_uri or (
@@ -592,15 +592,15 @@ class PredictCommand(Command):
         Returns:
             The exit status, EXIT_OK (0).
         """
-        model = bundle_module.ModelBundle.load(
-            args.bundle, trusted=args.trusted
-        )
+        model = bundle.ModelBundle.load(args.bundle, trusted=args.trusted)
         mapping = mapping_module.ColumnMapping(
             dict(pair.split("=", 1) for pair in args.rename),
             args.case_insensitive,
             args.strip_whitespace,
         )
-        frame = pd.DataFrame({"prediction": model.predict(args.data, mapping)})
+        frame = pandas.DataFrame(
+            {"prediction": model.predict(args.data, mapping)}
+        )
         if model.classes is not None:
             proba = model.predict_proba(args.data, mapping)
             for index, label in enumerate(model.classes):
@@ -652,9 +652,7 @@ class BatchCommand(Command):
         Returns:
             The exit status, EXIT_OK (0).
         """
-        model = bundle_module.ModelBundle.load(
-            args.bundle, trusted=args.trusted
-        )
+        model = bundle.ModelBundle.load(args.bundle, trusted=args.trusted)
         adapter = serving.BatchServing(
             model, on_null=args.on_null, on_unseen=args.on_unseen
         )
@@ -693,9 +691,7 @@ class ServeCommand(Command):
         Returns:
             The exit status, EXIT_OK (0), once serving has stopped.
         """
-        model = bundle_module.ModelBundle.load(
-            args.bundle, trusted=args.trusted
-        )
+        model = bundle.ModelBundle.load(args.bundle, trusted=args.trusted)
         adapter = serving.HttpServing(
             model,
             args.host,
@@ -741,9 +737,7 @@ class ExportOnnxCommand(Command):
         Returns:
             The exit status, EXIT_OK (0).
         """
-        model = bundle_module.ModelBundle.load(
-            args.bundle, trusted=args.trusted
-        )
+        model = bundle.ModelBundle.load(args.bundle, trusted=args.trusted)
         check = None if args.check is None else model.read_frame(args.check)
         written = model.export_onnx(args.output, check=check)
         LOGGER.info("wrote %s", written)
@@ -775,9 +769,7 @@ class PackageCommand(Command):
         Returns:
             The exit status, EXIT_OK (0).
         """
-        model = bundle_module.ModelBundle.load(
-            args.bundle, trusted=args.trusted
-        )
+        model = bundle.ModelBundle.load(args.bundle, trusted=args.trusted)
         folder = model.export_service(args.output)
         LOGGER.info("wrote service folder %s", folder)
         return EXIT_OK
@@ -805,9 +797,7 @@ class IngestCommand(Command):
         parser.add_argument("--eps-key", type=float, default=0.0)
         parser.add_argument("--eps-null", type=float, default=0.0)
         parser.add_argument("--eps-fk", type=float, default=0.0)
-        parser.add_argument(
-            "--max-key-size", type=int, default=ingest_grain.LEVELS
-        )
+        parser.add_argument("--max-key-size", type=int, default=grain.LEVELS)
         parser.add_argument("--max-queries", type=int)
         parser.add_argument("--max-rows-scanned", type=int)
         parser.add_argument("--max-seconds", type=float)
@@ -850,7 +840,7 @@ class IngestCommand(Command):
             pathlib.Path(args.output),
             ingest_plan.sqlite_factory(args.sqlite),
             settings,
-            ingest_budget.IngestBudget(
+            budget.IngestBudget(
                 args.max_queries, args.max_rows_scanned, args.max_seconds
             ),
         )
@@ -923,7 +913,7 @@ class CharterCommand(Command):
         if path.exists() and not args.force:
             raise errors.ConfigError(f"{path} exists; pass --force")
         path.write_text(
-            json.dumps(charter_contracts.template(), indent=2) + "\n",
+            json.dumps(contracts.template(), indent=2) + "\n",
             newline="\n",
         )
         LOGGER.info("wrote template charter %s", path)
@@ -939,7 +929,7 @@ class CharterCommand(Command):
         Returns:
             The exit status, EXIT_OK (0).
         """
-        loaded = charter_sealing.read_verified(args.path)
+        loaded = sealing.read_verified(args.path)
         charter = loaded.charter
         LOGGER.info(
             "charter %s %s",
@@ -947,7 +937,7 @@ class CharterCommand(Command):
             "signature verified" if loaded.signed else "unsigned or unchecked",
         )
         if args.rows is not None:
-            report = charter_feasibility.assess(
+            report = feasibility.assess(
                 n_confirmation=int(
                     args.rows * charter.sets.confirmation_fraction
                 ),
@@ -982,8 +972,8 @@ class CharterCommand(Command):
             raise errors.ConfigError(
                 "no signing key: set SCMLE_SIGNING_KEY or pass --key-file"
             )
-        charter = charter_contracts.read_charter(args.path)
-        output = charter_sealing.write_charter(
+        charter = contracts.read_charter(args.path)
+        output = sealing.write_charter(
             args.output or args.path, charter, signing_key=key
         )
         LOGGER.info("signed %s", output)
@@ -1078,13 +1068,13 @@ class LoopCommand(Command):
             The exit status, EXIT_OK (0).
         """
         loop = loop_module.Loop.resume(args.deploy_dir)
-        frame = pd.read_csv(args.batch)
+        frame = pandas.read_csv(args.batch)
         outcome = loop.observe(
             frame,
             frame[args.predictions_column].tolist(),
             frame[args.decisions_column].tolist(),
         )
-        counts = pd.Series(outcome.routing.status).value_counts().to_dict()
+        counts = pandas.Series(outcome.routing.status).value_counts().to_dict()
         print(json.dumps({"batch": outcome.batch, "routing": counts}))
         return EXIT_OK
 
@@ -1099,7 +1089,7 @@ class LoopCommand(Command):
             The exit status, EXIT_OK (0).
         """
         loop = loop_module.Loop.resume(args.deploy_dir)
-        frame = pd.read_csv(args.labels)
+        frame = pandas.read_csv(args.labels)
         matched = loop.mature(
             dict(zip(frame["case_id"].astype(str), frame["loss"], strict=True))
         )
@@ -1567,11 +1557,11 @@ class DeployCommand(Command):
             EXIT_BLOCKED (2) if the gate refuses, else EXIT_OK (0).
         """
         key = DeployCommand.read_key(args.key_file)
-        candidate = deploy_release.load_candidate(args.manifest)
+        candidate = release.load_candidate(args.manifest)
         if args.stage == "admit":
-            decision = deploy_gate.admit(candidate, key)
+            decision = gate.admit(candidate, key)
         else:
-            decision = deploy_gate.certify(candidate, key)
+            decision = gate.certify(candidate, key)
         print(json.dumps(decision.to_dict(), indent=2, sort_keys=True))
         if not decision.allowed:
             return EXIT_BLOCKED
@@ -1591,14 +1581,14 @@ class DeployCommand(Command):
         Returns:
             EXIT_OK (0) if they agree, else EXIT_FAILED (1).
         """
-        store = registry_module.ModelRegistryStore(args.registry)
+        store = registry.ModelRegistryStore(args.registry)
         ledger = (
             deployment_ledger.DeploymentLedger.load(args.ledger)
             if args.ledger
             else None
         )
-        seen = deploy_release.observation_from_dict(
-            deploy_release.read_json(pathlib.Path(args.observation))
+        seen = release.observation_from_dict(
+            release.read_json(pathlib.Path(args.observation))
         )
         report = release_state.ReleaseRegistry(store, ledger).reconcile(
             args.model, args.environment, seen
@@ -1621,9 +1611,9 @@ class DeployCommand(Command):
         Returns:
             The exit status, EXIT_OK (0).
         """
-        store = registry_module.ModelRegistryStore(args.registry)
+        store = registry.ModelRegistryStore(args.registry)
         version = store.resolve(args.model, args.version)
-        print(deploy_gate.model_digest_of(store, version))
+        print(gate.model_digest_of(store, version))
         return EXIT_OK
 
     @staticmethod
@@ -1825,15 +1815,15 @@ class FrameCommand(Command):
         Returns:
             EXIT_BLOCKED (2) if the framing was refused, else EXIT_OK (0).
         """
-        source = framing_draft.SourceDescription.from_dict(
-            charter_contracts.load_json(args.source)
+        source = draft.SourceDescription.from_dict(
+            contracts.load_json(args.source)
         )
         dates = [c for c in args.parse_dates.split(",") if c]
-        frame = pd.read_csv(args.data, parse_dates=dates)
+        frame = pandas.read_csv(args.data, parse_dates=dates)
         text = pathlib.Path(args.request).read_text(encoding="utf-8")
         model = (
-            framing_costs.DecisionCostModel.from_dict(
-                charter_contracts.load_json(args.cost_model)
+            costs.DecisionCostModel.from_dict(
+                contracts.load_json(args.cost_model)
             )
             if args.cost_model
             else None
@@ -1841,13 +1831,13 @@ class FrameCommand(Command):
         sampler = None
         tau = None
         if args.replay:
-            recorded = charter_contracts.load_json(args.replay)
-            sampler = framing_refusal.ReplaySampler(
+            recorded = contracts.load_json(args.replay)
+            sampler = refusal.ReplaySampler(
                 str(recorded["model_id"]), recorded["samples"]
             )
             tau = recorded.get("tau")
-        result = framing_draft.frame(
-            framing_draft.FramingRequest(text, source),
+        result = draft.frame(
+            draft.FramingRequest(text, source),
             frame,
             cost_model=model,
             baseline_column=args.baseline_column,
@@ -1855,7 +1845,7 @@ class FrameCommand(Command):
             tau=tau,
         )
         output = pathlib.Path(args.output)
-        written = framing_draft.write_artifacts(result, output)
+        written = draft.write_artifacts(result, output)
         if result.charter is not None:
             (output / "charter.json").write_text(
                 json.dumps(result.charter.to_dict(), indent=2) + "\n",
@@ -1863,9 +1853,7 @@ class FrameCommand(Command):
                 newline="\n",
             )
         LOGGER.info("framing %s: wrote %s", result.status, ", ".join(written))
-        return (
-            EXIT_BLOCKED if result.status == framing_draft.REFUSED else EXIT_OK
-        )
+        return EXIT_BLOCKED if result.status == draft.REFUSED else EXIT_OK
 
 
 class TrailCommand(Command):
@@ -1925,7 +1913,7 @@ class TrailCommand(Command):
             return EXIT_OK
         keys = self.keys(args.keys)
         if args.trail_action == "build":
-            report = trail_build.build(
+            report = builder.build(
                 args.output,
                 run_dir=args.run,
                 framing_dir=args.framing,
@@ -1935,7 +1923,7 @@ class TrailCommand(Command):
                 keys=keys,
             )
         else:
-            report = trail_chain.verify(args.trail_dir, keys)
+            report = chain.verify(args.trail_dir, keys)
         if args.json:
             print(json.dumps(report.to_dict(), indent=2))
         else:

@@ -18,12 +18,12 @@ import time
 from typing import Any
 from typing import Protocol
 
-import pandas as pd
+import pandas
 
 from scmle import durability
 from scmle.artifacts import bundle as bundle_module
 from scmle.contracts import errors
-from scmle.contracts import serving as serving_contract
+from scmle.contracts import serving
 from scmle.deploy import provenance
 from scmle.inference import guard
 from scmle.inference import validation
@@ -68,13 +68,13 @@ class ServingAdapter(abc.ABC):
         Raises:
             ConfigError: If a policy name is unknown.
         """
-        if on_null not in serving_contract.NULL_POLICIES:
+        if on_null not in serving.NULL_POLICIES:
             raise errors.ConfigError(
-                f"on_null must be in {serving_contract.NULL_POLICIES}"
+                f"on_null must be in {serving.NULL_POLICIES}"
             )
-        if on_unseen not in serving_contract.UNSEEN_POLICIES:
+        if on_unseen not in serving.UNSEEN_POLICIES:
             raise errors.ConfigError(
-                f"on_unseen must be in {serving_contract.UNSEEN_POLICIES}"
+                f"on_unseen must be in {serving.UNSEEN_POLICIES}"
             )
         self.loaded = bundle
         self.lock = threading.Lock()
@@ -108,7 +108,7 @@ class ServingAdapter(abc.ABC):
     @property
     def schema_digest(self) -> str:
         """Digest of the input schema of the bundle being served."""
-        return serving_contract.schema_digest(self.bundle.schema.to_dict())
+        return serving.schema_digest(self.bundle.schema.to_dict())
 
     def synthetic_record(self) -> dict[str, Any] | None:
         """Derives a record that is valid for the schema.
@@ -152,7 +152,7 @@ class ServingAdapter(abc.ABC):
                 )
                 return
             with self.lock:
-                self.bundle.score(pd.DataFrame(records))
+                self.bundle.score(pandas.DataFrame(records))
         except Exception as error:  # reported through readiness
             LOGGER.error("warm-up failed: %s", error)
             self.readiness.fail(f"warm-up failed: {type(error).__name__}")
@@ -201,10 +201,10 @@ class ServingAdapter(abc.ABC):
                     ][:20],
                 },
             )
-        return self.respond_frame(pd.DataFrame(records))
+        return self.respond_frame(pandas.DataFrame(records))
 
     def respond_frame(
-        self, frame: pd.DataFrame, remember: bool = True
+        self, frame: pandas.DataFrame, remember: bool = True
     ) -> dict[str, Any]:
         """Scores a frame; the one path used by online and batch serving.
 
@@ -231,7 +231,7 @@ class ServingAdapter(abc.ABC):
                 bundle.remember(frame)
         response.update(
             {
-                "schema_version": serving_contract.SCHEMA_VERSION,
+                "schema_version": serving.SCHEMA_VERSION,
                 "artifact_digest": self.artifact_digest,
                 "schema_digest": self.schema_digest,
                 "record_count": len(rows),
@@ -254,14 +254,14 @@ class ServingAdapter(abc.ABC):
         if self.on_null == "reject":
             nulls = [i for i, row in enumerate(rows) if row["missing"]]
             if nulls:
-                raise serving_contract.PolicyError(
+                raise serving.PolicyError(
                     "null features are rejected by policy",
                     {"records": nulls[:20]},
                 )
         if self.on_unseen == "reject":
             unseen = [i for i, row in enumerate(rows) if row["unseen"]]
             if unseen:
-                raise serving_contract.PolicyError(
+                raise serving.PolicyError(
                     "unseen categories are rejected by policy",
                     {"records": unseen[:20]},
                 )
@@ -323,7 +323,7 @@ class BatchServing(ServingAdapter):
                 drop=True
             )
             response = self.respond_frame(chunk)
-            result = pd.DataFrame({"prediction": response["predictions"]})
+            result = pandas.DataFrame({"prediction": response["predictions"]})
             if "classes" in response:
                 probabilities = response["probabilities"]
                 for index, label in enumerate(response["classes"]):
@@ -337,12 +337,12 @@ class BatchServing(ServingAdapter):
             flagged["rows_with_unseen_categories"] += sum(
                 1 for row in response["rows"] if row["unseen"]
             )
-        output = pd.concat(pieces, ignore_index=True)
+        output = pandas.concat(pieces, ignore_index=True)
         content = output.to_csv(index=False).encode("utf-8")
         target = pathlib.Path(destination)
         durability.write_atomically(target, content)
         manifest = {
-            "schema_version": serving_contract.SCHEMA_VERSION,
+            "schema_version": serving.SCHEMA_VERSION,
             "model_version": response.get(
                 "model_version", self.bundle.info.model_version
             ),
@@ -374,7 +374,7 @@ class RequestObserver(Protocol):
             seconds: Time the request took.
         """
 
-    def observe_features(self, at: float, frame: pd.DataFrame) -> int:
+    def observe_features(self, at: float, frame: pandas.DataFrame) -> int:
         """Observes the rows of a scored batch.
 
         Args:
@@ -592,11 +592,13 @@ class HttpServing(ServingAdapter):
         if self.monitor is None:
             return
         try:
-            self.monitor.observe_features(time.time(), pd.DataFrame(records))
+            self.monitor.observe_features(
+                time.time(), pandas.DataFrame(records)
+            )
         except Exception:  # monitoring must not change a response
             LOGGER.exception("the signal monitor failed on features")
 
-    def score(self, request: serving_contract.ScoreRequest) -> dict[str, Any]:
+    def score(self, request: serving.ScoreRequest) -> dict[str, Any]:
         """Scores a parsed request.
 
         Args:
@@ -614,7 +616,7 @@ class HttpServing(ServingAdapter):
             request.expected_schema_digest is not None
             and request.expected_schema_digest != self.schema_digest
         ):
-            raise serving_contract.SchemaChangeError(
+            raise serving.SchemaChangeError(
                 "the model's input schema differs from the one the caller "
                 "expects",
                 {
@@ -639,8 +641,8 @@ class HttpServing(ServingAdapter):
         if self.httpd is not None:
             raise errors.ScmleError("server is already running")
         adapter = self
-        request_schema = serving_contract.REQUEST_JSON_SCHEMA
-        response_schema = serving_contract.RESPONSE_JSON_SCHEMA
+        request_schema = serving.REQUEST_JSON_SCHEMA
+        response_schema = serving.RESPONSE_JSON_SCHEMA
 
         class ReferenceServer(server.ThreadingHTTPServer):
             daemon_threads = True
@@ -690,7 +692,7 @@ class HttpServing(ServingAdapter):
                 headers: dict[str, str] | None = None,
             ) -> None:
                 payload: dict[str, Any] = {
-                    "schema_version": serving_contract.SCHEMA_VERSION,
+                    "schema_version": serving.SCHEMA_VERSION,
                     "error": message,
                     "category": category,
                 }
@@ -781,7 +783,7 @@ class HttpServing(ServingAdapter):
                     self.send_json(
                         200,
                         {
-                            "schema_version": serving_contract.SCHEMA_VERSION,
+                            "schema_version": serving.SCHEMA_VERSION,
                             "schema": adapter.bundle.schema.to_dict(),
                             "schema_digest": adapter.schema_digest,
                             "request_schema": request_schema,
@@ -830,7 +832,7 @@ class HttpServing(ServingAdapter):
             def do_POST(self) -> None:
                 if not self.identify() or not self.authorize("POST"):
                     return
-                if self.path not in serving_contract.PREDICT_PATHS:
+                if self.path not in serving.PREDICT_PATHS:
                     self.fail(404, "not found", "request")
                     return
                 if not adapter.readiness.ready:
@@ -866,7 +868,7 @@ class HttpServing(ServingAdapter):
                             400, f"invalid JSON request: {error.msg}", "request"
                         )
                         return
-                    request = serving_contract.parse_request(
+                    request = serving.parse_request(
                         payload, adapter.max_records
                     )
                     response = adapter.admission.run(
@@ -878,7 +880,7 @@ class HttpServing(ServingAdapter):
                     self.fail(504, str(error), error.category)
                 except guard.NotReadyError as error:
                     self.fail(503, str(error), error.category)
-                except serving_contract.SchemaChangeError as error:
+                except serving.SchemaChangeError as error:
                     self.fail(409, str(error), error.category, error.details)
                 except errors.ScmleError as error:
                     # Rows that break the schema are well-formed requests the

@@ -1,18 +1,18 @@
 """Tests for data strategies."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
 from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.data.profiling import profiler
 from scmle.data.readers import tabular
-from scmle.models import registry as registry_module
+from scmle.models import registry
 from scmle.sampling import resampling
 from scmle.sampling import strategies
 
-REGISTRY = registry_module.ModelRegistry.with_builtins()
+REGISTRY = registry.ModelRegistry.with_builtins()
 BINARY = tasks.TaskType.BINARY
 
 
@@ -24,9 +24,9 @@ def profile_of(frame, task=BINARY):
 
 @pytest.fixture
 def skewed_imbalanced():
-    rng = np.random.default_rng(0)
+    rng = numpy.random.default_rng(0)
     rows = 400
-    frame = pd.DataFrame(
+    frame = pandas.DataFrame(
         {
             "spend": rng.exponential(5.0, rows),
             "age": rng.normal(40, 10, rows),
@@ -39,8 +39,10 @@ def skewed_imbalanced():
 
 @pytest.fixture
 def balanced():
-    rng = np.random.default_rng(1)
-    frame = pd.DataFrame({"a": rng.normal(size=300), "b": rng.normal(size=300)})
+    rng = numpy.random.default_rng(1)
+    frame = pandas.DataFrame(
+        {"a": rng.normal(size=300), "b": rng.normal(size=300)}
+    )
     frame["y"] = rng.integers(0, 2, 300)
     return frame
 
@@ -109,8 +111,8 @@ def test_log_skewed_needs_a_skewed_feature(balanced):
 
 
 def test_interaction_feature_count_limits():
-    rng = np.random.default_rng(2)
-    wide = pd.DataFrame({f"f{i}": rng.normal(size=100) for i in range(14)})
+    rng = numpy.random.default_rng(2)
+    wide = pandas.DataFrame({f"f{i}": rng.normal(size=100) for i in range(14)})
     wide["y"] = rng.integers(0, 2, 100)
     assert "outside" in reason(
         "interactions", profile_of(wide), "logistic_regression"
@@ -187,8 +189,10 @@ def test_registry_and_unknown_strategy():
 
 
 def smote_profile():
-    rng = np.random.default_rng(5)
-    frame = pd.DataFrame({"a": rng.normal(size=500), "b": rng.normal(size=500)})
+    rng = numpy.random.default_rng(5)
+    frame = pandas.DataFrame(
+        {"a": rng.normal(size=500), "b": rng.normal(size=500)}
+    )
     frame["y"] = (rng.random(500) < 0.08).astype(int)
     frame.loc[frame.y == 1, "a"] += 1.5
     return frame, profile_of(frame)
@@ -205,7 +209,7 @@ def test_smote_family_needs_the_sampling_extra_numeric_features_and_imbalance(
         assert "balanced enough" in reason(
             name, profile_of(balanced), "random_forest"
         )
-    mixed = frame.assign(cat=np.where(frame.a > 0, "p", "q"))
+    mixed = frame.assign(cat=numpy.where(frame.a > 0, "p", "q"))
     assert "one-hot" in reason("smote", profile_of(mixed), "random_forest")
     single = frame[["a", "y"]]
     assert "two numeric" in reason("smote", profile_of(single), "random_forest")
@@ -238,11 +242,11 @@ def test_smote_candidates_fit_and_resample_only_the_training_fold(name):
 def test_jitter_is_opt_in_and_only_perturbs_synthetic_numeric_rows():
     assert "jitter_augment" in strategies.OPT_IN
     assert "jitter_augment" not in strategies.DEFAULT_NAMES
-    rng = np.random.default_rng(6)
-    features = pd.DataFrame(
+    rng = numpy.random.default_rng(6)
+    features = pandas.DataFrame(
         {"a": rng.normal(size=200), "c": rng.choice(["x", "y"], 200)}
     )
-    target = pd.Series([1] * 20 + [0] * 180)
+    target = pandas.Series([1] * 20 + [0] * 180)
     sampled, labels = resampling.JitterOverSampler(0.1).resample(
         features, target, 0
     )
@@ -256,8 +260,8 @@ def test_jitter_is_opt_in_and_only_perturbs_synthetic_numeric_rows():
 
 
 def ratio_problem(rows=900, seed=3):
-    rng = np.random.default_rng(seed)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    frame = pandas.DataFrame(
         {
             "price": rng.uniform(1, 10, rows),
             "quantity": rng.uniform(1, 10, rows),
@@ -269,8 +273,8 @@ def ratio_problem(rows=900, seed=3):
 
 
 def wide_problem(rows=800, noise_columns=10, seed=4):
-    rng = np.random.default_rng(seed)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    frame = pandas.DataFrame(
         {f"n{i}": rng.normal(size=rows) for i in range(noise_columns)}
     )
     frame["s0"] = rng.normal(size=rows)
@@ -301,8 +305,8 @@ def cross_validated(frame, strategy_name, model):
 def test_constructed_ratios_let_a_linear_model_learn_a_ratio_target():
     from sklearn import model_selection
 
-    rng = np.random.default_rng(5)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(5)
+    frame = pandas.DataFrame(
         {
             "price": rng.uniform(1, 10, 900),
             "quantity": rng.uniform(1, 10, 900),
@@ -357,7 +361,7 @@ def test_selection_scores_as_well_as_the_full_set_with_fewer_features():
 
 
 def test_applicability_of_the_feature_strategies_is_explained():
-    single = pd.DataFrame({"a": np.arange(100.0), "y": [0, 1] * 50})
+    single = pandas.DataFrame({"a": numpy.arange(100.0), "y": [0, 1] * 50})
     profile = profile_of(single)
 
     assert "fewer than two numeric" in reason(
@@ -378,9 +382,9 @@ def test_applicability_of_the_feature_strategies_is_explained():
 
 
 def gappy_problem(rows=900, seed=7):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     base = rng.normal(size=rows)
-    frame = pd.DataFrame(
+    frame = pandas.DataFrame(
         {
             "a": base,
             "b": base * 2 + rng.normal(0, 0.1, rows),
@@ -389,7 +393,7 @@ def gappy_problem(rows=900, seed=7):
     )
     frame["y"] = (frame.b + rng.normal(0, 0.3, rows) > 0).astype(int)
     holes = rng.random(rows) < 0.3
-    frame.loc[holes, "b"] = np.nan
+    frame.loc[holes, "b"] = numpy.nan
     return frame, holes
 
 
@@ -397,9 +401,9 @@ def informative_gap_problem(rows=900, seed=7):
     """Like `gappy_problem`, but the gaps in `b` follow the outcome."""
     frame = gappy_problem(rows, seed)[0]
     restored = gappy_problem(rows, seed)[0]
-    rng = np.random.default_rng(seed + 1)
+    rng = numpy.random.default_rng(seed + 1)
     frame["b"] = restored["b"].fillna(0.0) + restored["a"] * 2
-    frame.loc[(frame.y == 1) & (rng.random(rows) < 0.5), "b"] = np.nan
+    frame.loc[(frame.y == 1) & (rng.random(rows) < 0.5), "b"] = numpy.nan
     return frame
 
 
@@ -421,7 +425,7 @@ def test_missing_indicators_append_a_flag_for_features_with_informative_gaps():
 def test_iterative_imputation_recovers_values_better_than_the_median():
     frame, holes = gappy_problem()
     truth = frame.copy()
-    rng = np.random.default_rng(7)
+    rng = numpy.random.default_rng(7)
     base = rng.normal(size=len(frame))
     truth["b"] = base * 2 + rng.normal(0, 0.1, len(frame))
     profile = profile_of(frame)
@@ -438,10 +442,10 @@ def test_iterative_imputation_recovers_values_better_than_the_median():
     matrix, names = error("iterative_imputation")
     filled = matrix[:, names.index("b")][holes]
     partner = matrix[:, names.index("a")][holes]
-    assert abs(np.corrcoef(filled, partner)[0, 1]) > 0.9
+    assert abs(numpy.corrcoef(filled, partner)[0, 1]) > 0.9
     default_matrix, default_names = error("default")
     flat = default_matrix[:, default_names.index("b")][holes]
-    assert np.std(flat) < 0.01
+    assert numpy.std(flat) < 0.01
 
 
 def test_feature_strategies_for_gaps_are_not_offered_when_the_model_copes():
@@ -463,9 +467,9 @@ def test_feature_strategies_for_gaps_are_not_offered_when_the_model_copes():
 def test_target_transform_helps_a_linear_model_on_a_long_tailed_target():
     from sklearn import model_selection
 
-    rng = np.random.default_rng(9)
-    frame = pd.DataFrame({"x": rng.normal(size=1000)})
-    frame["y"] = np.exp(1.2 * frame.x + rng.normal(0, 0.2, 1000))
+    rng = numpy.random.default_rng(9)
+    frame = pandas.DataFrame({"x": rng.normal(size=1000)})
+    frame["y"] = numpy.exp(1.2 * frame.x + rng.normal(0, 0.2, 1000))
     spec = tasks.ProjectSpec(data=tasks.DataSpec(uri="m", target="y"))
     profile = profiler.DatasetProfiler(spec).profile(
         frame,

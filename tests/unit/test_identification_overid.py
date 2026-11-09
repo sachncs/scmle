@@ -1,19 +1,19 @@
 """Overidentification tests for several instruments (Sargan and Hansen J)."""
 
-import numpy as np
+import numpy
 import pytest
 
 from scmle.data.identification import overid
 
 
 def world(seed, n=500, k=3, direct=0.0, controls=False, heavy=False):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     z = rng.standard_normal((n, k))
     u = rng.standard_normal(n)
-    d = z @ np.full(k, 0.5) + u + rng.standard_normal(n)
+    d = z @ numpy.full(k, 0.5) + u + rng.standard_normal(n)
     noise = rng.standard_normal(n)
     if heavy:
-        noise = noise * (0.5 + np.abs(z[:, 0]))
+        noise = noise * (0.5 + numpy.abs(z[:, 0]))
     y = 1.0 * d + 0.8 * u + direct * z[:, k - 1] + noise
     w = rng.standard_normal((n, 2)) if controls else None
     return y, d, z, w
@@ -24,7 +24,7 @@ def test_valid_instruments_are_rejected_at_most_at_the_level():
     # instruments the false-alarm rate of each test stays within three
     # standard errors of 0.05.
     worlds = 1000
-    bound = 0.05 + 3 * np.sqrt(0.05 * 0.95 / worlds)
+    bound = 0.05 + 3 * numpy.sqrt(0.05 * 0.95 / worlds)
     sargan = hansen = 0
     for seed in range(worlds):
         y, d, z, ignored = world(seed)
@@ -52,7 +52,7 @@ def test_the_robust_test_keeps_its_size_under_heteroskedasticity():
         overid.hansen_j(*world(seed, heavy=True)[:3])["p_value"] <= 0.05
         for seed in range(worlds)
     )
-    assert hits / worlds <= 0.05 + 3 * np.sqrt(0.05 * 0.95 / worlds)
+    assert hits / worlds <= 0.05 + 3 * numpy.sqrt(0.05 * 0.95 / worlds)
 
 
 def test_controls_are_partialled_out():

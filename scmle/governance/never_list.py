@@ -44,7 +44,7 @@ import enum
 from typing import Any
 
 from scmle.contracts import errors
-from scmle.governance import deployment_ledger as ledger_module
+from scmle.governance import deployment_ledger
 
 
 class NeverAction(enum.StrEnum):
@@ -65,8 +65,8 @@ class NeverAction(enum.StrEnum):
 
 ITEM_NUMBER = {action: number for number, action in enumerate(NeverAction, 1)}
 ALLOWING = (
-    ledger_module.ReplyDecision.APPROVE,
-    ledger_module.ReplyDecision.OVERRIDE,
+    deployment_ledger.ReplyDecision.APPROVE,
+    deployment_ledger.ReplyDecision.OVERRIDE,
 )
 
 
@@ -109,7 +109,7 @@ class Guard:
 
     def __init__(
         self,
-        ledger: ledger_module.DeploymentLedger,
+        ledger: deployment_ledger.DeploymentLedger,
         today: Callable[[], datetime.date] = datetime.date.today,
         verification_keys: Mapping[str, str | bytes] | None = None,
         single_use: bool = False,
@@ -134,7 +134,7 @@ class Guard:
 
     def valid_attestation(
         self, question: Mapping[str, Any]
-    ) -> ledger_module.Attestation | None:
+    ) -> deployment_ledger.Attestation | None:
         """Finds the first valid attestation for `question`.
 
         Args:
@@ -144,19 +144,19 @@ class Guard:
             The first unused attestation, in ledger order, to an escalation
             of exactly this question that `accepts` today, or None.
         """
-        digest = ledger_module.question_hash(question)
+        digest = deployment_ledger.question_hash(question)
         for identity, row in self.ledger.escalations.items():
             if row["question_hash"] != digest:
                 continue
             body = self.ledger.attestations.get(identity)
             if body is None or identity in self.ledger.used:
                 continue
-            reply = ledger_module.Attestation.from_dict(body)
+            reply = deployment_ledger.Attestation.from_dict(body)
             if self.accepts(reply, question["scope"]):
                 return reply
         return None
 
-    def accepts(self, reply: ledger_module.Attestation, scope: str) -> bool:
+    def accepts(self, reply: deployment_ledger.Attestation, scope: str) -> bool:
         """Whether `reply` allows an action in `scope` today.
 
         Args:
@@ -171,8 +171,8 @@ class Guard:
         if reply.decision not in ALLOWING or reply.scope != scope:
             return False
         today = self.today()
-        issued = ledger_module.parse_date(reply.date, "date")
-        expires = ledger_module.parse_date(reply.expires, "expires")
+        issued = deployment_ledger.parse_date(reply.date, "date")
+        expires = deployment_ledger.parse_date(reply.expires, "expires")
         if not issued <= today <= expires:
             return False
         if reply.key_id in self.ledger.system_keys:
@@ -192,7 +192,7 @@ class Guard:
             The identifier of the oldest pending escalation with this
             question, or None.
         """
-        digest = ledger_module.question_hash(question)
+        digest = deployment_ledger.question_hash(question)
         for row in self.ledger.pending():
             if row["question_hash"] == digest:
                 return str(row["id"])
@@ -205,7 +205,7 @@ class Guard:
         scope: str,
         proposed_default: str = "action_not_performed",
         evidence: tuple[str, ...] = (),
-    ) -> ledger_module.Attestation:
+    ) -> deployment_ledger.Attestation:
         """Returns the valid attestation, or escalates and raises.
 
         With `single_use`, using an attestation first commits an
@@ -231,7 +231,7 @@ class Guard:
         if reply is not None:
             if self.single_use:
                 self.ledger.commit(
-                    ledger_module.ATTESTATION_USED,
+                    deployment_ledger.ATTESTATION_USED,
                     {
                         "escalation_id": reply.escalation_id,
                         "action": action.value,
@@ -244,12 +244,12 @@ class Guard:
         if pending is None:
             pending = f"esc-{len(self.ledger.rows)}"
             self.ledger.commit(
-                ledger_module.ESCALATION,
+                deployment_ledger.ESCALATION,
                 {
-                    "phase": ledger_module.PHASE_OPEN,
+                    "phase": deployment_ledger.PHASE_OPEN,
                     "id": pending,
                     "question": question,
-                    "question_hash": ledger_module.question_hash(question),
+                    "question_hash": deployment_ledger.question_hash(question),
                     "evidence": list(evidence),
                     "proposed_default": proposed_default,
                     "never_list_item": ITEM_NUMBER[action],

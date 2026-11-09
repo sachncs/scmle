@@ -11,13 +11,13 @@ from typing import Any
 from typing import ClassVar
 from typing import Self
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
-from scmle.contracts import data as data_contracts
+from scmle.contracts import data
 from scmle.data.validation import columns
 
-DECILES = tuple(np.linspace(0.1, 0.9, 9))
+DECILES = tuple(numpy.linspace(0.1, 0.9, 9))
 MAX_CATEGORIES = 50
 OTHER = "__other__"
 EPSILON = 1e-4
@@ -25,7 +25,7 @@ NOISE_TAIL = 1.5
 
 
 def population_stability_index(
-    expected: np.ndarray, actual: np.ndarray
+    expected: numpy.ndarray, actual: numpy.ndarray
 ) -> float:
     """Computes PSI between two discrete distributions.
 
@@ -36,9 +36,9 @@ def population_stability_index(
     Returns:
         The PSI; ~0 for identical distributions, >0.25 is a large shift.
     """
-    e = np.clip(np.asarray(expected, dtype=float), EPSILON, None)
-    a = np.clip(np.asarray(actual, dtype=float), EPSILON, None)
-    return float(np.sum((a - e) * np.log(a / e)))
+    e = numpy.clip(numpy.asarray(expected, dtype=float), EPSILON, None)
+    a = numpy.clip(numpy.asarray(actual, dtype=float), EPSILON, None)
+    return float(numpy.sum((a - e) * numpy.log(a / e)))
 
 
 @dataclasses.dataclass(frozen=True)
@@ -57,7 +57,7 @@ class DistributionReference(abc.ABC):
     kind: ClassVar[str]
 
     @abc.abstractmethod
-    def proportions(self, values: pd.Series) -> np.ndarray:
+    def proportions(self, values: pandas.Series) -> numpy.ndarray:
         """Bins new values into this reference's bins as proportions.
 
         Args:
@@ -69,7 +69,7 @@ class DistributionReference(abc.ABC):
         """
 
     @abc.abstractmethod
-    def expected(self) -> np.ndarray:
+    def expected(self) -> numpy.ndarray:
         """Returns the reference proportions.
 
         Returns:
@@ -84,7 +84,7 @@ class DistributionReference(abc.ABC):
             A dict that `reference_from_dict` can rebuild this reference from.
         """
 
-    def psi(self, values: pd.Series) -> float:
+    def psi(self, values: pandas.Series) -> float:
         """Computes the raw PSI of new values against this reference.
 
         Args:
@@ -117,7 +117,7 @@ class DistributionReference(abc.ABC):
         bins = len(self.expected())
         return NOISE_TAIL * (bins - 1) * (1.0 / self.rows + 1.0 / new_rows)
 
-    def adjusted_psi(self, values: pd.Series) -> float:
+    def adjusted_psi(self, values: pandas.Series) -> float:
         """Computes PSI minus its sampling-noise floor, never below zero.
 
         Args:
@@ -130,7 +130,7 @@ class DistributionReference(abc.ABC):
         floor = self.noise_floor(int(values.notna().sum()))
         return max(raw - floor, 0.0)
 
-    def unseen_rate(self, values: pd.Series) -> float:
+    def unseen_rate(self, values: pandas.Series) -> float:
         """Computes the share of new values outside the reference domain.
 
         Args:
@@ -156,7 +156,7 @@ class NumericReference(DistributionReference):
     kind: ClassVar[str] = "numeric"
 
     @classmethod
-    def fit(cls, values: pd.Series) -> Self:
+    def fit(cls, values: pandas.Series) -> Self:
         """Learns decile edges from reference values.
 
         Args:
@@ -169,7 +169,7 @@ class NumericReference(DistributionReference):
         numeric = columns.to_finite(values)
         present = numeric.dropna().to_numpy(dtype=float)
         edges = (
-            tuple(np.unique(np.quantile(present, DECILES)))
+            tuple(numpy.unique(numpy.quantile(present, DECILES)))
             if len(present)
             else ()
         )
@@ -178,7 +178,7 @@ class NumericReference(DistributionReference):
         fractions = tuple(reference.proportions(numeric))
         return cls(missing, len(present), edges, fractions)
 
-    def proportions(self, values: pd.Series) -> np.ndarray:
+    def proportions(self, values: pandas.Series) -> numpy.ndarray:
         """Bins values by the stored edges.
 
         Args:
@@ -188,22 +188,26 @@ class NumericReference(DistributionReference):
             The share of numeric values in each bin.
         """
         numeric = (
-            pd.to_numeric(values, errors="coerce")
+            pandas.to_numeric(values, errors="coerce")
             .dropna()
             .to_numpy(dtype=float)
         )
-        bins = np.searchsorted(np.asarray(self.edges), numeric, side="right")
-        counts = np.bincount(bins, minlength=len(self.edges) + 1).astype(float)
+        bins = numpy.searchsorted(
+            numpy.asarray(self.edges), numeric, side="right"
+        )
+        counts = numpy.bincount(bins, minlength=len(self.edges) + 1).astype(
+            float
+        )
         total = counts.sum()
         return counts / total if total else counts
 
-    def expected(self) -> np.ndarray:
+    def expected(self) -> numpy.ndarray:
         """Returns the stored proportions.
 
         Returns:
             The reference share of each bin.
         """
-        return np.asarray(self.fractions, dtype=float)
+        return numpy.asarray(self.fractions, dtype=float)
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON-serializable mapping.
@@ -232,7 +236,7 @@ class CategoricalReference(DistributionReference):
     kind: ClassVar[str] = "categorical"
 
     @classmethod
-    def fit(cls, values: pd.Series) -> Self:
+    def fit(cls, values: pandas.Series) -> Self:
         """Learns category frequencies from reference values.
 
         Args:
@@ -256,7 +260,7 @@ class CategoricalReference(DistributionReference):
         """
         return sorted(self.frequencies)
 
-    def proportions(self, values: pd.Series) -> np.ndarray:
+    def proportions(self, values: pandas.Series) -> numpy.ndarray:
         """Counts new values per reference category (unknown -> other).
 
         Args:
@@ -272,21 +276,21 @@ class CategoricalReference(DistributionReference):
             .map(lambda v: v if v in known else OTHER)
         )
         counts = mapped.value_counts()
-        vector = np.array(
+        vector = numpy.array(
             [float(counts.get(level, 0.0)) for level in self.levels()]
         )
         total = vector.sum()
         return vector / total if total else vector
 
-    def expected(self) -> np.ndarray:
+    def expected(self) -> numpy.ndarray:
         """Returns reference proportions in `levels()` order.
 
         Returns:
             The reference share of each category.
         """
-        return np.array([self.frequencies[level] for level in self.levels()])
+        return numpy.array([self.frequencies[level] for level in self.levels()])
 
-    def unseen_rate(self, values: pd.Series) -> float:
+    def unseen_rate(self, values: pandas.Series) -> float:
         """Computes the share of new values with a category unseen in training.
 
         Args:
@@ -362,9 +366,9 @@ class ReferenceProfile:
     @classmethod
     def build(
         cls,
-        features: pd.DataFrame,
-        plan: data_contracts.FeaturePlan,
-        output: pd.Series,
+        features: pandas.DataFrame,
+        plan: data.FeaturePlan,
+        output: pandas.Series,
         output_name: str,
         reference_metrics: dict[str, float],
     ) -> Self:
@@ -390,7 +394,7 @@ class ReferenceProfile:
         for column in plan.categorical:
             if column in features.columns:
                 references[column] = CategoricalReference.fit(features[column])
-        numeric_output = pd.api.types.is_numeric_dtype(output)
+        numeric_output = pandas.api.types.is_numeric_dtype(output)
         output_reference = (
             NumericReference.fit(output)
             if numeric_output

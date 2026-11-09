@@ -9,7 +9,7 @@ from pathlib import Path
 import shutil
 import wave
 
-import numpy as np
+import numpy
 import pytest
 
 from scmle.contracts import data
@@ -105,7 +105,7 @@ def image_adapter() -> modality_lifecycle.ImageAdapter:
 
 def wav_bytes(amplitude: int) -> bytes:
     """Encode a short mono PCM fixture."""
-    samples = np.asarray([amplitude, -amplitude] * 40, dtype="<i2")
+    samples = numpy.asarray([amplitude, -amplitude] * 40, dtype="<i2")
     output = io.BytesIO()
     with wave.open(output, "wb") as opened:
         opened.setnchannels(1)
@@ -171,8 +171,10 @@ def decoded_video_adapter() -> modality_lifecycle.VideoAdapter:
         for index in range(12)
     )
 
-    def decoder(payload: bytes, frame_index: int) -> np.ndarray:
-        return np.full((2, 2, 3), payload[0] + frame_index, dtype=np.uint8)
+    def decoder(payload: bytes, frame_index: int) -> numpy.ndarray:
+        return numpy.full(
+            (2, 2, 3), payload[0] + frame_index, dtype=numpy.uint8
+        )
 
     return modality_lifecycle.VideoAdapter(
         video.VideoDataset(samples), frame_decoder=decoder, max_frames=4
@@ -284,8 +286,8 @@ def test_raster_adapter_accepts_a_named_bounded_decoder():
     decoded = modality_lifecycle.RasterAdapter(
         baseline.samples,
         {sample.source: baseline.label(sample) for sample in baseline.samples},
-        decoder=lambda payload: np.full(
-            (32, 32, 3), payload[0], dtype=np.uint8
+        decoder=lambda payload: numpy.full(
+            (32, 32, 3), payload[0], dtype=numpy.uint8
         ),
         decoder_name="fixture-raster-v1",
         max_pixels=32 * 32 * 3,
@@ -343,8 +345,8 @@ def test_decoded_raster_lifecycle_emits_pixel_occlusion_evidence(
     decoded = modality_lifecycle.RasterAdapter(
         baseline.samples,
         {sample.source: baseline.label(sample) for sample in baseline.samples},
-        decoder=lambda payload: np.full(
-            (32, 32, 3), payload[0], dtype=np.uint8
+        decoder=lambda payload: numpy.full(
+            (32, 32, 3), payload[0], dtype=numpy.uint8
         ),
         decoder_name="fixture-raster-v1",
         max_pixels=32 * 32 * 3,
@@ -383,7 +385,7 @@ def test_metadata_only_raster_explanation_is_explicitly_unavailable():
         adapter.samples[0],
         object(),
         (),
-        np.asarray([], dtype=float),
+        numpy.asarray([], dtype=float),
     )
 
     assert result["status"] == "not_available"

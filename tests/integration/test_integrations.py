@@ -7,7 +7,7 @@ import support
 
 from scmle.contracts import errors
 from scmle.contracts import tasks
-from scmle.core import orchestrator as orchestrator_module
+from scmle.core import orchestrator
 from scmle.core import scheduler
 
 
@@ -19,9 +19,9 @@ def test_mlflow_store_records_runs_trials_and_lineage(binary_frame, tmp_path):
         f"sqlite:///{(tmp_path / 'mlflow.db').as_posix()}", "scmle-test"
     )
     spec = support.make_project(binary_frame, "y", time_budget=300).spec
-    result = orchestrator_module.Orchestrator(
-        spec, binary_frame, tracker=store
-    ).run(tmp_path / "runs")
+    result = orchestrator.Orchestrator(spec, binary_frame, tracker=store).run(
+        tmp_path / "runs"
+    )
 
     runs = store.runs()
     assert len(runs) == 1 and runs[0]["run_id"] == result.run_id
@@ -99,10 +99,10 @@ def test_ray_run_matches_sequential(binary_frame, tmp_path):
             models=support.FAST_MODELS,
         )
 
-    sequential = orchestrator_module.Orchestrator(
+    sequential = orchestrator.Orchestrator(
         spec_with(1, "process"), binary_frame
     ).run(tmp_path / "seq")
-    distributed = orchestrator_module.Orchestrator(
+    distributed = orchestrator.Orchestrator(
         spec_with(2, "ray"), binary_frame
     ).run(tmp_path / "ray")
     try:

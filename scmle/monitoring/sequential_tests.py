@@ -53,7 +53,7 @@ from fractions import Fraction
 import math
 from typing import Any
 
-import numpy as np
+import numpy
 
 from scmle.data.ledger import online_fdr
 
@@ -64,7 +64,7 @@ DEFAULT_CAP = 0.5
 GRID_POINTS = 199
 
 
-def validate_unit(value: Any, name: str) -> np.ndarray:
+def validate_unit(value: Any, name: str) -> numpy.ndarray:
     """Checks that values are finite and lie in ``[0, 1]``.
 
     Args:
@@ -77,8 +77,12 @@ def validate_unit(value: Any, name: str) -> np.ndarray:
     Raises:
         ValueError: If a value is not finite or is outside ``[0, 1]``.
     """
-    array = np.asarray(value, dtype=float)
-    if not np.all(np.isfinite(array)) or np.any(array < 0) or np.any(array > 1):
+    array = numpy.asarray(value, dtype=float)
+    if (
+        not numpy.all(numpy.isfinite(array))
+        or numpy.any(array < 0)
+        or numpy.any(array > 1)
+    ):
         raise ValueError(f"{name} must be finite and within [0, 1]")
     return array
 
@@ -117,8 +121,8 @@ class BettingTest:
             raise ValueError("alpha must be strictly between 0 and 1")
         if not 0.0 < cap < 1.0:
             raise ValueError("cap must be strictly between 0 and 1")
-        mean = np.asarray(null_mean, dtype=float)
-        if np.any(mean <= 0.0) or np.any(mean >= 1.0):
+        mean = numpy.asarray(null_mean, dtype=float)
+        if numpy.any(mean <= 0.0) or numpy.any(mean >= 1.0):
             raise ValueError("null_mean must be strictly between 0 and 1")
         self.null_mean = mean
         self.direction = direction
@@ -128,17 +132,17 @@ class BettingTest:
         room = mean if direction == GREATER else 1.0 - mean
         self.bound = cap / room
         self.count = 0
-        self.total: Any = np.zeros(())
-        self.deviation: Any = np.zeros(())
-        self.log_capital = np.zeros_like(mean)
-        self.peak = np.zeros_like(mean)
+        self.total: Any = numpy.zeros(())
+        self.deviation: Any = numpy.zeros(())
+        self.log_capital = numpy.zeros_like(mean)
+        self.peak = numpy.zeros_like(mean)
 
     @property
     def threshold(self) -> float:
         """The value ``log(1 / alpha)``, where the test crosses."""
         return math.log(1.0 / self.alpha)
 
-    def bet(self) -> np.ndarray:
+    def bet(self) -> numpy.ndarray:
         """Computes the predictable bet size for the next observation.
 
         Returns:
@@ -147,12 +151,12 @@ class BettingTest:
         """
         step = self.count + 1
         variance = (0.25 + self.deviation) / step
-        raw = np.sqrt(
+        raw = numpy.sqrt(
             2.0 * self.threshold / (variance * step * math.log(1.0 + step))
         )
-        return np.minimum(raw, self.bound)
+        return numpy.minimum(raw, self.bound)
 
-    def update(self, observation: Any) -> np.ndarray:
+    def update(self, observation: Any) -> numpy.ndarray:
         """Feeds one observation in ``[0, 1]``.
 
         Args:
@@ -165,8 +169,8 @@ class BettingTest:
         value = validate_unit(observation, "observation")
         size = self.bet()
         factor = 1.0 + self.sign * size * (value - self.null_mean)
-        self.log_capital = self.log_capital + np.log(factor)
-        self.peak = np.maximum(self.peak, self.log_capital)
+        self.log_capital = self.log_capital + numpy.log(factor)
+        self.peak = numpy.maximum(self.peak, self.log_capital)
         self.count += 1
         self.total = self.total + value
         previous = (0.5 + self.total) / (self.count + 1)
@@ -184,9 +188,9 @@ class BettingTest:
         return self.peak >= self.threshold
 
     @property
-    def e_value(self) -> np.ndarray:
+    def e_value(self) -> numpy.ndarray:
         """The capital now: an e-value for the null at any stopping time."""
-        return np.exp(self.log_capital)
+        return numpy.exp(self.log_capital)
 
     def to_dict(self) -> dict[str, Any]:
         """Returns the JSON-ready state (scalar tests only).
@@ -229,10 +233,10 @@ class BettingTest:
             record["cap"],
         )
         test.count = int(record["count"])
-        test.total = np.asarray(float(record["total"]))
-        test.deviation = np.asarray(float(record["deviation"]))
-        test.log_capital = np.asarray(float(record["log_capital"]))
-        test.peak = np.asarray(float(record["peak"]))
+        test.total = numpy.asarray(float(record["total"]))
+        test.deviation = numpy.asarray(float(record["deviation"]))
+        test.log_capital = numpy.asarray(float(record["log_capital"]))
+        test.peak = numpy.asarray(float(record["peak"]))
         return test
 
 
@@ -283,7 +287,7 @@ class MixtureTest:
         """
         if stride < 1 or terms < 1:
             raise ValueError("stride and terms must be positive")
-        self.null_mean = np.asarray(null_mean, dtype=float)
+        self.null_mean = numpy.asarray(null_mean, dtype=float)
         self.direction = direction
         self.alpha = alpha
         self.stride = stride
@@ -293,8 +297,8 @@ class MixtureTest:
         self.started = 0
         self.inner: list[BettingTest] = []
         self.log_weights: list[float] = []
-        self.peak = np.zeros_like(self.null_mean)
-        self.log_capital = np.zeros_like(self.null_mean)
+        self.peak = numpy.zeros_like(self.null_mean)
+        self.log_capital = numpy.zeros_like(self.null_mean)
         self.start_term()
 
     def start_term(self) -> None:
@@ -318,7 +322,7 @@ class MixtureTest:
         """The value ``log(1 / alpha)``."""
         return math.log(1.0 / self.alpha)
 
-    def update(self, observation: Any) -> np.ndarray:
+    def update(self, observation: Any) -> numpy.ndarray:
         """Feeds one observation in ``[0, 1]``.
 
         A new term starts every `stride` observations.
@@ -334,15 +338,15 @@ class MixtureTest:
         for test in self.inner:
             test.update(observation)
         self.count += 1
-        stacked = np.stack(
+        stacked = numpy.stack(
             [
                 w + t.log_capital
                 for w, t in zip(self.log_weights, self.inner, strict=True)
             ]
         )
         top = stacked.max(axis=0)
-        self.log_capital = top + np.log(np.exp(stacked - top).sum(axis=0))
-        self.peak = np.maximum(self.peak, self.log_capital)
+        self.log_capital = top + numpy.log(numpy.exp(stacked - top).sum(axis=0))
+        self.peak = numpy.maximum(self.peak, self.log_capital)
         return self.log_capital
 
     @property
@@ -356,9 +360,9 @@ class MixtureTest:
         return self.peak >= self.threshold
 
     @property
-    def e_value(self) -> np.ndarray:
+    def e_value(self) -> numpy.ndarray:
         """The mixture now: an e-value at any stopping time."""
-        return np.exp(self.log_capital)
+        return numpy.exp(self.log_capital)
 
     def to_dict(self) -> dict[str, Any]:
         """Returns the JSON-ready state (scalar tests only).
@@ -409,8 +413,8 @@ class MixtureTest:
         test.started = int(record["started"])
         test.log_weights = [float(w) for w in record["log_weights"]]
         test.inner = [BettingTest.from_dict(t) for t in record["inner"]]
-        test.log_capital = np.asarray(float(record["log_capital"]))
-        test.peak = np.asarray(float(record["peak"]))
+        test.log_capital = numpy.asarray(float(record["log_capital"]))
+        test.peak = numpy.asarray(float(record["peak"]))
         return test
 
 
@@ -443,10 +447,10 @@ class ConfidenceSequence:
         if points < 3:
             raise ValueError("points must be at least 3")
         self.alpha = alpha
-        self.grid = (np.arange(points) + 1.0) / (points + 1.0)
+        self.grid = (numpy.arange(points) + 1.0) / (points + 1.0)
         self.upper_tests = BettingTest(self.grid, GREATER, alpha / 2.0)
         self.lower_tests = BettingTest(self.grid, LESS, alpha / 2.0)
-        self.alive = np.ones(points, dtype=bool)
+        self.alive = numpy.ones(points, dtype=bool)
 
     def update(self, observation: Any) -> tuple[float, float]:
         """Feeds one observation.
@@ -470,7 +474,7 @@ class ConfidenceSequence:
         """
         if not self.alive.any():
             return (1.0, 0.0)
-        where = np.flatnonzero(self.alive)
+        where = numpy.flatnonzero(self.alive)
         step = 1.0 / (len(self.grid) + 1.0)
         low = max(0.0, float(self.grid[where[0]]) - step)
         high = min(1.0, float(self.grid[where[-1]]) + step)
@@ -616,7 +620,7 @@ class PairedEProcess:
         second = validate_unit(other_loss, "other_loss")
         if first.shape != second.shape or first.size == 0:
             raise ValueError("paired losses must be non-empty and aligned")
-        return self.update_gap(float(np.mean(first - second)))
+        return self.update_gap(float(numpy.mean(first - second)))
 
     def update_gap(self, gap: float) -> bool:
         """Feeds a batch's mean loss difference, in loss units.
@@ -631,7 +635,7 @@ class PairedEProcess:
             ValueError: If `gap` is not finite or lies outside ``[-scale,
                 scale]``.
         """
-        if not np.isfinite(gap) or abs(gap) > self.scale + 1e-12:
+        if not numpy.isfinite(gap) or abs(gap) > self.scale + 1e-12:
             raise ValueError("gap must be finite and within [-scale, scale]")
         unit = min(max((gap / self.scale + 1.0) / 2.0, 0.0), 1.0)
         self.test.update(unit)

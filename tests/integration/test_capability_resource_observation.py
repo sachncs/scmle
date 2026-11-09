@@ -3,8 +3,8 @@
 import json
 import pathlib
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
 from scmle.contracts import capabilities
@@ -16,10 +16,10 @@ from scmle.models import registry as registry_module
 from scmle.models.sklearn import classical
 
 
-def binary_frame() -> pd.DataFrame:
+def binary_frame() -> pandas.DataFrame:
     """Build a small deterministic frame for the planning integration."""
-    rng = np.random.default_rng(23)
-    return pd.DataFrame(
+    rng = numpy.random.default_rng(23)
+    return pandas.DataFrame(
         {
             "feature": rng.normal(size=80),
             "y": rng.integers(0, 2, size=80),

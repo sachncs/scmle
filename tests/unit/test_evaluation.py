@@ -1,7 +1,7 @@
 """Tests for the metric catalog and selection policy."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 from sklearn import dummy
 
@@ -38,15 +38,15 @@ def test_orientation_natural_units():
 
 
 def test_evaluate_classification_and_regression():
-    features = pd.DataFrame({"a": np.arange(40.0)})
-    labels = pd.Series([0, 1] * 20)
+    features = pandas.DataFrame({"a": numpy.arange(40.0)})
+    labels = pandas.Series([0, 1] * 20)
     classifier = dummy.DummyClassifier(strategy="prior").fit(features, labels)
     scores = CATALOG.evaluate(
         classifier, features, labels, tasks.TaskType.BINARY
     )
     assert scores["roc_auc"] == 0.5
     assert scores["log_loss"] == pytest.approx(0.6931, abs=1e-3)
-    values = pd.Series(np.arange(40.0))
+    values = pandas.Series(numpy.arange(40.0))
     regressor = dummy.DummyRegressor().fit(features, values)
     scores = CATALOG.evaluate(
         regressor, features, values, tasks.TaskType.REGRESSION
@@ -56,14 +56,14 @@ def test_evaluate_classification_and_regression():
 
 
 def test_evaluate_reports_nan_for_undefined_metric():
-    features = pd.DataFrame({"a": np.arange(40.0)})
-    labels = pd.Series([0, 1] * 20)
+    features = pandas.DataFrame({"a": numpy.arange(40.0)})
+    labels = pandas.Series([0, 1] * 20)
     classifier = dummy.DummyClassifier(strategy="prior").fit(features, labels)
-    single_class = pd.Series([1] * 40)
+    single_class = pandas.Series([1] * 40)
     scores = CATALOG.evaluate(
         classifier, features, single_class, tasks.TaskType.BINARY
     )
-    assert np.isnan(scores["roc_auc"])
+    assert numpy.isnan(scores["roc_auc"])
 
 
 def make_trial(name, score, status=Status.OK):
@@ -113,10 +113,10 @@ def test_all_failed_raises(registry):
 
 
 def string_problem():
-    rng = np.random.default_rng(0)
-    features = pd.DataFrame({"a": rng.normal(size=200)})
-    labels = pd.Series(
-        np.where(features.a + rng.normal(size=200) > 0, "true", "false")
+    rng = numpy.random.default_rng(0)
+    features = pandas.DataFrame({"a": rng.normal(size=200)})
+    labels = pandas.Series(
+        numpy.where(features.a + rng.normal(size=200) > 0, "true", "false")
     )
     return features, labels
 
@@ -151,14 +151,15 @@ def test_evaluate_reports_f1_for_string_labels_instead_of_nan():
     features, labels = string_problem()
     model = linear_model.LogisticRegression().fit(features, labels)
     scores = CATALOG.evaluate(model, features, labels, tasks.TaskType.BINARY)
-    assert not any(np.isnan(value) for value in scores.values()), scores
+    assert not any(numpy.isnan(value) for value in scores.values()), scores
 
 
 def test_positive_label_is_none_outside_binary_tasks():
-    labels = pd.Series([0, 1, 2])
+    labels = pandas.Series([0, 1, 2])
     assert metrics.positive_label(labels, tasks.TaskType.MULTICLASS) is None
     assert (
-        metrics.positive_label(pd.Series([3, 7, 3]), tasks.TaskType.BINARY) == 7
+        metrics.positive_label(pandas.Series([3, 7, 3]), tasks.TaskType.BINARY)
+        == 7
     )
 
 
@@ -246,8 +247,8 @@ def folds_trial(name, scores):
         name,
         Status.OK,
         "m",
-        score_mean=float(np.mean(scores)),
-        score_std=float(np.std(scores)),
+        score_mean=float(numpy.mean(scores)),
+        score_std=float(numpy.std(scores)),
         fold_scores=scores,
     )
 
@@ -313,8 +314,8 @@ def test_a_lower_is_better_positive_label_metric_scores_sign_adjusted():
         sk_metrics.f1_score,
         ("predict",),
     )
-    target = pd.Series(["a", "b", "a", "b"])
-    features = pd.DataFrame({"x": [0.0, 1.0, 0.0, 1.0]})
+    target = pandas.Series(["a", "b", "a", "b"])
+    features = pandas.DataFrame({"x": [0.0, 1.0, 0.0, 1.0]})
     fitted = dummy.DummyClassifier(strategy="most_frequent").fit(
         features, target
     )
@@ -327,4 +328,4 @@ def test_a_lower_is_better_positive_label_metric_scores_sign_adjusted():
 
 def test_positive_label_needs_two_distinct_labels():
     with pytest.raises(ValueError, match="two distinct labels"):
-        metrics.positive_label(pd.Series([1, 1, 1]), tasks.TaskType.BINARY)
+        metrics.positive_label(pandas.Series([1, 1, 1]), tasks.TaskType.BINARY)

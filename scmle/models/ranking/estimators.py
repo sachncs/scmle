@@ -9,7 +9,7 @@ meaningful within a query.
 from typing import Any
 from typing import Self
 
-import numpy as np
+import numpy
 from sklearn import base
 from sklearn import ensemble
 
@@ -43,7 +43,7 @@ class ConstantRanker(base.RegressorMixin, base.BaseEstimator):
         """
         return self
 
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """Zero for every row.
 
         Args:
@@ -52,7 +52,7 @@ class ConstantRanker(base.RegressorMixin, base.BaseEstimator):
         Returns:
             Array of zeros of shape `(n_rows,)`.
         """
-        return np.zeros(features.shape[0])
+        return numpy.zeros(features.shape[0])
 
 
 class PointwiseRanker(base.RegressorMixin, base.BaseEstimator):
@@ -87,11 +87,11 @@ class PointwiseRanker(base.RegressorMixin, base.BaseEstimator):
         """
         model = self.regressor or ensemble.HistGradientBoostingRegressor()
         self.regressor_ = base.clone(model).fit(
-            features, np.asarray(target, dtype=float)
+            features, numpy.asarray(target, dtype=float)
         )
         return self
 
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """Predicted relevance.
 
         Args:
@@ -100,7 +100,7 @@ class PointwiseRanker(base.RegressorMixin, base.BaseEstimator):
         Returns:
             Array of shape `(n_rows,)` of predicted grades.
         """
-        return np.asarray(self.regressor_.predict(features), dtype=float)
+        return numpy.asarray(self.regressor_.predict(features), dtype=float)
 
 
 class LibraryRanker(base.RegressorMixin, base.BaseEstimator):
@@ -177,11 +177,11 @@ class LibraryRanker(base.RegressorMixin, base.BaseEstimator):
         """
         sizes = single_query(features.shape[0]) if group is None else group
         self.model_ = self.build().fit(
-            features, np.asarray(target).astype(int), group=list(sizes)
+            features, numpy.asarray(target).astype(int), group=list(sizes)
         )
         return self
 
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """Ranking scores.
 
         Args:
@@ -190,4 +190,4 @@ class LibraryRanker(base.RegressorMixin, base.BaseEstimator):
         Returns:
             Array of shape `(n_rows,)`; compare scores only within a query.
         """
-        return np.asarray(self.model_.predict(features), dtype=float)
+        return numpy.asarray(self.model_.predict(features), dtype=float)

@@ -1,7 +1,7 @@
 """Tests for resource measurement and limits."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 from sklearn import dummy
 from sklearn import ensemble
@@ -11,11 +11,11 @@ from scmle.evaluation import resources
 
 
 def fitted(model, rows=300):
-    rng = np.random.default_rng(0)
-    features = pd.DataFrame(
+    rng = numpy.random.default_rng(0)
+    features = pandas.DataFrame(
         {"a": rng.normal(size=rows), "b": rng.normal(size=rows)}
     )
-    target = pd.Series((features.a > 0).astype(int))
+    target = pandas.Series((features.a > 0).astype(int))
     return model.fit(features, target), features
 
 
@@ -37,7 +37,7 @@ def test_measurement_does_not_modify_the_model_or_data():
     model, features = fitted(dummy.DummyClassifier())
     before = features.copy()
     resources.measure(model, features)
-    pd.testing.assert_frame_equal(features, before)
+    pandas.testing.assert_frame_equal(features, before)
 
 
 def test_limits_report_each_violation():

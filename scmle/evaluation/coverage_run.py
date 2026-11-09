@@ -24,11 +24,11 @@ from collections.abc import Mapping
 from collections.abc import Sequence
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.contracts import errors
-from scmle.data.ledger import ledger as ledger_module
+from scmle.data.ledger import ledger
 from scmle.evaluation import coverage
 from scmle.evaluation import coverage_slices
 
@@ -99,12 +99,12 @@ def claim_hash(claim: dict[str, Any]) -> str:
     Returns:
         Its ledger digest.
     """
-    return ledger_module.digest(claim)
+    return ledger.digest(claim)
 
 
 def declared_slices(
-    inside: np.ndarray,
-    sizes: np.ndarray,
+    inside: numpy.ndarray,
+    sizes: numpy.ndarray,
     labels: Mapping[str, Any],
     level: float,
 ) -> dict[str, Any]:
@@ -137,7 +137,7 @@ def declared_slices(
 
 def regression_reports(
     bundle: Any,
-    features: pd.DataFrame,
+    features: pandas.DataFrame,
     target: Any,
     levels: Sequence[float],
     slices: Mapping[str, Any] | None = None,
@@ -157,7 +157,7 @@ def regression_reports(
         serve (`ArtifactError`) ends that method, so it and the later
         levels are omitted; a method with no served level is omitted.
     """
-    values = np.asarray(target, dtype=float)
+    values = numpy.asarray(target, dtype=float)
     reports: dict[str, Any] = {}
     for method in REGRESSION_METHODS:
         by_level: dict[str, Any] = {}
@@ -186,7 +186,7 @@ def regression_reports(
 
 def classification_reports(
     bundle: Any,
-    features: pd.DataFrame,
+    features: pandas.DataFrame,
     target: Any,
     levels: Sequence[float],
     slices: Mapping[str, Any] | None = None,
@@ -210,13 +210,13 @@ def classification_reports(
         by_level: dict[str, Any] = {}
         for level in levels:
             sets = bundle.predict_set(features, level, conditional=mode)
-            inside = np.array(
+            inside = numpy.array(
                 [
                     label in found
                     for label, found in zip(truth, sets, strict=True)
                 ]
             )
-            sizes = np.array([len(found) for found in sets], dtype=float)
+            sizes = numpy.array([len(found) for found in sets], dtype=float)
             by_level[f"{level:g}"] = coverage.coverage_report(
                 inside, sizes, level, true_classes=[str(t) for t in truth]
             )
@@ -230,7 +230,7 @@ def classification_reports(
 
 def run_report(
     bundle: Any,
-    features: pd.DataFrame,
+    features: pandas.DataFrame,
     target: Any,
     levels: Sequence[float],
     claim_sha256: str | None = None,

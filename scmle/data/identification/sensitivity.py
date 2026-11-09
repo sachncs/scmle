@@ -55,8 +55,8 @@ import dataclasses
 import math
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from scipy import stats
 
 D_TO_RR = 0.91
@@ -157,7 +157,7 @@ def partial_r2(t: float, dof: int) -> float:
 
 
 def ols_fit(
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     treatment: str,
     outcome: str,
     covariates: tuple[str, ...],
@@ -185,29 +185,29 @@ def ols_fit(
     x = (
         frame[list(covariates)].to_numpy(dtype=float)
         if covariates
-        else np.empty((n, 0))
+        else numpy.empty((n, 0))
     )
     d = frame[treatment].to_numpy(dtype=float)
     y = frame[outcome].to_numpy(dtype=float)
-    full = np.column_stack([np.ones(n), d, x])
+    full = numpy.column_stack([numpy.ones(n), d, x])
     dof = n - full.shape[1]
     if dof < 3:
         raise ValueError("too few rows for the regression")
-    coef = np.linalg.lstsq(full, y, rcond=None)[0]
+    coef = numpy.linalg.lstsq(full, y, rcond=None)[0]
     resid = y - full @ coef
     sigma2 = float(resid @ resid) / dof
-    cov = sigma2 * np.linalg.inv(full.T @ full)
+    cov = sigma2 * numpy.linalg.inv(full.T @ full)
     se = float(math.sqrt(cov[1, 1]))
     t = float(coef[1] / se)
     benchmarks = {}
     for j, name in enumerate(covariates):
         t_y = float(coef[2 + j] / math.sqrt(cov[2 + j, 2 + j]))
         r2y = partial_r2(t_y, dof)
-        design = np.column_stack([np.ones(n), x])
-        cd = np.linalg.lstsq(design, d, rcond=None)[0]
+        design = numpy.column_stack([numpy.ones(n), x])
+        cd = numpy.linalg.lstsq(design, d, rcond=None)[0]
         rd = d - design @ cd
         dof_d = n - design.shape[1]
-        cov_d = float(rd @ rd) / dof_d * np.linalg.inv(design.T @ design)
+        cov_d = float(rd @ rd) / dof_d * numpy.linalg.inv(design.T @ design)
         t_d = float(cd[1 + j] / math.sqrt(cov_d[1 + j, 1 + j]))
         benchmarks[name] = (partial_r2(t_d, dof_d), r2y)
     return OlsFit(float(coef[1]), se, dof, t, partial_r2(t, dof), benchmarks)
@@ -377,7 +377,7 @@ class SensitivityReport:
 
 
 def assess(
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     treatment: str,
     outcome: str,
     covariates: tuple[str, ...],

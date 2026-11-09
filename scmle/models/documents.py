@@ -19,7 +19,7 @@ from typing import Any
 from typing import Self
 
 import joblib
-import numpy as np
+import numpy
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score
@@ -442,7 +442,7 @@ class DocumentClassifier:
         if vectorizer is None or estimator is None:
             raise RuntimeError("classifier is not fitted")
         terms = vectorizer.get_feature_names_out()
-        strengths = np.mean(np.abs(estimator.coef_), axis=0)
+        strengths = numpy.mean(numpy.abs(estimator.coef_), axis=0)
         selected = sorted(
             (
                 (str(terms[index]), float(strengths[index]))
@@ -492,7 +492,7 @@ class DocumentClassifier:
         matrix = self.transform((sample,))
         predicted_label = estimator.predict(matrix)[0]
         class_index = int(
-            np.flatnonzero(estimator.classes_ == predicted_label)[0]
+            numpy.flatnonzero(estimator.classes_ == predicted_label)[0]
         )
         if len(estimator.classes_) == 2:
             coefficients = estimator.coef_[0]
@@ -505,7 +505,7 @@ class DocumentClassifier:
         contributions = sorted(
             (
                 (str(terms[index]), float(row[index] * coefficients[index]))
-                for index in np.flatnonzero(row)
+                for index in numpy.flatnonzero(row)
             ),
             key=lambda item: (-abs(item[1]), item[0]),
         )[:top_k]
@@ -565,7 +565,7 @@ class DocumentClassifier:
         terms = vectorizer.get_feature_names_out()
         row = matrix.toarray()[0]
         predicted = estimator.predict(matrix)[0]
-        class_index = int(np.flatnonzero(estimator.classes_ == predicted)[0])
+        class_index = int(numpy.flatnonzero(estimator.classes_ == predicted)[0])
         coefficients = estimator.coef_[0]
         if len(estimator.classes_) == 2 and class_index == 0:
             coefficients = -coefficients
@@ -574,7 +574,7 @@ class DocumentClassifier:
         candidates = sorted(
             (
                 (str(terms[index]), float(row[index] * coefficients[index]))
-                for index in np.flatnonzero(row)
+                for index in numpy.flatnonzero(row)
             ),
             key=lambda item: (-abs(item[1]), item[0]),
         )[:max_terms]
@@ -622,8 +622,8 @@ class DocumentClassifier:
         if estimator is None:
             raise RuntimeError("classifier is not fitted")
         predicted = estimator.predict(matrix)[0]
-        class_index = int(np.flatnonzero(estimator.classes_ == predicted)[0])
-        decision = np.asarray(estimator.decision_function(matrix))
+        class_index = int(numpy.flatnonzero(estimator.classes_ == predicted)[0])
+        decision = numpy.asarray(estimator.decision_function(matrix))
         if decision.ndim == 1:
             raw_score = float(decision[0])
             return raw_score if class_index == 1 else -raw_score

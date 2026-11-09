@@ -3,7 +3,7 @@
 from typing import Any
 from typing import Self
 
-import numpy as np
+import numpy
 from sklearn import base
 from sklearn import dummy
 from sklearn import ensemble
@@ -40,19 +40,19 @@ class PerTarget(base.BaseEstimator):
         Returns:
             This fitted estimator.
         """
-        matrix = np.asarray(targets)
+        matrix = numpy.asarray(targets)
         self.estimators_ = []
         for column in range(matrix.shape[1]):
             values = matrix[:, column]
             model = (
                 dummy.DummyClassifier(strategy="prior")
-                if self.classify and len(np.unique(values)) < 2
+                if self.classify and len(numpy.unique(values)) < 2
                 else base.clone(self.estimator)
             )
             self.estimators_.append(model.fit(features, values))
         return self
 
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """One prediction column per target.
 
         Args:
@@ -61,11 +61,11 @@ class PerTarget(base.BaseEstimator):
         Returns:
             Array of shape `(n_rows, n_targets)`.
         """
-        return np.column_stack(
-            [np.asarray(m.predict(features)) for m in self.estimators_]
+        return numpy.column_stack(
+            [numpy.asarray(m.predict(features)) for m in self.estimators_]
         )
 
-    def predict_proba(self, features: Any) -> np.ndarray:
+    def predict_proba(self, features: Any) -> numpy.ndarray:
         """Probability of the positive label for each target column.
 
         Args:
@@ -77,16 +77,16 @@ class PerTarget(base.BaseEstimator):
         """
         columns = []
         for model in self.estimators_:
-            probabilities = np.asarray(model.predict_proba(features))
+            probabilities = numpy.asarray(model.predict_proba(features))
             positive = (
                 list(model.classes_).index(1) if 1 in model.classes_ else None
             )
             columns.append(
                 probabilities[:, positive]
                 if positive is not None
-                else np.zeros(probabilities.shape[0])
+                else numpy.zeros(probabilities.shape[0])
             )
-        return np.column_stack(columns)
+        return numpy.column_stack(columns)
 
 
 class NativeMultiOutput(base.BaseEstimator):
@@ -121,11 +121,11 @@ class NativeMultiOutput(base.BaseEstimator):
             This fitted estimator.
         """
         self.estimator_ = base.clone(self.estimator).fit(
-            features, np.asarray(targets)
+            features, numpy.asarray(targets)
         )
         return self
 
-    def predict(self, features: Any) -> np.ndarray:
+    def predict(self, features: Any) -> numpy.ndarray:
         """One prediction column per target.
 
         Args:
@@ -134,9 +134,9 @@ class NativeMultiOutput(base.BaseEstimator):
         Returns:
             Array of shape `(n_rows, n_targets)`.
         """
-        return np.asarray(self.estimator_.predict(features))
+        return numpy.asarray(self.estimator_.predict(features))
 
-    def predict_proba(self, features: Any) -> np.ndarray:
+    def predict_proba(self, features: Any) -> numpy.ndarray:
         """Probability of the positive label for each target column.
 
         Args:
@@ -147,11 +147,11 @@ class NativeMultiOutput(base.BaseEstimator):
             do not include the label 1 gets probability zero.
         """
         found = self.estimator_.predict_proba(features)
-        return np.column_stack(
+        return numpy.column_stack(
             [
-                np.asarray(p)[:, list(c).index(1)]
+                numpy.asarray(p)[:, list(c).index(1)]
                 if 1 in c
-                else np.zeros(np.asarray(p).shape[0])
+                else numpy.zeros(numpy.asarray(p).shape[0])
                 for p, c in zip(found, self.estimator_.classes_, strict=True)
             ]
         )

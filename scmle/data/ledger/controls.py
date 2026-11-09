@@ -45,19 +45,19 @@ import dataclasses
 import math
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from scipy import stats
 
 from scmle.contracts import qualification
 from scmle.core import randomness
-from scmle.data.ledger import budget as budget_module
+from scmle.data.ledger import budget
 
 QUANTILE = 0.95
 INTERVAL_CONFIDENCE = 0.90
 PERMUTED_TARGET = "permuted_target"
 RESAMPLING = "resampling"
-COUNT_FUNCTION = Callable[[pd.DataFrame, pd.Series], int]
+COUNT_FUNCTION = Callable[[pandas.DataFrame, pandas.Series], int]
 
 
 def quantile_index(b: int, q: float = QUANTILE) -> int:
@@ -135,8 +135,10 @@ def percentile_interval(
 
 
 def permute_within(
-    values: np.ndarray, strata: np.ndarray | None, rng: np.random.Generator
-) -> np.ndarray:
+    values: numpy.ndarray,
+    strata: numpy.ndarray | None,
+    rng: numpy.random.Generator,
+) -> numpy.ndarray:
     """Permutes `values` within each stratum, or globally without strata.
 
     Args:
@@ -153,21 +155,21 @@ def permute_within(
         ValueError: If `strata` is given and does not have one label per
             entry of `values`.
     """
-    out = np.array(values, copy=True)
+    out = numpy.array(values, copy=True)
     if strata is None:
         return out[rng.permutation(len(out))]
-    labels = np.asarray(strata)
+    labels = numpy.asarray(strata)
     if len(labels) != len(out):
         raise ValueError("strata needs one label per row")
-    order = np.argsort(labels, kind="stable")
+    order = numpy.argsort(labels, kind="stable")
     sorted_labels = labels[order]
-    cuts = np.flatnonzero(sorted_labels[1:] != sorted_labels[:-1]) + 1
-    for block in np.split(order, cuts):
+    cuts = numpy.flatnonzero(sorted_labels[1:] != sorted_labels[:-1]) + 1
+    for block in numpy.split(order, cuts):
         out[block] = values[rng.permutation(block)]
     return out
 
 
-def block_labels(order: np.ndarray, block_size: int) -> np.ndarray:
+def block_labels(order: numpy.ndarray, block_size: int) -> numpy.ndarray:
     """Builds labels that cut rows, ordered by `order`, into contiguous blocks.
 
     Args:
@@ -180,8 +182,8 @@ def block_labels(order: np.ndarray, block_size: int) -> np.ndarray:
         `ValueError` from `qualification.count`.
     """
     qualification.count(block_size, "block_size", minimum=2)
-    ranks = np.empty(len(order), dtype=int)
-    ranks[np.argsort(order, kind="stable")] = np.arange(len(order))
+    ranks = numpy.empty(len(order), dtype=int)
+    ranks[numpy.argsort(order, kind="stable")] = numpy.arange(len(order))
     return ranks // block_size
 
 
@@ -301,9 +303,9 @@ def summarize(
             permutations, or `observed` is not a non-negative integer.
     """
     qualification.count(observed, "observed")
-    if len(counts) < budget_module.MIN_PERMUTATIONS:
+    if len(counts) < budget.MIN_PERMUTATIONS:
         raise ValueError(
-            f"a control needs at least {budget_module.MIN_PERMUTATIONS} re-runs"
+            f"a control needs at least {budget.MIN_PERMUTATIONS} re-runs"
         )
     p95 = percentile(counts)
     as_large = sum(1 for c in counts if c >= observed)
@@ -321,13 +323,13 @@ def summarize(
 
 def permuted_target_control(
     discoveries: COUNT_FUNCTION,
-    features: pd.DataFrame,
-    target: pd.Series,
+    features: pandas.DataFrame,
+    target: pandas.Series,
     *,
     observed: int,
     b: int,
     seed: int,
-    strata: np.ndarray | None,
+    strata: numpy.ndarray | None,
     component: str = "ledger.control.permuted_target",
 ) -> ControlResult:
     """Re-runs the exploration with the target permuted within strata.
@@ -354,14 +356,14 @@ def permuted_target_control(
         ValueError: If `b` is below the minimum or `strata` has the wrong
             length.
     """
-    qualification.count(b, "b", minimum=budget_module.MIN_PERMUTATIONS)
+    qualification.count(b, "b", minimum=budget.MIN_PERMUTATIONS)
     if strata is not None and len(strata) != len(target):
         raise ValueError("strata needs one label per row")
     counts = []
     for repeat in range(b):
         rng = randomness.component_rng(seed, component, repeat)
         values = permute_within(target.to_numpy(), strata, rng)
-        shuffled = pd.Series(values, index=target.index, name=target.name)
+        shuffled = pandas.Series(values, index=target.index, name=target.name)
         counts.append(int(discoveries(features, shuffled)))
     return summarize(
         PERMUTED_TARGET,
@@ -372,10 +374,10 @@ def permuted_target_control(
 
 
 def shuffle_columns(
-    features: pd.DataFrame,
-    rng: np.random.Generator,
-    strata: np.ndarray | None,
-) -> pd.DataFrame:
+    features: pandas.DataFrame,
+    rng: numpy.random.Generator,
+    strata: numpy.ndarray | None,
+) -> pandas.DataFrame:
     """Shuffles every column independently (within strata when given).
 
     Args:
@@ -391,12 +393,14 @@ def shuffle_columns(
     for name in features.columns:
         column = features[name].to_numpy()
         out[name] = permute_within(column, strata, rng)
-    return pd.DataFrame(out, index=features.index)
+    return pandas.DataFrame(out, index=features.index)
 
 
 def shuffle_blocks(
-    features: pd.DataFrame, blocks: np.ndarray, rng: np.random.Generator
-) -> pd.DataFrame:
+    features: pandas.DataFrame,
+    blocks: numpy.ndarray,
+    rng: numpy.random.Generator,
+) -> pandas.DataFrame:
     """Shuffles the order of contiguous blocks of each column independently.
 
     Rows are first ordered by block label; a column's values keep their order
@@ -411,34 +415,34 @@ def shuffle_blocks(
     Returns:
         A new frame with the same index and columns.
     """
-    labels = np.asarray(blocks)
-    order = np.argsort(labels, kind="stable")
+    labels = numpy.asarray(blocks)
+    order = numpy.argsort(labels, kind="stable")
     sorted_labels = labels[order]
-    cuts = np.flatnonzero(sorted_labels[1:] != sorted_labels[:-1]) + 1
-    pieces = np.split(order, cuts)
+    cuts = numpy.flatnonzero(sorted_labels[1:] != sorted_labels[:-1]) + 1
+    pieces = numpy.split(order, cuts)
     out = {}
     for name in features.columns:
         column = features[name].to_numpy()
-        shuffled = np.array(column, copy=True)
-        sequence = np.concatenate(
+        shuffled = numpy.array(column, copy=True)
+        sequence = numpy.concatenate(
             [pieces[i] for i in rng.permutation(len(pieces))]
         )
         shuffled[order] = column[sequence]
         out[name] = shuffled
-    return pd.DataFrame(out, index=features.index)
+    return pandas.DataFrame(out, index=features.index)
 
 
 def resampling_control(
     discoveries: COUNT_FUNCTION,
-    features: pd.DataFrame,
-    target: pd.Series,
+    features: pandas.DataFrame,
+    target: pandas.Series,
     *,
     observed: int,
     b: int,
     seed: int,
     mode: str = "columns",
-    strata: np.ndarray | None = None,
-    blocks: np.ndarray | None = None,
+    strata: numpy.ndarray | None = None,
+    blocks: numpy.ndarray | None = None,
     component: str = "ledger.control.resampling",
 ) -> ControlResult:
     """Re-runs the exploration with the features shuffled, ignoring the target.
@@ -465,7 +469,7 @@ def resampling_control(
         ValueError: On an unknown mode, `blocks` mode without labels, or
             `b` below the minimum.
     """
-    qualification.count(b, "b", minimum=budget_module.MIN_PERMUTATIONS)
+    qualification.count(b, "b", minimum=budget.MIN_PERMUTATIONS)
     if mode not in ("columns", "blocks"):
         raise ValueError("mode must be 'columns' or 'blocks'")
     if mode == "blocks" and blocks is None:

@@ -2,8 +2,8 @@
 
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.contracts import tasks
 from scmle.evaluation import diagnostics
@@ -48,10 +48,10 @@ class PartialDependence(diagnostics.Diagnostic):
             values = sample[column].dropna()
             if values.nunique() < 2:
                 continue
-            grid = np.unique(
-                np.quantile(
+            grid = numpy.unique(
+                numpy.quantile(
                     values,
-                    np.linspace(LOW_QUANTILE, HIGH_QUANTILE, GRID_POINTS),
+                    numpy.linspace(LOW_QUANTILE, HIGH_QUANTILE, GRID_POINTS),
                 )
             )
             report[column] = {
@@ -65,7 +65,7 @@ class PartialDependence(diagnostics.Diagnostic):
 
     @staticmethod
     def association(
-        sample: pd.DataFrame, name: str, outcome: pd.Series
+        sample: pandas.DataFrame, name: str, outcome: pandas.Series
     ) -> float:
         """Absolute Spearman correlation of a feature with the outcome.
 
@@ -77,11 +77,11 @@ class PartialDependence(diagnostics.Diagnostic):
         Returns:
             The absolute rank correlation, or 0.0 when it is undefined.
         """
-        values = pd.Series(sample[name].to_numpy(), dtype=float)
+        values = pandas.Series(sample[name].to_numpy(), dtype=float)
         return abs(values.corr(outcome, method="spearman") or 0.0)
 
     @staticmethod
-    def numeric_target(inputs: diagnostics.DiagnosticInput) -> pd.Series:
+    def numeric_target(inputs: diagnostics.DiagnosticInput) -> pandas.Series:
         """Returns the target as numbers (1 for the positive class if binary).
 
         Args:
@@ -94,7 +94,7 @@ class PartialDependence(diagnostics.Diagnostic):
             label and 0.0 elsewhere.
         """
         if inputs.task is tasks.TaskType.REGRESSION:
-            return pd.to_numeric(inputs.target).reset_index(drop=True)
+            return pandas.to_numeric(inputs.target).reset_index(drop=True)
         return (
             (inputs.target == inputs.positive_label)
             .astype(float)
@@ -104,10 +104,10 @@ class PartialDependence(diagnostics.Diagnostic):
     @staticmethod
     def prediction(
         inputs: diagnostics.DiagnosticInput,
-        sample: pd.DataFrame,
+        sample: pandas.DataFrame,
         column: str,
         value: float,
-    ) -> np.ndarray:
+    ) -> numpy.ndarray:
         """Predicts for the sample with one column held at `value`.
 
         Args:
@@ -122,5 +122,5 @@ class PartialDependence(diagnostics.Diagnostic):
         """
         swept = sample.assign(**{column: value})
         if inputs.task is tasks.TaskType.REGRESSION:
-            return np.asarray(inputs.estimator.predict(swept))
-        return np.asarray(inputs.estimator.predict_proba(swept))[:, 1]
+            return numpy.asarray(inputs.estimator.predict(swept))
+        return numpy.asarray(inputs.estimator.predict_proba(swept))[:, 1]

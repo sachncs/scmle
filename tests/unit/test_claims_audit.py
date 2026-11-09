@@ -12,7 +12,7 @@ from scmle.data.charter import sealing
 from scmle.data.custody import sealed
 from scmle.data.ledger import confirm
 from scmle.data.ledger import governed
-from scmle.data.ledger import ledger as ledger_module
+from scmle.data.ledger import ledger
 from scmle.data.splitting import splitters
 from tests.unit.test_charter_contracts import make_charter
 from tests.unit.test_ledger_governed import build
@@ -48,7 +48,7 @@ def make_run(tmp_path, withdraw=True, rules=None):
     if rules is not None:
         options = {
             "rule": rules.ledger_rule,
-            "confirmation_rule": confirm.budget_module.MultiplicityRule(
+            "confirmation_rule": confirm.budget.MultiplicityRule(
                 rules.confirmation_rule
             ),
         }
@@ -168,7 +168,7 @@ def test_a_withdrawn_survivor_tested_on_c_is_caught(tmp_path):
 
 def test_a_removed_or_edited_ledger_row_fails_the_chain(tmp_path):
     make_run(tmp_path)
-    path = tmp_path / ledger_module.FILE_NAME
+    path = tmp_path / ledger.FILE_NAME
     lines = path.read_text().splitlines()
     path.write_text("\n".join(lines[:-1]) + "\n")
     result = claims_audit.verify(tmp_path, KEY)
@@ -178,10 +178,10 @@ def test_a_removed_or_edited_ledger_row_fails_the_chain(tmp_path):
     again = tmp_path / "again"
     again.mkdir()
     make_run(again)
-    lines = (again / ledger_module.FILE_NAME).read_text().splitlines()
+    lines = (again / ledger.FILE_NAME).read_text().splitlines()
     index = next(i for i, line in enumerate(lines) if '"f0"' in line)
     lines[index] = lines[index].replace('"f0"', '"fX"')
-    (again / ledger_module.FILE_NAME).write_text("\n".join(lines) + "\n")
+    (again / ledger.FILE_NAME).write_text("\n".join(lines) + "\n")
     assert not claims_audit.verify(again, KEY).ok
 
 

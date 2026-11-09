@@ -1,8 +1,8 @@
-import numpy as np
+import numpy
 import pytest
 from scipy import stats
 
-from benchmarks.qualification import framing_certify as cert
+from benchmarks.qualification import framing_certify
 from scmle.contracts import qualification
 from scmle.data.framing import baseline
 from scmle.data.framing import costs
@@ -27,7 +27,7 @@ def reference_cluster_se(d, clusters):
 
 
 def test_cluster_test_matches_reference_loop():
-    rng = np.random.default_rng(3)
+    rng = numpy.random.default_rng(3)
     d = rng.normal(0.1, 1.0, 120)
     clusters = rng.integers(0, 12, 120)
     got = baseline.cluster_test(d, clusters)
@@ -48,7 +48,7 @@ def test_cluster_test_needs_two_clusters_and_aligned_inputs():
 
 
 def test_delta_is_linear_in_the_weight():
-    rng = np.random.default_rng(4)
+    rng = numpy.random.default_rng(4)
     y = (rng.random(300) < 0.3).astype(float)
     a = (rng.random(300) < 0.5).astype(float)
     b = (rng.random(300) < 0.4).astype(float)
@@ -68,31 +68,38 @@ def test_delta_is_linear_in_the_weight():
 
 def test_intersection_union_size_in_dev_worlds():
     for kind in ("null_hi", "null_lo", "null_both"):
-        se_a, fp_a = cert.null_parameters(kind)
+        se_a, fp_a = framing_certify.null_parameters(kind)
         runs = 400
         rejected = sum(
-            cert.claim_p(
-                cert.DEV_SEED_BASE + s, baseline.MIN_CLUSTERS, se_a, fp_a
+            framing_certify.claim_p(
+                framing_certify.DEV_SEED_BASE + s,
+                baseline.MIN_CLUSTERS,
+                se_a,
+                fp_a,
             )
             <= 0.05
             for s in range(runs)
         )
-        assert rejected / runs <= cert.size_bound(runs)
+        assert rejected / runs <= framing_certify.size_bound(runs)
 
 
 def test_power_where_the_closed_form_allows_it():
-    row = cert.power_rows(cert.DEV_SEED_BASE, 300)
+    row = framing_certify.power_rows(framing_certify.DEV_SEED_BASE, 300)
     assert row["attainable"]
     assert row["empirical_power"] >= row["floor"]
 
 
 def test_selective_labels_flag_and_clean_worlds():
     flagged = sum(
-        baseline.selective_labels(*cert.label_world(True, 10_000 + s)).flagged
+        baseline.selective_labels(
+            *framing_certify.label_world(True, 10_000 + s)
+        ).flagged
         for s in range(60)
     )
     clean = sum(
-        baseline.selective_labels(*cert.label_world(False, 10_000 + s)).flagged
+        baseline.selective_labels(
+            *framing_certify.label_world(False, 10_000 + s)
+        ).flagged
         for s in range(60)
     )
     assert flagged == 60
@@ -105,7 +112,7 @@ def test_selective_labels_small_arm_is_not_flagged():
 
 
 def rows(seed=0, g=60, se_a=0.85, fp_a=0.1):
-    return cert.world(seed, g, se_a, fp_a)
+    return framing_certify.world(seed, g, se_a, fp_a)
 
 
 def guard(alpha=0.05):
@@ -150,7 +157,7 @@ def test_no_gain_is_not_shown_and_stays_unverified():
 def test_selective_labels_block_the_claim():
     y, a, b, group = rows()
     y = y.copy()
-    y[b == 0] = np.nan
+    y[b == 0] = numpy.nan
     report = guard().evaluate(y, a, b, group, rule=RULE, model=MODEL)
     assert report.status == "not_issued" and not report.endpoints
     assert "selective labels" in report.reasons[0]
@@ -184,7 +191,7 @@ def test_profile_on_x_withholds_a_biased_baseline():
     clean = baseline.profile_on_exploration(y, b, MODEL)
     assert len(clean["net_benefit_baseline"]) == 5
     y2 = y.copy()
-    y2[b == 0] = np.nan
+    y2[b == 0] = numpy.nan
     biased = baseline.profile_on_exploration(y2, b, MODEL)
     assert biased["net_benefit_baseline"] == baseline.NOT_COMPUTED
     assert biased["selective_labels"]["flagged"]

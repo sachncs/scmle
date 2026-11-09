@@ -28,13 +28,13 @@ and the status makes no claim about that.
 from collections.abc import Mapping
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 from scipy import stats
 
 from scmle.contracts import tasks
 from scmle.data.ledger import confirm
-from scmle.data.ledger import ledger as ledger_module
+from scmle.data.ledger import ledger
 from scmle.evaluation import conformal
 from scmle.evaluation import coverage
 from scmle.evaluation import coverage_run
@@ -117,7 +117,7 @@ def registration(
         KIND,
         f"the {choice['method']} interval or set at level {choice['level']:g} "
         f"covers at least {floor:g} of the rows of C",
-        ledger_module.digest(registration_body(claim_sha256, choice)),
+        ledger.digest(registration_body(claim_sha256, choice)),
     )
 
 
@@ -196,10 +196,10 @@ def capped(task: str, status: str) -> str:
 
 def inside_of(
     bundle: Any,
-    features: pd.DataFrame,
+    features: pandas.DataFrame,
     target: Any,
     choice: Mapping[str, Any],
-) -> np.ndarray:
+) -> numpy.ndarray:
     """Whether the primary interval or set holds, per released row.
 
     Args:
@@ -217,13 +217,13 @@ def inside_of(
         band = bundle.predict_interval(
             features, coverage=level, method="residual"
         )
-        values = np.asarray(target, dtype=float)
-        return np.asarray(
+        values = numpy.asarray(target, dtype=float)
+        return numpy.asarray(
             (values >= band["lower"].to_numpy())
             & (values <= band["upper"].to_numpy())
         )
     sets = bundle.predict_set(features, level, conditional=None)
-    return np.array(
+    return numpy.array(
         [
             label in found
             for label, found in zip(list(target), sets, strict=True)
@@ -233,7 +233,7 @@ def inside_of(
 
 def evaluate_document(
     bundle: Any,
-    features: pd.DataFrame,
+    features: pandas.DataFrame,
     target: Any,
     claim_sha256: str,
     choice: Mapping[str, Any],
@@ -336,7 +336,9 @@ def build_runner(
     if choice is None or bundle.conformal is None:
         return None
 
-    def evaluate(features: pd.DataFrame, target: pd.Series) -> confirm.ClaimRun:
+    def evaluate(
+        features: pandas.DataFrame, target: pandas.Series
+    ) -> confirm.ClaimRun:
         document = evaluate_document(
             bundle, features, target, claim_sha256, choice, task
         )

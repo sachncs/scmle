@@ -2,15 +2,15 @@
 
 import json
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
 from scmle.data.charter import causal
 from scmle.data.identification import run
-from scmle.data.ledger import budget as budget_module
+from scmle.data.ledger import budget
 
-BUDGET = budget_module.ErrorBudget.create(0.05, 0.1)
+BUDGET = budget.ErrorBudget.create(0.05, 0.1)
 COVARIATES = "unconfoundedness_given:a,b"
 ASSUMPTIONS = (COVARIATES, "positivity", "no_interference")
 GATES = (
@@ -48,16 +48,16 @@ NAMED = dict.fromkeys(
 
 def observational(n: int, seed: int, tau: float = 2.0, hidden: float = 0.0):
     """Confounded by observed a, b; optional hidden u hitting both outcomes."""
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     a, b = rng.standard_normal(n), rng.standard_normal(n)
     u = rng.standard_normal(n)
-    e = 1 / (1 + np.exp(-(0.8 * a + 0.4 * b + hidden * u)))
+    e = 1 / (1 + numpy.exp(-(0.8 * a + 0.4 * b + hidden * u)))
     t = (rng.uniform(size=n) < e).astype(float)
     base = 1.0 * a - 0.5 * b + hidden * u
     y = tau * t + base + rng.standard_normal(n)
     nco = 0.7 * a - 0.3 * b + hidden * u + rng.standard_normal(n)
-    region = np.where(rng.uniform(size=n) < 0.5, "n", "s")
-    return pd.DataFrame(
+    region = numpy.where(rng.uniform(size=n) < 0.5, "n", "s")
+    return pandas.DataFrame(
         {"a": a, "b": b, "t": t, "y": y, "nco": nco, "region": region}
     )
 
@@ -177,14 +177,14 @@ def test_the_documents_are_deterministic_and_json_ready():
 
 
 def test_overlap_failure_without_trimming_refuses_and_with_trimming_runs():
-    rng = np.random.default_rng(0)
+    rng = numpy.random.default_rng(0)
 
     def world(n):
         a = rng.standard_normal(n)
-        e = 1 / (1 + np.exp(-4.0 * a))
+        e = 1 / (1 + numpy.exp(-4.0 * a))
         t = (rng.uniform(size=n) < e).astype(float)
         y = 2 * t + a + rng.standard_normal(n)
-        return pd.DataFrame(
+        return pandas.DataFrame(
             {"a": a, "b": rng.standard_normal(n), "t": t, "y": y}
         )
 
@@ -215,7 +215,7 @@ def test_randomized_difference_runs_and_is_labelled_not_applicable_for_sensitivi
         assumptions=("randomized_assignment", "no_interference"),
     )
     x = observational(500, 1, hidden=0.0)
-    c = x.assign(t=(np.arange(len(x)) % 2).astype(float))
+    c = x.assign(t=(numpy.arange(len(x)) % 2).astype(float))
     out = go(spec, x, c, attestors=NAMED | {"randomized_assignment": "R, 2026"})
     assert out.documents["sensitivity_report.json"]["applicable"] is False
     assert (
@@ -225,10 +225,10 @@ def test_randomized_difference_runs_and_is_labelled_not_applicable_for_sensitivi
 
 
 def did_frame(seed, n=120, tau=1.5, periods=5):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     rows = []
     for u in range(n):
-        g = 3.0 if u < n // 2 else np.nan
+        g = 3.0 if u < n // 2 else numpy.nan
         level = rng.normal()
         region = "n" if u % 2 else "s"
         for t in range(periods):
@@ -237,7 +237,9 @@ def did_frame(seed, n=120, tau=1.5, periods=5):
             if g == g and t >= g:
                 y += tau
             rows.append((u, t, g, y, nco, region))
-    return pd.DataFrame(rows, columns=["id", "t", "g", "y", "nco", "region"])
+    return pandas.DataFrame(
+        rows, columns=["id", "t", "g", "y", "nco", "region"]
+    )
 
 
 def test_difference_in_differences_runs_through_the_same_documents():
@@ -269,14 +271,14 @@ def test_difference_in_differences_runs_through_the_same_documents():
 
 
 def test_instrument_and_discontinuity_and_synthetic_control_run():
-    rng = np.random.default_rng(3)
+    rng = numpy.random.default_rng(3)
 
     def iv_world(n):
         z = rng.standard_normal(n)
         u = rng.standard_normal(n)
         d = z + u + rng.standard_normal(n)
         y = 2 * d + 1.5 * u + rng.standard_normal(n)
-        return pd.DataFrame({"z": z, "d": d, "y": y})
+        return pandas.DataFrame({"z": z, "d": d, "y": y})
 
     iv_spec = causal.CausalSpec(
         treatment="d",
@@ -302,7 +304,7 @@ def test_instrument_and_discontinuity_and_synthetic_control_run():
     def rd_world(n):
         x = rng.uniform(-1, 1, n)
         y = 2 * x + (x >= 0) + rng.normal(scale=0.5, size=n)
-        return pd.DataFrame({"x": x, "y": y})
+        return pandas.DataFrame({"x": x, "y": y})
 
     rd_spec = causal.CausalSpec(
         treatment="d",
@@ -318,7 +320,9 @@ def test_instrument_and_discontinuity_and_synthetic_control_run():
         out.documents["identification_report.json"]["design"]["bandwidth"] > 0
     )
     manip = rd_world(3000)
-    manip.loc[manip.x.between(-0.2, 0) & (np.arange(3000) % 2 == 0), "x"] *= -1
+    manip.loc[
+        manip.x.between(-0.2, 0) & (numpy.arange(3000) % 2 == 0), "x"
+    ] *= -1
     refused = go(rd_spec, manip, rd_world(3000))
     assert (
         "density" in refused.documents["identification_report.json"]["reason"]
@@ -332,7 +336,7 @@ def test_instrument_and_discontinuity_and_synthetic_control_run():
             y = factors[t] @ loadings[u] + rng.normal(scale=0.1)
             treated = float(u == 0 and t >= 12)
             rows.append((u, t, y + 3.0 * treated, treated))
-    panel = pd.DataFrame(rows, columns=["u", "t", "y", "d"])
+    panel = pandas.DataFrame(rows, columns=["u", "t", "y", "d"])
     sc_spec = causal.CausalSpec(
         treatment="d",
         outcome="y",
@@ -392,7 +396,9 @@ class StubAdapter(run.Adapter):
 
 def test_replication_leaves_the_adapter_design_and_weak_flag_unchanged():
     spec = block()
-    frame = pd.DataFrame({"region": ["a"] * 60 + ["b"] * 80, "y": 0.0, "t": 0})
+    frame = pandas.DataFrame(
+        {"region": ["a"] * 60 + ["b"] * 80, "y": 0.0, "t": 0}
+    )
     adapter = StubAdapter(spec, frame, 0, "linear", 0.05)
     adapter.design = {"overlap_on_c": "pooled"}
     run.replication(adapter, frame, 0.95, 1.0, 0.05)

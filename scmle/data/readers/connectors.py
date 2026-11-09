@@ -29,7 +29,7 @@ from urllib.parse import urlsplit
 from urllib.parse import urlunsplit
 from urllib.request import url2pathname
 
-import pandas as pd
+import pandas
 
 from scmle.contracts import errors
 from scmle.data.readers import tabular
@@ -38,7 +38,7 @@ T = TypeVar("T")
 Row = tuple[Any, ...]
 RangeReader = Callable[[str, int, int], bytes]
 SizeReader = Callable[[str], int]
-ObjectDecoder = Callable[[str, bytes], pd.DataFrame]
+ObjectDecoder = Callable[[str, bytes], pandas.DataFrame]
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -544,7 +544,7 @@ class SourceSchema:
         }
 
     @classmethod
-    def from_frame(cls, frame: pd.DataFrame) -> "SourceSchema":
+    def from_frame(cls, frame: pandas.DataFrame) -> "SourceSchema":
         """Builds a source schema from a pandas frame.
 
         Args:
@@ -1510,7 +1510,7 @@ class WarehouseConnector(SourceConnector):
         return schema
 
 
-def read_tabular_bytes(source_uri: str, payload: bytes) -> pd.DataFrame:
+def read_tabular_bytes(source_uri: str, payload: bytes) -> pandas.DataFrame:
     """Decodes one supported tabular object from bytes.
 
     The object-store connector accepts a byte-reader instead of importing a
@@ -1533,20 +1533,20 @@ def read_tabular_bytes(source_uri: str, payload: bytes) -> pd.DataFrame:
     name = pathlib.PurePosixPath(urlsplit(source_uri).path).name.lower()
     if name.endswith((".csv", ".csv.gz", ".csv.bz2", ".csv.xz")):
         if name.endswith(".gz"):
-            return pd.read_csv(io.BytesIO(payload), compression="gzip")
+            return pandas.read_csv(io.BytesIO(payload), compression="gzip")
         if name.endswith(".bz2"):
-            return pd.read_csv(io.BytesIO(payload), compression="bz2")
+            return pandas.read_csv(io.BytesIO(payload), compression="bz2")
         if name.endswith(".xz"):
-            return pd.read_csv(io.BytesIO(payload), compression="xz")
-        return pd.read_csv(io.BytesIO(payload))
+            return pandas.read_csv(io.BytesIO(payload), compression="xz")
+        return pandas.read_csv(io.BytesIO(payload))
     if name.endswith((".jsonl", ".ndjson", ".jsonl.gz", ".ndjson.gz")):
         if name.endswith(".gz"):
-            return pd.read_json(
+            return pandas.read_json(
                 io.BytesIO(payload), lines=True, compression="gzip"
             )
-        return pd.read_json(io.BytesIO(payload), lines=True)
+        return pandas.read_json(io.BytesIO(payload), lines=True)
     if name.endswith((".parquet", ".pq")):
-        return pd.read_parquet(io.BytesIO(payload))
+        return pandas.read_parquet(io.BytesIO(payload))
     raise ConnectorError(
         "unsupported_object_format",
         f"unsupported tabular object format: {name or '<unknown>'}",
@@ -1632,7 +1632,7 @@ class ObjectStoreConnector(SourceConnector):
             f"{self.source_uri}|decoder={self.decoder_name}"
         )
 
-    def load_frame(self) -> pd.DataFrame:
+    def load_frame(self) -> pandas.DataFrame:
         """Downloads and decodes the bounded object once.
 
         Returns:
@@ -1673,7 +1673,7 @@ class ObjectStoreConnector(SourceConnector):
             )
         return ObjectPayload(self.source_uri, payload)
 
-    def decode_object(self, object_payload: ObjectPayload) -> pd.DataFrame:
+    def decode_object(self, object_payload: ObjectPayload) -> pandas.DataFrame:
         """Decodes one observed object while preserving its raw identity.
 
         Args:
@@ -1702,7 +1702,7 @@ class ObjectStoreConnector(SourceConnector):
                     "error_type": type(error).__name__,
                 },
             ) from error
-        if not isinstance(frame, pd.DataFrame):
+        if not isinstance(frame, pandas.DataFrame):
             raise ConnectorError(
                 "invalid_decoded_object",
                 "object decoder must return a pandas DataFrame",

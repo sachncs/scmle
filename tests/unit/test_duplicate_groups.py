@@ -1,7 +1,7 @@
 """Copies of one record never straddle a split."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.contracts import tasks
 from scmle.data.splitting import duplicates
@@ -15,8 +15,8 @@ def spec(task="binary_classification"):
 
 
 def frame_with_copies(rows=600, copies=200, seed=0):
-    rng = np.random.default_rng(seed)
-    base = pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    base = pandas.DataFrame(
         {
             "a": rng.normal(size=rows),
             "b": rng.choice(["p", "q", "r"], rows),
@@ -24,11 +24,13 @@ def frame_with_copies(rows=600, copies=200, seed=0):
         }
     )
     extra = base.sample(copies, random_state=seed, replace=True)
-    return pd.concat([base, extra], ignore_index=True)
+    return pandas.concat([base, extra], ignore_index=True)
 
 
 def test_rows_with_the_same_features_share_a_group():
-    frame = pd.DataFrame({"a": [1.0, 1.0, 2.0, 3.0], "b": ["x", "x", "x", "y"]})
+    frame = pandas.DataFrame(
+        {"a": [1.0, 1.0, 2.0, 3.0], "b": ["x", "x", "x", "y"]}
+    )
 
     groups = duplicates.duplicate_groups(frame, ["a", "b"])
 
@@ -37,7 +39,7 @@ def test_rows_with_the_same_features_share_a_group():
 
 
 def test_numbers_are_compared_to_six_decimals():
-    frame = pd.DataFrame({"a": [1.0000001, 1.0000002, 1.01]})
+    frame = pandas.DataFrame({"a": [1.0000001, 1.0000002, 1.01]})
 
     groups = duplicates.duplicate_groups(frame, ["a"])
 
@@ -54,9 +56,9 @@ def test_no_duplicate_group_straddles_the_holdout_or_any_fold():
     dev = set(split.manifest.train_ids)
     test = set(split.manifest.test_ids)
     for group in set(groups) - {duplicates.NOT_DUPLICATED}:
-        rows = set(np.flatnonzero(groups == group).tolist())
+        rows = set(numpy.flatnonzero(groups == group).tolist())
         assert rows <= dev or rows <= test
-    dev_rows = np.array(split.manifest.train_ids)
+    dev_rows = numpy.array(split.manifest.train_ids)
     for fit, held in split.manifest.folds:
         fit_groups = set(groups[dev_rows[list(fit)]])
         held_groups = set(groups[dev_rows[list(held)]])

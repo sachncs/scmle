@@ -3,8 +3,8 @@
 from collections.abc import Callable
 from collections.abc import Sequence
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 MAX_BACKGROUND = 50
 
@@ -22,7 +22,7 @@ class OcclusionExplainer:
 
     def __init__(
         self,
-        predict: Callable[[pd.DataFrame], np.ndarray],
+        predict: Callable[[pandas.DataFrame], numpy.ndarray],
         features: Sequence[str],
     ) -> None:
         """Binds the explainer to a scoring function.
@@ -36,8 +36,8 @@ class OcclusionExplainer:
         self.features = list(features)
 
     def explain(
-        self, rows: pd.DataFrame, background: pd.DataFrame
-    ) -> pd.DataFrame:
+        self, rows: pandas.DataFrame, background: pandas.DataFrame
+    ) -> pandas.DataFrame:
         """Explains each row.
 
         Args:
@@ -51,16 +51,16 @@ class OcclusionExplainer:
         """
         reference = background.head(MAX_BACKGROUND).reset_index(drop=True)
         count, width = len(rows), len(reference)
-        scores = np.asarray(self.predict(rows), dtype=float)
+        scores = numpy.asarray(self.predict(rows), dtype=float)
         table = {"prediction": scores}
         repeated = rows.loc[rows.index.repeat(width)].reset_index(drop=True)
         for feature in self.features:
             replaced = repeated.copy()
-            replaced[feature] = np.tile(reference[feature].to_numpy(), count)
+            replaced[feature] = numpy.tile(reference[feature].to_numpy(), count)
             baseline = (
-                np.asarray(self.predict(replaced), dtype=float)
+                numpy.asarray(self.predict(replaced), dtype=float)
                 .reshape(count, width)
                 .mean(axis=1)
             )
             table[feature] = scores - baseline
-        return pd.DataFrame(table, index=rows.index)
+        return pandas.DataFrame(table, index=rows.index)

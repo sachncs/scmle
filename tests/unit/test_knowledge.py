@@ -2,8 +2,8 @@
 
 import dataclasses
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 
 from scmle.contracts import experiments
@@ -43,8 +43,8 @@ def fp(**overrides):
 
 
 def test_fingerprint_describes_shape_types_and_balance():
-    rng = np.random.default_rng(0)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(0)
+    frame = pandas.DataFrame(
         {
             "a": rng.exponential(size=1000),
             "b": rng.normal(size=1000),
@@ -62,7 +62,7 @@ def test_fingerprint_describes_shape_types_and_balance():
 def test_fingerprint_has_a_defined_missing_rate_without_features():
     """An empty feature plan remains finite and warning-free."""
     profile = profile_of(
-        pd.DataFrame({"feature": [1.0, 2.0, 3.0, 4.0], "y": [0, 1, 0, 1]})
+        pandas.DataFrame({"feature": [1.0, 2.0, 3.0, 4.0], "y": [0, 1, 0, 1]})
     )
     empty_plan = dataclasses.replace(
         profile.feature_plan, numeric=(), categorical=(), text=()

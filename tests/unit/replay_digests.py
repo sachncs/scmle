@@ -11,7 +11,7 @@ import pathlib
 import tempfile
 
 from scmle.data.framing import draft
-from tests.unit import test_framing_draft as base
+from tests.unit import test_framing_draft
 
 
 def file_digest(path: pathlib.Path) -> str:
@@ -21,11 +21,11 @@ def file_digest(path: pathlib.Path) -> str:
 
 def digests() -> dict[str, str]:
     """Charter hash and artifact digests of the seeded framing draft."""
-    frame = base.table()
+    frame = test_framing_draft.table()
     result = draft.frame(
-        base.request(frame),
+        test_framing_draft.request(frame),
         frame,
-        cost_model=base.MODEL,
+        cost_model=test_framing_draft.MODEL,
         baseline_column="current_rule",
     )
     out: dict[str, str] = {"charter_hash": result.charter.charter_hash}

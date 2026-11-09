@@ -11,8 +11,8 @@ recorded either way.
 import dataclasses
 from typing import Any
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.models import thresholds
 
@@ -57,7 +57,10 @@ class Mitigation:
 
 
 def rates(
-    groups: pd.Series, flagged: np.ndarray, actual: np.ndarray, criterion: str
+    groups: pandas.Series,
+    flagged: numpy.ndarray,
+    actual: numpy.ndarray,
+    criterion: str,
 ) -> dict[str, float]:
     """Per-group selection rate or true-positive rate.
 
@@ -89,7 +92,10 @@ def rates(
 
 
 def gap(
-    groups: pd.Series, flagged: np.ndarray, actual: np.ndarray, criterion: str
+    groups: pandas.Series,
+    flagged: numpy.ndarray,
+    actual: numpy.ndarray,
+    criterion: str,
 ) -> float:
     """Largest between-group difference in the criterion's rate.
 
@@ -108,9 +114,9 @@ def gap(
 
 
 def group_cuts(
-    probabilities: np.ndarray,
-    groups: pd.Series,
-    actual: np.ndarray,
+    probabilities: numpy.ndarray,
+    groups: pandas.Series,
+    actual: numpy.ndarray,
     criterion: str,
     base: float,
 ) -> dict[str, float]:
@@ -151,15 +157,17 @@ def group_cuts(
         if not enough:
             continue
         cuts[str(level)] = float(
-            np.clip(np.quantile(probabilities[pool], 1.0 - target), 0.0, 1.0)
+            numpy.clip(
+                numpy.quantile(probabilities[pool], 1.0 - target), 0.0, 1.0
+            )
         )
     return cuts
 
 
 def judge(
-    probabilities: np.ndarray,
-    groups: pd.Series,
-    actual: np.ndarray,
+    probabilities: numpy.ndarray,
+    groups: pandas.Series,
+    actual: numpy.ndarray,
     column: str,
     criterion: str,
     base: float,

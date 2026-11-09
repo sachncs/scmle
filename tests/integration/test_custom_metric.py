@@ -60,11 +60,11 @@ def test_registering_twice_needs_replace_and_unknown_tasks_are_rejected(
 
 
 def test_a_regression_metric_can_be_user_defined(tmp_path):
-    import numpy as np
-    import pandas as pd
+    import numpy
+    import pandas
 
-    rng = np.random.default_rng(2)
-    frame = pd.DataFrame({"x": rng.uniform(1, 5, 400)})
+    rng = numpy.random.default_rng(2)
+    frame = pandas.DataFrame({"x": rng.uniform(1, 5, 400)})
     frame["y"] = 3 * frame.x + rng.normal(0, 0.3, 400)
     scmle.register_metric(
         "mape",

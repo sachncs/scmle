@@ -14,7 +14,7 @@ from collections.abc import Mapping
 import dataclasses
 from typing import Any
 
-import pandas as pd
+import pandas
 
 from scmle.data.detectors import certificates
 from scmle.data.detectors import duplicates
@@ -71,7 +71,7 @@ def gate_status(
 
 
 def run(
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     target: str | None = None,
     store: certificates.CertificateStore | None = None,
     seed: int = 0,
@@ -92,7 +92,7 @@ def run(
     results: dict[str, Any] = {}
     skipped: dict[str, str] = {}
     order: list[str] = []
-    steps: dict[str, Callable[[pd.DataFrame], Any]] = {}
+    steps: dict[str, Callable[[pandas.DataFrame], Any]] = {}
     log: list[dict[str, Any]] = []
     working = frame
     report = sentinels.find_sentinels(frame)
@@ -120,7 +120,7 @@ def run(
 
 
 def label_step(
-    frame: pd.DataFrame, target: str | None, seed: int
+    frame: pandas.DataFrame, target: str | None, seed: int
 ) -> labels.LabelReport | str:
     """Runs the label-noise detector, or says why it was declined.
 

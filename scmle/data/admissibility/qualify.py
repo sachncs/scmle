@@ -31,7 +31,7 @@ import datetime
 import math
 from pathlib import Path
 
-import pandas as pd
+import pandas
 
 from scmle.contracts import qualification
 from scmle.data.admissibility import attestations as attestations_module
@@ -255,7 +255,7 @@ def attestation_check(
 
 
 def causal_admissibility(
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     candidates: Sequence[str],
     spec: causal_module.CausalSpec,
     graph: dag_module.Dag,
@@ -363,8 +363,8 @@ def causal_admissibility(
 
 
 def run(
-    features: pd.DataFrame,
-    target: pd.Series,
+    features: pandas.DataFrame,
+    target: pandas.Series,
     *,
     kind: str,
     classification: bool,

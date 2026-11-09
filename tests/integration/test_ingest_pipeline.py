@@ -3,10 +3,10 @@
 import json
 import sqlite3
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
-from benchmarks.qualification import ingest_worlds as worlds
+from benchmarks.qualification import ingest_worlds
 from scmle import cli
 from scmle.contracts import qualification
 from scmle.data.admissibility import provenance
@@ -22,27 +22,27 @@ SEED = 20240601
 
 
 def build(path=None):
-    rng = np.random.default_rng(SEED)
-    db = worlds.new_database("e2e")
+    rng = numpy.random.default_rng(SEED)
+    db = ingest_worlds.new_database("e2e")
     customers = 40
-    worlds.load(
+    ingest_worlds.load(
         db,
         "customers",
-        pd.DataFrame(
+        pandas.DataFrame(
             {
-                "customer_id": np.arange(customers),
+                "customer_id": numpy.arange(customers),
                 "segment": rng.choice(["a", "b", "c"], customers),
             }
         ),
     )
     orders = 300
     event = rng.uniform(0, 100, orders).round(1)
-    worlds.load(
+    ingest_worlds.load(
         db,
         "orders",
-        pd.DataFrame(
+        pandas.DataFrame(
             {
-                "order_id": np.arange(orders),
+                "order_id": numpy.arange(orders),
                 "customer_id": rng.integers(0, customers, orders),
                 "created": event,
                 "recorded": (event + rng.exponential(1.5, orders)).round(1),
@@ -53,15 +53,15 @@ def build(path=None):
     items = 900
     ievent = rng.uniform(0, 100, items).round(1)
     late = rng.random(items) < 0.2
-    worlds.load(
+    ingest_worlds.load(
         db,
         "events",
-        pd.DataFrame(
+        pandas.DataFrame(
             {
                 "order_id": rng.integers(0, orders, items),
                 "created": ievent,
                 "recorded": (
-                    ievent + np.where(late, rng.uniform(10, 40, items), 0.2)
+                    ievent + numpy.where(late, rng.uniform(10, 40, items), 0.2)
                 ).round(1),
                 "qty": rng.integers(1, 5, items).astype(float),
             }
@@ -72,7 +72,7 @@ def build(path=None):
 
 def frame_of(db, table, order):
     connector = connectors.DbApiConnector(
-        worlds.URI, f"SELECT * FROM {table} ORDER BY {order}", db.factory
+        ingest_worlds.URI, f"SELECT * FROM {table} ORDER BY {order}", db.factory
     )
     return profile.consistent_read(connector, 100).frame
 
@@ -119,8 +119,8 @@ def run_pipeline(db, tmp_path):
         asof_view.TimeRule(asof_view.NON_VERSIONED),
         name="customers_now",
     )
-    targets = pd.DataFrame(
-        {"customer_id": np.arange(40), "moment": np.full(40, 70.0)}
+    targets = pandas.DataFrame(
+        {"customer_id": numpy.arange(40), "moment": numpy.full(40, 70.0)}
     )
     source = synthesize.Source(orders, "customer_id")
     found = synthesize.synthesize(
@@ -174,7 +174,7 @@ def test_pipeline_artifacts_tiers_and_reconciliation(tmp_path):
 def test_pipeline_is_reproducible(tmp_path):
     first = run_pipeline(build(), tmp_path / "a")[2]
     second = run_pipeline(build(), tmp_path / "b")[2]
-    pd.testing.assert_frame_equal(first.frame, second.frame)
+    pandas.testing.assert_frame_equal(first.frame, second.frame)
     assert first.to_dict() == second.to_dict()
 
 
@@ -203,10 +203,10 @@ def test_features_count_only_orders_recorded_before_the_cutoff(tmp_path):
 def test_cli_ingest_runs_and_blocks_on_a_coarser_unit(tmp_path, capsys):
     path = tmp_path / "w.db"
     keeper = sqlite3.connect(path)
-    pd.DataFrame({"customer_id": range(10), "signup_month": [1] * 10}).to_sql(
-        "customers", keeper, index=False
-    )
-    pd.DataFrame(
+    pandas.DataFrame(
+        {"customer_id": range(10), "signup_month": [1] * 10}
+    ).to_sql("customers", keeper, index=False)
+    pandas.DataFrame(
         {"order_id": range(20), "customer_id": [k % 10 for k in range(20)]}
     ).to_sql("orders", keeper, index=False)
     keeper.commit()

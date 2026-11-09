@@ -2,7 +2,7 @@
 
 import io
 
-import numpy as np
+import numpy
 import pytest
 
 from scmle.data.modalities import image
@@ -326,9 +326,9 @@ def test_features_are_flattened_with_stable_shape_and_normalization():
     )
 
     assert features.shape == (1, 12)
-    assert features.dtype == np.float32
-    assert raw_features.dtype == np.uint8
-    np.testing.assert_allclose(features[0, :3], [1.0, 0.0, 128 / 255])
+    assert features.dtype == numpy.float32
+    assert raw_features.dtype == numpy.uint8
+    numpy.testing.assert_allclose(features[0, :3], [1.0, 0.0, 128 / 255])
 
 
 @PILLOW_SKIP
@@ -336,4 +336,4 @@ def test_empty_dataset_has_typed_feature_matrix():
     features = image.ImageDataset().prepare_tabular_features((3, 2), "L")
 
     assert features.shape == (0, 6)
-    assert features.dtype == np.float32
+    assert features.dtype == numpy.float32

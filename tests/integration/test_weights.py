@@ -1,7 +1,7 @@
 """A weight column steers training and is optional at prediction time."""
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 import support
 
@@ -12,12 +12,12 @@ from scmle.models import weighting
 
 def conflicting_frame(rows=800, seed=0):
     """Same feature, opposite labels in two groups; weights pick the winner."""
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     x = rng.normal(size=rows)
     other = rng.normal(size=rows)
-    first = np.arange(rows) % 2 == 0
-    y = np.where(first, x > 0, x <= 0).astype(int)
-    return pd.DataFrame({"x": x, "other": other, "first": first, "y": y})
+    first = numpy.arange(rows) % 2 == 0
+    y = numpy.where(first, x > 0, x <= 0).astype(int)
+    return pandas.DataFrame({"x": x, "other": other, "first": first, "y": y})
 
 
 def run(frame, tmp_path, **kwargs):
@@ -33,8 +33,8 @@ def run(frame, tmp_path, **kwargs):
 
 def test_weights_are_training_only_and_not_needed_to_predict(tmp_path):
     frame = conflicting_frame()
-    frame["w"] = np.where(frame["first"], 1.0, 0.01)
-    probe = pd.DataFrame({"x": [2.0, -2.0], "other": [0.0, 0.0]})
+    frame["w"] = numpy.where(frame["first"], 1.0, 0.01)
+    probe = pandas.DataFrame({"x": [2.0, -2.0], "other": [0.0, 0.0]})
 
     result = run(frame, tmp_path, weight_column="w", excluded_columns=["first"])
 
@@ -54,7 +54,7 @@ def test_bad_weights_are_refused_with_a_clear_message(tmp_path):
 
 def test_weighted_test_metrics_are_reported_beside_the_plain_ones(tmp_path):
     frame = conflicting_frame()
-    frame["w"] = np.where(frame["first"], 1.0, 0.01)
+    frame["w"] = numpy.where(frame["first"], 1.0, 0.01)
 
     weighted = run(
         frame, tmp_path / "w", weight_column="w", excluded_columns=["first"]
@@ -68,8 +68,8 @@ def test_weighted_test_metrics_are_reported_beside_the_plain_ones(tmp_path):
 
 
 def weights_frame(rows=700, seed=3):
-    rng = np.random.default_rng(seed)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(seed)
+    frame = pandas.DataFrame(
         {"x": rng.normal(size=rows), "other": rng.normal(size=rows)}
     )
     frame["y"] = (frame.x + rng.normal(0, 1.0, rows) > 0).astype(int)

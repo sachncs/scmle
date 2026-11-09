@@ -2,7 +2,7 @@
 
 import dataclasses
 
-import pandas as pd
+import pandas
 
 from scmle.contracts import errors
 
@@ -39,7 +39,9 @@ class ColumnMapping:
             name = name.strip()
         return name.lower() if self.case_insensitive else name
 
-    def apply(self, frame: pd.DataFrame, expected: list[str]) -> pd.DataFrame:
+    def apply(
+        self, frame: pandas.DataFrame, expected: list[str]
+    ) -> pandas.DataFrame:
         """Renames incoming columns according to the policy.
 
         Columns already named as expected are kept. Another column is renamed

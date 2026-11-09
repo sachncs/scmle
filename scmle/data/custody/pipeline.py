@@ -8,12 +8,12 @@ development rows, so confirmed claims never shape the model that `C` scores.
 
 import dataclasses
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 
 from scmle.contracts import errors
 from scmle.contracts import tasks
-from scmle.data.charter import contracts as charter_contracts
+from scmle.data.charter import contracts
 from scmle.data.charter import feasibility
 from scmle.data.custody import carve
 from scmle.data.custody import manifest as manifest_module
@@ -42,7 +42,7 @@ class CustodyOutcome:
     feasibility: feasibility.Feasibility
 
 
-def minority_rows(labels: np.ndarray | None, fraction: float) -> int | None:
+def minority_rows(labels: numpy.ndarray | None, fraction: float) -> int | None:
     """Estimates the minority-class rows in `C`.
 
     Args:
@@ -56,12 +56,12 @@ def minority_rows(labels: np.ndarray | None, fraction: float) -> int | None:
     """
     if labels is None:
         return None
-    counts = np.unique(labels, return_counts=True)[1]
-    return int(np.min(counts) * fraction)
+    counts = numpy.unique(labels, return_counts=True)[1]
+    return int(numpy.min(counts) * fraction)
 
 
 def assess(
-    charter: charter_contracts.AnalysisCharter,
+    charter: contracts.AnalysisCharter,
     n_rows: int,
     minority: int | None,
 ) -> feasibility.Feasibility:
@@ -87,7 +87,7 @@ def assess(
 
 
 def classes_complete(
-    labels: np.ndarray | None, carved: carve.Carve, dev_ids: np.ndarray
+    labels: numpy.ndarray | None, carved: carve.Carve, dev_ids: numpy.ndarray
 ) -> bool:
     """Checks that `C` holds every class that `X` holds.
 
@@ -110,7 +110,9 @@ def classes_complete(
 
 
 def empty_carve(
-    dev_ids: np.ndarray, folds: list[tuple[np.ndarray, np.ndarray]], note: str
+    dev_ids: numpy.ndarray,
+    folds: list[tuple[numpy.ndarray, numpy.ndarray]],
+    note: str,
 ) -> carve.Carve:
     """Builds a carve that leaves every development row in `X`.
 
@@ -132,10 +134,10 @@ def empty_carve(
 
 
 def measured_embargo(
-    frame: pd.DataFrame,
-    dev_ids: np.ndarray,
+    frame: pandas.DataFrame,
+    dev_ids: numpy.ndarray,
     data: tasks.DataSpec,
-    times: np.ndarray | None,
+    times: numpy.ndarray | None,
     task: tasks.TaskType,
 ) -> int:
     """Measures the embargo in rows from the target's autocorrelation, or 0.
@@ -159,19 +161,19 @@ def measured_embargo(
         return 0
     target = frame[data.target].iloc[dev_ids]
     if task.is_classification:
-        target = pd.Series(pd.factorize(target)[0], index=target.index)
-    values = pd.to_numeric(target, errors="coerce").to_numpy(dtype=float)
-    ordered = values[np.argsort(times, kind="stable")]
-    if np.isnan(ordered).any():
+        target = pandas.Series(pandas.factorize(target)[0], index=target.index)
+    values = pandas.to_numeric(target, errors="coerce").to_numpy(dtype=float)
+    ordered = values[numpy.argsort(times, kind="stable")]
+    if numpy.isnan(ordered).any():
         return 0
     return carve.acf_embargo(ordered)
 
 
 def apply_custody(
     *,
-    charter: charter_contracts.AnalysisCharter,
+    charter: contracts.AnalysisCharter,
     split: splitters.SplitResult,
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     spec: tasks.ProjectSpec,
     task: tasks.TaskType,
     data_hash: str,
@@ -196,16 +198,16 @@ def apply_custody(
         charter's when no `C` remains.
     """
     data, old = spec.data, split.manifest
-    dev_ids = np.asarray(old.train_ids, dtype=int)
-    folds = [(np.asarray(a, int), np.asarray(b, int)) for a, b in old.folds]
+    dev_ids = numpy.asarray(old.train_ids, dtype=int)
+    folds = [
+        (numpy.asarray(a, int), numpy.asarray(b, int)) for a, b in old.folds
+    ]
     labels = (
         frame[data.target].iloc[dev_ids].to_numpy()
         if task.is_classification
         else None
     )
-    known_entity = (
-        charter.unit_of_prediction == charter_contracts.KNOWN_ENTITY_FUTURE
-    )
+    known_entity = charter.unit_of_prediction == contracts.KNOWN_ENTITY_FUTURE
     # A known entity is not a unit: its rows may sit in X and in C, so the
     # carve (time blocks, with an embargo) does not tie them together.
     groups = (
@@ -296,12 +298,12 @@ def apply_custody(
 
 
 def finish(
-    charter: charter_contracts.AnalysisCharter,
+    charter: contracts.AnalysisCharter,
     split: splitters.SplitResult,
-    frame: pd.DataFrame,
+    frame: pandas.DataFrame,
     spec: tasks.ProjectSpec,
     carved: carve.Carve,
-    dev_ids: np.ndarray,
+    dev_ids: numpy.ndarray,
     report: feasibility.Feasibility,
     data_hash: str,
     vault: sealed.CustodyVault,
@@ -327,7 +329,7 @@ def finish(
         feasibility assessment.
     """
     old = split.manifest
-    keep = np.flatnonzero(np.isin(dev_ids, carved.exploration_ids))
+    keep = numpy.flatnonzero(numpy.isin(dev_ids, carved.exploration_ids))
     folds = tuple(
         (tuple(int(i) for i in fit), tuple(int(i) for i in held))
         for fit, held in carved.folds
@@ -337,7 +339,7 @@ def finish(
     confirmation = tuple(int(i) for i in carved.confirmation_ids)
     if confirmation:
         target = spec.data.target
-        rows = np.asarray(confirmation)
+        rows = numpy.asarray(confirmation)
         vault.seal(
             "C",
             frame.drop(columns=[target]).iloc[rows].reset_index(drop=True),

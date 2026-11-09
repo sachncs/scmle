@@ -2,7 +2,7 @@
 
 from typing import Any
 
-import numpy as np
+import numpy
 
 from scmle.evaluation import diagnostics
 
@@ -35,7 +35,7 @@ class PermutationImportance(diagnostics.Diagnostic):
             `std` over the shuffle repeats.
         """
         columns = list(inputs.feature_plan.input_columns)
-        rng = np.random.default_rng(inputs.seed)
+        rng = numpy.random.default_rng(inputs.seed)
         rows = rng.permutation(len(inputs.features))[:IMPORTANCE_ROWS]
         features = inputs.features[columns].iloc[rows].reset_index(drop=True)
         target = inputs.target.iloc[rows].reset_index(drop=True)
@@ -47,7 +47,9 @@ class PermutationImportance(diagnostics.Diagnostic):
                 break
             drops = []
             for repeat in range(IMPORTANCE_REPEATS):
-                shuffler = np.random.default_rng([inputs.seed, index, repeat])
+                shuffler = numpy.random.default_rng(
+                    [inputs.seed, index, repeat]
+                )
                 shuffled = features.copy()
                 shuffled[columns[index]] = shuffler.permutation(
                     features[columns[index]].to_numpy()
@@ -56,7 +58,7 @@ class PermutationImportance(diagnostics.Diagnostic):
                     baseline - scorer(inputs.estimator, shuffled, target)
                 )
             measured.append((columns[index], drops))
-        ranked = sorted(measured, key=lambda item: -float(np.mean(item[1])))
+        ranked = sorted(measured, key=lambda item: -float(numpy.mean(item[1])))
         return {
             "metric": inputs.metric.name,
             "truncated": len(measured) < len(columns),
@@ -65,8 +67,8 @@ class PermutationImportance(diagnostics.Diagnostic):
             "features": [
                 {
                     "feature": name,
-                    "importance": float(np.mean(drops)),
-                    "std": float(np.std(drops)),
+                    "importance": float(numpy.mean(drops)),
+                    "std": float(numpy.std(drops)),
                 }
                 for name, drops in ranked
             ],
