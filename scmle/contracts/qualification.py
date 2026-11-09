@@ -49,7 +49,19 @@ class SetId(enum.StrEnum):
 
 
 def finite(value: Any, name: str) -> float:
-    """Returns `value` as a float, requiring a finite real number."""
+    """Returns `value` as a float, requiring a finite real number.
+
+    Args:
+        value: The value to check.
+        name: The field name, for the error message.
+
+    Returns:
+        The value as a float.
+
+    Raises:
+        ValueError: If the value is a bool, not an int or float, or not
+            finite.
+    """
     if isinstance(value, bool) or not isinstance(value, int | float):
         raise ValueError(f"{name} must be a finite number")
     number = float(value)
@@ -59,7 +71,18 @@ def finite(value: Any, name: str) -> float:
 
 
 def probability(value: Any, name: str) -> float:
-    """Returns `value` as a float in [0, 1]."""
+    """Returns `value` as a float in [0, 1].
+
+    Args:
+        value: The value to check.
+        name: The field name, for the error message.
+
+    Returns:
+        The value as a float.
+
+    Raises:
+        ValueError: If the value is not a finite number within [0, 1].
+    """
     number = finite(value, name)
     if not 0.0 <= number <= 1.0:
         raise ValueError(f"{name} must be within [0, 1]")
@@ -67,7 +90,20 @@ def probability(value: Any, name: str) -> float:
 
 
 def count(value: Any, name: str, minimum: int = 0) -> int:
-    """Returns `value` as an integer of at least `minimum`."""
+    """Returns `value` as an integer of at least `minimum`.
+
+    Args:
+        value: The value to check.
+        name: The field name, for the error message.
+        minimum: The smallest accepted value.
+
+    Returns:
+        The value, unchanged.
+
+    Raises:
+        ValueError: If the value is not an integer (a bool does not count) or
+            is below the minimum.
+    """
     if isinstance(value, bool) or not isinstance(value, int):
         raise ValueError(f"{name} must be an integer")
     if value < minimum:
@@ -77,7 +113,15 @@ def count(value: Any, name: str, minimum: int = 0) -> int:
 
 
 def require_fields(cls: type, record: Mapping[str, Any]) -> None:
-    """Requires `record` to hold exactly the dataclass fields of `cls`."""
+    """Requires `record` to hold exactly the dataclass fields of `cls`.
+
+    Args:
+        cls: The dataclass whose fields are expected.
+        record: The mapping to check.
+
+    Raises:
+        ValueError: If the record has a field `cls` lacks or lacks one it has.
+    """
     names = {field.name for field in dataclasses.fields(cls)}
     unexpected = sorted(set(record) - names)
     missing = sorted(names - set(record))
@@ -88,7 +132,15 @@ def require_fields(cls: type, record: Mapping[str, Any]) -> None:
 
 
 def require_tuple(value: Any, name: str) -> None:
-    """Requires a tuple so that records compare equal after a round trip."""
+    """Requires a tuple so that records compare equal after a round trip.
+
+    Args:
+        value: The value to check.
+        name: The field name, for the error message.
+
+    Raises:
+        ValueError: If the value is not a tuple.
+    """
     if not isinstance(value, tuple):
         raise ValueError(f"{name} must be a tuple")
 
@@ -124,7 +176,17 @@ class Check:
     tier: Tier
 
     def __post_init__(self) -> None:
-        """Validates the record."""
+        """Validates the record.
+
+        Raises:
+            ValueError: If an identity, statistic, effect or count is invalid,
+                the
+                p-value is outside [0, 1], the interval is malformed or
+                reversed,
+                neither a p-value nor an interval is given, a decision, set or
+                tier has the wrong type, or the confirmed tier is not on the
+                confirmation set.
+        """
         evidence.require_text(self.check_id, "check_id")
         evidence.require_text(self.null_hypothesis, "null_hypothesis")
         finite(self.statistic, "statistic")
@@ -155,7 +217,12 @@ class Check:
             raise ValueError("confirmed tier requires the confirmation set 'C'")
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """JSON-ready record.
+
+        Returns:
+            The check's fields as a dict, with enums as their values and
+            sequences as lists.
+        """
         return {
             "check_id": self.check_id,
             "null_hypothesis": self.null_hypothesis,
@@ -172,7 +239,14 @@ class Check:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds a check, rejecting unknown or missing fields."""
+        """Rebuilds a check, rejecting unknown or missing fields.
+
+        Args:
+            record: A mapping as produced by `to_dict`.
+
+        Returns:
+            The check.
+        """
         require_fields(cls, record)
         interval = record["interval"]
         return cls(
@@ -213,7 +287,14 @@ class Claim:
     assumptions: tuple[str, ...]
 
     def __post_init__(self) -> None:
-        """Validates the record."""
+        """Validates the record.
+
+        Raises:
+            ValueError: If the id or statement is blank, there are no check ids,
+                the adjusted p-value is outside [0, 1], the effect is not
+                finite, the tier has the wrong type, or a confirmed claim has no
+                adjusted p-value.
+        """
         evidence.require_text(self.claim_id, "claim_id")
         evidence.require_text(self.statement, "statement")
         require_tuple(self.check_ids, "check_ids")
@@ -231,7 +312,12 @@ class Claim:
             raise ValueError("confirmed claims need an adjusted_p_value")
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """JSON-ready record.
+
+        Returns:
+            The claim's fields as a dict, with sequences as lists and the tier
+            as its value.
+        """
         return {
             "claim_id": self.claim_id,
             "statement": self.statement,
@@ -244,7 +330,14 @@ class Claim:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds a claim, rejecting unknown or missing fields."""
+        """Rebuilds a claim, rejecting unknown or missing fields.
+
+        Args:
+            record: A mapping as produced by `to_dict`.
+
+        Returns:
+            The claim.
+        """
         require_fields(cls, record)
         return cls(
             claim_id=record["claim_id"],
@@ -284,7 +377,14 @@ class Certificate:
     seed_path: SeedPath
 
     def __post_init__(self) -> None:
-        """Validates the record."""
+        """Validates the record.
+
+        Raises:
+            ValueError: If an identity is blank, the planted or clean counts are
+                below one, the detected count exceeds the planted count, the
+                false alarms exceed the clean rows, or the seed path is not a
+                tuple.
+        """
         evidence.require_text(self.detector_id, "detector_id")
         evidence.require_text(self.defect_type, "defect_type")
         count(self.planted, "planted", minimum=1)
@@ -332,7 +432,11 @@ class Certificate:
         return max(0.0, centre - half)
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """JSON-ready record.
+
+        Returns:
+            The certificate's fields as a dict, with the seed path as a list.
+        """
         return {
             "detector_id": self.detector_id,
             "defect_type": self.defect_type,
@@ -345,7 +449,14 @@ class Certificate:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds a certificate, rejecting unknown or missing fields."""
+        """Rebuilds a certificate, rejecting unknown or missing fields.
+
+        Args:
+            record: A mapping as produced by `to_dict`.
+
+        Returns:
+            The certificate.
+        """
         require_fields(cls, record)
         return cls(
             detector_id=record["detector_id"],

@@ -21,6 +21,9 @@ def normalize_quality_evidence(
 ) -> QualityEvidence:
     """Validates and normalizes one JSON-native quality evidence record.
 
+    A floating-point value that is not finite is refused by the JSON
+    validation (`ValueError`).
+
     Args:
         evidence: Mapping containing only JSON-native values.
         field_name: Path used in validation errors.
@@ -29,8 +32,8 @@ def normalize_quality_evidence(
         A detached dictionary containing JSON-native values.
 
     Raises:
-        TypeError: If a key or value is not JSON-native.
-        ValueError: If a floating-point value is not finite.
+        TypeError: If a key or value is not JSON-native, or the record does
+            not serialize to an object.
     """
     normalized = explanations.validate_json_value(evidence, field_name)
     if not isinstance(normalized, dict):
@@ -52,7 +55,11 @@ class QualityObservation:
     evidence: QualityEvidence
 
     def __post_init__(self) -> None:
-        """Validate and detach the evidence from mutable caller state."""
+        """Validate and detach the evidence from mutable caller state.
+
+        Raises:
+            ValueError: If the note is given but blank.
+        """
         if self.note is not None and not self.note.strip():
             raise ValueError("note must not be empty")
         object.__setattr__(
@@ -114,7 +121,12 @@ class CurationFinding:
     timestamp: str = dataclasses.field(default_factory=events.utc_timestamp)
 
     def __post_init__(self) -> None:
-        """Validates fields that determine finding identity and decisions."""
+        """Validates fields that determine finding identity and decisions.
+
+        Raises:
+            ValueError: If the id, rule version, remediation, owner or timestamp
+                is blank, or the confidence is not a finite number in [0, 1].
+        """
         if not self.finding_id.strip():
             raise ValueError("finding_id must not be empty")
         if not self.rule_version.strip():
@@ -201,7 +213,14 @@ class CurationFinding:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds a finding from its serialized representation."""
+        """Rebuilds a finding from its serialized representation.
+
+        Args:
+            record: A mapping as produced by `to_dict`.
+
+        Returns:
+            The finding.
+        """
         return cls(
             finding_id=str(record["id"]),
             rule_version=str(record["rule_version"]),
@@ -268,7 +287,14 @@ class SourceMetadata:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds source metadata from its serialized representation."""
+        """Rebuilds source metadata from its serialized representation.
+
+        Args:
+            record: A mapping as produced by `to_dict`; absent fields are empty.
+
+        Returns:
+            The source metadata.
+        """
         return cls(
             owner=str(record.get("owner", "")),
             acquisition_method=str(record.get("acquisition_method", "")),
@@ -316,7 +342,14 @@ class LineageMetadata:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds lineage metadata from its serialized representation."""
+        """Rebuilds lineage metadata from its serialized representation.
+
+        Args:
+            record: A mapping as produced by `to_dict`; absent fields are empty.
+
+        Returns:
+            The lineage metadata.
+        """
         return cls(
             source_snapshot=str(record.get("source_snapshot", "")),
             parent_datasets=tuple(record.get("parent_datasets", ())),
@@ -361,7 +394,15 @@ class PrivacyMetadata:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds privacy metadata from its serialized representation."""
+        """Rebuilds privacy metadata from its serialized representation.
+
+        Args:
+            record: A mapping as produced by `to_dict`; absent fields take
+                their defaults.
+
+        Returns:
+            The privacy metadata.
+        """
         return cls(
             classification=str(record.get("classification", "unclassified")),
             contains_pii=bool(record.get("contains_pii", False)),
@@ -417,7 +458,16 @@ class DatasetManifest:
     findings: tuple[CurationFinding, ...] = ()
 
     def __post_init__(self) -> None:
-        """Validate dataset identity before it enters a run or artifact."""
+        """Validate dataset identity before it enters a run or artifact.
+
+        Raises:
+            TypeError: If a count is not an integer, a metadata component has
+                the
+                wrong type, or a finding is not a `CurationFinding`.
+            ValueError: If an identity field is blank, a count is negative, or
+                the
+                schema version is below one.
+        """
         for field_name, field_value in (
             ("dataset_id", self.dataset_id),
             ("schema_hash", self.schema_hash),
@@ -478,7 +528,14 @@ class DatasetManifest:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds a manifest from its serialized representation."""
+        """Rebuilds a manifest from its serialized representation.
+
+        Args:
+            record: A mapping as produced by `to_dict`.
+
+        Returns:
+            The manifest.
+        """
         return cls(
             dataset_id=str(record["dataset_id"]),
             schema_hash=str(record["schema_hash"]),
@@ -527,7 +584,17 @@ class ModalityManifest:
     findings: tuple[CurationFinding, ...] = ()
 
     def __post_init__(self) -> None:
-        """Validate modality identity and attached governance metadata."""
+        """Validate modality identity and attached governance metadata.
+
+        Raises:
+            TypeError: If the sample count is not an integer, a metadata
+                component has the wrong type, or a finding is not a
+                `CurationFinding`.
+            ValueError: If an identity field is blank, the sample count is
+                negative, the schema version is below one, or the content hash
+                is
+                not a SHA-256 hex digest.
+        """
         for name, value in (
             ("dataset_id", self.dataset_id),
             ("snapshot_id", self.snapshot_id),
@@ -581,7 +648,14 @@ class ModalityManifest:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild a modality manifest from serialized evidence."""
+        """Rebuild a modality manifest from serialized evidence.
+
+        Args:
+            record: A mapping as produced by `to_dict`.
+
+        Returns:
+            The manifest.
+        """
         return cls(
             dataset_id=str(record["dataset_id"]),
             snapshot_id=str(record["snapshot_id"]),
@@ -801,7 +875,7 @@ class CurationReport:
 
     @property
     def unresolved_blocking_findings(self) -> tuple[CurationFinding, ...]:
-        """Return blocking findings without an explicit safe disposition."""
+        """The blocking findings without an explicit safe disposition."""
         safe_dispositions = {
             FindingDisposition.RESOLVED,
             FindingDisposition.WAIVED,
@@ -878,7 +952,13 @@ class DatasetCard:
     generated_at: str = dataclasses.field(default_factory=events.utc_timestamp)
 
     def __post_init__(self) -> None:
-        """Validates the fields that make the card useful to reviewers."""
+        """Validates the fields that make the card useful to reviewers.
+
+        Raises:
+            ValueError: If a required text field is blank, the schema version is
+                below one, a composition count is negative, or the out-of-scope
+                or limitations list is empty.
+        """
         for name, value in (
             ("dataset_id", self.dataset_id),
             ("modality", self.modality),
@@ -900,7 +980,14 @@ class DatasetCard:
 
     @classmethod
     def from_curation(cls, report: CurationReport) -> Self:
-        """Builds a card from the immutable curation evidence."""
+        """Builds a card from the immutable curation evidence.
+
+        Args:
+            report: The curation report.
+
+        Returns:
+            The card, with limitations that include the report's cleaning notes.
+        """
         manifest = report.manifest
         task = manifest.task or "the declared learning task"
         limitations = [

@@ -71,7 +71,15 @@ class BundleSchema:
 
     @classmethod
     def from_dict(cls, record: dict[str, Any]) -> Self:
-        """Rebuilds a schema from `to_dict` output."""
+        """Rebuilds a schema from `to_dict` output.
+
+        Args:
+            record: A mapping as produced by `to_dict`; the later fields default
+                to empty when absent.
+
+        Returns:
+            The schema.
+        """
         classes = record["classes"]
         return cls(
             target=record["target"],

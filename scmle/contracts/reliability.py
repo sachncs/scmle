@@ -102,7 +102,12 @@ class FaultEvidence:
     observation: str
 
     def __post_init__(self) -> None:
-        """Reject evidence records that cannot be independently reviewed."""
+        """Reject evidence records that cannot be independently reviewed.
+
+        Raises:
+            TypeError: If `observed_outcome` is not an `EvidenceOutcome`.
+            ValueError: If a required text field is blank.
+        """
         for name in (
             "evidence_type",
             "execution_id",
@@ -133,7 +138,14 @@ class FaultEvidence:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild evidence from its JSON-compatible representation."""
+        """Rebuild evidence from its JSON-compatible representation.
+
+        Args:
+            record: A mapping as produced by `to_dict`.
+
+        Returns:
+            The evidence.
+        """
         return cls(
             evidence_type=str(record["evidence_type"]),
             execution_id=str(record["execution_id"]),
@@ -173,7 +185,16 @@ class FaultScenarioPlan:
     evidence: tuple[FaultEvidence, ...] = ()
 
     def __post_init__(self) -> None:
-        """Validate declaration completeness and evidence/status consistency."""
+        """Validate declaration completeness and evidence/status consistency.
+
+        Raises:
+            TypeError: If an enumerated field has the wrong type or
+                `release_blocking` is not a bool.
+            ValueError: If the evidence requirements are empty, blank or
+                repeated, evidence types repeat, a status other than planned has
+                no evidence, or a passed scenario lacks a required evidence type
+                or has evidence of an unsafe outcome.
+        """
         enum_fields = (
             ("scenario", self.scenario, FaultScenario),
             ("expected_safe_outcome", self.expected_safe_outcome, SafeOutcome),
@@ -239,7 +260,14 @@ class FaultScenarioPlan:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild a scenario plan from its JSON-compatible representation."""
+        """Rebuild a scenario plan from its JSON-compatible representation.
+
+        Args:
+            record: A mapping as produced by `to_dict`.
+
+        Returns:
+            The scenario plan.
+        """
         return cls(
             scenario=FaultScenario(record["scenario"]),
             expected_safe_outcome=SafeOutcome(record["expected_safe_outcome"]),
@@ -280,7 +308,11 @@ class FaultInjectionPlanRegistry:
 
     @classmethod
     def production_beta(cls) -> Self:
-        """Build the complete reliability plan for the production beta."""
+        """Build the complete reliability plan for the production beta.
+
+        Returns:
+            A registry holding a plan for every required scenario.
+        """
         registry = cls()
         for plan in default_fault_injection_plans():
             registry.register(plan)
@@ -315,7 +347,8 @@ class FaultInjectionPlanRegistry:
         missing. A run with no unsafe evidence but incomplete coverage is
         ``INCONCLUSIVE``. The registry is updated only after the complete
         replacement plan validates, so malformed evidence cannot overwrite a
-        planned scenario.
+        planned scenario. A scenario that is not registered fails with a
+        `KeyError`.
 
         Args:
             scenario: Scenario whose execution produced the evidence.
@@ -326,9 +359,8 @@ class FaultInjectionPlanRegistry:
 
         Raises:
             TypeError: If the scenario or evidence shape is invalid.
-            KeyError: If the scenario is not registered.
-            ValueError: If evidence is empty or belongs to another scenario's
-                requirements.
+            ValueError: If evidence is empty, comes from more than one
+                execution, or belongs to another scenario's requirements.
         """
         if not isinstance(scenario, FaultScenario):
             raise TypeError("scenario must be FaultScenario")
@@ -367,7 +399,11 @@ class FaultInjectionPlanRegistry:
         return updated
 
     def validate_complete(self) -> None:
-        """Reject a registry that omits any required production scenario."""
+        """Reject a registry that omits any required production scenario.
+
+        Raises:
+            ValueError: If a scenario has no plan.
+        """
         missing = set(FaultScenario) - set(self.plans)
         if missing:
             missing_text = ", ".join(
@@ -390,7 +426,11 @@ class FaultInjectionPlanRegistry:
         }
 
     def to_json(self) -> str:
-        """Serialize the complete plan using canonical JSON ordering."""
+        """Serialize the complete plan using canonical JSON ordering.
+
+        Returns:
+            The plan as compact JSON with sorted keys.
+        """
         return json.dumps(
             self.to_dict(),
             ensure_ascii=True,
@@ -400,7 +440,19 @@ class FaultInjectionPlanRegistry:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild and validate a complete registry from a mapping."""
+        """Rebuild and validate a complete registry from a mapping.
+
+        Args:
+            record: A mapping with schema version 1 and a list of scenarios.
+
+        Returns:
+            The registry.
+
+        Raises:
+            TypeError: If a scenario is not a mapping.
+            ValueError: If the schema version is unsupported or the scenarios
+                are not a list.
+        """
         if record.get("schema_version") != 1:
             raise ValueError("unsupported fault-injection plan schema version")
         scenarios = record.get("scenarios")
@@ -416,7 +468,17 @@ class FaultInjectionPlanRegistry:
 
     @classmethod
     def from_json(cls, serialized: str) -> Self:
-        """Rebuild and validate a complete registry from canonical JSON."""
+        """Rebuild and validate a complete registry from canonical JSON.
+
+        Args:
+            serialized: The JSON text.
+
+        Returns:
+            The registry.
+
+        Raises:
+            TypeError: If the JSON does not hold an object.
+        """
         record = json.loads(serialized)
         if not isinstance(record, Mapping):
             raise TypeError("serialized plan must contain a JSON object")

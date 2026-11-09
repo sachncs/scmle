@@ -40,7 +40,11 @@ class Event:
     timestamp: str = dataclasses.field(default_factory=utc_timestamp)
 
     def to_json(self) -> str:
-        """Serializes the event as one canonical JSON line."""
+        """Serializes the event as one canonical JSON line.
+
+        Returns:
+            The event's fields as compact JSON with sorted keys, on one line.
+        """
         return json.dumps(dataclasses.asdict(self), default=str, sort_keys=True)
 
 

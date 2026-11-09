@@ -88,7 +88,14 @@ class ExperimentPlan:
 
     @classmethod
     def from_dict(cls, record: dict[str, Any]) -> Self:
-        """Rebuilds a plan from `to_dict` output."""
+        """Rebuilds a plan from `to_dict` output.
+
+        Args:
+            record: A mapping as produced by `to_dict`.
+
+        Returns:
+            The plan.
+        """
         return cls(
             plan_id=record["plan_id"],
             task=record["task"],

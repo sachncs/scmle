@@ -18,6 +18,13 @@ def key_from_environment(environ: Mapping[str, str]) -> str | None:
     The file form lets a secret manager mount the key (a Kubernetes secret, a
     Secrets Manager or Secret Manager volume) so it never sits in an
     environment variable or an image.
+
+    Args:
+        environ: The environment variables.
+
+    Returns:
+        The key from the variable, else the trimmed content of the file the
+        file variable names, or None if neither yields a key.
     """
     direct = environ.get(SIGNING_KEY_ENV)
     if direct:
@@ -30,7 +37,14 @@ def key_from_environment(environ: Mapping[str, str]) -> str | None:
 
 
 def resolve_key(signing_key: str | bytes | None) -> bytes | None:
-    """Return the explicit signing key or the configured environment key."""
+    """Return the explicit signing key or the configured environment key.
+
+    Args:
+        signing_key: The explicit key, or None to use the configured one.
+
+    Returns:
+        The key as bytes, or None if there is none or it is empty.
+    """
     key = (
         signing_key
         if signing_key is not None
@@ -42,7 +56,14 @@ def resolve_key(signing_key: str | bytes | None) -> bytes | None:
 
 
 def canonical_payload(payload: Mapping[str, Any]) -> bytes:
-    """Return the canonical JSON bytes covered by a signature."""
+    """Return the canonical JSON bytes covered by a signature.
+
+    Args:
+        payload: The payload to sign.
+
+    Returns:
+        The compact, key-sorted ASCII JSON of the payload as bytes.
+    """
     return json.dumps(
         payload,
         ensure_ascii=True,
@@ -52,7 +73,18 @@ def canonical_payload(payload: Mapping[str, Any]) -> bytes:
 
 
 def sign_payload(payload: Mapping[str, Any], key: str | bytes) -> str:
-    """Return an HMAC signature for a canonical contract payload."""
+    """Return an HMAC signature for a canonical contract payload.
+
+    Args:
+        payload: The payload to sign.
+        key: The signing key.
+
+    Returns:
+        The hex HMAC-SHA256 of the canonical payload.
+
+    Raises:
+        ValueError: If the key is empty.
+    """
     resolved = resolve_key(key)
     if resolved is None:
         raise ValueError("signing key must not be empty")

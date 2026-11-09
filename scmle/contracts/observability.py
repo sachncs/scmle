@@ -27,7 +27,18 @@ class SignalKind(enum.StrEnum):
 
 
 def require_text(value: str, field_name: str) -> str:
-    """Returns trimmed non-empty text for a contract field."""
+    """Returns trimmed non-empty text for a contract field.
+
+    Args:
+        value: The text to check.
+        field_name: The field name, for the error message.
+
+    Returns:
+        `value` with surrounding whitespace removed.
+
+    Raises:
+        ValueError: If the trimmed text is empty.
+    """
     result = value.strip()
     if not result:
         raise ValueError(f"{field_name} must not be empty")
@@ -35,7 +46,18 @@ def require_text(value: str, field_name: str) -> str:
 
 
 def validate_timestamp(value: str, field_name: str) -> str:
-    """Validates an aware ISO-8601 timestamp without changing its text."""
+    """Validates an aware ISO-8601 timestamp without changing its text.
+
+    Args:
+        value: The timestamp text.
+        field_name: The field name, for the error message.
+
+    Returns:
+        `value`, unchanged.
+
+    Raises:
+        ValueError: If the text is empty, not ISO-8601, or has no timezone.
+    """
     require_text(value, field_name)
     try:
         parsed = datetime.datetime.fromisoformat(value.replace("Z", "+00:00"))
@@ -58,7 +80,12 @@ class MetricSample:
     labels: Mapping[str, str] = dataclasses.field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        """Validate a metric before it is exported or persisted."""
+        """Validate a metric before it is exported or persisted.
+
+        Raises:
+            ValueError: If the name, unit or timestamp is invalid, the value is
+                not finite, or a label is empty.
+        """
         require_text(self.name, "metric.name")
         require_text(self.unit, "metric.unit")
         validate_timestamp(self.timestamp, "metric.timestamp")
@@ -85,7 +112,14 @@ class MetricSample:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds a metric from serialized evidence."""
+        """Rebuilds a metric from serialized evidence.
+
+        Args:
+            record: A mapping as produced by `to_dict`.
+
+        Returns:
+            The metric sample.
+        """
         return cls(
             name=str(record["name"]),
             kind=SignalKind(record["kind"]),
@@ -111,7 +145,14 @@ class InferenceEvent:
     redacted_fields: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
-        """Validate event identity and prevent unbounded sensitive payloads."""
+        """Validate event identity and prevent unbounded sensitive payloads.
+
+        Raises:
+            ValueError: If an identity field or the timestamp is invalid, the
+                latency is not finite and non-negative, an error event has no
+                category, a successful event has one, or a redacted field name
+                is empty.
+        """
         for field_name, value in (
             ("request_id", self.request_id),
             ("run_id", self.run_id),
@@ -154,7 +195,14 @@ class ObservabilityPolicy:
     alert_thresholds: Mapping[str, float]
 
     def __post_init__(self) -> None:
-        """Reject policies that silently omit required operational signals."""
+        """Reject policies that silently omit required operational signals.
+
+        Raises:
+            TypeError: If a required signal is not a `SignalKind`.
+            ValueError: If retention is under one day, no signals are required,
+                signals repeat, a redacted field name is empty, or an alert
+                threshold is unnamed, not finite or negative.
+        """
         if self.retention_days < 1:
             raise ValueError("retention_days must be at least 1")
         if not self.required_signals:
@@ -193,7 +241,16 @@ def canonical_json(
     events: Sequence[InferenceEvent],
     policy: ObservabilityPolicy,
 ) -> str:
-    """Returns deterministic redacted observability evidence."""
+    """Returns deterministic redacted observability evidence.
+
+    Args:
+        metrics: The metric samples.
+        events: The inference events.
+        policy: The observability policy.
+
+    Returns:
+        The compact, key-sorted ASCII JSON of the policy, metrics and events.
+    """
     payload = {
         "policy": policy.to_dict(),
         "metrics": [metric.to_dict() for metric in metrics],

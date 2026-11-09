@@ -324,7 +324,19 @@ FAIRNESS_METRICS: Mapping[tasks.TaskType, frozenset[str]] = {
 
 
 def validate_text(value: str, field_name: str) -> str:
-    """Return non-empty canonical text for a contract field."""
+    """Return non-empty canonical text for a contract field.
+
+    Args:
+        value: The text to check.
+        field_name: The field name, for the error message.
+
+    Returns:
+        `value`, unchanged.
+
+    Raises:
+        TypeError: If `value` is not a string.
+        ValueError: If the text is empty or has surrounding whitespace.
+    """
     if not isinstance(value, str):
         raise TypeError(f"{field_name} must be a string")
     result = value.strip()
@@ -338,7 +350,19 @@ def validate_text(value: str, field_name: str) -> str:
 def validate_evidence(
     values: tuple[str, ...], field_name: str
 ) -> tuple[str, ...]:
-    """Validate and return a deterministic evidence list."""
+    """Validate and return a deterministic evidence list.
+
+    Args:
+        values: The evidence references.
+        field_name: The field name, for the error message.
+
+    Returns:
+        `values`, unchanged.
+
+    Raises:
+        TypeError: If `values` is not a tuple.
+        ValueError: If a reference repeats.
+    """
     if not isinstance(values, tuple):
         raise TypeError(f"{field_name} must be a tuple of strings")
     for value in values:
@@ -349,7 +373,19 @@ def validate_evidence(
 
 
 def validate_finite(value: float, field_name: str) -> float:
-    """Validate a finite numeric threshold."""
+    """Validate a finite numeric threshold.
+
+    Args:
+        value: The number to check.
+        field_name: The field name, for the error message.
+
+    Returns:
+        The value as a float.
+
+    Raises:
+        TypeError: If the value is a bool or not numeric.
+        ValueError: If the value is not finite.
+    """
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise TypeError(f"{field_name} must be numeric")
     result = float(value)
@@ -369,7 +405,12 @@ class MetricDeclaration:
     evidence: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
-        """Validate the declaration before it enters a task policy."""
+        """Validate the declaration before it enters a task policy.
+
+        Raises:
+            TypeError: If the direction is not a `MetricDirection`.
+            ValueError: If a custom metric has no evidence.
+        """
         validate_text(self.name, "metric.name")
         if not isinstance(self.direction, MetricDirection):
             raise TypeError("metric.direction must be MetricDirection")
@@ -397,7 +438,11 @@ class MetricGate:
     threshold: float
 
     def __post_init__(self) -> None:
-        """Validate the metric gate's direction and threshold shape."""
+        """Validate the metric gate's direction and threshold shape.
+
+        Raises:
+            TypeError: If the direction is not a `MetricDirection`.
+        """
         validate_text(self.metric, "metric_gate.metric")
         if not isinstance(self.direction, MetricDirection):
             raise TypeError("metric_gate.direction must be MetricDirection")
@@ -423,7 +468,16 @@ class UncertaintyPolicy:
     minimum_rows: int | None = None
 
     def __post_init__(self) -> None:
-        """Validate confidence, coverage, and sample-size requirements."""
+        """Validate confidence, coverage, and sample-size requirements.
+
+        Raises:
+            TypeError: If the method is not an `UncertaintyMethod`.
+            ValueError: If uncertainty is required with no method, the
+                confidence level or coverage target is not strictly between 0
+                and
+                1, the minimum rows is below one, or a required method lacks the
+                confidence level or coverage target it needs.
+        """
         if not isinstance(self.method, UncertaintyMethod):
             raise TypeError("uncertainty.method must be UncertaintyMethod")
         if self.method is UncertaintyMethod.NONE and self.required:
@@ -484,7 +538,14 @@ class CalibrationPolicy:
     maximum_error: float | None = None
 
     def __post_init__(self) -> None:
-        """Validate calibration requirements."""
+        """Validate calibration requirements.
+
+        Raises:
+            TypeError: If the method is not a `CalibrationMethod`.
+            ValueError: If requirements are stated without a method, a required
+                calibration has no maximum error, or the maximum error is
+                negative.
+        """
         if not isinstance(self.method, CalibrationMethod):
             raise TypeError("calibration.method must be CalibrationMethod")
         if self.method is CalibrationMethod.NONE:
@@ -519,7 +580,13 @@ class FairnessPolicy:
     metrics: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
-        """Validate group columns and fairness metric names."""
+        """Validate group columns and fairness metric names.
+
+        Raises:
+            TypeError: If the method is not a `FairnessMethod`.
+            ValueError: If a method of none comes with columns or metrics, or a
+                method comes without sensitive columns or metrics.
+        """
         if not isinstance(self.method, FairnessMethod):
             raise TypeError("fairness.method must be FairnessMethod")
         validate_evidence(self.sensitive_columns, "fairness.sensitive_columns")
@@ -555,7 +622,12 @@ class FairnessGate:
     required_evidence: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
-        """Require one explicit bound and its supporting evidence."""
+        """Require one explicit bound and its supporting evidence.
+
+        Raises:
+            ValueError: If not exactly one of the maximum and minimum is given,
+                the maximum is negative, or there is no required evidence.
+        """
         validate_text(self.metric, "fairness_gate.metric")
         if (self.maximum is None) == (self.minimum is None):
             raise ValueError("fairness gate needs exactly one bound")
@@ -590,7 +662,12 @@ class SmallGroupPolicy:
     blocking_threshold: int | None = None
 
     def __post_init__(self) -> None:
-        """Validate subgroup thresholds and their ordering."""
+        """Validate subgroup thresholds and their ordering.
+
+        Raises:
+            ValueError: If the warning threshold is below one, or the blocking
+                threshold is not between one and the warning threshold.
+        """
         if self.warning_threshold < 1:
             raise ValueError("small-group warning_threshold must be at least 1")
         if (
@@ -623,7 +700,17 @@ class ExplanationPolicy:
     fidelity_threshold: float | None = None
 
     def __post_init__(self) -> None:
-        """Validate explanation methods and evidence declarations."""
+        """Validate explanation methods and evidence declarations.
+
+        Raises:
+            TypeError: If the availability is not an `ExplanationAvailability`.
+            ValueError: If a stability or fidelity threshold is outside [0, 1]
+                or
+                lacks its requirement flag, a requirement lacks its threshold,
+                requirements come with availability none, or an availability
+                level
+                has no required methods.
+        """
         if not isinstance(self.availability, ExplanationAvailability):
             raise TypeError(
                 "explanation.availability must be ExplanationAvailability"
@@ -699,7 +786,12 @@ class DiagnosticGate:
     required_evidence: tuple[str, ...]
 
     def __post_init__(self) -> None:
-        """Validate the diagnostic name, action, and evidence references."""
+        """Validate the diagnostic name, action, and evidence references.
+
+        Raises:
+            TypeError: If the action is not a `DiagnosticAction`.
+            ValueError: If there is no required evidence.
+        """
         validate_text(self.name, "diagnostic_gate.name")
         if not isinstance(self.action, DiagnosticAction):
             raise TypeError("diagnostic_gate.action must be DiagnosticAction")
@@ -728,7 +820,13 @@ class ReleasePolicy:
     fairness_gates: tuple[FairnessGate, ...] = ()
 
     def __post_init__(self) -> None:
-        """Require explicit thresholds, diagnostics, and evidence."""
+        """Require explicit thresholds, diagnostics, and evidence.
+
+        Raises:
+            ValueError: If there are no metric gates, diagnostic gates or
+                evidence, no diagnostic gate blocks, or a metric, diagnostic or
+                fairness gate repeats.
+        """
         if not self.metric_gates:
             raise ValueError("release policy requires metric_gates")
         if not self.diagnostic_gates:
@@ -783,7 +881,18 @@ class EvaluationPolicy:
         self.validate()
 
     def validate(self) -> None:
-        """Validate task support and all cross-field policy references."""
+        """Validate task support and all cross-field policy references.
+
+        Raises:
+            TypeError: If the task is not a `TaskType`.
+            UnsupportedEvaluationPolicyError: If a metric, uncertainty,
+                calibration, fairness, explanation or diagnostic choice is not
+                supported for the task.
+            ValueError: If the schema version is below one, metrics are missing,
+                repeated or lack the primary metric, a built-in metric has the
+                wrong direction, or a release gate is inconsistent with the
+                declarations.
+        """
         if not isinstance(self.task, tasks.TaskType):
             raise TypeError("policy.task must be TaskType")
         if self.schema_version < 1:
@@ -826,7 +935,11 @@ class EvaluationPolicy:
         self.validate_release()
 
     def validate_uncertainty(self) -> None:
-        """Reject uncertainty methods not implemented for this task."""
+        """Reject uncertainty methods not implemented for this task.
+
+        Raises:
+            UnsupportedEvaluationPolicyError: If the method is not supported.
+        """
         method = self.uncertainty.method
         if method not in SUPPORTED_UNCERTAINTY[self.task]:
             raise UnsupportedEvaluationPolicyError(
@@ -835,7 +948,11 @@ class EvaluationPolicy:
             )
 
     def validate_calibration(self) -> None:
-        """Reject calibration methods not implemented for this task."""
+        """Reject calibration methods not implemented for this task.
+
+        Raises:
+            UnsupportedEvaluationPolicyError: If the method is not supported.
+        """
         method = self.calibration.method
         if method not in SUPPORTED_CALIBRATION[self.task]:
             raise UnsupportedEvaluationPolicyError(
@@ -844,7 +961,12 @@ class EvaluationPolicy:
             )
 
     def validate_fairness(self) -> None:
-        """Reject fairness methods and metrics outside the task boundary."""
+        """Reject fairness methods and metrics outside the task boundary.
+
+        Raises:
+            UnsupportedEvaluationPolicyError: If the method or a metric is not
+                supported.
+        """
         method = self.fairness.method
         if method not in SUPPORTED_FAIRNESS[self.task]:
             raise UnsupportedEvaluationPolicyError(
@@ -860,7 +982,11 @@ class EvaluationPolicy:
                 )
 
     def validate_explanations(self) -> None:
-        """Reject explanation levels outside the task boundary."""
+        """Reject explanation levels outside the task boundary.
+
+        Raises:
+            UnsupportedEvaluationPolicyError: If the level is not supported.
+        """
         availability = self.explanations.availability
         if availability not in SUPPORTED_EXPLANATIONS[self.task]:
             raise UnsupportedEvaluationPolicyError(
@@ -869,7 +995,15 @@ class EvaluationPolicy:
             )
 
     def validate_release(self) -> None:
-        """Validate release gates against declared metrics and diagnostics."""
+        """Validate release gates against declared metrics and diagnostics.
+
+        Raises:
+            UnsupportedEvaluationPolicyError: If a gate names a metric or
+                diagnostic that is not supported for the task.
+            ValueError: If a gate names an undeclared metric, has a mismatched
+                direction, or the fairness gates and fairness declaration do not
+                match.
+        """
         declared_metrics = {metric.name: metric for metric in self.metrics}
         for gate in self.release.metric_gates:
             declaration = declared_metrics.get(gate.metric)
@@ -946,13 +1080,24 @@ class EvaluationPolicyRegistry:
     """Explicit registry that fails closed for undeclared task policies."""
 
     def __init__(self, policies: Iterable[EvaluationPolicy] = ()) -> None:
-        """Create a registry from complete policy declarations."""
+        """Create a registry from complete policy declarations.
+
+        Args:
+            policies: The policies to register.
+        """
         self.records: dict[tasks.TaskType, EvaluationPolicy] = {}
         for policy in policies:
             self.register(policy)
 
     def register(self, policy: EvaluationPolicy) -> None:
-        """Register a policy without silently replacing another policy."""
+        """Register a policy without silently replacing another policy.
+
+        Args:
+            policy: The policy to register.
+
+        Raises:
+            ConfigError: If the task already has a policy.
+        """
         if policy.task in self.records:
             raise errors.ConfigError(
                 f"evaluation policy already registered for task "
@@ -961,7 +1106,19 @@ class EvaluationPolicyRegistry:
         self.records[policy.task] = policy
 
     def require(self, task: tasks.TaskType) -> EvaluationPolicy:
-        """Return a task policy or reject an undeclared task explicitly."""
+        """Return a task policy or reject an undeclared task explicitly.
+
+        Args:
+            task: The task.
+
+        Returns:
+            The task's policy.
+
+        Raises:
+            TypeError: If `task` is not a `TaskType`.
+            UndeclaredEvaluationPolicyError: If no policy is declared for the
+                task.
+        """
         if not isinstance(task, tasks.TaskType):
             raise TypeError("task must be TaskType")
         policy = self.records.get(task)

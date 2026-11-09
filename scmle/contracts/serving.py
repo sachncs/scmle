@@ -44,7 +44,15 @@ class ScoreRequest:
 
 
 def schema_digest(schema: Mapping[str, Any]) -> str:
-    """The `sha256:` digest of a bundle's input schema."""
+    """The `sha256:` digest of a bundle's input schema.
+
+    Args:
+        schema: The input schema.
+
+    Returns:
+        ``sha256:`` followed by the hex digest of the schema's compact,
+        key-sorted JSON.
+    """
     text = json.dumps(
         schema, ensure_ascii=True, separators=(",", ":"), sort_keys=True
     )
@@ -54,10 +62,20 @@ def schema_digest(schema: Mapping[str, Any]) -> str:
 def parse_request(payload: object, max_records: int) -> ScoreRequest:
     """Validates a decoded JSON body against request schema version 1.
 
+    Args:
+        payload: The decoded JSON body.
+        max_records: Most records one request may hold.
+
+    Returns:
+        The request: its records, schema version and the digest the caller
+        expects, if given.
+
     Raises:
         ValueError: If the body does not match the request schema.
         OverflowError: If it holds more than `max_records` records.
         SchemaChangeError: If it names an unsupported schema version.
+        TypeError: If the body is not an object, the records are not a list
+            of objects, or the expected digest is not text.
     """
     if not isinstance(payload, dict):
         raise TypeError("the request body must be a JSON object")

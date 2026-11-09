@@ -101,7 +101,16 @@ class DatasetSnapshot(ContractModel):
     @pydantic.field_validator("identifier", "version", "digest")
     @classmethod
     def validate_identity(cls, value: str, info: Any) -> str:
-        """Rejects blank snapshot identity components."""
+        """Rejects blank snapshot identity components.
+
+        Args:
+            value: The component text.
+            info: The validation context, naming the field.
+
+        Returns:
+            The text with surrounding whitespace removed; blank text is
+            rejected.
+        """
         return require_text(value, f"dataset_snapshot.{info.field_name}")
 
 
@@ -114,7 +123,14 @@ class FeatureGraphReference(ContractModel):
     @pydantic.field_validator("fingerprint")
     @classmethod
     def validate_fingerprint(cls, value: str) -> str:
-        """Rejects a missing feature-graph fingerprint."""
+        """Rejects a missing feature-graph fingerprint.
+
+        Args:
+            value: The fingerprint.
+
+        Returns:
+            The fingerprint with surrounding whitespace removed.
+        """
         return require_text(value, "feature_graph.fingerprint")
 
 
@@ -127,13 +143,30 @@ class ExplanationMethod(ContractModel):
     @pydantic.field_validator("name")
     @classmethod
     def validate_name(cls, value: str) -> str:
-        """Rejects an unnamed explanation method."""
+        """Rejects an unnamed explanation method.
+
+        Args:
+            value: The method name.
+
+        Returns:
+            The name with surrounding whitespace removed.
+        """
         return require_text(value, "method.name")
 
     @pydantic.field_validator("parameters", mode="before")
     @classmethod
     def validate_parameters(cls, value: Any) -> dict[str, JsonValue]:
-        """Validates method parameters without lossy coercion."""
+        """Validates method parameters without lossy coercion.
+
+        Args:
+            value: The parameters as supplied.
+
+        Returns:
+            The parameters as a JSON-native mapping.
+
+        Raises:
+            ValueError: If the parameters are not JSON-native or not an object.
+        """
         try:
             normalized = validate_json_value(value, "method.parameters")
         except (TypeError, ValueError) as error:
@@ -153,7 +186,14 @@ class PrivacyDecision(ContractModel):
     @pydantic.field_validator("reason")
     @classmethod
     def validate_reason(cls, value: str) -> str:
-        """Requires an auditable reason for the privacy decision."""
+        """Requires an auditable reason for the privacy decision.
+
+        Args:
+            value: The reason.
+
+        Returns:
+            The reason with surrounding whitespace removed.
+        """
         return require_text(value, "privacy_decision.reason")
 
     @pydantic.field_validator("redacted_fields")
@@ -161,7 +201,14 @@ class PrivacyDecision(ContractModel):
     def validate_redacted_fields(
         cls, value: tuple[str, ...]
     ) -> tuple[str, ...]:
-        """Rejects blank names in the redaction record."""
+        """Rejects blank names in the redaction record.
+
+        Args:
+            value: The names of the redacted fields.
+
+        Returns:
+            The names with surrounding whitespace removed.
+        """
         return tuple(
             require_text(field, "privacy_decision.redacted_fields")
             for field in value
@@ -178,13 +225,31 @@ class EvidenceLink(ContractModel):
     @pydantic.field_validator("relation", "uri")
     @classmethod
     def validate_text(cls, value: str, info: Any) -> str:
-        """Requires link metadata and a non-empty URI."""
+        """Requires link metadata and a non-empty URI.
+
+        Args:
+            value: The relation or URI text.
+            info: The validation context, naming the field.
+
+        Returns:
+            The text with surrounding whitespace removed.
+        """
         return require_text(value, f"evidence_link.{info.field_name}")
 
     @pydantic.field_validator("uri")
     @classmethod
     def validate_uri(cls, value: str) -> str:
-        """Rejects URI schemes that cannot be safely rendered as links."""
+        """Rejects URI schemes that cannot be safely rendered as links.
+
+        Args:
+            value: The URI.
+
+        Returns:
+            `value`, unchanged.
+
+        Raises:
+            ValueError: If the scheme is data, javascript or vbscript.
+        """
         scheme = urlparse(value).scheme.casefold()
         if scheme in {"data", "javascript", "vbscript"}:
             raise ValueError(f"unsupported evidence link scheme: {scheme}")
@@ -193,7 +258,14 @@ class EvidenceLink(ContractModel):
     @pydantic.field_validator("digest")
     @classmethod
     def validate_digest(cls, value: str | None) -> str | None:
-        """Normalizes an optional evidence digest."""
+        """Normalizes an optional evidence digest.
+
+        Args:
+            value: The digest, or None.
+
+        Returns:
+            The digest with surrounding whitespace removed, or None.
+        """
         return None if value is None else require_text(value, "link.digest")
 
 
@@ -251,7 +323,15 @@ class ExplanationEvidence(ContractModel):
     )
     @classmethod
     def validate_identity(cls, value: str, info: Any) -> str:
-        """Rejects blank top-level identity fields."""
+        """Rejects blank top-level identity fields.
+
+        Args:
+            value: The field text.
+            info: The validation context, naming the field.
+
+        Returns:
+            The text with surrounding whitespace removed.
+        """
         return require_text(value, info.field_name)
 
     @pydantic.field_validator(
@@ -259,7 +339,18 @@ class ExplanationEvidence(ContractModel):
     )
     @classmethod
     def validate_json_fields(cls, value: Any, info: Any) -> JsonValue:
-        """Rejects values that cannot be safely serialized as JSON."""
+        """Rejects values that cannot be safely serialized as JSON.
+
+        Args:
+            value: The output, uncertainty or stability value.
+            info: The validation context, naming the field.
+
+        Returns:
+            The value as JSON-native data.
+
+        Raises:
+            ValueError: If the value is not JSON-native.
+        """
         try:
             return validate_json_value(value, info.field_name)
         except (TypeError, ValueError) as error:
@@ -270,7 +361,18 @@ class ExplanationEvidence(ContractModel):
     def validate_measurement_object(
         cls, value: dict[str, JsonValue], info: Any
     ) -> dict[str, JsonValue]:
-        """Requires an explicit uncertainty and stability object."""
+        """Requires an explicit uncertainty and stability object.
+
+        Args:
+            value: The uncertainty or stability mapping.
+            info: The validation context, naming the field.
+
+        Returns:
+            `value`, unchanged.
+
+        Raises:
+            ValueError: If the mapping is empty.
+        """
         if not value:
             raise ValueError(f"{info.field_name} must not be empty")
         return value
@@ -278,7 +380,17 @@ class ExplanationEvidence(ContractModel):
     @pydantic.field_validator("limitations")
     @classmethod
     def validate_limitations(cls, value: tuple[str, ...]) -> tuple[str, ...]:
-        """Requires at least one limitation to prevent silent overclaiming."""
+        """Requires at least one limitation to prevent silent overclaiming.
+
+        Args:
+            value: The limitations.
+
+        Returns:
+            The limitations with surrounding whitespace removed.
+
+        Raises:
+            ValueError: If there is none.
+        """
         if not value:
             raise ValueError("limitations must contain at least one item")
         return tuple(require_text(item, "limitations") for item in value)
@@ -286,7 +398,14 @@ class ExplanationEvidence(ContractModel):
     @pydantic.field_validator("causal_warning")
     @classmethod
     def validate_causal_warning(cls, value: str) -> str:
-        """Requires an explicit causal interpretation warning."""
+        """Requires an explicit causal interpretation warning.
+
+        Args:
+            value: The warning text.
+
+        Returns:
+            The warning with surrounding whitespace removed.
+        """
         return require_text(value, "causal_warning")
 
     @pydantic.field_validator("evidence_links")
@@ -294,7 +413,17 @@ class ExplanationEvidence(ContractModel):
     def validate_evidence_links(
         cls, value: tuple[EvidenceLink, ...]
     ) -> tuple[EvidenceLink, ...]:
-        """Requires at least one independently addressable evidence link."""
+        """Requires at least one independently addressable evidence link.
+
+        Args:
+            value: The evidence links.
+
+        Returns:
+            `value`, unchanged.
+
+        Raises:
+            ValueError: If there is no link.
+        """
         if not value:
             raise ValueError("evidence_links must contain at least one item")
         return value
@@ -302,13 +431,30 @@ class ExplanationEvidence(ContractModel):
     @pydantic.field_validator("timestamp")
     @classmethod
     def validate_timestamp(cls, value: datetime.datetime) -> datetime.datetime:
-        """Requires an aware timestamp and stores it in UTC."""
+        """Requires an aware timestamp and stores it in UTC.
+
+        Args:
+            value: The timestamp.
+
+        Returns:
+            The same instant in UTC.
+
+        Raises:
+            ValueError: If the timestamp has no timezone.
+        """
         if value.tzinfo is None or value.utcoffset() is None:
             raise ValueError("timestamp must include timezone information")
         return value.astimezone(datetime.UTC)
 
     def to_dict(self) -> dict[str, JsonValue]:
-        """Returns a JSON-native, deterministic evidence mapping."""
+        """Returns a JSON-native, deterministic evidence mapping.
+
+        Returns:
+            The evidence as JSON-native data.
+
+        Raises:
+            TypeError: If the serialized evidence is not an object.
+        """
         record = self.model_dump(mode="json")
         normalized = validate_json_value(record, "evidence")
         if not isinstance(normalized, dict):

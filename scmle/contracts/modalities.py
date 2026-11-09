@@ -45,7 +45,13 @@ class ExtensionModality:
     name: str
 
     def __post_init__(self) -> None:
-        """Validate a stable, non-built-in dataset-family name."""
+        """Validate a stable, non-built-in dataset-family name.
+
+        Raises:
+            TypeError: If the name is not a string.
+            ValueError: If the name is not lowercase namespaced text such as
+                ``acme/point-cloud`` or conflicts with a built-in modality.
+        """
         if not isinstance(self.name, str):
             raise TypeError("extension modality name must be a string")
         if not re.fullmatch(r"[a-z0-9][a-z0-9./-]*[a-z0-9]", self.name):
@@ -60,7 +66,7 @@ class ExtensionModality:
 
     @property
     def value(self) -> str:
-        """Return the serialized identity used in evidence artifacts."""
+        """The serialized identity used in evidence artifacts."""
         return f"extension:{self.name}"
 
 
@@ -68,14 +74,36 @@ ModalityIdentity = Modality | ExtensionModality
 
 
 def modality_value(modality: ModalityIdentity) -> str:
-    """Return the stable serialized value for a modality identity."""
+    """Return the stable serialized value for a modality identity.
+
+    Args:
+        modality: A built-in or extension modality.
+
+    Returns:
+        The built-in modality's value, or ``extension:`` followed by the
+        extension name.
+
+    Raises:
+        TypeError: If `modality` is not a `Modality` or `ExtensionModality`.
+    """
     if not isinstance(modality, (Modality, ExtensionModality)):
         raise TypeError("modality must be Modality or ExtensionModality")
     return modality.value
 
 
 def modality_from_value(value: str) -> ModalityIdentity:
-    """Restore a built-in or extension modality from evidence text."""
+    """Restore a built-in or extension modality from evidence text.
+
+    Args:
+        value: The serialized value, as returned by `modality_value`.
+
+    Returns:
+        The matching built-in or extension modality.
+
+    Raises:
+        ValueError: If the value is not a non-empty string, or is neither a
+            built-in value nor an ``extension:`` name.
+    """
     if not isinstance(value, str) or not value.strip():
         raise ValueError("modality value must be a non-empty string")
     try:
@@ -140,7 +168,14 @@ class StageEvidence:
     notes: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
-        """Validate stage identity and evidence text."""
+        """Validate stage identity and evidence text.
+
+        Raises:
+            TypeError: If the stage is not a `LifecycleStage` or the evidence is
+                not a mapping.
+            ValueError: If the evidence is not JSON-native or does not serialize
+                to an object, or a link or note is blank.
+        """
         if not isinstance(self.stage, LifecycleStage):
             raise TypeError("stage must be LifecycleStage")
         object.__setattr__(self, "evidence_links", tuple(self.evidence_links))
@@ -207,7 +242,17 @@ class ModalityDeclaration:
     limitations: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
-        """Validate declaration shape and supported-status evidence."""
+        """Validate declaration shape and supported-status evidence.
+
+        Raises:
+            TypeError: If the modality, status, resources or stage evidence has
+                the wrong type.
+            ValueError: If stages repeat, an extra, failure mode or limitation
+                is
+                blank, no failure mode is declared, an extension modality is not
+                extension-only, or a supported modality lacks evidence for a
+                required lifecycle stage.
+        """
         if not isinstance(self.modality, (Modality, ExtensionModality)):
             raise TypeError("modality must be Modality or ExtensionModality")
         if not isinstance(self.status, ModalityStatus):
@@ -253,7 +298,7 @@ class ModalityDeclaration:
 
     @property
     def missing_stages(self) -> tuple[LifecycleStage, ...]:
-        """Return required stages that are missing or lack evidence."""
+        """The required lifecycle stages that are missing or lack evidence."""
         evidence = {record.stage: record for record in self.stage_evidence}
         return tuple(
             stage
@@ -306,7 +351,11 @@ class ModalityRegistry:
     def __init__(
         self, declarations: Iterable[ModalityDeclaration] = ()
     ) -> None:
-        """Create a registry and register supplied declarations."""
+        """Create a registry and register supplied declarations.
+
+        Args:
+            declarations: The declarations to register.
+        """
         self.records: dict[ModalityIdentity, ModalityDeclaration] = {}
         for declaration in declarations:
             self.register(declaration)
@@ -318,6 +367,7 @@ class ModalityRegistry:
             declaration: Modality lifecycle declaration.
 
         Raises:
+            TypeError: If `declaration` is not a `ModalityDeclaration`.
             errors.ConfigError: If the modality is already registered.
         """
         if not isinstance(declaration, ModalityDeclaration):
@@ -330,7 +380,17 @@ class ModalityRegistry:
         self.records[declaration.modality] = declaration
 
     def find(self, modality: ModalityIdentity) -> ModalityDeclaration | None:
-        """Return a declaration or ``None`` when it is unregistered."""
+        """Return a declaration or ``None`` when it is unregistered.
+
+        Args:
+            modality: The modality to look up.
+
+        Returns:
+            The declaration, or None.
+
+        Raises:
+            TypeError: If `modality` is not a `Modality` or `ExtensionModality`.
+        """
         if not isinstance(modality, (Modality, ExtensionModality)):
             raise TypeError("modality must be Modality or ExtensionModality")
         return self.records.get(modality)
@@ -344,7 +404,9 @@ class ModalityRegistry:
 
         Incomplete declarations fail regardless of requested status. This
         prevents an explicit experimental opt-in from bypassing the lifecycle
-        evidence boundary.
+        evidence boundary. An absent, incomplete or status-ineligible modality
+        is refused with `UnsupportedModalityError` (raised by
+        `raise_unsupported`).
 
         Args:
             modality: Modality to resolve.
@@ -353,10 +415,6 @@ class ModalityRegistry:
 
         Returns:
             The registered complete declaration.
-
-        Raises:
-            UnsupportedModalityError: If the modality is absent, incomplete,
-                or has a disallowed status.
         """
         declaration = self.find(modality)
         statuses = (
@@ -412,7 +470,17 @@ class ModalityRegistry:
         reason: str,
         details: dict[str, object] | None = None,
     ) -> NoReturn:
-        """Raise a structured pre-execution modality rejection."""
+        """Raise a structured pre-execution modality rejection.
+
+        Args:
+            modality: The modality that was refused.
+            reason: Why it was refused.
+            details: Extra facts added to the diagnostic.
+
+        Raises:
+            UnsupportedModalityError: Always, with a diagnostic naming the
+                modality, the reason and the registered modalities.
+        """
         diagnostic: dict[str, object] = {
             "status": "unsupported",
             "reason": reason,

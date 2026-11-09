@@ -30,7 +30,18 @@ class EvidenceDecision(enum.StrEnum):
 
 
 def require_text(value: str, field_name: str) -> str:
-    """Returns a non-empty, trimmed string for a contract field."""
+    """Returns a non-empty, trimmed string for a contract field.
+
+    Args:
+        value: The text to check.
+        field_name: The field name, for the error message.
+
+    Returns:
+        `value` with surrounding whitespace removed.
+
+    Raises:
+        ValueError: If the trimmed text is empty.
+    """
     result = value.strip()
     if not result:
         raise ValueError(f"{field_name} must not be empty")
@@ -68,7 +79,13 @@ class EvidenceRecord:
     decision: EvidenceDecision
 
     def __post_init__(self) -> None:
-        """Validate the release-proof boundary."""
+        """Validate the release-proof boundary.
+
+        Raises:
+            ValueError: If a text field is blank, the scope, raw inputs,
+                artifact or limitations are empty or contain blanks, or the
+                observation time has no timezone.
+        """
         for field_name, value in (
             ("criterion_id", self.criterion_id),
             ("claim", self.claim),
@@ -117,7 +134,14 @@ class EvidenceRecord:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds a release evidence record from serialized data."""
+        """Rebuilds a release evidence record from serialized data.
+
+        Args:
+            record: A mapping as produced by `to_dict`.
+
+        Returns:
+            The evidence record.
+        """
         return cls(
             criterion_id=str(record["criterion_id"]),
             claim=str(record["claim"]),
@@ -141,7 +165,12 @@ class EvidenceIndex:
         records: Iterable[EvidenceRecord] = (),
         signature: str | None = None,
     ) -> None:
-        """Creates an index and registers the supplied records."""
+        """Creates an index and registers the supplied records.
+
+        Args:
+            records: The evidence records to register.
+            signature: The index signature, if it is already signed.
+        """
         self.records: dict[str, EvidenceRecord] = {}
         self.signature = signature
         if signature is not None:
@@ -150,7 +179,15 @@ class EvidenceIndex:
             self.register(record)
 
     def register(self, record: EvidenceRecord) -> None:
-        """Registers one criterion without silently replacing evidence."""
+        """Registers one criterion without silently replacing evidence.
+
+        Args:
+            record: The evidence record.
+
+        Raises:
+            ValueError: If the index is signed or the criterion is already
+                registered.
+        """
         if self.signature is not None:
             raise ValueError("a signed evidence index cannot be changed")
         if record.criterion_id in self.records:
@@ -160,7 +197,14 @@ class EvidenceIndex:
         self.records[record.criterion_id] = record
 
     def find(self, criterion_id: str) -> EvidenceRecord | None:
-        """Returns a criterion record, or ``None`` when it is absent."""
+        """Returns a criterion record, or ``None`` when it is absent.
+
+        Args:
+            criterion_id: The criterion to look up.
+
+        Returns:
+            The record, or None.
+        """
         return self.records.get(criterion_id)
 
     def pending(self) -> tuple[EvidenceRecord, ...]:
@@ -177,7 +221,11 @@ class EvidenceIndex:
         return tuple(self.records[key] for key in sorted(self.records))
 
     def ready(self) -> bool:
-        """Whether every registered criterion is an accepted pass."""
+        """Whether every registered criterion is an accepted pass.
+
+        Returns:
+            True if there is at least one record and none is pending.
+        """
         return bool(self.records) and not self.pending()
 
     def unsigned_dict(self) -> dict[str, Any]:
@@ -188,12 +236,26 @@ class EvidenceIndex:
         }
 
     def sign(self, signing_key: str | bytes) -> str:
-        """Sign the complete index and return its HMAC value."""
+        """Sign the complete index and return its HMAC value.
+
+        Args:
+            signing_key: The key to sign with.
+
+        Returns:
+            The signature, which is also stored on the index.
+        """
         self.signature = signing.sign_payload(self.unsigned_dict(), signing_key)
         return self.signature
 
     def verify(self, signing_key: str | bytes) -> bool:
-        """Verify the index signature against its current records."""
+        """Verify the index signature against its current records.
+
+        Args:
+            signing_key: The key to verify with.
+
+        Returns:
+            True if the index is signed and the signature matches its records.
+        """
         if self.signature is None:
             return False
         expected = signing.sign_payload(self.unsigned_dict(), signing_key)
@@ -211,7 +273,21 @@ class EvidenceIndex:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild and validate a versioned evidence index."""
+        """Rebuild and validate a versioned evidence index.
+
+        Args:
+            record: A mapping with schema version 1, a list of records and an
+                optional signature object.
+
+        Returns:
+            The index, signed if the record carried a signature.
+
+        Raises:
+            ValueError: If the schema version is unsupported, the records are
+                not
+                a list, or the signature is malformed or uses an unsupported
+                algorithm.
+        """
         if record.get("schema_version") != 1:
             raise ValueError("unsupported evidence index schema version")
         raw_records = record.get("records")

@@ -22,16 +22,45 @@ class Estimator(Protocol):
     """Scikit-learn compatible estimator protocol."""
 
     def fit(self, features: Any, target: Any) -> Any:
-        """Fits the estimator."""
+        """Fits the estimator.
+
+        Args:
+            features: The training features.
+            target: The training target.
+
+        Returns:
+            The fitted estimator.
+        """
 
     def predict(self, features: Any) -> Any:
-        """Predicts targets."""
+        """Predicts targets.
+
+        Args:
+            features: The features to predict for.
+
+        Returns:
+            The predictions, one per row.
+        """
 
     def get_params(self, deep: bool = True) -> dict[str, Any]:
-        """Returns hyper-parameters."""
+        """Returns hyper-parameters.
+
+        Args:
+            deep: Whether to include the parameters of nested estimators.
+
+        Returns:
+            The hyper-parameters by name.
+        """
 
     def set_params(self, **params: Any) -> Any:
-        """Sets hyper-parameters."""
+        """Sets hyper-parameters.
+
+        Args:
+            **params: The hyper-parameters to set, by name.
+
+        Returns:
+            The estimator.
+        """
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -144,6 +173,15 @@ class ModelAdapter(abc.ABC):
         structure-aware inner cross-validation on the raw frame; they return
         the finished candidate here. Ordinary adapters return None and get
         the standard preprocessing-plus-estimator pipeline.
+
+        Args:
+            plan: The feature plan.
+            task: Resolved task type.
+            seed: Random seed for deterministic behaviour.
+            params: Hyperparameter overrides from the search space.
+
+        Returns:
+            The finished candidate, or None for an ordinary adapter.
         """
         return None
 
@@ -167,11 +205,19 @@ class ModelAdapter(abc.ABC):
 
         The default trusts the declared capability; adapters whose GPU
         support depends on the installed hardware override it.
+
+        Returns:
+            True if the adapter can use a GPU here; by default the declared
+            GPU capability.
         """
         return self.capabilities.gpu
 
     def is_available(self) -> bool:
-        """Whether every required module is importable (checked lazily)."""
+        """Whether every required module is importable (checked lazily).
+
+        Returns:
+            True if every module in `requires` can be found.
+        """
         return all(
             importlib.util.find_spec(module) is not None
             for module in self.requires
@@ -207,4 +253,11 @@ class AdapterResolver(Protocol):
     """Anything that resolves a model name to its adapter (a registry)."""
 
     def get(self, name: str) -> ModelAdapter:
-        """Returns the adapter registered under `name`."""
+        """Returns the adapter registered under `name`.
+
+        Args:
+            name: The adapter's registered name.
+
+        Returns:
+            The adapter.
+        """

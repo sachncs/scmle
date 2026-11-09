@@ -21,7 +21,18 @@ class PerformanceOperation(enum.StrEnum):
 
 
 def parse_timestamp(value: str, field_name: str) -> datetime.datetime:
-    """Parse an offset-aware ISO-8601 timestamp."""
+    """Parse an offset-aware ISO-8601 timestamp.
+
+    Args:
+        value: The timestamp; a trailing ``Z`` means UTC.
+        field_name: The field name, for the error message.
+
+    Returns:
+        The timestamp as a timezone-aware datetime.
+
+    Raises:
+        ValueError: If the timestamp is malformed or has no timezone.
+    """
     timestamp = datetime.datetime.fromisoformat(value.replace("Z", "+00:00"))
     if timestamp.tzinfo is None or timestamp.utcoffset() is None:
         raise ValueError(f"{field_name} must include timezone information")
@@ -41,7 +52,13 @@ class PerformanceObservation:
     software: str
 
     def __post_init__(self) -> None:
-        """Reject measurements that cannot support a budget decision."""
+        """Reject measurements that cannot support a budget decision.
+
+        Raises:
+            ValueError: If the elapsed time or peak memory is not finite and
+                non-negative, the sample count is negative, the machine or
+                software is blank, or the timestamp is not offset-aware.
+        """
         if not isinstance(self.operation, PerformanceOperation):
             object.__setattr__(
                 self, "operation", PerformanceOperation(self.operation)
@@ -76,7 +93,14 @@ class PerformanceObservation:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild an observation from JSON-native evidence."""
+        """Rebuild an observation from JSON-native evidence.
+
+        Args:
+            record: A mapping as produced by `to_dict`.
+
+        Returns:
+            The observation.
+        """
         return cls(
             operation=PerformanceOperation(record["operation"]),
             elapsed_seconds=float(record["elapsed_seconds"]),
@@ -100,7 +124,13 @@ class PerformanceRun:
     observations: tuple[PerformanceObservation, ...]
 
     def __post_init__(self) -> None:
-        """Reject empty or ambiguous run evidence."""
+        """Reject empty or ambiguous run evidence.
+
+        Raises:
+            ValueError: If the run id is blank, there are no observations, an
+                operation repeats, or the observations come from more than one
+                environment.
+        """
         if not isinstance(self.run_id, str) or not self.run_id.strip():
             raise ValueError("run_id must not be empty")
         normalized = tuple(self.observations)
@@ -124,7 +154,14 @@ class PerformanceRun:
     def observation(
         self, operation: PerformanceOperation
     ) -> PerformanceObservation | None:
-        """Return the observation for an operation, when present."""
+        """Return the observation for an operation, when present.
+
+        Args:
+            operation: The operation to look up.
+
+        Returns:
+            The observation, or None if the run has none for that operation.
+        """
         return next(
             (
                 observation
@@ -145,7 +182,14 @@ class PerformanceRun:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild a measured run from JSON-native evidence."""
+        """Rebuild a measured run from JSON-native evidence.
+
+        Args:
+            record: A mapping as produced by `to_dict`.
+
+        Returns:
+            The run.
+        """
         return cls(
             run_id=str(record["run_id"]),
             observations=tuple(
@@ -184,7 +228,14 @@ class PerformanceBaseline:
     max_relative_regression: float = 0.10
 
     def __post_init__(self) -> None:
-        """Validate repeated, schema-consistent reference measurements."""
+        """Validate repeated, schema-consistent reference measurements.
+
+        Raises:
+            ValueError: If there are fewer than two reference runs, the allowed
+                regression is not finite and non-negative, the runs have no
+                operations, differ in operations or sample counts, or come from
+                more than one environment.
+        """
         runs = tuple(self.reference_runs)
         if len(runs) < 2:
             raise ValueError(
@@ -243,7 +294,24 @@ class PerformanceBaseline:
         object.__setattr__(self, "reference_runs", runs)
 
     def evaluate(self, current: PerformanceRun) -> PerformanceComparison:
-        """Compare one run with the median of the repeated baseline."""
+        """Compare one run with the median of the repeated baseline.
+
+        A run from a different environment, or with different sample counts,
+        does not pass and is reported without regressions.
+
+        Args:
+            current: The run to judge.
+
+        Returns:
+            The comparison: whether every operation stayed within the allowed
+            relative regression of the baseline median in time and, where the
+            baseline has it, peak memory; the regressions; and the violations.
+
+        Raises:
+            RuntimeError: If an observation validated earlier cannot be found.
+            ValueError: If the run covers different operations from the
+                baseline.
+        """
         operations = {
             observation.operation for observation in current.observations
         }
@@ -401,7 +469,17 @@ class PerformanceBaseline:
 
 
 def relative_change(reference: float, current: float) -> float:
-    """Return the non-negative relative increase from reference to current."""
+    """Return the non-negative relative increase from reference to current.
+
+    Args:
+        reference: The reference value.
+        current: The value compared with it.
+
+    Returns:
+        The increase as a share of the reference, or 0 if the value fell. A
+        zero reference gives 0 unless `current` is positive, which gives
+        infinity.
+    """
     if reference == 0:
         return 0.0 if current <= 0 else math.inf
     return max((current - reference) / reference, 0.0)
@@ -415,7 +493,12 @@ class PerformanceBudget:
     max_peak_memory_gb: float | None = None
 
     def __post_init__(self) -> None:
-        """Validate positive ceilings and normalize operation names."""
+        """Validate positive ceilings and normalize operation names.
+
+        Raises:
+            ValueError: If a time limit or the memory limit is not positive and
+                finite, or there are no time limits.
+        """
         normalized: dict[PerformanceOperation, float] = {}
         for operation, limit in self.max_seconds.items():
             resolved = (
@@ -440,7 +523,19 @@ class PerformanceBudget:
     def evaluate(
         self, observations: tuple[PerformanceObservation, ...]
     ) -> "PerformanceResult":
-        """Evaluate observations without treating missing data as pass."""
+        """Evaluate observations without treating missing data as pass.
+
+        Args:
+            observations: The observations, at most one for each operation.
+
+        Returns:
+            The result: whether no violation was found, the observations and
+            the violations (a missing observation, an exceeded time budget or an
+            exceeded or missing peak memory).
+
+        Raises:
+            ValueError: If an operation is observed more than once.
+        """
         by_operation: dict[PerformanceOperation, PerformanceObservation] = {}
         violations: list[str] = []
         for observation in observations:

@@ -48,7 +48,14 @@ class FloatParameter(Parameter):
     log: bool = False
 
     def sample(self, rng: random.Random) -> float:
-        """Draws a float."""
+        """Draws a float.
+
+        Args:
+            rng: The random generator.
+
+        Returns:
+            A value between low and high, log-uniform if `log` is set.
+        """
         if self.log:
             return math.exp(
                 rng.uniform(math.log(self.low), math.log(self.high))
@@ -71,7 +78,15 @@ class IntParameter(Parameter):
     log: bool = False
 
     def sample(self, rng: random.Random) -> int:
-        """Draws an integer."""
+        """Draws an integer.
+
+        Args:
+            rng: The random generator.
+
+        Returns:
+            An integer between low and high inclusive, log-uniform if `log`
+            is set.
+        """
         if self.log:
             value = math.exp(
                 rng.uniform(math.log(self.low), math.log(self.high + 1))
@@ -91,7 +106,14 @@ class ChoiceParameter(Parameter):
     choices: tuple[Any, ...]
 
     def sample(self, rng: random.Random) -> Any:
-        """Draws one of the choices."""
+        """Draws one of the choices.
+
+        Args:
+            rng: The random generator.
+
+        Returns:
+            One of the choices, uniformly.
+        """
         return rng.choice(self.choices)
 
 
@@ -106,7 +128,14 @@ class SearchSpace:
     parameters: tuple[Parameter, ...]
 
     def sample(self, rng: random.Random) -> dict[str, Any]:
-        """Draws one full configuration."""
+        """Draws one full configuration.
+
+        Args:
+            rng: The random generator.
+
+        Returns:
+            A mapping from parameter name to a sampled value.
+        """
         return {p.name: p.sample(rng) for p in self.parameters}
 
     def names(self) -> tuple[str, ...]:

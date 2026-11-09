@@ -33,7 +33,18 @@ class EvidenceNodeKind(enum.StrEnum):
 
 
 def require_text(value: str, name: str) -> str:
-    """Return a trimmed non-empty contract string."""
+    """Return a trimmed non-empty contract string.
+
+    Args:
+        value: The text to check.
+        name: The field name, for the error message.
+
+    Returns:
+        `value` with surrounding whitespace removed.
+
+    Raises:
+        ValueError: If the trimmed text is empty.
+    """
     result = value.strip()
     if not result:
         raise ValueError(f"{name} must not be empty")
@@ -50,7 +61,13 @@ class EvidenceNode:
     attributes: Mapping[str, str] = dataclasses.field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        """Validate and normalize node identity metadata."""
+        """Validate and normalize node identity metadata.
+
+        Raises:
+            TypeError: If an attribute value is not a string.
+            ValueError: If the id or digest is blank or an attribute name is
+                empty.
+        """
         require_text(self.node_id, "node_id")
         require_text(self.digest, "digest")
         if not isinstance(self.kind, EvidenceNodeKind):
@@ -73,7 +90,14 @@ class EvidenceNode:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild a node from its serialized representation."""
+        """Rebuild a node from its serialized representation.
+
+        Args:
+            record: A mapping as produced by `to_dict`.
+
+        Returns:
+            The node.
+        """
         return cls(
             node_id=str(record["node_id"]),
             kind=EvidenceNodeKind(record["kind"]),
@@ -91,7 +115,12 @@ class EvidenceEdge:
     relationship: str
 
     def __post_init__(self) -> None:
-        """Validate edge endpoints and relationship semantics."""
+        """Validate edge endpoints and relationship semantics.
+
+        Raises:
+            ValueError: If an endpoint or the relationship is blank, or the edge
+                connects a node to itself.
+        """
         require_text(self.source_id, "source_id")
         require_text(self.target_id, "target_id")
         require_text(self.relationship, "relationship")
@@ -108,7 +137,14 @@ class EvidenceEdge:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild an edge from its serialized representation."""
+        """Rebuild an edge from its serialized representation.
+
+        Args:
+            record: A mapping as produced by `to_dict`.
+
+        Returns:
+            The edge.
+        """
         return cls(
             source_id=str(record["source_id"]),
             target_id=str(record["target_id"]),
@@ -127,14 +163,26 @@ class EvidenceGraph:
     schema_version = 1
 
     def __init__(self, nodes: Iterable[EvidenceNode] = ()) -> None:
-        """Create a graph and register initial nodes."""
+        """Create a graph and register initial nodes.
+
+        Args:
+            nodes: The nodes to register.
+        """
         self.nodes: dict[str, EvidenceNode] = {}
         self.edges: list[EvidenceEdge] = []
         for node in nodes:
             self.add_node(node)
 
     def add_node(self, node: EvidenceNode) -> None:
-        """Register one node without silently replacing an identity."""
+        """Register one node without silently replacing an identity.
+
+        Args:
+            node: The node to register.
+
+        Raises:
+            TypeError: If `node` is not an `EvidenceNode`.
+            ValueError: If a different node already has the same id.
+        """
         if not isinstance(node, EvidenceNode):
             raise TypeError("node must be EvidenceNode")
         existing = self.nodes.get(node.node_id)
@@ -143,7 +191,18 @@ class EvidenceGraph:
         self.nodes[node.node_id] = node
 
     def add_edge(self, edge: EvidenceEdge) -> None:
-        """Register one edge and reject dangling or cyclic lineage."""
+        """Register one edge and reject dangling or cyclic lineage.
+
+        An edge that is already registered is ignored.
+
+        Args:
+            edge: The edge to register.
+
+        Raises:
+            TypeError: If `edge` is not an `EvidenceEdge`.
+            ValueError: If an endpoint is not a registered node, or the edge
+                would create a cycle.
+        """
         if not isinstance(edge, EvidenceEdge):
             raise TypeError("edge must be EvidenceEdge")
         if edge.source_id not in self.nodes or edge.target_id not in self.nodes:
@@ -155,7 +214,16 @@ class EvidenceGraph:
         self.edges.append(edge)
 
     def path_exists(self, source_id: str, target_id: str) -> bool:
-        """Return whether a directed path connects two registered nodes."""
+        """Return whether a directed path connects two registered nodes.
+
+        Args:
+            source_id: Id of the start node.
+            target_id: Id of the end node.
+
+        Returns:
+            True if both nodes are registered and a path leads from the first to
+            the second (a node reaches itself); False otherwise.
+        """
         if source_id not in self.nodes or target_id not in self.nodes:
             return False
         pending = [source_id]
@@ -182,7 +250,16 @@ class EvidenceGraph:
         }
 
     def topological_order(self) -> tuple[str, ...]:
-        """Return a deterministic topological node order."""
+        """Return a deterministic topological node order.
+
+        Returns:
+            The node ids ordered so every edge goes forward; ties are broken by
+            sorted id.
+
+        Raises:
+            ValueError: If the graph has a dangling or duplicate edge or
+                contains a cycle.
+        """
         self.validate()
         incoming = dict.fromkeys(self.nodes, 0)
         outgoing = self.outgoing()
@@ -205,7 +282,12 @@ class EvidenceGraph:
         return tuple(order)
 
     def validate(self) -> None:
-        """Validate endpoints, duplicates, and acyclicity."""
+        """Validate endpoints, duplicates, and acyclicity.
+
+        Raises:
+            ValueError: If an edge has an unknown endpoint, an edge is
+                duplicated, or the graph contains a cycle.
+        """
         seen: set[EvidenceEdge] = set()
         for edge in self.edges:
             if (
@@ -219,7 +301,15 @@ class EvidenceGraph:
         self.topological_order_without_validation()
 
     def topological_order_without_validation(self) -> tuple[str, ...]:
-        """Compute order without recursively invoking ``validate``."""
+        """Compute order without recursively invoking ``validate``.
+
+        Returns:
+            The node ids ordered so every edge goes forward; ties are broken by
+            sorted id.
+
+        Raises:
+            ValueError: If the graph contains a cycle.
+        """
         incoming = dict.fromkeys(self.nodes, 0)
         outgoing = self.outgoing()
         for edge in self.edges:
@@ -279,7 +369,19 @@ class EvidenceGraph:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild and validate a graph from serialized evidence."""
+        """Rebuild and validate a graph from serialized evidence.
+
+        Args:
+            record: A mapping with the schema version, nodes, edges and, if
+                present, the topological order.
+
+        Returns:
+            The graph.
+
+        Raises:
+            ValueError: If the schema version is unsupported or a recorded
+                topological order differs from the graph's.
+        """
         if int(record.get("schema_version", 0)) != cls.schema_version:
             raise ValueError("unsupported evidence graph schema version")
         graph = cls(

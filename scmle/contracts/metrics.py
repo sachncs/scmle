@@ -29,11 +29,23 @@ class Metric:
     tasks: frozenset[tasks.TaskType]
 
     def to_natural(self, scorer_value: float) -> float:
-        """Converts a sign-adjusted scorer value to natural units."""
+        """Converts a sign-adjusted scorer value to natural units.
+
+        Args:
+            scorer_value: The value the scorer returned, negated for metrics
+                where lower is better.
+
+        Returns:
+            The value in the metric's own units and direction.
+        """
         return scorer_value if self.greater_is_better else -scorer_value
 
     def accepts_weights(self) -> bool:
-        """Whether the scorer takes per-row `sample_weight`."""
+        """Whether the scorer takes per-row `sample_weight`.
+
+        Returns:
+            True if the scorer takes per-row ``sample_weight``.
+        """
         return True
 
     def scorer(self, positive: Any = None) -> Any:
@@ -60,6 +72,9 @@ class Metric:
             target: Evaluation labels.
             positive: Positive class label for binary metrics.
             sample_weight: Optional per-row weights for the score.
+
+        Returns:
+            The score in natural units (not sign-adjusted).
         """
         scorer = self.scorer(positive)
         extra = (
@@ -87,7 +102,15 @@ class PositiveLabelMetric(Metric):
     response_methods: tuple[str, ...] = ("predict",)
 
     def scorer(self, positive: Any = None) -> Any:
-        """Builds a scorer bound to `positive` (stock scorer if unknown)."""
+        """Builds a scorer bound to `positive` (stock scorer if unknown).
+
+        Args:
+            positive: The positive class label, or None.
+
+        Returns:
+            A scorer that treats `positive` as the positive class, or the
+            metric's stock scorer if `positive` is None.
+        """
         if positive is None:
             return super().scorer(None)
         return sk_metrics.make_scorer(
@@ -114,13 +137,24 @@ class FunctionMetric(Metric):
     response_method: str = "predict"
 
     def accepts_weights(self) -> bool:
-        """Whether the user function takes `sample_weight`."""
+        """Whether the user function takes `sample_weight`.
+
+        Returns:
+            True if the user function has a ``sample_weight`` parameter.
+        """
         return (
             "sample_weight" in inspect.signature(self.score_function).parameters
         )
 
     def scorer(self, positive: Any = None) -> Any:
-        """Builds a scorer that applies the user function."""
+        """Builds a scorer that applies the user function.
+
+        Args:
+            positive: Not used; the user function decides what is positive.
+
+        Returns:
+            A scorer wrapping the user function.
+        """
         return sk_metrics.make_scorer(
             self.score_function,
             greater_is_better=self.greater_is_better,

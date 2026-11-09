@@ -84,19 +84,47 @@ can train a model.
 
 
 def horizon_names(value: str, horizon: int) -> list[str]:
-    """Names of the future-value targets `<value>__h1 .. <value>__h<H>`."""
+    """Names of the future-value targets `<value>__h1 .. <value>__h<H>`.
+
+    Args:
+        value: The series value column.
+        horizon: The number of future steps.
+
+    Returns:
+        One name for each step from 1 to `horizon`.
+    """
     return [f"{value}{HORIZON_SEPARATOR}{k}" for k in range(1, horizon + 1)]
 
 
 def series_node(
     name: str, op: str, source: str, **params: Any
 ) -> dict[str, Any]:
-    """A feature-node record over one source column."""
+    """A feature-node record over one source column.
+
+    Args:
+        name: The node's name.
+        op: The operation.
+        source: The source column.
+        **params: The operation's parameters.
+
+    Returns:
+        The node record, with the source as its only input.
+    """
     return {"name": name, "op": op, "inputs": [source], "params": params}
 
 
 def forecast_nodes(record: dict[str, Any], value: str) -> list[dict[str, Any]]:
-    """Lag, rolling and calendar nodes for a forecasting data record."""
+    """Lag, rolling and calendar nodes for a forecasting data record.
+
+    Args:
+        record: The data record, giving the lags, windows, seasonal period
+            and calendar parts.
+        value: The series value column.
+
+    Returns:
+        Lag nodes (including the seasonal period), rolling mean and standard
+        deviation nodes, and calendar nodes when a time column is set.
+    """
     period = record.get("seasonal_period")
     lags = list(record.get("forecast_lags") or DEFAULT_LAGS)
     if period and period not in lags:
@@ -162,8 +190,12 @@ class FeatureGraphSpec(FrozenModel):
     def check_structure(self) -> Self:
         """Validates unique names and dependency order.
 
+        Returns:
+            The specification, unchanged.
+
         Raises:
-            ValueError: On duplicate names or a node using a later node.
+            ValueError: On duplicate names, a node without inputs, or a node
+                using a later node or itself.
         """
         seen: set[str] = set()
         names = [node.name for node in self.nodes]
@@ -184,7 +216,12 @@ class FeatureGraphSpec(FrozenModel):
         return self
 
     def fingerprint(self) -> str:
-        """Content hash identifying this exact graph."""
+        """Content hash identifying this exact graph.
+
+        Returns:
+            The first 16 hex characters of a SHA-256 over the version and the
+            nodes.
+        """
         payload = json.dumps(
             [node.model_dump(mode="json") for node in self.nodes],
             sort_keys=True,
@@ -290,9 +327,9 @@ class DataSpec(FrozenModel):
             the model selection is frozen and tests that model instead.
         ingest_plan: Path of an ingest plan (JSON) that names a database and
             the as-of views to synthesize features from. Needs a charter with
-            an `ingest` block (format 7); the table then needs the plan's key
-            and moment columns. The synthesized columns are added before the
-            split.
+            an `ingest` block (format 7); the table then needs the ingest
+            plan's key and moment columns. The synthesized columns are added
+            before the split.
         logged_action_column: With a charter decision block, the 0/1 action
             the current process logged. Never a feature.
         propensity_column: With a charter decision block and
@@ -510,7 +547,7 @@ class ModelSpec(FrozenModel):
             `deep_learning`, `boosting`).
         experimental_models: Explicitly opt-in model names that are not part
             of automatic beta search. Their experimental capability status is
-            still preserved in the plan and release evidence. Built-in
+            still preserved in the execution plan and release evidence. Built-in
             experimental names currently include torch_ft_transformer and
             torch_jepa; both require the deeplearning extra and remain
             tabular-only.
@@ -600,9 +637,9 @@ class ProjectSpec(FrozenModel):
     problem: ProblemSpec = pydantic.Field(default_factory=ProblemSpec)
     leakage_policy: Literal["warn", "block"] = "warn"
     # Path of an analysis charter. When set, the run splits the development
-    # rows into exploration and sealed confirmation sets (feature F2).
+    # rows into exploration and sealed confirmation sets.
     charter_path: str | None = None
-    # Choices for the claim ledger of a charter run (feature F3). `ledger_rule`
+    # Choices for the claim ledger of a charter run. `ledger_rule`
     # is the online FDR rule for exploration: e-LOND is valid under arbitrary
     # dependence; LORD++ and SAFFRON assume independent p-values.
     # `confirmation_rule` adjusts the survivors tested once on `C`.
@@ -621,6 +658,14 @@ class ProjectSpec(FrozenModel):
 
         The expansion is idempotent, so a saved configuration (which already
         contains the nodes) loads unchanged.
+
+        Args:
+            values: The raw specification.
+
+        Returns:
+            The specification with a lagged node for each delayed column and
+            those columns excluded; unchanged if it is not a mapping or has no
+            delays.
         """
         if not isinstance(values, dict):
             return values
@@ -669,6 +714,13 @@ class ProjectSpec(FrozenModel):
         the first future-value column, lists them all as targets and adds the
         lag / rolling feature nodes. It is idempotent, so a saved
         configuration loads unchanged.
+
+        Args:
+            values: The raw specification.
+
+        Returns:
+            The expanded specification; unchanged if the task is not forecast,
+            no horizon is set or it was already expanded.
         """
         if not isinstance(values, dict) or values.get("task") != "forecast":
             return values
@@ -884,7 +936,12 @@ class ProjectSpec(FrozenModel):
         return self.resources.time_budget_seconds < FAST_BUDGET_SECONDS
 
     def effective_search(self) -> SearchSpec:
-        """The search settings in force: reduced under a short budget."""
+        """The search settings in force: reduced under a short budget.
+
+        Returns:
+            The configured search settings, with the number of models and
+            configurations capped when the time budget is short.
+        """
         if not self.fast_budget:
             return self.search
         return self.search.model_copy(
@@ -897,7 +954,12 @@ class ProjectSpec(FrozenModel):
         )
 
     def effective_strategies(self) -> StrategySpec:
-        """The strategy settings in force: reduced under a short budget."""
+        """The strategy settings in force: reduced under a short budget.
+
+        Returns:
+            The configured strategy settings, with the number of models capped
+            when the time budget is short.
+        """
         if not self.fast_budget:
             return self.strategies
         return self.strategies.model_copy(
