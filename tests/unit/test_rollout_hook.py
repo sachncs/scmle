@@ -1,4 +1,4 @@
-"""The decision layer's rollout through LifecycleManager and the ledger (F11)."""
+"""The decision layer's rollout through LifecycleManager and the ledger."""
 
 from fractions import Fraction
 import json

@@ -1,4 +1,4 @@
-"""The F10 certificates are current, honest and cheap to re-check."""
+"""The causal certificates are current, honest and cheap to re-check."""
 
 import json
 

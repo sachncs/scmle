@@ -1,4 +1,4 @@
-"""F6 certificates: the stored file is current, honest and reproducible."""
+"""Robustness certificates: the stored file is current, honest and reproducible."""
 
 import json
 

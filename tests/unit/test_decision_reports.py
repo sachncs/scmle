@@ -1,4 +1,4 @@
-"""The F11 report builders: policy value, fairness and the rollout design."""
+"""The decision report builders: policy value, fairness and the rollout design."""
 
 from fractions import Fraction
 

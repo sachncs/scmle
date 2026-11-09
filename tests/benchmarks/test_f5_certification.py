@@ -1,4 +1,4 @@
-"""F5 certification harness and the committed detector certificates."""
+"""Data-detector certification harness and the committed detector certificates."""
 
 import pytest
 

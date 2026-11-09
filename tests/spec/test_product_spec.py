@@ -1,8 +1,8 @@
 """Executable item-by-item verification of the design specification.
 
-Each test names the spec line(s) it covers (`L<number>`) and checks the
-behaviour directly rather than trusting other suites. Section 1 is the
-decision table, then the normative statements in document order.
+Each test states the requirement it covers and checks the behaviour
+directly rather than trusting other suites. Section 1 is the decision table,
+then the normative statements in document order.
 """
 
 import ast
@@ -86,7 +86,7 @@ def events_of(result):
 
 
 def test_l5_to_l11_python_package_tabular_scope():
-    """L5-L11: Python-first, open-source package for tabular classification/regression."""
+    """Python-first, open-source package for tabular classification/regression."""
     meta = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]
     assert meta["requires-python"].startswith(">=3.11")
     assert meta["license"] == "Apache-2.0"
@@ -110,7 +110,7 @@ def test_l5_to_l11_python_package_tabular_scope():
 def test_l15_l17_user_states_objective_framework_plans_executes_validates_documents(
     run,
 ):
-    """L15-L17: the objective in, a planned, executed, validated, documented workflow out."""
+    """The objective in, a planned, executed, validated, documented workflow out."""
     result = run[1]
     for artifact in (
         "execution_plan.json",  # planned
@@ -125,7 +125,7 @@ def test_l15_l17_user_states_objective_framework_plans_executes_validates_docume
 
 
 def test_l19_conservative_when_ambiguous_and_transparent(frame, tmp_path):
-    """L19: blocks on ambiguity; every experiment and decision is recorded."""
+    """Blocks on ambiguity; every experiment and decision is recorded."""
     ambiguous = frame.assign(y=np.arange(len(frame)) % 5)
     with pytest.raises(errors.BlockedError):
         support.make_project(ambiguous, "y", output_dir=tmp_path).run()
@@ -136,7 +136,7 @@ def test_l19_conservative_when_ambiguous_and_transparent(frame, tmp_path):
 
 
 def test_l23_to_l39_decision_table(run):
-    """L23-L39: each row of the non-negotiable decisions table."""
+    """Each row of the non-negotiable decisions table."""
     project, result = run
     meta = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]
     assert meta["requires-python"].startswith(">=3.11")  # Python 3.11+
@@ -180,7 +180,7 @@ def test_l23_to_l39_decision_table(run):
 
 
 def test_l41_l43_no_mandatory_infrastructure_on_the_base_install():
-    """L41-L43: no Kubernetes / cloud / DB server / GPU / hosted tracker required."""
+    """No Kubernetes / cloud / DB server / GPU / hosted tracker required."""
     deps = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"][
         "dependencies"
     ]
@@ -220,7 +220,7 @@ def test_l41_l43_no_mandatory_infrastructure_on_the_base_install():
 
 
 def test_l101_l105_three_planes_are_separate_packages():
-    """L101-L105: control, execution and evidence planes are separate code."""
+    """Control, execution and evidence planes are separate code."""
     for plane in (
         ("core", "intelligence"),
         ("data", "models"),
@@ -230,7 +230,7 @@ def test_l101_l105_three_planes_are_separate_packages():
 
 
 def test_l113_l176_package_organization():
-    """L113-L176: every module of the spec's tree exists (flat `scmle/`)."""
+    """Every module of the spec's tree exists (flat `scmle/`)."""
     packages = (
         "api",
         "contracts",
@@ -294,7 +294,7 @@ def test_l113_l176_package_organization():
 
 
 def test_l178_modules_use_stable_contracts_not_private_internals():
-    """L178: no module reaches into another's internals; contracts depend on nothing above them."""
+    """No module reaches into another's internals; contracts depend on nothing above them."""
     for path in (PACKAGE / "contracts").glob("*.py"):
         tree = ast.parse(path.read_text())
         for node in ast.walk(tree):
@@ -318,7 +318,7 @@ def test_l178_modules_use_stable_contracts_not_private_internals():
 
 
 def test_l186_l194_explicit_versioned_serializable_hashable_saved_spec(run):
-    """L186, L194: explicit versioned spec; serializable; canonical hash; saved per run."""
+    """Explicit versioned spec; serializable; canonical hash; saved per run."""
     project, result = run
     spec = project.spec
     assert spec.version == tasks.CONFIG_VERSION
@@ -334,7 +334,7 @@ def test_l186_l194_explicit_versioned_serializable_hashable_saved_spec(run):
 
 
 def test_l192_cross_field_validation():
-    """L192: group needs a group column; temporal needs a time column; binary metrics need binary targets."""
+    """Group needs a group column; temporal needs a time column; binary metrics need binary targets."""
     with pytest.raises(ValueError, match="group_column"):
         tasks.ProjectSpec(
             data=tasks.DataSpec(uri="x", target="y"),
@@ -360,7 +360,7 @@ def test_l192_cross_field_validation():
 
 
 def test_l198_l206_foundational_and_production_contracts(run):
-    """L198-L206: contracts incl. schema types, capabilities, fit context, cancellation,
+    """Contracts incl. schema types, capabilities, fit context, cancellation,
     resource consumption, deterministic hashes, error categories, formats, compat versions."""
     project, result = run
     assert result.bundle.schema.dtypes  # schema types
@@ -404,7 +404,7 @@ def test_l198_l206_foundational_and_production_contracts(run):
 
 
 def test_l210_l224_module_io_matrix_invariants(run, tmp_path):
-    """L210-L224: key invariant of each module in the I/O matrix."""
+    """Key invariant of each module in the I/O matrix."""
     project, result = run
     from scmle.data.profiling import profiler
     from scmle.data.readers import tabular
@@ -444,7 +444,7 @@ def test_l210_l224_module_io_matrix_invariants(run, tmp_path):
 
 
 def test_l226_plugins_are_conformance_tested():
-    """L226: third-party plugins cannot violate expectations."""
+    """Third-party plugins cannot violate expectations."""
 
     class Bad(model_contracts.ModelAdapter):
         name = "bad"
@@ -468,7 +468,7 @@ def test_l226_plugins_are_conformance_tested():
 
 
 def test_l232_executable_dag_of_ordered_dependent_stages():
-    """L232: the request compiles into an executable dependency-ordered graph."""
+    """The request compiles into an executable dependency-ordered graph."""
     states = [stage.state for stage in stages.default_stages()]
     order = state.FORWARD_ORDER
     assert [order.index(s) for s in states] == sorted(
@@ -478,7 +478,7 @@ def test_l232_executable_dag_of_ordered_dependent_stages():
 
 
 def test_l234_to_l264_flow_with_locked_test_and_single_final_evaluation(run):
-    """L234-L264: split manifest, train branch, locked test branch, one-time final evaluation."""
+    """Split manifest, train branch, locked test branch, one-time final evaluation."""
     result = run[1]
     kinds = [e["kind"] for e in events_of(result)]
     assert kinds.count("test.opened") == 1
@@ -494,7 +494,7 @@ def test_l234_to_l264_flow_with_locked_test_and_single_final_evaluation(run):
         if d.action == "include" and d.technique in strategies_module.STRATEGIES
     }
     attempted = {t.strategy for t in result.trials} - {"default"}
-    assert attempted <= planned  # nothing outside the plan was tried
+    assert attempted <= planned  # nothing outside the execution plan was tried
     assert bool(attempted) == bool(planned)  # applicable strategies were tried
     assert (
         result.run_dir / "model"
@@ -502,7 +502,7 @@ def test_l234_to_l264_flow_with_locked_test_and_single_final_evaluation(run):
 
 
 def test_l268_l276_states_blocked_and_transition_events(run):
-    """L268-L276: explicit states incl. BLOCKED/FAILED/CANCELLED; events carry required fields."""
+    """Explicit states incl. BLOCKED/FAILED/CANCELLED; events carry required fields."""
     project, result = run
     assert {s.value for s in state.RunState} >= {
         "CREATED",
@@ -539,7 +539,7 @@ def test_l268_l276_states_blocked_and_transition_events(run):
 
 
 def test_l278_l288_orchestrator_support(frame, tmp_path):
-    """L278-L288: retries, cancellation, budget, checkpointing, restart, failures, ordering, parallelism, isolation."""
+    """Retries, cancellation, budget, checkpointing, restart, failures, ordering, parallelism, isolation."""
     import shutil
 
     from scmle.core import orchestrator as orchestrator_module
@@ -584,7 +584,7 @@ def test_l278_l288_orchestrator_support(frame, tmp_path):
 
 
 def test_l293_l307_fingerprint_dimensions(run):
-    """L293-L307: all eleven fingerprint dimensions."""
+    """All eleven fingerprint dimensions."""
     result = run[1]
     dims = set(result.profile.dataset_statistics)
     assert {
@@ -616,7 +616,7 @@ def test_l293_l307_fingerprint_dimensions(run):
 
 
 def test_l309_statistics_preserve_uncertainty_about_leakage():
-    """L309: strong association is a hypothesis, not a verdict."""
+    """Strong association is a hypothesis, not a verdict."""
     rng = np.random.default_rng(1)
     frame = pd.DataFrame({"x": rng.normal(size=300)})
     frame["y"] = (frame.x > 0).astype(int)
@@ -627,7 +627,7 @@ def test_l309_statistics_preserve_uncertainty_about_leakage():
 
 
 def test_l311_l321_decision_policy_examples():
-    """L311-L321: candidate generation rules; the planner proposes, evaluation decides."""
+    """Candidate generation rules; the planner proposes, evaluation decides."""
     rng = np.random.default_rng(2)
     frame = pd.DataFrame({"x": rng.normal(size=300)})
     frame["c"] = rng.choice([f"k{i}" for i in range(200)], 300)
@@ -652,7 +652,7 @@ def test_l311_l321_decision_policy_examples():
 
 
 def test_l327_l345_stages_a_to_e(run):
-    """L327-L345: baselines, screening, optimization, ensembles, select+package."""
+    """Baselines, screening, optimization, ensembles, select+package."""
     project, result = run
     models_run = {t.model_name for t in result.trials}
     assert "dummy" in models_run  # A
@@ -666,7 +666,7 @@ def test_l327_l345_stages_a_to_e(run):
 
 
 def test_l347_l356_model_family_registry():
-    """L347-L356: the initial model families."""
+    """The initial model families."""
     names = set(registry_module.ModelRegistry.with_builtins().adapters)
     assert {
         "dummy",
@@ -686,7 +686,7 @@ def test_l347_l356_model_family_registry():
 
 
 def test_l358_adapter_capability_declarations():
-    """L358: tasks, sparse, probabilities, native categoricals, missing values,
+    """Tasks, sparse, probabilities, native categoricals, missing values,
     early stopping, memory characteristics, serialization."""
     declared = {
         f.name for f in dataclasses.fields(model_contracts.Capabilities)
@@ -708,7 +708,7 @@ def test_l358_adapter_capability_declarations():
 
 
 def test_l360_planner_reads_capabilities_not_library_names():
-    """L360: planning uses declared capabilities (here: size limits and tasks)."""
+    """Planning uses declared capabilities (here: size limits and tasks)."""
     registry = registry_module.ModelRegistry.with_builtins()
     rejected = registry.candidates(tasks.TaskType.REGRESSION, 1_000_000)[1]
     assert (
@@ -717,7 +717,7 @@ def test_l360_planner_reads_capabilities_not_library_names():
 
 
 def test_l370_optimizer_library_is_not_the_architecture():
-    """L370: Optuna sits behind our ask/tell interface."""
+    """Optuna sits behind our ask/tell interface."""
     from scmle.optimization import optimizers
 
     assert issubclass(optimizers.OptunaOptimizer, optimizers.Optimizer)
@@ -728,7 +728,7 @@ def test_l370_optimizer_library_is_not_the_architecture():
 
 
 def test_l374_l393_balancing_and_augmentation(frame):
-    """L374-L393: the technique table and its policies."""
+    """The technique table and its policies."""
     from scmle.sampling import strategies
 
     for name in (
@@ -767,7 +767,7 @@ def test_l374_l393_balancing_and_augmentation(frame):
 
 
 def test_l385_l387_calibration_and_threshold_use_validation_evidence(run):
-    """L385-L387: threshold optimization uses validation predictions and an explicit objective."""
+    """Threshold optimization uses validation predictions and an explicit objective."""
     result = run[1]
     decision = result.evaluation["decision"]
     assert (
@@ -780,7 +780,7 @@ def test_l385_l387_calibration_and_threshold_use_validation_evidence(run):
 
 
 def test_l399_l409_evaluation_contract(run):
-    """L399-L409: standardized metrics/diagnostics; selectable objective; no accuracy assumption."""
+    """Standardized metrics/diagnostics; selectable objective; no accuracy assumption."""
     result = run[1]
     assert {"roc_auc", "pr_auc", "log_loss", "f1"} <= set(
         result.evaluation["test_metrics"]
@@ -796,7 +796,7 @@ def test_l399_l409_evaluation_contract(run):
     assert not defaults & {
         "accuracy",
         "f1",
-    }  # never assumes accuracy/F1 represents costs
+    }  # never assumes accuracy/F-score represents costs
     assert (
         result.evaluation["metric"] == "roc_auc"
     )  # user-selected objective honoured
@@ -808,7 +808,7 @@ def test_l399_l409_evaluation_contract(run):
 
 
 def test_l409_confidence_respects_independent_units(frame, tmp_path):
-    """L409: uncertainty follows groups / time structure."""
+    """Uncertainty follows groups / time structure."""
     framed = frame.assign(g=np.arange(len(frame)) % 30)
     result = support.make_project(
         framed, "y", group_column="g", output_dir=tmp_path
@@ -821,7 +821,7 @@ def test_l409_confidence_respects_independent_units(frame, tmp_path):
 def test_l411_l417_selection_constraints_measured_on_this_machine(
     frame, tmp_path
 ):
-    """L411-L417: maximize + constraints (size, latency) + tie-breaker, measured on hardware."""
+    """Maximize + constraints (size, latency) + tie-breaker, measured on hardware."""
     result = support.make_project(
         frame,
         "y",
@@ -841,7 +841,7 @@ def test_l411_l417_selection_constraints_measured_on_this_machine(
 
 
 def test_l421_l437_leakage_invariants(run, frame, tmp_path):
-    """L421-L437: structural protections 1-5."""
+    """Structural protections 1-5."""
     project, result = run
     manifest = json.loads(
         (result.run_dir / "validation_manifest.json").read_text()
@@ -881,7 +881,7 @@ def test_l421_l437_leakage_invariants(run, frame, tmp_path):
 
 
 def test_l439_deployment_scenario_splits(frame):
-    """L439: temporal/entity data must not use a random split."""
+    """Temporal/entity data must not use a random split."""
     from scmle.data.splitting import splitters
 
     with_time = support.make_project(
@@ -904,7 +904,7 @@ def test_l439_deployment_scenario_splits(frame):
 
 
 def test_l443_l466_run_directory_layout(run):
-    """L443-L466: the artifact directory structure."""
+    """The artifact directory structure."""
     result = run[1]
     for rel in (
         "config.json",
@@ -932,7 +932,7 @@ def test_l443_l466_run_directory_layout(run):
 
 
 def test_l470_l474_artifact_format_and_untrusted_artifacts(run, tmp_path):
-    """L470-L474: specified serialization; pickle treated as executable; checksums; refuse untrusted."""
+    """Specified serialization; pickle treated as executable; checksums; refuse untrusted."""
     result = run[1]
     directory = result.save(tmp_path / "m")
     manifest = json.loads((directory / "model_manifest.json").read_text())
@@ -953,7 +953,7 @@ def test_l470_l474_artifact_format_and_untrusted_artifacts(run, tmp_path):
 
 
 def test_l476_exact_replay_vs_comparable_rerun(run):
-    """L476: records reproducibility conditions; distinguishes exact from comparable."""
+    """Records reproducibility conditions; distinguishes exact from comparable."""
     from scmle.artifacts import reproducibility
 
     assert {
@@ -966,7 +966,7 @@ def test_l476_exact_replay_vs_comparable_rerun(run):
 
 
 def test_l480_l496_inference_contract(run, frame, tmp_path):
-    """L480-L496: whole pipeline; schema validation; explicit column mapping;
+    """Whole pipeline; schema validation; explicit column mapping;
     unknown categories; missing-feature diagnostics; batch; structured errors."""
     result = run[1]
     features = frame.drop(columns="y")
@@ -1006,7 +1006,7 @@ def test_l480_l496_inference_contract(run, frame, tmp_path):
 
 
 def test_l500_l546_stack_and_extras():
-    """L500-L546: the technology stack and the optional extras."""
+    """The technology stack and the optional extras."""
     project = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]
     base = " ".join(project["dependencies"])
     for needed in ("pydantic", "pyarrow", "pandas", "scikit-learn", "joblib"):
@@ -1018,7 +1018,7 @@ def test_l500_l546_stack_and_extras():
         "tracking",
         "distributed",
         "all",
-    } <= extras  # L538-L544
+    } <= extras
     assert (ROOT / "uv.lock").exists() and (
         ROOT / ".github/workflows/ci.yml"
     ).exists()
@@ -1031,7 +1031,7 @@ def test_l500_l546_stack_and_extras():
 
 
 def test_l548_no_heavy_imports_until_a_model_is_selected():
-    """L548: a registry entry must not import GPU/deep-learning dependencies."""
+    """A registry entry must not import GPU/deep-learning dependencies."""
     code = (
         "import sys; from scmle.contracts import tasks; from scmle.models import registry; "
         "r = registry.ModelRegistry.with_builtins(); r.candidates(tasks.TaskType.BINARY, 100); "
@@ -1063,7 +1063,7 @@ def test_core_deliverables_are_observable(frame, tmp_path):
 
 
 def test_l610_l629_backlog_priorities(run):
-    """L610-L629: each backlog row has a working implementation."""
+    """Each backlog row has a working implementation."""
     from scmle.contracts import models as model_contracts
     from scmle.evaluation import diagnostics
     from scmle.explainability import importance
@@ -1077,28 +1077,28 @@ def test_l610_l629_backlog_priorities(run):
     result = run[1]
     assert len(result.predict(make_frame().drop(columns="y"))) == len(
         make_frame()
-    )  # P0 project API and inference-ready artifact
-    assert issubclass(serving.HttpServing, serving.ServingAdapter)  # P2
-    assert callable(registry.ModelRegistryStore.promote)  # P2 deployment
+    )  # project API and inference-ready artifact
+    assert issubclass(serving.HttpServing, serving.ServingAdapter)  # serving
+    assert callable(registry.ModelRegistryStore.promote)  # deployment
     report = monitor.ModelMonitor(result.bundle).assess(
         make_frame(seed=3).drop(columns="y"), make_frame(seed=3)["y"]
     )
-    assert report.recommendation.action  # P2 monitoring
+    assert report.recommendation.action  # monitoring
     assert issubclass(
         importance.PermutationImportance, diagnostics.Diagnostic
-    )  # P1 explainability
+    )  # explainability
     assert "permutation_importance" in result.diagnostics
     assert issubclass(ensembles.StackingAdapter, model_contracts.ModelAdapter)
     generator = synthesis.GaussianCopulaGenerator().fit(
         make_frame()[["a", "b"]]
     )
     fake = generator.sample(30, np.random.default_rng(0))
-    assert fake.shape == (30, 2)  # P2 augmentation
-    assert knowledge.MetaLearner([]).recommend  # P2 meta-learning
+    assert fake.shape == (30, 2)  # augmentation
+    assert knowledge.MetaLearner([]).recommend  # meta-learning
 
 
 def test_l637_l669_test_categories_and_quality_gates(run):
-    """L637-L667: required test categories exist; each quality gate is observable."""
+    """Required test categories exist; each quality gate is observable."""
     for rel in (
         "tests/unit/test_component_contracts.py",  # contract
         "tests/unit/test_splitting.py",  # statistical
@@ -1122,7 +1122,7 @@ def test_l637_l669_test_categories_and_quality_gates(run):
 
 
 def test_l669_no_arbitrary_performance_promises():
-    """L669: no improvement percentage promised without a benchmark baseline."""
+    """No improvement percentage promised without a benchmark baseline."""
     text = (ROOT / "README.md").read_text() + (
         ROOT / "docs" / "TUTORIAL.md"
     ).read_text()
@@ -1135,7 +1135,7 @@ def test_l669_no_arbitrary_performance_promises():
 
 
 def test_l679_l735_v01_scope_matches_the_spec(frame, tmp_path):
-    """L679-L735: in-scope items work; out-of-scope ones are optional extras."""
+    """In-scope items work; out-of-scope ones are optional extras."""
     multi = make_frame(300).assign(
         y=lambda f: pd.cut(
             f.a.fillna(0) + f.b, [-9, -0.5, 0.5, 9], labels=["l", "m", "h"]
@@ -1157,7 +1157,7 @@ def test_l679_l735_v01_scope_matches_the_spec(frame, tmp_path):
 
 
 def test_l739_l747_first_sprint_outcomes(run):
-    """L739-L747: the five concrete outcomes."""
+    """The five concrete outcomes."""
     assert (ROOT / "docs" / "ARCHITECTURE.md").read_text().strip()  # 1
     assert (ROOT / "pyproject.toml").exists() and list(
         (ROOT / "tests").rglob("test_*.py")
@@ -1183,7 +1183,7 @@ def test_l739_l747_first_sprint_outcomes(run):
 
 
 def test_l751_l761_frozen_api(frame, tmp_path):
-    """L751-L761: the API as written, incl. approved plans and the classification alias."""
+    """The API as written, incl. approved plans and the classification alias."""
     project = scmle.MLProject(
         frame,
         "y",
@@ -1216,7 +1216,7 @@ def test_l751_l761_frozen_api(frame, tmp_path):
 
 
 def test_l765_l778_future_expansion_commitments(frame, tmp_path):
-    """L765-L778: each architectural commitment works, not merely exists."""
+    """Each architectural commitment works, not merely exists."""
     import pickle
 
     from scmle.core import policies
@@ -1318,7 +1318,7 @@ def scmle_profile(frame):
 def test_l786_l801_risks_have_mitigations_and_candidates_are_whole_pipelines(
     frame,
 ):
-    """L786-L801: a candidate is a complete, independently evaluable pipeline."""
+    """A candidate is a complete, independently evaluable pipeline."""
     from scmle.sampling import strategies
 
     registry = registry_module.ModelRegistry.with_builtins()
@@ -1349,7 +1349,7 @@ def test_l786_l801_risks_have_mitigations_and_candidates_are_whole_pipelines(
 
 
 def test_l805_l829_five_abstractions_and_the_core_path(run):
-    """L805-L829: Dataset, Plan, Experiment, Model Bundle, Lifecycle; Dataset->Plan->Experiment->Bundle."""
+    """Dataset, Plan, Experiment, Model Bundle, Lifecycle; Dataset->Plan->Experiment->Bundle."""
     from scmle.contracts import data as data_contracts
     from scmle.governance import registry
 

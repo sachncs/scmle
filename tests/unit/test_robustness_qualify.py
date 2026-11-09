@@ -1,4 +1,4 @@
-"""Wiring of the F6 checks onto the exploration set, and their reports."""
+"""Wiring of the robustness checks onto the exploration set, and their reports."""
 
 import copy
 import json

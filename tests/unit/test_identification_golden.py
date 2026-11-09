@@ -1,4 +1,4 @@
-"""Snapshots of the F10 estimators on fixed inputs (mutation pins).
+"""Snapshots of the identification estimators on fixed inputs (mutation pins).
 
 See `tests/unit/golden.py` and `tests/unit/MUTANTS_identification.md`.
 Regenerate with SCMLE_WRITE_GOLDEN=1 only after a reviewed change.

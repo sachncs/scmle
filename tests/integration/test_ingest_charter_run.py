@@ -1,4 +1,4 @@
-"""A charter run that synthesizes its features from a database (F9)."""
+"""A charter run that synthesizes its features from a database."""
 
 import json
 import pathlib

@@ -1,4 +1,4 @@
-"""The F9 certificates and measurements are current and honestly labelled."""
+"""The ingestion certificates and measurements are current and honestly labelled."""
 
 import json
 

@@ -105,7 +105,7 @@ def test_only_saffron_reports_candidates():
 
 
 def test_saffron_boundary_and_wealth_by_hand():
-    rule = o.Saffron(F(1, 4))  # W0 = 1/8; first level = (1/2)(1/8)(1/2)
+    rule = o.Saffron(F(1, 4))  # W_0 = 1/8; first level = (1/2)(1/8)(1/2)
     level = rule.level(rule.initial())
     assert level == F(1, 32)
     assert rule.step(rule.initial(), o.Evidence(p=1 / 32)).rejected is True
@@ -113,7 +113,7 @@ def test_saffron_boundary_and_wealth_by_hand():
         rule.step(rule.initial(), o.Evidence(p=1 / 32 * 1.001)).rejected
         is False
     )
-    # One rejected candidate at lambda = 2/5: credit = W0 + (alpha - W0).
+    # One rejected candidate at lambda = 2/5: credit = W_0 + (alpha - W_0).
     custom = o.Saffron(ALPHA, lam=F(2, 5))
     step = custom.step(custom.initial(), o.Evidence(p=0.0))
     assert step.wealth_after == F(3, 5) * ALPHA - 0

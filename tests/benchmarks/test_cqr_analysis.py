@@ -1,4 +1,4 @@
-"""The filed analysis of the G3 miss: shape, seeds and what it does not do."""
+"""The filed analysis of the CQR conditional-coverage miss: shape, seeds and what it does not do."""
 
 import json
 

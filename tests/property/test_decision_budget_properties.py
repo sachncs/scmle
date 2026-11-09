@@ -1,4 +1,4 @@
-"""Properties of the decision budget (B5): exact levels, never overspent."""
+"""Properties of the decision budget: exact levels, never overspent."""
 
 from fractions import Fraction
 

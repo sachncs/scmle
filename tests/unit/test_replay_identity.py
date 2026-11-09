@@ -1,4 +1,4 @@
-"""The framing draft replays to the same bytes on every interpreter (F8 10)."""
+"""The framing draft replays to the same bytes on every interpreter."""
 
 import json
 import os

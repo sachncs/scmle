@@ -1,4 +1,4 @@
-"""The subgroup family gates or only describes, by its certificate (F10)."""
+"""The subgroup family gates or only describes, by its certificate."""
 
 import json
 

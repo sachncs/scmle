@@ -1,4 +1,4 @@
-"""Phase 13 wiring: incidents on halt, the feedback test, guarded registry."""
+"""Closed-loop wiring: incidents on halt, the feedback test, guarded registry."""
 
 import json
 

@@ -1,4 +1,4 @@
-"""Signed attestations of the identification assumptions (F10)."""
+"""Signed attestations of the identification assumptions."""
 
 import json
 

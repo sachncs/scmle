@@ -1,4 +1,4 @@
-"""Wiring of the F4 tests and F5 detectors onto the exploration set."""
+"""Wiring of the admissibility tests and data detectors onto the exploration set."""
 
 import numpy as np
 import pandas as pd

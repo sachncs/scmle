@@ -1,4 +1,4 @@
-"""The F12 certificates are current, honest and cheap to re-check."""
+"""The coverage certificates are current, honest and cheap to re-check."""
 
 import json
 import math

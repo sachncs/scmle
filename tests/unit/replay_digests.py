@@ -3,8 +3,7 @@
 `digests()` runs the deterministic framing drafter on a seeded table and
 hashes the draft charter and every artifact it writes. The values are pinned
 in `tests/fixtures/replay_golden.json` and the test runs on every interpreter
-of the CI matrix, so one stored value holds for 3.11 to 3.14 (F8 acceptance
-10). Regenerate with SCMLE_WRITE_GOLDEN=1 only after a reviewed change.
+of the CI matrix, so one stored value holds for 3.11 to 3.14. Regenerate with SCMLE_WRITE_GOLDEN=1 only after a reviewed change.
 """
 
 import hashlib

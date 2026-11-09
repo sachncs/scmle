@@ -1,4 +1,4 @@
-"""The extract is reconciled to the totals the charter declared (F9)."""
+"""The extract is reconciled to the totals the charter declared."""
 
 import pandas as pd
 import pytest

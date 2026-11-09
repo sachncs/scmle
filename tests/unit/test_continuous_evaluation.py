@@ -1,4 +1,4 @@
-"""Delayed labels into the F13 loop, the retraining policy, gated replacement.
+"""Delayed labels into the closed loop, the retraining policy, gated replacement.
 
 The loop here keeps ``alarm_gates_retrain`` False, as the certified loop
 does: its alarm escalates for investigation and trains nothing. Retraining

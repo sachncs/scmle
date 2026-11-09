@@ -1,4 +1,4 @@
-"""Conformal extensions, coverage reporting and the F12 scores."""
+"""Conformal extensions, coverage reporting and the scores."""
 
 import math
 

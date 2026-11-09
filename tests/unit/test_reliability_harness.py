@@ -81,7 +81,7 @@ def test_harness_rejects_duplicate_evidence_before_writing(tmp_path):
 
 
 def test_harness_rejects_unexpected_evidence_before_writing(tmp_path):
-    """Evidence names outside the plan cannot leave orphaned artifacts."""
+    """Evidence names outside the scenario's expected set leave no artifacts."""
     runner = harness(tmp_path)
     scenario = reliability.FaultScenario.INVALID_SIGNATURE
 

@@ -1,4 +1,4 @@
-"""The resolved entity becomes the split's group column (F9)."""
+"""The resolved entity becomes the split's group column."""
 
 import pandas as pd
 import pytest

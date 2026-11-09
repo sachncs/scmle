@@ -1,4 +1,4 @@
-"""Pins for survivors of mutation testing in the F13 monitoring modules.
+"""Pins for survivors of mutation testing in the monitoring modules.
 
 Golden values were computed from the committed code on fixed sequences; each
 test names what the mutants it kills would change. See

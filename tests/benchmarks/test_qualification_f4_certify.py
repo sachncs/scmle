@@ -1,4 +1,4 @@
-"""F4 certificates: the stored file is current, honest and reproducible."""
+"""Admissibility certificates: the stored file is current, honest and reproducible."""
 
 import json
 

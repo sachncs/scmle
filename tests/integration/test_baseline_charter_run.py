@@ -1,4 +1,4 @@
-"""The F8 baseline claim in a charter run: frozen on X, tested once on C."""
+"""The framing baseline claim in a charter run: frozen on X, tested once on C."""
 
 import json
 import pathlib

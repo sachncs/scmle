@@ -420,7 +420,7 @@ def test_two_consecutive_rollbacks_escalate(tmp_path):
     )
 
 
-# ---------------------------------------------------------------- E1, halt
+# ------------------------------------------------------------------- halt
 
 
 def test_selective_risk_above_target_halts_and_coverage_goes_to_zero(tmp_path):

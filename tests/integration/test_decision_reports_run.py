@@ -1,4 +1,4 @@
-"""A charter run with a decision block writes the F11 report files."""
+"""A charter run with a decision block writes the decision report files."""
 
 from fractions import Fraction
 import json

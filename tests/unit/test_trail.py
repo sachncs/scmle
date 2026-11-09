@@ -1,6 +1,6 @@
 """The business trail: build, verify, and each seeded defect it must catch.
 
-The fixtures are copies of the committed Phase 18 trail, which was built from
+The fixtures are copies of the committed trail, which was built from
 a real run of the Titanic extract. A seeded defect edits one retained record
 in the copy and re-seals it, so the only thing the verifier can object to is
 the defect.

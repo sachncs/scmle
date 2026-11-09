@@ -3,16 +3,16 @@
 These are measurements of simulated streams, not of real traffic. Properties,
 fixed before the first run:
 
-* P1 it takes no action that needs a person: no attestation is spent, no
+* it takes no action that needs a person: no attestation is spent, no
   deployment is recorded, and no ledger row is of a kind outside the loop's
   own and the controller's;
-* P2 it never exceeds an envelope: trainings equal the uses on the ledger and
+* it never exceeds an envelope: trainings equal the uses on the ledger and
   never exceed the limit;
-* P3 the ledger it leaves verifies from disk;
-* P4 killed at any checkpoint and started again, it ends where an
-  uninterrupted run ends;
-* P5 with labels missing or an input corrupted it carries on and asks a
-  person; it does not halt the loop or act.
+* the ledger it leaves verifies from disk;
+* killed at any checkpoint and started again, it ends where an uninterrupted
+  run ends;
+* with labels missing or an input corrupted it carries on and asks a person;
+  it does not halt the loop or act.
 """
 
 import numpy as np
@@ -49,14 +49,14 @@ def run(world, ticks, controller, **deliveries):
 
 
 def check_properties(world, trainer=None, limit=0):
-    ledger = dl.DeploymentLedger.load(world.deploy / dl.FILE_NAME)  # P3
-    assert {row["kind"] for row in ledger.rows} <= worlds.ALLOWED_KINDS  # P1
-    assert not ledger.attestations and not ledger.used  # P1
+    ledger = dl.DeploymentLedger.load(world.deploy / dl.FILE_NAME)  # on disk
+    assert {row["kind"] for row in ledger.rows} <= worlds.ALLOWED_KINDS
+    assert not ledger.attestations and not ledger.used  # no person needed
     uses = worlds.kinds(ledger, dl.ENVELOPE_USED)
-    assert len(uses) <= limit  # P2
+    assert len(uses) <= limit  # within the envelope
     if trainer is not None:
-        assert trainer.calls == len(uses)  # P2
-    assert world.controller().loop.verify_ledger()  # P3
+        assert trainer.calls == len(uses)  # trainings equal uses
+    assert world.controller().loop.verify_ledger()  # the ledger verifies
     return ledger
 
 

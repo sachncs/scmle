@@ -22,7 +22,7 @@ from scmle.models.sklearn import classical
 
 
 def test_unknown_experimental_model_fails_closed():
-    """A typo in the public opt-in list cannot silently change the plan."""
+    """A typo in the public opt-in list cannot silently change the candidate set."""
     registry = registry_module.ModelRegistry((classical.DummyAdapter(),))
 
     with pytest.raises(
