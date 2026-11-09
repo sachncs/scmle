@@ -28,7 +28,7 @@ from scmle.operations import signals
 from scmle.security import access
 
 LOGGER = logging.getLogger("service")
-DEFAULT_HOST = "0.0.0.0"  # nosec B104 - a container service binds all interfaces
+DEFAULT_HOST = "0.0.0.0"  # noqa: S104 -- a container service binds all interfaces  # nosec B104
 
 
 def number(environ: Mapping[str, str], name: str, default: float) -> float:
@@ -135,7 +135,9 @@ def emit_signals(
     if path is None:
         LOGGER.info("signals %s", line)
     else:
-        with open(path, "a", encoding="utf-8", newline="\n") as handle:
+        with pathlib.Path(path).open(
+            "a", encoding="utf-8", newline="\n"
+        ) as handle:
             handle.write(line + "\n")
     return len(found)
 
@@ -225,7 +227,7 @@ def run(folder: pathlib.Path, environ: Mapping[str, str]) -> None:
         **settings(environ),
     )
     stop = threading.Event()
-    signal.signal(signal.SIGTERM, lambda signum, frame: stop.set())
+    signal.signal(signal.SIGTERM, lambda *ignored: stop.set())
     chosen = signal_settings(environ)
     threading.Thread(
         target=signal_loop,

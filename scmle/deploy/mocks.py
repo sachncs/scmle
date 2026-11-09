@@ -17,6 +17,7 @@ import pathlib
 import threading
 import time
 from typing import Any
+from typing import ClassVar
 import urllib.request
 
 from scmle import durability
@@ -26,6 +27,7 @@ from scmle.deploy import provenance
 
 MAX_OBJECT_BYTES = 256 * 1024 * 1024
 MAX_METRICS_BYTES = 1024 * 1024
+MINIMUM_KEY_PARTS = 2  # an object path is a bucket and at least a key
 DIGEST_HEADER = "X-Content-SHA256"
 
 
@@ -43,7 +45,7 @@ def safe_key(raw: str) -> pathlib.PurePosixPath:
         ValueError: If the path escapes the store or lacks a bucket and key.
     """
     path = pathlib.PurePosixPath(raw.split("?", 1)[0].lstrip("/"))
-    if len(path.parts) < 2 or any(
+    if len(path.parts) < MINIMUM_KEY_PARTS or any(
         part in {"", ".", ".."} or "\\" in part for part in path.parts
     ):
         raise ValueError("path must be /<bucket>/<key> without '..'")
@@ -120,6 +122,133 @@ class MockServer:
         self.httpd = self.thread = None
 
 
+class ObjectStoreResponder(server.BaseHTTPRequestHandler):
+    """Serves the object store's requests.
+
+    Attributes:
+        store: The object store served; `ObjectStore.handler` sets it on a
+            subclass.
+    """
+
+    store: ClassVar["ObjectStore"]
+
+    def reply(self, status: int, body: bytes, headers: dict[str, str]) -> None:
+        """Sends a response.
+
+        Args:
+            status: HTTP status code.
+            body: Response body; omitted from the wire for HEAD
+                requests.
+            headers: Extra response headers.
+        """
+        self.send_response(status)
+        self.send_header("Content-Length", str(len(body)))
+        for name, value in headers.items():
+            self.send_header(name, value)
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(body)
+
+    def problem(self, status: int, message: str) -> None:
+        """Sends a JSON error response.
+
+        Args:
+            status: HTTP status code.
+            message: Text placed under `error` in the body.
+        """
+        body = json.dumps({"error": message}).encode()
+        self.reply(status, body, {"Content-Type": "application/json"})
+
+    def target(self) -> pathlib.Path | None:
+        """Maps the request path to a file under the store root.
+
+        Returns:
+            The file path, or None after a 400 response when the path is
+            not a valid `/<bucket>/<key>`.
+        """
+        try:
+            relative = safe_key(self.path)
+        except ValueError as error:
+            self.problem(400, str(error))
+            return None
+        return self.store.root.joinpath(*relative.parts)
+
+    def do_PUT(self) -> None:
+        """Stores the request body if its size and digest are allowed.
+
+        The stored bytes are written atomically and the response carries
+        their SHA-256 as the `ETag`.
+        """
+        path = self.target()
+        if path is None:
+            return
+        length = int(self.headers.get("Content-Length", "-1"))
+        if length < 0 or length > MAX_OBJECT_BYTES:
+            self.problem(413, "object size not allowed")
+            return
+        body = self.rfile.read(length)
+        digest = provenance.sha256_digest(body)
+        claimed = self.headers.get(DIGEST_HEADER)
+        if claimed is not None and claimed != digest:
+            self.problem(400, "content digest mismatch")
+            return
+        path.parent.mkdir(parents=True, exist_ok=True)
+        durability.write_atomically(path, body)
+        self.reply(200, b"", {"ETag": digest})
+
+    def do_GET(self) -> None:
+        """Serves `/healthz`, a listing (`?list`) or one object."""
+        if self.path == "/healthz":
+            self.reply(200, b"ok", {"Content-Type": "text/plain"})
+            return
+        if "?list" in self.path:
+            prefix = self.path.split("?", 1)[0].strip("/")
+            base = self.store.root / prefix
+            entries = [
+                {
+                    "key": p.relative_to(self.store.root).as_posix(),
+                    "etag": provenance.file_digest(p),
+                    "size": p.stat().st_size,
+                }
+                for p in sorted(base.rglob("*"))
+                if p.is_file()
+            ]
+            body = json.dumps({"objects": entries}).encode()
+            self.reply(200, body, {"Content-Type": "application/json"})
+            return
+        path = self.target()
+        if path is None:
+            return
+        if not path.is_file():
+            self.problem(404, "no such object")
+            return
+        body = path.read_bytes()
+        self.reply(
+            200,
+            body,
+            {
+                "ETag": provenance.sha256_digest(body),
+                "Content-Type": "application/octet-stream",
+            },
+        )
+
+    def do_HEAD(self) -> None:
+        """Answers like GET, without a body."""
+        self.do_GET()
+
+    def log_message(
+        self,
+        format: str,  # noqa: A002 -- BaseHTTPRequestHandler.log_message name
+        *args: Any,
+    ) -> None:
+        """Silences per-request logging.
+
+        Args:
+            format: Log message format; ignored.
+            *args: Format arguments; ignored.
+        """
+
+
 class ObjectStore(MockServer):
     """PUT, GET, HEAD and list over `/<bucket>/<key>`, with SHA-256 etags.
 
@@ -147,126 +276,97 @@ class ObjectStore(MockServer):
         Returns:
             The handler class.
         """
-        store = self
 
-        class Responder(server.BaseHTTPRequestHandler):
-            """Serves the object store's requests."""
+        class Responder(ObjectStoreResponder):
+            """The responder bound to this object store."""
 
-            def reply(
-                self, status: int, body: bytes, headers: dict[str, str]
-            ) -> None:
-                """Sends a response.
-
-                Args:
-                    status: HTTP status code.
-                    body: Response body; omitted from the wire for HEAD
-                        requests.
-                    headers: Extra response headers.
-                """
-                self.send_response(status)
-                self.send_header("Content-Length", str(len(body)))
-                for name, value in headers.items():
-                    self.send_header(name, value)
-                self.end_headers()
-                if self.command != "HEAD":
-                    self.wfile.write(body)
-
-            def problem(self, status: int, message: str) -> None:
-                """Sends a JSON error response.
-
-                Args:
-                    status: HTTP status code.
-                    message: Text placed under `error` in the body.
-                """
-                body = json.dumps({"error": message}).encode()
-                self.reply(status, body, {"Content-Type": "application/json"})
-
-            def target(self) -> pathlib.Path | None:
-                """Maps the request path to a file under the store root.
-
-                Returns:
-                    The file path, or None after a 400 response when the path is
-                    not a valid `/<bucket>/<key>`.
-                """
-                try:
-                    relative = safe_key(self.path)
-                except ValueError as error:
-                    self.problem(400, str(error))
-                    return None
-                return store.root.joinpath(*relative.parts)
-
-            def do_PUT(self) -> None:
-                """Stores the request body if its size and digest are allowed.
-
-                The stored bytes are written atomically and the response carries
-                their SHA-256 as the `ETag`.
-                """
-                path = self.target()
-                if path is None:
-                    return
-                length = int(self.headers.get("Content-Length", "-1"))
-                if length < 0 or length > MAX_OBJECT_BYTES:
-                    self.problem(413, "object size not allowed")
-                    return
-                body = self.rfile.read(length)
-                digest = provenance.sha256_digest(body)
-                claimed = self.headers.get(DIGEST_HEADER)
-                if claimed is not None and claimed != digest:
-                    self.problem(400, "content digest mismatch")
-                    return
-                path.parent.mkdir(parents=True, exist_ok=True)
-                durability.write_atomically(path, body)
-                self.reply(200, b"", {"ETag": digest})
-
-            def do_GET(self) -> None:
-                """Serves `/healthz`, a listing (`?list`) or one object."""
-                if self.path == "/healthz":
-                    self.reply(200, b"ok", {"Content-Type": "text/plain"})
-                    return
-                if "?list" in self.path:
-                    prefix = self.path.split("?", 1)[0].strip("/")
-                    base = store.root / prefix
-                    entries = [
-                        {
-                            "key": p.relative_to(store.root).as_posix(),
-                            "etag": provenance.file_digest(p),
-                            "size": p.stat().st_size,
-                        }
-                        for p in sorted(base.rglob("*"))
-                        if p.is_file()
-                    ]
-                    body = json.dumps({"objects": entries}).encode()
-                    self.reply(200, body, {"Content-Type": "application/json"})
-                    return
-                path = self.target()
-                if path is None:
-                    return
-                if not path.is_file():
-                    self.problem(404, "no such object")
-                    return
-                body = path.read_bytes()
-                self.reply(
-                    200,
-                    body,
-                    {
-                        "ETag": provenance.sha256_digest(body),
-                        "Content-Type": "application/octet-stream",
-                    },
-                )
-
-            def do_HEAD(self) -> None:
-                """Answers like GET, without a body."""
-                self.do_GET()
-
-            def log_message(self, format: str, *args: Any) -> None:
-                """Silences per-request logging.
-
-                Args:
-                    format: Log message format; ignored.
-                    *args: Format arguments; ignored.
-                """
+            store = self
 
         return Responder
+
+
+class MetricsSinkResponder(server.BaseHTTPRequestHandler):
+    """Serves the metrics sink's requests.
+
+    Attributes:
+        sink: The metrics sink served; `MetricsSink.handler` sets it on a
+            subclass.
+    """
+
+    sink: ClassVar["MetricsSink"]
+
+    def reply(self, status: int, payload: dict[str, Any]) -> None:
+        """Sends a JSON response.
+
+        Args:
+            status: HTTP status code.
+            payload: Object sent as the body.
+        """
+        body = json.dumps(payload).encode()
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_GET(self) -> None:
+        """Serves `/healthz` and `/metrics`."""
+        if self.path == "/healthz":
+            self.reply(200, {"status": "ok"})
+        elif self.path == "/metrics":
+            stored = self.sink.samples()
+            self.reply(200, {"count": len(stored), "samples": stored})
+        else:
+            self.reply(404, {"error": "not found"})
+
+    def do_POST(self) -> None:
+        """Validates and stores the samples posted to `/metrics`.
+
+        The body is one sample or a list. Any invalid sample rejects the
+        whole request with 400 and nothing is stored; the response
+        reports how many were accepted.
+        """
+        if self.path != "/metrics":
+            self.reply(404, {"error": "not found"})
+            return
+        length = int(self.headers.get("Content-Length", "-1"))
+        if length < 0 or length > MAX_METRICS_BYTES:
+            self.reply(413, {"error": "payload size not allowed"})
+            return
+        try:
+            payload = json.loads(self.rfile.read(length))
+            batch = payload if isinstance(payload, list) else [payload]
+            samples = [
+                observability.MetricSample.from_dict(item).to_dict()
+                for item in batch
+            ]
+        except (ValueError, KeyError, TypeError) as error:
+            self.reply(400, {"error": f"invalid sample: {error}"})
+            return
+        with self.sink.lock, self.server_file() as handle:
+            for sample in samples:
+                handle.write(json.dumps(sample) + "\n")
+        self.reply(200, {"accepted": len(samples)})
+
+    def server_file(self) -> Any:
+        """Opens the sample file for appending.
+
+        Returns:
+            The open text file.
+        """
+        return self.sink.file.open("a", encoding="utf-8", newline="\n")
+
+    def log_message(
+        self,
+        format: str,  # noqa: A002 -- BaseHTTPRequestHandler.log_message name
+        *args: Any,
+    ) -> None:
+        """Silences per-request logging.
+
+        Args:
+            format: Log message format; ignored.
+            *args: Format arguments; ignored.
+        """
 
 
 class MetricsSink(MockServer):
@@ -313,79 +413,11 @@ class MetricsSink(MockServer):
         Returns:
             The handler class.
         """
-        sink = self
 
-        class Responder(server.BaseHTTPRequestHandler):
-            """Serves the metrics sink's requests."""
+        class Responder(MetricsSinkResponder):
+            """The responder bound to this metrics sink."""
 
-            def reply(self, status: int, payload: dict[str, Any]) -> None:
-                """Sends a JSON response.
-
-                Args:
-                    status: HTTP status code.
-                    payload: Object sent as the body.
-                """
-                body = json.dumps(payload).encode()
-                self.send_response(status)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Content-Length", str(len(body)))
-                self.end_headers()
-                self.wfile.write(body)
-
-            def do_GET(self) -> None:
-                """Serves `/healthz` and `/metrics`."""
-                if self.path == "/healthz":
-                    self.reply(200, {"status": "ok"})
-                elif self.path == "/metrics":
-                    stored = sink.samples()
-                    self.reply(200, {"count": len(stored), "samples": stored})
-                else:
-                    self.reply(404, {"error": "not found"})
-
-            def do_POST(self) -> None:
-                """Validates and stores the samples posted to `/metrics`.
-
-                The body is one sample or a list. Any invalid sample rejects the
-                whole request with 400 and nothing is stored; the response
-                reports how many were accepted.
-                """
-                if self.path != "/metrics":
-                    self.reply(404, {"error": "not found"})
-                    return
-                length = int(self.headers.get("Content-Length", "-1"))
-                if length < 0 or length > MAX_METRICS_BYTES:
-                    self.reply(413, {"error": "payload size not allowed"})
-                    return
-                try:
-                    payload = json.loads(self.rfile.read(length))
-                    batch = payload if isinstance(payload, list) else [payload]
-                    samples = [
-                        observability.MetricSample.from_dict(item).to_dict()
-                        for item in batch
-                    ]
-                except (ValueError, KeyError, TypeError) as error:
-                    self.reply(400, {"error": f"invalid sample: {error}"})
-                    return
-                with sink.lock, self.server_file() as handle:
-                    for sample in samples:
-                        handle.write(json.dumps(sample) + "\n")
-                self.reply(200, {"accepted": len(samples)})
-
-            def server_file(self) -> Any:
-                """Opens the sample file for appending.
-
-                Returns:
-                    The open text file.
-                """
-                return sink.file.open("a", encoding="utf-8", newline="\n")
-
-            def log_message(self, format: str, *args: Any) -> None:
-                """Silences per-request logging.
-
-                Args:
-                    format: Log message format; ignored.
-                    *args: Format arguments; ignored.
-                """
+            sink = self
 
         return Responder
 
@@ -406,13 +438,13 @@ def put_object(base: str, path: str, data: bytes, timeout: float = 30.0) -> str:
         ArtifactError: If the store's digest differs from the local one.
     """
     local = provenance.sha256_digest(data)
-    request = urllib.request.Request(
+    request = urllib.request.Request(  # noqa: S310 -- the mock endpoint is an http URL from the caller
         f"{base.rstrip('/')}/{path.lstrip('/')}",
         data,
         {DIGEST_HEADER: local},
         method="PUT",
     )
-    with urllib.request.urlopen(request, timeout=timeout) as reply:  # nosec B310
+    with urllib.request.urlopen(request, timeout=timeout) as reply:  # noqa: S310 -- the mock endpoint is an http URL from the caller  # nosec B310
         etag = str(reply.headers.get("ETag"))
     if etag != local:
         raise errors.ArtifactError("object store stored different bytes")
@@ -439,7 +471,7 @@ def get_object(
             etag.
     """
     url = f"{base.rstrip('/')}/{path.lstrip('/')}"
-    with urllib.request.urlopen(url, timeout=timeout) as reply:  # nosec B310
+    with urllib.request.urlopen(url, timeout=timeout) as reply:  # noqa: S310 -- the mock endpoint is an http URL from the caller  # nosec B310
         body: bytes = reply.read()
         etag = reply.headers.get("ETag")
     actual = provenance.sha256_digest(body)
@@ -461,13 +493,13 @@ def post_metrics(
     Returns:
         How many samples the sink accepted.
     """
-    request = urllib.request.Request(
+    request = urllib.request.Request(  # noqa: S310 -- the mock endpoint is an http URL from the caller
         f"{base.rstrip('/')}/metrics",
         json.dumps([sample.to_dict() for sample in samples]).encode(),
         {"Content-Type": "application/json"},
         method="POST",
     )
-    with urllib.request.urlopen(request, timeout=timeout) as reply:  # nosec B310
+    with urllib.request.urlopen(request, timeout=timeout) as reply:  # noqa: S310 -- the mock endpoint is an http URL from the caller  # nosec B310
         return int(json.loads(reply.read())["accepted"])
 
 
@@ -496,7 +528,7 @@ def main(arguments: list[str] | None = None) -> int:
         else MetricsSink(options.file, options.host, options.port)
     )
     service.start()
-    print(f"{options.service} listening on {service.address}", flush=True)
+    print(f"{options.service} listening on {service.address}", flush=True)  # noqa: T201 -- command-line output
     try:
         while True:
             time.sleep(3600)

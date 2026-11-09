@@ -356,10 +356,10 @@ def main(arguments: list[str] | None = None) -> int:
             options.folder, digest, lock, signing.resolve_key(None)
         )
     except (OSError, KeyError, ValueError, errors.ScmleError) as error:
-        print(f"error: {error}", file=sys.stderr)
+        print(f"error: {error}", file=sys.stderr)  # noqa: T201 -- command-line output
         return 1
     signed = document["signature"] is not None
-    print(f"attested {digest} (signed={signed})")
+    print(f"attested {digest} (signed={signed})")  # noqa: T201 -- command-line output
     return 0
 
 

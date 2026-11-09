@@ -93,12 +93,12 @@ def fetch_registry_digest(image: str, timeout: float = 30.0) -> str:
             multi-architecture index.
     """
     registry, repository, tag = split_image(image)
-    token_request = urllib.request.Request(
+    token_request = urllib.request.Request(  # noqa: S310 -- AUTH_ENDPOINT is an https constant
         AUTH_ENDPOINT.format(
             repository=urllib.parse.quote(repository, safe="/")
         )
     )
-    with urllib.request.urlopen(token_request, timeout=timeout) as reply:  # nosec B310
+    with urllib.request.urlopen(token_request, timeout=timeout) as reply:  # noqa: S310 -- the URL is https by construction  # nosec B310
         token = json.loads(reply.read())["token"]
     request = urllib.request.Request(
         f"https://{registry}/v2/{repository}/manifests/{tag}",
@@ -108,7 +108,7 @@ def fetch_registry_digest(image: str, timeout: float = 30.0) -> str:
             "Accept": ", ".join(INDEX_TYPES),
         },
     )
-    with urllib.request.urlopen(request, timeout=timeout) as reply:  # nosec B310
+    with urllib.request.urlopen(request, timeout=timeout) as reply:  # noqa: S310 -- the URL is https by construction  # nosec B310
         kind = reply.headers.get("Content-Type", "").split(";")[0]
         digest = reply.headers.get("Docker-Content-Digest", "")
     if kind not in INDEX_TYPES:
@@ -223,17 +223,18 @@ def main(arguments: list[str] | None = None) -> int:
                 encoding="utf-8",
                 newline="\n",
             )
-            print(f"{options.image} -> {record['digest']}")
+            print(f"{options.image} -> {record['digest']}")  # noqa: T201 -- command-line output
             return 0
         lock = read_lock(options.lock)
         if options.action == "argument":
-            print(build_argument(lock))
+            print(build_argument(lock))  # noqa: T201 -- command-line output
         else:
-            print(f"ok: {lock['image']} pinned to {lock['digest']}")
-        return 0
+            print(f"ok: {lock['image']} pinned to {lock['digest']}")  # noqa: T201 -- command-line output
     except (errors.ScmleError, OSError, KeyError, ValueError) as error:
-        print(f"error: {error}", file=sys.stderr)
+        print(f"error: {error}", file=sys.stderr)  # noqa: T201 -- command-line output
         return 1
+    else:
+        return 0
 
 
 if __name__ == "__main__":

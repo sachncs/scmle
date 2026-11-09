@@ -187,9 +187,9 @@ def main(arguments: list[str] | None = None) -> int:
     options = parser.parse_args(arguments)
     findings = scan(options.folder)
     for finding in findings:
-        print(finding, file=sys.stderr)
+        print(finding, file=sys.stderr)  # noqa: T201 -- command-line output
     if not findings:
-        print(
+        print(  # noqa: T201 -- command-line output
             f"{len(included_files(options.folder))} files in the context; "
             "nothing suspicious found"
         )
