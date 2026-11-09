@@ -53,7 +53,7 @@ def key_checksum(values: pandas.Series) -> str:
 
 def check(
     name: str, extract: Any, source: Any, gap: float, limit: float
-) -> dict:
+) -> dict[str, Any]:
     """Builds the record of one compared quantity.
 
     Args:
@@ -174,7 +174,7 @@ def reconcile(
 
 def source_check(
     name: str, extract: Any, source: Any, tolerance: float
-) -> dict:
+) -> dict[str, Any]:
     """Compares one quantity with the source's own answer.
 
     Counts and checksums are exact (`tolerance` 0); a source total of zero is
@@ -202,7 +202,7 @@ def source_totals(
     totals: ingest.TableTotals,
     source: profile.SqlSource,
     tolerance: float,
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Compares one extracted view with queries of its source table.
 
     The row count and the declared sum columns go through
@@ -287,7 +287,7 @@ def reconcile_source(
     spec: ingest.Expectation,
     factory: Callable[[], Any],
     tolerance: float,
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Queries the source database for each declared view and compares.
 
     Args:
@@ -304,7 +304,7 @@ def reconcile_source(
         ConfigError: If a declared view or column is not in the extract.
     """
     source = profile.SqlSource(factory)
-    checks: list[dict] = []
+    checks: list[dict[str, Any]] = []
     for totals in spec.tables:
         frame = frames.get(totals.view)
         if frame is None:
