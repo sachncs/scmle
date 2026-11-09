@@ -4,6 +4,7 @@ import dataclasses
 
 import pytest
 
+from scmle.contracts import signing
 from scmle.governance import attestation
 
 
@@ -77,3 +78,12 @@ def test_attestation_signature_rejects_tampered_persisted_record():
     loaded = attestation.ReleaseAttestation.from_dict(persisted)
 
     assert not loaded.verify(provenance, sbom, signing_key="release-key")
+
+
+def test_an_empty_bytes_signing_key_is_rejected():
+    with pytest.raises(ValueError, match="empty"):
+        signing.resolve_key(b"")
+    with pytest.raises(ValueError, match="empty"):
+        signing.sign_payload({"a": 1}, b"")
+    assert signing.resolve_key("") is None
+    assert signing.resolve_key(b"k") == b"k"

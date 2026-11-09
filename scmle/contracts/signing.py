@@ -45,8 +45,11 @@ def resolve_key(signing_key: str | bytes | None) -> bytes | None:
 
     Returns:
         The key as bytes (a string is UTF-8 encoded), or None if there is
-        no key or it is the empty string. An empty bytes key is returned
-        as is.
+        no key or it is the empty string.
+
+    Raises:
+        ValueError: If the key is empty bytes; an empty HMAC key would sign
+            with a publicly known secret.
     """
     key = (
         signing_key
@@ -55,7 +58,10 @@ def resolve_key(signing_key: str | bytes | None) -> bytes | None:
     )
     if key is None or key == "":
         return None
-    return key.encode() if isinstance(key, str) else key
+    resolved = key.encode() if isinstance(key, str) else key
+    if not resolved:
+        raise ValueError("signing key must not be empty")
+    return resolved
 
 
 def canonical_payload(payload: Mapping[str, Any]) -> bytes:
@@ -86,8 +92,7 @@ def sign_payload(payload: Mapping[str, Any], key: str | bytes) -> str:
         The hex HMAC-SHA256 of the canonical payload.
 
     Raises:
-        ValueError: If the key is the empty string. An empty bytes key is
-            not rejected.
+        ValueError: If the key is empty, as text or as bytes.
     """
     resolved = resolve_key(key)
     if resolved is None:

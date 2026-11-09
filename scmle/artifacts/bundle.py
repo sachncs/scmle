@@ -176,9 +176,12 @@ def resolve_key(signing_key: str | bytes | None) -> bytes | None:
 
     Returns:
         The key as bytes, or None if neither the argument nor the
-        environment variable gives one or the key is an empty string. An
-        empty `bytes` key is returned unchanged. A key passed explicitly,
-        even an empty string, never falls back to the environment.
+        environment variable gives one or the key is an empty string. A key
+        passed explicitly, even an empty string, never falls back to the
+        environment.
+
+    Raises:
+        ValueError: If the key is empty bytes.
     """
     key = (
         signing_key
@@ -187,7 +190,10 @@ def resolve_key(signing_key: str | bytes | None) -> bytes | None:
     )
     if key is None or key == "":
         return None
-    return key.encode() if isinstance(key, str) else key
+    resolved = key.encode() if isinstance(key, str) else key
+    if not resolved:
+        raise ValueError("signing key must not be empty")
+    return resolved
 
 
 def sign_manifest(manifest_bytes: bytes, key: bytes) -> str:
@@ -902,8 +908,11 @@ class ModelBundle:
                 `verify_signature`.
         """
         root = pathlib.Path(directory)
-        old = resolve_key(current_key)
-        replacement = resolve_key(new_key)
+        try:
+            old = resolve_key(current_key)
+            replacement = resolve_key(new_key)
+        except ValueError:
+            old = replacement = None
         if old is None or replacement is None:
             raise errors.ArtifactError(
                 "signing-key rotation requires non-empty current and new keys"

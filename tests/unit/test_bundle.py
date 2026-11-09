@@ -500,3 +500,9 @@ def test_a_version_mismatch_arrives_with_the_lock_attached(trained, tmp_path):
     lock = caught.value.details["environment_lock"]
     assert lock == bundle.environment_lock()
     assert f"numpy=={np.__version__}" in lock
+
+
+def test_an_empty_bytes_key_is_rejected_when_resolved():
+    with pytest.raises(ValueError, match="empty"):
+        bundle_module.resolve_key(b"")
+    assert bundle_module.resolve_key("") is None
