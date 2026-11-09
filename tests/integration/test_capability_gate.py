@@ -1,6 +1,7 @@
 """Pre-training capability boundary tests."""
 
 import dataclasses
+import importlib.util
 
 import numpy
 import pandas
@@ -121,12 +122,12 @@ def test_ft_transformer_uses_an_experimental_tabular_boundary():
     }
 
 
+@pytest.mark.skipif(
+    importlib.util.find_spec("torch") is None,
+    reason="the optional deeplearning extra is not installed",
+)
 def test_experimental_transformer_requires_explicit_model_opt_in():
     """An experimental FT-Transformer can be selected only by declaration."""
-    pytest.importorskip(
-        "torch",
-        reason="the optional deeplearning extra is not installed",
-    )
     adapter = networks.FT_TRANSFORMER
     registry = scmle.models.registry.Catalog((classical.Dummy(), adapter))
     default_context = make_context(model_registry=registry)
