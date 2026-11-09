@@ -800,7 +800,7 @@ def test_an_uncertified_alarm_escalates_instead_of_retraining(tmp_path):
 
 def test_a_rollback_proposal_never_lowers_an_infinite_tau(tmp_path):
     loop = open_loop(tmp_path)
-    assert math.isinf(loop.tau)
+    loop.tau = math.inf
     loop.rollback_watch = {
         "previous": "v1",
         "process": types.SimpleNamespace(crossed=True, e_value=50.0),

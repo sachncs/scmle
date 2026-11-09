@@ -1380,8 +1380,9 @@ class Loop:
     def decide_rollback(self) -> Escalation | None:
         """Turns a crossed reverse process into a rollback proposal.
 
-        If the watch has crossed, commits the proposal, raises a finite `tau` by
-        ``tighten_step`` (capped at 1; an infinite `tau` is kept) and ends the watch.
+        If the watch has crossed, commits the proposal, raises a finite
+        `tau` by ``tighten_step`` (capped at 1; an infinite `tau` is kept) and
+        ends the watch.
 
         Returns:
             The escalation opened for a second consecutive rollback proposal,
