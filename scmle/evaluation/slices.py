@@ -17,6 +17,7 @@ MAX_FEATURES = 4
 MAX_LEVELS = 12
 BANDS = 4
 MIN_SUPPORT = 30
+MIN_TARGET_LEVELS = 2
 WORST = 5
 RANKING_METRICS = frozenset({"roc_auc", "roc_auc_ovr", "pr_auc"})
 
@@ -130,7 +131,10 @@ class Slices(diagnostics.Diagnostic):
         if rows.sum() < MIN_SUPPORT:
             return None
         target = inputs.target[rows]
-        if inputs.task.is_classification and target.nunique() < 2:
+        if (
+            inputs.task.is_classification
+            and target.nunique() < MIN_TARGET_LEVELS
+        ):
             return None
         try:
             return float(

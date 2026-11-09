@@ -20,6 +20,7 @@ import scmle.contracts.metrics
 from scmle.evaluation import balance
 
 TOP_SHARE = 0.3
+MIN_CURVE_ROWS = 2
 PROPENSITY_AUC_LIMIT = 0.6
 MIN_ARM_SHARE = 0.05
 ASSUMPTION = (
@@ -75,7 +76,7 @@ def qini_coefficient(
         The coefficient, or NaN with fewer than two rows.
     """
     rows, curve = qini_curve(outcome, treatment, score)
-    if len(rows) < 2:
+    if len(rows) < MIN_CURVE_ROWS:
         return float("nan")
     line = rows / rows[-1] * curve[-1]
     return float(numpy.trapezoid(curve - line, rows) / (rows[-1] ** 2))
@@ -187,12 +188,14 @@ def check_propensity(
         return Propensity(
             share,
             float("nan"),
-            False,
-            f"only {min(share, 1 - share):.1%} of rows are in one arm",
+            randomized=False,
+            note=f"only {min(share, 1 - share):.1%} of rows are in one arm",
         )
     numeric = features.select_dtypes("number").fillna(0.0).to_numpy(dtype=float)
     if numeric.shape[1] == 0:
-        return Propensity(share, 0.5, True, "no numeric covariates to check")
+        return Propensity(
+            share, 0.5, randomized=True, note="no numeric covariates to check"
+        )
     scores = model_selection.cross_val_predict(
         linear_model.LogisticRegression(max_iter=500),
         (numeric - numeric.mean(0))
@@ -241,7 +244,7 @@ class UpliftMetric(scmle.contracts.metrics.Metric):
         """
         return False
 
-    def scorer(self, positive: Any = None) -> Any:
+    def scorer(self, positive: Any = None) -> Any:  # noqa: ARG002 -- metric scorer interface
         """Builds a scorer called as `(estimator, features, outcome)`.
 
         Args:
@@ -259,7 +262,7 @@ class UpliftMetric(scmle.contracts.metrics.Metric):
             estimator: Any,
             features: pandas.DataFrame,
             target: pandas.Series,
-            sample_weight: Any = None,
+            sample_weight: Any = None,  # noqa: ARG001 -- scorer protocol passes sample_weight
         ) -> float:
             arm = features[estimator.treatment_column].to_numpy(dtype=int)
             predicted = numpy.asarray(estimator.predict(features), dtype=float)

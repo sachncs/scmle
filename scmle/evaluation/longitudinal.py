@@ -27,6 +27,9 @@ from scipy import stats
 
 from scmle import durability
 
+PROPENSITY_CLIP_CEILING = 0.5
+SHA256_HEX_LENGTH = 64
+MATRIX_NDIM = 2
 REQUIRED_ASSUMPTIONS = frozenset(
     {
         "consistency",
@@ -154,7 +157,7 @@ class Config:
             raise ValueError(
                 "confidence_level must lie strictly between 0 and 1"
             )
-        if not 0.0 < self.propensity_clip < 0.5:
+        if not 0.0 < self.propensity_clip < PROPENSITY_CLIP_CEILING:
             raise ValueError(
                 "propensity_clip must lie strictly between 0 and 0.5"
             )
@@ -166,6 +169,17 @@ class Config:
             or self.seed < 0
         ):
             raise ValueError("seed must be a non-negative integer")
+        self.check_limits()
+
+    def check_limits(self) -> None:
+        """Checks the tolerances, iteration limit and row minimums.
+
+        Raises:
+            ValueError: If a tolerance is not positive and finite, a count is
+                not a positive integer, the effective sample size minimum is
+                not positive, or `minimum_rows_per_period` is below twice
+                `minimum_rows_per_arm`.
+        """
         for name, value in (
             ("tolerance", self.tolerance),
             ("reference_tolerance", self.reference_tolerance),
@@ -262,6 +276,22 @@ class PeriodATE:
             raise ValueError("period iterations must be positive")
         if not self.converged:
             raise ValueError("a period result must be converged")
+        self.check_finite()
+        if self.standard_error < 0.0:
+            raise ValueError("standard_error must not be negative")
+        if self.interval[0] > self.interval[1]:
+            raise ValueError("period interval must be ordered")
+        if not 0.0 <= self.fraction_clipped <= 1.0:
+            raise ValueError("fraction_clipped must lie between 0 and 1")
+        if self.propensity_min < 0.0 or self.propensity_max > 1.0:
+            raise ValueError("propensities must lie between 0 and 1")
+
+    def check_finite(self) -> None:
+        """Checks that every numeric field of the period is finite.
+
+        Raises:
+            ValueError: If a numeric field is not finite.
+        """
         for name, value in (
             ("estimate", self.estimate),
             ("standard_error", self.standard_error),
@@ -281,14 +311,6 @@ class PeriodATE:
         ):
             if not math.isfinite(float(value)):
                 raise ValueError(f"{name} must be finite")
-        if self.standard_error < 0.0:
-            raise ValueError("standard_error must not be negative")
-        if self.interval[0] > self.interval[1]:
-            raise ValueError("period interval must be ordered")
-        if not 0.0 <= self.fraction_clipped <= 1.0:
-            raise ValueError("fraction_clipped must lie between 0 and 1")
-        if self.propensity_min < 0.0 or self.propensity_max > 1.0:
-            raise ValueError("propensities must lie between 0 and 1")
 
     def to_dict(self) -> dict[str, Any]:
         """Returns JSON-compatible period evidence.
@@ -297,6 +319,23 @@ class PeriodATE:
             The period fields keyed by field name.
         """
         return dataclasses.asdict(self)
+
+
+def created_temporary(temporary: Path | None) -> Path:
+    """Returns the temporary report file, which must have been created.
+
+    Args:
+        temporary: The path of the temporary file, or None if none was made.
+
+    Returns:
+        `temporary`.
+
+    Raises:
+        RuntimeError: If no temporary file was created.
+    """
+    if temporary is None:
+        raise RuntimeError("temporary report was not created")
+    return temporary
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -349,6 +388,34 @@ class Estimation:
         labels = tuple(item.period for item in self.periods)
         if len(set(labels)) != len(labels):
             raise ValueError("period labels must be unique")
+        self.check_covariance()
+        self.check_row_accounting()
+        for name, item_value in (
+            ("diagnostics", self.diagnostics),
+            ("limitations", self.limitations),
+            ("reference", self.reference),
+        ):
+            if not isinstance(item_value, Mapping):
+                raise TypeError(f"{name} must be a mapping")
+        if (
+            not isinstance(self.raw_input_fingerprint, str)
+            or len(self.raw_input_fingerprint) != SHA256_HEX_LENGTH
+            or any(
+                character not in "0123456789abcdef"
+                for character in self.raw_input_fingerprint
+            )
+        ):
+            raise ValueError(
+                "raw_input_fingerprint must be a lowercase SHA-256 digest"
+            )
+
+    def check_covariance(self) -> None:
+        """Checks that the covariance is square, finite and symmetric.
+
+        Raises:
+            ValueError: If the covariance is not square over the periods,
+                has a non-finite value, or is not symmetric.
+        """
         expected = len(self.periods)
         if len(self.covariance) != expected or any(
             len(row) != expected for row in self.covariance
@@ -359,6 +426,14 @@ class Estimation:
             raise ValueError("covariance must contain finite values")
         if not numpy.allclose(covariance, covariance.T, rtol=1e-10, atol=1e-12):
             raise ValueError("covariance must be symmetric")
+
+    def check_row_accounting(self) -> None:
+        """Checks the row counts and that used plus dropped rows add up.
+
+        Raises:
+            ValueError: If a row count is not a non-negative integer, or the
+                used and dropped rows do not sum to the input rows.
+        """
         for name, value in (
             ("rows_input", self.rows_input),
             ("rows_used", self.rows_used),
@@ -372,24 +447,6 @@ class Estimation:
                 raise ValueError(f"{name} must be a non-negative integer")
         if self.rows_used + self.rows_dropped != self.rows_input:
             raise ValueError("row accounting must reconcile to rows_input")
-        for name, item_value in (
-            ("diagnostics", self.diagnostics),
-            ("limitations", self.limitations),
-            ("reference", self.reference),
-        ):
-            if not isinstance(item_value, Mapping):
-                raise TypeError(f"{name} must be a mapping")
-        if (
-            not isinstance(self.raw_input_fingerprint, str)
-            or len(self.raw_input_fingerprint) != 64
-            or any(
-                character not in "0123456789abcdef"
-                for character in self.raw_input_fingerprint
-            )
-        ):
-            raise ValueError(
-                "raw_input_fingerprint must be a lowercase SHA-256 digest"
-            )
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON-compatible longitudinal report.
@@ -465,9 +522,7 @@ class Estimation:
                 handle.write("\n")
                 handle.flush()
                 os.fsync(handle.fileno())
-            if temporary is None:
-                raise RuntimeError("temporary report was not created")
-            os.replace(temporary, destination)
+            created_temporary(temporary).replace(destination)
             durability.sync_directory(destination.parent)
         except BaseException:
             if temporary is not None:
@@ -830,6 +885,90 @@ class Estimator:
         }
 
 
+def check_declared_columns(
+    frame: pandas.DataFrame, estimand: Estimand
+) -> list[str]:
+    """Lists the declared columns and requires all of them in the frame.
+
+    Args:
+        frame: Long-format panel.
+        estimand: Declares the columns that must be present.
+
+    Returns:
+        The declared column names: subject, time, treatment, outcome and
+        covariates.
+
+    Raises:
+        ValueError: If a declared column is missing from the frame.
+    """
+    required = [
+        estimand.subject_identity,
+        estimand.time_column,
+        estimand.treatment_column,
+        estimand.outcome,
+        *estimand.covariates,
+    ]
+    missing_columns = [name for name in required if name not in frame.columns]
+    if missing_columns:
+        raise ValueError(
+            f"longitudinal frame is missing columns: {missing_columns}"
+        )
+    return required
+
+
+def check_subject_and_time(frame: pandas.DataFrame, estimand: Estimand) -> None:
+    """Checks the subject identities and time values of the panel.
+
+    Args:
+        frame: Long-format panel.
+        estimand: Names the subject and time columns.
+
+    Raises:
+        ValueError: If subject identities or time values are missing or
+            non-finite, subject-time pairs repeat, or the time values are not
+            strictly increasing within a subject.
+    """
+    if frame[estimand.subject_identity].isna().any():
+        raise ValueError("missing subject identities are not allowed")
+    subject_labels = frame[estimand.subject_identity].astype("string")
+    if subject_labels.fillna("").str.strip().eq("").any():
+        raise ValueError("missing subject identities are not allowed")
+    if frame[estimand.time_column].isna().any():
+        raise ValueError("missing time values are not allowed")
+    for name in (estimand.subject_identity, estimand.time_column):
+        if pandas.api.types.is_numeric_dtype(frame[name]):
+            values = frame[name].to_numpy(dtype=float)
+            if not numpy.isfinite(values).all():
+                raise ValueError(f"column {name!r} contains non-finite values")
+    if frame.duplicated(
+        [estimand.subject_identity, estimand.time_column]
+    ).any():
+        raise ValueError("duplicate subject-time rows are not allowed")
+    validate_time_order(frame, estimand)
+
+
+def convert_numeric_columns(
+    prepared: pandas.DataFrame, value_columns: list[str]
+) -> None:
+    """Converts the value columns to numbers in place and checks them.
+
+    Args:
+        prepared: The prepared frame, changed in place.
+        value_columns: Treatment, outcome and covariate columns.
+
+    Raises:
+        ValueError: If a column is non-numeric or holds non-finite values.
+    """
+    for name in value_columns:
+        try:
+            prepared[name] = pandas.to_numeric(prepared[name], errors="raise")
+        except (TypeError, ValueError) as error:
+            raise ValueError(f"column {name!r} must be numeric") from error
+        values = prepared[name].to_numpy(dtype=float)
+        if not numpy.isfinite(values).all():
+            raise ValueError(f"column {name!r} contains non-finite values")
+
+
 def prepare_longitudinal_frame(
     frame: pandas.DataFrame,
     estimand: Estimand,
@@ -861,35 +1000,8 @@ def prepare_longitudinal_frame(
         raise TypeError("frame must be a pandas DataFrame")
     if frame.empty:
         raise ValueError("longitudinal frame must not be empty")
-    required = [
-        estimand.subject_identity,
-        estimand.time_column,
-        estimand.treatment_column,
-        estimand.outcome,
-        *estimand.covariates,
-    ]
-    missing_columns = [name for name in required if name not in frame.columns]
-    if missing_columns:
-        raise ValueError(
-            f"longitudinal frame is missing columns: {missing_columns}"
-        )
-    if frame[estimand.subject_identity].isna().any():
-        raise ValueError("missing subject identities are not allowed")
-    subject_labels = frame[estimand.subject_identity].astype("string")
-    if subject_labels.fillna("").str.strip().eq("").any():
-        raise ValueError("missing subject identities are not allowed")
-    if frame[estimand.time_column].isna().any():
-        raise ValueError("missing time values are not allowed")
-    for name in (estimand.subject_identity, estimand.time_column):
-        if pandas.api.types.is_numeric_dtype(frame[name]):
-            values = frame[name].to_numpy(dtype=float)
-            if not numpy.isfinite(values).all():
-                raise ValueError(f"column {name!r} contains non-finite values")
-    if frame.duplicated(
-        [estimand.subject_identity, estimand.time_column]
-    ).any():
-        raise ValueError("duplicate subject-time rows are not allowed")
-    validate_time_order(frame, estimand)
+    required = check_declared_columns(frame, estimand)
+    check_subject_and_time(frame, estimand)
     prepared = frame[required].copy()
     value_columns = [
         estimand.treatment_column,
@@ -902,14 +1014,7 @@ def prepare_longitudinal_frame(
     rows_dropped = int(missing_mask.sum())
     if rows_dropped:
         prepared = prepared.loc[~missing_mask].copy()
-    for name in value_columns:
-        try:
-            prepared[name] = pandas.to_numeric(prepared[name], errors="raise")
-        except (TypeError, ValueError) as error:
-            raise ValueError(f"column {name!r} must be numeric") from error
-        values = prepared[name].to_numpy(dtype=float)
-        if not numpy.isfinite(values).all():
-            raise ValueError(f"column {name!r} contains non-finite values")
+    convert_numeric_columns(prepared, value_columns)
     treatment_values = set(
         prepared[estimand.treatment_column].unique().tolist()
     )
@@ -921,6 +1026,22 @@ def prepare_longitudinal_frame(
         raise ValueError("longitudinal frame has insufficient rows")
     validate_baseline_covariates(prepared, estimand)
     return prepared, rows_dropped
+
+
+def require_strictly_increasing(times: pandas.Series) -> None:
+    """Requires one subject's time values to be strictly increasing.
+
+    Args:
+        times: The subject's time values in row order.
+
+    Raises:
+        ValueError: If the values decrease or repeat.
+    """
+    if not times.is_monotonic_increasing:
+        raise ValueError("time values must be strictly increasing per subject")
+    values = times.tolist()
+    if any(left == right for left, right in itertools.pairwise(values)):
+        raise ValueError("time values must be strictly increasing per subject")
 
 
 def validate_time_order(frame: pandas.DataFrame, estimand: Estimand) -> None:
@@ -943,16 +1064,7 @@ def validate_time_order(frame: pandas.DataFrame, estimand: Estimand) -> None:
         for subject_group in frame.groupby(
             subject_name, sort=False, dropna=False
         ):
-            group = subject_group[1]
-            if not group[time_name].is_monotonic_increasing:
-                raise ValueError(
-                    "time values must be strictly increasing per subject"
-                )
-            values = group[time_name].tolist()
-            if any(left == right for left, right in itertools.pairwise(values)):
-                raise ValueError(
-                    "time values must be strictly increasing per subject"
-                )
+            require_strictly_increasing(subject_group[1][time_name])
     except (TypeError, ValueError) as error:
         if "strictly increasing" in str(error):
             raise
@@ -976,7 +1088,7 @@ def validate_baseline_covariates(
         return
     grouped = frame.groupby(estimand.subject_identity, sort=False, dropna=False)
     for name in estimand.covariates:
-        if (grouped[name].nunique(dropna=False) > 1).any():
+        if (grouped[name].nunique(dropna=False) > 1).any():  # noqa: PD101 -- per-subject distinct counts; Series.is_unique does not apply
             raise ValueError(
                 f"covariate {name!r} varies within a subject despite the "
                 "no_time_varying_covariates assumption"
@@ -1008,7 +1120,7 @@ def fit_logistic_propensity(
             singular, a step is not finite, or the fit does not converge
             within `policy.max_iterations`.
     """
-    if covariates.ndim != 2:
+    if covariates.ndim != MATRIX_NDIM:
         raise ValueError("covariates must be a two-dimensional matrix")
     design = numpy.column_stack((numpy.ones(len(treatment)), covariates))
     coefficients = numpy.zeros(design.shape[1], dtype=float)

@@ -17,6 +17,8 @@ from scmle.contracts import tasks
 from scmle.evaluation import diagnostics
 
 MIN_GROUP_ROWS = 30
+MIN_COLUMNS = 2
+MIN_GROUPS = 2
 NUMERIC_BANDS = 4
 MAX_LEVELS = 12
 PARITY_TOLERANCE = 0.10
@@ -111,7 +113,7 @@ class Fairness(diagnostics.Diagnostic):
             ` | `, missing where any column is missing; None with fewer than
             two columns.
         """
-        if len(columns) < 2:
+        if len(columns) < MIN_COLUMNS:
             return None
         grouped = [self.groups(features[column]) for column in columns]
         frame = pandas.concat(grouped, axis=1)
@@ -213,7 +215,7 @@ class Fairness(diagnostics.Diagnostic):
             "excluded_groups": excluded,
             "power_warning": bool(excluded),
         }
-        if len(stats) < 2:
+        if len(stats) < MIN_GROUPS:
             return {
                 "groups": stats,
                 "flags": [],
@@ -292,7 +294,7 @@ class Fairness(diagnostics.Diagnostic):
                 "bias": float(error[rows].mean()),
                 "rmse": float(numpy.sqrt(numpy.mean(error[rows] ** 2))),
             }
-        if len(stats) < 2:
+        if len(stats) < MIN_GROUPS:
             return {
                 "groups": stats,
                 "flags": [],

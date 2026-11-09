@@ -393,10 +393,14 @@ class ErrorAnalysis(Diagnostic):
                 "rows": rows,
                 "ranked_by": "misclassification_then_low_confidence",
                 "limitations": [
-                    "Rows are identified by their evaluation index only; raw "
-                    "feature values are not copied into the report.",
-                    "Confidence is model probability, not correctness "
-                    "certainty or causality.",
+                    (
+                        "Rows are identified by their evaluation index only; "
+                        "raw feature values are not copied into the report."
+                    ),
+                    (
+                        "Confidence is model probability, not correctness "
+                        "certainty or causality."
+                    ),
                 ],
             }
         actual = inputs.target.to_numpy(dtype=float)
@@ -423,10 +427,14 @@ class ErrorAnalysis(Diagnostic):
             ],
             "ranked_by": "absolute_error",
             "limitations": [
-                "Rows are identified by their evaluation index only; raw "
-                "feature values are not copied into the report.",
-                "Residuals diagnose model behaviour and do not establish "
-                "causal failure reasons.",
+                (
+                    "Rows are identified by their evaluation index only; raw "
+                    "feature values are not copied into the report."
+                ),
+                (
+                    "Residuals diagnose model behaviour and do not establish "
+                    "causal failure reasons."
+                ),
             ],
         }
 
@@ -684,7 +692,7 @@ def run_suite(
             )
         try:
             reports[diagnostic.name] = diagnostic.compute(limited)
-        except Exception as error:  # Isolation: diagnostics are advisory.
+        except Exception as error:  # noqa: BLE001 -- isolation: diagnostics are advisory
             reports[diagnostic.name] = {
                 "error": f"{type(error).__name__}: {error}"
             }

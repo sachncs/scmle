@@ -8,7 +8,7 @@ import pandas
 
 from scmle.evaluation import diagnostics
 
-UNSEEN_TOKEN = "__unseen_category__"  # nosec B105 - a data value, not a password
+UNSEEN_TOKEN = "__unseen_category__"  # nosec B105  # noqa: S105 -- a data value, not a password
 FRAGILE_DROP = 0.10
 
 

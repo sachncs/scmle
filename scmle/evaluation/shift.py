@@ -18,6 +18,8 @@ from scmle.evaluation import diagnostics
 from scmle.evaluation import shift_weights
 
 FOLDS = 5
+MIN_PRESENT_ROWS = 2
+BINARY_CLASSES = 2
 MAX_ROWS = 4000
 MODERATE_AUC = 0.60
 STRONG_AUC = 0.75
@@ -229,7 +231,10 @@ class AdversarialValidation(diagnostics.Diagnostic):
             )
             labels = numpy.r_[numpy.zeros(len(old)), numpy.ones(len(new))]
             present = values.notna().to_numpy()
-            if present.sum() < 2 or len(set(labels[present])) < 2:
+            if (
+                present.sum() < MIN_PRESENT_ROWS
+                or len(set(labels[present])) < BINARY_CLASSES
+            ):
                 continue
             auc = metrics.roc_auc_score(
                 labels[present], values.to_numpy()[present]

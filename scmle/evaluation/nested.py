@@ -134,7 +134,7 @@ def nested_score(
     Returns:
         The result, or None when time ran out or no fold had enough rows.
     """
-    rng = random.Random(seed)  # nosec B311 - seeded, not security
+    rng = random.Random(seed)  # nosec B311  # noqa: S311 -- seeded, not security
     outer, inner = [], []
     for train, test in outer_folds:
         if should_stop():

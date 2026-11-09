@@ -16,6 +16,7 @@ from scmle.contracts import metrics
 from scmle.models.survival import estimators
 
 GRID_POINTS = 10
+MIN_TIMES = 2
 LOWEST_QUANTILE = 0.1
 HIGHEST_QUANTILE = 0.9
 MIN_CENSORING_PROBABILITY = 0.05
@@ -131,7 +132,7 @@ def integrated_brier(
         score when there is one time.
     """
     scores = brier_scores(duration, event, survival, times)
-    if len(times) < 2:
+    if len(times) < MIN_TIMES:
         return float(scores[0])
     area = numpy.sum((scores[1:] + scores[:-1]) / 2 * numpy.diff(times))
     return float(area / (times[-1] - times[0]))
@@ -203,7 +204,7 @@ class SurvivalMetric(metrics.Metric):
         """
         return False
 
-    def scorer(self, positive: Any = None) -> Any:
+    def scorer(self, positive: Any = None) -> Any:  # noqa: ARG002 -- metric scorer interface
         """Builds a scorer called as `(estimator, features, durations)`.
 
         Args:
@@ -222,7 +223,7 @@ class SurvivalMetric(metrics.Metric):
             estimator: Any,
             features: pandas.DataFrame,
             target: pandas.Series,
-            sample_weight: Any = None,
+            sample_weight: Any = None,  # noqa: ARG001 -- scorer protocol passes sample_weight
         ) -> float:
             duration = numpy.asarray(target, dtype=float)
             event = features[estimator.event_column].to_numpy(dtype=float)

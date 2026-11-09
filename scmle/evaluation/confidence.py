@@ -15,6 +15,7 @@ import numpy
 from scipy import stats
 
 LEVEL = 0.95
+MIN_FOLDS = 2
 
 
 def cv_interval(
@@ -42,7 +43,7 @@ def cv_interval(
     """
     scores = numpy.asarray(fold_scores, dtype=float)
     folds = len(scores)
-    if folds < 2:
+    if folds < MIN_FOLDS:
         return {"available": False, "reason": "needs at least two folds"}
     mean = float(scores.mean())
     variance = float(scores.var(ddof=1))
