@@ -39,7 +39,16 @@ class AudioDependencyError(errors.DataError):
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class AudioMetadata:
-    """Decoded metadata required to identify an audio sample."""
+    """Decoded metadata required to identify an audio sample.
+
+    Attributes:
+        format: Non-empty container or codec name, such as ``wav``.
+        sample_rate: Frames per second; positive.
+        channels: Number of channels; positive.
+        frame_count: Number of frames; positive.
+        sample_width: Bytes per sample, or None when unknown; positive when
+            given.
+    """
 
     format: str
     sample_rate: int
@@ -48,7 +57,12 @@ class AudioMetadata:
     sample_width: int | None = None
 
     def __post_init__(self) -> None:
-        """Validate metadata before it enters a dataset contract."""
+        """Validate metadata before it enters a dataset contract.
+
+        Raises:
+            ValueError: If format is blank, or sample_rate, channels,
+                frame_count or a given sample_width is below one.
+        """
         if not self.format.strip():
             raise ValueError("format must not be empty")
         if self.sample_rate < 1:
@@ -62,13 +76,20 @@ class AudioMetadata:
 
     @property
     def duration_seconds(self) -> float:
-        """Return the decoded duration without rounding away short clips."""
+        """The decoded duration in seconds, never rounded to whole seconds."""
         return self.frame_count / self.sample_rate
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class AudioTranscriptSegment:
-    """One time-local transcript segment with provenance and confidence."""
+    """One time-local transcript segment with provenance and confidence.
+
+    Attributes:
+        start_seconds: Start offset in seconds; finite and non-negative.
+        end_seconds: End offset in seconds; finite and after the start.
+        text: Non-blank transcribed text.
+        confidence: Optional confidence in [0, 1].
+    """
 
     start_seconds: float
     end_seconds: float
@@ -76,7 +97,13 @@ class AudioTranscriptSegment:
     confidence: float | None = None
 
     def __post_init__(self) -> None:
-        """Validate time bounds, text, and optional confidence."""
+        """Validate time bounds, text, and optional confidence.
+
+        Raises:
+            ValueError: If the bounds are not finite, start is negative or
+                end is not after start, the text is blank, or the confidence
+                is a bool, not finite or outside [0, 1].
+        """
         if (
             not math.isfinite(self.start_seconds)
             or not math.isfinite(self.end_seconds)
@@ -96,7 +123,17 @@ class AudioTranscriptSegment:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class AudioTranscript:
-    """Immutable transcript output tied to its extraction provenance."""
+    """Immutable transcript output tied to its extraction provenance.
+
+    Attributes:
+        text: Non-blank full transcript text.
+        source: Non-blank identifier of the transcribed audio.
+        provider: Non-blank name of the transcription provider.
+        provider_version: Non-blank version of the provider.
+        language: Non-blank language of the transcript.
+        segments: Time-local segments, ordered by start time.
+        confidence: Optional overall confidence in [0, 1].
+    """
 
     text: str
     source: str
@@ -107,7 +144,15 @@ class AudioTranscript:
     confidence: float | None = None
 
     def __post_init__(self) -> None:
-        """Validate provenance, ordering, and optional confidence."""
+        """Validate provenance, ordering, and optional confidence.
+
+        Raises:
+            ValueError: If a text field is blank, the confidence is a bool,
+                not finite or outside [0, 1], or the segments are not
+                ordered by start time.
+            TypeError: If segments is not a tuple of
+                AudioTranscriptSegment.
+        """
         for field_name, value in (
             ("text", self.text),
             ("source", self.source),
@@ -141,13 +186,29 @@ class AudioTranscript:
             )
 
     def to_dict(self) -> dict[str, object]:
-        """Return JSON-native transcript provenance."""
+        """Return JSON-native transcript provenance.
+
+        Returns:
+            A dict of the fields, with segments as nested dicts.
+        """
         return dataclasses.asdict(self)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class AudioProfile:
-    """Bounded data-understanding summary for one audio sample."""
+    """Bounded data-understanding summary for one audio sample.
+
+    Attributes:
+        source: Source identifier of the sample.
+        format: Container or codec name.
+        sample_rate: Frames per second.
+        channels: Number of channels.
+        frame_count: Number of frames.
+        duration_seconds: Duration in seconds.
+        byte_size: Size of the encoded payload in bytes.
+        transcript_present: Whether a transcript is attached.
+        transcript_segment_count: Number of transcript segments.
+    """
 
     source: str
     format: str
@@ -162,7 +223,16 @@ class AudioProfile:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class AudioFeatures:
-    """Bounded numeric signal features with their observation boundary."""
+    """Bounded numeric signal features with their observation boundary.
+
+    Attributes:
+        sources: Source identifier of each row.
+        feature_names: Name of each column.
+        values: One tuple of feature values per source.
+        frames_observed: Number of frames each row was computed from.
+        frames_truncated: Whether each row saw fewer frames than the clip
+            holds.
+    """
 
     sources: tuple[str, ...]
     feature_names: tuple[str, ...]
@@ -172,24 +242,40 @@ class AudioFeatures:
 
     @property
     def shape(self) -> tuple[int, int]:
-        """Return the number of samples and features."""
+        """The number of samples and the number of features, as a pair."""
         return (len(self.sources), len(self.feature_names))
 
     def to_numpy(self) -> np.ndarray:
-        """Return a writable copy of the feature matrix."""
+        """Return a writable copy of the feature matrix.
+
+        Returns:
+            A float64 array of shape ``(samples, features)``.
+        """
         return np.asarray(self.values, dtype=np.float64).copy()
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class AudioSplit:
-    """Group-aware audio split that keeps related clips together."""
+    """Group-aware audio split that keeps related clips together.
+
+    Attributes:
+        train: Samples assigned to training.
+        validation: Samples assigned to validation.
+        test: Samples assigned to testing.
+    """
 
     train: tuple["AudioSample", ...]
     validation: tuple["AudioSample", ...]
     test: tuple["AudioSample", ...]
 
     def group_ids(self) -> dict[str, tuple[str, ...]]:
-        """Return the stable groups assigned to each partition."""
+        """Return the stable groups assigned to each partition.
+
+        Returns:
+            A dict from partition name (`train`, `validation`, `test`) to
+            the sorted distinct group ids; a sample without a group id uses
+            its source.
+        """
         return {
             name: tuple(
                 sorted({sample.group_id or sample.source for sample in samples})
@@ -206,7 +292,15 @@ AudioProbe = Callable[[bytes], AudioMetadata]
 
 
 def canonical_source(source: str | pathlib.Path) -> str:
-    """Return a stable source identifier for a path or URI-like value."""
+    """Return a stable source identifier for a path or URI-like value.
+
+    Args:
+        source: A filesystem path, a value containing ``://``, or empty.
+
+    Returns:
+        ``memory://`` for an empty value, the stripped value itself when it
+        contains ``://``, otherwise the absolute resolved path as a file URI.
+    """
     value = str(source).strip()
     if not value:
         return "memory://"
@@ -216,7 +310,18 @@ def canonical_source(source: str | pathlib.Path) -> str:
 
 
 def wav_metadata(encoded_bytes: bytes) -> AudioMetadata:
-    """Read WAV metadata using the standard library."""
+    """Read WAV metadata using the standard library.
+
+    Args:
+        encoded_bytes: A complete WAV file.
+
+    Returns:
+        The format (``wav``), sample rate, channel count, frame count and
+        sample width in bytes.
+
+    Raises:
+        AudioValidationError: If the payload is not a readable WAV file.
+    """
     try:
         with wave.open(io.BytesIO(encoded_bytes), "rb") as opened:
             return AudioMetadata(
@@ -243,6 +348,26 @@ def wav_signal_features(
     The returned statistics describe the bounded window beginning at
     'start_frame'. Callers receive the observed frame count so a truncated
     boundary cannot be mistaken for a full-clip measurement.
+
+    Args:
+        encoded_bytes: A complete WAV file.
+        max_frames: Largest number of frames to read; at least one.
+        start_frame: Index of the first frame to read; not negative.
+
+    Returns:
+        A pair. The first item holds nine statistics of the window, with
+        samples scaled to [-1, 1]: mean, mean absolute value, RMS, peak
+        absolute value, share of samples at or above 0.999 in magnitude,
+        share at or below 0.01, window duration in seconds, frame count
+        and PCM scale. The second item is the number of frames read.
+
+    Raises:
+        ValueError: If ``max_frames`` is below one or ``start_frame`` is
+            negative.
+        AudioValidationError: If the payload is not a readable WAV file,
+            ``start_frame`` is at or beyond the last frame, the window has
+            no complete frame, the sample width is not 1, 2, 3 or 4 bytes,
+            or a statistic is not finite.
     """
     if max_frames < 1:
         raise ValueError("max_frames must be at least one")
@@ -340,6 +465,20 @@ def wav_pcm_values(
     Values are normalized to ``[-1, 1]`` and shaped as frames by channels.
     This is a bounded dependency-light primitive for caller-owned perturbation
     probes; it is not a general-purpose audio decoder.
+
+    Args:
+        encoded_bytes: A complete WAV file.
+
+    Returns:
+        A pair. The first item is the writer parameters as channels, sample
+        width in bytes, frame rate, frame count, compression type and
+        compression name. The second is a float64 array of shape
+        ``(frames, channels)`` with values in [-1, 1].
+
+    Raises:
+        AudioValidationError: If the payload is not a readable WAV file,
+            holds no complete frame, has an unsupported sample width, or
+            decodes to non-finite values.
     """
     try:
         with wave.open(io.BytesIO(encoded_bytes), "rb") as opened:
@@ -400,7 +539,24 @@ def wav_pcm_values(
 def wav_payload_from_pcm(
     parameters: tuple[int, int, int, int, str, str], values: np.ndarray
 ) -> bytes:
-    """Encode normalized PCM values with the supplied WAV parameters."""
+    """Encode normalized PCM values with the supplied WAV parameters.
+
+    Values are clipped to [-1, 1] and rounded to the sample width given in
+    ``parameters``.
+
+    Args:
+        parameters: Writer parameters in the layout `wav_pcm_values`
+            returns: channels, sample width in bytes, frame rate, frame
+            count, compression type and compression name.
+        values: Frame-by-channel matrix of normalized values.
+
+    Returns:
+        The bytes of a WAV file holding the values.
+
+    Raises:
+        ValueError: If ``values`` is not a finite two-dimensional matrix.
+        AudioValidationError: If the sample width is not 1, 2, 3 or 4.
+    """
     matrix = np.asarray(values, dtype=np.float64)
     if matrix.ndim != 2 or not np.isfinite(matrix).all():
         raise ValueError("PCM values must be a finite frame-by-channel matrix")
@@ -436,7 +592,18 @@ def wav_payload_from_pcm(
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class AudioSample:
-    """Immutable encoded audio plus the metadata observed at ingestion."""
+    """Immutable encoded audio plus the metadata observed at ingestion.
+
+    Attributes:
+        source: Non-blank source label or URI.
+        encoded_bytes: The non-empty encoded payload.
+        file_hash: SHA-256 hex digest of the payload.
+        metadata: Metadata observed at ingestion.
+        label: Optional task label.
+        group_id: Optional identity used to keep related clips in one split.
+        transcript: Optional transcript; no segment may end after the audio.
+        byte_size: Length of the payload; set on construction.
+    """
 
     source: str
     encoded_bytes: bytes = dataclasses.field(repr=False)
@@ -448,7 +615,14 @@ class AudioSample:
     byte_size: int = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
-        """Validate bytes, source identity, and hash integrity."""
+        """Validate bytes, source identity, and hash integrity.
+
+        Raises:
+            ValueError: If source or group_id is blank, or file_hash is not
+                a lowercase SHA-256 hex digest of the payload.
+            AudioValidationError: If a transcript segment ends after the
+                audio does, or the payload is empty.
+        """
         raw = bytes(self.encoded_bytes)
         object.__setattr__(self, "encoded_bytes", raw)
         if not self.source.strip():
@@ -491,6 +665,26 @@ class AudioSample:
         WAV uses the standard-library probe by default. Every other format
         requires a caller-owned probe, making optional codec behavior visible
         in the run configuration and evidence.
+
+        Args:
+            encoded_bytes: The encoded audio payload.
+            source: Source label or URI, normalised with `canonical_source`.
+            probe: Function that reads metadata from the payload. When None
+                the payload must be WAV.
+            max_bytes: Largest payload size in bytes, or None for no limit.
+            label: Optional task label.
+            group_id: Optional identity used to prevent split leakage.
+            transcript: Optional transcript.
+
+        Returns:
+            The new sample.
+
+        Raises:
+            AudioValidationError: If the payload is empty, exceeds
+                ``max_bytes`` (or ``max_bytes`` is below one), or the probe
+                raises it.
+            AudioDependencyError: If no probe is given for a payload that is
+                not WAV, or the probe fails with any other exception.
         """
         raw = bytes(encoded_bytes)
         if not raw:
@@ -530,7 +724,11 @@ class AudioSample:
         )
 
     def profile(self) -> AudioProfile:
-        """Return bounded metadata suitable for curation and data cards."""
+        """Return bounded metadata suitable for curation and data cards.
+
+        Returns:
+            The profile of this sample.
+        """
         return AudioProfile(
             source=self.source,
             format=self.metadata.format,
@@ -548,13 +746,24 @@ class AudioSample:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class AudioDataset:
-    """Immutable audio collection with deterministic identity and splitting."""
+    """Immutable audio collection with deterministic identity and splitting.
+
+    Attributes:
+        samples: The samples, in caller order.
+        content_hash: SHA-256 hex digest of the sources and file hashes, in
+            sample order; set on construction.
+    """
 
     samples: tuple[AudioSample, ...]
     content_hash: str = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
-        """Reject duplicate source identities and derive dataset identity."""
+        """Reject duplicate source identities and derive dataset identity.
+
+        Raises:
+            AudioValidationError: If there are no samples or two samples
+                share a source.
+        """
         normalized = tuple(self.samples)
         if not normalized:
             raise AudioValidationError(
@@ -576,7 +785,11 @@ class AudioDataset:
         object.__setattr__(self, "content_hash", digest)
 
     def profiles(self) -> tuple[AudioProfile, ...]:
-        """Return profiles in source order for deterministic curation."""
+        """Return profiles in sample order for deterministic curation.
+
+        Returns:
+            One profile per sample.
+        """
         return tuple(sample.profile() for sample in self.samples)
 
     def prepare_features(
@@ -590,6 +803,21 @@ class AudioDataset:
         a caller-owned probe remain valid data contracts, but require a codec
         adapter before signal features can be prepared. The feature rows use
         only an observed prefix and record whether that prefix was truncated.
+
+        Args:
+            max_frames: Largest number of frames read per sample; at least
+                one.
+            start_frame: Index of the first frame read; not negative.
+
+        Returns:
+            Thirteen features per sample: nine signal statistics (see
+            `wav_signal_features`), then duration in seconds, sample rate,
+            channel count and sample width (0 when unknown).
+
+        Raises:
+            ValueError: If ``max_frames`` is below one or ``start_frame`` is
+                negative.
+            AudioDependencyError: If a sample is not in WAV format.
         """
         if max_frames < 1:
             raise ValueError("max_frames must be at least one")
@@ -652,6 +880,20 @@ class AudioDataset:
         A caller should use a speaker, session, device, or other identity as
         ``group_id``. Without one, source identity is the conservative group
         and repeated clips are not assumed to share a speaker.
+
+        Args:
+            validation_fraction: Share of groups for validation, in [0, 1).
+            test_fraction: Share of groups for testing, in [0, 1).
+            seed: Seed of the shuffle of the sorted group ids.
+
+        Returns:
+            The split. Whole groups go to one partition; with at least three
+            groups a non-zero fraction gets at least one group, and the
+            remaining groups form the training set.
+
+        Raises:
+            ValueError: If a fraction is outside [0, 1) or the fractions sum
+                to 1 or more.
         """
         if not 0 <= validation_fraction < 1:
             raise ValueError("validation_fraction must be in [0, 1)")
@@ -709,7 +951,15 @@ class AudioDataset:
         )
 
     def curate(self) -> ModalityCurationReport:
-        """Build reviewable metadata and compatibility findings."""
+        """Build reviewable metadata and compatibility findings.
+
+        Returns:
+            A curation report for modality ``audio`` with format, sample
+            rate, channel, duration, label and transcript statistics, and
+            findings for missing transcript confidence, format drift,
+            sample-rate or channel drift, mixed labelled and unlabelled
+            clips, and conflicting labels.
+        """
         profiles = self.profiles()
         formats = sorted({profile.format for profile in profiles})
         sample_rates = sorted({profile.sample_rate for profile in profiles})

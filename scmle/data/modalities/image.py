@@ -53,7 +53,12 @@ SENSITIVE_METADATA_TAGS = {
 
 
 class ImageError(errors.DataError):
-    """Base error for image ingestion and feature preparation."""
+    """Base error for image ingestion and feature preparation.
+
+    Attributes:
+        code: Machine-readable failure code.
+        source: Source identifier of the image concerned; may be empty.
+    """
 
     category = "image"
 
@@ -64,7 +69,15 @@ class ImageError(errors.DataError):
         source: str = "",
         details: dict[str, Any] | None = None,
     ) -> None:
-        """Initializes an image error with machine-readable context."""
+        """Initializes an image error with machine-readable context.
+
+        Args:
+            message: Human-readable description of the failure.
+            code: Machine-readable failure code, stored in the context.
+            source: Source identifier of the image; omitted from the context
+                when empty.
+            details: Extra context entries merged into the error context.
+        """
         context = {"code": code}
         if source:
             context["source"] = source
@@ -81,7 +94,11 @@ class ImageDependencyError(ImageError):
     category = "dependency"
 
     def __init__(self, operation: str) -> None:
-        """Initializes a dependency error for ``operation``."""
+        """Initializes a dependency error for ``operation``.
+
+        Args:
+            operation: Name of the operation that needs Pillow.
+        """
         super().__init__(
             "image operation requires the optional 'Pillow' dependency; "
             "install it with 'pip install Pillow'",
@@ -116,7 +133,15 @@ def require_pillow(operation: str = "image data") -> Any:
 
 
 def canonical_source(source: str | pathlib.Path) -> str:
-    """Returns a stable source identifier for a path or URI-like value."""
+    """Returns a stable source identifier for a path or URI-like value.
+
+    Args:
+        source: A filesystem path, a value containing ``://``, or empty.
+
+    Returns:
+        ``memory://`` for an empty value, the stripped value itself when it
+        contains ``://``, otherwise the absolute resolved path as a file URI.
+    """
     value = str(source).strip()
     if not value:
         return "memory://"
@@ -128,7 +153,19 @@ def canonical_source(source: str | pathlib.Path) -> str:
 def validate_feature_options(
     target_size: tuple[int, int], mode: str
 ) -> tuple[int, int]:
-    """Validates the deterministic baseline feature configuration."""
+    """Validates the deterministic baseline feature configuration.
+
+    Args:
+        target_size: ``(width, height)`` of the resized image.
+        mode: Pillow mode; one of ``SUPPORTED_FEATURE_MODES``.
+
+    Returns:
+        ``target_size`` unchanged.
+
+    Raises:
+        ValueError: If ``target_size`` is not two positive integers, or
+            ``mode`` is not a supported mode.
+    """
     if len(target_size) != 2 or any(
         not isinstance(value, int) or isinstance(value, bool) or value <= 0
         for value in target_size
@@ -146,7 +183,17 @@ def image_content_hash(
     width: int,
     height: int,
 ) -> str:
-    """Returns a format-independent hash of decoded RGBA content."""
+    """Returns a format-independent hash of decoded RGBA content.
+
+    Args:
+        image: A decoded Pillow image.
+        width: Width in pixels, included in the hashed payload.
+        height: Height in pixels, included in the hashed payload.
+
+    Returns:
+        The SHA-256 hex digest of a version tag, the dimensions and the RGBA
+        pixel bytes.
+    """
     canonical = image.convert("RGBA")
     payload = b"scmle-image-content-v1\0"
     payload += f"{width}x{height}\0".encode("ascii")
@@ -156,7 +203,16 @@ def image_content_hash(
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class ImageAugmentation:
-    """Caller-declared provenance for a transformed image sample."""
+    """Caller-declared provenance for a transformed image sample.
+
+    Attributes:
+        parent_source: Source of the image the sample was derived from,
+            normalised with `canonical_source`.
+        operation: Non-empty name of the transformation.
+        parameters: JSON-native transformation parameters, read-only.
+        tool: Name of the tool that applied the transformation; may be
+            empty.
+    """
 
     parent_source: str
     operation: str
@@ -164,7 +220,12 @@ class ImageAugmentation:
     tool: str = ""
 
     def __post_init__(self) -> None:
-        """Validate and normalize transformation provenance."""
+        """Validate and normalize transformation provenance.
+
+        Raises:
+            ValueError: If the operation is blank, a parameter key is not a
+                non-empty string, or the parameters are not JSON-native.
+        """
         parent = canonical_source(self.parent_source)
         operation = self.operation.strip()
         tool = self.tool.strip()
@@ -194,11 +255,19 @@ class ImageAugmentation:
 
     @property
     def identity(self) -> str:
-        """Return a deterministic identity for the transformation record."""
+        """A deterministic identity string for the transformation record.
+
+        It is the compact, key-sorted JSON of `to_dict`.
+        """
         return json.dumps(self.to_dict(), sort_keys=True, separators=(",", ":"))
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-native transformation provenance."""
+        """Return JSON-native transformation provenance.
+
+        Returns:
+            A dict with `parent_source`, `operation`, `parameters` and
+            `tool`.
+        """
         return {
             "parent_source": self.parent_source,
             "operation": self.operation,
@@ -215,6 +284,24 @@ class ImageSample:
     and metadata that were validated at ingestion time. ``file_hash`` hashes
     the encoded source bytes; ``content_hash`` hashes canonical decoded RGBA
     pixels and therefore supports content-based deduplication across formats.
+
+    Attributes:
+        source: Non-empty source label or URI.
+        encoded_bytes: The encoded image payload.
+        file_hash: SHA-256 hex digest of the encoded bytes.
+        content_hash: SHA-256 hex digest of the canonical decoded pixels.
+        width: Width in pixels; positive.
+        height: Height in pixels; positive.
+        channels: Number of colour bands; positive.
+        mode: Pillow mode of the stored image.
+        format: Encoded format name, or ``unknown``.
+        byte_size: Length of ``encoded_bytes``.
+        label: Optional task label.
+        group_id: Optional identity used to keep related samples in one
+            split.
+        exif_tags: Sorted EXIF tag numbers present, as text.
+        sensitive_metadata: Sorted names of sensitive EXIF fields present.
+        augmentation: Provenance if the sample is a transformed image.
     """
 
     source: str
@@ -234,7 +321,15 @@ class ImageSample:
     augmentation: ImageAugmentation | None = None
 
     def __post_init__(self) -> None:
-        """Validates immutable identity and geometry metadata."""
+        """Validates immutable identity and geometry metadata.
+
+        Raises:
+            ValueError: If source is blank, group_id is blank, byte_size
+                differs from the payload length, a dimension or the channel
+                count is not positive, or a hash is not 64 characters.
+            TypeError: If augmentation is neither None nor an
+                ImageAugmentation.
+        """
         object.__setattr__(self, "encoded_bytes", bytes(self.encoded_bytes))
         if not self.source.strip():
             raise ValueError("source must not be empty")
@@ -283,9 +378,10 @@ class ImageSample:
             A validated immutable image snapshot.
 
         Raises:
-            ImageDependencyError: If Pillow is unavailable.
             ImageValidationError: If the payload is empty, corrupt, or too
-                large.
+                large. An ImageDependencyError (Pillow missing) or a
+                ValueError (invalid limit) from the helpers it calls
+                propagates unchanged.
         """
         require_pillow("image ingestion")
         raw = bytes(encoded_bytes)
@@ -377,7 +473,25 @@ class ImageSample:
         group_id: str | None = None,
         augmentation: ImageAugmentation | None = None,
     ) -> Self:
-        """Builds a validated image sample from a local file."""
+        """Builds a validated image sample from a local file.
+
+        Args:
+            path: Path of the image file; ``~`` is expanded.
+            max_bytes: Maximum file size, or ``None`` for no limit.
+            max_pixels: Maximum decoded pixel count, or ``None`` for no
+                limit.
+            label: Optional task label retained for curation evidence.
+            group_id: Optional identity used to prevent split leakage.
+            augmentation: Optional caller-declared transformation provenance.
+
+        Returns:
+            A validated immutable image snapshot.
+
+        Raises:
+            ImageValidationError: If the file is missing, not a regular
+                file, larger than ``max_bytes``, or unreadable. Failures of
+                `from_bytes`, including ImageDependencyError, propagate.
+        """
         file_path = pathlib.Path(path).expanduser()
         source = canonical_source(file_path)
         if not file_path.exists():
@@ -420,7 +534,19 @@ class ImageSample:
         )
 
     def perceptual_hash(self, hash_size: int = 8) -> str:
-        """Return a bounded luminance signature for near-duplicate review."""
+        """Return a bounded luminance signature for near-duplicate review.
+
+        Args:
+            hash_size: Side length of the square luminance thumbnail.
+
+        Returns:
+            A hex string of ``hash_size ** 2`` digits, one per pixel of the
+            grayscale thumbnail in row-major order, each the pixel value
+            divided by 16.
+
+        Raises:
+            ValueError: If ``hash_size`` is not an integer from 2 to 32.
+        """
         if (
             not isinstance(hash_size, int)
             or isinstance(hash_size, bool)
@@ -436,7 +562,15 @@ class ImageSample:
         max_bytes: int | None,
         max_pixels: int | None,
     ) -> None:
-        """Validates optional resource limits before reading or decoding."""
+        """Validates optional resource limits before reading or decoding.
+
+        Args:
+            max_bytes: Encoded size limit, or None for no limit.
+            max_pixels: Decoded pixel-count limit, or None for no limit.
+
+        Raises:
+            ValueError: If a limit is neither None nor a positive integer.
+        """
         for name, value in (
             ("max_bytes", max_bytes),
             ("max_pixels", max_pixels),
@@ -461,6 +595,11 @@ class ImageSample:
 
         Returns:
             Array shaped ``(height, width, channels)``.
+
+        Raises:
+            ValueError: If the mode is unsupported or ``target_size`` is not
+                two positive integers.
+            ImageValidationError: If the stored bytes cannot be decoded.
         """
         image_library = require_pillow("image decoding")
         selected_mode = mode or self.mode
@@ -490,7 +629,12 @@ class ImageSample:
         return np.ascontiguousarray(pixels)
 
     def to_dict(self) -> dict[str, Any]:
-        """Returns JSON-compatible metadata without embedding image bytes."""
+        """Returns JSON-compatible metadata without embedding image bytes.
+
+        Returns:
+            A dict of every field except ``encoded_bytes``; the tag tuples
+            become lists and the augmentation becomes its own dict or None.
+        """
         return {
             "source": self.source,
             "file_hash": self.file_hash,
@@ -515,7 +659,28 @@ class ImageSample:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class ImageProfile:
-    """Bounded, deterministic summary of an image dataset."""
+    """Bounded, deterministic summary of an image dataset.
+
+    Attributes:
+        dataset_count: Number of samples in the dataset.
+        profiled_count: Number of samples profiled.
+        truncated: Whether samples were left out of the profile.
+        profiled_bytes: Total encoded size of the profiled samples.
+        unique_content_count: Distinct content hashes among them.
+        duplicate_count: Profiled samples minus unique content.
+        modes: Sorted ``(mode, count)`` pairs.
+        channels: Sorted ``(channel count, count)`` pairs.
+        width_min: Smallest width in pixels.
+        width_max: Largest width in pixels.
+        width_mean: Mean width in pixels.
+        height_min: Smallest height in pixels.
+        height_max: Largest height in pixels.
+        height_mean: Mean height in pixels.
+        mean_pixel: Mean RGB value per channel on 0-255, from resized
+            copies.
+        pixel_std: Per-channel standard deviation on 0-255, from resized
+            copies.
+    """
 
     dataset_count: int
     profiled_count: int
@@ -535,20 +700,36 @@ class ImageProfile:
     pixel_std: tuple[float, ...]
 
     def to_dict(self) -> dict[str, Any]:
-        """Returns JSON-compatible profile data."""
+        """Returns JSON-compatible profile data.
+
+        Returns:
+            A dict of every field of the profile.
+        """
         return dataclasses.asdict(self)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class ImageSplit:
-    """Group-aware image split that keeps related samples together."""
+    """Group-aware image split that keeps related samples together.
+
+    Attributes:
+        train: Samples assigned to training.
+        validation: Samples assigned to validation.
+        test: Samples assigned to testing.
+    """
 
     train: tuple[ImageSample, ...]
     validation: tuple[ImageSample, ...]
     test: tuple[ImageSample, ...]
 
     def group_ids(self) -> dict[str, tuple[str, ...]]:
-        """Return the stable groups assigned to each partition."""
+        """Return the stable groups assigned to each partition.
+
+        Returns:
+            A dict from partition name (`train`, `validation`, `test`) to
+            the sorted distinct group ids; a sample without a group id uses
+            its source.
+        """
         return {
             name: tuple(
                 sorted({sample.group_id or sample.source for sample in samples})
@@ -563,13 +744,23 @@ class ImageSplit:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class ImageDataset:
-    """Immutable collection of validated image samples."""
+    """Immutable collection of validated image samples.
+
+    Attributes:
+        samples: The samples, in caller order.
+        content_hash: Order-independent digest of the sources, content hashes
+            and augmentation identities; set on construction.
+    """
 
     samples: tuple[ImageSample, ...] = ()
     content_hash: str = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
-        """Normalizes samples to an immutable tuple and validates types."""
+        """Normalizes samples to an immutable tuple and validates types.
+
+        Raises:
+            TypeError: If an element is not an ImageSample.
+        """
         normalized = tuple(self.samples)
         if any(not isinstance(sample, ImageSample) for sample in normalized):
             raise TypeError("samples must contain only ImageSample objects")
@@ -593,7 +784,18 @@ class ImageDataset:
         max_pixels: int | None = DEFAULT_MAX_PIXELS,
         deduplicate: bool = False,
     ) -> Self:
-        """Builds a dataset from local paths in caller-provided order."""
+        """Builds a dataset from local paths in caller-provided order.
+
+        Args:
+            paths: Paths of the image files.
+            max_bytes: Maximum file size per image, or None for no limit.
+            max_pixels: Maximum pixel count per image, or None for no limit.
+            deduplicate: Whether to drop samples with duplicate content.
+
+        Returns:
+            The dataset; deduplicated when requested. Failures of
+            `ImageSample.from_path` propagate unchanged.
+        """
         dataset = cls(
             tuple(
                 ImageSample.from_path(path, max_bytes, max_pixels)
@@ -604,7 +806,7 @@ class ImageDataset:
 
     @property
     def sample_count(self) -> int:
-        """Returns the number of samples in the dataset."""
+        """The number of samples in the dataset."""
         return len(self.samples)
 
     def deduplicate(self) -> Self:
@@ -613,6 +815,10 @@ class ImageDataset:
         For each content identity, the lexicographically smallest source is
         retained. Sorting by content and source makes the result independent
         of input iteration order.
+
+        Returns:
+            A new dataset with one sample per distinct content hash, ordered
+            by content hash and then source.
         """
         selected: dict[str, ImageSample] = {}
         for sample in self.samples:
@@ -645,6 +851,24 @@ class ImageDataset:
         The signature is a quantized, resized luminance representation. It is
         review evidence for likely near duplicates, not a semantic similarity
         model or a proof that two images depict the same object.
+
+        Args:
+            max_samples: Number of leading samples considered.
+            hash_size: Side of the luminance thumbnail used for the
+                signature.
+            max_hamming_distance: Largest number of differing signature bits
+                for two images to count as neighbours.
+
+        Returns:
+            Connected groups of neighbouring samples that contain more than
+            one distinct content hash. Each group is a sorted tuple of
+            sources; the groups are sorted.
+
+        Raises:
+            ValueError: If ``max_samples`` is not a positive integer or
+                ``max_hamming_distance`` is not a non-negative integer. An
+                invalid ``hash_size`` also raises ValueError, from
+                `ImageSample.perceptual_hash`.
         """
         if not isinstance(max_samples, int) or isinstance(max_samples, bool):
             raise ValueError("max_samples must be a positive integer")
@@ -699,7 +923,21 @@ class ImageDataset:
         max_samples: int = 1024,
         profile_size: tuple[int, int] = DEFAULT_PROFILE_SIZE,
     ) -> ImageProfile:
-        """Profiles at most ``max_samples`` images and bounded pixels."""
+        """Profiles at most ``max_samples`` images and bounded pixels.
+
+        Args:
+            max_samples: Number of leading samples profiled.
+            profile_size: ``(width, height)`` each image is resized to
+                before pixel statistics are computed.
+
+        Returns:
+            The profile; an empty dataset gives all-zero counts.
+
+        Raises:
+            ValueError: If ``max_samples`` is not a positive integer.
+                ``profile_size`` that is not two positive integers also
+                raises ValueError, from `validate_feature_options`.
+        """
         if not isinstance(max_samples, int) or isinstance(max_samples, bool):
             raise ValueError("max_samples must be a positive integer")
         if max_samples <= 0:
@@ -773,7 +1011,21 @@ class ImageDataset:
         max_samples: int = 1024,
         profile_size: tuple[int, int] = DEFAULT_PROFILE_SIZE,
     ) -> ModalityCurationReport:
-        """Build bounded image statistics and reviewable findings."""
+        """Build bounded image statistics and reviewable findings.
+
+        Args:
+            max_samples: Number of leading samples profiled and checked for
+                near duplicates.
+            profile_size: Resize target used for pixel statistics.
+
+        Returns:
+            A curation report for modality ``image`` carrying the profile,
+            label counts, conflicting labels, sensitive metadata,
+            near-duplicate groups and augmentation summary, with quality and
+            risk findings. Invalid ``max_samples`` or ``profile_size``
+            (ValueError) and an undecodable image (ImageValidationError)
+            propagate from `profile`.
+        """
         profile = self.profile(max_samples, profile_size)
         labels = label_counts(sample.label for sample in self.samples)
         conflicts = conflicting_label_groups(
@@ -927,10 +1179,20 @@ class ImageDataset:
     ) -> np.ndarray:
         """Flattens resized pixels for a numeric baseline adapter.
 
-        The result has one row per sample and a stable column order of
-        channel-major? No: Pillow/NumPy row-major order is retained, with
-        channels in the selected mode's order. Values are ``[0, 1]`` when
-        ``normalize`` is true, otherwise ``uint8`` values in ``[0, 255]``.
+        The result has one row per sample. Columns keep Pillow/NumPy
+        row-major order, with channels in the selected mode's order.
+
+        Args:
+            target_size: ``(width, height)`` each image is resized to.
+            mode: Pillow mode; one of ``L``, ``RGB`` or ``RGBA``.
+            normalize: Whether to scale values to ``[0, 1]`` as float32;
+                otherwise they are ``uint8`` in ``[0, 255]``.
+
+        Returns:
+            Array of shape ``(sample_count, width * height * channels)``;
+            with no samples, shape ``(0, width * height * channels)``. An
+            invalid ``target_size`` or ``mode`` raises ValueError from
+            `validate_feature_options`.
         """
         validate_feature_options(target_size, mode)
         channels = 1 if mode == "L" else len(mode)
@@ -957,6 +1219,20 @@ class ImageDataset:
 
         A caller should use a subject, capture session, or other identity as
         ``group_id``. Without one, source identity is the conservative group.
+
+        Args:
+            validation_fraction: Share of groups for validation, in [0, 1).
+            test_fraction: Share of groups for testing, in [0, 1).
+            seed: Seed of the shuffle of the sorted group ids.
+
+        Returns:
+            The split. Whole groups go to one partition; with at least three
+            groups a non-zero fraction gets at least one group, and the
+            remaining groups form the training set.
+
+        Raises:
+            ValueError: If the dataset is empty, a fraction is outside
+                [0, 1), or the fractions sum to 1 or more.
         """
         if not self.samples:
             raise ValueError("cannot split an empty image dataset")

@@ -13,7 +13,17 @@ from scmle.contracts import data as data_contracts
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class ModalityCurationReport:
-    """JSON-native data-understanding evidence before modelling."""
+    """JSON-native data-understanding evidence before modelling.
+
+    Attributes:
+        modality: Name of the modality the report describes.
+        dataset_hash: Order-independent digest of the sample identities.
+        sample_count: Number of samples profiled.
+        profile: Modality-specific summary statistics, JSON-native.
+        quality_findings: Findings about data quality.
+        risk_findings: Findings about risk (leakage, privacy, bias).
+        schema_version: Version of the serialised report layout.
+    """
 
     modality: str
     dataset_hash: str
@@ -27,7 +37,11 @@ class ModalityCurationReport:
     def unresolved_blocking_findings(
         self,
     ) -> tuple[data_contracts.CurationFinding, ...]:
-        """Return blocking findings without a safe review disposition."""
+        """The blocking findings without a safe review disposition.
+
+        A disposition is safe when it is resolved, waived or a false
+        positive. Quality findings come before risk findings.
+        """
         safe_dispositions = {
             data_contracts.FindingDisposition.RESOLVED,
             data_contracts.FindingDisposition.WAIVED,
@@ -41,11 +55,17 @@ class ModalityCurationReport:
 
     @property
     def release_ready(self) -> bool:
-        """Return whether curation has no unresolved blocking finding."""
+        """Whether curation has no unresolved blocking finding."""
         return not self.unresolved_blocking_findings
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a stable JSON-compatible report."""
+        """Serialise the report to a stable JSON-compatible mapping.
+
+        Returns:
+            A dict with the report fields, each finding as its own dict, the
+            derived `release_ready` flag and the ids of the unresolved
+            blocking findings.
+        """
         return {
             "schema_version": self.schema_version,
             "modality": self.modality,
@@ -73,6 +93,20 @@ class ModalityDatasetCard:
     The card keeps data understanding separate from model quality. Privacy
     and provenance are explicit status fields because a modality adapter
     cannot infer consent, ownership, retention, or access policy from bytes.
+
+    Attributes:
+        modality: Name of the modality the card describes.
+        dataset_hash: Order-independent digest of the sample identities.
+        sample_count: Number of samples; never negative.
+        curation: The curation report as a JSON-native mapping. Its
+            `dataset_hash` and `sample_count` must equal the card's.
+        intended_use: Statement of what the data may be used for.
+        limitations: Non-empty tuple of known limitations.
+        provenance: Non-empty mapping of provenance status fields.
+        privacy: Non-empty mapping of privacy status fields.
+        manifest: Optional manifest that must agree with the card on content
+            hash, sample count and modality.
+        schema_version: Version of the serialised card layout.
     """
 
     modality: str
@@ -87,7 +121,18 @@ class ModalityDatasetCard:
     schema_version: int = 1
 
     def __post_init__(self) -> None:
-        """Reject a card that is detached from its curation report."""
+        """Reject a card that is detached from its curation report.
+
+        Raises:
+            ValueError: If modality, dataset_hash or intended_use is blank,
+                sample_count is negative or a bool, limitations is empty or
+                holds a blank item, curation is not JSON-native or does not
+                serialise to an object, curation disagrees with the card on
+                dataset_hash or sample_count, provenance or privacy is empty
+                or holds a blank key or value, or the manifest disagrees
+                with the card on dataset_hash, sample_count or modality.
+            TypeError: If manifest is not a ModalityManifest.
+        """
         if not self.modality.strip():
             raise ValueError("modality must not be empty")
         if not self.dataset_hash.strip():
@@ -146,8 +191,31 @@ class ModalityDatasetCard:
     ) -> Self:
         """Build a card without inventing missing governance decisions.
 
-        ``task`` is explicit so curation-only callers can use
-        ``not_declared`` instead of implying a supervised learning task.
+        When the manifest, built here if absent, carries no source owner,
+        acquisition method or privacy classification, provenance and privacy
+        are marked as not declared, with the action required before
+        promotion.
+
+        Args:
+            modality: Name of the modality.
+            report: A curation report as produced by
+                `ModalityCurationReport.to_dict`; must hold `dataset_hash`
+                (str) and `sample_count` (int).
+            limitations: Known limitations to record on the card.
+            manifest: Manifest to attach. When None, one is built from the
+                report and its findings.
+            task: Task recorded on a built manifest. It is explicit so
+                curation-only callers can use ``not_declared`` instead of
+                implying a supervised learning task.
+
+        Returns:
+            A new card for the report.
+
+        Raises:
+            ValueError: If the report lacks a string `dataset_hash` or an
+                int `sample_count`, if the manifest disagrees with the
+                report on dataset hash, sample count or modality, or on any
+                validation failure of the card itself.
         """
         dataset_hash_value = report.get("dataset_hash")
         sample_count_value = report.get("sample_count")
@@ -216,7 +284,12 @@ class ModalityDatasetCard:
         )
 
     def to_dict(self) -> dict[str, Any]:
-        """Return deterministic JSON-native dataset-card evidence."""
+        """Serialise the card to a deterministic JSON-native mapping.
+
+        Returns:
+            A dict of the card fields. Provenance and privacy are sorted by
+            key; the manifest is its own dict, or None when absent.
+        """
         return {
             "schema_version": self.schema_version,
             "modality": self.modality,
@@ -234,13 +307,28 @@ class ModalityDatasetCard:
 
 
 def dataset_hash(identities: Iterable[str]) -> str:
-    """Return an order-independent digest for modality sample identities."""
+    """Compute an order-independent digest of sample identities.
+
+    Args:
+        identities: Sample identities; each is converted with `str`.
+
+    Returns:
+        The SHA-256 hex digest of the sorted identities joined by newlines.
+    """
     canonical = "\n".join(sorted(str(identity) for identity in identities))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def label_counts(labels: Iterable[Any]) -> dict[str, int]:
-    """Return stable label buckets without interpreting task semantics."""
+    """Count labels in stable buckets without interpreting task semantics.
+
+    Args:
+        labels: Labels of any type; None counts as unlabeled.
+
+    Returns:
+        A dict from bucket to count, sorted by bucket. A bucket is
+        `unlabeled` for None and `<type name>:<label>` otherwise.
+    """
     counts: dict[str, int] = {}
     for label in labels:
         bucket = (
@@ -258,6 +346,14 @@ def conflicting_label_groups(
     Each item contains an identity, source, and optional label. Unlabeled
     samples do not create a conflict by themselves; disagreement between two
     known labels does.
+
+    Args:
+        items: Triples of (identity, source, label); label may be None.
+
+    Returns:
+        One dict per identity with more than one distinct label bucket, with
+        keys `identity`, `sources` (sorted) and `labels` (sorted buckets),
+        ordered by identity.
     """
     grouped: dict[str, dict[str, Any]] = {}
     for identity, source, label in items:
@@ -293,7 +389,22 @@ def build_finding(
     remediation: str,
     blocking: bool,
 ) -> data_contracts.CurationFinding:
-    """Build one modality curation finding with a shared rule version."""
+    """Build one modality curation finding with a shared rule version.
+
+    The finding has confidence 1.0, owner `data-curation`, no reviewer and
+    the open disposition.
+
+    Args:
+        finding_id: Identifier of the finding.
+        severity: Severity of the finding.
+        scope: Description of what the finding affects.
+        evidence: Evidence supporting the finding.
+        remediation: Action that would resolve the finding.
+        blocking: Whether the finding blocks release until resolved.
+
+    Returns:
+        The new finding.
+    """
     return data_contracts.CurationFinding(
         finding_id=finding_id,
         rule_version="multimodal-curation.v1",
