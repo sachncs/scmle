@@ -5,7 +5,7 @@ from typing import Any
 
 import numpy
 import pandas
-from sklearn import metrics as sk_metrics
+from sklearn import metrics
 
 import scmle.contracts.metrics
 
@@ -21,7 +21,7 @@ def f1_macro_labels(truth: numpy.ndarray, guess: numpy.ndarray) -> float:
         The macro-averaged F-measure; undefined cases count as 0.
     """
     return float(
-        sk_metrics.f1_score(truth, guess, average="macro", zero_division=0)
+        metrics.f1_score(truth, guess, average="macro", zero_division=0)
     )
 
 
@@ -36,7 +36,7 @@ def f1_micro_labels(truth: numpy.ndarray, guess: numpy.ndarray) -> float:
         The micro-averaged F-measure; undefined cases count as 0.
     """
     return float(
-        sk_metrics.f1_score(truth, guess, average="micro", zero_division=0)
+        metrics.f1_score(truth, guess, average="micro", zero_division=0)
     )
 
 
@@ -50,7 +50,7 @@ def hamming(truth: numpy.ndarray, guess: numpy.ndarray) -> float:
     Returns:
         The Hamming loss.
     """
-    return float(sk_metrics.hamming_loss(truth, guess))
+    return float(metrics.hamming_loss(truth, guess))
 
 
 def subset_accuracy(truth: numpy.ndarray, guess: numpy.ndarray) -> float:
@@ -78,9 +78,7 @@ def r2_mean(truth: numpy.ndarray, guess: numpy.ndarray) -> float:
     Returns:
         The uniformly averaged R-squared.
     """
-    return float(
-        sk_metrics.r2_score(truth, guess, multioutput="uniform_average")
-    )
+    return float(metrics.r2_score(truth, guess, multioutput="uniform_average"))
 
 
 def mae_mean_scaled(truth: numpy.ndarray, guess: numpy.ndarray) -> float:

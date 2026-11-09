@@ -57,17 +57,17 @@ class FakeBundle:
 
         if method != "quantile":
             raise errors.ArtifactError("none")
-        import pandas as pd
+        import pandas
 
-        return pd.DataFrame(
+        return pandas.DataFrame(
             {"lower": numpy.full(len(features), -1e9), "upper": 1e9}
         )
 
 
 def test_the_report_carries_the_hash_of_the_claim():
-    import pandas as pd
+    import pandas
 
-    features = pd.DataFrame({"a": range(40)})
+    features = pandas.DataFrame({"a": range(40)})
     report = coverage_run.run_report(
         FakeBundle(), features, numpy.zeros(40), (0.5,), claim_sha256="f" * 64
     )

@@ -5,7 +5,7 @@ import json
 import platform
 
 import numpy
-import pandas as pd
+import pandas
 import pytest
 
 import scmle.artifacts.bundle
@@ -23,10 +23,10 @@ PLAN = data.FeaturePlan(("num",), ("cat",))
 @pytest.fixture
 def trained():
     rng = numpy.random.default_rng(0)
-    features = pd.DataFrame(
+    features = pandas.DataFrame(
         {"num": rng.normal(size=200), "cat": rng.choice(["a", "b"], 200)}
     )
-    target = pd.Series((features.num > 0).astype(int))
+    target = pandas.Series((features.num > 0).astype(int))
     registry = scmle.models.registry.ModelRegistry.with_builtins()
     pipe = preprocessing.build_pipeline(
         PLAN, registry.get("random_forest"), tasks.TaskType.BINARY, 0
@@ -171,7 +171,7 @@ def test_unknown_signature_algorithm_is_rejected(trained, tmp_path):
 
 def test_regression_bundle_has_no_probabilities(tmp_path):
     rng = numpy.random.default_rng(1)
-    features = pd.DataFrame({"num": rng.normal(size=80)})
+    features = pandas.DataFrame({"num": rng.normal(size=80)})
     registry = scmle.models.registry.ModelRegistry.with_builtins()
     plan = data.FeaturePlan(("num",), ())
     pipe = preprocessing.build_pipeline(
@@ -219,7 +219,7 @@ def test_reference_profile_roundtrips_and_is_checksummed(trained, tmp_path):
     from scmle.monitoring import reference
 
     bundle, features = trained
-    scores = pd.Series(bundle.predict_proba(features)[:, 1], name="score")
+    scores = pandas.Series(bundle.predict_proba(features)[:, 1], name="score")
     bundle.reference = reference.ReferenceProfile.build(
         features, PLAN, scores, "score", {"roc_auc": 0.9}
     )

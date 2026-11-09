@@ -70,15 +70,15 @@ def test_end_to_end_with_string_labels(multiclass_frame, tmp_path):
 
 
 def test_label_encoded_classifier_roundtrips_string_labels():
-    import numpy as np
-    import pandas as pd
+    import numpy
+    import pandas
     from sklearn import tree
 
     from scmle.models import wrappers
 
-    rng = np.random.default_rng(0)
-    features = pd.DataFrame({"a": rng.normal(size=60)})
-    labels = np.where(features.a > 0, "pos", "neg")
+    rng = numpy.random.default_rng(0)
+    features = pandas.DataFrame({"a": rng.normal(size=60)})
+    labels = numpy.where(features.a > 0, "pos", "neg")
     model = wrappers.LabelEncodedClassifier(tree.DecisionTreeClassifier()).fit(
         features, labels
     )
@@ -138,8 +138,8 @@ def test_catboost_handles_string_labels_natively(multiclass_frame, tmp_path):
 
 
 def test_flat_prediction_wrapper_flattens_column_vectors():
-    import numpy as np
-    import pandas as pd
+    import numpy
+    import pandas
     from sklearn import tree
 
     from scmle.models import wrappers
@@ -148,9 +148,9 @@ def test_flat_prediction_wrapper_flattens_column_vectors():
         def predict(self, features):
             return super().predict(features).reshape(-1, 1)
 
-    rng = np.random.default_rng(0)
-    features = pd.DataFrame({"a": rng.normal(size=80)})
-    target = pd.Series((features.a > 0).astype(int))
+    rng = numpy.random.default_rng(0)
+    features = pandas.DataFrame({"a": rng.normal(size=80)})
+    target = pandas.Series((features.a > 0).astype(int))
     plain = ColumnVectorTree().fit(features, target)
     assert plain.predict(features).ndim == 2
     wrapped = wrappers.FlatPredictionClassifier(ColumnVectorTree()).fit(

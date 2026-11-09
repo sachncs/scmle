@@ -60,11 +60,11 @@ def test_suites_cover_the_data_structures_the_framework_claims():
 
 
 def test_dropped_columns_are_removed_when_loading(monkeypatch):
-    import pandas as pd
+    import pandas
 
     class Fake(datasets.BenchmarkDataset):
         def fetch(self):
-            return pd.DataFrame(
+            return pandas.DataFrame(
                 {"id": [1, 2, 3], "x": [1.0, 2.0, 3.0], "y": [0, 1, 0]}
             )
 
@@ -74,11 +74,11 @@ def test_dropped_columns_are_removed_when_loading(monkeypatch):
 
 
 def test_numeric_targets_stored_as_text_are_converted(monkeypatch):
-    import pandas as pd
+    import pandas
 
     class Fake(datasets.BenchmarkDataset):
         def fetch(self):
-            return pd.DataFrame({"x": [1.0, 2.0], "y": ["7", "9"]})
+            return pandas.DataFrame({"x": [1.0, 2.0], "y": ["7", "9"]})
 
     loaded = Fake("f", "y", "regression", "rmse", numeric_target=True).load()
 

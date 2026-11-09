@@ -24,7 +24,7 @@ import scmle.artifacts.bundle
 from scmle.contracts import errors
 from scmle.contracts import events
 from scmle.contracts import experiments
-from scmle.contracts import models as model_contracts
+from scmle.contracts import models
 from scmle.contracts import tasks
 from scmle.core import scheduler
 from scmle.core import stages
@@ -144,7 +144,7 @@ def test_l23_to_l39_decision_table(run):
     assert issubclass(
         tasks.ProjectSpec, tasks.pydantic.BaseModel
     )  # typed config
-    assert issubclass(model_contracts.ModelAdapter, object) and hasattr(
+    assert issubclass(models.ModelAdapter, object) and hasattr(
         project.spec, "config_hash"
     )
     assert hasattr(project, "plan") and hasattr(
@@ -364,9 +364,7 @@ def test_l198_l206_foundational_and_production_contracts(run):
     resource consumption, deterministic hashes, error categories, formats, compat versions."""
     project, result = run
     assert result.bundle.schema.dtypes  # schema types
-    assert dataclasses.fields(
-        model_contracts.Capabilities
-    )  # capability discovery
+    assert dataclasses.fields(models.Capabilities)  # capability discovery
     from scmle.experimentation import trials
 
     assert {f.name for f in dataclasses.fields(trials.TrialPayload)} >= {
@@ -448,12 +446,10 @@ def test_l210_l224_module_io_matrix_invariants(run, tmp_path):
 def test_l226_plugins_are_conformance_tested():
     """Third-party plugins cannot violate expectations."""
 
-    class Bad(model_contracts.ModelAdapter):
+    class Bad(models.ModelAdapter):
         name = "bad"
         family = "x"
-        capabilities = model_contracts.Capabilities(
-            frozenset({tasks.TaskType.BINARY})
-        )
+        capabilities = models.Capabilities(frozenset({tasks.TaskType.BINARY}))
 
         def build(self, task, seed, params=None):
             class Broken:
@@ -691,9 +687,7 @@ def test_l347_l356_model_family_registry():
 def test_l358_adapter_capability_declarations():
     """Tasks, sparse, probabilities, native categoricals, missing values,
     early stopping, memory characteristics, serialization."""
-    declared = {
-        f.name for f in dataclasses.fields(model_contracts.Capabilities)
-    }
+    declared = {f.name for f in dataclasses.fields(models.Capabilities)}
     assert {
         "tasks",
         "sparse_input",
@@ -1070,7 +1064,7 @@ def test_core_deliverables_are_observable(frame, tmp_path):
 
 def test_l610_l629_backlog_priorities(run):
     """Each backlog row has a working implementation."""
-    from scmle.contracts import models as model_contracts
+    from scmle.contracts import models
     from scmle.evaluation import diagnostics
     from scmle.explainability import importance
     from scmle.governance import registry
@@ -1094,7 +1088,7 @@ def test_l610_l629_backlog_priorities(run):
         importance.PermutationImportance, diagnostics.Diagnostic
     )  # explainability
     assert "permutation_importance" in result.diagnostics
-    assert issubclass(ensembles.StackingAdapter, model_contracts.ModelAdapter)
+    assert issubclass(ensembles.StackingAdapter, models.ModelAdapter)
     generator = synthesis.GaussianCopulaGenerator().fit(
         make_frame()[["a", "b"]]
     )

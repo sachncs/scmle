@@ -13,7 +13,7 @@ from typing import Any
 import numpy
 import pandas
 from sklearn import linear_model
-from sklearn import metrics as sk_metrics
+from sklearn import metrics
 from sklearn import model_selection
 
 import scmle.contracts.metrics
@@ -201,7 +201,7 @@ def check_propensity(
         cv=model_selection.StratifiedKFold(3, shuffle=True, random_state=seed),
         method="predict_proba",
     )[:, 1]
-    auc = float(sk_metrics.roc_auc_score(arm, scores))
+    auc = float(metrics.roc_auc_score(arm, scores))
     found = balance.balance_test(features, arm, seed)
     p_value = found["p_value"]
     evidence = (

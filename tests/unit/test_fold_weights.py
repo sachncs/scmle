@@ -3,7 +3,7 @@
 import numpy
 import pandas
 import pytest
-from sklearn import metrics as sk_metrics
+from sklearn import metrics
 
 from scmle.contracts import data
 from scmle.contracts import tasks
@@ -47,7 +47,7 @@ def test_a_weighted_score_equals_the_hand_computed_one():
     guess = numpy.array([1.0, 2.0, 5.0])
     weights = numpy.array([1.0, 1.0, 2.0])
 
-    value = sk_metrics.mean_absolute_error(truth, guess, sample_weight=weights)
+    value = metrics.mean_absolute_error(truth, guess, sample_weight=weights)
 
     assert value == pytest.approx((0 + 0 + 2 * 2) / 4)
 

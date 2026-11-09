@@ -36,7 +36,7 @@ from scmle.runners import roles
 from scmle.security import access
 from scmle.security import audit
 from scmle.security import tokens
-import scmle.trail as trail
+import scmle.trail
 from scmle.workflow import definition
 from scmle.workflow import executor
 from scmle.workflow import schedule
@@ -241,7 +241,7 @@ EXTENSION_SURFACES = {
         ("FlushResult", "MetricsSpool"),
     ),
     "scmle.trail": (
-        trail,
+        scmle.trail,
         ("Finding", "Report", "build", "render", "seal", "verify"),
     ),
     "scmle.operations.notify": (

@@ -15,7 +15,7 @@ from typing import ClassVar
 import numpy
 import pandas
 from sklearn import base
-from sklearn import metrics as sk_metrics
+from sklearn import metrics
 
 from scmle.contracts import data
 from scmle.contracts import errors
@@ -133,11 +133,11 @@ class ClassificationReport(Diagnostic):
         """
         predicted = inputs.estimator.predict(inputs.features)
         labels = list(inputs.estimator.classes_)
-        matrix = sk_metrics.confusion_matrix(
+        matrix = metrics.confusion_matrix(
             inputs.target, predicted, labels=labels
         )
         precision, recall, f1, support = (
-            sk_metrics.precision_recall_fscore_support(
+            metrics.precision_recall_fscore_support(
                 inputs.target, predicted, labels=labels, zero_division=0
             )
         )

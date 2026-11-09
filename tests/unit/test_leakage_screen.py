@@ -4,8 +4,8 @@ import dataclasses
 from fractions import Fraction
 import math
 
-import numpy as np
-import pandas as pd
+import numpy
+import pandas
 import pytest
 from scipy import stats
 from sklearn.metrics import r2_score
@@ -27,8 +27,10 @@ FAST = leakage.LeakageConfig(
 
 
 def world(seed, n=300, columns=4):
-    rng = np.random.default_rng(seed)
-    frame = pd.DataFrame({f"x{i}": rng.normal(size=n) for i in range(columns)})
+    rng = numpy.random.default_rng(seed)
+    frame = pandas.DataFrame(
+        {f"x{i}": rng.normal(size=n) for i in range(columns)}
+    )
     frame["y"] = rng.integers(0, 2, n)
     return frame
 
@@ -46,83 +48,83 @@ def suspects(report):
 
 @pytest.mark.parametrize("seed", range(4))
 def test_within_fold_auc_matches_sklearn_per_fold(seed):
-    rng = np.random.default_rng(seed)
+    rng = numpy.random.default_rng(seed)
     n = 120
     truth = rng.integers(0, 2, n)
-    score = np.round(rng.normal(size=n) + truth, 1)
-    tests = [np.arange(0, 60), np.arange(60, 120)]
+    score = numpy.round(rng.normal(size=n) + truth, 1)
+    tests = [numpy.arange(0, 60), numpy.arange(60, 120)]
     wins, pairs = screen.fold_concordance(
         score[None, :], (truth == 1)[None, :], tests
     )
     expected = [roc_auc_score(truth[t], score[t]) for t in tests]
     sizes = [(truth[t] == 1).sum() * (truth[t] == 0).sum() for t in tests]
     assert wins[0] / pairs[0] == pytest.approx(
-        np.average(expected, weights=sizes), abs=1e-12
+        numpy.average(expected, weights=sizes), abs=1e-12
     )
 
 
 def test_a_pooled_auc_would_differ_from_the_within_fold_one():
-    rng = np.random.default_rng(0)
+    rng = numpy.random.default_rng(0)
     truth = rng.integers(0, 2, 200)
-    score = rng.normal(size=200) + np.repeat([0.0, 3.0], 100)
-    tests = [np.arange(100), np.arange(100, 200)]
+    score = rng.normal(size=200) + numpy.repeat([0.0, 3.0], 100)
+    tests = [numpy.arange(100), numpy.arange(100, 200)]
     within = screen.auc_rows(score[None, :], (truth == 1)[None, :], tests)[0]
     assert within != pytest.approx(roc_auc_score(truth, score), abs=1e-3)
 
 
 def test_auc_is_nan_when_no_fold_has_both_classes():
     out = screen.auc_rows(
-        np.arange(4.0)[None, :],
-        np.ones((1, 4), dtype=bool),
-        [np.arange(2), np.arange(2, 4)],
+        numpy.arange(4.0)[None, :],
+        numpy.ones((1, 4), dtype=bool),
+        [numpy.arange(2), numpy.arange(2, 4)],
     )
     assert math.isnan(out[0])
 
 
 def test_the_ridge_fit_matches_numpy_least_squares_on_a_fold():
-    rng = np.random.default_rng(1)
+    rng = numpy.random.default_rng(1)
     n = 80
     x = rng.normal(size=n)
     y = 2 * x + rng.normal(scale=0.1, size=n)
-    phi = screen.basis(pd.Series(x))
+    phi = screen.basis(pandas.Series(x))
     splits = [
-        (np.arange(40), np.arange(40, 80)),
-        (np.arange(40, 80), np.arange(40)),
+        (numpy.arange(40), numpy.arange(40, 80)),
+        (numpy.arange(40, 80), numpy.arange(40)),
     ]
     pred = screen.oof_fit(y[None, :], phi, splits)[0]
     train, test = splits[0]
     centred = y[train] - y[train].mean()
-    gram = phi[train].T @ phi[train] + screen.RIDGE * np.eye(phi.shape[1])
-    beta = np.linalg.solve(gram, phi[train].T @ centred)
+    gram = phi[train].T @ phi[train] + screen.RIDGE * numpy.eye(phi.shape[1])
+    beta = numpy.linalg.solve(gram, phi[train].T @ centred)
     expected = y[train].mean() + phi[test] @ beta
     assert pred[test] == pytest.approx(expected, abs=1e-9)
 
 
 def test_a_linear_relation_is_inside_the_numeric_basis():
-    x = pd.Series(np.linspace(-3, 3, 200))
+    x = pandas.Series(numpy.linspace(-3, 3, 200))
     phi = screen.basis(x)
-    beta = np.linalg.lstsq(phi, x.to_numpy(), rcond=None)[0]
+    beta = numpy.linalg.lstsq(phi, x.to_numpy(), rcond=None)[0]
     assert phi @ beta == pytest.approx(x.to_numpy(), abs=1e-9)
 
 
 def test_basis_keeps_missing_and_categories_apart():
-    numeric = pd.Series(np.r_[np.linspace(0, 1, 30), [np.nan] * 5])
+    numeric = pandas.Series(numpy.r_[numpy.linspace(0, 1, 30), [numpy.nan] * 5])
     phi = screen.basis(numeric)
     assert phi[-1, -1] == 1.0 and phi[:30, -1].sum() == 0.0
-    assert phi.sum(axis=1) == pytest.approx(np.ones(35))
-    codes = screen.basis(pd.Series([*list("abcab"), None]))
+    assert phi.sum(axis=1) == pytest.approx(numpy.ones(35))
+    codes = screen.basis(pandas.Series([*list("abcab"), None]))
     assert codes.shape == (6, 4)
     assert codes.sum(axis=1).tolist() == [1.0] * 6
 
 
 def test_constant_column_has_a_single_basis_column():
-    assert screen.basis(pd.Series([1.0] * 50)).shape[1] == 1
-    assert screen.basis(pd.Series(["a"] * 50)).shape[1] == 1
+    assert screen.basis(pandas.Series([1.0] * 50)).shape[1] == 1
+    assert screen.basis(pandas.Series(["a"] * 50)).shape[1] == 1
 
 
 def test_permutations_stay_inside_their_strata():
-    strata = np.repeat([0, 1, 2], [5, 7, 3])
-    rng = np.random.default_rng(0)
+    strata = numpy.repeat([0, 1, 2], [5, 7, 3])
+    rng = numpy.random.default_rng(0)
     index = screen.batch_permutations(strata, 50, rng)
     assert index.shape == (50, 15)
     for row in index:
@@ -133,15 +135,15 @@ def test_permutations_stay_inside_their_strata():
 
 def test_permutations_are_global_with_one_stratum():
     index = screen.batch_permutations(
-        np.zeros(30, dtype=int), 20, np.random.default_rng(1)
+        numpy.zeros(30, dtype=int), 20, numpy.random.default_rng(1)
     )
-    assert (index != np.arange(30)).any(axis=1).all()
+    assert (index != numpy.arange(30)).any(axis=1).all()
 
 
 def test_strata_follow_groups_blocks_or_nothing():
     assert screen.strata_of(6, None, None).tolist() == [0] * 6
     assert screen.strata_of(6, None, 2).tolist() == [0, 0, 1, 1, 2, 2]
-    groups = np.array(["b", "a", "b", "a"])
+    groups = numpy.array(["b", "a", "b", "a"])
     assert screen.strata_of(4, groups, None).tolist() == [0, 1, 0, 1]
 
 
@@ -156,12 +158,12 @@ def test_required_permutations_reach_the_by_threshold():
 
 
 def test_purity_bound_is_clopper_pearson():
-    classes = np.array([0] * 40 + [1] * 60)
-    recorded = np.zeros(100, dtype=bool)
+    classes = numpy.array([0] * 40 + [1] * 60)
+    recorded = numpy.zeros(100, dtype=bool)
     recorded[:30] = True
     bound = screen.purity_bound(recorded, classes, FAST, None)
     assert bound == pytest.approx(0.05 ** (1 / 30), abs=1e-12)
-    mixed = np.zeros(100, dtype=bool)
+    mixed = numpy.zeros(100, dtype=bool)
     mixed[35:65] = True
     expected = stats.beta.ppf(0.05, 25, 6)
     assert screen.purity_bound(mixed, classes, FAST, None) == pytest.approx(
@@ -170,20 +172,20 @@ def test_purity_bound_is_clopper_pearson():
 
 
 def test_purity_bound_counts_groups_not_rows_when_grouped():
-    classes = np.zeros(40, dtype=int)
-    recorded = np.ones(40, dtype=bool)
-    groups = np.repeat(np.arange(4), 10)
+    classes = numpy.zeros(40, dtype=int)
+    recorded = numpy.ones(40, dtype=bool)
+    groups = numpy.repeat(numpy.arange(4), 10)
     one_per_group = screen.purity_bound(recorded, classes, FAST, groups)
     assert one_per_group == pytest.approx(0.05 ** (1 / 4))
     assert one_per_group < screen.purity_bound(recorded, classes, FAST, None)
 
 
 def test_chi_square_rows_match_scipy():
-    rng = np.random.default_rng(3)
+    rng = numpy.random.default_rng(3)
     missing = rng.random(90) < 0.3
     labels = rng.integers(0, 3, 90)
-    totals = np.bincount(labels).astype(float)
-    table = pd.crosstab(missing, labels).to_numpy()
+    totals = numpy.bincount(labels).astype(float)
+    table = pandas.crosstab(missing, labels).to_numpy()
     expected = stats.chi2_contingency(table, correction=False)[0]
     got = screen.chi_square_rows(missing, labels[None, :], totals)[0]
     assert got == pytest.approx(expected, rel=1e-12)
@@ -206,7 +208,7 @@ def test_a_clean_table_has_no_suspect_and_a_planted_copy_has_one():
 
 def test_a_strong_legitimate_predictor_is_significant_but_not_a_suspect():
     frame = world(1, n=600)
-    frame["strong"] = frame.y + np.random.default_rng(1).normal(
+    frame["strong"] = frame.y + numpy.random.default_rng(1).normal(
         scale=1.0, size=600
     )
     report = run(frame)
@@ -220,7 +222,7 @@ def test_a_strong_legitimate_predictor_is_significant_but_not_a_suspect():
 
 def test_the_family_counts_every_column_and_every_mechanism():
     frame = world(2, columns=3)
-    frame.loc[::4, "x0"] = np.nan
+    frame.loc[::4, "x0"] = numpy.nan
     report = run(frame)
     mechanisms = [f.mechanism for f in report.findings]
     assert report.family == len(report.findings) == 5
@@ -244,7 +246,7 @@ def test_by_decisions_equal_the_exact_adjustment_of_the_reported_p_values():
 
 def test_early_stopping_leaves_the_decisions_unchanged(monkeypatch):
     frame = world(4).assign(leak=lambda f: f.y + 0.0)
-    frame["weak"] = frame.y * 0.3 + np.random.default_rng(4).normal(size=300)
+    frame["weak"] = frame.y * 0.3 + numpy.random.default_rng(4).normal(size=300)
     early = run(frame)
     original = screen.draw_permutations
 
@@ -275,10 +277,10 @@ def test_the_screen_is_deterministic_in_the_seed():
 
 
 def test_a_noisy_copy_and_a_threshold_rule_are_suspects():
-    rng = np.random.default_rng(6)
+    rng = numpy.random.default_rng(6)
     frame = world(6, n=500)
     flip = rng.random(500) < 0.02
-    frame["noisy"] = np.where(flip, 1 - frame.y, frame.y)
+    frame["noisy"] = numpy.where(flip, 1 - frame.y, frame.y)
     frame["threshold"] = frame.y + rng.normal(scale=0.25, size=500)
     assert suspects(run(frame)) == {
         ("noisy", screen.SKILL),
@@ -287,10 +289,12 @@ def test_a_noisy_copy_and_a_threshold_rule_are_suspects():
 
 
 def test_a_value_recorded_only_for_one_class_is_a_suspect():
-    rng = np.random.default_rng(7)
+    rng = numpy.random.default_rng(7)
     frame = world(7, n=400)
-    frame["body"] = np.where(
-        (frame.y == 0) & (rng.random(400) < 0.3), rng.normal(size=400), np.nan
+    frame["body"] = numpy.where(
+        (frame.y == 0) & (rng.random(400) < 0.3),
+        rng.normal(size=400),
+        numpy.nan,
     )
     report = run(frame)
     assert ("body", screen.PURITY) in suspects(report)
@@ -302,9 +306,9 @@ def test_a_value_recorded_only_for_one_class_is_a_suspect():
 
 
 def test_missing_only_for_one_class_is_a_missingness_suspect():
-    rng = np.random.default_rng(8)
+    rng = numpy.random.default_rng(8)
     frame = world(8, n=400)
-    frame["boat"] = np.where(frame.y == 1, rng.normal(size=400), np.nan)
+    frame["boat"] = numpy.where(frame.y == 1, rng.normal(size=400), numpy.nan)
     report = run(frame)
     assert ("boat", screen.MISSING) in suspects(report)
     found = next(f for f in report.suspects if f.mechanism == screen.MISSING)
@@ -313,12 +317,12 @@ def test_missing_only_for_one_class_is_a_missingness_suspect():
 
 def test_random_gaps_are_not_a_suspect():
     frame = world(9, n=400)
-    frame.loc[np.random.default_rng(9).random(400) < 0.3, "x0"] = np.nan
+    frame.loc[numpy.random.default_rng(9).random(400) < 0.3, "x0"] = numpy.nan
     assert run(frame).suspects == ()
 
 
 def test_classification_with_more_than_two_classes():
-    rng = np.random.default_rng(10)
+    rng = numpy.random.default_rng(10)
     frame = world(10, n=450)
     frame["y"] = rng.integers(0, 3, 450)
     frame["leak"] = frame.y * 2.0
@@ -327,7 +331,7 @@ def test_classification_with_more_than_two_classes():
 
 
 def test_regression_copy_and_a_strong_but_noisy_predictor():
-    rng = np.random.default_rng(111)
+    rng = numpy.random.default_rng(111)
     frame = world(11, n=300)
     frame["y"] = rng.normal(size=300)
     frame["leak"] = frame.y * 2.0 + 1.0
@@ -340,7 +344,7 @@ def test_regression_copy_and_a_strong_but_noisy_predictor():
 
 def test_groups_keep_entities_whole_and_still_find_a_leak():
     frame = world(12, n=400)
-    groups = pd.Series(np.arange(400) // 8)
+    groups = pandas.Series(numpy.arange(400) // 8)
     frame["leak"] = frame.y + 0.0
     report = run(frame, groups=groups)
     assert suspects(report) == {("leak", screen.SKILL)}
@@ -355,13 +359,13 @@ def test_time_blocks_run_and_flag_a_leak():
 
 
 def test_a_null_outcome_inside_groups_is_not_flagged():
-    rng = np.random.default_rng(14)
+    rng = numpy.random.default_rng(14)
     n = 400
-    groups = pd.Series(np.arange(n) // 8)
-    frame = pd.DataFrame(
-        {"x0": np.repeat(rng.normal(size=n // 8), 8) + rng.normal(size=n)}
+    groups = pandas.Series(numpy.arange(n) // 8)
+    frame = pandas.DataFrame(
+        {"x0": numpy.repeat(rng.normal(size=n // 8), 8) + rng.normal(size=n)}
     )
-    base = np.repeat(rng.integers(0, 2, n // 8), 8)
+    base = numpy.repeat(rng.integers(0, 2, n // 8), 8)
     frame["y"] = base
     report = run(frame, groups=groups)
     assert report.suspects == ()
@@ -390,9 +394,9 @@ def test_unknown_columns_and_both_scopes_are_refused():
     with pytest.raises(ValueError, match="not feature columns"):
         run(frame, features=["ghost"])
     with pytest.raises(ValueError, match="not both"):
-        run(frame, groups=pd.Series(np.arange(300)), block_size=5)
+        run(frame, groups=pandas.Series(numpy.arange(300)), block_size=5)
     with pytest.raises(ValueError, match="same length"):
-        run(frame, groups=pd.Series([1, 2]))
+        run(frame, groups=pandas.Series([1, 2]))
 
 
 def test_large_tables_are_subsampled_without_losing_the_leak():
@@ -405,14 +409,14 @@ def test_large_tables_are_subsampled_without_losing_the_leak():
 
 def test_subsample_keeps_groups_whole_and_time_order():
     n = screen.MAX_ROWS * 2
-    groups = np.repeat(np.arange(n // 4), 4)
+    groups = numpy.repeat(numpy.arange(n // 4), 4)
     rows = screen.subsample(n, groups, None, 0)[0]
     assert len(rows) >= screen.MAX_ROWS
     kept = groups[rows]
-    for g in np.unique(kept):
+    for g in numpy.unique(kept):
         assert (kept == g).sum() == 4
     rows, block = screen.subsample(n, None, 40, 0)
-    assert (np.diff(rows) > 0).all() and block == 20
+    assert (numpy.diff(rows) > 0).all() and block == 20
     all_rows, same = screen.subsample(100, None, 7, 0)
     assert all_rows.tolist() == list(range(100)) and same == 7
 
@@ -522,8 +526,8 @@ def test_the_report_is_json_ready_and_says_it_is_not_proof():
 
 def test_screen_table_orders_by_time_and_respects_groups():
     frame = world(22, n=300).assign(leak=lambda f: f.y + 0.0)
-    frame["t"] = np.random.default_rng(22).permutation(300)
-    frame["g"] = np.arange(300) % 30
+    frame["t"] = numpy.random.default_rng(22).permutation(300)
+    frame["g"] = numpy.arange(300) % 30
     by_time = screen.screen_table(
         frame, "y", CLS, ["x0", "leak"], 0, time_column="t"
     )
@@ -536,7 +540,7 @@ def test_screen_table_orders_by_time_and_respects_groups():
 
 
 def test_r2_matches_sklearn_for_the_observed_regression_fit():
-    rng = np.random.default_rng(23)
+    rng = numpy.random.default_rng(23)
     n = 200
     x = rng.normal(size=n)
     y = x + rng.normal(size=n)
@@ -544,7 +548,7 @@ def test_r2_matches_sklearn_for_the_observed_regression_fit():
     problem = screen.Problem(
         y, "regression", 0, folds, float(((y - y.mean()) ** 2).sum())
     )
-    phi = screen.basis(pd.Series(x))
+    phi = screen.basis(pandas.Series(x))
     got = screen.skill_statistic(problem, phi)(y[None, :])[0]
     pred = screen.oof_fit(y[None, :], phi, folds)[0]
     assert got == pytest.approx(r2_score(y, pred), abs=1e-12)
@@ -553,13 +557,13 @@ def test_r2_matches_sklearn_for_the_observed_regression_fit():
 def test_a_wide_multiclass_table_is_declined_quickly_and_says_so():
     import time
 
-    import numpy as np
-    import pandas as pd
+    import numpy
+    import pandas
 
     from scmle.data.admissibility import screen
 
-    rng = np.random.default_rng(0)
-    frame = pd.DataFrame(
+    rng = numpy.random.default_rng(0)
+    frame = pandas.DataFrame(
         rng.normal(size=(600, 64)), columns=[f"c{i}" for i in range(64)]
     )
     frame["y"] = rng.integers(0, 10, 600)

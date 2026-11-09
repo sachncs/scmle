@@ -5,7 +5,7 @@ from typing import Any
 
 import numpy
 import pandas
-from sklearn import metrics as sk_metrics
+from sklearn import metrics
 
 import scmle.contracts.metrics
 
@@ -55,7 +55,7 @@ def mean_ndcg(
         if len(rows) < MIN_DOCUMENTS or truth.max() <= 0:
             continue
         values.append(
-            sk_metrics.ndcg_score(
+            metrics.ndcg_score(
                 truth[None, :],
                 numpy.asarray(scores, dtype=float)[rows][None, :],
                 k=cutoff,
@@ -93,7 +93,7 @@ def per_query_ndcg(
             excluded += 1
             continue
         values.append(
-            sk_metrics.ndcg_score(
+            metrics.ndcg_score(
                 truth[None, :],
                 numpy.asarray(scores, dtype=float)[rows][None, :],
                 k=cutoff,

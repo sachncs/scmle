@@ -4,7 +4,7 @@ import os
 import sys
 import time
 
-import numpy as np
+import numpy
 import pytest
 
 from scmle.contracts import tasks
@@ -23,7 +23,7 @@ def spin(seconds):
 
 
 def hog(megabytes):
-    block = np.ones(megabytes * 131072)  # touches every page
+    block = numpy.ones(megabytes * 131072)  # touches every page
     time.sleep(5)
     return block.size
 
@@ -73,10 +73,10 @@ def read_thread_setting(value):
 
 
 def large_products(value):
-    import numpy as np
+    import numpy
 
-    matrix = np.random.default_rng(0).normal(size=(3000, 3000))
-    vector = np.ones(3000)
+    matrix = numpy.random.default_rng(0).normal(size=(3000, 3000))
+    vector = numpy.ones(3000)
     return float(
         sum((matrix @ vector).sum() for repeat in range(3) if repeat >= 0)
     )

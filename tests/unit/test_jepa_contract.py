@@ -31,10 +31,10 @@ def test_jepa_is_a_self_supervised_representation_contract():
 )
 def test_tabular_jepa_trains_and_encodes():
     """The optional worker path produces finite, reproducible embeddings."""
-    import numpy as np
+    import numpy
 
-    rng = np.random.default_rng(5)
-    features = rng.normal(size=(48, 4)).astype(np.float32)
+    rng = numpy.random.default_rng(5)
+    features = rng.normal(size=(48, 4)).astype(numpy.float32)
     estimator = JepaEstimator(
         hidden_size=16,
         embedding_size=8,
@@ -47,7 +47,7 @@ def test_tabular_jepa_trains_and_encodes():
     embeddings = estimator.transform(features[:5])
 
     assert embeddings.shape == (5, 8)
-    assert np.isfinite(embeddings).all()
+    assert numpy.isfinite(embeddings).all()
 
 
 @pytest.mark.skipif(
@@ -66,10 +66,10 @@ def test_invalid_training_configuration_has_actionable_diagnostic(
     parameter, value, message
 ):
     """Invalid training settings fail at the JEPA contract boundary."""
-    import numpy as np
+    import numpy
 
-    rng = np.random.default_rng(11)
-    features = rng.normal(size=(8, 3)).astype(np.float32)
+    rng = numpy.random.default_rng(11)
+    features = rng.normal(size=(8, 3)).astype(numpy.float32)
     settings = {parameter: value}
 
     with pytest.raises(ValueError, match=message):
