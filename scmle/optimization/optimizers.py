@@ -48,12 +48,22 @@ class Optimizer(abc.ABC):
 
     @classmethod
     def is_available(cls) -> bool:
-        """Whether every required module is importable."""
+        """Reports whether every required module is importable.
+
+        Returns:
+            True if each module named in `requires` can be found (always True
+            when `requires` is empty), otherwise False.
+        """
         return all(importlib.util.find_spec(m) for m in cls.requires)
 
     @abc.abstractmethod
     def ask(self) -> dict[str, Any]:
-        """Proposes the next configuration."""
+        """Proposes the next configuration.
+
+        Returns:
+            A mapping from parameter name to the proposed value, covering every
+            parameter in the search space.
+        """
 
     @abc.abstractmethod
     def tell(self, params: dict[str, Any], score: float) -> None:
@@ -76,23 +86,49 @@ class RandomOptimizer(Optimizer):
         seed: int,
         greater_is_better: bool = True,
     ) -> None:
-        """Initializes the sampler and the observation history."""
+        """Initializes the sampler and the observation history.
+
+        Args:
+            space: Parameters to tune.
+            seed: Seed of the random generator.
+            greater_is_better: Orientation of the scores passed to `tell`.
+        """
         super().__init__(space, seed, greater_is_better)
         self.rng = random.Random(seed)  # nosec B311 - seeded search, not security
         self.history: list[tuple[dict[str, Any], float]] = []
 
     def ask(self) -> dict[str, Any]:
-        """Draws a configuration uniformly from the space."""
+        """Draws a configuration uniformly from the space.
+
+        Returns:
+            A mapping from parameter name to the sampled value.
+        """
         return self.space.sample(self.rng)
 
     def tell(self, params: dict[str, Any], score: float) -> None:
-        """Records the observation."""
+        """Records the observation.
+
+        Args:
+            params: A configuration previously returned by `ask`.
+            score: Its score.
+        """
         self.history.append((params, score))
 
 
 @functools.singledispatch
 def suggest(parameter: search.Parameter, trial: Any) -> Any:
-    """Asks an Optuna trial for a value of `parameter` (dispatch on type)."""
+    """Asks an Optuna trial for a value of `parameter` (dispatch on type).
+
+    This is the fallback of a single-dispatch function; the registered
+    implementations below handle the supported parameter types.
+
+    Args:
+        parameter: The search-space parameter to suggest a value for.
+        trial: An Optuna trial.
+
+    Raises:
+        ConfigError: If the parameter's type has no registered implementation.
+    """
     raise errors.ConfigError(
         f"unsupported parameter type {type(parameter).__name__}"
     )
@@ -100,7 +136,16 @@ def suggest(parameter: search.Parameter, trial: Any) -> Any:
 
 @suggest.register
 def suggest_float(parameter: search.FloatParameter, trial: Any) -> float:
-    """Suggests a float."""
+    """Suggests a float.
+
+    Args:
+        parameter: The float parameter, with its bounds and log flag.
+        trial: An Optuna trial.
+
+    Returns:
+        A float within the parameter's bounds, on a log scale if the parameter
+        is logarithmic.
+    """
     return trial.suggest_float(
         parameter.name, parameter.low, parameter.high, log=parameter.log
     )
@@ -108,7 +153,16 @@ def suggest_float(parameter: search.FloatParameter, trial: Any) -> float:
 
 @suggest.register
 def suggest_int(parameter: search.IntParameter, trial: Any) -> int:
-    """Suggests an integer."""
+    """Suggests an integer.
+
+    Args:
+        parameter: The integer parameter, with its bounds and log flag.
+        trial: An Optuna trial.
+
+    Returns:
+        An integer within the parameter's bounds, on a log scale if the
+        parameter is logarithmic.
+    """
     return trial.suggest_int(
         parameter.name, parameter.low, parameter.high, log=parameter.log
     )
@@ -116,7 +170,15 @@ def suggest_int(parameter: search.IntParameter, trial: Any) -> int:
 
 @suggest.register
 def suggest_choice(parameter: search.ChoiceParameter, trial: Any) -> Any:
-    """Suggests one of the choices."""
+    """Suggests one of the choices.
+
+    Args:
+        parameter: The categorical parameter, with its allowed choices.
+        trial: An Optuna trial.
+
+    Returns:
+        One of the parameter's choices.
+    """
     return trial.suggest_categorical(parameter.name, list(parameter.choices))
 
 
@@ -138,7 +200,14 @@ class GridOptimizer(Optimizer):
         seed: int,
         greater_is_better: bool = True,
     ) -> None:
-        """Builds and shuffles the grid."""
+        """Builds and shuffles the grid.
+
+        Args:
+            space: Parameters to tune.
+            seed: Seed used to shuffle the grid and to draw once it is
+                exhausted.
+            greater_is_better: Orientation of the scores passed to `tell`.
+        """
         super().__init__(space, seed, greater_is_better)
         axes = [self.levels(p) for p in space.parameters]
         points = [
@@ -152,7 +221,17 @@ class GridOptimizer(Optimizer):
 
     @classmethod
     def levels(cls, parameter: search.Parameter) -> list[Any]:
-        """The grid values of one parameter."""
+        """Lists the grid values of one parameter.
+
+        Args:
+            parameter: The search-space parameter.
+
+        Returns:
+            The first `MAX_CHOICES` choices for a categorical parameter. For an
+            integer parameter, the sorted distinct values among low, middle and
+            high (geometric middle if logarithmic). For a float parameter, the
+            list low, middle, high.
+        """
         if isinstance(parameter, search.ChoiceParameter):
             return list(parameter.choices)[: cls.MAX_CHOICES]
         if isinstance(parameter, search.IntParameter):
@@ -168,7 +247,12 @@ class GridOptimizer(Optimizer):
         return [low, middle, high]
 
     def ask(self) -> dict[str, Any]:
-        """The next grid point, then random draws."""
+        """Returns the next grid point, then random draws.
+
+        Returns:
+            The next unvisited point of the shuffled grid, as a copy; once the
+            grid is exhausted, a random sample from the space.
+        """
         if self.position < len(self.points):
             point = self.points[self.position]
             self.position += 1
@@ -176,7 +260,12 @@ class GridOptimizer(Optimizer):
         return self.space.sample(self.rng)
 
     def tell(self, params: dict[str, Any], score: float) -> None:
-        """A grid keeps no state beyond its position."""
+        """Ignores the observation: a grid keeps no state beyond its position.
+
+        Args:
+            params: A configuration previously returned by `ask`. Unused.
+            score: Its score. Unused.
+        """
 
 
 class OptunaOptimizer(Optimizer):
@@ -192,6 +281,12 @@ class OptunaOptimizer(Optimizer):
         greater_is_better: bool = True,
     ) -> None:
         """Creates the study.
+
+        Args:
+            space: Parameters to tune.
+            seed: Seed of the TPE sampler.
+            greater_is_better: Whether the study maximizes (True) or minimizes
+                (False) the told scores.
 
         Raises:
             ConfigError: If Optuna is not installed.
@@ -211,14 +306,25 @@ class OptunaOptimizer(Optimizer):
         self.pending: list[tuple[dict[str, Any], Any]] = []
 
     def ask(self) -> dict[str, Any]:
-        """Asks the study for the next configuration."""
+        """Asks the study for the next configuration.
+
+        Returns:
+            A mapping from parameter name to the value suggested by the study's
+            trial. The trial is held pending until `tell` receives its score.
+        """
         trial = self.study.ask()
         params = {p.name: suggest(p, trial) for p in self.space.parameters}
         self.pending.append((params, trial))
         return params
 
     def tell(self, params: dict[str, Any], score: float) -> None:
-        """Feeds the score back to the matching pending trial."""
+        """Feeds the score back to the matching pending trial.
+
+        Args:
+            params: A configuration previously returned by `ask`. If no pending
+                trial has equal parameters, the call does nothing.
+            score: Its score.
+        """
         for index, (candidate, trial) in enumerate(self.pending):
             if candidate == params:
                 self.study.tell(trial, score)
@@ -247,10 +353,11 @@ def create_optimizer(
         greater_is_better: Orientation of the told scores.
 
     Returns:
-        The optimizer.
+        The optimizer registered under `name`.
 
     Raises:
-        ConfigError: If the name is unknown or its dependency is missing.
+        ConfigError: If the name is unknown, or if the optimizer's constructor
+            raises it because its dependency is missing.
     """
     if name not in OPTIMIZERS:
         raise errors.ConfigError(
