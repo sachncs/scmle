@@ -1,6 +1,5 @@
 """Bounded host observations used by the pre-training capability gate."""
 
-from collections.abc import Iterable
 import datetime
 import importlib.metadata
 import os
@@ -9,8 +8,12 @@ import re
 import shutil
 import sys
 from typing import Any
+from typing import TYPE_CHECKING
 
 from scmle.contracts import capabilities
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 OBSERVATION_SCHEMA_VERSION = 1
 BYTES_PER_GB = 1024**3
@@ -181,7 +184,7 @@ def observe_memory_gb() -> tuple[float | None, str]:
 def observe_windows_memory_gb() -> tuple[float | None, str]:
     """Returns total physical memory on Windows from ``psutil``."""
     try:
-        import psutil  # Windows-only dependency.
+        import psutil  # noqa: PLC0415 -- Windows-only dependency
 
         total = psutil.virtual_memory().total
     except (ImportError, OSError, AttributeError):

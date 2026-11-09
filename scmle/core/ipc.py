@@ -23,6 +23,35 @@ class StartError(OSError):
     """Raised when a helper process exits or never connects."""
 
 
+def wait_for_helper(
+    thread: threading.Thread,
+    process: subprocess.Popen[bytes],
+    module: str,
+    deadline: float,
+) -> None:
+    """Waits for the thread that accepts the helper's connection.
+
+    Args:
+        thread: The thread that accepts the connection.
+        process: The helper process.
+        module: The helper's module name, for the error message.
+        deadline: The `time.monotonic()` instant by which it must connect.
+
+    Raises:
+        StartError: If the helper exits before connecting or the deadline
+            passes.
+    """
+    while thread.is_alive():
+        thread.join(POLL_SECONDS)
+        if process.poll() is not None and thread.is_alive():
+            raise StartError(
+                f"{module} exited with code {process.returncode} "
+                "before connecting"
+            )
+        if time.monotonic() > deadline:
+            raise StartError(f"{module} did not connect in time")
+
+
 def start_helper(
     module: str,
 ) -> tuple[subprocess.Popen[bytes], connection.Connection]:
@@ -42,10 +71,10 @@ def start_helper(
     key = secrets.token_bytes(KEY_BYTES)
     listener = connection.Listener(authkey=key)
     address = str(listener.address)
-    process = subprocess.Popen(  # nosec B603
+    process = subprocess.Popen(  # noqa: S603 -- own interpreter, caller's module # nosec B603
         [sys.executable, "-m", module, address], stdin=subprocess.PIPE
     )
-    assert process.stdin is not None  # nosec B101
+    assert process.stdin is not None  # noqa: S101 -- narrows the PIPE type # nosec B101
     process.stdin.write(key.hex().encode("ascii"))
     process.stdin.close()
     accepted: list[connection.Connection] = []
@@ -54,22 +83,14 @@ def start_helper(
     def accept() -> None:
         try:
             accepted.append(listener.accept())
-        except BaseException as error:  # Reported to the caller.
+        except BaseException as error:  # noqa: BLE001 -- reported to the caller
             failures.append(error)
 
     thread = threading.Thread(target=accept, daemon=True)
     thread.start()
     deadline = time.monotonic() + CONNECT_SECONDS
     try:
-        while thread.is_alive():
-            thread.join(POLL_SECONDS)
-            if process.poll() is not None and thread.is_alive():
-                raise StartError(
-                    f"{module} exited with code {process.returncode} "
-                    "before connecting"
-                )
-            if time.monotonic() > deadline:
-                raise StartError(f"{module} did not connect in time")
+        wait_for_helper(thread, process, module, deadline)
     except StartError:
         process.kill()
         process.wait()

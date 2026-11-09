@@ -429,8 +429,8 @@ class Orchestrator:
         context.tracker = tracker
         context.history = self.load_history(tracker)
         context.checkpoints = checkpoints
-        for name, reason in self.registry.plugin_failures.items():
-            context.emit("plugin.rejected", f"{name}: {reason}")
+        for name, failure in self.registry.plugin_failures.items():
+            context.emit("plugin.rejected", f"{name}: {failure}")
         try:
             for stage in self.stages:
                 context.check_cancelled()

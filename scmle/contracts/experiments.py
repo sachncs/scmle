@@ -75,9 +75,11 @@ class Plan:
     def summary(self) -> str:
         """Returns a human-readable multi-line summary."""
         lines = [
-            f"Plan {self.plan_id}: {self.task}, metric={self.metric}, "
-            f"validation={self.validation_strategy}, "
-            f"budget={self.optimization_budget_seconds}s",
+            (
+                f"Plan {self.plan_id}: {self.task}, metric={self.metric}, "
+                f"validation={self.validation_strategy}, "
+                f"budget={self.optimization_budget_seconds}s"
+            ),
             "Candidates: " + ", ".join(self.candidate_models),
         ]
         lines += [

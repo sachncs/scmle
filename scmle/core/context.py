@@ -110,6 +110,116 @@ TABULAR_BETA_EVALUATIONS = {
 """Canonical evaluation contract for each tabular task path."""
 
 
+def fairness_options(task: tasks.Task) -> tuple[capabilities.Fairness, ...]:
+    """Lists the fairness declarations a tabular task path is registered with.
+
+    Args:
+        task: The task type.
+
+    Returns:
+        No fairness constraint, plus mitigation for binary and multiclass
+        tasks.
+    """
+    if task in (tasks.Task.BINARY, tasks.Task.MULTICLASS):
+        return (
+            capabilities.Fairness.NONE,
+            capabilities.Fairness.MITIGATION,
+        )
+    return (capabilities.Fairness.NONE,)
+
+
+def supported_tabular_capability(
+    task: tasks.Task,
+    model_family: str,
+    fairness: capabilities.Fairness,
+) -> capabilities.Capability:
+    """Builds the supported library-inference capability of one tabular path.
+
+    Args:
+        task: The task type.
+        model_family: The model family name.
+        fairness: The fairness declaration.
+
+    Returns:
+        The supported capability, with its failure modes, evidence link and
+        limitations.
+    """
+    return capabilities.Capability(
+        key=capabilities.Coordinate(
+            modality=capabilities.Modality.TABULAR,
+            task=task,
+            model_family=model_family,
+            evaluation=TABULAR_BETA_EVALUATIONS[task],
+            uncertainty=capabilities.Uncertainty.NONE,
+            fairness=fairness,
+            explainability=capabilities.Explainability.NONE,
+            inference=capabilities.Inference.LIBRARY,
+        ),
+        status=capabilities.Status.SUPPORTED,
+        required_extras=(
+            ("deeplearning",) if model_family == "deep_learning" else ("core",)
+        ),
+        resources=capabilities.ResourceAssumptions(memory_gb=1.0),
+        failure_modes=(
+            "malformed or schema-incompatible input",
+            "model-family dependency unavailable",
+            "resource limits exceeded",
+        ),
+        evidence_links=("tests/integration/test_capability_gate.py",),
+        limitations=(
+            "tabular modality only",
+            "library inference only",
+            "no portable explanation contract",
+            "no predictive uncertainty contract",
+        ),
+    )
+
+
+def experimental_tabular_capability(
+    task: tasks.Task,
+    model_family: str,
+    fairness: capabilities.Fairness,
+    failure_modes: tuple[str, ...],
+    evidence_links: tuple[str, ...],
+    limitations: tuple[str, ...],
+) -> capabilities.Capability:
+    """Builds the experimental capability of one deep tabular path.
+
+    Args:
+        task: The task type.
+        model_family: The model family name.
+        fairness: The fairness declaration.
+        failure_modes: Known failures of the path.
+        evidence_links: Tests that evidence the path.
+        limitations: User-visible boundaries of the path.
+
+    Returns:
+        The experimental capability, which needs the deeplearning extra, 4 GB
+        of memory and at most 100,000 rows.
+    """
+    return capabilities.Capability(
+        key=capabilities.Coordinate(
+            modality=capabilities.Modality.TABULAR,
+            task=task,
+            model_family=model_family,
+            evaluation=capabilities.Evaluation.STANDARD,
+            uncertainty=capabilities.Uncertainty.NONE,
+            fairness=fairness,
+            explainability=capabilities.Explainability.NONE,
+            inference=capabilities.Inference.LIBRARY,
+        ),
+        status=capabilities.Status.EXPERIMENTAL,
+        required_extras=("deeplearning",),
+        resources=capabilities.ResourceAssumptions(
+            memory_gb=4.0,
+            max_rows=100_000,
+        ),
+        failure_modes=failure_modes,
+        evidence_links=evidence_links,
+        limitations=limitations,
+    )
+
+
 def tabular_beta_capability_registry() -> capabilities.Registry:
     """Builds the explicit capability registry for the tabular beta.
 
@@ -125,154 +235,76 @@ def tabular_beta_capability_registry() -> capabilities.Registry:
     records: list[capabilities.Capability] = []
     for task, families in TABULAR_BETA_TASK_FAMILIES:
         for model_family in families:
-            for fairness in (
-                (capabilities.Fairness.NONE,)
-                if task not in (tasks.Task.BINARY, tasks.Task.MULTICLASS)
-                else (
-                    capabilities.Fairness.NONE,
-                    capabilities.Fairness.MITIGATION,
-                )
-            ):
-                records.append(
-                    capabilities.Capability(
-                        key=capabilities.Coordinate(
-                            modality=capabilities.Modality.TABULAR,
-                            task=task,
-                            model_family=model_family,
-                            evaluation=TABULAR_BETA_EVALUATIONS[task],
-                            uncertainty=capabilities.Uncertainty.NONE,
-                            fairness=fairness,
-                            explainability=capabilities.Explainability.NONE,
-                            inference=capabilities.Inference.LIBRARY,
-                        ),
-                        status=capabilities.Status.SUPPORTED,
-                        required_extras=(
-                            ("deeplearning",)
-                            if model_family == "deep_learning"
-                            else ("core",)
-                        ),
-                        resources=capabilities.ResourceAssumptions(
-                            memory_gb=1.0
-                        ),
-                        failure_modes=(
-                            "malformed or schema-incompatible input",
-                            "model-family dependency unavailable",
-                            "resource limits exceeded",
-                        ),
-                        evidence_links=(
-                            "tests/integration/test_capability_gate.py",
-                        ),
-                        limitations=(
-                            "tabular modality only",
-                            "library inference only",
-                            "no portable explanation contract",
-                            "no predictive uncertainty contract",
-                        ),
-                    )
-                )
-    for task in (
-        tasks.Task.BINARY,
-        tasks.Task.MULTICLASS,
-        tasks.Task.REGRESSION,
-    ):
-        for fairness in (
+            records.extend(
+                supported_tabular_capability(task, model_family, fairness)
+                for fairness in fairness_options(task)
+            )
+    experimental_families = (
+        (
+            capabilities.ModelFamily.TRANSFORMER.value,
             (
-                capabilities.Fairness.NONE,
-                capabilities.Fairness.MITIGATION,
-            )
-            if task in (tasks.Task.BINARY, tasks.Task.MULTICLASS)
-            else (capabilities.Fairness.NONE,)
-        ):
-            records.append(
-                capabilities.Capability(
-                    key=capabilities.Coordinate(
-                        modality=capabilities.Modality.TABULAR,
-                        task=task,
-                        model_family=capabilities.ModelFamily.TRANSFORMER.value,
-                        evaluation=capabilities.Evaluation.STANDARD,
-                        uncertainty=capabilities.Uncertainty.NONE,
-                        fairness=fairness,
-                        explainability=capabilities.Explainability.NONE,
-                        inference=capabilities.Inference.LIBRARY,
-                    ),
-                    status=capabilities.Status.EXPERIMENTAL,
-                    required_extras=("deeplearning",),
-                    resources=capabilities.ResourceAssumptions(
-                        memory_gb=4.0,
-                        max_rows=100_000,
-                    ),
-                    failure_modes=(
-                        "torch runtime or tabular transformer adapter is "
-                        "unavailable",
-                        "numeric feature-token training or evaluation fails",
-                        "resource limits or experimental evidence are "
-                        "incomplete",
-                    ),
-                    evidence_links=(
-                        "tests/integration/test_capability_gate.py",
-                        "tests/unit/test_deeplearning.py",
-                    ),
-                    limitations=(
-                        "experimental tabular FT-Transformer only",
-                        "requires explicit models.experimental_models opt-in",
-                        "not a text, image, audio, video, or multimodal "
-                        "transformer",
-                        "no production support guarantee",
-                    ),
-                )
-            )
-    for task in (
-        tasks.Task.BINARY,
-        tasks.Task.MULTICLASS,
-        tasks.Task.REGRESSION,
-    ):
-        for fairness in (
+                ("torch runtime or tabular transformer adapter is unavailable"),
+                "numeric feature-token training or evaluation fails",
+                ("resource limits or experimental evidence are incomplete"),
+            ),
             (
-                capabilities.Fairness.NONE,
-                capabilities.Fairness.MITIGATION,
-            )
-            if task in (tasks.Task.BINARY, tasks.Task.MULTICLASS)
-            else (capabilities.Fairness.NONE,)
+                "tests/integration/test_capability_gate.py",
+                "tests/unit/test_deeplearning.py",
+            ),
+            (
+                "experimental tabular FT-Transformer only",
+                "requires explicit models.experimental_models opt-in",
+                ("not a text, image, audio, video, or multimodal transformer"),
+                "no production support guarantee",
+            ),
+        ),
+        (
+            capabilities.ModelFamily.JEPA.value,
+            (
+                "torch runtime or tabular JEPA adapter is unavailable",
+                (
+                    "numeric representation training or downstream "
+                    "head evaluation fails"
+                ),
+                ("resource limits or experimental evidence are incomplete"),
+            ),
+            (
+                "tests/integration/test_capability_gate.py",
+                "tests/integration/test_experimental_models.py",
+                "tests/unit/test_jepa_contract.py",
+            ),
+            (
+                (
+                    "experimental tabular numeric representation plus "
+                    "supervised head only"
+                ),
+                "requires explicit models.experimental_models opt-in",
+                ("not a text, image, audio, video, graph, or multimodal JEPA"),
+                "no production support guarantee",
+            ),
+        ),
+    )
+    for (
+        model_family,
+        failure_modes,
+        evidence_links,
+        limitations,
+    ) in experimental_families:
+        for task in (
+            tasks.Task.BINARY,
+            tasks.Task.MULTICLASS,
+            tasks.Task.REGRESSION,
         ):
-            records.append(
-                capabilities.Capability(
-                    key=capabilities.Coordinate(
-                        modality=capabilities.Modality.TABULAR,
-                        task=task,
-                        model_family=capabilities.ModelFamily.JEPA.value,
-                        evaluation=capabilities.Evaluation.STANDARD,
-                        uncertainty=capabilities.Uncertainty.NONE,
-                        fairness=fairness,
-                        explainability=capabilities.Explainability.NONE,
-                        inference=capabilities.Inference.LIBRARY,
-                    ),
-                    status=capabilities.Status.EXPERIMENTAL,
-                    required_extras=("deeplearning",),
-                    resources=capabilities.ResourceAssumptions(
-                        memory_gb=4.0,
-                        max_rows=100_000,
-                    ),
-                    failure_modes=(
-                        "torch runtime or tabular JEPA adapter is unavailable",
-                        "numeric representation training or downstream "
-                        "head evaluation fails",
-                        "resource limits or experimental evidence are "
-                        "incomplete",
-                    ),
-                    evidence_links=(
-                        "tests/integration/test_capability_gate.py",
-                        "tests/integration/test_experimental_models.py",
-                        "tests/unit/test_jepa_contract.py",
-                    ),
-                    limitations=(
-                        "experimental tabular numeric representation plus "
-                        "supervised head only",
-                        "requires explicit models.experimental_models opt-in",
-                        "not a text, image, audio, video, graph, or "
-                        "multimodal JEPA",
-                        "no production support guarantee",
-                    ),
+            records.extend(
+                experimental_tabular_capability(
+                    task,
+                    model_family,
+                    fairness,
+                    failure_modes,
+                    evidence_links,
+                    limitations,
                 )
+                for fairness in fairness_options(task)
             )
     return capabilities.Registry.with_declared_model_families(records)
 

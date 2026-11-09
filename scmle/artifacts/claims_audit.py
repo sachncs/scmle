@@ -64,7 +64,7 @@ CUSTODY_FILE = "custody_log.jsonl"
 CONTROL_FILE = "negative_control.json"
 BASELINE_FILE = "baseline_report.json"
 CAUSAL_FILE = "causal_claims.json"
-PASS = "pass"  # nosec B105
+PASS = "pass"  # noqa: S105 -- a verdict label, not a credential # nosec B105
 FAIL = "fail"
 SKIPPED = "skipped"
 TOLERANCE = 1e-12
@@ -421,6 +421,33 @@ def check_charter(
     return findings
 
 
+def ledger_header_mismatches(
+    document: dict[str, Any],
+    sealed_row: dict[str, Any],
+    survivors: Any,
+) -> list[str]:
+    """Names the header fields of a claims document that differ from the seal.
+
+    Args:
+        document: The claims document.
+        sealed_row: The ledger's confirmation row.
+        survivors: The ledger's frozen survivor set.
+
+    Returns:
+        The names of the differing fields, in a fixed order; empty if none.
+    """
+    problems = []
+    if document.get("survivors_sha256") != survivors.sha256:
+        problems.append("survivor hash")
+    if document.get("outcome") != sealed_row.get("outcome"):
+        problems.append("outcome")
+    if document.get("rule") != sealed_row.get("rule"):
+        problems.append("rule")
+    if document.get("alpha_confirm") != sealed_row.get("alpha_confirm"):
+        problems.append("alpha_confirm")
+    return problems
+
+
 def check_claims_against_ledger(
     document: dict[str, Any], ledger: scmle.data.ledger.ledger.Ledger
 ) -> Finding:
@@ -440,15 +467,7 @@ def check_claims_against_ledger(
     survivors = ledger.survivor_set
     if sealed_row is None or survivors is None:
         return Finding(name, FAIL, "the ledger is not sealed")
-    problems = []
-    if document.get("survivors_sha256") != survivors.sha256:
-        problems.append("survivor hash")
-    if document.get("outcome") != sealed_row.get("outcome"):
-        problems.append("outcome")
-    if document.get("rule") != sealed_row.get("rule"):
-        problems.append("rule")
-    if document.get("alpha_confirm") != sealed_row.get("alpha_confirm"):
-        problems.append("alpha_confirm")
+    problems = ledger_header_mismatches(document, sealed_row, survivors)
     ids = [c["claim_id"] for c in document["claims"]]
     if document.get("outcome") == confirm.NO_SURVIVORS:
         ok_ids = ids == []
@@ -529,6 +548,37 @@ def check_replay(document: dict[str, Any]) -> Finding:
     )
 
 
+def stage_two_record_problems(
+    record: dict[str, Any],
+    survivors: Any,
+    withdrawn: set[str],
+    family: list[str],
+    expected: str,
+) -> list[str]:
+    """Checks a second-stage record against the frozen survivors.
+
+    Args:
+        record: The claims document's `stage_two` record.
+        survivors: The ledger's frozen survivor set.
+        withdrawn: The withdrawn hypothesis ids.
+        family: The survivors that remain after the withdrawal.
+        expected: The digest the family and survivors must hash to.
+
+    Returns:
+        What is inconsistent, in a fixed order; empty if nothing is.
+    """
+    problems = []
+    if not withdrawn <= set(survivors.hypothesis_ids):
+        problems.append("a withdrawn id is not a survivor")
+    if record["family"] != family:
+        problems.append("family is not survivors minus withdrawn")
+    if record["family_sha256"] != expected:
+        problems.append("family hash")
+    if record["survivors_sha256"] != survivors.sha256:
+        problems.append("survivor hash")
+    return problems
+
+
 def check_stage_two(
     document: dict[str, Any], ledger: scmle.data.ledger.ledger.Ledger
 ) -> Finding:
@@ -556,23 +606,19 @@ def check_stage_two(
     expected = scmle.data.ledger.ledger.digest(
         {"survivors_sha256": survivors.sha256, "family": family}
     )
-    problems = []
-    if not withdrawn <= set(survivors.hypothesis_ids):
-        problems.append("a withdrawn id is not a survivor")
-    if record["family"] != family:
-        problems.append("family is not survivors minus withdrawn")
-    if record["family_sha256"] != expected:
-        problems.append("family hash")
-    if record["survivors_sha256"] != survivors.sha256:
-        problems.append("survivor hash")
+    problems = stage_two_record_problems(
+        record, survivors, withdrawn, family, expected
+    )
     tested = {c["check_id"].split(":")[0] for c in document["checks"]}
     if tested & withdrawn:
         problems.append("a withdrawn survivor was tested on C")
     if tested - set(family):
         problems.append("a check on C is outside the family")
-    for claim in document["claims"]:
-        if claim["claim_id"] in withdrawn and is_confirmed(claim):
-            problems.append("a withdrawn survivor is confirmed")
+    problems.extend(
+        "a withdrawn survivor is confirmed"
+        for claim in document["claims"]
+        if claim["claim_id"] in withdrawn and is_confirmed(claim)
+    )
     if problems:
         return Finding(name, FAIL, "; ".join(problems))
     return Finding(
@@ -580,6 +626,66 @@ def check_stage_two(
         PASS,
         f"{len(family)} tested, {len(withdrawn)} withdrawn before C opened",
     )
+
+
+def custody_open_finding(
+    name: str, document: dict[str, Any], opened: int
+) -> Finding | None:
+    """Judges how often `C` was opened, when that alone decides the check.
+
+    Args:
+        name: The name of the finding.
+        document: The claims document.
+        opened: The number of open events for `C` in the custody log.
+
+    Returns:
+        A failing finding if `C` was opened more than once or a confirmed
+        outcome has no single open event, a passing one if `C` was never
+        opened in a non-confirmed run, otherwise None.
+    """
+    if opened > 1:
+        return Finding(name, FAIL, f"C was opened {opened} times")
+    if document.get("outcome") == confirm.CONFIRMED and opened != 1:
+        return Finding(
+            name, FAIL, "outcome is confirmed but C has no open event"
+        )
+    if opened == 0 and document.get("outcome") != confirm.CONFIRMED:
+        return Finding(
+            name, PASS, f"C not opened (outcome {document['outcome']})"
+        )
+    return None
+
+
+def frozen_selection_problem(
+    entries: list[dict[str, Any]],
+    names: list[str],
+    document: dict[str, Any],
+) -> str | None:
+    """Checks the `selection_frozen` event against the claims document.
+
+    Args:
+        entries: The custody log entries for `C`.
+        names: The event names of those entries, in order.
+        document: The claims document.
+
+    Returns:
+        What is wrong with the frozen selection, or None if nothing is.
+    """
+    frozen = [e for e in entries if e["event"] == "selection_frozen"]
+    if len(frozen) != 1 or names.index("selection_frozen") > names.index(
+        "open"
+    ):
+        return "no single selection_frozen before the open"
+    detail = frozen[0].get("detail", {})
+    if detail.get("survivors_sha256") != document.get("survivors_sha256"):
+        return "frozen survivor hash differs from the claims"
+    record = document.get("stage_two")
+    if (
+        record is not None
+        and detail.get("family_sha256") != record["family_sha256"]
+    ):
+        return "frozen family hash differs from the claims"
+    return None
 
 
 def check_custody(
@@ -612,33 +718,43 @@ def check_custody(
     entries = [e for e in log.entries if e.get("set") == "C"]
     names = [e["event"] for e in entries]
     opened = names.count("open")
-    if opened > 1:
-        return Finding(name, FAIL, f"C was opened {opened} times")
-    if document.get("outcome") == confirm.CONFIRMED and opened != 1:
-        return Finding(
-            name, FAIL, "outcome is confirmed but C has no open event"
-        )
-    if opened == 0 and document.get("outcome") != confirm.CONFIRMED:
-        return Finding(
-            name, PASS, f"C not opened (outcome {document['outcome']})"
-        )
-    frozen = [e for e in entries if e["event"] == "selection_frozen"]
-    if len(frozen) != 1 or names.index("selection_frozen") > names.index(
-        "open"
-    ):
-        return Finding(name, FAIL, "no single selection_frozen before the open")
-    detail = frozen[0].get("detail", {})
-    if detail.get("survivors_sha256") != document.get("survivors_sha256"):
-        return Finding(
-            name, FAIL, "frozen survivor hash differs from the claims"
-        )
-    record = document.get("stage_two")
-    if (
-        record is not None
-        and detail.get("family_sha256") != record["family_sha256"]
-    ):
-        return Finding(name, FAIL, "frozen family hash differs from the claims")
+    early = custody_open_finding(name, document, opened)
+    if early is not None:
+        return early
+    problem = frozen_selection_problem(entries, names, document)
+    if problem is not None:
+        return Finding(name, FAIL, problem)
     return Finding(name, PASS, f"{len(log.entries)} entries, chain verified")
+
+
+def decision_file_problems(
+    run_dir: Path, registered: dict[str, Any]
+) -> list[str]:
+    """Compares each decision file with the hash the custody log registered.
+
+    Args:
+        run_dir: The run directory.
+        registered: Registered file digests by file name.
+
+    Returns:
+        One message per file that is unreadable, unregistered, missing or
+        changed; empty if all match.
+    """
+    problems = []
+    for file_name in decision_reports.DECISION_FILES:
+        expected = registered.get(file_name)
+        try:
+            found = decision_reports.file_digest(run_dir / file_name)
+        except ValueError as error:
+            problems.append(f"{file_name}: unreadable ({error})")
+            continue
+        if expected is None and found is not None:
+            problems.append(f"{file_name}: not registered")
+        elif expected is not None and found is None:
+            problems.append(f"{file_name}: missing")
+        elif found != expected:
+            problems.append(f"{file_name}: differs from the registered hash")
+    return problems
 
 
 def check_decision_files(
@@ -683,24 +799,34 @@ def check_decision_files(
     if len(entries) > 1:
         return Finding(name, FAIL, "the decision files were registered twice")
     registered = entries[0].get("detail", {}).get("files", {})
-    problems = []
-    for file_name in decision_reports.DECISION_FILES:
-        expected = registered.get(file_name)
-        try:
-            found = decision_reports.file_digest(run_dir / file_name)
-        except ValueError as error:
-            problems.append(f"{file_name}: unreadable ({error})")
-            continue
-        if expected is None and found is not None:
-            problems.append(f"{file_name}: not registered")
-        elif expected is not None and found is None:
-            problems.append(f"{file_name}: missing")
-        elif found != expected:
-            problems.append(f"{file_name}: differs from the registered hash")
+    problems = decision_file_problems(run_dir, registered)
     if problems:
         return Finding(name, FAIL, "; ".join(problems))
     count = sum(1 for v in registered.values() if v is not None)
     return Finding(name, PASS, f"{count} file(s) hash to the registration")
+
+
+def coverage_report_problems(
+    report_path: Path, claim_hash: str | None
+) -> list[str]:
+    """Checks that a coverage report names the registered claim.
+
+    Args:
+        report_path: Where the coverage report would be.
+        claim_hash: The hash of the claim, or None if the claim is unreadable.
+
+    Returns:
+        A message if the report exists and names another claim; else empty.
+    """
+    if not report_path.exists():
+        return []
+    try:
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        report = {}
+    if claim_hash is not None and report.get("claim_sha256") != claim_hash:
+        return [f"{coverage_run.REPORT_FILE}: names another claim"]
+    return []
 
 
 def check_coverage_claim(
@@ -752,16 +878,66 @@ def check_coverage_claim(
             )
     else:
         return Finding(name, SKIPPED, f"{CUSTODY_FILE} is not in the run")
-    if report_path.exists():
-        try:
-            report = json.loads(report_path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            report = {}
-        if found is not None and report.get("claim_sha256") != found:
-            problems.append(f"{coverage_run.REPORT_FILE}: names another claim")
+    problems.extend(coverage_report_problems(report_path, found))
     if problems:
         return Finding(name, FAIL, "; ".join(problems))
     return Finding(name, PASS, "claim hash registered; the report names it")
+
+
+def unregistered_coverage_finding(
+    name: str, document: dict[str, Any], registered: dict[str, Any] | None
+) -> Finding | None:
+    """Judges a coverage confirmation whose registration decides the check.
+
+    Args:
+        name: The name of the finding.
+        document: The coverage confirmation document.
+        registered: The ledger's registration of the claim, or None.
+
+    Returns:
+        A failing finding if the claim is registered but not evaluated, or
+        evaluated but not registered; a skipped one if the claim was neither;
+        otherwise None.
+    """
+    if document.get("status") == confirm.NOT_EVALUATED:
+        if registered is not None:
+            return Finding(
+                name, FAIL, "a registered claim has no evaluation document"
+            )
+        return Finding(name, SKIPPED, "the claim could not be tested on C")
+    if registered is None:
+        return Finding(name, FAIL, "the claim is not registered in the ledger")
+    return None
+
+
+def coverage_status_problems(
+    document: dict[str, Any],
+    redone: dict[str, Any],
+    ledger: scmle.data.ledger.ledger.Ledger,
+) -> list[str]:
+    """Checks the stated coverage status against the test and the ledger.
+
+    Args:
+        document: The coverage confirmation document.
+        redone: The recomputed decision for the claim.
+        ledger: The run's ledger.
+
+    Returns:
+        A message for each status that does not follow from the test or
+        differs from the sealed ledger row; empty if both agree.
+    """
+    problems = []
+    gate = document.get("task_gate")
+    expected = redone["status"]
+    if isinstance(gate, dict) and "task" in gate:
+        expected = coverage_confirm.capped(str(gate["task"]), expected)
+    if expected != document.get("status"):
+        problems.append("the status does not follow from the test")
+    sealed_row = (ledger.confirmation or {}).get("claims", {})
+    stated = (sealed_row.get(coverage_confirm.CLAIM_ID) or {}).get("status")
+    if stated != document.get("status"):
+        problems.append("the status differs from the sealed ledger row")
+    return problems
 
 
 def check_coverage_confirmation(
@@ -787,14 +963,9 @@ def check_coverage_confirmation(
     if document is None:
         return None
     registered = ledger.claims.get(coverage_confirm.CLAIM_ID)
-    if document.get("status") == confirm.NOT_EVALUATED:
-        if registered is not None:
-            return Finding(
-                name, FAIL, "a registered claim has no evaluation document"
-            )
-        return Finding(name, SKIPPED, "the claim could not be tested on C")
-    if registered is None:
-        return Finding(name, FAIL, "the claim is not registered in the ledger")
+    early = unregistered_coverage_finding(name, document, registered)
+    if early is not None:
+        return early
     problems = []
     claim = read_optional(run_dir / coverage_run.CLAIM_FILE)
     try:
@@ -812,16 +983,7 @@ def check_coverage_confirmation(
         return Finding(name, FAIL, "the document is malformed")
     if abs(redone["p_value"] - float(document["p_value"])) > TOLERANCE:
         problems.append("the p-value does not recompute from the counts")
-    gate = document.get("task_gate")
-    expected = redone["status"]
-    if isinstance(gate, dict) and "task" in gate:
-        expected = coverage_confirm.capped(str(gate["task"]), expected)
-    if expected != document.get("status"):
-        problems.append("the status does not follow from the test")
-    sealed_row = (ledger.confirmation or {}).get("claims", {})
-    stated = (sealed_row.get(coverage_confirm.CLAIM_ID) or {}).get("status")
-    if stated != document.get("status"):
-        problems.append("the status differs from the sealed ledger row")
+    problems.extend(coverage_status_problems(document, redone, ledger))
     if problems:
         return Finding(name, FAIL, "; ".join(problems))
     return Finding(
@@ -830,6 +992,52 @@ def check_coverage_confirmation(
         f"{document['covered']} of {document['rows']} covered; "
         f"status {document['status']}",
     )
+
+
+def attachment_problems(
+    run_dir: Path, attachments: dict[str, str]
+) -> list[str]:
+    """Checks that each attachment file hashes to its sealed digest.
+
+    Args:
+        run_dir: The run directory.
+        attachments: The sealed digests by file name.
+
+    Returns:
+        A message for each attachment that is missing or differs; empty if
+        all match.
+    """
+    problems = []
+    for file_name, expected in sorted(attachments.items()):
+        found = read_optional(run_dir / file_name)
+        if found is None:
+            problems.append(f"{file_name}: missing")
+        elif scmle.data.ledger.ledger.digest(found) != expected:
+            problems.append(f"{file_name}: differs from the sealed hash")
+    return problems
+
+
+def baseline_report_problems(
+    run_dir: Path, ledger: scmle.data.ledger.ledger.Ledger
+) -> list[str]:
+    """Checks that the baseline report names the registered baseline claim.
+
+    Args:
+        run_dir: The run directory.
+        ledger: The run's ledger.
+
+    Returns:
+        A message for each baseline claim whose registration the report does
+        not name; empty if there is no report or all match.
+    """
+    baseline_doc = read_optional(run_dir / BASELINE_FILE)
+    return [
+        f"{claim_id}: report names another registration"
+        for claim_id, item in ledger.claims.items()
+        if item["kind"] == "baseline"
+        and baseline_doc is not None
+        and baseline_doc.get("registration_hash") != item["sha256"]
+    ]
 
 
 def check_registered(
@@ -859,22 +1067,10 @@ def check_registered(
         stated = (sealed_row.get("claims") or {}).get(claim_id)
         if stated is None or stated.get("sha256") != item["sha256"]:
             problems.append(f"{claim_id}: registration hash differs")
-    for file_name, expected in sorted(attachments.items()):
-        found = read_optional(run_dir / file_name)
-        if found is None:
-            problems.append(f"{file_name}: missing")
-        elif scmle.data.ledger.ledger.digest(found) != expected:
-            problems.append(f"{file_name}: differs from the sealed hash")
+    problems.extend(attachment_problems(run_dir, attachments))
     if document.get("attachments") != attachments:
         problems.append("attachment hashes differ from the claims file")
-    baseline_doc = read_optional(run_dir / BASELINE_FILE)
-    for claim_id, item in ledger.claims.items():
-        if (
-            item["kind"] == "baseline"
-            and baseline_doc is not None
-            and baseline_doc.get("registration_hash") != item["sha256"]
-        ):
-            problems.append(f"{claim_id}: report names another registration")
+    problems.extend(baseline_report_problems(run_dir, ledger))
     if problems:
         return Finding(name, FAIL, "; ".join(problems))
     return Finding(
@@ -908,6 +1104,86 @@ def check_control(
     if scmle.data.ledger.ledger.digest(body) == ledger.control.get("sha256"):
         return Finding(name, PASS, "hash equal")
     return Finding(name, FAIL, "the file differs from the ledger's control row")
+
+
+def evaluate_attestation(
+    item: dict[str, Any],
+    report: dict[str, Any],
+    charter: Any,
+    allowed: dict[str, set[str]],
+    signing_key: str | bytes | None,
+) -> tuple[Any, list[str], bool]:
+    """Checks one accepted attestation.
+
+    Args:
+        item: The attestation record.
+        report: The attestation report, which names the evaluation day.
+        charter: The charter the attestation must be scoped to.
+        allowed: The assumptions each named attestor may attest.
+        signing_key: Key for the signature, or None to use the environment
+            key.
+
+    Returns:
+        The parsed attestation (None if malformed), a message for each
+        problem, and whether the signature could not be checked for lack of
+        a key.
+    """
+    try:
+        given = attest.Attestation.from_dict(item)
+    except (ValueError, TypeError) as error:
+        return None, [f"malformed attestation: {error}"], False
+    problems = []
+    if given.assumption not in allowed.get(given.attestor, set()):
+        problems.append(f"{given.assumption}: {given.attestor} not permitted")
+    if given.scope != charter.charter_hash:
+        problems.append(f"{given.assumption}: scope is not this charter")
+    day = str(report.get("evaluated_on", ""))
+    try:
+        valid = given.date <= day <= given.expires
+    except TypeError:
+        valid = False
+    if not valid:
+        problems.append(f"{given.assumption}: not valid on {day!r}")
+    unchecked = False
+    if signing_key is None and not signing.resolve_key(None):
+        unchecked = True
+    elif not given.verify(signing_key):
+        problems.append(f"{given.assumption}: signature does not verify")
+    return given, problems, unchecked
+
+
+def evaluate_attestations(
+    report: dict[str, Any],
+    charter: Any,
+    allowed: dict[str, set[str]],
+    signing_key: str | bytes | None,
+) -> tuple[dict[str, str], list[str], bool]:
+    """Checks every accepted attestation of a report.
+
+    Args:
+        report: The attestation report.
+        charter: The charter the attestations must be scoped to.
+        allowed: The assumptions each named attestor may attest.
+        signing_key: Key for the signatures, or None to use the environment
+            key.
+
+    Returns:
+        The attestor by assumption for each well-formed attestation, a
+        message for each problem, and whether any signature could not be
+        checked for lack of a key.
+    """
+    accepted: dict[str, str] = {}
+    problems: list[str] = []
+    unchecked = False
+    for item in report.get("accepted", []):
+        given, found, skipped = evaluate_attestation(
+            item, report, charter, allowed, signing_key
+        )
+        problems.extend(found)
+        unchecked = unchecked or skipped
+        if given is not None:
+            accepted[given.assumption] = given.attestor
+    return accepted, problems, unchecked
 
 
 def check_attestations(
@@ -950,32 +1226,10 @@ def check_attestations(
             "tier above unverified but the charter names no attestors"
         )
     allowed = {a.name: set(a.assumptions) for a in block.attestors}
-    accepted = {}
-    unchecked = False
-    for item in report.get("accepted", []):
-        try:
-            given = attest.Attestation.from_dict(item)
-        except (ValueError, TypeError) as error:
-            problems.append(f"malformed attestation: {error}")
-            continue
-        accepted[given.assumption] = given.attestor
-        if given.assumption not in allowed.get(given.attestor, set()):
-            problems.append(
-                f"{given.assumption}: {given.attestor} not permitted"
-            )
-        if given.scope != charter.charter_hash:
-            problems.append(f"{given.assumption}: scope is not this charter")
-        day = str(report.get("evaluated_on", ""))
-        try:
-            valid = given.date <= day <= given.expires
-        except TypeError:
-            valid = False
-        if not valid:
-            problems.append(f"{given.assumption}: not valid on {day!r}")
-        if signing_key is None and not signing.resolve_key(None):
-            unchecked = True
-        elif not given.verify(signing_key):
-            problems.append(f"{given.assumption}: signature does not verify")
+    accepted, found, unchecked = evaluate_attestations(
+        report, charter, allowed, signing_key
+    )
+    problems.extend(found)
     for assumption, named in (claims.get("assumptions") or {}).items():
         if named and accepted.get(assumption) != named:
             problems.append(

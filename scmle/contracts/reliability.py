@@ -160,6 +160,27 @@ class Evidence:
         )
 
 
+def check_evidence_requirements(requirements: tuple[str, ...]) -> None:
+    """Checks the evidence types a fault scenario requires.
+
+    Args:
+        requirements: The required evidence types.
+
+    Raises:
+        ValueError: If there are none, one is blank or not text, or one is
+            repeated.
+    """
+    if not requirements:
+        raise ValueError("evidence_requirements must not be empty")
+    if any(
+        not isinstance(requirement, str) or not requirement.strip()
+        for requirement in requirements
+    ):
+        raise ValueError("evidence_requirements must contain text")
+    if len(set(requirements)) != len(requirements):
+        raise ValueError("evidence_requirements must be unique")
+
+
 @dataclasses.dataclass(frozen=True, slots=True)
 class Plan:
     """Declaration and verification state for one fault scenario.
@@ -211,17 +232,7 @@ class Plan:
         for name, value, expected in enum_fields:
             if not isinstance(value, expected):
                 raise TypeError(f"{name} must be {expected.__name__}")
-        if not self.evidence_requirements:
-            raise ValueError("evidence_requirements must not be empty")
-        if any(
-            not isinstance(requirement, str) or not requirement.strip()
-            for requirement in self.evidence_requirements
-        ):
-            raise ValueError("evidence_requirements must contain text")
-        if len(set(self.evidence_requirements)) != len(
-            self.evidence_requirements
-        ):
-            raise ValueError("evidence_requirements must be unique")
+        check_evidence_requirements(self.evidence_requirements)
         if not isinstance(self.release_blocking, bool):
             raise TypeError("release_blocking must be bool")
         evidence_types = [item.evidence_type for item in self.evidence]

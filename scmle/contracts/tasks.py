@@ -13,6 +13,8 @@ CONFIG_VERSION = 1
 FAST_BUDGET_SECONDS = 300
 FAST_SEARCH_MODELS = 1
 FAST_SEARCH_CONFIGS = 3
+MIN_ORDINAL_LEVELS = 3
+MIN_TARGETS = 2
 GRAPH_VERSION = 1
 DELAYED_SUFFIX = "__available"
 HORIZON_SEPARATOR = "__h"
@@ -770,121 +772,10 @@ class Config(FrozenModel):
                 data columns.
         """
         data, validation = self.data, self.validation
-        if validation.strategy == "group" and not (
-            data.group_column or data.query_column
-        ):
-            raise ValueError(
-                "strategy 'group' requires data.group_column (or "
-                "data.query_column for ranking)"
-            )
-        if validation.strategy in ("temporal", "rolling") and (
-            not data.time_column
-        ):
-            raise ValueError(
-                f"strategy '{validation.strategy}' requires data.time_column"
-            )
-        if (
-            validation.horizon_rows or validation.window_rows
-        ) and validation.strategy not in ("rolling", "auto"):
-            raise ValueError(
-                "horizon_rows and window_rows apply to the rolling strategy"
-            )
-        if data.feature_delays and not data.time_column:
-            raise ValueError("data.feature_delays requires data.time_column")
-        if any(delay < 1 for delay in data.feature_delays.values()):
-            raise ValueError("feature delays must be at least 1 row")
-        stale = [
-            node.name
-            for node in self.feature_graph.nodes
-            if set(node.inputs) & set(data.feature_delays)
-            and not node.name.endswith(DELAYED_SUFFIX)
-        ]
-        if stale:
-            raise ValueError(
-                f"feature nodes {stale} read a delayed column directly; "
-                f"read '<column>{DELAYED_SUFFIX}' instead"
-            )
-        if validation.strategy == "stratified" and self.task in (
-            "regression",
-            "survival",
-            "ordinal",
-            "ranking",
-            "multilabel",
-            "multioutput",
-            "forecast",
-            "uplift",
-        ):
-            raise ValueError(
-                f"stratified validation is undefined for {self.task}"
-            )
-        if (self.task == "survival") != (data.event_column is not None):
-            raise ValueError(
-                "survival tasks need data.event_column, and only survival "
-                "tasks may set it"
-            )
-        if (self.task == "ordinal") != bool(data.ordinal_order):
-            raise ValueError(
-                "ordinal tasks need data.ordinal_order, and only ordinal "
-                "tasks may set it"
-            )
-        if len(set(data.ordinal_order)) != len(data.ordinal_order):
-            raise ValueError("data.ordinal_order must not repeat a label")
-        if self.task == "ordinal" and len(data.ordinal_order) < 3:
-            raise ValueError("ordinal tasks need at least three levels")
-        if data.memory_budget_gb is not None and (
-            data.time_column
-            or data.group_column
-            or data.query_column
-            or data.horizon
-            or data.feature_delays
-            or self.feature_graph.nodes
-            or data.unlabeled != "block"
-        ):
-            raise ValueError(
-                "streaming a file larger than memory supports random or "
-                "stratified validation only (no time, group, query, "
-                "feature graph, forecast or unlabeled-row options)"
-            )
-        if data.training == "stream" and data.memory_budget_gb is None:
-            raise ValueError("training='stream' needs data.memory_budget_gb")
-        if (
-            self.fairness.mitigation == "reweighing"
-            and data.weight_column not in (None, FAIRNESS_WEIGHT)
-        ):
-            raise ValueError(
-                "fairness reweighing cannot be combined with data.weight_column"
-            )
-        if self.fairness.mitigation != "none":
-            chosen = self.fairness.column or next(
-                iter(data.sensitive_columns), None
-            )
-            if chosen is None or chosen not in data.sensitive_columns:
-                raise ValueError(
-                    "fairness mitigation needs a column listed in "
-                    "data.sensitive_columns"
-                )
-        if self.task == "forecast":
-            if not (data.horizon and data.time_column):
-                raise ValueError(
-                    "forecast tasks need data.horizon and data.time_column"
-                )
-        elif data.horizon is not None:
-            raise ValueError("data.horizon applies to forecast tasks only")
-        multi = self.task in ("multilabel", "multioutput", "forecast")
-        if multi != bool(data.targets):
-            raise ValueError(
-                "multilabel and multioutput tasks need data.targets, and "
-                "only they may set it"
-            )
-        if multi:
-            if len(set(data.targets)) != len(data.targets) or (
-                len(data.targets) < 2
-            ):
-                raise ValueError(
-                    "data.targets needs at least two distinct columns"
-                )
-            if data.targets[0] != data.target:
-                raise ValueError("data.targets must start with data.target")
+        check_validation_rules(self)
+        check_survival_and_ordinal_rules(self)
+        check_streaming_and_fairness_rules(self)
+        check_multi_target_rules(self)
         if (self.task == "uplift") != (data.treatment_column is not None):
             raise ValueError(
                 "uplift tasks need data.treatment_column, and only uplift "
@@ -895,25 +786,7 @@ class Config(FrozenModel):
                 "ranking tasks need data.query_column, and only ranking "
                 "tasks may set it"
             )
-        if data.event_column == data.target:
-            raise ValueError("data.event_column must differ from the target")
-        for name in ("group_column", "time_column"):
-            if getattr(data, name) == data.target:
-                raise ValueError(f"data.{name} must differ from the target")
-        if data.target in data.id_columns:
-            raise ValueError("the target cannot be an id column")
-        if data.target in data.excluded_columns:
-            raise ValueError("the target cannot be excluded")
-        if any(
-            sign not in (-1, 1) for sign in data.monotonic_constraints.values()
-        ):
-            raise ValueError("monotonic constraints must be +1 or -1")
-        if data.target in data.monotonic_constraints:
-            raise ValueError("the target cannot have a monotonic constraint")
-        if data.target in data.sensitive_columns:
-            raise ValueError("the target cannot be a sensitive column")
-        if data.target in data.unavailable_at_prediction:
-            raise ValueError("the target cannot be unavailable at prediction")
+        check_target_column_rules(self)
         wanted = self.selection.maximize
         if wanted and self.metric and wanted != self.metric:
             raise ValueError(
@@ -981,3 +854,207 @@ class Config(FrozenModel):
         """Returns a short deterministic hash of the canonical configuration."""
         digest = hashlib.sha256(self.canonical_json().encode()).hexdigest()
         return digest[:16]
+
+
+def check_validation_rules(config: Config) -> None:
+    """Checks the validation strategy against the columns it needs.
+
+    Args:
+        config: The configuration being validated.
+
+    Raises:
+        ValueError: If a strategy lacks its column, the row options do not fit
+            the strategy, feature delays are inconsistent, or stratified
+            validation is used with a task that has no classes.
+    """
+    data, validation = config.data, config.validation
+    if validation.strategy == "group" and not (
+        data.group_column or data.query_column
+    ):
+        raise ValueError(
+            "strategy 'group' requires data.group_column (or "
+            "data.query_column for ranking)"
+        )
+    if validation.strategy in ("temporal", "rolling") and (
+        not data.time_column
+    ):
+        raise ValueError(
+            f"strategy '{validation.strategy}' requires data.time_column"
+        )
+    if (
+        validation.horizon_rows or validation.window_rows
+    ) and validation.strategy not in ("rolling", "auto"):
+        raise ValueError(
+            "horizon_rows and window_rows apply to the rolling strategy"
+        )
+    if data.feature_delays and not data.time_column:
+        raise ValueError("data.feature_delays requires data.time_column")
+    if any(delay < 1 for delay in data.feature_delays.values()):
+        raise ValueError("feature delays must be at least 1 row")
+    stale = [
+        node.name
+        for node in config.feature_graph.nodes
+        if set(node.inputs) & set(data.feature_delays)
+        and not node.name.endswith(DELAYED_SUFFIX)
+    ]
+    if stale:
+        raise ValueError(
+            f"feature nodes {stale} read a delayed column directly; "
+            f"read '<column>{DELAYED_SUFFIX}' instead"
+        )
+    if validation.strategy == "stratified" and config.task in (
+        "regression",
+        "survival",
+        "ordinal",
+        "ranking",
+        "multilabel",
+        "multioutput",
+        "forecast",
+        "uplift",
+    ):
+        raise ValueError(
+            f"stratified validation is undefined for {config.task}"
+        )
+
+
+def check_survival_and_ordinal_rules(config: Config) -> None:
+    """Checks that survival and ordinal tasks have their columns.
+
+    Args:
+        config: The configuration being validated.
+
+    Raises:
+        ValueError: If the event column or the ordinal order does not match the
+            task, the order repeats a label, or an ordinal task has fewer than
+            three levels.
+    """
+    data = config.data
+    if (config.task == "survival") != (data.event_column is not None):
+        raise ValueError(
+            "survival tasks need data.event_column, and only survival "
+            "tasks may set it"
+        )
+    if (config.task == "ordinal") != bool(data.ordinal_order):
+        raise ValueError(
+            "ordinal tasks need data.ordinal_order, and only ordinal "
+            "tasks may set it"
+        )
+    if len(set(data.ordinal_order)) != len(data.ordinal_order):
+        raise ValueError("data.ordinal_order must not repeat a label")
+    if (
+        config.task == "ordinal"
+        and len(data.ordinal_order) < MIN_ORDINAL_LEVELS
+    ):
+        raise ValueError("ordinal tasks need at least three levels")
+
+
+def check_streaming_and_fairness_rules(config: Config) -> None:
+    """Checks streaming training and fairness mitigation settings.
+
+    Args:
+        config: The configuration being validated.
+
+    Raises:
+        ValueError: If streaming is combined with an unsupported option, or the
+            training mode lacks its memory budget, or fairness reweighing
+            conflicts with a weight column, or a mitigation has no sensitive
+            column to act on.
+    """
+    data = config.data
+    if data.memory_budget_gb is not None and (
+        data.time_column
+        or data.group_column
+        or data.query_column
+        or data.horizon
+        or data.feature_delays
+        or config.feature_graph.nodes
+        or data.unlabeled != "block"
+    ):
+        raise ValueError(
+            "streaming a file larger than memory supports random or "
+            "stratified validation only (no time, group, query, "
+            "feature graph, forecast or unlabeled-row options)"
+        )
+    if data.training == "stream" and data.memory_budget_gb is None:
+        raise ValueError("training='stream' needs data.memory_budget_gb")
+    if (
+        config.fairness.mitigation == "reweighing"
+        and data.weight_column not in (None, FAIRNESS_WEIGHT)
+    ):
+        raise ValueError(
+            "fairness reweighing cannot be combined with data.weight_column"
+        )
+    if config.fairness.mitigation != "none":
+        chosen = config.fairness.column or next(
+            iter(data.sensitive_columns), None
+        )
+        if chosen is None or chosen not in data.sensitive_columns:
+            raise ValueError(
+                "fairness mitigation needs a column listed in "
+                "data.sensitive_columns"
+            )
+
+
+def check_multi_target_rules(config: Config) -> None:
+    """Checks that forecast and multi-target tasks have their columns.
+
+    Args:
+        config: The configuration being validated.
+
+    Raises:
+        ValueError: If a forecast lacks its horizon or time column, another
+            task sets a horizon, or the targets do not match the task, repeat,
+            number fewer than two, or do not start with the target.
+    """
+    data = config.data
+    if config.task == "forecast":
+        if not (data.horizon and data.time_column):
+            raise ValueError(
+                "forecast tasks need data.horizon and data.time_column"
+            )
+    elif data.horizon is not None:
+        raise ValueError("data.horizon applies to forecast tasks only")
+    multi = config.task in ("multilabel", "multioutput", "forecast")
+    if multi != bool(data.targets):
+        raise ValueError(
+            "multilabel and multioutput tasks need data.targets, and "
+            "only they may set it"
+        )
+    if multi:
+        if len(set(data.targets)) != len(data.targets) or (
+            len(data.targets) < MIN_TARGETS
+        ):
+            raise ValueError("data.targets needs at least two distinct columns")
+        if data.targets[0] != data.target:
+            raise ValueError("data.targets must start with data.target")
+
+
+def check_target_column_rules(config: Config) -> None:
+    """Checks that the target column is not reused for another role.
+
+    Args:
+        config: The configuration being validated.
+
+    Raises:
+        ValueError: If the event, group or time column equals the target, the
+            target is an id, excluded, constrained, sensitive or unavailable
+            column, or a monotonic constraint is not +1 or -1.
+    """
+    data = config.data
+    if data.event_column == data.target:
+        raise ValueError("data.event_column must differ from the target")
+    for name in ("group_column", "time_column"):
+        if getattr(data, name) == data.target:
+            raise ValueError(f"data.{name} must differ from the target")
+    if data.target in data.id_columns:
+        raise ValueError("the target cannot be an id column")
+    if data.target in data.excluded_columns:
+        raise ValueError("the target cannot be excluded")
+    if any(sign not in (-1, 1) for sign in data.monotonic_constraints.values()):
+        raise ValueError("monotonic constraints must be +1 or -1")
+    if data.target in data.monotonic_constraints:
+        raise ValueError("the target cannot have a monotonic constraint")
+    if data.target in data.sensitive_columns:
+        raise ValueError("the target cannot be a sensitive column")
+    if data.target in data.unavailable_at_prediction:
+        raise ValueError("the target cannot be unavailable at prediction")

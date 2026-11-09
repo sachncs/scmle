@@ -12,6 +12,7 @@ from scmle.contracts import events
 from scmle.contracts import explanations
 
 HIGH_CARDINALITY_LEVELS = 20
+SHA256_HEX_LENGTH = 64
 
 
 def normalize_quality_evidence(
@@ -242,6 +243,19 @@ class CurationFinding:
             blocking=bool(record["blocking"]),
             timestamp=str(record["timestamp"]),
         )
+
+
+def check_findings(findings: tuple[Any, ...]) -> None:
+    """Checks that every entry of a record's findings is a finding.
+
+    Args:
+        findings: The findings of a manifest.
+
+    Raises:
+        TypeError: If an entry is not a `CurationFinding`.
+    """
+    if any(not isinstance(finding, CurationFinding) for finding in findings):
+        raise TypeError("findings must contain CurationFinding records")
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -507,11 +521,7 @@ class DatasetManifest:
             if not isinstance(component, expected):
                 raise TypeError(f"{component_name} must be {expected.__name__}")
         object.__setattr__(self, "findings", tuple(self.findings))
-        if any(
-            not isinstance(finding, CurationFinding)
-            for finding in self.findings
-        ):
-            raise TypeError("findings must contain CurationFinding records")
+        check_findings(self.findings)
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON- and Arrow-compatible mapping."""
@@ -618,7 +628,7 @@ class ModalityManifest:
             raise ValueError("sample_count must not be negative")
         if self.schema_version < 1:
             raise ValueError("schema_version must be positive")
-        if len(self.content_hash) != 64 or any(
+        if len(self.content_hash) != SHA256_HEX_LENGTH or any(
             character not in "0123456789abcdef"
             for character in self.content_hash
         ):
@@ -630,11 +640,7 @@ class ModalityManifest:
         if not isinstance(self.privacy, PrivacyMetadata):
             raise TypeError("privacy must be PrivacyMetadata")
         object.__setattr__(self, "findings", tuple(self.findings))
-        if any(
-            not isinstance(finding, CurationFinding)
-            for finding in self.findings
-        ):
-            raise TypeError("findings must contain CurationFinding records")
+        check_findings(self.findings)
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON- and Arrow-compatible modality manifest."""
@@ -1023,8 +1029,10 @@ class DatasetCard:
             out_of_scope=(
                 "It is not evidence of production-population coverage.",
                 "It is not a release approval or a causal claim.",
-                "It must not be used outside the declared task and "
-                "privacy policy.",
+                (
+                    "It must not be used outside the declared task and "
+                    "privacy policy."
+                ),
             ),
             composition={
                 "source_rows": report.source_rows,

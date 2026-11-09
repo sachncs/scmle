@@ -5,6 +5,7 @@ import hashlib
 import hmac
 import json
 import os
+import pathlib
 from typing import Any
 
 SIGNING_KEY_ENV = "SCMLE_SIGNING_KEY"
@@ -32,7 +33,7 @@ def key_from_environment(environ: Mapping[str, str]) -> str | None:
         return direct
     path = environ.get(SIGNING_KEY_FILE_ENV)
     if path:
-        with open(path, encoding="utf-8") as handle:
+        with pathlib.Path(path).open(encoding="utf-8") as handle:
             return handle.read().strip() or None
     return None
 

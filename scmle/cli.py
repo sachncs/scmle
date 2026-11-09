@@ -93,6 +93,41 @@ class Command(abc.ABC):
         """
 
 
+def add_validation_arguments(parser: argparse.ArgumentParser) -> None:
+    """Adds the validation strategy, fold, test-split and window options.
+
+    Args:
+        parser: The argument parser of the command.
+    """
+    parser.add_argument(
+        "--validation",
+        choices=[
+            "auto",
+            "stratified",
+            "stratified_events",
+            "multilabel_stratified",
+            "treatment_stratified",
+            "random",
+            "group",
+            "temporal",
+            "rolling",
+        ],
+        default="auto",
+    )
+    parser.add_argument("--folds", type=int, default=5)
+    parser.add_argument("--test-fraction", type=float, default=0.2)
+    parser.add_argument(
+        "--horizon-rows",
+        type=int,
+        help="rolling validation: rows in each validation window",
+    )
+    parser.add_argument(
+        "--window-rows",
+        type=int,
+        help="rolling validation: rows in each training window",
+    )
+
+
 class ProjectCommand(Command):
     """Shared arguments for commands that build an `Project`."""
 
@@ -153,33 +188,7 @@ class ProjectCommand(Command):
             default="random",
         )
         parser.add_argument("--output-dir", default="runs")
-        parser.add_argument(
-            "--validation",
-            choices=[
-                "auto",
-                "stratified",
-                "stratified_events",
-                "multilabel_stratified",
-                "treatment_stratified",
-                "random",
-                "group",
-                "temporal",
-                "rolling",
-            ],
-            default="auto",
-        )
-        parser.add_argument("--folds", type=int, default=5)
-        parser.add_argument("--test-fraction", type=float, default=0.2)
-        parser.add_argument(
-            "--horizon-rows",
-            type=int,
-            help="rolling validation: rows in each validation window",
-        )
-        parser.add_argument(
-            "--window-rows",
-            type=int,
-            help="rolling validation: rows in each training window",
-        )
+        add_validation_arguments(parser)
         parser.add_argument(
             "--monotonic",
             nargs="*",
@@ -2016,10 +2025,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         return command.execute(args)
     except errors.BlockedError as error:
-        LOGGER.error("blocked: %s", error)
+        LOGGER.error("blocked: %s", error)  # noqa: TRY400 -- one-line report; a traceback is noise
         return EXIT_BLOCKED
     except errors.ScmleError as error:
-        LOGGER.error("%s error: %s", error.category, error)
+        LOGGER.error("%s error: %s", error.category, error)  # noqa: TRY400 -- one-line report; a traceback is noise
         return EXIT_FAILED
 
 

@@ -462,6 +462,44 @@ class MetricGate:
         }
 
 
+def check_open_unit_interval(value: float, field_name: str) -> None:
+    """Validates a finite number strictly between zero and one.
+
+    Args:
+        value: The number to check.
+        field_name: The field name, for the error message.
+
+    Raises:
+        ValueError: If the value is not strictly between 0 and 1 (or is not
+            finite).
+    """
+    checked = validate_finite(value, field_name)
+    if not 0 < checked < 1:
+        raise ValueError(f"{field_name} must be between 0 and 1")
+
+
+def check_explanation_threshold(
+    threshold: float, name: str, required: bool, requirement: str
+) -> None:
+    """Validates a stability or fidelity threshold of an explanation policy.
+
+    Args:
+        threshold: The threshold to check.
+        name: The threshold's field name.
+        required: Whether its requirement flag is set.
+        requirement: The name of the requirement flag.
+
+    Raises:
+        ValueError: If the threshold is outside [0, 1] or not finite, or its
+            requirement flag is not set.
+    """
+    value = validate_finite(threshold, f"explanation.{name}")
+    if not 0.0 <= value <= 1.0:
+        raise ValueError(f"explanation.{name} must be between 0 and 1")
+    if not required:
+        raise ValueError(f"{name} requires {requirement}")
+
+
 @dataclasses.dataclass(frozen=True, slots=True)
 class Uncertainty:
     """Task-specific uncertainty promise and statistical requirements."""
@@ -490,21 +528,13 @@ class Uncertainty:
                 "uncertainty cannot be required when method is none"
             )
         if self.confidence_level is not None:
-            confidence = validate_finite(
+            check_open_unit_interval(
                 self.confidence_level, "uncertainty.confidence_level"
             )
-            if not 0 < confidence < 1:
-                raise ValueError(
-                    "uncertainty.confidence_level must be between 0 and 1"
-                )
         if self.coverage_target is not None:
-            coverage = validate_finite(
+            check_open_unit_interval(
                 self.coverage_target, "uncertainty.coverage_target"
             )
-            if not 0 < coverage < 1:
-                raise ValueError(
-                    "uncertainty.coverage_target must be between 0 and 1"
-                )
         if self.minimum_rows is not None and self.minimum_rows < 1:
             raise ValueError("uncertainty.minimum_rows must be at least 1")
         if self.method is not UncertaintyMethod.NONE and self.required:
@@ -725,27 +755,19 @@ class Explanations:
             self.required_evidence, "explanation.required_evidence"
         )
         if self.stability_threshold is not None:
-            stability = validate_finite(
-                self.stability_threshold, "explanation.stability_threshold"
+            check_explanation_threshold(
+                self.stability_threshold,
+                "stability_threshold",
+                self.require_stability,
+                "require_stability",
             )
-            if not 0.0 <= stability <= 1.0:
-                raise ValueError(
-                    "explanation.stability_threshold must be between 0 and 1"
-                )
-            if not self.require_stability:
-                raise ValueError(
-                    "stability_threshold requires require_stability"
-                )
         if self.fidelity_threshold is not None:
-            fidelity = validate_finite(
-                self.fidelity_threshold, "explanation.fidelity_threshold"
+            check_explanation_threshold(
+                self.fidelity_threshold,
+                "fidelity_threshold",
+                self.require_fidelity,
+                "require_fidelity",
             )
-            if not 0.0 <= fidelity <= 1.0:
-                raise ValueError(
-                    "explanation.fidelity_threshold must be between 0 and 1"
-                )
-            if not self.require_fidelity:
-                raise ValueError("fidelity_threshold requires require_fidelity")
         if self.require_stability and self.stability_threshold is None:
             raise ValueError("require_stability needs stability_threshold")
         if self.require_fidelity and self.fidelity_threshold is None:
@@ -1002,18 +1024,14 @@ class Criteria:
                 f"task '{self.task.value}'"
             )
 
-    def validate_release(self) -> None:
-        """Validates release gates against declared metrics and diagnostics.
+    def validate_metric_gates(self) -> None:
+        """Validates release metric gates against the declared metrics.
 
         Raises:
-            UnsupportedEvaluationPolicyError: If a metric gate names an
-                undeclared metric that the task does not support, or a
-                diagnostic gate names a diagnostic the task does not support.
-            ValueError: If a metric gate names an undeclared supported metric
-                or has a direction that differs from the declaration, a
-                fairness gate names a metric absent from the fairness
-                declaration, or fairness gates exist without a fairness
-                method or a fairness method has no gates.
+            UnsupportedEvaluationPolicyError: If a gate names an undeclared
+                metric that the task does not support.
+            ValueError: If a gate names an undeclared supported metric or has
+                a direction that differs from the declaration.
         """
         declared_metrics = {metric.name: metric for metric in self.metrics}
         for gate in self.release.metric_gates:
@@ -1032,6 +1050,21 @@ class Criteria:
                     f"release metric gate '{gate.metric}' has a mismatched "
                     "direction"
                 )
+
+    def validate_release(self) -> None:
+        """Validates release gates against declared metrics and diagnostics.
+
+        Raises:
+            UnsupportedEvaluationPolicyError: If a metric gate names an
+                undeclared metric that the task does not support, or a
+                diagnostic gate names a diagnostic the task does not support.
+            ValueError: If a metric gate names an undeclared supported metric
+                or has a direction that differs from the declaration, a
+                fairness gate names a metric absent from the fairness
+                declaration, or fairness gates exist without a fairness
+                method or a fairness method has no gates.
+        """
+        self.validate_metric_gates()
         for fairness_gate in self.release.fairness_gates:
             if fairness_gate.metric not in self.fairness.metrics:
                 raise ValueError(

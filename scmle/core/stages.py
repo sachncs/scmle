@@ -162,6 +162,7 @@ class Stage(abc.ABC):
 
 
 PARITY_ROWS = 200
+MATRIX_DIMENSIONS = 2
 
 
 class IngestStage(Stage):
@@ -169,7 +170,10 @@ class IngestStage(Stage):
 
     state = scmle.core.state.RunState.VALIDATING
 
-    def describe(self, context: scmle.core.context.Context) -> str:
+    def describe(
+        self,
+        context: scmle.core.context.Context,  # noqa: ARG002 -- Stage.describe
+    ) -> str:
         """Names the stage.
 
         Args:
@@ -448,7 +452,10 @@ class ProfileStage(Stage):
     requires = (IngestStage,)
     state = scmle.core.state.RunState.PROFILING
 
-    def describe(self, context: scmle.core.context.Context) -> str:
+    def describe(
+        self,
+        context: scmle.core.context.Context,  # noqa: ARG002 -- Stage.describe
+    ) -> str:
         """Names the stage.
 
         Args:
@@ -520,6 +527,54 @@ class ProfileStage(Stage):
         """
         spec = context.spec
         frame = scmle.core.context.require(context.frame, "frame")
+        frame, task = self.resolve_task(context, frame)
+        self.check_role_columns(spec, frame)
+        frame = self.synthesize_features(context, frame)
+        split = self.make_split(context, task, frame)
+        spec = context.spec  # reweighing may have set the weight column
+        profile, development = self.profile_development(
+            context, spec, task, frame, split
+        )
+        self.record_curation(context, frame, development, profile)
+        context.emit(
+            "features.selected",
+            "feature set and exclusions fixed from the profile",
+            ("dataset_profile.json",),
+            {
+                "numeric": list(profile.feature_plan.numeric),
+                "categorical": list(profile.feature_plan.categorical),
+                "dropped": dict(profile.feature_plan.dropped),
+            },
+        )
+        context.track(
+            fingerprint=knowledge.fingerprint(profile, task), task=task.value
+        )
+        self.enforce_leakage_policy(spec, profile)
+        self.run_claim_ledger(context, task)
+
+    def resolve_task(
+        self, context: scmle.core.context.Context, frame: pandas.DataFrame
+    ) -> tuple[pandas.DataFrame, tasks.Task]:
+        """Resolves the task and validates the target columns it needs.
+
+        Sets the context's task and metric (and, for an ordinal task, the
+        encoded frame and the labels).
+
+        Args:
+            context: The run context.
+            frame: The loaded data.
+
+        Returns:
+            The frame (with rows lacking a target set aside, or an ordinal
+            target encoded) and the resolved task.
+
+        Raises:
+            ConfigError: If `pseudo_label` is used for a non-classification
+                task, the approved plan's task differs from the one the data
+                resolves to, or a success criterion names a metric that is not
+                reported.
+        """
+        spec = context.spec
         target = frame[spec.data.target]
         if target.isna().any():
             frame = self.set_aside_unlabeled(context, frame)
@@ -572,6 +627,21 @@ class ProfileStage(Stage):
                 f"success criteria name unreported metrics {unknown}; "
                 f"available: {sorted(context.catalog.report_names[task])}"
             )
+        return frame, task
+
+    def check_role_columns(
+        self, spec: tasks.Config, frame: pandas.DataFrame
+    ) -> None:
+        """Checks that the declared group, time and weight columns exist.
+
+        Args:
+            spec: The project specification.
+            frame: The loaded data.
+
+        Raises:
+            DataError: If a declared group, time or weight column is missing
+                from the data.
+        """
         for role, column in (
             ("group", spec.data.group_column),
             ("time", spec.data.time_column),
@@ -582,9 +652,29 @@ class ProfileStage(Stage):
                     f"{role} column '{column}' not found; "
                     f"columns: {list(frame.columns)[:20]}"
                 )
-        frame = self.synthesize_features(context, frame)
-        split = self.make_split(context, task, frame)
-        spec = context.spec  # reweighing may have set the weight column
+
+    def profile_development(
+        self,
+        context: scmle.core.context.Context,
+        spec: tasks.Config,
+        task: tasks.Task,
+        frame: pandas.DataFrame,
+        split: Any,
+    ) -> tuple[Any, pandas.DataFrame]:
+        """Profiles the development rows of a split.
+
+        Args:
+            context: The run context, holding the manifest and cleaning notes.
+            spec: The project specification.
+            task: The resolved task.
+            frame: The whole loaded data.
+            split: The split whose development rows are profiled.
+
+        Returns:
+            The profile, with the feature graph, cleaning notes, quality notes
+            and (for an uplift task) the propensity finding attached, and the
+            development frame.
+        """
         development = split.dev_features.assign(
             **{spec.data.target: split.dev_target}
         )
@@ -617,6 +707,27 @@ class ProfileStage(Stage):
                 profile,
                 quality_findings=(*profile.quality_findings, finding),
             )
+        return profile, development
+
+    def record_curation(
+        self,
+        context: scmle.core.context.Context,
+        frame: pandas.DataFrame,
+        development: pandas.DataFrame,
+        profile: Any,
+    ) -> None:
+        """Writes the curation report and dataset card and checks them.
+
+        Args:
+            context: The run context; receives the profile, the curation
+                report and the artifacts written for them.
+            frame: The whole loaded data.
+            development: The development rows that were profiled.
+            profile: The dataset profile.
+
+        Raises:
+            BlockedError: If curation leaves unresolved blocking findings.
+        """
         source_rows = (
             context.stream[1].rows if context.stream is not None else len(frame)
         )
@@ -676,19 +787,19 @@ class ProfileStage(Stage):
                 "unresolved blocking curation findings",
                 {"finding_ids": list(finding_ids)},
             )
-        context.emit(
-            "features.selected",
-            "feature set and exclusions fixed from the profile",
-            ("dataset_profile.json",),
-            {
-                "numeric": list(profile.feature_plan.numeric),
-                "categorical": list(profile.feature_plan.categorical),
-                "dropped": dict(profile.feature_plan.dropped),
-            },
-        )
-        context.track(
-            fingerprint=knowledge.fingerprint(profile, task), task=task.value
-        )
+
+    def enforce_leakage_policy(self, spec: tasks.Config, profile: Any) -> None:
+        """Applies the leakage policy to the profile's leakage evidence.
+
+        Args:
+            spec: The project specification.
+            profile: The dataset profile.
+
+        Raises:
+            BlockedError: If `leakage_policy` is `block` and a leakage
+                hypothesis was raised or a screened column could not be
+                checked.
+        """
         if profile.unchecked_columns:
             if spec.leakage_policy == "block":
                 raise errors.BlockedError(
@@ -717,7 +828,6 @@ class ProfileStage(Stage):
                 "column unavailable at prediction, or attest it)",
                 ", ".join(sorted(set(map(str, profile.leakage["suspects"])))),
             )
-        self.run_claim_ledger(context, task)
 
     def synthesize_features(
         self, context: scmle.core.context.Context, frame: pandas.DataFrame
@@ -884,7 +994,7 @@ class ProfileStage(Stage):
         rules = charter.rules
         stage = prefilter.StabilityStage(
             lambda columns: self.run_robustness(
-                context, task, charter, view, columns, structure
+                context, task, charter, view, columns
             ),
             requested=bool(rules and rules.stability_filter),
             rows=len(view.features),
@@ -1023,7 +1133,7 @@ class ProfileStage(Stage):
                 "rules": "chartered" if rules else "not chartered",
             },
         )
-        self.assess_robustness(context, charter, run, pending.stage)
+        self.assess_robustness(context, pending.stage)
         self.assess_framing(context, charter, view)
         self.assess_identification(
             context, charter, view, run, pending.graph, pending.found
@@ -1087,7 +1197,9 @@ class ProfileStage(Stage):
                 f"baseline column '{column}' is not in the exploration rows"
             )
         classes = sorted(view.target.dropna().unique(), key=str)
-        outcome = explore.encode_target(view.target, True, classes)
+        outcome = explore.encode_target(
+            view.target, classification=True, classes=classes
+        )
         plan = scmle.core.context.require(
             context.profile, "profile"
         ).feature_plan
@@ -1218,7 +1330,6 @@ class ProfileStage(Stage):
         charter: contracts.AnalysisCharter,
         view: Any,
         survivors: tuple[str, ...],
-        structure: tuple[str, ...],
     ) -> scmle.data.robustness.qualify.Robustness:
         """Assesses the stability of the survivors and shift from a reference.
 
@@ -1233,7 +1344,6 @@ class ProfileStage(Stage):
                 and multiverse choices.
             view: The exploration view (features and target).
             survivors: Columns that survived exploration.
-            structure: Group, time and baseline columns.
 
         Returns:
             The stability and shift assessment of the survivors.
@@ -1277,8 +1387,6 @@ class ProfileStage(Stage):
     def assess_robustness(
         self,
         context: scmle.core.context.Context,
-        charter: contracts.AnalysisCharter,
-        run: governed.GovernedRun,
         stage: prefilter.StabilityStage,
     ) -> None:
         """Writes the stability and shift reports and the EDA page.
@@ -1295,8 +1403,6 @@ class ProfileStage(Stage):
 
         Args:
             context: The run context that stores the reports.
-            charter: The analysis charter.
-            run: The governed run.
             stage: The stability stage, holding the assessment it ran.
 
         Raises:
@@ -1697,7 +1803,7 @@ class ProfileStage(Stage):
             The sealed set; this process keeps only the row ids. The
             resident object is emptied so no reference to the rows remains.
         """
-        assert isinstance(locked, splitters.ResidentTestSet)  # nosec B101
+        assert isinstance(locked, splitters.ResidentTestSet)  # noqa: S101 -- narrows the type # nosec B101
         sealed = vault.SealedTestSet(locked.features, locked.target, locked.ids)
         locked.features = locked.features.iloc[0:0]
         locked.target = locked.target.iloc[0:0]
@@ -2207,7 +2313,10 @@ class PlanStage(Stage):
     requires = (ProfileStage,)
     state = scmle.core.state.RunState.PLANNING
 
-    def describe(self, context: scmle.core.context.Context) -> str:
+    def describe(
+        self,
+        context: scmle.core.context.Context,  # noqa: ARG002 -- Stage.describe
+    ) -> str:
         """Names the stage.
 
         Args:
@@ -2671,7 +2780,7 @@ def reference_scores(
     if task is tasks.Task.BINARY:
         return pandas.Series(fitted.predict_proba(features)[:, 1], name="score")
     predicted = numpy.asarray(fitted.predict(features))
-    if predicted.ndim == 2:
+    if predicted.ndim == MATRIX_DIMENSIONS:
         predicted = predicted[:, 0]  # The primary target stands for all.
     return pandas.Series(predicted, name="prediction")
 
@@ -3789,8 +3898,10 @@ class PackageStage(Stage):
                     reviewer="scmle.automation",
                     observed_at=datetime.datetime.now(datetime.UTC).isoformat(),
                     limitations=(
-                        "automated artifact-presence and digest check; "
-                        "independent human review is not represented",
+                        (
+                            "automated artifact-presence and digest check; "
+                            "independent human review is not represented"
+                        ),
                     ),
                     decision=scmle.contracts.evidence.Disposition.ACCEPTED,
                 )
@@ -3835,8 +3946,10 @@ class PackageStage(Stage):
                 "passed": False,
                 "blocked": True,
                 "blocking_reasons": [
-                    "no explicit success criteria were declared; release "
-                    "thresholds were not invented from observed metrics",
+                    (
+                        "no explicit success criteria were declared; release "
+                        "thresholds were not invented from observed metrics"
+                    ),
                 ],
                 "findings": [],
             }
@@ -4061,14 +4174,12 @@ class PackageStage(Stage):
 
     def sbom_record(
         self,
-        context: scmle.core.context.Context,
         store: Any,
         bundle: scmle.artifacts.bundle.Bundle,
     ) -> dict[str, Any]:
         """Builds and persists the packaged environment's SBOM.
 
         Args:
-            context: The run context; not consulted.
             store: The run store receiving `sbom.json`.
             bundle: The packaged model bundle, supplying the environment.
 
@@ -4110,7 +4221,10 @@ class PackageStage(Stage):
         store.write_json("fault_injection_plan.json", record)
         return record
 
-    def describe(self, context: scmle.core.context.Context) -> str:
+    def describe(
+        self,
+        context: scmle.core.context.Context,  # noqa: ARG002 -- Stage.describe
+    ) -> str:
         """Names the stage.
 
         Args:
@@ -4936,28 +5050,7 @@ class PackageStage(Stage):
                 "diagnostics/forecast_backtest.json",
                 evaluation["forecast_backtest"],
             )
-        if bundle.quantile is not None and context.test_rows is not None:
-            evaluation["quantile_coverage"] = bundle.quantile.coverage_curve(
-                *context.test_rows, COVERAGE_LEVELS
-            )
-        if context.test_rows is not None:
-            measured = coverage_run.run_report(
-                bundle,
-                *context.test_rows,
-                COVERAGE_LEVELS,
-                claim_sha256=context.coverage_claim_sha256,
-                slices=slice_labels(context, context.test_rows[0]),
-            )
-            if measured is not None:
-                bundle.coverage_report = measured
-                context.write_json("coverage_report.json", measured)
-                context.emit(
-                    "coverage.reported",
-                    "coverage of the stored intervals or sets was measured "
-                    "on the final test rows",
-                    ("coverage_report.json",),
-                    {"methods": sorted(measured["methods"])},
-                )
+        self.measure_coverage(context, bundle, evaluation)
         bundle.novelty = novelty.NoveltyDetector.fit(
             split.dev_features,
             bundle.schema.numeric,
@@ -4979,7 +5072,7 @@ class PackageStage(Stage):
         evaluation["reliability_plan"] = self.reliability_plan_record(
             context, store
         )
-        evaluation["sbom"] = self.sbom_record(context, store, bundle)
+        evaluation["sbom"] = self.sbom_record(store, bundle)
         evaluation["provenance"] = self.provenance_record(
             context, store, bundle
         )
@@ -5049,6 +5142,47 @@ class PackageStage(Stage):
             report.Renderer().render(result, board),
         )
         context.bundle, context.result = bundle, result
+
+    def measure_coverage(
+        self,
+        context: scmle.core.context.Context,
+        bundle: scmle.artifacts.bundle.Bundle,
+        evaluation: dict[str, Any],
+    ) -> None:
+        """Measures the coverage of the bundle's intervals on the test rows.
+
+        Does nothing without held-out test rows. Adds `quantile_coverage` to
+        the evaluation when the bundle has quantile models, and stores and
+        writes the coverage report when one is measured.
+
+        Args:
+            context: The run context, holding the test rows and the claim.
+            bundle: The model bundle; receives the coverage report.
+            evaluation: The evaluation document; receives the quantile
+                coverage curve.
+        """
+        if bundle.quantile is not None and context.test_rows is not None:
+            evaluation["quantile_coverage"] = bundle.quantile.coverage_curve(
+                *context.test_rows, COVERAGE_LEVELS
+            )
+        if context.test_rows is not None:
+            measured = coverage_run.run_report(
+                bundle,
+                *context.test_rows,
+                COVERAGE_LEVELS,
+                claim_sha256=context.coverage_claim_sha256,
+                slices=slice_labels(context, context.test_rows[0]),
+            )
+            if measured is not None:
+                bundle.coverage_report = measured
+                context.write_json("coverage_report.json", measured)
+                context.emit(
+                    "coverage.reported",
+                    "coverage of the stored intervals or sets was measured "
+                    "on the final test rows",
+                    ("coverage_report.json",),
+                    {"methods": sorted(measured["methods"])},
+                )
 
     def lineage(self, store: Any) -> dict[str, str]:
         """Returns checksums of the artifacts a run produced, for lineage.

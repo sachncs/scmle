@@ -16,6 +16,8 @@ import json
 import pathlib
 from typing import Any
 
+from scmle.evaluation import parameter_estimation
+
 EXACT = "exact"
 COMPARABLE = "comparable"
 DIFFERENT = "different"
@@ -73,8 +75,6 @@ def load_run(directory: str | pathlib.Path) -> dict[str, Any]:
     parameter_path = root / "parameter_estimation.json"
     parameter_digest = None
     if parameter_path.exists():
-        from scmle.evaluation import parameter_estimation
-
         parameter_digest = parameter_estimation.Estimation.read(
             parameter_path
         ).digest()
@@ -99,26 +99,36 @@ def load_run(directory: str | pathlib.Path) -> dict[str, Any]:
     }
 
 
-def compare_runs(
-    first: dict[str, Any],
-    second: dict[str, Any],
-    tolerance_std: float = DEFAULT_TOLERANCE_STD,
-) -> ReplayVerdict:
-    """Classifies a rerun against the original.
+def trial_identity(trial: dict[str, Any]) -> tuple[Any, ...]:
+    """Names the part of a trial that must not change between runs.
+
+    Args:
+        trial: A trial record.
+
+    Returns:
+        Its id, model name, strategy and key-sorted JSON parameters.
+    """
+    return (
+        trial["trial_id"],
+        trial["model_name"],
+        trial["strategy"],
+        json.dumps(trial["params"], sort_keys=True),
+    )
+
+
+def structural_differences(
+    first: dict[str, Any], second: dict[str, Any]
+) -> tuple[list[str], list[str]]:
+    """Compares what two runs must share before their scores are compared.
 
     Args:
         first: Facts of the original run (see `load_run`).
         second: Facts of the rerun.
-        tolerance_std: Allowed difference between a trial's mean scores, in
-            units of the larger of the two trials' score standard deviations
-            (floored at 1e-9), for a `comparable` verdict.
 
     Returns:
-        `different` if the configuration, dataset hash, split, parameter
-        estimation digest or executed trials (id, model, strategy, params)
-        differ, if a trial's status changed, a mean moved beyond the
-        tolerance, or a different candidate was selected. Otherwise `exact` if
-        every fold score is identical, else `comparable`.
+        The reasons the runs differ (configuration, dataset, split,
+        parameter-estimation evidence, executed trials) and the notes, which
+        do not change the verdict (differing environments).
     """
     reasons: list[str] = []
     notes: list[str] = []
@@ -132,31 +142,35 @@ def compare_runs(
         reasons.append("splits differ")
     if first.get("parameter_estimation") != second.get("parameter_estimation"):
         reasons.append("parameter-estimation evidence differs")
-    a, b = first["trials"], second["trials"]
-    identity = [
-        (
-            t["trial_id"],
-            t["model_name"],
-            t["strategy"],
-            json.dumps(t["params"], sort_keys=True),
-        )
-        for t in a
-    ]
-    if identity != [
-        (
-            t["trial_id"],
-            t["model_name"],
-            t["strategy"],
-            json.dumps(t["params"], sort_keys=True),
-        )
-        for t in b
+    if [trial_identity(t) for t in first["trials"]] != [
+        trial_identity(t) for t in second["trials"]
     ]:
         reasons.append("the executed trials differ")
-    if reasons:
-        return ReplayVerdict(DIFFERENT, reasons, float("nan"), 0, notes)
+    return reasons, notes
 
+
+def compare_trial_scores(
+    first_trials: list[dict[str, Any]],
+    second_trials: list[dict[str, Any]],
+    tolerance_std: float,
+) -> tuple[float, bool, bool, list[str]]:
+    """Compares the scores of two runs' trials, which share their structure.
+
+    Args:
+        first_trials: Trial records of the original run.
+        second_trials: Trial records of the rerun, in the same order.
+        tolerance_std: Allowed difference between a trial's mean scores, in
+            units of the larger of the two trials' score standard deviations
+            (floored at `FLOOR`).
+
+    Returns:
+        The largest fold-score gap, whether every fold score is identical,
+        whether every trial is within tolerance, and the reasons for any
+        trial that is not.
+    """
+    reasons: list[str] = []
     largest, exact, comparable = 0.0, True, True
-    for left, right in zip(a, b, strict=True):
+    for left, right in zip(first_trials, second_trials, strict=True):
         if left["status"] != right["status"]:
             was, now = left["status"], right["status"]
             reasons.append(f"{left['trial_id']}: status {was} -> {now}")
@@ -183,6 +197,39 @@ def compare_runs(
                     f"{abs(left['score_mean'] - right['score_mean']):.4g} "
                     f"(allowed {allowed:.4g})"
                 )
+    return largest, exact, comparable, reasons
+
+
+def compare_runs(
+    first: dict[str, Any],
+    second: dict[str, Any],
+    tolerance_std: float = DEFAULT_TOLERANCE_STD,
+) -> ReplayVerdict:
+    """Classifies a rerun against the original.
+
+    Args:
+        first: Facts of the original run (see `load_run`).
+        second: Facts of the rerun.
+        tolerance_std: Allowed difference between a trial's mean scores, in
+            units of the larger of the two trials' score standard deviations
+            (floored at 1e-9), for a `comparable` verdict.
+
+    Returns:
+        `different` if the configuration, dataset hash, split, parameter
+        estimation digest or executed trials (id, model, strategy, params)
+        differ, if a trial's status changed, a mean moved beyond the
+        tolerance, or a different candidate was selected. Otherwise `exact` if
+        every fold score is identical, else `comparable`.
+    """
+    reasons, notes = structural_differences(first, second)
+    a, b = first["trials"], second["trials"]
+    if reasons:
+        return ReplayVerdict(DIFFERENT, reasons, float("nan"), 0, notes)
+
+    largest, exact, comparable, score_reasons = compare_trial_scores(
+        a, b, tolerance_std
+    )
+    reasons.extend(score_reasons)
     if first["selected"] != second["selected"]:
         exact = False
         comparable = False

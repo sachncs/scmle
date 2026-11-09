@@ -22,6 +22,7 @@ import dataclasses
 import multiprocessing
 from multiprocessing import connection
 import os
+import pathlib
 import signal
 import subprocess  # nosec B404
 import sys
@@ -106,7 +107,7 @@ def peak_memory_gb() -> float:
         not counted).
     """
     if resource is None:
-        import psutil  # Windows-only dependency.
+        import psutil  # noqa: PLC0415 -- Windows-only dependency
 
         return psutil.Process().memory_info().peak_wset / BYTES_PER_GB
     scale = 1 if sys.platform == "darwin" else KILOBYTES  # macOS reports bytes
@@ -124,13 +125,14 @@ def proc_table() -> dict[int, tuple[int, int]]:
     """
     table: dict[int, tuple[int, int]] = {}
     page = resource.getpagesize()
-    for name in os.listdir("/proc"):
+    for entry in pathlib.Path("/proc").iterdir():
+        name = entry.name
         if not name.isdigit():
             continue
         try:
-            with open(f"/proc/{name}/stat", encoding="ascii") as handle:
+            with (entry / "stat").open(encoding="ascii") as handle:
                 after_name = handle.read().rsplit(")", 1)[1].split()
-            with open(f"/proc/{name}/statm", encoding="ascii") as handle:
+            with (entry / "statm").open(encoding="ascii") as handle:
                 resident = int(handle.read().split()[1]) * page
         except (OSError, IndexError, ValueError):
             continue
@@ -146,7 +148,7 @@ def ps_table() -> dict[int, tuple[int, int]]:
         output that are not three integer fields are ignored.
     """
     completed = subprocess.run(  # nosec B603 B607
-        ["ps", "-A", "-o", "pid=,ppid=,rss="],
+        ["ps", "-A", "-o", "pid=,ppid=,rss="],  # noqa: S607 -- `ps` is found on PATH by design
         capture_output=True,
         text=True,
         check=False,
@@ -166,7 +168,7 @@ def psutil_table() -> dict[int, tuple[int, int]]:
         A mapping from pid to (parent pid, resident bytes). Processes whose
         memory information is unavailable are omitted.
     """
-    import psutil  # Windows-only dependency.
+    import psutil  # noqa: PLC0415 -- Windows-only dependency
 
     table: dict[int, tuple[int, int]] = {}
     for process in psutil.process_iter(["pid", "ppid", "memory_info"]):
@@ -185,7 +187,7 @@ def process_table() -> dict[int, tuple[int, int]]:
     """
     if WINDOWS:
         return psutil_table()
-    if os.path.isdir("/proc/self"):
+    if pathlib.Path("/proc/self").is_dir():
         return proc_table()
     return ps_table()
 
@@ -243,7 +245,7 @@ def child_main(
     """
     try:
         channel.send((True, function(argument)))
-    except BaseException as error:  # Reported to the supervisor.
+    except BaseException as error:  # noqa: BLE001 -- reported to the supervisor
         channel.send((False, f"{type(error).__name__}: {error}"))
     finally:
         channel.close()

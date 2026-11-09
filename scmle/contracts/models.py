@@ -165,10 +165,10 @@ class Model(abc.ABC):
 
     def assemble(
         self,
-        plan: data.FeaturePlan,
-        task: tasks.Task,
-        seed: int,
-        params: Mapping[str, Any] | None = None,
+        plan: data.FeaturePlan,  # noqa: ARG002 -- overridden by meta-models
+        task: tasks.Task,  # noqa: ARG002 -- overridden by meta-models
+        seed: int,  # noqa: ARG002 -- overridden by meta-models
+        params: Mapping[str, Any] | None = None,  # noqa: ARG002 -- overridden
     ) -> Estimator | None:
         """Builds a complete pipeline itself, if the model needs to.
 
@@ -188,7 +188,10 @@ class Model(abc.ABC):
         """
         return None
 
-    def categorical_params(self, indices: list[int]) -> Mapping[str, Any]:
+    def categorical_params(
+        self,
+        indices: list[int],  # noqa: ARG002 -- overridden by adapters
+    ) -> Mapping[str, Any]:
         """Returns estimator parameters marking columns as native categoricals.
 
         Adapters declaring `native_categorical` override this; the pipeline

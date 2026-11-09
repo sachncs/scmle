@@ -176,7 +176,7 @@ def verified_attestors(
         given,
         run.needed_assumptions(plan.primary, spec),
         charter_hash,
-        datetime.date.today().isoformat(),
+        datetime.datetime.now().astimezone().date().isoformat(),
         signing_key,
     )
 

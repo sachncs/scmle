@@ -14,6 +14,8 @@ import joblib
 
 from scmle.contracts import errors
 
+MIN_POOL_WORKERS = 2
+
 
 class Executor(abc.ABC):
     """Runs a function over independent work items.
@@ -60,7 +62,7 @@ class Serial(Executor):
         self,
         function: Callable[[Any], Any],
         items: Sequence[Any],
-        on_failure: Callable[[Any, Exception], Any] | None = None,
+        on_failure: Callable[[Any, Exception], Any] | None = None,  # noqa: ARG002 -- Executor.map interface
     ) -> list[Any]:
         """Applies `function` in order, in this process.
 
@@ -90,7 +92,7 @@ class Pool(Executor):
         Raises:
             ConfigError: If fewer than two workers are requested.
         """
-        if workers < 2:
+        if workers < MIN_POOL_WORKERS:
             raise errors.ConfigError("Pool needs at least 2 workers")
         self.workers = workers
 
@@ -98,7 +100,7 @@ class Pool(Executor):
         self,
         function: Callable[[Any], Any],
         items: Sequence[Any],
-        on_failure: Callable[[Any, Exception], Any] | None = None,
+        on_failure: Callable[[Any, Exception], Any] | None = None,  # noqa: ARG002 -- Executor.map interface
     ) -> list[Any]:
         """Applies `function` across worker processes, preserving order.
 
@@ -141,7 +143,7 @@ def create_backend(
         ConfigError: For an unknown executor.
     """
     if executor == "ray":
-        from scmle.integrations import ray_backend
+        from scmle.integrations import ray_backend  # noqa: PLC0415 -- optional dependency (the `distributed` extra)
 
         return ray_backend.RayBackend(workers, address)
     if executor != "process":
