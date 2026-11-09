@@ -10,6 +10,7 @@ coverage report describes slice by slice (`slice_columns`; they enter the
 registered coverage claim).
 """
 
+from collections.abc import Iterable
 from collections.abc import Mapping
 import dataclasses
 from typing import Any
@@ -53,8 +54,9 @@ class Uncertainty:
         if not isinstance(self.coverage_on_confirmation, bool):
             raise ValueError("coverage_on_confirmation must be a bool")
         qualification.require_tuple(self.slice_columns, "slice_columns")
+        columns: Iterable[object] = self.slice_columns
         if len(set(self.slice_columns)) != len(self.slice_columns) or any(
-            not isinstance(c, str) or not c.strip() for c in self.slice_columns
+            not isinstance(c, str) or not c.strip() for c in columns
         ):
             raise ValueError("slice_columns are distinct, non-blank names")
         if self.cv_plus_max_bytes is not None:
