@@ -48,12 +48,24 @@ class GreedyBlender(base.BaseEstimator, abc.ABC):
     """
 
     def __init__(self, members: int = 2, rounds: int = 25) -> None:
-        """Stores the member count and the number of greedy rounds."""
+        """Stores the member count and the number of greedy rounds.
+
+        Args:
+            members: Number of members whose outputs are concatenated.
+            rounds: Number of greedy additions.
+        """
         self.members = members
         self.rounds = rounds
 
     def outputs(self, meta: Any) -> np.ndarray:
-        """Per-member outputs, shape (rows, members, columns)."""
+        """Splits the concatenated meta-features by member.
+
+        Args:
+            meta: Concatenated member outputs, one row per sample.
+
+        Returns:
+            Float array of shape (rows, members, columns per member).
+        """
         values = np.asarray(meta, dtype=float)
         return values.reshape(len(values), self.members, -1)
 
@@ -61,14 +73,40 @@ class GreedyBlender(base.BaseEstimator, abc.ABC):
     def prepare(
         self, stacked: np.ndarray, target: Any
     ) -> tuple[np.ndarray, np.ndarray]:
-        """Returns the member outputs and the truth in comparable shapes."""
+        """Puts the member outputs and the truth in comparable shapes.
+
+        Args:
+            stacked: Member outputs, shape (rows, members, columns).
+            target: True targets, one per row.
+
+        Returns:
+            The member outputs, shape (rows, members, columns), and the
+            truth, shape (rows, columns), matching the blended columns.
+        """
 
     @abc.abstractmethod
     def loss(self, blend: np.ndarray, truth: np.ndarray) -> float:
-        """Loss of a blended prediction."""
+        """Scores a blended prediction against the truth.
+
+        Args:
+            blend: Blended prediction, shape (rows, columns).
+            truth: True values in the shape returned by `prepare`.
+
+        Returns:
+            The loss; smaller is better.
+        """
 
     def fit(self, meta: Any, target: Any) -> Self:
-        """Selects the blend weights on out-of-fold predictions."""
+        """Selects the blend weights on out-of-fold predictions.
+
+        Args:
+            meta: Concatenated out-of-fold member outputs, one row per
+                sample.
+            target: True targets, one per row.
+
+        Returns:
+            This blender, with `weights_` set.
+        """
         stacked, truth = self.prepare(self.outputs(meta), target)
         counts = np.zeros(self.members)
         running = np.zeros_like(stacked[:, 0, :])
@@ -85,12 +123,27 @@ class GreedyBlender(base.BaseEstimator, abc.ABC):
         return self
 
     def blend(self, meta: Any) -> np.ndarray:
-        """The weighted average of the members' outputs."""
+        """Averages the members' outputs with the selected weights.
+
+        Args:
+            meta: Concatenated member outputs, one row per sample.
+
+        Returns:
+            Array of shape (rows, columns per member) holding the weighted
+            average.
+        """
         stacked = self.expand(self.outputs(meta))
         return np.tensordot(self.weights_, stacked.transpose(1, 0, 2), axes=1)
 
     def expand(self, stacked: np.ndarray) -> np.ndarray:
-        """Hook for turning single probability columns into two (binary)."""
+        """Hook for turning single probability columns into two (binary).
+
+        Args:
+            stacked: Member outputs, shape (rows, members, columns).
+
+        Returns:
+            The member outputs, unchanged in this base class.
+        """
         return stacked
 
 
@@ -98,7 +151,15 @@ class ClassifierBlender(base.ClassifierMixin, GreedyBlender):
     """Greedy blend of members' class probabilities."""
 
     def expand(self, stacked: np.ndarray) -> np.ndarray:
-        """Binary members give P(positive) only; add P(negative)."""
+        """Adds the negative-class column for binary members.
+
+        Args:
+            stacked: Member outputs, shape (rows, members, columns).
+
+        Returns:
+            For members that give only P(positive), outputs with columns
+            (P(negative), P(positive)); otherwise `stacked` unchanged.
+        """
         if stacked.shape[2] == 1:
             return np.concatenate([1.0 - stacked, stacked], axis=2)
         return stacked
@@ -106,21 +167,52 @@ class ClassifierBlender(base.ClassifierMixin, GreedyBlender):
     def prepare(
         self, stacked: np.ndarray, target: Any
     ) -> tuple[np.ndarray, np.ndarray]:
-        """One-hot truth and two-column probabilities for binary members."""
+        """Encodes the truth one-hot and expands binary member outputs.
+
+        Args:
+            stacked: Member outputs, shape (rows, members, columns).
+            target: True class labels, one per row.
+
+        Returns:
+            The expanded member outputs, and the one-hot truth with one
+            column per class in `classes_` order. Sets `classes_`.
+        """
         self.classes_, encoded = np.unique(target, return_inverse=True)
         return self.expand(stacked), np.eye(len(self.classes_))[encoded]
 
     def loss(self, blend: np.ndarray, truth: np.ndarray) -> float:
-        """Log loss."""
+        """Computes the log loss.
+
+        Args:
+            blend: Blended class probabilities, shape (rows, classes).
+            truth: One-hot truth, shape (rows, classes).
+
+        Returns:
+            Mean negative log probability of the true class.
+        """
         clipped = np.clip(blend, 1e-12, 1.0)
         return float(-np.mean(np.sum(truth * np.log(clipped), axis=1)))
 
     def predict_proba(self, meta: Any) -> np.ndarray:
-        """Blended class probabilities."""
+        """Predicts class probabilities.
+
+        Args:
+            meta: Concatenated member outputs, one row per sample.
+
+        Returns:
+            Array of shape (rows, classes) in `classes_` order.
+        """
         return self.blend(meta)
 
     def predict(self, meta: Any) -> np.ndarray:
-        """Most probable class."""
+        """Predicts the most probable class.
+
+        Args:
+            meta: Concatenated member outputs, one row per sample.
+
+        Returns:
+            Array of class labels, one per row.
+        """
         return self.classes_[self.blend(meta).argmax(axis=1)]
 
 
@@ -130,15 +222,39 @@ class RegressorBlender(base.RegressorMixin, GreedyBlender):
     def prepare(
         self, stacked: np.ndarray, target: Any
     ) -> tuple[np.ndarray, np.ndarray]:
-        """Column-vector truth."""
+        """Reshapes the truth to a column vector.
+
+        Args:
+            stacked: Member outputs, shape (rows, members, columns).
+            target: True values, one per row.
+
+        Returns:
+            The member outputs unchanged, and the truth as floats with shape
+            (rows, 1).
+        """
         return stacked, np.asarray(target, dtype=float).reshape(-1, 1)
 
     def loss(self, blend: np.ndarray, truth: np.ndarray) -> float:
-        """Squared error."""
+        """Computes the mean squared error.
+
+        Args:
+            blend: Blended predictions, shape (rows, 1).
+            truth: True values, shape (rows, 1).
+
+        Returns:
+            Mean squared difference.
+        """
         return float(np.mean((blend - truth) ** 2))
 
     def predict(self, meta: Any) -> np.ndarray:
-        """The blended value."""
+        """Predicts the blended value.
+
+        Args:
+            meta: Concatenated member outputs, one row per sample.
+
+        Returns:
+            One-dimensional array of blended predictions, one per row.
+        """
         return self.blend(meta)[:, 0]
 
 
@@ -174,6 +290,13 @@ class StackingAdapter(models.ModelAdapter):
     def members_of(params: Mapping[str, Any] | None) -> list[dict[str, Any]]:
         """Returns the member specifications.
 
+        Args:
+            params: Model parameters, which may contain `members`.
+
+        Returns:
+            The list of member entries, each `{"model": name, "params":
+            {...}}`.
+
         Raises:
             ConfigError: If fewer than two members are given.
         """
@@ -194,6 +317,17 @@ class StackingAdapter(models.ModelAdapter):
         Every member brings its own preprocessing, so the stack consumes the
         raw frame and its inner cross-validation can follow the group and
         time structure of the data.
+
+        Args:
+            plan: Feature plan the member pipelines preprocess with.
+            task: Resolved task type.
+            seed: Random seed.
+            params: Must contain `members`: a list of
+                `{"model": name, "params": {...}}` entries.
+
+        Returns:
+            An unfitted stacking classifier or regressor over the member
+            pipelines. Fewer than two members is a `ConfigError`.
         """
         members = self.members_of(params)
         estimators = [
@@ -222,7 +356,16 @@ class StackingAdapter(models.ModelAdapter):
         )
 
     def meta_learner(self, task: tasks.TaskType, members: int) -> Any:
-        """The model that combines the members' out-of-fold predictions."""
+        """Creates the model that combines the members' out-of-fold predictions.
+
+        Args:
+            task: Resolved task type.
+            members: Number of members; unused by this implementation.
+
+        Returns:
+            An unfitted logistic regression for classification, otherwise a
+            cross-validated ridge regression.
+        """
         if task.is_classification:
             return linear_model.LogisticRegression(max_iter=1000)
         return linear_model.RidgeCV()
@@ -242,10 +385,8 @@ class StackingAdapter(models.ModelAdapter):
                 `{"model": name, "params": {...}}` entries.
 
         Returns:
-            An unfitted stacking classifier or regressor.
-
-        Raises:
-            ConfigError: If fewer than two members are given.
+            An unfitted stacking classifier or regressor. Fewer than two
+            members is a `ConfigError`.
         """
         members = self.members_of(params)
         estimators = [
@@ -276,7 +417,16 @@ class BlendingAdapter(StackingAdapter):
     name = "blending"
 
     def meta_learner(self, task: tasks.TaskType, members: int) -> Any:
-        """A greedy blender instead of a fitted linear model."""
+        """Creates a greedy blender instead of a fitted linear model.
+
+        Args:
+            task: Resolved task type.
+            members: Number of members whose outputs are blended.
+
+        Returns:
+            An unfitted classifier blender for classification, otherwise a
+            regressor blender.
+        """
         if task.is_classification:
             return ClassifierBlender(members)
         return RegressorBlender(members)

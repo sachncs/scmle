@@ -18,7 +18,17 @@ ROWS = 120
 def toy_problem(
     task: tasks.TaskType, seed: int = 0
 ) -> tuple[pd.DataFrame, pd.Series | pd.DataFrame]:
-    """Builds a small learnable problem for `task`."""
+    """Builds a small learnable problem for `task`.
+
+    Args:
+        task: Task type the problem is shaped for.
+        seed: Seed for the random generator.
+
+    Returns:
+        A pair of 120 rows of two numeric features ("a", "b") and a target
+        suited to `task`: a series for single-target tasks, or a two-column
+        frame ("first", "second") for multilabel, multioutput and forecast.
+    """
     rng = np.random.default_rng(seed)
     features = pd.DataFrame(
         {"a": rng.normal(size=ROWS), "b": rng.normal(size=ROWS)}
@@ -67,6 +77,12 @@ def check_declared_capabilities(
     emits sparse matrices for `sparse_input`, marks columns categorical for
     `native_categorical` and persists with joblib for `serializable`, so each
     declaration is exercised here.
+
+    Args:
+        adapter: Adapter under test.
+        task: Task type to build the estimator for.
+        features: Toy features from `toy_problem`.
+        target: Toy target from `toy_problem`.
 
     Raises:
         ConfigError: If a declared capability is not honoured.

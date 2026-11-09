@@ -35,7 +35,12 @@ USER_LOCK = threading.RLock()
 
 
 def user_adapters() -> dict[str, models.ModelAdapter]:
-    """Returns a consistent copy of the registered user adapters."""
+    """Returns a consistent copy of the registered user adapters.
+
+    Returns:
+        A new mapping of model name to adapter; changing it does not change
+        the shared registrations.
+    """
     with USER_LOCK:
         return dict(USER_ADAPTERS)
 
@@ -61,13 +66,21 @@ def add_user_adapter(
 
 
 def remove_user_adapter(name: str) -> None:
-    """Removes a user adapter atomically (no-op if it is not registered)."""
+    """Removes a user adapter atomically (no-op if it is not registered).
+
+    Args:
+        name: Name of the adapter to remove.
+    """
     with USER_LOCK:
         USER_ADAPTERS.pop(name, None)
 
 
 def builtin_names() -> frozenset[str]:
-    """Names of the built-in model families."""
+    """Lists the built-in model names.
+
+    Returns:
+        The names of the built-in adapters, excluding user registrations.
+    """
     return frozenset(ModelRegistry.with_builtins(include_user=False).adapters)
 
 
@@ -91,12 +104,16 @@ class ModelRegistry:
 
         These are scikit-learn, boosting and PyTorch families.
 
+        Optional adapters register unconditionally; they are rejected at
+        planning time when their library is not installed.
+
         Args:
             include_user: Also add adapters from `register_estimator`
                 (a snapshot taken once, so later changes do not leak in).
 
-        Optional adapters register unconditionally; they are rejected at
-        planning time when their library is not installed.
+        Returns:
+            A new registry holding the built-in adapters, the stacking and
+            blending adapters, and the user adapters if requested.
         """
         classes = (
             *classical.BUILTIN_ADAPTERS,
@@ -136,7 +153,11 @@ class ModelRegistry:
         self.adapters[adapter.name] = adapter
 
     def unregister(self, name: str) -> None:
-        """Removes an adapter if present."""
+        """Removes an adapter if present.
+
+        Args:
+            name: Name of the adapter to remove; unknown names are ignored.
+        """
         self.adapters.pop(name, None)
 
     def load_plugins(self) -> list[str]:
@@ -168,6 +189,12 @@ class ModelRegistry:
 
     def get(self, name: str) -> models.ModelAdapter:
         """Returns the adapter called `name`.
+
+        Args:
+            name: Registered model name.
+
+        Returns:
+            The adapter registered under `name`.
 
         Raises:
             ConfigError: If it is not registered.

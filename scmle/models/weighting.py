@@ -46,7 +46,7 @@ class WeightedEstimator(base.BaseEstimator):
 
     @property
     def event_column(self) -> str:
-        """The wrapped survival pipeline's event column, so scorers find it."""
+        """The wrapped survival pipeline's event column name."""
         return self.estimator.event_column
 
     @property
@@ -70,7 +70,15 @@ class WeightedEstimator(base.BaseEstimator):
         return self.estimator.query_column
 
     def accepts_weights(self, candidate: base.BaseEstimator) -> bool:
-        """Whether the pipeline's model step takes `sample_weight`."""
+        """Checks whether a pipeline's model step takes `sample_weight`.
+
+        Args:
+            candidate: Estimator to inspect.
+
+        Returns:
+            True if `candidate` is a pipeline with a step named `model`
+            whose `fit` accepts `sample_weight`; False otherwise.
+        """
         if not isinstance(candidate, pipeline.Pipeline):
             return False
         model = candidate.named_steps.get("model")
@@ -79,7 +87,16 @@ class WeightedEstimator(base.BaseEstimator):
         return "sample_weight" in inspect.signature(model.fit).parameters
 
     def fit(self, features: Any, target: Any) -> Self:
-        """Fits the pipeline weighted by the weight column."""
+        """Fits the pipeline weighted by the weight column.
+
+        Args:
+            features: Training features, convertible to a data frame, that
+                include the weight column.
+            target: Training labels, one per row.
+
+        Returns:
+            This estimator, fitted. The fitted pipeline is `estimator_`.
+        """
         frame = pd.DataFrame(features).reset_index(drop=True)
         labels = pd.Series(np.asarray(target))
         weights = frame[self.column].to_numpy(dtype=float)
@@ -96,11 +113,27 @@ class WeightedEstimator(base.BaseEstimator):
         return self
 
     def predict(self, features: Any) -> np.ndarray:
-        """Predicts with the fitted pipeline."""
+        """Predicts with the fitted pipeline.
+
+        Args:
+            features: Rows to predict.
+
+        Returns:
+            The fitted pipeline's predictions, one per row.
+        """
         return self.estimator_.predict(features)
 
     def predict_survival(self, features: Any, times: Any) -> np.ndarray:
-        """Survival curves from the fitted survival pipeline."""
+        """Predicts survival curves with the fitted survival pipeline.
+
+        Args:
+            features: Rows to predict.
+            times: Time points at which to evaluate each curve.
+
+        Returns:
+            The fitted pipeline's survival probabilities, one row per input
+            row and one column per time point.
+        """
         return self.estimator_.predict_survival(features, times)
 
 
@@ -108,13 +141,29 @@ class WeightedClassifier(base.ClassifierMixin, WeightedEstimator):
     """Weighted fitting for classifiers."""
 
     def fit(self, features: Any, target: Any) -> Self:
-        """Fits and exposes the class labels."""
+        """Fits the pipeline and exposes its class labels.
+
+        Args:
+            features: Training features that include the weight column.
+            target: Training class labels, one per row.
+
+        Returns:
+            This classifier, fitted, with `classes_` set.
+        """
         super().fit(features, target)
         self.classes_ = self.estimator_.classes_
         return self
 
     def predict_proba(self, features: Any) -> np.ndarray:
-        """Returns class probabilities in `classes_` order."""
+        """Predicts class probabilities.
+
+        Args:
+            features: Rows to predict.
+
+        Returns:
+            Array with one row per input row and one column per class, in
+            `classes_` order.
+        """
         return self.estimator_.predict_proba(features)
 
 
@@ -125,7 +174,18 @@ class WeightedRegressor(base.RegressorMixin, WeightedEstimator):
 def weighted(
     estimator: base.BaseEstimator, column: str, seed: int
 ) -> WeightedEstimator:
-    """Wraps a candidate so rows are weighted by `column`."""
+    """Wraps a candidate so rows are weighted by `column`.
+
+    Args:
+        estimator: Pipeline to wrap.
+        column: Name of the weight column in the training features.
+        seed: Seed for the weighted draw used when the model has no
+            `sample_weight` support.
+
+    Returns:
+        A weighted classifier if `estimator` is a classifier, otherwise a
+        weighted regressor.
+    """
     kind = (
         WeightedClassifier
         if base.is_classifier(estimator)

@@ -31,7 +31,15 @@ class LabelEncodedClassifier(base.ClassifierMixin, base.BaseEstimator):
         self.estimator = estimator
 
     def fit(self, features: Any, target: Any) -> Self:
-        """Encodes the labels and fits the wrapped classifier."""
+        """Encodes the labels and fits the wrapped classifier.
+
+        Args:
+            features: Training features.
+            target: Training labels, of any sortable type.
+
+        Returns:
+            This wrapper, fitted.
+        """
         self.encoder_ = preprocessing.LabelEncoder().fit(target)
         self.classes_ = self.encoder_.classes_
         self.estimator_ = base.clone(self.estimator).fit(
@@ -40,12 +48,27 @@ class LabelEncodedClassifier(base.ClassifierMixin, base.BaseEstimator):
         return self
 
     def predict(self, features: Any) -> np.ndarray:
-        """Predicts and decodes back to the original labels."""
+        """Predicts and decodes back to the original labels.
+
+        Args:
+            features: Rows to predict.
+
+        Returns:
+            Array of original class labels, one per row.
+        """
         encoded = np.asarray(self.estimator_.predict(features)).astype(int)
         return self.encoder_.inverse_transform(encoded)
 
     def predict_proba(self, features: Any) -> np.ndarray:
-        """Returns class probabilities in `classes_` order."""
+        """Predicts class probabilities.
+
+        Args:
+            features: Rows to predict.
+
+        Returns:
+            Array with one row per input row and one column per class, in
+            `classes_` order.
+        """
         return self.estimator_.predict_proba(features)
 
 
@@ -70,17 +93,39 @@ class FlatPredictionClassifier(base.ClassifierMixin, base.BaseEstimator):
         self.estimator = estimator
 
     def fit(self, features: Any, target: Any) -> Self:
-        """Fits a clone of the wrapped classifier."""
+        """Fits a clone of the wrapped classifier.
+
+        Args:
+            features: Training features.
+            target: Training labels.
+
+        Returns:
+            This wrapper, fitted.
+        """
         self.estimator_ = base.clone(self.estimator).fit(features, target)
         self.classes_ = np.asarray(self.estimator_.classes_).ravel()
         return self
 
     def predict(self, features: Any) -> np.ndarray:
-        """Predicts, flattened to one dimension."""
+        """Predicts, flattened to one dimension.
+
+        Args:
+            features: Rows to predict.
+
+        Returns:
+            One-dimensional array of predicted labels, one per row.
+        """
         return np.asarray(self.estimator_.predict(features)).ravel()
 
     def predict_proba(self, features: Any) -> np.ndarray:
-        """Returns class probabilities."""
+        """Predicts class probabilities.
+
+        Args:
+            features: Rows to predict.
+
+        Returns:
+            Array with one row per input row and one column per class.
+        """
         return self.estimator_.predict_proba(features)
 
 
@@ -111,7 +156,15 @@ class FitParamsClassifier(base.ClassifierMixin, base.BaseEstimator):
         self.fit_params = fit_params
 
     def fit(self, features: Any, target: Any) -> Self:
-        """Fits a clone with the fixed arguments."""
+        """Fits a clone with the fixed arguments.
+
+        Args:
+            features: Training features.
+            target: Training labels.
+
+        Returns:
+            This wrapper, fitted.
+        """
         self.estimator_ = base.clone(self.estimator).fit(
             features, target, **self.fit_params
         )
@@ -119,11 +172,25 @@ class FitParamsClassifier(base.ClassifierMixin, base.BaseEstimator):
         return self
 
     def predict(self, features: Any) -> np.ndarray:
-        """Predicts class labels."""
+        """Predicts class labels.
+
+        Args:
+            features: Rows to predict.
+
+        Returns:
+            Array of predicted labels, one per row.
+        """
         return np.asarray(self.estimator_.predict(features))
 
     def predict_proba(self, features: Any) -> np.ndarray:
-        """Returns class probabilities."""
+        """Predicts class probabilities.
+
+        Args:
+            features: Rows to predict.
+
+        Returns:
+            Array with one row per input row and one column per class.
+        """
         return self.estimator_.predict_proba(features)
 
 
@@ -149,14 +216,29 @@ class FitParamsRegressor(base.RegressorMixin, base.BaseEstimator):
         self.fit_params = fit_params
 
     def fit(self, features: Any, target: Any) -> Self:
-        """Fits a clone with the fixed arguments."""
+        """Fits a clone with the fixed arguments.
+
+        Args:
+            features: Training features.
+            target: Training values.
+
+        Returns:
+            This wrapper, fitted.
+        """
         self.estimator_ = base.clone(self.estimator).fit(
             features, target, **self.fit_params
         )
         return self
 
     def predict(self, features: Any) -> np.ndarray:
-        """Predicts values."""
+        """Predicts values.
+
+        Args:
+            features: Rows to predict.
+
+        Returns:
+            Array of predicted values, one per row.
+        """
         return np.asarray(self.estimator_.predict(features))
 
 
@@ -182,13 +264,30 @@ class MonotoneEstimator(base.BaseEstimator):
         parameter: str,
         signs: tuple[int, ...],
     ) -> None:
-        """Stores the model, the parameter name and the leading signs."""
+        """Stores the model, the parameter name and the leading signs.
+
+        Args:
+            estimator: Unfitted model whose `parameter` takes the sign
+                vector.
+            parameter: Name of that parameter, set on the innermost
+                estimator beneath any wrappers.
+            signs: Signs (+1, -1, 0) for the leading columns.
+        """
         self.estimator = estimator
         self.parameter = parameter
         self.signs = signs
 
     def fit(self, features: Any, target: Any) -> Self:
-        """Completes the sign vector for this input width and fits."""
+        """Completes the sign vector for this input width and fits.
+
+        Args:
+            features: Training features; the number of columns sets the
+                vector length.
+            target: Training targets.
+
+        Returns:
+            This wrapper, fitted.
+        """
         width = features.shape[1]
         vector = list(self.signs)[:width]
         vector += [0] * (width - len(vector))
@@ -202,7 +301,14 @@ class MonotoneEstimator(base.BaseEstimator):
         return self
 
     def predict(self, features: Any) -> np.ndarray:
-        """Predictions of the constrained model."""
+        """Predicts with the constrained model.
+
+        Args:
+            features: Rows to predict.
+
+        Returns:
+            Array of predictions, one per row.
+        """
         return np.asarray(self.estimator_.predict(features))
 
 
@@ -211,11 +317,19 @@ class MonotoneClassifier(base.ClassifierMixin, MonotoneEstimator):
 
     @property
     def classes_(self) -> np.ndarray:
-        """Class labels of the fitted model."""
+        """The class labels of the fitted model."""
         return np.asarray(self.estimator_.classes_)
 
     def predict_proba(self, features: Any) -> np.ndarray:
-        """Class probabilities of the constrained model."""
+        """Predicts class probabilities with the constrained model.
+
+        Args:
+            features: Rows to predict.
+
+        Returns:
+            Array with one row per input row and one column per class, in
+            `classes_` order.
+        """
         return np.asarray(self.estimator_.predict_proba(features))
 
 
@@ -226,7 +340,17 @@ class MonotoneRegressor(base.RegressorMixin, MonotoneEstimator):
 def monotone(
     estimator: base.BaseEstimator, parameter: str, signs: tuple[int, ...]
 ) -> MonotoneEstimator:
-    """Wraps an estimator so its monotonic parameter is set at fit time."""
+    """Wraps an estimator so its monotonic parameter is set at fit time.
+
+    Args:
+        estimator: Unfitted model to constrain.
+        parameter: Name of the parameter that takes the sign vector.
+        signs: Signs (+1, -1, 0) for the leading columns.
+
+    Returns:
+        A monotone classifier if `estimator` is a classifier, otherwise a
+        monotone regressor.
+    """
     kind = (
         MonotoneClassifier
         if base.is_classifier(estimator)

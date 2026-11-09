@@ -1,9 +1,9 @@
 """A bounded, explainable baseline lifecycle for labelled documents.
 
-This module is intentionally a document-specific capability slice. It uses
-the validated document contracts, keeps feature preparation and modelling in
-one immutable configuration, and refuses to imply that a serialized model is
-safe to load without an explicit trust decision.
+This module covers documents only. It uses the validated document contracts,
+keeps feature preparation and modelling in one immutable configuration, and
+refuses to imply that a serialized model is safe to load without an explicit
+trust decision.
 """
 
 from collections.abc import Sequence
@@ -32,7 +32,17 @@ from scmle.data.modalities import document
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class DocumentModelConfig:
-    """Bounded configuration for the reproducible document baseline."""
+    """Bounded configuration for the reproducible document baseline.
+
+    Attributes:
+        max_features: Maximum vocabulary size; at least 1.
+        ngram_range: Smallest and largest n-gram length, 1 <= low <= high.
+        min_df: Minimum number of documents a term must appear in; at least 1.
+        regularization: Inverse regularization strength of the logistic
+            regression; must be positive.
+        max_iter: Maximum solver iterations; at least 1.
+        random_state: Seed for the estimator.
+    """
 
     max_features: int = 10_000
     ngram_range: tuple[int, int] = (1, 2)
@@ -42,7 +52,13 @@ class DocumentModelConfig:
     random_state: int = 0
 
     def __post_init__(self) -> None:
-        """Validate resource and estimator bounds before fitting."""
+        """Validates resource and estimator bounds before fitting.
+
+        Raises:
+            ValueError: If `max_features`, `min_df` or `max_iter` is below 1,
+                `ngram_range` is not two ordered positive bounds, or
+                `regularization` is not positive.
+        """
         if self.max_features < 1:
             raise ValueError("max_features must be positive")
         if len(self.ngram_range) != 2 or not (
@@ -57,7 +73,11 @@ class DocumentModelConfig:
             raise ValueError("max_iter must be positive")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-compatible configuration evidence."""
+        """Converts the configuration to JSON-compatible values.
+
+        Returns:
+            Mapping of field name to value, with `ngram_range` as a list.
+        """
         return {
             "max_features": self.max_features,
             "ngram_range": list(self.ngram_range),
@@ -70,7 +90,16 @@ class DocumentModelConfig:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class DocumentEvaluation:
-    """Evaluation evidence for a held-out document split."""
+    """Evaluation evidence for a held-out document split.
+
+    Attributes:
+        sample_count: Number of documents evaluated.
+        accuracy: Share of documents classified correctly.
+        macro_f1: Unweighted mean of the per-class harmonic mean of
+            precision and recall.
+        log_loss: Mean negative log probability of the true class.
+        labels: Class labels, as text, in the classifier's class order.
+    """
 
     sample_count: int
     accuracy: float
@@ -79,13 +108,27 @@ class DocumentEvaluation:
     labels: tuple[str, ...]
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-compatible evaluation evidence."""
+        """Converts the evaluation to JSON-compatible values.
+
+        Returns:
+            Mapping of field name to value.
+        """
         return dataclasses.asdict(self)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class DocumentExplanation:
-    """Global or local term-weight explanation evidence."""
+    """Global or local term-weight explanation evidence.
+
+    Attributes:
+        model_digest: Digest of the model state that was explained.
+        input_hash: Content hash of the explained document, or None for a
+            global explanation.
+        method: Name of the explanation method.
+        terms: Pairs of term and its score, strongest first.
+        limitations: Plain statements of what the explanation does not show.
+        citations: Source locations of the explained document, if any.
+    """
 
     model_digest: str
     input_hash: str | None
@@ -95,7 +138,12 @@ class DocumentExplanation:
     citations: tuple[document.DocumentCitation, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-compatible explanation evidence."""
+        """Converts the explanation to JSON-compatible values.
+
+        Returns:
+            Mapping of field name to value, with `terms` as lists of term
+            and score and `citations` as dictionaries.
+        """
         return {
             "model_digest": self.model_digest,
             "input_hash": self.input_hash,
@@ -108,20 +156,41 @@ class DocumentExplanation:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class DocumentModelArtifact:
-    """Identity of an atomically written trusted-model package."""
+    """Identity of an atomically written trusted-model package.
+
+    Attributes:
+        path: Directory of the package.
+        digest: SHA-256 digest of the model payload file.
+        schema_version: Version of the package layout.
+    """
 
     path: str
     digest: str
     schema_version: int = 1
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-compatible package identity."""
+        """Converts the package identity to JSON-compatible values.
+
+        Returns:
+            Mapping of field name to value.
+        """
         return dataclasses.asdict(self)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class DocumentDriftReport:
-    """Profile drift evidence comparing a reference and observed corpus."""
+    """Profile drift evidence comparing a reference and observed corpus.
+
+    Attributes:
+        reference_hash: Dataset hash of the reference corpus.
+        observed_hash: Dataset hash of the observed corpus.
+        language_distance: Total variation distance between the language
+            shares of the two corpora.
+        mean_character_delta: Change in mean character count relative to the
+            reference mean.
+        duplicate_rate: Share of observed documents in duplicate groups.
+        threshold: Level above which a signal counts as shifted.
+    """
 
     reference_hash: str
     observed_hash: str
@@ -132,7 +201,7 @@ class DocumentDriftReport:
 
     @property
     def shifted(self) -> bool:
-        """Return whether any monitored profile signal exceeds its bound."""
+        """Whether any monitored profile signal exceeds the threshold."""
         return (
             self.language_distance > self.threshold
             or abs(self.mean_character_delta) > self.threshold
@@ -140,7 +209,11 @@ class DocumentDriftReport:
         )
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-compatible monitoring evidence."""
+        """Converts the drift report to JSON-compatible values.
+
+        Returns:
+            Mapping of field name to value, plus a `shifted` flag.
+        """
         return {
             **dataclasses.asdict(self),
             "shifted": self.shifted,
@@ -148,10 +221,23 @@ class DocumentDriftReport:
 
 
 class DocumentClassifier:
-    """TF-IDF document classifier with evidence and safe package boundaries."""
+    """TF-IDF document classifier with evidence and safe package boundaries.
+
+    Attributes:
+        config: Feature and estimator configuration.
+        vectorizer: Fitted TF-IDF vectorizer, or None before fitting.
+        estimator: Fitted logistic regression, or None before fitting.
+        curation_report: Curation report of the training documents, or None
+            before fitting.
+    """
 
     def __init__(self, config: DocumentModelConfig | None = None) -> None:
-        """Initialize an unfitted classifier."""
+        """Initializes an unfitted classifier.
+
+        Args:
+            config: Configuration to use; defaults to
+                `DocumentModelConfig()`.
+        """
         self.config = config or DocumentModelConfig()
         self.vectorizer: TfidfVectorizer | None = None
         self.estimator: LogisticRegression | None = None
@@ -159,12 +245,16 @@ class DocumentClassifier:
 
     @property
     def fitted(self) -> bool:
-        """Return whether feature preparation and modelling are complete."""
+        """Whether the vectorizer and the estimator are both fitted."""
         return self.vectorizer is not None and self.estimator is not None
 
     @property
     def model_digest(self) -> str:
-        """Return a deterministic digest of the fitted model state."""
+        """The SHA-256 digest of the configuration, vocabulary and coefficients.
+
+        Raises:
+            RuntimeError: If the classifier has not been fitted.
+        """
         self.require_fitted()
         vectorizer = self.vectorizer
         estimator = self.estimator
@@ -189,7 +279,7 @@ class DocumentClassifier:
         self,
         training_samples: Sequence[document.DocumentSample],
     ) -> Self:
-        """Fit the baseline on labelled, curated training documents.
+        """Fits the baseline on labelled, curated training documents.
 
         Args:
             training_samples: Samples from the training partition only.
@@ -198,8 +288,9 @@ class DocumentClassifier:
             The fitted classifier.
 
         Raises:
-            ValueError: If labels are missing, conflicting duplicate content
-                is present, or fewer than two classes are available.
+            ValueError: If there are no samples, curation has unresolved
+                blocking findings, a label is missing, fewer than two
+                classes are present, or no usable tokens remain.
         """
         values = tuple(training_samples)
         if not values:
@@ -246,7 +337,18 @@ class DocumentClassifier:
         self,
         samples: Sequence[document.DocumentSample],
     ) -> tuple[Any, ...]:
-        """Predict labels for validated documents."""
+        """Predicts labels for validated documents.
+
+        Args:
+            samples: Documents to classify.
+
+        Returns:
+            Predicted labels, one per document in order; empty if there are
+            no samples.
+
+        Raises:
+            RuntimeError: If the classifier has not been fitted.
+        """
         self.require_fitted()
         if not samples:
             return ()
@@ -260,7 +362,18 @@ class DocumentClassifier:
         self,
         samples: Sequence[document.DocumentSample],
     ) -> tuple[tuple[float, ...], ...]:
-        """Return class probabilities for validated documents."""
+        """Predicts class probabilities for validated documents.
+
+        Args:
+            samples: Documents to classify.
+
+        Returns:
+            One tuple of probabilities per document, in `classes` order;
+            empty if there are no samples.
+
+        Raises:
+            RuntimeError: If the classifier has not been fitted.
+        """
         self.require_fitted()
         if not samples:
             return ()
@@ -274,9 +387,19 @@ class DocumentClassifier:
         self,
         samples: Sequence[document.DocumentSample],
     ) -> DocumentEvaluation:
-        """Evaluate labelled documents without refitting or touching training.
+        """Evaluates labelled documents without refitting or touching training.
 
         The evaluator never changes the fitted vocabulary or estimator.
+
+        Args:
+            samples: Labelled documents to score.
+
+        Returns:
+            Accuracy, macro-averaged precision/recall balance and log loss
+            over the documents.
+
+        Raises:
+            ValueError: If there are no samples or any document has no label.
         """
         values = tuple(samples)
         if not values:
@@ -298,7 +421,19 @@ class DocumentClassifier:
         )
 
     def global_explanation(self, top_k: int = 10) -> DocumentExplanation:
-        """Return stable global term importance from linear coefficients."""
+        """Ranks terms by their mean absolute linear coefficient.
+
+        Args:
+            top_k: Number of terms to keep.
+
+        Returns:
+            Global explanation whose terms are (term, mean absolute
+            coefficient) pairs, largest first, ties broken alphabetically.
+
+        Raises:
+            ValueError: If `top_k` is below 1.
+            RuntimeError: If the classifier has not been fitted.
+        """
         if top_k < 1:
             raise ValueError("top_k must be positive")
         self.require_fitted()
@@ -331,7 +466,22 @@ class DocumentClassifier:
         sample: document.DocumentSample,
         top_k: int = 10,
     ) -> DocumentExplanation:
-        """Return local signed term contributions for one document."""
+        """Computes signed term contributions for one document.
+
+        Args:
+            sample: Document to explain.
+            top_k: Number of terms to keep.
+
+        Returns:
+            Local explanation whose terms are (term, TF-IDF value times
+            coefficient) pairs for the predicted class, largest absolute
+            value first; positive favors the predicted class. It carries
+            the document's citations.
+
+        Raises:
+            ValueError: If `top_k` is below 1.
+            RuntimeError: If the classifier has not been fitted.
+        """
         if top_k < 1:
             raise ValueError("top_k must be positive")
         self.require_fitted()
@@ -377,7 +527,7 @@ class DocumentClassifier:
         top_k: int = 10,
         max_terms: int = 100,
     ) -> DocumentExplanation:
-        """Measure predicted-class score changes when terms are removed.
+        """Measures predicted-class score changes when terms are removed.
 
         Candidate terms are selected by absolute local linear contribution,
         then removed from the original text one at a time. The returned value
@@ -449,7 +599,18 @@ class DocumentClassifier:
         )
 
     def predicted_class_score(self, matrix: Any) -> float:
-        """Return the decision score for the class predicted by the model."""
+        """Computes the decision score of the predicted class.
+
+        Args:
+            matrix: Feature matrix whose first row is scored.
+
+        Returns:
+            The decision-function value for the class predicted for the
+            first row; larger means more support for that class.
+
+        Raises:
+            RuntimeError: If the classifier has not been fitted.
+        """
         self.require_fitted()
         estimator = self.estimator
         if estimator is None:
@@ -464,7 +625,11 @@ class DocumentClassifier:
 
     @property
     def classes(self) -> tuple[Any, ...]:
-        """Return the fitted class labels in estimator order."""
+        """The fitted class labels in estimator order.
+
+        Raises:
+            RuntimeError: If the classifier has not been fitted.
+        """
         self.require_fitted()
         estimator = self.estimator
         if estimator is None:
@@ -472,7 +637,17 @@ class DocumentClassifier:
         return tuple(estimator.classes_.tolist())
 
     def save(self, path: str | pathlib.Path) -> DocumentModelArtifact:
-        """Atomically save this fitted classifier as a verified package."""
+        """Atomically saves this fitted classifier as a verified package.
+
+        Args:
+            path: Directory to create; it must not exist yet.
+
+        Returns:
+            The package path and the digest of its model payload.
+
+        Raises:
+            FileExistsError: If `path` already exists.
+        """
         self.require_fitted()
         target = pathlib.Path(path).expanduser()
         if target.exists():
@@ -527,7 +702,23 @@ class DocumentClassifier:
         path: str | pathlib.Path,
         trusted: bool = False,
     ) -> Self:
-        """Load a package only after an explicit caller trust decision."""
+        """Loads a package only after an explicit caller trust decision.
+
+        Args:
+            path: Package directory written by `save`.
+            trusted: Must be True; loading unpickles the payload, so only
+                packages from trusted sources may be loaded.
+
+        Returns:
+            The fitted classifier stored in the package.
+
+        Raises:
+            PermissionError: If `trusted` is not True.
+            FileNotFoundError: If `path` is not a directory.
+            ValueError: If the manifest or payload is missing, the version
+                is unsupported, or a digest does not match.
+            TypeError: If the payload is not a `DocumentClassifier`.
+        """
         if not trusted:
             raise PermissionError(
                 "loading a document model package requires trusted=True"
@@ -556,7 +747,17 @@ class DocumentClassifier:
         return loaded
 
     def transform(self, samples: Sequence[document.DocumentSample]) -> Any:
-        """Transform documents with the fitted training vocabulary."""
+        """Transforms documents with the fitted training vocabulary.
+
+        Args:
+            samples: Documents to convert.
+
+        Returns:
+            Sparse TF-IDF matrix with one row per document.
+
+        Raises:
+            RuntimeError: If the classifier has not been fitted.
+        """
         self.require_fitted()
         vectorizer = self.vectorizer
         if vectorizer is None:
@@ -564,20 +765,38 @@ class DocumentClassifier:
         return vectorizer.transform([sample.content for sample in samples])
 
     def require_fitted(self) -> None:
-        """Raise when an operation needs a fitted classifier."""
+        """Checks that the classifier has been fitted.
+
+        Raises:
+            RuntimeError: If it has not been fitted.
+        """
         if not self.fitted:
             raise RuntimeError("document classifier has not been fitted")
 
 
 class DocumentMonitor:
-    """Monitor bounded corpus-profile signals against a reference snapshot."""
+    """Monitors bounded corpus-profile signals against a reference snapshot.
+
+    Attributes:
+        reference: Curation report of the reference corpus.
+        threshold: Level above which a signal counts as shifted.
+    """
 
     def __init__(
         self,
         reference: document.DocumentCurationReport,
         threshold: float = 0.25,
     ) -> None:
-        """Initialize a monitor with an explicit normalized drift threshold."""
+        """Initializes a monitor with an explicit normalized drift threshold.
+
+        Args:
+            reference: Curation report of the reference corpus.
+            threshold: Level above which a signal counts as shifted; in
+                (0, 1].
+
+        Raises:
+            ValueError: If `threshold` is outside (0, 1].
+        """
         if not 0 < threshold <= 1:
             raise ValueError("threshold must be in (0, 1]")
         self.reference = reference
@@ -587,7 +806,15 @@ class DocumentMonitor:
         self,
         observed: document.DocumentDataset,
     ) -> DocumentDriftReport:
-        """Compare observed document profiles with the reference corpus."""
+        """Compares observed document profiles with the reference corpus.
+
+        Args:
+            observed: Documents to compare against the reference.
+
+        Returns:
+            Drift report with the language distance, the relative change in
+            mean character count and the duplicate rate.
+        """
         current = observed.curate(
             self.reference.max_characters,
             self.reference.max_tokens,
@@ -628,7 +855,14 @@ class DocumentMonitor:
         self,
         report: document.DocumentCurationReport,
     ) -> float:
-        """Return the mean bounded character count from a curation report."""
+        """Computes the mean bounded character count from a curation report.
+
+        Args:
+            report: Curation report whose document profiles are averaged.
+
+        Returns:
+            The mean character count, or 0.0 if the report has no profiles.
+        """
         if not report.profiles:
             return 0.0
         return sum(
@@ -637,7 +871,14 @@ class DocumentMonitor:
 
 
 def file_digest(path: pathlib.Path) -> str:
-    """Return a SHA-256 digest for a package artifact."""
+    """Computes a SHA-256 digest for a package artifact.
+
+    Args:
+        path: File to hash.
+
+    Returns:
+        The hexadecimal digest of the file contents.
+    """
     digest = hashlib.sha256()
     with path.open("rb") as stream:
         for block in iter(lambda: stream.read(1024 * 1024), b""):
@@ -646,7 +887,11 @@ def file_digest(path: pathlib.Path) -> str:
 
 
 def sync_directory(path: pathlib.Path) -> None:
-    """Flush a directory entry after an atomic package replacement."""
+    """Flushes a directory entry after an atomic package replacement.
+
+    Args:
+        path: Directory whose entry must reach stable storage.
+    """
     durability.sync_directory(path)
 
 

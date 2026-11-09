@@ -74,7 +74,11 @@ class LifecycleCancelledError(errors.CancelledError):
     """Raised when a modality lifecycle receives a cancellation request."""
 
     def __init__(self, message: str) -> None:
-        """Create a cancellation error with an actionable message."""
+        """Creates a cancellation error with an actionable message.
+
+        Args:
+            message: Explanation of why and where the run was cancelled.
+        """
         super().__init__(message, {"scope": "modality_lifecycle"})
 
 
@@ -82,7 +86,7 @@ class LifecycleCancellation:
     """Thread-safe cooperative cancellation signal for one lifecycle run."""
 
     def __init__(self) -> None:
-        """Create a cancellation signal in the not-cancelled state."""
+        """Creates a cancellation signal in the not-cancelled state."""
         self.signal = threading.Event()
 
     def cancel(self) -> None:
@@ -90,20 +94,37 @@ class LifecycleCancellation:
         self.signal.set()
 
     def is_cancelled(self) -> bool:
-        """Return whether cancellation has been requested."""
+        """Reports whether cancellation has been requested.
+
+        Returns:
+            True once `cancel` has been called, otherwise False.
+        """
         return self.signal.is_set()
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class FeatureBatch:
-    """A finite, bounded feature matrix tied to stable sample identities."""
+    """A finite, bounded feature matrix tied to stable sample identities.
+
+    Attributes:
+        sample_ids: Unique identifier of each row, in row order.
+        feature_names: Non-empty name of each column, in column order.
+        values: Read-only float matrix with one row per sample ID and one column
+            per feature name; every value is finite.
+    """
 
     sample_ids: tuple[str, ...]
     feature_names: tuple[str, ...]
     values: np.ndarray = dataclasses.field(repr=False)
 
     def __post_init__(self) -> None:
-        """Validate shape, finiteness, and immutable identity metadata."""
+        """Validates shape, finiteness, and immutable identity metadata.
+
+        Raises:
+            ValueError: If the values are not a two-dimensional matrix, the row
+                or column counts do not match the IDs or names, a value is not
+                finite, sample IDs repeat, or a feature name is blank.
+        """
         matrix = np.asarray(self.values, dtype=np.float64)
         if matrix.ndim != 2:
             raise ValueError("feature values must be a two-dimensional matrix")
@@ -126,7 +147,15 @@ class FeatureBatch:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class DatasetPartitions:
-    """Leakage-aware train, validation, and test partitions."""
+    """Leakage-aware train, validation, and test partitions.
+
+    Attributes:
+        train: Samples used to fit the model.
+        validation: Samples held out for validation.
+        test: Samples held out for the final evaluation.
+        groups: Mapping of partition name to the sorted group identifiers it
+            contains.
+    """
 
     train: tuple[Any, ...]
     validation: tuple[Any, ...]
@@ -134,7 +163,7 @@ class DatasetPartitions:
     groups: dict[str, tuple[str, ...]]
 
     def __post_init__(self) -> None:
-        """Normalize partitions and reject identity overlap."""
+        """Normalizes partitions to tuples and sorts each group list."""
         object.__setattr__(self, "train", tuple(self.train))
         object.__setattr__(self, "validation", tuple(self.validation))
         object.__setattr__(self, "test", tuple(self.test))
@@ -146,7 +175,14 @@ class DatasetPartitions:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class LifecyclePackage:
-    """Digest and signature identity of an atomically written package."""
+    """Digest and signature identity of an atomically written package.
+
+    Attributes:
+        path: Package directory.
+        model_sha256: SHA-256 digest of the serialized model.
+        signature: Signature value of the package manifest.
+        schema_version: Version of the package layout.
+    """
 
     path: str
     model_sha256: str
@@ -154,7 +190,12 @@ class LifecyclePackage:
     schema_version: int = PACKAGE_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
-        """Validate package identity before it enters lifecycle evidence."""
+        """Validates package identity before it enters lifecycle evidence.
+
+        Raises:
+            ValueError: If the path or signature is blank, the model digest is
+                not a SHA-256 digest, or the schema version is unsupported.
+        """
         if not isinstance(self.path, str) or not self.path.strip():
             raise ValueError("package path must be non-empty")
         if not isinstance(self.model_sha256, str) or not is_sha256(
@@ -167,7 +208,11 @@ class LifecyclePackage:
             raise ValueError("unsupported modality package schema version")
 
     def to_dict(self) -> dict[str, object]:
-        """Return JSON-native package evidence."""
+        """Converts the package identity to JSON-native values.
+
+        Returns:
+            Mapping of field name to value.
+        """
         return dataclasses.asdict(self)
 
 
@@ -179,6 +224,16 @@ class ModalityPredictor:
     representation policy required for new samples. This class does not
     infer a codec, deserialize arbitrary raw transport payloads, or expose an
     HTTP server; it keeps those deployment decisions outside the package.
+
+    Attributes:
+        adapter: Adapter that turns new samples into features.
+        model: Verified classifier loaded from the package.
+        package: Identity of the package the model came from.
+        feature_names: Feature names the package was trained on.
+        training_dataset_hash: Hash of the training dataset recorded in the
+            package.
+        lifecycle_report_digest: Digest of the verified lifecycle report, or
+            None if no report was checked.
     """
 
     adapter: ModalityAdapter
@@ -196,12 +251,29 @@ class ModalityPredictor:
         signing_key: str | bytes,
         lifecycle_report_path: str | Path | None = None,
     ) -> Self:
-        """Load and validate a signed package for one modality adapter.
+        """Loads and validates a signed package for one modality adapter.
 
         When ``lifecycle_report_path`` is supplied, the signed report must
         identify this exact modality, dataset, package path, model digest,
         and package signature. This creates an auditable package-to-serving
         boundary without changing the experimental modality status.
+
+        Args:
+            adapter: Adapter for new samples; its modality must match the
+                package.
+            package_path: Package directory written by the lifecycle.
+            signing_key: Key that the package and report signatures are checked
+                with.
+            lifecycle_report_path: Signed lifecycle report to cross-check with
+                the package, if any.
+
+        Returns:
+            A predictor holding the verified model and its feature schema.
+
+        Raises:
+            ValueError: If the manifest, modality, feature names or signature
+                are invalid or mismatch the adapter or the model, or the
+                lifecycle report does not identify this package.
         """
         model = load_package(package_path, signing_key)
         manifest_path = Path(package_path) / "manifest.json"
@@ -271,7 +343,18 @@ class ModalityPredictor:
         )
 
     def features_for(self, samples: Sequence[Any]) -> FeatureBatch:
-        """Prepare and validate features for new modality samples."""
+        """Prepares and validates features for new modality samples.
+
+        Args:
+            samples: New samples to featurize.
+
+        Returns:
+            The feature batch for the samples, in order.
+
+        Raises:
+            ValueError: If there are no samples or the adapter's feature names
+                differ from the package's.
+        """
         values = tuple(samples)
         if not values:
             raise ValueError("samples must not be empty")
@@ -281,15 +364,36 @@ class ModalityPredictor:
         return batch
 
     def predict(self, samples: Sequence[Any]) -> np.ndarray:
-        """Return predictions after validating the signed feature contract."""
+        """Predicts labels after validating the signed feature contract.
+
+        Args:
+            samples: New samples to classify.
+
+        Returns:
+            Array of predicted labels, one per sample.
+        """
         return self.model.predict(self.features_for(samples).values)
 
     def predict_proba(self, samples: Sequence[Any]) -> np.ndarray:
-        """Return class probabilities after feature-contract validation."""
+        """Predicts class probabilities after feature-contract validation.
+
+        Args:
+            samples: New samples to classify.
+
+        Returns:
+            Array with one row per sample and one column per class, in the
+            model's class order.
+        """
         return self.model.predict_proba(self.features_for(samples).values)
 
     def health(self) -> dict[str, object]:
-        """Return machine-readable package and inference readiness evidence."""
+        """Reports machine-readable package and inference readiness evidence.
+
+        Returns:
+            Mapping with the verification flag, modality, training dataset hash,
+            feature names and model digest, plus the lifecycle report digest and
+            flag if a report was checked.
+        """
         health = {
             "package_verified": True,
             "modality": modalities.modality_value(self.adapter.modality),
@@ -309,7 +413,21 @@ class ModalityPredictor:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class LifecycleReport:
-    """All evidence emitted by one completed modality lifecycle."""
+    """All evidence emitted by one completed modality lifecycle.
+
+    Attributes:
+        modality: Modality value the lifecycle ran for.
+        dataset_hash: Hash identifying the dataset.
+        stage_evidence: Evidence of every required lifecycle stage, in order.
+        evaluation: Held-out evaluation evidence.
+        performance: Resource and timing evidence.
+        package: Identity of the written model package.
+        inference: Inference smoke-test evidence.
+        monitoring: Drift-monitoring evidence.
+        documentation: Documentation evidence.
+        recovery: Recovery and resource evidence.
+        signature: SHA-256 signature of the report content, or None if unsigned.
+    """
 
     modality: str
     dataset_hash: str
@@ -324,7 +442,15 @@ class LifecycleReport:
     signature: str | None = None
 
     def __post_init__(self) -> None:
-        """Validate the report identity and optional signature."""
+        """Validates the report identity and optional signature.
+
+        Raises:
+            ValueError: If the modality or dataset hash is blank, the stage
+                evidence is not every required stage once in order or lacks
+                evidence links, or the signature is not a SHA-256 digest.
+            TypeError: If the package is not a `LifecyclePackage` or the stage
+                evidence holds other objects.
+        """
         for field_name in ("modality", "dataset_hash"):
             value = getattr(self, field_name)
             if not isinstance(value, str) or not value.strip():
@@ -366,7 +492,11 @@ class LifecycleReport:
             raise ValueError("signature must be a SHA-256 digest")
 
     def unsigned_dict(self) -> dict[str, object]:
-        """Return the exact report content covered by the signature."""
+        """Builds the exact report content covered by the signature.
+
+        Returns:
+            JSON-native mapping of every field except the signature.
+        """
         return {
             "schema_version": 2,
             "modality": self.modality,
@@ -384,7 +514,14 @@ class LifecycleReport:
         }
 
     def sign(self, signing_key: str | bytes) -> Self:
-        """Return a report signed over its exact serialized evidence."""
+        """Signs the report over its exact serialized evidence.
+
+        Args:
+            signing_key: Key to sign with.
+
+        Returns:
+            A copy of this report carrying the signature.
+        """
         return dataclasses.replace(
             self,
             signature=attestation.sign_payload(
@@ -393,7 +530,15 @@ class LifecycleReport:
         )
 
     def verify_signature(self, signing_key: str | bytes) -> bool:
-        """Return whether the report signature matches its current content."""
+        """Checks the report signature against its current content.
+
+        Args:
+            signing_key: Key the signature should have been made with.
+
+        Returns:
+            True if the report is signed and the signature matches; False if it
+            is unsigned or does not match.
+        """
         if self.signature is None:
             return False
         expected = attestation.sign_payload(self.unsigned_dict(), signing_key)
@@ -401,7 +546,18 @@ class LifecycleReport:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, object]) -> Self:
-        """Restore a versioned report without trusting its evidence claims."""
+        """Restores a versioned report without trusting its evidence claims.
+
+        Args:
+            record: Mapping produced by `to_dict`.
+
+        Returns:
+            The restored report.
+
+        Raises:
+            ValueError: If the schema version is unsupported or any field is
+                missing or has the wrong shape.
+        """
         if record.get("schema_version") != 2:
             raise ValueError("unsupported lifecycle report schema version")
 
@@ -505,7 +661,17 @@ class LifecycleReport:
 
     @classmethod
     def read(cls, path: str | Path) -> Self:
-        """Read and parse a persisted lifecycle report."""
+        """Reads and parses a persisted lifecycle report.
+
+        Args:
+            path: JSON file written from `to_dict`.
+
+        Returns:
+            The parsed report (signature not yet verified).
+
+        Raises:
+            ValueError: If the file does not hold a JSON object.
+        """
         record = json.loads(Path(path).read_text(encoding="utf-8"))
         if not isinstance(record, Mapping):
             raise ValueError("lifecycle report must be a JSON object")
@@ -513,14 +679,30 @@ class LifecycleReport:
 
     @classmethod
     def read_verified(cls, path: str | Path, signing_key: str | bytes) -> Self:
-        """Read a report and reject it unless its content signature verifies."""
+        """Reads a report and rejects it unless its content signature verifies.
+
+        Args:
+            path: JSON file written from `to_dict`.
+            signing_key: Key the signature should have been made with.
+
+        Returns:
+            The parsed report with a verified signature.
+
+        Raises:
+            ValueError: If the signature is missing or does not verify.
+        """
         report = cls.read(path)
         if not report.verify_signature(signing_key):
             raise ValueError("lifecycle report signature does not verify")
         return report
 
     def to_dict(self) -> dict[str, object]:
-        """Return a deterministic JSON-compatible lifecycle record."""
+        """Converts the report to a deterministic JSON-compatible record.
+
+        Returns:
+            The unsigned content plus a `signature` entry that is None if
+            unsigned, otherwise the algorithm and value.
+        """
         record = self.unsigned_dict()
         record["signature"] = (
             None
@@ -542,6 +724,26 @@ class LifecycleCheckpoint:
     against the caller-provided adapter, then verifies that every replayed
     stage is byte-for-byte equivalent to the checkpoint. This avoids trusting
     a serialized estimator or arbitrary adapter object as recovery state.
+
+    Attributes:
+        modality: Modality value of the run.
+        dataset_hash: Hash identifying the training dataset.
+        observed_dataset_hash: Hash identifying the dataset used for
+            monitoring.
+        package_path: Where the model package is written.
+        report_path: Where the lifecycle report is written.
+        seed: Random seed of the run.
+        completed_stages: Values of the lifecycle stages finished so far, a
+            prefix of the required order.
+        stage_digests: Digest of each completed stage's evidence, in the same
+            order.
+        require_independent_ground_truth: Whether the run demands independently
+            authored explanation ground truth.
+        manifest_digest: Digest of the package manifest once it exists, else
+            None.
+        status: "running" until every stage is done, then "completed".
+        signature: Signature value over the content, or None if unsigned.
+        schema_version: Version of the checkpoint layout.
     """
 
     modality: str
@@ -559,7 +761,16 @@ class LifecycleCheckpoint:
     schema_version: int = 1
 
     def __post_init__(self) -> None:
-        """Reject incomplete, non-prefix, or unsigned-identity state."""
+        """Rejects incomplete, non-prefix, or unsigned-identity state.
+
+        Raises:
+            ValueError: If an identity field is blank, the status is unknown, a
+                digest or signature is blank, the completed stages are not an
+                ordered prefix of the lifecycle, the digests do not match the
+                stages, or a completed checkpoint lacks a stage.
+            TypeError: If the seed is not an integer or the ground-truth
+                requirement is not a boolean.
+        """
         for field_name in (
             "modality",
             "dataset_hash",
@@ -601,7 +812,11 @@ class LifecycleCheckpoint:
             )
 
     def unsigned_dict(self) -> dict[str, object]:
-        """Return the exact checkpoint content covered by its signature."""
+        """Builds the exact checkpoint content covered by its signature.
+
+        Returns:
+            JSON-native mapping of every field except the signature.
+        """
         return {
             "schema_version": self.schema_version,
             "record_type": "modality_lifecycle_checkpoint",
@@ -621,7 +836,14 @@ class LifecycleCheckpoint:
         }
 
     def sign(self, signing_key: str | bytes) -> Self:
-        """Return a checkpoint signed over its exact serialized identity."""
+        """Signs the checkpoint over its exact serialized identity.
+
+        Args:
+            signing_key: Key to sign with.
+
+        Returns:
+            A copy of this checkpoint carrying the signature.
+        """
         return dataclasses.replace(
             self,
             signature=attestation.sign_payload(
@@ -630,7 +852,15 @@ class LifecycleCheckpoint:
         )
 
     def verify_signature(self, signing_key: str | bytes) -> bool:
-        """Return whether the persisted checkpoint signature is valid."""
+        """Checks the persisted checkpoint signature.
+
+        Args:
+            signing_key: Key the signature should have been made with.
+
+        Returns:
+            True if the checkpoint is signed and the signature matches; False if
+            it is unsigned or does not match.
+        """
         if self.signature is None:
             return False
         expected = attestation.sign_payload(self.unsigned_dict(), signing_key)
@@ -638,7 +868,18 @@ class LifecycleCheckpoint:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, object]) -> Self:
-        """Restore a checkpoint without trusting its serialized claims."""
+        """Restores a checkpoint without trusting its serialized claims.
+
+        Args:
+            record: Mapping produced by `to_dict`.
+
+        Returns:
+            The restored checkpoint.
+
+        Raises:
+            ValueError: If the schema version, record type, signature or any
+                field is unsupported, missing or malformed.
+        """
         if record.get("schema_version") != 1:
             raise ValueError("unsupported lifecycle checkpoint schema version")
         if record.get("record_type") != "modality_lifecycle_checkpoint":
@@ -690,7 +931,12 @@ class LifecycleCheckpoint:
         )
 
     def to_dict(self) -> dict[str, object]:
-        """Return deterministic JSON-native checkpoint evidence."""
+        """Converts the checkpoint to deterministic JSON-native evidence.
+
+        Returns:
+            The unsigned content plus a `signature` entry holding the algorithm
+            and value.
+        """
         record = self.unsigned_dict()
         record["signature"] = {
             "algorithm": attestation.SIGNATURE_ALGORITHM,
@@ -700,7 +946,17 @@ class LifecycleCheckpoint:
 
     @classmethod
     def read(cls, path: str | Path) -> Self:
-        """Read a persisted lifecycle checkpoint."""
+        """Reads a persisted lifecycle checkpoint.
+
+        Args:
+            path: JSON file written from `to_dict`.
+
+        Returns:
+            The parsed checkpoint (signature not yet verified).
+
+        Raises:
+            ValueError: If the file does not hold a JSON object.
+        """
         record = json.loads(Path(path).read_text(encoding="utf-8"))
         if not isinstance(record, Mapping):
             raise ValueError("lifecycle checkpoint must be a JSON object")
@@ -708,7 +964,18 @@ class LifecycleCheckpoint:
 
     @classmethod
     def read_verified(cls, path: str | Path, signing_key: str | bytes) -> Self:
-        """Read a checkpoint and reject it unless its signature verifies."""
+        """Reads a checkpoint and rejects it unless its signature verifies.
+
+        Args:
+            path: JSON file written from `to_dict`.
+            signing_key: Key the signature should have been made with.
+
+        Returns:
+            The parsed checkpoint with a verified signature.
+
+        Raises:
+            ValueError: If the signature does not verify.
+        """
         checkpoint = cls.read(path)
         if not checkpoint.verify_signature(signing_key):
             raise ValueError("lifecycle checkpoint signature does not verify")
@@ -722,6 +989,15 @@ class ModalityCurationResult:
     ``content_digest`` is the SHA-256 digest of the canonical unsigned
     evidence. It is deliberately independent of the signing key so that
     consumers can compare curation content across attestations.
+
+    Attributes:
+        modality: Modality value of the dataset.
+        dataset_hash: Hash identifying the dataset.
+        sample_count: Number of samples curated; non-negative.
+        curation: Curation report evidence as a JSON-native mapping.
+        dataset_card: Dataset card evidence as a JSON-native mapping.
+        path: Where the evidence file is written.
+        signature: SHA-256 signature of the unsigned evidence.
     """
 
     modality: str
@@ -733,7 +1009,14 @@ class ModalityCurationResult:
     signature: str
 
     def __post_init__(self) -> None:
-        """Validate curation evidence identity before it is published."""
+        """Validates curation evidence identity before it is published.
+
+        Raises:
+            ValueError: If an identity field is blank, the sample count is not a
+                non-negative integer, the signature is not a SHA-256 digest, or
+                the curation or dataset card disagrees with the modality,
+                dataset hash or sample count.
+        """
         for field_name in ("modality", "dataset_hash", "path"):
             value = getattr(self, field_name)
             if not isinstance(value, str) or not value.strip():
@@ -764,7 +1047,12 @@ class ModalityCurationResult:
         object.__setattr__(self, "dataset_card", normalized_card)
 
     def unsigned_dict(self) -> dict[str, object]:
-        """Return the exact curation content covered by the signature."""
+        """Builds the exact curation content covered by the signature.
+
+        Returns:
+            JSON-native mapping of the record type, identity, curation and
+            dataset card.
+        """
         return {
             "schema_version": CURATION_SCHEMA_VERSION,
             "record_type": "modality_curation",
@@ -777,16 +1065,28 @@ class ModalityCurationResult:
 
     @property
     def content_digest(self) -> str:
-        """Return the deterministic digest of the unsigned evidence."""
+        """The deterministic digest of the unsigned evidence."""
         return attestation.canonical_digest(self.unsigned_dict())
 
     def verify_signature(self, signing_key: str | bytes) -> bool:
-        """Return whether the persisted curation signature verifies."""
+        """Checks the persisted curation signature.
+
+        Args:
+            signing_key: Key the signature should have been made with.
+
+        Returns:
+            True if the signature matches the unsigned evidence, else False.
+        """
         expected = attestation.sign_payload(self.unsigned_dict(), signing_key)
         return hmac.compare_digest(self.signature, expected)
 
     def to_dict(self) -> dict[str, object]:
-        """Return JSON-native curation result evidence."""
+        """Converts the result to JSON-native curation evidence.
+
+        Returns:
+            The unsigned content plus the content digest, path and a `signature`
+            entry holding the algorithm and value.
+        """
         record = self.unsigned_dict()
         record["content_digest"] = self.content_digest
         record["path"] = self.path
@@ -798,7 +1098,19 @@ class ModalityCurationResult:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, object]) -> Self:
-        """Restore a curation result without trusting its signature claim."""
+        """Restores a curation result without trusting its signature claim.
+
+        Args:
+            record: Mapping produced by `to_dict`.
+
+        Returns:
+            The restored result.
+
+        Raises:
+            ValueError: If the schema version, record type, identity, evidence,
+                signature or content digest is unsupported, malformed or does
+                not match.
+        """
         if record.get("schema_version") != CURATION_SCHEMA_VERSION:
             raise ValueError("unsupported modality curation schema version")
         if record.get("record_type") != "modality_curation":
@@ -853,7 +1165,17 @@ class ModalityCurationResult:
 
     @classmethod
     def read(cls, path: str | Path) -> Self:
-        """Read a persisted curation result."""
+        """Reads a persisted curation result.
+
+        Args:
+            path: JSON file written from `to_dict`.
+
+        Returns:
+            The parsed result (signature not yet verified).
+
+        Raises:
+            ValueError: If the file does not hold a JSON object.
+        """
         record = json.loads(Path(path).read_text(encoding="utf-8"))
         if not isinstance(record, Mapping):
             raise ValueError("modality curation record must be an object")
@@ -861,7 +1183,18 @@ class ModalityCurationResult:
 
     @classmethod
     def read_verified(cls, path: str | Path, signing_key: str | bytes) -> Self:
-        """Read curation evidence and require a valid content signature."""
+        """Reads curation evidence and requires a valid content signature.
+
+        Args:
+            path: JSON file written from `to_dict`.
+            signing_key: Key the signature should have been made with.
+
+        Returns:
+            The parsed result with a verified signature.
+
+        Raises:
+            ValueError: If the signature does not verify.
+        """
         result = cls.read(path)
         if not result.verify_signature(signing_key):
             raise ValueError("modality curation signature does not verify")
@@ -874,37 +1207,53 @@ class ModalityCurationAdapter(abc.ABC):
     @property
     @abc.abstractmethod
     def modality(self) -> modalities.ModalityIdentity:
-        """Return the declared dataset family."""
+        """The declared dataset family."""
 
     @property
     @abc.abstractmethod
     def dataset_hash(self) -> str:
-        """Return the immutable dataset identity."""
+        """The immutable dataset identity."""
 
     @property
     @abc.abstractmethod
     def samples(self) -> tuple[Any, ...]:
-        """Return samples in canonical source order."""
+        """The samples in canonical source order."""
 
     @abc.abstractmethod
     def curate(
         self,
     ) -> curation.ModalityCurationReport | document.DocumentCurationReport:
-        """Return reviewable data-understanding evidence."""
+        """Builds reviewable data-understanding evidence.
+
+        Returns:
+            The curation report for the dataset.
+        """
 
     @abc.abstractmethod
     def modality_notes(self) -> tuple[str, ...]:
-        """Return representation and curation limits."""
+        """Lists representation and curation limits.
+
+        Returns:
+            Plain statements of what the representation and curation do not
+            cover.
+        """
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class ExtensionCurationAdapter(ModalityCurationAdapter):
-    """Adapt arbitrary caller-owned records to the curation-only contract.
+    """Adapts arbitrary caller-owned records to the curation-only contract.
 
     The callback owns domain-specific profiling and validation. This adapter
     binds its result to the extension identity, immutable dataset identity,
     and sample count before the signed curation project can publish evidence.
     It intentionally does not provide split, feature, label, or model hooks.
+
+    Attributes:
+        extension: Namespaced extension modality identity.
+        sample_values: Caller-owned records in canonical order.
+        dataset_hash_value: Caller-owned immutable dataset identity.
+        curation_callback: Callable that returns the curation report.
+        limitations: Non-empty statements of the dataset's boundaries.
     """
 
     extension: modalities.ExtensionModality
@@ -914,7 +1263,14 @@ class ExtensionCurationAdapter(ModalityCurationAdapter):
     limitations: tuple[str, ...]
 
     def __post_init__(self) -> None:
-        """Validate the caller-owned curation boundary."""
+        """Validates the caller-owned curation boundary.
+
+        Raises:
+            TypeError: If `extension` is not an `ExtensionModality` or the
+                callback is not callable.
+            ValueError: If the dataset hash is blank or the limitations are
+                empty or contain blank values.
+        """
         if not isinstance(self.extension, modalities.ExtensionModality):
             raise TypeError("extension must be ExtensionModality")
         if not self.dataset_hash_value.strip():
@@ -930,23 +1286,32 @@ class ExtensionCurationAdapter(ModalityCurationAdapter):
 
     @property
     def modality(self) -> modalities.ExtensionModality:
-        """Return the namespaced extension identity."""
+        """The namespaced extension identity."""
         return self.extension
 
     @property
     def dataset_hash(self) -> str:
-        """Return the caller-owned immutable dataset identity."""
+        """The caller-owned immutable dataset identity."""
         return self.dataset_hash_value
 
     @property
     def samples(self) -> tuple[Any, ...]:
-        """Return arbitrary records in caller-defined canonical order."""
+        """The records in caller-defined canonical order."""
         return self.sample_values
 
     def curate(
         self,
     ) -> curation.ModalityCurationReport:
-        """Run and validate the caller-owned curation callback."""
+        """Runs and validates the caller-owned curation callback.
+
+        Returns:
+            The report returned by the callback.
+
+        Raises:
+            TypeError: If the callback does not return a curation report.
+            ValueError: If the report's modality, dataset hash or sample count
+                does not match the extension.
+        """
         report = self.curation_callback()
         if not isinstance(report, curation.ModalityCurationReport):
             raise TypeError("curation_callback must return a curation report")
@@ -962,7 +1327,11 @@ class ExtensionCurationAdapter(ModalityCurationAdapter):
         return report
 
     def modality_notes(self) -> tuple[str, ...]:
-        """Return explicit caller-owned boundaries for the dataset card."""
+        """Lists the explicit caller-owned boundaries for the dataset card.
+
+        Returns:
+            The limitations given at construction.
+        """
         return self.limitations
 
 
@@ -973,23 +1342,58 @@ class ModalityAdapter(ModalityCurationAdapter):
 
     @abc.abstractmethod
     def split(self, seed: int) -> DatasetPartitions:
-        """Return leakage-aware partitions."""
+        """Splits the dataset into leakage-aware partitions.
+
+        Args:
+            seed: Random seed for the split.
+
+        Returns:
+            Train, validation and test partitions.
+        """
 
     @abc.abstractmethod
     def features(self, samples: Sequence[Any]) -> FeatureBatch:
-        """Return bounded features for the supplied samples."""
+        """Builds bounded features for the supplied samples.
+
+        Args:
+            samples: Samples to featurize.
+
+        Returns:
+            Feature batch with one row per sample, in order.
+        """
 
     @abc.abstractmethod
     def sample_id(self, sample: Any) -> str:
-        """Return the stable identity of one sample."""
+        """Gives the stable identity of one sample.
+
+        Args:
+            sample: Sample to identify.
+
+        Returns:
+            The sample's identifier.
+        """
 
     @abc.abstractmethod
     def label(self, sample: Any) -> object | None:
-        """Return the supervised label, if one exists."""
+        """Gives the supervised label of one sample.
+
+        Args:
+            sample: Sample to label.
+
+        Returns:
+            The label, or None if the sample has none.
+        """
 
     @abc.abstractmethod
     def monitor(self, observed: ModalityAdapter) -> dict[str, object]:
-        """Compare this reference adapter with an observed adapter."""
+        """Compares this reference adapter with an observed adapter.
+
+        Args:
+            observed: Adapter over the newly observed data.
+
+        Returns:
+            Drift evidence as a JSON-native mapping.
+        """
 
     def modality_specific_explanation(
         self,
@@ -998,11 +1402,22 @@ class ModalityAdapter(ModalityCurationAdapter):
         feature_names: Sequence[str],
         coefficients: np.ndarray,
     ) -> dict[str, object]:
-        """Return explicit modality-specific explanation evidence.
+        """Builds explicit modality-specific explanation evidence.
 
         The default is an honest unavailable result. Adapters override this
         hook only when they own a decoder or perturbation policy that can be
         represented and tested without inventing raw-modality semantics.
+
+        Args:
+            sample: Sample to explain.
+            model: Fitted classifier.
+            feature_names: Names of the model's features.
+            coefficients: Linear coefficients for the predicted class, one per
+                feature.
+
+        Returns:
+            Mapping with a "status" key; in this base class always
+            "not_available" with the reason and limitations.
         """
         return {
             "status": "not_available",
@@ -1019,50 +1434,92 @@ class ModalityAdapter(ModalityCurationAdapter):
         sample: Any,
         feature_names: Sequence[str],
     ) -> quality.ExplanationGroundTruth | None:
-        """Return caller-owned independent explanation evidence, if known.
+        """Gives caller-owned independent explanation evidence, if known.
 
         Built-in adapters return no reference by default because raw-modality
         semantics cannot be inferred from a feature matrix. A domain adapter
         may override this method when it carries an independently authored
         annotation, benchmark, or synthetic oracle.
+
+        Args:
+            sample: Sample being explained.
+            feature_names: Names of the model's features.
+
+        Returns:
+            The ground truth for the sample, or None if none is known (always
+            None in this base class).
         """
         del sample, feature_names
         return None
 
     def labels(self, samples: Sequence[Any]) -> tuple[object, ...]:
-        """Return labels in sample order."""
+        """Gives the labels of several samples.
+
+        Args:
+            samples: Samples to label.
+
+        Returns:
+            Labels in sample order.
+        """
         return tuple(self.label(sample) for sample in samples)
 
     def group_ids(self, samples: Sequence[Any]) -> tuple[str, ...]:
-        """Return stable grouping identities for split evidence."""
+        """Gives the stable grouping identities used for split evidence.
+
+        Args:
+            samples: Samples to identify.
+
+        Returns:
+            The sample identifier of each sample, in order.
+        """
         return tuple(self.sample_id(sample) for sample in samples)
 
 
 class DocumentAdapter(ModalityAdapter):
-    """Adapter for UTF-8, Markdown, and caller-decoded document samples."""
+    """Adapter for UTF-8, Markdown, and caller-decoded document samples.
+
+    Attributes:
+        dataset: Immutable document dataset the adapter wraps.
+    """
 
     modality = modalities.Modality.DOCUMENT
 
     def __init__(self, dataset: document.DocumentDataset) -> None:
-        """Bind an immutable document dataset."""
+        """Binds an immutable document dataset.
+
+        Args:
+            dataset: Documents the lifecycle runs on.
+        """
         self.dataset = dataset
 
     @property
     def dataset_hash(self) -> str:
-        """Return the document corpus identity."""
+        """The document corpus identity."""
         return self.dataset.content_hash
 
     @property
     def samples(self) -> tuple[document.DocumentSample, ...]:
-        """Return document samples."""
+        """The document samples in the dataset."""
         return self.dataset.samples
 
     def curate(self) -> document.DocumentCurationReport:
-        """Return document profiling and label evidence."""
+        """Builds document profiling and label evidence.
+
+        Returns:
+            The curation report for the dataset.
+        """
         return self.dataset.curate()
 
     def split(self, seed: int) -> DatasetPartitions:
-        """Split by document identity to prevent chunk leakage."""
+        """Splits by document identity to prevent chunk leakage.
+
+        Args:
+            seed: Random seed for the split.
+
+        Returns:
+            Train, validation and test partitions, with the sorted document IDs
+            of each under `groups`.
+        """
         result = self.dataset.split(seed=seed)
         return DatasetPartitions(
             result.train,
@@ -1084,7 +1541,15 @@ class DocumentAdapter(ModalityAdapter):
     def features(
         self, samples: Sequence[document.DocumentSample]
     ) -> FeatureBatch:
-        """Prepare bounded lexical features without using labels."""
+        """Prepares bounded lexical features without using labels.
+
+        Args:
+            samples: Documents to featurize.
+
+        Returns:
+            Batch with one row per document and two columns, "character_count"
+            and "token_count".
+        """
         profiles = document.DocumentDataset(tuple(samples)).profile()
         rows = np.asarray(
             [
@@ -1100,11 +1565,25 @@ class DocumentAdapter(ModalityAdapter):
         )
 
     def sample_id(self, sample: document.DocumentSample) -> str:
-        """Return a stable identity for one document sample or chunk."""
+        """Gives a stable identity for one document sample or chunk.
+
+        Args:
+            sample: Document sample.
+
+        Returns:
+            The document ID and content hash joined by a colon.
+        """
         return f"{sample.document_id}:{sample.content_hash}"
 
     def label(self, sample: document.DocumentSample) -> object | None:
-        """Return the document label."""
+        """Gives the document label.
+
+        Args:
+            sample: Document sample.
+
+        Returns:
+            The sample's label, or None if it has none.
+        """
         return sample.label
 
     def modality_specific_explanation(
@@ -1114,7 +1593,21 @@ class DocumentAdapter(ModalityAdapter):
         feature_names: Sequence[str],
         coefficients: np.ndarray,
     ) -> dict[str, object]:
-        """Return page and section provenance for a document explanation."""
+        """Builds page and section provenance for a document explanation.
+
+        Args:
+            sample: Document sample to explain.
+            model: Fitted classifier.
+            feature_names: Names of the model's features (unused).
+            coefficients: Linear coefficients (unused).
+
+        Returns:
+            Mapping with the document's source identity, citations, provenance
+            spans, source-span occlusion scores and limitations.
+
+        Raises:
+            TypeError: If `sample` is not a `DocumentSample`.
+        """
         if not isinstance(sample, document.DocumentSample):
             raise TypeError("sample must be a DocumentSample")
         raw_occlusion = self.raw_span_occlusion_scores(sample, model)
@@ -1153,7 +1646,18 @@ class DocumentAdapter(ModalityAdapter):
         sample: document.DocumentSample,
         model: LogisticRegression,
     ) -> dict[str, object]:
-        """Score source-character masks while preserving span offsets."""
+        """Scores source-character masks while preserving span offsets.
+
+        Args:
+            sample: Document sample to explain.
+            model: Fitted classifier.
+
+        Returns:
+            Mapping with one entry per provenance span holding the change in the
+            model's decision score when the span's characters are replaced by
+            spaces (full score minus masked score), plus the baseline and
+            limitations.
+        """
         original_features = self.features((sample,)).values
         original_decision = np.asarray(
             model.decision_function(original_features)
@@ -1228,7 +1732,17 @@ class DocumentAdapter(ModalityAdapter):
         }
 
     def monitor(self, observed: ModalityAdapter) -> dict[str, object]:
-        """Return the document profile drift report."""
+        """Builds the document profile drift report.
+
+        Args:
+            observed: Adapter over the newly observed documents.
+
+        Returns:
+            The drift report as a JSON-native mapping.
+
+        Raises:
+            TypeError: If `observed` is not a `DocumentAdapter`.
+        """
         if not isinstance(observed, DocumentAdapter):
             raise TypeError("observed adapter must be a DocumentAdapter")
         current = self.dataset.curate()
@@ -1238,7 +1752,11 @@ class DocumentAdapter(ModalityAdapter):
         return report.to_dict()
 
     def modality_notes(self) -> tuple[str, ...]:
-        """Describe the bounded document representation."""
+        """Describes the bounded document representation.
+
+        Returns:
+            Plain statements of what the representation does not cover.
+        """
         return (
             "The lifecycle baseline uses character and token counts, not OCR, "
             "layout, or semantic embeddings.",
@@ -1254,30 +1772,50 @@ class TextAdapter(DocumentAdapter):
 
 
 class ImageAdapter(ModalityAdapter):
-    """Adapter for bounded, decoded image samples."""
+    """Adapter for bounded, decoded image samples.
+
+    Attributes:
+        dataset: Immutable image dataset the adapter wraps.
+    """
 
     modality = modalities.Modality.IMAGE
 
     def __init__(self, dataset: image.ImageDataset) -> None:
-        """Bind an immutable image dataset."""
+        """Binds an immutable image dataset.
+
+        Args:
+            dataset: Images the lifecycle runs on.
+        """
         self.dataset = dataset
 
     @property
     def dataset_hash(self) -> str:
-        """Return the image corpus identity."""
+        """The image corpus identity."""
         return self.dataset.content_hash
 
     @property
     def samples(self) -> tuple[image.ImageSample, ...]:
-        """Return image samples."""
+        """The image samples in the dataset."""
         return self.dataset.samples
 
     def curate(self) -> curation.ModalityCurationReport:
-        """Return image dimensions, encodings, duplicate, and label evidence."""
+        """Builds image dimension, encoding, duplicate, and label evidence.
+
+        Returns:
+            The curation report for the dataset.
+        """
         return self.dataset.curate()
 
     def split(self, seed: int) -> DatasetPartitions:
-        """Split by capture group to prevent identity leakage."""
+        """Splits by capture group to prevent identity leakage.
+
+        Args:
+            seed: Random seed for the split.
+
+        Returns:
+            Train, validation and test partitions, with the dataset's group IDs
+            under `groups`.
+        """
         result = self.dataset.split(seed=seed)
         return DatasetPartitions(
             result.train,
@@ -1287,7 +1825,15 @@ class ImageAdapter(ModalityAdapter):
         )
 
     def features(self, samples: Sequence[image.ImageSample]) -> FeatureBatch:
-        """Prepare deterministic resized-pixel features."""
+        """Prepares deterministic resized-pixel features.
+
+        Args:
+            samples: Images to featurize.
+
+        Returns:
+            Batch with one row per image and 768 columns, one per pixel of a
+            16 x 16 RGB image, named "pixel[row,column,channel]".
+        """
         dataset = image.ImageDataset(tuple(samples))
         values = dataset.prepare_tabular_features()
         width, height = (16, 16)
@@ -1303,11 +1849,25 @@ class ImageAdapter(ModalityAdapter):
         )
 
     def sample_id(self, sample: image.ImageSample) -> str:
-        """Return a source-and-content identity for one image sample."""
+        """Gives a source-and-content identity for one image sample.
+
+        Args:
+            sample: Image sample.
+
+        Returns:
+            The image source and content hash joined by a colon.
+        """
         return f"{sample.source}:{sample.content_hash}"
 
     def label(self, sample: image.ImageSample) -> object | None:
-        """Return the image label."""
+        """Gives the image label.
+
+        Args:
+            sample: Image sample.
+
+        Returns:
+            The sample's label, or None if it has none.
+        """
         return sample.label
 
     def modality_specific_explanation(
@@ -1317,7 +1877,23 @@ class ImageAdapter(ModalityAdapter):
         feature_names: Sequence[str],
         coefficients: np.ndarray,
     ) -> dict[str, object]:
-        """Return bounded occlusion evidence on transformed RGB pixels."""
+        """Builds bounded occlusion evidence on transformed RGB pixels.
+
+        Args:
+            sample: Image sample to explain.
+            model: Fitted classifier.
+            feature_names: Names of the model's features (unused).
+            coefficients: Linear coefficients (unused).
+
+        Returns:
+            Mapping with the ten 4 x 4 pixel regions whose occlusion changes the
+            decision score most (score minus occluded score), the source-pixel
+            occlusion evidence and limitations.
+
+        Raises:
+            TypeError: If `sample` is not an `ImageSample`.
+            ValueError: If the features are not 16 x 16 RGB.
+        """
         if not isinstance(sample, image.ImageSample):
             raise TypeError("sample must be an ImageSample")
         features = self.features((sample,)).values
@@ -1389,12 +1965,27 @@ class ImageAdapter(ModalityAdapter):
         selected_class: int,
         original_score: float,
     ) -> dict[str, object]:
-        """Score bounded source-pixel masks before the resize transform.
+        """Scores bounded source-pixel masks before the resize transform.
 
         The model still consumes the declared 16x16 RGB representation. The
         difference is that each mask is applied to the validated source
         pixels first, so the evidence records a source-space perturbation and
         the exact image dimensions used to construct it.
+
+        Args:
+            sample: Image sample to explain.
+            model: Fitted classifier.
+            selected_class: Index of the class whose score is tracked.
+            original_score: Decision score of the unmasked image for that class.
+
+        Returns:
+            Mapping with the ten source regions (a 4 x 4 grid over the source
+            image) whose masking changes the score most (original minus masked),
+            the source dimensions as [width, height], the baseline and
+            limitations.
+
+        Raises:
+            ValueError: If the decoded image does not have three channels.
         """
         source_pixels = sample.decode("RGB")
         source_height, source_width, source_channels = source_pixels.shape
@@ -1445,7 +2036,17 @@ class ImageAdapter(ModalityAdapter):
         }
 
     def monitor(self, observed: ModalityAdapter) -> dict[str, object]:
-        """Return mean-pixel and duplicate drift evidence."""
+        """Builds the mean-pixel and duplicate drift evidence.
+
+        Args:
+            observed: Adapter over the newly observed images.
+
+        Returns:
+            The drift report as a JSON-native mapping.
+
+        Raises:
+            TypeError: If `observed` is not an `ImageAdapter`.
+        """
         if not isinstance(observed, ImageAdapter):
             raise TypeError("observed adapter must be an ImageAdapter")
         report = image_models.ImageMonitor(self.dataset.curate()).observe(
@@ -1454,7 +2055,11 @@ class ImageAdapter(ModalityAdapter):
         return report.to_dict()
 
     def modality_notes(self) -> tuple[str, ...]:
-        """Describe image lifecycle limits."""
+        """Describes image lifecycle limits.
+
+        Returns:
+            Plain statements of what the representation does not claim.
+        """
         return (
             "The baseline uses resized RGB pixels and does not claim "
             "localization, saliency validation, or object detection.",
@@ -1462,52 +2067,104 @@ class ImageAdapter(ModalityAdapter):
 
 
 class AudioAdapter(ModalityAdapter):
-    """Adapter for WAV-capable audio samples and explicit codec probes."""
+    """Adapter for WAV-capable audio samples and explicit codec probes.
+
+    Attributes:
+        dataset: Immutable audio dataset the adapter wraps.
+    """
 
     modality = modalities.Modality.AUDIO
 
     def __init__(self, dataset: audio.AudioDataset) -> None:
-        """Bind an immutable audio dataset."""
+        """Binds an immutable audio dataset.
+
+        Args:
+            dataset: Audio the lifecycle runs on.
+        """
         self.dataset = dataset
 
     @property
     def dataset_hash(self) -> str:
-        """Return the audio corpus identity."""
+        """The audio corpus identity."""
         return self.dataset.content_hash
 
     @property
     def samples(self) -> tuple[audio.AudioSample, ...]:
-        """Return audio samples."""
+        """The audio samples in the dataset."""
         return self.dataset.samples
 
     def curate(self) -> curation.ModalityCurationReport:
-        """Return codec, signal shape, duration, and label evidence."""
+        """Builds codec, signal shape, duration, and label evidence.
+
+        Returns:
+            The curation report for the dataset.
+        """
         return self.dataset.curate()
 
     def split(self, seed: int) -> DatasetPartitions:
-        """Split by speaker/session group."""
+        """Splits by speaker/session group.
+
+        Args:
+            seed: Random seed for the split.
+
+        Returns:
+            Train, validation and test partitions, with the dataset's group IDs
+            under `groups`.
+        """
         result = self.dataset.split(seed=seed)
         return DatasetPartitions(
             result.train, result.validation, result.test, result.group_ids()
         )
 
     def features(self, samples: Sequence[audio.AudioSample]) -> FeatureBatch:
-        """Prepare bounded WAV signal statistics."""
+        """Prepares bounded WAV signal statistics.
+
+        Args:
+            samples: Audio samples to featurize.
+
+        Returns:
+            Batch with one row per sample, identified by its source.
+        """
         prepared = audio.AudioDataset(tuple(samples)).prepare_features()
         return FeatureBatch(
             tuple(prepared.sources), prepared.feature_names, prepared.to_numpy()
         )
 
     def sample_id(self, sample: audio.AudioSample) -> str:
-        """Return the audio source identity."""
+        """Gives the audio source identity.
+
+        Args:
+            sample: Audio sample.
+
+        Returns:
+            The sample's source.
+        """
         return sample.source
 
     def label(self, sample: audio.AudioSample) -> object | None:
-        """Return the audio label."""
+        """Gives the audio label.
+
+        Args:
+            sample: Audio sample.
+
+        Returns:
+            The sample's label, or None if it has none.
+        """
         return sample.label
 
     def monitor(self, observed: ModalityAdapter) -> dict[str, object]:
-        """Return curation identity and profile drift evidence."""
+        """Builds curation identity and profile drift evidence.
+
+        Args:
+            observed: Adapter over the newly observed audio.
+
+        Returns:
+            Mapping with both dataset hashes, the sample count change (observed
+            minus reference) and, per profile key, whether its value differs.
+
+        Raises:
+            TypeError: If `observed` is not an `AudioAdapter`.
+        """
         if not isinstance(observed, AudioAdapter):
             raise TypeError("observed adapter must be an AudioAdapter")
         current = observed.dataset.curate()
@@ -1523,7 +2180,11 @@ class AudioAdapter(ModalityAdapter):
         }
 
     def modality_notes(self) -> tuple[str, ...]:
-        """Describe audio lifecycle limits."""
+        """Describes audio lifecycle limits.
+
+        Returns:
+            Plain statements of what the representation does not claim.
+        """
         return (
             "Signal features are bounded WAV statistics; non-WAV codecs "
             "require an explicit decoder adapter.",
@@ -1538,7 +2199,23 @@ class AudioAdapter(ModalityAdapter):
         feature_names: Sequence[str],
         coefficients: np.ndarray,
     ) -> dict[str, object]:
-        """Return bounded time-local score evidence for WAV samples."""
+        """Builds bounded time-local score evidence for WAV samples.
+
+        Args:
+            sample: Audio sample to explain.
+            model: Fitted classifier.
+            feature_names: Names of the model's features (unused).
+            coefficients: Linear coefficients (unused).
+
+        Returns:
+            Mapping with the model's decision score for up to eight consecutive
+            time windows of the sample, raw-waveform occlusion scores and a
+            noise robustness probe; or a mapping with status "not_available" if
+            the sample is not WAV.
+
+        Raises:
+            TypeError: If `sample` is not an `AudioSample`.
+        """
         if not isinstance(sample, audio.AudioSample):
             raise TypeError("sample must be an AudioSample")
         if sample.metadata.format.lower() != "wav":
@@ -1608,11 +2285,29 @@ class AudioAdapter(ModalityAdapter):
         snr_db: tuple[float, ...] = (20.0, 10.0, 0.0),
         seed: int = 0,
     ) -> dict[str, object]:
-        """Measure bounded score changes under deterministic additive noise.
+        """Measures bounded score changes under deterministic additive noise.
 
         This is a reproducible perturbation probe for the current linear
         baseline. It is not a perceptual speech-quality test, a denoising
         system, or evidence that the model is robust to real recording noise.
+
+        Args:
+            sample: WAV audio sample to perturb.
+            model: Fitted classifier.
+            original_score: Decision score of the unperturbed sample.
+            snr_db: Requested signal-to-noise ratios in decibels; one to eight
+                finite values in [0, 120].
+            seed: Seed of the noise generator.
+
+        Returns:
+            Mapping with one scenario per requested ratio holding the observed
+            ratio, the score, its change from `original_score` and the share
+            of clipped values; or status "not_available" if the sample is not
+            WAV or is silent.
+
+        Raises:
+            ValueError: If `snr_db` is empty, has more than eight values, or
+                holds a value outside [0, 120].
         """
         if sample.metadata.format.lower() != "wav":
             return {
@@ -1691,7 +2386,19 @@ class AudioAdapter(ModalityAdapter):
         original_score: float,
         window_frames: int,
     ) -> dict[str, object]:
-        """Score source PCM windows after replacing them with silence."""
+        """Scores source PCM windows after replacing them with silence.
+
+        Args:
+            sample: WAV audio sample to explain.
+            model: Fitted classifier.
+            original_score: Decision score of the unmasked sample.
+            window_frames: Number of PCM frames in each window.
+
+        Returns:
+            Mapping with one entry per window holding its frame and second
+            bounds and the score change (masked score minus original); or
+            status "not_available" if the sample width is unknown.
+        """
         if sample.metadata.sample_width is None:
             return {
                 "status": "not_available",
@@ -1758,7 +2465,17 @@ class AudioAdapter(ModalityAdapter):
 
 
 class VideoAdapter(ModalityAdapter):
-    """Adapter for probed video metadata or an explicit frame decoder."""
+    """Adapter for probed video metadata or an explicit frame decoder.
+
+    Attributes:
+        dataset: Immutable video dataset the adapter wraps.
+        frame_decoder: Caller-supplied frame decoder, or None to use container
+            metadata only.
+        max_frames: Maximum number of frames sampled per video.
+        max_frame_pixels: Maximum number of pixels per decoded frame.
+        temporal_cutoff: Canonical observation time that separates training
+            from later data, or None to split by group.
+    """
 
     modality = modalities.Modality.VIDEO
 
@@ -1770,7 +2487,20 @@ class VideoAdapter(ModalityAdapter):
         max_frame_pixels: int = 1_000_000,
         temporal_cutoff: datetime | str | None = None,
     ) -> None:
-        """Bind a dataset, decoder, and optional explicit temporal policy."""
+        """Binds a dataset, decoder, and optional explicit temporal policy.
+
+        Args:
+            dataset: Videos the lifecycle runs on.
+            frame_decoder: Decoder that turns encoded bytes and a frame index
+                into pixels; if None, only container metadata is used.
+            max_frames: Maximum number of frames sampled per video.
+            max_frame_pixels: Maximum number of pixels per decoded frame.
+            temporal_cutoff: Time that separates training from later data, if
+                the split must be temporal.
+
+        Raises:
+            ValueError: If `max_frames` or `max_frame_pixels` is below 1.
+        """
         if max_frames < 1 or max_frame_pixels < 1:
             raise ValueError("frame bounds must be positive")
         self.dataset = dataset
@@ -1785,20 +2515,32 @@ class VideoAdapter(ModalityAdapter):
 
     @property
     def dataset_hash(self) -> str:
-        """Return the video corpus identity."""
+        """The video corpus identity."""
         return self.dataset.content_hash
 
     @property
     def samples(self) -> tuple[video.VideoSample, ...]:
-        """Return video samples."""
+        """The video samples in the dataset."""
         return self.dataset.samples
 
     def curate(self) -> curation.ModalityCurationReport:
-        """Return encoding, shape, timing, and label evidence."""
+        """Builds encoding, shape, timing, and label evidence.
+
+        Returns:
+            The curation report for the dataset.
+        """
         return self.dataset.curate()
 
     def split(self, seed: int) -> DatasetPartitions:
-        """Split by subject/session/camera group."""
+        """Splits by subject/session/camera group, or by time with a cutoff.
+
+        Args:
+            seed: Random seed for the group split; unused for a temporal split.
+
+        Returns:
+            Train, validation and test partitions with their group IDs. With a
+            temporal cutoff, validation is empty and test holds the later data.
+        """
         if self.temporal_cutoff is not None:
             temporal_result = self.dataset.split_temporal(self.temporal_cutoff)
 
@@ -1830,7 +2572,15 @@ class VideoAdapter(ModalityAdapter):
         )
 
     def features(self, samples: Sequence[video.VideoSample]) -> FeatureBatch:
-        """Prepare metadata or explicitly decoded temporal features."""
+        """Prepares metadata or explicitly decoded temporal features.
+
+        Args:
+            samples: Videos to featurize.
+
+        Returns:
+            Batch with one row per video, identified by its source; decoded
+            frame statistics if a decoder is set, otherwise container metadata.
+        """
         dataset = video.VideoDataset(tuple(samples))
         prepared = (
             dataset.prepare_frame_features(
@@ -1846,15 +2596,40 @@ class VideoAdapter(ModalityAdapter):
         )
 
     def sample_id(self, sample: video.VideoSample) -> str:
-        """Return the video source identity."""
+        """Gives the video source identity.
+
+        Args:
+            sample: Video sample.
+
+        Returns:
+            The sample's source.
+        """
         return sample.source
 
     def label(self, sample: video.VideoSample) -> object | None:
-        """Return the video label."""
+        """Gives the video label.
+
+        Args:
+            sample: Video sample.
+
+        Returns:
+            The sample's label, or None if it has none.
+        """
         return sample.label
 
     def monitor(self, observed: ModalityAdapter) -> dict[str, object]:
-        """Return curation identity and metadata drift evidence."""
+        """Builds curation identity and metadata drift evidence.
+
+        Args:
+            observed: Adapter over the newly observed videos.
+
+        Returns:
+            Mapping with both dataset hashes, the sample count change (observed
+            minus reference) and, per profile key, whether its value differs.
+
+        Raises:
+            TypeError: If `observed` is not a `VideoAdapter`.
+        """
         if not isinstance(observed, VideoAdapter):
             raise TypeError("observed adapter must be a VideoAdapter")
         reference = self.dataset.curate()
@@ -1870,7 +2645,12 @@ class VideoAdapter(ModalityAdapter):
         }
 
     def modality_notes(self) -> tuple[str, ...]:
-        """Describe video lifecycle limits."""
+        """Describes video lifecycle limits.
+
+        Returns:
+            Plain statements of the representation in use and what it does not
+            cover.
+        """
         representation = (
             "The baseline uses caller-decoded, evenly sampled frame "
             "statistics with a bounded pixel budget."
@@ -1891,7 +2671,22 @@ class VideoAdapter(ModalityAdapter):
         feature_names: Sequence[str],
         coefficients: np.ndarray,
     ) -> dict[str, object]:
-        """Return bounded temporal frame-statistics occlusion evidence."""
+        """Builds bounded temporal frame-statistics occlusion evidence.
+
+        Args:
+            sample: Video sample to explain.
+            model: Fitted classifier.
+            feature_names: Names of the model's features (unused).
+            coefficients: Linear coefficients (unused).
+
+        Returns:
+            Mapping with the score change (zeroed minus full) per sampled frame,
+            largest absolute change first, plus raw-frame occlusion evidence; or
+            status "not_available" if no frame decoder is set.
+
+        Raises:
+            TypeError: If `sample` is not a `VideoSample`.
+        """
         if not isinstance(sample, video.VideoSample):
             raise TypeError("sample must be a VideoSample")
         if self.frame_decoder is None:
@@ -1954,7 +2749,18 @@ class VideoAdapter(ModalityAdapter):
         model: LogisticRegression,
         original_score: float,
     ) -> dict[str, object]:
-        """Score sampled decoded frames after replacing each with zeros."""
+        """Scores sampled decoded frames after replacing each with zeros.
+
+        Args:
+            sample: Video sample to explain.
+            model: Fitted classifier.
+            original_score: Decision score with no frame masked.
+
+        Returns:
+            Mapping with one entry per sampled frame holding its index, time in
+            seconds and score change (masked minus original); or status
+            "not_available" if no frame decoder is set.
+        """
         if self.frame_decoder is None:
             return {
                 "status": "not_available",
@@ -2011,30 +2817,50 @@ class VideoAdapter(ModalityAdapter):
 
 
 class GraphAdapter(ModalityAdapter):
-    """Adapter for inductive node classification on graph node features."""
+    """Adapter for inductive node classification on graph node features.
+
+    Attributes:
+        dataset: Validated graph with declared node features.
+    """
 
     modality = modalities.Modality.GRAPH
 
     def __init__(self, dataset: graph.GraphData) -> None:
-        """Bind a validated graph with declared node features."""
+        """Binds a validated graph with declared node features.
+
+        Args:
+            dataset: Graph the lifecycle runs on.
+        """
         self.dataset = dataset
 
     @property
     def dataset_hash(self) -> str:
-        """Return the full graph identity."""
+        """The full graph identity."""
         return self.dataset.identity
 
     @property
     def samples(self) -> tuple[graph.GraphNode, ...]:
-        """Return canonical graph nodes."""
+        """The canonical graph nodes."""
         return self.dataset.nodes
 
     def curate(self) -> curation.ModalityCurationReport:
-        """Return topology, feature, and label evidence."""
+        """Builds topology, feature, and label evidence.
+
+        Returns:
+            The curation report for the graph.
+        """
         return self.dataset.curate()
 
     def split(self, seed: int) -> DatasetPartitions:
-        """Split nodes inductively and retain partition-local edge evidence."""
+        """Splits nodes inductively and retains partition-local edge evidence.
+
+        Args:
+            seed: Random seed for the split.
+
+        Returns:
+            Train, validation and test partitions of nodes, with the node IDs of
+            each under `groups`.
+        """
         result = graph.inductive_node_split(self.dataset, seed=seed)
         by_id = {node.node_id: node for node in self.dataset.nodes}
         return DatasetPartitions(
@@ -2049,7 +2875,18 @@ class GraphAdapter(ModalityAdapter):
         )
 
     def features(self, samples: Sequence[graph.GraphNode]) -> FeatureBatch:
-        """Prepare declared node features without cross-partition topology."""
+        """Prepares declared node features without cross-partition topology.
+
+        Args:
+            samples: Nodes to featurize.
+
+        Returns:
+            Batch with one row per node, identified by its node ID, and one
+            column per declared node feature.
+
+        Raises:
+            ValueError: If the graph declares no node features.
+        """
         if not self.dataset.feature_names:
             raise ValueError("graph baseline requires declared node features")
         rows = np.asarray([sample.features for sample in samples], dtype=float)
@@ -2060,11 +2897,25 @@ class GraphAdapter(ModalityAdapter):
         )
 
     def sample_id(self, sample: graph.GraphNode) -> str:
-        """Return a node identity."""
+        """Gives a node identity.
+
+        Args:
+            sample: Graph node.
+
+        Returns:
+            The node ID.
+        """
         return sample.node_id
 
     def label(self, sample: graph.GraphNode) -> object | None:
-        """Return the node label."""
+        """Gives the node label.
+
+        Args:
+            sample: Graph node.
+
+        Returns:
+            The node's label, or None if it has none.
+        """
         return sample.label
 
     def one_hop_subgraph(
@@ -2073,11 +2924,25 @@ class GraphAdapter(ModalityAdapter):
         max_nodes: int = MAX_GRAPH_CONTEXT_NODES,
         max_edges: int = MAX_GRAPH_CONTEXT_EDGES,
     ) -> dict[str, object]:
-        """Return bounded, deterministic one-hop topology evidence.
+        """Builds bounded, deterministic one-hop topology evidence.
 
         The result is review context for a node-feature baseline. It does not
         claim that the model used topology or that edge removal is a faithful
         graph-neural-network attribution method.
+
+        Args:
+            node_id: Node at the center of the subgraph.
+            max_nodes: Maximum number of nodes returned, including the center.
+            max_edges: Maximum number of edges returned.
+
+        Returns:
+            Mapping with the center node, the selected node IDs (center first,
+            then neighbors in sorted order), the edges among them, the limits,
+            flags for whether nodes or edges were truncated, and the observed
+            counts of incident edges and neighbors.
+
+        Raises:
+            ValueError: If `node_id` is blank or unknown, or a limit is below 1.
         """
         if not node_id.strip():
             raise ValueError("node_id must not be empty")
@@ -2141,7 +3006,23 @@ class GraphAdapter(ModalityAdapter):
         feature_names: Sequence[str],
         coefficients: np.ndarray,
     ) -> dict[str, object]:
-        """Return one-hop graph context and node-feature evidence."""
+        """Builds one-hop graph context and node-feature evidence.
+
+        Args:
+            sample: Graph node to explain.
+            model: Fitted classifier.
+            feature_names: Names of the model's features.
+            coefficients: Linear coefficients for the model's features, one per
+                feature name.
+
+        Returns:
+            Mapping with the one-hop subgraph, the ten largest feature
+            contributions (value times coefficient), the decision score and the
+            change in score when each of up to 64 features is zeroed.
+
+        Raises:
+            TypeError: If `sample` is not a `GraphNode`.
+        """
         if not isinstance(sample, graph.GraphNode):
             raise TypeError("sample must be a GraphNode")
         subgraph = self.one_hop_subgraph(sample.node_id)
@@ -2222,7 +3103,18 @@ class GraphAdapter(ModalityAdapter):
         }
 
     def monitor(self, observed: ModalityAdapter) -> dict[str, object]:
-        """Return graph identity and profile drift evidence."""
+        """Builds graph identity and profile drift evidence.
+
+        Args:
+            observed: Adapter over the newly observed graph.
+
+        Returns:
+            Mapping with both graph identities and, per profile key, whether its
+            value differs.
+
+        Raises:
+            TypeError: If `observed` is not a `GraphAdapter`.
+        """
         if not isinstance(observed, GraphAdapter):
             raise TypeError("observed adapter must be a GraphAdapter")
         reference = self.dataset.profile().to_dict()
@@ -2237,7 +3129,11 @@ class GraphAdapter(ModalityAdapter):
         }
 
     def modality_notes(self) -> tuple[str, ...]:
-        """Describe graph lifecycle limits."""
+        """Describes graph lifecycle limits.
+
+        Returns:
+            Plain statements of what the baseline does and does not claim.
+        """
         return (
             "The baseline is inductive node classification on declared node "
             "features.",
@@ -2247,14 +3143,27 @@ class GraphAdapter(ModalityAdapter):
 
 
 class GeospatialAdapter(ModalityAdapter):
-    """Adapter for CRS-declared vector feature classification."""
+    """Adapter for CRS-declared vector feature classification.
+
+    Attributes:
+        dataset: Geospatial dataset with a declared coordinate reference system.
+        block_size: Side of the spatial split blocks, in CRS units.
+    """
 
     modality = modalities.Modality.GEOSPATIAL
 
     def __init__(
         self, dataset: geospatial.GeospatialDataset, block_size: float = 1.0
     ) -> None:
-        """Bind a geospatial dataset and an explicit CRS-unit block size."""
+        """Binds a geospatial dataset and an explicit CRS-unit block size.
+
+        Args:
+            dataset: Vector features the lifecycle runs on.
+            block_size: Side of the spatial split blocks, in CRS units.
+
+        Raises:
+            ValueError: If `block_size` is not positive.
+        """
         if block_size <= 0:
             raise ValueError("block_size must be positive")
         self.dataset = dataset
@@ -2262,16 +3171,21 @@ class GeospatialAdapter(ModalityAdapter):
 
     @property
     def dataset_hash(self) -> str:
-        """Return the vector dataset identity."""
+        """The vector dataset identity."""
         return self.dataset.content_hash
 
     @property
     def samples(self) -> tuple[geospatial.GeoFeature, ...]:
-        """Return geospatial features."""
+        """The geospatial features in the dataset."""
         return self.dataset.features
 
     def curate(self) -> curation.ModalityCurationReport:
-        """Return geometry, CRS, bounds, and label evidence."""
+        """Builds geometry, CRS, bounds, and label evidence.
+
+        Returns:
+            The curation report with spatial boundary leakage added to its
+            profile, and a warning finding if geometries cross block envelopes.
+        """
         report = self.dataset.curate()
         profile = dict(report.profile)
         quality_findings = list(report.quality_findings)
@@ -2305,7 +3219,15 @@ class GeospatialAdapter(ModalityAdapter):
         )
 
     def split(self, seed: int) -> DatasetPartitions:
-        """Split by spatial blocks in declared CRS units."""
+        """Splits by spatial blocks in declared CRS units.
+
+        Args:
+            seed: Random seed for the split.
+
+        Returns:
+            Train, validation and test partitions, with the block IDs of each
+            under `groups`.
+        """
         result = self.dataset.split_spatial(self.block_size, seed=seed)
         return DatasetPartitions(
             result.train,
@@ -2317,7 +3239,14 @@ class GeospatialAdapter(ModalityAdapter):
     def features(
         self, samples: Sequence[geospatial.GeoFeature]
     ) -> FeatureBatch:
-        """Prepare bounded geometry envelope and centroid features."""
+        """Prepares bounded geometry envelope and centroid features.
+
+        Args:
+            samples: Features to convert.
+
+        Returns:
+            Batch with one row per feature, identified by its feature ID.
+        """
         dataset = geospatial.GeospatialDataset(
             tuple(samples), crs=self.dataset.crs, source=self.dataset.source
         )
@@ -2329,11 +3258,25 @@ class GeospatialAdapter(ModalityAdapter):
         )
 
     def sample_id(self, sample: geospatial.GeoFeature) -> str:
-        """Return a feature identity."""
+        """Gives a feature identity.
+
+        Args:
+            sample: Geospatial feature.
+
+        Returns:
+            The feature ID.
+        """
         return sample.feature_id
 
     def label(self, sample: geospatial.GeoFeature) -> object | None:
-        """Return the feature label."""
+        """Gives the feature label.
+
+        Args:
+            sample: Geospatial feature.
+
+        Returns:
+            The feature's label, or None if it has none.
+        """
         return sample.label
 
     def modality_specific_explanation(
@@ -2343,7 +3286,24 @@ class GeospatialAdapter(ModalityAdapter):
         feature_names: Sequence[str],
         coefficients: np.ndarray,
     ) -> dict[str, object]:
-        """Return CRS-bound geometry and feature-contribution evidence."""
+        """Builds CRS-bound geometry and feature-contribution evidence.
+
+        Args:
+            sample: Geospatial feature to explain; it must be in the dataset.
+            model: Fitted classifier.
+            feature_names: Names of the model's features.
+            coefficients: Linear coefficients for the model's features, one per
+                feature name.
+
+        Returns:
+            Mapping with the feature's CRS, geometry type and bounds, the ten
+            largest feature contributions (value times coefficient), the
+            decision score and the score change when each coordinate axis is
+            replaced by the bounds midpoint.
+
+        Raises:
+            TypeError: If `sample` is not a `GeoFeature`.
+        """
         if not isinstance(sample, geospatial.GeoFeature):
             raise TypeError("sample must be a GeoFeature")
         feature_index = next(
@@ -2429,7 +3389,18 @@ class GeospatialAdapter(ModalityAdapter):
         }
 
     def monitor(self, observed: ModalityAdapter) -> dict[str, object]:
-        """Return geospatial identity, CRS, and profile drift evidence."""
+        """Builds geospatial identity, CRS, and profile drift evidence.
+
+        Args:
+            observed: Adapter over the newly observed features.
+
+        Returns:
+            Mapping with both dataset hashes and flags for whether the CRS and
+            the bounds differ.
+
+        Raises:
+            TypeError: If `observed` is not a `GeospatialAdapter`.
+        """
         if not isinstance(observed, GeospatialAdapter):
             raise TypeError("observed adapter must be a GeospatialAdapter")
         reference = self.dataset.profile().to_dict()
@@ -2442,7 +3413,11 @@ class GeospatialAdapter(ModalityAdapter):
         }
 
     def modality_notes(self) -> tuple[str, ...]:
-        """Describe geospatial lifecycle limits."""
+        """Describes geospatial lifecycle limits.
+
+        Returns:
+            Plain statements of what the baseline does and does not claim.
+        """
         return (
             "The baseline uses geometry envelopes and centroids in the "
             "declared CRS.",
@@ -2452,7 +3427,15 @@ class GeospatialAdapter(ModalityAdapter):
 
 
 class RasterAdapter(ModalityAdapter):
-    """Adapter for labelled raster metadata or bounded decoded pixels."""
+    """Adapter for labelled raster metadata or bounded decoded pixels.
+
+    Attributes:
+        dataset: Raster samples, in the order given.
+        labels_by_source: Caller-owned label of each raster, keyed by source.
+        decoder: Caller-owned pixel decoder, or None for metadata only.
+        decoder_name: Stripped name and version of the decoder, or None.
+        max_pixels: Maximum number of pixels decoded per raster.
+    """
 
     modality = modalities.Modality.RASTER
 
@@ -2464,12 +3447,27 @@ class RasterAdapter(ModalityAdapter):
         decoder_name: str | None = None,
         max_pixels: int = 4_000_000,
     ) -> None:
-        """Bind raster identities and caller-owned labels.
+        """Binds raster identities and caller-owned labels.
 
         Raster payload decoding remains caller-owned. When supplied, the
         decoder name and pixel budget become part of the representation
         contract. The label sidecar is keyed by the canonical raster source
         and is part of the caller's dataset evidence.
+
+        Args:
+            samples: Rasters to run on; at least one, with unique sources.
+            labels: Label of each raster, keyed by its source.
+            decoder: Callable that decodes a raster payload to pixels, or None
+                to use metadata only.
+            decoder_name: Name and version that identify the decoder; required
+                with a decoder and not allowed without one.
+            max_pixels: Maximum number of pixels decoded per raster.
+
+        Raises:
+            ValueError: If there are no samples, sources repeat, a source has no
+                label, `max_pixels` is below 1, or the decoder and its name are
+                not given together.
+            TypeError: If `decoder` is not callable.
         """
         normalized = tuple(samples)
         if not normalized:
@@ -2497,7 +3495,7 @@ class RasterAdapter(ModalityAdapter):
 
     @property
     def dataset_hash(self) -> str:
-        """Return the raster identity and label-sidecar digest."""
+        """The raster identity and label-sidecar digest."""
         identities = (
             f"{sample.source}\0{sample.file_hash}\0"
             f"{sample.nodata_value}\0{sample.nodata_fraction}\0"
@@ -2510,11 +3508,17 @@ class RasterAdapter(ModalityAdapter):
 
     @property
     def samples(self) -> tuple[geospatial.RasterSample, ...]:
-        """Return raster samples."""
+        """The raster samples in the dataset."""
         return self.dataset
 
     def curate(self) -> curation.ModalityCurationReport:
-        """Return raster shape, CRS, transform, and label evidence."""
+        """Builds raster shape, CRS, transform, and label evidence.
+
+        Returns:
+            The curation report, with decoded pixel statistics if a decoder is
+            set (otherwise a metadata-only marker) and warnings for mixed
+            shapes, CRS or data types and for unknown nodata handling.
+        """
         dimensions = sorted(
             {
                 (sample.width, sample.height, sample.bands)
@@ -2637,7 +3641,16 @@ class RasterAdapter(ModalityAdapter):
         )
 
     def split(self, seed: int) -> DatasetPartitions:
-        """Split by source identity because the core lacks raster decoding."""
+        """Splits by source identity because the core lacks raster decoding.
+
+        Args:
+            seed: Random seed for the shuffle.
+
+        Returns:
+            Train, validation and test partitions where validation and test each
+            hold a fifth of the rasters (at least one), with the sources of each
+            under `groups`.
+        """
         generator = np.random.default_rng(seed)
         order = generator.permutation(len(self.dataset))
         test_count = max(1, len(self.dataset) // 5)
@@ -2676,7 +3689,20 @@ class RasterAdapter(ModalityAdapter):
     def features(
         self, samples: Sequence[geospatial.RasterSample]
     ) -> FeatureBatch:
-        """Prepare raster metadata or bounded decoded pixel features."""
+        """Prepares raster metadata or bounded decoded pixel features.
+
+        Args:
+            samples: Rasters to featurize.
+
+        Returns:
+            Batch with one row per raster, identified by its source: per-band
+            pixel statistics if a decoder is set, otherwise width, height, band
+            count, byte size and six transform values.
+
+        Raises:
+            GeospatialValidationError: If decoding is on and the rasters do not
+                share one band count.
+        """
         if self.decoder is not None:
             band_counts = {sample.bands for sample in samples}
             if len(band_counts) != 1:
@@ -2725,7 +3751,18 @@ class RasterAdapter(ModalityAdapter):
 
     @staticmethod
     def pixel_feature_names(band_count: int) -> tuple[str, ...]:
-        """Return names for bounded decoded-pixel summary features."""
+        """Names the bounded decoded-pixel summary features.
+
+        Args:
+            band_count: Number of raster bands.
+
+        Returns:
+            For each band in order, the names of its mean, standard deviation,
+            minimum and maximum.
+
+        Raises:
+            ValueError: If `band_count` is below 1.
+        """
         if band_count < 1:
             raise ValueError("band_count must be positive")
         return tuple(
@@ -2738,7 +3775,21 @@ class RasterAdapter(ModalityAdapter):
     def pixel_feature_values(
         pixels: np.ndarray, band_count: int
     ) -> tuple[float, ...]:
-        """Return finite per-band summary values for decoded pixels."""
+        """Computes finite per-band summary values for decoded pixels.
+
+        Args:
+            pixels: Decoded array of shape (rows, columns) for one band or
+                (rows, columns, bands).
+            band_count: Number of bands the raster declares.
+
+        Returns:
+            For each band in order, the mean, standard deviation, minimum and
+            maximum of its values.
+
+        Raises:
+            GeospatialValidationError: If the pixel shape does not match the
+                declared band count.
+        """
         values = np.asarray(pixels)
         if values.ndim == 2:
             if band_count != 1:
@@ -2766,11 +3817,25 @@ class RasterAdapter(ModalityAdapter):
         )
 
     def sample_id(self, sample: geospatial.RasterSample) -> str:
-        """Return the canonical raster source identity."""
+        """Gives the canonical raster source identity.
+
+        Args:
+            sample: Raster sample.
+
+        Returns:
+            The raster's source.
+        """
         return sample.source
 
     def label(self, sample: geospatial.RasterSample) -> object | None:
-        """Return the caller-owned raster label."""
+        """Gives the caller-owned raster label.
+
+        Args:
+            sample: Raster sample.
+
+        Returns:
+            The label recorded for the raster's source.
+        """
         return self.labels_by_source[sample.source]
 
     def modality_specific_explanation(
@@ -2780,7 +3845,26 @@ class RasterAdapter(ModalityAdapter):
         feature_names: Sequence[str],
         coefficients: np.ndarray,
     ) -> dict[str, object]:
-        """Return bounded occlusion evidence for decoded raster pixels."""
+        """Builds bounded occlusion evidence for decoded raster pixels.
+
+        Args:
+            sample: Raster sample to explain.
+            model: Fitted classifier.
+            feature_names: Names of the model's features; they must be the
+                raster's pixel feature names.
+            coefficients: Linear coefficients, one per feature.
+
+        Returns:
+            Mapping with the ten pixel windows (a 4 x 4 grid) whose masking
+            changes the decision score most (original minus masked), all
+            windows with their spatial bounds, and limitations; or status
+            "not_available" if no decoder is set.
+
+        Raises:
+            TypeError: If `sample` is not a `RasterSample`.
+            ValueError: If the feature names or coefficients do not match the
+                raster's pixel features.
+        """
         if not isinstance(sample, geospatial.RasterSample):
             raise TypeError("sample must be a RasterSample")
         if self.decoder is None:
@@ -2881,7 +3965,17 @@ class RasterAdapter(ModalityAdapter):
         }
 
     def monitor(self, observed: ModalityAdapter) -> dict[str, object]:
-        """Return raster profile drift evidence."""
+        """Builds raster profile drift evidence.
+
+        Args:
+            observed: Adapter over the newly observed rasters.
+
+        Returns:
+            Mapping with both dataset hashes and whether the profile differs.
+
+        Raises:
+            TypeError: If `observed` is not a `RasterAdapter`.
+        """
         if not isinstance(observed, RasterAdapter):
             raise TypeError("observed adapter must be a RasterAdapter")
         reference = self.curate()
@@ -2893,7 +3987,12 @@ class RasterAdapter(ModalityAdapter):
         }
 
     def modality_notes(self) -> tuple[str, ...]:
-        """Describe raster lifecycle limits."""
+        """Describes raster lifecycle limits.
+
+        Returns:
+            Plain statements of the representation in use and what it does not
+            cover.
+        """
         representation = (
             "The baseline uses caller-decoded, bounded pixel summary "
             "features with an explicit decoder policy."
@@ -2911,7 +4010,33 @@ class RasterAdapter(ModalityAdapter):
 
 @dataclasses.dataclass
 class LifecycleContext:
-    """Mutable products shared by the fifteen lifecycle stages."""
+    """Mutable products shared by the fifteen lifecycle stages.
+
+    Attributes:
+        adapter: Modality adapter the lifecycle runs on.
+        package_path: Directory the model package is written to.
+        signing_key: Key that signs the package and report.
+        seed: Random seed of the run.
+        observed_adapter: Adapter over the data used for monitoring.
+        manifest: Modality manifest, if the caller supplied one.
+        require_independent_ground_truth: Whether explanation quality needs
+            independently authored ground truth.
+        resume_replay: Whether the run replays stages already checkpointed.
+        stage_records: Result of each completed stage.
+        curation_report: Curation report produced by the curation stage.
+        partitions: Train, validation and test partitions, once split.
+        feature_batches: Feature batch per partition name.
+        model: Fitted classifier, once trained.
+        evaluation: Held-out evaluation evidence.
+        performance_observations: Measured operations, one per kind.
+        data_explanation: Data explainability evidence.
+        model_explanation: Model explainability evidence.
+        package: Identity of the written package, once packaged.
+        inference: Inference smoke-test evidence.
+        monitoring: Drift-monitoring evidence.
+        documentation: Documentation evidence.
+        recovery: Recovery and resource evidence.
+    """
 
     adapter: ModalityAdapter
     package_path: Path
@@ -2952,7 +4077,12 @@ class LifecycleContext:
         stage: modalities.LifecycleStage,
         payload: dict[str, object],
     ) -> None:
-        """Record one stage result for the final evidence index."""
+        """Records one stage result for the final evidence index.
+
+        Args:
+            stage: Stage that produced the result.
+            payload: JSON-native result of the stage.
+        """
         self.stage_records[stage] = payload
 
     def record_performance(
@@ -2961,7 +4091,13 @@ class LifecycleContext:
         elapsed_seconds: float,
         sample_count: int,
     ) -> None:
-        """Record one measured operation with machine and timestamp context."""
+        """Records one measured operation with machine and timestamp context.
+
+        Args:
+            operation: Operation that was measured.
+            elapsed_seconds: Wall-clock duration of the operation.
+            sample_count: Number of samples the operation processed.
+        """
         self.performance_observations[operation] = (
             performance.PerformanceObservation(
                 operation=operation,
@@ -2979,7 +4115,13 @@ class LifecycleContext:
 
 
 class ModalityLifecycleStage(abc.ABC):
-    """One polymorphic stage in a modality lifecycle."""
+    """One polymorphic stage in a modality lifecycle.
+
+    Attributes:
+        stage: Lifecycle stage this class implements.
+        performance_operation: Operation whose duration is measured for this
+            stage, or None if it is not timed.
+    """
 
     stage: ClassVar[modalities.LifecycleStage]
     performance_operation: ClassVar[performance.PerformanceOperation | None] = (
@@ -2988,7 +4130,11 @@ class ModalityLifecycleStage(abc.ABC):
 
     @abc.abstractmethod
     def execute(self, context: LifecycleContext) -> None:
-        """Execute the stage and record its evidence."""
+        """Executes the stage and records its evidence.
+
+        Args:
+            context: Shared lifecycle state, updated in place.
+        """
 
 
 class IngestionStage(ModalityLifecycleStage):
@@ -2998,7 +4144,14 @@ class IngestionStage(ModalityLifecycleStage):
     performance_operation = performance.PerformanceOperation.INGEST
 
     def execute(self, context: LifecycleContext) -> None:
-        """Record immutable source identity."""
+        """Records immutable source identity.
+
+        Args:
+            context: Shared lifecycle state, updated in place.
+
+        Raises:
+            ValueError: If the dataset has no samples.
+        """
         if not context.adapter.samples:
             raise ValueError("modality dataset must not be empty")
         context.record(
@@ -3016,7 +4169,15 @@ class ValidationStage(ModalityLifecycleStage):
     stage = modalities.LifecycleStage.VALIDATION
 
     def execute(self, context: LifecycleContext) -> None:
-        """Validate labels and dataset-level curation state."""
+        """Validates labels and dataset-level curation state.
+
+        Args:
+            context: Shared lifecycle state, updated in place.
+
+        Raises:
+            ValueError: If any sample lacks a label or fewer than two classes
+                are present.
+        """
         labels = context.adapter.labels(context.adapter.samples)
         if any(label is None for label in labels):
             raise ValueError("complete modality lifecycle requires labels")
@@ -3034,7 +4195,11 @@ class ProfilingStage(ModalityLifecycleStage):
     stage = modalities.LifecycleStage.PROFILING
 
     def execute(self, context: LifecycleContext) -> None:
-        """Persist the curation/profile object in lifecycle state."""
+        """Persists the curation/profile object in lifecycle state.
+
+        Args:
+            context: Shared lifecycle state, updated in place.
+        """
         context.curation_report = context.adapter.curate()
         context.record(
             self.stage, {"profile": context.curation_report.to_dict()}
@@ -3047,7 +4212,15 @@ class CurationStage(ModalityLifecycleStage):
     stage = modalities.LifecycleStage.CURATION
 
     def execute(self, context: LifecycleContext) -> None:
-        """Require a release-ready curation report."""
+        """Requires a release-ready curation report.
+
+        Args:
+            context: Shared lifecycle state, updated in place.
+
+        Raises:
+            ValueError: If there is no curation report or it has unresolved
+                blocking findings.
+        """
         report = context.curation_report
         if report is None or not report.release_ready:
             findings = (
@@ -3070,7 +4243,15 @@ class SplittingStage(ModalityLifecycleStage):
     stage = modalities.LifecycleStage.SPLITTING
 
     def execute(self, context: LifecycleContext) -> None:
-        """Split and reject overlapping sample identities."""
+        """Splits and rejects overlapping sample identities.
+
+        Args:
+            context: Shared lifecycle state, updated in place.
+
+        Raises:
+            ValueError: If the train or test partition is empty or two
+                partitions share a group.
+        """
         partitions = context.adapter.split(context.seed)
         if not partitions.train or not partitions.test:
             raise ValueError(
@@ -3106,7 +4287,15 @@ class FeaturePreparationStage(ModalityLifecycleStage):
     stage = modalities.LifecycleStage.FEATURE_PREPARATION
 
     def execute(self, context: LifecycleContext) -> None:
-        """Prepare and align features without fitting on held-out rows."""
+        """Prepares and aligns features without fitting on held-out rows.
+
+        Args:
+            context: Shared lifecycle state, updated in place.
+
+        Raises:
+            RuntimeError: If the data has not been split yet.
+            ValueError: If the partitions' feature names differ.
+        """
         partitions = context.partitions
         if partitions is None:
             raise RuntimeError("splitting must precede feature preparation")
@@ -3138,7 +4327,11 @@ class ModellingStage(ModalityLifecycleStage):
     performance_operation = performance.PerformanceOperation.FIT
 
     def execute(self, context: LifecycleContext) -> None:
-        """Fit only on the training partition."""
+        """Fits only on the training partition.
+
+        Args:
+            context: Shared lifecycle state, updated in place.
+        """
         batch = context.feature_batches["train"]
         labels = context.adapter.labels(
             context.partitions.train if context.partitions else ()
@@ -3161,7 +4354,14 @@ class EvaluationStage(ModalityLifecycleStage):
     stage = modalities.LifecycleStage.EVALUATION
 
     def execute(self, context: LifecycleContext) -> None:
-        """Compute deterministic classification metrics and predictions."""
+        """Computes deterministic classification metrics and predictions.
+
+        Args:
+            context: Shared lifecycle state, updated in place.
+
+        Raises:
+            RuntimeError: If the model or partitions are missing.
+        """
         model = context.model
         partitions = context.partitions
         if model is None or partitions is None:
@@ -3191,7 +4391,14 @@ class DataExplainabilityStage(ModalityLifecycleStage):
     stage = modalities.LifecycleStage.DATA_EXPLAINABILITY
 
     def execute(self, context: LifecycleContext) -> None:
-        """Record data lineage and non-causal feature summaries."""
+        """Records data lineage and non-causal feature summaries.
+
+        Args:
+            context: Shared lifecycle state, updated in place.
+
+        Raises:
+            RuntimeError: If the data has not been split yet.
+        """
         batch = context.feature_batches["train"]
         partitions = context.partitions
         if partitions is None:
@@ -3264,7 +4471,18 @@ class ModelExplainabilityStage(ModalityLifecycleStage):
     stage = modalities.LifecycleStage.MODEL_EXPLAINABILITY
 
     def execute(self, context: LifecycleContext) -> None:
-        """Record signed coefficient contributions with limitations."""
+        """Records signed coefficient contributions with limitations.
+
+        Args:
+            context: Shared lifecycle state, updated in place.
+
+        Raises:
+            RuntimeError: If the model, partitions or test features are missing,
+                or no explanation report could be produced.
+            ValueError: If the linear reference does not match the model's
+                decision output, or independent ground truth is required and the
+                suite is unavailable or failed.
+        """
         model = context.model
         batch = context.feature_batches["test"]
         partitions = context.partitions
@@ -3482,7 +4700,20 @@ class PackagingStage(ModalityLifecycleStage):
     performance_operation = performance.PerformanceOperation.PACKAGE
 
     def execute(self, context: LifecycleContext) -> None:
-        """Persist the estimator and signed manifest."""
+        """Persists the estimator and signed manifest.
+
+        When replaying a checkpointed run onto an existing package, the package
+        is verified against the replayed model instead of being rewritten.
+
+        Args:
+            context: Shared lifecycle state, updated in place.
+
+        Raises:
+            RuntimeError: If there is no fitted model.
+            ValueError: If an existing package does not match the resumed run.
+            FileExistsError: If the package path already exists and the run is
+                not replaying a checkpoint.
+        """
         model = context.model
         if model is None:
             raise RuntimeError("model is required before packaging")
@@ -3571,7 +4802,16 @@ class InferenceStage(ModalityLifecycleStage):
     stage = modalities.LifecycleStage.INFERENCE
 
     def execute(self, context: LifecycleContext) -> None:
-        """Load trusted bytes and compare predictions with the fitted model."""
+        """Loads trusted bytes and compares predictions with the fitted model.
+
+        Args:
+            context: Shared lifecycle state, updated in place.
+
+        Raises:
+            RuntimeError: If the package or partitions are missing.
+            ValueError: If the packaged model's predictions differ from the
+                evaluation predictions.
+        """
         if context.package is None or context.partitions is None:
             raise RuntimeError(
                 "package and partitions are required before inference"
@@ -3610,7 +4850,11 @@ class MonitoringStage(ModalityLifecycleStage):
     stage = modalities.LifecycleStage.MONITORING
 
     def execute(self, context: LifecycleContext) -> None:
-        """Record modality-specific monitoring output."""
+        """Records modality-specific monitoring output.
+
+        Args:
+            context: Shared lifecycle state, updated in place.
+        """
         context.monitoring = context.adapter.monitor(context.observed_adapter)
         context.record(self.stage, context.monitoring.copy())
 
@@ -3621,7 +4865,14 @@ class DocumentationStage(ModalityLifecycleStage):
     stage = modalities.LifecycleStage.DOCUMENTATION
 
     def execute(self, context: LifecycleContext) -> None:
-        """Record support status, intended use, and limitations."""
+        """Records support status, intended use, and limitations.
+
+        Args:
+            context: Shared lifecycle state, updated in place.
+
+        Raises:
+            RuntimeError: If the data has not been profiled yet.
+        """
         if context.curation_report is None:
             raise RuntimeError("profiling must precede documentation")
         dataset_card = curation.ModalityDatasetCard.from_report(
@@ -3661,7 +4912,15 @@ class RecoveryAndResourceStage(ModalityLifecycleStage):
     stage = modalities.LifecycleStage.RECOVERY_AND_RESOURCE_TESTS
 
     def execute(self, context: LifecycleContext) -> None:
-        """Copy, tamper, and verify the package without touching its source."""
+        """Tampers with a copy of the package and verifies it is rejected.
+
+        Args:
+            context: Shared lifecycle state, updated in place.
+
+        Raises:
+            RuntimeError: If there is no package.
+            ValueError: If a tampered copy of the package is not rejected.
+        """
         if context.package is None:
             raise RuntimeError("package is required before recovery tests")
         temporary = Path(tempfile.mkdtemp(prefix="scmle-lifecycle-recovery-"))
@@ -3697,7 +4956,11 @@ class RecoveryAndResourceStage(ModalityLifecycleStage):
 
 
 class ModalityLifecycle:
-    """Execute the fifteen shared lifecycle stages in deterministic order."""
+    """Executes the fifteen shared lifecycle stages in deterministic order.
+
+    Attributes:
+        stages: The stage objects, in required lifecycle order.
+    """
 
     stages: ClassVar[tuple[ModalityLifecycleStage, ...]] = (
         IngestionStage(),
@@ -3733,11 +4996,57 @@ class ModalityLifecycle:
         checkpoint_path: str | Path | None = None,
         resume: bool = False,
     ) -> LifecycleReport:
-        """Run every stage and optionally persist its evidence report.
+        """Runs every stage and optionally persists its evidence report.
 
         A supplied manifest is checked against the adapter before any stage
         executes. This keeps source, task, privacy, and lineage claims bound
         to the exact modality content used by the lifecycle.
+
+        If `cancellation_check` returns True at a stage boundary, artifacts
+        created by this run are removed and `LifecycleCancelledError` is
+        raised.
+
+        Args:
+            adapter: Adapter for the reference dataset.
+            package_path: Directory the model package is written to; it must not
+                exist unless a checkpoint replay is resuming onto it.
+            signing_key: Key that signs the package, report and checkpoints.
+            seed: Random seed for the split and the model.
+            observed_adapter: Adapter over the data to monitor against the
+                reference; defaults to `adapter`. Its modality must match.
+            report_path: File the signed report is written to, if any.
+            performance_budget: Limits the measured operations must meet, if
+                any.
+            performance_baseline: Earlier run the measurements are compared
+                with, if any.
+            manifest: Modality manifest to check against the adapter, if any.
+            require_independent_ground_truth: Whether to fail unless the
+                independent explanation ground-truth suite is available and
+                passes.
+            cancellation_check: Callable polled at stage boundaries that returns
+                True to cancel the run.
+            checkpoint_path: File where signed stage checkpoints are kept, if
+                any; requires `report_path` and must differ from it.
+            resume: Whether to resume from an existing checkpoint at
+                `checkpoint_path`, replaying its completed stages and verifying
+                their digests.
+
+        Returns:
+            The signed lifecycle report. If a completed checkpoint is resumed,
+            the previously written report after verification.
+
+        Raises:
+            TypeError: If `require_independent_ground_truth` or `resume` is
+                not a bool, or `cancellation_check` is not callable.
+            ValueError: If the option combination is invalid, the observed
+                modality or manifest does not match the adapter, a checkpoint or
+                report does not match the resumed run, a stage fails, or the
+                performance budget or baseline is violated.
+            RuntimeError: If the stage order is invalid or packaging produced no
+                package.
+            FileExistsError: If the checkpoint exists and `resume` is False.
+            FileNotFoundError: If `resume` is True and the checkpoint does not
+                exist.
         """
         if not isinstance(require_independent_ground_truth, bool):
             raise TypeError("require_independent_ground_truth must be bool")
@@ -3765,7 +5074,12 @@ class ModalityLifecycle:
         )
 
         def ensure_not_cancelled() -> None:
-            """Stop before publication and remove this run's artifacts."""
+            """Stops before publication and removes this run's artifacts.
+
+            Raises:
+                LifecycleCancelledError: If `cancellation_check` reports
+                    cancellation.
+            """
             if cancellation_check is None or not cancellation_check():
                 return
             if not package_preexisting:
@@ -3883,7 +5197,13 @@ class ModalityLifecycle:
             stage_digests: Sequence[str],
             status: Literal["running", "completed"],
         ) -> None:
-            """Atomically persist a signed stage boundary."""
+            """Atomically persists a signed stage boundary.
+
+            Args:
+                completed_stages: Values of the stages finished so far.
+                stage_digests: Digest of each finished stage's evidence.
+                status: "running" or "completed".
+            """
             if checkpoint_target is None:
                 return
             record = LifecycleCheckpoint(
@@ -4069,7 +5389,16 @@ class ModalityLifecycle:
     def declaration(
         self, report: LifecycleReport
     ) -> modalities.ModalityDeclaration:
-        """Convert a report into an explicit experimental declaration."""
+        """Converts a report into an explicit experimental declaration.
+
+        Args:
+            report: Completed lifecycle report.
+
+        Returns:
+            A modality declaration with the report's stage evidence and
+            limitations; its status is extension-only for extension modalities
+            and experimental otherwise.
+        """
         return modalities.ModalityDeclaration(
             modality=modalities.modality_from_value(report.modality),
             status=(
@@ -4095,7 +5424,14 @@ class ModalityLifecycle:
 
 
 def file_digest(path: Path) -> str:
-    """Return the SHA-256 digest of a file."""
+    """Computes the SHA-256 digest of a file.
+
+    Args:
+        path: File to hash.
+
+    Returns:
+        The hexadecimal digest of the file contents.
+    """
     digest = hashlib.sha256()
     with path.open("rb") as stream:
         for block in iter(lambda: stream.read(1024 * 1024), b""):
@@ -4104,19 +5440,41 @@ def file_digest(path: Path) -> str:
 
 
 def sync_file(path: Path) -> None:
-    """Flush a file before it becomes visible through an atomic rename."""
+    """Flushes a file before it becomes visible through an atomic rename.
+
+    Args:
+        path: File to flush.
+    """
     durability.sync_file(path)
 
 
 def sync_directory(path: Path) -> None:
-    """Flush a directory entry after an atomic replacement."""
+    """Flushes a directory entry after an atomic replacement.
+
+    Args:
+        path: Directory whose entry must reach stable storage.
+    """
     durability.sync_directory(path)
 
 
 def load_package(
     path: str | Path, signing_key: str | bytes
 ) -> LogisticRegression:
-    """Verify a signed package before deserializing its estimator."""
+    """Verifies a signed package before deserializing its estimator.
+
+    Args:
+        path: Package directory holding `manifest.json` and `model.joblib`.
+        signing_key: Key the manifest signature is checked with.
+
+    Returns:
+        The classifier stored in the package.
+
+    Raises:
+        ValueError: If the package is incomplete, its manifest, signature,
+            digest or feature schema is invalid, or the classifier has fewer
+            than two classes or non-finite values.
+        TypeError: If the payload is not a logistic regression.
+    """
     target = Path(path)
     manifest_path = target / "manifest.json"
     model_path = target / "model.joblib"
@@ -4187,7 +5545,14 @@ def load_package(
 
 
 def is_sha256(value: str) -> bool:
-    """Return whether a value is a canonical lowercase SHA-256 digest."""
+    """Checks for a canonical lowercase SHA-256 digest.
+
+    Args:
+        value: Text to check.
+
+    Returns:
+        True if `value` is 64 lowercase hexadecimal characters, else False.
+    """
     return len(value) == SHA256_LENGTH and all(
         character in "0123456789abcdef" for character in value
     )
@@ -4196,7 +5561,20 @@ def is_sha256(value: str) -> bool:
 def normalize_json_object(
     value: Mapping[str, object], name: str
 ) -> dict[str, object]:
-    """Return a finite JSON object or reject the evidence boundary."""
+    """Normalizes a finite JSON object or rejects the evidence boundary.
+
+    Args:
+        value: Mapping to normalize.
+        name: Field name used in error messages.
+
+    Returns:
+        A new dictionary of JSON-native values with sorted keys.
+
+    Raises:
+        TypeError: If `value` is not a mapping.
+        ValueError: If `value` is not JSON-native, has non-finite numbers, or
+            does not serialize to an object.
+    """
     if not isinstance(value, Mapping):
         raise TypeError(f"{name} must be a mapping")
     try:

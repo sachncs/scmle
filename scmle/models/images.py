@@ -29,7 +29,17 @@ from scmle.data.modalities import image
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class ImageModelConfig:
-    """Bounded configuration for the deterministic pixel baseline."""
+    """Bounded configuration for the deterministic pixel baseline.
+
+    Attributes:
+        target_size: Width and height images are resized to.
+        mode: Pillow color mode of the pixels ("L", "RGB" or "RGBA").
+        normalize: Whether pixel values are scaled to [0, 1].
+        regularization: Inverse regularization strength of the logistic
+            regression; must be positive.
+        max_iter: Maximum solver iterations; must be at least 1.
+        random_state: Seed for the estimator.
+    """
 
     target_size: tuple[int, int] = (16, 16)
     mode: str = "RGB"
@@ -39,7 +49,12 @@ class ImageModelConfig:
     random_state: int = 0
 
     def __post_init__(self) -> None:
-        """Validate feature and estimator bounds before fitting."""
+        """Validates feature and estimator bounds before fitting.
+
+        Raises:
+            ValueError: If `target_size` or `mode` is unsupported,
+                `regularization` is not positive, or `max_iter` is below 1.
+        """
         image.validate_feature_options(self.target_size, self.mode)
         if self.regularization <= 0:
             raise ValueError("regularization must be positive")
@@ -47,7 +62,11 @@ class ImageModelConfig:
             raise ValueError("max_iter must be positive")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-compatible configuration evidence."""
+        """Converts the configuration to JSON-compatible values.
+
+        Returns:
+            Mapping of field name to value, with `target_size` as a list.
+        """
         return {
             "target_size": list(self.target_size),
             "mode": self.mode,
@@ -60,7 +79,16 @@ class ImageModelConfig:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class ImageEvaluation:
-    """Evaluation evidence for a held-out image dataset."""
+    """Evaluation evidence for a held-out image dataset.
+
+    Attributes:
+        sample_count: Number of images evaluated.
+        accuracy: Share of images classified correctly.
+        macro_f1: Unweighted mean of the per-class harmonic mean of
+            precision and recall.
+        log_loss: Mean negative log probability of the true class.
+        labels: Class labels, as text, in the classifier's class order.
+    """
 
     sample_count: int
     accuracy: float
@@ -69,13 +97,27 @@ class ImageEvaluation:
     labels: tuple[str, ...]
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-compatible evaluation evidence."""
+        """Converts the evaluation to JSON-compatible values.
+
+        Returns:
+            Mapping of field name to value.
+        """
         return dataclasses.asdict(self)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class ImageExplanation:
-    """Global or local signed pixel-contribution evidence."""
+    """Global or local signed pixel-contribution evidence.
+
+    Attributes:
+        model_digest: Digest of the model state that was explained.
+        input_hash: Content hash of the explained image, or None for a
+            global explanation.
+        method: Name of the explanation method.
+        terms: Pairs of feature or region name and its score, strongest
+            first.
+        limitations: Plain statements of what the explanation does not show.
+    """
 
     model_digest: str
     input_hash: str | None
@@ -84,7 +126,12 @@ class ImageExplanation:
     limitations: tuple[str, ...]
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-compatible explanation evidence."""
+        """Converts the explanation to JSON-compatible values.
+
+        Returns:
+            Mapping of field name to value, with `terms` as lists of name
+            and score.
+        """
         return {
             "model_digest": self.model_digest,
             "input_hash": self.input_hash,
@@ -96,20 +143,39 @@ class ImageExplanation:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class ImageModelArtifact:
-    """Identity of an atomically written trusted-model package."""
+    """Identity of an atomically written trusted-model package.
+
+    Attributes:
+        path: Directory of the package.
+        digest: SHA-256 digest of the model payload file.
+        schema_version: Version of the package layout.
+    """
 
     path: str
     digest: str
     schema_version: int = 1
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-compatible package identity."""
+        """Converts the package identity to JSON-compatible values.
+
+        Returns:
+            Mapping of field name to value.
+        """
         return dataclasses.asdict(self)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class ImageDriftReport:
-    """Profile drift evidence comparing reference and observed images."""
+    """Profile drift evidence comparing reference and observed images.
+
+    Attributes:
+        reference_hash: Dataset hash of the reference images.
+        observed_hash: Dataset hash of the observed images.
+        mean_pixel_distance: Mean absolute difference of the per-channel
+            mean pixel values, divided by 255.
+        duplicate_rate: Share of observed images that are duplicates.
+        threshold: Level above which a signal counts as shifted.
+    """
 
     reference_hash: str
     observed_hash: str
@@ -119,22 +185,39 @@ class ImageDriftReport:
 
     @property
     def shifted(self) -> bool:
-        """Return whether a monitored image-profile signal shifted."""
+        """Whether the pixel distance or the duplicate rate exceeds the threshold."""
         return (
             self.mean_pixel_distance > self.threshold
             or self.duplicate_rate > self.threshold
         )
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-compatible monitoring evidence."""
+        """Converts the drift report to JSON-compatible values.
+
+        Returns:
+            Mapping of field name to value, plus a `shifted` flag.
+        """
         return {**dataclasses.asdict(self), "shifted": self.shifted}
 
 
 class ImageClassifier:
-    """Pixel-baseline classifier with evidence and safe package boundaries."""
+    """Pixel-baseline classifier with evidence and safe package boundaries.
+
+    Attributes:
+        config: Feature and estimator configuration.
+        estimator: Fitted logistic regression, or None before fitting.
+        feature_names: Names of the flattened pixel features, empty before
+            fitting.
+        curation_report: Curation report of the training images, or None
+            before fitting.
+    """
 
     def __init__(self, config: ImageModelConfig | None = None) -> None:
-        """Initialize an unfitted classifier."""
+        """Initializes an unfitted classifier.
+
+        Args:
+            config: Configuration to use; defaults to `ImageModelConfig()`.
+        """
         self.config = config or ImageModelConfig()
         self.estimator: LogisticRegression | None = None
         self.feature_names: tuple[str, ...] = ()
@@ -142,12 +225,16 @@ class ImageClassifier:
 
     @property
     def fitted(self) -> bool:
-        """Return whether feature preparation and modelling are complete."""
+        """Whether the classifier has been fitted."""
         return self.estimator is not None
 
     @property
     def classes(self) -> tuple[Any, ...]:
-        """Return fitted class labels in estimator order."""
+        """The fitted class labels in estimator order.
+
+        Raises:
+            RuntimeError: If the classifier has not been fitted.
+        """
         self.require_fitted()
         estimator = self.estimator
         if estimator is None:
@@ -156,7 +243,11 @@ class ImageClassifier:
 
     @property
     def model_digest(self) -> str:
-        """Return a deterministic digest of the fitted model state."""
+        """The SHA-256 digest of the configuration, classes and coefficients.
+
+        Raises:
+            RuntimeError: If the classifier has not been fitted.
+        """
         self.require_fitted()
         estimator = self.estimator
         if estimator is None:
@@ -233,7 +324,18 @@ class ImageClassifier:
         return self
 
     def predict(self, dataset: image.ImageDataset) -> tuple[Any, ...]:
-        """Predict labels for validated images."""
+        """Predicts labels for validated images.
+
+        Args:
+            dataset: Images to classify.
+
+        Returns:
+            Predicted labels, one per image in order; empty if the dataset
+            has no samples.
+
+        Raises:
+            RuntimeError: If the classifier has not been fitted.
+        """
         self.require_fitted()
         if not dataset.samples:
             return ()
@@ -246,7 +348,18 @@ class ImageClassifier:
         self,
         dataset: image.ImageDataset,
     ) -> tuple[tuple[float, ...], ...]:
-        """Return class probabilities for validated images."""
+        """Predicts class probabilities for validated images.
+
+        Args:
+            dataset: Images to classify.
+
+        Returns:
+            One tuple of probabilities per image, in `classes` order; empty
+            if the dataset has no samples.
+
+        Raises:
+            RuntimeError: If the classifier has not been fitted.
+        """
         self.require_fitted()
         if not dataset.samples:
             return ()
@@ -257,7 +370,18 @@ class ImageClassifier:
         return tuple(tuple(row) for row in probabilities)
 
     def evaluate(self, dataset: image.ImageDataset) -> ImageEvaluation:
-        """Evaluate labelled images without refitting or changing features."""
+        """Evaluates labelled images without refitting or changing features.
+
+        Args:
+            dataset: Labelled images to score.
+
+        Returns:
+            Accuracy, macro-averaged precision/recall balance and log loss
+            over the images.
+
+        Raises:
+            ValueError: If the dataset is empty or any image has no label.
+        """
         if not dataset.samples:
             raise ValueError("evaluation images must not be empty")
         labels = tuple(sample.label for sample in dataset.samples)
@@ -277,7 +401,19 @@ class ImageClassifier:
         )
 
     def global_explanation(self, top_k: int = 10) -> ImageExplanation:
-        """Return global pixel importance from linear coefficients."""
+        """Ranks pixels by their mean absolute linear coefficient.
+
+        Args:
+            top_k: Number of pixel features to keep.
+
+        Returns:
+            Global explanation whose terms are (feature name, mean absolute
+            coefficient) pairs, largest first.
+
+        Raises:
+            ValueError: If `top_k` is below 1.
+            RuntimeError: If the classifier has not been fitted.
+        """
         if top_k < 1:
             raise ValueError("top_k must be positive")
         self.require_fitted()
@@ -306,7 +442,21 @@ class ImageClassifier:
         sample: image.ImageSample,
         top_k: int = 10,
     ) -> ImageExplanation:
-        """Return local signed pixel contributions for one image."""
+        """Computes signed pixel contributions for one image.
+
+        Args:
+            sample: Image to explain.
+            top_k: Number of pixel features to keep.
+
+        Returns:
+            Local explanation whose terms are (feature name, coefficient
+            times pixel value) pairs for the predicted class, largest
+            absolute value first; positive favors the predicted class.
+
+        Raises:
+            ValueError: If `top_k` is below 1.
+            RuntimeError: If the classifier has not been fitted.
+        """
         if top_k < 1:
             raise ValueError("top_k must be positive")
         self.require_fitted()
@@ -348,7 +498,7 @@ class ImageClassifier:
         top_k: int = 10,
         patch_size: tuple[int, int] = (4, 4),
     ) -> ImageExplanation:
-        """Measure predicted-class score changes under regional occlusion.
+        """Measures predicted-class score changes under regional occlusion.
 
         Occlusion is performed after the declared resize and color transform.
         A patch is replaced by the zero-valued feature baseline, which is black
@@ -367,7 +517,6 @@ class ImageClassifier:
         Raises:
             ValueError: If the requested output or patch dimensions are
                 invalid.
-            RuntimeError: If the classifier has not been fitted.
         """
         if top_k < 1:
             raise ValueError("top_k must be positive")
@@ -416,7 +565,18 @@ class ImageClassifier:
         )
 
     def predicted_class_score(self, features: np.ndarray) -> float:
-        """Return the decision score for the class predicted by the model."""
+        """Computes the decision score of the predicted class.
+
+        Args:
+            features: Feature matrix whose first row is scored.
+
+        Returns:
+            The decision-function value for the class predicted for the
+            first row; larger means more support for that class.
+
+        Raises:
+            RuntimeError: If the classifier has not been fitted.
+        """
         self.require_fitted()
         estimator = self.estimator
         if estimator is None:
@@ -430,7 +590,17 @@ class ImageClassifier:
         return float(decision[0, class_index])
 
     def save(self, path: str | pathlib.Path) -> ImageModelArtifact:
-        """Atomically save this fitted classifier as a verified package."""
+        """Atomically saves this fitted classifier as a verified package.
+
+        Args:
+            path: Directory to create; it must not exist yet.
+
+        Returns:
+            The package path and the digest of its model payload.
+
+        Raises:
+            FileExistsError: If `path` already exists.
+        """
         self.require_fitted()
         target = pathlib.Path(path).expanduser()
         if target.exists():
@@ -476,7 +646,23 @@ class ImageClassifier:
 
     @classmethod
     def load(cls, path: str | pathlib.Path, trusted: bool = False) -> Self:
-        """Load a package only after an explicit caller trust decision."""
+        """Loads a package only after an explicit caller trust decision.
+
+        Args:
+            path: Package directory written by `save`.
+            trusted: Must be True; loading unpickles the payload, so only
+                packages from trusted sources may be loaded.
+
+        Returns:
+            The fitted classifier stored in the package.
+
+        Raises:
+            PermissionError: If `trusted` is not True.
+            FileNotFoundError: If `path` is not a directory.
+            ValueError: If the manifest or payload is missing, the version
+                is unsupported, or a digest does not match.
+            TypeError: If the payload is not an `ImageClassifier`.
+        """
         if not trusted:
             raise PermissionError(
                 "loading an image model package requires trusted=True"
@@ -505,7 +691,14 @@ class ImageClassifier:
         return loaded
 
     def transform(self, dataset: image.ImageDataset) -> np.ndarray:
-        """Prepare pixels with the fitted configuration."""
+        """Prepares pixels with the fitted configuration.
+
+        Args:
+            dataset: Images to convert.
+
+        Returns:
+            Array with one row of flattened pixels per image.
+        """
         self.require_fitted()
         return dataset.prepare_tabular_features(
             self.config.target_size,
@@ -514,7 +707,12 @@ class ImageClassifier:
         )
 
     def make_feature_names(self) -> tuple[str, ...]:
-        """Return deterministic channel-major names for flattened pixels."""
+        """Builds the names of the flattened pixel features.
+
+        Returns:
+            Names of the form "pixel[row,column,channel]", ordered by row,
+            then column, then channel.
+        """
         width, height = self.config.target_size
         channels = 1 if self.config.mode == "L" else len(self.config.mode)
         names = []
@@ -525,27 +723,52 @@ class ImageClassifier:
         return tuple(names)
 
     def require_fitted(self) -> None:
-        """Raise when an operation needs a fitted classifier."""
+        """Checks that the classifier has been fitted.
+
+        Raises:
+            RuntimeError: If it has not been fitted.
+        """
         if not self.fitted:
             raise RuntimeError("image classifier has not been fitted")
 
 
 class ImageMonitor:
-    """Monitor bounded image-profile signals against a reference snapshot."""
+    """Monitors bounded image-profile signals against a reference snapshot.
+
+    Attributes:
+        reference: Curation report of the reference images.
+        threshold: Level above which a signal counts as shifted.
+    """
 
     def __init__(
         self,
         reference: image.ModalityCurationReport,
         threshold: float = 0.25,
     ) -> None:
-        """Initialize a monitor with an explicit normalized threshold."""
+        """Initializes a monitor with an explicit normalized threshold.
+
+        Args:
+            reference: Curation report of the reference images.
+            threshold: Level above which a signal counts as shifted; in
+                (0, 1].
+
+        Raises:
+            ValueError: If `threshold` is outside (0, 1].
+        """
         if not 0 < threshold <= 1:
             raise ValueError("threshold must be in (0, 1]")
         self.reference = reference
         self.threshold = threshold
 
     def observe(self, observed: image.ImageDataset) -> ImageDriftReport:
-        """Compare observed mean pixels and duplicate rate with reference."""
+        """Compares observed mean pixels and duplicate rate with reference.
+
+        Args:
+            observed: Images to compare against the reference.
+
+        Returns:
+            Drift report with the mean pixel distance and duplicate rate.
+        """
         current = observed.curate()
         reference_mean = np.asarray(
             self.reference.profile.get("mean_pixel", (0.0, 0.0, 0.0)),
@@ -569,7 +792,14 @@ class ImageMonitor:
 
 
 def file_digest(path: pathlib.Path) -> str:
-    """Return a SHA-256 digest for a package artifact."""
+    """Computes a SHA-256 digest for a package artifact.
+
+    Args:
+        path: File to hash.
+
+    Returns:
+        The hexadecimal digest of the file contents.
+    """
     digest = hashlib.sha256()
     with path.open("rb") as stream:
         for block in iter(lambda: stream.read(1024 * 1024), b""):
@@ -578,7 +808,11 @@ def file_digest(path: pathlib.Path) -> str:
 
 
 def flush_directory(path: pathlib.Path) -> None:
-    """Flush a directory entry after an atomic package replacement."""
+    """Flushes a directory entry after an atomic package replacement.
+
+    Args:
+        path: Directory whose entry must reach stable storage.
+    """
     durability.sync_directory(path)
 
 

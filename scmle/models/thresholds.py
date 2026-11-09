@@ -36,16 +36,28 @@ class ThresholdObjective(abc.ABC):
         Args:
             actual: True where the real label is the positive class.
             flagged: True where the model predicts the positive class.
+
+        Returns:
+            The objective value for these decisions; larger is better.
         """
 
 
 class F1Objective(ThresholdObjective):
-    """F1 of the positive class."""
+    """Harmonic mean of precision and recall for the positive class."""
 
     name = "f1"
 
     def score(self, actual: np.ndarray, flagged: np.ndarray) -> float:
-        """Returns the positive-class F1."""
+        """Scores decisions by precision and recall of the positive class.
+
+        Args:
+            actual: True where the real label is the positive class.
+            flagged: True where the model predicts the positive class.
+
+        Returns:
+            2 * true positives / (actual positives + flagged positives), or
+            0.0 if both counts are zero.
+        """
         true_positive = float((actual & flagged).sum())
         denominator = float(actual.sum() + flagged.sum())
         return 2 * true_positive / denominator if denominator else 0.0
@@ -57,7 +69,15 @@ class AccuracyObjective(ThresholdObjective):
     name = "accuracy"
 
     def score(self, actual: np.ndarray, flagged: np.ndarray) -> float:
-        """Returns the share of correct decisions."""
+        """Scores decisions by the share that are correct.
+
+        Args:
+            actual: True where the real label is the positive class.
+            flagged: True where the model predicts the positive class.
+
+        Returns:
+            The fraction of rows where `flagged` equals `actual`.
+        """
         return float((actual == flagged).mean())
 
 
@@ -67,7 +87,15 @@ class BalancedAccuracyObjective(ThresholdObjective):
     name = "balanced_accuracy"
 
     def score(self, actual: np.ndarray, flagged: np.ndarray) -> float:
-        """Returns (recall + specificity) / 2."""
+        """Scores decisions by the mean of recall and specificity.
+
+        Args:
+            actual: True where the real label is the positive class.
+            flagged: True where the model predicts the positive class.
+
+        Returns:
+            (recall + specificity) / 2; a term is 0.0 if its class is absent.
+        """
         positives, negatives = actual.sum(), (~actual).sum()
         recall = (actual & flagged).sum() / positives if positives else 0.0
         specificity = (
@@ -90,7 +118,16 @@ class CostObjective(ThresholdObjective):
     name: ClassVar[str] = "cost"
 
     def score(self, actual: np.ndarray, flagged: np.ndarray) -> float:
-        """Returns minus the mean cost per decision."""
+        """Scores decisions by their negative mean cost.
+
+        Args:
+            actual: True where the real label is the positive class.
+            flagged: True where the model predicts the positive class.
+
+        Returns:
+            Minus the total error cost divided by the number of rows (at
+            least 1); closer to zero is better.
+        """
         false_positives = float((~actual & flagged).sum())
         false_negatives = float((actual & ~flagged).sum())
         total = self.false_positive_cost * false_positives
@@ -159,24 +196,57 @@ class ThresholdClassifier(base.ClassifierMixin, base.BaseEstimator):
 
     @classmethod
     def around_fitted(cls, fitted: Any, threshold: float) -> Self:
-        """Wraps an already fitted classifier without refitting it."""
+        """Wraps an already fitted classifier without refitting it.
+
+        Args:
+            fitted: Fitted binary classifier with `predict_proba` and
+                `classes_`.
+            threshold: Decision threshold for the positive class.
+
+        Returns:
+            A wrapper that uses `fitted` as its fitted classifier.
+        """
         wrapper = cls(fitted, threshold)
         wrapper.estimator_ = fitted
         wrapper.classes_ = fitted.classes_
         return wrapper
 
     def fit(self, features: Any, target: Any) -> Self:
-        """Fits a clone of the wrapped classifier."""
+        """Fits a clone of the wrapped classifier.
+
+        Args:
+            features: Training features.
+            target: Training labels.
+
+        Returns:
+            This wrapper, fitted.
+        """
         self.estimator_ = base.clone(self.estimator).fit(features, target)
         self.classes_ = self.estimator_.classes_
         return self
 
     def predict_proba(self, features: Any) -> np.ndarray:
-        """Returns the wrapped classifier's probabilities."""
+        """Predicts class probabilities with the wrapped classifier.
+
+        Args:
+            features: Rows to predict.
+
+        Returns:
+            Array with one row per input row and one column per class, in
+            `classes_` order.
+        """
         return self.estimator_.predict_proba(features)
 
     def predict(self, features: Any) -> np.ndarray:
-        """Predicts the positive class where probability >= threshold."""
+        """Predicts the positive class where probability >= threshold.
+
+        Args:
+            features: Rows to predict.
+
+        Returns:
+            Array of class labels, one per row: the second class where its
+            probability is at or above the threshold, else the first.
+        """
         positive = self.predict_proba(features)[:, 1] >= self.threshold
         return np.where(positive, self.classes_[1], self.classes_[0])
 
@@ -234,7 +304,16 @@ class GroupAssigner:
 
     @classmethod
     def fit(cls, values: pd.Series) -> Self:
-        """Learns the grouping from training values."""
+        """Learns the grouping from training values.
+
+        Args:
+            values: Training values of the sensitive column.
+
+        Returns:
+            An assigner with quartile band edges if the column is numeric
+            with more than 12 distinct values, otherwise one that keeps
+            categories as they are.
+        """
         numeric = pd.api.types.is_numeric_dtype(values) and (
             values.nunique() > NUMERIC_LEVELS
         )
@@ -246,7 +325,16 @@ class GroupAssigner:
         return cls(tuple(float(c) for c in np.unique(cuts)))
 
     def assign(self, values: pd.Series) -> pd.Series:
-        """Group name per row; missing values stay missing."""
+        """Names the group of each row.
+
+        Args:
+            values: Values of the sensitive column.
+
+        Returns:
+            Series with the index of `values` holding the group name per row
+            ("band_<n>" for numeric bands, else the value as text); missing
+            values stay missing.
+        """
         if self.edges:
             bands = np.searchsorted(self.edges, values.to_numpy(float))
             named = pd.Series(
@@ -280,7 +368,15 @@ class GroupThresholdClassifier(base.ClassifierMixin, base.BaseEstimator):
         thresholds: dict[str, float],
         default_threshold: float = 0.5,
     ) -> None:
-        """Wraps an already fitted classifier."""
+        """Wraps an already fitted classifier.
+
+        Args:
+            estimator: Fitted binary classifier with `predict_proba`.
+            column: Sensitive column the thresholds are keyed by.
+            assigner: How values of that column become group names.
+            thresholds: Group name to threshold.
+            default_threshold: Threshold for unknown or missing groups.
+        """
         self.estimator = estimator
         self.column = column
         self.assigner = assigner
@@ -289,17 +385,41 @@ class GroupThresholdClassifier(base.ClassifierMixin, base.BaseEstimator):
         self.classes_ = estimator.classes_
 
     def fit(self, features: Any, target: Any) -> Self:
-        """Thresholds are learned elsewhere; fitting refits the classifier."""
+        """Refits the classifier; the group thresholds are kept as given.
+
+        Args:
+            features: Training features.
+            target: Training labels.
+
+        Returns:
+            This wrapper, with a refitted clone of the classifier.
+        """
         self.estimator = base.clone(self.estimator).fit(features, target)
         self.classes_ = self.estimator.classes_
         return self
 
     def predict_proba(self, features: Any) -> np.ndarray:
-        """The wrapped classifier's probabilities."""
+        """Predicts class probabilities with the wrapped classifier.
+
+        Args:
+            features: Rows to predict.
+
+        Returns:
+            Array with one row per input row and one column per class, in
+            `classes_` order.
+        """
         return self.estimator.predict_proba(features)
 
     def cuts(self, features: Any) -> np.ndarray:
-        """Threshold per row, from its group when the column is present."""
+        """Looks up the threshold that applies to each row.
+
+        Args:
+            features: Rows to predict, ideally with the sensitive column.
+
+        Returns:
+            Float array with one threshold per row: that of the row's group,
+            or the default if the column is absent or the group is unknown.
+        """
         frame = pd.DataFrame(features)
         if self.column not in frame.columns:
             return np.full(len(frame), self.default_threshold)
@@ -311,6 +431,15 @@ class GroupThresholdClassifier(base.ClassifierMixin, base.BaseEstimator):
         )
 
     def predict(self, features: Any) -> np.ndarray:
-        """Positive class where probability reaches the row's threshold."""
+        """Predicts the positive class where probability reaches the threshold.
+
+        Args:
+            features: Rows to predict.
+
+        Returns:
+            Array of class labels, one per row: the second class where its
+            probability is at or above the row's group threshold, else the
+            first.
+        """
         positive = self.predict_proba(features)[:, 1] >= self.cuts(features)
         return np.where(positive, self.classes_[1], self.classes_[0])

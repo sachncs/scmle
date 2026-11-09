@@ -50,7 +50,16 @@ class EstimatorSpec:
 
 
 def rebuild(spec: EstimatorSpec) -> models.ModelAdapter:
-    """Creates the adapter for `spec` (also how it is unpickled)."""
+    """Creates the adapter for `spec` (also how it is unpickled).
+
+    Args:
+        spec: Description of the estimator to adapt.
+
+    Returns:
+        A new adapter whose capabilities follow `spec`: classification tasks
+        if a classifier class is given, regression if a regressor class is
+        given, and probabilities if the classifier has `predict_proba`.
+    """
     supported: frozenset[tasks.TaskType] = frozenset()
     if spec.classifier is not None:
         supported |= CLASSIFICATION
@@ -144,7 +153,11 @@ def register_estimator(
 
 
 def unregister_estimator(name: str) -> None:
-    """Removes a registered estimator (no-op if it is not registered)."""
+    """Removes a registered estimator (no-op if it is not registered).
+
+    Args:
+        name: Public model name given to `register_estimator`.
+    """
     from scmle.models import registry  # Deferred: registry imports this module.
 
     registry.remove_user_adapter(name)
