@@ -23,7 +23,8 @@ class HtmlReport:
             An HTML string with the run summary, findings (the screening
             warning first), leaderboard, test metrics, top-10 permutation
             importance, calibration scores when present, reliability checks,
-            links to the per-method explanation pages and the execution plan summary.
+            links to the per-method explanation pages and the execution plan
+            summary.
         """
         escape = html.escape
         metric_rows = "".join(
