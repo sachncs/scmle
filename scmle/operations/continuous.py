@@ -1076,7 +1076,7 @@ class ContinuousEvaluation:
                 challenger=challenger,
                 reasons=reasons,
             )
-            return Replacement(False, tuple(reasons))
+            return Replacement(done=False, reasons=tuple(reasons))
         outcome = release.promote(
             candidate.model.model,
             candidate.model.version,

@@ -203,7 +203,7 @@ class Controller:
             return None
         try:
             return self.retrain()
-        except Exception as error:  # a failed training must not stop the loop
+        except Exception as error:  # noqa: BLE001 -- a failed training must not stop the loop
             loop.escalate(
                 "retrain_failed",
                 {"envelope": used, "error": type(error).__name__},

@@ -12,6 +12,7 @@ for alerting are computed from events by `scmle.operations.signals`.
 """
 
 from collections.abc import Mapping
+import http
 import math
 import re
 import sys
@@ -569,11 +570,17 @@ class ServiceMetrics:
         for labels, count in self.registry.series(self.REQUESTS).items():
             status = int(dict(labels)["status"])
             total += count
-            if status >= 500:
+            if status >= http.HTTPStatus.INTERNAL_SERVER_ERROR:
                 server += count
-            elif status >= 400 and status not in UNAVAILABLE_STATUSES:
+            elif (
+                status >= http.HTTPStatus.BAD_REQUEST
+                and status not in UNAVAILABLE_STATUSES
+            ):
                 client += count
-            if status >= 500 or status in UNAVAILABLE_STATUSES:
+            if (
+                status >= http.HTTPStatus.INTERNAL_SERVER_ERROR
+                or status in UNAVAILABLE_STATUSES
+            ):
                 unavailable += count
         hist = self.registry.merged_histogram(self.DURATION)
         return {

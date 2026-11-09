@@ -18,6 +18,7 @@ from collections.abc import Mapping
 import contextlib
 import copy
 import dataclasses
+import http
 import json
 import os
 import pathlib
@@ -58,6 +59,10 @@ ENVIRONMENT = "production"
 GOLDEN = pathlib.Path("deploy/local/golden")
 READY_SECONDS = 60.0  # before `recovery.scaled`
 METHOD_CLOCK = "time.monotonic() in the runner"
+SPOOLED_SAMPLES = 50  # samples the outage scenario writes to the spool
+FULL_TRAFFIC_PERCENT = 100  # a single revision takes all the traffic
+LABEL_NOISE_RATE = 0.05  # share of delayed labels that disagree with the truth
+INTERRUPTED_STEP_RUNS = 2  # the killed step runs once before and once after
 
 
 def records(count: int = 3) -> list[dict[str, Any]]:
@@ -175,7 +180,7 @@ class Fleet:
         }
         env.pop("SCMLE_TRUSTED", None)
         folder = folder.resolve()
-        process = subprocess.Popen(  # nosec B603 - our interpreter, our file
+        process = subprocess.Popen(  # noqa: S603 -- our interpreter, our file  # nosec B603
             [sys.executable, str(folder / "serve.py")],
             cwd=folder,
             env=env,
@@ -210,7 +215,7 @@ class Fleet:
             The child process (standard output piped as text, standard error
             discarded), which the fleet remembers.
         """
-        process = subprocess.Popen(  # nosec B603 - our interpreter, our code
+        process = subprocess.Popen(  # noqa: S603 -- our interpreter, our code  # nosec B603
             [sys.executable, "-c", code, *arguments],
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
@@ -504,7 +509,7 @@ def process_kill() -> recovery.Outcome:
             after = None
             while time.monotonic() - killed < recovery.scaled(READY_SECONDS):
                 status, body = predict(second.base)
-                if status == 200:
+                if status == http.HTTPStatus.OK:
                     after = body.get("predictions")
                     break
                 time.sleep(0.1)
@@ -576,7 +581,7 @@ class Client(threading.Thread):
             status = predict(self.router["current"].base, 1)[0]
             self.sent += 1
             now = time.monotonic()
-            if status == 200:
+            if status == http.HTTPStatus.OK:
                 if gap_start is not None:
                     self.longest_gap = max(self.longest_gap, now - gap_start)
                     gap_start = None
@@ -618,7 +623,7 @@ def rolling_restart() -> recovery.Outcome:
         time.sleep(0.5)
         bad = fleet.start(broken)
         verdict = await_unready(bad)
-        admitted = verdict["readyz"] == 200
+        admitted = verdict["readyz"] == http.HTTPStatus.OK
         bad.process.kill()
         started = time.monotonic()
         new = fleet.start(service)
@@ -640,9 +645,9 @@ def rolling_restart() -> recovery.Outcome:
         window = time.monotonic() - started
         result.checks = {
             "the unready replacement stayed alive and unready": (
-                verdict["livez"] == 200
-                and verdict["readyz"] == 503
-                and verdict["predict"] == 503
+                verdict["livez"] == http.HTTPStatus.OK
+                and verdict["readyz"] == http.HTTPStatus.SERVICE_UNAVAILABLE
+                and verdict["predict"] == http.HTTPStatus.SERVICE_UNAVAILABLE
             ),
             "the unready replacement was never given traffic": not admitted,
             "the ready replacement took over": became_ready is not None,
@@ -701,12 +706,16 @@ def invalid_credentials() -> recovery.Outcome:
         right = fleet.start(service, key=demo.DEMO_SIGNING_KEY)
         seconds = ready_after(right)
         elapsed = time.monotonic() - detected
-        served = predict(right.base)[0] == 200 if seconds is not None else False
+        served = (
+            predict(right.base)[0] == http.HTTPStatus.OK
+            if seconds is not None
+            else False
+        )
         result.checks = {
             "the wrong key leaves the service alive and unready": (
-                verdict["livez"] == 200
-                and verdict["readyz"] == 503
-                and verdict["predict"] == 503
+                verdict["livez"] == http.HTTPStatus.OK
+                and verdict["readyz"] == http.HTTPStatus.SERVICE_UNAVAILABLE
+                and verdict["predict"] == http.HTTPStatus.SERVICE_UNAVAILABLE
             ),
             "the failure reason is reported without the key": WRONG_KEY
             not in json.dumps(verdict),
@@ -768,10 +777,11 @@ def secret_rotation() -> recovery.Outcome:
         result.checks = {
             "the service ran under the old key": before is not None,
             "the rotated bundle is refused under the old key": (
-                verdict["readyz"] == 503 and verdict["predict"] == 503
+                verdict["readyz"] == http.HTTPStatus.SERVICE_UNAVAILABLE
+                and verdict["predict"] == http.HTTPStatus.SERVICE_UNAVAILABLE
             ),
             "the rotated key serves": seconds is not None
-            and predict(fresh.base)[0] == 200,
+            and predict(fresh.base)[0] == http.HTTPStatus.OK,
             "the rotation is in the audit ledger": bool(log.rows("admin")),
         }
         result.measurements = [
@@ -826,7 +836,7 @@ def object_store_loss() -> recovery.Outcome:
             mocks.get_object(url, "models/m/v1/serve.py", timeout=2.0)
         except OSError:
             fetch_failed = True
-        served_during = predict(running.base)[0] == 200
+        served_during = predict(running.base)[0] == http.HTTPStatus.OK
         restored = time.monotonic()
         again = mocks.ObjectStore(base / "objects", port=port)
         fleet.serve(again)
@@ -909,14 +919,14 @@ def metrics_destination_outage() -> recovery.Outcome:
                 "count",
                 stamp,
             )
-            for n in range(50)
+            for n in range(SPOOLED_SAMPLES)
         ]
         first = spool.MetricsSpool(base / "spool.jsonl", send, batch_size=20)
         first.add(samples)
         down = first.flush()
         serving_during = (
-            predict(running.base)[0] == 200
-            and demo.get_json(f"{running.base}/readyz")[0] == 200
+            predict(running.base)[0] == http.HTTPStatus.OK
+            and demo.get_json(f"{running.base}/readyz")[0] == http.HTTPStatus.OK
         )
         restarted = spool.MetricsSpool(
             base / "spool.jsonl", send, batch_size=20
@@ -931,10 +941,11 @@ def metrics_destination_outage() -> recovery.Outcome:
         lost = len({s.name for s in samples} - stored)
         result.checks = {
             "the failed flush kept every sample": down.sent == 0
-            and down.remaining == 50
+            and down.remaining == SPOOLED_SAMPLES
             and down.error is not None,
             "serving and readiness were unaffected": serving_during,
-            "a restarted spool still held every sample": survived == 50,
+            "a restarted spool still held every sample": survived
+            == SPOOLED_SAMPLES,
             "the spool drained": done.remaining == 0 and done.error is None,
         }
         result.measurements = [
@@ -986,14 +997,14 @@ def corrupted_bundle() -> recovery.Outcome:
         elapsed = time.monotonic() - detected
         result.checks = {
             "the tampered bundle was alive but never ready": (
-                verdict["livez"] == 200
-                and verdict["readyz"] == 503
-                and verdict["predict"] == 503
+                verdict["livez"] == http.HTTPStatus.OK
+                and verdict["readyz"] == http.HTTPStatus.SERVICE_UNAVAILABLE
+                and verdict["predict"] == http.HTTPStatus.SERVICE_UNAVAILABLE
             ),
             "the tampered bundle's digest differs": differs,
             "the restored copy has the recorded digest": restored,
             "the restored bundle serves": seconds is not None
-            and predict(fixed.base)[0] == 200,
+            and predict(fixed.base)[0] == http.HTTPStatus.OK,
         }
         result.measurements = [
             recovery.Measurement(
@@ -1066,10 +1077,10 @@ def incompatible_schema() -> recovery.Outcome:
         elapsed = time.monotonic() - started
         result.checks = {
             "a different expected schema digest is refused with 409": (
-                wrong_digest == 409
+                wrong_digest == http.HTTPStatus.CONFLICT
             ),
             "an unserved schema version is refused with 409": wrong_version
-            == 409,
+            == http.HTTPStatus.CONFLICT,
             "a record missing a required column is refused with 422": set(
                 statuses
             )
@@ -1077,11 +1088,12 @@ def incompatible_schema() -> recovery.Outcome:
             "the refusals classify as data quality, not infrastructure": (
                 verdict.verdict is classify.Verdict.DATA_QUALITY
             ),
-            "the caller recovers after reading /schema": adapted == 200,
+            "the caller recovers after reading /schema": adapted
+            == http.HTTPStatus.OK,
             "the service stayed ready": demo.get_json(f"{running.base}/readyz")[
                 0
             ]
-            == 200,
+            == http.HTTPStatus.OK,
         }
         result.measurements = [
             recovery.Measurement(
@@ -1189,7 +1201,10 @@ class ProcessPlane(control.ControlPlane):
             Unsupported: If the allocation is not 100 percent to a single
                 revision.
         """
-        if len(allocation) != 1 or sum(allocation.values()) != 100:
+        if (
+            len(allocation) != 1
+            or sum(allocation.values()) != FULL_TRAFFIC_PERCENT
+        ):
             raise control.Unsupported("only all traffic to one revision")
         self.primary = next(iter(allocation))
 
@@ -1205,7 +1220,7 @@ class ProcessPlane(control.ControlPlane):
         try:
             return (
                 demo.get_json(f"{self.revisions[revision].base}/readyz", 2.0)[0]
-                == 200
+                == http.HTTPStatus.OK
             )
         except OSError:
             return False
@@ -1286,6 +1301,44 @@ def register(
     return record
 
 
+def detect_performance_loss(
+    plane: ProcessPlane,
+    watch: signals.SignalMonitor,
+    rng: numpy.random.Generator,
+    known_good: list[Any] | None,
+) -> tuple[int | None, float | None]:
+    """Feeds noisy delayed labels to the monitor until it flags the release.
+
+    Args:
+        plane: The process plane whose service is asked for predictions.
+        watch: The monitor that receives the labelled outcomes.
+        rng: Source of the label noise.
+        known_good: The answers of the good release, which stand in for the
+            truth; labelling stops being possible without them.
+
+    Returns:
+        The number of labelled cases served when the loss was first classified
+        as model performance and the `time.monotonic()` of that moment, or
+        `(None, None)` if it never was.
+    """
+    for step in range(60):
+        served = predict(plane.base(), 3)[1].get("predictions") or []
+        if not known_good or len(served) != len(known_good):
+            # A request that failed or came back short has no labels to
+            # compare with; it must not abort the run with a mismatch.
+            continue
+        truth = [
+            p if rng.random() > LABEL_NOISE_RATE else 1 - p for p in known_good
+        ]
+        watch.observe_outcomes(
+            float(step), signals.zero_one_losses(served, truth)
+        )
+        verdict = classify.classify(watch.evaluate(float(step)))
+        if verdict.verdict is classify.Verdict.MODEL_PERFORMANCE:
+            return (step + 1) * 3, time.monotonic()
+    return None, None
+
+
 def bad_release() -> recovery.Outcome:
     """Promotes a wrong release, detects it from labels and rolls it back.
 
@@ -1348,23 +1401,9 @@ def bad_release() -> recovery.Outcome:
             signals.Window(window_seconds=1000.0, min_samples=30),
             signals.SignalThresholds(reference_loss=0.05, loss_tolerance=0.05),
         )
-        detected_after = None
-        detected_at = None
-        for step in range(60):
-            served = predict(plane.base(), 3)[1].get("predictions") or []
-            if not known_good or len(served) != len(known_good):
-                # A request that failed or came back short has no labels to
-                # compare with; it must not abort the run with a mismatch.
-                continue
-            truth = [p if rng.random() > 0.05 else 1 - p for p in known_good]
-            watch.observe_outcomes(
-                float(step), signals.zero_one_losses(served, truth)
-            )
-            verdict = classify.classify(watch.evaluate(float(step)))
-            if verdict.verdict is classify.Verdict.MODEL_PERFORMANCE:
-                detected_after = (step + 1) * 3
-                detected_at = time.monotonic()
-                break
+        detected_after, detected_at = detect_performance_loss(
+            plane, watch, rng, known_good
+        )
         rolled = release.rollback(
             MODEL, ENVIRONMENT, plane, signing_key=demo.DEMO_SIGNING_KEY
         )
@@ -1516,7 +1555,8 @@ def job_interruption() -> recovery.Outcome:
             and after_kill == ["ingest", "train"],
             "the continued run finished": finished,
             "the finished step was not repeated": final.count("ingest") == 1,
-            "the interrupted step ran again once": final.count("train") == 2,
+            "the interrupted step ran again once": final.count("train")
+            == INTERRUPTED_STEP_RUNS,
             "the remaining step ran once": final.count("evaluate") == 1,
         }
         result.measurements = [

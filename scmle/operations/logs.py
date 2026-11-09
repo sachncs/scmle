@@ -13,6 +13,7 @@ bodies are not logged: the caller passes only counts and fingerprints.
 
 from collections.abc import Callable
 from collections.abc import Mapping
+import http
 import json
 import pathlib
 import re
@@ -230,7 +231,11 @@ class StructuredLog:
         Returns:
             The record that was written.
         """
-        level = "error" if status >= 500 else "info"
+        level = (
+            "error"
+            if status >= http.HTTPStatus.INTERNAL_SERVER_ERROR
+            else "info"
+        )
         return self.emit(
             level,
             "request",

@@ -182,10 +182,14 @@ CATALOGUE = (
         "SIGKILL the serving process; a supervisor starts a new one. Also "
         "kills a state writer at random points.",
         ("service", "registry_state"),
-        True,
-        "The runner is the supervisor; no orchestrator restarts anything.",
-        "Kill a task or revision instance and read the platform's own "
-        "restart and health record.",
+        local=True,
+        local_limits=(
+            "The runner is the supervisor; no orchestrator restarts anything."
+        ),
+        cloud_needs=(
+            "Kill a task or revision instance and read the platform's own "
+            "restart and health record."
+        ),
     ),
     Fault(
         "unhealthy_container_rolling_restart",
@@ -193,11 +197,15 @@ CATALOGUE = (
         "A replacement that never becomes ready is not admitted; a ready "
         "replacement takes over without dropped requests.",
         ("service",),
-        True,
-        "Processes, not containers; readiness-gated switching is done by "
-        "the runner, not by a managed platform.",
-        "A failing health check and a rolling deployment on a managed "
-        "platform with the load balancer's request log.",
+        local=True,
+        local_limits=(
+            "Processes, not containers; readiness-gated switching is done by "
+            "the runner, not by a managed platform."
+        ),
+        cloud_needs=(
+            "A failing health check and a rolling deployment on a managed "
+            "platform with the load balancer's request log."
+        ),
     ),
     Fault(
         "invalid_credentials",
@@ -205,11 +213,15 @@ CATALOGUE = (
         "The service starts with a key that does not verify its bundle; it "
         "stays alive and unready until the key is corrected.",
         ("secrets",),
-        True,
-        "The credential is the bundle signing key in an environment "
-        "variable; no IAM, token issuer or secret manager is involved.",
-        "Revoked or wrong workload identity and secret versions on a "
-        "managed platform.",
+        local=True,
+        local_limits=(
+            "The credential is the bundle signing key in an environment "
+            "variable; no IAM, token issuer or secret manager is involved."
+        ),
+        cloud_needs=(
+            "Revoked or wrong workload identity and secret versions on a "
+            "managed platform."
+        ),
     ),
     Fault(
         "lost_object_store_access",
@@ -217,11 +229,15 @@ CATALOGUE = (
         "The store stops answering; the running service keeps serving; when "
         "access returns the bundle is fetched again by digest.",
         ("object_store",),
-        True,
-        "A local emulator (scmle.deploy.mocks); no IAM, bucket policy, "
-        "versioning or replication.",
-        "A denied bucket policy or key on a managed object store and a "
-        "restore from versioned objects.",
+        local=True,
+        local_limits=(
+            "A local emulator (scmle.deploy.mocks); no IAM, bucket policy, "
+            "versioning or replication."
+        ),
+        cloud_needs=(
+            "A denied bucket policy or key on a managed object store and a "
+            "restore from versioned objects."
+        ),
     ),
     Fault(
         "dependency_outage",
@@ -229,9 +245,9 @@ CATALOGUE = (
         "The metrics destination is down; telemetry is spooled and drained "
         "when it returns; serving is unaffected.",
         ("telemetry_spool",),
-        True,
-        "A local metrics sink; not a managed metrics backend.",
-        "An outage or throttling of a managed metrics backend.",
+        local=True,
+        local_limits="A local metrics sink; not a managed metrics backend.",
+        cloud_needs="An outage or throttling of a managed metrics backend.",
     ),
     Fault(
         "corrupted_bundle",
@@ -239,10 +255,12 @@ CATALOGUE = (
         "A modified model file never becomes ready; restoring the bundle "
         "from a digest-checked copy recovers.",
         ("service", "object_store"),
-        True,
-        "The copy is in a local folder and an emulator.",
-        "A corrupted object in a managed object store and an image whose "
-        "bundle digest differs from the release record.",
+        local=True,
+        local_limits="The copy is in a local folder and an emulator.",
+        cloud_needs=(
+            "A corrupted object in a managed object store and an image whose "
+            "bundle digest differs from the release record."
+        ),
     ),
     Fault(
         "incompatible_schema",
@@ -251,10 +269,12 @@ CATALOGUE = (
         "a precise status; the service keeps serving; the caller recovers by "
         "reading the schema.",
         ("service",),
-        True,
-        "One local service and one client.",
-        "A client and a model version released on a platform that differ "
-        "in schema.",
+        local=True,
+        local_limits="One local service and one client.",
+        cloud_needs=(
+            "A client and a model version released on a platform that differ "
+            "in schema."
+        ),
     ),
     Fault(
         "bad_release",
@@ -264,11 +284,16 @@ CATALOGUE = (
         "never becomes ready is not promoted and the previous revision is "
         "restored.",
         ("service",),
-        True,
-        "Revisions are local processes behind a local control plane that "
-        "implements the same interface as a managed platform's control plane.",
-        "The same on a managed platform with its real revisions and traffic "
-        "shares.",
+        local=True,
+        local_limits=(
+            "Revisions are local processes behind a local control plane that "
+            "implements the same interface as a managed platform's control "
+            "plane."
+        ),
+        cloud_needs=(
+            "The same on a managed platform with its real revisions and "
+            "traffic shares."
+        ),
     ),
     Fault(
         "job_interruption",
@@ -276,9 +301,11 @@ CATALOGUE = (
         "A workflow run is killed mid-step; after the lease expires it "
         "continues; finished steps are not repeated.",
         ("job_state",),
-        True,
-        "The local executor and a local state directory.",
-        "Managed workflow executions with their own retry and state.",
+        local=True,
+        local_limits="The local executor and a local state directory.",
+        cloud_needs=(
+            "Managed workflow executions with their own retry and state."
+        ),
     ),
     Fault(
         "audit_log_continuity",
@@ -286,10 +313,14 @@ CATALOGUE = (
         "The ledger writer is killed; the chain verifies after restart and "
         "continues without a gap.",
         ("ledger",),
-        True,
-        "Process kill only; no machine crash, disk full or torn page.",
-        "The ledger on the platform's durable storage across a task "
-        "replacement.",
+        local=True,
+        local_limits=(
+            "Process kill only; no machine crash, disk full or torn page."
+        ),
+        cloud_needs=(
+            "The ledger on the platform's durable storage across a task "
+            "replacement."
+        ),
     ),
     Fault(
         "secret_rotation_recovery",
@@ -297,10 +328,14 @@ CATALOGUE = (
         "The signing key is rotated; a service with the old key cannot "
         "verify the new bundle and recovers once given the new key.",
         ("secrets",),
-        True,
-        "A rotated environment variable; no secret manager versions.",
-        "A rotation in a managed secret store with the workload picking "
-        "up the new version.",
+        local=True,
+        local_limits=(
+            "A rotated environment variable; no secret manager versions."
+        ),
+        cloud_needs=(
+            "A rotation in a managed secret store with the workload picking up "
+            "the new version."
+        ),
     ),
     Fault(
         "rollback_to_managed_revision",
@@ -308,20 +343,24 @@ CATALOGUE = (
         "Traffic returns to the previous revision of the managed service "
         "and the registry follows only after the platform confirms.",
         ("service",),
-        False,
-        "The registry logic is exercised in bad_release against local "
-        "processes; no managed revision exists locally.",
-        "A previous revision of a managed service with the traffic split "
-        "read back from the platform.",
+        local=False,
+        local_limits=(
+            "The registry logic is exercised in bad_release against local "
+            "processes; no managed revision exists locally."
+        ),
+        cloud_needs=(
+            "A previous revision of a managed service with the traffic split "
+            "read back from the platform."
+        ),
     ),
     Fault(
         "zone_or_region_loss",
         "Zone or region loss",
         "A zone or region of the platform is unavailable.",
         ("service", "object_store", "ledger"),
-        False,
-        "Nothing local resembles it.",
-        "Two zones or regions and a deliberate failover.",
+        local=False,
+        local_limits="Nothing local resembles it.",
+        cloud_needs="Two zones or regions and a deliberate failover.",
     ),
 )
 FAULT_IDS = tuple(item.id for item in CATALOGUE)
@@ -525,7 +564,7 @@ class Runner:
             try:
                 result = scenario()
                 result.judge()
-            except Exception as error:  # a crash is a failed fault
+            except Exception as error:  # noqa: BLE001 -- a crash is a failed fault
                 result = Outcome(fault.id, FAILED, "crashed")
                 result.problems = [
                     f"{type(error).__name__}: {error}",
