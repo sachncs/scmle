@@ -32,6 +32,19 @@ def runner_handler(
     """
 
     def handler(context: executor.StepContext) -> Mapping[str, Any]:
+        """Runs the training job built for this step execution.
+
+        Args:
+            context: The step execution context.
+
+        Returns:
+            The run id, result digest, number of attempts and cost of the
+            succeeded job.
+
+        Raises:
+            StepInterruptedError: If the job was interrupted on every attempt.
+            ScmleError: If the job ended in any other final state.
+        """
         manifest = runner.run(make_spec(context))
         context.spend(manifest.total_cost)
         if manifest.state == base.RunState.SUCCEEDED:

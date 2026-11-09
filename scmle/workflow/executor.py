@@ -56,7 +56,17 @@ LEASE_SECONDS = 300.0
 
 
 class RunState(enum.StrEnum):
-    """Where a run is."""
+    """Where a run is.
+
+    Attributes:
+        RUNNING: Steps are being executed.
+        WAITING_APPROVAL: Stopped at an approval step with no decision yet.
+        SUCCEEDED: Every step succeeded.
+        FAILED: A step failed.
+        BUDGET_STOPPED: The run's cost budget was passed.
+        REJECTED: An approver rejected the run.
+        EXPIRED: An approval was not decided in time.
+    """
 
     RUNNING = "running"
     WAITING_APPROVAL = "waiting_approval"
@@ -79,7 +89,19 @@ FINISHED = frozenset(
 
 
 class StepState(enum.StrEnum):
-    """Where a step is."""
+    """Where a step is.
+
+    Attributes:
+        PENDING: Not started.
+        RUNNING: Executing.
+        SUCCEEDED: Ended successfully.
+        FAILED: Ended with an error after its retries.
+        SKIPPED: Not run because an upstream step did not succeed or the run's
+            budget was passed.
+        WAITING: An approval step waiting for a decision.
+        REJECTED: An approval step that was rejected.
+        EXPIRED: An approval step that was not decided in time.
+    """
 
     PENDING = "pending"
     RUNNING = "running"
@@ -138,6 +160,11 @@ class StepContext:
         idempotency_key: Stable across retries and re-invocations.
         upstream: Outputs of the steps it depends on, by step name.
         store: The executor's durable store.
+        started: Clock reading when the attempt started.
+        clock: Returns the current time in epoch seconds.
+        spent: Cost recorded by this attempt so far.
+        run_spent: Cost of the run before this step.
+        run_budget: Ceiling for the run's cost, or None.
     """
 
     run_id: str
@@ -153,7 +180,12 @@ class StepContext:
     run_budget: float | None = None
 
     def check(self) -> None:
-        """Raises if the step is past its timeout."""
+        """Raises if the step is past its timeout.
+
+        Raises:
+            StepTimeoutError: If more than the step's timeout has passed since
+                the attempt started.
+        """
         if self.clock() - self.started > self.step.timeout_seconds:
             raise StepTimeoutError(
                 f"{self.step.name} passed {self.step.timeout_seconds}s"
@@ -161,6 +193,9 @@ class StepContext:
 
     def spend(self, amount: float) -> None:
         """Records cost; raises if a budget is passed.
+
+        Args:
+            amount: Cost to add.
 
         Raises:
             StepBudgetError: If the step's or the run's budget is exceeded.
@@ -181,19 +216,48 @@ StepResult = tuple[str, Mapping[str, Any], float]
 
 
 def digest_of(value: Any) -> str:
-    """SHA-256 of canonical JSON."""
+    """Digests a value as canonical JSON.
+
+    Args:
+        value: A JSON-serializable value; other types are converted with `str`.
+
+    Returns:
+        The hex SHA-256 of the key-sorted JSON.
+    """
     text = json.dumps(value, sort_keys=True, default=str)
     return hashlib.sha256(text.encode()).hexdigest()
 
 
 def run_id_for(workflow: definition.Workflow, trigger_key: str) -> str:
-    """The durable run id of a trigger."""
+    """Derives the durable run id of a trigger.
+
+    Args:
+        workflow: The workflow.
+        trigger_key: Identifies the trigger (a schedule slot, a request).
+
+    Returns:
+        The workflow name and a 16-character digest of its name, version and the
+        trigger key, truncated to 64 characters.
+    """
     short = digest_of([workflow.name, workflow.version, trigger_key])[:16]
     return f"{workflow.name}-{short}"[:64]
 
 
 class LocalExecutor:
-    """Runs a `Workflow` against handlers, keeping durable state."""
+    """Runs a `Workflow` against handlers, keeping durable state.
+
+    Attributes:
+        workflow: The definition.
+        store: Durable state.
+        handlers: Step name to handler.
+        approver_keys: Approver identity to the key their decisions are signed
+            with.
+        clock: Returns epoch seconds.
+        sleep: Waits between retries.
+        lease_seconds: Validity of a run lease.
+        owner: Name written into the lease.
+        guard: Serializes writes of step records.
+    """
 
     def __init__(
         self,
@@ -245,11 +309,25 @@ class LocalExecutor:
     # ---- keys and records -------------------------------------------------
 
     def base(self, run_id: str) -> str:
-        """Key prefix of a run."""
+        """Builds the key prefix of a run.
+
+        Args:
+            run_id: The run.
+
+        Returns:
+            The prefix under which the run's records are stored.
+        """
         return f"workflows/{self.workflow.name}/runs/{run_id}/"
 
     def read(self, key: str) -> dict[str, Any] | None:
-        """A stored JSON record, or None."""
+        """Reads a stored JSON record.
+
+        Args:
+            key: Object key.
+
+        Returns:
+            The record, or None if there is no such object.
+        """
         try:
             data, ignored = self.store.get(key)
         except objectstore.NotFoundError:
@@ -258,22 +336,53 @@ class LocalExecutor:
         return record
 
     def write(self, key: str, record: Mapping[str, Any]) -> None:
-        """Stores a JSON record atomically."""
+        """Stores a JSON record atomically.
+
+        Args:
+            key: Object key.
+            record: The record to store.
+        """
         body = json.dumps(record, indent=2, sort_keys=True).encode()
         self.store.put(key, body)
 
     def run_record(self, run_id: str) -> dict[str, Any] | None:
-        """The stored run record."""
+        """Reads the stored run record.
+
+        Args:
+            run_id: The run.
+
+        Returns:
+            The run record, or None if the run is unknown.
+        """
         return self.read(self.base(run_id) + "run.json")
 
     def step_record(self, run_id: str, name: str) -> dict[str, Any] | None:
-        """The stored record of one step."""
+        """Reads the stored record of one step.
+
+        Args:
+            run_id: The run.
+            name: The step name.
+
+        Returns:
+            The step record, or None if the step has not been recorded.
+        """
         return self.read(f"{self.base(run_id)}steps/{name}.json")
 
     # ---- leases and concurrency ------------------------------------------
 
     def take_lease(self, run_id: str) -> None:
-        """Acquires the run's lease, or raises `RunInFlightError`."""
+        """Acquires the run's lease, or raises `RunInFlightError`.
+
+        An expired lease is taken over; the take-over is a delete followed by a
+        conditional create.
+
+        Args:
+            run_id: The run.
+
+        Raises:
+            RunInFlightError: If another executor holds a valid lease, or wins a
+                race for an expired one.
+        """
         key = self.base(run_id) + "lock"
         body = json.dumps(
             {"owner": self.owner, "expires": self.clock() + self.lease_seconds}
@@ -293,7 +402,11 @@ class LocalExecutor:
             raise RunInFlightError(f"run {run_id} was just taken") from error
 
     def renew_lease(self, run_id: str) -> None:
-        """Extends the lease."""
+        """Extends the lease.
+
+        Args:
+            run_id: The run.
+        """
         self.write(
             self.base(run_id) + "lock",
             {
@@ -303,11 +416,19 @@ class LocalExecutor:
         )
 
     def release_lease(self, run_id: str) -> None:
-        """Gives the lease up."""
+        """Gives the lease up.
+
+        Args:
+            run_id: The run.
+        """
         self.store.delete(self.base(run_id) + "lock")
 
     def active_runs(self) -> list[str]:
-        """Runs of this workflow whose lease is valid."""
+        """Lists the runs of this workflow whose lease is valid.
+
+        Returns:
+            The run ids.
+        """
         prefix = f"workflows/{self.workflow.name}/runs/"
         active = []
         for meta in self.store.list_objects(prefix):
@@ -335,10 +456,6 @@ class LocalExecutor:
 
         Returns:
             The run record when this call stops (finished or waiting).
-
-        Raises:
-            RunInFlightError: If another executor is working on the run.
-            ConcurrencyLimitError: If the workflow is at its run limit.
         """
         run_id = run_id_for(self.workflow, trigger_key)
         existing = self.run_record(run_id)
@@ -351,11 +468,16 @@ class LocalExecutor:
     def resume(self, run_id: str) -> dict[str, Any]:
         """Continues a run (after an approval, a crash or a failure).
 
-        A failed run is retried from its failed steps; succeeded steps are
-        kept. Runs that were rejected, expired, budget-stopped or succeeded
-        are final and returned as they are. Calling `start` again with the
-        same trigger never retries a failed run: that is an explicit choice
-        made here.
+        A failed run is retried from its failed steps; succeeded steps are kept.
+        Runs that were rejected, expired, budget-stopped or succeeded are final
+        and returned as they are. Calling `start` again with the same trigger
+        never retries a failed run: that is an explicit choice made here.
+
+        Args:
+            run_id: The run.
+
+        Returns:
+            The run record when this call stops.
 
         Raises:
             ConfigError: If the run does not exist.
@@ -371,7 +493,23 @@ class LocalExecutor:
     def drive(
         self, run_id: str, trigger_key: str, requested_by: str
     ) -> dict[str, Any]:
-        """Runs the steps under the lease."""
+        """Runs the steps under the lease.
+
+        Args:
+            run_id: The run.
+            trigger_key: Identifies the trigger; stored on a new run.
+            requested_by: Who asked; stored on a new run.
+
+        Returns:
+            The run record when the run stops. Another executor holding the
+            lease raises `RunInFlightError` (from `take_lease`).
+
+        Raises:
+            ConcurrencyLimitError: If the workflow already has its maximum
+                number of runs in flight.
+            ConfigError: If the run was started with a different workflow
+                definition.
+        """
         others = [r for r in self.active_runs() if r != run_id]
         if len(others) >= self.workflow.max_concurrent_runs:
             raise ConcurrencyLimitError(
@@ -409,7 +547,15 @@ class LocalExecutor:
     # ---- the run loop ----------------------------------------------------
 
     def execute(self, run_id: str, record: dict[str, Any]) -> dict[str, Any]:
-        """Runs ready steps until nothing more can run."""
+        """Runs ready steps until nothing more can run.
+
+        Args:
+            run_id: The run.
+            record: The run record, updated in place.
+
+        Returns:
+            The run record with its final state, step states, cost and end time.
+        """
         states: dict[str, str] = {}
         outputs: dict[str, Mapping[str, Any]] = {}
         for step in self.workflow.steps:
@@ -519,7 +665,16 @@ class LocalExecutor:
         return record
 
     def final_state(self, states: Mapping[str, str]) -> RunState:
-        """The run's state from its steps' states."""
+        """Derives the run's state from its steps' states.
+
+        Args:
+            states: Step state value by step name.
+
+        Returns:
+            `WAITING_APPROVAL`, `REJECTED` or `EXPIRED` if any step is in the
+            corresponding state (in that order of precedence), `SUCCEEDED` if
+            all succeeded, otherwise `FAILED`.
+        """
         values = set(states.values())
         if StepState.WAITING.value in values:
             return RunState.WAITING_APPROVAL
@@ -532,7 +687,14 @@ class LocalExecutor:
         return RunState.FAILED
 
     def recorded_cost(self, run_id: str) -> float:
-        """Cost of steps already recorded for this run."""
+        """Sums the cost of steps already recorded as succeeded for this run.
+
+        Args:
+            run_id: The run.
+
+        Returns:
+            The total cost, rounded to six decimals.
+        """
         total = 0.0
         for step in self.workflow.steps:
             saved = self.step_record(run_id, step.name)
@@ -548,7 +710,17 @@ class LocalExecutor:
         step: definition.Step,
         upstream: Mapping[str, Mapping[str, Any]],
     ) -> str:
-        """The step's key: run, step, parameters and upstream outputs."""
+        """Computes the step's key from its run, parameters and upstream.
+
+        Args:
+            run_id: The run.
+            step: The step.
+            upstream: Outputs of the steps it depends on, by step name.
+
+        Returns:
+            The hex digest of the run id, step name, parameters and the digests
+            of the upstream outputs.
+        """
         return digest_of(
             [
                 run_id,
@@ -565,7 +737,14 @@ class LocalExecutor:
         state: StepState,
         **fields: Any,
     ) -> None:
-        """Writes a step record."""
+        """Writes a step record.
+
+        Args:
+            run_id: The run.
+            step: The step.
+            state: The step's new state.
+            **fields: Further fields stored in the record.
+        """
         with self.guard:
             self.write(
                 f"{self.base(run_id)}steps/{step.name}.json",
@@ -579,7 +758,22 @@ class LocalExecutor:
         upstream: Mapping[str, Mapping[str, Any]],
         run_spent: float,
     ) -> StepResult:
-        """Runs one step with its retries; returns state, outputs, cost."""
+        """Runs one step with its retries.
+
+        A step that already succeeded with the same idempotency key is not run
+        again. A transient error is retried after the policy's delay; any other
+        error fails the step.
+
+        Args:
+            run_id: The run.
+            step: The step.
+            upstream: Outputs of the steps it depends on, by step name.
+            run_spent: Cost of the run before this step.
+
+        Returns:
+            The final step state value, the handler's outputs (empty on failure)
+            and the cost incurred.
+        """
         key = self.idempotency_key(run_id, step, upstream)
         saved = self.step_record(run_id, step.name)
         if (
@@ -669,7 +863,18 @@ class LocalExecutor:
     def approval_payload(
         self, run_id: str, step: str, approver: str, decision: str, at: float
     ) -> dict[str, Any]:
-        """The content an approver signs."""
+        """Builds the content an approver signs.
+
+        Args:
+            run_id: The run.
+            step: The approval step name.
+            approver: The approver's identity.
+            decision: `approve` or `reject`.
+            at: Decision time in epoch seconds.
+
+        Returns:
+            A mapping that also names the workflow digest.
+        """
         return {
             "run_id": run_id,
             "workflow_digest": self.workflow.digest(),
@@ -688,7 +893,19 @@ class LocalExecutor:
         key: str,
         at: float | None = None,
     ) -> dict[str, Any]:
-        """Builds a signed decision (what an approver's tool does)."""
+        """Builds a signed decision (what an approver's tool does).
+
+        Args:
+            run_id: The run.
+            step: The approval step name.
+            approver: The approver's identity.
+            decision: `approve` or `reject`.
+            key: The approver's key.
+            at: Decision time in epoch seconds; the current time if None.
+
+        Returns:
+            The decision payload with its signature.
+        """
         moment = self.clock() if at is None else at
         payload = self.approval_payload(
             run_id, step, approver, decision, moment
@@ -698,11 +915,16 @@ class LocalExecutor:
     def submit_approval(self, decision: Mapping[str, Any]) -> None:
         """Records a signed decision after checking it.
 
+        Args:
+            decision: A decision produced by `sign_approval`. A decision that
+                names a step the workflow does not have raises `ConfigError`
+                (from `Workflow.step`).
+
         Raises:
             ApprovalError: If the approver is unknown or not listed for the
                 step, is the person who requested the run, the signature does
-                not verify, the decision is not approve or reject, or the run
-                or step does not exist.
+                not verify, the decision is not approve or reject, a decision is
+                already recorded, or the run does not exist.
         """
         run_id, name = str(decision["run_id"]), str(decision["step"])
         record = self.run_record(run_id)
@@ -736,7 +958,20 @@ class LocalExecutor:
     def settle_approval(
         self, run_id: str, step: definition.Step, record: Mapping[str, Any]
     ) -> StepState:
-        """The approval step's state now (waiting, succeeded, rejected...)."""
+        """Determines the approval step's state now.
+
+        A recorded decision settles the step to succeeded (approve) or rejected;
+        otherwise the step waits, and expires once it has waited longer than its
+        expiry.
+
+        Args:
+            run_id: The run.
+            step: The approval step.
+            record: The run record. Unused.
+
+        Returns:
+            The step's new state.
+        """
         decision = self.read(f"{self.base(run_id)}approvals/{step.name}.json")
         if decision is not None:
             if decision["decision"] == "approve":
@@ -769,6 +1004,15 @@ class LocalExecutor:
 def signing_matches(
     payload: Mapping[str, Any], key: str, decision: Mapping[str, Any]
 ) -> bool:
-    """Whether the decision's signature is the payload's signature."""
+    """Checks that the decision's signature is the payload's signature.
+
+    Args:
+        payload: The content that was signed.
+        key: The approver's key.
+        decision: The submitted decision, with its `signature`.
+
+    Returns:
+        True if the signature equals the HMAC of the payload under the key.
+    """
     expected = signing.sign_payload(payload, key)
     return hmac.compare_digest(expected, str(decision.get("signature", "")))

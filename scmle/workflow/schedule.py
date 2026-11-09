@@ -49,7 +49,11 @@ class TickReport:
     deferred: tuple[float, ...]
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready form."""
+        """Builds a JSON-ready form.
+
+        Returns:
+            A dict with `ran` (slot and state pairs), `missed` and `deferred`.
+        """
         return {
             "ran": [[slot, state] for slot, state in self.ran],
             "missed": list(self.missed),
@@ -58,7 +62,14 @@ class TickReport:
 
 
 class Scheduler:
-    """Drives a scheduled workflow through an executor."""
+    """Drives a scheduled workflow through an executor.
+
+    Attributes:
+        workflow: The workflow.
+        schedule: The workflow's schedule.
+        store: Where the scheduler keeps its position.
+        key: Object key of the scheduler's state.
+    """
 
     def __init__(
         self,
@@ -82,7 +93,11 @@ class Scheduler:
         self.key = f"workflows/{workflow.name}/schedule/state.json"
 
     def last_slot(self) -> float | None:
-        """The newest slot already dealt with."""
+        """Reads the newest slot already dealt with.
+
+        Returns:
+            The slot time in epoch seconds, or None if none has been dealt with.
+        """
         try:
             data, ignored = self.store.get(self.key)
         except objectstore.NotFoundError:
@@ -91,12 +106,25 @@ class Scheduler:
         return None if value is None else float(value)
 
     def save(self, slot: float, report: dict[str, Any]) -> None:
-        """Records progress."""
+        """Records progress.
+
+        Args:
+            slot: The newest slot dealt with.
+            report: What was done, stored with the slot.
+        """
         body = json.dumps({"last_slot": slot, "last": report}, sort_keys=True)
         self.store.put(self.key, body.encode())
 
     def due(self, now: float) -> list[float]:
-        """Slots that have come due since the last one dealt with."""
+        """Lists the slots that have come due since the last one dealt with.
+
+        Args:
+            now: Current time in epoch seconds.
+
+        Returns:
+            Slot times in order; only the newest slot on the very first call;
+            empty before the schedule's start.
+        """
         schedule = self.schedule
         if now < schedule.start_epoch:
             return []
@@ -114,8 +142,15 @@ class Scheduler:
     def tick(self, executor: executor_module.LocalExecutor) -> TickReport:
         """Runs what is due under the catch-up policy.
 
+        A slot that cannot start because a run is in flight or the workflow is
+        at its run limit is deferred, and later slots are not tried. Progress is
+        saved up to the last slot that was settled.
+
         Args:
             executor: Runs the slots (its clock is the scheduler's `now`).
+
+        Returns:
+            The slots that ran, were missed and were deferred.
         """
         now = executor.clock()
         slots = self.due(now)

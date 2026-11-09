@@ -33,7 +33,16 @@ APPROVED = "approved"
 
 
 class StepKind(enum.StrEnum):
-    """What a step does."""
+    """What a step does.
+
+    Attributes:
+        INGEST: Reads data in.
+        TRAIN: Trains a model.
+        EVALUATE: Evaluates a model.
+        MONITOR: Monitors a model.
+        BATCH_PREDICT: Scores a batch of records.
+        APPROVAL: Waits for a person's decision.
+    """
 
     INGEST = "ingest"
     TRAIN = "train"
@@ -44,7 +53,13 @@ class StepKind(enum.StrEnum):
 
 
 class CatchUp(enum.StrEnum):
-    """What to do about schedule slots that were missed."""
+    """What to do about schedule slots that were missed.
+
+    Attributes:
+        RUN_ALL: Run every missed slot, up to a limit.
+        LATEST_ONLY: Run only the newest due slot.
+        SKIP: Run a due slot only if it is recent; miss the rest.
+    """
 
     RUN_ALL = "run_all"
     LATEST_ONLY = "latest_only"
@@ -52,7 +67,19 @@ class CatchUp(enum.StrEnum):
 
 
 def check_name(name: str, what: str) -> str:
-    """Returns `name` if it is 1-64 letters, digits, `-` or `_`."""
+    """Returns `name` if it is 1-64 letters, digits, `-` or `_`.
+
+    Args:
+        name: The candidate name.
+        what: What the name is, for the error message.
+
+    Returns:
+        `name`, unchanged.
+
+    Raises:
+        ConfigError: If the name is empty, longer than 64 characters or holds
+            another character.
+    """
     if not name or len(name) > 64 or set(name) - NAME_CHARACTERS:
         raise errors.ConfigError(
             f"{what} must be 1-64 characters of letters, digits, - and _"
@@ -115,7 +142,12 @@ class Step:
             raise errors.ConfigError("an approval step is itself automatic")
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready form."""
+        """Builds a JSON-ready form.
+
+        Returns:
+            A dict of all fields, with the kind as its value and the retry
+            policy as a dict.
+        """
         return {
             "name": self.name,
             "kind": self.kind.value,
@@ -148,7 +180,11 @@ class Schedule:
     max_catch_up: int = 10
 
     def __post_init__(self) -> None:
-        """Validates the schedule."""
+        """Validates the schedule.
+
+        Raises:
+            ConfigError: If the interval or `max_catch_up` is not positive.
+        """
         if self.interval_seconds <= 0 or self.max_catch_up < 1:
             raise errors.ConfigError(
                 "interval and max_catch_up must be positive"
@@ -166,8 +202,8 @@ class Workflow:
         schedule: When runs start, if scheduled.
         max_concurrent_runs: Runs of this workflow allowed at once.
         cost_budget: Ceiling for one run's total cost, if any.
-        group_limits: Concurrency group name to the steps allowed at once
-            (a group not listed allows one).
+        group_limits: Concurrency group name to the steps allowed at once (a
+            group not listed allows one).
         max_parallel: Steps the local executor runs at once.
     """
 
@@ -214,14 +250,27 @@ class Workflow:
                 )
 
     def step(self, name: str) -> Step:
-        """The step called `name`."""
+        """Looks up a step by name.
+
+        Args:
+            name: The step name.
+
+        Returns:
+            The step called `name`.
+
+        Raises:
+            ConfigError: If there is no such step.
+        """
         for candidate in self.steps:
             if candidate.name == name:
                 return candidate
         raise errors.ConfigError(f"no step {name!r}")
 
     def order(self) -> tuple[str, ...]:
-        """A deterministic topological order (ties broken by name).
+        """Computes a deterministic topological order (ties broken by name).
+
+        Returns:
+            The step names, each after all of its dependencies.
 
         Raises:
             ConfigError: If the dependencies contain a cycle.
@@ -242,7 +291,11 @@ class Workflow:
         return tuple(ordered)
 
     def layers(self) -> tuple[tuple[str, ...], ...]:
-        """Steps grouped by depth: each layer depends only on earlier ones."""
+        """Groups steps by depth: each layer depends only on earlier ones.
+
+        Returns:
+            The layers in order, each a sorted tuple of step names.
+        """
         depth: dict[str, int] = {}
         for name in self.order():
             parents = self.step(name).depends_on
@@ -254,7 +307,14 @@ class Workflow:
         )
 
     def ancestors(self, name: str) -> frozenset[str]:
-        """Every step `name` depends on, directly or not."""
+        """Finds every step `name` depends on, directly or not.
+
+        Args:
+            name: The step name.
+
+        Returns:
+            The names of all upstream steps.
+        """
         found: set[str] = set()
         pending = list(self.step(name).depends_on)
         while pending:
@@ -265,17 +325,35 @@ class Workflow:
         return frozenset(found)
 
     def has_approval_upstream(self, name: str) -> bool:
-        """Whether an approval step precedes `name`."""
+        """Reports whether an approval step precedes `name`.
+
+        Args:
+            name: The step name.
+
+        Returns:
+            True if any upstream step is an approval step.
+        """
         return any(
             self.step(a).kind is StepKind.APPROVAL for a in self.ancestors(name)
         )
 
     def group_limit(self, group: str) -> int:
-        """Steps of a concurrency group allowed at once."""
+        """Looks up how many steps of a concurrency group may run at once.
+
+        Args:
+            group: The group name.
+
+        Returns:
+            The configured limit, or 1 for a group that is not listed.
+        """
         return int(self.group_limits.get(group, 1))
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready form."""
+        """Builds a JSON-ready form.
+
+        Returns:
+            A dict of all fields, with the steps and schedule as dicts.
+        """
         return {
             "name": self.name,
             "version": self.version,
@@ -295,7 +373,11 @@ class Workflow:
         }
 
     def digest(self) -> str:
-        """SHA-256 of the canonical definition."""
+        """Digests the definition.
+
+        Returns:
+            The hex SHA-256 of the key-sorted JSON of `to_dict()`.
+        """
         text = json.dumps(self.to_dict(), sort_keys=True)
         return hashlib.sha256(text.encode()).hexdigest()
 
@@ -307,10 +389,20 @@ def standard_workflow(
     approvers: Sequence[str] = ("ml-owner",),
     cost_budget: float | None = None,
 ) -> Workflow:
-    """The usual pipeline: ingest, train, evaluate, monitor, approve, publish.
+    """Builds the usual pipeline: ingest through approval to publication.
 
-    Batch prediction publishes results to consumers, so it is an approved
-    action behind the approval step; monitoring is automatic.
+    Batch prediction publishes results to consumers, so it is an approved action
+    behind the approval step; monitoring is automatic.
+
+    Args:
+        name: Workflow name.
+        version: Version label.
+        schedule: When runs start, if scheduled.
+        approvers: Identities that may decide the approval step.
+        cost_budget: Ceiling for one run's total cost, if any.
+
+    Returns:
+        The workflow.
     """
     return Workflow(
         name=name,
