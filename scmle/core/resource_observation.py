@@ -41,7 +41,7 @@ class RuntimeResourceObservation:
         extra_observations: dict[str, bool | None],
         sources: dict[str, str],
     ) -> None:
-        """Initialize an observation without retaining host-specific objects.
+        """Initializes an observation holding only plain values.
 
         Args:
             environment: The observed capability environment.
@@ -100,7 +100,7 @@ class RuntimeResourceObservation:
 def observe_runtime_resources(
     disk_path: str | pathlib.Path | None = None,
 ) -> RuntimeResourceObservation:
-    """Capture only bounded host facts needed by capability declarations.
+    """Captures only the bounded host facts that capability declarations need.
 
     A failed probe yields ``None``. The capability registry then rejects a
     declaration that requires that fact instead of treating the probe failure
@@ -125,7 +125,7 @@ def observe_runtime_resources(
         cpu_cores=cpu_cores,
         memory_gb=memory_gb,
         disk_gb=disk_gb,
-        # These are intentionally not guessed by this slice. A capability
+        # These are intentionally not guessed here. A capability
         # that declares either requirement therefore fails closed.
         gpu_available=None,
         network_available=None,
@@ -192,7 +192,7 @@ def observe_windows_memory_gb() -> tuple[float | None, str]:
 
 
 def observe_disk_gb(path: pathlib.Path) -> tuple[float | None, str]:
-    """Returns free bytes on the filesystem containing ``path``.
+    """Returns the free space of the filesystem containing ``path``.
 
     Args:
         path: Any path on the filesystem to measure.
@@ -211,7 +211,10 @@ def observe_disk_gb(path: pathlib.Path) -> tuple[float | None, str]:
 def observe_extras() -> tuple[
     frozenset[str], dict[str, bool | None], dict[str, str]
 ]:
-    """Observe project extras by checking their declared distributions.
+    """Observes project extras by checking their declared distributions.
+
+    An extra counts as installed only when every distribution it requires has
+    readable metadata.
 
     Returns:
         A triple: the extras observed as installed, each extra's observation

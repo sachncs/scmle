@@ -1,7 +1,7 @@
 """Execution backends: where independent trials run.
 
 The control plane only ever calls `ExecutionBackend.map`, so moving from a
-single process to a pool (or, later, a cluster) never touches orchestration.
+single process to a pool (or a Ray cluster) never touches orchestration.
 """
 
 import abc

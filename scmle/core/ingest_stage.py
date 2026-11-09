@@ -84,7 +84,10 @@ class IngestResult:
             admissibility tests.
         documents: File name to JSON-ready content (the ingest plan's own
             files are written by `IngestPlan`).
-        summary: Verdict, link count and budget state for the run event.
+        summary: The ingest plan's summary (whether the budget cut the run
+            short, source queries, unit verdict, accepted links, open
+            questions) plus `declared_family_size` and the number of
+            `proposed` features, for the run event.
     """
 
     features: pd.DataFrame
@@ -105,7 +108,8 @@ def load_plan(path: str) -> dict[str, Any]:
         `moment`, `tables` and `views` entries.
 
     Raises:
-        ConfigError: If it cannot be read or lacks a required key.
+        ConfigError: If the file cannot be read or parsed, is not a JSON
+            object, or lacks a required key.
     """
     try:
         document = json.loads(Path(path).read_text(encoding="utf-8"))
@@ -164,6 +168,9 @@ def rule_of(
 
 def read_frame(entry: dict[str, Any], factory: Any) -> pd.DataFrame:
     """One table, read once with a snapshot check.
+
+    A read that sees the table change on every attempt fails with the
+    snapshot check's own `TornReadError`.
 
     Args:
         entry: The plan entry naming the `table` and its `order_by` clause.
@@ -237,8 +244,11 @@ def run(
         provenance fields, documents to write and a summary.
 
     Raises:
-        BlockedError: If the unit verdict is `coarser` or `unknown`.
-        ConfigError: If the ingest plan names a column the table lacks.
+        BlockedError: If the unit verdict is `coarser` or `unknown`, or the
+            extracted views do not reproduce the declared or source-queried
+            totals of the charter's `reconcile` block.
+        ConfigError: If `frame` lacks the key or moment column the ingest plan
+            names, or a table or ordering it names is not valid.
     """
     key, moment = plan_document["key"], plan_document["moment"]
     missing = [c for c in (key, moment) if c not in frame.columns]
@@ -404,8 +414,9 @@ def check_multiplicity(
 ) -> None:
     """Fails the run when the ledger did not register the declared family.
 
-    Every synthesized feature that was not quarantined or excluded must be a
-    registered hypothesis of the ledger, and nothing else may be counted.
+    The declared size must equal the number of synthesized columns, every
+    synthesized column that was not excluded must be a registered hypothesis
+    of the ledger, and no excluded one may be registered.
 
     Args:
         declared: The declared family size.
@@ -415,7 +426,9 @@ def check_multiplicity(
             excluded).
 
     Raises:
-        BlockedError: If the registered count differs from the expected one.
+        BlockedError: If the declared size differs from the number of
+            synthesized columns, or the synthesized columns registered in the
+            ledger are not exactly the non-excluded ones.
     """
     if declared != len(synthesized):
         raise errors.BlockedError(

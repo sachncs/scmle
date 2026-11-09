@@ -42,7 +42,7 @@ class WorkflowStage(Protocol):
         """
 
     def execute(self, context: "context_module.RunContext") -> None:
-        """Execute the stage against the shared run context.
+        """Executes the stage against the shared run context.
 
         Args:
             context: The shared run context, read and updated by the stage.

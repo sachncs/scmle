@@ -131,7 +131,9 @@ def describe(
     Returns:
         A review summarizing the execution plan at the gate after planning,
         or the selected model and strategy (with its cross-validation
-        score) at any other gate.
+        score) at any other gate. A missing stage product (no plan or no
+        selected trial in the context) fails with the context's
+        unavailable-product error.
     """
     if gate is PLAN_GATE:
         plan = context_module.require(context.plan, "plan")

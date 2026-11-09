@@ -35,7 +35,9 @@ def start_helper(
         The helper process and the parent end of the channel.
 
     Raises:
-        HelperStartError: If the helper dies or does not connect in time.
+        HelperStartError: If the helper exits before connecting, does not
+            connect within `CONNECT_SECONDS`, or the connection attempt fails.
+            The helper is killed first.
     """
     key = secrets.token_bytes(KEY_BYTES)
     listener = connection.Listener(authkey=key)
@@ -83,7 +85,10 @@ def start_helper(
 
 
 def connect_to_parent() -> connection.Connection:
-    """Helper side: connects using the address argument and key on stdin.
+    """Connects a helper to its parent, from the helper's side.
+
+    Reads the hex secret key from standard input and the listener address
+    from the first command-line argument.
 
     Returns:
         The authenticated connection to the parent process.

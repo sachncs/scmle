@@ -198,8 +198,8 @@ def process_tree(root: int) -> dict[int, int]:
 
     Returns:
         A mapping from pid to resident bytes for the root and every descendant
-        found in the process table. A root that is gone yields an empty
-        mapping.
+        found in the process table; a root missing from the table is left
+        out, so a vanished root yields an empty mapping.
     """
     table = process_table()
     members = {root}
@@ -264,7 +264,8 @@ class TrialSupervisor:
     def run(self, function: Callable[[Any], Any], argument: Any) -> Any:
         """Calls `function(argument)` in a child process and returns its value.
 
-        The child and every process it started are killed once the call ends.
+        If the child is still running when the call ends (a limit was
+        exceeded, say), it and every process it started are killed.
 
         Args:
             function: Picklable module-level function.
@@ -274,7 +275,9 @@ class TrialSupervisor:
             The value `function(argument)` returned in the child process.
 
         Raises:
-            TrialLimitError: If the child exceeded a limit, died, or raised.
+            TrialLimitError: If the child exceeded a limit, died without
+                sending a result, or raised (the message is then
+                `ErrorType: message` of the child's exception).
         """
         context: Any
         if WINDOWS:
@@ -391,7 +394,8 @@ class ResourceGovernor:
         """Whether peak memory is above the configured limit.
 
         Returns:
-            True if this process's peak memory exceeds the configured limit.
+            True if the larger of this process's and its finished children's
+            peak resident memory exceeds `memory_limit_gb`.
         """
         return peak_memory_gb() > self.spec.memory_limit_gb
 
@@ -449,9 +453,11 @@ class ResourceGovernor:
         """Describes each limit, how it was applied and what was observed.
 
         Returns:
-            A dict with `time_budget`, `cpu`, `memory` and `gpu` entries, each
-            giving the limit, how it was enforced and, where measurable,
-            what was observed and whether it was within the limit.
+            A dict with `time_budget`, `cpu`, `memory` and `gpu` entries. The
+            time and memory entries give the limit, the observed value, how
+            it is enforced and `within_limit`; `cpu` gives the limit, worker
+            count, threads per worker and enforcement; `gpu` gives the mode
+            and enforcement.
         """
         elapsed = time.monotonic() - self.started_at
         peak = peak_memory_gb()

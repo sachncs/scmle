@@ -75,7 +75,7 @@ class RetryPolicy:
             raise errors.ConfigError("factor must be at least 1")
 
     def delay_after(self, failures: int) -> float:
-        """The wait after `failures` failed attempts (1 for the first).
+        """Returns the wait after `failures` failed attempts (1 for the first).
 
         Args:
             failures: Number of failed attempts so far; at least 1.
@@ -88,7 +88,7 @@ class RetryPolicy:
         return min(wait, self.max_delay_seconds)
 
     def delays(self) -> list[float]:
-        """The waits between all attempts, in order.
+        """Returns the waits between all attempts, in order.
 
         Returns:
             The waits in seconds between consecutive attempts, in order; one
@@ -97,7 +97,7 @@ class RetryPolicy:
         return [self.delay_after(n) for n in range(1, self.max_attempts)]
 
     def to_dict(self) -> dict[str, float | int]:
-        """JSON-ready form.
+        """Returns the JSON-ready form.
 
         Returns:
             The policy's fields as a dict.
@@ -119,7 +119,8 @@ def call_with_retries(
         policy: Attempts and backoff.
         is_transient: Whether an exception may be retried; anything else
             propagates at once. By default only `TransientError`.
-        sleep: Waits between attempts.
+        sleep: Called with each wait in seconds between attempts, not after
+            the last one.
 
     Returns:
         The operation's result.

@@ -72,10 +72,12 @@ class Orchestrator:
             frame: In-memory dataset, if not read from `spec.data.uri`.
             registry: Model registry; defaults to the built-in adapters plus
                 every installed plugin that passes the conformance suite.
-            policy: Selection policy; defaults to best mean CV score.
+            policy: Selection policy; defaults to `BestMeanPolicy` (best mean
+                cross-validation score with the configured tie rule).
             stages: Stage sequence; defaults to the standard workflow.
-            checkpoints: Approval gates consulted after the planning and
-                selection stages; any rejection blocks the run.
+            checkpoints: Approval gates, each consulted after the stages in
+                its own `gates` (planning and selection by default); any
+                rejection blocks the run.
             tracker: Experiment store; defaults to a SQLite database next to
                 the run directories.
             capability_registry: Explicit capability declarations; defaults
@@ -164,12 +166,12 @@ class Orchestrator:
     def apply_plan(self, approved: experiments.ExperimentPlan | None) -> None:
         """Makes an approved or modified plan binding on the specification.
 
-        The plan's validation strategy, time budget and metric replace the
-        configured ones (and are validated with the rest of the
-        specification); its candidate models restrict the search, and its
-        task must match what the data resolves to. A plan that contradicts the
-        specification, for example group validation without a group column,
-        fails that validation with a `ValidationError`.
+        Replaces `self.spec` with a copy whose validation strategy, time
+        budget and metric are those of `approved`, validated with the rest
+        of the specification. A plan that contradicts the specification, for example
+        group validation without a group column, fails that validation with
+        a `ValidationError`. The plan's candidate models and task are not
+        applied here; the stages read them from the context's approved plan.
 
         Args:
             approved: The plan, or None to keep the specification as is.
@@ -192,8 +194,11 @@ class Orchestrator:
         Args:
             approved: Plan restricting which models may be considered.
 
+        Applies `approved` to the specification first (see `apply_plan`).
+
         Returns:
-            A context whose `profile` and `plan` are populated.
+            A context, with no run store or log, whose `profile` and `plan`
+            are populated.
         """
         self.apply_plan(approved)
         context = self.new_context(approved_plan=approved)
@@ -219,11 +224,13 @@ class Orchestrator:
         wrapped). The run directory is in the error's `details["run_dir"]`.
 
         Args:
-            output_dir: Parent directory for run directories and the
-                tracking database.
+            output_dir: Parent directory for run directories and, unless a
+                tracker was given, the tracking database.
             approved: Approved or modified plan restricting candidates.
-            parameter_estimation_declaration: Explicit scientific declaration
-                for the optional parameter-estimation evidence track.
+            parameter_estimation_declaration: Declaration for the optional
+                parameter-estimation evidence track, written (with the
+                project config hash and its digest) to the run directory;
+                a disabled declaration is written when None.
 
         Returns:
             The completed run.
@@ -254,8 +261,9 @@ class Orchestrator:
         """Continues an interrupted run, reusing its completed trials.
 
         The configuration must be identical (same hash). Stages are
-        re-executed deterministically; trials whose checkpoints are valid
-        are reused instead of recomputed.
+        re-executed; trials whose checkpoints were saved in the run directory
+        are reused instead of recomputed, and a saved `execution_plan.json`
+        is applied as the approved plan.
 
         Args:
             run_directory: Directory of a cancelled, failed or crashed run.
@@ -351,7 +359,7 @@ class Orchestrator:
         """Asks every checkpoint registered for `gate` and audits the verdicts.
 
         Args:
-            gate: The stage that just completed.
+            gate: The state of the stage that just completed.
             context: The run context, used to build each review and to record
                 the verdict.
 

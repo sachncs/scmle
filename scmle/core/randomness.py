@@ -21,7 +21,8 @@ def validate_key(run_seed: int, component: str, index: int) -> str:
     """Checks a stream key and returns the trimmed component name.
 
     Args:
-        run_seed: The run's seed; must be a non-negative integer.
+        run_seed: The run's seed; must be a non-negative integer (a bool is
+            rejected).
         component: Name of the check or detector; surrounding whitespace is
             removed.
         index: Repeat counter; must be a non-negative integer.
@@ -42,13 +43,13 @@ def validate_key(run_seed: int, component: str, index: int) -> str:
 
 
 def name_words(component: str) -> tuple[int, ...]:
-    """Stable 32-bit words derived from a component name.
+    """Returns stable 32-bit words derived from a component name.
 
     Args:
         component: The component name, hashed with SHA-256.
 
     Returns:
-        The first words of the digest, each read as a big-endian unsigned
+        The first four words of the digest, each read as a big-endian unsigned
         32-bit integer.
     """
     digest = hashlib.sha256(component.encode("utf-8")).digest()
@@ -61,7 +62,7 @@ def name_words(component: str) -> tuple[int, ...]:
 def component_seed_sequence(
     run_seed: int, component: str, index: int = 0
 ) -> np.random.SeedSequence:
-    """Seeds sequence for one component of one run.
+    """Returns the seed sequence for one component of one run.
 
     Args:
         run_seed: The run's seed.
@@ -80,7 +81,7 @@ def component_seed_sequence(
 def component_rng(
     run_seed: int, component: str, index: int = 0
 ) -> np.random.Generator:
-    """Generator for one component of one run.
+    """Returns the random generator for one component of one run.
 
     Args:
         run_seed: The run's seed.
@@ -96,7 +97,7 @@ def component_rng(
 
 
 def derive_int_seed(run_seed: int, component: str, index: int = 0) -> int:
-    """32-bit integer seed for libraries that take `random_state=int`.
+    """Returns a 32-bit integer seed for libraries that take `random_state`.
 
     Args:
         run_seed: The run's seed.
@@ -116,7 +117,7 @@ def derive_int_seed(run_seed: int, component: str, index: int = 0) -> int:
 def seed_path(
     run_seed: int, component: str, index: int = 0
 ) -> qualification.SeedPath:
-    """The key to record on a `Check` or `Certificate`.
+    """Returns the key to record on a `Check` or `Certificate`.
 
     Args:
         run_seed: The run's seed.

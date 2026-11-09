@@ -345,6 +345,8 @@ class RunContext:
         registry: Model registry.
         catalog: Metric catalog.
         policy: Model selection policy.
+        capability_registry: Declared capabilities that planning checks the
+            run against (the tabular beta registry by default).
         store: Run directory, or None for previews.
         log: Event log, or None for previews.
         capability_observation: Runtime resource facts captured before the
@@ -362,6 +364,8 @@ class RunContext:
         cleaning_notes: Data repairs made at ingestion (reported as quality
             findings).
         manifest: Dataset identity.
+        evidence_graph: Graph of the run's evidence, replaced by the one
+            built when the run is packaged.
         task: Resolved task type.
         profile: Dataset profile.
         cluster_column: Entity column whose rows are not independent in the
@@ -384,6 +388,8 @@ class RunContext:
         diagnostics: Post-selection diagnostic reports by name.
         reference_scores: Model scores / predicted classes on the held-out
             rows, the reference for output-drift monitoring.
+        coverage_claim_sha256: Hash of the coverage claim written for the
+            run, or None when no claim was made.
         pending_ledger: The exploration of a charter run whose opening of the
             confirmation set waits for the model selection, or None.
         refits: Candidates already refit on development data during
@@ -400,11 +406,14 @@ class RunContext:
         ordinal_labels: For ordinal tasks, the labels from lowest to highest
             (the data's target holds their integer ranks).
         unlabeled: Rows without a target, set aside by the `unlabeled` policy.
+        ingest: Result of declared-source ingestion, or None when the project
+            declared none.
         semi_supervised: Record of the self-training judgement, if any.
         evaluation: Final evaluation record.
         bundle: Packaged model.
         result: Final run result.
-        deadline: Monotonic deadline of the time budget.
+        started_at: Monotonic time at which the context was created; the
+            time budget (and the `deadline` property) counts from it.
     """
 
     spec: tasks.ProjectSpec
@@ -624,8 +633,8 @@ class RunContext:
             outcome: The finished trial to record.
 
         Raises:
-            ScmleError: If a different trial already used the identifier,
-                which would silently overwrite its checkpoint.
+            ScmleError: If a recorded trial already has the same identifier,
+                which would overwrite its checkpoint.
         """
         if any(t.trial_id == outcome.trial_id for t in self.trials):
             raise errors.ScmleError(

@@ -110,7 +110,7 @@ def policy_value(
 
     Args:
         layer: The charter's decision layer, whose off-policy rules apply.
-        actions: The rule's chosen action probabilities, one per row.
+        actions: The probability that the rule takes action 1, one per row.
         outcome: The observed outcome, one per row.
         logged: The action taken in the log (0 or 1), or None if there is no
             randomized log.
@@ -118,9 +118,11 @@ def policy_value(
             or None.
 
     Returns:
-        The estimated value with its row count, reward definition and
-        assumptions, or a record whose status is not assessable and says why
-        when the log is missing or its propensities and actions are invalid.
+        The estimate (a refused one, without value or interval, when the
+        support or effective-sample-size gate fails) with its row count,
+        reward definition and assumptions, or a record whose status is not
+        assessable and says why when the log is missing or its propensities
+        and actions are invalid.
     """
     if logged is None or propensity is None:
         return {
@@ -178,7 +180,7 @@ def fairness(
         layer: The charter's decision layer, listing the constraints.
         features: The test rows, holding each constrained attribute.
         outcome: The observed outcome, one per row.
-        actions: The rule's actions, one per row.
+        actions: The rule's actions (0 or 1), one per row.
         alpha: Significance level of each satisfaction test.
 
     Returns:
@@ -281,8 +283,10 @@ def decision_report(
         design_record: The rollout design record, or None.
 
     Returns:
-        The summary document, which references the other decision files and
-        lists the limits of the analysis.
+        The summary document: the cost model hash, unit, threshold, the net
+        benefit record, the status of the policy value (with its file name),
+        the fairness records, the rollout plan hash (marked as not run) and
+        the limits of the analysis.
     """
     model = charter.cost_model
     return {
