@@ -1586,7 +1586,7 @@ class ModelBundle:
         background: str | pathlib.Path | pd.DataFrame,
         max_changes: int = 3,
     ) -> counterfactual_module.Counterfactual:
-        """Searches greedily for a small change to `row` giving the wanted outcome.
+        """Searches greedily for a small change that reaches the wanted outcome.
 
         Only the columns in `actionable` are ever changed, and only to
         candidate values drawn from `background` (quantiles of numeric
