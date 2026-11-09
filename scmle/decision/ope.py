@@ -194,12 +194,13 @@ def terms(
 
     Args:
         log: The logged data, target policy and, for `dr`, the outcome model.
-        estimator: `ipw`, `snips` or `dr`.
+        estimator: `ipw` or `snips`; any other value is treated as `dr`
+            (callers validate it against `ESTIMATORS`).
         clip: Largest importance weight allowed, or None.
 
     Returns:
-        The term for each row, and the share of rows whose weight was
-        clipped.
+        The term for each row, and the share of rows whose raw weight
+        exceeded `clip` (0.0 when `clip` is None).
 
     Raises:
         ValueError: If `estimator` is `dr` and the log has no outcome model.

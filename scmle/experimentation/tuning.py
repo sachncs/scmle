@@ -115,8 +115,9 @@ class Tuner:
     def rung_schedule(self) -> list[list[int | None]]:
         """Computes the fold budgets of each Hyperband bracket, cheapest first.
 
-        With `F` folds and reduction factor `eta`, rungs are the geometric fold
-        counts `F / eta^k` (at least one fold) ending at the full evaluation
+        With `F` folds and reduction factor `eta`, rungs are the distinct fold
+        counts `int(F / eta^k)` for `k` from 0 to 3 (at least one fold, fewer
+        than `F`), in ascending order, followed by the full evaluation
         (`None`). Bracket `s` starts at rung `s`: early brackets try many
         configurations cheaply, the last one a few at full cost.
 

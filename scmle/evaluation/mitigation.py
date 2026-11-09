@@ -26,7 +26,8 @@ class Mitigation:
 
     Attributes:
         column: Sensitive column.
-        criterion: Gap the thresholds aim to close.
+        criterion: Gap the thresholds aim to close, `demographic_parity` or
+            `equal_opportunity`.
         thresholds: Group name to threshold.
         gap_before: Largest between-group difference with one threshold.
         gap_after: The same with group thresholds.

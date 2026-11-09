@@ -345,7 +345,9 @@ def check_delete(store: objectstore.ObjectStore, base: str) -> None:
     """Delete removes the object and is idempotent.
 
     The check fails with `ConformanceFailure` (through `require`) if the
-    object still exists after it is deleted.
+    object still exists after it is deleted. Deleting the same key again,
+    or a key that never existed, must not raise; any error the backend
+    raises there propagates.
 
     Args:
         store: The backend under test.

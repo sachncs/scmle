@@ -117,7 +117,9 @@ class DataContract:
         """Validates the contract.
 
         Raises:
-            ConfigError: If it is incomplete or names an unknown kind.
+            ConfigError: If the name, schema version or columns are empty, a
+                column has a kind outside `KINDS`, a key column is not among
+                the columns, or `max_age_seconds` is set and not positive.
         """
         if not self.name or not self.schema_version or not self.columns:
             raise errors.ConfigError(

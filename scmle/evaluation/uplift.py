@@ -162,9 +162,12 @@ def check_propensity(
         seed: Seed of the cross-validation and the permutation test.
 
     Returns:
-        The treated share, the cross-validated AUC, the verdict and a note.
-        An arm with under `MIN_ARM_SHARE` of the rows gives a NaN AUC and
-        not randomized; no numeric covariates gives AUC 0.5 and randomized.
+        The treated share, the cross-validated AUC, the verdict, a note and
+        the permutation-test p-value when there is one. The verdict follows
+        the permutation balance test when it is available, otherwise the
+        AUC against `PROPENSITY_AUC_LIMIT`. An arm with under
+        `MIN_ARM_SHARE` of the rows gives a NaN AUC and not randomized; no
+        numeric covariates gives AUC 0.5 and randomized.
     """
     arm = np.asarray(treatment).astype(int)
     share = float(arm.mean())

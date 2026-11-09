@@ -105,8 +105,9 @@ def scan_result(
 ) -> gate.ImageScan:
     """Applies the vulnerability policy to a scanner report.
 
-    An unreadable report, an empty scan or any blocking finding is a failed
-    scan, never a pass.
+    A report that cannot be parsed, an empty scan or any blocking finding is
+    a failed scan, never a pass. A report file that cannot be opened for
+    hashing raises `OSError` instead.
 
     Args:
         report: Scanner report file.

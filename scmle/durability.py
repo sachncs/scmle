@@ -68,7 +68,7 @@ def sync_file(path: str | pathlib.Path) -> None:
 
 
 def sync_directory(directory: str | pathlib.Path) -> None:
-    """Flush a directory entry after an atomic replacement.
+    """Flushes a directory entry after an atomic replacement.
 
     ``fsync`` on the temporary file protects its contents. A second ``fsync``
     on the containing directory protects the rename itself from being lost

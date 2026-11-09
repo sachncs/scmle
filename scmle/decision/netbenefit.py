@@ -46,17 +46,17 @@ def rule_hash(label: str, threshold: float) -> str:
     """SHA-256 of a frozen rule's label and threshold.
 
     The rule is identified by what fixed it on development data, never by
-    its actions on the final table.
+    its actions on the final table. A threshold that is not a finite real
+    number (a bool counts as not) is rejected with a `ValueError` by
+    `qualification.finite`.
 
     Args:
         label: Text identifying how the rule was fixed.
-        threshold: The rule's threshold; must be a finite number.
+        threshold: The rule's threshold.
 
     Returns:
-        The hexadecimal SHA-256 digest of the label and threshold.
-
-    A threshold that is not a finite number is rejected with a `ValueError`
-    by `qualification.finite`.
+        The hexadecimal SHA-256 digest of the label and the `repr` of the
+        threshold as a float, joined by `|`.
     """
     payload = f"{label}|{qualification.finite(threshold, 'threshold')!r}"
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
@@ -352,7 +352,8 @@ class FinalNetBenefit:
         """Registers the hash of the frozen rule.
 
         Args:
-            frozen: Hash of the frozen rule; a non-blank string.
+            frozen: Hash of the frozen rule. A blank or non-string value is
+                rejected with a `ValueError`.
         """
         self.frozen = qualification_text(frozen)
         self.used = False

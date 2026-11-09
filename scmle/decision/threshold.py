@@ -432,17 +432,27 @@ def choose_threshold(
 ) -> ThresholdDecision:
     """Chooses the operating threshold on development data only.
 
+    If the probabilities pass a calibration check, the rule is the Bayes
+    threshold of the cost model. Otherwise the probabilities are recalibrated
+    with Platt scaling when a cross-fitted recheck passes and the slope is
+    positive; failing that, the threshold is the cost-minimising cut found
+    on a grid. A grid rule, or a cost model with unverified entries, is
+    labelled `unverified`; otherwise the tier is `attested`.
+
     Args:
         p: Out-of-fold development probabilities.
-        y: Development labels.
+        y: Development labels, 0 or 1.
         model: The chartered cost model.
-        level: Level of the calibration checks.
-        clusters: Entity labels when the split is grouped.
+        level: Significance level, in (0, 1), of the calibration checks.
+        clusters: Entity labels when the split is grouped, so the cost
+            interval resamples whole entities; None resamples rows.
         replicates: Bootstrap replicates for the cost interval.
-        seed: Seed of the streams.
+        seed: Seed of the cross-fitting and of the bootstrap.
 
     Returns:
-        The frozen rule and its development evidence.
+        The frozen rule with its tier, calibration checks, expected cost,
+        cost interval and stable threshold range (None if there is none).
+        Invalid inputs are rejected with a `ValueError` by the helpers.
     """
     risk, labels = probabilities_and_labels(p, y)
     first = calibration_check(risk, labels, level)

@@ -576,7 +576,8 @@ class QualityGate:
     """Applies rules to a snapshot and acts on each rule's policy.
 
     Attributes:
-        rules: The rules, evaluated in order.
+        rules: The rules, in order; a run evaluates those that apply to its
+            stage.
         store: Where reports and quarantined rows are written, if anywhere.
     """
 

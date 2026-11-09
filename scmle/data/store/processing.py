@@ -110,10 +110,10 @@ class Checkpoint:
             The checkpoint they describe.
 
         Raises:
-            ValueError: Raised inside the parser for a digest or format
-                mismatch; it never escapes, being converted to the error
-                below.
-            CheckpointCorruptError: If it is malformed or its digest is wrong.
+            ValueError: Raised internally on a digest or format mismatch and
+                converted to the error below.
+            CheckpointCorruptError: If the bytes are not valid JSON, lack a
+                field, or have a wrong digest or format.
         """
         try:
             document = json.loads(data)

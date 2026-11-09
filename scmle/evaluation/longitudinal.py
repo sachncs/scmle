@@ -1139,7 +1139,7 @@ def build_period_result(
 def independent_reference(
     fitted: Sequence[Mapping[str, Any]], tolerance: float
 ) -> dict[str, Any]:
-    """Recalculate normalized weighted means through an independent path.
+    """Recalculates normalized weighted means through an independent path.
 
     Args:
         fitted: One `fit_period` record per period.
@@ -1147,9 +1147,10 @@ def independent_reference(
 
     Returns:
         A dictionary with the method name, the tolerance, an overall
-        "passed" flag, and one record per period (recomputed estimate,
-        primary estimate, absolute difference, pass flag, arm row counts,
-        propensity range, and the recomputed arm means).
+        "passed" flag, and one record per period (period label, recomputed
+        estimate, primary estimate, absolute difference, pass flag, arm row
+        counts, propensity range, the method name, and the recomputed arm
+        means).
     """
     records = []
     for item in fitted:

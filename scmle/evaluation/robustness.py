@@ -47,7 +47,9 @@ class MissingValues(Stressor):
         """Stores the share of cells to blank.
 
         Args:
-            rate: Probability that a cell of an input column is blanked.
+            rate: Probability that a cell of an input column is blanked. The
+                stressor is named `missing_<N>pct`, with `N` the rate in
+                percent, rounded down.
         """
         self.rate = rate
         self.name = f"missing_{int(rate * 100)}pct"

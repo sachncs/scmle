@@ -1441,7 +1441,7 @@ def validate_matrix(matrix: np.ndarray, columns: int, name: str) -> None:
 
 
 def validate_vector(values: np.ndarray, name: str) -> None:
-    """Validates a numeric one-dimensional vector without dropping values.
+    """Checks that a vector is one-dimensional without altering it.
 
     Args:
         values: Vector to check.
@@ -2265,7 +2265,7 @@ def fit_aipw_nuisance_models(
     np.ndarray,
     dict[str, Any],
 ]:
-    """Fits AIPW nuisance models on training rows and predict evaluation rows.
+    """Fits AIPW nuisance models on training rows and predicts evaluation rows.
 
     Args:
         training_design: Design matrix of the training rows, with intercept.
@@ -2975,7 +2975,7 @@ def fit_hierarchical_random_slope(
 
 
 def project_random_effect_covariance(covariance: np.ndarray) -> np.ndarray:
-    """Project a moment covariance to the positive-semidefinite cone.
+    """Projects a moment covariance to the positive-semidefinite cone.
 
     Args:
         covariance: Square moment estimate of the random-effect covariance.
@@ -4977,7 +4977,7 @@ def draw_hierarchical_bootstrap_sample(
     clusters: np.ndarray,
     rng: np.random.Generator,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict[str, Any]]:
-    """Draws whole clusters and assign fresh identities to selected copies.
+    """Draws whole clusters and assigns fresh identities to selected copies.
 
     Args:
         matrix: Complete feature rows from the source estimate.

@@ -123,7 +123,11 @@ class FairnessReport(diagnostics.Diagnostic):
         predicted: np.ndarray,
         positive: Any,
     ) -> dict[str, Any]:
-        """Selection, true-positive and false-positive rates per group.
+        """Summarizes outcome and error rates, and their disparities, by group.
+
+        Each group with at least `MIN_GROUP_ROWS` rows gets its row count,
+        base rate, selection rate, true-positive rate, false-positive rate
+        and accuracy.
 
         Args:
             groups: Group label of each row.
@@ -132,9 +136,9 @@ class FairnessReport(diagnostics.Diagnostic):
             positive: The positive class.
 
         Returns:
-            The `binary_summary` of the statistics of each group with at
-            least `MIN_GROUP_ROWS` rows. A rate whose denominator is zero is
-            None.
+            The `binary_summary` of those per-group statistics, with the
+            groups below `MIN_GROUP_ROWS` rows reported as excluded. A rate
+            whose denominator is zero is None.
         """
         actual = truth == positive
         chosen = predicted == positive

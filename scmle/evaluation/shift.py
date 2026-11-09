@@ -196,9 +196,11 @@ class AdversarialValidation(diagnostics.Diagnostic):
     ) -> list[dict[str, Any]]:
         """Ranks features by how separable the two sets are on that feature.
 
-        Numeric features use the single-feature AUC distance from 0.5;
-        categorical features use the total-variation distance between level
-        frequencies. Both lie in [0, 1] and are comparable as a ranking.
+        Numeric features use `2 * |AUC - 0.5|` of the single feature as a
+        classifier of old versus new rows; categorical features use the
+        total-variation distance between level frequencies. Both lie in
+        [0, 1] and are comparable as a ranking. A numeric feature with fewer
+        than two non-missing values is left out.
 
         Args:
             old: Sampled reference rows.

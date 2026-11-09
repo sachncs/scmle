@@ -222,7 +222,7 @@ class TaskResolver:
         return tasks.TaskType.UPLIFT
 
     def resolve_ranking(self, target: pd.Series) -> tasks.TaskType:
-        """Relevance grades must be non-negative whole numbers.
+        """Resolves a ranking target, requiring non-negative whole grades.
 
         Args:
             target: The relevance column.

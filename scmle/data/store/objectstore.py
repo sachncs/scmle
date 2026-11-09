@@ -301,10 +301,11 @@ def refused_as_existing(error: OSError, path: pathlib.Path) -> bool:
         path: The target of the link.
 
     Returns:
-        True for FileExistsError, and for the access or sharing errors
-        Windows raises while another writer creates the target, once the
-        target is seen to exist; False for any other error, or if the target
-        never appears.
+        True for FileExistsError. Also True for a PermissionError or an
+        error whose Windows code is in `EXISTING_WINERRORS` (access denied,
+        sharing violation, file exists), provided the target is seen to
+        exist within a few short retries. False for any other error, or if
+        the target never appears.
     """
     if isinstance(error, FileExistsError):
         return True

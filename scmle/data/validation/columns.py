@@ -289,8 +289,12 @@ class ColumnKind(abc.ABC):
             task: Resolved task type.
 
         Returns:
-            A score in [0, 1]; 1.0 when the feature is recorded for only one
-            outcome class, otherwise the gain of the missingness indicator.
+            A score in [0, 1]. 0.0 when fewer than `MIN_MISSING_RATE` of the
+            values are missing or fewer than `MIN_PRESENT_ROWS` are present.
+            For a regression task, the absolute Spearman correlation of the
+            missingness indicator with the target. For classification, the
+            gain of the indicator, or 1.0 if the recorded rows hold a single
+            class while the missing rows hold several.
         """
         indicator = series.isna()
         rate = float(indicator.mean())

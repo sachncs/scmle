@@ -308,8 +308,10 @@ def verify_image(
         The verified attestation statement.
 
     Raises:
-        ArtifactError: If the signature is missing or wrong, the image digest
-            differs, or the provenance file is not the one attested.
+        ArtifactError: If the attestation file cannot be read or is not a
+            valid statement, the signature is wrong or (when required)
+            missing, the image digest differs, or the provenance file is not
+            the one attested.
     """
     body, signed = verify_document(
         read_document(folder / IMAGE_ATTESTATION_FILE), signing_key

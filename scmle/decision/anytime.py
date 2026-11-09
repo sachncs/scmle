@@ -179,8 +179,12 @@ def log_wealth(
     Returns:
         An array of the same shape as `unit`.
 
+    A `null_unit` outside `(0, 1)` or a `size` below 1 is rejected by
+    `bet_grid` with a `ValueError`.
+
     Raises:
-        ScmleError: If the bet grid is empty.
+        ScmleError: If the bet grid is empty, which `bet_grid` already
+            prevents.
     """
     grid = bet_grid(null_unit, size)
     centred = unit - null_unit
@@ -426,10 +430,12 @@ def centered_stream(
         assignment_prob: The recorded probability `q` of the challenger,
             strictly between 0 and 1.
         null: The null mean of the centred difference.
-        direction: `greater` or `less`.
+        direction: `greater` or `less`; any other value is rejected by
+            `Stream` with a `ValueError`.
 
     Returns:
-        The stream on `[-M, M]` with `M = max(1/q, 1/(1 - q))`.
+        The stream on `[-M, M]` with `M = max(1/q, 1/(1 - q))`. A Python
+        float `q` of exactly 0 or 1 raises `ZeroDivisionError`.
     """
     q = assignment_prob
     bound = max(1.0 / q, 1.0 / (1.0 - q))

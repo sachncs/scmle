@@ -207,7 +207,7 @@ class IsMissing(FeatureOp):
     name = "is_missing"
 
     def apply(self, inputs: Inputs, params: Params, state: Any) -> pd.Series:
-        """Flag missing values; works for any dtype.
+        """Flags missing values; works for any dtype.
 
         Args:
             inputs: One column.
@@ -405,7 +405,7 @@ class Bin(FeatureOp):
         return np.unique(edges)
 
     def apply(self, inputs: Inputs, params: Params, state: Any) -> pd.Series:
-        """Assign each value to its bin.
+        """Assigns each value to its bin.
 
         Args:
             inputs: One column.
@@ -590,7 +590,7 @@ class Diff(OrderedOp):
             raise errors.ConfigError(f"node '{node.name}': diff k must be >= 1")
 
     def compute(self, grouped: Any, params: Params) -> pd.Series:
-        """Subtract the lagged value from the current one.
+        """Subtracts the lagged value from the current one.
 
         Args:
             grouped: The values, sorted by time and grouped by entity.
@@ -785,8 +785,9 @@ def validate_graph(
 
     Raises:
         ConfigError: For unknown operations, bad arity or parameters, missing
-            inputs, use of the target, name clashes, ordered operations
-            without a time column, or ordered nodes consuming row-wise ones.
+            inputs, use of the target, a node name that clashes with a raw
+            column, ordered operations without a time column, or ordered
+            nodes consuming row-wise ones.
     """
     known = set(available)
     ordered_names: set[str] = set()

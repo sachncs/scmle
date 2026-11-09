@@ -266,13 +266,14 @@ class ModelFamilyContract:
         return value in self.modalities
 
     def require_modality(self, modality: capabilities.Modality | str) -> None:
-        """Fail closed when a caller requests an undeclared modality.
+        """Rejects a request for a modality the family does not declare.
 
         Args:
             modality: A `Modality` or its string value.
 
         Raises:
-            ValueError: If the family does not declare the modality.
+            ValueError: If the family does not declare the modality, or the
+                string is not a known modality.
         """
         value = capabilities.Modality(modality)
         if not self.supports_modality(value):

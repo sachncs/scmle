@@ -29,8 +29,9 @@ class HoldoutEarlyStopping(base.BaseEstimator):
         rounds: Rounds without improvement before stopping.
         fraction: Share of the training rows held out for stopping.
         random_state: Seed of the holdout split.
-        best_iteration_: Boosting rounds kept, set by fit (None when the
-            data was too small to hold anything out).
+        best_iteration_: Boosting rounds kept, set by fit. None when the
+            data was too small to hold anything out (fewer than `MIN_ROWS`
+            rows) or the library does not report it.
     """
 
     def __init__(

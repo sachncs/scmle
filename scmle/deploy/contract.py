@@ -155,7 +155,9 @@ class ImageRef:
 
         Raises:
             ConfigError: If the repository or digest is invalid, or the
-                architectures are empty or repeated.
+                architectures are empty or repeated. An architecture that is
+                not a valid `Architecture` value is rejected with a
+                `ValueError`.
         """
         require_name(self.repository, "image.repository")
         require_digest(self.digest, "image.digest")
@@ -339,6 +341,8 @@ class SecretRef:
 
         Args:
             record: A record produced by `to_dict`; `required` defaults to True.
+                A missing `name`, `source` or `locator` raises `KeyError`, and
+                an unknown `source` raises `ValueError`.
 
         Returns:
             The reference.
@@ -539,8 +543,10 @@ class DeploymentSpec:
             ConfigError: If the version or port is invalid; a config key is not
                 an upper-case variable, its value is not text, its name looks
                 like a secret or its value holds key material; secret names
-                repeat or collide with config names; or, in production, the
-                service is marked trusted or the bundle is unsigned.
+                repeat or collide with config names; or, in production (the
+                environment is production, or the config says so), the
+                service is marked trusted or the bundle is unsigned. An
+                unknown environment is rejected with a `ValueError`.
         """
         if VERSION_PATTERN.fullmatch(str(self.version)) is None:
             raise errors.ConfigError("version is not valid")

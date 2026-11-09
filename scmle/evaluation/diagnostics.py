@@ -437,6 +437,9 @@ class CachedPredictions(base.BaseEstimator):
         predictions: Predicted labels / values by row label.
         probabilities: Class probabilities by row label (classifiers).
         classes_: Class labels of the wrapped model, if any.
+
+    `probabilities` is None unless the wrapped model has both `classes_` and
+    `predict_proba`.
     """
 
     def __init__(self, estimator: Any, features: pd.DataFrame) -> None:
@@ -479,7 +482,8 @@ class CachedPredictions(base.BaseEstimator):
             The cached class probabilities, in the order of `features`.
 
         Raises:
-            errors.ArtifactError: If the wrapped model had no probabilities.
+            errors.ArtifactError: If no probabilities were cached, because the
+                wrapped model lacks `classes_` or `predict_proba`.
         """
         if self.probabilities is None:
             raise errors.ArtifactError("the model has no probabilities")
