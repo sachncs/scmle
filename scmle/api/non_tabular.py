@@ -37,7 +37,16 @@ class UnsupportedNonTabularModelError(errors.ConfigError):
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class NonTabularModelCapability:
-    """The bounded representation and claim for one accepted adapter."""
+    """The bounded representation and claim for one accepted adapter.
+
+    Attributes:
+        modality: The modality name.
+        representation: How samples are turned into model inputs.
+        decoder_policy: Who decodes the samples and how.
+        model_family: The model family fitted on the representation.
+        status: Always `experimental`.
+        limitations: Non-empty statements of what the path does not claim.
+    """
 
     modality: str
     representation: str
@@ -47,7 +56,13 @@ class NonTabularModelCapability:
     limitations: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
-        """Validate the capability record before it is persisted or returned."""
+        """Validate the capability record before it is persisted or returned.
+
+        Raises:
+            ValueError: If a text field is empty, the status is not
+                `experimental`, or the limitations are empty or contain a blank
+                entry.
+        """
         for name in (
             "modality",
             "representation",
@@ -67,7 +82,11 @@ class NonTabularModelCapability:
         object.__setattr__(self, "limitations", tuple(self.limitations))
 
     def to_dict(self) -> dict[str, object]:
-        """Return JSON-native capability evidence."""
+        """Return JSON-native capability evidence.
+
+        Returns:
+            A dict of all fields, with the limitations as a list.
+        """
         return {
             "modality": self.modality,
             "representation": self.representation,
@@ -80,14 +99,25 @@ class NonTabularModelCapability:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class NonTabularModelResult:
-    """Verified model, lifecycle evidence, and representation declaration."""
+    """Verified model, lifecycle evidence, and representation declaration.
+
+    Attributes:
+        report: The verified lifecycle report.
+        predictor: The predictor loaded from the signed package.
+        capability: The bounded capability the model was built under.
+    """
 
     report: modality_lifecycle.LifecycleReport
     predictor: modality_lifecycle.ModalityPredictor
     capability: NonTabularModelCapability
 
     def __post_init__(self) -> None:
-        """Validate the result's package and capability identities."""
+        """Validate the result's package and capability identities.
+
+        Raises:
+            ValueError: If the report and capability modalities differ, or the
+                predictor was trained on a different dataset than the report.
+        """
         if self.report.modality != self.capability.modality:
             raise ValueError("report and capability modalities do not match")
         if self.predictor.training_dataset_hash != self.report.dataset_hash:
@@ -95,24 +125,43 @@ class NonTabularModelResult:
 
     @property
     def modality(self) -> str:
-        """Return the declared modality."""
+        """The declared modality."""
         return self.capability.modality
 
     @property
     def dataset_hash(self) -> str:
-        """Return the immutable training snapshot identity."""
+        """The immutable training snapshot identity."""
         return self.report.dataset_hash
 
     def predict(self, samples: Sequence[Any]) -> np.ndarray:
-        """Predict labels after validating the stored representation schema."""
+        """Predict labels after validating the stored representation schema.
+
+        Args:
+            samples: The samples to score, in the adapter's input form.
+
+        Returns:
+            The predicted labels, one per sample.
+        """
         return self.predictor.predict(samples)
 
     def predict_proba(self, samples: Sequence[Any]) -> np.ndarray:
-        """Return probabilities after validating the stored schema."""
+        """Return probabilities after validating the stored schema.
+
+        Args:
+            samples: The samples to score, in the adapter's input form.
+
+        Returns:
+            The class probabilities, one row per sample.
+        """
         return self.predictor.predict_proba(samples)
 
     def health(self) -> dict[str, object]:
-        """Return verified inference health and the capability boundary."""
+        """Return verified inference health and the capability boundary.
+
+        Returns:
+            The predictor's health record plus the support status,
+            representation, decoder policy, model family and limitations.
+        """
         return {
             **self.predictor.health(),
             "support_status": self.capability.status,
@@ -132,6 +181,14 @@ def capability_for_adapter(
     validation, splitting, feature construction, or decoder semantics and is
     therefore rejected by this production-oriented boundary. Such adapters
     remain usable through the broader experimental lifecycle.
+
+    Args:
+        adapter: The adapter to describe.
+
+    Returns:
+        The capability of the adapter's exact type, including whether a video
+        frame decoder or raster decoder makes the representation pixel- or
+        frame-based or metadata-only.
 
     Raises:
         TypeError: If ``adapter`` is not a modelling adapter.
@@ -265,6 +322,24 @@ class NonTabularModelProject:
     ``experimental_opt_in`` because the repository has not completed the
     independent review, external fault, hosted serving, and modality-specific
     fidelity gates needed for a supported production declaration.
+
+    Attributes:
+        capability: The bounded capability of the adapter.
+        adapter: The adapter holding the training samples.
+        signing_key: HMAC key that signs the package and the report.
+        output_dir: Directory for the report and the package.
+        seed: Random seed.
+        observed_adapter: Adapter holding later observed samples, if any.
+        performance_budget: Performance limits to enforce, if any.
+        performance_baseline: Performance baseline to compare with, if any.
+        manifest: The modality manifest, if any.
+        require_independent_ground_truth: Whether independent ground truth is
+            required.
+        cancellation: Cancellation signal checked by the lifecycle.
+        checkpoint_path: Where progress is checkpointed, if anywhere.
+        resume: Whether to resume from the checkpoint.
+        lifecycle: The lifecycle that runs the model.
+        result: The latest result run or loaded, or None.
     """
 
     def __init__(
@@ -286,9 +361,31 @@ class NonTabularModelProject:
     ) -> None:
         """Define a bounded non-tabular model run.
 
+        Args:
+            adapter: Exact built-in adapter holding the training samples.
+            signing_key: Non-empty HMAC key that signs the package and report.
+            experimental_opt_in: Must be True to acknowledge the experimental
+                status.
+            output_dir: Directory for the report and the package.
+            seed: Random seed (an integer, not a bool).
+            observed_adapter: Adapter of later observed samples; it must have
+                the same capability and share the decoder object of `adapter`.
+            performance_budget: Performance limits to enforce.
+            performance_baseline: Performance baseline to compare with.
+            manifest: The modality manifest.
+            require_independent_ground_truth: Whether independent ground truth
+                is required.
+            cancellation: Cancellation signal; a new one if omitted.
+            checkpoint_path: Where to checkpoint progress.
+            resume: Whether to resume from the checkpoint.
+
         Raises:
-            UnsupportedNonTabularModelError: If opt-in is absent or the
-                adapter is outside the exact built-in boundary.
+            UnsupportedNonTabularModelError: If opt-in is absent, the adapter is
+                outside the exact built-in boundary, or the observed adapter
+                differs in capability or decoder.
+            TypeError: If a flag, the seed or the cancellation has the wrong
+                type.
+            ValueError: If the signing key is empty.
         """
         self.capability = capability_for_adapter(adapter)
         if not isinstance(experimental_opt_in, bool):
@@ -367,16 +464,24 @@ class NonTabularModelProject:
 
     @property
     def report_path(self) -> Path:
-        """Return the signed lifecycle report location."""
+        """The signed lifecycle report location."""
         return self.output_dir / NON_TABULAR_MODEL_REPORT
 
     @property
     def package_path(self) -> Path:
-        """Return the signed model package location."""
+        """The signed model package location."""
         return self.output_dir / NON_TABULAR_MODEL_DIRECTORY
 
     def run(self) -> NonTabularModelResult:
-        """Run, verify, and return the complete bounded lifecycle."""
+        """Run, verify, and return the complete bounded lifecycle.
+
+        Returns:
+            The verified result, loaded back from the written report and
+            package.
+
+        Raises:
+            ValueError: If `output_dir` exists and is not a directory.
+        """
         if self.output_dir.exists() and not self.output_dir.is_dir():
             raise ValueError("output_dir must be a directory")
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -400,7 +505,15 @@ class NonTabularModelProject:
         return self.load_result()
 
     def load_result(self) -> NonTabularModelResult:
-        """Load and verify the signed report and package for this project."""
+        """Load and verify the signed report and package for this project.
+
+        Returns:
+            The verified result, which is also kept as `result`.
+
+        Raises:
+            ValueError: If the report's modality or dataset does not match the
+                project.
+        """
         report = modality_lifecycle.LifecycleReport.read_verified(
             self.report_path, self.signing_key
         )
@@ -422,14 +535,21 @@ class NonTabularModelProject:
         return self.result
 
     def cancel(self) -> None:
-        """Request cancellation at the next lifecycle stage boundary."""
+        """Request cancellation at the next lifecycle check."""
         self.cancellation.cancel()
 
     @classmethod
     def capability_for_adapter(
         cls, adapter: modality_lifecycle.ModalityAdapter
     ) -> NonTabularModelCapability:
-        """Return the capability without opting into a model run."""
+        """Return the capability without opting into a model run.
+
+        Args:
+            adapter: The adapter to describe.
+
+        Returns:
+            The capability of the adapter's exact type.
+        """
         return capability_for_adapter(adapter)
 
 

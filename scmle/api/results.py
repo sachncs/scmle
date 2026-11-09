@@ -33,7 +33,7 @@ class RunResult:
         run_id: Run identifier.
         run_dir: Directory holding all artifacts.
         state: Terminal state name.
-        plan: The executed plan.
+        plan: The executed experiment plan.
         profile: Dataset profile.
         trials: All trials in execution order.
         selected_model: Winning model name.
@@ -59,12 +59,25 @@ class RunResult:
     estimation: parameter_estimation.EstimationResult | None = None
 
     def feature_importance(self) -> pd.DataFrame:
-        """Returns permutation importance, most important feature first."""
+        """Returns permutation importance, most important feature first.
+
+        Returns:
+            One row per feature from the permutation-importance diagnostic; an
+            empty frame if that diagnostic was not produced.
+        """
         report = self.diagnostics.get("permutation_importance", {})
         return pd.DataFrame(report.get("features", []))
 
     def health_label(self, trial: experiments.TrialResult) -> str:
-        """Fit-health verdict of a trial, or an empty string if unknown."""
+        """Gives the fit-health verdict of a trial.
+
+        Args:
+            trial: A trial of this run.
+
+        Returns:
+            The verdict, or an empty string for a trial that did not succeed or
+            whose fit health cannot be assessed.
+        """
         if trial.status is not experiments.TrialStatus.OK:
             return ""
         health = fit_health.assess_trial(
@@ -73,7 +86,13 @@ class RunResult:
         return "" if health is None else health.verdict
 
     def leaderboard(self) -> pd.DataFrame:
-        """Returns trials ranked best-first, failed/skipped trials last."""
+        """Returns trials ranked best-first, failed/skipped trials last.
+
+        Returns:
+            One row per trial with its fit-health verdict and whether it was
+            selected; detail columns are left out and the parameters are JSON
+            text.
+        """
         board = pd.DataFrame([t.to_dict() for t in self.trials])
         board["fit_health"] = [
             self.health_label(trial) for trial in self.trials
@@ -91,11 +110,19 @@ class RunResult:
         return pd.concat([ranked, board[~succeeded]]).reset_index(drop=True)
 
     def leaderboard_arrow(self) -> pa.Table:
-        """The leaderboard as an Arrow table."""
+        """Returns the leaderboard as an Arrow table.
+
+        Returns:
+            The table form of `leaderboard()`.
+        """
         return interchange.to_arrow(self.leaderboard())
 
     def load_best_model(self) -> bundle_module.ModelBundle:
-        """Returns the packaged best model."""
+        """Returns the packaged best model.
+
+        Returns:
+            The model bundle of the selected model.
+        """
         return self.bundle
 
     def save(
@@ -109,17 +136,34 @@ class RunResult:
             directory: Destination directory.
             signing_key: HMAC key; defaults to `$SCMLE_SIGNING_KEY`. Signed
                 bundles load without `trusted=True`.
+
+        Returns:
+            The directory the bundle was written to.
         """
         return self.bundle.save(directory, signing_key)
 
     def predict(self, data: str | pathlib.Path | pd.DataFrame) -> np.ndarray:
-        """Predicts with the best model."""
+        """Predicts with the best model.
+
+        Args:
+            data: DataFrame or path to a supported tabular dataset.
+
+        Returns:
+            Predictions, one per row.
+        """
         return self.bundle.predict(data)
 
     def predict_proba(
         self, data: str | pathlib.Path | pd.DataFrame
     ) -> np.ndarray:
-        """Predicts class probabilities with the best model."""
+        """Predicts class probabilities with the best model.
+
+        Args:
+            data: DataFrame or path to a supported tabular dataset.
+
+        Returns:
+            Class probabilities, one row per input row.
+        """
         return self.bundle.predict_proba(data)
 
     def explain(
@@ -128,7 +172,17 @@ class RunResult:
         background: str | pathlib.Path | pd.DataFrame,
         class_label: Any = None,
     ) -> pd.DataFrame:
-        """Explains predictions of the best model against a background."""
+        """Explains predictions of the best model against a background.
+
+        Args:
+            data: DataFrame or path to the rows to explain.
+            background: DataFrame or path to the reference rows.
+            class_label: Class to explain for a classifier; the bundle's default
+                if None.
+
+        Returns:
+            The explanation as a frame.
+        """
         return self.bundle.explain(data, background, class_label=class_label)
 
     @property
@@ -175,7 +229,14 @@ class RunResult:
         return counts
 
     def summary(self) -> str:
-        """Returns a one-line human-readable result."""
+        """Returns a one-line human-readable result.
+
+        Returns:
+            The run id, selected model, cross-validation score, test metrics,
+            whether the success criteria were met, claim tiers and any warning.
+            A result with unattested flagged columns or an incomplete leakage
+            screen is marked provisional.
+        """
         evaluation = self.evaluation
         test = ", ".join(
             f"{name}={value:.4f}"

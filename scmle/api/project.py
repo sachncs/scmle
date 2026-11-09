@@ -54,8 +54,12 @@ def publish_curation_artifact(path: pathlib.Path, content: bytes) -> None:
 
     A hard link from a fully flushed sibling file gives the destination a
     no-clobber, atomic first publication.  ``FileExistsError`` is deliberately
-    preserved for the caller so a concurrent publisher can verify and reuse
-    its result instead of replacing it.
+    preserved for the caller so a concurrent publisher can verify and reuse its
+    result instead of replacing it.
+
+    Args:
+        path: Destination of the artifact; its directory is created.
+        content: The bytes to publish.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     descriptor, temporary_name = tempfile.mkstemp(
@@ -88,11 +92,22 @@ def build_parameter_estimation_declaration(
 ) -> dict[str, Any]:
     """Builds the explicit scientific declaration stored with a run.
 
-    The orchestrator adds the final project configuration hash and the
-    content digest immediately after it allocates the run directory. Keeping
-    this record separate from the model-selection specification lets resume
-    reconstruct the scientific contract without changing the public project
-    specification schema.
+    The orchestrator adds the final project configuration hash and the content
+    digest immediately after it allocates the run directory. Keeping this record
+    separate from the model-selection specification lets resume reconstruct the
+    scientific contract without changing the public project specification
+    schema.
+
+    Args:
+        estimand: The declared population quantity, or None.
+        policy: The declared estimation policy, or None.
+
+    Returns:
+        A record with the schema version, whether estimation is enabled, and the
+        estimand and policy when it is.
+
+    Raises:
+        ConfigError: If only one of the estimand and the policy is given.
     """
     if (estimand is None) != (policy is None):
         raise errors.ConfigError(
@@ -112,7 +127,14 @@ def build_parameter_estimation_declaration(
 def parameter_estimation_declaration_digest(
     declaration: dict[str, Any],
 ) -> str:
-    """Returns the canonical digest for a declaration without its digest."""
+    """Computes the canonical digest for a declaration without its digest.
+
+    Args:
+        declaration: The declaration record, without a `digest` entry.
+
+    Returns:
+        The hex SHA-256 of its compact, key-sorted JSON.
+    """
     return hashlib.sha256(
         json.dumps(declaration, sort_keys=True, separators=(",", ":")).encode(
             "utf-8"
@@ -127,7 +149,25 @@ def restore_parameter_estimation_declaration(
     parameter_estimation.EstimandSpec | None,
     parameter_estimation.EstimationPolicy | None,
 ]:
-    """Validates and reconstructs the scientific declaration for resume."""
+    """Validates and reconstructs the scientific declaration for resume.
+
+    Args:
+        run_directory: Directory of the run holding the declaration and its lock
+            file.
+        expected_config_hash: Configuration hash the declaration must have been
+            written for.
+
+    Returns:
+        The estimand and the policy, or a pair of None if estimation was
+        disabled for the run.
+
+    Raises:
+        ArtifactError: If the declaration or its lock is missing, unreadable,
+            not an object, lacks a digest, fails the digest check, has an
+            unsupported schema or another configuration hash, has fields that do
+            not match its enabled state, or describes an invalid estimand or
+            policy.
+    """
     artifact_path = pathlib.Path(run_directory)
     report_path = artifact_path / PARAMETER_ESTIMATION_DECLARATION_ARTIFACT
     lock_path = artifact_path / PARAMETER_ESTIMATION_DECLARATION_LOCK
@@ -249,6 +289,15 @@ def bind_parameter_estimation_evidence(
     reference. The parameter report remains a scientific sibling of model
     evaluation: the snapshot supplies its input, but model selection does not
     consume its estimates.
+
+    Args:
+        run_directory: Directory of the run.
+        artifact: The persisted parameter-estimation report.
+        estimation: The verified estimation result.
+
+    Raises:
+        ArtifactError: If the evidence graph lacks the evaluation or snapshot
+            node.
     """
     graph_path = run_directory / "evidence_graph.json"
     graph = inference_evidence.InferenceEvidenceLinker.load(graph_path)
@@ -302,7 +351,21 @@ def persist_parameter_estimation_evidence(
     result: results.RunResult,
     estimation: parameter_estimation.EstimationResult,
 ) -> None:
-    """Persists and binds a verified parameter report to a run result."""
+    """Persists and binds a verified parameter report to a run result.
+
+    The report is written, read back and compared with the digest of what was
+    written. The run's evaluation record is then rewritten with a reference to
+    the report, the evidence graph is updated, and the result exposes the
+    verified report.
+
+    Args:
+        result: The completed run; its evaluation and estimation are updated.
+        estimation: The estimation to persist.
+
+    Raises:
+        ArtifactError: If the written report cannot be read back or its digest
+            differs from the one written.
+    """
     artifact = result.run_dir / "parameter_estimation.json"
     expected_digest = estimation.write(artifact)
     try:
@@ -358,7 +421,25 @@ def estimate_parameters_for_project(
     policy: parameter_estimation.EstimationPolicy,
     artifact_directory: str | pathlib.Path | None = None,
 ) -> parameter_estimation.EstimationResult:
-    """Estimates the declared parameters against an orchestrator dataset."""
+    """Estimates the declared parameters against an orchestrator dataset.
+
+    Args:
+        orchestrator: The orchestrator holding the project's data and spec.
+        estimand: The declared population quantity.
+        policy: The declared estimation policy.
+        artifact_directory: If given, the report is written there as
+            ``parameter_estimation.json`` and read back verified.
+
+    Returns:
+        The estimation result, with diagnostics naming the columns used, the
+        missingness handling and the data identity.
+
+    Raises:
+        ConfigError: If the modality is not tabular, or a treatment-based
+            estimator lacks a consistent `treatment_column`.
+        DataError: If a declared column is absent, or has missing values under
+            the `reject` policy.
+    """
     if orchestrator.spec.data.modality != "tabular":
         raise errors.ConfigError(
             "parameter estimation is supported only for the declared "
@@ -458,7 +539,17 @@ def estimate_parameters_for_project(
 
 
 class MLProject:
-    """A declarative ML project over a tabular dataset."""
+    """A declarative ML project over a tabular dataset.
+
+    Attributes:
+        spec: The full project specification.
+        output_dir: Parent directory for run directories.
+        estimand: The declared population quantity for parameter estimation, or
+            None.
+        estimation_policy: The declared estimation policy, or None.
+        orchestrator: The orchestrator that executes the project.
+        profile: The dataset profile, once `plan` has run.
+    """
 
     def __init__(
         self,
@@ -534,143 +625,143 @@ class MLProject:
     ) -> None:
         """Defines a project.
 
+        An inconsistent configuration raises pydantic's `ValidationError` when
+        the specification is built.
+
         Args:
-            data: Supported tabular path (CSV/TSV, JSON/JSONL, Excel,
-                Parquet or Feather), or an in-memory table: pandas DataFrame,
-                pyarrow Table, Polars frame, or anything implementing the
-                Arrow stream protocol.
+            data: Supported tabular path (CSV/TSV, JSON/JSONL, Excel, Parquet or
+                Feather), or an in-memory table: pandas DataFrame, pyarrow
+                Table, Polars frame, or anything implementing the Arrow stream
+                protocol.
             target: Name of the target column, or for `multilabel` and
                 `multioutput` tasks the list of all target columns.
             task: `auto`, `classification`, `regression`, or an explicit
                 binary/multiclass task.
+            metric: Primary metric; defaults per task.
+            time_budget: Wall-clock budget in seconds.
             modality: Dataset family declaration. The supported beta path is
                 `tabular`; other families fail closed until their complete
                 lifecycle is registered.
-            metric: Primary metric; defaults per task.
-            time_budget: Wall-clock budget in seconds.
+            workers: Concurrent trial processes (1 = sequential).
+            enforcement: `hard` supervises every trial in its own process and
+                kills it past the time or memory limit; `cooperative` only stops
+                new trials from starting (and allows in-process hooks).
             executor: `process` (default) or `ray`.
             cluster_address: Ray cluster to join (a local runtime if None).
             memory_limit_gb: Hard memory cap per trial.
-            workers: Concurrent trial processes (1 = sequential).
-            enforcement: `hard` supervises every trial in its own process and
-                kills it past the time or memory limit; `cooperative` only
-                stops new trials from starting (and allows in-process hooks).
             id_columns: Identifier columns excluded from features.
             group_column: Entity column that must not straddle splits.
             time_column: Column ordering rows in time.
-            time_as_feature: Also let the model use the time column as a
-                feature (off by default; models must extrapolate in time).
+            time_as_feature: Also let the model use the time column as a feature
+                (off by default; models must extrapolate in time).
             excluded_columns: Other columns to ignore.
             unavailable_at_prediction: Columns known only after the outcome
                 (excluded; the feature-availability contract).
             feature_delays: Columns whose value is known only that many rows
-                after the row it describes; the model sees the value from
-                that many rows earlier (needs `time_column`).
-            sensitive_columns: Columns describing groups of people; the
-                fairness report compares outcomes across them.
-            event_column: For `task="survival"`, the 0/1 column saying
-                whether the event was observed (1) or the row was censored
-                (0); the target is the time to the event or to censoring.
-            text_encoding: `tfidf` (default) or `embedding` for free-text
-                columns (needs the `embeddings` extra; falls back to TF-IDF
-                with a warning when unavailable).
-            embedding_model: Sentence-embedding model for `embedding`.
+                after the row it describes; the model sees the value from that
+                many rows earlier (needs `time_column`).
+            sensitive_columns: Columns describing groups of people; the fairness
+                report compares outcomes across them.
+            weight_column: Numeric column of per-row training weights (never a
+                feature; not needed at prediction time; test metrics are also
+                reported weighted).
+            event_column: For `task="survival"`, the 0/1 column saying whether
+                the event was observed (1) or the row was censored (0); the
+                target is the time to the event or to censoring.
+            query_column: For `task="ranking"`, the column identifying each
+                row's query; the target is the relevance grade.
             memory_budget_gb: Largest in-memory size of the dataset; a bigger
                 Parquet / CSV file is streamed (see `DataSpec`).
             training: `sample` or `stream` for a streamed file.
-            treatment_column: For `task="uplift"`, the 0/1 column saying
-                whether a row was treated; the target is the outcome.
+            treatment_column: For `task="uplift"`, the 0/1 column saying whether
+                a row was treated; the target is the outcome.
             horizon: For `task="forecast"`, how many steps ahead to predict
                 (needs `time_column`; `target` is the series value).
             seasonal_period: Rows per season of a forecast series.
-            forecast_lags: Lags of the value used as features (default
-                1, 2, 3 and 7).
+            forecast_lags: Lags of the value used as features (default 1, 2, 3
+                and 7).
             forecast_windows: Rolling-window sizes (default 3 and 7).
             forecast_calendar: Date parts of the time column to add.
-            query_column: For `task="ranking"`, the column identifying each
-                row's query; the target is the relevance grade.
-            ordinal_order: For `task="ordinal"`, the target's labels from
-                lowest to highest.
-            reference: Path of a recent sample of the population the model will
-                serve; the development rows are compared with it.
+            text_encoding: `tfidf` (default) or `embedding` for free-text
+                columns (needs the `embeddings` extra; falls back to TF-IDF with
+                a warning when unavailable).
+            embedding_model: Sentence-embedding model for `embedding`.
+            ordinal_order: For `task="ordinal"`, the target's labels from lowest
+                to highest.
             unlabeled: What to do with rows whose target is missing: `block`
                 (default), `ignore`, or `pseudo_label` (classification; used
                 only if it wins in cross-validation).
+            reference: Path of a recent sample of the population the model will
+                serve; the development rows are compared with it.
             pseudo_label_confidence: Smallest probability trusted as a label.
-            weight_column: Numeric column of per-row training weights (never
-                a feature; not needed at prediction time; test metrics
-                are also reported weighted).
-            monotonic_constraints: Numeric feature to +1 / -1: predictions
-                must never fall / rise as the feature grows (binary
-                classification and regression).
-            embargo_rows: Rows dropped between training and validation
-                windows in temporal validation.
+            monotonic_constraints: Numeric feature to +1 / -1: predictions must
+                never fall / rise as the feature grows (binary classification
+                and regression).
+            embargo_rows: Rows dropped between training and validation windows
+                in temporal validation.
             horizon_rows: Rolling validation: rows in each validation window.
-            window_rows: Rolling validation: rows in each training window
-                (all earlier rows when omitted).
+            window_rows: Rolling validation: rows in each training window (all
+                earlier rows when omitted).
             validation: Split strategy or `auto`.
             folds: Cross-validation folds.
             test_fraction: Share of rows locked away for the final test.
             seed: Random seed.
-            search: Hyperparameter search settings; defaults to a small
-                pruned random search. Use `SearchSpec(top_models=0)` to
-                disable tuning.
-            strategies: Which data strategies to evaluate; defaults to all.
-                Use `StrategySpec(top_models=0)` to disable.
+            search: Hyperparameter search settings; defaults to a small pruned
+                random search. Use `SearchSpec(top_models=0)` to disable tuning.
+            strategies: Which data strategies to evaluate; defaults to all. Use
+                `StrategySpec(top_models=0)` to disable.
             models: Model names and families to exclude.
             ensemble: Stacking settings; `EnsembleSpec(size=0)` disables.
             feature_graph: Declarative derived features (row-wise, fitted and
                 time-series operations), versioned with the configuration.
             selection: Serving constraints (max model size, p95 latency).
-            problem: The decision, the population and the scores the model
-                must reach on the locked rows (checked after the one test
-                release).
+            decision: Threshold optimization for binary tasks (objective f1,
+                accuracy, balanced_accuracy or an explicit cost).
+            fairness: Optional group-threshold mitigation of outcome gaps across
+                a sensitive column (binary tasks).
+            problem: The decision, the population and the scores the model must
+                reach on the locked rows (checked after the one test release).
             estimand: Explicit population quantity for a separate parameter
-                estimation evidence track. It does not affect model
-                selection.
-            estimation_policy: Explicit likelihood, covariance, missingness,
-                and uncertainty policy for parameter estimation.
-            fairness: Optional group-threshold mitigation of outcome gaps
-                across a sensitive column (binary tasks).
-            decision: Threshold optimization for binary tasks (objective
-                f1, accuracy, balanced_accuracy or an explicit cost).
+                estimation evidence track. It does not affect model selection.
+            estimation_policy: Explicit likelihood, covariance, missingness, and
+                uncertainty policy for parameter estimation.
             leakage_policy: `warn` or `block` on leakage hypotheses.
-            charter: Path of an analysis charter (`scmle charter init`).
-                When given, the development rows are split into exploration
-                rows and a sealed confirmation set the exploration stages
-                cannot read; the charter is checked before any profiling.
+            charter: Path of an analysis charter (`scmle charter init`). When
+                given, the development rows are split into exploration rows and
+                a sealed confirmation set the exploration steps cannot read; the
+                charter is checked before any profiling.
             leakage_attestations: JSON file of per-column attestations that a
                 strong predictor flagged by the leakage screen is legitimate.
-                Used only with `charter`; each counts only for that charter
-                and while valid, and is recorded in the ledger at tier
-                `attested`.
-            baseline_column: Used with `charter` on a binary task whose
-                charter has a cost model: the 0/1 decisions of the current
-                process. It is never a feature. A rule is frozen on the
-                exploration rows and the claim that it beats the current
-                process over the cost range is registered in the ledger and
-                tested once on the confirmation set (`baseline_report.json`).
-            baseline_subject: `frozen_rule` (default) or `selected_model`;
-                the latter defers the opening of the confirmation set until
-                the model selection is frozen and tests the selected model
-                against the current process instead of the logistic rule.
-            ingest_plan: Path of an ingest plan (JSON); needs a charter with
-                an `ingest` block. Features are synthesized through the as-of
-                views of the plan's database before the data are split.
-            logged_action_column: With a charter decision block, the 0/1
-                action the current process logged; never a feature.
+                Used only with `charter`; each counts only for that charter and
+                while valid, and is recorded in the ledger at tier `attested`.
+            baseline_column: Used with `charter` on a binary task whose charter
+                has a cost model: the 0/1 decisions of the current process. It
+                is never a feature. A rule is frozen on the exploration rows and
+                the claim that it beats the current process over the cost range
+                is registered in the ledger and tested once on the confirmation
+                set (`baseline_report.json`).
+            baseline_subject: `frozen_rule` (default) or `selected_model`; the
+                latter defers the opening of the confirmation set until the
+                model selection is frozen and tests the selected model against
+                the current process instead of the logistic rule.
+            framing_draft: The `framing_draft.json` written by `scmle frame` for
+                the charter; a claim that depends on an LLM-filled field of an
+                unsigned charter stays `unverified`.
             propensity_column: With `logged_action_column`, the recorded
                 probability of action 1; never a feature. It enables the
                 off-policy value of the frozen rule (`policy_value.json`).
-            framing_draft: The `framing_draft.json` written by `scmle frame`
-                for the charter; a claim that depends on an LLM-filled field
-                of an unsigned charter stays `unverified`.
-            checkpoints: Approval gates after planning and selection (the
-                latter fires before the test set is opened).
+            logged_action_column: With a charter decision block, the 0/1 action
+                the current process logged; never a feature.
+            ingest_plan: Path of an ingest plan (JSON); needs a charter with an
+                `ingest` block. Features are synthesized through the as-of views
+                of the ingest plan's database before the data are split.
+            checkpoints: Approval gates after planning and selection (the latter
+                fires before the test set is opened).
             output_dir: Parent directory for run directories.
 
         Raises:
-            pydantic.ValidationError: If the configuration is inconsistent.
+            ConfigError: If only one of `estimand` and `estimation_policy` is
+                given.
         """
         frame = (
             interchange.to_pandas(data)
@@ -769,7 +860,12 @@ class MLProject:
         self.profile: data_contracts.DatasetProfile | None = None
 
     def plan(self) -> experiments.ExperimentPlan:
-        """Analyzes the data and proposes a workflow; trains nothing."""
+        """Analyzes the data and proposes a workflow; trains nothing.
+
+        Returns:
+            The proposed experiment plan. The dataset profile is kept as
+            `profile`.
+        """
         context = self.orchestrator.prepare()
         try:
             self.profile = context.profile
@@ -795,6 +891,9 @@ class MLProject:
         self, plan: experiments.ExperimentPlan | None = None
     ) -> results.RunResult:
         """Executes the workflow.
+
+        If an estimand and policy were declared, the parameter estimation runs
+        first and its evidence is bound to the result.
 
         Args:
             plan: An approved or modified plan restricting candidates.
@@ -822,10 +921,9 @@ class MLProject:
     ) -> parameter_estimation.EstimationResult:
         """Estimates declared parameters without changing model selection.
 
-        The estimation track is intentionally separate from the model
-        selection track. It only runs when both scientific declarations are
-        present, and it fails before fitting when the dataset or declaration
-        is incompatible.
+        The estimation track is intentionally separate from the model selection
+        track. It only runs when both scientific declarations are present, and
+        it fails before fitting when the dataset or declaration is incompatible.
 
         Args:
             artifact_directory: Optional directory in which to write
@@ -835,9 +933,8 @@ class MLProject:
             The declared parameter estimates and uncertainty evidence.
 
         Raises:
-            ConfigError: If the estimand, policy, or modality is undeclared
-                or incompatible with this tabular estimator.
-            DataError: If the declared columns are absent.
+            ConfigError: If the estimand, policy, or modality is undeclared or
+                incompatible with this tabular estimator.
         """
         if self.estimand is None or self.estimation_policy is None:
             raise errors.ConfigError(
@@ -863,8 +960,8 @@ class MLProject:
 
         Args:
             run_directory: Directory of a cancelled, failed or crashed run.
-            data: The original in-memory data, required only if the project
-                was created from a DataFrame rather than a file.
+            data: The original in-memory data, required only if the project was
+                created from a DataFrame rather than a file.
 
         Returns:
             The completed run.
@@ -940,10 +1037,27 @@ class ModalityProject:
 
     ``MLProject`` remains the supported tabular beta surface. This project
     surface accepts a concrete ``ModalityAdapter`` for experimental text,
-    document, image, audio, video, graph, geospatial-vector, or raster data.
-    It gives those datasets the same curation, explainability, packaging,
+    document, image, audio, video, graph, geospatial-vector, or raster data. It
+    gives those datasets the same curation, explainability, packaging,
     inference, monitoring, documentation, and recovery evidence without
     pretending that a tabular estimator can decode arbitrary raw bytes.
+
+    Attributes:
+        adapter: The adapter holding the samples.
+        signing_key: Key that authenticates the package.
+        output_dir: Directory for the package and the lifecycle report.
+        seed: Seed of the split and the model.
+        observed_adapter: Shifted dataset for monitoring, if any.
+        performance_budget: Declared performance budget, if any.
+        performance_baseline: Comparable-run baseline, if any.
+        manifest: Identity and governance contract, if any.
+        require_independent_ground_truth: Whether an independent explanation
+            reference suite is required before packaging.
+        checkpoint_path: Recovery checkpoint path, if any.
+        resume: Whether to resume from the checkpoint.
+        cancellation: Cooperative cancellation signal.
+        lifecycle: The lifecycle that executes the run.
+        report: The report of the latest run, or None.
     """
 
     def __init__(
@@ -976,16 +1090,19 @@ class ModalityProject:
             require_independent_ground_truth: Require a complete independent
                 explanation reference suite before packaging.
             cancellation: Optional thread-safe signal for cooperative
-                cancellation at lifecycle stage boundaries.
-            checkpoint_path: Optional signed, atomic stage checkpoint path for
-                durable modality recovery. Supplying this requires the
-                lifecycle report path managed by this project.
+                cancellation at lifecycle checkpoints.
+            checkpoint_path: Optional signed, atomic checkpoint path for durable
+                modality recovery. Supplying this requires the lifecycle report
+                path managed by this project.
             resume: Resume from ``checkpoint_path`` after verifying its
-                signature, identity, and deterministic completed-stage replay.
+                signature, identity, and deterministic replay of the completed
+                work.
 
         Raises:
-            TypeError: If an object is not a modality adapter.
-            ValueError: If the signing key is empty or the output is invalid.
+            TypeError: If an object is not a modality adapter, a flag or the
+                seed has the wrong type, or the cancellation is not a
+                cancellation signal.
+            ValueError: If the signing key is empty.
         """
         if not isinstance(adapter, modality_lifecycle.ModalityAdapter):
             raise TypeError("adapter must be a ModalityAdapter")
@@ -1027,7 +1144,14 @@ class ModalityProject:
         self.report: modality_lifecycle.LifecycleReport | None = None
 
     def run(self) -> modality_lifecycle.LifecycleReport:
-        """Run all fifteen stages and persist their evidence atomically."""
+        """Run the full lifecycle and persist its evidence atomically.
+
+        Returns:
+            The lifecycle report, also kept as `report`.
+
+        Raises:
+            ValueError: If `output_dir` exists and is not a directory.
+        """
         if self.output_dir.exists() and not self.output_dir.is_dir():
             raise ValueError("output_dir must be a directory")
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -1053,7 +1177,14 @@ class ModalityProject:
         self.cancellation.cancel()
 
     def declaration(self) -> modalities.ModalityDeclaration:
-        """Return the experimental capability declaration after a run."""
+        """Return the experimental capability declaration after a run.
+
+        Returns:
+            The declaration derived from the latest report.
+
+        Raises:
+            RuntimeError: If `run` has not completed.
+        """
         if self.report is None:
             raise RuntimeError("run must complete before declaration")
         return self.lifecycle.declaration(self.report)
@@ -1062,9 +1193,15 @@ class ModalityProject:
 class ModalityCurationProject:
     """Curate and document a modality without forcing a model fit.
 
-    This is the data-understanding entry point for unlabeled, unsupervised,
-    or domain-specific datasets. It persists signed curation and dataset-card
+    This is the data-understanding entry point for unlabeled, unsupervised, or
+    domain-specific datasets. It persists signed curation and dataset-card
     evidence, but it never invents labels, features, metrics, or a model.
+
+    Attributes:
+        adapter: Adapter that owns source identity and curation policy.
+        signing_key: Key that authenticates the evidence.
+        output_dir: Directory where curation evidence is written.
+        manifest: Source, lineage, privacy and task contract, if any.
     """
 
     def __init__(
@@ -1085,7 +1222,7 @@ class ModalityCurationProject:
 
         Raises:
             TypeError: If the adapter or manifest has the wrong type.
-            ValueError: If the signing key is empty or the output is invalid.
+            ValueError: If the signing key is empty.
         """
         if not isinstance(adapter, modality_lifecycle.ModalityCurationAdapter):
             raise TypeError("adapter must be a ModalityCurationAdapter")
@@ -1101,7 +1238,24 @@ class ModalityCurationProject:
         self.manifest = manifest
 
     def run(self) -> modality_lifecycle.ModalityCurationResult:
-        """Persist signed curation evidence without entering modelling."""
+        """Persist signed curation evidence without entering modelling.
+
+        If an artifact already exists it is verified and reused when it matches
+        the current adapter, instead of being replaced.
+
+        Returns:
+            The signed curation result, either newly written or the matching
+            existing one.
+
+        Raises:
+            ValueError: If `output_dir` exists and is not a directory, the
+                manifest or the curation report disagrees with the adapter, or
+                an existing artifact is unreadable, is not an object, or differs
+                from the current adapter's modality, dataset hash, sample count
+                or content.
+            TypeError: If the adapter's `curate()` does not return a modality
+                curation report.
+        """
         if self.output_dir.exists() and not self.output_dir.is_dir():
             raise ValueError("output_dir must be a directory")
         samples = self.adapter.samples

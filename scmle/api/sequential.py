@@ -36,12 +36,20 @@ def resolve_tabular_input(data: TabularInput) -> pd.DataFrame:
 
 
 class SequentialEstimationProject:
-    """Run and durably verify a sequential causal estimation project.
+    """Runs and durably verifies a sequential causal estimation project.
 
     The project owns the input declaration, sequential estimand, numerical
     policy, and deterministic artifact location.  A run is not exposed as
-    complete until the report has been atomically written and read back
-    through its digest-verifying envelope.
+    complete until the report has been atomically written and read back through
+    its digest-verifying envelope.
+
+    Attributes:
+        data: The input as given.
+        estimand: The sustained-treatment causal declaration.
+        policy: The numerical, support, and truncation policy.
+        output_dir: Directory containing the report artifact.
+        artifact_path: Path of the report artifact.
+        result: The latest result run or loaded, or None.
     """
 
     def __init__(
@@ -80,7 +88,15 @@ class SequentialEstimationProject:
         self.result: sequential.SequentialEstimationResult | None = None
 
     def run(self) -> sequential.SequentialEstimationResult:
-        """Estimate, atomically persist, and read back the verified result."""
+        """Estimates, atomically persists, and reads back the verified result.
+
+        Returns:
+            The result as read back from the persisted report.
+
+        Raises:
+            ValueError: If the persisted report's digest differs from the digest
+                of the report that was written.
+        """
         frame = resolve_tabular_input(self.data)
         estimate = sequential.SequentialIPWEstimator(
             self.estimand, self.policy
@@ -95,7 +111,11 @@ class SequentialEstimationProject:
         return verified
 
     def load_result(self) -> sequential.SequentialEstimationResult:
-        """Load and verify the durable report associated with this project."""
+        """Loads and verifies the durable report associated with this project.
+
+        Returns:
+            The persisted result, which is also kept as `result`.
+        """
         self.result = sequential.SequentialEstimationResult.read(
             self.artifact_path
         )
