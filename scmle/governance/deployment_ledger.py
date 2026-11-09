@@ -703,7 +703,7 @@ class DeploymentLedger:
             handlers.get(kind, self.apply_free)(body)
         except DeploymentLedgerError:
             raise
-        except (KeyError, TypeError, ValueError) as error:
+        except (KeyError, TypeError, ValueError, ZeroDivisionError) as error:
             raise DeploymentLedgerError(
                 f"malformed {kind} row {len(self.rows)}: {error!r}"
             ) from error

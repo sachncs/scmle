@@ -256,3 +256,11 @@ def test_replay_is_deterministic_across_loads(tmp_path):
     first = dl.DeploymentLedger.load(tmp_path / dl.FILE_NAME)
     second = dl.DeploymentLedger.load(tmp_path / dl.FILE_NAME)
     assert first.head == second.head == ledger.head
+
+
+def test_an_experiment_level_with_a_zero_denominator_is_a_ledger_error():
+    ledger = make()
+    with pytest.raises(dl.DeploymentLedgerError, match="malformed"):
+        ledger.commit(
+            dl.ROLLOUT_EXPERIMENT, {"experiment_id": "e1", "level": "1/0"}
+        )
