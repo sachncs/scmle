@@ -163,7 +163,10 @@ def side_labels(sample_rows: int, reference_rows: int) -> numpy.ndarray:
         A float array of length ``sample_rows + reference_rows``: 0 for each
         sample row, then 1 for each reference row.
     """
-    return numpy.r_[numpy.zeros(sample_rows), numpy.ones(reference_rows)]
+    labels: numpy.ndarray = numpy.r_[
+        numpy.zeros(sample_rows), numpy.ones(reference_rows)
+    ]
+    return labels
 
 
 def holdout_split(
@@ -371,7 +374,8 @@ def gaussian_kernel(design: numpy.ndarray, bandwidth: float) -> numpy.ndarray:
         The symmetric kernel matrix, with ones on the diagonal.
     """
     squared = distance.cdist(design, design, "sqeuclidean")
-    return numpy.exp(-squared / (2.0 * bandwidth * bandwidth))
+    kernel: numpy.ndarray = numpy.exp(-squared / (2.0 * bandwidth * bandwidth))
+    return kernel
 
 
 def mmd_statistics(
@@ -394,7 +398,10 @@ def mmd_statistics(
     xx = (first * (off @ first)).sum(axis=0)
     yy = (second * (off @ second)).sum(axis=0)
     xy = (first * (off @ second)).sum(axis=0)
-    return xx / (m * (m - 1.0)) + yy / (r * (r - 1.0)) - 2.0 * xy / (m * r)
+    statistics: numpy.ndarray = (
+        xx / (m * (m - 1.0)) + yy / (r * (r - 1.0)) - 2.0 * xy / (m * r)
+    )
+    return statistics
 
 
 def mmd_test(

@@ -458,13 +458,10 @@ class IncrementalProcessor:
         frame, record = self.retrying(
             lambda: self.reader.read(meta.key, self.contract)
         )
-        if self.gate is not None:
+        gate = self.gate
+        if gate is not None:
             frame = self.retrying(
-                lambda: (
-                    self.gate.run(
-                        frame, record, self.contract, self.stage
-                    ).frame
-                )
+                lambda: gate.run(frame, record, self.contract, self.stage).frame
             )
         keys = row_keys(frame, self.contract.key_columns)
         fresh = ~keys.isin(checkpoint.seen) & ~keys.duplicated(keep="first")

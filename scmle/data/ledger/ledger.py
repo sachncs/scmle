@@ -1118,8 +1118,9 @@ class Ledger:
             LedgerError: If the freeze row was written but the set was not
                 recorded (a defect, not a data error).
         """
-        if self.survivor_set is not None:
-            return self.survivor_set
+        frozen = self.survivor_set
+        if frozen is not None:
+            return frozen
         kept = self.survivors()
         ids = tuple(h.hypothesis_id for h in kept)
         specs = {h.hypothesis_id: h.spec for h in kept}

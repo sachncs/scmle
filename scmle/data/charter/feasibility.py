@@ -51,11 +51,12 @@ def open_unit(value: float, name: str, low: float = 0.0) -> float:
         ValueError: If `value` is a bool, not an int or float, not finite,
             or not strictly between `low` and 1.
     """
+    candidate: object = value
     if (
-        isinstance(value, bool)
-        or not isinstance(value, int | float)
-        or not low < value < 1
-        or not math.isfinite(value)
+        isinstance(candidate, bool)
+        or not isinstance(candidate, int | float)
+        or not low < candidate < 1
+        or not math.isfinite(candidate)
     ):
         raise ValueError(f"{name} must be strictly between {low} and 1")
     return float(value)
@@ -75,11 +76,12 @@ def positive_delta(value: float, name: str) -> float:
         ValueError: If `value` is a bool, not an int or float, not finite,
             or not greater than 0.
     """
+    candidate: object = value
     if (
-        isinstance(value, bool)
-        or not isinstance(value, int | float)
-        or not math.isfinite(value)
-        or value <= 0
+        isinstance(candidate, bool)
+        or not isinstance(candidate, int | float)
+        or not math.isfinite(candidate)
+        or candidate <= 0
     ):
         raise ValueError(f"{name} must be a finite number greater than 0")
     return float(value)
@@ -97,7 +99,12 @@ def check_k(k_max: int) -> int:
     Raises:
         ValueError: If `k_max` is not an int or is below 1.
     """
-    if isinstance(k_max, bool) or not isinstance(k_max, int) or k_max < 1:
+    candidate: object = k_max
+    if (
+        isinstance(candidate, bool)
+        or not isinstance(candidate, int)
+        or candidate < 1
+    ):
         raise ValueError("k_max must be an integer of at least 1")
     return k_max
 

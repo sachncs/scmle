@@ -287,7 +287,8 @@ def calibrate(p: float, kappa: float = DEFAULT_KAPPA) -> float:
     floored = max(p, P_FLOOR)
     if level == DEFAULT_KAPPA:
         return 0.5 / math.sqrt(floored)
-    return level * floored ** (level - 1.0)
+    result: float = level * floored ** (level - 1.0)
+    return result
 
 
 def exact_alpha(value: Any, name: str) -> Fraction:

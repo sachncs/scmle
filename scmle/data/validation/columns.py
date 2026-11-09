@@ -310,7 +310,7 @@ class ColumnKind(abc.ABC):
             corr = indicator.astype(float).corr(
                 target.astype(float), method="spearman"
             )
-            return float(abs(corr)) if pandas.notna(corr) else 0.0
+            return 0.0 if numpy.isnan(corr) else float(abs(corr))
         gain = purity_association(indicator, target)
         one_sided = (
             target[~indicator].nunique() == 1  # noqa: PD101 -- counts distinct non-missing labels; an equality check would treat missing labels as different
@@ -470,7 +470,7 @@ class NumericKind(ColumnKind):
             corr = values.astype(float).corr(
                 labels.astype(float), method="spearman"
             )
-            return float(abs(corr)) if pandas.notna(corr) else 0.0
+            return 0.0 if numpy.isnan(corr) else float(abs(corr))
         if values.nunique() <= MAX_DIRECT_VALUES:
             return purity_association(values, labels)
         return threshold_association(values.astype(float), labels)

@@ -24,6 +24,7 @@ import re
 import sqlite3
 import time
 from typing import Any
+from typing import Literal
 from typing import TypeVar
 from urllib.parse import urlsplit
 from urllib.parse import urlunsplit
@@ -37,7 +38,11 @@ from scmle.data.readers import tabular
 T = TypeVar("T")
 
 SHA256_HEX_LENGTH = 64
-CSV_COMPRESSION = {".gz": "gzip", ".bz2": "bz2", ".xz": "xz"}
+CSV_COMPRESSION: dict[str, Literal["gzip", "bz2", "xz"]] = {
+    ".gz": "gzip",
+    ".bz2": "bz2",
+    ".xz": "xz",
+}
 JSON_TYPE_NAMES = (
     (bool, "bool"),
     (int, "int"),
@@ -1369,7 +1374,9 @@ class WarehouseConnector(SourceConnector):
             )
         if not query.strip():
             raise ValueError("query must not be empty")
-        if not callable(schema_reader) or not callable(batch_reader):
+        schema_candidate: object = schema_reader
+        batch_candidate: object = batch_reader
+        if not callable(schema_candidate) or not callable(batch_candidate):
             raise TypeError("schema_reader and batch_reader must be callable")
         self.query = query
         self.schema_reader = schema_reader
@@ -1543,7 +1550,7 @@ def read_tabular_bytes(source_uri: str, payload: bytes) -> pandas.DataFrame:
     """
     name = pathlib.PurePosixPath(urlsplit(source_uri).path).name.lower()
     if name.endswith((".csv", ".csv.gz", ".csv.bz2", ".csv.xz")):
-        compression = next(
+        compression: Literal["infer", "gzip", "bz2", "xz"] = next(
             (
                 method
                 for suffix, method in CSV_COMPRESSION.items()
@@ -1846,7 +1853,9 @@ class StreamingObjectStoreConnector(SourceConnector):
                 value,
                 {"supported_formats": ["jsonl", "ndjson"]},
             )
-        if not callable(read_range) or not callable(size_bytes):
+        range_candidate: object = read_range
+        size_candidate: object = size_bytes
+        if not callable(range_candidate) or not callable(size_candidate):
             raise TypeError("read_range and size_bytes must be callable")
         if chunk_bytes < 1:
             raise ValueError("chunk_bytes must be positive")
@@ -1868,7 +1877,7 @@ class StreamingObjectStoreConnector(SourceConnector):
             ConnectorError: ``invalid_object_size`` if the lookup does not
                 return a non-negative integer.
         """
-        size = execute_with_retries(
+        size: object = execute_with_retries(
             lambda: self.size_bytes(self.source_uri),
             "head_object",
             self.source_uri,

@@ -1492,7 +1492,8 @@ class Dataset:
                 "reprojection requires a declared source CRS",
                 {"code": "missing_crs"},
             )
-        if not isinstance(target_crs, str) or not target_crs.strip():
+        candidate_crs: object = target_crs
+        if not isinstance(candidate_crs, str) or not candidate_crs.strip():
             raise ValueError("target_crs must be a non-empty string")
         canonical_target_crs = target_crs.strip()
         if canonical_target_crs == self.crs:
@@ -2053,13 +2054,12 @@ class RasterSample:
                 the nodata fraction is non-finite or outside [0, 1].
         """
         if self.nodata_value is not None:
-            if isinstance(self.nodata_value, bool) or not isinstance(
-                self.nodata_value, Real
-            ):
+            nodata: object = self.nodata_value
+            if isinstance(nodata, bool) or not isinstance(nodata, Real):
                 raise ValueError("nodata_value must be numeric")
-            if not math.isfinite(float(self.nodata_value)):
+            if not math.isfinite(float(nodata)):
                 raise ValueError("nodata_value must be finite")
-            object.__setattr__(self, "nodata_value", float(self.nodata_value))
+            object.__setattr__(self, "nodata_value", float(nodata))
         if (
             self.nodata_fraction is not None
             and not 0.0 <= float(self.nodata_fraction) <= 1.0

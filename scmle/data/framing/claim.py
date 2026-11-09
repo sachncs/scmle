@@ -126,7 +126,10 @@ class Regression:
             .to_numpy(dtype=float)
         )
         raw = numpy.where(numpy.isnan(raw), numpy.asarray(self.medians), raw)
-        return (raw - numpy.asarray(self.means)) / numpy.asarray(self.scales)
+        standardised: numpy.ndarray = (
+            raw - numpy.asarray(self.means)
+        ) / numpy.asarray(self.scales)
+        return standardised
 
     def actions(self, features: pandas.DataFrame) -> numpy.ndarray:
         """Computes the actions of the rule on any rows.
@@ -140,7 +143,8 @@ class Regression:
         """
         score = self.matrix(features) @ numpy.asarray(self.coefficients)
         probability = 1.0 / (1.0 + numpy.exp(-(score + self.intercept)))
-        return (probability >= self.cut).astype(float)
+        flags: numpy.ndarray = (probability >= self.cut).astype(float)
+        return flags
 
 
 class Rule(Protocol):

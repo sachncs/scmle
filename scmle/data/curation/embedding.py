@@ -23,7 +23,7 @@ DEFAULT_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 FALLBACK_TERMS = 200
 
 
-class TextEmbedder(base.TransformerMixin, base.BaseEstimator):
+class TextEmbedder(base.TransformerMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information, so its base classes are Any
     """Embeds a text column with a sentence-embedding model.
 
     Attributes:

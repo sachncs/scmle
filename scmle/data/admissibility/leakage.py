@@ -724,7 +724,8 @@ def strata_labels(
             min_samples_leaf=cfg.min_samples_leaf,
             random_state=0,
         ).fit(z, codes)
-    return tree.apply(z).astype("int64")
+    leaves: numpy.ndarray = tree.apply(z).astype("int64")
+    return leaves
 
 
 def within_strata(

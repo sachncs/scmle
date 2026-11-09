@@ -64,7 +64,10 @@ def row_hash(positions: numpy.ndarray, seed: int) -> numpy.ndarray:
         z = (z ^ (z >> numpy.uint64(30))) * MIX_A
         z = (z ^ (z >> numpy.uint64(27))) * MIX_B
         z = z ^ (z >> numpy.uint64(31))
-    return (z >> numpy.uint64(11)).astype(numpy.float64) / float(1 << 53)
+    unit: numpy.ndarray = (z >> numpy.uint64(11)).astype(numpy.float64) / float(
+        1 << 53
+    )
+    return unit
 
 
 class ChunkSource(abc.ABC):
@@ -590,7 +593,8 @@ class Batch:
             raise ValueError("batch and checkpoint snapshots differ")
         if self.start_offset < 0:
             raise ValueError("start_offset must be non-negative")
-        if not isinstance(self.frame, pandas.DataFrame) or self.frame.empty:
+        frame: object = self.frame
+        if not isinstance(frame, pandas.DataFrame) or frame.empty:
             raise ValueError("frame must contain at least one row")
         if self.next_checkpoint.offset <= self.start_offset:
             raise ValueError("checkpoint must advance past the batch start")
@@ -1006,11 +1010,12 @@ class CommitLedger:
             None, while the exclusive lock on the sidecar file is held.
         """
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+        windows_lock: Any = None
         with self.lock_path.open("a+b") as handle:
             if os.name == "nt":
                 import msvcrt  # noqa: PLC0415 -- Windows-only module, imported only on Windows
 
-                windows_lock: Any = msvcrt
+                windows_lock = msvcrt
                 handle.seek(0)
                 windows_lock.locking(handle.fileno(), windows_lock.LK_LOCK, 1)
             else:
@@ -1026,6 +1031,8 @@ class CommitLedger:
                         handle.fileno(), windows_lock.LK_UNLCK, 1
                     )
                 else:
+                    import fcntl  # noqa: PLC0415 -- POSIX-only module, imported only off Windows
+
                     fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
     def load(self) -> CommittedState:
@@ -1595,7 +1602,11 @@ class Consumer:
         """
         if not consumer_group.strip():
             raise ValueError("consumer_group must not be empty")
-        if not callable(writer) or not callable(acknowledge):
+        writer_candidate: object = writer
+        acknowledge_candidate: object = acknowledge
+        if not callable(writer_candidate) or not callable(
+            acknowledge_candidate
+        ):
             raise TypeError("writer and acknowledge must be callable")
         self.ledger = ledger
         self.consumer_group = consumer_group

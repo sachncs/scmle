@@ -16,7 +16,7 @@ from sklearn import model_selection
 from scmle.contracts import data
 
 
-class StructuredKFold(model_selection.BaseCrossValidator):
+class StructuredKFold(model_selection.BaseCrossValidator):  # type: ignore[misc]  # scikit-learn ships no type information, so its base class is Any
     """K-fold over a training frame that keeps groups and time order intact.
 
     * With a group column, whole groups go to one inner fold.

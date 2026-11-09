@@ -1915,7 +1915,7 @@ def needed_assumptions(strategy: str, spec: causal.Question) -> tuple[str, ...]:
         requirement replaced by the charter's matching assumption words.
     """
     required = select.STRATEGIES[strategy].assumptions
-    out = []
+    out: list[str] = []
     for word in required:
         if word == "unconfoundedness_given":
             out.extend(

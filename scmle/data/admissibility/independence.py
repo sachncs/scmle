@@ -127,7 +127,8 @@ def residuals(values: numpy.ndarray, given: numpy.ndarray) -> numpy.ndarray:
     """
     design = numpy.column_stack([numpy.ones(len(values)), given])
     solution = numpy.linalg.lstsq(design, values, rcond=None)
-    return values - design @ solution[0]
+    fitted_residuals: numpy.ndarray = values - design @ solution[0]
+    return fitted_residuals
 
 
 def partial_correlation(

@@ -26,7 +26,7 @@ BINARY_CLASSES = 2
 MIN_DISTINCT_VALUES = 2
 
 
-class FeatureConstructor(base.TransformerMixin, base.BaseEstimator):
+class FeatureConstructor(base.TransformerMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information, so its base classes are Any
     """Appends pairwise differences and ratios of the most informative columns.
 
     The columns that are combined are the numeric ones most associated with
@@ -137,7 +137,7 @@ class FeatureConstructor(base.TransformerMixin, base.BaseEstimator):
         return numpy.asarray(names, dtype=object)
 
 
-class SparseSelector(base.TransformerMixin, base.BaseEstimator):
+class SparseSelector(base.TransformerMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information, so its base classes are Any
     """Keeps the columns an L1-penalised linear model gives weight.
 
     The matrix should be scaled so the penalty treats columns alike. At
@@ -239,4 +239,5 @@ class SparseSelector(base.TransformerMixin, base.BaseEstimator):
             The names of the columns kept in fit, as an object array.
         """
         names = numpy.asarray(input_features, dtype=object)
-        return names[self.support_]
+        kept: numpy.ndarray = names[self.support_]
+        return kept
