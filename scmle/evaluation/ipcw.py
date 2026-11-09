@@ -106,7 +106,8 @@ def censoring_weights(
             level = estimators.step_lookup(
                 model.moments_, model.baseline_, numpy.array([moment]), 0.0
             )[0]
-            return numpy.exp(-level * relative[rows])
+            survival: numpy.ndarray = numpy.exp(-level * relative[rows])
+            return survival
 
         survival_of = cox_at
     floored = raw < floor

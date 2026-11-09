@@ -26,7 +26,10 @@ def load() -> dict[str, Any]:
         The per-task records of `task_gate_status.json`, keyed by task
         type name.
     """
-    return json.loads(STATUS_PATH.read_text(encoding="utf-8"))["tasks"]
+    records: dict[str, Any] = json.loads(
+        STATUS_PATH.read_text(encoding="utf-8")
+    )["tasks"]
+    return records
 
 
 def status(task: tasks.Task) -> str:

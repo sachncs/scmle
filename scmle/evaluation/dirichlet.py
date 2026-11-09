@@ -18,7 +18,7 @@ from sklearn import linear_model
 FLOOR = 1e-6
 
 
-class DirichletCalibrator(base.BaseEstimator, base.ClassifierMixin):
+class DirichletCalibrator(base.BaseEstimator, base.ClassifierMixin):  # type: ignore[misc]  # scikit-learn is untyped
     """A frozen classifier whose probabilities are Dirichlet-calibrated.
 
     Attributes:
@@ -79,7 +79,10 @@ class DirichletCalibrator(base.BaseEstimator, base.ClassifierMixin):
             Probabilities of shape `(rows, classes)`, columns in `classes_`
             order.
         """
-        return self.map_.predict_proba(self.log_probabilities(features))
+        probabilities: numpy.ndarray = self.map_.predict_proba(
+            self.log_probabilities(features)
+        )
+        return probabilities
 
     def predict(self, features: Any) -> numpy.ndarray:
         """Most probable class after calibration.
@@ -90,4 +93,7 @@ class DirichletCalibrator(base.BaseEstimator, base.ClassifierMixin):
         Returns:
             The class with the highest calibrated probability for each row.
         """
-        return self.classes_[self.predict_proba(features).argmax(axis=1)]
+        labels: numpy.ndarray = self.classes_[
+            self.predict_proba(features).argmax(axis=1)
+        ]
+        return labels

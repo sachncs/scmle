@@ -96,10 +96,11 @@ def released_scores(bundle: Any, features: Any, target: Any) -> numpy.ndarray:
         band = bundle.predict_interval(
             features, coverage=conformal.DEFAULT_COVERAGE, method="residual"
         )
-        return numpy.abs(
+        residuals: numpy.ndarray = numpy.abs(
             numpy.asarray(target, dtype=float)
             - band["prediction"].to_numpy(dtype=float)
         )
+        return residuals
     probabilities = numpy.asarray(bundle.predict_proba(features), dtype=float)
     position = {label: i for i, label in enumerate(calibrator.classes)}
     columns = [position[label] for label in list(target)]

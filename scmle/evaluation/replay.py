@@ -11,7 +11,7 @@ import numpy
 from sklearn import base
 
 
-class PredictionReplay(base.BaseEstimator):
+class PredictionReplay(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn is untyped
     """Returns stored predictions whatever rows it is handed.
 
     Attributes:
@@ -65,9 +65,9 @@ class PredictionReplay(base.BaseEstimator):
         return self.probabilities
 
 
-class ClassifierPredictions(base.ClassifierMixin, PredictionReplay):
+class ClassifierPredictions(base.ClassifierMixin, PredictionReplay):  # type: ignore[misc]  # scikit-learn is untyped
     """Stored predictions that scikit-learn treats as a classifier."""
 
 
-class RegressorPredictions(base.RegressorMixin, PredictionReplay):
+class RegressorPredictions(base.RegressorMixin, PredictionReplay):  # type: ignore[misc]  # scikit-learn is untyped
     """Stored predictions that scikit-learn treats as a regressor."""
