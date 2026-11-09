@@ -366,7 +366,8 @@ def auc_rows(
     """
     wins, pairs = fold_concordance(score, positive, tests)
     with numpy.errstate(invalid="ignore", divide="ignore"):
-        return wins / pairs
+        auc: numpy.ndarray = wins / pairs
+    return auc
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -408,7 +409,8 @@ def skill_statistic(problem: Problem, phi: numpy.ndarray) -> Statistic:
         if problem.task == "regression":
             pred = oof_fit(labels, phi, problem.splits)
             squares = ((labels - pred) ** 2).sum(axis=1)
-            return 1.0 - squares / problem.total_squares
+            skill: numpy.ndarray = 1.0 - squares / problem.total_squares
+            return skill
         wanted = (
             [1] if problem.classes == BINARY_CLASSES else range(problem.classes)
         )
