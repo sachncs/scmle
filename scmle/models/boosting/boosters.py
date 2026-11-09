@@ -7,7 +7,6 @@ records the adapter as rejected for a missing dependency.
 
 from collections.abc import Mapping
 import importlib
-import types
 from typing import Any
 
 from scmle.contracts import errors
@@ -17,7 +16,7 @@ from scmle.contracts import tasks
 from scmle.models import wrappers
 from scmle.models.boosting import early_stopping
 
-NO_PARAMS: types.MappingProxyType = types.MappingProxyType({})
+NO_PARAMS: dict[str, Any] = {}
 
 
 class Booster(models.Model):
@@ -46,7 +45,7 @@ class Booster(models.Model):
     flatten_predictions: bool = False
     classifier_name: str
     regressor_name: str
-    fixed_params: types.MappingProxyType = NO_PARAMS
+    fixed_params: dict[str, Any] = NO_PARAMS
     fit_param_names: tuple[str, ...] = ()
     stopping_rounds: int | None = early_stopping.DEFAULT_ROUNDS
 
@@ -62,7 +61,7 @@ class Booster(models.Model):
         regressor_name: str | None = None,
         needs_integer_labels: bool | None = None,
         flatten_predictions: bool | None = None,
-        fixed_params: types.MappingProxyType | None = None,
+        fixed_params: dict[str, Any] | None = None,
         fit_param_names: tuple[str, ...] | None = None,
         stopping_rounds: int | None = None,
         search_space: search.SearchSpace | None = None,
@@ -203,9 +202,7 @@ LIGHTGBM = LightGbm(
         cost=3,
         memory_factor=2.0,
     ),
-    fixed_params=types.MappingProxyType(
-        {"verbose": -1, "subsample_freq": 1, "n_jobs": 1}
-    ),
+    fixed_params={"verbose": -1, "subsample_freq": 1, "n_jobs": 1},
     search_space=search.SearchSpace(
         (
             search.IntParameter("n_estimators", 50, 400),
@@ -237,7 +234,7 @@ XGBOOST = Booster(
         cost=3,
         memory_factor=2.5,
     ),
-    fixed_params=types.MappingProxyType({"verbosity": 0, "n_jobs": 1}),
+    fixed_params={"verbosity": 0, "n_jobs": 1},
     search_space=search.SearchSpace(
         (
             search.IntParameter("n_estimators", 50, 400),
@@ -269,9 +266,11 @@ CATBOOST = Booster(
         cost=4,
         memory_factor=3.0,
     ),
-    fixed_params=types.MappingProxyType(
-        {"verbose": 0, "allow_writing_files": False, "thread_count": 1}
-    ),
+    fixed_params={
+        "verbose": 0,
+        "allow_writing_files": False,
+        "thread_count": 1,
+    },
     search_space=search.SearchSpace(
         (
             search.IntParameter("iterations", 100, 500),

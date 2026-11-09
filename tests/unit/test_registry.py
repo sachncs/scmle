@@ -311,3 +311,21 @@ def test_a_default_orchestrator_discovers_conforming_plugins_only(
     assert "third_party" in engine.registry.adapters
     assert "non_conforming" not in engine.registry.adapters
     assert "predict_proba" in engine.registry.plugin_failures["bad"]
+
+
+def test_every_built_in_adapter_pickles():
+    """Adapters travel to worker processes, so none may hold an unpicklable value.
+
+    A mapping proxy, a lock or an open handle in an instance attribute passes
+    every in-process test and fails only when a trial runs in a worker.
+    """
+    catalog = scmle.models.registry.Catalog.with_builtins(include_user=False)
+
+    unpicklable = []
+    for name, adapter in catalog.adapters.items():
+        try:
+            pickle.loads(pickle.dumps(adapter))
+        except (TypeError, pickle.PicklingError, AttributeError) as error:
+            unpicklable.append(f"{name}: {error}")
+
+    assert unpicklable == []
