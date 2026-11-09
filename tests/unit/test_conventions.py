@@ -142,7 +142,7 @@ def test_alias_checker_detects_violations():
         "    inner = X\n"
     )
 
-    found = [description for _, description in aliases(ast.parse(source))]
+    found = [item[1] for item in aliases(ast.parse(source))]
 
     assert sorted(found) == [
         "TypeAlias annotation",
