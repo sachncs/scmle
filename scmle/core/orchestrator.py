@@ -39,7 +39,12 @@ from scmle.models import registry as registry_module
 
 
 def environment_lock() -> str:
-    """Lists installed distributions as sorted `name==version` lines."""
+    """Lists installed distributions as sorted `name==version` lines.
+
+    Returns:
+        One `name==version` line per installed distribution, sorted and
+        joined with newlines.
+    """
     pins = {
         f"{d.metadata['Name']}=={d.version}" for d in metadata.distributions()
     }
@@ -162,14 +167,12 @@ class Orchestrator:
         The plan's validation strategy, time budget and metric replace the
         configured ones (and are validated with the rest of the
         specification); its candidate models restrict the search, and its
-        task must match what the data resolves to.
+        task must match what the data resolves to. A plan that contradicts the
+        specification, for example group validation without a group column,
+        fails that validation with a `ValidationError`.
 
         Args:
             approved: The plan, or None to keep the specification as is.
-
-        Raises:
-            ValidationError: If the plan contradicts the specification, for
-                example group validation without a group column.
         """
         if approved is None:
             return
@@ -210,6 +213,11 @@ class Orchestrator:
     ) -> results.RunResult:
         """Executes the full workflow in a new run directory.
 
+        Failures surface from `execute`: a run that cannot safely continue
+        raises `BlockedError`, a cancelled run raises `CancelledError`, and
+        any other failure is raised as `ScmleError` (unexpected errors are
+        wrapped). The run directory is in the error's `details["run_dir"]`.
+
         Args:
             output_dir: Parent directory for run directories and the
                 tracking database.
@@ -219,12 +227,6 @@ class Orchestrator:
 
         Returns:
             The completed run.
-
-        Raises:
-            BlockedError: The framework could not safely continue.
-            CancelledError: The run was cancelled.
-            ScmleError: Any other framework failure; unexpected errors are
-                wrapped. The run directory is in `details["run_dir"]`.
         """
         self.apply_plan(approved)
         store = store_module.RunStore.create(output_dir)
@@ -312,7 +314,15 @@ class Orchestrator:
     def load_checkpoints(
         self, store: store_module.RunStore
     ) -> dict[str, experiments.TrialResult]:
-        """Reads completed trial checkpoints from a run directory."""
+        """Reads completed trial checkpoints from a run directory.
+
+        Args:
+            store: The run directory.
+
+        Returns:
+            The stored trial results keyed by trial id, read from the run's
+            `trials/trial_*.json` files in file-name order.
+        """
         checkpoints: dict[str, experiments.TrialResult] = {}
         for path in sorted(store.path("trials").glob("trial_*.json")):
             record = json.loads(path.read_text(encoding="utf-8"))
@@ -325,6 +335,10 @@ class Orchestrator:
 
         Args:
             store: The run directory.
+
+        Returns:
+            The sorted names (without extension) of the trial checkpoint
+            files in the run, empty if there is no trials directory.
         """
         trials_dir = store.path("trials")
         if not trials_dir.exists():
@@ -335,6 +349,11 @@ class Orchestrator:
         self, gate: state.RunState, context: context_module.RunContext
     ) -> None:
         """Asks every checkpoint registered for `gate` and audits the verdicts.
+
+        Args:
+            gate: The stage that just completed.
+            context: The run context, used to build each review and to record
+                the verdict.
 
         Raises:
             BlockedError: If any checkpoint rejects.
@@ -365,6 +384,10 @@ class Orchestrator:
     ) -> results.RunResult:
         """Runs the stage sequence under the state machine.
 
+        The run ends in the completed, cancelled, blocked or failed state. On a
+        cancellation or failure the error's `details` gain the run directory and
+        the recoverable trial checkpoints.
+
         Args:
             store: Run directory.
             approved: Plan restricting candidates.
@@ -373,6 +396,12 @@ class Orchestrator:
 
         Returns:
             The completed run.
+
+        Raises:
+            BlockedError: If a stage or an approval gate blocks the run.
+            CancelledError: If the run is cancelled, or interrupted from the
+                keyboard.
+            ScmleError: If a stage fails; any other exception is wrapped in it.
         """
         log = events.EventLog(store.path("events.jsonl"))
         tracker = self.tracker or tracking_stores.SqliteExperimentStore(

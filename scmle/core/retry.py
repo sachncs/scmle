@@ -75,16 +75,33 @@ class RetryPolicy:
             raise errors.ConfigError("factor must be at least 1")
 
     def delay_after(self, failures: int) -> float:
-        """The wait after `failures` failed attempts (1 for the first)."""
+        """The wait after `failures` failed attempts (1 for the first).
+
+        Args:
+            failures: Number of failed attempts so far; at least 1.
+
+        Returns:
+            The wait in seconds: the base delay grown by the factor for each
+            earlier failure, capped at the maximum delay.
+        """
         wait = self.base_delay_seconds * self.factor ** (failures - 1)
         return min(wait, self.max_delay_seconds)
 
     def delays(self) -> list[float]:
-        """The waits between all attempts, in order."""
+        """The waits between all attempts, in order.
+
+        Returns:
+            The waits in seconds between consecutive attempts, in order; one
+            fewer than the maximum number of attempts.
+        """
         return [self.delay_after(n) for n in range(1, self.max_attempts)]
 
     def to_dict(self) -> dict[str, float | int]:
-        """JSON-ready form."""
+        """JSON-ready form.
+
+        Returns:
+            The policy's fields as a dict.
+        """
         return dataclasses.asdict(self)
 
 

@@ -76,7 +76,13 @@ class StateMachine:
         reason: str,
         artifacts: tuple[str, ...] = (),
     ) -> None:
-        """Emits the event for entering `state`."""
+        """Emits the event for entering `state`.
+
+        Args:
+            state: The state being entered.
+            reason: Why the state is entered.
+            artifacts: Paths of the artifacts the state produced.
+        """
         self.log.emit(
             events.Event(
                 run_id=self.run_id,

@@ -20,6 +20,15 @@ UINT32_BYTES = 4
 def validate_key(run_seed: int, component: str, index: int) -> str:
     """Checks a stream key and returns the trimmed component name.
 
+    Args:
+        run_seed: The run's seed; must be a non-negative integer.
+        component: Name of the check or detector; surrounding whitespace is
+            removed.
+        index: Repeat counter; must be a non-negative integer.
+
+    Returns:
+        The component name with surrounding whitespace removed.
+
     Raises:
         ValueError: If the seed or index is not a non-negative integer or the
             component name is blank.
@@ -33,7 +42,15 @@ def validate_key(run_seed: int, component: str, index: int) -> str:
 
 
 def name_words(component: str) -> tuple[int, ...]:
-    """Stable 32-bit words derived from a component name."""
+    """Stable 32-bit words derived from a component name.
+
+    Args:
+        component: The component name, hashed with SHA-256.
+
+    Returns:
+        The first words of the digest, each read as a big-endian unsigned
+        32-bit integer.
+    """
     digest = hashlib.sha256(component.encode("utf-8")).digest()
     return tuple(
         int.from_bytes(digest[i : i + UINT32_BYTES], "big")
@@ -63,14 +80,33 @@ def component_seed_sequence(
 def component_rng(
     run_seed: int, component: str, index: int = 0
 ) -> np.random.Generator:
-    """Generator for one component of one run."""
+    """Generator for one component of one run.
+
+    Args:
+        run_seed: The run's seed.
+        component: Stable name of the check or detector.
+        index: Repeat counter for components that draw several streams.
+
+    Returns:
+        A NumPy generator that depends only on the three arguments.
+    """
     return np.random.default_rng(
         component_seed_sequence(run_seed, component, index)
     )
 
 
 def derive_int_seed(run_seed: int, component: str, index: int = 0) -> int:
-    """32-bit integer seed for libraries that take `random_state=int`."""
+    """32-bit integer seed for libraries that take `random_state=int`.
+
+    Args:
+        run_seed: The run's seed.
+        component: Stable name of the check or detector.
+        index: Repeat counter for components that draw several streams.
+
+    Returns:
+        An integer derived from the component's seed sequence, the same for
+        the same three arguments.
+    """
     state = component_seed_sequence(run_seed, component, index).generate_state(
         1
     )
@@ -80,5 +116,15 @@ def derive_int_seed(run_seed: int, component: str, index: int = 0) -> int:
 def seed_path(
     run_seed: int, component: str, index: int = 0
 ) -> qualification.SeedPath:
-    """The key to record on a `Check` or `Certificate`."""
+    """The key to record on a `Check` or `Certificate`.
+
+    Args:
+        run_seed: The run's seed.
+        component: Stable name of the check or detector.
+        index: Repeat counter for components that draw several streams.
+
+    Returns:
+        The triple (run seed, trimmed component name, index) that identifies
+        the random stream.
+    """
     return (run_seed, validate_key(run_seed, component, index), index)

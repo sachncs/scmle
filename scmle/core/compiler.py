@@ -32,10 +32,21 @@ class WorkflowStage(Protocol):
     requires: ClassVar[tuple[type["WorkflowStage"], ...]]
 
     def describe(self, context: "context_module.RunContext") -> str:
-        """Return the reason recorded on stage entry."""
+        """Return the reason recorded on stage entry.
+
+        Args:
+            context: The shared run context.
+
+        Returns:
+            The reason text attached to the stage's state transition.
+        """
 
     def execute(self, context: "context_module.RunContext") -> None:
-        """Execute the stage against the shared run context."""
+        """Execute the stage against the shared run context.
+
+        Args:
+            context: The shared run context, read and updated by the stage.
+        """
 
 
 StageT = TypeVar("StageT", bound=WorkflowStage)

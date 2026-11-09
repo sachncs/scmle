@@ -62,7 +62,17 @@ class SequentialBackend(ExecutionBackend):
         items: Sequence[Any],
         on_failure: Callable[[Any, Exception], Any] | None = None,
     ) -> list[Any]:
-        """Applies `function` in order, in this process."""
+        """Applies `function` in order, in this process.
+
+        Args:
+            function: Called once per item.
+            items: The inputs, in order.
+            on_failure: Not used by this backend; an exception raised by
+                `function` propagates to the caller.
+
+        Returns:
+            The results of `function`, in the order of `items`.
+        """
         return [function(item) for item in items]
 
 
@@ -90,7 +100,21 @@ class ProcessBackend(ExecutionBackend):
         items: Sequence[Any],
         on_failure: Callable[[Any, Exception], Any] | None = None,
     ) -> list[Any]:
-        """Applies `function` across worker processes, preserving order."""
+        """Applies `function` across worker processes, preserving order.
+
+        Zero or one items run in this process without a pool; otherwise the
+        pool uses at most the configured number of workers, and no more
+        workers than items.
+
+        Args:
+            function: Called once per item; must be picklable.
+            items: The inputs.
+            on_failure: Not used by this backend; an exception raised by
+                `function` propagates to the caller.
+
+        Returns:
+            The results of `function`, in the order of `items`.
+        """
         if len(items) <= 1:
             return [function(item) for item in items]
         parallel = joblib.Parallel(

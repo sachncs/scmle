@@ -99,6 +99,11 @@ def peak_memory_gb() -> float:
     """Peak resident memory of this process and its finished children.
 
     Windows does not report finished children, so only this process counts.
+
+    Returns:
+        The larger of this process's and its finished children's peak resident
+        memory, in gigabytes (the resident set on Windows, where children are
+        not counted).
     """
     if resource is None:
         import psutil  # Windows-only dependency.
@@ -111,7 +116,12 @@ def peak_memory_gb() -> float:
 
 
 def proc_table() -> dict[int, tuple[int, int]]:
-    """Process table from `/proc` (Linux), without needing `ps`."""
+    """Process table from `/proc` (Linux), without needing `ps`.
+
+    Returns:
+        A mapping from pid to (parent pid, resident bytes). Processes that
+        vanish or cannot be read while scanning are omitted.
+    """
     table: dict[int, tuple[int, int]] = {}
     page = resource.getpagesize()
     for name in os.listdir("/proc"):
@@ -129,7 +139,12 @@ def proc_table() -> dict[int, tuple[int, int]]:
 
 
 def ps_table() -> dict[int, tuple[int, int]]:
-    """Process table from `ps` (macOS and other Unix systems)."""
+    """Process table from `ps` (macOS and other Unix systems).
+
+    Returns:
+        A mapping from pid to (parent pid, resident bytes). Lines of the `ps`
+        output that are not three integer fields are ignored.
+    """
     completed = subprocess.run(  # nosec B603 B607
         ["ps", "-A", "-o", "pid=,ppid=,rss="],
         capture_output=True,
@@ -145,7 +160,12 @@ def ps_table() -> dict[int, tuple[int, int]]:
 
 
 def psutil_table() -> dict[int, tuple[int, int]]:
-    """Process table from `psutil` (Windows)."""
+    """Process table from `psutil` (Windows).
+
+    Returns:
+        A mapping from pid to (parent pid, resident bytes). Processes whose
+        memory information is unavailable are omitted.
+    """
     import psutil  # Windows-only dependency.
 
     table: dict[int, tuple[int, int]] = {}
@@ -157,7 +177,12 @@ def psutil_table() -> dict[int, tuple[int, int]]:
 
 
 def process_table() -> dict[int, tuple[int, int]]:
-    """Maps every live pid to its (parent pid, resident bytes)."""
+    """Maps every live pid to its (parent pid, resident bytes).
+
+    Returns:
+        A mapping from pid to (parent pid, resident bytes), read from the
+        source suited to the platform.
+    """
     if WINDOWS:
         return psutil_table()
     if os.path.isdir("/proc/self"):
@@ -166,7 +191,16 @@ def process_table() -> dict[int, tuple[int, int]]:
 
 
 def process_tree(root: int) -> dict[int, int]:
-    """Resident bytes of a process and all its descendants, by pid."""
+    """Resident bytes of a process and all its descendants, by pid.
+
+    Args:
+        root: Pid of the process whose subtree is measured.
+
+    Returns:
+        A mapping from pid to resident bytes for the root and every descendant
+        found in the process table. A root that is gone yields an empty
+        mapping.
+    """
     table = process_table()
     members = {root}
     grew = True
@@ -180,7 +214,14 @@ def process_tree(root: int) -> dict[int, int]:
 
 
 def resident_bytes(pid: int) -> int:
-    """Resident memory of a process and its descendants, 0 if it is gone."""
+    """Resident memory of a process and its descendants, 0 if it is gone.
+
+    Args:
+        pid: Pid of the root of the process subtree.
+
+    Returns:
+        The summed resident memory, in bytes.
+    """
     return sum(process_tree(pid).values())
 
 
@@ -189,7 +230,17 @@ def child_main(
     function: Callable[[Any], Any],
     argument: Any,
 ) -> None:
-    """Runs `function(argument)` in the supervised process."""
+    """Runs `function(argument)` in the supervised process.
+
+    The outcome is sent over the channel as `(True, value)` on success or
+    `(False, "ErrorType: message")` if the function raised any exception, and
+    the channel is then closed.
+
+    Args:
+        channel: Sending end of the pipe back to the supervisor.
+        function: Picklable module-level function to call.
+        argument: Picklable argument passed to the function.
+    """
     try:
         channel.send((True, function(argument)))
     except BaseException as error:  # Reported to the supervisor.
@@ -213,9 +264,14 @@ class TrialSupervisor:
     def run(self, function: Callable[[Any], Any], argument: Any) -> Any:
         """Calls `function(argument)` in a child process and returns its value.
 
+        The child and every process it started are killed once the call ends.
+
         Args:
             function: Picklable module-level function.
             argument: Picklable argument.
+
+        Returns:
+            The value `function(argument)` returned in the child process.
 
         Raises:
             TrialLimitError: If the child exceeded a limit, died, or raised.
@@ -259,7 +315,11 @@ class TrialSupervisor:
 
     @staticmethod
     def kill_descendants(root: int) -> None:
-        """Kills processes the trial started, so none outlive it."""
+        """Kills processes the trial started, so none outlive it.
+
+        Args:
+            root: Pid of the trial process; it is not itself signalled.
+        """
         for pid in process_tree(root):
             if pid != root:
                 try:
@@ -276,7 +336,16 @@ class TrialSupervisor:
     def violation(
         self, process: multiprocessing.process.BaseProcess, elapsed: float
     ) -> str | None:
-        """Why the running trial must be killed, or None."""
+        """Why the running trial must be killed, or None.
+
+        Args:
+            process: The running trial process.
+            elapsed: Seconds since the trial started.
+
+        Returns:
+            A message naming the exceeded limit (hard time ceiling or memory),
+            or None if the trial is within its limits.
+        """
         if self.ceiling_seconds is not None and elapsed > self.ceiling_seconds:
             return (
                 f"trial exceeded its {self.ceiling_seconds:.1f}s hard time "
@@ -319,7 +388,11 @@ class ResourceGovernor:
         return 1 if self.workers > 1 else None
 
     def memory_exceeded(self) -> bool:
-        """Whether peak memory is above the configured limit."""
+        """Whether peak memory is above the configured limit.
+
+        Returns:
+            True if this process's peak memory exceeds the configured limit.
+        """
         return peak_memory_gb() > self.spec.memory_limit_gb
 
     @property
@@ -328,13 +401,26 @@ class ResourceGovernor:
         return self.spec.enforcement == "hard"
 
     def enforcement_text(self, hard_part: str) -> str:
-        """Describes how a limit is applied under the current mode."""
+        """Describes how a limit is applied under the current mode.
+
+        Args:
+            hard_part: Wording for what hard enforcement additionally does.
+
+        Returns:
+            The hard-mode description (stated limit plus `hard_part`) when
+            enforcement is hard, else the cooperative-mode description.
+        """
         if self.hard:
             return f"no trial starts past the limit; {hard_part}"
         return "cooperative: no trial starts past the limit"
 
     def trial_ceiling_seconds(self) -> float:
-        """Hard time ceiling for a trial dispatched now."""
+        """Hard time ceiling for a trial dispatched now.
+
+        Returns:
+            The time ceiling in seconds: the remaining budget plus a grace share
+            of the budget, never below the minimum ceiling.
+        """
         budget = self.spec.time_budget_seconds
         remaining = max(budget - (time.monotonic() - self.started_at), 0.0)
         return max(remaining + GRACE_SHARE * budget, MIN_CEILING_SECONDS)
@@ -345,6 +431,11 @@ class ResourceGovernor:
         Args:
             first: True for the first trial, which always runs so that a
                 result exists even under a tiny budget.
+
+        Returns:
+            A message saying why the next trial must not start (time budget
+            exhausted or memory limit reached), or None if it may start. Always
+            None for the first trial.
         """
         if first:
             return None
@@ -355,7 +446,13 @@ class ResourceGovernor:
         return None
 
     def report(self) -> dict[str, Any]:
-        """Describes each limit, how it was applied and what was observed."""
+        """Describes each limit, how it was applied and what was observed.
+
+        Returns:
+            A dict with `time_budget`, `cpu`, `memory` and `gpu` entries, each
+            giving the limit, how it was enforced and, where measurable,
+            what was observed and whether it was within the limit.
+        """
         elapsed = time.monotonic() - self.started_at
         peak = peak_memory_gb()
         return {

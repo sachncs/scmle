@@ -1,4 +1,4 @@
-"""The ingest plan stage of a charter run (F9).
+"""The ingest plan stage of a charter run.
 
 A charter with an `ingest` block and a data spec that names `ingest_plan` read
 their features from a database through the as-of views instead of from the
@@ -80,9 +80,10 @@ class IngestResult:
     Attributes:
         features: One column per kept feature, indexed like the run table.
         declared: The declared family size (kept features).
-        records: Field provenance of the kept features, for F4.
-        documents: File name to JSON-ready content (the plan's own files are
-            written by `IngestPlan`).
+        records: Field provenance of the kept features, for the
+            admissibility tests.
+        documents: File name to JSON-ready content (the ingest plan's own
+            files are written by `IngestPlan`).
         summary: Verdict, link count and budget state for the run event.
     """
 
@@ -94,7 +95,14 @@ class IngestResult:
 
 
 def load_plan(path: str) -> dict[str, Any]:
-    """Reads the plan file.
+    """Reads the ingest plan file.
+
+    Args:
+        path: Path of the JSON ingest plan.
+
+    Returns:
+        The plan document, which holds at least the `database`, `key`,
+        `moment`, `tables` and `views` entries.
 
     Raises:
         ConfigError: If it cannot be read or lacks a required key.
@@ -112,7 +120,19 @@ def load_plan(path: str) -> dict[str, Any]:
 
 
 def identifier(value: Any, what: str) -> str:
-    """A bare SQL identifier."""
+    """A bare SQL identifier.
+
+    Args:
+        value: The candidate name.
+        what: What the name is, used in the error message.
+
+    Returns:
+        `value` unchanged.
+
+    Raises:
+        ConfigError: If `value` is not a string matching the identifier
+            pattern.
+    """
     if not isinstance(value, str) or not IDENTIFIER.match(value):
         raise errors.ConfigError(f"ingest plan {what} {value!r} is not a name")
     return value
@@ -121,7 +141,17 @@ def identifier(value: Any, what: str) -> str:
 def rule_of(
     record: dict[str, Any], spec: charter_ingest.IngestSpec
 ) -> asof_view.TimeRule:
-    """The time rule a view declares."""
+    """The time rule a view declares.
+
+    Args:
+        record: The view's rule entry: its mode, optional known-time column,
+            optional recording delay and optional attestation.
+        spec: The charter's ingest settings, whose recording delay applies
+            when the entry gives none.
+
+    Returns:
+        The time rule, with no delay for a non-versioned view.
+    """
     note = record.get("attestation")
     delay = record.get("delta_rec_days", spec.delta_rec)
     return asof_view.TimeRule(
@@ -133,7 +163,19 @@ def rule_of(
 
 
 def read_frame(entry: dict[str, Any], factory: Any) -> pd.DataFrame:
-    """One table, read once with a snapshot check."""
+    """One table, read once with a snapshot check.
+
+    Args:
+        entry: The plan entry naming the `table` and its `order_by` clause.
+        factory: Opens a database connection.
+
+    Returns:
+        The table's rows as read in one consistent snapshot.
+
+    Raises:
+        ConfigError: If the table name is not an identifier or `order_by` is
+            not a valid ordering.
+    """
     table = identifier(entry["table"], "table")
     order = str(entry["order_by"])
     if not ORDER.match(order):
@@ -149,7 +191,18 @@ def read_view(
     spec: charter_ingest.IngestSpec,
     frame: pd.DataFrame | None = None,
 ) -> asof_view.AsOfView:
-    """One table as an as-of view; `frame` is the extract if already read."""
+    """One table as an as-of view; `frame` is the extract if already read.
+
+    Args:
+        entry: The plan entry for the view: its table, key, time rule, event
+            time column, name and whether it is permissive.
+        factory: Opens a database connection.
+        spec: The charter's ingest settings.
+        frame: The table already extracted, or None to read it.
+
+    Returns:
+        The as-of view over the table.
+    """
     table = identifier(entry["table"], "table")
     if frame is None:
         frame = read_frame(entry, factory)
@@ -169,11 +222,23 @@ def run(
     frame: pd.DataFrame,
     run_dir: Path | None,
 ) -> IngestResult:
-    """Runs the plan, then synthesizes features for the rows of `frame`.
+    """Runs the ingest plan, then synthesizes features for the rows of `frame`.
+
+    Args:
+        plan_document: The loaded ingest plan.
+        spec: The charter's ingest settings.
+        frame: The target rows; it must hold the ingest plan's key and moment
+            columns.
+        run_dir: Directory the ingest plan writes its records into, or None
+            to use a temporary one that is discarded.
+
+    Returns:
+        The synthesized feature frame with its declared family size,
+        provenance fields, documents to write and a summary.
 
     Raises:
         BlockedError: If the unit verdict is `coarser` or `unknown`.
-        ConfigError: If the plan names a column the table lacks.
+        ConfigError: If the ingest plan names a column the table lacks.
     """
     key, moment = plan_document["key"], plan_document["moment"]
     missing = [c for c in (key, moment) if c not in frame.columns]
@@ -341,6 +406,13 @@ def check_multiplicity(
 
     Every synthesized feature that was not quarantined or excluded must be a
     registered hypothesis of the ledger, and nothing else may be counted.
+
+    Args:
+        declared: The declared family size.
+        synthesized: Names of the synthesized columns that reached the table.
+        registered_columns: Columns registered as hypotheses of the ledger.
+        excluded: Synthesized columns left out of the family (quarantined or
+            excluded).
 
     Raises:
         BlockedError: If the registered count differs from the expected one.

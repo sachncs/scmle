@@ -1,4 +1,4 @@
-"""The causal estimate on `C` as a registered claim of the ledger (F10).
+"""The causal estimate on `C` as a registered claim of the ledger.
 
 This glue lives outside `scmle.data.identification` on purpose: that package
 may not import the custody or confirmation APIs (an import test enforces it),
@@ -61,6 +61,13 @@ DOCUMENTS = run.DOCUMENTS
 def load_dag(path: str | None) -> dag_module.Dag | None:
     """The DAG hypothesis a causal block declares, verified by its hash.
 
+    Args:
+        path: Path of the stored DAG document, or None or empty if the block
+            declares none.
+
+    Returns:
+        The loaded DAG, or None if no path is given.
+
     Raises:
         ConfigError: If the file cannot be read or is not a stored DAG.
     """
@@ -82,7 +89,22 @@ def registration(
     error_budget: budget_module.ErrorBudget,
     exploration_rows: int,
 ) -> confirm.RegisteredClaim:
-    """The claim as it is fixed before `C` is opened."""
+    """The claim as it is fixed before `C` is opened.
+
+    Args:
+        spec: The charter's causal block.
+        plan: The identification plan; its primary strategy is part of the
+            claim.
+        dag: The declared DAG, or None; only its digest is registered.
+        error_budget: The charter's error budget; its confirmation alpha is
+            registered.
+        exploration_rows: Number of exploration rows the claim was formed on.
+
+    Returns:
+        The registered claim, whose digest covers the hypothesis, the causal
+        block, the strategy, the DAG digest, the confirmation alpha and the
+        exploration row count.
+    """
     body = {
         "hypothesis": f"{spec.estimand} of {spec.treatment} on "
         f"{spec.outcome} = 0",
@@ -102,7 +124,16 @@ def registration(
 
 
 def jsonable(document: Mapping[str, Any]) -> dict[str, Any]:
-    """A JSON round trip, so the hashed document is the written one."""
+    """A JSON round trip, so the hashed document is the written one.
+
+    Args:
+        document: The document to normalize; values that JSON cannot encode
+            are converted with `str`.
+
+    Returns:
+        A plain dict holding exactly what a JSON file written from the
+        document would contain.
+    """
     return dict(json.loads(json.dumps(document, default=str)))
 
 
@@ -114,8 +145,24 @@ def verified_attestors(
 ) -> attest.Applied:
     """Which attestations count for the assumptions the chosen strategy needs.
 
+    Args:
+        spec: The charter's causal block, naming the attestors and the
+            attestations file.
+        plan: The identification plan; its primary strategy decides which
+            assumptions need attestation.
+        charter_hash: The charter's hash, the scope the attestations must
+            carry.
+        signing_key: Key the attestations are verified with, or None for the
+            configured default.
+
+    Returns:
+        The attestations accepted and rejected for the needed assumptions,
+        as checked against today's date.
+
     Raises:
-        ConfigError: If the attestation file cannot be read.
+        ConfigError: If the identification plan has no primary strategy,
+            the block names no attestations file, or the attestation file
+            cannot be read.
     """
     if plan.primary is None or spec.attestations is None:
         raise errors.ConfigError("the charter declares no attestations file")
@@ -166,6 +213,10 @@ def build_runner(
     Returns:
         None for a charter nothing identifies: no estimate can exist, `C` is
         not opened for it, and the stage writes the refusal from `X`.
+
+    Raises:
+        ConfigError: If the block names attestors, none were supplied, and
+            no charter hash was given to verify attestations against.
     """
     plan = select.select(spec, dag)
     if plan.primary is None:

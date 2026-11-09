@@ -59,14 +59,28 @@ class PolicyCheckpoint(abc.ABC):
 
     @abc.abstractmethod
     def review(self, review: GateReview) -> Approval:
-        """Decides whether the run may continue past the gate."""
+        """Decides whether the run may continue past the gate.
+
+        Args:
+            review: What the reviewer is shown at the gate.
+
+        Returns:
+            The reviewer's verdict.
+        """
 
 
 class AutoApprove(PolicyCheckpoint):
     """Approves everything (fully automatic operation)."""
 
     def review(self, review: GateReview) -> Approval:
-        """Always approves."""
+        """Always approves.
+
+        Args:
+            review: The gate review; not consulted.
+
+        Returns:
+            An approval by reviewer "auto".
+        """
         return Approval(True, "auto", "automatic approval")
 
 
@@ -89,7 +103,16 @@ class CallbackCheckpoint(PolicyCheckpoint):
             self.gates = gates
 
     def review(self, review: GateReview) -> Approval:
-        """Calls the function and normalizes its answer."""
+        """Calls the function and normalizes its answer.
+
+        Args:
+            review: What the reviewer is shown at the gate, passed to the
+                callback.
+
+        Returns:
+            The callback's `Approval` as is, or an approval by reviewer
+            "callback" whose outcome is the truth value of its answer.
+        """
         verdict = self.decide(review)
         if isinstance(verdict, Approval):
             return verdict
@@ -99,7 +122,17 @@ class CallbackCheckpoint(PolicyCheckpoint):
 def describe(
     gate: state.RunState, context: context_module.RunContext
 ) -> GateReview:
-    """Builds the review shown at `gate`."""
+    """Builds the review shown at `gate`.
+
+    Args:
+        gate: The stage that just completed.
+        context: The run context holding that stage's product.
+
+    Returns:
+        A review summarizing the execution plan at the gate after planning,
+        or the selected model and strategy (with its cross-validation
+        score) at any other gate.
+    """
     if gate is PLAN_GATE:
         plan = context_module.require(context.plan, "plan")
         return GateReview(gate, plan.summary(), plan.to_dict())

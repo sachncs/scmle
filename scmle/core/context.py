@@ -117,6 +117,10 @@ def tabular_beta_capability_registry() -> capabilities.CapabilityRegistry:
     no portable explanation or predictive-uncertainty promise. Modalities,
     task/model paths, and contract dimensions not listed here are rejected
     before fitting rather than being inferred from an adapter's existence.
+
+    Returns:
+        A registry of the supported and experimental tabular capabilities,
+        each with its failure modes, evidence links and limitations.
     """
     records: list[capabilities.Capability] = []
     for task, families in TABULAR_BETA_TASK_FAMILIES:
@@ -282,6 +286,13 @@ def extension_capability(
     User-registered and test adapters are allowed to exercise the extension
     boundary, but they must never inherit the supported status of a built-in
     family. The plan records this distinction before the adapter is fitted.
+
+    Args:
+        key: The capability key of the supplied adapter.
+
+    Returns:
+        A capability with extension-only status, no required extras and the
+        limitations that the built-in guarantee does not cover it.
     """
     return capabilities.Capability(
         key=key,
@@ -517,12 +528,22 @@ class RunContext:
             self.custody_vault.close()
 
     def write_json(self, relative: str, payload: Any) -> None:
-        """Writes a JSON artifact if the run is persisted."""
+        """Writes a JSON artifact if the run is persisted.
+
+        Args:
+            relative: Artifact path relative to the run directory.
+            payload: JSON-serializable content.
+        """
         if self.store is not None:
             self.store.write_json(relative, payload)
 
     def write_text(self, relative: str, text: str) -> None:
-        """Writes a text artifact if the run is persisted."""
+        """Writes a text artifact if the run is persisted.
+
+        Args:
+            relative: Artifact path relative to the run directory.
+            text: The content to write.
+        """
         if self.store is not None:
             self.store.write_text(relative, text)
 
@@ -568,7 +589,15 @@ class RunContext:
             )
 
     def allocate_trial_ids(self, count: int) -> list[str]:
-        """Hands out the next `count` sequential trial identifiers."""
+        """Hands out the next `count` sequential trial identifiers.
+
+        Args:
+            count: How many identifiers to reserve.
+
+        Returns:
+            Identifiers of the form `trial_001`, continuing from the trials
+            already allocated.
+        """
         start = self.trial_counter
         self.trial_counter += count
         return [f"trial_{start + offset + 1:03d}" for offset in range(count)]
@@ -579,11 +608,20 @@ class RunContext:
         action: experiments.DecisionAction,
         reason: str,
     ) -> None:
-        """Records an evidence-based decision for the decision log."""
+        """Records an evidence-based decision for the decision log.
+
+        Args:
+            technique: The technique the decision concerns.
+            action: What was decided (the decision action).
+            reason: The evidence behind the decision.
+        """
         self.outcomes.append(experiments.Decision(technique, action, reason))
 
     def record_trial(self, outcome: experiments.TrialResult) -> None:
         """Appends a trial and persists, announces and tracks it.
+
+        Args:
+            outcome: The finished trial to record.
 
         Raises:
             ScmleError: If a different trial already used the identifier,
@@ -602,7 +640,11 @@ class RunContext:
             self.tracker.record_trial(self.store.run_id, outcome)
 
     def track(self, **fields: Any) -> None:
-        """Updates the tracked run row if the run is persisted."""
+        """Updates the tracked run row if the run is persisted.
+
+        Args:
+            **fields: Run-row fields to update.
+        """
         if self.store is not None:
             self.tracker.update_run(self.store.run_id, **fields)
 

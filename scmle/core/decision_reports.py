@@ -1,4 +1,4 @@
-"""The decision layer's report files for a charter run (F11).
+"""The decision layer's report files for a charter run.
 
 Built once from the locked test set after the frozen rule exists, inside
 `FinalEvaluationStage`:
@@ -13,12 +13,13 @@ Built once from the locked test set after the frozen rule exists, inside
   propensity is ever estimated here.
 * the fairness satisfaction test for every declared constraint, once, on the
   same rows (`satisfaction_test`, upper bound of the gap against `max_gap`).
-* `rollout_design.json`: the plan, its hash, the fixed-horizon sample size for
-  the planned improvement, the expected sample number of the anytime-valid test
-  by simulation, and the level the decision budget would assign to the first
-  experiment. No experiment ran, so there is no assignment or decision to log.
+* `rollout_design.json`: the rollout plan, its hash, the fixed-horizon
+  sample size for the planned improvement, the expected sample number of
+  the anytime-valid test by simulation, and the level the decision budget
+  would assign to the first experiment. No experiment ran, so there is no
+  assignment or decision to log.
 * `rollout_decisions.jsonl`: the hash-chained decision log, holding one row,
-  the registration of the plan. Experiment assignments and e-process
+  the registration of the rollout plan. Experiment assignments and e-process
   snapshots are written to it by whoever runs the rollout, not by this run.
 * `decision_threshold.json` and `net_benefit.json`: the frozen threshold rule
   and the net benefit of the rule on the locked rows, as their own files.
@@ -68,6 +69,12 @@ REGISTRATION_EVENT = "decision_files"
 def file_digest(path: Path) -> str | None:
     """Hash of a JSON file's content (`ledger.digest`), None if absent.
 
+    Args:
+        path: The JSON file.
+
+    Returns:
+        The content digest, or None if the file does not exist.
+
     Raises:
         ValueError: If the file is not a JSON object.
     """
@@ -80,7 +87,15 @@ def file_digest(path: Path) -> str | None:
 
 
 def file_digests(folder: str | Path) -> dict[str, str | None]:
-    """The hash of each of the four decision files, None where absent."""
+    """The hash of each of the four decision files, None where absent.
+
+    Args:
+        folder: The directory holding the decision files.
+
+    Returns:
+        A mapping from decision file name to its content digest, or None
+        for a file that does not exist.
+    """
     return {name: file_digest(Path(folder) / name) for name in DECISION_FILES}
 
 
@@ -91,7 +106,22 @@ def policy_value(
     logged: np.ndarray | None,
     propensity: np.ndarray | None,
 ) -> dict[str, Any]:
-    """Off-policy value of the frozen rule, or why there is none."""
+    """Off-policy value of the frozen rule, or why there is none.
+
+    Args:
+        layer: The charter's decision layer, whose off-policy rules apply.
+        actions: The rule's chosen action probabilities, one per row.
+        outcome: The observed outcome, one per row.
+        logged: The action taken in the log (0 or 1), or None if there is no
+            randomized log.
+        propensity: The probability with which the logged action was taken,
+            or None.
+
+    Returns:
+        The estimated value with its row count, reward definition and
+        assumptions, or a record whose status is not assessable and says why
+        when the log is missing or its propensities and actions are invalid.
+    """
     if logged is None or propensity is None:
         return {
             "status": NOT_ASSESSABLE,
@@ -142,7 +172,19 @@ def fairness(
     actions: np.ndarray,
     alpha: float,
 ) -> list[dict[str, Any]]:
-    """The satisfaction test for each declared constraint."""
+    """The satisfaction test for each declared constraint.
+
+    Args:
+        layer: The charter's decision layer, listing the constraints.
+        features: The test rows, holding each constrained attribute.
+        outcome: The observed outcome, one per row.
+        actions: The rule's actions, one per row.
+        alpha: Significance level of each satisfaction test.
+
+    Returns:
+        One record per constraint, in declaration order: the test result, or
+        a not-assessable status if the attribute is not a column.
+    """
     out = []
     for item in layer.fairness:
         if item.attribute not in features.columns:
@@ -164,7 +206,18 @@ def fairness(
 def rollout_design(
     charter: charter_contracts.AnalysisCharter, base_rate: float
 ) -> tuple[dict[str, Any], rollout.DecisionLog] | None:
-    """The rollout plan's design record and its one-row decision log."""
+    """The rollout plan's design record and its one-row decision log.
+
+    Args:
+        charter: The charter, which may declare a rollout plan.
+        base_rate: The baseline rate of the positive outcome.
+
+    Returns:
+        The design record (plan hash, first experiment level, budget and,
+        where the base rate leaves room for the minimum effect, the fixed
+        horizon and expected sample number) with a decision log holding the
+        registration, or None if the charter has no rollout plan.
+    """
     layer = charter.decision
     plan = layer.rollout if layer is not None else None
     if layer is None or plan is None:
@@ -217,7 +270,20 @@ def decision_report(
     satisfaction: list[dict[str, Any]],
     design_record: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
-    """The summary file."""
+    """The summary file.
+
+    Args:
+        charter: The charter, supplying the cost model, unit and plan.
+        decision: The decision record, or None.
+        net_benefit: The net-benefit record, or None.
+        value: The off-policy value record.
+        satisfaction: The fairness records.
+        design_record: The rollout design record, or None.
+
+    Returns:
+        The summary document, which references the other decision files and
+        lists the limits of the analysis.
+    """
     model = charter.cost_model
     return {
         "schema_version": 1,

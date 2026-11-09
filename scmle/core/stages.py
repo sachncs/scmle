@@ -143,11 +143,23 @@ class Stage(abc.ABC):
 
     @abc.abstractmethod
     def describe(self, context: context_module.RunContext) -> str:
-        """Returns the reason recorded on entering the stage."""
+        """Returns the reason recorded on entering the stage.
+
+        Args:
+            context: The run context.
+
+        Returns:
+            The reason text attached to the stage's state transition.
+        """
 
     @abc.abstractmethod
     def execute(self, context: context_module.RunContext) -> None:
-        """Performs the stage, reading and writing the context."""
+        """Performs the stage, reading and writing the context.
+
+        Args:
+            context: The run context; earlier stages' products are read from it
+                and this stage's products are written to it.
+        """
 
 
 PARITY_ROWS = 200
@@ -159,12 +171,28 @@ class IngestStage(Stage):
     state = run_state.RunState.VALIDATING
 
     def describe(self, context: context_module.RunContext) -> str:
-        """Names the stage."""
+        """Names the stage.
+
+        Args:
+            context: The run context; not consulted.
+
+        Returns:
+            The text "ingest dataset".
+        """
         return "ingest dataset"
 
     @staticmethod
     def must_stream(data: tasks.DataSpec) -> bool:
-        """Whether the file is bigger than the memory budget."""
+        """Whether the file is bigger than the memory budget.
+
+        Args:
+            data: The data specification, giving the source and the optional
+                memory budget in gigabytes.
+
+        Returns:
+            True if a memory budget is set and the source's estimated size
+            exceeds it; False if no budget is set.
+        """
         if data.memory_budget_gb is None:
             return False
         size = streaming.source_for(data.uri).estimated_bytes()
@@ -173,7 +201,17 @@ class IngestStage(Stage):
     def read_stream(
         self, context: context_module.RunContext, data: tasks.DataSpec
     ) -> pd.DataFrame:
-        """One pass over the file: locked rows by hash, a development sample."""
+        """One pass over the file: locked rows by hash, a development sample.
+
+        The streaming source and the pass totals are stored in `context.stream`.
+
+        Args:
+            context: The run context, supplying the validation settings.
+            data: The data specification naming the source and memory budget.
+
+        Returns:
+            The development sample together with the locked rows.
+        """
         source = streaming.source_for(data.uri)
         columns = source.shape()[1]
         development, locked = streaming.sample_caps(
@@ -192,7 +230,17 @@ class IngestStage(Stage):
         return frame
 
     def execute(self, context: context_module.RunContext) -> None:
-        """Loads data (copying in-memory input) and builds the manifest."""
+        """Loads data (copying in-memory input) and builds the manifest.
+
+        Args:
+            context: The run context; receives the frame, manifest and cleaning
+                notes.
+
+        Raises:
+            UnsupportedCapabilityError: If the data is not tabular and no
+                in-memory frame was supplied, since no other modality has an
+                ingestion adapter.
+        """
         data = context.spec.data
         if data.modality != "tabular" and context.input_frame is None:
             raise capabilities.UnsupportedCapabilityError(
@@ -256,7 +304,16 @@ class IngestStage(Stage):
     def persist_source_snapshot(
         self, context: context_module.RunContext, frame: pd.DataFrame
     ) -> None:
-        """Persist source identity and reject breaking resume evolution."""
+        """Persist source identity and reject breaking resume evolution.
+
+        Args:
+            context: The run context, holding the manifest and the run store.
+            frame: The loaded data, whose column names and dtypes are recorded.
+
+        Raises:
+            ConfigError: If the run is resuming and the source's schema changed
+                incompatibly since the earlier snapshot.
+        """
         manifest = require(context.manifest, "manifest")
         snapshot = source_registry.SourceSnapshot.from_manifest(
             manifest,
@@ -300,6 +357,9 @@ class IngestStage(Stage):
 
     def refuse_stale_resume(self, context: context_module.RunContext) -> None:
         """Rejects resuming trials computed on different data.
+
+        Args:
+            context: The run context, holding the checkpoints and manifest.
 
         Raises:
             ConfigError: If the run has checkpoints and the data hash differs
@@ -374,13 +434,25 @@ class ProfileStage(Stage):
     state = run_state.RunState.PROFILING
 
     def describe(self, context: context_module.RunContext) -> str:
-        """Names the stage."""
+        """Names the stage.
+
+        Args:
+            context: The run context; not consulted.
+
+        Returns:
+            The text "profile dataset".
+        """
         return "profile dataset"
 
     def set_aside_unlabeled(
         self, context: context_module.RunContext, frame: pd.DataFrame
     ) -> pd.DataFrame:
         """Applies the `unlabeled` policy to rows with a missing target.
+
+        Args:
+            context: The run context; receives the unlabeled rows and the
+                labeled frame.
+            frame: The data, some of whose target values are missing.
 
         Returns:
             The labeled rows. The others wait in `context.unlabeled` (their
@@ -411,9 +483,20 @@ class ProfileStage(Stage):
     def execute(self, context: context_module.RunContext) -> None:
         """Resolves task/metric, profiles, and enforces the leakage policy.
 
+        Args:
+            context: The run context; receives the task, metric, profile,
+                curation report and the artifacts written for them.
+
         Raises:
-            BlockedError: When `leakage_policy` is `block` and a leakage
-                hypothesis was raised.
+            BlockedError: If curation leaves unresolved blocking findings, or
+                `leakage_policy` is `block` and a leakage hypothesis was raised
+                or a screened column could not be checked.
+            ConfigError: If `pseudo_label` is used for a non-classification
+                task, the approved plan's task differs from the one the data
+                resolves to, or a success criterion names a metric that is not
+                reported.
+            DataError: If a declared group, time or weight column is missing
+                from the data.
         """
         spec = context.spec
         frame = require(context.frame, "frame")
@@ -611,18 +694,25 @@ class ProfileStage(Stage):
     def synthesize_features(
         self, context: context_module.RunContext, frame: pd.DataFrame
     ) -> pd.DataFrame:
-        """Adds the F9 synthesized features before the data are split.
+        """Adds the synthesized features before the data are split.
 
         Runs when the data spec names an `ingest_plan`, which needs a charter
         with an `ingest` block. The plan reads the database through the as-of
         views, so no feature uses a fact recorded after its row's cutoff; the
-        confirmation set does not exist yet. A unit verdict that does not
-        match stops the run.
+        confirmation set does not exist yet. A unit verdict of `coarser` or
+        `unknown` blocks the run (raised by the ingest stage as `BlockedError`).
+
+        Args:
+            context: The run context, holding the specification and run store.
+            frame: The loaded data.
+
+        Returns:
+            The frame with the synthesized columns appended, or `frame` itself
+            when no ingest plan and no charter ingest block are set.
 
         Raises:
-            ConfigError: If only one of the plan and the charter block is set,
-                or a synthesized name collides with a column.
-            BlockedError: If the unit verdict is `coarser` or `unknown`.
+            ConfigError: If only one of the ingest plan and the charter block
+                is set, or a synthesized name collides with a column.
         """
         data = context.spec.data
         path = context.spec.charter_path
@@ -676,7 +766,15 @@ class ProfileStage(Stage):
         entity: charter_ingest.EntitySpec,
         frame: pd.DataFrame,
     ) -> pd.DataFrame:
-        """Makes the resolved entity the split's group column (F9).
+        """Makes the resolved entity the split's group column.
+
+        Args:
+            context: The run context; its specification gains the group column.
+            entity: The charter's entity block.
+            frame: The data with the synthesized features.
+
+        Returns:
+            The frame with the resolved entity column added.
 
         Raises:
             ConfigError: If the data spec names a group column, or the
@@ -714,13 +812,19 @@ class ProfileStage(Stage):
     def run_claim_ledger(
         self, context: context_module.RunContext, task: tasks.TaskType
     ) -> None:
-        """Explores `X` under the ledger and confirms once on `C` (F3).
+        """Explores `X` under the ledger and confirms once on `C`.
 
-        Runs only for a charter run. Exploration reads the exploration view;
-        the sealed confirmation set is handed to the confirmation stage as an
-        argument and is opened at most once, after the survivors are frozen
-        in the ledger. Tasks other than classification and regression are
-        recorded as skipped: their findings stay unconfirmed.
+        Runs only for a charter run. Exploration reads the exploration view; the
+        sealed confirmation set is handed to the confirmation stage as an
+        argument and is opened at most once, after the survivors are frozen in
+        the ledger. Tasks other than classification and regression are recorded
+        as skipped: their findings stay unconfirmed. When the baseline claim is
+        about the selected model, or the coverage claim needs the calibrated
+        model, the confirmation is deferred until the model is frozen.
+
+        Args:
+            context: The run context, holding the custody outcome and vault.
+            task: The resolved task.
         """
         outcome = context.custody
         vault = context.custody_vault
@@ -828,7 +932,7 @@ class ProfileStage(Stage):
         subject: framing_claim.Rule | None = None,
         extra: ledger_confirm.ClaimRunner | None = None,
     ) -> None:
-        """Registers the claims and opens `C` once (F3), then the reports.
+        """Registers the claims and opens `C` once, then the reports.
 
         Args:
             context: The run context.
@@ -905,7 +1009,7 @@ class ProfileStage(Stage):
         signed: bool,
         subject: framing_claim.Rule | None = None,
     ) -> ledger_confirm.ClaimRunner | None:
-        """Freezes the baseline rule on `X` and registers the claim (F8).
+        """Freezes the baseline rule on `X` and registers the claim.
 
         Runs when the data spec names `baseline_column`. The rule is fitted
         on the exploration rows, the selection of outcomes is checked on those
@@ -914,6 +1018,22 @@ class ProfileStage(Stage):
         the one opening of `C`. With `subject` (the selected model, frozen
         before this call) the claim is about that model and the logistic rule
         is reported next to it as the reference.
+
+        Args:
+            context: The run context, holding the profile and unlabeled rows.
+            task: The resolved task.
+            charter: The analysis charter, supplying the cost model.
+            view: The exploration view (features and target).
+            structure: Group, time and baseline columns, which are not used as
+                rule inputs.
+            signed: Whether the charter is signed, which bears on the ceiling
+                that a drafted framing may claim.
+            subject: The frozen rule of the selected model, or None to make the
+                claim about the logistic rule itself.
+
+        Returns:
+            The runner that registers and evaluates the baseline claim, or None
+            if the data spec names no `baseline_column`.
 
         Raises:
             ConfigError: If the charter has no cost model, the task is not
@@ -980,9 +1100,15 @@ class ProfileStage(Stage):
     ) -> None:
         """Requires the ledger to hold exactly the declared synthesized family.
 
-        Raises:
-            BlockedError: If the declared family size and the registered
-                hypotheses differ.
+        A mismatch between the declared family size and the registered
+        hypotheses blocks the run (the multiplicity check raises
+        `BlockedError`).
+
+        Args:
+            context: The run context, holding the ingest result.
+            run: The governed run whose ledger registered the hypotheses.
+            found: The exploration qualification, whose quarantined columns
+                are exempt.
         """
         result = context.ingest
         if result is None:
@@ -1011,6 +1137,12 @@ class ProfileStage(Stage):
 
         A claim that `C` could not test (no confirmation set, or a failure)
         is written as not evaluated, never left out.
+
+        Args:
+            context: The run context that stores the documents.
+            run: The governed run, holding the confirmation's documents.
+            runner: The claim runner, or None if no claim was registered, in
+                which case nothing is written.
         """
         if runner is None:
             return
@@ -1052,8 +1184,19 @@ class ProfileStage(Stage):
 
         Reads the exploration view and the data spec's reference sample, if
         any; never `C` and never `F`. It runs between exploration and the
-        opening of `C` (the second stage), so its inputs are exploration
-        rows only.
+        opening of `C`, so its inputs are exploration rows only.
+
+        Args:
+            context: The run context, holding the profile and specification.
+            task: The resolved task.
+            charter: The analysis charter, supplying the stability rule, seed
+                and multiverse choices.
+            view: The exploration view (features and target).
+            survivors: Columns that survived exploration.
+            structure: Group, time and baseline columns.
+
+        Returns:
+            The stability and shift assessment of the survivors.
         """
         data = context.spec.data
         profile = require(context.profile, "profile")
@@ -1108,6 +1251,15 @@ class ProfileStage(Stage):
         withdrawn from the confirmation only if the charter's rules ask for
         it and the stability rule is certified for its thresholds; the
         report says which.
+
+        Args:
+            context: The run context that stores the reports.
+            charter: The analysis charter.
+            run: The governed run.
+            stage: The stability stage, holding the assessment it ran.
+
+        Raises:
+            BlockedError: If the stability stage never ran.
         """
         found = stage.found
         if found is None:  # pragma: no cover - run_governed always calls it
@@ -1146,12 +1298,18 @@ class ProfileStage(Stage):
         charter: charter_contracts.AnalysisCharter,
         view: Any,
     ) -> None:
-        """Checks that the charter's words name real columns (F8).
+        """Checks that the charter's words name real columns.
 
         Reads the column names of the exploration view and the target
         column, never row values. Writes `framing_link.json`. The result is
         descriptive: a name that matches no column is `unresolved`, and
         nothing in the run is gated on it.
+
+        Args:
+            context: The run context that stores the report.
+            charter: The analysis charter whose target, moment and unit are
+                matched.
+            view: The exploration view, supplying the column names.
         """
         data = context.spec.data
         columns = [*view.features.columns, data.target]
@@ -1172,14 +1330,25 @@ class ProfileStage(Stage):
         graph: Any,
         found: qualify.Qualification,
     ) -> ledger_confirm.ClaimRunner | None:
-        """Registers the primary causal hypothesis for the one opening (F10).
+        """Registers the primary causal hypothesis for the one opening.
 
         The strategy is chosen from the charter and the declared DAG alone.
         The estimate, the falsification battery, the replication, the
         sensitivity assessment and the tier are computed on the frame the
         confirmation releases, in the same opening that tests the bivariate
-        family; nothing opens `C` for them. None for a predictive charter and
-        for a charter no strategy identifies (no estimate can exist).
+        family; nothing opens `C` for them.
+
+        Args:
+            context: The run context, supplying the target name.
+            charter: The analysis charter, with its causal block and budget.
+            view: The exploration view (features and target).
+            graph: The declared DAG, or None.
+            found: The exploration qualification, whose DAG checks are
+                copied into the report.
+
+        Returns:
+            The claim runner, or None for a predictive charter and for a
+            charter no strategy identifies (no estimate can exist).
         """
         block = charter.estimand.causal
         if block is None:
@@ -1206,7 +1375,7 @@ class ProfileStage(Stage):
         graph: Any,
         found: qualify.Qualification,
     ) -> None:
-        """Reports the identification of a causal charter (F10).
+        """Reports the identification of a causal charter.
 
         Runs only when the charter's estimand carries a causal block. When the
         confirmation evaluated the registered claim, its five report files
@@ -1216,6 +1385,14 @@ class ProfileStage(Stage):
         not be evaluated) the strategy is chosen from the charter, the design
         is diagnosed on `X`, and the claim is `unverified` or
         `not_identified` with no estimate.
+
+        Args:
+            context: The run context that stores the documents.
+            charter: The analysis charter.
+            view: The exploration view (features and target).
+            run: The governed run, holding the confirmation's documents.
+            graph: The declared DAG, or None.
+            found: The exploration qualification, whose DAG checks are used.
         """
         block = charter.estimand.causal
         if block is None:
@@ -1268,7 +1445,7 @@ class ProfileStage(Stage):
         structure: tuple[str, ...],
         graph: Any = None,
     ) -> qualify.Qualification:
-        """Runs the F4 admissibility tests and F5 detectors on `X` only.
+        """Runs the admissibility tests and detectors on `X` only.
 
         Writes `admissibility_table.json` and `detector_certificates.json`
         (the certificates the run used). A leakage suspicion quarantines a
@@ -1278,8 +1455,23 @@ class ProfileStage(Stage):
         with a ledger diagnostic. Quarantined fields leave the feature plan,
         with the reason logged.
 
+        Args:
+            context: The run context, holding the profile; the feature plan,
+                curation report and dataset card are amended when fields are
+                quarantined.
+            task: The resolved task.
+            charter: The analysis charter.
+            view: The exploration view (features and target).
+            structure: Group, time and baseline columns.
+            graph: The declared DAG, or None.
+
+        Returns:
+            The qualification: admissibility table, detector results,
+            quarantined fields with reasons, and leakage suspects.
+
         Raises:
             BlockedError: If every feature would be quarantined.
+            ConfigError: If the leakage attestations file is invalid.
         """
         spec = context.spec
         try:
@@ -1395,7 +1587,19 @@ class ProfileStage(Stage):
         development: pd.DataFrame,
         profile: data_contracts.DatasetProfile,
     ) -> data_contracts.DatasetProfile:
-        """Appends label-noise and representativeness findings."""
+        """Appends label-noise and representativeness findings.
+
+        Args:
+            spec: The project specification.
+            task: The resolved task; label noise is assessed for binary and
+                multiclass tasks only.
+            development: The development rows.
+            profile: The dataset profile to extend.
+
+        Returns:
+            The profile with the new findings and their evidence appended, or
+            `profile` itself if there are none.
+        """
         present = set(development.columns)
         columns = [c for c in profile.feature_plan.numeric if c in present]
         categorical = [
@@ -1459,7 +1663,14 @@ class ProfileStage(Stage):
         """Weights development rows so group and label are independent.
 
         The weights come from development rows only; the locked rows are
-        untouched. The weight column then trains the models as any other.
+        untouched. The weight column then trains the models as any other. Does
+        nothing unless reweighing is the requested mitigation; for tasks other
+        than binary and multiclass it records a rejection instead.
+
+        Args:
+            context: The run context; its specification gains the weight column.
+            task: The resolved task.
+            split: The split whose development features receive the weights.
         """
         fairness = context.spec.fairness
         if fairness.mitigation != "reweighing":
@@ -1505,9 +1716,23 @@ class ProfileStage(Stage):
         exploration rows only, so the profiler and every trial that follows
         read nothing from the confirmation set.
 
-        Limits (canon P6): the vault is a separate process on this machine.
-        This process drops its own reference to the sealed rows, but the
-        caller's DataFrame or the original file still holds every row.
+        Limits: the vault is a separate process on this machine. This process
+        drops its own reference to the sealed rows, but the caller's DataFrame
+        or the original file still holds every row.
+
+        Args:
+            context: The run context; receives the custody outcome and vault
+                and the files that describe them.
+            task: The resolved task.
+            frame: The full data before partitioning.
+            split: The split before the confirmation rows are carved out.
+
+        Returns:
+            The split reduced to exploration rows.
+
+        Raises:
+            ConfigError: If the charter's unit of prediction is `new_entity`
+                and the data spec has no group column.
         """
         path = str(context.spec.charter_path)
         verified = charter_sealing.read_verified(path)
@@ -1580,12 +1805,18 @@ class ProfileStage(Stage):
         charter: charter_contracts.AnalysisCharter,
         split: splitters.SplitResult,
     ) -> None:
-        """Requires the data a known-entity-future charter needs (F12).
+        """Requires the data a known-entity-future charter needs.
 
         A later row of an entity seen in training is predicted, so the
         entity column and the time column must be named and validation must
         be time-ordered: an entity-disjoint split would test the wrong unit
         (that is `new_entity`).
+
+        Args:
+            context: The run context, supplying the data spec.
+            charter: The analysis charter; nothing is checked unless its unit
+                of prediction is `known_entity_future`.
+            split: The split, whose strategy must be time-ordered.
 
         Raises:
             ConfigError: If a column is missing or the split is entity-disjoint.
@@ -1624,7 +1855,17 @@ class ProfileStage(Stage):
         task: tasks.TaskType,
         frame: pd.DataFrame,
     ) -> splitters.SplitResult:
-        """Splits the dataset and records the manifest."""
+        """Splits the dataset and records the manifest.
+
+        Args:
+            context: The run context; receives the split and its manifest.
+            task: The resolved task.
+            frame: The data to split.
+
+        Returns:
+            The split; under a charter, or when resources are hard-enforced, its
+            locked rows are sealed in a separate vault process.
+        """
         split = splitters.SplitManager(context.spec, task).split(frame)
         data = context.spec.data
         if task is tasks.TaskType.FORECAST and data.seasonal_period:
@@ -1683,6 +1924,9 @@ def chartered_rule(
         requested: Value in the run specification.
         chartered: Value in the charter's rules, or None without rules.
         default: The specification's default.
+
+    Returns:
+        The charter's value when it fixes one, otherwise `requested`.
 
     Raises:
         ConfigError: If the specification contradicts the charter.
@@ -1752,7 +1996,13 @@ def build_plan(
     The planner remains responsible for adapter compatibility and search
     policy. The capability registry is the separate release boundary: every
     candidate in the resulting plan must have an explicit complete capability
-    declaration before the plan can reach ``TrainStage``.
+    declaration before the execution plan can reach ``TrainStage``.
+
+    Args:
+        context: The run context, holding the profile, task and manifest.
+
+    Returns:
+        The validated experiment plan.
 
     Raises:
         capabilities.UnsupportedCapabilityError: If any planned candidate or
@@ -1815,9 +2065,19 @@ def capability_key(
     Selection uncertainty is deliberately not translated into predictive
     uncertainty: it is a model-selection policy, not an output contract.
 
+    Args:
+        context: The run context, supplying the manifest and specification.
+        task: The resolved task.
+        model_family: Family of the candidate model.
+
+    Returns:
+        The capability key requested for the candidate.
+
     Raises:
-        capabilities.UnsupportedCapabilityError: If the requested fairness
-            behavior is not implemented for ``task``.
+        capabilities.UnsupportedCapabilityError: If the dataset modality is
+            unknown, or the requested fairness behavior is not implemented
+            for ``task``.
+        ConfigError: If the manifest's modality differs from the data spec's.
     """
     manifest = require(context.manifest, "manifest")
     try:
@@ -1885,11 +2145,25 @@ class PlanStage(Stage):
     state = run_state.RunState.PLANNING
 
     def describe(self, context: context_module.RunContext) -> str:
-        """Names the stage."""
+        """Names the stage.
+
+        Args:
+            context: The run context; not consulted.
+
+        Returns:
+            The text "build execution plan".
+        """
         return "build execution plan"
 
     def execute(self, context: context_module.RunContext) -> None:
-        """Plans candidates."""
+        """Plans candidates.
+
+        Writes the execution plan, the capability registry, the decision log and
+        the recommendations.
+
+        Args:
+            context: The run context; receives the execution plan.
+        """
         plan = build_plan(context)
         context.plan = plan
         context.write_json("execution_plan.json", plan.to_dict())
@@ -1920,7 +2194,14 @@ class TrainStage(Stage):
     state = run_state.RunState.TRAINING
 
     def describe(self, context: context_module.RunContext) -> str:
-        """Reports the number of candidates."""
+        """Reports the number of candidates.
+
+        Args:
+            context: The run context, holding the execution plan.
+
+        Returns:
+            The candidate count as text.
+        """
         plan = require(context.plan, "plan")
         return f"{len(plan.candidate_models)} candidates"
 
@@ -1930,6 +2211,10 @@ class TrainStage(Stage):
         Candidates run in chunks of `backend.workers`; the budget is checked
         before every chunk but the first, and results are recorded in
         candidate order regardless of the backend.
+
+        Args:
+            context: The run context, holding the execution plan; receives the
+            trials.
         """
         runner = trials.TrialRunner(context)
         plan = require(context.plan, "plan")
@@ -1968,11 +2253,22 @@ class SelectStage(Stage):
     state = run_state.RunState.SELECTING
 
     def describe(self, context: context_module.RunContext) -> str:
-        """Names the policy."""
+        """Names the policy.
+
+        Args:
+            context: The run context, holding the selection policy.
+
+        Returns:
+            The selection policy's description.
+        """
         return context.policy.description
 
     def announce(self, context: context_module.RunContext) -> None:
-        """Audits that the selection is frozen before the test set opens."""
+        """Audits that the selection is frozen before the test set opens.
+
+        Args:
+            context: The run context, holding the selected trial.
+        """
         selected = require(context.selected, "selected")
         context.emit(
             "selection.frozen",
@@ -1988,7 +2284,14 @@ class SelectStage(Stage):
     def limits(
         self, context: context_module.RunContext
     ) -> resources.ResourceLimits:
-        """Builds the serving limits from the specification."""
+        """Builds the serving limits from the specification.
+
+        Args:
+            context: The run context, supplying the selection settings.
+
+        Returns:
+            The model-size and latency limits.
+        """
         spec = context.spec.selection
         return resources.ResourceLimits(
             spec.max_model_mb,
@@ -2007,6 +2310,11 @@ class SelectStage(Stage):
         Among candidates that meet the limits and score within
         `pareto_tolerance` of the best, the fastest wins (smaller size breaks
         ties). The whole front is reported so the trade-off is visible.
+
+        Args:
+            context: The run context; receives the front and the selection.
+            checked: The best-ranked trials to measure.
+            limits: The serving limits.
 
         Raises:
             BlockedError: If no checked candidate satisfies the limits.
@@ -2060,10 +2368,15 @@ class SelectStage(Stage):
         self.announce(context)
 
     def execute(self, context: context_module.RunContext) -> None:
-        """Chooses the model, then opens a deferred confirmation (F8).
+        """Chooses the model, then opens a deferred confirmation.
 
-        Raises:
-            BlockedError: If no checked candidate satisfies the constraints.
+        If the confirmation was deferred, it is completed here once the model
+        is frozen, unless the coverage claim still waits for calibration.
+        Raises `BlockedError` (through `choose`) if no checked candidate
+        satisfies the constraints.
+
+        Args:
+            context: The run context, holding any pending ledger.
         """
         self.choose(context)
         pending = context.pending_ledger
@@ -2090,7 +2403,19 @@ class SelectStage(Stage):
         selected: experiments.TrialResult,
         split: Any,
     ) -> framing_claim.SelectedModelRule:
-        """The selected model as the rule the baseline claim is about."""
+        """The selected model as the rule the baseline claim is about.
+
+        Args:
+            context: The run context; the refit pipeline is cached in it.
+            pending: The deferred ledger, supplying the view and charter.
+            selected: The selected trial.
+            split: The split whose development rows the model is refit on if
+                no refit exists.
+
+        Returns:
+            The selected model with its positive class, the cost model's
+            threshold and a description of how it was fitted.
+        """
         pipeline = context.refits.get(selected.trial_id)
         if pipeline is None:
             pipeline = strategies.get_strategy(selected.strategy).build(
@@ -2123,6 +2448,9 @@ class SelectStage(Stage):
 
         Candidates are walked in policy order; each is refit and measured on
         this machine, and the first one within every limit wins.
+
+        Args:
+            context: The run context; receives the selected trial.
 
         Raises:
             BlockedError: If no checked candidate satisfies the constraints.
@@ -2196,7 +2524,19 @@ class Measured:
 def pareto_report(
     rows: list[Measured], chosen: Measured, sign: float
 ) -> list[dict[str, Any]]:
-    """Score / latency / size of each measured candidate, with dominance."""
+    """Score / latency / size of each measured candidate, with dominance.
+
+    Args:
+        rows: The measured candidates.
+        chosen: The candidate that was selected.
+        sign: 1 if a higher score is better, -1 if a lower score is better.
+
+    Returns:
+        One record per candidate, in order: model, strategy, score, p95
+        latency, size, limit violations, whether another candidate is at
+        least as good on all three and better on one, and whether it was
+        chosen.
+    """
     points = [
         (
             sign * r.trial.score_mean,
@@ -2257,7 +2597,16 @@ def reference_scores(
 def coverage_on_confirmation(
     charter: charter_contracts.AnalysisCharter, task: tasks.TaskType
 ) -> bool:
-    """Whether the charter asks for the coverage claim on `C` for this task."""
+    """Whether the charter asks for the coverage claim on `C` for this task.
+
+    Args:
+        charter: The analysis charter.
+        task: The resolved task.
+
+    Returns:
+        True if the charter's uncertainty block asks for it and the task
+        has a primary coverage choice.
+    """
     block = charter.uncertainty
     return (
         block is not None
@@ -2269,7 +2618,15 @@ def coverage_on_confirmation(
 def declared_slice_columns(
     context: context_module.RunContext,
 ) -> tuple[str, ...]:
-    """The slice columns the charter's uncertainty block declares."""
+    """The slice columns the charter's uncertainty block declares.
+
+    Args:
+        context: The run context, supplying the charter path.
+
+    Returns:
+        The declared columns; empty if there is no charter or no
+        uncertainty block.
+    """
     path = context.spec.charter_path
     if not path:
         return ()
@@ -2284,6 +2641,13 @@ def slice_labels(
 
     Bands of a numeric column are cut at quantiles of the development rows.
     A column the rows lack, or that has too many levels, maps to None.
+
+    Args:
+        context: The run context, supplying the split and charter.
+        features: The final test rows.
+
+    Returns:
+        A mapping from each declared slice column to its labels, or None.
     """
     split = require(context.split, "split")
     found: dict[str, Any] = {}
@@ -2301,7 +2665,15 @@ def slice_labels(
 def chartered_decision_model(
     context: context_module.RunContext,
 ) -> charter_contracts.AnalysisCharter | None:
-    """The charter when it declares a decision layer (F11), else None."""
+    """The charter when it declares a decision layer, else None.
+
+    Args:
+        context: The run context, supplying the charter path.
+
+    Returns:
+        The charter if it declares both a decision layer and a cost model,
+        else None.
+    """
     path = context.spec.charter_path
     if path is None:
         return None
@@ -2324,6 +2696,22 @@ def chartered_threshold(
     The rule is chosen on out-of-fold development probabilities only and is
     frozen; a recalibrating rule is expressed as the equivalent cut on the raw
     probability, so the served classifier needs no extra stage.
+
+    Args:
+        fitted: The fitted classifier to wrap.
+        probabilities: Out-of-fold development probabilities.
+        actual: The observed labels.
+        charter: The analysis charter with its decision layer and cost model.
+        seed: Seed for the calibration replicates.
+        rows: Number of validation rows, recorded in the description.
+
+    Returns:
+        The thresholded classifier and a description of the objective, the
+        raw threshold and the cost model's hash.
+
+    Raises:
+        ScmleError: If the charter has no decision layer or cost model, or
+            the chosen rule has no raw threshold.
     """
     layer = charter.decision
     model = charter.cost_model
@@ -2359,13 +2747,28 @@ def chartered_net_benefit(
     target: pd.Series,
     decision: dict[str, Any] | None,
 ) -> dict[str, Any] | None:
-    """Net benefit of the frozen rule on the locked test set, once (F11).
+    """Net benefit of the frozen rule on the locked test set, once.
 
     Registered by the rule's hash before the table is read; the guard refuses
     a second call. The band is simultaneous over the chartered range of
     threshold probabilities and clustered by the group column of a grouped
     split. The claim is `useful` or `not_useful_in_range`; it is tiered
     `attested` when every cost came from a person and `unverified` otherwise.
+
+    Args:
+        context: The run context, supplying the charter and split.
+        pipeline: The fitted classifier.
+        features: The final test rows.
+        target: The final test labels.
+        decision: The chartered threshold description, or None.
+
+    Returns:
+        The net-benefit report with its tier, cost model hash and rule
+        hash, or None if the charter has no decision layer or the decision
+        carries no chartered rule.
+
+    Raises:
+        ScmleError: If the charter has no cost model.
     """
     charter = chartered_decision_model(context)
     if charter is None or decision is None or "f11" not in decision:
@@ -2471,7 +2874,14 @@ class FinalEvaluationStage(Stage):
     state = run_state.RunState.TESTING
 
     def describe(self, context: context_module.RunContext) -> str:
-        """Names the selected model."""
+        """Names the selected model.
+
+        Args:
+            context: The run context, holding the selected trial.
+
+        Returns:
+            The reason text naming the model that is evaluated.
+        """
         selected = require(context.selected, "selected")
         return f"final one-time test evaluation of {selected.model_name}"
 
@@ -2481,6 +2891,13 @@ class FinalEvaluationStage(Stage):
 
         A share of the time budget, never less than a minimum, so wide
         datasets cannot turn explanation into the slowest step of the run.
+
+        Args:
+            context: The run context, supplying the time budget.
+
+        Returns:
+            The total seconds the diagnostics may use: a fixed share of the time
+            budget, but never less than the minimum.
         """
         budget = context.spec.resources.time_budget_seconds
         return max(DIAGNOSTIC_MIN_SECONDS, DIAGNOSTIC_BUDGET_SHARE * budget)
@@ -2490,7 +2907,16 @@ class FinalEvaluationStage(Stage):
         context: context_module.RunContext,
         selected: experiments.TrialResult,
     ) -> dict[str, Any] | None:
-        """Fit-health record of the selected trial, if it can be judged."""
+        """Fit-health record of the selected trial, if it can be judged.
+
+        Args:
+            context: The run context, holding the trials and the metric.
+            selected: The selected trial.
+
+        Returns:
+            The fit-health assessment as a dict, or None if the trial cannot be
+            judged.
+        """
         health = fit_health.assess_trial(
             selected,
             context.trials,
@@ -2509,6 +2935,15 @@ class FinalEvaluationStage(Stage):
 
         The judgement uses out-of-fold development predictions only. The
         outcome (applied or not) is always written to the decision log.
+
+        Args:
+            context: The run context; receives the decision-log entry and the
+                mitigation record.
+            selected: The selected trial, used to rebuild the model for the
+                out-of-fold predictions.
+            pipeline: The fitted final model.
+            decision: The chartered or default threshold description, or None;
+                its threshold is the base cut of the groups (0.5 if None).
 
         Returns:
             A group-threshold classifier when applied, else `pipeline`.
@@ -2580,6 +3015,14 @@ class FinalEvaluationStage(Stage):
         The preprocessing stays as fitted on the development sample; the
         final model keeps learning from every development row, batch by
         batch, in one pass over the file.
+
+        Args:
+            context: The run context, holding the stream and settings.
+            pipeline: The fitted final model.
+
+        Returns:
+            `pipeline`, updated in place when the data is streamed for training,
+            otherwise unchanged.
         """
         if context.stream is None or context.spec.data.training != "stream":
             return pipeline
@@ -2615,7 +3058,16 @@ class FinalEvaluationStage(Stage):
         context: context_module.RunContext,
         pipeline: Any,
     ) -> dict[str, Any] | None:
-        """Scores every locked row of a streamed file, batch by batch."""
+        """Scores every locked row of a streamed file, batch by batch.
+
+        Args:
+            context: The run context, holding the stream and catalog.
+            pipeline: The fitted final model.
+
+        Returns:
+            The number of locked rows, the total number of rows and the metrics
+            on the locked rows, or None if the data was not streamed.
+        """
         if context.stream is None:
             return None
         source, totals = context.stream
@@ -2663,7 +3115,20 @@ class FinalEvaluationStage(Stage):
         features: pd.DataFrame,
         outcome: pd.Series,
     ) -> dict[str, Any] | None:
-        """Treatment-effect evidence on the released rows, with its caveat."""
+        """Treatment-effect evidence on the released rows, with its caveat.
+
+        Args:
+            context: The run context, supplying the task, treatment column and
+                propensity check.
+            fitted: The fitted model whose predictions are the predicted effect.
+            features: The released rows, including the treatment column.
+            outcome: The observed outcome of those rows.
+
+        Returns:
+            The stated assumption, propensity check, average effect, mean
+            predicted effect and a sampled Qini curve, or None if the task is
+            not uplift.
+        """
         if require(context.task, "task") is not tasks.TaskType.UPLIFT:
             return None
         arm = features[context.spec.data.treatment_column].to_numpy(dtype=int)
@@ -2691,7 +3156,17 @@ class FinalEvaluationStage(Stage):
         features: pd.DataFrame,
         target: pd.Series,
     ) -> None:
-        """Adds the gap and accuracy on the released rows to the evidence."""
+        """Adds the gap and accuracy on the released rows to the evidence.
+
+        Does nothing unless a group-threshold mitigation was applied.
+
+        Args:
+            context: The run context, holding the mitigation record.
+            before: The model without the group thresholds.
+            after: The model with the group thresholds.
+            features: The released rows.
+            target: The labels of the released rows.
+        """
         record = context.fairness_mitigation
         if record is None or not record["applied"]:
             return
@@ -2727,6 +3202,11 @@ class FinalEvaluationStage(Stage):
 
         The judgement uses only development folds. The unlabeled rows never
         touch the locked test rows.
+
+        Args:
+            context: The run context, holding the unlabeled rows and split.
+            selected: The selected trial, used to build the template model.
+            pipeline: The fitted final model.
 
         Returns:
             The pipeline to carry forward: the self-trained refit when
@@ -2786,6 +3266,9 @@ class FinalEvaluationStage(Stage):
         Written to `coverage_claim.json`, announced by a `coverage.registered`
         event and, in a charter run, appended to the custody log. A task with
         no interval or set has no claim.
+
+        Args:
+            context: The run context that stores the claim and its hash.
         """
         split = require(context.split, "split")
         charter_hash = None
@@ -2824,7 +3307,13 @@ class FinalEvaluationStage(Stage):
     def register_decision_files(
         self, context: context_module.RunContext
     ) -> None:
-        """Appends the hashes of the four decision files to the custody log."""
+        """Appends the hashes of the four decision files to the custody log.
+
+        Does nothing without a custody vault or a stored run.
+
+        Args:
+            context: The run context, holding the vault and the run directory.
+        """
         vault = context.custody_vault
         if vault is None or context.store is None:
             return
@@ -2844,12 +3333,20 @@ class FinalEvaluationStage(Stage):
         decision: dict[str, Any] | None,
         net_benefit: dict[str, Any] | None,
     ) -> None:
-        """Policy value, fairness satisfaction and the rollout design (F11).
+        """Policy value, fairness satisfaction and the rollout design.
 
         Runs only when the charter has a decision block and the task is
         binary, once, on the locked rows that were just opened. It writes
         `policy_value.json`, `rollout_design.json`, `rollout_decisions.jsonl`
         and `decision_report.json`.
+
+        Args:
+            context: The run context that stores the reports.
+            pipeline: The fitted final model.
+            features: The released rows.
+            target: The labels of the released rows.
+            decision: The chartered threshold description, or None.
+            net_benefit: The net-benefit report, or None.
         """
         charter = chartered_decision_model(context)
         if charter is None or charter.decision is None:
@@ -2923,7 +3420,16 @@ class FinalEvaluationStage(Stage):
         )
 
     def execute(self, context: context_module.RunContext) -> None:
-        """Refits on all development data and evaluates on the test set."""
+        """Refits on all development data and evaluates on the test set.
+
+        Opens the locked rows once, after the selection is frozen, and
+        records the test metrics, diagnostics and the evaluation document in
+        the context.
+
+        Args:
+            context: The run context; receives the final model, the test rows
+                and the evaluation.
+        """
         context.check_cancelled()
         split = require(context.split, "split")
         selected = require(context.selected, "selected")
@@ -3115,6 +3621,17 @@ class PackageStage(Stage):
         only when the referenced artifact exists and its digest is captured.
         The evidence limitation records that an independent human review is
         not represented by this automated run.
+
+        Args:
+            context: The run context, supplying the manifest, task and
+                configuration hash.
+            store: The run store holding the artifacts.
+            policy: The evaluation policy, naming the evidence references that
+                a release requires.
+
+        Returns:
+            An index with one accepted record for each required reference whose
+            artifact exists; missing artifacts are omitted.
         """
         manifest = require(context.manifest, "manifest")
         raw_inputs = {
@@ -3162,7 +3679,20 @@ class PackageStage(Stage):
         store: Any,
         evaluation: dict[str, Any],
     ) -> None:
-        """Evaluate explicit success criteria against release evidence."""
+        """Evaluate explicit success criteria against release evidence.
+
+        Writes the release policy, evidence and evaluation files into the run
+        store and records the results in `evaluation`. When no success criteria
+        were declared, the evaluation is blocked with status
+        `policy_not_declared`; thresholds are never invented from observed
+        metrics.
+
+        Args:
+            context: The run context, holding the task, metric and diagnostics.
+            store: The run store receiving the files.
+            evaluation: The evaluation document; the release policy,
+                evaluation and evidence entries are added to it.
+        """
         task = require(context.task, "task")
         metric = require(context.metric, "metric")
         policy = policies.release_policy_from_criteria(
@@ -3241,7 +3771,17 @@ class PackageStage(Stage):
         context: context_module.RunContext,
         store: Any,
     ) -> dict[str, dict[str, Any]]:
-        """Persist portable evidence for explanations produced by the run."""
+        """Persist portable evidence for explanations produced by the run.
+
+        Args:
+            context: The run context, holding the diagnostics, manifest and
+                split.
+            store: The run store; the evidence is written under `explanations/`.
+
+        Returns:
+            A mapping from diagnostic name to its evidence record, for each
+            explanation diagnostic that ran without error and has a report.
+        """
         manifest = require(context.manifest, "manifest")
         split = require(context.split, "split")
         model_manifest = store.path(f"model/{bundle_module.MANIFEST_FILE}")
@@ -3328,7 +3868,20 @@ class PackageStage(Stage):
         store: Any,
         bundle: bundle_module.ModelBundle,
     ) -> dict[str, Any]:
-        """Build a content-linked provenance record for the packaged run."""
+        """Build a content-linked provenance record for the packaged run.
+
+        The record is also written to `provenance.json`.
+
+        Args:
+            context: The run context, supplying the manifest and configuration.
+            store: The run store, supplying the run id and model manifest.
+            bundle: The packaged model bundle, supplying the model and
+                environment information.
+
+        Returns:
+            The provenance record: dataset, model manifest digest, environment
+            and signature presence.
+        """
         manifest = require(context.manifest, "manifest")
         model_manifest = store.path(f"model/{bundle_module.MANIFEST_FILE}")
         record = {
@@ -3372,7 +3925,16 @@ class PackageStage(Stage):
         store: Any,
         bundle: bundle_module.ModelBundle,
     ) -> dict[str, Any]:
-        """Build and persist the packaged environment's SBOM."""
+        """Build and persist the packaged environment's SBOM.
+
+        Args:
+            context: The run context; not consulted.
+            store: The run store receiving `sbom.json`.
+            bundle: The packaged model bundle, supplying the environment.
+
+        Returns:
+            The software bill of materials.
+        """
         record = sbom.build(
             bundle.info.environment,
             run_id=store.run_id,
@@ -3386,7 +3948,17 @@ class PackageStage(Stage):
         context: context_module.RunContext,
         store: Any,
     ) -> dict[str, Any]:
-        """Persist the complete, unexecuted production fault plan."""
+        """Persist the complete, unexecuted production fault plan.
+
+        Args:
+            context: The run context; not consulted.
+            store: The run store receiving `fault_injection_plan.json`.
+
+        Returns:
+            The fault-injection plan of the production beta, marked as not
+            executed with the release blocked, since the fault plan declares
+            required evidence and does not claim that the scenarios ran.
+        """
         del context
         record = (
             reliability.FaultInjectionPlanRegistry.production_beta().to_dict()
@@ -3401,7 +3973,14 @@ class PackageStage(Stage):
         return record
 
     def describe(self, context: context_module.RunContext) -> str:
-        """Names the stage."""
+        """Names the stage.
+
+        Args:
+            context: The run context; not consulted.
+
+        Returns:
+            The text "write bundle and reports".
+        """
         return "write bundle and reports"
 
     def learning_curve(
@@ -3410,6 +3989,10 @@ class PackageStage(Stage):
         selected: experiments.TrialResult,
     ) -> dict[str, Any] | None:
         """Learning curve of the selected candidate on its first fold.
+
+        Args:
+            context: The run context, holding the split, metric and budget.
+            selected: The selected trial, used to build the model.
 
         Returns:
             The curve as a record, or None when the budget is spent or the
@@ -3446,7 +4029,12 @@ class PackageStage(Stage):
     def note_conformal_skipped(
         self, context: context_module.RunContext, reason: str
     ) -> None:
-        """Records why the bundle will have no prediction intervals or sets."""
+        """Records why the bundle will have no prediction intervals or sets.
+
+        Args:
+            context: The run context that receives the event.
+            reason: Why calibration was skipped.
+        """
         context.emit(
             "conformal.skipped",
             f"conformal calibration skipped: {reason}",
@@ -3465,9 +4053,15 @@ class PackageStage(Stage):
         training rows and scored on its held-out rows, so every calibration
         score comes from a model that never saw that row.
 
+        Args:
+            context: The run context, holding the split, budget and charter.
+            selected: The selected trial, used to build the fold models.
+            bundle: The model bundle; the fold models are kept on it when the
+                CV+ rule applies.
+
         Returns:
-            The calibrator, or None when the time budget is spent or too few
-            held-out rows exist.
+            The calibrator, or None when the task has no conformal margin, the
+            time budget is spent or too few held-out rows exist.
         """
         task = require(context.task, "task")
         if task in (
@@ -3570,9 +4164,15 @@ class PackageStage(Stage):
         """The group column when the charter's unit is a new entity.
 
         Intervals for a new entity treat one score per entity as the
-        exchangeable unit (F12 B5), so calibration keeps one random held-out
+        exchangeable unit, so calibration keeps one random held-out
         row of each entity. Returns None without a charter or for any other
         unit, and the row-wise calibration applies.
+
+        Args:
+            context: The run context, supplying the charter path and data spec.
+
+        Returns:
+            The group column name, or None when row-wise calibration applies.
         """
         path = context.spec.charter_path
         if not path:
@@ -3596,6 +4196,13 @@ class PackageStage(Stage):
         `MIN_ROWS_FOR_SPLIT` or more rows the pooled margin is used instead,
         and a model set above `MAX_BYTES` is not kept. The reason is
         emitted either way.
+
+        Args:
+            context: The run context, holding the split.
+            bundle: The model bundle that receives the ensemble.
+            models: The fold models, one per cross-validation fold.
+            observed: The held-out labels.
+            predicted: The held-out predictions.
         """
         split = require(context.split, "split")
         held = [fold[1] for fold in split.manifest.folds]
@@ -3627,11 +4234,16 @@ class PackageStage(Stage):
         context: context_module.RunContext,
         bundle: bundle_module.ModelBundle,
     ) -> None:
-        """Opens `C` once the bundle and its calibration are frozen (F12).
+        """Opens `C` once the bundle and its calibration are frozen.
 
         Only for a charter that asked for the coverage claim on `C`: the
         ledger was held back, and now registers the coverage claim with the
         others and tests everything in the one opening.
+
+        Args:
+            context: The run context, holding the pending ledger.
+            bundle: The frozen model bundle, whose conformal calibration the
+                coverage claim tests.
         """
         pending = context.pending_ledger
         if pending is None:
@@ -3656,7 +4268,15 @@ class PackageStage(Stage):
         )
 
     def cv_plus_cap(self, context: context_module.RunContext) -> int:
-        """The most bytes of fold models to keep (charter's, else default)."""
+        """The most bytes of fold models to keep (charter's, else default).
+
+        Args:
+            context: The run context, supplying the charter path.
+
+        Returns:
+            The byte limit from the charter's uncertainty block, or the default
+            limit if the charter sets none.
+        """
         path = context.spec.charter_path
         if path:
             block = charter_sealing.read_verified(str(path)).charter.uncertainty
@@ -3673,6 +4293,9 @@ class PackageStage(Stage):
         cross-validation fold fits them on its training rows and records how
         far its held-out rows fall outside the band; the final pair is fit on
         all development rows.
+
+        Args:
+            context: The run context, holding the split, plan and budget.
 
         Returns:
             The intervals, or None for classification, when the time budget
@@ -3732,7 +4355,17 @@ class PackageStage(Stage):
         context: context_module.RunContext,
         selected: experiments.TrialResult,
     ) -> dict[str, Any] | None:
-        """Splits the selected model's error into bias and variance."""
+        """Splits the selected model's error into bias and variance.
+
+        Args:
+            context: The run context, holding the split and settings.
+            selected: The selected trial.
+
+        Returns:
+            The decomposition; a record with a `skipped` reason when the task is
+            not binary, multiclass or regression, or the budget was spent; None
+            when no replicates are configured.
+        """
         replicates = context.spec.selection.bias_variance_replicates
         task = require(context.task, "task")
         if not replicates:
@@ -3766,7 +4399,17 @@ class PackageStage(Stage):
         context: context_module.RunContext,
         selected: experiments.TrialResult,
     ) -> dict[str, Any] | None:
-        """Spread of the selected model's score over training, split, noise."""
+        """Spread of the selected model's score over training, split, noise.
+
+        Args:
+            context: The run context, holding the split and settings.
+            selected: The selected trial.
+
+        Returns:
+            The spread report with its dominant source; a record with a
+            `skipped` reason for other tasks or when the budget was spent; None
+            when no repeats are configured.
+        """
         repeats = context.spec.selection.sensitivity_repeats
         task = require(context.task, "task")
         if not repeats:
@@ -3803,7 +4446,19 @@ class PackageStage(Stage):
         context: context_module.RunContext,
         selected: experiments.TrialResult,
     ) -> dict[str, Any] | None:
-        """Estimates the optimism of the winning score by nested validation."""
+        """Estimates the optimism of the winning score by nested validation.
+
+        Args:
+            context: The run context, holding the split and settings.
+            selected: The selected trial.
+
+        Returns:
+            The nested-score record, with the mean and optimism in the metric's
+            natural direction; a record with a `skipped` reason when the
+            validation strategy is not random or stratified, the budget was
+            spent or there were too few rows; None when nested validation is
+            off.
+        """
         if not context.spec.selection.nested_cv:
             return None
         split = require(context.split, "split")
@@ -3852,6 +4507,10 @@ class PackageStage(Stage):
         The locked rows give the headline comparison. Each cross-validation
         fold (an origin) refits the selected candidate on its past and scores
         the future that followed.
+
+        Args:
+            context: The run context, holding the split and test rows.
+            selected: The selected trial.
 
         Returns:
             The report, or None when the time budget is spent.
@@ -3903,7 +4562,15 @@ class PackageStage(Stage):
         context: context_module.RunContext,
         store: Any,
     ) -> lineage.EvidenceGraph:
-        """Build the content-linked graph for one completed package."""
+        """Build the content-linked graph for one completed package.
+
+        Args:
+            context: The run context, supplying the manifest, split and trial.
+            store: The run store holding the artifacts that are hashed.
+
+        Returns:
+            The graph from the raw source through the model and the reports.
+        """
         manifest = require(context.manifest, "manifest")
         split = require(context.split, "split")
         selected = require(context.selected, "selected")
@@ -4038,7 +4705,11 @@ class PackageStage(Stage):
         return graph
 
     def execute(self, context: context_module.RunContext) -> None:
-        """Packages artifacts and assembles the `RunResult`."""
+        """Packages artifacts and assembles the `RunResult`.
+
+        Args:
+            context: The run context; receives the bundle and the result.
+        """
         store = context.run_store
         split = require(context.split, "split")
         selected = require(context.selected, "selected")
@@ -4197,7 +4868,15 @@ class PackageStage(Stage):
         context.bundle, context.result = bundle, result
 
     def lineage(self, store: Any) -> dict[str, str]:
-        """Checksums of the artifacts a run produced, for tracking lineage."""
+        """Checksums of the artifacts a run produced, for tracking lineage.
+
+        Args:
+            store: The run store whose artifacts are hashed.
+
+        Returns:
+            A mapping from artifact path to its SHA-256 checksum, for the
+            known artifacts that exist.
+        """
         names = (
             "config.json",
             "dataset_manifest.json",

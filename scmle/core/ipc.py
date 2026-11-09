@@ -83,6 +83,10 @@ def start_helper(
 
 
 def connect_to_parent() -> connection.Connection:
-    """Helper side: connects using the address argument and key on stdin."""
+    """Helper side: connects using the address argument and key on stdin.
+
+    Returns:
+        The authenticated connection to the parent process.
+    """
     key = bytes.fromhex(sys.stdin.buffer.read().decode("ascii"))
     return connection.Client(sys.argv[1], authkey=key)
