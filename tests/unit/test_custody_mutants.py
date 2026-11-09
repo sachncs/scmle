@@ -137,7 +137,7 @@ def test_the_chain_fails_on_either_a_wrong_sequence_or_a_wrong_link(
         out.append(json.dumps(record))
     path.write_text("\n".join(out) + "\n")
     with pytest.raises(errors.ArtifactError) as caught:
-        sealed.OpenLog.verify_file(path)
+        sealed.OpenLog(path)
     assert str(caught.value) == "custody log chain broken at entry 1"
 
 
@@ -145,7 +145,7 @@ def test_the_mac_error_names_the_entry(tmp_path):
     path = tmp_path / "log.jsonl"
     sealed.OpenLog(path, signing_key="k").append("C", "sealed", "o")
     with pytest.raises(errors.ArtifactError) as caught:
-        sealed.OpenLog.verify_file(path, signing_key="other")
+        sealed.OpenLog(path, signing_key="other")
     assert str(caught.value) == "custody log MAC invalid at entry 0"
 
 

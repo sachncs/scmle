@@ -256,15 +256,6 @@ def test_indicator_model_boundaries():
         missingness.indicator_model_test(enough, "t", 0, 9, folds=1)
 
 
-def test_pattern_table_counts_patterns():
-    frame = pandas.DataFrame(
-        {"a": [1, numpy.nan, 3, numpy.nan], "b": [1, 2, numpy.nan, numpy.nan]}
-    )
-    table = missingness.pattern_table(frame)
-    assert table["count"].sum() == 4 and len(table) == 4
-    assert list(table["count"]) == sorted(table["count"], reverse=True)
-
-
 def test_numeric_columns_skip_constants_text_and_booleans():
     frame = pandas.DataFrame(
         {"a": [1.0, 2.0], "c": [1.0, 1.0], "s": ["x", "y"], "b": [True, False]}
@@ -302,21 +293,12 @@ def test_assess_mechanism_records_caps_instead_of_failing(monkeypatch):
     assert any("indicator models" in s for s in report.skipped)
 
 
-def test_informative_columns_use_the_existing_screen():
-    rng = numpy.random.default_rng(0)
-    target = pandas.Series(rng.integers(0, 2, 400))
-    gap = target == 1
-    frame = pandas.DataFrame({"a": numpy.where(gap, numpy.nan, 1.0), "b": 1.0})
-    assert missingness.informative_columns(frame, ["a", "b"], target, True) == [
-        "a"
-    ]
-
-
 def test_tipping_point_matches_closed_form_and_grid():
     rng = numpy.random.default_rng(0)
     observed = rng.normal(1.0, 1.0, 100)
     k, null = 20, 0.5
-    delta = missingness.mean_tipping_delta(observed, k, null)
+    n = len(observed)
+    delta = null * (n + k) / k - observed.sum() / k - observed.mean()
     full = (observed.sum() + k * (observed.mean() + delta)) / (
         len(observed) + k
     )
@@ -374,7 +356,6 @@ def test_imputation_errors_and_selection():
     errors = missingness.imputation_errors(values, seed=0)
     assert set(errors) == set(missingness.STRATEGIES)
     assert errors["knn"] < errors["mean"]
-    assert missingness.select_imputer(values, seed=0) == "knn"
     with pytest.raises(ValueError, match="share"):
         missingness.imputation_errors(values, share=1.0)
     with pytest.raises(ValueError, match="strategy"):

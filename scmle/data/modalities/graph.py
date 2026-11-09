@@ -407,25 +407,6 @@ class InductiveNodeSplit:
         """The train, validation and test node partitions, in that order."""
         return (self.train_nodes, self.validation_nodes, self.test_nodes)
 
-    def has_edge_leakage(self) -> bool:
-        """Returns whether any retained edge crosses node partitions.
-
-        Returns:
-            True if a retained edge has endpoints in different partitions,
-            where an endpoint in no partition differs from one in a
-            partition; False otherwise.
-        """
-        partitions = {
-            node_id: index
-            for index, nodes in enumerate(self.node_partitions)
-            for node_id in nodes
-        }
-        retained = self.train_edges + self.validation_edges + self.test_edges
-        return any(
-            partitions.get(edge.source) != partitions.get(edge.target)
-            for edge in retained
-        )
-
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class PreparedFeatures:
@@ -828,44 +809,6 @@ class Dataset:
             component_count=len(self.connected_components()),
             node=self.profile_nodes(),
             edge=self.profile_edges(),
-        )
-
-    def temporal_split(self, cutoff: datetime | str) -> TemporalSplit:
-        """Splits fully timestamped edges into past and future partitions.
-
-        Edges at the cutoff belong to training; edges after the cutoff belong
-        to the future evaluation partition. Untimestamped edges fail closed
-        because they cannot be assigned without inventing temporal order.
-
-        Args:
-            cutoff: Timezone-aware datetime or ISO 8601 text.
-
-        Returns:
-            The split, with the cutoff in UTC.
-
-        Raises:
-            GraphTemporalError: If any edge has no event time, or the cutoff
-                is invalid (see `canonical_event_time`).
-        """
-        cutoff_time = canonical_event_time(cutoff)
-        if any(edge.event_time is None for edge in self.edges):
-            raise GraphTemporalError(
-                "temporal splitting requires an event time on every edge"
-            )
-        train_edges = tuple(
-            edge
-            for edge in self.edges
-            if edge.event_time is not None and edge.event_time <= cutoff_time
-        )
-        future_edges = tuple(
-            edge
-            for edge in self.edges
-            if edge.event_time is not None and edge.event_time > cutoff_time
-        )
-        return TemporalSplit(
-            cutoff=cutoff_time,
-            train_edges=train_edges,
-            future_edges=future_edges,
         )
 
     def curate(self) -> Curation:
@@ -1407,33 +1350,6 @@ def prepare_features(
     )
 
 
-def load_graph(
-    path: str | Path,
-    nodes: Iterable[Node | str] | None = None,
-    directed: bool = True,
-    time_column: str | None = None,
-) -> Dataset:
-    """Loads a CSV or JSONL graph using the default edge column names.
-
-    Args:
-        path: Edge file (``.csv``, ``.jsonl`` or ``.ndjson``).
-        nodes: Nodes or node identifiers. When None, nodes are derived from
-            the edge endpoints.
-        directed: Whether edges are directed.
-        time_column: Name of the event-time column or key, or None for
-            untimed edges.
-
-    Returns:
-        The validated graph; see `Dataset.from_edge_file`.
-    """
-    return Dataset.from_edge_file(
-        path,
-        nodes=nodes,
-        directed=directed,
-        time_column=time_column,
-    )
-
-
 __all__ = [
     "Dataset",
     "Edge",
@@ -1453,7 +1369,6 @@ __all__ = [
     "edges_from_records",
     "graph_identity",
     "inductive_node_split",
-    "load_graph",
     "prepare_features",
     "read_edges",
 ]

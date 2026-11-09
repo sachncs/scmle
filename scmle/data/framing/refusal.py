@@ -362,44 +362,6 @@ class Calibration:
         }
 
 
-def calibrate_tau(
-    ambiguity: Sequence[float],
-    wrong: Sequence[bool],
-    epsilon: float = DEFAULT_EPSILON,
-    level: float = 0.95,
-) -> Calibration:
-    """Largest `tau` whose accepted drafts have CP upper bound <= `epsilon`.
-
-    Args:
-        ambiguity: Ambiguity score of each calibration problem.
-        wrong: Whether the accepted draft would be wrong for each problem.
-        epsilon: Tolerated error rate among accepted drafts.
-        level: Confidence of the one-sided bound.
-
-    Returns:
-        The calibration. `tau` is None when no candidate meets `epsilon`.
-
-    Raises:
-        ValueError: If `ambiguity` and `wrong` differ in length or are
-            empty.
-    """
-    scores = numpy.asarray(ambiguity, dtype=float)
-    bad = numpy.asarray(wrong, dtype=bool)
-    if scores.shape != bad.shape or scores.size == 0:
-        raise ValueError("ambiguity and wrong must be equal, non-empty")
-    curve = []
-    best: float | None = None
-    for tau in sorted(set(scores.tolist())):
-        accepted = scores <= tau
-        n = int(accepted.sum())
-        wrong_n = int(bad[accepted].sum())
-        bound = clopper_pearson_upper(wrong_n, n, level)
-        curve.append((tau, n / scores.size, wrong_n / n, bound))
-        if bound <= epsilon:
-            best = tau
-    return Calibration(best, epsilon, scores.size, tuple(curve))
-
-
 def refuse(ambiguity: float, tau: float | None) -> bool:
     """Decides whether to refuse a draft.
 

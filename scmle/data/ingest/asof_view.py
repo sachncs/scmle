@@ -33,8 +33,6 @@ import pandas
 from scmle.contracts import errors
 from scmle.contracts import qualification
 from scmle.data.admissibility import provenance
-from scmle.data.ingest import profile
-from scmle.data.readers import connectors
 
 TRANSACTION = "transaction"
 EVENT_DELAY = "event_delay"
@@ -307,35 +305,3 @@ class AsOfView:
             "delta_rec_days": self.rule.delta_rec_days,
             "tier": self.rule.tier(today).value,
         }
-
-    @classmethod
-    def from_connector(
-        cls,
-        connector: connectors.SourceConnector,
-        key: str,
-        rule: KnownTime,
-        event_time: str | None = None,
-        name: str = "",
-        permissive: bool = False,
-        batch_rows: int = 1_000,
-    ) -> "AsOfView":
-        """Reads a table through `consistent_read` and opens a view on it.
-
-        A source that changes during the read is rejected by
-        `consistent_read` with `TornReadError`, which propagates.
-
-        Args:
-            connector: The source to read completely.
-            key: Column joining the table to its target rows.
-            rule: How known time is obtained.
-            event_time: Column of when the fact happened; required unless
-                the table is `non_versioned`.
-            name: Table name, for provenance and messages.
-            permissive: Allow a `non_versioned` read (unverified).
-            batch_rows: Rows per read batch.
-
-        Returns:
-            A view over the rows that were read.
-        """
-        read = profile.consistent_read(connector, batch_rows)
-        return cls(read.frame, key, rule, event_time, name, permissive)

@@ -79,7 +79,7 @@ def test_the_charter_artifacts_are_written_and_verifiable(
     assert sealing.read_verified(
         folder / "analysis_charter.json", signing_key=KEY
     ).signed
-    sealed.OpenLog.verify_file(folder / "custody_log.jsonl")
+    sealed.OpenLog(folder / "custody_log.jsonl")
 
 
 def test_profiling_sees_exploration_rows_only(binary_frame, tmp_path):
@@ -177,7 +177,7 @@ def test_a_charter_run_writes_the_ledger_control_and_claims(
     # Only numeric features are candidates; the categorical one is skipped.
     assert {h.spec.column for h in ledger.hypotheses.values()} == {"a", "b"}
     assert claims["outcome"] == done["outcome"]
-    log = sealed.OpenLog.verify_file(folder / "custody_log.jsonl")
+    log = sealed.OpenLog(folder / "custody_log.jsonl")
     events_c = [e["event"] for e in log.entries if e["set"] == "C"]
     if claims["outcome"] == "confirmed":
         assert events_c.count("open") == 1

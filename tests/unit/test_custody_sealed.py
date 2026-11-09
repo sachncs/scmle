@@ -38,7 +38,7 @@ def test_log_detects_a_changed_entry(tmp_path):
     lines[0] = json.dumps(record)
     path.write_text("\n".join(lines) + "\n")
     with pytest.raises(errors.ArtifactError, match="chain"):
-        sealed.OpenLog.verify_file(path)
+        sealed.OpenLog(path)
 
 
 def test_log_detects_a_removed_entry(tmp_path):
@@ -50,7 +50,7 @@ def test_log_detects_a_removed_entry(tmp_path):
     del lines[1]
     path.write_text("\n".join(lines) + "\n")
     with pytest.raises(errors.ArtifactError, match="chain"):
-        sealed.OpenLog.verify_file(path)
+        sealed.OpenLog(path)
 
 
 def test_log_reloads_and_continues_the_chain(tmp_path):
@@ -59,7 +59,7 @@ def test_log_reloads_and_continues_the_chain(tmp_path):
     again = sealed.OpenLog(path)
     entry = again.append("C", "open", "confirmation")
     assert entry["seq"] == 1
-    sealed.OpenLog.verify_file(path)
+    sealed.OpenLog(path)
 
 
 def test_a_set_opens_once_and_every_attempt_is_logged():
@@ -209,7 +209,7 @@ def test_a_keyed_log_carries_a_mac_on_every_entry(tmp_path):
     first = log.append("C", "sealed", "orchestrator")
     assert first["mac"] == sealed.entry_mac(first["hash"], b"k1")
     assert len(first["mac"]) == 64
-    sealed.OpenLog.verify_file(tmp_path / "log.jsonl", signing_key="k1")
+    sealed.OpenLog(tmp_path / "log.jsonl", signing_key="k1")
 
 
 def test_a_forger_who_recomputes_the_chain_fails_the_mac(tmp_path):
@@ -225,19 +225,19 @@ def test_a_forger_who_recomputes_the_chain_fails_the_mac(tmp_path):
     rechain(path)
     assert len(sealed.OpenLog(path).entries) == 2  # a checksum is satisfied
     with pytest.raises(errors.ArtifactError, match="MAC"):
-        sealed.OpenLog.verify_file(path, signing_key="k1")
+        sealed.OpenLog(path, signing_key="k1")
 
 
 def test_the_wrong_key_and_stripped_macs_are_refused(tmp_path):
     path = tmp_path / "log.jsonl"
     sealed.OpenLog(path, signing_key="k1").append("C", "sealed", "o")
     with pytest.raises(errors.ArtifactError, match="MAC"):
-        sealed.OpenLog.verify_file(path, signing_key="k2")
+        sealed.OpenLog(path, signing_key="k2")
     record = json.loads(path.read_text())
     del record["mac"]
     path.write_text(json.dumps(record) + "\n")
     with pytest.raises(errors.ArtifactError, match="MAC"):
-        sealed.OpenLog.verify_file(path, signing_key="k1")
+        sealed.OpenLog(path, signing_key="k1")
 
 
 def test_the_environment_key_signs_when_no_key_is_given(tmp_path, monkeypatch):

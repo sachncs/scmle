@@ -11,21 +11,6 @@ import pandas
 from scmle.contracts import tasks
 
 
-def target_names(value: str, horizon: int) -> list[str]:
-    """Names of the future-value targets: `<value>__h1 .. <value>__h<H>`.
-
-    Args:
-        value: Name of the value column.
-        horizon: Number of steps ahead to forecast.
-
-    Returns:
-        The `horizon` target names, ordered from one step ahead onward.
-    """
-    return [
-        f"{value}{tasks.HORIZON_SEPARATOR}{k}" for k in range(1, horizon + 1)
-    ]
-
-
 def add_targets(
     frame: pandas.DataFrame, data: tasks.Dataset
 ) -> pandas.DataFrame:

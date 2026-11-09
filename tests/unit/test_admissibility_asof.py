@@ -6,13 +6,7 @@ import numpy
 import pandas
 import pytest
 
-from scmle.contracts.qualification import Decision
-from scmle.contracts.qualification import SetId
-from scmle.contracts.qualification import Tier
 from scmle.data.admissibility import asof
-from scmle.data.admissibility import provenance
-from scmle.data.detectors import certificates
-from tests.unit.test_admissibility_provenance import make_field
 
 
 def brute_force(rows, log):
@@ -166,36 +160,11 @@ def make_clean(n=40, seed=0):
     return rows, log, values
 
 
-def audit(rows, log, **kw):
-    return asof.audit_field(
-        rows, log, "key", "moment", "stored", "written_at", "value", **kw
+def statuses(rows, log):
+    joined = asof.point_in_time(
+        rows, log, "key", "moment", "written_at", "value"
     )
-
-
-def test_clean_table_has_no_mismatch_and_a_derived_rule():
-    rows, log = make_clean()[:2]
-    result = audit(rows, log)
-    assert result.log_check.mismatched == 0
-    assert result.counts == {
-        "match": 40,
-        "overwritten": 0,
-        "not_yet_written": 0,
-    }
-    assert result.as_of.kind is provenance.AsOfKind.TIMESTAMP
-    gaps = [
-        m - w
-        for m, w in zip(
-            rows["moment"],
-            asof.point_in_time(
-                rows, log, "key", "moment", "written_at", "value"
-            )["known_at"],
-            strict=True,
-        )
-    ]
-    assert result.as_of.lead_seconds == pytest.approx(min(gaps))
-    assert result.as_of.lead_seconds > 0
-    assert result.check.decision is Decision.PASS
-    assert result.check.set_id is SetId.EXPLORATION
+    return asof.classify_rows(rows["stored"], joined)
 
 
 @pytest.mark.parametrize("seed", range(8))
@@ -205,16 +174,15 @@ def test_planted_overwrites_are_recovered_exactly(seed):
     chosen = rng.choice(60, size=9, replace=False)
     planted = rows.copy()
     planted.loc[chosen, "stored"] = values[chosen, 2] + 1.0  # later, new value
-    result = audit(planted, log)
     flagged = asof.reconstruction_mismatch(
         planted, log, "key", "moment", "stored", "written_at", "value"
     )
     assert set(numpy.flatnonzero(flagged)) == set(chosen)
-    assert result.log_check.mismatched == 9
-    assert result.log_check.rate == pytest.approx(9 / 60)
-    low, high = result.interval
-    assert low <= 9 / 60 <= high
-    assert (low, high) == certificates.wilson_interval(9, 60)
+
+
+def test_a_clean_table_has_no_mismatch():
+    rows, log = make_clean()[:2]
+    assert set(statuses(rows, log)) == {"match"}
 
 
 def test_a_value_stored_before_it_was_written_is_not_yet_written():
@@ -222,8 +190,7 @@ def test_a_value_stored_before_it_was_written_is_not_yet_written():
         {"key": [1, 2], "moment": [5.0, 5.0], "stored": [3.0, numpy.nan]}
     )
     log = pandas.DataFrame({"key": [1], "written_at": [9.0], "value": [3.0]})
-    result = audit(rows, log)
-    assert result.status.tolist() == ["not_yet_written", "match"]
+    assert statuses(rows, log).tolist() == ["not_yet_written", "match"]
 
 
 def test_a_missing_stored_value_where_the_log_has_one_is_a_mismatch():
@@ -231,56 +198,7 @@ def test_a_missing_stored_value_where_the_log_has_one_is_a_mismatch():
         {"key": [1], "moment": [5.0], "stored": [numpy.nan]}
     )
     log = pandas.DataFrame({"key": [1], "written_at": [1.0], "value": [3.0]})
-    assert audit(rows, log).status.tolist() == ["overwritten"]
-
-
-def test_the_tolerance_decides_the_field_and_the_gate_the_decision():
-    rows, log, values = make_clean(50)
-    bad = rows.copy()
-    bad.loc[:4, "stored"] = values[:5, 2] + 1.0  # 5 of 50 = 0.1
-    at = audit(bad, log, tolerance=0.1)
-    over = audit(bad, log, tolerance=0.0999)
-    assert at.check.decision is Decision.PASS
-    assert over.check.decision is Decision.WARN  # descriptive: demoted
-    gated = audit(
-        bad, log, tolerance=0.0999, gate=certificates.GateStatus.GATING
-    )
-    assert gated.check.decision is Decision.QUARANTINE
-    assert gated.check.tier is Tier.UNVERIFIED
-
-
-def test_log_provenance_confirms_a_clean_field_and_refuses_a_mismatched_rule():
-    rows, log = make_clean()[:2]
-    base = make_field("stored", source=provenance.AsOfSource.NONE)
-    record = asof.log_provenance(base, audit(rows, log))
-    assert record.as_of_source is provenance.AsOfSource.LOG
-    assert record.tier() is Tier.CONFIRMED
-    with pytest.raises(ValueError, match="another field"):
-        asof.log_provenance(make_field("other"), audit(rows, log))
-    empty = pandas.DataFrame(
-        {"key": [1], "moment": [5.0], "stored": [numpy.nan]}
-    )
-    nothing = pandas.DataFrame(
-        {"key": [2], "written_at": [1.0], "value": [1.0]}
-    )
-    with pytest.raises(ValueError, match="no row matched"):
-        asof.log_provenance(base, audit(empty, nothing))
-
-
-def test_a_failed_audit_gives_a_field_that_is_not_confirmed():
-    rows, log, values = make_clean()
-    bad = rows.copy()
-    bad.loc[0, "stored"] = values[0, 2] + 1.0
-    record = asof.log_provenance(
-        make_field("stored", source=provenance.AsOfSource.NONE), audit(bad, log)
-    )
-    assert record.tier() is Tier.UNVERIFIED
-
-
-def test_empty_rows_are_rejected():
-    rows, log = make_clean()[:2]
-    with pytest.raises(ValueError, match="empty"):
-        audit(rows.iloc[:0], log)
+    assert statuses(rows, log).tolist() == ["overwritten"]
 
 
 def test_agreement_treats_two_missing_values_as_equal():

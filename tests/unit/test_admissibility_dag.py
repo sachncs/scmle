@@ -94,9 +94,9 @@ def test_d_separation_matches_path_enumeration(seed):
         others = [n for n in names if n not in (x, y)]
         for size in range(len(others) + 1):
             for z in itertools.combinations(others, size):
-                assert graph.d_separated([x], [y], z) == brute_dsep(
-                    names, graph.edges, x, y, z
-                ), (edges, x, y, z)
+                assert dag.separated(
+                    graph.nodes, graph.edges, [x], [y], z
+                ) == brute_dsep(names, graph.edges, x, y, z), (edges, x, y, z)
 
 
 @pytest.mark.parametrize("seed", range(60))
@@ -187,9 +187,9 @@ def test_validation_rejects_cycles_loops_and_unsorted_input():
 def test_separation_rejects_overlapping_or_unknown_sets():
     graph = dag.Dag.build([("a", "b")], "t")
     with pytest.raises(ValueError, match="disjoint"):
-        graph.d_separated(["a"], ["a"], [])
+        dag.separated(graph.nodes, graph.edges, ["a"], ["a"], [])
     with pytest.raises(ValueError, match="not in the graph"):
-        graph.d_separated(["a"], ["q"], [])
+        dag.separated(graph.nodes, graph.edges, ["a"], ["q"], [])
     with pytest.raises(ValueError, match="differ"):
         graph.backdoor_valid("a", "a", [])
     with pytest.raises(ValueError, match="not nodes"):

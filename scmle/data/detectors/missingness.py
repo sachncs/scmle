@@ -9,7 +9,7 @@ Mechanism is argued from evidence, never asserted:
 * MNAR cannot be tested from the data. `tipping_point` reports the shift of
   the missing values at which a conclusion flips, over a declared range.
 * The per-column screen against the target stays in
-  `scmle.data.profiling.missingness` and is reused here unchanged.
+  `scmle.data.profiling.missingness`.
 
 References:
     Little, R. J. A. (1988). A test of missing completely at random for
@@ -38,7 +38,6 @@ from sklearn import impute
 from sklearn import model_selection
 
 from scmle.core import randomness
-from scmle.data.profiling import missingness
 
 MAX_ROWS = 5000
 MAX_COLUMNS = 40
@@ -166,20 +165,6 @@ def numeric_columns(frame: pandas.DataFrame) -> list[Any]:
             continue
         names.append(name)
     return names
-
-
-def pattern_table(frame: pandas.DataFrame) -> pandas.DataFrame:
-    """Counts of each missingness pattern, most frequent first.
-
-    Args:
-        frame: Any table.
-
-    Returns:
-        One row per pattern with boolean column flags and a `count`.
-    """
-    flags = frame.isna()
-    counts = flags.value_counts().rename("count").reset_index()
-    return counts.sort_values("count", ascending=False, kind="stable")
 
 
 def em_normal(
@@ -580,31 +565,6 @@ def assess_mechanism(
     )
 
 
-def informative_columns(
-    frame: pandas.DataFrame,
-    columns: list[str],
-    target: pandas.Series,
-    classification: bool,
-) -> list[str]:
-    """Finds the columns whose gaps are associated with the target.
-
-    This is the cheap screen. It delegates to
-    `scmle.data.profiling.missingness.assess`, whose thresholds stay the
-    policy defaults so behaviour is unchanged.
-
-    Args:
-        frame: Table.
-        columns: Columns to screen.
-        target: The target values.
-        classification: Whether the target is categorical.
-
-    Returns:
-        The names of the columns the screen finds informative.
-    """
-    findings = missingness.assess(frame, columns, target, classification)
-    return [f.column for f in findings if f.informative]
-
-
 @dataclasses.dataclass(frozen=True)
 class TippingPoint:
     """Where a conclusion flips when missing values are shifted by delta.
@@ -672,30 +632,6 @@ def tipping_point(
     ]
     flip = min(flips, key=abs) if flips else None
     return TippingPoint(low, high, flip, flip is not None, baseline, steps)
-
-
-def mean_tipping_delta(
-    observed: numpy.ndarray, n_missing: int, null_value: float
-) -> float:
-    """Computes the delta at which the completed mean equals `null_value`.
-
-    With the missing values imputed at the observed mean m and shifted by
-    delta, the completed mean is (sum + k (m + delta)) / (n + k); setting it
-    to `null_value` gives delta = null_value (n + k) / k - sum / k - m.
-
-    Args:
-        observed: Observed values of the column.
-        n_missing: Number of missing values `k`, at least 1.
-        null_value: The value of the mean at which the conclusion flips.
-
-    Returns:
-        The shift of the imputed values at which the completed mean equals
-        `null_value`.
-    """
-    values = numpy.asarray(observed, dtype=float)
-    n, k = values.size, n_missing
-    centre = float(values.mean())
-    return float(null_value * (n + k) / k - values.sum() / k - centre)
 
 
 def draw_holdout(
@@ -826,27 +762,3 @@ def imputation_errors(
             scores.append(float(numpy.sqrt(numpy.mean(diff**2))))
         errors[strategy] = float(numpy.mean(scores)) if scores else float("nan")
     return errors
-
-
-def select_imputer(
-    values: numpy.ndarray, seed: int = 0, folds: int = FOLDS
-) -> str:
-    """Selects the imputation strategy with the smallest held-out error.
-
-    Args:
-        values: Array (n, p) with NaN for gaps.
-        seed: Run seed.
-        folds: Folds, at least 2.
-
-    Returns:
-        The name of the strategy; ties go to the one listed first in
-        `STRATEGIES`.
-
-    Raises:
-        ValueError: If no strategy has a finite error.
-    """
-    errors = imputation_errors(values, seed, folds)
-    finite = {k: v for k, v in errors.items() if numpy.isfinite(v)}
-    if not finite:
-        raise ValueError("no strategy could be scored")
-    return min(STRATEGIES, key=lambda s: finite.get(s, float("inf")))

@@ -43,7 +43,7 @@ Limits. A hash chain shows that nothing was changed, removed from
 the middle or reordered since it was written. It cannot show that the *last*
 rows were never deleted: a prefix of a valid chain is valid. Pass the head
 hash recorded elsewhere (the custody log and the claims file store it) to
-`verify_file` to detect tail truncation. Someone able to rewrite the whole
+`Ledger.load` to detect tail truncation. Someone able to rewrite the whole
 file and every copy of the head can forge a ledger; this is tamper-evidence on
 one machine, not protection from an adversary.
 """
@@ -311,18 +311,6 @@ def survivors_hash(ids: tuple[str, ...], specs: Mapping[str, Test]) -> str:
     )
 
 
-def encode_fraction(value: Fraction) -> str:
-    """Writes a fraction as text.
-
-    Args:
-        value: The fraction.
-
-    Returns:
-        The fraction as ``"p/q"`` (``"p"`` when the denominator is 1).
-    """
-    return str(value)
-
-
 class Ledger:
     """The hypothesis ledger of one run (file-backed or in memory)."""
 
@@ -386,7 +374,7 @@ class Ledger:
                     "verified": rule.guarantee.verified,
                     "dependence": rule.guarantee.dependence,
                 },
-                "alpha_confirm": encode_fraction(alpha_confirm),
+                "alpha_confirm": str(alpha_confirm),
                 "seed": seed,
             },
         )
@@ -436,21 +424,6 @@ class Ledger:
                 "removed from the end or the file was replaced"
             )
         return ledger
-
-    @classmethod
-    def verify_file(
-        cls, path: str | Path, expected_head: str | None = None
-    ) -> "Ledger":
-        """Loads a ledger, which verifies it (see `load`).
-
-        Args:
-            path: The ledger file.
-            expected_head: Head hash recorded elsewhere, or None.
-
-        Returns:
-            The verified ledger.
-        """
-        return cls.load(path, expected_head)
 
     @classmethod
     def open(
@@ -705,10 +678,10 @@ class Ledger:
             body["wealth_after"],
         )
         replayed = (
-            encode_fraction(step.level),
+            str(step.level),
             step.rejected,
-            encode_fraction(step.wealth_before),
-            encode_fraction(step.wealth_after),
+            str(step.wealth_before),
+            str(step.wealth_after),
         )
         if stored != replayed:
             raise LedgerError(
@@ -1074,11 +1047,11 @@ class Ledger:
                 "check": None if check is None else check.to_dict(),
                 "evidence": {"p": p, "e": step.e_value},
                 "e_value": step.e_value,
-                "level": encode_fraction(step.level),
+                "level": str(step.level),
                 "rejected": step.rejected,
                 "decision": decision,
-                "wealth_before": encode_fraction(step.wealth_before),
-                "wealth_after": encode_fraction(step.wealth_after),
+                "wealth_before": str(step.wealth_before),
+                "wealth_after": str(step.wealth_after),
                 "reason": reason,
             },
         )

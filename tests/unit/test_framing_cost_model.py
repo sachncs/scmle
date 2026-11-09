@@ -46,9 +46,9 @@ def test_identity_over_random_cost_matrices():
         y = (rng.random(40) < rng.uniform(0.05, 0.95)).astype(float)
         a = (rng.random(40) < 0.5).astype(float)
         direct = costs.expected_cost(y, a, m)
-        via = costs.cost_constant(y, m) - m.c_fn * costs.net_benefit(
-            y, a, m.threshold
-        )
+        prevalence = float(numpy.mean(y))
+        never_acts = m.c_00 * (1.0 - prevalence) + m.c_01 * prevalence
+        via = never_acts - m.c_fn * costs.net_benefit(y, a, m.threshold)
         worst = max(worst, abs(direct - via))
     assert worst <= 1e-9
 
