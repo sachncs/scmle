@@ -11,7 +11,7 @@ from sklearn import ensemble
 MIN_DISTINCT_VALUES = 2
 
 
-class PerTarget(base.BaseEstimator):
+class PerTarget(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Fits one clone of an estimator for each target column.
 
     Attributes:
@@ -92,7 +92,7 @@ class PerTarget(base.BaseEstimator):
         return numpy.column_stack(columns)
 
 
-class NativeMultiOutput(base.BaseEstimator):
+class NativeMultiOutput(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """A tree ensemble that models all targets jointly.
 
     Attributes:

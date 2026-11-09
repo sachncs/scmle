@@ -27,7 +27,7 @@ def load_keras() -> Any:
     return importlib.import_module("keras")
 
 
-class Trainer(base.BaseEstimator):
+class Trainer(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """A dense network trained with Keras, Adam and early stopping.
 
     Attributes:
@@ -85,7 +85,7 @@ class Trainer(base.BaseEstimator):
         """
         return 1
 
-    def loss_name(self) -> str:
+    def loss_name(self) -> Any:
         """Keras loss identifier.
 
         Returns:
@@ -253,7 +253,7 @@ class Trainer(base.BaseEstimator):
         )
 
 
-class Classifier(base.ClassifierMixin, Trainer):
+class Classifier(base.ClassifierMixin, Trainer):  # type: ignore[misc]  # scikit-learn ships no type information
     """Classifier: softmax over class scores."""
 
     def output_units(self) -> int:
@@ -264,7 +264,7 @@ class Classifier(base.ClassifierMixin, Trainer):
         """
         return len(self.classes_)
 
-    def loss_name(self) -> str:
+    def loss_name(self) -> Any:
         """Cross entropy over integer class codes, from logits.
 
         Returns:
@@ -299,7 +299,8 @@ class Classifier(base.ClassifierMixin, Trainer):
         scores = self.raw_outputs(features)
         scores = scores - scores.max(axis=1, keepdims=True)
         exp = numpy.exp(scores)
-        return exp / exp.sum(axis=1, keepdims=True)
+        probabilities: numpy.ndarray = exp / exp.sum(axis=1, keepdims=True)
+        return probabilities
 
     def predict(self, features: Any) -> numpy.ndarray:
         """Most probable class.
@@ -313,7 +314,7 @@ class Classifier(base.ClassifierMixin, Trainer):
         return self.classes_[self.predict_proba(features).argmax(axis=1)]
 
 
-class Regressor(base.RegressorMixin, Trainer):
+class Regressor(base.RegressorMixin, Trainer):  # type: ignore[misc]  # scikit-learn ships no type information
     """Regressor trained on the standardized target."""
 
     def encode_target(self, target: Any) -> numpy.ndarray:

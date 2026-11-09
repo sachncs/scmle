@@ -9,7 +9,7 @@ from sklearn import base
 from sklearn import pipeline
 
 
-class EventAwareEstimator(base.RegressorMixin, base.BaseEstimator):
+class EventAwareEstimator(base.RegressorMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Fits a survival pipeline using the event column of the features frame.
 
     The preprocessing steps never see the event indicator (they select their
@@ -65,7 +65,10 @@ class EventAwareEstimator(base.RegressorMixin, base.BaseEstimator):
         Returns:
             Array of shape `(n_rows,)` of risk scores.
         """
-        return self.model_.predict(self.preprocessing_.transform(features))
+        risk: numpy.ndarray = self.model_.predict(
+            self.preprocessing_.transform(features)
+        )
+        return risk
 
     def predict_survival(self, features: Any, times: Any) -> numpy.ndarray:
         """Probability of no event yet at each time, `(rows, len(times))`.
@@ -77,6 +80,7 @@ class EventAwareEstimator(base.RegressorMixin, base.BaseEstimator):
         Returns:
             Array of shape `(n_rows, len(times))` of survival probabilities.
         """
-        return self.model_.predict_survival(
+        survival: numpy.ndarray = self.model_.predict_survival(
             self.preprocessing_.transform(features), times
         )
+        return survival

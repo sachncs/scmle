@@ -172,7 +172,7 @@ def optimize_threshold(
     return best[1], best[0]
 
 
-class Classifier(base.ClassifierMixin, base.BaseEstimator):
+class Classifier(base.ClassifierMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Applies a fixed decision threshold to a probabilistic classifier.
 
     Attributes:
@@ -235,7 +235,8 @@ class Classifier(base.ClassifierMixin, base.BaseEstimator):
             Array with one row per input row and one column per class, in
             `classes_` order.
         """
-        return self.estimator_.predict_proba(features)
+        probabilities: numpy.ndarray = self.estimator_.predict_proba(features)
+        return probabilities
 
     def predict(self, features: Any) -> numpy.ndarray:
         """Predicts the positive class where probability >= threshold.
@@ -248,7 +249,10 @@ class Classifier(base.ClassifierMixin, base.BaseEstimator):
             probability is at or above the threshold, else the first.
         """
         positive = self.predict_proba(features)[:, 1] >= self.threshold
-        return numpy.where(positive, self.classes_[1], self.classes_[0])
+        labels: numpy.ndarray = numpy.where(
+            positive, self.classes_[1], self.classes_[0]
+        )
+        return labels
 
 
 def out_of_fold_probabilities(
@@ -345,7 +349,7 @@ class GroupAssigner:
         return values.astype(object).where(values.notna()).astype(str)
 
 
-class GroupClassifier(base.ClassifierMixin, base.BaseEstimator):
+class GroupClassifier(base.ClassifierMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Decides with a separate probability threshold for each group.
 
     The wrapped classifier is untouched; only the cut between the two classes
@@ -409,7 +413,8 @@ class GroupClassifier(base.ClassifierMixin, base.BaseEstimator):
             Array with one row per input row and one column per class, in
             `classes_` order.
         """
-        return self.estimator.predict_proba(features)
+        probabilities: numpy.ndarray = self.estimator.predict_proba(features)
+        return probabilities
 
     def cuts(self, features: Any) -> numpy.ndarray:
         """Looks up the threshold that applies to each row.
@@ -443,4 +448,7 @@ class GroupClassifier(base.ClassifierMixin, base.BaseEstimator):
             first.
         """
         positive = self.predict_proba(features)[:, 1] >= self.cuts(features)
-        return numpy.where(positive, self.classes_[1], self.classes_[0])
+        labels: numpy.ndarray = numpy.where(
+            positive, self.classes_[1], self.classes_[0]
+        )
+        return labels

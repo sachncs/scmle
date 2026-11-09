@@ -14,7 +14,7 @@ from sklearn import base
 from sklearn import ensemble
 
 
-class ConstantRanker(base.RegressorMixin, base.BaseEstimator):
+class ConstantRanker(base.RegressorMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Gives every row the same score: the order carries no information."""
 
     def fit(self, features: Any, target: Any, group: Any = None) -> Self:  # noqa: ARG002 -- fit signature of the ranking estimators
@@ -43,7 +43,7 @@ class ConstantRanker(base.RegressorMixin, base.BaseEstimator):
         return numpy.zeros(features.shape[0])
 
 
-class PointwiseRanker(base.RegressorMixin, base.BaseEstimator):
+class PointwiseRanker(base.RegressorMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Ranks by a regressor's prediction of the relevance grade.
 
     Attributes:
@@ -91,7 +91,7 @@ class PointwiseRanker(base.RegressorMixin, base.BaseEstimator):
         return numpy.asarray(self.regressor_.predict(features), dtype=float)
 
 
-class LibraryRanker(base.RegressorMixin, base.BaseEstimator):
+class LibraryRanker(base.RegressorMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """A boosted ranker from LightGBM or XGBoost that learns the ordering.
 
     Attributes:

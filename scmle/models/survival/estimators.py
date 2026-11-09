@@ -70,7 +70,7 @@ def step_lookup(
     return padded[position]
 
 
-class SurvivalEstimator(base.RegressorMixin, base.BaseEstimator, abc.ABC):
+class SurvivalEstimator(base.RegressorMixin, base.BaseEstimator, abc.ABC):  # type: ignore[misc]  # scikit-learn ships no type information
     """Base class: `predict` is a risk score, `predict_survival` a curve."""
 
     @abc.abstractmethod
@@ -263,7 +263,10 @@ class CoxRegressor(SurvivalEstimator):
         Returns:
             Array of shape `(n_rows,)` of linear predictors.
         """
-        return numpy.asarray(features, dtype=float) @ self.coefficients_
+        linear: numpy.ndarray = (
+            numpy.asarray(features, dtype=float) @ self.coefficients_
+        )
+        return linear
 
     def predict_survival(self, features: Any, times: Any) -> numpy.ndarray:
         """Survival `exp(-B(t) * exp(eta))` for each row and time.
@@ -429,9 +432,10 @@ class DiscreteTimeBoosting(SurvivalEstimator):
         )
         if 1 not in self.model_.classes_:
             return numpy.zeros((len(matrix), count))
-        return self.model_.predict_proba(stacked)[:, 1].reshape(
-            len(matrix), count
-        )
+        probabilities: numpy.ndarray = self.model_.predict_proba(stacked)[
+            :, 1
+        ].reshape(len(matrix), count)
+        return probabilities
 
     def predict(self, features: Any) -> numpy.ndarray:
         """Cumulative hazard over all intervals as the risk score.

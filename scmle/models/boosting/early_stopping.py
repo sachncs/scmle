@@ -22,7 +22,7 @@ MIN_ROWS = 60
 MIN_CLASS_COUNT_TO_STRATIFY = 2
 
 
-class HoldoutEarlyStopping(base.BaseEstimator):
+class HoldoutEarlyStopping(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Stops boosting when a held-out slice stops improving.
 
     Attributes:
@@ -188,7 +188,10 @@ class HoldoutEarlyStopping(base.BaseEstimator):
         """
         predicted = numpy.asarray(self.estimator_.predict(features))
         if hasattr(self, "encoder_"):
-            return self.encoder_.inverse_transform(predicted.astype(int))
+            decoded: numpy.ndarray = self.encoder_.inverse_transform(
+                predicted.astype(int)
+            )
+            return decoded
         return predicted
 
     def predict_proba(self, features: Any) -> numpy.ndarray:
@@ -203,7 +206,7 @@ class HoldoutEarlyStopping(base.BaseEstimator):
         return numpy.asarray(self.estimator_.predict_proba(features))
 
 
-class EarlyStoppingClassifier(base.ClassifierMixin, HoldoutEarlyStopping):
+class EarlyStoppingClassifier(base.ClassifierMixin, HoldoutEarlyStopping):  # type: ignore[misc]  # scikit-learn ships no type information
     """Early-stopped boosting classifier."""
 
     @property
@@ -212,7 +215,7 @@ class EarlyStoppingClassifier(base.ClassifierMixin, HoldoutEarlyStopping):
         return numpy.asarray(self.encoder_.classes_)
 
 
-class EarlyStoppingRegressor(base.RegressorMixin, HoldoutEarlyStopping):
+class EarlyStoppingRegressor(base.RegressorMixin, HoldoutEarlyStopping):  # type: ignore[misc]  # scikit-learn ships no type information
     """Early-stopped boosting regressor."""
 
 

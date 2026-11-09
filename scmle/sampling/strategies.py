@@ -138,7 +138,10 @@ class Default(Strategy):
         Returns:
             The unfitted candidate estimator, preprocessing included.
         """
-        return preprocessing.build_pipeline(plan, adapter, task, seed, params)
+        pipeline: models.Estimator = preprocessing.build_pipeline(
+            plan, adapter, task, seed, params
+        )
+        return pipeline
 
 
 class Rebalancing(Strategy):
@@ -224,7 +227,10 @@ class ClassWeighting(Rebalancing):
             The unfitted candidate estimator, preprocessing included.
         """
         weighted = {**(params or {}), "class_weight": "balanced"}
-        return preprocessing.build_pipeline(plan, adapter, task, seed, weighted)
+        pipeline: models.Estimator = preprocessing.build_pipeline(
+            plan, adapter, task, seed, weighted
+        )
+        return pipeline
 
 
 class FoldResampling(Rebalancing):
@@ -332,13 +338,14 @@ class Recalibration(Strategy):
             The unfitted candidate estimator, preprocessing included.
         """
         inner = preprocessing.build_pipeline(plan, adapter, task, seed, params)
-        return calibration.CalibratedClassifierCV(
+        calibrated: models.Estimator = calibration.CalibratedClassifierCV(
             inner,
             method="sigmoid",
             cv=inner_cv.for_plan(
                 plan, classification=True, folds=CALIBRATION_FOLDS, seed=seed
             ),
         )
+        return calibrated
 
 
 class Jitter(FoldResampling):
@@ -503,9 +510,10 @@ class Features(Strategy):
         )
         if self.select:
             options = dataclasses.replace(options, scale=True)
-        return preprocessing.build_pipeline(
+        pipeline: models.Estimator = preprocessing.build_pipeline(
             plan, adapter, task, seed, params, options
         )
+        return pipeline
 
 
 class LogTransform(Features):
@@ -680,9 +688,10 @@ class TargetEncoding(Strategy):
             high_cardinality="target",
             sparse=False,
         )
-        return preprocessing.build_pipeline(
+        pipeline: models.Estimator = preprocessing.build_pipeline(
             plan, adapter, task, seed, params, options
         )
+        return pipeline
 
 
 class Interactions(Features):
@@ -956,12 +965,13 @@ class TargetTransform(Strategy):
         Returns:
             The unfitted candidate estimator, preprocessing included.
         """
-        return compose.TransformedTargetRegressor(
+        transformed: models.Estimator = compose.TransformedTargetRegressor(
             regressor=preprocessing.build_pipeline(
                 plan, adapter, task, seed, params
             ),
             transformer=transformers.AsinhTarget(),
         )
+        return transformed
 
 
 STRATEGIES: dict[str, Strategy] = {

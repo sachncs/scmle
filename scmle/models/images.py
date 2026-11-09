@@ -24,6 +24,7 @@ from sklearn.metrics import f1_score
 from sklearn.metrics import log_loss
 
 from scmle import durability
+from scmle.data.modalities import curation
 from scmle.data.modalities import image
 
 PATCH_DIMENSION_COUNT = 2
@@ -225,7 +226,7 @@ class Classifier:
         self.config = config or Config()
         self.estimator: LogisticRegression | None = None
         self.feature_names: tuple[str, ...] = ()
-        self.curation_report: image.Curation | None = None
+        self.curation_report: curation.Curation | None = None
 
     @property
     def fitted(self) -> bool:
@@ -725,7 +726,7 @@ class Classifier:
         """
         width, height = self.config.target_size
         channels = 1 if self.config.mode == "L" else len(self.config.mode)
-        names = []
+        names: list[str] = []
         for row in range(height):
             for column in range(width):
                 names.extend(
@@ -754,7 +755,7 @@ class Monitor:
 
     def __init__(
         self,
-        reference: image.Curation,
+        reference: curation.Curation,
         threshold: float = 0.25,
     ) -> None:
         """Initializes a monitor with an explicit normalized threshold.

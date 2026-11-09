@@ -83,7 +83,10 @@ class Bagging(models.Model):
             if task.is_classification
             else ensemble.BaggingRegressor
         )
-        return bagger(estimator=member, random_state=seed, n_jobs=1, **bag)
+        bagged: models.Estimator = bagger(
+            estimator=member, random_state=seed, n_jobs=1, **bag
+        )
+        return bagged
 
 
 class BaggedTree(Bagging):

@@ -83,7 +83,8 @@ def rebuild(spec: Registration) -> models.Model:
         "__reduce__": lambda self: (rebuild, (self.spec,)),
     }
     kind = type("Custom", (classical.Learner,), members)
-    return kind()
+    learner: models.Model = kind()
+    return learner
 
 
 def register_estimator(

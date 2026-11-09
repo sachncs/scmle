@@ -27,7 +27,7 @@ STACK_FOLDS = 3
 MIN_MEMBERS = 2
 
 
-class GreedyBlender(base.BaseEstimator, abc.ABC):
+class GreedyBlender(base.BaseEstimator, abc.ABC):  # type: ignore[misc]  # scikit-learn ships no type information
     """Meta-learner that averages members with weights found greedily.
 
     Caruana-style ensemble selection: starting from nothing, repeatedly add
@@ -149,7 +149,7 @@ class GreedyBlender(base.BaseEstimator, abc.ABC):
         return stacked
 
 
-class ClassifierBlender(base.ClassifierMixin, GreedyBlender):
+class ClassifierBlender(base.ClassifierMixin, GreedyBlender):  # type: ignore[misc]  # scikit-learn ships no type information
     """Greedy blend of members' class probabilities."""
 
     def expand(self, stacked: numpy.ndarray) -> numpy.ndarray:
@@ -218,7 +218,7 @@ class ClassifierBlender(base.ClassifierMixin, GreedyBlender):
         return self.classes_[self.blend(meta).argmax(axis=1)]
 
 
-class RegressorBlender(base.RegressorMixin, GreedyBlender):
+class RegressorBlender(base.RegressorMixin, GreedyBlender):  # type: ignore[misc]  # scikit-learn ships no type information
     """Greedy blend of members' predictions."""
 
     def prepare(
@@ -349,13 +349,16 @@ class Stacking(models.Model):
             plan, task.is_classification, STACK_FOLDS, seed
         )
         meta = self.meta_learner(task, len(estimators))
+        stack: models.Estimator
         if task.is_classification:
-            return ensemble.StackingClassifier(
+            stack = ensemble.StackingClassifier(
                 estimators, final_estimator=meta, cv=inner, stack_method="auto"
             )
-        return ensemble.StackingRegressor(
-            estimators, final_estimator=meta, cv=inner
-        )
+        else:
+            stack = ensemble.StackingRegressor(
+                estimators, final_estimator=meta, cv=inner
+            )
+        return stack
 
     def meta_learner(self, task: tasks.Task, members: int) -> Any:  # noqa: ARG002 -- override point of the stacking template
         """Creates the model that combines the members' out-of-fold predictions.
@@ -401,16 +404,19 @@ class Stacking(models.Model):
             for index, member in enumerate(members)
         ]
         meta = self.meta_learner(task, len(estimators))
+        stack: models.Estimator
         if task.is_classification:
-            return ensemble.StackingClassifier(
+            stack = ensemble.StackingClassifier(
                 estimators,
                 final_estimator=meta,
                 cv=STACK_FOLDS,
                 stack_method="auto",
             )
-        return ensemble.StackingRegressor(
-            estimators, final_estimator=meta, cv=STACK_FOLDS
-        )
+        else:
+            stack = ensemble.StackingRegressor(
+                estimators, final_estimator=meta, cv=STACK_FOLDS
+            )
+        return stack
 
 
 class Blending(Stacking):

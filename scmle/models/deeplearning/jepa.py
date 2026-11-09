@@ -17,7 +17,7 @@ from scmle.models.deeplearning import contracts
 from scmle.models.deeplearning import estimators
 
 
-class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):
+class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Worker-backed tabular JEPA representation estimator.
 
     This is a self-supervised numeric-tabular representation path. It is not a
