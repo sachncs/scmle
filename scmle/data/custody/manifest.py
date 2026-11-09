@@ -47,7 +47,8 @@ def ids(value: Any, name: str) -> tuple[int, ...]:
     qualification.require_tuple(value, name)
     if not all(isinstance(i, int) and not isinstance(i, bool) for i in value):
         raise ValueError(f"{name} must hold integers")
-    return value
+    members: tuple[int, ...] = value
+    return members
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
