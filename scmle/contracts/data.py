@@ -146,11 +146,13 @@ class CurationFinding:
             raise ValueError("owner must not be empty")
         if not self.timestamp.strip():
             raise ValueError("timestamp must not be empty")
-        if not isinstance(self.severity, FindingSeverity):
-            object.__setattr__(self, "severity", FindingSeverity(self.severity))
-        if not isinstance(self.disposition, FindingDisposition):
+        severity: Any = self.severity  # may be a raw value at runtime
+        if not isinstance(severity, FindingSeverity):
+            object.__setattr__(self, "severity", FindingSeverity(severity))
+        disposition: Any = self.disposition  # may be a raw value at runtime
+        if not isinstance(disposition, FindingDisposition):
             object.__setattr__(
-                self, "disposition", FindingDisposition(self.disposition)
+                self, "disposition", FindingDisposition(disposition)
             )
 
     def to_dict(self) -> dict[str, Any]:
@@ -489,13 +491,14 @@ class DatasetManifest:
                 modality) is blank or not a string, a count is negative, or
                 the schema version is below one.
         """
-        for field_name, field_value in (
+        text_fields: tuple[tuple[str, object], ...] = (
             ("dataset_id", self.dataset_id),
             ("schema_hash", self.schema_hash),
             ("data_hash", self.data_hash),
             ("target", self.target),
             ("modality", self.modality),
-        ):
+        )
+        for field_name, field_value in text_fields:
             if not isinstance(field_value, str) or not field_value.strip():
                 raise ValueError(f"{field_name} must not be empty")
         for count_name, count_value in (

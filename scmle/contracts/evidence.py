@@ -105,10 +105,12 @@ class Record:
             raise ValueError("limitations must state known uncertainty")
         if not all(item.strip() for item in self.limitations):
             raise ValueError("limitations must not contain empty values")
-        if not isinstance(self.result, Outcome):
-            object.__setattr__(self, "result", Outcome(self.result))
-        if not isinstance(self.decision, Disposition):
-            object.__setattr__(self, "decision", Disposition(self.decision))
+        result: Any = self.result  # may be a raw value at runtime
+        if not isinstance(result, Outcome):
+            object.__setattr__(self, "result", Outcome(result))
+        decision: Any = self.decision  # may be a raw value at runtime
+        if not isinstance(decision, Disposition):
+            object.__setattr__(self, "decision", Disposition(decision))
         timestamp = datetime.datetime.fromisoformat(self.observed_at)
         if timestamp.tzinfo is None or timestamp.utcoffset() is None:
             raise ValueError("observed_at must include timezone information")

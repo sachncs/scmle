@@ -70,8 +70,9 @@ class Node:
         """
         require_text(self.node_id, "node_id")
         require_text(self.digest, "digest")
-        if not isinstance(self.kind, Kind):
-            object.__setattr__(self, "kind", Kind(self.kind))
+        kind: Any = self.kind  # may be a raw value at runtime
+        if not isinstance(kind, Kind):
+            object.__setattr__(self, "kind", Kind(kind))
         normalized = dict(self.attributes)
         if any(not key.strip() for key in normalized):
             raise ValueError("attribute names must not be empty")

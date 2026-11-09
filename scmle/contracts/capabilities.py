@@ -169,9 +169,12 @@ class ModelFamilyDeclaration:
             ("evidence_links", self.evidence_links),
             ("limitations", self.limitations),
         ):
+            entries: Iterable[object] = (
+                values  # may hold non-strings at runtime
+            )
             if any(
                 not isinstance(value, str) or not value.strip()
-                for value in values
+                for value in entries
             ):
                 raise ValueError(f"{name} must contain non-empty strings")
             object.__setattr__(self, name, tuple(sorted(set(values))))
@@ -230,9 +233,9 @@ class Environment:
             ValueError: If an available extra is blank, the CPU count is below
                 one, or the memory or disk size is not finite and non-negative.
         """
+        extras: Iterable[object] = self.available_extras  # may hold non-strings
         if any(
-            not isinstance(extra, str) or not extra.strip()
-            for extra in self.available_extras
+            not isinstance(extra, str) or not extra.strip() for extra in extras
         ):
             raise ValueError("available_extras must contain non-empty strings")
         object.__setattr__(
@@ -379,9 +382,8 @@ class ResourceAssumptions:
             raise ValueError("disk_gb must not be negative")
         if self.max_rows is not None and self.max_rows < 1:
             raise ValueError("max_rows must be at least 1")
-        if any(
-            not isinstance(note, str) or not note.strip() for note in self.notes
-        ):
+        notes: Iterable[object] = self.notes  # may hold non-strings at runtime
+        if any(not isinstance(note, str) or not note.strip() for note in notes):
             raise ValueError("resource notes must not be empty")
         object.__setattr__(self, "notes", tuple(sorted(set(self.notes))))
 
@@ -446,9 +448,12 @@ class Capability:
             ("evidence_links", self.evidence_links),
             ("limitations", self.limitations),
         ):
+            entries: Iterable[object] = (
+                values  # may hold non-strings at runtime
+            )
             if any(
                 not isinstance(value, str) or not value.strip()
-                for value in values
+                for value in entries
             ):
                 raise ValueError(f"{name} must contain non-empty strings")
         if self.status is Status.SUPPORTED and not self.evidence_links:

@@ -1,5 +1,6 @@
 """Evidence-first contracts for production reliability fault scenarios."""
 
+from collections.abc import Iterable
 from collections.abc import Mapping
 import dataclasses
 import enum
@@ -172,9 +173,10 @@ def check_evidence_requirements(requirements: tuple[str, ...]) -> None:
     """
     if not requirements:
         raise ValueError("evidence_requirements must not be empty")
+    supplied: Iterable[object] = requirements  # may hold non-strings
     if any(
         not isinstance(requirement, str) or not requirement.strip()
-        for requirement in requirements
+        for requirement in supplied
     ):
         raise ValueError("evidence_requirements must contain text")
     if len(set(requirements)) != len(requirements):
@@ -386,7 +388,8 @@ class Registry:
         """
         if not isinstance(scenario, FaultScenario):
             raise TypeError("scenario must be FaultScenario")
-        if not isinstance(evidence, tuple) or not evidence:
+        supplied: object = evidence  # callers may pass a non-tuple
+        if not isinstance(supplied, tuple) or not supplied:
             raise ValueError("evidence must be a non-empty tuple")
         if not all(isinstance(item, Evidence) for item in evidence):
             raise TypeError("evidence must contain Evidence values")
