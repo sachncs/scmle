@@ -3946,8 +3946,7 @@ class PackageStage(Stage):
             ]
             if result.get("truncated"):
                 limitations.append("feature coverage was truncated by budget")
-            builder = scmle.explainability.suite.ExplanationEvidenceBuilder()
-            record = builder.build(
+            record = scmle.explainability.suite.build_evidence(
                 diagnostic,
                 result,
                 model_fingerprint=bundle_digest,

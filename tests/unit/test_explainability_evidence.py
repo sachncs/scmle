@@ -95,7 +95,7 @@ def build_evidence(
 ) -> explanations.Evidence:
     """Builds evidence using the test diagnostic and explicit identities."""
     values = cast(EvidenceInputs, {**build_inputs(), **overrides})
-    return suite.ExplanationEvidenceBuilder().build(
+    return suite.build_evidence(
         CustomExplanation(),
         result
         if result is not None
@@ -162,7 +162,7 @@ def test_builder_does_not_invent_identity_from_diagnostic_output():
 
 def test_builder_rejects_unnamed_diagnostics():
     with pytest.raises(ValueError, match=r"diagnostic\.name"):
-        suite.ExplanationEvidenceBuilder().build(
+        suite.build_evidence(
             UnnamedExplanation(),
             {"value": 1},
             **build_inputs(),
