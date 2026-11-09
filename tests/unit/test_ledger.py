@@ -176,7 +176,7 @@ def test_the_file_reloads_replays_and_continues(tmp_path):
     }
     extra = again.register(spec("signal", name="signal~y second"))
     assert extra.hypothesis_id == "h000004"
-    scmle.data.ledger.ledger.Ledger.verify_file(path)
+    scmle.data.ledger.ledger.Ledger.load(path)
 
 
 def test_two_identical_runs_write_identical_bytes(tmp_path):

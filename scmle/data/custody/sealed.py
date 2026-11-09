@@ -183,23 +183,6 @@ class OpenLog:
         """Hash of the newest entry, or the genesis value when empty."""
         return str(self.entries[-1]["hash"]) if self.entries else GENESIS
 
-    @classmethod
-    def verify_file(
-        cls, path: str | Path, signing_key: str | bytes | None = None
-    ) -> "OpenLog":
-        """Loads a log file and verifies its chain and, with a key, its MACs.
-
-        A failed verification raises ArtifactError from the constructor.
-
-        Args:
-            path: The log file.
-            signing_key: HMAC key; the environment key is used when None.
-
-        Returns:
-            The loaded log.
-        """
-        return cls(path, signing_key)
-
 
 class SealedSet:
     """A named set behind a one-time, token-gated release, with a log."""

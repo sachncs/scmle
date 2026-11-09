@@ -96,11 +96,11 @@ def test_open_creates_missing_folders_and_passes_the_horizon(tmp_path):
         )
 
 
-def test_verify_file_checks_the_recorded_head(tmp_path):
+def test_load_checks_the_recorded_head(tmp_path):
     path = tmp_path / scmle.data.ledger.ledger.FILE_NAME
     ledger = fresh(path)
     assert (
-        scmle.data.ledger.ledger.Ledger.verify_file(path, ledger.head).head
+        scmle.data.ledger.ledger.Ledger.load(path, ledger.head).head
         == ledger.head
     )
     with raises(
@@ -108,7 +108,7 @@ def test_verify_file_checks_the_recorded_head(tmp_path):
         "ledger head does not match the recorded head: rows were removed "
         "from the end or the file was replaced",
     ):
-        scmle.data.ledger.ledger.Ledger.verify_file(path, "0" * 64)
+        scmle.data.ledger.ledger.Ledger.load(path, "0" * 64)
 
 
 def rechained(rows):
