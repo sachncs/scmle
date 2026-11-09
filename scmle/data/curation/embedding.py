@@ -80,7 +80,7 @@ class TextEmbedder(base.TransformerMixin, base.BaseEstimator):
         position = {text: index for index, text in enumerate(unique)}
         return numpy.asarray(matrix)[[position[t] for t in strings]]
 
-    def fit(self, texts: Any, target: Any = None) -> Self:
+    def fit(self, texts: Any, target: Any = None) -> Self:  # noqa: ARG002 -- scikit-learn fit signature
         """Checks the model works; otherwise falls back to TF-IDF.
 
         Any failure of the worker while embedding up to two probe strings
@@ -98,7 +98,7 @@ class TextEmbedder(base.TransformerMixin, base.BaseEstimator):
         try:
             self.width_ = int(self.request(strings[:2] or [""]).shape[1])
             self.mode_ = "embedding"
-        except Exception as error:  # The worker reports many kinds.
+        except Exception as error:  # noqa: BLE001 -- the embedding worker reports many kinds of failure
             LOGGER.warning(
                 "embedding model '%s' is unavailable (%s); falling back to "
                 "TF-IDF terms",
@@ -127,7 +127,8 @@ class TextEmbedder(base.TransformerMixin, base.BaseEstimator):
         return self.request(strings)
 
     def get_feature_names_out(
-        self, input_features: Any = None
+        self,
+        input_features: Any = None,  # noqa: ARG002 -- scikit-learn get_feature_names_out signature
     ) -> numpy.ndarray:
         """Names of the output columns.
 

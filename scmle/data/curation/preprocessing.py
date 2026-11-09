@@ -239,48 +239,90 @@ def default_options(
     )
 
 
-def build_pipeline(
-    plan: data.FeaturePlan,
-    adapter: models.Model,
-    task: tasks.Task,
-    seed: int,
-    params: Mapping[str, Any] | None = None,
-    options: data.Preprocessing | None = None,
-) -> Any:
-    """Builds a complete, independently evaluable candidate pipeline.
+def adapter_params(
+    plan: data.FeaturePlan, params: Mapping[str, Any] | None
+) -> Mapping[str, Any] | None:
+    """Adds the plan's ordinal levels and uplift flag to the overrides.
 
     Args:
         plan: Feature columns grouped by kind.
-        adapter: Model family to place after preprocessing.
-        task: Resolved task type.
-        seed: Random seed forwarded to the estimator.
         params: Hyperparameter overrides for the estimator.
-        options: Preprocessing switches; by default `default_options`.
 
     Returns:
-        An unfitted pipeline of preprocessing followed by the estimator.
+        `params` with `levels` set when the plan has ordinal levels and
+        `classify` set when the plan has a treatment column; the argument
+        itself when neither applies.
     """
     if plan.ordinal_levels:
         params = {**(params or {}), "levels": plan.ordinal_levels}
     if plan.treatment_column:
         params = {**(params or {}), "classify": plan.binary_outcome}
-    assembled: Any
+    return params
+
+
+def adapter_assembly(
+    plan: data.FeaturePlan,
+    adapter: models.Model,
+    task: tasks.Task,
+    seed: int,
+    params: Mapping[str, Any] | None,
+) -> Any:
+    """Asks the model family for a pipeline it assembles itself.
+
+    Args:
+        plan: Feature columns grouped by kind.
+        adapter: Model family.
+        task: Resolved task type.
+        seed: Random seed forwarded to the estimator.
+        params: Hyperparameter overrides for the estimator.
+
+    Returns:
+        The assembled pipeline, or None when the family leaves the
+        preprocessing to this module. The dummy family on a forecast task
+        is a last-value forecaster.
+    """
     if task is tasks.Task.FORECAST and adapter.name == "dummy":
-        assembled = estimators.LastValueForecaster(
+        return estimators.LastValueForecaster(
             None, plan.target_columns, plan.value_column or ""
         )
-    else:
-        assembled = adapter.assemble(plan, task, seed, params)
-    if assembled is not None:
-        if plan.weight_column:
-            return weighting.weighted(assembled, plan.weight_column, seed)
-        return assembled
-    params = dict(params or {})
-    if options is None:
-        options = default_options(plan, adapter)
-    special = split_high_cardinality(plan, options)
-    if options.high_cardinality == "ordinal" and special:
-        params |= adapter.categorical_params(list(range(len(special))))
+    return adapter.assemble(plan, task, seed, params)
+
+
+def with_weights(model: Any, plan: data.FeaturePlan, seed: int) -> Any:
+    """Wraps a model so that it reads the plan's weight column.
+
+    Args:
+        model: The pipeline or estimator.
+        plan: Feature columns grouped by kind.
+        seed: Random seed forwarded to the wrapper.
+
+    Returns:
+        The weighted model, or `model` itself when the plan has no weight
+        column.
+    """
+    if plan.weight_column:
+        return weighting.weighted(model, plan.weight_column, seed)
+    return model
+
+
+def preprocessing_steps(
+    plan: data.FeaturePlan,
+    options: data.Preprocessing,
+    task: tasks.Task,
+    seed: int,
+) -> list[tuple[str, Any]]:
+    """Lists the steps that come before the estimator.
+
+    Args:
+        plan: Feature columns grouped by kind.
+        options: Preprocessing switches.
+        task: Resolved task type.
+        seed: Random seed forwarded to the selector.
+
+    Returns:
+        The graph, construction, preprocessing and selection steps that the
+        plan and the options call for, in that order.
+    """
     steps: list[tuple[str, Any]] = []
     if plan.derived:
         steps.append(
@@ -300,20 +342,22 @@ def build_pipeline(
                 ),
             )
         )
-    estimator = adapter.build(task, seed, params)
-    problem = monotonic_layout_problem(plan, options.select, options.missing)
-    if problem:
-        raise errors.ConfigError(
-            f"monotonic constraints cannot apply: {problem}"
-        )
-    if plan.monotonic:
-        estimator = wrappers.monotone(
-            estimator,
-            adapter.monotonic_param or "",
-            monotonic_signs(plan, len(special)),
-        )
-    steps.append(("model", estimator))
-    built: Any = pipeline.Pipeline(steps)
+    return steps
+
+
+def wrap_estimator(built: Any, plan: data.FeaturePlan, task: tasks.Task) -> Any:
+    """Wraps a pipeline in the estimators the plan's columns call for.
+
+    Args:
+        built: The pipeline.
+        plan: Feature columns grouped by kind.
+        task: Resolved task type.
+
+    Returns:
+        The pipeline wrapped for survival events, forecasting or several
+        targets, then for treatment and query columns, when the plan has
+        them.
+    """
     if plan.event_column:
         built = scmle.models.survival.wrapper.EventAwareEstimator(
             built, plan.event_column
@@ -337,6 +381,57 @@ def build_pipeline(
         built = scmle.models.ranking.wrapper.QueryAwareEstimator(
             built, plan.query_column
         )
-    if plan.weight_column:
-        return weighting.weighted(built, plan.weight_column, seed)
     return built
+
+
+def build_pipeline(
+    plan: data.FeaturePlan,
+    adapter: models.Model,
+    task: tasks.Task,
+    seed: int,
+    params: Mapping[str, Any] | None = None,
+    options: data.Preprocessing | None = None,
+) -> Any:
+    """Builds a complete, independently evaluable candidate pipeline.
+
+    Args:
+        plan: Feature columns grouped by kind.
+        adapter: Model family to place after preprocessing.
+        task: Resolved task type.
+        seed: Random seed forwarded to the estimator.
+        params: Hyperparameter overrides for the estimator.
+        options: Preprocessing switches; by default `default_options`.
+
+    Returns:
+        An unfitted pipeline of preprocessing followed by the estimator.
+
+    Raises:
+        ConfigError: If the plan's monotonic constraints cannot apply to the
+            layout the preprocessing produces.
+    """
+    params = adapter_params(plan, params)
+    assembled = adapter_assembly(plan, adapter, task, seed, params)
+    if assembled is not None:
+        return with_weights(assembled, plan, seed)
+    params = dict(params or {})
+    if options is None:
+        options = default_options(plan, adapter)
+    special = split_high_cardinality(plan, options)
+    if options.high_cardinality == "ordinal" and special:
+        params |= adapter.categorical_params(list(range(len(special))))
+    steps = preprocessing_steps(plan, options, task, seed)
+    estimator = adapter.build(task, seed, params)
+    problem = monotonic_layout_problem(plan, options.select, options.missing)
+    if problem:
+        raise errors.ConfigError(
+            f"monotonic constraints cannot apply: {problem}"
+        )
+    if plan.monotonic:
+        estimator = wrappers.monotone(
+            estimator,
+            adapter.monotonic_param or "",
+            monotonic_signs(plan, len(special)),
+        )
+    steps.append(("model", estimator))
+    built = wrap_estimator(pipeline.Pipeline(steps), plan, task)
+    return with_weights(built, plan, seed)

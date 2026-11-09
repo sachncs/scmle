@@ -23,6 +23,7 @@ DEFAULT_ALPHA = 0.02
 DEFAULT_STRENGTH = 0.1
 ZERO = 1e-8
 BINARY_CLASSES = 2
+MIN_DISTINCT_VALUES = 2
 
 
 class FeatureConstructor(base.TransformerMixin, base.BaseEstimator):
@@ -79,7 +80,7 @@ class FeatureConstructor(base.TransformerMixin, base.BaseEstimator):
                 values = pandas.to_numeric(features[column]).reset_index(
                     drop=True
                 )
-                if values.nunique() < 2:
+                if values.nunique() < MIN_DISTINCT_VALUES:
                     continue
                 rho = stats.spearmanr(values, outcome, nan_policy="omit")[0]
                 scored.append((abs(float(numpy.nan_to_num(rho))), column))
