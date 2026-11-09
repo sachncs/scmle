@@ -9,6 +9,7 @@ from scmle.contracts import tasks
 from scmle.evaluation import diagnostics
 
 MAX_FEATURES = 3
+MIN_DISTINCT_VALUES = 2
 GRID_POINTS = 8
 MAX_ROWS = 200
 LOW_QUANTILE = 0.05
@@ -46,7 +47,7 @@ class PartialDependence(diagnostics.Diagnostic):
         report = {}
         for column in ranked[:MAX_FEATURES]:
             values = sample[column].dropna()
-            if values.nunique() < 2:
+            if values.nunique() < MIN_DISTINCT_VALUES:
                 continue
             grid = numpy.unique(
                 numpy.quantile(
