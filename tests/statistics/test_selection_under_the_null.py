@@ -58,7 +58,9 @@ def test_a_prespecified_comparison_of_equal_models_stays_within_its_level(
     claims = 0
     for ignored in range(runs):
         target = rng.normal(size=rows)
-        first, second = (rng.normal(size=(rows, features)) for _ in range(2))
+        first, second = (
+            rng.normal(size=(rows, features)) for ignored in range(2)
+        )
         losses = cross_validated_losses(rng, [first, second], target, folds)
         verdict = comparison.compare_paired(
             [-loss for loss in losses[0]], [-loss for loss in losses[1]]

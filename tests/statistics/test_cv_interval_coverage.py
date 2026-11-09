@@ -21,7 +21,7 @@ import support_statistics
 from scmle.evaluation import confidence
 
 SIMULATIONS = 1000
-NOMINAL = confidence.LEVEL
+NOMINAL = 0.95
 
 
 def ols_fold_scores(rng, rows, folds, features):
@@ -60,6 +60,7 @@ def iid_coverage(rows, folds, features, seed):
 
 
 def test_the_interval_covers_the_expected_score_with_iid_rows():
+    assert confidence.LEVEL == NOMINAL
     for rows, folds, features in [(100, 5, 20), (100, 10, 20), (60, 5, 10)]:
         corrected, naive = iid_coverage(rows, folds, features, seed=2)
         label = f"n={rows} k={folds} p={features}"
