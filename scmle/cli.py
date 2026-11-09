@@ -35,6 +35,7 @@ from scmle.data.framing import draft
 from scmle.data.framing import refusal
 from scmle.data.ingest import budget
 from scmle.data.ingest import grain
+from scmle.data.ingest import joins
 import scmle.data.ingest.plan
 from scmle.data.readers import tabular
 from scmle.deploy import gate
@@ -830,7 +831,7 @@ class IngestCommand(Command):
         Raises:
             BlockedError: If the unit verdict is one that blocks the run.
         """
-        declared: tuple[scmle.data.ingest.plan.joins.DeclaredKey, ...] = ()
+        declared: tuple[joins.DeclaredKey, ...] = ()
         if args.foreign_keys:
             declared = scmle.data.ingest.plan.declared_from_json(
                 json.loads(pathlib.Path(args.foreign_keys).read_text())
@@ -903,7 +904,8 @@ class CharterCommand(Command):
             The exit status of the chosen action.
         """
         action = getattr(self, f"run_{args.charter_action}")
-        return action(args)
+        status: int = action(args)
+        return status
 
     @staticmethod
     def run_init(args: argparse.Namespace) -> int:
@@ -1044,7 +1046,8 @@ class LoopCommand(Command):
             The exit status of the chosen action.
         """
         action = getattr(self, f"run_{args.loop_action}")
-        return action(args)
+        status: int = action(args)
+        return status
 
     @staticmethod
     def run_init(args: argparse.Namespace) -> int:
@@ -1282,7 +1285,8 @@ class OperateCommand(Command):
             The exit status of the chosen action.
         """
         action = getattr(self, f"run_{args.operate_action}")
-        return action(args)
+        status: int = action(args)
+        return status
 
     @staticmethod
     def open(
@@ -1488,7 +1492,8 @@ class DeployCommand(Command):
             The exit status of the chosen action.
         """
         action = getattr(self, f"run_{args.deploy_action.replace('-', '_')}")
-        return action(args)
+        status: int = action(args)
+        return status
 
     @staticmethod
     def read_key(path: str) -> str:
@@ -1683,7 +1688,8 @@ class ClaimsCommand(Command):
             The exit status of the chosen action.
         """
         action = getattr(self, f"run_{args.claims_action}")
-        return action(args)
+        status: int = action(args)
+        return status
 
     @staticmethod
     def run_list(args: argparse.Namespace) -> int:
