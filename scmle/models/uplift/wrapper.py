@@ -27,12 +27,25 @@ class TreatmentAwareEstimator(base.RegressorMixin, base.BaseEstimator):
     def __init__(
         self, estimator: pipeline.Pipeline, treatment_column: str
     ) -> None:
-        """Initializes the wrapper."""
+        """Initializes the wrapper.
+
+        Args:
+            estimator: Unfitted pipeline whose last step is an uplift model.
+            treatment_column: Name of the 0/1 treatment column.
+        """
         self.estimator = estimator
         self.treatment_column = treatment_column
 
     def fit(self, features: Any, target: Any) -> Self:
-        """Fits preprocessing, then the model on outcome and treatment."""
+        """Fits preprocessing, then the model on outcome and treatment.
+
+        Args:
+            features: Frame holding the model inputs and the treatment column.
+            target: Outcome per row.
+
+        Returns:
+            This fitted estimator.
+        """
         frame = pd.DataFrame(features)
         arm = frame[self.treatment_column].to_numpy(dtype=int)
         steps = base.clone(self.estimator)
@@ -44,5 +57,12 @@ class TreatmentAwareEstimator(base.RegressorMixin, base.BaseEstimator):
         return self
 
     def predict(self, features: Any) -> np.ndarray:
-        """Estimated effect of treating each row."""
+        """Estimated effect of treating each row.
+
+        Args:
+            features: Frame with the same columns as at fit.
+
+        Returns:
+            Array of shape `(n_rows,)` of estimated effects.
+        """
         return self.model_.predict(self.preprocessing_.transform(features))

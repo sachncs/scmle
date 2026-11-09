@@ -53,17 +53,36 @@ class TorchAdapter(models.ModelAdapter):
     )
 
     def gpu_usable(self) -> bool:
-        """Whether PyTorch can see a CUDA device (asked of the worker)."""
+        """Whether PyTorch can see a CUDA device (asked of the worker).
+
+        Returns:
+            True if the adapter's dependencies are installed and the worker
+            reports that CUDA is available, else False.
+        """
         return self.is_available() and bool(
             worker.client().request("probe", ())
         )
 
     def supports_modality(self, modality: str) -> bool:
-        """Return whether this adapter has a declared modality boundary."""
+        """Return whether this adapter has a declared modality boundary.
+
+        Args:
+            modality: A modality name or `Modality` value.
+
+        Returns:
+            True if the family contract declares the modality.
+        """
         return self.family_contract.supports_modality(modality)
 
     def require_modality(self, modality: str) -> None:
-        """Fail closed when an adapter is asked to model another modality."""
+        """Fail closed when an adapter is asked to model another modality.
+
+        The family contract raises ValueError if it does not declare the
+        modality.
+
+        Args:
+            modality: A modality name or `Modality` value.
+        """
         self.family_contract.require_modality(modality)
 
     def build(
@@ -209,7 +228,16 @@ class TorchJepaAdapter(TorchAdapter):
     def rejection_reason(
         self, task: tasks.TaskType, row_count: int | None = None
     ) -> str | None:
-        """Rejects datasets too small for representation cross-validation."""
+        """Rejects datasets too small for representation cross-validation.
+
+        Args:
+            task: Resolved task type.
+            row_count: Dataset size, if known.
+
+        Returns:
+            The base adapter's reason if it has one; otherwise a reason when
+            `row_count` is below 16; otherwise None.
+        """
         reason = super().rejection_reason(task, row_count)
         if reason is not None:
             return reason
@@ -231,7 +259,7 @@ class TorchJepaAdapter(TorchAdapter):
         Args:
             task: Resolved binary, multiclass, or regression task.
             seed: Seed shared by the representation and prediction head.
-            params: Optional search overrides shared by both stages where
+            params: Optional search overrides shared by both steps where
                 their parameter names overlap.
 
         Returns:
@@ -301,6 +329,16 @@ class TorchJepaAdapter(TorchAdapter):
         the supervised head consumes its embeddings. Keeping this composition
         in the adapter makes it available to every strategy, package, and
         prediction path without a special-case orchestrator branch.
+
+        Args:
+            plan: Feature plan describing the declared columns.
+            task: Resolved task type.
+            seed: Random seed.
+            params: Optional search overrides, as for `build`.
+
+        Returns:
+            An unfitted pipeline: the feature front end followed by the JEPA
+            representation and prediction head.
         """
         from scmle.data.curation import preprocessing
 
@@ -352,6 +390,14 @@ class KerasMlpAdapter(TorchAdapter):
     ) -> models.Estimator:
         """Creates an unfitted Keras estimator.
 
+        Args:
+            task: Resolved task type.
+            seed: Random seed.
+            params: Search-space overrides passed to the estimator.
+
+        Returns:
+            An unfitted Keras classifier or regressor.
+
         Raises:
             ConfigError: If PyTorch or Keras is not installed.
         """
@@ -395,6 +441,14 @@ class TabPfnAdapter(models.ModelAdapter):
         support boundary. It remains available through its explicit adapter
         and foundation-engine contract, but installing the package alone
         must not make ordinary projects depend on that external agreement.
+
+        Args:
+            task: Resolved task type.
+            row_count: Dataset size, if known.
+
+        Returns:
+            The base adapter's reason if it has one; otherwise always the
+            extension-only reason, so it is never an automatic candidate.
         """
         missing = super().rejection_reason(task, row_count)
         if missing is not None:
@@ -405,7 +459,12 @@ class TabPfnAdapter(models.ModelAdapter):
         )
 
     def gpu_usable(self) -> bool:
-        """Whether PyTorch can see a CUDA device (asked of the worker)."""
+        """Whether PyTorch can see a CUDA device (asked of the worker).
+
+        Returns:
+            True if the adapter's dependencies are installed and the worker
+            reports that CUDA is available, else False.
+        """
         return self.is_available() and bool(
             worker.client().request("probe", ())
         )
@@ -417,6 +476,14 @@ class TabPfnAdapter(models.ModelAdapter):
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
         """Creates an unfitted TabPFN estimator.
+
+        Args:
+            task: Resolved task type.
+            seed: Random seed.
+            params: Search-space overrides passed to the estimator.
+
+        Returns:
+            An unfitted TabPFN classifier or regressor.
 
         Raises:
             ConfigError: If the `tabpfn` package is not installed.

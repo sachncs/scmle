@@ -82,7 +82,34 @@ class NetworkEstimator(base.BaseEstimator):
         huber_delta: float = 1.0,
         accumulation_steps: int = 1,
     ) -> None:
-        """Stores the hyperparameters (scikit-learn convention)."""
+        """Stores the hyperparameters (scikit-learn convention).
+
+        Args:
+            architecture: Name in `architectures.ARCHITECTURES`.
+            hidden_sizes: Layer widths (residual: width, then block count).
+            dropout: Dropout probability.
+            learning_rate: Adam step size.
+            weight_decay: L2 penalty.
+            epochs: Maximum epochs.
+            batch_size: Rows per step, or `auto` to size it from the data.
+            schedule: Learning-rate schedule, `cosine` or `constant`.
+            warmup_epochs: Epochs of linear learning-rate warm-up.
+            max_grad_norm: Gradient clipping threshold (None disables it).
+            patience: Epochs without validation improvement before stopping.
+            validation_fraction: Share of rows held out for early stopping.
+            device: `auto` (CUDA when available), `cpu` or `cuda`.
+            random_state: Seed for initialization, shuffling and the split.
+            optimizer: `adam`, `adamw`, `sgd` (with `momentum`), `rmsprop` or
+                `lbfgs` (full-batch second-order steps).
+            momentum: Momentum of `sgd`.
+            loss: `default`, or `focal` (classifier) / `huber` (regressor).
+            label_smoothing: Share of probability moved off the true class.
+            focal_gamma: Focusing strength of the focal loss.
+            huber_delta: Where the Huber loss turns from squared to linear (in
+                standardized target units).
+            accumulation_steps: Mini-batches whose gradients are summed before
+                one parameter update (a larger effective batch).
+        """
         self.optimizer = optimizer
         self.momentum = momentum
         self.loss = loss
@@ -107,7 +134,14 @@ class NetworkEstimator(base.BaseEstimator):
 
     @staticmethod
     def dense(features: Any) -> np.ndarray:
-        """Returns a float32 matrix, densifying sparse input."""
+        """Returns a float32 matrix, densifying sparse input.
+
+        Args:
+            features: Dense or sparse array-like of model inputs.
+
+        Returns:
+            Dense float32 array.
+        """
         if sparse.issparse(features):
             features = features.toarray()
         return np.asarray(features, dtype=np.float32)
@@ -121,7 +155,11 @@ class NetworkEstimator(base.BaseEstimator):
         return self.model_contract().inference
 
     def explanation_contract(self) -> contracts.ExplanationContract:
-        """Return the local feature-attribution contract."""
+        """Return the local feature-attribution contract.
+
+        Raises:
+            ValueError: If the model family declares no explanation contract.
+        """
         explanation = self.model_contract().explanation
         if explanation is None:
             raise ValueError(
@@ -153,6 +191,9 @@ class NetworkEstimator(base.BaseEstimator):
         self, features: Any, target: Any, sample_weight: Any = None
     ) -> "NetworkEstimator":
         """Trains the network in the worker.
+
+        Features that fail the contract validation (not a finite numeric 2-D
+        matrix) raise ValueError.
 
         Args:
             features: Numeric matrix.
@@ -186,10 +227,30 @@ class NetworkEstimator(base.BaseEstimator):
         return self
 
     def remember(self, state: dict[str, Any]) -> None:
-        """Copies the attributes scikit-learn expects from the fitted state."""
+        """Copies the attributes scikit-learn expects from the fitted state.
+
+        Args:
+            state: Fitted state returned by the worker.
+        """
 
     def call(self, method: str, features: Any) -> np.ndarray:
-        """Runs an engine method in the worker on new rows."""
+        """Runs an engine method in the worker on new rows.
+
+        If the worker does not hold the fitted state it is sent once and the
+        call is retried. Features that are not a finite numeric matrix of the
+        fitted width raise ValueError from the contract validation.
+
+        Args:
+            method: Name of the engine method to call, for example `predict`.
+            features: Numeric matrix with the width seen at fit.
+
+        Returns:
+            The method's result as a numpy array.
+
+        Raises:
+            WorkerError: If the worker still lacks the model state after it was
+                sent.
+        """
         utils.validation.check_is_fitted(self, attributes=["state_"])
         matrix = self.model_contract().validate_features(
             features, expected_width=self.state_["input_width_"]
@@ -211,6 +272,13 @@ class NetworkEstimator(base.BaseEstimator):
         the predicted class logit for classification, the averaged ensemble
         value for regression, or the embedding energy for a representation
         estimator. These are sensitivity scores, not causal effects.
+
+        Args:
+            features: Numeric matrix with the width seen at fit.
+
+        Returns:
+            A `FeatureExplanation` with one signed attribution per row and input
+            feature.
         """
         values = self.call("explain", features)
         return contracts.FeatureExplanation(
@@ -221,7 +289,16 @@ class NetworkEstimator(base.BaseEstimator):
         )
 
     def save_checkpoint(self, path: str | pathlib.Path) -> pathlib.Path:
-        """Atomically save a verified, trusted-local fitted checkpoint."""
+        """Atomically save a verified, trusted-local fitted checkpoint.
+
+        An unfitted estimator raises scikit-learn's `NotFittedError`.
+
+        Args:
+            path: Destination file. Missing parent directories are created.
+
+        Returns:
+            The checkpoint path.
+        """
         utils.validation.check_is_fitted(self, attributes=["state_"])
         destination = pathlib.Path(path)
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -263,6 +340,17 @@ class NetworkEstimator(base.BaseEstimator):
         Checkpoints are trusted-local joblib payloads. The digest detects
         truncation and accidental modification; it is not a protection
         against a malicious pickle.
+
+        Args:
+            path: Checkpoint produced by `save_checkpoint`.
+
+        Returns:
+            The fitted estimator stored in the checkpoint.
+
+        Raises:
+            ValueError: If the file cannot be read, the envelope, metadata or
+                digest check fails, or the payload does not hold a fitted
+                estimator of this class that matches the metadata.
         """
         try:
             envelope = joblib.load(path)
@@ -361,7 +449,36 @@ class TorchClassifier(base.ClassifierMixin, NetworkEstimator):
         accumulation_steps: int = 1,
         class_weight: str | None = None,
     ) -> None:
-        """Stores the hyperparameters, plus `class_weight` (`balanced`)."""
+        """Stores the hyperparameters, plus `class_weight` (`balanced`).
+
+        Args:
+            architecture: Name in `architectures.ARCHITECTURES`.
+            hidden_sizes: Layer widths (residual: width, then block count).
+            dropout: Dropout probability.
+            learning_rate: Adam step size.
+            weight_decay: L2 penalty.
+            epochs: Maximum epochs.
+            batch_size: Rows per step, or `auto` to size it from the data.
+            schedule: Learning-rate schedule, `cosine` or `constant`.
+            warmup_epochs: Epochs of linear learning-rate warm-up.
+            max_grad_norm: Gradient clipping threshold (None disables it).
+            patience: Epochs without validation improvement before stopping.
+            validation_fraction: Share of rows held out for early stopping.
+            device: `auto` (CUDA when available), `cpu` or `cuda`.
+            random_state: Seed for initialization, shuffling and the split.
+            optimizer: `adam`, `adamw`, `sgd` (with `momentum`), `rmsprop` or
+                `lbfgs` (full-batch second-order steps).
+            momentum: Momentum of `sgd`.
+            loss: `default`, or `focal` (classifier) / `huber` (regressor).
+            label_smoothing: Share of probability moved off the true class.
+            focal_gamma: Focusing strength of the focal loss.
+            huber_delta: Where the Huber loss turns from squared to linear (in
+                standardized target units).
+            accumulation_steps: Mini-batches whose gradients are summed before
+                one parameter update (a larger effective batch).
+            class_weight: `balanced` for inverse-class-frequency row weights, or
+                None for equal weights.
+        """
         super().__init__(
             architecture,
             hidden_sizes,
@@ -388,15 +505,33 @@ class TorchClassifier(base.ClassifierMixin, NetworkEstimator):
         self.class_weight = class_weight
 
     def remember(self, state: dict[str, Any]) -> None:
-        """Exposes `classes_` after fitting."""
+        """Exposes `classes_` after fitting.
+
+        Args:
+            state: Fitted state returned by the worker.
+        """
         self.classes_ = state["classes_"]
 
     def predict_proba(self, features: Any) -> np.ndarray:
-        """Class probabilities, columns ordered like `classes_`."""
+        """Class probabilities, columns ordered like `classes_`.
+
+        Args:
+            features: Numeric matrix with the width seen at fit.
+
+        Returns:
+            Array of shape `(n_rows, n_classes)`.
+        """
         return self.call("predict_proba", features)
 
     def predict(self, features: Any) -> np.ndarray:
-        """Most probable class."""
+        """Most probable class.
+
+        Args:
+            features: Numeric matrix with the width seen at fit.
+
+        Returns:
+            Array of shape `(n_rows,)` of class labels.
+        """
         return self.call("predict", features)
 
 
@@ -406,7 +541,14 @@ class TorchRegressor(base.RegressorMixin, NetworkEstimator):
     engine_path = "scmle.models.deeplearning.engines.RegressorEngine"
 
     def predict(self, features: Any) -> np.ndarray:
-        """Predicted values in the original units."""
+        """Predicted values in the original units.
+
+        Args:
+            features: Numeric matrix with the width seen at fit.
+
+        Returns:
+            Array of shape `(n_rows,)`.
+        """
         return self.call("predict", features)
 
 
@@ -427,13 +569,27 @@ class TabPfnEstimator(base.BaseEstimator):
         random_state: int = 0,
         n_estimators: int = 8,
     ) -> None:
-        """Stores the settings (scikit-learn convention)."""
+        """Stores the settings (scikit-learn convention).
+
+        Args:
+            device: `auto`, `cpu` or `cuda`.
+            random_state: Seed of TabPFN's internal ensemble.
+            n_estimators: Members of TabPFN's internal ensemble.
+        """
         self.device = device
         self.random_state = random_state
         self.n_estimators = n_estimators
 
     def fit(self, features: Any, target: Any) -> "TabPfnEstimator":
-        """Stores the rows in the worker's TabPFN model."""
+        """Stores the rows in the worker's TabPFN model.
+
+        Args:
+            features: Training matrix.
+            target: Labels or values.
+
+        Returns:
+            The fitted estimator.
+        """
         matrix = NetworkEstimator.dense(features)
         self.state_ = worker.client().request(
             "fit",
@@ -450,10 +606,29 @@ class TabPfnEstimator(base.BaseEstimator):
         return self
 
     def remember(self, state: dict[str, Any]) -> None:
-        """Copies attributes scikit-learn expects from the fitted state."""
+        """Copies attributes scikit-learn expects from the fitted state.
+
+        Args:
+            state: Fitted state returned by the worker.
+        """
 
     def call(self, method: str, features: Any) -> np.ndarray:
-        """Runs an engine method in the worker on new rows."""
+        """Runs an engine method in the worker on new rows.
+
+        If the worker does not hold the fitted state it is sent once and the
+        call is retried.
+
+        Args:
+            method: Name of the engine method to call, for example `predict`.
+            features: Numeric matrix with the width seen at fit.
+
+        Returns:
+            The method's result as a numpy array.
+
+        Raises:
+            WorkerError: If the worker still lacks the model state after it was
+                sent.
+        """
         matrix = NetworkEstimator.dense(features)
         client = worker.client()
         for state in (None, self.state_):
@@ -472,15 +647,33 @@ class TabPfnClassifier(base.ClassifierMixin, TabPfnEstimator):
     engine_path = "scmle.models.deeplearning.foundation.ClassifierEngine"
 
     def remember(self, state: dict[str, Any]) -> None:
-        """Exposes `classes_` after fitting."""
+        """Exposes `classes_` after fitting.
+
+        Args:
+            state: Fitted state returned by the worker.
+        """
         self.classes_ = state["classes_"]
 
     def predict_proba(self, features: Any) -> np.ndarray:
-        """Class probabilities."""
+        """Class probabilities.
+
+        Args:
+            features: Numeric matrix with the width seen at fit.
+
+        Returns:
+            Array of shape `(n_rows, n_classes)`.
+        """
         return self.call("predict_proba", features)
 
     def predict(self, features: Any) -> np.ndarray:
-        """Most probable class."""
+        """Most probable class.
+
+        Args:
+            features: Numeric matrix with the width seen at fit.
+
+        Returns:
+            Array of shape `(n_rows,)` of class labels.
+        """
         return self.call("predict", features)
 
 
@@ -490,7 +683,14 @@ class TabPfnRegressor(base.RegressorMixin, TabPfnEstimator):
     engine_path = "scmle.models.deeplearning.foundation.RegressorEngine"
 
     def predict(self, features: Any) -> np.ndarray:
-        """Predicted values."""
+        """Predicted values.
+
+        Args:
+            features: Numeric matrix with the width seen at fit.
+
+        Returns:
+            Array of shape `(n_rows,)`.
+        """
         return self.call("predict", features)
 
 
@@ -523,7 +723,19 @@ class KerasEstimator(NetworkEstimator):
         validation_fraction: float = 0.1,
         random_state: int = 0,
     ) -> None:
-        """Stores the hyperparameters (scikit-learn convention)."""
+        """Stores the hyperparameters (scikit-learn convention).
+
+        Args:
+            hidden_sizes: Layer widths.
+            dropout: Dropout probability.
+            learning_rate: Adam step size.
+            l2: L2 penalty on the kernels.
+            epochs: Maximum epochs.
+            batch_size: Rows per step.
+            patience: Epochs without validation improvement before stopping.
+            validation_fraction: Share of rows held out for early stopping.
+            random_state: Seed.
+        """
         self.hidden_sizes = hidden_sizes
         self.dropout = dropout
         self.learning_rate = learning_rate
@@ -541,15 +753,33 @@ class KerasClassifier(base.ClassifierMixin, KerasEstimator):
     engine_path = "scmle.models.deeplearning.keras_engine.ClassifierEngine"
 
     def remember(self, state: dict[str, Any]) -> None:
-        """Exposes `classes_` after fitting."""
+        """Exposes `classes_` after fitting.
+
+        Args:
+            state: Fitted state returned by the worker.
+        """
         self.classes_ = state["classes_"]
 
     def predict_proba(self, features: Any) -> np.ndarray:
-        """Class probabilities."""
+        """Class probabilities.
+
+        Args:
+            features: Numeric matrix with the width seen at fit.
+
+        Returns:
+            Array of shape `(n_rows, n_classes)`.
+        """
         return self.call("predict_proba", features)
 
     def predict(self, features: Any) -> np.ndarray:
-        """Most probable class."""
+        """Most probable class.
+
+        Args:
+            features: Numeric matrix with the width seen at fit.
+
+        Returns:
+            Array of shape `(n_rows,)` of class labels.
+        """
         return self.call("predict", features)
 
 
@@ -559,5 +789,12 @@ class KerasRegressor(base.RegressorMixin, KerasEstimator):
     engine_path = "scmle.models.deeplearning.keras_engine.RegressorEngine"
 
     def predict(self, features: Any) -> np.ndarray:
-        """Predicted values."""
+        """Predicted values.
+
+        Args:
+            features: Numeric matrix with the width seen at fit.
+
+        Returns:
+            Array of shape `(n_rows,)`.
+        """
         return self.call("predict", features)

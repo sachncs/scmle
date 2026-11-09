@@ -46,6 +46,9 @@ class BaggedAdapter(models.ModelAdapter):
 
         The ensemble costs more, needs dense input, and keeps whatever the
         base model can do about missing values and probabilities.
+
+        Args:
+            **options: Class keyword arguments forwarded to the parent class.
         """
         super().__init_subclass__(**options)
         inner = cls.base.capabilities

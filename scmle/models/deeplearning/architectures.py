@@ -34,6 +34,9 @@ class Architecture(abc.ABC):
             outputs: Number of output units.
             hidden_sizes: Layer widths.
             dropout: Dropout probability.
+
+        Returns:
+            The untrained network mapping `(rows, inputs)` to outputs.
         """
 
 
@@ -50,7 +53,19 @@ class MlpArchitecture(Architecture):
         hidden_sizes: tuple[int, ...],
         dropout: float,
     ) -> Any:
-        """Stacks linear, ReLU and dropout layers."""
+        """Stacks linear, ReLU and dropout layers.
+
+        Args:
+            torch: The imported torch module.
+            inputs: Width of the input matrix.
+            outputs: Number of output units.
+            hidden_sizes: Layer widths.
+            dropout: Dropout probability.
+
+        Returns:
+            A sequential network with one hidden layer per entry of
+            `hidden_sizes`, ending in a linear layer of `outputs` units.
+        """
         layers: list[Any] = []
         width = inputs
         for size in hidden_sizes:
@@ -81,7 +96,20 @@ class ResidualArchitecture(Architecture):
         hidden_sizes: tuple[int, ...],
         dropout: float,
     ) -> Any:
-        """Builds the residual network."""
+        """Builds the residual network.
+
+        Args:
+            torch: The imported torch module.
+            inputs: Width of the input matrix.
+            outputs: Number of output units.
+            hidden_sizes: The first entry is the block width; each non-zero
+                entry adds one residual block.
+            dropout: Dropout probability.
+
+        Returns:
+            A sequential network: input projection, residual blocks, layer norm
+            and a linear head.
+        """
         width = hidden_sizes[0]
 
         class Block(torch.nn.Module):
@@ -94,7 +122,14 @@ class ResidualArchitecture(Architecture):
                 self.drop = torch.nn.Dropout(dropout)
 
             def forward(self, features: Any) -> Any:
-                """Adds the transformed input back to itself."""
+                """Adds the transformed input back to itself.
+
+                Args:
+                    features: Tensor of shape `(rows, width)`.
+
+                Returns:
+                    Tensor of the same shape.
+                """
                 hidden = self.linear(torch.relu(self.norm(features)))
                 return features + self.drop(hidden)
 
@@ -130,13 +165,30 @@ class EnsembleArchitecture(Architecture):
         hidden_sizes: tuple[int, ...],
         dropout: float,
     ) -> Any:
-        """Builds the shared-weight ensemble."""
+        """Builds the shared-weight ensemble.
+
+        Args:
+            torch: The imported torch module.
+            inputs: Width of the input matrix.
+            outputs: Number of output units.
+            hidden_sizes: Layer widths.
+            dropout: Dropout probability.
+
+        Returns:
+            A network returning one output per ensemble member.
+        """
         members = ENSEMBLE_MEMBERS
 
         class EnsembleLinear(torch.nn.Module):
             """Shared weight with per-member input/output scales and bias."""
 
             def __init__(self, width_in: int, width_out: int) -> None:
+                """Creates the shared weight and the per-member parameters.
+
+                Args:
+                    width_in: Input width of the layer.
+                    width_out: Output width of the layer.
+                """
                 super().__init__()
                 self.weight = torch.nn.Parameter(
                     torch.empty(width_in, width_out)
@@ -150,7 +202,14 @@ class EnsembleArchitecture(Architecture):
                 self.bias = torch.nn.Parameter(torch.zeros(members, width_out))
 
             def forward(self, features: Any) -> Any:
-                """Applies the member-specific adaptation of the layer."""
+                """Applies the member-specific adaptation of the layer.
+
+                Args:
+                    features: Tensor of shape `(rows, members, width_in)`.
+
+                Returns:
+                    Tensor of shape `(rows, members, width_out)`.
+                """
                 return (
                     features * self.in_scale
                 ) @ self.weight * self.out_scale + self.bias
@@ -173,7 +232,14 @@ class EnsembleArchitecture(Architecture):
                 self.layers = torch.nn.Sequential(*layers)
 
             def forward(self, features: Any) -> Any:
-                """Returns member outputs of shape (rows, members, outputs)."""
+                """Returns member outputs of shape (rows, members, outputs).
+
+                Args:
+                    features: Tensor of shape `(rows, inputs)`.
+
+                Returns:
+                    Tensor of shape `(rows, members, outputs)`.
+                """
                 repeated = features.unsqueeze(1).expand(-1, members, -1)
                 return self.layers(repeated)
 
@@ -200,7 +266,19 @@ class TransformerArchitecture(Architecture):
         hidden_sizes: tuple[int, ...],
         dropout: float,
     ) -> Any:
-        """Builds the tokenizer, encoder and head."""
+        """Builds the tokenizer, encoder and head.
+
+        Args:
+            torch: The imported torch module.
+            inputs: Number of numeric features, each embedded as one token.
+            outputs: Number of output units.
+            hidden_sizes: The first entry is the embedding width; the number of
+                entries is the number of encoder layers.
+            dropout: Dropout probability.
+
+        Returns:
+            A network mapping `(rows, inputs)` to `(rows, outputs)`.
+        """
         width = hidden_sizes[0]
         heads = ATTENTION_HEADS if width % ATTENTION_HEADS == 0 else 1
 
@@ -233,7 +311,14 @@ class TransformerArchitecture(Architecture):
                 )
 
             def forward(self, features: Any) -> Any:
-                """Scores each row from its classification token."""
+                """Scores each row from its classification token.
+
+                Args:
+                    features: Tensor of shape `(rows, inputs)`.
+
+                Returns:
+                    Tensor of shape `(rows, outputs)`.
+                """
                 tokens = features.unsqueeze(-1) * self.weight + self.bias
                 cls = self.cls.expand(tokens.shape[0], -1, -1)
                 encoded = self.encoder(torch.cat([cls, tokens], dim=1))
@@ -260,7 +345,19 @@ class RobustMlpArchitecture(Architecture):
         hidden_sizes: tuple[int, ...],
         dropout: float,
     ) -> Any:
-        """Builds the scaling, clipping and parametric-activation stack."""
+        """Builds the scaling, clipping and parametric-activation stack.
+
+        Args:
+            torch: The imported torch module.
+            inputs: Width of the input matrix.
+            outputs: Number of output units.
+            hidden_sizes: Layer widths.
+            dropout: Dropout probability.
+
+        Returns:
+            A sequential network of learned scaling, smooth clipping and linear
+            layers with PReLU activations.
+        """
 
         class Scaling(torch.nn.Module):
             """Learned per-feature scale."""
@@ -270,14 +367,28 @@ class RobustMlpArchitecture(Architecture):
                 self.scale = torch.nn.Parameter(torch.ones(inputs))
 
             def forward(self, features: Any) -> Any:
-                """Multiplies each feature by its scale."""
+                """Multiplies each feature by its scale.
+
+                Args:
+                    features: Input tensor.
+
+                Returns:
+                    Tensor of the same shape as `features`.
+                """
                 return features * self.scale
 
         class SmoothClip(torch.nn.Module):
             """Soft saturation of large magnitudes."""
 
             def forward(self, features: Any) -> Any:
-                """Maps R to (-3, 3) smoothly."""
+                """Maps R to (-3, 3) smoothly.
+
+                Args:
+                    features: Input tensor.
+
+                Returns:
+                    Tensor of the same shape with every value inside (-3, 3).
+                """
                 return features / torch.sqrt(1.0 + (features / 3.0) ** 2)
 
         layers: list[Any] = [Scaling(), SmoothClip()]

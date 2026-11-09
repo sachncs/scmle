@@ -18,7 +18,15 @@ from scmle.contracts import capabilities
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class CheckpointContract:
-    """Serialization boundary for a fitted model family."""
+    """Serialization boundary for a fitted model family.
+
+    Attributes:
+        format: Identifier of the checkpoint format.
+        schema_version: Positive version of the checkpoint schema.
+        trusted_local_storage: Whether checkpoints may only be loaded from
+            trusted local storage.
+        atomic_replace: Whether saving replaces the file atomically.
+    """
 
     format: str
     schema_version: int
@@ -26,7 +34,11 @@ class CheckpointContract:
     atomic_replace: bool
 
     def __post_init__(self) -> None:
-        """Validate the checkpoint declaration."""
+        """Validate the checkpoint declaration.
+
+        Raises:
+            ValueError: If the format is blank or the schema version is below 1.
+        """
         if not self.format.strip():
             raise ValueError("checkpoint format must not be empty")
         if self.schema_version < 1:
@@ -44,7 +56,16 @@ class CheckpointContract:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class InferenceContract:
-    """Input and output behavior promised by a model family."""
+    """Input and output behavior promised by a model family.
+
+    Attributes:
+        modality: Input modality the family accepts.
+        input_rank: Number of dimensions of the input array.
+        input_dtype: Name of the dtype the input is converted to.
+        methods: Inference methods offered, sorted and de-duplicated.
+        output: Description of what the methods return.
+        deterministic: Whether repeated inference gives identical output.
+    """
 
     modality: capabilities.Modality
     input_rank: int
@@ -54,7 +75,12 @@ class InferenceContract:
     deterministic: bool
 
     def __post_init__(self) -> None:
-        """Validate the inference declaration."""
+        """Validate the inference declaration.
+
+        Raises:
+            ValueError: If the input rank is below 1, the dtype or output is
+                blank, or no method (or a blank method) is declared.
+        """
         if self.input_rank < 1:
             raise ValueError("inference input rank must be positive")
         if not self.input_dtype.strip() or not self.output.strip():
@@ -79,7 +105,14 @@ class InferenceContract:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class ExplanationContract:
-    """Local explanation behavior promised by a model family."""
+    """Local explanation behavior promised by a model family.
+
+    Attributes:
+        method: Name of the attribution method.
+        scope: Scope of the explanation, for example `local`.
+        output: Description of what an explanation contains.
+        limitations: Caveats of the method, sorted and de-duplicated.
+    """
 
     method: str
     scope: str
@@ -87,7 +120,12 @@ class ExplanationContract:
     limitations: tuple[str, ...]
 
     def __post_init__(self) -> None:
-        """Validate the explanation declaration."""
+        """Validate the explanation declaration.
+
+        Raises:
+            ValueError: If the method, scope or output is blank, or any
+                limitation is blank.
+        """
         if not self.method.strip() or not self.scope.strip():
             raise ValueError("explanation method and scope must not be empty")
         if not self.output.strip():
@@ -110,7 +148,15 @@ class ExplanationContract:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class FeatureExplanation:
-    """Feature-level attribution returned by a fitted tabular model."""
+    """Feature-level attribution returned by a fitted tabular model.
+
+    Attributes:
+        values: Attribution matrix of shape `(n_rows, feature_count)`, stored
+            as float64.
+        method: Name of the attribution method.
+        target: What the attribution is taken with respect to.
+        feature_count: Number of input features, equal to the column count.
+    """
 
     values: np.ndarray
     method: str
@@ -118,7 +164,13 @@ class FeatureExplanation:
     feature_count: int
 
     def __post_init__(self) -> None:
-        """Validate the returned attribution matrix."""
+        """Validate the returned attribution matrix.
+
+        Raises:
+            ValueError: If `values` is not two-dimensional, its column count
+                differs from `feature_count`, it contains non-finite numbers, or
+                the method or target is blank.
+        """
         values = np.asarray(self.values, dtype=np.float64)
         if values.ndim != 2:
             raise ValueError(
@@ -145,7 +197,19 @@ class FeatureExplanation:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class ModelFamilyContract:
-    """Reusable capability boundary for one deep-learning model family."""
+    """Reusable capability boundary for one deep-learning model family.
+
+    Attributes:
+        model_family: Name of the model family.
+        status: Support status of the family.
+        modalities: Modalities the family accepts, sorted by value.
+        required_extras: Optional install extras the family needs.
+        checkpoint: Serialization contract.
+        inference: Input and output contract.
+        explanation: Explanation contract, or None when the family offers no
+            explanations.
+        limitations: Caveats of the family, sorted and de-duplicated.
+    """
 
     model_family: str
     status: capabilities.CapabilityStatus
@@ -157,7 +221,13 @@ class ModelFamilyContract:
     limitations: tuple[str, ...]
 
     def __post_init__(self) -> None:
-        """Validate and canonicalize the family declaration."""
+        """Validate and canonicalize the family declaration.
+
+        Raises:
+            ValueError: If the family name is blank, no modality is declared, or
+                an extra or limitation is blank.
+            TypeError: If a modality is not a `Modality` value.
+        """
         if not self.model_family.strip():
             raise ValueError("model family must not be empty")
         if not self.modalities:
@@ -184,12 +254,26 @@ class ModelFamilyContract:
         )
 
     def supports_modality(self, modality: capabilities.Modality | str) -> bool:
-        """Return whether this family accepts the declared modality."""
+        """Return whether this family accepts the declared modality.
+
+        Args:
+            modality: A `Modality` or its string value.
+
+        Returns:
+            True if the modality is among the family's declared modalities.
+        """
         value = capabilities.Modality(modality)
         return value in self.modalities
 
     def require_modality(self, modality: capabilities.Modality | str) -> None:
-        """Fail closed when a caller requests an undeclared modality."""
+        """Fail closed when a caller requests an undeclared modality.
+
+        Args:
+            modality: A `Modality` or its string value.
+
+        Raises:
+            ValueError: If the family does not declare the modality.
+        """
         value = capabilities.Modality(modality)
         if not self.supports_modality(value):
             supported = ", ".join(item.value for item in self.modalities)
@@ -201,7 +285,20 @@ class ModelFamilyContract:
     def validate_features(
         self, features: Any, expected_width: int | None = None
     ) -> np.ndarray:
-        """Convert and validate the numeric tabular inference boundary."""
+        """Convert and validate the numeric tabular inference boundary.
+
+        Args:
+            features: Dense or sparse array-like of model inputs.
+            expected_width: Required number of columns; None skips the check.
+
+        Returns:
+            The features as a float32 array with the declared input rank.
+
+        Raises:
+            ValueError: If the family has no tabular input contract, the input
+                cannot be converted to a numeric array, its rank or width is
+                wrong, or it contains non-finite values.
+        """
         if not self.supports_modality(capabilities.Modality.TABULAR):
             raise ValueError(
                 f"{self.model_family} has no numeric tabular input contract"
@@ -365,7 +462,15 @@ TABULAR_TORCH_CONTRACT = ModelFamilyContract(
 
 
 def model_family_contract(architecture: str) -> ModelFamilyContract:
-    """Resolve the explicit contract for a worker-backed architecture."""
+    """Resolve the explicit contract for a worker-backed architecture.
+
+    Args:
+        architecture: Architecture name, for example `ft_transformer`.
+
+    Returns:
+        The transformer contract for `ft_transformer`, otherwise the generic
+        tabular PyTorch contract.
+    """
     if architecture == "ft_transformer":
         return TABULAR_TRANSFORMER_CONTRACT
     return TABULAR_TORCH_CONTRACT

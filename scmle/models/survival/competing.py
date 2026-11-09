@@ -64,11 +64,27 @@ class CauseSpecificCox:
     """
 
     def __init__(self, penalty: float = 1.0) -> None:
-        """Stores the settings."""
+        """Stores the settings.
+
+        Args:
+            penalty: Ridge strength of every cause's model.
+        """
         self.penalty = penalty
 
     def fit(self, features: Any, duration: Any, cause: Any) -> Self:
-        """Fits one Cox model per cause, others counted as censored."""
+        """Fits one Cox model per cause, others counted as censored.
+
+        Args:
+            features: Covariate matrix.
+            duration: Follow-up time of each row.
+            cause: 0 when censored, otherwise the cause code.
+
+        Returns:
+            This fitted model.
+
+        Raises:
+            ValueError: If no event of any cause was observed.
+        """
         code = np.asarray(cause, dtype=int)
         self.causes_ = sorted(int(c) for c in set(code) if c != 0)
         if not self.causes_:
@@ -84,7 +100,16 @@ class CauseSpecificCox:
     def cumulative_hazard(
         self, features: Any, times: np.ndarray
     ) -> dict[int, np.ndarray]:
-        """Cumulative cause-specific hazard, rows by times."""
+        """Cumulative cause-specific hazard, rows by times.
+
+        Args:
+            features: Covariate matrix.
+            times: Times at which to evaluate the hazard.
+
+        Returns:
+            Mapping from cause code to an array of shape `(n_rows, len(times))`
+            holding that cause's cumulative hazard.
+        """
         result = {}
         for c, model in self.models_.items():
             base = estimators.step_lookup(
@@ -97,7 +122,20 @@ class CauseSpecificCox:
     def predict_incidence(
         self, features: Any, times: Any, cause: int
     ) -> np.ndarray:
-        """Probability of `cause` by each time for each row (rows by times)."""
+        """Probability of `cause` by each time for each row (rows by times).
+
+        Args:
+            features: Covariate matrix.
+            times: Times at which to evaluate the incidence; times before the
+                first event give zero.
+            cause: Cause code, one of `causes_`.
+
+        Returns:
+            Array of shape `(n_rows, len(times))` of cumulative incidence.
+
+        Raises:
+            ValueError: If `cause` was not seen in training.
+        """
         if cause not in self.models_:
             raise ValueError(f"unknown cause {cause}; seen {self.causes_}")
         grid = np.unique(
@@ -125,7 +163,17 @@ class CauseSpecificCox:
         return padded[:, position + 1]
 
     def predict(self, features: Any, horizon: float, cause: int) -> np.ndarray:
-        """Risk score: probability of `cause` by `horizon`."""
+        """Risk score: probability of `cause` by `horizon`.
+
+        Args:
+            features: Covariate matrix.
+            horizon: Time at which to evaluate the incidence.
+            cause: Cause code, one of `causes_`.
+
+        Returns:
+            Array of shape `(n_rows,)` of cumulative incidence at `horizon`.
+            An unknown `cause` raises ValueError from `predict_incidence`.
+        """
         return self.predict_incidence(features, [horizon], cause)[:, 0]
 
 
@@ -133,6 +181,15 @@ def naive_complement(duration: Any, cause: Any, target: int) -> pd.Series:
     """Kaplan-Meier `1 - S` that wrongly treats other causes as censored.
 
     Provided to show the bias that `cumulative_incidence` removes.
+
+    Args:
+        duration: Follow-up time of each row.
+        cause: 0 when censored, otherwise the cause code.
+        target: Cause code whose curve is computed.
+
+    Returns:
+        Series indexed by the event times of `target`, holding one minus the
+        Kaplan-Meier survival just after each.
     """
     code = np.asarray(cause, dtype=int)
     times, survival = estimators.kaplan_meier(

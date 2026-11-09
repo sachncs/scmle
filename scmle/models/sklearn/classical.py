@@ -112,7 +112,20 @@ class DummyAdapter(models.ModelAdapter):
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
-        """Returns a prior classifier, a mean regressor or a marginal curve."""
+        """Returns a prior classifier, a mean regressor or a marginal curve.
+
+        Other tasks get their matching baseline: zero effect for uplift, a
+        constant score for ranking, per-target priors or means for multi-target
+        tasks, and a median regressor behind thresholds for ordinal.
+
+        Args:
+            task: Resolved task type, which selects the baseline.
+            seed: Random seed (used by the ordinal baseline).
+            params: Only the `levels` entry is read, for ordinal tasks.
+
+        Returns:
+            An unfitted baseline estimator for the task.
+        """
         if task is tasks.TaskType.SURVIVAL:
             return survival_estimators.MarginalSurvival()
         if task is tasks.TaskType.UPLIFT:
@@ -310,7 +323,15 @@ class HistGradientBoostingAdapter(SklearnAdapter):
     monotonic_param = "monotonic_cst"
 
     def categorical_params(self, indices: list[int]) -> dict[str, Any]:
-        """Marks the integer-coded columns as categorical."""
+        """Marks the integer-coded columns as categorical.
+
+        Args:
+            indices: Positions of the integer-coded categorical columns.
+
+        Returns:
+            Constructor parameters naming those columns, as
+            `{"categorical_features": [...]}`.
+        """
         return {"categorical_features": list(indices)}
 
     search_space = search.SearchSpace(
@@ -356,7 +377,17 @@ class SupportVectorAdapter(SklearnAdapter):
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
-        """Builds an SVR, or a calibrated SVC for classification."""
+        """Builds an SVR, or a calibrated SVC for classification.
+
+        Args:
+            task: Resolved task type.
+            seed: Random seed of the classifier.
+            params: Search-space overrides for the SVC or SVR.
+
+        Returns:
+            An unfitted SVR for regression, or a sigmoid-calibrated SVC with
+            cross-fitted calibration for classification.
+        """
         kwargs: dict[str, Any] = dict(params or {})
         if not task.is_classification:
             return svm.SVR(**kwargs)

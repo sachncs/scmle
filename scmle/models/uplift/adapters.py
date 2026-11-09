@@ -26,7 +26,17 @@ class UpliftAdapter(models.ModelAdapter):
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
-        """Builds the learner; the outcome kind is set by the wrapper."""
+        """Builds the learner; the outcome kind is set by the wrapper.
+
+        Args:
+            task: Resolved task type.
+            seed: Random seed of the outcome models.
+            params: Only the `classify` entry is read (default True, a 0/1
+                outcome); other entries are ignored.
+
+        Returns:
+            An unfitted uplift learner of the adapter's `learner` class.
+        """
         settings = dict(params or {})
         return self.learner(
             classify=settings.pop("classify", True), random_state=seed

@@ -40,7 +40,17 @@ class MultiTargetAdapter(models.ModelAdapter):
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
-        """Wraps the per-target estimator for the task."""
+        """Wraps the per-target estimator for the task.
+
+        Args:
+            task: Resolved task type; multi-label builds the classifier class,
+                any other task the regressor class.
+            seed: Random seed, passed as `random_state` when the class takes it.
+            params: Constructor overrides for the per-target estimator.
+
+        Returns:
+            An unfitted estimator that fits one clone per target column.
+        """
         classify = task is tasks.TaskType.MULTILABEL
         kind = self.classifier if classify else self.regressor
         assert kind is not None  # nosec B101 - capability guard
@@ -70,7 +80,16 @@ class MultilabelLogisticAdapter(MultiTargetAdapter):
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
-        """One regularised logistic regression per label."""
+        """One regularised logistic regression per label.
+
+        Args:
+            task: Resolved task type.
+            seed: Random seed.
+            params: Search-space overrides.
+
+        Returns:
+            An unfitted estimator with one logistic regression per label.
+        """
         return estimators.PerTarget(
             linear_model.LogisticRegression(
                 max_iter=1000, random_state=seed, **dict(params or {})
@@ -97,7 +116,16 @@ class MultioutputRidgeAdapter(MultiTargetAdapter):
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
-        """One ridge regression per quantity."""
+        """One ridge regression per quantity.
+
+        Args:
+            task: Resolved task type.
+            seed: Random seed.
+            params: Search-space overrides.
+
+        Returns:
+            An unfitted estimator with one ridge regression per quantity.
+        """
         return estimators.PerTarget(
             linear_model.Ridge(**dict(params or {})), False
         )
@@ -134,7 +162,17 @@ class MultiForestAdapter(models.ModelAdapter):
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
-        """The forest for the task's kind of target."""
+        """The forest for the task's kind of target.
+
+        Args:
+            task: Resolved task type; multi-label builds a classifier forest,
+                any other task a regressor forest.
+            seed: Random seed.
+            params: Ignored.
+
+        Returns:
+            An unfitted forest that models all targets jointly.
+        """
         return estimators.forest(task is tasks.TaskType.MULTILABEL, seed)
 
 

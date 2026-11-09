@@ -44,7 +44,23 @@ class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):
         device: str = "auto",
         random_state: int = 0,
     ) -> None:
-        """Store the explicit JEPA contract and resource policy."""
+        """Store the explicit JEPA contract and resource policy.
+
+        Args:
+            hidden_size: Width of the hidden layers.
+            embedding_size: Width of the learned embedding.
+            mask_probability: Probability that an input value is masked in the
+                context view.
+            learning_rate: AdamW learning rate.
+            weight_decay: AdamW weight decay.
+            epochs: Number of training epochs.
+            batch_size: Rows per step, or `auto` for the full data in one batch.
+            ema_decay: Decay of the exponential moving average that updates the
+                target encoder.
+            variance_weight: Weight of the variance-preservation penalty.
+            device: `auto`, `cpu` or `cuda`.
+            random_state: Seed for initialisation, masking and shuffling.
+        """
         self.hidden_size = hidden_size
         self.embedding_size = embedding_size
         self.mask_probability = mask_probability
@@ -70,6 +86,14 @@ class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):
         deliberately replaces it with a constant placeholder before the
         worker call. This keeps the representation path self-supervised even
         when it is composed with a downstream classifier or regressor.
+
+        Args:
+            features: Numeric training matrix.
+            target: Ignored.
+            sample_weight: Passed to the worker, whose JEPA engine ignores it.
+
+        Returns:
+            This fitted estimator.
         """
         del target
         return super().fit(
@@ -79,7 +103,14 @@ class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):
         )
 
     def transform(self, features: Any) -> np.ndarray:
-        """Return context-encoder embeddings for new rows."""
+        """Return context-encoder embeddings for new rows.
+
+        Args:
+            features: Numeric matrix with the width seen at fit.
+
+        Returns:
+            Embedding matrix of shape `(n_rows, embedding_size)`.
+        """
         return self.call("encode", features)
 
     def model_contract(self) -> contracts.ModelFamilyContract:
@@ -91,14 +122,26 @@ class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):
         return self.model_contract().inference
 
     def explanation_contract(self) -> contracts.ExplanationContract:
-        """Return the embedding-sensitivity explanation contract."""
+        """Return the embedding-sensitivity explanation contract.
+
+        Raises:
+            ValueError: If the JEPA family declares no explanation contract.
+        """
         explanation = self.model_contract().explanation
         if explanation is None:
             raise ValueError("tabular JEPA has no explanation contract")
         return explanation
 
     def explain(self, features: Any) -> contracts.FeatureExplanation:
-        """Explain local sensitivity of the learned embedding."""
+        """Explain local sensitivity of the learned embedding.
+
+        Args:
+            features: Numeric matrix with the width seen at fit.
+
+        Returns:
+            Gradient-times-input attributions of the embedding energy, one value
+            per row and input feature.
+        """
         values = self.call("explain", features)
         return contracts.FeatureExplanation(
             values=values,
@@ -132,16 +175,14 @@ class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):
         envelope includes a SHA-256 digest so truncated or accidentally
         modified files fail closed before the estimator is trusted. It is
         intended for trusted local storage; loading it uses joblib's
-        pickle-based format and is not a security boundary.
+        pickle-based format and is not a security boundary. An unfitted
+        estimator raises scikit-learn's `NotFittedError`.
 
         Args:
-            path: Destination file. Its parent directory must already exist.
+            path: Destination file. Missing parent directories are created.
 
         Returns:
             The checkpoint path.
-
-        Raises:
-            sklearn.exceptions.NotFittedError: If the estimator is unfitted.
         """
         utils.validation.check_is_fitted(self, attributes=["state_"])
         destination = pathlib.Path(path)
@@ -185,13 +226,15 @@ class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):
         """Load a trusted fitted tabular JEPA checkpoint.
 
         Args:
-            path: Checkpoint produced by :meth:`save_checkpoint`.
+            path: Checkpoint produced by `save_checkpoint`.
 
         Returns:
             A fitted estimator whose transform output matches the saved model.
 
         Raises:
-            ValueError: If the checkpoint format or payload is invalid.
+            ValueError: If the file cannot be read, the format, metadata or
+                digest check fails, or the payload does not hold a matching
+                fitted `JepaEstimator`.
         """
         try:
             payload = joblib.load(path)

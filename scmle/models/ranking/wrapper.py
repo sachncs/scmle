@@ -24,12 +24,25 @@ class QueryAwareEstimator(base.RegressorMixin, base.BaseEstimator):
     """
 
     def __init__(self, estimator: pipeline.Pipeline, query_column: str) -> None:
-        """Initializes the wrapper."""
+        """Initializes the wrapper.
+
+        Args:
+            estimator: Unfitted pipeline whose last step is a ranker.
+            query_column: Name of the query identifier column.
+        """
         self.estimator = estimator
         self.query_column = query_column
 
     def fit(self, features: Any, target: Any) -> Self:
-        """Fits preprocessing, then the ranker with query group sizes."""
+        """Fits preprocessing, then the ranker with query group sizes.
+
+        Args:
+            features: Frame holding the model inputs and the query column.
+            target: Relevance grade per row.
+
+        Returns:
+            This fitted estimator.
+        """
         frame = pd.DataFrame(features).reset_index(drop=True)
         relevance = np.asarray(target)
         order = np.argsort(
@@ -46,5 +59,12 @@ class QueryAwareEstimator(base.RegressorMixin, base.BaseEstimator):
         return self
 
     def predict(self, features: Any) -> np.ndarray:
-        """Ranking score per row, in the rows' order."""
+        """Ranking score per row, in the rows' order.
+
+        Args:
+            features: Frame with the same columns as at fit.
+
+        Returns:
+            Array of shape `(n_rows,)`; compare scores only within a query.
+        """
         return self.model_.predict(self.preprocessing_.transform(features))

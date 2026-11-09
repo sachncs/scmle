@@ -23,7 +23,13 @@ class ForecastEstimator(wrapper.MultiOutputEstimator):
         target_columns: tuple[str, ...],
         value_column: str = "",
     ) -> None:
-        """Initializes the wrapper."""
+        """Initializes the wrapper.
+
+        Args:
+            estimator: Pipeline fitted on the future-value targets.
+            target_columns: Future-value target columns, one per step.
+            value_column: Name of the series' value column.
+        """
         super().__init__(estimator, target_columns)
         self.value_column = value_column
 
@@ -45,16 +51,40 @@ class LastValueForecaster(wrapper.MultiOutputEstimator):
         target_columns: tuple[str, ...] = (),
         value_column: str = "",
     ) -> None:
-        """Initializes the baseline."""
+        """Initializes the baseline.
+
+        Args:
+            estimator: Unused; accepted so the baseline fits the multi-output
+                wrapper interface.
+            target_columns: Future-value target columns, one per step.
+            value_column: Name of the series' value column.
+        """
         super().__init__(estimator, target_columns)
         self.value_column = value_column
 
     def fit(self, features: Any, target: Any) -> Self:
-        """Nothing to learn."""
+        """Nothing to learn.
+
+        Args:
+            features: Ignored.
+            target: Ignored.
+
+        Returns:
+            This forecaster, unchanged.
+        """
         return self
 
     def predict(self, features: Any) -> np.ndarray:
-        """The current value repeated for every step."""
+        """The current value repeated for every step.
+
+        Args:
+            features: Rows containing `value_column`; non-numeric entries become
+                NaN.
+
+        Returns:
+            Array of shape `(n_rows, len(target_columns))`; every column holds
+            the row's current value.
+        """
         current = pd.to_numeric(
             pd.DataFrame(features)[self.value_column], errors="coerce"
         ).to_numpy(dtype=float)

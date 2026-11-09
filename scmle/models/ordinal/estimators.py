@@ -41,7 +41,13 @@ class CumulativeThresholdRegressor(base.RegressorMixin, base.BaseEstimator):
         levels: int | None = None,
         random_state: int = 0,
     ) -> None:
-        """Initializes the model."""
+        """Initializes the model.
+
+        Args:
+            regressor: Unfitted regressor producing the latent score.
+            levels: Number of ordered levels; inferred from the target if None.
+            random_state: Seed for the cross-fitting that places the thresholds.
+        """
         self.regressor = regressor
         self.levels = levels
         self.random_state = random_state
@@ -52,6 +58,13 @@ class CumulativeThresholdRegressor(base.RegressorMixin, base.BaseEstimator):
         Thresholds are set on out-of-fold scores (the model has not seen the
         row it scores), so an overfit regressor cannot squeeze the levels
         together.
+
+        Args:
+            features: Training matrix.
+            target: Integer rank of each row's level, `0..levels-1`.
+
+        Returns:
+            This fitted model.
         """
         ranks = np.asarray(target, dtype=float).round().astype(int)
         count = self.levels or int(ranks.max()) + 1
@@ -76,13 +89,31 @@ class CumulativeThresholdRegressor(base.RegressorMixin, base.BaseEstimator):
     def level_probabilities(
         self, scores: np.ndarray, scale: float
     ) -> np.ndarray:
-        """Probability of each level for latent `scores`."""
+        """Probability of each level for latent `scores`.
+
+        Args:
+            scores: Latent scores of shape `(n_rows,)`.
+            scale: Width of the logistic link around the thresholds.
+
+        Returns:
+            Array of shape `(n_rows, levels)`, floored at a tiny positive value;
+            rows are not renormalised.
+        """
         edges = np.concatenate([[-np.inf], self.thresholds_, [np.inf]])
         below = special.expit((edges[None, :] - scores[:, None]) / scale)
         return np.clip(np.diff(below, axis=1), EPSILON, None)
 
     def best_scale(self, scores: np.ndarray, ranks: np.ndarray) -> float:
-        """The link width with the highest likelihood on the fitted scores."""
+        """The link width with the highest likelihood on the fitted scores.
+
+        Args:
+            scores: Latent scores of shape `(n_rows,)`.
+            ranks: True integer level of each row.
+
+        Returns:
+            The scale from a fixed grid, in multiples of the score spread, with
+            the highest mean log-likelihood of the true levels.
+        """
         spread = float(np.std(scores)) or 1.0
         best, best_value = spread, -np.inf
         for factor in SCALE_GRID:
@@ -96,12 +127,26 @@ class CumulativeThresholdRegressor(base.RegressorMixin, base.BaseEstimator):
         return best
 
     def predict_proba(self, features: Any) -> np.ndarray:
-        """Level probabilities, columns in level order."""
+        """Level probabilities, columns in level order.
+
+        Args:
+            features: Matrix to predict for.
+
+        Returns:
+            Array of shape `(n_rows, levels)` whose rows sum to one.
+        """
         scores = np.asarray(self.regressor_.predict(features), dtype=float)
         probabilities = self.level_probabilities(scores, self.scale_)
         return probabilities / probabilities.sum(axis=1, keepdims=True)
 
     def predict(self, features: Any) -> np.ndarray:
-        """Level rank: the number of thresholds the latent score has passed."""
+        """Level rank: the number of thresholds the latent score has passed.
+
+        Args:
+            features: Matrix to predict for.
+
+        Returns:
+            Integer array of shape `(n_rows,)` with values in `0..levels-1`.
+        """
         scores = np.asarray(self.regressor_.predict(features), dtype=float)
         return np.searchsorted(self.thresholds_, scores, side="right")

@@ -28,8 +28,11 @@ class Embedder:
     def __init__(self, name: str) -> None:
         """Loads the model on the CPU.
 
-        Raises:
-            ImportError: If `sentence-transformers` is not installed.
+        Importing `sentence_transformers` raises ImportError if the package
+        is not installed.
+
+        Args:
+            name: Model identifier passed to `SentenceTransformer`.
         """
         module = importlib.import_module("sentence_transformers")
         self.name = name
@@ -41,9 +44,12 @@ class Embedder:
     def embed(self, texts: list[str]) -> tuple[np.ndarray, int]:
         """Embeds texts, encoding only those not seen before.
 
+        Args:
+            texts: Strings to embed; duplicates are encoded once.
+
         Returns:
-            A float32 matrix, one row per text, and how many texts had to be
-            encoded (the rest came from the cache).
+            A float32 matrix, one row per text in the given order, and how many
+            texts had to be encoded (the rest came from the cache).
         """
         missing = list(dict.fromkeys(t for t in texts if t not in self.cache))
         if missing:
@@ -63,14 +69,27 @@ MODELS: dict[str, Embedder] = {}
 
 
 def embed(name: str, texts: list[str]) -> tuple[np.ndarray, int]:
-    """Embeds `texts` with the (cached) model called `name`."""
+    """Embeds `texts` with the (cached) model called `name`.
+
+    Args:
+        name: Model identifier; the model is loaded on first use.
+        texts: Strings to embed.
+
+    Returns:
+        A float32 matrix with one row per text, and how many texts had to be
+        encoded rather than read from the cache.
+    """
     if name not in MODELS:
         MODELS[name] = Embedder(name)
     return MODELS[name].embed(texts)
 
 
 def available() -> bool:
-    """Whether the embedding library can be imported here."""
+    """Whether the embedding library can be imported here.
+
+    Returns:
+        True if `sentence_transformers` can be imported, else False.
+    """
     try:
         importlib.import_module("sentence_transformers")
     except ImportError:
@@ -79,5 +98,9 @@ def available() -> bool:
 
 
 def describe() -> dict[str, Any]:
-    """Which models are loaded and how many strings each has cached."""
+    """Which models are loaded and how many strings each has cached.
+
+    Returns:
+        Mapping from model identifier to its number of cached strings.
+    """
     return {name: len(model.cache) for name, model in MODELS.items()}

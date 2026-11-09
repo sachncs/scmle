@@ -34,13 +34,23 @@ class TabPfnEngine:
         random_state: int = 0,
         n_estimators: int = 8,
     ) -> None:
-        """Stores the settings."""
+        """Stores the settings.
+
+        Args:
+            device: `auto`, `cpu` or `cuda`.
+            random_state: Seed of TabPFN's internal ensemble.
+            n_estimators: Members of TabPFN's internal ensemble.
+        """
         self.device = device
         self.random_state = random_state
         self.n_estimators = n_estimators
 
     def build(self) -> Any:
-        """Creates the TabPFN model from the installed package."""
+        """Creates the TabPFN model from the installed package.
+
+        Returns:
+            An unfitted TabPFN estimator of this engine's `class_name`.
+        """
         library = importlib.import_module("tabpfn")
         return getattr(library, self.class_name)(
             device="cuda" if self.device == "cuda" else self.device,
@@ -52,6 +62,14 @@ class TabPfnEngine:
         self, features: Any, target: Any, sample_weight: Any = None
     ) -> "TabPfnEngine":
         """Stores the training rows with the model (in-context learning).
+
+        Args:
+            features: Training matrix, dense or sparse.
+            target: Training labels or values.
+            sample_weight: Must be None.
+
+        Returns:
+            This fitted engine.
 
         Raises:
             ValueError: If the data exceeds what TabPFN supports, or if
@@ -74,7 +92,12 @@ class TabPfnEngine:
         return self
 
     def __getstate__(self) -> dict[str, Any]:
-        """The data and settings from which the model is rebuilt."""
+        """The data and settings from which the model is rebuilt.
+
+        Returns:
+            Mapping of the settings, the stored training rows, a fixed training
+            report and any task-specific entries.
+        """
         return {
             "device": self.device,
             "random_state": self.random_state,
@@ -87,11 +110,19 @@ class TabPfnEngine:
         }
 
     def extra_state(self) -> dict[str, Any]:
-        """Task-specific entries of the state."""
+        """Task-specific entries of the state.
+
+        Returns:
+            Extra entries merged into the pickled state; empty by default.
+        """
         return {}
 
     def __setstate__(self, state: dict[str, Any]) -> None:
-        """Rebuilds the model from the stored rows (cheap: no training)."""
+        """Rebuilds the model from the stored rows (cheap: no training).
+
+        Args:
+            state: Mapping produced by `__getstate__`.
+        """
         self.device = state["device"]
         self.random_state = state["random_state"]
         self.n_estimators = state["n_estimators"]
@@ -100,7 +131,14 @@ class TabPfnEngine:
         self.model_ = self.build().fit(self.train_features_, self.train_target_)
 
     def rows(self, features: Any) -> np.ndarray:
-        """Float32 matrix of the rows to score."""
+        """Float32 matrix of the rows to score.
+
+        Args:
+            features: Matrix to score.
+
+        Returns:
+            Dense float32 array of the rows.
+        """
         if sparse.issparse(features):
             features = features.toarray()
         return np.asarray(features, dtype=np.float32)
@@ -112,15 +150,33 @@ class ClassifierEngine(TabPfnEngine):
     class_name = "TabPFNClassifier"
 
     def extra_state(self) -> dict[str, Any]:
-        """The class labels."""
+        """The class labels.
+
+        Returns:
+            Mapping with the fitted model's `classes_`.
+        """
         return {"classes_": np.asarray(self.model_.classes_)}
 
     def predict_proba(self, features: Any) -> np.ndarray:
-        """Class probabilities."""
+        """Class probabilities.
+
+        Args:
+            features: Matrix to score.
+
+        Returns:
+            Array of shape `(n_rows, n_classes)`.
+        """
         return np.asarray(self.model_.predict_proba(self.rows(features)))
 
     def predict(self, features: Any) -> np.ndarray:
-        """Most probable class."""
+        """Most probable class.
+
+        Args:
+            features: Matrix to score.
+
+        Returns:
+            Array of shape `(n_rows,)` of class labels.
+        """
         return np.asarray(self.model_.predict(self.rows(features)))
 
 
@@ -130,5 +186,12 @@ class RegressorEngine(TabPfnEngine):
     class_name = "TabPFNRegressor"
 
     def predict(self, features: Any) -> np.ndarray:
-        """Predicted values."""
+        """Predicted values.
+
+        Args:
+            features: Matrix to score.
+
+        Returns:
+            Array of shape `(n_rows,)`.
+        """
         return np.asarray(self.model_.predict(self.rows(features)))

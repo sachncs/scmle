@@ -140,7 +140,15 @@ class LightGbmAdapter(LazyLibraryAdapter):
     )
 
     def categorical_params(self, indices: list[int]) -> dict[str, Any]:
-        """Marks the integer-coded columns as categorical."""
+        """Marks the integer-coded columns as categorical.
+
+        Args:
+            indices: Positions of the integer-coded categorical columns.
+
+        Returns:
+            Fit-time parameters naming those columns, as
+            `{"categorical_feature": [...]}`.
+        """
         return {"categorical_feature": list(indices)}
 
 

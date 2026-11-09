@@ -27,12 +27,26 @@ class MultiTargetEstimator(base.BaseEstimator):
     def __init__(
         self, estimator: pipeline.Pipeline, target_columns: tuple[str, ...]
     ) -> None:
-        """Initializes the wrapper."""
+        """Initializes the wrapper.
+
+        Args:
+            estimator: Unfitted pipeline whose last step takes a target matrix.
+            target_columns: Names of all target columns, primary target first.
+        """
         self.estimator = estimator
         self.target_columns = target_columns
 
     def fit(self, features: Any, target: Any) -> Self:
-        """Fits preprocessing, then the model on all target columns."""
+        """Fits preprocessing, then the model on all target columns.
+
+        Args:
+            features: Frame holding the model inputs and the non-primary target
+                columns.
+            target: Primary target, the first of `target_columns`.
+
+        Returns:
+            This fitted estimator.
+        """
         frame = pd.DataFrame(features)
         matrix = np.column_stack(
             [
@@ -47,7 +61,14 @@ class MultiTargetEstimator(base.BaseEstimator):
         return self
 
     def predict(self, features: Any) -> np.ndarray:
-        """Predictions, one column per target."""
+        """Predictions, one column per target.
+
+        Args:
+            features: Frame with the same columns as at fit.
+
+        Returns:
+            Array of shape `(n_rows, len(target_columns))`.
+        """
         return self.model_.predict(self.preprocessing_.transform(features))
 
 
@@ -55,7 +76,14 @@ class MultiLabelEstimator(base.ClassifierMixin, MultiTargetEstimator):
     """Multi-label flavour: also provides per-label probabilities."""
 
     def predict_proba(self, features: Any) -> np.ndarray:
-        """Probability of each label being present, one column per label."""
+        """Probability of each label being present, one column per label.
+
+        Args:
+            features: Frame with the same columns as at fit.
+
+        Returns:
+            Array of shape `(n_rows, n_labels)` as returned by the fitted model.
+        """
         return self.model_.predict_proba(
             self.preprocessing_.transform(features)
         )

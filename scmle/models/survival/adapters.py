@@ -27,7 +27,16 @@ class CoxAdapter(models.ModelAdapter):
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
-        """Returns an unfitted Cox model."""
+        """Returns an unfitted Cox model.
+
+        Args:
+            task: Resolved task type.
+            seed: Random seed.
+            params: Search-space overrides passed to the model constructor.
+
+        Returns:
+            An unfitted penalised Cox regressor; `seed` is not used.
+        """
         return estimators.CoxRegressor(**dict(params or {}))
 
 
@@ -52,7 +61,16 @@ class DiscreteTimeAdapter(models.ModelAdapter):
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
-        """Returns an unfitted discrete-time boosted hazard model."""
+        """Returns an unfitted discrete-time boosted hazard model.
+
+        Args:
+            task: Resolved task type.
+            seed: Random seed.
+            params: Search-space overrides passed to the model constructor.
+
+        Returns:
+            An unfitted discrete-time boosting hazard model.
+        """
         return estimators.DiscreteTimeBoosting(
             random_state=seed, **dict(params or {})
         )

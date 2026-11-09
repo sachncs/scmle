@@ -26,7 +26,16 @@ class PointwiseAdapter(models.ModelAdapter):
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
-        """Returns an unfitted pointwise ranker."""
+        """Returns an unfitted pointwise ranker.
+
+        Args:
+            task: Resolved task type.
+            seed: Random seed.
+            params: Search-space overrides passed to the underlying model.
+
+        Returns:
+            A pointwise ranker around a histogram gradient-boosting regressor.
+        """
         from sklearn import ensemble
 
         return estimators.PointwiseRanker(
@@ -68,7 +77,16 @@ class LibraryRankerAdapter(models.ModelAdapter):
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
-        """Returns an unfitted boosted ranker."""
+        """Returns an unfitted boosted ranker.
+
+        Args:
+            task: Resolved task type.
+            seed: Random seed.
+            params: Search-space overrides passed to the underlying model.
+
+        Returns:
+            A ranker built on the adapter's boosting library.
+        """
         return estimators.LibraryRanker(
             self.library, random_state=seed, **dict(params or {})
         )

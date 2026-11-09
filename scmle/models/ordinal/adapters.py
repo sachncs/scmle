@@ -35,7 +35,18 @@ class OrdinalAdapter(classical.SklearnAdapter):
         seed: int,
         params: Mapping[str, Any] | None = None,
     ) -> models.Estimator:
-        """Builds the thresholded regressor around the configured class."""
+        """Builds the thresholded regressor around the configured class.
+
+        Args:
+            task: Resolved task type; the inner regressor is always built as a
+                regression.
+            seed: Random seed.
+            params: Search-space overrides for the regressor, plus the optional
+                `levels` entry giving the number of ordered levels.
+
+        Returns:
+            An unfitted ordinal estimator wrapping the regressor.
+        """
         settings = dict(params or {})
         levels = settings.pop(LEVELS, None)
         inner = super().build(tasks.TaskType.REGRESSION, seed, settings)

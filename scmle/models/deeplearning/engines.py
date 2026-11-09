@@ -78,7 +78,34 @@ class TabularEngine(base.BaseEstimator, abc.ABC):
         huber_delta: float = 1.0,
         accumulation_steps: int = 1,
     ) -> None:
-        """Stores the hyperparameters (scikit-learn convention)."""
+        """Stores the hyperparameters (scikit-learn convention).
+
+        Args:
+            architecture: Name in `architectures.ARCHITECTURES`.
+            hidden_sizes: Layer widths (residual: width, then block count).
+            dropout: Dropout probability.
+            learning_rate: Adam step size.
+            weight_decay: L2 penalty.
+            epochs: Maximum epochs.
+            batch_size: Rows per step, or `auto` to size it from the data.
+            schedule: Learning-rate schedule, `cosine` or `constant`.
+            warmup_epochs: Epochs of linear learning-rate warm-up.
+            max_grad_norm: Gradient clipping threshold (None disables it).
+            patience: Epochs without validation improvement before stopping.
+            validation_fraction: Share of rows held out for early stopping.
+            device: `auto` (CUDA when available), `cpu` or `cuda`.
+            random_state: Seed for initialization, shuffling and the split.
+            optimizer: `adam`, `adamw`, `sgd` (with `momentum`), `rmsprop` or
+                `lbfgs` (full-batch second-order steps).
+            momentum: Momentum of `sgd`.
+            loss: `default`, or `focal` (classifier) / `huber` (regressor).
+            label_smoothing: Share of probability moved off the true class.
+            focal_gamma: Focusing strength of the focal loss.
+            huber_delta: Where the Huber loss turns from squared to linear (in
+                standardized target units).
+            accumulation_steps: Mini-batches whose gradients are summed before
+                one parameter update (a larger effective batch).
+        """
         self.optimizer = optimizer
         self.momentum = momentum
         self.loss = loss
@@ -103,29 +130,71 @@ class TabularEngine(base.BaseEstimator, abc.ABC):
 
     @abc.abstractmethod
     def encode_target(self, target: Any) -> np.ndarray:
-        """Converts the target to the array the loss consumes."""
+        """Converts the target to the array the loss consumes.
+
+        Args:
+            target: Training labels or values.
+
+        Returns:
+            The encoded target, one entry per row.
+        """
 
     @abc.abstractmethod
     def output_units(self) -> int:
-        """Number of network outputs."""
+        """Number of network outputs.
+
+        Returns:
+            The number of output units the network needs.
+        """
 
     @abc.abstractmethod
     def row_losses(self, torch: Any, outputs: Any, targets: Any) -> Any:
-        """Per-row loss (no reduction)."""
+        """Per-row loss (no reduction).
+
+        Args:
+            torch: The imported torch module.
+            outputs: Network outputs, one row per (example, member) pair.
+            targets: Encoded targets repeated once per member.
+
+        Returns:
+            Tensor with one loss per (example, member) pair.
+        """
 
     @abc.abstractmethod
     def row_weights(self, targets: np.ndarray) -> np.ndarray:
-        """Per-row weight implied by the estimator's own settings."""
+        """Per-row weight implied by the estimator's own settings.
+
+        Args:
+            targets: Encoded targets.
+
+        Returns:
+            Float32 array with one weight per row.
+        """
 
     def resolve_device(self, torch: Any) -> str:
-        """Chooses where to train."""
+        """Chooses where to train.
+
+        Args:
+            torch: The imported torch module.
+
+        Returns:
+            `cuda` or `cpu` when `device` is `auto` (by CUDA availability),
+            otherwise the configured device.
+        """
         if self.device == "auto":
             return "cuda" if torch.cuda.is_available() else "cpu"
         return self.device
 
     @staticmethod
     def dense(features: Any) -> np.ndarray:
-        """Returns a float32 matrix, densifying sparse input."""
+        """Returns a float32 matrix, densifying sparse input.
+
+        Args:
+            features: Dense or sparse array-like of model inputs.
+
+        Returns:
+            Dense float32 array.
+        """
         if sparse.issparse(features):
             features = features.toarray()
         return np.asarray(features, dtype=np.float32)
@@ -134,6 +203,9 @@ class TabularEngine(base.BaseEstimator, abc.ABC):
         self, features: Any, target: Any, sample_weight: Any = None
     ) -> "TabularEngine":
         """Trains the network.
+
+        An unknown optimizer or loss, or a non-positive accumulation count,
+        raises `ConfigError` from `check_options`.
 
         Args:
             features: Numeric matrix.
@@ -298,7 +370,15 @@ class TabularEngine(base.BaseEstimator, abc.ABC):
             raise errors.ConfigError("accumulation_steps must be at least 1")
 
     def new_optimizer(self, torch: Any, network: Any) -> Any:
-        """Creates the configured optimizer for the network's parameters."""
+        """Creates the configured optimizer for the network's parameters.
+
+        Args:
+            torch: The imported torch module.
+            network: The network whose parameters are optimised.
+
+        Returns:
+            The torch optimizer; Adam for any unrecognised name.
+        """
         parameters = network.parameters()
         rate, decay = self.learning_rate, self.weight_decay
         if self.optimizer == "adamw":
@@ -327,7 +407,18 @@ class TabularEngine(base.BaseEstimator, abc.ABC):
         tensors: dict[str, Any],
         batch: Any,
     ) -> tuple[float, float]:
-        """One full-batch L-BFGS step; returns the loss and gradient norm."""
+        """One full-batch L-BFGS step; returns the loss and gradient norm.
+
+        Args:
+            torch: The imported torch module.
+            network: The network being trained.
+            optimizer: The L-BFGS optimizer.
+            tensors: Device tensors `x`, `y` and `w` (inputs, targets, weights).
+            batch: Indices of the rows to use.
+
+        Returns:
+            The loss value and the unclipped gradient norm.
+        """
 
         def closure() -> Any:
             optimizer.zero_grad()
@@ -342,7 +433,14 @@ class TabularEngine(base.BaseEstimator, abc.ABC):
         return float(loss.detach()), norm
 
     def new_network(self, torch: Any) -> Any:
-        """Creates an untrained network of the configured architecture."""
+        """Creates an untrained network of the configured architecture.
+
+        Args:
+            torch: The imported torch module.
+
+        Returns:
+            The untrained module, sized by `input_width_` and `output_units()`.
+        """
         return architectures.ARCHITECTURES[self.architecture].build(
             torch,
             self.input_width_,
@@ -352,7 +450,12 @@ class TabularEngine(base.BaseEstimator, abc.ABC):
         )
 
     def __getstate__(self) -> dict[str, Any]:
-        """Pickles the weights as plain arrays, not the module objects."""
+        """Pickles the weights as plain arrays, not the module objects.
+
+        Returns:
+            The instance state with `network_` replaced by `weights_`, a mapping
+            of parameter names to numpy arrays.
+        """
         state = dict(super().__getstate__())
         network = state.pop("network_", None)
         if network is not None:
@@ -363,7 +466,11 @@ class TabularEngine(base.BaseEstimator, abc.ABC):
         return state
 
     def __setstate__(self, state: dict[str, Any]) -> None:
-        """Rebuilds the network from the pickled weights."""
+        """Rebuilds the network from the pickled weights.
+
+        Args:
+            state: Mapping produced by `__getstate__`.
+        """
         state = dict(state)
         weights = state.pop("weights_", None)
         super().__setstate__(state)
@@ -378,7 +485,17 @@ class TabularEngine(base.BaseEstimator, abc.ABC):
     def weighted_loss(
         self, torch: Any, network: Any, tensors: dict[str, Any], rows: Any
     ) -> Any:
-        """Weighted mean loss over the given row indices."""
+        """Weighted mean loss over the given row indices.
+
+        Args:
+            torch: The imported torch module.
+            network: The network to evaluate.
+            tensors: Device tensors `x`, `y` and `w` (inputs, targets, weights).
+            rows: Indices of the rows to use.
+
+        Returns:
+            Scalar tensor: the member-averaged row losses weighted by `w`.
+        """
         outputs = network(tensors["x"][rows])
         if outputs.dim() == 2:
             outputs = outputs.unsqueeze(1)
@@ -396,6 +513,12 @@ class TabularEngine(base.BaseEstimator, abc.ABC):
         """Member outputs for new rows, shape (rows, members, outputs).
 
         Single networks have one member. Evaluation mode, on the CPU.
+
+        Args:
+            features: Numeric matrix (dense or sparse) of the width seen at fit.
+
+        Returns:
+            Array of shape `(n_rows, n_members, n_outputs)`.
         """
         torch = importlib.import_module("torch")
         with torch.no_grad():
@@ -412,6 +535,12 @@ class TabularEngine(base.BaseEstimator, abc.ABC):
         Regression selects the ensemble-mean output. The worker returns one
         signed attribution per numeric input feature, preserving the model's
         actual input space rather than inventing raw-column semantics.
+
+        Args:
+            features: Numeric matrix (dense or sparse) of the width seen at fit.
+
+        Returns:
+            Array of shape `(n_rows, input_width)`.
         """
         torch = importlib.import_module("torch")
         matrix = self.dense(features)
@@ -460,7 +589,36 @@ class ClassifierEngine(base.ClassifierMixin, TabularEngine):
         accumulation_steps: int = 1,
         class_weight: str | None = None,
     ) -> None:
-        """Stores the hyperparameters, plus `class_weight` (`balanced`)."""
+        """Stores the hyperparameters, plus `class_weight` (`balanced`).
+
+        Args:
+            architecture: Name in `architectures.ARCHITECTURES`.
+            hidden_sizes: Layer widths (residual: width, then block count).
+            dropout: Dropout probability.
+            learning_rate: Adam step size.
+            weight_decay: L2 penalty.
+            epochs: Maximum epochs.
+            batch_size: Rows per step, or `auto` to size it from the data.
+            schedule: Learning-rate schedule, `cosine` or `constant`.
+            warmup_epochs: Epochs of linear learning-rate warm-up.
+            max_grad_norm: Gradient clipping threshold (None disables it).
+            patience: Epochs without validation improvement before stopping.
+            validation_fraction: Share of rows held out for early stopping.
+            device: `auto` (CUDA when available), `cpu` or `cuda`.
+            random_state: Seed for initialization, shuffling and the split.
+            optimizer: `adam`, `adamw`, `sgd` (with `momentum`), `rmsprop` or
+                `lbfgs` (full-batch second-order steps).
+            momentum: Momentum of `sgd`.
+            loss: `default`, or `focal` (classifier) / `huber` (regressor).
+            label_smoothing: Share of probability moved off the true class.
+            focal_gamma: Focusing strength of the focal loss.
+            huber_delta: Where the Huber loss turns from squared to linear (in
+                standardized target units).
+            accumulation_steps: Mini-batches whose gradients are summed before
+                one parameter update (a larger effective batch).
+            class_weight: `balanced` for inverse-class-frequency row weights, or
+                None for equal weights.
+        """
         super().__init__(
             architecture,
             hidden_sizes,
@@ -487,18 +645,38 @@ class ClassifierEngine(base.ClassifierMixin, TabularEngine):
         self.class_weight = class_weight
 
     def encode_target(self, target: Any) -> np.ndarray:
-        """Maps labels to 0..K-1 and remembers the classes."""
+        """Maps labels to 0..K-1 and remembers the classes.
+
+        Args:
+            target: Class labels.
+
+        Returns:
+            Integer codes into `classes_`, as int64.
+        """
         self.classes_, codes = np.unique(
             np.asarray(target), return_inverse=True
         )
         return codes.astype(np.int64)
 
     def output_units(self) -> int:
-        """One unit per class."""
+        """One unit per class.
+
+        Returns:
+            The number of classes seen by `encode_target`.
+        """
         return len(self.classes_)
 
     def row_losses(self, torch: Any, outputs: Any, targets: Any) -> Any:
-        """Cross entropy per row, optionally smoothed or focal."""
+        """Cross entropy per row, optionally smoothed or focal.
+
+        Args:
+            torch: The imported torch module.
+            outputs: Network outputs, one row per (example, member) pair.
+            targets: Encoded targets repeated once per member.
+
+        Returns:
+            Tensor with one loss per (example, member) pair.
+        """
         entropy = torch.nn.functional.cross_entropy(
             outputs,
             targets,
@@ -511,7 +689,14 @@ class ClassifierEngine(base.ClassifierMixin, TabularEngine):
         return entropy
 
     def row_weights(self, targets: np.ndarray) -> np.ndarray:
-        """Inverse class frequency when `class_weight` is `balanced`."""
+        """Inverse class frequency when `class_weight` is `balanced`.
+
+        Args:
+            targets: Integer class codes.
+
+        Returns:
+            Float32 array with one weight per row; all ones unless balanced.
+        """
         weights = np.ones(len(targets), dtype=np.float32)
         if self.class_weight == "balanced":
             counts = np.bincount(targets, minlength=len(self.classes_))
@@ -520,7 +705,15 @@ class ClassifierEngine(base.ClassifierMixin, TabularEngine):
         return weights
 
     def predict_proba(self, features: Any) -> np.ndarray:
-        """Class probabilities, columns ordered like `classes_`."""
+        """Class probabilities, columns ordered like `classes_`.
+
+        Args:
+            features: Numeric matrix (dense or sparse) of the width seen at fit.
+
+        Returns:
+            Array of shape `(n_rows, n_classes)`: the softmax probabilities
+            averaged over ensemble members.
+        """
         scores = self.raw_outputs(features)
         scores = scores - scores.max(axis=2, keepdims=True)
         exp = np.exp(scores)
@@ -528,7 +721,14 @@ class ClassifierEngine(base.ClassifierMixin, TabularEngine):
         return probabilities.mean(axis=1)
 
     def predict(self, features: Any) -> np.ndarray:
-        """Most probable class."""
+        """Most probable class.
+
+        Args:
+            features: Numeric matrix (dense or sparse) of the width seen at fit.
+
+        Returns:
+            Array of shape `(n_rows,)` of class labels.
+        """
         return self.classes_[self.predict_proba(features).argmax(axis=1)]
 
 
@@ -538,7 +738,15 @@ class RegressorEngine(base.RegressorMixin, TabularEngine):
     losses = ("default", "huber")
 
     def encode_target(self, target: Any) -> np.ndarray:
-        """Standardizes the target and remembers its scale."""
+        """Standardizes the target and remembers its scale.
+
+        Args:
+            target: Training values.
+
+        Returns:
+            The values minus their mean and divided by their standard deviation
+            (1 when it is zero), as float32.
+        """
         values = np.asarray(target, dtype=np.float64)
         self.target_mean_ = float(values.mean())
         self.target_scale_ = float(values.std()) or 1.0
@@ -547,11 +755,24 @@ class RegressorEngine(base.RegressorMixin, TabularEngine):
         )
 
     def output_units(self) -> int:
-        """A single value."""
+        """A single value.
+
+        Returns:
+            1.
+        """
         return 1
 
     def row_losses(self, torch: Any, outputs: Any, targets: Any) -> Any:
-        """Squared error per row, or Huber when configured."""
+        """Squared error per row, or Huber when configured.
+
+        Args:
+            torch: The imported torch module.
+            outputs: Network outputs, one row per (example, member) pair.
+            targets: Encoded targets repeated once per member.
+
+        Returns:
+            Tensor with one loss per (example, member) pair.
+        """
         if self.loss == "huber":
             return torch.nn.functional.huber_loss(
                 outputs.squeeze(-1),
@@ -562,10 +783,24 @@ class RegressorEngine(base.RegressorMixin, TabularEngine):
         return (outputs.squeeze(-1) - targets) ** 2
 
     def row_weights(self, targets: np.ndarray) -> np.ndarray:
-        """Unit weights."""
+        """Unit weights.
+
+        Args:
+            targets: Encoded targets.
+
+        Returns:
+            Float32 array of ones, one per row.
+        """
         return np.ones(len(targets), dtype=np.float32)
 
     def predict(self, features: Any) -> np.ndarray:
-        """Predicted values in the original units."""
+        """Predicted values in the original units.
+
+        Args:
+            features: Numeric matrix (dense or sparse) of the width seen at fit.
+
+        Returns:
+            Array of shape `(n_rows,)`, averaged over ensemble members.
+        """
         scaled = self.raw_outputs(features)[:, :, 0].mean(axis=1)
         return scaled * self.target_scale_ + self.target_mean_

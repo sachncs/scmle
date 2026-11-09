@@ -21,12 +21,25 @@ class PerTarget(base.BaseEstimator):
     def __init__(
         self, estimator: base.BaseEstimator, classify: bool = False
     ) -> None:
-        """Initializes the wrapper."""
+        """Initializes the wrapper.
+
+        Args:
+            estimator: Unfitted estimator, cloned for fitting.
+            classify: Whether the targets are binary labels.
+        """
         self.estimator = estimator
         self.classify = classify
 
     def fit(self, features: Any, targets: Any) -> Self:
-        """Fits each column; a column with one value becomes a constant."""
+        """Fits each column; a column with one value becomes a constant.
+
+        Args:
+            features: Training matrix.
+            targets: Target matrix of shape `(n_rows, n_targets)`.
+
+        Returns:
+            This fitted estimator.
+        """
         matrix = np.asarray(targets)
         self.estimators_ = []
         for column in range(matrix.shape[1]):
@@ -40,13 +53,28 @@ class PerTarget(base.BaseEstimator):
         return self
 
     def predict(self, features: Any) -> np.ndarray:
-        """One prediction column per target."""
+        """One prediction column per target.
+
+        Args:
+            features: Matrix to predict for.
+
+        Returns:
+            Array of shape `(n_rows, n_targets)`.
+        """
         return np.column_stack(
             [np.asarray(m.predict(features)) for m in self.estimators_]
         )
 
     def predict_proba(self, features: Any) -> np.ndarray:
-        """Probability of the positive label for each target column."""
+        """Probability of the positive label for each target column.
+
+        Args:
+            features: Matrix to predict for.
+
+        Returns:
+            Array of shape `(n_rows, n_targets)`; a target whose fitted classes
+            do not include the label 1 gets probability zero.
+        """
         columns = []
         for model in self.estimators_:
             probabilities = np.asarray(model.predict_proba(features))
@@ -73,23 +101,51 @@ class NativeMultiOutput(base.BaseEstimator):
     def __init__(
         self, estimator: base.BaseEstimator, classify: bool = False
     ) -> None:
-        """Initializes the wrapper."""
+        """Initializes the wrapper.
+
+        Args:
+            estimator: Unfitted estimator that accepts a target matrix.
+            classify: Whether the targets are binary labels.
+        """
         self.estimator = estimator
         self.classify = classify
 
     def fit(self, features: Any, targets: Any) -> Self:
-        """Fits one model on the whole target matrix."""
+        """Fits one model on the whole target matrix.
+
+        Args:
+            features: Training matrix.
+            targets: Target matrix of shape `(n_rows, n_targets)`.
+
+        Returns:
+            This fitted estimator.
+        """
         self.estimator_ = base.clone(self.estimator).fit(
             features, np.asarray(targets)
         )
         return self
 
     def predict(self, features: Any) -> np.ndarray:
-        """One prediction column per target."""
+        """One prediction column per target.
+
+        Args:
+            features: Matrix to predict for.
+
+        Returns:
+            Array of shape `(n_rows, n_targets)`.
+        """
         return np.asarray(self.estimator_.predict(features))
 
     def predict_proba(self, features: Any) -> np.ndarray:
-        """Probability of the positive label for each target column."""
+        """Probability of the positive label for each target column.
+
+        Args:
+            features: Matrix to predict for.
+
+        Returns:
+            Array of shape `(n_rows, n_targets)`; a target whose fitted classes
+            do not include the label 1 gets probability zero.
+        """
         found = self.estimator_.predict_proba(features)
         return np.column_stack(
             [
@@ -102,7 +158,15 @@ class NativeMultiOutput(base.BaseEstimator):
 
 
 def forest(classify: bool, seed: int) -> NativeMultiOutput:
-    """Random forest over all targets together."""
+    """Random forest over all targets together.
+
+    Args:
+        classify: True for a classifier, False for a regressor.
+        seed: Random seed of the forest.
+
+    Returns:
+        An unfitted forest wrapped to model every target jointly.
+    """
     inner = (
         ensemble.RandomForestClassifier(n_estimators=150, random_state=seed)
         if classify

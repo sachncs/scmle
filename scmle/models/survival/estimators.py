@@ -26,6 +26,10 @@ def kaplan_meier(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Kaplan-Meier survival curve.
 
+    Args:
+        duration: Follow-up time of each row.
+        event: 1 where the event was observed, 0 where censored.
+
     Returns:
         Distinct event times and the survival probability just after each.
     """
@@ -45,7 +49,17 @@ def kaplan_meier(
 def step_lookup(
     moments: np.ndarray, values: np.ndarray, times: np.ndarray, before: float
 ) -> np.ndarray:
-    """Value of a right-continuous step function at each time."""
+    """Value of a right-continuous step function at each time.
+
+    Args:
+        moments: Sorted jump times of the function.
+        values: Function value just after each jump time.
+        times: Times at which to evaluate the function.
+        before: Value before the first jump time.
+
+    Returns:
+        Array with one value per entry of `times`.
+    """
     position = np.searchsorted(moments, np.asarray(times, dtype=float), "right")
     padded = np.concatenate([[before], values])
     return padded[position]
@@ -56,15 +70,40 @@ class SurvivalEstimator(base.RegressorMixin, base.BaseEstimator, abc.ABC):
 
     @abc.abstractmethod
     def fit(self, features: Any, duration: Any, event: Any = None) -> Self:
-        """Fits on durations and event indicators."""
+        """Fits on durations and event indicators.
+
+        Args:
+            features: Covariate matrix.
+            duration: Follow-up time of each row.
+            event: 1 where the event was observed, 0 where censored; None means
+                every row had the event.
+
+        Returns:
+            This fitted estimator.
+        """
 
     @abc.abstractmethod
     def predict(self, features: Any) -> np.ndarray:
-        """Risk score per row; larger means the event is expected sooner."""
+        """Risk score per row; larger means the event is expected sooner.
+
+        Args:
+            features: Covariate matrix.
+
+        Returns:
+            Array of shape `(n_rows,)` of risk scores.
+        """
 
     @abc.abstractmethod
     def predict_survival(self, features: Any, times: Any) -> np.ndarray:
-        """Probability of no event yet, shape `(rows, len(times))`."""
+        """Probability of no event yet, shape `(rows, len(times))`.
+
+        Args:
+            features: Covariate matrix.
+            times: Times at which to evaluate survival.
+
+        Returns:
+            Array of shape `(n_rows, len(times))` of survival probabilities.
+        """
 
 
 class MarginalSurvival(SurvivalEstimator):
@@ -76,17 +115,42 @@ class MarginalSurvival(SurvivalEstimator):
     """
 
     def fit(self, features: Any, duration: Any, event: Any = None) -> Self:
-        """Fits the Kaplan-Meier curve."""
+        """Fits the Kaplan-Meier curve.
+
+        Args:
+            features: Covariate matrix.
+            duration: Follow-up time of each row.
+            event: 1 where the event was observed, 0 where censored; None means
+                every row had the event.
+
+        Returns:
+            This fitted estimator.
+        """
         seen = np.ones(len(duration)) if event is None else np.asarray(event)
         self.moments_, self.curve_ = kaplan_meier(np.asarray(duration), seen)
         return self
 
     def predict(self, features: Any) -> np.ndarray:
-        """Same risk for every row, so the ordering is no better than chance."""
+        """Same risk for every row, so the ordering is no better than chance.
+
+        Args:
+            features: Matrix whose row count sets the output length.
+
+        Returns:
+            Array of zeros of shape `(n_rows,)`.
+        """
         return np.zeros(features.shape[0])
 
     def predict_survival(self, features: Any, times: Any) -> np.ndarray:
-        """The population curve repeated for each row."""
+        """The population curve repeated for each row.
+
+        Args:
+            features: Covariate matrix.
+            times: Times at which to evaluate survival.
+
+        Returns:
+            Array of shape `(n_rows, len(times))` of survival probabilities.
+        """
         curve = step_lookup(self.moments_, self.curve_, np.asarray(times), 1.0)
         return np.tile(curve, (features.shape[0], 1))
 
@@ -114,7 +178,17 @@ class CoxRegressor(SurvivalEstimator):
         self.penalty = penalty
 
     def fit(self, features: Any, duration: Any, event: Any = None) -> Self:
-        """Maximises the penalised partial likelihood."""
+        """Maximises the penalised partial likelihood.
+
+        Args:
+            features: Covariate matrix.
+            duration: Follow-up time of each row.
+            event: 1 where the event was observed, 0 where censored; None means
+                every row had the event.
+
+        Returns:
+            This fitted estimator.
+        """
         matrix = np.asarray(features, dtype=float)
         time = np.asarray(duration, dtype=float)
         seen = (
@@ -127,6 +201,14 @@ class CoxRegressor(SurvivalEstimator):
         first = np.searchsorted(time, time, side="left")
 
         def objective(beta: np.ndarray) -> tuple[float, np.ndarray]:
+            """Penalised negative log partial likelihood and its gradient.
+
+            Args:
+                beta: Coefficient vector.
+
+            Returns:
+                The objective value and its gradient with respect to `beta`.
+            """
             eta = matrix @ beta
             shift = eta.max()
             weight = np.exp(eta - shift)
@@ -164,11 +246,29 @@ class CoxRegressor(SurvivalEstimator):
         return self
 
     def predict(self, features: Any) -> np.ndarray:
-        """Linear predictor (log relative hazard)."""
+        """Linear predictor (log relative hazard).
+
+        Args:
+            features: Covariate matrix.
+
+        Returns:
+            Array of shape `(n_rows,)` of linear predictors.
+        """
         return np.asarray(features, dtype=float) @ self.coefficients_
 
     def predict_survival(self, features: Any, times: Any) -> np.ndarray:
-        """`exp(-H0(t) * exp(eta))` for each row and time."""
+        """Survival `exp(-B(t) * exp(eta))` for each row and time.
+
+        Here `B` is the cumulative baseline hazard and `eta` the linear
+        predictor.
+
+        Args:
+            features: Covariate matrix.
+            times: Times at which to evaluate survival.
+
+        Returns:
+            Array of shape `(n_rows, len(times))` of survival probabilities.
+        """
         cumulative = step_lookup(
             self.moments_, self.baseline_, np.asarray(times), 0.0
         )
@@ -202,14 +302,28 @@ class DiscreteTimeBoosting(SurvivalEstimator):
         max_leaf_nodes: int = 15,
         random_state: int = 0,
     ) -> None:
-        """Initializes the model."""
+        """Initializes the model.
+
+        Args:
+            bins: Number of time intervals.
+            learning_rate: Boosting learning rate.
+            max_leaf_nodes: Largest tree.
+            random_state: Seed.
+        """
         self.bins = bins
         self.learning_rate = learning_rate
         self.max_leaf_nodes = max_leaf_nodes
         self.random_state = random_state
 
     def interval_of(self, time: np.ndarray) -> np.ndarray:
-        """Index of the interval each time falls in."""
+        """Index of the interval each time falls in.
+
+        Args:
+            time: Times to place into intervals.
+
+        Returns:
+            Integer array of interval indices, capped at the last interval.
+        """
         return np.minimum(
             np.searchsorted(self.edges_, time, side="left"),
             len(self.edges_) - 1,
@@ -218,7 +332,17 @@ class DiscreteTimeBoosting(SurvivalEstimator):
     def expand(
         self, matrix: np.ndarray, last: np.ndarray, hit: np.ndarray
     ) -> tuple[np.ndarray, np.ndarray]:
-        """One record per row and interval the row was at risk in."""
+        """One record per row and interval the row was at risk in.
+
+        Args:
+            matrix: Covariate matrix.
+            last: Index of the last interval each row was observed in.
+            hit: Whether each row had the event in its last interval.
+
+        Returns:
+            The expanded covariates with the interval index as the final column,
+            and the 0/1 label, which is 1 only in the interval of an event.
+        """
         lengths = last + 1
         rows = np.repeat(np.arange(len(matrix)), lengths)
         offsets = np.arange(lengths.sum()) - np.repeat(
@@ -228,7 +352,20 @@ class DiscreteTimeBoosting(SurvivalEstimator):
         return np.column_stack([matrix[rows], offsets]), labels
 
     def fit(self, features: Any, duration: Any, event: Any = None) -> Self:
-        """Builds the person-interval data and fits the hazard model."""
+        """Builds the person-interval data and fits the hazard model.
+
+        When the expanded data would exceed the row cap, a random subset of
+        rows is used.
+
+        Args:
+            features: Covariate matrix.
+            duration: Follow-up time of each row.
+            event: 1 where the event was observed, 0 where censored; None means
+                every row had the event.
+
+        Returns:
+            This fitted estimator.
+        """
         matrix = np.asarray(features, dtype=float)
         time = np.asarray(duration, dtype=float)
         seen = (
@@ -261,7 +398,15 @@ class DiscreteTimeBoosting(SurvivalEstimator):
         return self
 
     def hazards(self, features: Any) -> np.ndarray:
-        """Hazard in each interval, shape `(rows, intervals)`."""
+        """Hazard in each interval, shape `(rows, intervals)`.
+
+        Args:
+            features: Covariate matrix.
+
+        Returns:
+            Array of shape `(n_rows, n_intervals)` of hazards; zeros when
+            training saw no event.
+        """
         matrix = np.asarray(features, dtype=float)
         count = len(self.edges_)
         stacked = np.column_stack(
@@ -277,11 +422,26 @@ class DiscreteTimeBoosting(SurvivalEstimator):
         )
 
     def predict(self, features: Any) -> np.ndarray:
-        """Cumulative hazard over all intervals as the risk score."""
+        """Cumulative hazard over all intervals as the risk score.
+
+        Args:
+            features: Covariate matrix.
+
+        Returns:
+            Array of shape `(n_rows,)` of summed hazards.
+        """
         return self.hazards(features).sum(axis=1)
 
     def predict_survival(self, features: Any, times: Any) -> np.ndarray:
-        """Running product of one minus the hazard, read at each time."""
+        """Running product of one minus the hazard, read at each time.
+
+        Args:
+            features: Covariate matrix.
+            times: Times at which to evaluate survival.
+
+        Returns:
+            Array of shape `(n_rows, len(times))` of survival probabilities.
+        """
         curve = np.cumprod(1.0 - self.hazards(features), axis=1)
         interval = np.searchsorted(
             self.edges_, np.asarray(times, dtype=float), side="right"

@@ -29,13 +29,29 @@ class WorkerError(errors.ScmleError):
 
 
 def resolve(path: str) -> Any:
-    """Imports an engine class from its dotted path."""
+    """Imports an engine class from its dotted path.
+
+    Args:
+        path: Dotted `module.ClassName` path.
+
+    Returns:
+        The class object found at `path`.
+    """
     module, name = path.rsplit(".", 1)
     return getattr(importlib.import_module(module), name)
 
 
 def rebuild(path: str, state: dict[str, Any]) -> Any:
-    """Recreates a fitted engine from its numpy state."""
+    """Recreates a fitted engine from its numpy state.
+
+    Args:
+        path: Dotted `module.ClassName` path of the engine class.
+        state: State mapping produced by the engine's `__getstate__`.
+
+    Returns:
+        The engine instance, restored through `__setstate__` without calling
+        its constructor.
+    """
     engine = resolve(path).__new__(resolve(path))
     engine.__setstate__(state)
     return engine
@@ -54,7 +70,11 @@ def handle(
         payload: Operation arguments.
 
     Returns:
-        The reply value.
+        The reply value: whether CUDA is available for `probe`, the
+        embedding matrix and encoded count for `embed`, the fitted engine's
+        state for `fit`, and otherwise the result of the called method.
+        Returns the `need_state` marker when the engine is not cached and no
+        state was sent.
     """
     if operation == "probe":
         return bool(importlib.import_module("torch").cuda.is_available())
@@ -80,7 +100,11 @@ def handle(
 
 
 def serve(channel: connection.Connection) -> None:
-    """Worker main loop: answer requests until the parent goes away."""
+    """Worker main loop: answer requests until the parent goes away.
+
+    Args:
+        channel: Connection to the parent process.
+    """
     cache: collections.OrderedDict[str, Any] = collections.OrderedDict()
     while True:
         try:
@@ -112,7 +136,11 @@ class WorkerClient:
         self.channel: connection.Connection | None = None
 
     def ensure_running(self) -> connection.Connection:
-        """Starts (or restarts) the worker process."""
+        """Starts (or restarts) the worker process.
+
+        Returns:
+            The connection to the live worker process.
+        """
         if (
             self.process is not None
             and self.process.poll() is None
@@ -130,6 +158,9 @@ class WorkerClient:
         Args:
             operation: `fit` or `call`.
             payload: Operation arguments.
+
+        Returns:
+            The value the worker replied with.
 
         Raises:
             WorkerError: If the worker reports an error or dies.
@@ -167,6 +198,9 @@ def client() -> WorkerClient:
 
     Safe to call from several threads: the first creates the client, and
     every other caller gets that same one.
+
+    Returns:
+        The worker client registered for the current process id.
     """
     pid = os.getpid()
     found = CLIENTS.get(pid)

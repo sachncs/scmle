@@ -40,7 +40,14 @@ class HoldoutEarlyStopping(base.BaseEstimator):
         fraction: float = DEFAULT_FRACTION,
         random_state: int = 0,
     ) -> None:
-        """Stores the wrapped estimator and the stopping rule."""
+        """Stores the wrapped estimator and the stopping rule.
+
+        Args:
+            estimator: Unfitted LightGBM, XGBoost or CatBoost estimator.
+            rounds: Rounds without improvement before stopping.
+            fraction: Share of the training rows held out for stopping.
+            random_state: Seed of the holdout split.
+        """
         self.estimator = estimator
         self.rounds = rounds
         self.fraction = fraction
@@ -96,7 +103,16 @@ class HoldoutEarlyStopping(base.BaseEstimator):
 
     @staticmethod
     def take(features: Any, rows: np.ndarray) -> Any:
-        """Selects rows of a dense matrix or a frame."""
+        """Selects rows of a dense matrix or a frame.
+
+        Args:
+            features: Dense matrix or pandas frame.
+            rows: Integer positions of the rows to keep.
+
+        Returns:
+            The selected rows, as a frame when `features` is one and as a numpy
+            array otherwise.
+        """
         if hasattr(features, "iloc"):
             return features.iloc[rows]
         return np.asarray(features)[rows]
@@ -104,7 +120,21 @@ class HoldoutEarlyStopping(base.BaseEstimator):
     def stopping_arguments(
         self, features: Any, target: Any, held: np.ndarray
     ) -> dict[str, Any]:
-        """Per-library `fit` arguments that enable stopping on the holdout."""
+        """Builds the per-library `fit` arguments that enable stopping.
+
+        For XGBoost and CatBoost this also sets `early_stopping_rounds` on the
+        cloned estimator before returning.
+
+        Args:
+            features: Full training matrix.
+            target: Encoded training labels or values.
+            held: Integer positions of the rows held out as the validation set.
+
+        Returns:
+            Keyword arguments for the library's `fit`: an evaluation set built
+            from the held-out rows, plus the stopping callback (LightGBM) or
+            `verbose=False` (XGBoost).
+        """
         validation = (
             features[held]
             if hasattr(features, "tocsr")
@@ -129,7 +159,13 @@ class HoldoutEarlyStopping(base.BaseEstimator):
         return {"eval_set": validation}
 
     def recorded_iteration(self) -> int | None:
-        """Rounds the library kept, if it reports them."""
+        """Rounds the library kept, if it reports them.
+
+        Returns:
+            The best iteration read from `best_iteration_`, `best_iteration` or
+            `get_best_iteration()` of the fitted estimator, or None when none of
+            them is available.
+        """
         for name in ("best_iteration_", "best_iteration"):
             value = getattr(self.estimator_, name, None)
             if isinstance(value, int | np.integer):
@@ -138,14 +174,29 @@ class HoldoutEarlyStopping(base.BaseEstimator):
         return int(getter()) if callable(getter) else None
 
     def predict(self, features: Any) -> np.ndarray:
-        """Predicts with the stopped model, in the original labels."""
+        """Predicts with the stopped model, in the original labels.
+
+        Args:
+            features: Matrix to predict for.
+
+        Returns:
+            One prediction per row; class labels are mapped back to the original
+            labels for classifiers.
+        """
         predicted = np.asarray(self.estimator_.predict(features))
         if hasattr(self, "encoder_"):
             return self.encoder_.inverse_transform(predicted.astype(int))
         return predicted
 
     def predict_proba(self, features: Any) -> np.ndarray:
-        """Class probabilities of the stopped model."""
+        """Class probabilities of the stopped model.
+
+        Args:
+            features: Matrix to predict for.
+
+        Returns:
+            Array of shape `(n_rows, n_classes)`, columns in `classes_` order.
+        """
         return np.asarray(self.estimator_.predict_proba(features))
 
 

@@ -17,7 +17,11 @@ MIN_ROWS_FOR_VALIDATION = 30
 
 
 def load_keras() -> Any:
-    """Imports Keras on the PyTorch backend (it reads the variable once)."""
+    """Imports Keras on the PyTorch backend (it reads the variable once).
+
+    Returns:
+        The imported `keras` module.
+    """
     os.environ.setdefault("KERAS_BACKEND", "torch")
     return importlib.import_module("keras")
 
@@ -49,7 +53,19 @@ class KerasEngine(base.BaseEstimator):
         validation_fraction: float = 0.1,
         random_state: int = 0,
     ) -> None:
-        """Stores the hyperparameters (scikit-learn convention)."""
+        """Stores the hyperparameters (scikit-learn convention).
+
+        Args:
+            hidden_sizes: Layer widths.
+            dropout: Dropout probability after each hidden layer.
+            learning_rate: Adam step size.
+            l2: L2 penalty on the dense kernels.
+            epochs: Maximum epochs.
+            batch_size: Rows per step.
+            patience: Epochs without validation improvement before stopping.
+            validation_fraction: Share of rows held out for early stopping.
+            random_state: Seed.
+        """
         self.hidden_sizes = hidden_sizes
         self.dropout = dropout
         self.learning_rate = learning_rate
@@ -61,19 +77,43 @@ class KerasEngine(base.BaseEstimator):
         self.random_state = random_state
 
     def output_units(self) -> int:
-        """Network outputs (overridden by the classifier)."""
+        """Network outputs (overridden by the classifier).
+
+        Returns:
+            The number of output units: 1 for the base engine.
+        """
         return 1
 
     def loss_name(self) -> str:
-        """Keras loss identifier."""
+        """Keras loss identifier.
+
+        Returns:
+            The loss passed to `compile`: `"mse"` for the base engine.
+        """
         return "mse"
 
     def encode_target(self, target: Any) -> np.ndarray:
-        """Converts the target to what the loss consumes."""
+        """Converts the target to what the loss consumes.
+
+        Args:
+            target: Training labels or values.
+
+        Returns:
+            The target as a float32 array.
+        """
         return np.asarray(target, dtype=np.float32)
 
     def build_network(self, keras: Any, width: int) -> Any:
-        """Creates the untrained network."""
+        """Creates the untrained network.
+
+        Args:
+            keras: The imported keras module.
+            width: Number of input features.
+
+        Returns:
+            A sequential model of ReLU dense layers with dropout and a final
+            dense layer of `output_units()` units.
+        """
         regularizer = keras.regularizers.l2(self.l2)
         layers = [keras.layers.Input((width,))]
         for size in self.hidden_sizes:
@@ -89,7 +129,19 @@ class KerasEngine(base.BaseEstimator):
     def fit(
         self, features: Any, target: Any, sample_weight: Any = None
     ) -> "KerasEngine":
-        """Trains the network and keeps its weights as numpy arrays."""
+        """Trains the network and keeps its weights as numpy arrays.
+
+        Early stopping on a validation split is used only when there are at
+        least 30 rows.
+
+        Args:
+            features: Training matrix.
+            target: Training labels or values.
+            sample_weight: Per-row weights; None weights all rows equally.
+
+        Returns:
+            This fitted engine.
+        """
         keras = load_keras()
         keras.utils.set_random_seed(self.random_state)
         matrix = np.asarray(features, dtype=np.float32)
@@ -129,7 +181,16 @@ class KerasEngine(base.BaseEstimator):
 
     @staticmethod
     def verdict(losses: list[float]) -> dict[str, Any]:
-        """Names a failed run: non-finite loss, or no progress at all."""
+        """Names a failed run: non-finite loss, or no progress at all.
+
+        Args:
+            losses: Training loss of each epoch.
+
+        Returns:
+            A mapping with the verdict (`diverged`, `stalled` or `ok`) and the
+            number of epochs; a run that did not diverge also carries the
+            relative loss improvement.
+        """
         if not np.isfinite(losses).all():
             return {"verdict": "diverged", "steps": len(losses)}
         improvement = 0.0
@@ -143,7 +204,12 @@ class KerasEngine(base.BaseEstimator):
         }
 
     def __getstate__(self) -> dict[str, Any]:
-        """Pickles the weights as plain arrays, not the Keras model."""
+        """Pickles the weights as plain arrays, not the Keras model.
+
+        Returns:
+            The instance state with `network_` replaced by `weights_`, a list of
+            numpy arrays.
+        """
         state = dict(super().__getstate__())
         network = state.pop("network_", None)
         if network is not None:
@@ -153,7 +219,11 @@ class KerasEngine(base.BaseEstimator):
         return state
 
     def __setstate__(self, state: dict[str, Any]) -> None:
-        """Rebuilds the network and loads the pickled weights."""
+        """Rebuilds the network and loads the pickled weights.
+
+        Args:
+            state: Mapping produced by `__getstate__`.
+        """
         state = dict(state)
         weights = state.pop("weights_", None)
         super().__setstate__(state)
@@ -164,7 +234,14 @@ class KerasEngine(base.BaseEstimator):
             self.network_ = network
 
     def raw_outputs(self, features: Any) -> np.ndarray:
-        """Network outputs for new rows."""
+        """Network outputs for new rows.
+
+        Args:
+            features: Numeric matrix with the width seen at fit.
+
+        Returns:
+            Array of shape `(n_rows, output_units)`.
+        """
         return np.asarray(
             self.network_.predict(
                 np.asarray(features, dtype=np.float32), verbose=0
@@ -176,30 +253,59 @@ class ClassifierEngine(base.ClassifierMixin, KerasEngine):
     """Classifier: softmax over class scores."""
 
     def output_units(self) -> int:
-        """One unit per class."""
+        """One unit per class.
+
+        Returns:
+            The number of classes seen by `encode_target`.
+        """
         return len(self.classes_)
 
     def loss_name(self) -> str:
-        """Cross entropy over integer class codes, from logits."""
+        """Cross entropy over integer class codes, from logits.
+
+        Returns:
+            A Keras sparse categorical cross-entropy loss with `from_logits`.
+        """
         keras = load_keras()
         return keras.losses.SparseCategoricalCrossentropy(from_logits=True)
 
     def encode_target(self, target: Any) -> np.ndarray:
-        """Maps labels to 0..K-1 and remembers the classes."""
+        """Maps labels to 0..K-1 and remembers the classes.
+
+        Args:
+            target: Class labels.
+
+        Returns:
+            Integer codes into `classes_`, as int64.
+        """
         self.classes_, codes = np.unique(
             np.asarray(target), return_inverse=True
         )
         return codes.astype(np.int64)
 
     def predict_proba(self, features: Any) -> np.ndarray:
-        """Class probabilities, columns ordered like `classes_`."""
+        """Class probabilities, columns ordered like `classes_`.
+
+        Args:
+            features: Numeric matrix with the width seen at fit.
+
+        Returns:
+            Array of shape `(n_rows, n_classes)`; each row sums to one.
+        """
         scores = self.raw_outputs(features)
         scores = scores - scores.max(axis=1, keepdims=True)
         exp = np.exp(scores)
         return exp / exp.sum(axis=1, keepdims=True)
 
     def predict(self, features: Any) -> np.ndarray:
-        """Most probable class."""
+        """Most probable class.
+
+        Args:
+            features: Numeric matrix with the width seen at fit.
+
+        Returns:
+            Array of shape `(n_rows,)` of class labels.
+        """
         return self.classes_[self.predict_proba(features).argmax(axis=1)]
 
 
@@ -207,7 +313,15 @@ class RegressorEngine(base.RegressorMixin, KerasEngine):
     """Regressor trained on the standardized target."""
 
     def encode_target(self, target: Any) -> np.ndarray:
-        """Standardizes the target and remembers its scale."""
+        """Standardizes the target and remembers its scale.
+
+        Args:
+            target: Training values.
+
+        Returns:
+            The values minus their mean and divided by their standard deviation
+            (1 when it is zero), as float32.
+        """
         values = np.asarray(target, dtype=np.float64)
         self.target_mean_ = float(values.mean())
         self.target_scale_ = float(values.std()) or 1.0
@@ -216,6 +330,13 @@ class RegressorEngine(base.RegressorMixin, KerasEngine):
         )
 
     def predict(self, features: Any) -> np.ndarray:
-        """Predicted values in the original units."""
+        """Predicted values in the original units.
+
+        Args:
+            features: Numeric matrix with the width seen at fit.
+
+        Returns:
+            Array of shape `(n_rows,)`.
+        """
         scaled = self.raw_outputs(features)[:, 0]
         return scaled * self.target_scale_ + self.target_mean_

@@ -17,7 +17,14 @@ class JepaNetwork:
         hidden_size: int,
         embedding_size: int,
     ) -> None:
-        """Build the two-tower representation model."""
+        """Build the two-tower representation model.
+
+        Args:
+            torch: The imported torch module.
+            inputs: Number of input features.
+            hidden_size: Width of the hidden layers.
+            embedding_size: Width of the embedding.
+        """
         module = torch.nn
         self.module = module.Module()
         self.module.context_encoder = module.Sequential(
@@ -45,7 +52,12 @@ class JepaNetwork:
         return self.module.state_dict()
 
     def load_state_dict(self, state: dict[str, Any]) -> None:
-        """Restore the complete network state."""
+        """Restore the complete network state.
+
+        Args:
+            state: Mapping of parameter names to tensors, as returned by
+                `state_dict`.
+        """
         self.module.load_state_dict(state)
 
 
@@ -66,7 +78,23 @@ class JepaEngine:
         device: str = "auto",
         random_state: int = 0,
     ) -> None:
-        """Store self-supervised training settings."""
+        """Store self-supervised training settings.
+
+        Args:
+            hidden_size: Width of the hidden layers.
+            embedding_size: Width of the learned embedding.
+            mask_probability: Probability that an input value is masked in the
+                context view.
+            learning_rate: AdamW learning rate.
+            weight_decay: AdamW weight decay.
+            epochs: Number of training epochs.
+            batch_size: Rows per step, or `auto` for the full data in one batch.
+            ema_decay: Decay of the exponential moving average that updates the
+                target encoder.
+            variance_weight: Weight of the variance-preservation penalty.
+            device: `auto`, `cpu` or `cuda`.
+            random_state: Seed for initialisation, masking and shuffling.
+        """
         self.hidden_size = hidden_size
         self.embedding_size = embedding_size
         self.mask_probability = mask_probability
@@ -85,7 +113,21 @@ class JepaEngine:
         target: Any = None,
         sample_weight: Any = None,
     ) -> "JepaEngine":
-        """Fit context prediction without consuming labels."""
+        """Fit context prediction without consuming labels.
+
+        Args:
+            features: Finite numeric matrix with at least 8 rows and 1 column.
+            target: Ignored.
+            sample_weight: Ignored.
+
+        Returns:
+            This fitted engine.
+
+        Raises:
+            ValueError: If the features are not a finite numeric 2-D matrix with
+                at least 8 rows and one column, a hyperparameter is outside its
+                valid range, or a CUDA device is requested but unavailable.
+        """
         del target, sample_weight
         try:
             matrix = np.asarray(features, dtype=np.float32)
@@ -236,7 +278,18 @@ class JepaEngine:
         return self
 
     def encode(self, features: Any) -> np.ndarray:
-        """Encode rows with the learned context encoder."""
+        """Encode rows with the learned context encoder.
+
+        Args:
+            features: Numeric matrix with the width seen at fit.
+
+        Returns:
+            Embedding matrix of shape `(n_rows, embedding_size)`.
+
+        Raises:
+            ValueError: If the features are not a finite numeric matrix of
+                shape `(rows, input_width)`.
+        """
         torch = importlib.import_module("torch")
         try:
             matrix = np.asarray(features, dtype=np.float32)
@@ -263,6 +316,16 @@ class JepaEngine:
 
         This explains local sensitivity of the learned representation. It is
         intentionally not presented as a label explanation or causal effect.
+
+        Args:
+            features: Numeric matrix with the width seen at fit.
+
+        Returns:
+            Array of shape `(n_rows, input_width)`.
+
+        Raises:
+            ValueError: If the features are not a finite numeric matrix of
+                shape `(rows, input_width)`.
         """
         torch = importlib.import_module("torch")
         try:
@@ -287,7 +350,12 @@ class JepaEngine:
         return (gradient * tensor).detach().numpy()
 
     def __getstate__(self) -> dict[str, Any]:
-        """Serialize weights as NumPy arrays for the parent process."""
+        """Serialize weights as NumPy arrays for the parent process.
+
+        Returns:
+            The instance state with `network_` replaced by `weights_`, a mapping
+            of parameter names to numpy arrays.
+        """
         state = dict(self.__dict__)
         network = state.pop("network_", None)
         if network is not None:
@@ -298,7 +366,11 @@ class JepaEngine:
         return state
 
     def __setstate__(self, state: dict[str, Any]) -> None:
-        """Rebuild the PyTorch network from serialized arrays."""
+        """Rebuild the PyTorch network from serialized arrays.
+
+        Args:
+            state: Mapping produced by `__getstate__`.
+        """
         state = dict(state)
         weights = state.pop("weights_", None)
         self.__dict__.update(state)

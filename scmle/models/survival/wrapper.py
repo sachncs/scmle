@@ -29,13 +29,21 @@ class EventAwareEstimator(base.RegressorMixin, base.BaseEstimator):
 
         Args:
             estimator: Pipeline of preprocessing then a survival model.
-            event_column: Event column name.
+            event_column: Name of the 0/1 event column.
         """
         self.estimator = estimator
         self.event_column = event_column
 
     def fit(self, features: Any, target: Any) -> Self:
-        """Fits preprocessing, then the model on duration and events."""
+        """Fits preprocessing, then the model on duration and events.
+
+        Args:
+            features: Frame holding the model inputs and the event column.
+            target: Observed duration per row.
+
+        Returns:
+            This fitted estimator.
+        """
         frame = pd.DataFrame(features)
         events = frame[self.event_column].to_numpy(dtype=float)
         steps = base.clone(self.estimator)
@@ -49,11 +57,26 @@ class EventAwareEstimator(base.RegressorMixin, base.BaseEstimator):
         return self
 
     def predict(self, features: Any) -> np.ndarray:
-        """Risk score per row; larger means the event is expected sooner."""
+        """Risk score per row; larger means the event is expected sooner.
+
+        Args:
+            features: Frame with the same columns as at fit.
+
+        Returns:
+            Array of shape `(n_rows,)` of risk scores.
+        """
         return self.model_.predict(self.preprocessing_.transform(features))
 
     def predict_survival(self, features: Any, times: Any) -> np.ndarray:
-        """Probability of no event yet at each time, `(rows, len(times))`."""
+        """Probability of no event yet at each time, `(rows, len(times))`.
+
+        Args:
+            features: Frame with the same columns as at fit.
+            times: Times at which to evaluate survival.
+
+        Returns:
+            Array of shape `(n_rows, len(times))` of survival probabilities.
+        """
         return self.model_.predict_survival(
             self.preprocessing_.transform(features), times
         )

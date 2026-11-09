@@ -28,11 +28,24 @@ class TimeVaryingCox:
     """
 
     def __init__(self, penalty: float = 1.0) -> None:
-        """Stores the settings."""
+        """Stores the settings.
+
+        Args:
+            penalty: Ridge strength on the coefficients.
+        """
         self.penalty = penalty
 
     def fit(self, features: Any, start: Any, stop: Any, event: Any) -> Self:
         """Maximises the penalised partial likelihood.
+
+        Args:
+            features: Covariate matrix, one row per observed interval.
+            start: Exclusive start time of each interval.
+            stop: Inclusive stop time of each interval.
+            event: 1 where the event happened at `stop`, else 0.
+
+        Returns:
+            This fitted model.
 
         Raises:
             ValueError: If a row has `stop <= start`, there is no event, or
@@ -57,6 +70,14 @@ class TimeVaryingCox:
         event_rows = matrix[seen]
 
         def objective(beta: np.ndarray) -> tuple[float, np.ndarray]:
+            """Penalised negative log partial likelihood and its gradient.
+
+            Args:
+                beta: Coefficient vector.
+
+            Returns:
+                The objective value and its gradient with respect to `beta`.
+            """
             eta = matrix @ beta
             shift = eta.max()
             weight = np.exp(eta - shift)
@@ -83,5 +104,12 @@ class TimeVaryingCox:
         return self
 
     def predict(self, features: Any) -> np.ndarray:
-        """Linear predictor (log relative hazard) for a covariate row."""
+        """Linear predictor (log relative hazard) for a covariate row.
+
+        Args:
+            features: Covariate matrix, one row per person.
+
+        Returns:
+            Array of shape `(n_rows,)` of linear predictors.
+        """
         return np.asarray(features, dtype=float) @ self.coefficients_
