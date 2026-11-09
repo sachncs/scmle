@@ -31,6 +31,20 @@ benchmarks, which are not a head-to-head with people.
 * **Choosing the best of many models is slightly optimistic.** The more models
   tried, the more the winner's practice score flatters it. The exam score is
   the one to trust ([`README.md`](../README.md) says the same).
+* **When no model has any skill, the winner's band is too narrow and too
+  often above chance.** In 200 simulated runs (1,000 rows, a target drawn
+  independently of every column, three candidate models, true ROC AUC 0.5,
+  one process on one machine, `benchmarks/statistics/null_selection.py`):
+  the run's 95 percent band on the winner's exam score lay wholly above 0.5 in
+  13 runs (6.5 percent; exact 95 percent interval 3.5 to 10.9) and contained
+  the true value 0.5 in 176 (88 percent; 82.7 to 92.2), where 95 percent is
+  the promise. The cross-validation band did better: 94 percent covered (89.8
+  to 96.9) and 6.0 percent wholly above the baseline (3.1 to 10.2). No run
+  labelled its winner `healthy`, and the leakage screen flagged no honest
+  column. Selection among candidates is not corrected for multiplicity and
+  nested validation is off by default, so read a small lead over the baseline,
+  or a band whose lower end is just above it, as weak evidence. Only these
+  settings were measured.
 * **Duplicates can inflate scores.** SCMLE warns and keeps copies together in a
   charter run, but it does not remove them for you.
 * **A leakage flag is a suspicion.** By default it does not stop the run: it labels the score provisional (`block` stops). A real strong predictor looks the same to
