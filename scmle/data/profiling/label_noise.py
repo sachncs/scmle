@@ -67,7 +67,7 @@ class LabelNoiseReport:
         rows_checked: int,
         seed: int,
         sample_limit: int,
-    ) -> data.QualityEvidence:
+    ) -> dict[str, object]:
         """Returns reproducible evidence for this label-noise check.
 
         Args:

@@ -1,7 +1,6 @@
 """Public project API for durable sequential causal estimation."""
 
 import pathlib
-from typing import TypeAlias
 
 import pandas
 
@@ -9,11 +8,12 @@ from scmle.artifacts import reproducibility
 from scmle.data.readers import tabular
 from scmle.evaluation import sequential
 
-TabularInput: TypeAlias = pandas.DataFrame | str | pathlib.Path
 SEQUENTIAL_ESTIMATION_ARTIFACT = "sequential_estimation.json"
 
 
-def resolve_tabular_input(data: TabularInput) -> pandas.DataFrame:
+def resolve_tabular_input(
+    data: pandas.DataFrame | str | pathlib.Path,
+) -> pandas.DataFrame:
     """Resolves an in-memory frame or supported tabular file into a copy.
 
     Args:
@@ -55,7 +55,7 @@ class SequentialEstimationProject:
 
     def __init__(
         self,
-        data: TabularInput,
+        data: pandas.DataFrame | str | pathlib.Path,
         estimand: sequential.SequentialEstimand,
         policy: sequential.SequentialEstimationPolicy,
         *,
@@ -128,7 +128,7 @@ class SequentialEstimationProject:
         return self.result
 
     def verify_replay(
-        self, data: TabularInput | None = None
+        self, data: pandas.DataFrame | str | pathlib.Path | None = None
     ) -> reproducibility.ReplayVerdict:
         """Replays the project and verifies input, policy, and result identity.
 

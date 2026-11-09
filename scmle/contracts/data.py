@@ -7,18 +7,16 @@ import hashlib
 import math
 from typing import Any
 from typing import Self
-from typing import TypeAlias
 
 from scmle.contracts import events
 from scmle.contracts import explanations
 
 HIGH_CARDINALITY_LEVELS = 20
-QualityEvidence: TypeAlias = dict[str, explanations.JsonValue]
 
 
 def normalize_quality_evidence(
     evidence: Mapping[str, Any], field_name: str = "quality_evidence"
-) -> QualityEvidence:
+) -> dict[str, object]:
     """Validates and normalizes one JSON-native quality evidence record.
 
     A floating-point value that is not finite is refused with a
@@ -52,7 +50,7 @@ class QualityObservation:
     """
 
     note: str | None
-    evidence: QualityEvidence
+    evidence: dict[str, object]
 
     def __post_init__(self) -> None:
         """Validates and detaches the evidence from mutable caller state.
@@ -823,7 +821,7 @@ class DatasetProfile:
         default_factory=dict
     )
     missingness: tuple[Mapping[str, Any], ...] = ()
-    quality_evidence: tuple[QualityEvidence, ...] = ()
+    quality_evidence: tuple[dict[str, object], ...] = ()
     leakage: Mapping[str, Any] = dataclasses.field(default_factory=dict)
 
     @property

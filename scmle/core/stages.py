@@ -1657,7 +1657,7 @@ class ProfileStage(Stage):
             c for c in profile.feature_plan.categorical if c in present
         ]
         notes: list[str] = []
-        evidence: list[scmle.contracts.data.QualityEvidence] = []
+        evidence: list[dict[str, object]] = []
         if columns and task in (
             tasks.TaskType.BINARY,
             tasks.TaskType.MULTICLASS,

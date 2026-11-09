@@ -70,7 +70,7 @@ class RepresentativenessReport:
         checked_reference_rows: int,
         seed: int,
         shared_columns: tuple[str, ...],
-    ) -> data.QualityEvidence:
+    ) -> dict[str, object]:
         """Returns reproducible evidence for this comparison.
 
         Args:

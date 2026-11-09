@@ -6,15 +6,12 @@ import json
 import math
 from typing import Any
 from typing import Literal
-from typing import TypeAlias
 from urllib.parse import urlparse
 
 import pydantic
 
 EXPLANATION_SCHEMA_VERSION = 1
 PrivacyStatus = Literal["allowed", "redacted", "denied"]
-JsonScalar: TypeAlias = bool | int | float | str | None
-JsonValue: TypeAlias = JsonScalar | list["JsonValue"] | dict[str, "JsonValue"]
 
 
 def require_text(value: str, field_name: str) -> str:
@@ -36,7 +33,7 @@ def require_text(value: str, field_name: str) -> str:
     return stripped
 
 
-def validate_json_value(value: Any, field_name: str = "value") -> JsonValue:
+def validate_json_value(value: Any, field_name: str = "value") -> object:
     """Validates and normalizes a value accepted by the evidence contract.
 
     Only JSON-native values are accepted. In particular, non-finite floats,
@@ -68,7 +65,7 @@ def validate_json_value(value: Any, field_name: str = "value") -> JsonValue:
             for index, item in enumerate(value)
         ]
     if isinstance(value, Mapping):
-        normalized: dict[str, JsonValue] = {}
+        normalized: dict[str, object] = {}
         for key, item in value.items():
             if type(key) is not str:
                 raise TypeError(f"{field_name} has a non-string key: {key!r}")
@@ -155,7 +152,7 @@ class ExplanationMethod(ContractModel):
 
     @pydantic.field_validator("parameters", mode="before")
     @classmethod
-    def validate_parameters(cls, value: Any) -> dict[str, JsonValue]:
+    def validate_parameters(cls, value: Any) -> dict[str, object]:
         """Validates method parameters without lossy coercion.
 
         Args:
@@ -341,7 +338,7 @@ class ExplanationEvidence(ContractModel):
         "output", "uncertainty", "stability", mode="before"
     )
     @classmethod
-    def validate_json_fields(cls, value: Any, info: Any) -> JsonValue:
+    def validate_json_fields(cls, value: Any, info: Any) -> object:
         """Rejects values that cannot be safely serialized as JSON.
 
         Args:
@@ -363,8 +360,8 @@ class ExplanationEvidence(ContractModel):
     @pydantic.field_validator("uncertainty", "stability")
     @classmethod
     def validate_measurement_object(
-        cls, value: dict[str, JsonValue], info: Any
-    ) -> dict[str, JsonValue]:
+        cls, value: dict[str, object], info: Any
+    ) -> dict[str, object]:
         """Requires an explicit uncertainty and stability object.
 
         Args:
@@ -450,7 +447,7 @@ class ExplanationEvidence(ContractModel):
             raise ValueError("timestamp must include timezone information")
         return value.astimezone(datetime.UTC)
 
-    def to_dict(self) -> dict[str, JsonValue]:
+    def to_dict(self) -> dict[str, object]:
         """Returns a JSON-native, deterministic evidence mapping.
 
         Returns:
