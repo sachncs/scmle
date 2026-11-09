@@ -192,8 +192,7 @@ class VerificationKey:
         Raises:
             ConfigError: If the entry lacks `kid` or `kty`, a key field is
                 missing or not base64url, the type is neither `oct` nor `RSA`,
-                or the key is too weak. A non-numeric `nbf` or `exp` raises
-                `ValueError` from `float` instead.
+                a non-numeric `nbf` or `exp`, or the key is too weak.
         """
         try:
             kid = str(entry["kid"])
@@ -217,7 +216,7 @@ class VerificationKey:
                     not_before=not_before,
                     expires=expires,
                 )
-        except (KeyError, TypeError, TokenError) as error:
+        except (KeyError, TypeError, ValueError, TokenError) as error:
             raise errors.ConfigError("malformed JWK entry") from error
         raise errors.ConfigError(f"unsupported JWK type {kind!r}")
 
@@ -310,10 +309,12 @@ class KeySet:
             The key set.
 
         Raises:
-            ConfigError: If the document has no `keys` list. A malformed entry
-                is refused with the same error.
+            ConfigError: If the document is not an object with a `keys`
+                list. A malformed entry is refused with the same error.
         """
-        entries = document.get("keys")
+        entries = (
+            document.get("keys") if isinstance(document, Mapping) else None
+        )
         if not isinstance(entries, list):
             raise errors.ConfigError("a JWKS document needs a keys list")
         return cls([VerificationKey.from_jwk(entry) for entry in entries])
@@ -330,8 +331,8 @@ class KeySet:
 
         Raises:
             ConfigError: If the file is unreadable, is not JSON, or holds no
-                valid `keys` list. A JSON document that is not an object
-                raises `AttributeError` instead.
+                valid `keys` list (a JSON document that is not an object
+                has none).
         """
         try:
             text = pathlib.Path(path).read_text(encoding="utf-8")

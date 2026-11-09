@@ -233,3 +233,18 @@ def test_a_key_set_loads_from_a_jwks_file(tmp_path):
 def test_a_short_hs256_secret_cannot_mint():
     with pytest.raises(errors.ConfigError):
         tokens.sign_hs256(b"short", "k", {})
+
+
+def test_a_non_numeric_validity_bound_is_a_config_error():
+    with pytest.raises(errors.ConfigError):
+        tokens.VerificationKey.from_jwk({**idp.hs_jwk("hs-1"), "exp": "soon"})
+
+
+@pytest.mark.parametrize("document", ["[]", '"keys"', "5", "null"])
+def test_a_key_set_file_that_is_not_an_object_is_a_config_error(
+    tmp_path, document
+):
+    path = tmp_path / "jwks.json"
+    path.write_text(document)
+    with pytest.raises(errors.ConfigError):
+        tokens.KeySet.from_file(path)
