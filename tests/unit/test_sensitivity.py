@@ -99,3 +99,9 @@ def test_too_few_rows_are_refused():
         sensitivity.analyze(
             linear_model.LogisticRegression, features, target, auc
         )
+
+
+def test_noise_on_a_single_row_column_leaves_it_finite():
+    frame = pd.DataFrame({"a": [1.0]})
+    out = sensitivity.noisy(frame, 0.5, np.random.default_rng(0))
+    assert np.isfinite(out["a"]).all()

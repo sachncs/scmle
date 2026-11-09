@@ -236,7 +236,9 @@ def noisy(
     """
     result = features.copy()
     for name in result.select_dtypes("number").columns:
-        scale = float(result[name].std() or 0.0)
+        scale = float(result[name].std())
+        if not np.isfinite(scale):
+            scale = 0.0
         result[name] = result[name] + generator.normal(
             0.0, level * scale, len(result)
         )
