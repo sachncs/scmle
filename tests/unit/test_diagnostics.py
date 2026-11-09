@@ -297,3 +297,38 @@ def test_cached_predictions_match_the_model():
     )
     with pytest.raises(Exception, match="no probabilities"):
         bare.predict_proba(inputs.features)
+
+
+def test_block_resamples_can_start_at_the_last_possible_position():
+    rng = np.random.default_rng(0)
+    firsts = {
+        int(diagnostics.resample_rows(10, None, True, rng)[0])
+        for _ in range(300)
+    }
+    assert 5 in firsts  # blocks of 5 rows may start at row 5 of 10
+
+
+def test_uncertainty_is_unavailable_when_every_resample_fails():
+    class Failing:
+        name = "failing"
+
+        def score(self, *args):
+            if not Failing.first:
+                raise ValueError("one class")
+            Failing.first = False
+            return 0.5
+
+    Failing.first = True
+    inputs = make_inputs(tasks.TaskType.BINARY)
+    inputs = diagnostics.DiagnosticInput(
+        inputs.estimator,
+        inputs.features,
+        inputs.target,
+        inputs.task,
+        Failing(),
+        inputs.feature_plan,
+        0,
+    )
+    report = diagnostics.MetricUncertainty().compute(inputs)
+    assert report["ci_95"] is None and report["resamples"] == 0
+    assert report["estimate"] == 0.5

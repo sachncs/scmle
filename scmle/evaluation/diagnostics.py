@@ -531,7 +531,9 @@ def resample_rows(
         return np.concatenate([members[labels[i]] for i in drawn])
     if temporal:
         length = max(5, int(np.sqrt(rows)))
-        starts = rng.integers(0, max(rows - length, 1), -(-rows // length))
+        starts = rng.integers(
+            0, max(rows - length + 1, 1), -(-rows // length)
+        )
         blocks = np.concatenate(
             [np.arange(s, min(s + length, rows)) for s in starts]
         )
@@ -559,7 +561,8 @@ class MetricUncertainty(Diagnostic):
 
         Returns:
             The metric name, its point estimate, the percentile interval
-            (key `ci_` plus the confidence), the resampling unit, the number
+            (key `ci_` plus the confidence; None when every resample
+            failed), the resampling unit, the number
             of successful resamples (resamples that fail with a
             `ValueError`, such as one missing a class, are skipped), the
             number of evaluation rows and the number of independent units
@@ -606,14 +609,20 @@ class MetricUncertainty(Diagnostic):
                 )
             except ValueError:  # A resample missing a class.
                 continue
-        low, high = np.percentile(
-            scores,
-            [(100 - self.confidence) / 2, 100 - (100 - self.confidence) / 2],
-        )
+        interval = None
+        if scores:
+            low, high = np.percentile(
+                scores,
+                [
+                    (100 - self.confidence) / 2,
+                    100 - (100 - self.confidence) / 2,
+                ],
+            )
+            interval = [float(low), float(high)]
         return {
             "metric": metric.name,
             "estimate": float(estimate),
-            f"ci_{self.confidence}": [float(low), float(high)],
+            f"ci_{self.confidence}": interval,
             "resampling_unit": unit,
             "resamples": len(scores),
             "evaluation_rows": len(target),
