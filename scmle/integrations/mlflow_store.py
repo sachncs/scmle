@@ -6,6 +6,7 @@ be used without changing how runs are executed.
 """
 
 import json
+import math
 import pathlib
 from typing import Any
 
@@ -42,8 +43,8 @@ class MlflowExperimentStore(stores.ExperimentStore):
             ConfigError: If MLflow is not installed.
         """
         try:
-            import mlflow
-            from mlflow import tracking
+            import mlflow  # noqa: PLC0415 -- optional dependency
+            from mlflow import tracking  # noqa: PLC0415 -- optional dependency
         except ImportError as error:
             raise errors.ConfigError(
                 "MlflowExperimentStore needs the 'tracking' extra (mlflow)"
@@ -159,7 +160,7 @@ class MlflowExperimentStore(stores.ExperimentStore):
                     value if isinstance(value, dict) else json.loads(value)
                 )
                 for key, number in metrics.items():
-                    if number == number:  # Skip NaN.
+                    if not math.isnan(float(number)):  # Skip NaN.
                         self.client.log_metric(
                             parent, f"test.{key}", float(number)
                         )
