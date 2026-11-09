@@ -59,8 +59,8 @@ def curve(specs: list[dict[str, Any]]) -> str:
     if not points:
         return "<p>no specification produced an estimate</p>"
     points = sorted(points, key=lambda s: s["effect"])
-    low = min(*(s["low"] for s in points), 0.0)
-    high = max(*(s["high"] for s in points), 0.0)
+    low: float = min(*(s["low"] for s in points), 0.0)
+    high: float = max(*(s["high"] for s in points), 0.0)
     span = (high - low) or 1.0
 
     def y(value: float) -> float:
