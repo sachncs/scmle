@@ -130,14 +130,15 @@ class LeakageAttestation:
         """Rebuilds the record, rejecting unknown or missing fields.
 
         Args:
-            record: A mapping with `column`, `lead_seconds` (converted with
-                `float`) and the fields of an attestation.
+            record: A mapping with `column`, `lead_seconds` (a finite
+                number, not a bool or text) and the fields of an attestation.
 
         Returns:
             The record.
 
         Raises:
-            ValueError: If `column` or `lead_seconds` is missing, or the
+            ValueError: If `column` or `lead_seconds` is missing, `lead_seconds`
+                is not a finite number, or the
                 attestation fields are unexpected, missing or invalid.
         """
         body = {k: v for k, v in record.items() if k not in OWN_FIELDS}
@@ -148,7 +149,7 @@ class LeakageAttestation:
         return cls(
             own["column"],
             provenance.Attestation.from_dict(body),
-            float(own["lead_seconds"]),
+            qualification.finite(own["lead_seconds"], "lead_seconds"),
         )
 
 

@@ -152,3 +152,11 @@ def test_a_record_with_an_unknown_field_is_refused():
 def test_a_missing_file_is_a_value_error(tmp_path):
     with pytest.raises(ValueError, match="cannot read"):
         attestations.load(tmp_path / "none.json")
+
+
+@pytest.mark.parametrize("lead", [True, "5", None])
+def test_a_lead_that_is_not_a_number_is_a_value_error(lead):
+    record = {**attest().to_dict(), "lead_seconds": lead}
+
+    with pytest.raises(ValueError, match="lead_seconds"):
+        attestations.LeakageAttestation.from_dict(record)

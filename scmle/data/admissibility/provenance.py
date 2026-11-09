@@ -221,6 +221,8 @@ class Attestation:
             "evidence",
             "scope",
         ):
+            if not isinstance(getattr(self, name), str):
+                raise ValueError(f"{name} must be text")
             evidence.require_text(getattr(self, name), name)
         issued = parse_date(self.date, "date")
         if parse_date(self.expires, "expires") < issued:
@@ -614,6 +616,8 @@ class ProvenanceTable:
         extra = sorted(set(document) - {"format_version", "fields"})
         if extra:
             raise ValueError(f"unexpected field(s): {extra}")
+        if "fields" not in document:
+            raise ValueError("missing field(s): ['fields']")
         return cls(
             tuple(FieldProvenance.from_dict(f) for f in document["fields"])
         )

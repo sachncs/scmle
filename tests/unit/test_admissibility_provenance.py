@@ -234,3 +234,14 @@ def test_table_rejects_duplicate_names():
 def test_no_field_is_confirmed_without_a_log():
     for source in (p.AsOfSource.ATTESTED, p.AsOfSource.NONE):
         assert make_field(source=source).tier(DAY) is not Tier.CONFIRMED
+
+
+def test_a_table_without_fields_is_a_value_error():
+    with pytest.raises(ValueError, match="fields"):
+        p.ProvenanceTable.from_dict({"format_version": 1})
+
+
+@pytest.mark.parametrize("value", [None, 5, ["x"]])
+def test_an_attestation_text_field_that_is_not_text_is_a_value_error(value):
+    with pytest.raises(ValueError, match="role"):
+        attestation(role=value)
