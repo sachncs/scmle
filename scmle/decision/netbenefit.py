@@ -413,6 +413,7 @@ def qualification_text(value: str) -> str:
     Raises:
         ValueError: If `value` is not a string or is blank.
     """
-    if not isinstance(value, str) or not value.strip():
+    candidate: object = value  # callers may pass a non-string
+    if not isinstance(candidate, str) or not candidate.strip():
         raise ValueError("the rule hash must be a non-blank string")
     return value
