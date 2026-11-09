@@ -86,12 +86,26 @@ def unit_labels(
     parent = np.arange(size)
 
     def find(index: int) -> int:
+        """Finds the root of a row's unit, compressing the path.
+
+        Args:
+            index: Row position.
+
+        Returns:
+            The position of the unit's root row.
+        """
         while parent[index] != index:
             parent[index] = parent[parent[index]]
             index = int(parent[index])
         return index
 
     def union(a: int, b: int) -> None:
+        """Merges the units of two rows, keeping the smaller root.
+
+        Args:
+            a: Position of the first row.
+            b: Position of the second row.
+        """
         root_a, root_b = find(a), find(b)
         if root_a != root_b:
             parent[max(root_a, root_b)] = min(root_a, root_b)
