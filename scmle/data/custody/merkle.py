@@ -29,7 +29,16 @@ EMPTY_ROOT = hashlib.sha256(b"scmle.custody.merkle.empty").hexdigest()
 
 
 def canonical(value: Any) -> str:
-    """Platform-independent text of one cell, tagged with its type."""
+    """Renders one cell as platform-independent text tagged with its type.
+
+    Args:
+        value: A cell value: None, NaT, NaN, a bool, int, float, Timestamp,
+            numpy scalar or anything else (rendered with `str`).
+
+    Returns:
+        `null` for None, NaT or NaN; otherwise a type tag and the value
+        (`b:`, `i:`, `f:` with the round-trip `repr`, `t:` ISO 8601, or `s:`).
+    """
     if value is None or value is pd.NaT:
         return "null"
     if hasattr(value, "item") and not isinstance(value, pd.Timestamp):
@@ -48,7 +57,15 @@ def canonical(value: Any) -> str:
 
 
 def row_hash(row_id: int, cells: Sequence[tuple[str, Any]]) -> str:
-    """Hash of one row: its id and every `(column, value)` pair."""
+    """Hashes one row from its id and every `(column, value)` pair.
+
+    Args:
+        row_id: Position of the row in the dataset.
+        cells: The `(column name, value)` pairs in frame order.
+
+    Returns:
+        The SHA-256 hex digest of the row text, prefixed with the leaf tag.
+    """
     text = SEPARATOR.join(
         [f"id={int(row_id)}"]
         + [f"{name}={canonical(value)}" for name, value in cells]
@@ -57,7 +74,15 @@ def row_hash(row_id: int, cells: Sequence[tuple[str, Any]]) -> str:
 
 
 def row_hashes(frame: pd.DataFrame, ids: Sequence[int]) -> list[str]:
-    """Leaf hashes of `frame` rows at positions `ids`, in id order."""
+    """Hashes the rows of a frame at the given positions.
+
+    Args:
+        frame: The dataset; columns are read in frame order.
+        ids: Row positions to hash; sorted before use.
+
+    Returns:
+        One leaf hash per id, in ascending id order.
+    """
     ordered = sorted(int(i) for i in ids)
     names = [str(c) for c in frame.columns]
     columns = [frame.iloc[ordered, k].tolist() for k in range(len(names))]
@@ -70,14 +95,29 @@ def row_hashes(frame: pd.DataFrame, ids: Sequence[int]) -> list[str]:
 
 
 def combine(left: str, right: str) -> str:
-    """Parent of two nodes."""
+    """Hashes two child nodes into their parent.
+
+    Args:
+        left: Hex digest of the left child.
+        right: Hex digest of the right child.
+
+    Returns:
+        The SHA-256 hex digest of the node tag and both children.
+    """
     return hashlib.sha256(
         NODE + bytes.fromhex(left) + bytes.fromhex(right)
     ).hexdigest()
 
 
 def merkle_root(leaves: Sequence[str]) -> str:
-    """Root over leaf hashes, in the order given."""
+    """Folds leaf hashes into a Merkle root.
+
+    Args:
+        leaves: Leaf hex digests, in the order they are combined.
+
+    Returns:
+        The root hex digest, or `EMPTY_ROOT` when there are no leaves.
+    """
     level = list(leaves)
     if not level:
         return EMPTY_ROOT
@@ -92,5 +132,13 @@ def merkle_root(leaves: Sequence[str]) -> str:
 
 
 def frame_root(frame: pd.DataFrame, ids: Sequence[int]) -> str:
-    """Merkle root over the content of the rows at positions `ids`."""
+    """Computes the Merkle root over the content of selected rows.
+
+    Args:
+        frame: The dataset.
+        ids: Row positions to include.
+
+    Returns:
+        The root hex digest of the rows in ascending id order.
+    """
     return merkle_root(row_hashes(frame, ids))

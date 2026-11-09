@@ -30,7 +30,20 @@ Fold = tuple[tuple[int, ...], tuple[int, ...]]
 
 
 def ids(value: Any, name: str) -> tuple[int, ...]:
-    """Requires a tuple of integers."""
+    """Requires a tuple of integers.
+
+    Args:
+        value: The value to check.
+        name: Field name used in error messages.
+
+    Returns:
+        `value`, unchanged.
+
+    Raises:
+        ValueError: If a member is not an integer (a bool does not count).
+            `qualification.require_tuple` raises first when `value` is not
+            a tuple.
+    """
     qualification.require_tuple(value, name)
     if not all(isinstance(i, int) and not isinstance(i, bool) for i in value):
         raise ValueError(f"{name} must hold integers")
@@ -77,7 +90,15 @@ class CustodyManifest:
     row_roots: tuple[tuple[str, str], ...] = ()
 
     def __post_init__(self) -> None:
-        """Validates the manifest."""
+        """Validates the manifest.
+
+        Raises:
+            ValueError: If `scope` is not a known scope, or a set repeats a
+                row, or two sets share a row. The field checks of
+                `evidence.require_text`, `qualification.count`,
+                `qualification.require_tuple` and `ids` raise on a malformed
+                field.
+        """
         evidence.require_text(self.strategy, "strategy")
         evidence.require_text(self.charter_hash, "charter_hash")
         evidence.require_text(self.data_hash, "data_hash")
@@ -104,7 +125,12 @@ class CustodyManifest:
         qualification.require_tuple(self.row_roots, "row_roots")
 
     def body(self) -> dict[str, Any]:
-        """The hashed content: everything except the hash itself."""
+        """Builds the hashed content: everything except the hash itself.
+
+        Returns:
+            A JSON-ready dict including the manifest version. `row_roots`
+            is present only when it is not empty.
+        """
         body: dict[str, Any] = {
             "manifest_version": MANIFEST_VERSION,
             "strategy": self.strategy,
@@ -135,11 +161,20 @@ class CustodyManifest:
         ).hexdigest()
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record including the hash."""
+        """Builds the JSON-ready record including the hash.
+
+        Returns:
+            The `body` with the `sha256` field added.
+        """
         return {**self.body(), HASH_FIELD: self.sha256}
 
     def set_ids(self) -> dict[str, tuple[int, ...]]:
-        """Row ids of each set that carries a content root."""
+        """Lists the row ids of each set that carries a content root.
+
+        Returns:
+            A dict from set name (`exploration`, `confirmation`,
+            `final_test`) to its row ids.
+        """
         return {
             "exploration": self.exploration_ids,
             "confirmation": self.confirmation_ids,
@@ -169,9 +204,18 @@ class CustodyManifest:
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
         """Rebuilds the manifest and verifies its hash.
 
+        Unknown or missing fields raise ValueError from
+        `qualification.require_fields`.
+
+        Args:
+            record: A parsed manifest record as written by `to_dict`.
+
+        Returns:
+            The manifest.
+
         Raises:
-            ArtifactError: If the hash does not match the content.
-            ValueError: On unknown or missing fields.
+            ArtifactError: If the manifest version is not 2 or the hash does
+                not match the content.
         """
         values = dict(record)
         claimed = values.pop(HASH_FIELD, None)
@@ -211,7 +255,18 @@ class CustodyManifest:
 
 
 def read_v1(record: Mapping[str, Any]) -> splitters.SplitManifest:
-    """Rebuilds a v1 manifest and checks its 16-hex fingerprint."""
+    """Rebuilds a v1 manifest and checks its 16-hex fingerprint.
+
+    Args:
+        record: A parsed v1 manifest record.
+
+    Returns:
+        The v1 manifest.
+
+    Raises:
+        ArtifactError: If the recorded fingerprint differs from the one
+            computed from the content.
+    """
     manifest = splitters.SplitManifest(
         strategy=record["strategy"],
         seed=record["seed"],

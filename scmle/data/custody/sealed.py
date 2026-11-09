@@ -1,6 +1,6 @@
 """Sealed sets, the hash-chained open log and the exploration view.
 
-Protection model (canon P6). A sealed set lives in a separate operating-system
+Protection model. A sealed set lives in a separate operating-system
 process (`scmle.governance.vault`): after sealing, the orchestrator keeps only
 row ids and a release token, and the rows travel to the token holder once, over
 a channel keyed by a secret that only the parent and the vault hold. Code that
@@ -34,7 +34,15 @@ PROTOCOL_LEVEL = "in-process protocol"
 
 
 def binding_digest(claims_hash: str, ledger_hash: str) -> str:
-    """Digest that a release is bound to: the claim set and the ledger."""
+    """Digests the claim set and the ledger state a release is bound to.
+
+    Args:
+        claims_hash: Digest of the claims to be tested.
+        ledger_hash: Head hash of the hypothesis ledger.
+
+    Returns:
+        The SHA-256 hex digest of the canonical JSON of both hashes.
+    """
     return hashlib.sha256(
         signing.canonical_payload(
             {"claims_hash": claims_hash, "ledger_hash": ledger_hash}
@@ -43,12 +51,27 @@ def binding_digest(claims_hash: str, ledger_hash: str) -> str:
 
 
 def entry_hash(body: Mapping[str, Any]) -> str:
-    """Hash of a log entry's content."""
+    """Hashes the content of a log entry.
+
+    Args:
+        body: The entry fields without `hash` and `mac`.
+
+    Returns:
+        The SHA-256 hex digest of the canonical JSON of `body`.
+    """
     return hashlib.sha256(signing.canonical_payload(body)).hexdigest()
 
 
 def entry_mac(entry_hash_value: str, key: bytes) -> str:
-    """HMAC-SHA256 of an entry's hash under the log key."""
+    """Computes the HMAC-SHA256 of an entry's hash.
+
+    Args:
+        entry_hash_value: The entry's hash, as hex text.
+        key: The log key.
+
+    Returns:
+        The HMAC as a hex digest.
+    """
     return hmac.new(key, entry_hash_value.encode(), hashlib.sha256).hexdigest()
 
 
@@ -71,14 +94,14 @@ class OpenLog:
     ) -> None:
         """Opens the log, loading and verifying an existing file.
 
+        An existing file is verified with `verify`, whose ArtifactError
+        propagates when the chain or a MAC fails.
+
         Args:
             path: File to persist to (one JSON object per line), or None for
                 an in-memory log.
             signing_key: HMAC key; the environment key is used when None.
                 Without any key the log is hash-chained but not MAC-ed.
-
-        Raises:
-            ArtifactError: If an existing file fails verification.
         """
         self.path = Path(path) if path is not None else None
         self.key = signing.resolve_key(signing_key)
@@ -162,7 +185,17 @@ class OpenLog:
     def verify_file(
         cls, path: str | Path, signing_key: str | bytes | None = None
     ) -> "OpenLog":
-        """Loads a log file and verifies its chain and, with a key, its MACs."""
+        """Loads a log file and verifies its chain and, with a key, its MACs.
+
+        A failed verification raises ArtifactError from the constructor.
+
+        Args:
+            path: The log file.
+            signing_key: HMAC key; the environment key is used when None.
+
+        Returns:
+            The loaded log.
+        """
         return cls(path, signing_key)
 
 
@@ -196,7 +229,11 @@ class SealedSet:
         return bool(self.locked.opened)
 
     def issue_token(self) -> str:
-        """Returns the release token; call only once selection is frozen."""
+        """Issues the release token; call only once selection is frozen.
+
+        Returns:
+            The token that `open` requires.
+        """
         token = self.locked.issue_token()
         self.log.append(self.set_id, "token_issued", ORCHESTRATOR)
         return token
@@ -212,7 +249,8 @@ class SealedSet:
         After this, `open` releases the rows only when it is given the same
         two hashes; a release for any other selection is refused by the
         vault (or, for an in-process set, by the protocol check). The
-        binding is logged with both hashes.
+        binding is logged with both hashes. The locked set raises
+        LeakageError when the set is already committed or was opened.
 
         Args:
             claims_hash: Digest of the claims (survivors) to be tested.
@@ -220,9 +258,6 @@ class SealedSet:
 
         Returns:
             The binding digest.
-
-        Raises:
-            LeakageError: If the set is already committed or was opened.
         """
         binding = binding_digest(claims_hash, ledger_hash)
         self.locked.bind(binding)
@@ -251,9 +286,12 @@ class SealedSet:
                 `ledger_hash`, once the set is committed.
             ledger_hash: Head hash of the ledger.
 
+        Returns:
+            The released features and labels.
+
         Raises:
             LeakageError: On a wrong token, a binding that does not match,
-                or a repeated release.
+                or a repeated release. The refusal is logged as `denied`.
         """
         offered = (
             binding_digest(claims_hash, ledger_hash)
@@ -293,7 +331,18 @@ class CustodyVault:
         return VAULT_LEVEL if self.process else PROTOCOL_LEVEL
 
     def adopt(self, set_id: str, locked: splitters.LockedTestSet) -> SealedSet:
-        """Registers an already-locked set under a name."""
+        """Registers an already-locked set under a name.
+
+        Args:
+            set_id: Name of the set.
+            locked: The locked set.
+
+        Returns:
+            The sealed set that wraps `locked`.
+
+        Raises:
+            ValueError: If a set of that name is already sealed.
+        """
         if set_id in self.sets:
             raise ValueError(f"set {set_id} is already sealed")
         held = SealedSet(set_id, locked, self.log)
@@ -307,7 +356,18 @@ class CustodyVault:
         target: pd.Series,
         ids: tuple[int, ...],
     ) -> SealedSet:
-        """Moves rows into custody and keeps only their ids here."""
+        """Moves rows into custody and keeps only their ids here.
+
+        Args:
+            set_id: Name of the set.
+            features: Feature rows to seal.
+            target: Labels of those rows.
+            ids: Row ids of the rows.
+
+        Returns:
+            The sealed set; its rows are in a vault process when `process`
+            is True, otherwise in this process behind the token protocol.
+        """
         locked: splitters.LockedTestSet = (
             vault_module.SealedTestSet(features, target, ids)
             if self.process

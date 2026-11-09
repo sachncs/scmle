@@ -49,7 +49,16 @@ class Carve:
 
 
 def derived_seed(charter_hash: str, data_hash: str, seed: int) -> int:
-    """32-bit run seed that depends on all three inputs."""
+    """Derives the run seed from the data, the charter and the seed.
+
+    Args:
+        charter_hash: Hash of the charter.
+        data_hash: Hash of the data.
+        seed: Seed from the charter.
+
+    Returns:
+        A 32-bit integer taken from the SHA-256 of all three inputs.
+    """
     digest = hashlib.sha256(
         f"{data_hash}|{charter_hash}|{seed}".encode()
     ).digest()
@@ -64,6 +73,15 @@ def unit_labels(
     Rows sharing a group value or a duplicate-group id are merged
     transitively, so a group that contains a copy of a record in another
     group pulls both groups into one unit.
+
+    Args:
+        size: Number of rows.
+        groups: Group value per row, or None for no grouping.
+        duplicates: Duplicate-group id per row (`NO_DUPLICATE` = none), or
+            None for no duplicate information.
+
+    Returns:
+        An integer array of length `size`: the unit label of each row.
     """
     parent = np.arange(size)
 
@@ -102,7 +120,20 @@ def pick_units(
     fraction: float,
     rng: np.random.Generator,
 ) -> np.ndarray:
-    """Marks rows of randomly chosen whole units, stratum by stratum."""
+    """Marks rows of randomly chosen whole units, stratum by stratum.
+
+    In each stratum units are taken in random order until about `fraction` of
+    the stratum's rows are marked; at least one unit is always left unmarked.
+
+    Args:
+        units: Unit label per row.
+        strata: Stratum label per row.
+        fraction: Share of each stratum's rows to mark.
+        rng: Random generator that orders the units.
+
+    Returns:
+        A boolean mask over the rows, True for the marked rows.
+    """
     chosen = np.zeros(len(units), dtype=bool)
     for stratum in sorted(set(strata.tolist())):
         in_stratum = strata == stratum
@@ -121,7 +152,18 @@ def pick_units(
 def pick_blocks(
     times: np.ndarray, fraction: float, embargo: int, rng: np.random.Generator
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Marks contiguous time blocks as `C`; returns the mask and the order."""
+    """Marks contiguous time blocks as `C`.
+
+    Args:
+        times: Ordering value per row.
+        fraction: Share of rows to mark.
+        embargo: Embargo in rows; sets the minimum block length.
+        rng: Random generator that orders the blocks.
+
+    Returns:
+        A pair of the boolean mask of marked rows and the row positions in
+        stable time order.
+    """
     size = len(times)
     order = np.argsort(times, kind="stable")
     block = max(4 * embargo, math.ceil(size / BLOCKS), 1)
@@ -139,7 +181,15 @@ def pick_blocks(
 
 
 def close_over_units(in_c: np.ndarray, units: np.ndarray) -> np.ndarray:
-    """Moves any unit split between C and the rest wholly out of C."""
+    """Moves any unit split between C and the rest wholly out of C.
+
+    Args:
+        in_c: Boolean mask of rows in `C`; modified in place.
+        units: Unit label per row.
+
+    Returns:
+        The same `in_c` array after the update.
+    """
     for unit in np.unique(units[in_c]):
         members = units == unit
         if not in_c[members].all():
@@ -148,7 +198,17 @@ def close_over_units(in_c: np.ndarray, units: np.ndarray) -> np.ndarray:
 
 
 def embargo_mask(in_c: np.ndarray, order: np.ndarray, rows: int) -> np.ndarray:
-    """Rows within `rows` places (in time order) of a `C` row, not in `C`."""
+    """Finds rows within `rows` places (in time order) of a `C` row.
+
+    Args:
+        in_c: Boolean mask of rows in `C`.
+        order: Row positions in time order.
+        rows: Embargo length in rows on each side of a `C` row.
+
+    Returns:
+        A boolean mask of the rows to drop, which excludes the `C` rows
+        themselves. All False when `rows` is 0 or `C` is empty.
+    """
     if rows == 0 or not in_c.any():
         return np.zeros(len(in_c), dtype=bool)
     flags = in_c[order].astype(int)
@@ -159,9 +219,15 @@ def embargo_mask(in_c: np.ndarray, order: np.ndarray, rows: int) -> np.ndarray:
 
 
 def autocorrelation(values: np.ndarray, max_lag: int) -> np.ndarray:
-    """Sample autocorrelation at lags 1..max_lag (biased, mean-removed).
+    """Computes the sample autocorrelation (biased, mean-removed).
 
-    Returns zeros for a constant series.
+    Args:
+        values: Numeric series.
+        max_lag: Largest lag.
+
+    Returns:
+        An array of length `max_lag` with the autocorrelation at lags
+        1 to `max_lag`; zeros for a constant series.
     """
     series = np.asarray(values, dtype=float)
     series = series - series.mean()
@@ -214,6 +280,14 @@ def restrict_folds(
     Every exploration row stays in the same validation fold it had before;
     carved-out rows disappear from both sides of every fold.
 
+    Args:
+        folds: Folds as `(fit, validation)` positions within `dev_ids`.
+        dev_ids: Row ids of the development rows.
+        exploration_ids: Row ids that remain, in their new order.
+
+    Returns:
+        The folds as positions within `exploration_ids`.
+
     Raises:
         ConfigError: If a validation fold would be left empty.
     """
@@ -236,7 +310,17 @@ def check_inputs(
     fraction: float,
     arrays: dict[str, np.ndarray | None],
 ) -> None:
-    """Validates the fraction and that every array is aligned."""
+    """Validates the fraction and that every array is aligned.
+
+    Args:
+        size: Number of development rows.
+        fraction: Requested share for `C`.
+        arrays: Named optional arrays, each expected to have `size` entries.
+
+    Raises:
+        ValueError: If `fraction` is outside (0, `MAX_FRACTION`] or a given
+            array does not have `size` entries.
+    """
     if not 0 < fraction <= MAX_FRACTION:
         raise ValueError(f"fraction must be in (0, {MAX_FRACTION}]")
     for name, values in arrays.items():
@@ -260,6 +344,12 @@ def carve_confirmation(
 ) -> Carve:
     """Divides the development rows into `X`, `C` and the embargo.
 
+    Errors raised by the helpers propagate. `check_inputs` raises ValueError
+    when `fraction` is outside (0, 0.5] or an array does not have one entry
+    per development row. `restrict_folds` raises ConfigError when the carve
+    would leave a validation fold empty; `apply_custody` turns that refusal
+    into a run with no confirmation set.
+
     Args:
         dev_ids: Row ids of the development rows.
         folds: Existing folds as positions within `dev_ids`.
@@ -277,10 +367,6 @@ def carve_confirmation(
     Returns:
         The division, with folds restricted to `X`.
 
-    Raises:
-        ConfigError: If the carve would leave a validation fold empty. This is
-            an explicit refusal; `apply_custody` turns it into a run with no
-            confirmation set.
     """
     dev_ids = np.asarray(dev_ids)
     size = len(dev_ids)

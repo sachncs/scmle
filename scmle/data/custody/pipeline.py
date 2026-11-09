@@ -2,7 +2,7 @@
 
 Runs after `SplitManager.split` and before profiling, so the profiler,
 feature selection and every trial see only exploration rows. The final test
-set keeps the role it has today; `C` is a separate carve-out of the
+set keeps its role; `C` is a separate carve-out of the
 development rows, so confirmed claims never shape the model that `C` scores.
 """
 
@@ -43,7 +43,17 @@ class CustodyOutcome:
 
 
 def minority_rows(labels: np.ndarray | None, fraction: float) -> int | None:
-    """Expected minority-class rows in `C`, or None without labels."""
+    """Estimates the minority-class rows in `C`.
+
+    Args:
+        labels: Class label per development row, or None for a task without
+            classes.
+        fraction: Share of development rows placed in `C`.
+
+    Returns:
+        The size of the smallest class times `fraction`, truncated to an
+        integer; None when `labels` is None.
+    """
     if labels is None:
         return None
     counts = np.unique(labels, return_counts=True)[1]
@@ -55,7 +65,17 @@ def assess(
     n_rows: int,
     minority: int | None,
 ) -> feasibility.Feasibility:
-    """Feasibility of a confirmation set of `n_rows` under the charter."""
+    """Assesses whether a confirmation set supports the charter's power.
+
+    Args:
+        charter: The governing charter.
+        n_rows: Number of rows in the confirmation set.
+        minority: Minority-class rows in it, or None when there are no
+            classes.
+
+    Returns:
+        The feasibility assessment for `n_rows` rows.
+    """
     return feasibility.assess(
         n_confirmation=n_rows,
         min_effect=charter.min_effect,
@@ -69,7 +89,18 @@ def assess(
 def classes_complete(
     labels: np.ndarray | None, carved: carve.Carve, dev_ids: np.ndarray
 ) -> bool:
-    """Whether `C` holds every class that `X` holds."""
+    """Checks that `C` holds every class that `X` holds.
+
+    Args:
+        labels: Class label per development row, or None for a task without
+            classes.
+        carved: The carve to check.
+        dev_ids: Row ids of the development rows, aligned with `labels`.
+
+    Returns:
+        True when `labels` is None or every class in `X` also occurs in
+        `C`.
+    """
     if labels is None:
         return True
     position = {int(row): index for index, row in enumerate(dev_ids)}
@@ -81,7 +112,16 @@ def classes_complete(
 def empty_carve(
     dev_ids: np.ndarray, folds: list[tuple[np.ndarray, np.ndarray]], note: str
 ) -> carve.Carve:
-    """A carve that leaves every development row in `X`."""
+    """Builds a carve that leaves every development row in `X`.
+
+    Args:
+        dev_ids: Row ids of the development rows.
+        folds: Existing folds, kept unchanged.
+        note: Why nothing was carved.
+
+    Returns:
+        A carve with empty `C` and embargo and `note` as its only note.
+    """
     return carve.Carve(
         exploration_ids=dev_ids,
         confirmation_ids=dev_ids[:0],
@@ -102,6 +142,18 @@ def measured_embargo(
 
     Only temporal strategies carry an embargo. The target is read in time
     order over the development rows; a target that is not numeric gives 0.
+
+    Args:
+        frame: The full dataset, indexed by row id.
+        dev_ids: Row ids of the development rows.
+        data: Data specification naming the target column.
+        times: Ordering value per development row, or None for a
+            non-temporal strategy.
+        task: Resolved task type; class labels are coded as integers first.
+
+    Returns:
+        The embargo in rows; 0 when `times` is None or the target has
+        missing or non-numeric values.
     """
     if times is None:
         return 0
@@ -201,7 +253,7 @@ def apply_custody(
         except errors.ConfigError as refusal:
             # The carve refuses explicitly (for example when it would leave a
             # validation fold empty). The run continues with no confirmation
-            # set and an unconfirmed scope, as for an infeasible size (F1/F2).
+            # set and an unconfirmed scope, as for an infeasible size.
             carved = empty_carve(
                 dev_ids, folds, f"confirmation set not carved: {refusal}"
             )
@@ -253,7 +305,25 @@ def finish(
     vault: sealed.CustodyVault,
     embargo_rows: int,
 ) -> CustodyOutcome:
-    """Builds the restricted split, seals `C` and records the manifest."""
+    """Builds the restricted split, seals `C` and records the manifest.
+
+    Args:
+        charter: The governing charter.
+        split: Result of the ordinary split.
+        frame: The full dataset (target included), indexed by row id.
+        spec: Project specification.
+        carved: The division of the development rows.
+        dev_ids: Row ids of the development rows.
+        report: Feasibility assessment of the final confirmation set.
+        data_hash: Hash of the dataset.
+        vault: Where sealed sets are held; `C` is sealed in it when it is
+            not empty.
+        embargo_rows: Embargo recorded in the manifest.
+
+    Returns:
+        The restricted split, the exploration view, the v2 manifest and the
+        feasibility assessment.
+    """
     old = split.manifest
     keep = np.flatnonzero(np.isin(dev_ids, carved.exploration_ids))
     folds = tuple(

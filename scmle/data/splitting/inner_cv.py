@@ -129,7 +129,8 @@ def for_plan(
         seed: Seed for shuffled folds.
 
     Returns:
-        A splitter using the plan's group and time columns.
+        A splitter using the group and time columns of the
+        feature plan.
     """
     return StructuredKFold(
         folds, plan.group_column, plan.time_column, classification, seed
