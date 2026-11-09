@@ -447,6 +447,12 @@ def test_a_damaged_checkpoint_is_never_silently_reset(store):
     assert not store.exists("state/lock")
 
 
+@pytest.mark.parametrize("stored", [b"1", b"[]", b'"text"', b"null"])
+def test_a_checkpoint_that_is_not_an_object_is_reported_as_corrupt(stored):
+    with pytest.raises(processing.CheckpointCorruptError):
+        processing.Checkpoint.from_bytes(stored)
+
+
 def test_a_second_run_cannot_share_the_checkpoint(store):
     seed(store)
     store.put("state/lock", b"someone")

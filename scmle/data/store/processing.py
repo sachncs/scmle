@@ -124,7 +124,7 @@ class Checkpoint:
             if digest != expected or document["format"] != FORMAT:
                 raise ValueError("digest or format mismatch")
             return cls(dict(document["processed"]), set(document["seen"]))
-        except (ValueError, KeyError, TypeError) as error:
+        except (ValueError, KeyError, TypeError, AttributeError) as error:
             raise CheckpointCorruptError(
                 f"checkpoint is corrupt: {error}"
             ) from error
