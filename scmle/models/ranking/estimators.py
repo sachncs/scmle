@@ -14,18 +14,6 @@ from sklearn import base
 from sklearn import ensemble
 
 
-def single_query(rows: int) -> list[int]:
-    """Group sizes for data that is one query.
-
-    Args:
-        rows: Number of rows in the data.
-
-    Returns:
-        The one-element list `[rows]`.
-    """
-    return [rows]
-
-
 class ConstantRanker(base.RegressorMixin, base.BaseEstimator):
     """Gives every row the same score: the order carries no information."""
 
@@ -175,7 +163,7 @@ class LibraryRanker(base.RegressorMixin, base.BaseEstimator):
         Returns:
             This fitted ranker.
         """
-        sizes = single_query(features.shape[0]) if group is None else group
+        sizes = [features.shape[0]] if group is None else group
         self.model_ = self.build().fit(
             features, numpy.asarray(target).astype(int), group=list(sizes)
         )

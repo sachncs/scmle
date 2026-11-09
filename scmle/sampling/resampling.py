@@ -138,7 +138,7 @@ class RandomUnderSampler(IndexResampler):
         return rng.permutation(numpy.concatenate(chosen))
 
 
-class JitterOverSampler(IndexResampler):
+class JitterOverSampler(RandomOverSampler):
     """Experimental: oversamples with Gaussian-jittered copies of minority rows.
 
     Synthetic rows copy a real minority row and add noise (a fraction of the
@@ -159,20 +159,6 @@ class JitterOverSampler(IndexResampler):
             scale: Noise level relative to each numeric column's std.
         """
         self.scale = scale
-
-    def indices(
-        self, target: pandas.Series, rng: numpy.random.Generator
-    ) -> numpy.ndarray:
-        """Chooses source rows exactly like plain oversampling.
-
-        Args:
-            target: Training labels.
-            rng: Source of randomness.
-
-        Returns:
-            Positions as `RandomOverSampler.indices` returns them.
-        """
-        return RandomOverSampler().indices(target, rng)
 
     def resample(
         self, features: pandas.DataFrame, target: pandas.Series, seed: int
