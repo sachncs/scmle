@@ -115,18 +115,6 @@ class FeatureOp(abc.ABC):
         """
 
 
-def numeric(series: pandas.Series) -> pandas.Series:
-    """Coerces to float; unparseable and infinite values become NaN.
-
-    Args:
-        series: The column to convert.
-
-    Returns:
-        A float series with NaN in place of unparseable or infinite values.
-    """
-    return columns.to_finite(series)
-
-
 class Log1p(FeatureOp):
     """`log(1 + max(x, 0))`."""
 
@@ -145,7 +133,7 @@ class Log1p(FeatureOp):
         Returns:
             `log(1 + max(x, 0))` per row.
         """
-        return numpy.log1p(numeric(inputs[0]).clip(lower=0))
+        return numpy.log1p(columns.to_finite(inputs[0]).clip(lower=0))
 
 
 class Sqrt(FeatureOp):
@@ -166,7 +154,7 @@ class Sqrt(FeatureOp):
         Returns:
             `sqrt(max(x, 0))` per row.
         """
-        return numpy.sqrt(numeric(inputs[0]).clip(lower=0))
+        return numpy.sqrt(columns.to_finite(inputs[0]).clip(lower=0))
 
 
 class Square(FeatureOp):
@@ -187,7 +175,7 @@ class Square(FeatureOp):
         Returns:
             `x ** 2` per row.
         """
-        return numeric(inputs[0]) ** 2
+        return columns.to_finite(inputs[0]) ** 2
 
 
 class Absolute(FeatureOp):
@@ -208,7 +196,7 @@ class Absolute(FeatureOp):
         Returns:
             `abs(x)` per row.
         """
-        return numeric(inputs[0]).abs()
+        return columns.to_finite(inputs[0]).abs()
 
 
 class IsMissing(FeatureOp):
@@ -252,7 +240,9 @@ class Sum(FeatureOp):
         Returns:
             The row-wise sum; NaN where any input is NaN.
         """
-        return sum(numeric(s) for s in inputs[1:]) + numeric(inputs[0])
+        return sum(
+            columns.to_finite(s) for s in inputs[1:]
+        ) + columns.to_finite(inputs[0])
 
 
 class Difference(FeatureOp):
@@ -275,7 +265,7 @@ class Difference(FeatureOp):
         Returns:
             `a - b` per row.
         """
-        return numeric(inputs[0]) - numeric(inputs[1])
+        return columns.to_finite(inputs[0]) - columns.to_finite(inputs[1])
 
 
 class Product(FeatureOp):
@@ -298,9 +288,9 @@ class Product(FeatureOp):
         Returns:
             The row-wise product; NaN where any input is NaN.
         """
-        result = numeric(inputs[0])
+        result = columns.to_finite(inputs[0])
         for series in inputs[1:]:
-            result = result * numeric(series)
+            result = result * columns.to_finite(series)
         return result
 
 
@@ -324,8 +314,8 @@ class Ratio(FeatureOp):
         Returns:
             `a / b` per row, NaN where `b` is zero.
         """
-        denominator = numeric(inputs[1]).replace(0.0, numpy.nan)
-        return numeric(inputs[0]) / denominator
+        denominator = columns.to_finite(inputs[1]).replace(0.0, numpy.nan)
+        return columns.to_finite(inputs[0]) / denominator
 
 
 class Clip(FeatureOp):
@@ -345,7 +335,7 @@ class Clip(FeatureOp):
             The (low, high) quantile values, or (-inf, inf) when the column
             has no finite values.
         """
-        values = numeric(inputs[0]).dropna()
+        values = columns.to_finite(inputs[0]).dropna()
         if values.empty:
             return (-numpy.inf, numpy.inf)
         low, high = numpy.quantile(values, [params["lower"], params["upper"]])
@@ -364,7 +354,7 @@ class Clip(FeatureOp):
         Returns:
             The column limited to the bounds.
         """
-        return numeric(inputs[0]).clip(lower=state[0], upper=state[1])
+        return columns.to_finite(inputs[0]).clip(lower=state[0], upper=state[1])
 
 
 class Standardize(FeatureOp):
@@ -383,7 +373,7 @@ class Standardize(FeatureOp):
             The (mean, std) pair; the std is 1.0 when it is zero or fewer than
             two values exist, and the mean is 0.0 for an empty column.
         """
-        values = numeric(inputs[0]).dropna()
+        values = columns.to_finite(inputs[0]).dropna()
         spread = float(values.std()) if len(values) > 1 else 0.0
         return (float(values.mean()) if len(values) else 0.0, spread or 1.0)
 
@@ -400,7 +390,7 @@ class Standardize(FeatureOp):
         Returns:
             The z-score per row.
         """
-        return (numeric(inputs[0]) - state[0]) / state[1]
+        return (columns.to_finite(inputs[0]) - state[0]) / state[1]
 
 
 class Bin(FeatureOp):
@@ -420,7 +410,7 @@ class Bin(FeatureOp):
             The sorted unique interior edges as an array; empty when the
             column has no finite values.
         """
-        values = numeric(inputs[0]).dropna().to_numpy()
+        values = columns.to_finite(inputs[0]).dropna().to_numpy()
         if values.size == 0:
             return numpy.array([])
         edges = numpy.quantile(
@@ -441,7 +431,7 @@ class Bin(FeatureOp):
         Returns:
             The ordinal bin code per row as a float; NaN stays NaN.
         """
-        values = numeric(inputs[0])
+        values = columns.to_finite(inputs[0])
         codes = numpy.searchsorted(
             state, values.to_numpy(), side="right"
         ).astype(float)
@@ -1080,7 +1070,7 @@ class SeriesFeatureBuilder:
         order = numpy.lexsort((position, times.to_numpy(), groups))
         sorted_groups = groups[order]
         for node in self.nodes:
-            values = numeric(result[node.inputs[0]]).to_numpy()[order]
+            values = columns.to_finite(result[node.inputs[0]]).to_numpy()[order]
             grouped = pandas.Series(values).groupby(sorted_groups)
             op = get_op(node.op)
             if not isinstance(op, OrderedOp):
