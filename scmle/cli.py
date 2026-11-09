@@ -75,7 +75,11 @@ class Command(abc.ABC):
 
     @abc.abstractmethod
     def configure(self, parser: argparse.ArgumentParser) -> None:
-        """Adds this command's arguments to `parser`."""
+        """Adds this command's arguments to `parser`.
+
+        Args:
+            parser: The argument parser of this command.
+        """
 
     @abc.abstractmethod
     def execute(self, args: argparse.Namespace) -> int:
@@ -93,7 +97,11 @@ class ProjectCommand(Command):
     """Shared arguments for commands that build an `MLProject`."""
 
     def configure(self, parser: argparse.ArgumentParser) -> None:
-        """Adds data and project options."""
+        """Adds data and project options.
+
+        Args:
+            parser: The argument parser of this command.
+        """
         parser.add_argument("data", help="CSV or Parquet file")
         parser.add_argument("--target", required=True, nargs="+")
         parser.add_argument("--task", default="auto")
@@ -246,7 +254,16 @@ class ProjectCommand(Command):
         )
 
     def build_project(self, args: argparse.Namespace) -> project.MLProject:
-        """Creates the project described by the arguments."""
+        """Creates the project described by the arguments.
+
+        Args:
+            args: The parsed command-line arguments, including the optional
+                `--config` sections file.
+
+        Returns:
+            The project; search, model and strategy settings given on the
+            command line are used unless the config file sets that section.
+        """
         sections = config.load_sections(args.config)
         sections.setdefault(
             "search",
@@ -329,7 +346,14 @@ class PlanCommand(ProjectCommand):
     help = "analyze the data and print the proposed plan"
 
     def execute(self, args: argparse.Namespace) -> int:
-        """Prints the plan summary."""
+        """Prints the summary of the execution plan.
+
+        Args:
+            args: The parsed command-line arguments.
+
+        Returns:
+            The exit status, EXIT_OK (0).
+        """
         LOGGER.info(self.build_project(args).plan().summary())
         return EXIT_OK
 
@@ -341,7 +365,14 @@ class RunCommand(ProjectCommand):
     help = "execute the full workflow"
 
     def execute(self, args: argparse.Namespace) -> int:
-        """Runs the project and prints the result summary."""
+        """Runs the project and prints the result summary.
+
+        Args:
+            args: The parsed command-line arguments.
+
+        Returns:
+            The exit status, EXIT_OK (0).
+        """
         result = self.build_project(args).run()
         LOGGER.info("%s", result.summary())
         LOGGER.info("artifacts: %s", result.run_dir)
@@ -355,11 +386,25 @@ class ResumeCommand(Command):
     help = "continue a cancelled, failed or crashed run, reusing its trials"
 
     def configure(self, parser: argparse.ArgumentParser) -> None:
-        """Adds the run directory argument."""
+        """Adds the run directory argument.
+
+        Args:
+            parser: The argument parser of this command.
+        """
         parser.add_argument("run_directory")
 
     def execute(self, args: argparse.Namespace) -> int:
-        """Resumes the run and prints the result summary."""
+        """Resumes the run and prints the result summary.
+
+        Args:
+            args: The parsed command-line arguments.
+
+        Returns:
+            The exit status, EXIT_OK (0).
+
+        Raises:
+            ArtifactError: If the run directory cannot be found.
+        """
         try:
             result = project.MLProject.resume(args.run_directory)
         except FileNotFoundError as error:
@@ -376,7 +421,11 @@ class CatalogCommand(Command):
     help = "catalog a local table or opaque raw bytes"
 
     def configure(self, parser: argparse.ArgumentParser) -> None:
-        """Adds input, label, source and artifact options."""
+        """Adds input, label, source and artifact options.
+
+        Args:
+            parser: The argument parser of this command.
+        """
         parser.add_argument(
             "input",
             nargs="?",
@@ -409,7 +458,18 @@ class CatalogCommand(Command):
         )
 
     def read_raw_bytes(self, location: str) -> bytes:
-        """Reads raw bytes from a local path or standard input."""
+        """Reads raw bytes from a local path or standard input.
+
+        Args:
+            location: A file path, or ``-`` for standard input.
+
+        Returns:
+            The bytes read.
+
+        Raises:
+            DataError: If the file cannot be read or standard input is not a
+                binary stream.
+        """
         if location == "-":
             stream = getattr(sys.stdin, "buffer", sys.stdin)
             payload = stream.read()
@@ -425,7 +485,19 @@ class CatalogCommand(Command):
         return payload
 
     def execute(self, args: argparse.Namespace) -> int:
-        """Builds, emits and optionally persists catalog evidence."""
+        """Builds, emits and optionally persists catalog evidence.
+
+        Args:
+            args: The parsed command-line arguments.
+
+        Returns:
+            The exit status, EXIT_OK (0).
+
+        Raises:
+            ArtifactError: If the artifact cannot be written to `--output`.
+            ConfigError: If both or neither of a tabular input and
+                `--raw-bytes` are given, or the catalog options are invalid.
+        """
         if args.input is not None and args.raw_bytes is not None:
             raise errors.ConfigError(
                 "provide either a tabular input or --raw-bytes, not both"
@@ -480,7 +552,11 @@ class PredictCommand(Command):
     help = "predict with a saved model bundle (trusted bundles only)"
 
     def configure(self, parser: argparse.ArgumentParser) -> None:
-        """Adds bundle, data and output options."""
+        """Adds bundle, data and output options.
+
+        Args:
+            parser: The argument parser of this command.
+        """
         parser.add_argument("bundle", help="bundle directory")
         parser.add_argument("data", help="CSV or Parquet file")
         parser.add_argument("--output", default="predictions.csv")
@@ -500,7 +576,14 @@ class PredictCommand(Command):
         )
 
     def execute(self, args: argparse.Namespace) -> int:
-        """Writes predictions (and probabilities for classifiers)."""
+        """Writes predictions (and probabilities for classifiers).
+
+        Args:
+            args: The parsed command-line arguments.
+
+        Returns:
+            The exit status, EXIT_OK (0).
+        """
         model = bundle_module.ModelBundle.load(
             args.bundle, trusted=args.trusted
         )
@@ -531,7 +614,11 @@ class BatchCommand(Command):
     )
 
     def configure(self, parser: argparse.ArgumentParser) -> None:
-        """Adds bundle, data, output and policy options."""
+        """Adds bundle, data, output and policy options.
+
+        Args:
+            parser: The argument parser of this command.
+        """
         parser.add_argument("bundle", help="bundle directory")
         parser.add_argument("data", help="CSV or Parquet file")
         parser.add_argument("--output", default="predictions.csv")
@@ -549,7 +636,14 @@ class BatchCommand(Command):
         )
 
     def execute(self, args: argparse.Namespace) -> int:
-        """Writes predictions and `<output>.manifest.json`."""
+        """Writes predictions and `<output>.manifest.json`.
+
+        Args:
+            args: The parsed command-line arguments.
+
+        Returns:
+            The exit status, EXIT_OK (0).
+        """
         model = bundle_module.ModelBundle.load(
             args.bundle, trusted=args.trusted
         )
@@ -568,7 +662,11 @@ class ServeCommand(Command):
     help = "serve a saved model bundle over HTTP (trusted bundles only)"
 
     def configure(self, parser: argparse.ArgumentParser) -> None:
-        """Adds bundle and binding options."""
+        """Adds bundle and binding options.
+
+        Args:
+            parser: The argument parser of this command.
+        """
         parser.add_argument("bundle", help="bundle directory")
         parser.add_argument("--host", default="127.0.0.1")
         parser.add_argument("--port", type=int, default=8000)
@@ -579,7 +677,14 @@ class ServeCommand(Command):
         )
 
     def execute(self, args: argparse.Namespace) -> int:
-        """Loads the bundle and serves until interrupted."""
+        """Loads the bundle and serves until interrupted.
+
+        Args:
+            args: The parsed command-line arguments.
+
+        Returns:
+            The exit status, EXIT_OK (0), once serving has stopped.
+        """
         model = bundle_module.ModelBundle.load(
             args.bundle, trusted=args.trusted
         )
@@ -607,7 +712,11 @@ class ExportOnnxCommand(Command):
     help = "export a saved model bundle as ONNX (needs the onnx extra)"
 
     def configure(self, parser: argparse.ArgumentParser) -> None:
-        """Adds bundle, output and parity-check options."""
+        """Adds bundle, output and parity-check options.
+
+        Args:
+            parser: The argument parser of this command.
+        """
         parser.add_argument("bundle", help="bundle directory")
         parser.add_argument("--output", default="model.onnx")
         parser.add_argument(
@@ -616,7 +725,14 @@ class ExportOnnxCommand(Command):
         parser.add_argument("--trusted", action="store_true")
 
     def execute(self, args: argparse.Namespace) -> int:
-        """Writes the graph, optionally verifying it on sample rows."""
+        """Writes the graph, optionally verifying it on sample rows.
+
+        Args:
+            args: The parsed command-line arguments.
+
+        Returns:
+            The exit status, EXIT_OK (0).
+        """
         model = bundle_module.ModelBundle.load(
             args.bundle, trusted=args.trusted
         )
@@ -633,13 +749,24 @@ class PackageCommand(Command):
     help = "package a saved model bundle as a ready-to-run service folder"
 
     def configure(self, parser: argparse.ArgumentParser) -> None:
-        """Adds bundle and destination options."""
+        """Adds bundle and destination options.
+
+        Args:
+            parser: The argument parser of this command.
+        """
         parser.add_argument("bundle", help="bundle directory")
         parser.add_argument("--output", default="service")
         parser.add_argument("--trusted", action="store_true")
 
     def execute(self, args: argparse.Namespace) -> int:
-        """Writes the folder."""
+        """Writes the folder.
+
+        Args:
+            args: The parsed command-line arguments.
+
+        Returns:
+            The exit status, EXIT_OK (0).
+        """
         model = bundle_module.ModelBundle.load(
             args.bundle, trusted=args.trusted
         )
@@ -655,7 +782,11 @@ class IngestCommand(Command):
     help = "profile a relational source: tables, keys, grain and joins"
 
     def configure(self, parser: argparse.ArgumentParser) -> None:
-        """Adds source, scope, tolerance and budget options."""
+        """Adds source, scope, tolerance and budget options.
+
+        Args:
+            parser: The argument parser of this command.
+        """
         parser.add_argument("--sqlite", required=True, help="database file")
         parser.add_argument(
             "--tables", required=True, help="comma-separated table names"
@@ -678,7 +809,17 @@ class IngestCommand(Command):
         )
 
     def execute(self, args: argparse.Namespace) -> int:
-        """Runs the stages and prints a summary; 2 if the unit blocks."""
+        """Runs the stages and prints a summary; 2 if the unit blocks.
+
+        Args:
+            args: The parsed command-line arguments.
+
+        Returns:
+            The exit status, EXIT_OK (0).
+
+        Raises:
+            BlockedError: If the unit verdict is one that blocks the run.
+        """
         declared: tuple[ingest_plan.joins.DeclaredKey, ...] = ()
         if args.foreign_keys:
             declared = ingest_plan.declared_from_json(
@@ -718,7 +859,11 @@ class CharterCommand(Command):
     help = "create, check or sign an analysis charter"
 
     def configure(self, parser: argparse.ArgumentParser) -> None:
-        """Adds the `init`, `check` and `sign` actions."""
+        """Adds the `init`, `check` and `sign` actions.
+
+        Args:
+            parser: The argument parser of this command.
+        """
         actions = parser.add_subparsers(dest="charter_action", required=True)
         init = actions.add_parser("init", help="write a template charter")
         init.add_argument("path")
@@ -739,13 +884,30 @@ class CharterCommand(Command):
         )
 
     def execute(self, args: argparse.Namespace) -> int:
-        """Runs the chosen action."""
+        """Runs the chosen action.
+
+        Args:
+            args: The parsed command-line arguments.
+
+        Returns:
+            The exit status of the chosen action.
+        """
         action = getattr(self, f"run_{args.charter_action}")
         return action(args)
 
     @staticmethod
     def run_init(args: argparse.Namespace) -> int:
-        """Writes a template that fails `check` until it is filled in."""
+        """Writes a template that fails `check` until it is filled in.
+
+        Args:
+            args: The parsed command-line arguments.
+
+        Returns:
+            The exit status, EXIT_OK (0).
+
+        Raises:
+            ConfigError: If the file exists and `--force` is not given.
+        """
         path = pathlib.Path(args.path)
         if path.exists() and not args.force:
             raise errors.ConfigError(f"{path} exists; pass --force")
@@ -758,7 +920,14 @@ class CharterCommand(Command):
 
     @staticmethod
     def run_check(args: argparse.Namespace) -> int:
-        """Validates the charter, its hash and (if present) its signature."""
+        """Validates the charter, its hash and (if present) its signature.
+
+        Args:
+            args: The parsed command-line arguments.
+
+        Returns:
+            The exit status, EXIT_OK (0).
+        """
         loaded = charter_sealing.read_verified(args.path)
         charter = loaded.charter
         LOGGER.info(
@@ -781,7 +950,18 @@ class CharterCommand(Command):
 
     @staticmethod
     def run_sign(args: argparse.Namespace) -> int:
-        """Signs the charter with a key from a file or the environment."""
+        """Signs the charter with a key from a file or the environment.
+
+        Args:
+            args: The parsed command-line arguments.
+
+        Returns:
+            The exit status, EXIT_OK (0).
+
+        Raises:
+            ConfigError: If no signing key is available from the key file or
+                the environment.
+        """
         key = (
             pathlib.Path(args.key_file).read_text().strip()
             if args.key_file
@@ -806,7 +986,11 @@ class LoopCommand(Command):
     help = "observe batches, step the closed loop, list and answer escalations"
 
     def configure(self, parser: argparse.ArgumentParser) -> None:
-        """Adds the loop actions."""
+        """Adds the loop actions.
+
+        Args:
+            parser: The argument parser of this command.
+        """
         actions = parser.add_subparsers(dest="loop_action", required=True)
         init = actions.add_parser("init", help="create the deployment ledger")
         init.add_argument("deploy_dir")
@@ -841,13 +1025,27 @@ class LoopCommand(Command):
         verify.add_argument("deploy_dir")
 
     def execute(self, args: argparse.Namespace) -> int:
-        """Runs the chosen action."""
+        """Runs the chosen action.
+
+        Args:
+            args: The parsed command-line arguments.
+
+        Returns:
+            The exit status of the chosen action.
+        """
         action = getattr(self, f"run_{args.loop_action}")
         return action(args)
 
     @staticmethod
     def run_init(args: argparse.Namespace) -> int:
-        """Creates the ledger from a policy file and a charter hash."""
+        """Creates the ledger from a policy file and a charter hash.
+
+        Args:
+            args: The parsed command-line arguments.
+
+        Returns:
+            The exit status, EXIT_OK (0).
+        """
         policy = loop_module.LoopPolicy.from_dict(
             json.loads(pathlib.Path(args.policy).read_text())
         )
@@ -858,7 +1056,14 @@ class LoopCommand(Command):
 
     @staticmethod
     def run_observe(args: argparse.Namespace) -> int:
-        """Routes one batch and prints how many cases went where."""
+        """Routes one batch and prints how many cases went where.
+
+        Args:
+            args: The parsed command-line arguments.
+
+        Returns:
+            The exit status, EXIT_OK (0).
+        """
         loop = loop_module.Loop.resume(args.deploy_dir)
         frame = pd.read_csv(args.batch)
         outcome = loop.observe(
@@ -872,7 +1077,14 @@ class LoopCommand(Command):
 
     @staticmethod
     def run_mature(args: argparse.Namespace) -> int:
-        """Stores arrived losses by case id."""
+        """Stores arrived losses by case id.
+
+        Args:
+            args: The parsed command-line arguments.
+
+        Returns:
+            The exit status, EXIT_OK (0).
+        """
         loop = loop_module.Loop.resume(args.deploy_dir)
         frame = pd.read_csv(args.labels)
         matched = loop.mature(
@@ -883,7 +1095,14 @@ class LoopCommand(Command):
 
     @staticmethod
     def run_step(args: argparse.Namespace) -> int:
-        """Steps the loop and prints what it found."""
+        """Steps the loop and prints what it found.
+
+        Args:
+            args: The parsed command-line arguments.
+
+        Returns:
+            The exit status, EXIT_OK (0).
+        """
         loop = loop_module.Loop.resume(args.deploy_dir)
         result = loop.step()
         print(
@@ -904,7 +1123,14 @@ class LoopCommand(Command):
 
     @staticmethod
     def run_pending(args: argparse.Namespace) -> int:
-        """Lists open escalations with their questions."""
+        """Lists open escalations with their questions.
+
+        Args:
+            args: The parsed command-line arguments.
+
+        Returns:
+            The exit status, EXIT_OK (0).
+        """
         loop = loop_module.Loop.resume(args.deploy_dir)
         print(
             json.dumps(
@@ -925,7 +1151,17 @@ class LoopCommand(Command):
 
     @staticmethod
     def run_reply(args: argparse.Namespace) -> int:
-        """Records a person's signed reply; refused replies fail."""
+        """Records a person's signed reply; refused replies fail.
+
+        Args:
+            args: The parsed command-line arguments.
+
+        Returns:
+            The exit status, EXIT_OK (0).
+
+        Raises:
+            ConfigError: If the reply is refused.
+        """
         loop = loop_module.Loop.resume(args.deploy_dir)
         reply = deployment_ledger.Attestation.from_dict(
             json.loads(pathlib.Path(args.attestation).read_text())
@@ -948,7 +1184,17 @@ class LoopCommand(Command):
 
     @staticmethod
     def run_verify(args: argparse.Namespace) -> int:
-        """Verifies the ledger chain and the e-LOND replay."""
+        """Verifies the ledger chain and the e-LOND replay.
+
+        Args:
+            args: The parsed command-line arguments.
+
+        Returns:
+            The exit status, EXIT_OK (0).
+
+        Raises:
+            ArtifactError: If the ledger fails verification.
+        """
         path = pathlib.Path(args.deploy_dir) / deployment_ledger.FILE_NAME
         try:
             ledger = deployment_ledger.DeploymentLedger.load(path)
@@ -973,7 +1219,11 @@ class OperateCommand(Command):
     )
 
     def configure(self, parser: argparse.ArgumentParser) -> None:
-        """Adds the controller actions."""
+        """Adds the controller actions.
+
+        Args:
+            parser: The argument parser of this command.
+        """
         actions = parser.add_subparsers(dest="operate_action", required=True)
         tick = actions.add_parser(
             "tick", help="apply new inbox files once and step the loop"
@@ -1011,7 +1261,14 @@ class OperateCommand(Command):
         halt.add_argument("--reason", required=True)
 
     def execute(self, args: argparse.Namespace) -> int:
-        """Runs the chosen action."""
+        """Runs the chosen action.
+
+        Args:
+            args: The parsed command-line arguments.
+
+        Returns:
+            The exit status of the chosen action.
+        """
         action = getattr(self, f"run_{args.operate_action}")
         return action(args)
 
@@ -1019,7 +1276,18 @@ class OperateCommand(Command):
     def open(
         deploy_dir: str, keys: dict[str, str] | None = None
     ) -> controller_module.Controller:
-        """Opens the controller of a deployment, mapping ledger faults."""
+        """Opens the controller of a deployment, mapping ledger faults.
+
+        Args:
+            deploy_dir: Directory of the deployment.
+            keys: Verification keys by key id, or None.
+
+        Returns:
+            The controller.
+
+        Raises:
+            ArtifactError: If the deployment ledger cannot be opened.
+        """
         try:
             return controller_module.Controller(
                 deploy_dir, verification_keys=keys
@@ -1031,7 +1299,14 @@ class OperateCommand(Command):
 
     @classmethod
     def run_tick(cls, args: argparse.Namespace) -> int:
-        """Applies the inbox once and prints what happened."""
+        """Applies the inbox once and prints what happened.
+
+        Args:
+            args: The parsed command-line arguments.
+
+        Returns:
+            The exit status, EXIT_OK (0).
+        """
         keys = (
             json.loads(pathlib.Path(args.keys_file).read_text())
             if args.keys_file
@@ -1043,13 +1318,30 @@ class OperateCommand(Command):
 
     @classmethod
     def run_status(cls, args: argparse.Namespace) -> int:
-        """Prints the controller's state."""
+        """Prints the controller's state.
+
+        Args:
+            args: The parsed command-line arguments.
+
+        Returns:
+            The exit status, EXIT_OK (0).
+        """
         print(json.dumps(cls.open(args.deploy_dir).status(), indent=2))
         return EXIT_OK
 
     @classmethod
     def run_grant(cls, args: argparse.Namespace) -> int:
-        """Records an envelope after checking its signature."""
+        """Records an envelope after checking its signature.
+
+        Args:
+            args: The parsed command-line arguments.
+
+        Returns:
+            The exit status, EXIT_OK (0).
+
+        Raises:
+            ConfigError: If the envelope is refused.
+        """
         key = pathlib.Path(args.key_file).read_text().strip()
         envelope = deployment_ledger.Envelope.from_dict(
             json.loads(pathlib.Path(args.envelope).read_text())
@@ -1069,7 +1361,17 @@ class OperateCommand(Command):
 
     @classmethod
     def run_revoke(cls, args: argparse.Namespace) -> int:
-        """Removes an envelope's authority."""
+        """Removes an envelope's authority.
+
+        Args:
+            args: The parsed command-line arguments.
+
+        Returns:
+            The exit status, EXIT_OK (0).
+
+        Raises:
+            ConfigError: If the revocation is refused.
+        """
         controller = cls.open(args.deploy_dir)
         try:
             controller.envelopes.revoke(args.envelope_id, args.reason)
@@ -1080,7 +1382,14 @@ class OperateCommand(Command):
 
     @classmethod
     def run_halt(cls, args: argparse.Namespace) -> int:
-        """Halts the loop; only a passing recalibration releases it."""
+        """Halts the loop; only a passing recalibration releases it.
+
+        Args:
+            args: The parsed command-line arguments.
+
+        Returns:
+            The exit status, EXIT_OK (0).
+        """
         controller = cls.open(args.deploy_dir)
         controller.loop.enter_halt("operator_halt", {"reason": args.reason})
         controller.loop.save_state()
@@ -1095,7 +1404,11 @@ class DeployCommand(Command):
     help = "live checks of a service, the promotion gate, deployment records"
 
     def configure(self, parser: argparse.ArgumentParser) -> None:
-        """Adds the `live`, `gate` and `verify-record` actions."""
+        """Adds the `live`, `gate` and `verify-record` actions.
+
+        Args:
+            parser: The argument parser of this command.
+        """
         actions = parser.add_subparsers(dest="deploy_action", required=True)
         live = actions.add_parser(
             "live", help="health, schema, inference and security checks"
@@ -1146,13 +1459,30 @@ class DeployCommand(Command):
         verify.add_argument("--key-file", required=True)
 
     def execute(self, args: argparse.Namespace) -> int:
-        """Runs the chosen action."""
+        """Runs the chosen action.
+
+        Args:
+            args: The parsed command-line arguments.
+
+        Returns:
+            The exit status of the chosen action.
+        """
         action = getattr(self, f"run_{args.deploy_action.replace('-', '_')}")
         return action(args)
 
     @staticmethod
     def read_key(path: str) -> str:
-        """Reads a key from a file (never from the command line)."""
+        """Reads a key from a file (never from the command line).
+
+        Args:
+            path: The key file.
+
+        Returns:
+            The key, with surrounding whitespace removed.
+
+        Raises:
+            ConfigError: If the file holds no key.
+        """
         key = pathlib.Path(path).read_text(encoding="utf-8").strip()
         if not key:
             raise errors.ConfigError(f"{path} holds no key")
@@ -1160,7 +1490,14 @@ class DeployCommand(Command):
 
     @staticmethod
     def run_live(args: argparse.Namespace) -> int:
-        """Runs the four live checks; exit 1 if any failed."""
+        """Runs the four live checks; exit 1 if any failed.
+
+        Args:
+            args: The parsed command-line arguments.
+
+        Returns:
+            EXIT_OK (0) if every check passed, else EXIT_FAILED (1).
+        """
         read_only = (
             DeployCommand.read_key(args.read_only_token_file)
             if args.read_only_token_file
@@ -1194,7 +1531,14 @@ class DeployCommand(Command):
 
     @staticmethod
     def run_gate(args: argparse.Namespace) -> int:
-        """Prints the decision; a refusal exits with the blocked status."""
+        """Prints the decision; a refusal exits with the blocked status.
+
+        Args:
+            args: The parsed command-line arguments.
+
+        Returns:
+            EXIT_BLOCKED (2) if the gate refuses, else EXIT_OK (0).
+        """
         key = DeployCommand.read_key(args.key_file)
         candidate = deploy_release.load_candidate(args.manifest)
         if args.stage == "admit":
@@ -1210,7 +1554,14 @@ class DeployCommand(Command):
 
     @staticmethod
     def run_reconcile(args: argparse.Namespace) -> int:
-        """Exits 1 if the registry, ledger and runtime disagree."""
+        """Exits 1 if the registry, ledger and runtime disagree.
+
+        Args:
+            args: The parsed command-line arguments.
+
+        Returns:
+            EXIT_OK (0) if they agree, else EXIT_FAILED (1).
+        """
         store = registry_module.ModelRegistryStore(args.registry)
         ledger = (
             deployment_ledger.DeploymentLedger.load(args.ledger)
@@ -1233,7 +1584,14 @@ class DeployCommand(Command):
 
     @staticmethod
     def run_model_digest(args: argparse.Namespace) -> int:
-        """Prints the digest a service running this version reports."""
+        """Prints the digest a service running this version reports.
+
+        Args:
+            args: The parsed command-line arguments.
+
+        Returns:
+            The exit status, EXIT_OK (0).
+        """
         store = registry_module.ModelRegistryStore(args.registry)
         version = store.resolve(args.model, args.version)
         print(deploy_gate.model_digest_of(store, version))
@@ -1241,7 +1599,14 @@ class DeployCommand(Command):
 
     @staticmethod
     def run_verify_record(args: argparse.Namespace) -> int:
-        """Exits 0 only if the record's signature verifies."""
+        """Exits 0 only if the record's signature verifies.
+
+        Args:
+            args: The parsed command-line arguments.
+
+        Returns:
+            EXIT_OK (0) if the signature verifies, else EXIT_FAILED (1).
+        """
         record = deploy_record.read_record(args.record)
         valid = record.verify(DeployCommand.read_key(args.key_file))
         print(json.dumps({"valid": valid, "digest": record.digest()}))
@@ -1255,7 +1620,11 @@ class ClaimsCommand(Command):
     help = "list, show or verify the claims and ledger of a charter run"
 
     def configure(self, parser: argparse.ArgumentParser) -> None:
-        """Adds the `list`, `show` and `verify` actions."""
+        """Adds the `list`, `show` and `verify` actions.
+
+        Args:
+            parser: The argument parser of this command.
+        """
         actions = parser.add_subparsers(dest="claims_action", required=True)
         listing = actions.add_parser("list", help="one row per claim")
         listing.add_argument("run_dir")
@@ -1277,13 +1646,27 @@ class ClaimsCommand(Command):
         )
 
     def execute(self, args: argparse.Namespace) -> int:
-        """Runs the chosen action."""
+        """Runs the chosen action.
+
+        Args:
+            args: The parsed command-line arguments.
+
+        Returns:
+            The exit status of the chosen action.
+        """
         action = getattr(self, f"run_{args.claims_action}")
         return action(args)
 
     @staticmethod
     def run_list(args: argparse.Namespace) -> int:
-        """Prints the claims of a run."""
+        """Prints the claims of a run.
+
+        Args:
+            args: The parsed command-line arguments.
+
+        Returns:
+            The exit status, EXIT_OK (0).
+        """
         rows = claims_audit.list_claims(args.run_dir)
         if args.tier:
             rows = [r for r in rows if r["tier"] == args.tier]
@@ -1315,7 +1698,14 @@ class ClaimsCommand(Command):
 
     @staticmethod
     def run_show(args: argparse.Namespace) -> int:
-        """Prints one claim with its hypothesis and checks."""
+        """Prints one claim with its hypothesis and checks.
+
+        Args:
+            args: The parsed command-line arguments.
+
+        Returns:
+            The exit status, EXIT_OK (0).
+        """
         print(
             json.dumps(
                 claims_audit.show_claim(args.run_dir, args.claim_id),
@@ -1327,7 +1717,17 @@ class ClaimsCommand(Command):
 
     @staticmethod
     def run_verify(args: argparse.Namespace) -> int:
-        """Verifies the run's artifacts; a failed step makes the exit code 1."""
+        """Verifies the run's artifacts; a failed step makes the exit code 1.
+
+        Args:
+            args: The parsed command-line arguments.
+
+        Returns:
+            The exit status, EXIT_OK (0) if every step passed.
+
+        Raises:
+            ArtifactError: If any verification step failed.
+        """
         key = (
             pathlib.Path(args.key_file).read_text().strip()
             if args.key_file
@@ -1357,7 +1757,11 @@ class FrameCommand(Command):
     )
 
     def configure(self, parser: argparse.ArgumentParser) -> None:
-        """Adds the request, source, data and optional inputs."""
+        """Adds the request, source, data and optional inputs.
+
+        Args:
+            parser: The argument parser of this command.
+        """
         parser.add_argument("request", help="text file with the request")
         parser.add_argument(
             "--source",
@@ -1379,7 +1783,14 @@ class FrameCommand(Command):
         parser.add_argument("--output", required=True, help="output directory")
 
     def execute(self, args: argparse.Namespace) -> int:
-        """Writes the framing artifacts and the unsigned draft charter."""
+        """Writes the framing artifacts and the unsigned draft charter.
+
+        Args:
+            args: The parsed command-line arguments.
+
+        Returns:
+            EXIT_BLOCKED (2) if the framing was refused, else EXIT_OK (0).
+        """
         source = framing_draft.SourceDescription.from_dict(
             charter_contracts.load_json(args.source)
         )
@@ -1430,7 +1841,11 @@ class TrailCommand(Command):
     help = "build, verify or show the business trail of a deployed model"
 
     def configure(self, parser: argparse.ArgumentParser) -> None:
-        """Adds the `build`, `verify` and `show` actions."""
+        """Adds the `build`, `verify` and `show` actions.
+
+        Args:
+            parser: The argument parser of this command.
+        """
         actions = parser.add_subparsers(dest="trail_action", required=True)
         build = actions.add_parser(
             "build", help="copy the retained records and seal the trail"
@@ -1460,7 +1875,17 @@ class TrailCommand(Command):
             sub.add_argument("--json", action="store_true")
 
     def execute(self, args: argparse.Namespace) -> int:
-        """Runs the chosen action."""
+        """Runs the chosen action.
+
+        Args:
+            args: The parsed command-line arguments.
+
+        Returns:
+            The exit status, EXIT_OK (0).
+
+        Raises:
+            ArtifactError: If the built or verified trail does not verify.
+        """
         if args.trail_action == "show":
             print(trail_show.render(args.trail_dir))
             return EXIT_OK
@@ -1492,7 +1917,15 @@ class TrailCommand(Command):
 
     @staticmethod
     def keys(path: str | None) -> dict[str, str | None]:
-        """Keys by role from a file, else the environment key as analyst."""
+        """Keys by role from a file, else the environment key as analyst.
+
+        Args:
+            path: A JSON file mapping role to key, or None.
+
+        Returns:
+            The keys by role; with no file, only the analyst's key from the
+            environment (None if it is not set).
+        """
         if path:
             loaded = json.loads(pathlib.Path(path).read_text("utf-8"))
             return {str(k): str(v) for k, v in loaded.items()}
@@ -1522,7 +1955,11 @@ COMMANDS: tuple[Command, ...] = (
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """Builds the argument parser from the registered commands."""
+    """Builds the argument parser from the registered commands.
+
+    Returns:
+        The parser, with a sub-command for each registered command.
+    """
     parser = argparse.ArgumentParser(prog="scmle")
     parser.add_argument(
         "--log-level",
