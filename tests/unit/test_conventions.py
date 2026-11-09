@@ -69,6 +69,90 @@ def test_no_private_file_names(path):
     assert not is_private(path.stem), path
 
 
+ALIAS_SOURCES = sorted(
+    path
+    for folder in ("scmle", "tests", "benchmarks", "scripts", "examples")
+    for path in (ROOT / folder).rglob("*.py")
+    if "mutants" not in path.parts
+)
+
+
+def chain(node):
+    """Whether an expression is a plain name or an attribute chain on one."""
+    while isinstance(node, ast.Attribute):
+        node = node.value
+    return isinstance(node, ast.Name)
+
+
+def aliases(tree):
+    """Lists every second name for an existing thing, by line.
+
+    Covers `import x as y`, `from m import n as a`, module-level
+    `NAME = other.name` assignments, and type aliases. Class-level
+    assignments are attribute configuration, not aliases, and are not listed.
+    """
+    found = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.alias) and node.asname:
+            found.append((node.lineno, f"import {node.name} as {node.asname}"))
+        elif isinstance(node, ast.TypeAlias):
+            found.append((node.lineno, f"type alias {node.name.id}"))
+        elif isinstance(node, ast.AnnAssign) and "TypeAlias" in ast.unparse(
+            node.annotation
+        ):
+            found.append((node.lineno, "TypeAlias annotation"))
+    for node in tree.body:
+        if (
+            isinstance(node, ast.Assign)
+            and len(node.targets) == 1
+            and isinstance(node.targets[0], ast.Name)
+            and isinstance(node.value, ast.Name | ast.Attribute)
+            and chain(node.value)
+            and ast.unparse(node.value) not in ("True", "False", "None")
+        ):
+            found.append(
+                (
+                    node.lineno,
+                    f"{node.targets[0].id} = {ast.unparse(node.value)}",
+                )
+            )
+    return found
+
+
+@pytest.mark.parametrize(
+    "path", ALIAS_SOURCES, ids=lambda p: str(p.relative_to(ROOT))
+)
+def test_no_aliases(path):
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+
+    assert not aliases(tree), [f"{path.name}:{n} {d}" for n, d in aliases(tree)]
+
+
+def test_alias_checker_detects_violations():
+    source = (
+        "import numpy as np\n"
+        "from os import path as p\n"
+        "X = np.pi\n"
+        "Y: TypeAlias = int | str\n"
+        "type Z = list[int]\n"
+        "class K:\n"
+        "    kind = X\n"
+        "ok = None\n"
+        "def f():\n"
+        "    inner = X\n"
+    )
+
+    found = [description for _, description in aliases(ast.parse(source))]
+
+    assert sorted(found) == [
+        "TypeAlias annotation",
+        "X = np.pi",
+        "import numpy as np",
+        "import path as p",
+        "type alias Z",
+    ]
+
+
 def test_checker_detects_violations():
     tree = ast.parse("def _a(): pass\nclass _B: pass\nx = y._z\n_ = 1")
     private = {entry[1] for entry in identifiers(tree) if is_private(entry[1])}
