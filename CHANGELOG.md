@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+* Removed the cloud infrastructure and everything built on it, to focus on the
+  package. Gone: the Terraform for AWS and GCP and its reader, policy check and
+  orphan finder; the ECS and Cloud Run runtime adapters and `scmle deploy
+  observe`; the S3 and GCS object stores (the `ObjectStore` interface and the
+  local backend remain); the AWS and GCP training runners (the `Runner`
+  interface and the local runner remain); the Step Functions and Cloud
+  Workflows emitters (the workflow definition and the local executor remain);
+  the CloudWatch and Cloud Monitoring exporters; the production-claim checks
+  (`operations/claim.py`, `scripts/check_production_claim.py`) and the
+  `scripts/make_phase*_evidence.py` scripts with `plan/evidence/`; the
+  cloud-release workflow. Release gating, live checks, signed deployment
+  records and the release registry remain, driven by a control plane the user
+  supplies. No cloud-provider or hosted-compute SDK is a dependency
+  (`docs/DEPENDENCIES.md`). Documentation: `docs/CLOUD_RELEASE.md`,
+  `docs/INFRASTRUCTURE.md` and their site pages are removed, the remaining
+  pages no longer describe a cloud, and `plan/` has four stages (the cloud
+  stage is deleted, its container, trail and breadth items move into the last
+  stage, and the register is 139 rows: 53 class A, 52 class B, 11 class C, 23
+  class D). The `cloud_deployment` lifecycle key of `benchmarks/breadth/` is
+  now `deployment`.
 * Unattended operation, tested on simulated streams only (`docs/AUTONOMY.md`).
   An envelope (`scmle.governance.envelope`) is authority a person signs in
   advance for `train_challenger`, with a scope, dates and a use limit; the
