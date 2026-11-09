@@ -19,7 +19,13 @@ COMBINERS = (STACK, BLEND)
 
 
 class EnsembleSearch:
-    """Assembles and evaluates a stacking candidate."""
+    """Assembles and evaluates a stacking candidate.
+
+    Attributes:
+        context: Run context.
+        runner: Trial runner used for the evaluation.
+        metric: The metric being optimized.
+    """
 
     def __init__(
         self, context: context_module.RunContext, runner: trials.TrialRunner
@@ -62,10 +68,15 @@ class EnsembleSearch:
         return list(best.values())[:size]
 
     def search(self, evaluated: list[experiments.TrialResult]) -> None:
-        """Evaluates one stack and records the verdict.
+        """Evaluates one stack and one blend and records the verdicts.
+
+        Nothing is done if the configured ensemble size is below
+        `ensembles.MIN_MEMBERS` or the resource governor asks to skip. With
+        fewer than `ensembles.MIN_MEMBERS` eligible models, each combiner is
+        rejected with that reason.
 
         Args:
-            evaluated: All trials produced before the ensemble phase.
+            evaluated: All trials produced before the ensemble step.
         """
         size = self.context.spec.ensemble.size
         if (
@@ -109,7 +120,17 @@ class EnsembleSearch:
         outcome: experiments.TrialResult,
         names: list[str],
     ) -> None:
-        """Compares an ensemble with its best member."""
+        """Compares an ensemble with its best member and records the verdict.
+
+        The ensemble is included if it beats the leader in the metric's favour,
+        otherwise rejected; a trial that did not succeed is rejected.
+
+        Args:
+            combiner: Name of the ensemble kind.
+            leader: The best member trial.
+            outcome: The ensemble's trial result.
+            names: Model names of the members, for the explanation.
+        """
         if outcome.status is not Status.OK:
             self.context.add_outcome(
                 combiner,

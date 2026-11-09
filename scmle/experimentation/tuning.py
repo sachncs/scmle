@@ -18,7 +18,14 @@ Status = experiments.TrialStatus
 
 
 class Tuner:
-    """Tunes the top screened models within the remaining time budget."""
+    """Tunes the top screened models within the remaining time budget.
+
+    Attributes:
+        context: Run context.
+        runner: Trial runner used for every evaluation.
+        search: The effective search specification.
+        metric: The metric being optimized.
+    """
 
     def __init__(
         self, context: context_module.RunContext, runner: trials.TrialRunner
@@ -63,7 +70,7 @@ class Tuner:
         """Searches the most promising candidates; results go to the context.
 
         Args:
-            screened: Default-configuration trials from earlier phases.
+            screened: Default-configuration trials from earlier steps.
         """
         if self.search.top_models == 0:
             return
@@ -73,7 +80,14 @@ class Tuner:
             self.tune_model(name, strategy, index)
 
     def tune_model(self, name: str, strategy: str, index: int) -> None:
-        """Runs batched, pruned search for one model under one strategy."""
+        """Runs batched, pruned search for one model under one strategy.
+
+        Args:
+            name: Model to tune.
+            strategy: Data strategy the model is tuned under.
+            index: Position of the model among those tuned; offsets the
+                optimizer seed.
+        """
         context, search = self.context, self.search
         space = context_module.require(
             context.registry.get(name).search_space, f"{name}.search_space"
@@ -99,12 +113,16 @@ class Tuner:
             self.run_batch(name, strategy, optimizer, size)
 
     def rung_schedule(self) -> list[list[int | None]]:
-        """Fold budgets of each Hyperband bracket, cheapest start first.
+        """Computes the fold budgets of each Hyperband bracket, cheapest first.
 
-        With `F` folds and reduction factor `eta`, rungs are the geometric
-        fold counts `F / eta^k` (at least one fold) ending at the full
-        evaluation (`None`). Bracket `s` starts at rung `s`: early brackets
-        try many configurations cheaply, the last one a few at full cost.
+        With `F` folds and reduction factor `eta`, rungs are the geometric fold
+        counts `F / eta^k` (at least one fold) ending at the full evaluation
+        (`None`). Bracket `s` starts at rung `s`: early brackets try many
+        configurations cheaply, the last one a few at full cost.
+
+        Returns:
+            One list of rungs per bracket, each ending in `None` (all folds); a
+            single full-evaluation rung if there are fewer than two folds.
         """
         folds = len(self.runner.folds)
         if folds < 2:
@@ -123,12 +141,16 @@ class Tuner:
         strategy: str,
         optimizer: optimizers.Optimizer,
     ) -> None:
-        """Hyperband: successive-halving brackets with different start costs.
+        """Runs Hyperband: halving brackets with different start costs.
 
-        The configuration budget is shared between brackets, weighted toward
-        the cheap ones (many tries need cheap screening); each bracket keeps
-        the best `1/eta` at every rung and finishes the survivors on every
-        fold.
+        The configuration budget is shared between brackets, weighted toward the
+        cheap ones (many tries need cheap screening); each bracket keeps the
+        best `1/eta` at every rung and finishes the survivors on every fold.
+
+        Args:
+            name: Model being tuned.
+            strategy: Data strategy the model is tuned under.
+            optimizer: Source of configurations; told every score.
         """
         brackets = self.rung_schedule()
         weights = [len(brackets) - index for index in range(len(brackets))]
@@ -156,7 +178,15 @@ class Tuner:
         size: int,
         rungs: list[int | None],
     ) -> None:
-        """Evaluates `size` configurations through the rungs of one bracket."""
+        """Evaluates `size` configurations through the rungs of one bracket.
+
+        Args:
+            name: Model being tuned.
+            strategy: Data strategy the model is tuned under.
+            optimizer: Source of configurations; told every score.
+            size: Number of configurations to propose.
+            rungs: Fold counts of the rungs, ending in `None` for all folds.
+        """
         proposals = [optimizer.ask() for count in range(size)]
         ids = self.context.allocate_trial_ids(len(proposals))
         current = self.runner.run_many(
@@ -253,7 +283,15 @@ class Tuner:
     def survivor_ids(
         self, first_rung: list[experiments.TrialResult]
     ) -> set[str]:
-        """Returns the ids of first-rung trials that advance."""
+        """Selects the first-rung trials that advance.
+
+        Args:
+            first_rung: Results of the first rung.
+
+        Returns:
+            The ids of the best successful trials, keeping at least one and
+            dropping the configured prune fraction.
+        """
         ok = [t for t in first_rung if t.status is Status.OK]
         keep = max(1, math.ceil(len(ok) * (1 - self.search.prune_fraction)))
         sign = 1 if self.metric.greater_is_better else -1
@@ -263,7 +301,14 @@ class Tuner:
     def complete(
         self, trial: experiments.TrialResult, optimizer: optimizers.Optimizer
     ) -> None:
-        """Tells the optimizer the trial's score (if any) and records it."""
+        """Tells the optimizer the trial's score (if any) and records it.
+
+        Successful and pruned trials are reported to the optimizer.
+
+        Args:
+            trial: The trial result.
+            optimizer: The optimizer that proposed the configuration.
+        """
         if trial.status in (Status.OK, Status.PRUNED):
             optimizer.tell(trial.params, trial.score_mean)
         self.context.record_trial(trial)

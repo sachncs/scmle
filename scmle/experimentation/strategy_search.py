@@ -24,7 +24,7 @@ def best_default_trials(
     """Ranks successful default-pipeline trials best-first.
 
     Args:
-        screened: Trials from the screening phase.
+        screened: Trials from screening.
         metric_greater_is_better: Orientation of the metric.
         limit: Number of models to keep.
         baseline_family_names: Models excluded from strategy search.
@@ -46,7 +46,15 @@ def best_default_trials(
 
 
 class StrategySearch:
-    """Evaluates data strategies for the most promising screened models."""
+    """Evaluates data strategies for the most promising screened models.
+
+    Attributes:
+        context: Run context.
+        runner: Trial runner used for every evaluation.
+        metric: The metric being optimized.
+        task: The resolved task.
+        profile: The data profile.
+    """
 
     def __init__(
         self, context: context_module.RunContext, runner: trials.TrialRunner
@@ -67,7 +75,7 @@ class StrategySearch:
         """Runs the search; results and verdicts go to the context.
 
         Args:
-            screened: Default-configuration trials from the screening phase.
+            screened: Default-configuration trials from the screening step.
         """
         spec = self.context.spec.effective_strategies()
         if not spec.names or spec.top_models == 0:
@@ -90,7 +98,15 @@ class StrategySearch:
     def search_model(
         self, leader: experiments.TrialResult, names: list[str]
     ) -> None:
-        """Tries every applicable strategy for one model."""
+        """Tries every applicable strategy for one model.
+
+        Inapplicable strategies are rejected with the reason; the others are
+        evaluated as trials and judged against the leader.
+
+        Args:
+            leader: The model's default-pipeline trial.
+            names: Names of the strategies to try.
+        """
         adapter = self.context.registry.get(leader.model_name)
         chosen: list[str] = []
         for name in names:
@@ -116,7 +132,15 @@ class StrategySearch:
     def judge(
         self, leader: experiments.TrialResult, outcome: experiments.TrialResult
     ) -> None:
-        """Compares a strategy trial with its model's default pipeline."""
+        """Compares a strategy trial with its model's default pipeline.
+
+        The strategy is included if it beats the default in the metric's favour,
+        otherwise rejected; a trial that did not succeed is rejected.
+
+        Args:
+            leader: The model's default-pipeline trial.
+            outcome: The strategy trial's result.
+        """
         technique = f"{outcome.strategy}@{outcome.model_name}"
         if outcome.status is not Status.OK:
             self.context.add_outcome(

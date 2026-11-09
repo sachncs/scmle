@@ -69,7 +69,7 @@ class TrialPayload:
         thread_limit: Threads each worker may use (None = library default).
         ceiling_seconds: Hard time ceiling for the trial (None = none).
         memory_gb: Hard memory cap for the trial (None = none).
-        weighted: Score folds with the plan's weight column.
+        weighted: Score folds with the feature plan's weight column.
     """
 
     job: TrialJob
@@ -93,14 +93,30 @@ TRAIN_SCORE_ROWS = 2000
 
 
 def access_record(row_ids: pd.Index) -> dict[str, Any]:
-    """Row count and digest of the rows a fit or scoring call received."""
+    """Summarizes the rows a fit or scoring call received.
+
+    Args:
+        row_ids: Index of the rows.
+
+    Returns:
+        A dict with the row count and a 16-character digest of the sorted row
+        ids.
+    """
     ordered = sorted(map(str, row_ids))
     digest = hashlib.sha256("\x1f".join(ordered).encode()).hexdigest()
     return {"rows": len(ordered), "digest": digest[:16]}
 
 
 def runtime_requirements(adapter: models.ModelAdapter) -> dict[str, Any]:
-    """Python version and versions of the libraries the model needs."""
+    """Lists the Python version and the library versions a model needs.
+
+    Args:
+        adapter: The model adapter, whose `requires` names the libraries.
+
+    Returns:
+        A dict with `python` and `libraries` (name to installed version, or
+        `unknown` if not installed).
+    """
     needed = {}
     for module in adapter.requires:
         try:
@@ -113,7 +129,16 @@ def runtime_requirements(adapter: models.ModelAdapter) -> dict[str, Any]:
 def fold_weights(
     payload: TrialPayload, positions: np.ndarray
 ) -> dict[str, np.ndarray]:
-    """Scorer keyword arguments carrying the rows' weights, when weighted."""
+    """Builds scorer keyword arguments carrying the rows' weights.
+
+    Args:
+        payload: The trial payload.
+        positions: Row positions in the development data.
+
+    Returns:
+        `{"sample_weight": ...}` with the weight column's values at those
+        positions, or an empty dict when the trial is not weighted.
+    """
     if not payload.weighted:
         return {}
     column = payload.feature_plan.weight_column
@@ -210,7 +235,15 @@ def evaluate_payload(payload: TrialPayload) -> experiments.TrialResult:
 def lost_trial(
     payload: TrialPayload, error: Exception
 ) -> experiments.TrialResult:
-    """A failed result for a trial whose worker was lost."""
+    """Builds a failed result for a trial whose worker was lost.
+
+    Args:
+        payload: The payload that was being evaluated.
+        error: The error that reported the loss.
+
+    Returns:
+        A `FAILED` result whose error starts with `WorkerLost`.
+    """
     job = payload.job
     return experiments.TrialResult(
         job.trial_id,
@@ -228,6 +261,13 @@ def guarded_evaluate(payload: TrialPayload) -> experiments.TrialResult:
 
     A trial killed for exceeding a limit, or lost with its process, becomes a
     `FAILED` result so the run continues.
+
+    Args:
+        payload: Self-contained description of the work.
+
+    Returns:
+        The trial result, `FAILED` with a `TrialLimitError` message if a limit
+        was exceeded.
     """
     supervisor = limits.TrialSupervisor(
         payload.ceiling_seconds, payload.memory_gb
@@ -248,7 +288,16 @@ def guarded_evaluate(payload: TrialPayload) -> experiments.TrialResult:
 
 
 class TrialRunner:
-    """Evaluates candidate pipelines with failure isolation."""
+    """Evaluates candidate pipelines with failure isolation.
+
+    Attributes:
+        context: Run context.
+        split: The data split.
+        task: The resolved task.
+        metric: The metric being optimized.
+        feature_plan: Feature columns by kind.
+        folds: Cross-validation folds as lists of positions.
+    """
 
     def __init__(self, context: context_module.RunContext) -> None:
         """Initializes the runner from a context holding a split and plan.
@@ -269,11 +318,19 @@ class TrialRunner:
 
     @property
     def workers(self) -> int:
-        """Concurrency of the execution backend."""
+        """The concurrency of the execution backend."""
         return self.context.backend.workers
 
     def payload(self, job: TrialJob) -> TrialPayload:
-        """Builds the self-contained payload for a job."""
+        """Builds the self-contained payload for a job.
+
+        Args:
+            job: The job.
+
+        Returns:
+            The payload, with scoring weighted only if the selection spec asks
+            for it, a weight column exists and the metric accepts weights.
+        """
         context = self.context
         governor = context.resource_governor
         return TrialPayload(
@@ -403,7 +460,16 @@ class TrialRunner:
     def skip(
         self, trial_id: str, model_name: str, reason: str
     ) -> experiments.TrialResult:
-        """Creates a `SKIPPED` result."""
+        """Creates a `SKIPPED` result.
+
+        Args:
+            trial_id: Identifier for the result.
+            model_name: Registered model that was not evaluated.
+            reason: Why it was skipped.
+
+        Returns:
+            The result, with the reason as its error text.
+        """
         return experiments.TrialResult(
             trial_id,
             model_name,

@@ -69,27 +69,59 @@ class ExperimentStore(abc.ABC):
     def start_run(
         self, run_id: str, config_hash: str, run_dir: str, started_at: str
     ) -> None:
-        """Registers (or re-registers, on resume) a run."""
+        """Registers (or re-registers, on resume) a run.
+
+        Args:
+            run_id: Identifier of the run.
+            config_hash: Hash of the run configuration.
+            run_dir: Directory of the run.
+            started_at: Start timestamp.
+        """
 
     @abc.abstractmethod
     def update_run(self, run_id: str, **fields: Any) -> None:
-        """Updates run columns (state, dataset_id, selected_model, ...)."""
+        """Updates run columns (state, dataset_id, selected_model, ...).
+
+        Args:
+            run_id: Identifier of the run.
+            **fields: Columns to update, with their new values.
+        """
 
     @abc.abstractmethod
     def record_trial(self, run_id: str, trial: experiments.TrialResult) -> None:
-        """Inserts or replaces a trial."""
+        """Inserts or replaces a trial.
+
+        Args:
+            run_id: Identifier of the run the trial belongs to.
+            trial: The trial result.
+        """
 
     @abc.abstractmethod
     def runs(self) -> list[dict[str, Any]]:
-        """Returns all runs, newest first."""
+        """Lists all runs, newest first.
+
+        Returns:
+            One dict per run.
+        """
 
     @abc.abstractmethod
     def trials(self, run_id: str) -> list[dict[str, Any]]:
-        """Returns a run's trials in insertion order."""
+        """Lists a run's trials in insertion order.
+
+        Args:
+            run_id: Identifier of the run.
+
+        Returns:
+            One dict per trial.
+        """
 
     @abc.abstractmethod
     def history(self) -> list[experiments.HistoricalRun]:
-        """Returns completed runs that carry a dataset fingerprint."""
+        """Lists completed runs that carry a dataset fingerprint.
+
+        Returns:
+            The historical runs, for meta-learning.
+        """
 
     def listen(self, run_id: str, event: events.Event) -> None:
         """Mirrors state-change events into the run's `state` column.
@@ -108,29 +140,66 @@ class NullExperimentStore(ExperimentStore):
     def start_run(
         self, run_id: str, config_hash: str, run_dir: str, started_at: str
     ) -> None:
-        """Ignores the run."""
+        """Ignores the run.
+
+        Args:
+            run_id: Identifier of the run. Unused.
+            config_hash: Hash of the run configuration. Unused.
+            run_dir: Directory of the run. Unused.
+            started_at: Start timestamp. Unused.
+        """
 
     def update_run(self, run_id: str, **fields: Any) -> None:
-        """Ignores the update."""
+        """Ignores the update.
+
+        Args:
+            run_id: Identifier of the run. Unused.
+            **fields: Columns to update. Unused.
+        """
 
     def record_trial(self, run_id: str, trial: experiments.TrialResult) -> None:
-        """Ignores the trial."""
+        """Ignores the trial.
+
+        Args:
+            run_id: Identifier of the run. Unused.
+            trial: The trial result. Unused.
+        """
 
     def runs(self) -> list[dict[str, Any]]:
-        """Returns nothing."""
+        """Returns nothing.
+
+        Returns:
+            An empty list.
+        """
         return []
 
     def trials(self, run_id: str) -> list[dict[str, Any]]:
-        """Returns nothing."""
+        """Returns nothing.
+
+        Args:
+            run_id: Identifier of the run. Unused.
+
+        Returns:
+            An empty list.
+        """
         return []
 
     def history(self) -> list[experiments.HistoricalRun]:
-        """Returns nothing."""
+        """Returns nothing.
+
+        Returns:
+            An empty list.
+        """
         return []
 
 
 class SqliteExperimentStore(ExperimentStore):
-    """Local SQLite tracking database (one file, no services)."""
+    """Local SQLite tracking database (one file, no services).
+
+    Attributes:
+        COLUMNS: Run columns that `update_run` may set.
+        path: Path of the database file.
+    """
 
     COLUMNS = frozenset(
         {
@@ -163,7 +232,11 @@ class SqliteExperimentStore(ExperimentStore):
             self.migrate(connection)
 
     def migrate(self, connection: sqlite3.Connection) -> None:
-        """Adds columns introduced after a database was first created."""
+        """Adds columns introduced after a database was first created.
+
+        Args:
+            connection: An open connection to the database.
+        """
         existing = {
             row["name"] for row in connection.execute("PRAGMA table_info(runs)")
         }
@@ -187,7 +260,19 @@ class SqliteExperimentStore(ExperimentStore):
     def add_column(
         connection: sqlite3.Connection, table: str, column: str
     ) -> None:
-        """Adds a text column, tolerating another process adding it first."""
+        """Adds a text column, tolerating another process adding it first.
+
+        Args:
+            connection: An open connection to the database.
+            table: Table name; must come from a fixed list, as it is not
+                escaped.
+            column: Column name; must come from a fixed list, as it is not
+                escaped.
+
+        Raises:
+            OperationalError: If SQLite refuses the statement for any reason
+                other than the column already existing.
+        """
         try:
             # Identifiers come from the fixed lists in `migrate`.
             connection.execute(
@@ -201,8 +286,12 @@ class SqliteExperimentStore(ExperimentStore):
     def session(self) -> Iterator[sqlite3.Connection]:
         """Opens a transaction and always closes the connection.
 
-        `with sqlite3.connect(...)` only commits or rolls back; it never
-        closes, which leaks a connection per call.
+        `with sqlite3.connect(...)` only commits or rolls back; it never closes,
+        which leaks a connection per call.
+
+        Yields:
+            An open connection; the transaction commits when the block ends
+            normally and rolls back on an exception.
         """
         connection = self.connect()
         try:
@@ -212,7 +301,12 @@ class SqliteExperimentStore(ExperimentStore):
             connection.close()
 
     def connect(self) -> sqlite3.Connection:
-        """Opens a short-lived connection with row access by name."""
+        """Opens a short-lived connection with row access by name.
+
+        Returns:
+            A new connection that waits up to `BUSY_TIMEOUT_SECONDS` for a
+            competing writer.
+        """
         connection = sqlite3.connect(self.path, timeout=BUSY_TIMEOUT_SECONDS)
         connection.row_factory = sqlite3.Row
         return connection
@@ -220,7 +314,16 @@ class SqliteExperimentStore(ExperimentStore):
     def start_run(
         self, run_id: str, config_hash: str, run_dir: str, started_at: str
     ) -> None:
-        """Inserts the run, or refreshes it when resuming."""
+        """Inserts the run, or refreshes it when resuming.
+
+        A resumed run is set back to the `CREATED` state.
+
+        Args:
+            run_id: Identifier of the run.
+            config_hash: Hash of the run configuration.
+            run_dir: Directory of the run.
+            started_at: Start timestamp.
+        """
         with self.session() as connection:
             connection.execute(
                 "INSERT INTO runs (run_id, config_hash, state, started_at, "
@@ -232,6 +335,10 @@ class SqliteExperimentStore(ExperimentStore):
 
     def update_run(self, run_id: str, **fields: Any) -> None:
         """Updates whitelisted columns; dict values are stored as JSON.
+
+        Args:
+            run_id: Identifier of the run.
+            **fields: Columns to update, with their new values.
 
         Raises:
             ValueError: For columns outside the schema.
@@ -254,7 +361,12 @@ class SqliteExperimentStore(ExperimentStore):
             )
 
     def record_trial(self, run_id: str, trial: experiments.TrialResult) -> None:
-        """Upserts a trial."""
+        """Upserts a trial.
+
+        Args:
+            run_id: Identifier of the run the trial belongs to.
+            trial: The trial result.
+        """
         with self.session() as connection:
             connection.execute(
                 "INSERT OR REPLACE INTO trials (run_id, trial_id, model_name, "
@@ -278,7 +390,11 @@ class SqliteExperimentStore(ExperimentStore):
             )
 
     def runs(self) -> list[dict[str, Any]]:
-        """Returns runs newest first."""
+        """Lists runs, newest first.
+
+        Returns:
+            One dict per run, ordered by start time and run id, descending.
+        """
         with self.session() as connection:
             rows = connection.execute(
                 "SELECT * FROM runs ORDER BY started_at DESC, run_id DESC"
@@ -286,7 +402,14 @@ class SqliteExperimentStore(ExperimentStore):
         return [dict(row) for row in rows]
 
     def trials(self, run_id: str) -> list[dict[str, Any]]:
-        """Returns a run's trials ordered by trial id."""
+        """Lists a run's trials ordered by trial id.
+
+        Args:
+            run_id: Identifier of the run.
+
+        Returns:
+            One dict per trial.
+        """
         with self.session() as connection:
             rows = connection.execute(
                 "SELECT * FROM trials WHERE run_id = ? ORDER BY trial_id",
@@ -295,7 +418,13 @@ class SqliteExperimentStore(ExperimentStore):
         return [dict(row) for row in rows]
 
     def history(self) -> list[experiments.HistoricalRun]:
-        """Returns completed, fingerprinted runs, oldest first."""
+        """Lists completed, fingerprinted runs, oldest first.
+
+        Returns:
+            The runs whose state is `COMPLETED` and which have a fingerprint and
+            a selected model. A missing score is NaN and a missing strategy is
+            `default`.
+        """
         with self.session() as connection:
             rows = connection.execute(
                 "SELECT * FROM runs WHERE state = 'COMPLETED' AND "
