@@ -57,7 +57,7 @@ class Environment(enum.StrEnum):
     PRODUCTION = "production"
 
 
-def require_digest(value: str, field_name: str) -> str:
+def require_digest(value: object, field_name: str) -> str:
     """Returns `value` if it is a `sha256:<64 hex>` digest.
 
     Args:
@@ -79,7 +79,7 @@ def require_digest(value: str, field_name: str) -> str:
     return value
 
 
-def require_name(value: str, field_name: str) -> str:
+def require_name(value: object, field_name: str) -> str:
     """Returns `value` if it is a plain identifier.
 
     Args:
@@ -97,7 +97,7 @@ def require_name(value: str, field_name: str) -> str:
     return value
 
 
-def require_positive(value: float, field_name: str) -> float:
+def require_positive(value: object, field_name: str) -> float:
     """Returns `value` if it is a positive finite number.
 
     Args:
@@ -297,7 +297,7 @@ class SecretRef:
                 f"secret name must be an upper-case variable: {self.name!r}"
             )
         object.__setattr__(self, "source", SecretSource(self.source))
-        text = self.locator
+        text: object = self.locator  # may be any value from a record
         if (
             not isinstance(text, str)
             or not text.strip()
