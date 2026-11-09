@@ -177,7 +177,7 @@ def test_implied_statements_of_the_chain():
     assert len(texts) == 4 and len(statements) == 4
     assert skipped == []
     for s in statements:  # every statement is a true d-separation
-        assert CHAIN.d_separated([s.x], [s.y], s.given)
+        assert dag.separated(CHAIN.nodes, CHAIN.edges, [s.x], [s.y], s.given)
 
 
 def test_latent_parents_skip_the_node():

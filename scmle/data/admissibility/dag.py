@@ -304,26 +304,6 @@ class Dag:
         """
         return reach([node], children_map(self.edges))
 
-    def d_separated(
-        self,
-        xs: Collection[str],
-        ys: Collection[str],
-        zs: Collection[str] = (),
-    ) -> bool:
-        """Tests whether `zs` d-separates `xs` and `ys`.
-
-        Args:
-            xs: First set of nodes.
-            ys: Second set of nodes.
-            zs: Conditioning set.
-
-        Returns:
-            True when every path between `xs` and `ys` is blocked by `zs`.
-            Overlapping sets and unknown nodes are rejected with a
-            `ValueError` from `separated`.
-        """
-        return separated(self.nodes, self.edges, xs, ys, zs)
-
     def backdoor_valid(
         self, treatment: str, outcome: str, adjustment: Collection[str]
     ) -> bool:

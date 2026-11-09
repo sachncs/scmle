@@ -81,20 +81,6 @@ class Availability(enum.StrEnum):
     UNKNOWN = "unknown"
 
 
-def number(value: Any, name: str) -> float:
-    """Checks that a value is a finite number and returns it as a float.
-
-    Args:
-        value: The value to check.
-        name: Field name used in the error message.
-
-    Returns:
-        `value` as a float. A value that is not a finite number is
-        rejected with a `ValueError` from `qualification.finite`.
-    """
-    return qualification.finite(value, name)
-
-
 @dataclasses.dataclass(frozen=True, slots=True)
 class AsOf:
     """How long before the prediction moment a value is known.
@@ -125,7 +111,7 @@ class AsOf:
         else:
             if self.lead_seconds is None:
                 raise ValueError("a known as-of rule needs lead_seconds")
-            number(self.lead_seconds, "lead_seconds")
+            qualification.finite(self.lead_seconds, "lead_seconds")
 
     @classmethod
     def unknown(cls) -> Self:
