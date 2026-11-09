@@ -72,7 +72,8 @@ def breast_cancer() -> pandas.DataFrame:
         The scikit-learn breast-cancer features and `target`, with a fresh
         0..n-1 index.
     """
-    return load_breast_cancer(as_frame=True).frame.reset_index(drop=True)
+    frame: pandas.DataFrame = load_breast_cancer(as_frame=True).frame
+    return frame.reset_index(drop=True)
 
 
 def plant_leak(

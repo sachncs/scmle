@@ -55,7 +55,7 @@ NOISE_SEEDS = (0, 1, 2, 3, 4)
 CRASH_ROWS = 200
 
 
-class CrashingClassifier(base.ClassifierMixin, base.BaseEstimator):
+class CrashingClassifier(base.ClassifierMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Fails on real-sized data; used to prove one bad candidate is isolated.
 
     Registration runs a conformance check on a tiny problem, so the estimator

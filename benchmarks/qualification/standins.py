@@ -53,7 +53,8 @@ def demo_frame() -> pandas.DataFrame:
     Returns:
         The features and the `target` column, with a fresh 0..n-1 index.
     """
-    return load_breast_cancer(as_frame=True).frame.reset_index(drop=True)
+    frame: pandas.DataFrame = load_breast_cancer(as_frame=True).frame
+    return frame.reset_index(drop=True)
 
 
 def label_flip_standin(frame: pandas.DataFrame) -> pandas.Series:

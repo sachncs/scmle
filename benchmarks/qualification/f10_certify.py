@@ -1085,7 +1085,8 @@ def load() -> dict[str, Any] | None:
     """
     if not STORE_PATH.exists():
         return None
-    return json.loads(STORE_PATH.read_text(encoding="utf-8"))
+    stored: dict[str, Any] = json.loads(STORE_PATH.read_text(encoding="utf-8"))
+    return stored
 
 
 def problems(document: dict[str, Any] | None = None) -> list[str]:

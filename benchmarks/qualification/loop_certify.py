@@ -363,7 +363,8 @@ def sequence_gaps(
     low = numpy.clip(base - advantages, 0.0, 1.0)[:, None, None]
     champion = (latent < base).astype(float)[None]
     challenger = (seen < low).astype(float)
-    return (champion - challenger).mean(axis=2)
+    difference: numpy.ndarray = (champion - challenger).mean(axis=2)
+    return difference
 
 
 def eprocess_paths(gaps: numpy.ndarray) -> numpy.ndarray:

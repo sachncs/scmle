@@ -77,7 +77,8 @@ def check_features(features: pandas.DataFrame) -> None:
         ValueError: On an empty frame, a non-numeric or boolean column, a
             missing or infinite value, a constant column or a repeated name.
     """
-    if not isinstance(features, pandas.DataFrame) or features.empty:
+    candidate: object = features  # callers may pass anything
+    if not isinstance(candidate, pandas.DataFrame) or candidate.empty:
         raise ValueError("features must be a non-empty DataFrame")
     if not features.columns.is_unique:
         raise ValueError("feature names must be unique")

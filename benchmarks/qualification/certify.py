@@ -74,7 +74,7 @@ def flags_for(
     Raises:
         ValueError: If the output is not a boolean Series aligned to `frame`.
     """
-    flags = detector(frame)
+    flags: object = detector(frame)  # a detector may return anything
     if (
         not isinstance(flags, pandas.Series)
         or flags.dtype != bool

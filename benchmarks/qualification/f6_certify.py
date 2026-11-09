@@ -192,7 +192,8 @@ def source_values() -> numpy.ndarray:
     """
     frame = load_breast_cancer(as_frame=True).frame
     values = frame[SOURCE_COLUMN].to_numpy(dtype=float)
-    return (values - values.mean()) / values.std()
+    standardised: numpy.ndarray = (values - values.mean()) / values.std()
+    return standardised
 
 
 def stability_world(

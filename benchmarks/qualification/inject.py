@@ -103,7 +103,8 @@ def check_frame(frame: pandas.DataFrame) -> None:
         ValueError: If it is not a non-empty DataFrame, or its column names
             or index labels repeat.
     """
-    if not isinstance(frame, pandas.DataFrame) or frame.empty:
+    candidate: object = frame  # callers may pass anything
+    if not isinstance(candidate, pandas.DataFrame) or candidate.empty:
         raise ValueError("frame must be a non-empty DataFrame")
     if not frame.columns.is_unique or not frame.index.is_unique:
         raise ValueError("frame needs unique column names and index labels")

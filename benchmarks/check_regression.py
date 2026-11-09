@@ -14,6 +14,7 @@ import json
 import logging
 import pathlib
 import sys
+from typing import Any
 
 from benchmarks import intervals
 
@@ -21,7 +22,9 @@ BASELINE = pathlib.Path(__file__).with_name("baseline.json")
 LOWER_IS_BETTER = {"log_loss", "rmse", "mae"}
 
 
-def violations(results: list[dict], baseline: dict[str, dict]) -> list[str]:
+def violations(
+    results: list[dict[str, Any]], baseline: dict[str, dict[str, Any]]
+) -> list[str]:
     """Lists every benchmark that regressed or is missing.
 
     Args:
