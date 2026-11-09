@@ -365,8 +365,9 @@ class SigningKeyRegistry:
     ) -> SigningKeyRecord:
         """Immediately invalidates signatures made by a compromised key.
 
-        Only an active key can be revoked; the refusals are those of
-        `transition`.
+        An active or a retired key can be revoked (a retired key still
+        verifies historical signatures, so a later compromise must be able to
+        end that); the refusals are those of `transition`.
 
         Args:
             key_id: Identifier of the key.
@@ -400,14 +401,17 @@ class SigningKeyRegistry:
 
         Raises:
             ValueError: If the key or the replacement key is unknown, the key
-                is not active, the target state is active, the replacement key
+                is not active (a retired key may only be revoked), the target state is active, the replacement key
                 is not active, or the new record is invalid (for example a
                 malformed time, a blank reason or the key as its own
                 replacement). Nothing changes in that case.
         """
         with self.lock:  # Read, validate and replace as one step.
             current = self.get(key_id)
-            if current.state is not KeyState.ACTIVE:
+            if current.state is not KeyState.ACTIVE and not (
+                current.state is KeyState.RETIRED
+                and state is KeyState.REVOKED
+            ):
                 raise ValueError(
                     f"key is already {current.state.value}: {key_id}"
                 )
@@ -418,7 +422,11 @@ class SigningKeyRegistry:
                 state=state,
                 state_changed_at=changed_at,
                 reason=reason,
-                replacement_key_id=replacement_key_id,
+                replacement_key_id=(
+                    replacement_key_id
+                    if replacement_key_id is not None
+                    else current.replacement_key_id
+                ),
             )
             if replacement_key_id is not None:
                 replacement = self.get(replacement_key_id)

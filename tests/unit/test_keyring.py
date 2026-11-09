@@ -167,3 +167,31 @@ def test_timestamp_parser_accepts_zulu_and_offset_forms():
     assert isinstance(
         keyring.parse_timestamp(OBSERVED, "timestamp"), datetime.datetime
     )
+
+
+def test_a_retired_key_found_compromised_can_still_be_revoked():
+    """Retirement keeps historical proof alive, so revocation must stay open."""
+    registry = keyring.SigningKeyRegistry((record(),))
+    payload = {"release": "candidate-1"}
+    envelope = registry.sign(
+        payload, "release-2026-10", "secret", "2026-10-20T12:00:00+00:00"
+    )
+    registry.retire("release-2026-10", ROTATED, "rotation")
+    assert registry.verify(
+        payload,
+        envelope,
+        {"release-2026-10": "secret"},
+        OBSERVED,
+        historical=True,
+    )
+    registry.revoke("release-2026-10", OBSERVED, "credential compromise")
+
+    assert not registry.verify(
+        payload,
+        envelope,
+        {"release-2026-10": "secret"},
+        OBSERVED,
+        historical=True,
+    )
+    with pytest.raises(ValueError, match="already revoked"):
+        registry.revoke("release-2026-10", OBSERVED, "again")
