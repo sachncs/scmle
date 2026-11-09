@@ -1,8 +1,8 @@
-"""Which code each F5 detector consists of, and what it may gate on.
+"""Which code each detector consists of, and what it may gate on.
 
 A certificate is tied to a hash of the detector's source. Each detector here
 is hashed over whole modules, so an edit to any helper makes its certificate
-stale and the detector falls back to descriptive (canon P1).
+stale and the detector falls back to descriptive.
 """
 
 import dataclasses
@@ -33,7 +33,11 @@ class DetectorSpec:
     defect_types: tuple[str, ...]
 
     def code_hash(self) -> str:
-        """Hash of the detector's modules."""
+        """Hashes the source of the detector's modules.
+
+        Returns:
+            The code hash that a certificate for this detector must match.
+        """
         return certificates.code_hash(*self.modules)
 
 

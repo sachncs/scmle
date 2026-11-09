@@ -10,8 +10,8 @@ column, in units of column standard deviations. The default cut is a policy
 value selected by the certification harness from a grid on clean data (see
 `benchmarks/qualification/f5.py`), not chosen by hand.
 
-MinHash on tokenised strings, named in the F5 specification, is not
-implemented: text columns only block exact matches.
+MinHash on tokenised strings is not implemented: text columns only block
+exact matches.
 
 The duplicate rate carries an exact (Clopper-Pearson) binomial interval.
 """
@@ -59,12 +59,24 @@ class DuplicateReport:
     groups: int
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Returns the report as a JSON-ready record.
+
+        Returns:
+            A mapping of every field to its value.
+        """
         return dataclasses.asdict(self)
 
 
 def exact_flags(frame: pd.DataFrame, columns: Sequence[str]) -> np.ndarray:
-    """True for every row after the first of its exact-duplicate group."""
+    """Flags every row after the first of its exact-duplicate group.
+
+    Args:
+        frame: Table.
+        columns: Columns that define a record.
+
+    Returns:
+        A boolean per row, True for a row that repeats an earlier row.
+    """
     ids = groups.duplicate_groups(frame, list(columns))
     flags = np.zeros(len(frame), dtype=bool)
     seen: set[int] = set()
@@ -78,7 +90,16 @@ def exact_flags(frame: pd.DataFrame, columns: Sequence[str]) -> np.ndarray:
 
 
 def standardized_block(values: pd.DataFrame, spread: pd.Series) -> np.ndarray:
-    """Numeric block divided by column spread, missing filled by the mean."""
+    """Scales a numeric block by column spread, filling gaps with the mean.
+
+    Args:
+        values: Numeric columns. Non-finite entries count as missing.
+        spread: Spread (standard deviation) of each column, nonzero.
+
+    Returns:
+        A float array with missing entries replaced by the column mean, then
+        divided by `spread`.
+    """
     block = values.to_numpy(dtype=float, copy=True)
     block[~np.isfinite(block)] = np.nan
     centre = np.nanmean(block, axis=0)
@@ -138,7 +159,17 @@ def near_flags(
 
 
 def duplicate_flags(frame: pd.DataFrame, cut: float = DEFAULT_CUT) -> pd.Series:
-    """Rows that repeat an earlier row exactly or within the near cut."""
+    """Flags rows that repeat an earlier row exactly or within the near cut.
+
+    A `cut` that is not positive and finite raises `ValueError`.
+
+    Args:
+        frame: Table; every column defines a record.
+        cut: Near-duplicate distance cut.
+
+    Returns:
+        A boolean Series on the index of `frame`.
+    """
     columns = list(frame.columns)
     flags = exact_flags(frame, columns) | near_flags(frame, columns, cut)
     return pd.Series(flags, index=frame.index)
@@ -147,7 +178,16 @@ def duplicate_flags(frame: pd.DataFrame, cut: float = DEFAULT_CUT) -> pd.Series:
 def clopper_pearson(
     successes: int, n: int, confidence: float = CONFIDENCE
 ) -> tuple[float, float]:
-    """Exact two-sided binomial interval (via scipy)."""
+    """Computes an exact two-sided binomial interval, via scipy.
+
+    Args:
+        successes: Number of successes.
+        n: Number of trials.
+        confidence: Confidence level of the interval.
+
+    Returns:
+        The lower and upper limits of the interval for the proportion.
+    """
     result = stats.binomtest(successes, n).proportion_ci(confidence)
     return float(result.low), float(result.high)
 

@@ -1,7 +1,7 @@
 """Detector certificates: measured operating characteristics tied to code.
 
-Canon P1: a check may gate a run only if its operating characteristic has been
-measured and is on file. A `DetectorCertificate` records, per defect type, how
+A check may gate a run only if its operating characteristic has been measured
+and is on file. A `DetectorCertificate` records, per defect type, how
 many planted defects a detector found and how many clean rows it flagged, with
 Wilson intervals. It is keyed by a hash of the detector's code, so a code
 change without re-certification leaves the old certificate stale, and the
@@ -103,7 +103,15 @@ def wilson_interval(
 
 
 def docstring_lines(tree: ast.Module) -> set[int]:
-    """Line numbers occupied only by a docstring statement."""
+    """Finds the lines occupied only by a docstring statement.
+
+    Args:
+        tree: Parsed module.
+
+    Returns:
+        The 1-based line numbers of every docstring that shares its lines
+        with no other statement.
+    """
     statements = [n for n in ast.walk(tree) if isinstance(n, ast.stmt)]
     lines: set[int] = set()
     for owner in ast.walk(tree):
@@ -131,6 +139,7 @@ def hash_source(source: str) -> str:
     The text itself is hashed, not a syntax tree, so the value does not
     depend on the Python version that computes it. Reformatting the code
     changes the hash, which is deliberate: any edit needs re-certification.
+    Source that is not valid Python raises `SyntaxError`.
 
     Args:
         source: Python source for a function, class or module.
@@ -176,7 +185,13 @@ def code_hash(*objects: Any) -> str:
 
 
 def corpus_hash(parts: Iterable[str]) -> str:
-    """Order-independent hash of the corpus file hashes a run used.
+    """Hashes the corpus file hashes a run used, ignoring their order.
+
+    Args:
+        parts: SHA-256 hex digests of the corpus files.
+
+    Returns:
+        64 lowercase hexadecimal characters.
 
     Raises:
         ValueError: If no part is given or a part is not a SHA-256 digest.
@@ -190,7 +205,18 @@ def corpus_hash(parts: Iterable[str]) -> str:
 
 
 def require_digest(value: Any, name: str) -> str:
-    """Returns `value` if it is a lowercase SHA-256 hex digest."""
+    """Returns `value` if it is a lowercase SHA-256 hex digest.
+
+    Args:
+        value: The value to check.
+        name: Name of the value, used in the error message.
+
+    Returns:
+        `value`, unchanged.
+
+    Raises:
+        ValueError: If `value` is not a 64-character lowercase hex string.
+    """
     if not isinstance(value, str) or not SHA256_HEX.fullmatch(value):
         raise ValueError(f"{name} must be a 64-character lowercase SHA-256")
     return value
@@ -212,7 +238,12 @@ class CertificationPolicy:
     confidence: float = DEFAULT_CONFIDENCE
 
     def __post_init__(self) -> None:
-        """Validates the thresholds."""
+        """Validates the thresholds.
+
+        Raises:
+            ValueError: If a floor or ceiling is not a probability, or
+                `confidence` is not strictly between 0 and 1.
+        """
         qualification.probability(self.recall_floor, "recall_floor")
         qualification.probability(
             self.false_alarm_ceiling, "false_alarm_ceiling"
@@ -222,18 +253,42 @@ class CertificationPolicy:
             raise ValueError("confidence must be within (0, 1)")
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Returns the policy as a JSON-ready record.
+
+        Returns:
+            A mapping of every field to its value.
+        """
         return dataclasses.asdict(self)
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds a policy, rejecting unknown or missing fields."""
+        """Rebuilds a policy, rejecting unknown or missing fields.
+
+        Args:
+            record: A mapping holding exactly the fields of the policy.
+
+        Returns:
+            The policy. A record with unexpected or missing fields, or
+            invalid values, raises `ValueError`.
+        """
         qualification.require_fields(cls, record)
         return cls(**record)
 
 
 def interval_pair(value: Any, name: str) -> tuple[float, float]:
-    """Parses a stored (low, high) interval."""
+    """Parses a stored (low, high) interval.
+
+    Args:
+        value: A list or tuple of two numbers.
+        name: Name of the field, used in the error message.
+
+    Returns:
+        The low and high limits as floats.
+
+    Raises:
+        ValueError: If `value` is not a pair, or a limit is not a finite
+            number.
+    """
     if not isinstance(value, list | tuple) or len(value) != 2:
         raise ValueError(f"{name} must hold (low, high)")
     return (
@@ -264,7 +319,18 @@ class DefectOutcome:
         certificate: qualification.Certificate,
         policy: CertificationPolicy,
     ) -> Self:
-        """Computes the intervals and verdict for `certificate`."""
+        """Computes the intervals and verdict for `certificate`.
+
+        Args:
+            certificate: Counts of planted defects found and clean rows
+                flagged.
+            policy: The floors to judge against.
+
+        Returns:
+            The outcome. It passes when the lower Wilson bound of recall is
+            at least the recall floor and the upper Wilson bound of the
+            false-alarm rate is at most the false-alarm ceiling.
+        """
         recall = wilson_interval(
             certificate.detected, certificate.planted, policy.confidence
         )
@@ -278,7 +344,12 @@ class DefectOutcome:
         return cls(certificate, recall, alarms, passed)
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Returns the outcome as a JSON-ready record.
+
+        Returns:
+            A mapping of the certificate, the two intervals as lists and
+            the verdict.
+        """
         return {
             "certificate": self.certificate.to_dict(),
             "recall_interval": list(self.recall_interval),
@@ -291,6 +362,13 @@ class DefectOutcome:
         cls, record: Mapping[str, Any], policy: CertificationPolicy
     ) -> Self:
         """Rebuilds an outcome and checks it against its own counts.
+
+        Args:
+            record: A mapping holding exactly the fields of the outcome.
+            policy: The policy the verdict is recomputed under.
+
+        Returns:
+            The outcome as recomputed from the counts.
 
         Raises:
             CertificateError: If a stored interval or verdict disagrees with
@@ -340,7 +418,14 @@ class DetectorCertificate:
     created: str | None = None
 
     def __post_init__(self) -> None:
-        """Validates the record."""
+        """Validates the record.
+
+        Raises:
+            ValueError: If an id or hash is invalid, `seeds` or `outcomes`
+                is not a non-empty tuple, a seed is not a non-negative
+                integer, defect types repeat, or an outcome belongs to a
+                different detector.
+        """
         evidence.require_text(self.detector_id, "detector_id")
         require_digest(self.code_hash, "code_hash")
         require_digest(self.corpus_hash, "corpus_hash")
@@ -361,7 +446,7 @@ class DetectorCertificate:
 
     @property
     def key(self) -> tuple[str, str, str, tuple[int, ...]]:
-        """What identifies this certificate in a store."""
+        """The detector id, code hash, corpus hash and sorted seeds."""
         return (
             self.detector_id,
             self.code_hash,
@@ -371,13 +456,18 @@ class DetectorCertificate:
 
     @property
     def certified_defect_types(self) -> tuple[str, ...]:
-        """Defect types whose outcome passed the policy."""
+        """The defect types whose outcome passed the policy."""
         return tuple(
             o.certificate.defect_type for o in self.outcomes if o.passed
         )
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Returns the certificate as a JSON-ready record.
+
+        Returns:
+            A mapping of every field to its value, with the policy and the
+            outcomes as records and the seeds as a list.
+        """
         return {
             "detector_id": self.detector_id,
             "code_hash": self.code_hash,
@@ -390,7 +480,16 @@ class DetectorCertificate:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds a certificate, verifying every stored verdict."""
+        """Rebuilds a certificate, verifying every stored verdict.
+
+        Args:
+            record: A mapping holding exactly the fields of the certificate.
+
+        Returns:
+            The certificate. A record that is invalid, or whose stored
+            verdict disagrees with its counts, raises `ValueError` or
+            `CertificateError`.
+        """
         qualification.require_fields(cls, record)
         policy = CertificationPolicy.from_dict(record["policy"])
         return cls(
@@ -428,10 +527,8 @@ def certify(
         created: Optional ISO timestamp supplied by the caller.
 
     Returns:
-        The certificate, with a verdict per defect type.
-
-    Raises:
-        ValueError: If `results` is empty or repeats a defect type.
+        The certificate, with a verdict per defect type. An empty `results`
+        or a repeated defect type raises `ValueError`.
     """
     outcomes = tuple(DefectOutcome.measure(r, policy) for r in results)
     return DetectorCertificate(
@@ -448,7 +545,16 @@ def certify(
 def demote(
     decision: qualification.Decision, status: GateStatus
 ) -> qualification.Decision:
-    """Limits a descriptive check to a warning at most."""
+    """Limits a descriptive check to a warning at most.
+
+    Args:
+        decision: The decision the check reached.
+        status: Whether the check may gate.
+
+    Returns:
+        `decision` when the check is gating or the decision is not a block
+        or quarantine; otherwise a warning.
+    """
     if status is GateStatus.GATING:
         return decision
     if decision in (
@@ -476,7 +582,7 @@ class AuditReport:
 
     @property
     def ok(self) -> bool:
-        """Whether every gating detector has a usable certificate."""
+        """True when every gating detector has a usable certificate."""
         return not (self.missing or self.stale or self.uncertified)
 
 
@@ -484,24 +590,40 @@ class CertificateStore:
     """The set of certificates written as `detector_certificates.json`."""
 
     def __init__(self, items: Iterable[DetectorCertificate] = ()) -> None:
-        """Creates a store, keeping the last certificate for each key."""
+        """Creates a store, keeping the last certificate for each key.
+
+        Args:
+            items: Certificates to add, in order.
+        """
         self.by_key: dict[tuple[Any, ...], DetectorCertificate] = {}
         for item in items:
             self.add(item)
 
     @property
     def certificates(self) -> tuple[DetectorCertificate, ...]:
-        """Stored certificates in a stable order."""
+        """The stored certificates, ordered by key."""
         return tuple(self.by_key[key] for key in sorted(self.by_key))
 
     def add(self, item: DetectorCertificate) -> None:
-        """Stores a certificate, replacing one with the same key."""
+        """Stores a certificate, replacing one with the same key.
+
+        Args:
+            item: The certificate to store.
+        """
         self.by_key[item.key] = item
 
     def current(
         self, detector_id: str, code_digest: str
     ) -> tuple[DetectorCertificate, ...]:
-        """Certificates issued for exactly this code."""
+        """Finds the certificates issued for exactly this code.
+
+        Args:
+            detector_id: The detector.
+            code_digest: Hash of the detector's current code.
+
+        Returns:
+            The matching certificates, ordered by key.
+        """
         return tuple(
             c
             for c in self.certificates
@@ -509,7 +631,17 @@ class CertificateStore:
         )
 
     def state(self, detector_id: str, code_digest: str) -> CertificateState:
-        """Whether a detector's code has a current certificate."""
+        """Finds how the store relates to a detector's current code.
+
+        Args:
+            detector_id: The detector.
+            code_digest: Hash of the detector's current code.
+
+        Returns:
+            `current` if a certificate matches the code, `stale` if the
+            detector has certificates only for other code, otherwise
+            `missing`.
+        """
         if self.current(detector_id, code_digest):
             return CertificateState.CURRENT
         if any(c.detector_id == detector_id for c in self.certificates):
@@ -519,7 +651,17 @@ class CertificateStore:
     def status(
         self, detector_id: str, code_digest: str, defect_type: str
     ) -> GateStatus:
-        """Gating only when current code passed for `defect_type`."""
+        """Finds whether a detector may gate on a defect type.
+
+        Args:
+            detector_id: The detector.
+            code_digest: Hash of the detector's current code.
+            defect_type: The defect type.
+
+        Returns:
+            `gating` when a certificate for the current code passed for
+            `defect_type`, otherwise `descriptive`.
+        """
         for item in self.current(detector_id, code_digest):
             if defect_type in item.certified_defect_types:
                 return GateStatus.GATING
@@ -529,6 +671,14 @@ class CertificateStore:
         self, detector_id: str, code_digest: str, defect_type: str
     ) -> GateStatus:
         """Returns `GATING`, or raises when the detector may not gate.
+
+        Args:
+            detector_id: The detector.
+            code_digest: Hash of the detector's current code.
+            defect_type: The defect type.
+
+        Returns:
+            `GateStatus.GATING`.
 
         Raises:
             StaleCertificateError: The certificate is for other code.
@@ -553,7 +703,12 @@ class CertificateStore:
         return GateStatus.GATING
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready document."""
+        """Returns the store as a JSON-ready document.
+
+        Returns:
+            A mapping of the schema version and the certificates as
+            records.
+        """
         return {
             "schema_version": SCHEMA_VERSION,
             "certificates": [c.to_dict() for c in self.certificates],
@@ -563,9 +718,18 @@ class CertificateStore:
     def from_dict(cls, document: Mapping[str, Any]) -> Self:
         """Rebuilds a store, verifying every stored verdict.
 
+        Args:
+            document: A mapping with `schema_version` and `certificates`.
+
+        Returns:
+            The store.
+
         Raises:
-            CertificateError: On an unknown schema version or a stored
-                verdict that disagrees with its counts.
+            CertificateError: On an unknown schema version.
+            ValueError: If the document has fields other than
+                `schema_version` and `certificates`. A certificate that is
+                invalid, or whose stored verdict disagrees with its counts,
+                also raises `ValueError` or `CertificateError`.
         """
         if document.get("schema_version") != SCHEMA_VERSION:
             raise CertificateError(
@@ -580,13 +744,26 @@ class CertificateStore:
         )
 
     def save(self, path: Path) -> None:
-        """Writes stable JSON, so equal stores give equal bytes."""
+        """Writes stable JSON, so equal stores give equal bytes.
+
+        Args:
+            path: File to write.
+        """
         text = json.dumps(self.to_dict(), indent=2, sort_keys=True)
         path.write_text(text + "\n", encoding="utf-8", newline="\n")
 
     @classmethod
     def load(cls, path: Path) -> Self:
-        """Reads and verifies a store written by `save`."""
+        """Reads and verifies a store written by `save`.
+
+        Args:
+            path: File to read.
+
+        Returns:
+            The store. A missing file raises `OSError`, invalid JSON raises
+            `json.JSONDecodeError`, and a document `from_dict` rejects
+            raises the error it raises.
+        """
         return cls.from_dict(json.loads(path.read_text(encoding="utf-8")))
 
 

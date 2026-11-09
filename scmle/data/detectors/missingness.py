@@ -138,12 +138,23 @@ class MissingnessReport:
     tier: str = "unverified"
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Returns the report as a JSON-ready record.
+
+        Returns:
+            A mapping of every field to its value.
+        """
         return dataclasses.asdict(self)
 
 
 def numeric_columns(frame: pd.DataFrame) -> list[Any]:
-    """Numeric, non-boolean columns that are not constant."""
+    """Finds the numeric, non-boolean columns that are not constant.
+
+    Args:
+        frame: Any table.
+
+    Returns:
+        The column names, in table order.
+    """
     names: list[Any] = []
     for name in frame.columns:
         column = frame[name]
@@ -189,7 +200,8 @@ def em_normal(
             relative to the covariance scale, is below this.
 
     Returns:
-        The estimates.
+        The estimated mean and covariance, the iterations used and whether
+        the tolerance was reached.
 
     Raises:
         ValueError: If a column is entirely missing or `values` is not 2-D.
@@ -232,7 +244,15 @@ def em_normal(
 
 
 def row_patterns(seen: np.ndarray) -> list[tuple[np.ndarray, np.ndarray]]:
-    """Groups row positions by which columns are observed."""
+    """Groups row positions by which columns are observed.
+
+    Args:
+        seen: Boolean array (n, p), True where a value is observed.
+
+    Returns:
+        One pair per missingness pattern: the positions of the observed
+        columns and the positions of the rows with that pattern.
+    """
     keys: dict[bytes, list[int]] = {}
     for row, flags in enumerate(seen):
         keys.setdefault(flags.tobytes(), []).append(row)
@@ -250,7 +270,20 @@ def expect_block(
     covariance: np.ndarray,
     p: int,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """E-step for rows sharing one pattern: filled rows and extra covariance."""
+    """Runs the E-step for rows sharing one missingness pattern.
+
+    Args:
+        block: The observed values of those rows, shape (rows, observed).
+        observed: Positions of the observed columns.
+        mean: Current mean estimate, length p.
+        covariance: Current covariance estimate, shape (p, p).
+        p: Number of columns.
+
+    Returns:
+        The rows with missing entries replaced by their conditional means,
+        shape (rows, p), and the conditional covariance of the missing
+        entries, shape (p, p), which is zero outside them.
+    """
     rows = block.shape[0]
     filled = np.tile(mean, (rows, 1))
     extra = np.zeros((p, p))
@@ -277,6 +310,13 @@ def little_statistic(values: np.ndarray, fit: EmResult) -> tuple[float, int]:
     d2 = sum over patterns j of n_j (ybar_j - mu_j)' S_j^{-1} (ybar_j - mu_j),
     where mu_j and S_j are the ML mean and covariance restricted to the
     variables observed in pattern j. df = sum_j k_j - p.
+
+    Args:
+        values: Array (n, p) with NaN for missing entries.
+        fit: ML mean and covariance of `values`.
+
+    Returns:
+        The statistic d2 and its degrees of freedom.
     """
     seen = ~np.isnan(values)
     p = values.shape[1]
@@ -298,6 +338,13 @@ def normal_scores(values: np.ndarray) -> np.ndarray:
     A monotone transform of the observed values leaves the missingness
     mechanism unchanged, and makes the normal model of Little's test less
     sensitive to skew.
+
+    Args:
+        values: Array (n, p) with NaN for missing entries.
+
+    Returns:
+        An array of the same shape holding the inverse-normal score of each
+        observed value's rank within its column, NaN where missing.
     """
     out = np.full_like(values, np.nan, dtype=float)
     for j in range(values.shape[1]):
@@ -356,7 +403,16 @@ def little_mcar_test(
 
 
 def auc_from_ranks(scores: np.ndarray, positive: np.ndarray) -> float:
-    """Area under the ROC curve via the rank-sum identity."""
+    """Computes the area under the ROC curve via the rank-sum identity.
+
+    Args:
+        scores: Score of each row.
+        positive: Boolean per row, True for the positive class. Both classes
+            must be present.
+
+    Returns:
+        The area under the curve, with ties given average ranks.
+    """
     ranks = stats.rankdata(scores)
     n_pos = int(positive.sum())
     n_neg = len(positive) - n_pos
@@ -367,7 +423,16 @@ def auc_from_ranks(scores: np.ndarray, positive: np.ndarray) -> float:
 def oof_linear_scores(
     design: np.ndarray, target: np.ndarray, folds: list[np.ndarray]
 ) -> np.ndarray:
-    """Out-of-fold least-squares scores of a 0/1 target."""
+    """Computes out-of-fold least-squares scores of a 0/1 target.
+
+    Args:
+        design: Design matrix, one row per observation.
+        target: The 0/1 target as floats.
+        folds: Row positions of each held-out fold.
+
+    Returns:
+        For each row, the prediction of a model fitted on the other folds.
+    """
     scores = np.zeros(len(target))
     for held in folds:
         fit = np.setdiff1d(np.arange(len(target)), held)
@@ -400,6 +465,9 @@ def indicator_model_test(
     Returns:
         The result, or None when there are too few missing or observed
         values or no other numeric column.
+
+    Raises:
+        ValueError: If `permutations` is below 1 or `folds` is below 2.
     """
     if permutations < 1 or folds < 2:
         raise ValueError("need permutations >= 1 and folds >= 2")
@@ -452,6 +520,9 @@ def assess_mechanism(
         The report. `mcar_rejected` is True when Little's test rejects at
         `alpha / 2` or any indicator model rejects at `alpha / 2` divided by
         the number of models. Anything not run is listed in `skipped`.
+
+    Raises:
+        ValueError: If `alpha` is not strictly between 0 and 1.
     """
     if not 0.0 < alpha < 1.0:
         raise ValueError("alpha must be within (0, 1)")
@@ -506,10 +577,20 @@ def informative_columns(
     target: pd.Series,
     classification: bool,
 ) -> list[str]:
-    """Columns whose gaps are associated with the target (the cheap screen).
+    """Finds the columns whose gaps are associated with the target.
 
-    Delegates to `scmle.data.profiling.missingness.assess`, whose
-    thresholds stay the policy defaults so behaviour is unchanged.
+    This is the cheap screen. It delegates to
+    `scmle.data.profiling.missingness.assess`, whose thresholds stay the
+    policy defaults so behaviour is unchanged.
+
+    Args:
+        frame: Table.
+        columns: Columns to screen.
+        target: The target values.
+        classification: Whether the target is categorical.
+
+    Returns:
+        The names of the columns the screen finds informative.
     """
     findings = screen.assess(frame, columns, target, classification)
     return [f.column for f in findings if f.informative]
@@ -558,8 +639,7 @@ def tipping_point(
         conclusion: Maps the completed values to a boolean conclusion.
         low: Lower end of the declared range (<= 0 <= high not required).
         high: Upper end of the declared range, above `low`.
-        steps: Grid points, at least 2; the grid includes zero's neighbours
-            only if the range does.
+        steps: Grid points over `[low, high]`, at least 2.
 
     Returns:
         The tipping point.
@@ -588,11 +668,20 @@ def tipping_point(
 def mean_tipping_delta(
     observed: np.ndarray, n_missing: int, null_value: float
 ) -> float:
-    """Closed-form delta at which the completed mean equals `null_value`.
+    """Computes the delta at which the completed mean equals `null_value`.
 
     With the missing values imputed at the observed mean m and shifted by
     delta, the completed mean is (sum + k (m + delta)) / (n + k); setting it
     to `null_value` gives delta = null_value (n + k) / k - sum / k - m.
+
+    Args:
+        observed: Observed values of the column.
+        n_missing: Number of missing values `k`, at least 1.
+        null_value: The value of the mean at which the conclusion flips.
+
+    Returns:
+        The shift of the imputed values at which the completed mean equals
+        `null_value`.
     """
     values = np.asarray(observed, dtype=float)
     n, k = values.size, n_missing
@@ -603,7 +692,17 @@ def mean_tipping_delta(
 def draw_holdout(
     train: np.ndarray, seed: int, fold: int, share: float
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Observed cells of `train` hidden for scoring: (rows, columns)."""
+    """Picks observed cells of `train` to hide for scoring.
+
+    Args:
+        train: Array (n, p) with NaN for gaps.
+        seed: Run seed.
+        fold: Fold number, which varies the draw.
+        share: Probability that each observed cell is chosen.
+
+    Returns:
+        The row positions and the column positions of the chosen cells.
+    """
     rng = randomness.component_rng(seed, "detectors.imputation.holdout", fold)
     rows, cols = np.nonzero(~np.isnan(train))
     chosen = rng.random(len(rows)) < share
@@ -611,7 +710,17 @@ def draw_holdout(
 
 
 def make_imputer(strategy: str) -> Any:
-    """Builds an unfitted imputer for a strategy name."""
+    """Builds an unfitted imputer for a strategy name.
+
+    Args:
+        strategy: One of `STRATEGIES`.
+
+    Returns:
+        A scikit-learn imputer that keeps all-missing columns.
+
+    Raises:
+        ValueError: If `strategy` is not one of `STRATEGIES`.
+    """
     if strategy in ("mean", "median"):
         return impute.SimpleImputer(strategy=strategy, keep_empty_features=True)
     if strategy == "knn":
@@ -646,7 +755,16 @@ def fold_imputers(
 
 
 def fit_one(values: np.ndarray, strategy: str, train: np.ndarray) -> Any:
-    """An imputer fitted on the rows `train` of `values` and nothing else."""
+    """Fits an imputer on the rows `train` of `values` and nothing else.
+
+    Args:
+        values: Array (n, p) with NaN for gaps.
+        strategy: One of `STRATEGIES`.
+        train: Positions of the rows to fit on.
+
+    Returns:
+        The fitted imputer.
+    """
     imputer = make_imputer(strategy)
     imputer.fit(values[train])
     return imputer
@@ -658,7 +776,7 @@ def imputation_errors(
     folds: int = FOLDS,
     share: float = HOLDOUT_SHARE,
 ) -> dict[str, float]:
-    """Held-out imputation error per strategy, fitted inside the folds.
+    """Measures held-out imputation error per strategy, fitted in the folds.
 
     Within each fold a share of observed cells of the held-out rows is
     hidden; the imputer, fitted on the training rows, fills them; the error
@@ -671,7 +789,11 @@ def imputation_errors(
         share: Share of held-out observed cells to hide, in (0, 1).
 
     Returns:
-        Strategy name -> mean standardized RMSE over folds.
+        Strategy name -> mean standardized RMSE over folds (NaN when no
+        cell could be hidden in any fold).
+
+    Raises:
+        ValueError: If `share` is not strictly between 0 and 1.
     """
     if not 0.0 < share < 1.0:
         raise ValueError("share must be within (0, 1)")
@@ -700,7 +822,20 @@ def imputation_errors(
 def select_imputer(
     values: np.ndarray, seed: int = 0, folds: int = FOLDS
 ) -> str:
-    """Strategy with the smallest held-out error (ties: listed order)."""
+    """Selects the imputation strategy with the smallest held-out error.
+
+    Args:
+        values: Array (n, p) with NaN for gaps.
+        seed: Run seed.
+        folds: Folds, at least 2.
+
+    Returns:
+        The name of the strategy; ties go to the one listed first in
+        `STRATEGIES`.
+
+    Raises:
+        ValueError: If no strategy has a finite error.
+    """
     errors = imputation_errors(values, seed, folds)
     finite = {k: v for k, v in errors.items() if np.isfinite(v)}
     if not finite:

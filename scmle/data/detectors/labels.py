@@ -101,12 +101,24 @@ class LabelReport:
     thresholds: tuple[float, ...]
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Returns the report as a JSON-ready record.
+
+        Returns:
+            A mapping of every field to its value.
+        """
         return dataclasses.asdict(self)
 
 
 def encode(labels: Sequence[Any] | pd.Series) -> tuple[np.ndarray, np.ndarray]:
-    """Class values and integer codes of a label vector."""
+    """Encodes a label vector as integer codes.
+
+    Args:
+        labels: The class label of each row.
+
+    Returns:
+        The sorted distinct class values, and the integer code of each row
+        (an index into the class values).
+    """
     classes, codes = np.unique(np.asarray(labels), return_inverse=True)
     return classes, np.asarray(codes).ravel()
 
@@ -114,7 +126,16 @@ def encode(labels: Sequence[Any] | pd.Series) -> tuple[np.ndarray, np.ndarray]:
 def model(
     seed: int, leaves: int = MAX_LEAF_NODES
 ) -> ensemble.HistGradientBoostingClassifier:
-    """The boosting model with `leaves` leaves per tree."""
+    """Builds the boosting model.
+
+    Args:
+        seed: Random seed of the model.
+        leaves: Maximum number of leaves per tree.
+
+    Returns:
+        An unfitted gradient-boosting classifier of `MAX_ITER` rounds
+        without early stopping.
+    """
     return ensemble.HistGradientBoostingClassifier(
         max_iter=MAX_ITER,
         max_leaf_nodes=leaves,
@@ -126,7 +147,16 @@ def model(
 def out_of_fold_probabilities(
     features: pd.DataFrame, codes: np.ndarray, seed: int
 ) -> np.ndarray:
-    """Class probabilities from models that never saw the row.
+    """Computes class probabilities from models that never saw the row.
+
+    Args:
+        features: Numeric feature frame.
+        codes: Integer class code of each row.
+        seed: Run seed, from which the fold assignment is derived.
+
+    Returns:
+        An array of shape (rows, classes) of cross-validated probabilities,
+        using at most `FOLDS` stratified folds.
 
     Raises:
         ValueError: With too few rows, one class, or a class of one row.
@@ -155,7 +185,16 @@ def out_of_fold_probabilities(
 def class_thresholds(
     probabilities: np.ndarray, codes: np.ndarray
 ) -> np.ndarray:
-    """t_j: mean probability of class j over rows labelled j."""
+    """Computes the confident-learning thresholds.
+
+    Args:
+        probabilities: Out-of-fold probabilities, shape (n, K).
+        codes: Given label codes.
+
+    Returns:
+        For each class j, the mean probability of class j over the rows
+        labelled j.
+    """
     return np.array(
         [
             probabilities[codes == j, j].mean()
@@ -167,10 +206,18 @@ def class_thresholds(
 def confident_assignment(
     probabilities: np.ndarray, thresholds: np.ndarray
 ) -> np.ndarray:
-    """Class each row is confidently counted into, or -1.
+    """Finds the class each row is confidently counted into, or -1.
 
     Among classes whose probability reaches their threshold, the one with the
     largest probability.
+
+    Args:
+        probabilities: Out-of-fold probabilities, shape (n, K).
+        thresholds: Per-class thresholds, length K.
+
+    Returns:
+        The class code of each row, or -1 where no class reaches its
+        threshold.
     """
     eligible = probabilities >= thresholds
     masked = np.where(eligible, probabilities, -np.inf)
@@ -198,7 +245,17 @@ def confident_learning_flags(
 def mean_margins(
     features: pd.DataFrame, codes: np.ndarray, seed: int
 ) -> np.ndarray:
-    """Area under the margin over boosting stages, for the training rows."""
+    """Computes the area under the margin over boosting stages.
+
+    Args:
+        features: Numeric feature frame.
+        codes: Integer class code of each row.
+        seed: Random seed of the model.
+
+    Returns:
+        For each row, the mean over boosting stages of the score of the
+        given label minus the best other score.
+    """
     fitted = model(seed, MARGIN_LEAVES).fit(features, codes)
     total = np.zeros(len(codes))
     stages = 0
@@ -224,6 +281,14 @@ def margin_flags(
     (`MARGIN_LEAVES`) so that it cannot memorise wrong labels; a row is
     flagged when its area under the margin is negative, that is, the model
     scores some other class above the given one on average.
+
+    Args:
+        features: Numeric feature frame.
+        codes: Integer class code of each row.
+        seed: Random seed of the model.
+
+    Returns:
+        A boolean per row, True where the area under the margin is negative.
     """
     area = mean_margins(features, codes, seed)
     return area < 0.0
@@ -249,10 +314,12 @@ def ppi_mean(
         confidence: Interval level in (0, 1).
 
     Returns:
-        (estimate, (low, high)).
+        The estimate of the mean and its (low, high) interval.
 
     Raises:
-        ValueError: With fewer than 2 audited rows or no unlabeled rows.
+        ValueError: With fewer than 2 audited rows or fewer than 2 unlabeled
+            rows, if the audited predictions and truth differ in length, or
+            if `confidence` is not strictly between 0 and 1.
     """
     f_big = np.asarray(predicted_unlabeled, dtype=float)
     f_small = np.asarray(predicted_labeled, dtype=float)
@@ -288,6 +355,9 @@ def noise_rate(
         With an audit of 2+ rows (and 2+ others), a prediction-powered
         interval, tier `attested`; otherwise the detector-only flag rate with
         a Wilson interval for the flag *rate* and tier `unverified`.
+
+    Raises:
+        ValueError: If the audit positions are not unique.
     """
     flags = np.asarray(flags, dtype=bool)
     n = len(flags)
@@ -334,7 +404,15 @@ def noise_rate(
 def hoeffding_bound(
     rows: int, confidence: float = SAMPLING_CONFIDENCE
 ) -> float:
-    """Half-width of a Hoeffding interval for a rate from `rows` draws."""
+    """Computes the half-width of a Hoeffding interval for a rate.
+
+    Args:
+        rows: Number of draws the rate is estimated from.
+        confidence: Confidence level of the interval.
+
+    Returns:
+        The half-width of the interval.
+    """
     return math.sqrt(math.log(2.0 / (1.0 - confidence)) / (2.0 * rows))
 
 
@@ -345,6 +423,9 @@ def detect(
     audit: pd.Series | None = None,
 ) -> LabelReport:
     """Runs both detectors and reports where they agree.
+
+    Too few rows or classes raise `ValueError` (see
+    `out_of_fold_probabilities`).
 
     Args:
         features: Numeric feature frame (exploration rows only).
@@ -358,9 +439,6 @@ def detect(
         audited rows. When rows are capped, `sampling_bound` records the
         Hoeffding half-width of a rate from the sample.
 
-    Raises:
-        ValueError: With too few rows or classes (see
-            `out_of_fold_probabilities`).
     """
     input_rows = len(features)
     positions = np.arange(input_rows)

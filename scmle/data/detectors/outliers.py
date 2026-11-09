@@ -1,7 +1,7 @@
 """Outlier triage: what is it, not how far out is it.
 
 A distance score only ranks candidates. The class of a row comes from
-provenance the caller supplies (the F4 field records):
+provenance the caller supplies (the field records):
 
 * `error`: a value outside the field's declared instrument range, or a row
   that violates a declared cross-field contract. Such rows are classed even
@@ -75,13 +75,25 @@ class TriageResult:
     tier: str
 
     def counts(self) -> dict[str, int]:
-        """Rows per class."""
+        """Counts the rows of each class.
+
+        Returns:
+            Class -> number of rows, for every name in `CLASSES`.
+        """
         counted = self.classes.value_counts()
         return {name: int(counted.get(name, 0)) for name in CLASSES}
 
 
 def robust_z(series: pd.Series) -> pd.Series:
-    """Absolute robust z-score; zero where the spread is zero."""
+    """Computes the absolute robust z-score of a series.
+
+    Args:
+        series: Numeric values.
+
+    Returns:
+        `|x - median| / (1.4826 * MAD)` per value, or all zeros where the
+        spread is zero or not finite. Missing values score zero.
+    """
     values = series.astype(float)
     centre = float(values.median())
     mad = MAD_SCALE * float((values - centre).abs().median())
@@ -91,7 +103,15 @@ def robust_z(series: pd.Series) -> pd.Series:
 
 
 def row_scores(frame: pd.DataFrame, columns: list[str]) -> pd.Series:
-    """Maximum robust z-score per row over `columns`."""
+    """Computes the maximum robust z-score per row over `columns`.
+
+    Args:
+        frame: Table.
+        columns: Numeric columns to score.
+
+    Returns:
+        The largest score of each row, or zeros when `columns` is empty.
+    """
     if not columns:
         return pd.Series(0.0, index=frame.index)
     table = pd.concat([robust_z(frame[c]) for c in columns], axis=1)
@@ -101,9 +121,17 @@ def row_scores(frame: pd.DataFrame, columns: list[str]) -> pd.Series:
 def isolation_rank(
     frame: pd.DataFrame, columns: list[str], seed: int
 ) -> pd.Series:
-    """Isolation Forest anomaly score (higher = more isolated), for ordering.
+    """Scores rows with an Isolation Forest, for ordering.
 
     Missing values are filled with the column median.
+
+    Args:
+        frame: Table.
+        columns: Numeric columns to use.
+        seed: Run seed from which the forest's seed is derived.
+
+    Returns:
+        The anomaly score of each row (higher is more isolated).
     """
     block = frame[columns].astype(float)
     block = block.fillna(block.median())
@@ -114,7 +142,16 @@ def isolation_rank(
 
 
 def outside(series: pd.Series, bounds: tuple[float, float]) -> pd.Series:
-    """True where a non-missing value lies outside inclusive `bounds`."""
+    """Flags values that lie outside inclusive bounds.
+
+    Args:
+        series: Numeric values.
+        bounds: Low and high limits, both allowed.
+
+    Returns:
+        True where a non-missing value is below the low or above the high
+        limit.
+    """
     low, high = bounds
     values = series.astype(float)
     return ((values < low) | (values > high)) & values.notna()
@@ -139,6 +176,10 @@ def triage(
         The triage. A numeric column without provenance still ranks
         candidates but cannot produce `error`, `population` or
         `real_extreme`.
+
+    Raises:
+        ValueError: If `provenance` names a column the frame lacks, or a
+            contract does not return a boolean Series.
     """
     known = dict(provenance or {})
     numeric = [
@@ -181,7 +222,17 @@ def error_flags(
     provenance: Mapping[str, FieldProvenance],
     contracts: Mapping[str, Contract] | None = None,
 ) -> pd.Series:
-    """Rows classed `error` by provenance, as one boolean per row."""
+    """Flags the rows classed `error` by provenance.
+
+    Args:
+        frame: Exploration rows.
+        provenance: Field name -> provenance.
+        contracts: Name -> function returning a boolean Series that is True
+            where a cross-field contract is violated.
+
+    Returns:
+        A boolean per row on the index of `frame`.
+    """
     result = triage(frame, provenance, contracts)
     return pd.Series(
         (result.classes == "error").to_numpy(dtype=bool), index=frame.index
@@ -189,5 +240,12 @@ def error_flags(
 
 
 def summary(result: TriageResult) -> dict[str, Any]:
-    """JSON-ready counts and tier."""
+    """Summarises a triage result.
+
+    Args:
+        result: The triage to summarise.
+
+    Returns:
+        A JSON-ready mapping of the rows per class and the tier.
+    """
     return {"counts": result.counts(), "tier": result.tier}

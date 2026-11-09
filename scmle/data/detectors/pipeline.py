@@ -1,4 +1,4 @@
-"""Runs the F5 detectors in order and reports what each may gate.
+"""Runs the detectors in order and reports what each may gate.
 
 Order: sentinels, duplicates, missingness, labels, outliers. Sentinels run
 first and their codes are recoded to missing before any later detector sees
@@ -6,7 +6,7 @@ the table, because a code such as 999 hides in every other statistic.
 
 Every detector's status is `gating` only if the certificate store holds a
 current, passing certificate for the defect type; otherwise it is
-`descriptive` and its decisions are limited to warnings (canon P1).
+`descriptive` and its decisions are limited to warnings.
 """
 
 from collections.abc import Callable
@@ -31,7 +31,8 @@ class PipelineResult:
 
     Attributes:
         order: Detector ids in the order they ran or were skipped.
-        results: Detector id -> result object (or a skip reason string).
+        results: Detector id -> result object; a detector that did not run is
+            absent.
         status: Detector id -> defect type -> gating status.
         recode_log: Sentinel recodes applied before later detectors.
         skipped: Detector id -> reason it did not run.
@@ -47,7 +48,16 @@ class PipelineResult:
 def gate_status(
     store: certificates.CertificateStore | None, detector_id: str
 ) -> dict[str, certificates.GateStatus]:
-    """Gating status per defect type; descriptive without a store."""
+    """Looks up the gating status of each defect type of a detector.
+
+    Args:
+        store: Certificates on file, or None.
+        detector_id: Key of the detector in `registry.SPECS`.
+
+    Returns:
+        Defect type -> gating status for the detector's current code. Every
+        status is descriptive when there is no store.
+    """
     spec = registry.SPECS[detector_id]
     digest = spec.code_hash()
     return {
@@ -70,7 +80,7 @@ def run(
     """Runs all detectors on exploration rows.
 
     Args:
-        frame: Exploration set `X` only (canon P3).
+        frame: Exploration set `X` only.
         target: Label column, if any; label noise needs a categorical one.
         store: Certificates on file, or None (everything descriptive).
         seed: Run seed.
@@ -112,7 +122,18 @@ def run(
 def label_step(
     frame: pd.DataFrame, target: str | None, seed: int
 ) -> labels.LabelReport | str:
-    """Runs label noise or returns the reason it was declined."""
+    """Runs the label-noise detector, or says why it was declined.
+
+    Args:
+        frame: Exploration rows, with the target column among them.
+        target: Label column, or None.
+        seed: Run seed.
+
+    Returns:
+        The label-noise report, or the reason it could not run: no target
+        column, no numeric features, or the message of the `ValueError`
+        the detector raised. Numeric features are median-filled first.
+    """
     if target is None or target not in frame.columns:
         return "no target column"
     features = frame.drop(columns=[target])
