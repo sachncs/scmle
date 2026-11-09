@@ -205,7 +205,8 @@ def ranked_hits(
     order = numpy.argsort(
         -numpy.asarray(scores, dtype=float)[rows], kind="stable"
     )
-    return truth[order]
+    ranked: numpy.ndarray = truth[order]
+    return ranked
 
 
 def mean_reciprocal_rank(

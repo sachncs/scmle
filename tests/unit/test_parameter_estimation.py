@@ -1,5 +1,6 @@
 """First-class parameter-estimation contracts and uncertainty evidence."""
 
+import dataclasses
 import json
 from types import SimpleNamespace
 from typing import Any
@@ -187,6 +188,44 @@ def test_linear_estimation_records_robust_uncertainty_and_reference():
     assert covariance_conditioning["rank"] == 3
     assert covariance_conditioning["condition_number"] < 1e12
     assert result.parameters[1].interval[0] < result.parameters[1].estimate
+
+
+def test_standard_errors_without_interval_errors_use_them_for_intervals(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """A fit that sets only standard errors scales its intervals by them."""
+    real_fit_estimator = parameter_estimation.fit_estimator
+    seen: dict[str, Any] = {}
+
+    def only_standard_errors(*args: Any, **kwargs: Any) -> Any:
+        fit = real_fit_estimator(*args, **kwargs)
+        seen["pivot"] = fit.pivot
+        return dataclasses.replace(
+            fit,
+            standard_errors=numpy.full(len(fit.names), 0.5),
+            interval_errors=None,
+        )
+
+    monkeypatch.setattr(
+        parameter_estimation, "fit_estimator", only_standard_errors
+    )
+    rng = numpy.random.default_rng(7)
+    features = rng.normal(size=(60, 2))
+    outcome = 1.0 + features[:, 0] + rng.normal(scale=0.2, size=60)
+
+    result = estimate_parameters(
+        features,
+        outcome,
+        linear_estimand(),
+        Config(estimator="linear", covariance="hc3"),
+    )
+
+    for parameter in result.parameters:
+        assert parameter.standard_error == pytest.approx(0.5)
+        half_width = seen["pivot"] * 0.5
+        assert parameter.interval == pytest.approx(
+            (parameter.estimate - half_width, parameter.estimate + half_width)
+        )
 
 
 def test_estimation_fingerprint_binds_raw_feature_outcome_and_clusters():

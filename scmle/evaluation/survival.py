@@ -56,7 +56,8 @@ def censoring_probability(
     """
     moments, values = curve
     found = estimators.step_lookup(moments, values, times, 1.0)
-    return numpy.maximum(found, MIN_CENSORING_PROBABILITY)
+    floored: numpy.ndarray = numpy.maximum(found, MIN_CENSORING_PROBABILITY)
+    return floored
 
 
 def time_grid(duration: numpy.ndarray, event: numpy.ndarray) -> numpy.ndarray:

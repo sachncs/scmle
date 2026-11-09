@@ -107,7 +107,8 @@ def modality_from_value(value: str) -> ModalityIdentity:
             built-in value nor prefixed with ``extension:``, or the text
             after the prefix is not a valid `ExtensionModality` name.
     """
-    if not isinstance(value, str) or not value.strip():
+    candidate: object = value  # callers may pass a non-string
+    if not isinstance(candidate, str) or not candidate.strip():
         raise ValueError("modality value must be a non-empty string")
     try:
         return Modality(value)

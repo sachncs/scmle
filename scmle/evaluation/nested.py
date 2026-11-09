@@ -136,6 +136,7 @@ def nested_score(
     """
     rng = random.Random(seed)  # nosec B311  # noqa: S311 -- seeded, not security
     outer, inner = [], []
+    candidates: list[dict[str, Any]] = []
     for train, test in outer_folds:
         if should_stop():
             return None
@@ -143,7 +144,7 @@ def nested_score(
         y_train = target.iloc[numpy.asarray(train)]
         if len(x_train) < MIN_INNER_ROWS:
             continue
-        candidates: list[dict[str, Any]] = [{}]
+        candidates = [{}]
         if space is not None:
             candidates += [
                 space.sample(rng) for draw in range(max(configurations - 1, 0))

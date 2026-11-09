@@ -62,8 +62,9 @@ class Observation:
                 count is negative (or a bool), the machine or software is
                 blank, or the timestamp is malformed or not offset-aware.
         """
-        if not isinstance(self.operation, Operation):
-            object.__setattr__(self, "operation", Operation(self.operation))
+        operation: Any = self.operation  # may be a raw value at runtime
+        if not isinstance(operation, Operation):
+            object.__setattr__(self, "operation", Operation(operation))
         if not math.isfinite(self.elapsed_seconds) or self.elapsed_seconds < 0:
             raise ValueError("elapsed_seconds must be finite and non-negative")
         if self.peak_memory_gb is not None and (
@@ -74,9 +75,11 @@ class Observation:
             )
         if isinstance(self.sample_count, bool) or self.sample_count < 0:
             raise ValueError("sample_count must be non-negative")
-        if not isinstance(self.machine, str) or not self.machine.strip():
+        machine: object = self.machine  # may be a non-string at runtime
+        if not isinstance(machine, str) or not machine.strip():
             raise ValueError("machine must not be empty")
-        if not isinstance(self.software, str) or not self.software.strip():
+        software: object = self.software  # may be a non-string at runtime
+        if not isinstance(software, str) or not software.strip():
             raise ValueError("software must not be empty")
         parse_timestamp(self.observed_at, "observed_at")
 
@@ -132,7 +135,8 @@ class Run:
                 operation repeats, or the observations come from more than one
                 environment.
         """
-        if not isinstance(self.run_id, str) or not self.run_id.strip():
+        run_id: object = self.run_id  # may be a non-string at runtime
+        if not isinstance(run_id, str) or not run_id.strip():
             raise ValueError("run_id must not be empty")
         normalized = tuple(self.observations)
         operations = [observation.operation for observation in normalized]
@@ -557,10 +561,9 @@ class Budget:
         """
         normalized: dict[Operation, float] = {}
         for operation, limit in self.max_seconds.items():
+            named: Any = operation  # keys may be raw values at runtime
             resolved = (
-                operation
-                if isinstance(operation, Operation)
-                else Operation(operation)
+                named if isinstance(named, Operation) else Operation(named)
             )
             if not math.isfinite(limit) or limit <= 0:
                 raise ValueError(

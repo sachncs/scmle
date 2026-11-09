@@ -2,6 +2,7 @@
 
 import abc
 import math
+from typing import Any
 
 from scmle.contracts import errors
 from scmle.contracts import experiments
@@ -178,10 +179,10 @@ class MeanSelector(Selector):
         pool = [t for t in ok if t.model_name != BASELINE] or ok
         sign = 1 if metric.greater_is_better else -1
 
-        def by_score(trial: experiments.Trial) -> tuple:
+        def by_score(trial: experiments.Trial) -> tuple[float, ...]:
             return (-sign * round(trial.score_mean, SCORE_PRECISION),)
 
-        def tie_key(trial: experiments.Trial) -> tuple:
+        def tie_key(trial: experiments.Trial) -> tuple[Any, ...]:
             cost = registry.get(trial.model_name).capabilities.cost
             plain = trial.strategy == experiments.DEFAULT_STRATEGY
             ordering = (

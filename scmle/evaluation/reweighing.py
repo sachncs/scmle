@@ -39,4 +39,5 @@ def reweighing_weights(
     label_share = frame.label.map(frame.label.value_counts() / total)
     joint = frame.groupby(["group", "label"]).group.transform("size") / total
     weights = (group_share * label_share / joint).to_numpy(dtype=float)
-    return weights / weights.mean()
+    normalised: numpy.ndarray = weights / weights.mean()
+    return normalised

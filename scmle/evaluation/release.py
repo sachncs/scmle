@@ -6,6 +6,7 @@ the evaluator applies the thresholds and evidence references declared by an
 ``Criteria``. Unknown inputs and incomplete evidence fail closed.
 """
 
+from collections.abc import Iterable
 from collections.abc import Mapping
 import dataclasses
 import enum
@@ -124,19 +125,21 @@ class ReleaseFinding:
         """
         if not isinstance(self.kind, FindingKind):
             raise TypeError("kind must be FindingKind")
-        if not isinstance(self.name, str) or not self.name.strip():
+        name: object = self.name  # may be a non-string at runtime
+        if not isinstance(name, str) or not name.strip():
             raise ValueError("name must not be empty")
         if not isinstance(self.passed, bool):
             raise TypeError("passed must be bool")
         if not isinstance(self.blocking, bool):
             raise TypeError("blocking must be bool")
-        if not isinstance(self.reason, str) or not self.reason.strip():
+        reason: object = self.reason  # may be a non-string at runtime
+        if not isinstance(reason, str) or not reason.strip():
             raise ValueError("reason must not be empty")
         if not isinstance(self.evidence, tuple):
             raise TypeError("evidence must be a tuple of strings")
+        entries: Iterable[object] = self.evidence  # may hold non-strings
         if any(
-            not isinstance(item, str) or not item.strip()
-            for item in self.evidence
+            not isinstance(item, str) or not item.strip() for item in entries
         ):
             raise ValueError("evidence must contain non-empty strings")
         if len(self.evidence) != len(set(self.evidence)):
@@ -319,12 +322,14 @@ class ReleaseReadinessSummary:
                 an integer, or `counts_by_kind` is not a mapping of strings
                 to `FindingCounts`.
         """
-        if not isinstance(self.task, str) or not self.task.strip():
+        task: object = self.task  # may be a non-string at runtime
+        if not isinstance(task, str) or not task.strip():
             raise ValueError("task must not be empty")
+        schema_version: object = self.policy_schema_version  # may be non-int
         if (
-            isinstance(self.policy_schema_version, bool)
-            or not isinstance(self.policy_schema_version, int)
-            or self.policy_schema_version < 0
+            isinstance(schema_version, bool)
+            or not isinstance(schema_version, int)
+            or schema_version < 0
         ):
             raise ValueError("policy_schema_version must be non-negative")
         if not isinstance(self.status, ReleaseStatus):
@@ -449,7 +454,8 @@ class ReleaseEvaluation:
             TypeError: If `passed` is not a bool, `findings` is not a tuple
                 of `ReleaseFinding`, or `blocking_reasons` is not a tuple.
         """
-        if not isinstance(self.task, str) or not self.task.strip():
+        task: object = self.task  # may be a non-string at runtime
+        if not isinstance(task, str) or not task.strip():
             raise ValueError("task must not be empty")
         if self.policy_schema_version < 0:
             raise ValueError("policy_schema_version must not be negative")
@@ -932,10 +938,11 @@ def metric_gate_finding(
             observed=observed,
             expected=threshold,
         )
-    if metric_gate.direction is evaluation.MetricDirection.MAXIMIZE:
+    direction: object = metric_gate.direction  # may be a raw value at runtime
+    if direction is evaluation.MetricDirection.MAXIMIZE:
         passed = observed >= threshold
         operator = ">="
-    elif metric_gate.direction is evaluation.MetricDirection.MINIMIZE:
+    elif direction is evaluation.MetricDirection.MINIMIZE:
         passed = observed <= threshold
         operator = "<="
     else:
@@ -1281,7 +1288,8 @@ def evaluate_release(
         block. A required explanation quality measure with no threshold in
         the policy raises `ValueError`.
     """
-    if not isinstance(policy, evaluation.Criteria):
+    supplied_policy: object = policy  # callers may pass any object
+    if not isinstance(supplied_policy, evaluation.Criteria):
         finding = blocked_input_finding(
             "policy", "unsupported evaluation policy"
         )
@@ -1295,7 +1303,8 @@ def evaluate_release(
 
     findings: list[ReleaseFinding] = []
 
-    if not isinstance(metric_values, Mapping):
+    supplied_metrics: object = metric_values  # callers may pass any object
+    if not isinstance(supplied_metrics, Mapping):
         metric_values = {}
         findings.append(
             blocked_input_finding(
@@ -1303,7 +1312,8 @@ def evaluate_release(
                 "metric values are unsupported; expected a mapping",
             )
         )
-    if not isinstance(diagnostic_reports, Mapping):
+    supplied_diagnostics: object = diagnostic_reports  # may be any object
+    if not isinstance(supplied_diagnostics, Mapping):
         diagnostic_reports = {}
         findings.append(
             blocked_input_finding(
@@ -1311,7 +1321,8 @@ def evaluate_release(
                 "diagnostic reports are unsupported; expected a mapping",
             )
         )
-    if not isinstance(fairness_reports, Mapping):
+    supplied_fairness: object = fairness_reports  # callers may pass any object
+    if not isinstance(supplied_fairness, Mapping):
         fairness_reports = {}
         findings.append(
             blocked_input_finding(

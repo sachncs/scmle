@@ -439,7 +439,7 @@ class ErrorAnalysis(Diagnostic):
         }
 
 
-class CachedPredictions(base.BaseEstimator):
+class CachedPredictions(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn is untyped
     """Replays a fitted model's predictions by row label.
 
     Lets a bootstrap re-score thousands of resamples without re-predicting:
@@ -503,11 +503,11 @@ class CachedPredictions(base.BaseEstimator):
         return self.probabilities.loc[features.index].to_numpy()
 
 
-class ClassifierReplay(base.ClassifierMixin, CachedPredictions):
+class ClassifierReplay(base.ClassifierMixin, CachedPredictions):  # type: ignore[misc]  # scikit-learn is untyped
     """Cached predictions that scikit-learn treats as a classifier."""
 
 
-class RegressorReplay(base.RegressorMixin, CachedPredictions):
+class RegressorReplay(base.RegressorMixin, CachedPredictions):  # type: ignore[misc]  # scikit-learn is untyped
     """Cached predictions that scikit-learn treats as a regressor."""
 
 

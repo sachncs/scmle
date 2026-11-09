@@ -75,9 +75,10 @@ class Estimand:
                 is empty or not a string, column names repeat, no
                 assumptions are given, or a required assumption is missing.
         """
-        if not isinstance(self.name, str) or not self.name.strip():
+        name: object = self.name  # may be a non-string at runtime
+        if not isinstance(name, str) or not name.strip():
             raise ValueError("estimand name must not be empty")
-        names = (
+        names: tuple[object, ...] = (
             self.subject_identity,
             self.time_column,
             self.treatment_column,
@@ -88,7 +89,8 @@ class Estimand:
             raise ValueError("estimand column names must be non-empty strings")
         if len(set(names)) != len(names):
             raise ValueError("estimand columns must be unique")
-        if not isinstance(self.population, str) or not self.population.strip():
+        population: object = self.population  # may be a non-string at runtime
+        if not isinstance(population, str) or not population.strip():
             raise ValueError("estimand population must not be empty")
         if not self.assumptions:
             raise ValueError("estimand needs explicit assumptions")
@@ -163,11 +165,8 @@ class Config:
             )
         if self.missingness not in ("reject", "complete_case"):
             raise ValueError("missingness must be reject or complete_case")
-        if (
-            isinstance(self.seed, bool)
-            or not isinstance(self.seed, int)
-            or self.seed < 0
-        ):
+        seed: object = self.seed  # may be a non-integer at runtime
+        if isinstance(seed, bool) or not isinstance(seed, int) or seed < 0:
             raise ValueError("seed must be a non-negative integer")
         self.check_limits()
 
@@ -186,15 +185,16 @@ class Config:
         ):
             if not math.isfinite(float(value)) or value <= 0.0:
                 raise ValueError(f"{name} must be positive and finite")
-        for name, value in (
+        counts: tuple[tuple[str, object], ...] = (
             ("max_iterations", self.max_iterations),
             ("minimum_rows_per_period", self.minimum_rows_per_period),
             ("minimum_rows_per_arm", self.minimum_rows_per_arm),
-        ):
+        )
+        for name, count in counts:
             if (
-                isinstance(value, bool)
-                or not isinstance(value, int)
-                or value < 1
+                isinstance(count, bool)
+                or not isinstance(count, int)
+                or count < 1
             ):
                 raise ValueError(f"{name} must be a positive integer")
         if (
@@ -397,12 +397,12 @@ class Estimation:
         ):
             if not isinstance(item_value, Mapping):
                 raise TypeError(f"{name} must be a mapping")
+        fingerprint: object = self.raw_input_fingerprint  # may be non-text
         if (
-            not isinstance(self.raw_input_fingerprint, str)
-            or len(self.raw_input_fingerprint) != SHA256_HEX_LENGTH
+            not isinstance(fingerprint, str)
+            or len(fingerprint) != SHA256_HEX_LENGTH
             or any(
-                character not in "0123456789abcdef"
-                for character in self.raw_input_fingerprint
+                character not in "0123456789abcdef" for character in fingerprint
             )
         ):
             raise ValueError(
@@ -434,15 +434,16 @@ class Estimation:
             ValueError: If a row count is not a non-negative integer, or the
                 used and dropped rows do not sum to the input rows.
         """
-        for name, value in (
+        counts: tuple[tuple[str, object], ...] = (
             ("rows_input", self.rows_input),
             ("rows_used", self.rows_used),
             ("rows_dropped", self.rows_dropped),
-        ):
+        )
+        for name, count in counts:
             if (
-                isinstance(value, bool)
-                or not isinstance(value, int)
-                or value < 0
+                isinstance(count, bool)
+                or not isinstance(count, int)
+                or count < 0
             ):
                 raise ValueError(f"{name} must be a non-negative integer")
         if self.rows_used + self.rows_dropped != self.rows_input:

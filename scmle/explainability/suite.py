@@ -73,7 +73,8 @@ def build_evidence(
         raise ValueError("diagnostic.name must be a non-empty string")
     if isinstance(limitations, str):
         raise TypeError("limitations must be a sequence of strings")
-    if isinstance(evidence_links, str):
+    supplied_links: object = evidence_links  # callers may pass a string
+    if isinstance(supplied_links, str):
         raise TypeError(
             "evidence_links must be a sequence of EvidenceLink values"
         )

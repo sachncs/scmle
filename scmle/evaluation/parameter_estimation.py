@@ -19,7 +19,6 @@ import os
 from pathlib import Path
 import tempfile
 from typing import Any
-from typing import cast
 from typing import Literal
 
 import numpy
@@ -376,18 +375,16 @@ class Config:
             or self.continuous_weight_cap <= 1.0
         ):
             raise ValueError("continuous_weight_cap must be greater than 1")
-        if (
-            isinstance(self.cross_fitting_folds, bool)
-            or not isinstance(self.cross_fitting_folds, int)
-            or self.cross_fitting_folds < 1
-        ):
+        folds: object = self.cross_fitting_folds  # may be a non-integer
+        if isinstance(folds, bool) or not isinstance(folds, int) or folds < 1:
             raise ValueError("cross_fitting_folds must be a positive integer")
         if self.hierarchical_method not in ("moment_gls", "reml"):
             raise ValueError("hierarchical_method must be moment_gls or reml")
-        if self.random_slope_position is not None and (
-            isinstance(self.random_slope_position, bool)
-            or not isinstance(self.random_slope_position, int)
-            or self.random_slope_position < 0
+        slope_position: object = self.random_slope_position  # may be non-int
+        if slope_position is not None and (
+            isinstance(slope_position, bool)
+            or not isinstance(slope_position, int)
+            or slope_position < 0
         ):
             raise ValueError(
                 "random_slope_position must be a non-negative integer or None"
@@ -775,12 +772,12 @@ class Estimation:
         ):
             if not isinstance(mapping_value, Mapping):
                 raise TypeError(f"{mapping_name} must be a mapping")
+        fingerprint: object = self.raw_input_fingerprint  # may be non-text
         if (
-            not isinstance(self.raw_input_fingerprint, str)
-            or len(self.raw_input_fingerprint) != SHA256_HEX_LENGTH
+            not isinstance(fingerprint, str)
+            or len(fingerprint) != SHA256_HEX_LENGTH
             or any(
-                character not in "0123456789abcdef"
-                for character in self.raw_input_fingerprint
+                character not in "0123456789abcdef" for character in fingerprint
             )
         ):
             raise ValueError(
@@ -794,12 +791,13 @@ class Estimation:
             ValueError: If a row count is negative or not an integer, or the
                 used and dropped rows do not sum to the input rows.
         """
-        for name, value in (
+        counts: tuple[tuple[str, object], ...] = (
             ("rows_input", self.rows_input),
             ("rows_used", self.rows_used),
             ("rows_dropped", self.rows_dropped),
-        ):
-            if not isinstance(value, int) or value < 0:
+        )
+        for name, count in counts:
+            if not isinstance(count, int) or count < 0:
                 raise ValueError(f"{name} must be a non-negative integer")
         if self.rows_used + self.rows_dropped != self.rows_input:
             raise ValueError("row accounting must reconcile to rows_input")
@@ -1291,6 +1289,7 @@ def fit_bayesian_estimator(
         raise ValueError(
             f"{policy.estimator} estimation requires an explicit prior"
         )
+    treatment_position, treated_rows, control_rows = 0, 0, 0
     if policy.estimator == "bayesian_ate":
         treatment_position, treated_rows, control_rows = (
             check_bayesian_treatment(matrix, policy)
@@ -1311,9 +1310,7 @@ def fit_bayesian_estimator(
             "estimator_family": "causal_bayesian_gaussian",
             "method": "normal_inverse_gamma_outcome_regression",
             "treatment_position": treatment_position,
-            "treatment_name": estimand.feature_names[
-                cast("int", treatment_position)
-            ],
+            "treatment_name": estimand.feature_names[treatment_position],
             "treated_rows": treated_rows,
             "control_rows": control_rows,
             "identification": (
@@ -1782,7 +1779,11 @@ def estimate_parameters(
         interval_errors = standard_errors
     else:
         standard_errors = fit.standard_errors
-        interval_errors = fit.interval_errors
+        interval_errors = (
+            standard_errors
+            if fit.interval_errors is None
+            else fit.interval_errors
+        )
 
     parameters = tuple(
         ParameterEstimate(
@@ -2061,9 +2062,7 @@ def prepare_rows(
     valid = numpy.isfinite(matrix).all(axis=1) & numpy.isfinite(values)
     if clusters is not None:
         cluster_array = numpy.asarray(clusters, dtype=object)
-        cluster_missing = pandas.isna(cluster_array)
-        if not isinstance(cluster_missing, numpy.ndarray):
-            cluster_missing = numpy.asarray(cluster_missing)
+        cluster_missing = numpy.asarray(pandas.isna(cluster_array))
         if cluster_missing.ndim != 1:
             raise ValueError("cluster labels must be scalar values")
         valid &= ~cluster_missing.astype(bool)
@@ -2997,7 +2996,10 @@ def center_influence(influence: numpy.ndarray) -> numpy.ndarray:
         raise ValueError("influence uncertainty needs at least two rows")
     if not numpy.isfinite(centered_influence).all():
         raise ValueError("influence scores must contain only finite values")
-    return centered_influence - numpy.mean(centered_influence)
+    centered: numpy.ndarray = centered_influence - numpy.mean(
+        centered_influence
+    )
+    return centered
 
 
 def influence_variance(
@@ -3560,7 +3562,8 @@ def project_random_effect_covariance(
     eigenvalues, eigenvectors = numpy.linalg.eigh(symmetric)
     projected = eigenvectors @ numpy.diag(numpy.maximum(eigenvalues, 0.0))
     projected = projected @ eigenvectors.T
-    return (projected + projected.T) / 2.0
+    symmetrized: numpy.ndarray = (projected + projected.T) / 2.0
+    return symmetrized
 
 
 def hierarchical_random_slope_gls_system(
@@ -3637,11 +3640,14 @@ def hierarchical_random_effect_precision(
         @ random_effect_design.T
     )
     try:
-        return linalg.solve(covariance, numpy.eye(count), assume_a="pos")
+        precision: numpy.ndarray = linalg.solve(
+            covariance, numpy.eye(count), assume_a="pos"
+        )
     except numpy.linalg.LinAlgError as error:
         raise ValueError(
             "hierarchical random-effect covariance is not positive definite"
         ) from error
+    return precision
 
 
 def hierarchical_random_slope_diagnostics(
@@ -4436,7 +4442,8 @@ def covariance_matrix(
     correction = (len(groups) / (len(groups) - 1)) * (
         (len(design) - 1) / max(len(design) - design.shape[1], 1)
     )
-    return correction * bread @ meat @ bread
+    sandwich: numpy.ndarray = correction * bread @ meat @ bread
+    return sandwich
 
 
 def reference_linear(

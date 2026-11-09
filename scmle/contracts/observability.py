@@ -90,8 +90,9 @@ class MetricSample:
         require_text(self.name, "metric.name")
         require_text(self.unit, "metric.unit")
         validate_timestamp(self.timestamp, "metric.timestamp")
-        if not isinstance(self.kind, SignalKind):
-            object.__setattr__(self, "kind", SignalKind(self.kind))
+        kind: Any = self.kind  # may be a raw value at runtime
+        if not isinstance(kind, SignalKind):
+            object.__setattr__(self, "kind", SignalKind(kind))
         if not math.isfinite(self.value):
             raise ValueError("metric.value must be finite")
         if any(

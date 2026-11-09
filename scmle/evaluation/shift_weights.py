@@ -58,7 +58,8 @@ class ShiftWeights:
             numpy.asarray(features, dtype=float)
         )[:, 1]
         odds = probability / numpy.maximum(1.0 - probability, 1e-12)
-        return numpy.minimum(odds * self.scale, self.clip)
+        capped: numpy.ndarray = numpy.minimum(odds * self.scale, self.clip)
+        return capped
 
 
 def effective_sample_size(weights: numpy.ndarray) -> float:

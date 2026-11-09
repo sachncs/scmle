@@ -39,9 +39,10 @@ def bottom_up(
     Returns:
         `(steps, n)` coherent forecasts of all series.
     """
-    return (
+    coherent: numpy.ndarray = (
         numpy.asarray(bottom_forecasts, dtype=float) @ numpy.asarray(summing).T
     )
+    return coherent
 
 
 def shrunk_covariance(residuals: numpy.ndarray) -> numpy.ndarray:
@@ -76,7 +77,8 @@ def shrunk_covariance(residuals: numpy.ndarray) -> numpy.ndarray:
         else min(1.0, max(0.0, float(spread[off].sum()) / squared))
     )
     shrunk = numpy.where(off, (1.0 - intensity) * correlation, 1.0)
-    return shrunk * scale[:, None] * scale[None, :]
+    covariance: numpy.ndarray = shrunk * scale[:, None] * scale[None, :]
+    return covariance
 
 
 def mint(
@@ -100,7 +102,10 @@ def mint(
     s = numpy.asarray(summing, dtype=float)
     inverse = numpy.linalg.inv(numpy.asarray(covariance, dtype=float))
     gain = numpy.linalg.solve(s.T @ inverse @ s, s.T @ inverse)
-    return numpy.asarray(base_forecasts, dtype=float) @ (s @ gain).T
+    reconciled: numpy.ndarray = (
+        numpy.asarray(base_forecasts, dtype=float) @ (s @ gain).T
+    )
+    return reconciled
 
 
 def coherence_residual(
