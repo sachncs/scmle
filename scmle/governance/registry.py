@@ -466,8 +466,8 @@ class ModelRegistryStore:
         independent approval, is refused with an `ArtifactError`. If the
         registry has a guard and the champion move has no valid attestation,
         the guard raises `AttestationRequired` (an escalation is written and
-        nothing is moved); the guard is asked first, before the model,
-        version or approval is checked. When the champion moves to a
+        nothing is moved); the guard is asked after the model, version and
+        approval are checked, so a refused request spends no attestation. When the champion moves to a
         different version, the version it replaced becomes `previous`. The
         move is recorded in the audit log.
 
@@ -484,14 +484,63 @@ class ModelRegistryStore:
                 has a guard and `alias` is the champion; defaults to the
                 model and version. A rollback names itself here.
         """
-        if alias == CHAMPION and self.guard is not None:
-            self.guard.require(
-                never_list.NeverAction.MOVE_CHAMPION,
-                dict(guard_detail or {"model": model, "version": version}),
-                self.scope,
-            )
         with self.lock:
+            self.check_promotion(model, version, alias, approval, signing_key)
+            if alias == CHAMPION and self.guard is not None:
+                self.guard.require(
+                    never_list.NeverAction.MOVE_CHAMPION,
+                    dict(guard_detail or {"model": model, "version": version}),
+                    self.scope,
+                )
             self.promote_locked(model, version, alias, approval, signing_key)
+
+    def check_promotion(
+        self,
+        model: str,
+        version: int,
+        alias: str,
+        approval: PromotionApproval | None,
+        signing_key: str | bytes | None,
+        index: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Validates a move without changing anything.
+
+        Args:
+            model: Model name.
+            version: Registered version number.
+            alias: Alias to move.
+            approval: The independent approval, required for the champion.
+            signing_key: HMAC key for the approval signature.
+            index: The registry index, read when not given.
+
+        Returns:
+            The model's index entry.
+
+        Raises:
+            ArtifactError: If the version is not registered, a champion move
+                has no approval, or the approval is not valid for the bundle.
+        """
+        if index is None:
+            index = self.read_index()
+        entry = index["models"].get(model)
+        if entry is None or str(version) not in entry["versions"]:
+            raise errors.ArtifactError(f"{model} v{version} is not registered")
+        record = VersionRecord(**entry["versions"][str(version)])
+        if alias == CHAMPION:
+            if approval is None:
+                raise errors.ArtifactError(
+                    "champion promotion requires independent approval"
+                )
+            try:
+                approval.validate_target(
+                    model,
+                    version,
+                    record.content_id,
+                    signing_key,
+                )
+            except (TypeError, ValueError) as error:
+                raise errors.ArtifactError(str(error)) from error
+        return entry
 
     def promote_locked(
         self,
@@ -519,24 +568,9 @@ class ModelRegistryStore:
                 has no approval, or the approval is not valid for the bundle.
         """
         index = self.read_index()
-        entry = index["models"].get(model)
-        if entry is None or str(version) not in entry["versions"]:
-            raise errors.ArtifactError(f"{model} v{version} is not registered")
-        record = VersionRecord(**entry["versions"][str(version)])
-        if alias == CHAMPION:
-            if approval is None:
-                raise errors.ArtifactError(
-                    "champion promotion requires independent approval"
-                )
-            try:
-                approval.validate_target(
-                    model,
-                    version,
-                    record.content_id,
-                    signing_key,
-                )
-            except (TypeError, ValueError) as error:
-                raise errors.ArtifactError(str(error)) from error
+        entry = self.check_promotion(
+            model, version, alias, approval, signing_key, index
+        )
         previous = entry["aliases"].get(alias)
         entry["aliases"][alias] = version
         if alias == CHAMPION and previous is not None and previous != version:

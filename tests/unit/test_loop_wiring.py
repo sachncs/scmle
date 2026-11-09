@@ -242,3 +242,37 @@ def test_a_rollback_needs_an_attestation_naming_the_rollback(
         signing_key=APPROVAL_KEY,
     )
     assert outcome.rolled_back and store.resolve("m").version == 1
+
+
+def test_a_guarded_loop_move_spends_a_single_use_attestation_once(
+    tmp_path, exported
+):
+    loop = base.open_loop(tmp_path, single_use_attestations=True)
+    store = registry_module.ModelRegistryStore(tmp_path / "registry")
+    loop.guard_registry(store)
+    record = store.register("m", exported[0], trusted=True)
+    approval = approval_for(record)
+    with pytest.raises(never_list.AttestationRequired):
+        loop.move_champion(store, "m", 1, approval, APPROVAL_KEY)
+    approve_pending(loop)
+    loop.move_champion(store, "m", 1, approval, APPROVAL_KEY)
+    assert store.resolve("m").version == 1
+    assert len(base.rows(loop, dl.ATTESTATION_USED)) == 1
+
+
+def test_a_refused_approval_does_not_spend_a_single_use_attestation(
+    tmp_path, exported
+):
+    loop = base.open_loop(tmp_path, single_use_attestations=True)
+    store = registry_module.ModelRegistryStore(tmp_path / "registry")
+    loop.guard_registry(store)
+    record = store.register("m", exported[0], trusted=True)
+    approval = approval_for(record)
+    with pytest.raises(never_list.AttestationRequired):
+        store.promote("m", 1, approval=approval, signing_key=APPROVAL_KEY)
+    approve_pending(loop)
+    with pytest.raises(registry_module.errors.ArtifactError):
+        store.promote("m", 1, approval=None, signing_key=APPROVAL_KEY)
+    assert base.rows(loop, dl.ATTESTATION_USED) == []
+    store.promote("m", 1, approval=approval, signing_key=APPROVAL_KEY)
+    assert store.resolve("m").version == 1

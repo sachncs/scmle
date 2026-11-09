@@ -1802,12 +1802,20 @@ class Loop:
         Returns:
             Whatever the registry's `promote` returns.
         """
+        def move() -> Any:
+            return registry.promote(
+                model, version, approval=approval, signing_key=signing_key
+            )
+
+        if getattr(registry, "guard", None) is self.guard:
+            try:
+                return move()
+            finally:
+                self.save_state()
         return self.perform(
             never_list.NeverAction.MOVE_CHAMPION,
             {"model": model, "version": version},
-            lambda: registry.promote(
-                model, version, approval=approval, signing_key=signing_key
-            ),
+            move,
         )
 
     def execute_rollback(
