@@ -675,8 +675,8 @@
           1.0
         ]
       },
-      "code_hash": "cf0066d62fcc6cec5857afae2a32a83114950927a8aac342c2c5c7ffd8f4b1e1",
-      "method_hash": "03de4a53316b12d3f6803337e79a85ad43dbf1e99f3858f346fe02e26618724e",
+      "code_hash": "4d4f43326d6dc54a86e1cd0d0e3a1a91cf89968a3e7c96f09251b385556c2fbc",
+      "method_hash": "7df4dd7fd705d3cda71d4b3da70040c624809d32b1ac4b0372ae9b94f5bafbec",
       "passed": true,
       "refuses_when_none_eligible": {
         "hits": 200,
