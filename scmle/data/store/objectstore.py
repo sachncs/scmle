@@ -332,9 +332,10 @@ def unlink_tolerantly(path: pathlib.Path) -> None:
     for attempt in range(RETRY_ATTEMPTS):
         try:
             path.unlink(missing_ok=True)
-            return
         except PermissionError:
             time.sleep(0.005 * (attempt + 1))
+        else:
+            return
 
 
 class LocalObjectStore(ObjectStore):
@@ -372,7 +373,7 @@ class LocalObjectStore(ObjectStore):
         Raises:
             StoreError: If the key is not valid or its path leaves the root.
         """
-        target = pathlib.Path(os.path.abspath(self.root / check_key(key)))
+        target = pathlib.Path(os.path.abspath(self.root / check_key(key)))  # noqa: PTH100 -- abspath normalises `..` without following symlinks; resolve() would also follow them and change which keys are accepted
         if self.root not in target.parents:
             raise StoreError(f"key {key!r} escapes the store root")
         return target

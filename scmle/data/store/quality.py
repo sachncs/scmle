@@ -230,7 +230,13 @@ class Check(abc.ABC):
             A finding with no rows, and one violation when `ok` is false.
         """
         return Finding(
-            self.name, self.policy, ok, 0 if ok else 1, False, (), detail
+            rule=self.name,
+            policy=self.policy,
+            passed=ok,
+            violations=0 if ok else 1,
+            row_level=False,
+            rows=(),
+            detail=detail,
         )
 
     def row_finding(self, bad: pandas.Series, detail: str) -> Finding:
@@ -247,7 +253,13 @@ class Check(abc.ABC):
         """
         rows = tuple(int(i) for i in bad.to_numpy().nonzero()[0])
         return Finding(
-            self.name, self.policy, not rows, len(rows), True, rows, detail
+            rule=self.name,
+            policy=self.policy,
+            passed=not rows,
+            violations=len(rows),
+            row_level=True,
+            rows=rows,
+            detail=detail,
         )
 
 
@@ -259,7 +271,7 @@ class SchemaCheck(Check):
     def evaluate(
         self,
         frame: pandas.DataFrame,
-        record: snapshot.SnapshotRecord,
+        record: snapshot.SnapshotRecord,  # noqa: ARG002 -- overrides Check.evaluate, whose signature every rule shares
         contract: snapshot.DataContract,
     ) -> Finding:
         """Compares the frame's schema with the contract's.
@@ -284,9 +296,9 @@ class FreshnessCheck(Check):
 
     def evaluate(
         self,
-        frame: pandas.DataFrame,
+        frame: pandas.DataFrame,  # noqa: ARG002 -- overrides Check.evaluate, whose signature every rule shares
         record: snapshot.SnapshotRecord,
-        contract: snapshot.DataContract,
+        contract: snapshot.DataContract,  # noqa: ARG002 -- overrides Check.evaluate, whose signature every rule shares
     ) -> Finding:
         """Checks the snapshot's age against the contract's limit.
 
@@ -324,8 +336,8 @@ class MinRowsCheck(Check):
     def evaluate(
         self,
         frame: pandas.DataFrame,
-        record: snapshot.SnapshotRecord,
-        contract: snapshot.DataContract,
+        record: snapshot.SnapshotRecord,  # noqa: ARG002 -- overrides Check.evaluate, whose signature every rule shares
+        contract: snapshot.DataContract,  # noqa: ARG002 -- overrides Check.evaluate, whose signature every rule shares
     ) -> Finding:
         """Checks the number of rows.
 
@@ -364,8 +376,8 @@ class NullFractionCheck(Check):
     def evaluate(
         self,
         frame: pandas.DataFrame,
-        record: snapshot.SnapshotRecord,
-        contract: snapshot.DataContract,
+        record: snapshot.SnapshotRecord,  # noqa: ARG002 -- overrides Check.evaluate, whose signature every rule shares
+        contract: snapshot.DataContract,  # noqa: ARG002 -- overrides Check.evaluate, whose signature every rule shares
     ) -> Finding:
         """Checks the fraction of nulls in the column.
 
@@ -380,7 +392,9 @@ class NullFractionCheck(Check):
             frame (its fraction counts as 1.0) unless `maximum` is 1 or more.
         """
         if self.column not in frame.columns:
-            return self.dataset_finding(False, f"no column {self.column}")
+            return self.dataset_finding(
+                ok=False, detail=f"no column {self.column}"
+            )
         fraction = (
             float(frame[self.column].isna().mean()) if len(frame) else 1.0
         )
@@ -408,8 +422,8 @@ class NoNullsCheck(Check):
     def evaluate(
         self,
         frame: pandas.DataFrame,
-        record: snapshot.SnapshotRecord,
-        contract: snapshot.DataContract,
+        record: snapshot.SnapshotRecord,  # noqa: ARG002 -- overrides Check.evaluate, whose signature every rule shares
+        contract: snapshot.DataContract,  # noqa: ARG002 -- overrides Check.evaluate, whose signature every rule shares
     ) -> Finding:
         """Checks that the column has no nulls.
 
@@ -423,7 +437,9 @@ class NoNullsCheck(Check):
             failing dataset-level finding if the column is missing.
         """
         if self.column not in frame.columns:
-            return self.dataset_finding(False, f"no column {self.column}")
+            return self.dataset_finding(
+                ok=False, detail=f"no column {self.column}"
+            )
         return self.row_finding(
             frame[self.column].isna().reset_index(drop=True),
             f"null {self.column}",
@@ -438,7 +454,7 @@ class UniqueKeyCheck(Check):
     def evaluate(
         self,
         frame: pandas.DataFrame,
-        record: snapshot.SnapshotRecord,
+        record: snapshot.SnapshotRecord,  # noqa: ARG002 -- overrides Check.evaluate, whose signature every rule shares
         contract: snapshot.DataContract,
     ) -> Finding:
         """Checks that no key repeats.
@@ -456,7 +472,9 @@ class UniqueKeyCheck(Check):
         """
         keys = list(contract.key_columns)
         if not keys or any(k not in frame.columns for k in keys):
-            return self.dataset_finding(False, "no usable key columns")
+            return self.dataset_finding(
+                ok=False, detail="no usable key columns"
+            )
         repeated = frame.duplicated(subset=keys, keep="first")
         return self.row_finding(
             repeated.reset_index(drop=True), f"repeated key {keys}"
@@ -491,8 +509,8 @@ class RangeCheck(Check):
     def evaluate(
         self,
         frame: pandas.DataFrame,
-        record: snapshot.SnapshotRecord,
-        contract: snapshot.DataContract,
+        record: snapshot.SnapshotRecord,  # noqa: ARG002 -- overrides Check.evaluate, whose signature every rule shares
+        contract: snapshot.DataContract,  # noqa: ARG002 -- overrides Check.evaluate, whose signature every rule shares
     ) -> Finding:
         """Checks that values lie within the bounds, which are inclusive.
 
@@ -510,9 +528,11 @@ class RangeCheck(Check):
             missing.
         """
         if self.column not in frame.columns:
-            return self.dataset_finding(False, f"no column {self.column}")
+            return self.dataset_finding(
+                ok=False, detail=f"no column {self.column}"
+            )
         values = pandas.to_numeric(frame[self.column], errors="coerce")
-        bad = pandas.Series(False, index=values.index)
+        bad = pandas.Series(data=False, index=values.index)
         if self.minimum is not None:
             bad |= values < self.minimum
         if self.maximum is not None:
@@ -545,8 +565,8 @@ class AllowedValuesCheck(Check):
     def evaluate(
         self,
         frame: pandas.DataFrame,
-        record: snapshot.SnapshotRecord,
-        contract: snapshot.DataContract,
+        record: snapshot.SnapshotRecord,  # noqa: ARG002 -- overrides Check.evaluate, whose signature every rule shares
+        contract: snapshot.DataContract,  # noqa: ARG002 -- overrides Check.evaluate, whose signature every rule shares
     ) -> Finding:
         """Checks that values belong to the declared set.
 
@@ -563,7 +583,9 @@ class AllowedValuesCheck(Check):
             missing.
         """
         if self.column not in frame.columns:
-            return self.dataset_finding(False, f"no column {self.column}")
+            return self.dataset_finding(
+                ok=False, detail=f"no column {self.column}"
+            )
         column = frame[self.column]
         bad = (~column.isin(self.allowed)) & column.notna()
         return self.row_finding(

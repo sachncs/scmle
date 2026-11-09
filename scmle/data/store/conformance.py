@@ -182,9 +182,12 @@ def check_overwrite(store: objectstore.ObjectStore, base: str) -> None:
         base: Key prefix reserved for this check.
     """
     store.put(f"{base}/o", b"one")
-    store.put(f"{base}/o", b"two!")
+    second = b"two!"
+    store.put(f"{base}/o", second)
     content, meta = store.get(f"{base}/o")
-    require(content == b"two!" and meta.size == 4, "overwrite not visible")
+    require(
+        content == second and meta.size == len(second), "overwrite not visible"
+    )
 
 
 def check_missing(store: objectstore.ObjectStore, base: str) -> None:
@@ -279,7 +282,7 @@ def check_if_absent_race(store: objectstore.ObjectStore, base: str) -> None:
             result = "won"
         except objectstore.AlreadyExistsError:
             result = "lost"
-        except Exception as error:
+        except Exception as error:  # noqa: BLE001 -- any backend failure is recorded as this racer's outcome
             result = f"failed {type(error).__name__}: {error}"
         with guard:
             outcomes.append(result)
@@ -360,7 +363,7 @@ def check_delete(store: objectstore.ObjectStore, base: str) -> None:
     store.delete(f"{base}/never-existed")
 
 
-def check_key_rules(store: objectstore.ObjectStore, base: str) -> None:
+def check_key_rules(store: objectstore.ObjectStore, base: str) -> None:  # noqa: ARG001 -- every check in CHECKS is called with the store and a key prefix
     """Unsafe keys are refused before reaching the backend.
 
     The check fails with `ConformanceError` (through `require`) if if
@@ -439,7 +442,7 @@ def run_conformance(
         try:
             check(store, base)
             outcome, detail = True, ""
-        except Exception as error:
+        except Exception as error:  # noqa: BLE001 -- a failing check is reported in the result, not raised
             outcome, detail = False, f"{type(error).__name__}: {error}"
         finally:
             cleanup(store, base)

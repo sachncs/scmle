@@ -51,6 +51,22 @@ FORMAT = 1
 SEPARATOR = "\x1f"
 
 
+def require_match(digest: str, expected: str, document: dict[str, Any]) -> None:
+    """Checks a checkpoint's digest and format.
+
+    Args:
+        digest: The digest stored in the checkpoint.
+        expected: The digest recomputed from the document.
+        document: The decoded checkpoint without its digest; its format is
+            read only when the digests agree.
+
+    Raises:
+        ValueError: If the digest differs or the format is not `FORMAT`.
+    """
+    if digest != expected or document["format"] != FORMAT:
+        raise ValueError("digest or format mismatch")
+
+
 class CheckpointCorruptError(errors.DataError):
     """The checkpoint does not match its digest or format."""
 
@@ -121,8 +137,7 @@ class Checkpoint:
             expected = hashlib.sha256(
                 json.dumps(document, sort_keys=True).encode()
             ).hexdigest()
-            if digest != expected or document["format"] != FORMAT:
-                raise ValueError("digest or format mismatch")
+            require_match(digest, expected, document)
             return cls(dict(document["processed"]), set(document["seen"]))
         except (ValueError, KeyError, TypeError, AttributeError) as error:
             raise CheckpointCorruptError(
