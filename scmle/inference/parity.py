@@ -13,6 +13,7 @@ import json
 import pathlib
 from typing import Any
 import urllib.error
+import urllib.parse
 import urllib.request
 
 import numpy
@@ -31,6 +32,8 @@ from scmle.contracts import errors
 from scmle.contracts import serving
 
 MISSING_CATEGORY = "__missing__"
+POSITIVE_CLASS_THRESHOLD = 0.5
+REMOTE_URL_SCHEMES = ("http", "https")
 
 
 def read_json(path: str | pathlib.Path) -> dict[str, Any]:
@@ -313,7 +316,7 @@ def expected_outputs(
         probabilities.append(1.0 / (1.0 + float(numpy.exp(-logit))))
     return {
         "classes": list(spec["classes"]),
-        "labels": [int(p > 0.5) for p in probabilities],
+        "labels": [int(p > POSITIVE_CLASS_THRESHOLD) for p in probabilities],
         "probability_of_class_1": probabilities,
     }
 
@@ -341,11 +344,11 @@ def compare(
     count = len(expected["labels"])
     if len(predictions) != count or len(probabilities) != count:
         return Parity(
-            False,
-            count,
-            float("inf"),
-            tolerance.probability_abs,
-            (f"expected {count} outputs, got {len(predictions)}",),
+            passed=False,
+            records=count,
+            max_probability_error=float("inf"),
+            tolerance=tolerance.probability_abs,
+            mismatches=(f"expected {count} outputs, got {len(predictions)}",),
         )
     worst = 0.0
     for index in range(count):
@@ -359,11 +362,11 @@ def compare(
         if error > tolerance.probability_abs:
             mismatches.append(f"record {index}: probability off by {error:.3g}")
     return Parity(
-        not mismatches,
-        count,
-        worst,
-        tolerance.probability_abs,
-        tuple(mismatches),
+        passed=not mismatches,
+        records=count,
+        max_probability_error=worst,
+        tolerance=tolerance.probability_abs,
+        mismatches=tuple(mismatches),
     )
 
 
@@ -393,17 +396,24 @@ def check_remote(
         `probabilities`, only `passed` (False) and `mismatches` are returned
         (with `level` for the latter). An unreadable golden file raises
         `ArtifactError` from `read_json`; other network errors propagate.
+
+    Raises:
+        ValueError: If `url` does not use http or https.
     """
+    if urllib.parse.urlsplit(url).scheme not in REMOTE_URL_SCHEMES:
+        raise ValueError(f"url must use http or https, got {url!r}")
     root = pathlib.Path(directory)
     golden = load_golden(root)
     expected = read_json(root / "expected.json")
-    request = urllib.request.Request(
+    request = urllib.request.Request(  # noqa: S310 -- scheme checked above
         url.rstrip("/") + "/predict",
         json.dumps({"records": golden.records}).encode(),
         {"Content-Type": "application/json"},
     )
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as reply:  # nosec B310
+        with urllib.request.urlopen(  # noqa: S310 -- scheme checked above
+            request, timeout=timeout
+        ) as reply:
             body = json.loads(reply.read())
     except urllib.error.HTTPError as error:
         return {"passed": False, "mismatches": [f"HTTP {error.code}"]}

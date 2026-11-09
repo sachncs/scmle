@@ -52,9 +52,7 @@ class Link:
             value = getattr(self, name)
             if not isinstance(value, str) or not value.strip():
                 raise ValueError(f"{name} must not be empty")
-        parsed = datetime.datetime.fromisoformat(
-            self.timestamp.replace("Z", "+00:00")
-        )
+        parsed = datetime.datetime.fromisoformat(self.timestamp)
         if parsed.tzinfo is None:
             raise ValueError("timestamp must include a timezone")
 
@@ -213,7 +211,7 @@ class Linker:
                 handle.write("\n")
                 handle.flush()
                 os.fsync(handle.fileno())
-            os.replace(temporary_name, path)
+            pathlib.Path(temporary_name).replace(path)
             durability.sync_directory(path.parent)
         except BaseException:
             pathlib.Path(temporary_name).unlink(missing_ok=True)
