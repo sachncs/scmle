@@ -1,5 +1,6 @@
 import datetime
 import json
+import math
 import os
 import types
 
@@ -795,3 +796,14 @@ def test_an_uncertified_alarm_escalates_instead_of_retraining(tmp_path):
         e.question["action"] == "l1_alarm_investigate"
         for e in loop.pending_escalations()
     )
+
+
+def test_a_rollback_proposal_never_lowers_an_infinite_tau(tmp_path):
+    loop = open_loop(tmp_path)
+    assert math.isinf(loop.tau)
+    loop.rollback_watch = {
+        "previous": "v1",
+        "process": types.SimpleNamespace(crossed=True, e_value=50.0),
+    }
+    loop.decide_rollback()
+    assert math.isinf(loop.tau)
