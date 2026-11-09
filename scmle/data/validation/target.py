@@ -9,6 +9,8 @@ TEXT_TARGET_MIN_CLASSES = 20
 TEXT_TARGET_MAX_RATIO = 0.5
 AMBIGUOUS_MAX_VALUES = 10
 AMBIGUOUS_MAX_RATIO = 0.05
+MIN_CLASSES = 2
+BINARY_CLASSES = 2
 
 
 def is_numeric_target(target: pandas.Series) -> bool:
@@ -170,20 +172,19 @@ class TaskResolver:
             raise errors.BlockedError(
                 f"target '{target.name}' has no non-missing values"
             )
-        if self.request == "survival":
-            return self.resolve_survival(target)
-        if self.request == "ordinal":
-            return self.resolve_ordinal(target)
-        if self.request == "ranking":
-            return self.resolve_ranking(target)
-        if self.request == "uplift":
-            return self.resolve_uplift(target)
+        handlers = {
+            "survival": self.resolve_survival,
+            "ordinal": self.resolve_ordinal,
+            "ranking": self.resolve_ranking,
+            "uplift": self.resolve_uplift,
+            "regression": self.resolve_regression,
+            "auto": self.resolve_auto,
+        }
+        handler = handlers.get(self.request)
+        if handler is not None:
+            return handler(target)
         if self.request in ("multilabel", "multioutput", "forecast"):
             return tasks.Task(self.request)
-        if self.request == "regression":
-            return self.resolve_regression(target)
-        if self.request == "auto":
-            return self.resolve_auto(target)
         return self.resolve_classification(target)
 
     def resolve_survival(self, target: pandas.Series) -> tasks.Task:
@@ -303,11 +304,11 @@ class TaskResolver:
                 or a `multiclass_classification` request has only two.
         """
         classes = target.nunique(dropna=True)
-        if classes < 2:
+        if classes < MIN_CLASSES:
             raise errors.BlockedError(
                 f"classification needs >=2 classes; target has {classes}"
             )
-        binary = classes == 2
+        binary = classes == BINARY_CLASSES
         if self.request == "binary_classification" and not binary:
             raise errors.BlockedError(
                 f"binary_classification requested but target has {classes} "
@@ -337,7 +338,7 @@ class TaskResolver:
                 versus regression is ambiguous.
         """
         classes = target.nunique(dropna=True)
-        if classes < 2:
+        if classes < MIN_CLASSES:
             raise errors.BlockedError(
                 f"target '{target.name}' has {classes} distinct value(s); "
                 "there is nothing to learn"
@@ -353,8 +354,12 @@ class TaskResolver:
                 "not a class label; choose another target"
             )
         if not is_numeric_target(target):
-            return tasks.Task.BINARY if classes == 2 else tasks.Task.MULTICLASS
-        if classes == 2:
+            return (
+                tasks.Task.BINARY
+                if classes == BINARY_CLASSES
+                else tasks.Task.MULTICLASS
+            )
+        if classes == BINARY_CLASSES:
             return tasks.Task.BINARY
         values = target.dropna()
         integral = bool((values % 1 == 0).all())
