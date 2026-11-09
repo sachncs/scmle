@@ -43,6 +43,7 @@ from scmle.data.admissibility import dag
 MAX_DISCRETE_LEVELS = 10
 COMPONENT = "dag.ci"
 FINITE_CAP = 1e308
+MIN_TABLE_SIDE = 2
 
 
 class CIKind(enum.StrEnum):
@@ -211,7 +212,7 @@ def stratified_chi2(
     groups = frame.groupby(keys, sort=True, observed=True)
     for rows in (part[1] for part in groups):
         table = pandas.crosstab(rows[x], rows[y])
-        if table.shape[0] < 2 or table.shape[1] < 2:
+        if table.shape[0] < MIN_TABLE_SIDE or table.shape[1] < MIN_TABLE_SIDE:
             skipped += 1
             continue
         statistic = stats.chi2_contingency(table, correction=False)[0]
