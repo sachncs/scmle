@@ -735,10 +735,13 @@ class EstimationResult:
         return hashlib.sha256(content).hexdigest()
 
     def write(self, path: str | Path) -> str:
-        """Atomically write and return a digest-bound estimation report.
+        """Atomically writes a digest-bound estimation report.
 
         The report is written to a temporary file in the destination
-        directory, flushed to disk and renamed over the destination.
+        directory, flushed to disk and renamed over the destination. The file
+        holds an envelope with `schema_version` 1, the report and its digest.
+        On any failure the temporary file is removed and the error
+        propagates.
 
         Args:
             path: Destination file; missing parent directories are created.
@@ -747,7 +750,8 @@ class EstimationResult:
             The SHA-256 hex digest of the canonical report.
 
         Raises:
-            RuntimeError: If the temporary file was not created.
+            RuntimeError: If the temporary file path was not recorded; the
+                check cannot trigger in practice.
         """
         destination = Path(path)
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -795,7 +799,8 @@ class EstimationResult:
         Raises:
             ValueError: If the schema version is not 1, the report is not a
                 mapping, the stored digest does not match the report, or the
-                rebuilt result does not reproduce the digest.
+                rebuilt result does not reproduce the digest. A file that is
+                not valid JSON raises `json.JSONDecodeError`, a subclass.
         """
         envelope = json.loads(Path(path).read_text(encoding="utf-8"))
         if envelope.get("schema_version") != 1:
@@ -897,9 +902,13 @@ def estimate_parameters(
         policy: Estimator, covariance, missingness, and uncertainty policy.
             ``bayesian_linear`` and ``bayesian_ate`` require an explicit
             ``BayesianPrior`` and report posterior credible intervals.
-        clusters: Optional cluster labels. Required for clustered covariance.
-        shift_reference: Optional feature matrix from the target population for
-            standardized mean-shift diagnostics.
+        clusters: Optional cluster labels, one per input row. Required for
+            clustered covariance and ``hierarchical_linear``; rejected by
+            the Bayesian estimators; for ``ipw_ate``, ``aipw_ate`` and
+            ``continuous_ipw_ate`` allowed only with clustered covariance.
+        shift_reference: Optional feature matrix from the target population,
+            with the same columns as `features`, for standardized mean-shift
+            diagnostics.
 
     Returns:
         A result containing estimates, covariance, intervals, diagnostics,
@@ -1546,7 +1555,7 @@ def prepare_rows(
     missing: MissingPolicy,
     clusters: Any | None,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray | None, int]:
-    """Applies the declared missingness policy and retain cluster labels.
+    """Applies the declared missingness policy and keeps cluster labels aligned.
 
     Args:
         matrix: Feature matrix.
@@ -1596,7 +1605,7 @@ def fit_linear(
     max_iterations: int,
     tolerance: float,
 ) -> tuple[np.ndarray, dict[str, Any]]:
-    """Solve the Gaussian likelihood using a full-rank normal equation.
+    """Solves the Gaussian likelihood using a full-rank normal equation.
 
     Args:
         design: Design matrix including the intercept column.
@@ -1632,13 +1641,14 @@ def fit_continuous_ipw_effect(
     density estimated from the declared non-treatment features. Stabilized
     density-ratio weights then define a weighted marginal dose-response
     regression. The reported treatment slope is a one-unit marginal effect,
-    not a claim about an arbitrary nonlinear dose-response curve.
+    not a claim about an arbitrary nonlinear dose-response curve. The weights
+    are capped at `policy.continuous_weight_cap`.
 
     Args:
         matrix: Complete numeric feature matrix.
         values: Complete numeric outcomes.
         treatment_position: Column containing the continuous treatment.
-        policy: Continuous-treatment and uncertainty policy.
+        policy: Supplies the weight cap and the covariance kind.
         clusters: Optional independent sampling-unit labels.
 
     Returns:
@@ -2041,8 +2051,8 @@ def fit_aipw_ate(
 ) -> tuple[np.ndarray, np.ndarray, dict[str, Any], dict[str, np.ndarray]]:
     """Estimates a binary-treatment ATE with an augmented IPW score.
 
-    With one fold, nuisance models are fitted on the full sample, preserving
-    the historical estimator behavior. With multiple folds, each nuisance
+    With one fold, nuisance models are fitted on the full sample and scored
+    on the same rows. With multiple folds, each nuisance
     model is fitted only on the corresponding training rows and its score is
     evaluated on held-out rows.
 
@@ -2414,7 +2424,7 @@ def validate_cross_fitting_support(
 
 
 def aipw_limitations(cross_fitted: bool) -> list[str]:
-    """Returns limitations that apply to both bounded AIPW modes.
+    """Returns limitations of the AIPW estimator.
 
     Args:
         cross_fitted: Whether the nuisance models were cross-fitted.
@@ -3187,8 +3197,9 @@ def fit_hierarchical_random_slope_reml(
 
     Raises:
         ValueError: If the optimizer result is rejected (see
-            `validate_reml_optimizer_result`) or the GLS system is not
-            identifiable.
+            `validate_reml_optimizer_result`), the GLS system is not
+            identifiable, or the objective rejects a covariance block that
+            is not positive definite.
     """
     lower_bound, upper_bound = policy.reml_variance_bounds
     intercept_variance = max(float(initial_random_effect_covariance[0, 0]), 0.0)
@@ -3298,7 +3309,7 @@ def random_slope_covariance_from_reml_point(
     variance_components: np.ndarray,
     correlation_parameter: float,
 ) -> np.ndarray:
-    """Construct a positive-definite random-effect covariance from REML.
+    """Constructs a random-effect covariance from a REML parameter point.
 
     Args:
         variance_components: Array of the residual, random-intercept and
@@ -3343,8 +3354,9 @@ def random_slope_reml_profile_objective(
 
     Returns:
         The objective value to minimize, or infinity when the parameters
-        give a variance that is not positive and finite, a non-positive
-        determinant, or a singular GLS system.
+        give a variance that is not positive and finite, the information
+        matrix or a cluster covariance has a non-positive determinant, or the
+        GLS system is singular.
 
     Raises:
         ValueError: If `parameters` does not have exactly four values, or if
@@ -3802,6 +3814,9 @@ def covariance_matrix(
 ) -> np.ndarray:
     """Computes iid, HC3, or cluster-robust sandwich covariance.
 
+    A singular design makes the matrix inversion raise numpy's
+    `LinAlgError`.
+
     Args:
         design: Design matrix including the intercept column.
         residuals: Residuals of the fit (outcome minus fitted probability for
@@ -3861,7 +3876,7 @@ def reference_linear(
     coefficients: np.ndarray,
     policy: EstimationPolicy,
 ) -> dict[str, Any]:
-    """Independently verify the linear solution with least squares.
+    """Independently verifies the linear solution with least squares.
 
     Args:
         design: Design matrix including the intercept column.
@@ -3975,8 +3990,9 @@ def reference_aipw_ate(
     """Recomputes the augmented IPW score with an independent reference.
 
     Args:
-        inputs: Arrays from the primary fit: the nuisance design, the
-            treatment, the fold assignments and the predicted outcomes.
+        inputs: Arrays from the primary fit. Without cross-fitting only the
+            `nuisance_design` and `treatment` entries are used; the
+            reference refits the nuisance models itself.
         values: Outcome vector.
         coefficients: ATE vector from the primary fit.
         policy: Supplies the cross-fitting folds, reference tolerance,
@@ -4074,7 +4090,7 @@ def reference_cross_fitted_aipw_ate(
     policy: EstimationPolicy,
     clusters: np.ndarray | None,
 ) -> dict[str, Any]:
-    """Independently recompute each cross-fitted AIPW validation score.
+    """Independently recomputes each cross-fitted AIPW validation score.
 
     Args:
         inputs: Arrays from the primary fit: the nuisance design, the
@@ -4231,7 +4247,8 @@ def reference_hierarchical_linear(
         difference, and ``passed``, True when it is within the tolerance.
 
     Raises:
-        ValueError: If the cluster labels are not hashable.
+        ValueError: If the cluster labels are not hashable. A dense system
+            that is not positive definite raises `LinAlgError`, a subclass.
     """
     try:
         labels = tuple(dict.fromkeys(clusters.tolist()))
@@ -4291,7 +4308,9 @@ def reference_hierarchical_reml(
 
     Raises:
         ValueError: If the cluster labels are not hashable, or if the dense
-            covariance or information matrix is not positive definite.
+            covariance or information matrix is not positive definite
+            (scipy raises `LinAlgError`, a subclass, before the
+            determinant sign check can).
     """
     try:
         labels = tuple(dict.fromkeys(clusters.tolist()))
@@ -4368,7 +4387,8 @@ def reference_hierarchical_random_slope(
         ``passed``, True when the difference is within the tolerance.
 
     Raises:
-        ValueError: If the cluster labels are not hashable.
+        ValueError: If the cluster labels are not hashable. A dense system
+            that is not positive definite raises `LinAlgError`, a subclass.
     """
     try:
         labels = tuple(dict.fromkeys(clusters.tolist()))
@@ -4442,7 +4462,9 @@ def reference_hierarchical_random_slope_reml(
 
     Raises:
         ValueError: If the cluster labels are not hashable, or if the dense
-            covariance or information matrix is not positive definite.
+            covariance or information matrix is not positive definite
+            (scipy raises `LinAlgError`, a subclass, before the
+            determinant sign check can).
     """
     try:
         labels = tuple(dict.fromkeys(clusters.tolist()))
@@ -4543,7 +4565,7 @@ def reference_bayesian_ate(
     coefficients: np.ndarray,
     policy: EstimationPolicy,
 ) -> dict[str, Any]:
-    """Independently verify the causal posterior mean and ATE coefficient.
+    """Independently verifies the causal posterior mean and ATE coefficient.
 
     Args:
         design: Design matrix including the intercept column.
@@ -4591,7 +4613,7 @@ def reference_logistic(
     coefficients: np.ndarray,
     policy: EstimationPolicy,
 ) -> dict[str, Any]:
-    """Independently verify logistic coefficients with scipy optimization.
+    """Independently verifies logistic coefficients with scipy optimization.
 
     Args:
         design: Design matrix including the intercept column.
@@ -4676,7 +4698,7 @@ def sensitivity_report(
         matrix: Complete feature rows used by the fit.
         values: Complete outcomes used by the fit.
         policy: Supplies the estimator, missing policy, seed, confidence
-            level and bootstrap replicate count.
+            level, bootstrap replicate count and treatment position.
         design: Design matrix including the intercept column.
         coefficients: Point-estimate coefficient vector.
         shift_reference: Optional feature matrix from a target population.
@@ -4692,8 +4714,9 @@ def sensitivity_report(
     Raises:
         ValueError: If the Bayesian causal estimator has no treatment
             position, if `shift_reference` has the wrong shape or holds
-            non-finite values, or if a hierarchical bootstrap is requested
-            without cluster labels.
+            non-finite values, if a hierarchical bootstrap is requested
+            without cluster labels, or if a causal or hierarchical bootstrap
+            yields fewer than two valid replicates.
     """
     report: dict[str, Any] = {
         "prior": {
@@ -4854,7 +4877,9 @@ def hierarchical_bootstrap_sensitivity(
         percentile intervals, independent reference counts, and limitations.
 
     Raises:
-        ValueError: If fewer than two reference-checked replicates succeed.
+        ValueError: If fewer than two reference-checked replicates succeed,
+            or the cluster labels are unhashable or form fewer than two
+            clusters.
     """
     rng = np.random.default_rng(policy.seed)
     bootstrap_policy = dataclasses.replace(policy, bootstrap_replicates=0)
@@ -5056,7 +5081,8 @@ def causal_bootstrap_sensitivity(
 
     Raises:
         ValueError: If the bootstrap cannot produce at least two valid,
-            independently reference-checked replicates.
+            independently reference-checked replicates, or clustered labels
+            are unhashable or form fewer than two clusters.
     """
     rng = np.random.default_rng(policy.seed)
     bootstrap_policy = dataclasses.replace(policy, bootstrap_replicates=0)

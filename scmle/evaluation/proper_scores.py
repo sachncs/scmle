@@ -94,7 +94,8 @@ def weighted_interval_score(
         The weighted interval score; lower is better.
 
     Raises:
-        ValueError: With no interval.
+        ValueError: If `intervals` is empty, or if any `alpha` is not
+            strictly between 0 and 1 (rejected by `interval_score`).
     """
     if not intervals:
         raise ValueError("need at least one interval")

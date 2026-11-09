@@ -73,8 +73,9 @@ class QuantileBand:
             The band holding each row's miss: the larger of lower minus
             value and value minus upper.
 
-        Fewer rows than `ConformalCalibrator.checked` requires are rejected
-        by it with a `ValueError`.
+        Raises:
+            ValueError: If there are fewer rows than
+                `ConformalCalibrator.checked` requires.
         """
         values = np.asarray(observed, dtype=float)
         low = np.asarray(lower, dtype=float)

@@ -48,7 +48,12 @@ def shrunk_covariance(residuals: np.ndarray) -> np.ndarray:
             forecasts of all `n` series.
 
     Returns:
-        A positive-definite matrix keeping the sample variances.
+        An `(n, n)` matrix with the sample variances (floored at
+        `DIAGONAL_FLOOR`) on the diagonal and the sample correlations
+        shrunk toward zero off the diagonal by the plug-in intensity
+        (clipped to [0, 1]). It is diagonal when the intensity is 1; it is
+        positive definite only if the shrunk correlation matrix is, which
+        is not guaranteed for little shrinkage with fewer rows than series.
     """
     values = np.asarray(residuals, dtype=float)
     rows, count = values.shape
@@ -82,6 +87,9 @@ def mint(
 
     Returns:
         `(steps, n)` reconciled forecasts `S G y_hat`.
+
+    Raises:
+        numpy.linalg.LinAlgError: If `covariance` or `S' W^-1 S` is singular.
     """
     s = np.asarray(summing, dtype=float)
     inverse = np.linalg.inv(np.asarray(covariance, dtype=float))
@@ -92,8 +100,9 @@ def mint(
 def coherence_residual(forecasts: np.ndarray, summing: np.ndarray) -> float:
     """Largest gap between each series and the sum of its bottom series.
 
-    The bottom series are the rows of `summing` that are unit vectors; they
-    are taken as the last `m` columns of `forecasts`.
+    The bottom series are taken to be the last `m` columns of `forecasts`
+    (`m` being the number of columns of `summing`); the row order of
+    `summing` is not checked against that assumption.
 
     Args:
         forecasts: `(steps, n)` forecasts of all series.

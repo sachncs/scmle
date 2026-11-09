@@ -112,8 +112,7 @@ def query_bootstrap_ndcg(
     """Mean NDCG with a percentile interval from resampling whole queries.
 
     Documents of one query are not independent, so queries are the
-    resampling unit. Returns the mean, the limits, the number of scored
-    queries and the number excluded for having nothing relevant.
+    resampling unit.
 
     Args:
         relevance: Relevance grade of each document.
@@ -127,7 +126,7 @@ def query_bootstrap_ndcg(
     Returns:
         The `mean`, `lower` and `upper` limits (NaN when no query is
         scorable), the number of scored `queries` and the number
-        `excluded`.
+        `excluded` (queries with a single document or nothing relevant).
     """
     values, excluded = per_query_ndcg(relevance, scores, queries, cutoff)
     if values.size == 0:
@@ -236,6 +235,9 @@ def precision_at(
 ) -> float:
     """Share of the top `cutoff` documents that are relevant, per query.
 
+    A query with fewer than `cutoff` documents is divided by its own document
+    count.
+
     Args:
         relevance: Relevance grade of each document.
         scores: Predicted score of each document, aligned with `relevance`.
@@ -298,13 +300,16 @@ class RankingMetric(metric_contracts.Metric):
 
     Attributes:
         kind: A key of `FUNCTIONS` (`ndcg`, `map`, `mrr`, `precision_at_10`,
-            `recall_at_10`).
+            `recall_at_10`). The inherited `Metric` fields are documented on
+            `Metric`.
     """
 
     kind: str = "ndcg"
 
     def accepts_weights(self) -> bool:
-        """Queries are the unit of scoring, not weighted rows.
+        """Returns whether the metric can use row weights.
+
+        Queries are the unit of scoring, not weighted rows.
 
         Returns:
             Always False.
