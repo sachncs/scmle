@@ -15,13 +15,11 @@ from collections.abc import Callable
 from collections.abc import Mapping
 from collections.abc import Sequence
 import dataclasses
-from datetime import datetime
 import hashlib
 import hmac
 import io
 import json
 import math
-import os
 from pathlib import Path
 import platform
 import shutil
@@ -33,6 +31,7 @@ from typing import cast
 from typing import ClassVar
 from typing import Literal
 from typing import Self
+from typing import TYPE_CHECKING
 import wave
 
 import joblib
@@ -61,6 +60,9 @@ from scmle.governance import attestation
 from scmle.models import documents
 from scmle.models import images
 
+if TYPE_CHECKING:
+    from datetime import datetime
+
 MAX_REPEATED_EXPLANATION_SAMPLES = 128
 MAX_RAW_GRAPH_FEATURES = 64
 MAX_GRAPH_CONTEXT_NODES = 64
@@ -68,6 +70,14 @@ MAX_GRAPH_CONTEXT_EDGES = 128
 PACKAGE_SCHEMA_VERSION = 1
 CURATION_SCHEMA_VERSION = 1
 SHA256_LENGTH = 64
+MATRIX_RANK = 2
+CHANNELED_PIXEL_RANK = 3
+RGB_CHANNEL_COUNT = 3
+REPORT_SCHEMA_VERSION = 2
+MAX_SNR_VALUES = 8
+MAX_SNR_DB = 120.0
+MIN_CLASS_COUNT = 2
+MIN_STABILITY_COEFFICIENT = 1e-12
 
 
 class LifecycleCancelledError(errors.CancelledError):
@@ -126,7 +136,7 @@ class FeatureBatch:
                 finite, sample IDs repeat, or a feature name is blank.
         """
         matrix = numpy.asarray(self.values, dtype=numpy.float64)
-        if matrix.ndim != 2:
+        if matrix.ndim != MATRIX_RANK:
             raise ValueError("feature values must be a two-dimensional matrix")
         if matrix.shape[0] != len(self.sample_ids):
             raise ValueError("feature rows must match sample IDs")
@@ -243,6 +253,40 @@ class Predictor:
     training_dataset_hash: str
     lifecycle_report_digest: str | None = None
 
+    @staticmethod
+    def check_report_identifies_package(
+        report: Record,
+        adapter: Preparer,
+        package_path: Path,
+        identity: tuple[str, str, str],
+    ) -> None:
+        """Checks that a verified lifecycle report names this exact package.
+
+        Args:
+            report: The verified lifecycle report.
+            adapter: Adapter for new samples.
+            package_path: Package directory.
+            identity: Dataset hash, model digest and signature value that the
+                package manifest records.
+
+        Raises:
+            ValueError: If the report's modality, dataset, package path, model
+                digest or package signature differ.
+        """
+        dataset_hash, model_digest, signature_value = identity
+        if report.modality != modalities.modality_value(adapter.modality):
+            raise ValueError("lifecycle report modality does not match")
+        if report.dataset_hash != dataset_hash:
+            raise ValueError("lifecycle report dataset identity does not match")
+        if Path(report.package.path).resolve() != package_path.resolve():
+            raise ValueError("lifecycle report package path does not match")
+        if report.package.model_sha256 != model_digest:
+            raise ValueError("lifecycle report model digest does not match")
+        if report.package.signature != signature_value:
+            raise ValueError(
+                "lifecycle report package signature does not match"
+            )
+
     @classmethod
     def from_package(
         cls,
@@ -308,23 +352,12 @@ class Predictor:
         report_digest: str | None = None
         if lifecycle_report_path is not None:
             report = Record.read_verified(lifecycle_report_path, signing_key)
-            if report.modality != modalities.modality_value(adapter.modality):
-                raise ValueError("lifecycle report modality does not match")
-            if report.dataset_hash != dataset_hash:
-                raise ValueError(
-                    "lifecycle report dataset identity does not match"
-                )
-            if (
-                Path(report.package.path).resolve()
-                != Path(package_path).resolve()
-            ):
-                raise ValueError("lifecycle report package path does not match")
-            if report.package.model_sha256 != model_digest:
-                raise ValueError("lifecycle report model digest does not match")
-            if report.package.signature != signature["value"]:
-                raise ValueError(
-                    "lifecycle report package signature does not match"
-                )
+            cls.check_report_identifies_package(
+                report,
+                adapter,
+                Path(package_path),
+                (dataset_hash, model_digest, signature["value"]),
+            )
             report_digest = attestation.canonical_digest(report.unsigned_dict())
         package = Package(
             path=str(package_path),
@@ -407,6 +440,182 @@ class Predictor:
                 }
             )
         return health
+
+
+def parse_stage_evidence(
+    raw_stage_evidence: object,
+) -> tuple[modalities.StageEvidence, ...]:
+    """Restores the per-stage evidence of a persisted lifecycle report.
+
+    Args:
+        raw_stage_evidence: The report's `stage_evidence` entry.
+
+    Returns:
+        The restored stage evidence, in order.
+
+    Raises:
+        ValueError: If the entry is not a list or an item lacks a valid
+            stage, evidence links, evidence mapping or notes.
+    """
+    if not isinstance(raw_stage_evidence, list):
+        raise ValueError("lifecycle report stage_evidence must be a list")
+    stage_evidence: list[modalities.StageEvidence] = []
+    for item in raw_stage_evidence:
+        if not isinstance(item, Mapping):
+            raise ValueError("lifecycle report stage evidence is invalid")
+        stage = item.get("stage")
+        evidence_links = item.get("evidence_links")
+        evidence = item.get("evidence")
+        notes = item.get("notes")
+        if not isinstance(stage, str):
+            raise ValueError("lifecycle report stage is invalid")
+        if not isinstance(evidence_links, list) or not all(
+            isinstance(value, str) for value in evidence_links
+        ):
+            raise ValueError("lifecycle report evidence_links are invalid")
+        if not isinstance(evidence, Mapping):
+            raise ValueError("lifecycle report evidence is invalid")
+        if not isinstance(notes, list) or not all(
+            isinstance(value, str) for value in notes
+        ):
+            raise ValueError("lifecycle report notes are invalid")
+        stage_evidence.append(
+            modalities.StageEvidence(
+                stage=modalities.LifecycleStage(stage),
+                evidence_links=tuple(evidence_links),
+                evidence=evidence,
+                notes=tuple(notes),
+            )
+        )
+    return tuple(stage_evidence)
+
+
+def parse_package(raw_package: object) -> Package:
+    """Restores the package identity of a persisted lifecycle report.
+
+    Args:
+        raw_package: The report's `package` entry.
+
+    Returns:
+        The restored package identity.
+
+    Raises:
+        ValueError: If the entry is not a mapping, its path, digest or
+            signature is not a string, or its schema version is not an
+            integer.
+    """
+    if not isinstance(raw_package, Mapping):
+        raise ValueError("lifecycle report package is invalid")
+    package_values = {
+        "path": raw_package.get("path"),
+        "model_sha256": raw_package.get("model_sha256"),
+        "signature": raw_package.get("signature"),
+        "schema_version": raw_package.get("schema_version"),
+    }
+    if not all(
+        isinstance(package_values[field_name], str)
+        for field_name in ("path", "model_sha256", "signature")
+    ):
+        raise ValueError("lifecycle report package identity is invalid")
+    if not isinstance(package_values["schema_version"], int):
+        raise ValueError("lifecycle report package schema is invalid")
+    return Package(
+        path=cast("str", package_values["path"]),
+        model_sha256=cast("str", package_values["model_sha256"]),
+        signature=cast("str", package_values["signature"]),
+        schema_version=cast("int", package_values["schema_version"]),
+    )
+
+
+def parse_signature(raw_signature: object) -> str | None:
+    """Restores the content signature of a persisted lifecycle report.
+
+    Args:
+        raw_signature: The report's `signature` entry.
+
+    Returns:
+        The signature value, or None for an unsigned report.
+
+    Raises:
+        ValueError: If the entry is neither None nor a mapping with the
+            supported algorithm and a non-blank string value.
+    """
+    if raw_signature is None:
+        return None
+    if not isinstance(raw_signature, Mapping):
+        raise ValueError("lifecycle report signature is invalid")
+    if raw_signature.get("algorithm") != attestation.SIGNATURE_ALGORITHM:
+        raise ValueError("unsupported lifecycle report signature")
+    signature_value = raw_signature.get("value")
+    if not isinstance(signature_value, str) or not signature_value.strip():
+        raise ValueError("lifecycle report signature is invalid")
+    return signature_value
+
+
+def require_string_list(value: object, message: str) -> list[str]:
+    """Checks that a persisted value is a list of strings.
+
+    Args:
+        value: The persisted value.
+        message: Error message for a value that is not a list of strings.
+
+    Returns:
+        The same list.
+
+    Raises:
+        ValueError: If `value` is not a list or holds a non-string.
+    """
+    if not isinstance(value, list) or not all(
+        isinstance(item, str) for item in value
+    ):
+        raise ValueError(message)
+    return value
+
+
+def parse_curation_signature(signature: object) -> str:
+    """Restores the signature value of a persisted curation result.
+
+    Args:
+        signature: The result's `signature` entry.
+
+    Returns:
+        The signature value.
+
+    Raises:
+        ValueError: If the entry is not a mapping with the supported
+            algorithm and a SHA-256 string value.
+    """
+    if not isinstance(signature, Mapping):
+        raise ValueError("modality curation signature is missing")
+    if signature.get("algorithm") != attestation.SIGNATURE_ALGORITHM:
+        raise ValueError("unsupported modality curation signature")
+    signature_value = signature.get("value")
+    if not isinstance(signature_value, str) or not is_sha256(signature_value):
+        raise ValueError("modality curation signature is invalid")
+    return signature_value
+
+
+def parse_checkpoint_signature(signature: object) -> str:
+    """Restores the signature value of a persisted lifecycle checkpoint.
+
+    Args:
+        signature: The checkpoint's `signature` entry.
+
+    Returns:
+        The signature value.
+
+    Raises:
+        ValueError: If the entry is not a mapping with the supported
+            algorithm and a non-blank string value.
+    """
+    if not isinstance(signature, Mapping):
+        raise ValueError("checkpoint signature is missing")
+    if signature.get("algorithm") != attestation.SIGNATURE_ALGORITHM:
+        raise ValueError("unsupported lifecycle checkpoint signature")
+    signature_value = signature.get("value")
+    if not isinstance(signature_value, str) or not signature_value.strip():
+        raise ValueError("lifecycle checkpoint signature is invalid")
+    return signature_value
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -562,57 +771,11 @@ class Record:
             ValueError: If the schema version is unsupported or any field is
                 missing or has the wrong shape.
         """
-        if record.get("schema_version") != 2:
+        if record.get("schema_version") != REPORT_SCHEMA_VERSION:
             raise ValueError("unsupported lifecycle report schema version")
 
-        raw_stage_evidence = record.get("stage_evidence")
-        if not isinstance(raw_stage_evidence, list):
-            raise ValueError("lifecycle report stage_evidence must be a list")
-        stage_evidence: list[modalities.StageEvidence] = []
-        for item in raw_stage_evidence:
-            if not isinstance(item, Mapping):
-                raise ValueError("lifecycle report stage evidence is invalid")
-            stage = item.get("stage")
-            evidence_links = item.get("evidence_links")
-            evidence = item.get("evidence")
-            notes = item.get("notes")
-            if not isinstance(stage, str):
-                raise ValueError("lifecycle report stage is invalid")
-            if not isinstance(evidence_links, list) or not all(
-                isinstance(value, str) for value in evidence_links
-            ):
-                raise ValueError("lifecycle report evidence_links are invalid")
-            if not isinstance(evidence, Mapping):
-                raise ValueError("lifecycle report evidence is invalid")
-            if not isinstance(notes, list) or not all(
-                isinstance(value, str) for value in notes
-            ):
-                raise ValueError("lifecycle report notes are invalid")
-            stage_evidence.append(
-                modalities.StageEvidence(
-                    stage=modalities.LifecycleStage(stage),
-                    evidence_links=tuple(evidence_links),
-                    evidence=evidence,
-                    notes=tuple(notes),
-                )
-            )
-
-        raw_package = record.get("package")
-        if not isinstance(raw_package, Mapping):
-            raise ValueError("lifecycle report package is invalid")
-        package_values = {
-            "path": raw_package.get("path"),
-            "model_sha256": raw_package.get("model_sha256"),
-            "signature": raw_package.get("signature"),
-            "schema_version": raw_package.get("schema_version"),
-        }
-        if not all(
-            isinstance(package_values[field_name], str)
-            for field_name in ("path", "model_sha256", "signature")
-        ):
-            raise ValueError("lifecycle report package identity is invalid")
-        if not isinstance(package_values["schema_version"], int):
-            raise ValueError("lifecycle report package schema is invalid")
+        stage_evidence = parse_stage_evidence(record.get("stage_evidence"))
+        package = parse_package(record.get("package"))
 
         def mapping_field(name: str) -> dict[str, object]:
             value = record.get(name)
@@ -620,25 +783,7 @@ class Record:
                 raise ValueError(f"lifecycle report {name} must be an object")
             return dict(value)
 
-        raw_signature = record.get("signature")
-        signature: str | None
-        if raw_signature is None:
-            signature = None
-        elif isinstance(raw_signature, Mapping):
-            if (
-                raw_signature.get("algorithm")
-                != attestation.SIGNATURE_ALGORITHM
-            ):
-                raise ValueError("unsupported lifecycle report signature")
-            signature_value = raw_signature.get("value")
-            if (
-                not isinstance(signature_value, str)
-                or not signature_value.strip()
-            ):
-                raise ValueError("lifecycle report signature is invalid")
-            signature = signature_value
-        else:
-            raise ValueError("lifecycle report signature is invalid")
+        signature = parse_signature(record.get("signature"))
 
         modality = record.get("modality")
         dataset_hash = record.get("dataset_hash")
@@ -647,15 +792,10 @@ class Record:
         return cls(
             modality=modality,
             dataset_hash=dataset_hash,
-            stage_evidence=tuple(stage_evidence),
+            stage_evidence=stage_evidence,
             evaluation=mapping_field("evaluation"),
             performance=mapping_field("performance"),
-            package=Package(
-                path=cast(str, package_values["path"]),
-                model_sha256=cast(str, package_values["model_sha256"]),
-                signature=cast(str, package_values["signature"]),
-                schema_version=cast(int, package_values["schema_version"]),
-            ),
+            package=package,
             inference=mapping_field("inference"),
             monitoring=mapping_field("monitoring"),
             documentation=mapping_field("documentation"),
@@ -797,6 +937,16 @@ class Checkpoint:
             raise ValueError("manifest_digest must be non-empty when provided")
         if self.signature is not None and not self.signature.strip():
             raise ValueError("signature must be non-empty when provided")
+        self.check_stage_progress()
+
+    def check_stage_progress(self) -> None:
+        """Rejects stages that are not an ordered prefix of the lifecycle.
+
+        Raises:
+            ValueError: If the completed stages are not an ordered prefix of
+                the lifecycle, the digests do not match the stages, a digest
+                is blank, or a completed checkpoint lacks a stage.
+        """
         expected_stages = tuple(
             stage.value for stage in modalities.REQUIRED_LIFECYCLE_STAGES
         )[: len(self.completed_stages)]
@@ -889,16 +1039,14 @@ class Checkpoint:
             raise ValueError("unsupported lifecycle checkpoint schema version")
         if record.get("record_type") != "modality_lifecycle_checkpoint":
             raise ValueError("invalid lifecycle checkpoint record type")
-        completed = record.get("completed_stages")
-        digests = record.get("stage_digests")
-        if not isinstance(completed, list) or not all(
-            isinstance(stage, str) for stage in completed
-        ):
-            raise ValueError("checkpoint completed_stages must be a list")
-        if not isinstance(digests, list) or not all(
-            isinstance(digest, str) for digest in digests
-        ):
-            raise ValueError("checkpoint stage_digests must be a list")
+        completed = require_string_list(
+            record.get("completed_stages"),
+            "checkpoint completed_stages must be a list",
+        )
+        digests = require_string_list(
+            record.get("stage_digests"),
+            "checkpoint stage_digests must be a list",
+        )
         seed = record.get("seed")
         if isinstance(seed, bool) or not isinstance(seed, int):
             raise ValueError("checkpoint seed is invalid")
@@ -908,14 +1056,7 @@ class Checkpoint:
         status = record.get("status")
         if status not in ("running", "completed"):
             raise ValueError("checkpoint status is invalid")
-        signature = record.get("signature")
-        if not isinstance(signature, Mapping):
-            raise ValueError("checkpoint signature is missing")
-        if signature.get("algorithm") != attestation.SIGNATURE_ALGORITHM:
-            raise ValueError("unsupported lifecycle checkpoint signature")
-        signature_value = signature.get("value")
-        if not isinstance(signature_value, str) or not signature_value.strip():
-            raise ValueError("lifecycle checkpoint signature is invalid")
+        signature_value = parse_checkpoint_signature(record.get("signature"))
         manifest_digest = record.get("manifest_digest")
         if manifest_digest is not None and not isinstance(manifest_digest, str):
             raise ValueError("checkpoint manifest_digest is invalid")
@@ -930,7 +1071,7 @@ class Checkpoint:
             stage_digests=tuple(digests),
             require_independent_ground_truth=require_ground_truth,
             manifest_digest=manifest_digest,
-            status=cast(Literal["running", "completed"], status),
+            status=cast("Literal['running', 'completed']", status),
             signature=signature_value,
             schema_version=1,
         )
@@ -1139,36 +1280,37 @@ class Curation:
             dataset_card, Mapping
         ):
             raise ValueError("modality curation evidence is invalid")
-        signature = record.get("signature")
-        if not isinstance(signature, Mapping):
-            raise ValueError("modality curation signature is missing")
-        if signature.get("algorithm") != attestation.SIGNATURE_ALGORITHM:
-            raise ValueError("unsupported modality curation signature")
-        signature_value = signature.get("value")
-        if not isinstance(signature_value, str) or not is_sha256(
-            signature_value
-        ):
-            raise ValueError("modality curation signature is invalid")
+        signature_value = parse_curation_signature(record.get("signature"))
         result = cls(
-            modality=cast(str, modality),
-            dataset_hash=cast(str, dataset_hash),
+            modality=cast("str", modality),
+            dataset_hash=cast("str", dataset_hash),
             sample_count=sample_count,
             curation=curation,
             dataset_card=dataset_card,
-            path=cast(str, path),
+            path=cast("str", path),
             signature=signature_value,
         )
         content_digest = record.get("content_digest")
         if content_digest is not None:
-            if not isinstance(content_digest, str) or not is_sha256(
-                content_digest
-            ):
-                raise ValueError("modality curation content_digest is invalid")
-            if not hmac.compare_digest(content_digest, result.content_digest):
-                raise ValueError(
-                    "modality curation content_digest does not match evidence"
-                )
+            result.check_content_digest(content_digest)
         return result
+
+    def check_content_digest(self, content_digest: object) -> None:
+        """Checks a persisted content digest against the evidence.
+
+        Args:
+            content_digest: The persisted `content_digest` entry.
+
+        Raises:
+            ValueError: If it is not a SHA-256 digest or differs from the
+                digest of this result's content.
+        """
+        if not isinstance(content_digest, str) or not is_sha256(content_digest):
+            raise ValueError("modality curation content_digest is invalid")
+        if not hmac.compare_digest(content_digest, self.content_digest):
+            raise ValueError(
+                "modality curation content_digest does not match evidence"
+            )
 
     @classmethod
     def read(cls, path: str | Path) -> Self:
@@ -1404,10 +1546,10 @@ class Preparer(Curator):
 
     def modality_specific_explanation(
         self,
-        sample: Any,
-        model: LogisticRegression,
-        feature_names: Sequence[str],
-        coefficients: numpy.ndarray,
+        sample: Any,  # noqa: ARG002 -- hook signature that subclasses override
+        model: LogisticRegression,  # noqa: ARG002 -- hook signature that subclasses override
+        feature_names: Sequence[str],  # noqa: ARG002 -- hook signature that subclasses override
+        coefficients: numpy.ndarray,  # noqa: ARG002 -- hook signature that subclasses override
     ) -> dict[str, object]:
         """Builds explicit modality-specific explanation evidence.
 
@@ -1595,8 +1737,8 @@ class DocumentPreparer(Preparer):
         self,
         sample: Any,
         model: LogisticRegression,
-        feature_names: Sequence[str],
-        coefficients: numpy.ndarray,
+        feature_names: Sequence[str],  # noqa: ARG002 -- overrides Preparer.modality_specific_explanation
+        coefficients: numpy.ndarray,  # noqa: ARG002 -- overrides Preparer.modality_specific_explanation
     ) -> dict[str, object]:
         """Builds page and section provenance for a document explanation.
 
@@ -1639,8 +1781,10 @@ class DocumentPreparer(Preparer):
             ],
             "raw_input_occlusion": raw_occlusion,
             "limitations": [
-                "Span provenance and occlusion identify source context; they "
-                "are not OCR confidence or citation grounding.",
+                (
+                    "Span provenance and occlusion identify source context; "
+                    "they are not OCR confidence or citation grounding."
+                ),
                 "The lifecycle model uses bounded lexical counts.",
                 "No causal claim is made.",
             ],
@@ -1731,10 +1875,14 @@ class DocumentPreparer(Preparer):
             "baseline": "space replacement in source character spans",
             "feature_space_only": False,
             "limitations": [
-                "The model consumes bounded character and token counts after "
-                "masking.",
-                "Span masks do not establish citation grounding, OCR "
-                "confidence, or semantic causality.",
+                (
+                    "The model consumes bounded character and token counts "
+                    "after masking."
+                ),
+                (
+                    "Span masks do not establish citation grounding, OCR "
+                    "confidence, or semantic causality."
+                ),
             ],
         }
 
@@ -1763,10 +1911,14 @@ class DocumentPreparer(Preparer):
             Plain statements of what the representation does not cover.
         """
         return (
-            "The lifecycle baseline uses character and token counts, not OCR, "
-            "layout, or semantic embeddings.",
-            "Term-level document explanations require the separate "
-            "Classifier path.",
+            (
+                "The lifecycle baseline uses character and token counts, not "
+                "OCR, layout, or semantic embeddings."
+            ),
+            (
+                "Term-level document explanations require the separate "
+                "Classifier path."
+            ),
         )
 
 
@@ -1879,8 +2031,8 @@ class ImagePreparer(Preparer):
         self,
         sample: Any,
         model: LogisticRegression,
-        feature_names: Sequence[str],
-        coefficients: numpy.ndarray,
+        feature_names: Sequence[str],  # noqa: ARG002 -- overrides Preparer.modality_specific_explanation
+        coefficients: numpy.ndarray,  # noqa: ARG002 -- overrides Preparer.modality_specific_explanation
     ) -> dict[str, object]:
         """Builds bounded occlusion evidence on transformed RGB pixels.
 
@@ -1959,8 +2111,10 @@ class ImagePreparer(Preparer):
             "raw_input_occlusion": raw_terms,
             "limitations": [
                 "Occlusion occurs after resizing and RGB conversion.",
-                "Raw input occlusion is bounded pixel evidence, not object "
-                "localization or validated saliency.",
+                (
+                    "Raw input occlusion is bounded pixel evidence, not object "
+                    "localization or validated saliency."
+                ),
                 "Score changes are associational and not causal.",
             ],
         }
@@ -1996,7 +2150,7 @@ class ImagePreparer(Preparer):
         """
         source_pixels = sample.decode("RGB")
         source_height, source_width, source_channels = source_pixels.shape
-        if source_channels != 3:
+        if source_channels != RGB_CHANNEL_COUNT:
             raise ValueError("decoded RGB image must have three channels")
         image_library = image.require_pillow("raw image explanation")
         row_step = max(1, int(numpy.ceil(source_height / 4)))
@@ -2067,8 +2221,10 @@ class ImagePreparer(Preparer):
             Plain statements of what the representation does not claim.
         """
         return (
-            "The baseline uses resized RGB pixels and does not claim "
-            "localization, saliency validation, or object detection.",
+            (
+                "The baseline uses resized RGB pixels and does not claim "
+                "localization, saliency validation, or object detection."
+            ),
         )
 
 
@@ -2192,18 +2348,22 @@ class AudioPreparer(Preparer):
             Plain statements of what the representation does not claim.
         """
         return (
-            "Signal features are bounded WAV statistics; non-WAV codecs "
-            "require an explicit decoder adapter.",
-            "The baseline does not claim transcript, speaker, or time-local "
-            "explanations.",
+            (
+                "Signal features are bounded WAV statistics; non-WAV codecs "
+                "require an explicit decoder adapter."
+            ),
+            (
+                "The baseline does not claim transcript, speaker, or "
+                "time-local explanations."
+            ),
         )
 
     def modality_specific_explanation(
         self,
         sample: Any,
         model: LogisticRegression,
-        feature_names: Sequence[str],
-        coefficients: numpy.ndarray,
+        feature_names: Sequence[str],  # noqa: ARG002 -- overrides Preparer.modality_specific_explanation
+        coefficients: numpy.ndarray,  # noqa: ARG002 -- overrides Preparer.modality_specific_explanation
     ) -> dict[str, object]:
         """Builds bounded time-local score evidence for WAV samples.
 
@@ -2278,10 +2438,14 @@ class AudioPreparer(Preparer):
             "raw_input_occlusion": raw_windows,
             "background_noise_robustness": noise_robustness,
             "limitations": [
-                "Raw waveform windows are bounded occlusion evidence, not "
-                "validated waveform saliency.",
-                "The score is associational and does not establish a causal "
-                "audio event.",
+                (
+                    "Raw waveform windows are bounded occlusion evidence, not "
+                    "validated waveform saliency."
+                ),
+                (
+                    "The score is associational and does not establish a "
+                    "causal audio event."
+                ),
             ],
         }
 
@@ -2323,10 +2487,10 @@ class AudioPreparer(Preparer):
                 "method": "deterministic_additive_background_noise",
                 "reason": "an explicit WAV decoder is required",
             }
-        if not snr_db or len(snr_db) > 8:
+        if not snr_db or len(snr_db) > MAX_SNR_VALUES:
             raise ValueError("snr_db must contain between one and eight values")
         if any(
-            not numpy.isfinite(value) or value < 0.0 or value > 120.0
+            not numpy.isfinite(value) or value < 0.0 or value > MAX_SNR_DB
             for value in snr_db
         ):
             raise ValueError("snr_db values must be finite and in [0, 120]")
@@ -2378,12 +2542,18 @@ class AudioPreparer(Preparer):
             "scenarios": scenarios,
             "feature_space_only": False,
             "limitations": [
-                "Synthetic white noise is a repeatable stressor, not a model "
-                "of every recording environment.",
-                "Score changes do not establish perceptual quality or causal "
-                "robustness.",
-                "Clipping is measured after mixing and must be reviewed "
-                "before interpreting low-SNR results.",
+                (
+                    "Synthetic white noise is a repeatable stressor, not a "
+                    "model of every recording environment."
+                ),
+                (
+                    "Score changes do not establish perceptual quality or "
+                    "causal robustness."
+                ),
+                (
+                    "Clipping is measured after mixing and must be reviewed "
+                    "before interpreting low-SNR results."
+                ),
             ],
         }
 
@@ -2464,10 +2634,14 @@ class AudioPreparer(Preparer):
             "baseline": "silence replacement in source PCM frames",
             "feature_space_only": False,
             "limitations": [
-                "The model consumes bounded aggregate signal features after "
-                "masking.",
-                "This does not establish transcript, speaker, event, or "
-                "causal attribution.",
+                (
+                    "The model consumes bounded aggregate signal features "
+                    "after masking."
+                ),
+                (
+                    "This does not establish transcript, speaker, event, or "
+                    "causal attribution."
+                ),
             ],
         }
 
@@ -2668,16 +2842,18 @@ class VideoPreparer(Preparer):
         )
         return (
             representation,
-            "Temporal, audio-video synchronization, and frame-local "
-            "explanations require a decoder policy.",
+            (
+                "Temporal, audio-video synchronization, and frame-local "
+                "explanations require a decoder policy."
+            ),
         )
 
     def modality_specific_explanation(
         self,
         sample: Any,
         model: LogisticRegression,
-        feature_names: Sequence[str],
-        coefficients: numpy.ndarray,
+        feature_names: Sequence[str],  # noqa: ARG002 -- overrides Preparer.modality_specific_explanation
+        coefficients: numpy.ndarray,  # noqa: ARG002 -- overrides Preparer.modality_specific_explanation
     ) -> dict[str, object]:
         """Builds bounded temporal frame-statistics occlusion evidence.
 
@@ -2730,8 +2906,8 @@ class VideoPreparer(Preparer):
             )
         terms.sort(
             key=lambda item: (
-                -abs(float(cast(float, item["score_delta"]))),
-                int(cast(int, item["frame_index"])),
+                -abs(float(cast("float", item["score_delta"]))),
+                int(cast("int", item["frame_index"])),
             )
         )
         raw_windows = self.raw_frame_occlusion_scores(sample, model, full_score)
@@ -2743,10 +2919,14 @@ class VideoPreparer(Preparer):
             "feature_space_only": True,
             "raw_input_occlusion": raw_windows,
             "limitations": [
-                "Raw frame occlusion is bounded decoded-pixel evidence, not "
-                "validated motion or semantic saliency.",
-                "Audio-video synchronization and temporal event localization "
-                "are not established.",
+                (
+                    "Raw frame occlusion is bounded decoded-pixel evidence, "
+                    "not validated motion or semantic saliency."
+                ),
+                (
+                    "Audio-video synchronization and temporal event "
+                    "localization are not established."
+                ),
                 "Score changes are associational and not causal.",
             ],
         }
@@ -2817,10 +2997,14 @@ class VideoPreparer(Preparer):
             "baseline": "zero-valued decoded source frames",
             "feature_space_only": False,
             "limitations": [
-                "The caller-owned decoder defines frame pixels and codec "
-                "semantics.",
-                "Frame masks do not establish motion, synchronization, or "
-                "semantic localization.",
+                (
+                    "The caller-owned decoder defines frame pixels and codec "
+                    "semantics."
+                ),
+                (
+                    "Frame masks do not establish motion, synchronization, or "
+                    "semantic localization."
+                ),
                 "Score changes are associational and not causal.",
             ],
         }
@@ -2968,7 +3152,7 @@ class GraphPreparer(Preparer):
         incident_edges = tuple(
             edge
             for edge in self.dataset.edges
-            if edge.source == node_id or edge.target == node_id
+            if node_id in (edge.source, edge.target)
         )
         neighbor_ids = tuple(
             sorted(
@@ -3038,9 +3222,9 @@ class GraphPreparer(Preparer):
         if not isinstance(sample, graph.Node):
             raise TypeError("sample must be a Node")
         subgraph = self.one_hop_subgraph(sample.node_id)
-        subgraph_node_ids = cast(list[str], subgraph["node_ids"])
+        subgraph_node_ids = cast("list[str]", subgraph["node_ids"])
         neighbors = subgraph_node_ids[1:]
-        edges = cast(list[dict[str, object]], subgraph["edges"])
+        edges = cast("list[dict[str, object]]", subgraph["edges"])
         values = numpy.asarray(sample.features, dtype=numpy.float64)
         decision = numpy.asarray(model.decision_function(values[None]))
         if decision.ndim == 1:
@@ -3102,10 +3286,14 @@ class GraphPreparer(Preparer):
                 "feature_space_only": False,
                 "bounded_by": MAX_RAW_GRAPH_FEATURES,
                 "limitations": [
-                    "The perturbation masks declared node features, not graph "
-                    "topology or neighbor identity.",
-                    "Topology remains review context because the baseline does "
-                    "not consume edges.",
+                    (
+                        "The perturbation masks declared node features, not "
+                        "graph topology or neighbor identity."
+                    ),
+                    (
+                        "Topology remains review context because the baseline "
+                        "does not consume edges."
+                    ),
                     "Score changes are associational and not causal.",
                 ],
             },
@@ -3149,10 +3337,14 @@ class GraphPreparer(Preparer):
             Plain statements of what the baseline does and does not claim.
         """
         return (
-            "The baseline is inductive node classification on declared node "
-            "features.",
-            "It excludes topology-derived features across partitions and "
-            "does not claim graph-neural-network support.",
+            (
+                "The baseline is inductive node classification on declared "
+                "node features."
+            ),
+            (
+                "It excludes topology-derived features across partitions and "
+                "does not claim graph-neural-network support."
+            ),
         )
 
 
@@ -3223,7 +3415,7 @@ class GeospatialPreparer(Preparer):
                         leakage.to_dict(),
                         "Review geometries crossing spatial block envelopes "
                         "before using centroid-based evaluation.",
-                        False,
+                        blocking=False,
                     )
                 )
         return dataclasses.replace(
@@ -3395,18 +3587,26 @@ class GeospatialPreparer(Preparer):
                 "baseline": "centroid replacement in source CRS units",
                 "feature_space_only": False,
                 "limitations": [
-                    "Axis masks are bounded geometry perturbations, not a map, "
-                    "region, or spatial-semantic attribution.",
-                    "Geometry validity beyond the declared source contract is "
-                    "not inferred from score changes.",
+                    (
+                        "Axis masks are bounded geometry perturbations, not a "
+                        "map, region, or spatial-semantic attribution."
+                    ),
+                    (
+                        "Geometry validity beyond the declared source contract "
+                        "is not inferred from score changes."
+                    ),
                     "Score changes are associational and not causal.",
                 ],
             },
             "limitations": [
-                "Coordinates remain in the declared CRS and are not "
-                "reprojected.",
-                "The result is not a map attribution, spatial join, or causal "
-                "claim.",
+                (
+                    "Coordinates remain in the declared CRS and are not "
+                    "reprojected."
+                ),
+                (
+                    "The result is not a map attribution, spatial join, or "
+                    "causal claim."
+                ),
             ],
         }
 
@@ -3441,10 +3641,14 @@ class GeospatialPreparer(Preparer):
             Plain statements of what the baseline does and does not claim.
         """
         return (
-            "The baseline uses geometry envelopes and centroids in the "
-            "declared CRS.",
-            "It does not claim reprojection, raster, spatial-join, or causal "
-            "spatial inference support.",
+            (
+                "The baseline uses geometry envelopes and centroids in the "
+                "declared CRS."
+            ),
+            (
+                "It does not claim reprojection, raster, spatial-join, or "
+                "causal spatial inference support."
+            ),
         )
 
 
@@ -3639,7 +3843,7 @@ class RasterPreparer(Preparer):
                     },
                     "Record an explicit raster normalization policy before "
                     "promotion.",
-                    False,
+                    blocking=False,
                 )
             )
         if any(sample.nodata_status == "unknown" for sample in self.dataset):
@@ -3651,7 +3855,7 @@ class RasterPreparer(Preparer):
                     {"statuses": nodata_profile["statuses"]},
                     "Declare or measure nodata handling before interpreting "
                     "raster values.",
-                    False,
+                    blocking=False,
                 )
             )
         return curation.Curation(
@@ -3816,14 +4020,17 @@ class RasterPreparer(Preparer):
                 declared band count.
         """
         values = numpy.asarray(pixels)
-        if values.ndim == 2:
+        if values.ndim == MATRIX_RANK:
             if band_count != 1:
                 raise geospatial.GeospatialValidationError(
                     "single-band decoded pixels must declare one band",
                     {"code": "pixel_band_mismatch"},
                 )
             channels = values[:, :, None]
-        elif values.ndim == 3 and values.shape[2] == band_count:
+        elif (
+            values.ndim == CHANNELED_PIXEL_RANK
+            and values.shape[2] == band_count
+        ):
             channels = values
         else:
             raise geospatial.GeospatialValidationError(
@@ -3898,8 +4105,10 @@ class RasterPreparer(Preparer):
                 "modality": modalities.modality_value(self.modality),
                 "reason": "an explicit named raster decoder is required",
                 "limitations": [
-                    "Metadata-only rasters cannot produce pixel-region "
-                    "evidence.",
+                    (
+                        "Metadata-only rasters cannot produce pixel-region "
+                        "evidence."
+                    ),
                     "Raw encoded-payload occlusion is outside this contract.",
                 ],
             }
@@ -3934,7 +4143,7 @@ class RasterPreparer(Preparer):
                 end_row = min(row + row_step, height)
                 end_column = min(column + column_step, width)
                 masked_pixels = pixels.copy()
-                if masked_pixels.ndim == 2:
+                if masked_pixels.ndim == MATRIX_RANK:
                     masked_pixels[row:end_row, column:end_column] = 0.0
                 else:
                     masked_pixels[row:end_row, column:end_column, :] = 0.0
@@ -3983,10 +4192,15 @@ class RasterPreparer(Preparer):
             "baseline": "zero-valued decoded raster pixels",
             "feature_space_only": False,
             "limitations": [
-                "Occlusion is applied after the caller-owned decoder and is "
-                "not evidence about encoded bytes or decoder failure modes.",
-                "Regions are pixel windows, not semantic objects or validated "
-                "geospatial causal explanations.",
+                (
+                    "Occlusion is applied after the caller-owned decoder and "
+                    "is not evidence about encoded bytes or decoder failure "
+                    "modes."
+                ),
+                (
+                    "Regions are pixel windows, not semantic objects or "
+                    "validated geospatial causal explanations."
+                ),
                 "Score changes are associational and not causal.",
             ],
         }
@@ -4029,9 +4243,11 @@ class RasterPreparer(Preparer):
         )
         return (
             representation,
-            "Raster transforms, reprojection, window sampling, and spatial "
-            "joins require an explicit codec policy; nodata metadata is "
-            "caller-owned unless measured through the decoder.",
+            (
+                "Raster transforms, reprojection, window sampling, and spatial "
+                "joins require an explicit codec policy; nodata metadata is "
+                "caller-owned unless measured through the decoder."
+            ),
         )
 
 
@@ -4208,7 +4424,7 @@ class ValidationStage(Stage):
         labels = context.adapter.labels(context.adapter.samples)
         if any(label is None for label in labels):
             raise ValueError("complete modality lifecycle requires labels")
-        if len(set(labels)) < 2:
+        if len(set(labels)) < MIN_CLASS_COUNT:
             raise ValueError("classification lifecycle requires two labels")
         context.record(
             self.stage,
@@ -4490,12 +4706,227 @@ class DataExplainabilityStage(Stage):
             },
             "split_groups": partitions.groups,
             "limitations": [
-                "Feature summaries describe association and coverage, not "
-                "causation.",
+                (
+                    "Feature summaries describe association and coverage, not "
+                    "causation."
+                ),
                 *context.adapter.modality_notes(),
             ],
         }
         context.record(self.stage, context.data_explanation.copy())
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class RepeatedExplanation:
+    """Linear explanations of test rows under tiny feature perturbations.
+
+    Attributes:
+        stabilities: Ranking stability of every evaluated row.
+        reports: Contribution report of every evaluated row.
+        coefficients: Coefficients that explain the first row.
+        perturbation_reports: Contribution reports of the first row followed
+            by those of its perturbed copies.
+        perturbation_stability: Ranking stability of the first row.
+        zero_ablation_consistency: Share of first-row zero-ablations whose
+            decision change has the sign the linear model predicts.
+    """
+
+    stabilities: list[float]
+    reports: list[dict[str, object]]
+    coefficients: numpy.ndarray
+    perturbation_reports: list[dict[str, object]]
+    perturbation_stability: float
+    zero_ablation_consistency: float
+
+
+def zero_ablation_consistency(
+    model: LogisticRegression,
+    sample_row: numpy.ndarray,
+    sample_coefficients: numpy.ndarray,
+    sample_decision: numpy.ndarray,
+    sample_class: int,
+) -> float:
+    """Measures whether zeroing a feature moves the decision as predicted.
+
+    Args:
+        model: Fitted linear classifier.
+        sample_row: Feature values of the explained row.
+        sample_coefficients: Coefficients of the explained class.
+        sample_decision: The model's decision output for the row.
+        sample_class: Index of the explained class.
+
+    Returns:
+        The share of non-negligible features whose zero-ablation changes the
+        decision with the sign the linear coefficients predict; 0.0 when no
+        feature contributes.
+    """
+    nonzero = numpy.flatnonzero(
+        numpy.abs(sample_row * sample_coefficients) > MIN_STABILITY_COEFFICIENT
+    )
+    if not len(nonzero):
+        return 0.0
+    perturbed = numpy.repeat(sample_row[None, :], len(nonzero), axis=0)
+    perturbed[numpy.arange(len(nonzero)), nonzero] = 0.0
+    perturbed_decisions = numpy.asarray(model.decision_function(perturbed))
+    if perturbed_decisions.ndim == 1:
+        observed_change = perturbed_decisions - sample_decision[0]
+    else:
+        observed_change = (
+            perturbed_decisions[:, sample_class]
+            - sample_decision[0, sample_class]
+        )
+    expected_change = -(sample_row[nonzero] * sample_coefficients[nonzero])
+    return float(
+        numpy.mean(numpy.sign(observed_change) == numpy.sign(expected_change))
+    )
+
+
+def perturbed_contribution_reports(
+    batch: FeatureBatch,
+    sample_index: int,
+    sample_coefficients: numpy.ndarray,
+    perturbation_size: numpy.ndarray,
+) -> list[dict[str, object]]:
+    """Explains a row and copies of it with one feature nudged at a time.
+
+    Args:
+        batch: Feature batch holding the row.
+        sample_index: Position of the row in the batch.
+        sample_coefficients: Coefficients of the explained class.
+        perturbation_size: Size of the nudge for each feature.
+
+    Returns:
+        The row's contribution report, then one report for each feature
+        nudged down and up.
+    """
+    sample_row = batch.values[sample_index]
+    top_k = min(10, len(batch.feature_names))
+    reports = [
+        quality.linear_contribution_report(
+            batch.sample_ids[sample_index],
+            batch.feature_names,
+            sample_row.tolist(),
+            sample_coefficients.tolist(),
+            top_k=top_k,
+        )
+    ]
+    for feature_index in range(len(batch.feature_names)):
+        for direction in (-1.0, 1.0):
+            perturbed_row = sample_row.copy()
+            perturbed_row[feature_index] += (
+                direction * perturbation_size[feature_index]
+            )
+            reports.append(
+                quality.linear_contribution_report(
+                    batch.sample_ids[sample_index],
+                    batch.feature_names,
+                    perturbed_row.tolist(),
+                    sample_coefficients.tolist(),
+                    top_k=top_k,
+                )
+            )
+    return reports
+
+
+def repeated_explanations(
+    model: LogisticRegression,
+    batch: FeatureBatch,
+    perturbation_size: numpy.ndarray,
+    evaluated_sample_count: int,
+) -> RepeatedExplanation:
+    """Explains the first rows of a batch and tests how stable they are.
+
+    Args:
+        model: Fitted linear classifier.
+        batch: Test feature batch.
+        perturbation_size: Size of the nudge for each feature.
+        evaluated_sample_count: Number of leading rows to evaluate.
+
+    Returns:
+        The reports and stabilities of every evaluated row, with the
+        perturbation and zero-ablation evidence of the first row.
+
+    Raises:
+        RuntimeError: If no row was evaluated.
+    """
+    stabilities: list[float] = []
+    explanation_reports: list[dict[str, object]] = []
+    first: tuple[numpy.ndarray, list[dict[str, object]], float, float] | None
+    first = None
+    for sample_index in range(evaluated_sample_count):
+        sample_row = batch.values[sample_index]
+        sample_decision = numpy.asarray(
+            model.decision_function(sample_row[None])
+        )
+        sample_class = 0
+        if sample_decision.ndim > 1:
+            sample_class = int(numpy.argmax(sample_decision[0]))
+        sample_coefficients = model.coef_[sample_class]
+        sample_reports = perturbed_contribution_reports(
+            batch, sample_index, sample_coefficients, perturbation_size
+        )
+        explanation_reports.append(sample_reports[0])
+        sample_stability = quality.ranking_stability(
+            tuple(sample_reports),
+            top_k=min(10, len(batch.feature_names)),
+        )
+        stabilities.append(sample_stability)
+        if sample_index == 0:
+            first = (
+                sample_coefficients,
+                sample_reports,
+                sample_stability,
+                zero_ablation_consistency(
+                    model,
+                    sample_row,
+                    sample_coefficients,
+                    sample_decision,
+                    sample_class,
+                ),
+            )
+    if first is None:
+        raise RuntimeError("repeated explanation evaluation produced no report")
+    return RepeatedExplanation(
+        stabilities=stabilities,
+        reports=explanation_reports,
+        coefficients=first[0],
+        perturbation_reports=first[1],
+        perturbation_stability=first[2],
+        zero_ablation_consistency=first[3],
+    )
+
+
+def linear_decision_fidelity(
+    model: LogisticRegression, batch: FeatureBatch
+) -> float:
+    """Scores how closely the linear reference reproduces the decision output.
+
+    Args:
+        model: Fitted linear classifier.
+        batch: Test feature batch.
+
+    Returns:
+        The fidelity of `X @ coef_.T + intercept_` to `decision_function`.
+
+    Raises:
+        ValueError: If the linear reference does not match the model's
+            decision output in shape.
+    """
+    decision_values = numpy.asarray(model.decision_function(batch.values))
+    reference_values = batch.values @ model.coef_.T + model.intercept_
+    if reference_values.ndim == MATRIX_RANK and reference_values.shape[1] == 1:
+        reference_values = reference_values[:, 0]
+    if decision_values.ndim == MATRIX_RANK and decision_values.shape[1] == 1:
+        decision_values = decision_values[:, 0]
+    if decision_values.shape != reference_values.shape:
+        raise ValueError(
+            "linear explanation reference shape does not match model "
+            "decision output"
+        )
+    return quality.fidelity_score(
+        decision_values.astype(float).reshape(-1).tolist(),
+        reference_values.astype(float).reshape(-1).tolist(),
+    )
 
 
 class ModelExplainabilityStage(Stage):
@@ -4503,138 +4934,30 @@ class ModelExplainabilityStage(Stage):
 
     stage = modalities.LifecycleStage.MODEL_EXPLAINABILITY
 
-    def execute(self, context: Context) -> None:
-        """Records signed coefficient contributions with limitations.
+    @staticmethod
+    def ground_truth_evidence(
+        context: Context,
+        batch: FeatureBatch,
+        partitions: DatasetPartitions,
+        evaluated_sample_count: int,
+        explanation_reports: list[dict[str, object]],
+    ) -> dict[str, object]:
+        """Compares the explanations with caller-authored ground truth.
 
         Args:
-            context: Shared lifecycle state, updated in place.
+            context: Shared lifecycle state.
+            batch: Test feature batch.
+            partitions: Train, validation and test partitions.
+            evaluated_sample_count: Number of leading rows that were explained.
+            explanation_reports: Contribution report of each of those rows.
+
+        Returns:
+            The ground-truth suite result with its limitations.
 
         Raises:
-            RuntimeError: If the model, partitions or test features are missing,
-                or no explanation report could be produced.
-            ValueError: If the linear reference does not match the model's
-                decision output, or independent ground truth is required and the
-                suite is unavailable or failed.
+            ValueError: If independent ground truth is required and the suite
+                is unavailable or failed.
         """
-        model = context.model
-        batch = context.feature_batches["test"]
-        partitions = context.partitions
-        if model is None or partitions is None or not len(batch.sample_ids):
-            raise RuntimeError(
-                "model, partitions, and test features are required"
-            )
-        strength = numpy.mean(numpy.abs(model.coef_), axis=0)
-        global_terms = sorted(
-            (
-                (name, float(strength[index]))
-                for index, name in enumerate(batch.feature_names)
-            ),
-            key=lambda item: (-item[1], item[0]),
-        )[:10]
-        decision_values = numpy.asarray(model.decision_function(batch.values))
-        reference_values = batch.values @ model.coef_.T + model.intercept_
-        if reference_values.ndim == 2 and reference_values.shape[1] == 1:
-            reference_values = reference_values[:, 0]
-        if decision_values.ndim == 2 and decision_values.shape[1] == 1:
-            decision_values = decision_values[:, 0]
-        if decision_values.shape != reference_values.shape:
-            raise ValueError(
-                "linear explanation reference shape does not match model "
-                "decision output"
-            )
-        fidelity = quality.fidelity_score(
-            decision_values.astype(float).reshape(-1).tolist(),
-            reference_values.astype(float).reshape(-1).tolist(),
-        )
-        train_values = context.feature_batches["train"].values
-        feature_scales = numpy.maximum(numpy.std(train_values, axis=0), 1.0)
-        perturbation_size = feature_scales * 1e-6
-        repeated_stabilities: list[float] = []
-        local_report: dict[str, object] | None = None
-        explanation_reports: list[dict[str, object]] = []
-        perturbation_reports: list[dict[str, object]] = []
-        coefficients = model.coef_[0]
-        stability = 0.0
-        evaluated_sample_count = min(
-            len(batch.sample_ids), MAX_REPEATED_EXPLANATION_SAMPLES
-        )
-        for sample_index in range(evaluated_sample_count):
-            sample_row = batch.values[sample_index]
-            sample_decision = numpy.asarray(
-                model.decision_function(sample_row[None])
-            )
-            sample_class = 0
-            if sample_decision.ndim > 1:
-                sample_class = int(numpy.argmax(sample_decision[0]))
-            sample_coefficients = model.coef_[sample_class]
-            sample_report = quality.linear_contribution_report(
-                batch.sample_ids[sample_index],
-                batch.feature_names,
-                sample_row.tolist(),
-                sample_coefficients.tolist(),
-                top_k=min(10, len(batch.feature_names)),
-            )
-            sample_reports = [sample_report]
-            for feature_index in range(len(batch.feature_names)):
-                for direction in (-1.0, 1.0):
-                    perturbed_row = sample_row.copy()
-                    perturbed_row[feature_index] += (
-                        direction * perturbation_size[feature_index]
-                    )
-                    sample_reports.append(
-                        quality.linear_contribution_report(
-                            batch.sample_ids[sample_index],
-                            batch.feature_names,
-                            perturbed_row.tolist(),
-                            sample_coefficients.tolist(),
-                            top_k=min(10, len(batch.feature_names)),
-                        )
-                    )
-            explanation_reports.append(sample_report)
-            sample_stability = quality.ranking_stability(
-                tuple(sample_reports),
-                top_k=min(10, len(batch.feature_names)),
-            )
-            repeated_stabilities.append(sample_stability)
-            if sample_index == 0:
-                coefficients = sample_coefficients
-                local_report = sample_report
-                perturbation_reports = sample_reports
-                perturbation_stability = sample_stability
-                stability_decision = sample_decision
-                nonzero = numpy.flatnonzero(
-                    numpy.abs(sample_row * sample_coefficients) > 1e-12
-                )
-                if len(nonzero):
-                    perturbed = numpy.repeat(
-                        sample_row[None, :], len(nonzero), axis=0
-                    )
-                    perturbed[numpy.arange(len(nonzero)), nonzero] = 0.0
-                    perturbed_decisions = numpy.asarray(
-                        model.decision_function(perturbed)
-                    )
-                    if perturbed_decisions.ndim == 1:
-                        observed_change = (
-                            perturbed_decisions - stability_decision[0]
-                        )
-                    else:
-                        observed_change = (
-                            perturbed_decisions[:, sample_class]
-                            - stability_decision[0, sample_class]
-                        )
-                    expected_change = -(
-                        sample_row[nonzero] * sample_coefficients[nonzero]
-                    )
-                    stability = float(
-                        numpy.mean(
-                            numpy.sign(observed_change)
-                            == numpy.sign(expected_change)
-                        )
-                    )
-        if local_report is None or not perturbation_reports:
-            raise RuntimeError(
-                "repeated explanation evaluation produced no report"
-            )
         references = []
         for sample_index in range(evaluated_sample_count):
             ground_truth = context.adapter.explanation_ground_truth(
@@ -4654,8 +4977,10 @@ class ModelExplainabilityStage(Stage):
             ).to_dict(),
             "feature_space_only": True,
             "limitations": [
-                "Feature-space stability and fidelity are not independent "
-                "semantic validation.",
+                (
+                    "Feature-space stability and fidelity are not independent "
+                    "semantic validation."
+                ),
                 "Raw-modality ground truth remains caller-owned evidence.",
             ],
         }
@@ -4667,7 +4992,51 @@ class ModelExplainabilityStage(Stage):
                 "independent explanation ground-truth suite is required "
                 "before packaging"
             )
-        repeated_stability = min(repeated_stabilities)
+        return ground_truth_evidence
+
+    def execute(self, context: Context) -> None:
+        """Records signed coefficient contributions with limitations.
+
+        Args:
+            context: Shared lifecycle state, updated in place.
+
+        Raises:
+            RuntimeError: If the model, partitions or test features are missing,
+                or no explanation report could be produced.
+        """
+        model = context.model
+        batch = context.feature_batches["test"]
+        partitions = context.partitions
+        if model is None or partitions is None or not len(batch.sample_ids):
+            raise RuntimeError(
+                "model, partitions, and test features are required"
+            )
+        strength = numpy.mean(numpy.abs(model.coef_), axis=0)
+        global_terms = sorted(
+            (
+                (name, float(strength[index]))
+                for index, name in enumerate(batch.feature_names)
+            ),
+            key=lambda item: (-item[1], item[0]),
+        )[:10]
+        fidelity = linear_decision_fidelity(model, batch)
+        train_values = context.feature_batches["train"].values
+        feature_scales = numpy.maximum(numpy.std(train_values, axis=0), 1.0)
+        perturbation_size = feature_scales * 1e-6
+        evaluated_sample_count = min(
+            len(batch.sample_ids), MAX_REPEATED_EXPLANATION_SAMPLES
+        )
+        repeated = repeated_explanations(
+            model, batch, perturbation_size, evaluated_sample_count
+        )
+        ground_truth_evidence = self.ground_truth_evidence(
+            context,
+            batch,
+            partitions,
+            evaluated_sample_count,
+            repeated.reports,
+        )
+        repeated_stability = min(repeated.stabilities)
         quality_evaluation = quality.evaluate(
             method="linear_reference_zero_ablation_and_perturbation",
             sample_count=len(batch.sample_ids),
@@ -4684,12 +5053,14 @@ class ModelExplainabilityStage(Stage):
             "global_terms": [list(value) for value in global_terms],
             "local": {
                 "sample_id": batch.sample_ids[0],
-                "terms": local_report["terms"],
+                "terms": repeated.perturbation_reports[0]["terms"],
             },
-            "zero_ablation_direction_consistency": stability,
+            "zero_ablation_direction_consistency": (
+                repeated.zero_ablation_consistency
+            ),
             "perturbation_stability": {
-                "score": perturbation_stability,
-                "report_count": len(perturbation_reports),
+                "score": repeated.perturbation_stability,
+                "report_count": len(repeated.perturbation_reports),
                 "relative_step": 1e-6,
                 "feature_space_only": True,
             },
@@ -4702,10 +5073,15 @@ class ModelExplainabilityStage(Stage):
                 "feature_space_only": True,
                 "bounded_by": MAX_REPEATED_EXPLANATION_SAMPLES,
                 "limitations": [
-                    "The suite perturbs the declared feature representation; "
-                    "it does not establish raw-modality saliency.",
-                    "The sample bound is a lifecycle resource limit, not a "
-                    "production-scale stress guarantee.",
+                    (
+                        "The suite perturbs the declared feature "
+                        "representation; it does not establish raw-modality "
+                        "saliency."
+                    ),
+                    (
+                        "The sample bound is a lifecycle resource limit, not a "
+                        "production-scale stress guarantee."
+                    ),
                 ],
             },
             "independent_ground_truth": ground_truth_evidence,
@@ -4713,15 +5089,19 @@ class ModelExplainabilityStage(Stage):
                 partitions.test[0],
                 model,
                 batch.feature_names,
-                coefficients,
+                repeated.coefficients,
             ),
             "quality": quality_evaluation.to_dict(),
             "limitations": [
                 "Associational explanation only.",
-                "Input representation and linear approximation constrain "
-                "interpretation.",
-                "Quality checks validate the feature-space linear baseline; "
-                "they do not validate raw-modality causality.",
+                (
+                    "Input representation and linear approximation constrain "
+                    "interpretation."
+                ),
+                (
+                    "Quality checks validate the feature-space linear "
+                    "baseline; they do not validate raw-modality causality."
+                ),
             ],
         }
         context.record(self.stage, context.model_explanation.copy())
@@ -4821,7 +5201,7 @@ class PackagingStage(Stage):
             )
             durability.sync_file(manifest_path)
             durability.sync_directory(temporary)
-            os.replace(temporary, target)
+            Path(temporary).replace(target)
             durability.sync_directory(target.parent)
             context.package = Package(
                 str(target), str(unsigned["model_sha256"]), signature
@@ -4991,6 +5371,407 @@ class RecoveryAndResourceStage(Stage):
             shutil.rmtree(temporary, ignore_errors=True)
 
 
+def check_run_option_types(
+    require_independent_ground_truth: object,
+    cancellation_check: object,
+    resume: object,
+) -> None:
+    """Rejects lifecycle run options of the wrong type.
+
+    Args:
+        require_independent_ground_truth: Candidate for the ground-truth flag.
+        cancellation_check: Candidate for the cancellation callable.
+        resume: Candidate for the resume flag.
+
+    Raises:
+        TypeError: If a flag is not a bool or the cancellation check is not
+            callable.
+    """
+    if not isinstance(require_independent_ground_truth, bool):
+        raise TypeError("require_independent_ground_truth must be bool")
+    if cancellation_check is not None and not callable(cancellation_check):
+        raise TypeError("cancellation_check must be callable")
+    if not isinstance(resume, bool):
+        raise TypeError("resume must be bool")
+
+
+def check_checkpoint_options(
+    resume: bool, checkpoint_target: Path | None, report_target: Path | None
+) -> None:
+    """Rejects inconsistent checkpoint and report paths.
+
+    Args:
+        resume: Whether the run resumes from a checkpoint.
+        checkpoint_target: The checkpoint file, if any.
+        report_target: The report file, if any.
+
+    Raises:
+        ValueError: If `resume` is set without a checkpoint path, a
+            checkpoint path comes without a report path, or the two paths
+            are the same.
+    """
+    if resume and checkpoint_target is None:
+        raise ValueError("resume requires checkpoint_path")
+    if checkpoint_target is not None and report_target is None:
+        raise ValueError(
+            "checkpoint_path requires report_path so completion can be verified"
+        )
+    if checkpoint_target is not None and checkpoint_target == report_target:
+        raise ValueError("checkpoint_path and report_path must differ")
+
+
+def execute_with_performance(context: Context, stage: Stage) -> None:
+    """Executes one stage and records its duration when it is measured.
+
+    Args:
+        context: Shared lifecycle state, updated in place.
+        stage: The stage to execute.
+    """
+    started = time.perf_counter()
+    stage.execute(context)
+    operation = stage.performance_operation
+    if operation is not None:
+        if operation is performance.Operation.INGEST:
+            sample_count = len(context.adapter.samples)
+        else:
+            sample_count = len(context.feature_batches["train"].sample_ids)
+        context.record_performance(
+            operation,
+            time.perf_counter() - started,
+            sample_count,
+        )
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class RunPlan:
+    """The fixed inputs of one lifecycle run and what they imply.
+
+    Attributes:
+        adapter: Adapter for the reference dataset.
+        observed: Adapter over the data to monitor.
+        package_target: Directory the model package is written to.
+        report_target: File the signed report is written to, if any.
+        checkpoint_target: File where signed checkpoints are kept, if any.
+        signing_key: Key that signs the package, report and checkpoints.
+        seed: Random seed of the run.
+        require_independent_ground_truth: Whether the run demands
+            independently authored explanation ground truth.
+        manifest: Modality manifest to check against the adapter, if any.
+        cancellation_check: Callable polled at stage boundaries, if any.
+        package_preexisting: Whether the package directory existed before
+            the run.
+        report_preexisting: Whether the report file existed before the run.
+    """
+
+    adapter: Preparer
+    observed: Preparer
+    package_target: Path
+    report_target: Path | None
+    checkpoint_target: Path | None
+    signing_key: str | bytes
+    seed: int
+    require_independent_ground_truth: bool
+    manifest: data.ModalityManifest | None
+    cancellation_check: Callable[[], bool] | None
+    package_preexisting: bool
+    report_preexisting: bool
+
+    @property
+    def manifest_digest(self) -> str | None:
+        """The digest of the manifest, or None without one."""
+        if self.manifest is None:
+            return None
+        return attestation.canonical_digest(self.manifest.to_dict())
+
+    def ensure_not_cancelled(self) -> None:
+        """Stops before publication and removes this run's artifacts.
+
+        Does nothing when no check was given or it reports no cancellation.
+        On cancellation it deletes the package directory and the report file
+        unless they existed before the run.
+
+        Raises:
+            LifecycleCancelledError: If `cancellation_check` reports
+                cancellation.
+        """
+        if self.cancellation_check is None or not self.cancellation_check():
+            return
+        self.remove_package()
+        if self.report_target is not None and not self.report_preexisting:
+            self.report_target.unlink(missing_ok=True)
+        raise LifecycleCancelledError(
+            "modality lifecycle cancelled at a stage boundary"
+        )
+
+    def remove_package(self) -> None:
+        """Deletes the package directory unless it existed before the run."""
+        if not self.package_preexisting:
+            shutil.rmtree(self.package_target, ignore_errors=True)
+
+    def check_observed_modality(self) -> None:
+        """Checks that the monitored data has the reference modality.
+
+        Raises:
+            ValueError: If the observed adapter's modality differs.
+        """
+        if self.observed.modality != self.adapter.modality:
+            raise ValueError(
+                "observed adapter modality must match reference modality"
+            )
+
+    def check_manifest(self) -> None:
+        """Checks the manifest, if any, against the adapter.
+
+        Raises:
+            ValueError: If the manifest's modality, content hash or sample
+                count differs from the adapter's.
+        """
+        manifest = self.manifest
+        if manifest is None:
+            return
+        if manifest.modality != modalities.modality_value(
+            self.adapter.modality
+        ):
+            raise ValueError("manifest modality must match adapter")
+        if manifest.content_hash != self.adapter.dataset_hash:
+            raise ValueError("manifest content_hash must match adapter")
+        if manifest.sample_count != len(self.adapter.samples):
+            raise ValueError("manifest sample_count must match adapter")
+
+    def check_checkpoint_presence(self, *, resume: bool) -> None:
+        """Checks that the checkpoint file exists exactly when resuming.
+
+        Args:
+            resume: Whether the run resumes from the checkpoint.
+
+        Raises:
+            FileExistsError: If the checkpoint exists and `resume` is False.
+            FileNotFoundError: If `resume` is True and it does not exist.
+        """
+        target = self.checkpoint_target
+        if target is None:
+            return
+        if target.exists() and not resume:
+            raise FileExistsError(target)
+        if resume and not target.exists():
+            raise FileNotFoundError(target)
+
+    def identity(self) -> dict[str, object]:
+        """Describes the run as a checkpoint must record it.
+
+        Returns:
+            The identity fields a checkpoint of this run has to match.
+        """
+        return {
+            "modality": modalities.modality_value(self.adapter.modality),
+            "dataset_hash": self.adapter.dataset_hash,
+            "observed_dataset_hash": self.observed.dataset_hash,
+            "package_path": str(self.package_target),
+            "report_path": str(self.report_target),
+            "seed": self.seed,
+            "require_independent_ground_truth": (
+                self.require_independent_ground_truth
+            ),
+            "manifest_digest": self.manifest_digest,
+        }
+
+    def load_resume_checkpoint(self, stage_names: Sequence[str]) -> Checkpoint:
+        """Reads the checkpoint to resume from and checks that it fits.
+
+        Args:
+            stage_names: Values of the lifecycle stages, in order.
+
+        Returns:
+            The verified checkpoint.
+
+        Raises:
+            ValueError: If the checkpoint identity or stage order does not
+                match this run.
+        """
+        checkpoint = Checkpoint.read_verified(
+            cast("Path", self.checkpoint_target), self.signing_key
+        )
+        actual_identity = {
+            "modality": checkpoint.modality,
+            "dataset_hash": checkpoint.dataset_hash,
+            "observed_dataset_hash": checkpoint.observed_dataset_hash,
+            "package_path": checkpoint.package_path,
+            "report_path": checkpoint.report_path,
+            "seed": checkpoint.seed,
+            "require_independent_ground_truth": (
+                checkpoint.require_independent_ground_truth
+            ),
+            "manifest_digest": checkpoint.manifest_digest,
+        }
+        if actual_identity != self.identity():
+            raise ValueError(
+                "lifecycle checkpoint identity does not match the "
+                "requested resume"
+            )
+        if (
+            checkpoint.completed_stages
+            != stage_names[: len(checkpoint.completed_stages)]
+        ):
+            raise ValueError(
+                "lifecycle checkpoint stage order does not match "
+                "the current lifecycle"
+            )
+        return checkpoint
+
+    def verified_completed_report(self) -> Record:
+        """Verifies the report of a run whose checkpoint is completed.
+
+        Returns:
+            The previously written report, after checking it and its package.
+
+        Raises:
+            ValueError: If the report is missing or does not match the run.
+        """
+        report_target = self.report_target
+        if report_target is None or not report_target.is_file():
+            raise ValueError("completed lifecycle checkpoint has no report")
+        completed_report = Record.read_verified(report_target, self.signing_key)
+        if (
+            completed_report.modality
+            != modalities.modality_value(self.adapter.modality)
+            or completed_report.dataset_hash != self.adapter.dataset_hash
+            or Path(completed_report.package.path) != self.package_target
+        ):
+            raise ValueError(
+                "completed lifecycle report does not match the requested resume"
+            )
+        Predictor.from_package(
+            self.adapter,
+            completed_report.package.path,
+            self.signing_key,
+            lifecycle_report_path=report_target,
+        )
+        return completed_report
+
+    def persist_checkpoint(
+        self,
+        completed_stages: Sequence[str],
+        stage_digests: Sequence[str],
+        status: Literal["running", "completed"],
+    ) -> None:
+        """Atomically persists a signed stage boundary.
+
+        Does nothing when the run keeps no checkpoint.
+
+        Args:
+            completed_stages: Values of the stages finished so far.
+            stage_digests: Digest of each finished stage's evidence.
+            status: "running" or "completed".
+        """
+        if self.checkpoint_target is None:
+            return
+        record = Checkpoint(
+            modality=modalities.modality_value(self.adapter.modality),
+            dataset_hash=self.adapter.dataset_hash,
+            observed_dataset_hash=self.observed.dataset_hash,
+            package_path=str(self.package_target),
+            report_path=str(self.report_target),
+            seed=self.seed,
+            completed_stages=tuple(completed_stages),
+            stage_digests=tuple(stage_digests),
+            require_independent_ground_truth=(
+                self.require_independent_ground_truth
+            ),
+            manifest_digest=self.manifest_digest,
+            status=status,
+        ).sign(self.signing_key)
+        durability.write_atomically(
+            self.checkpoint_target,
+            (
+                json.dumps(record.to_dict(), indent=2, sort_keys=True) + "\n"
+            ).encode("utf-8"),
+        )
+
+    def evaluate_performance(
+        self,
+        context: Context,
+        performance_budget: performance.Budget | None,
+        performance_baseline: performance.Baseline | None,
+    ) -> dict[str, object]:
+        """Measures the run against its budget and baseline.
+
+        Args:
+            context: Shared lifecycle state with the observations.
+            performance_budget: Limits the measured operations must meet, if
+                any.
+            performance_baseline: Earlier run the measurements are compared
+                with, if any.
+
+        Returns:
+            The performance evidence of the report.
+
+        Raises:
+            ValueError: If the budget or the baseline is violated; the
+                package this run created is removed first.
+        """
+        observations = tuple(
+            context.performance_observations[operation]
+            for operation in performance.Operation
+            if operation in context.performance_observations
+        )
+        performance_run = performance.Run(
+            run_id=f"{self.adapter.dataset_hash}:{self.seed}",
+            observations=observations,
+        )
+        performance_result = (
+            performance_budget.evaluate(observations)
+            if performance_budget is not None
+            else None
+        )
+        performance_comparison = (
+            performance_baseline.evaluate(performance_run)
+            if performance_baseline is not None
+            else None
+        )
+        evidence: dict[str, object] = {
+            "run": performance_run.to_dict(),
+            "observations": [
+                observation.to_dict() for observation in observations
+            ],
+            "budget": (
+                performance_budget.to_dict()
+                if performance_budget is not None
+                else None
+            ),
+            "result": (
+                performance_result.to_dict()
+                if performance_result is not None
+                else None
+            ),
+            "baseline": (
+                performance_baseline.to_dict()
+                if performance_baseline is not None
+                else None
+            ),
+            "comparison": (
+                performance_comparison.to_dict()
+                if performance_comparison is not None
+                else None
+            ),
+        }
+        if performance_result is not None and not performance_result.passed:
+            self.remove_package()
+            raise ValueError(
+                "performance budget failed: "
+                + "; ".join(performance_result.violations)
+            )
+        if (
+            performance_comparison is not None
+            and not performance_comparison.passed
+        ):
+            self.remove_package()
+            raise ValueError(
+                "performance baseline failed: "
+                + "; ".join(performance_comparison.violations)
+            )
+        return evidence
+
+
 class Lifecycle:
     """Executes the fifteen shared lifecycle stages in deterministic order.
 
@@ -5015,6 +5796,52 @@ class Lifecycle:
         DocumentationStage(),
         RecoveryAndResourceStage(),
     )
+
+    def run_stages(
+        self,
+        plan: RunPlan,
+        context: Context,
+        resumed: tuple[int, tuple[str, ...]],
+        progress: tuple[list[str], list[str]],
+    ) -> None:
+        """Executes every stage, replaying the ones a checkpoint completed.
+
+        Args:
+            plan: The run's fixed inputs.
+            context: Shared lifecycle state, updated in place.
+            resumed: Number of leading stages that a checkpoint completed,
+                and their evidence digests.
+            progress: Values of the completed stages and their digests; both
+                lists grow as stages finish and are persisted at every
+                boundary.
+
+        Raises:
+            ValueError: If a replayed stage's digest differs from the
+                checkpoint's.
+        """
+        resume_count, resume_digests = resumed
+        completed_stages, stage_digests = progress
+        for stage_index, stage in enumerate(self.stages):
+            plan.ensure_not_cancelled()
+            context.resume_replay = stage_index < resume_count
+            execute_with_performance(context, stage)
+            stage_digest = attestation.canonical_digest(
+                context.stage_records[stage.stage]
+            )
+            if stage_index < resume_count:
+                if stage_digest != resume_digests[stage_index]:
+                    raise ValueError(
+                        "lifecycle checkpoint replay diverged at stage "
+                        f"{stage.stage.value}"
+                    )
+            else:
+                completed_stages.append(stage.stage.value)
+                stage_digests.append(stage_digest)
+                plan.persist_checkpoint(
+                    completed_stages, stage_digests, "running"
+                )
+            context.resume_replay = False
+            plan.ensure_not_cancelled()
 
     def run(
         self,
@@ -5084,70 +5911,34 @@ class Lifecycle:
             FileNotFoundError: If `resume` is True and the checkpoint does not
                 exist.
         """
-        if not isinstance(require_independent_ground_truth, bool):
-            raise TypeError("require_independent_ground_truth must be bool")
-        if cancellation_check is not None and not callable(cancellation_check):
-            raise TypeError("cancellation_check must be callable")
-        if not isinstance(resume, bool):
-            raise TypeError("resume must be bool")
-        package_target = Path(package_path)
+        check_run_option_types(
+            require_independent_ground_truth, cancellation_check, resume
+        )
         report_target = Path(report_path) if report_path is not None else None
         checkpoint_target = (
             Path(checkpoint_path) if checkpoint_path is not None else None
         )
-        if resume and checkpoint_target is None:
-            raise ValueError("resume requires checkpoint_path")
-        if checkpoint_target is not None and report_target is None:
-            raise ValueError(
-                "checkpoint_path requires report_path so completion can be "
-                "verified"
-            )
-        if checkpoint_target is not None and checkpoint_target == report_target:
-            raise ValueError("checkpoint_path and report_path must differ")
-        package_preexisting = package_target.exists()
-        report_preexisting = (
-            report_target.exists() if report_target is not None else False
+        check_checkpoint_options(resume, checkpoint_target, report_target)
+        package_target = Path(package_path)
+        plan = RunPlan(
+            adapter=adapter,
+            observed=observed_adapter or adapter,
+            package_target=package_target,
+            report_target=report_target,
+            checkpoint_target=checkpoint_target,
+            signing_key=signing_key,
+            seed=seed,
+            require_independent_ground_truth=require_independent_ground_truth,
+            manifest=manifest,
+            cancellation_check=cancellation_check,
+            package_preexisting=package_target.exists(),
+            report_preexisting=(
+                report_target.exists() if report_target is not None else False
+            ),
         )
-
-        def ensure_not_cancelled() -> None:
-            """Stops before publication and removes this run's artifacts.
-
-            Does nothing when no check was given or it reports no
-            cancellation. On cancellation it deletes the package directory and
-            the report file unless they existed before the run.
-
-            Raises:
-                LifecycleCancelledError: If `cancellation_check` reports
-                    cancellation.
-            """
-            if cancellation_check is None or not cancellation_check():
-                return
-            if not package_preexisting:
-                shutil.rmtree(package_target, ignore_errors=True)
-            if report_target is not None and not report_preexisting:
-                report_target.unlink(missing_ok=True)
-            raise LifecycleCancelledError(
-                "modality lifecycle cancelled at a stage boundary"
-            )
-
-        ensure_not_cancelled()
-        observed = observed_adapter or adapter
-        if observed.modality != adapter.modality:
-            raise ValueError(
-                "observed adapter modality must match reference modality"
-            )
-        if manifest is not None:
-            if manifest.modality != modalities.modality_value(adapter.modality):
-                raise ValueError("manifest modality must match adapter")
-            if manifest.content_hash != adapter.dataset_hash:
-                raise ValueError("manifest content_hash must match adapter")
-            if manifest.sample_count != len(adapter.samples):
-                raise ValueError("manifest sample_count must match adapter")
-        manifest_digest = (
-            attestation.canonical_digest(manifest.to_dict())
-            if manifest is not None
-            else None
-        )
+        plan.ensure_not_cancelled()
+        plan.check_observed_modality()
+        plan.check_manifest()
         stage_names = tuple(stage.stage.value for stage in self.stages)
         required_stage_names = tuple(
             stage.value for stage in modalities.REQUIRED_LIFECYCLE_STAGES
@@ -5159,115 +5950,13 @@ class Lifecycle:
         checkpoint: Checkpoint | None = None
 
         if checkpoint_target is not None:
-            if checkpoint_target.exists() and not resume:
-                raise FileExistsError(checkpoint_target)
-            if resume and not checkpoint_target.exists():
-                raise FileNotFoundError(checkpoint_target)
+            plan.check_checkpoint_presence(resume=resume)
             if resume:
-                checkpoint = Checkpoint.read_verified(
-                    checkpoint_target, signing_key
-                )
-                expected_identity = {
-                    "modality": modalities.modality_value(adapter.modality),
-                    "dataset_hash": adapter.dataset_hash,
-                    "observed_dataset_hash": observed.dataset_hash,
-                    "package_path": str(package_target),
-                    "report_path": str(report_target),
-                    "seed": seed,
-                    "require_independent_ground_truth": (
-                        require_independent_ground_truth
-                    ),
-                    "manifest_digest": manifest_digest,
-                }
-                actual_identity = {
-                    "modality": checkpoint.modality,
-                    "dataset_hash": checkpoint.dataset_hash,
-                    "observed_dataset_hash": checkpoint.observed_dataset_hash,
-                    "package_path": checkpoint.package_path,
-                    "report_path": checkpoint.report_path,
-                    "seed": checkpoint.seed,
-                    "require_independent_ground_truth": (
-                        checkpoint.require_independent_ground_truth
-                    ),
-                    "manifest_digest": checkpoint.manifest_digest,
-                }
-                if actual_identity != expected_identity:
-                    raise ValueError(
-                        "lifecycle checkpoint identity does not match the "
-                        "requested resume"
-                    )
-                if (
-                    checkpoint.completed_stages
-                    != stage_names[: len(checkpoint.completed_stages)]
-                ):
-                    raise ValueError(
-                        "lifecycle checkpoint stage order does not match "
-                        "the current lifecycle"
-                    )
+                checkpoint = plan.load_resume_checkpoint(stage_names)
                 if checkpoint.status == "completed":
-                    if report_target is None or not report_target.is_file():
-                        raise ValueError(
-                            "completed lifecycle checkpoint has no report"
-                        )
-                    completed_report = Record.read_verified(
-                        report_target, signing_key
-                    )
-                    if (
-                        completed_report.modality
-                        != modalities.modality_value(adapter.modality)
-                        or completed_report.dataset_hash != adapter.dataset_hash
-                        or Path(completed_report.package.path) != package_target
-                    ):
-                        raise ValueError(
-                            "completed lifecycle report does not match "
-                            "the requested resume"
-                        )
-                    Predictor.from_package(
-                        adapter,
-                        completed_report.package.path,
-                        signing_key,
-                        lifecycle_report_path=report_target,
-                    )
-                    return completed_report
+                    return plan.verified_completed_report()
                 resume_count = len(checkpoint.completed_stages)
                 resume_digests = checkpoint.stage_digests
-
-        def persist_checkpoint(
-            completed_stages: Sequence[str],
-            stage_digests: Sequence[str],
-            status: Literal["running", "completed"],
-        ) -> None:
-            """Atomically persists a signed stage boundary.
-
-            Args:
-                completed_stages: Values of the stages finished so far.
-                stage_digests: Digest of each finished stage's evidence.
-                status: "running" or "completed".
-            """
-            if checkpoint_target is None:
-                return
-            record = Checkpoint(
-                modality=modalities.modality_value(adapter.modality),
-                dataset_hash=adapter.dataset_hash,
-                observed_dataset_hash=observed.dataset_hash,
-                package_path=str(package_target),
-                report_path=str(report_target),
-                seed=seed,
-                completed_stages=tuple(completed_stages),
-                stage_digests=tuple(stage_digests),
-                require_independent_ground_truth=(
-                    require_independent_ground_truth
-                ),
-                manifest_digest=manifest_digest,
-                status=status,
-            ).sign(signing_key)
-            durability.write_atomically(
-                checkpoint_target,
-                (
-                    json.dumps(record.to_dict(), indent=2, sort_keys=True)
-                    + "\n"
-                ).encode("utf-8"),
-            )
 
         completed_stages = list(
             checkpoint.completed_stages if checkpoint is not None else ()
@@ -5275,54 +5964,23 @@ class Lifecycle:
         stage_digests = list(
             checkpoint.stage_digests if checkpoint is not None else ()
         )
-        persist_checkpoint(completed_stages, stage_digests, "running")
+        plan.persist_checkpoint(completed_stages, stage_digests, "running")
         context = Context(
             adapter=adapter,
             package_path=package_target,
             signing_key=signing_key,
             seed=seed,
-            observed_adapter=observed,
+            observed_adapter=plan.observed,
             manifest=manifest,
             require_independent_ground_truth=require_independent_ground_truth,
         )
-        for stage_index, stage in enumerate(self.stages):
-            ensure_not_cancelled()
-            context.resume_replay = stage_index < resume_count
-            started = time.perf_counter()
-            stage.execute(context)
-            operation = stage.performance_operation
-            if operation is not None:
-                if operation is performance.Operation.INGEST:
-                    sample_count = len(context.adapter.samples)
-                elif operation is performance.Operation.FIT:
-                    sample_count = len(
-                        context.feature_batches["train"].sample_ids
-                    )
-                else:
-                    sample_count = len(
-                        context.feature_batches["train"].sample_ids
-                    )
-                context.record_performance(
-                    operation,
-                    time.perf_counter() - started,
-                    sample_count,
-                )
-            stage_digest = attestation.canonical_digest(
-                context.stage_records[stage.stage]
-            )
-            if stage_index < resume_count:
-                if stage_digest != resume_digests[stage_index]:
-                    raise ValueError(
-                        "lifecycle checkpoint replay diverged at stage "
-                        f"{stage.stage.value}"
-                    )
-            else:
-                completed_stages.append(stage.stage.value)
-                stage_digests.append(stage_digest)
-                persist_checkpoint(completed_stages, stage_digests, "running")
-            context.resume_replay = False
-            ensure_not_cancelled()
-        ensure_not_cancelled()
+        self.run_stages(
+            plan,
+            context,
+            (resume_count, resume_digests),
+            (completed_stages, stage_digests),
+        )
+        plan.ensure_not_cancelled()
         records = tuple(
             modalities.StageEvidence(
                 stage=stage,
@@ -5335,68 +5993,9 @@ class Lifecycle:
         package = context.package
         if package is None:
             raise RuntimeError("packaging stage did not produce a package")
-        observations = tuple(
-            context.performance_observations[operation]
-            for operation in performance.Operation
-            if operation in context.performance_observations
+        performance_evidence = plan.evaluate_performance(
+            context, performance_budget, performance_baseline
         )
-        performance_run = performance.Run(
-            run_id=f"{adapter.dataset_hash}:{seed}",
-            observations=observations,
-        )
-        performance_result = (
-            performance_budget.evaluate(observations)
-            if performance_budget is not None
-            else None
-        )
-        performance_comparison = (
-            performance_baseline.evaluate(performance_run)
-            if performance_baseline is not None
-            else None
-        )
-        performance_evidence: dict[str, object] = {
-            "run": performance_run.to_dict(),
-            "observations": [
-                observation.to_dict() for observation in observations
-            ],
-            "budget": (
-                performance_budget.to_dict()
-                if performance_budget is not None
-                else None
-            ),
-            "result": (
-                performance_result.to_dict()
-                if performance_result is not None
-                else None
-            ),
-            "baseline": (
-                performance_baseline.to_dict()
-                if performance_baseline is not None
-                else None
-            ),
-            "comparison": (
-                performance_comparison.to_dict()
-                if performance_comparison is not None
-                else None
-            ),
-        }
-        if performance_result is not None and not performance_result.passed:
-            if not package_preexisting:
-                shutil.rmtree(package_target, ignore_errors=True)
-            raise ValueError(
-                "performance budget failed: "
-                + "; ".join(performance_result.violations)
-            )
-        if (
-            performance_comparison is not None
-            and not performance_comparison.passed
-        ):
-            if not package_preexisting:
-                shutil.rmtree(package_target, ignore_errors=True)
-            raise ValueError(
-                "performance baseline failed: "
-                + "; ".join(performance_comparison.violations)
-            )
         report = Record(
             modality=modalities.modality_value(adapter.modality),
             dataset_hash=adapter.dataset_hash,
@@ -5417,12 +6016,10 @@ class Lifecycle:
                     + "\n"
                 ).encode("utf-8"),
             )
-            ensure_not_cancelled()
+            plan.ensure_not_cancelled()
         if checkpoint_target is not None:
-            persist_checkpoint(
-                completed_stages,
-                stage_digests,
-                "completed",
+            plan.persist_checkpoint(
+                completed_stages, stage_digests, "completed"
             )
         return report
 
@@ -5455,7 +6052,7 @@ class Lifecycle:
             limitations=tuple(
                 str(value)
                 for value in cast(
-                    Sequence[object], report.documentation["limitations"]
+                    "Sequence[object]", report.documentation["limitations"]
                 )
             ),
         )
@@ -5477,6 +6074,131 @@ def file_digest(path: Path) -> str:
     return digest.hexdigest()
 
 
+def require_feature_names(feature_names: object) -> list[str]:
+    """Checks the feature names that a package manifest declares.
+
+    Args:
+        feature_names: The manifest's `feature_names` entry.
+
+    Returns:
+        The same list.
+
+    Raises:
+        ValueError: If it is not a non-empty list of distinct, non-blank
+            strings.
+    """
+    if not isinstance(feature_names, list) or not feature_names:
+        raise ValueError("modality package feature_names are invalid")
+    if any(
+        not isinstance(name, str) or not name.strip() for name in feature_names
+    ) or len(set(feature_names)) != len(feature_names):
+        raise ValueError("modality package feature_names are invalid")
+    return feature_names
+
+
+def check_package_signature(
+    signature: object, unsigned: Mapping[str, object], signing_key: str | bytes
+) -> None:
+    """Checks a package manifest's signature over its unsigned content.
+
+    Args:
+        signature: The manifest's `signature` entry.
+        unsigned: The manifest without its signature.
+        signing_key: Key the signature is checked with.
+
+    Raises:
+        ValueError: If the signature is missing, unsupported, empty or does
+            not verify.
+    """
+    if (
+        not isinstance(signature, dict)
+        or signature.get("algorithm") != attestation.SIGNATURE_ALGORITHM
+    ):
+        raise ValueError("modality package signature is missing or unsupported")
+    value = signature.get("value")
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError("modality package signature is empty")
+    expected = attestation.sign_payload(unsigned, signing_key)
+    if not hmac.compare_digest(value, expected):
+        raise ValueError("modality package signature does not verify")
+
+
+def verify_package_manifest(
+    manifest: object, signing_key: str | bytes
+) -> tuple[list[str], str]:
+    """Checks a package manifest's content and signature.
+
+    Args:
+        manifest: The parsed `manifest.json`.
+        signing_key: Key the manifest signature is checked with.
+
+    Returns:
+        The feature names the package was trained on and the model digest
+        that the manifest records.
+
+    Raises:
+        ValueError: If the manifest is not an object, or its schema version,
+            modality, dataset hash, feature names, model digest, evaluation
+            or signature is missing, malformed or does not verify.
+    """
+    if not isinstance(manifest, Mapping):
+        raise ValueError("modality package manifest must be an object")
+    unsigned = dict(manifest)
+    signature = unsigned.pop("signature", None)
+    schema_version = unsigned.get("schema_version")
+    if isinstance(schema_version, bool) or schema_version != (
+        PACKAGE_SCHEMA_VERSION
+    ):
+        raise ValueError("unsupported modality package schema version")
+    modality = unsigned.get("modality")
+    if not isinstance(modality, str) or not modality.strip():
+        raise ValueError("modality package modality is invalid")
+    dataset_hash = unsigned.get("dataset_hash")
+    if not isinstance(dataset_hash, str) or not dataset_hash.strip():
+        raise ValueError("modality package dataset_hash is invalid")
+    feature_names = require_feature_names(unsigned.get("feature_names"))
+    model_digest = unsigned.get("model_sha256")
+    if not isinstance(model_digest, str) or not is_sha256(model_digest):
+        raise ValueError("modality package model_sha256 is invalid")
+    if not isinstance(unsigned.get("evaluation"), Mapping):
+        raise ValueError("modality package evaluation is invalid")
+    check_package_signature(signature, unsigned, signing_key)
+    return feature_names, model_digest
+
+
+def check_package_classifier(loaded: object, feature_count: int) -> None:
+    """Checks a deserialized package classifier against its feature schema.
+
+    Args:
+        loaded: The deserialized payload.
+        feature_count: Number of features the manifest declares.
+
+    Raises:
+        TypeError: If the payload is not a logistic regression.
+        ValueError: If the model's feature count differs, it has fewer than
+            two classes or it holds non-finite values.
+    """
+    if not isinstance(loaded, LogisticRegression):
+        raise TypeError(
+            "modality package does not contain the expected classifier"
+        )
+    if getattr(loaded, "n_features_in_", None) != feature_count:
+        raise ValueError(
+            "modality package model and feature schema do not match"
+        )
+    if len(getattr(loaded, "classes_", ())) < MIN_CLASS_COUNT:
+        raise ValueError(
+            "modality package classifier has fewer than two classes"
+        )
+    if (
+        not numpy.isfinite(loaded.coef_).all()
+        or not numpy.isfinite(loaded.intercept_).all()
+    ):
+        raise ValueError(
+            "modality package classifier contains non-finite values"
+        )
+
+
 def load_package(
     path: str | Path, signing_key: str | bytes
 ) -> LogisticRegression:
@@ -5493,7 +6215,6 @@ def load_package(
         ValueError: If the package is incomplete, its manifest, signature,
             digest or feature schema is invalid, or the classifier has fewer
             than two classes or non-finite values.
-        TypeError: If the payload is not a logistic regression.
     """
     target = Path(path)
     manifest_path = target / "manifest.json"
@@ -5501,66 +6222,11 @@ def load_package(
     if not manifest_path.is_file() or not model_path.is_file():
         raise ValueError("modality package is incomplete")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    if not isinstance(manifest, Mapping):
-        raise ValueError("modality package manifest must be an object")
-    unsigned = dict(manifest)
-    signature = unsigned.pop("signature", None)
-    schema_version = unsigned.get("schema_version")
-    if isinstance(schema_version, bool) or schema_version != (
-        PACKAGE_SCHEMA_VERSION
-    ):
-        raise ValueError("unsupported modality package schema version")
-    modality = unsigned.get("modality")
-    if not isinstance(modality, str) or not modality.strip():
-        raise ValueError("modality package modality is invalid")
-    dataset_hash = unsigned.get("dataset_hash")
-    if not isinstance(dataset_hash, str) or not dataset_hash.strip():
-        raise ValueError("modality package dataset_hash is invalid")
-    feature_names = unsigned.get("feature_names")
-    if not isinstance(feature_names, list) or not feature_names:
-        raise ValueError("modality package feature_names are invalid")
-    if any(
-        not isinstance(name, str) or not name.strip() for name in feature_names
-    ) or len(set(feature_names)) != len(feature_names):
-        raise ValueError("modality package feature_names are invalid")
-    model_digest = unsigned.get("model_sha256")
-    if not isinstance(model_digest, str) or not is_sha256(model_digest):
-        raise ValueError("modality package model_sha256 is invalid")
-    if not isinstance(unsigned.get("evaluation"), Mapping):
-        raise ValueError("modality package evaluation is invalid")
-    if (
-        not isinstance(signature, dict)
-        or signature.get("algorithm") != attestation.SIGNATURE_ALGORITHM
-    ):
-        raise ValueError("modality package signature is missing or unsupported")
-    value = signature.get("value")
-    if not isinstance(value, str) or not value.strip():
-        raise ValueError("modality package signature is empty")
-    expected = attestation.sign_payload(unsigned, signing_key)
-    if not hmac.compare_digest(value, expected):
-        raise ValueError("modality package signature does not verify")
+    feature_names, model_digest = verify_package_manifest(manifest, signing_key)
     if file_digest(model_path) != model_digest:
         raise ValueError("modality package model digest does not verify")
     loaded = joblib.load(model_path)
-    if not isinstance(loaded, LogisticRegression):
-        raise TypeError(
-            "modality package does not contain the expected classifier"
-        )
-    if getattr(loaded, "n_features_in_", None) != len(feature_names):
-        raise ValueError(
-            "modality package model and feature schema do not match"
-        )
-    if len(getattr(loaded, "classes_", ())) < 2:
-        raise ValueError(
-            "modality package classifier has fewer than two classes"
-        )
-    if (
-        not numpy.isfinite(loaded.coef_).all()
-        or not numpy.isfinite(loaded.intercept_).all()
-    ):
-        raise ValueError(
-            "modality package classifier contains non-finite values"
-        )
+    check_package_classifier(loaded, len(feature_names))
     return loaded
 
 
