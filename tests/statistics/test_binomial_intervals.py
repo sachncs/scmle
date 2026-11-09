@@ -162,3 +162,24 @@ def test_one_sided_upper_bound_covers_at_least_nominal(trials, proportion):
     support_statistics.assert_rate_at_least(
         observed, LEVEL, SIMULATIONS, "one-sided upper bound"
     )
+
+
+@pytest.mark.parametrize(
+    ("first", "second"), [((150, 0.3), (200, 0.2)), ((400, 0.5), (400, 0.45))]
+)
+def test_newcombe_difference_interval_is_near_nominal_in_simulation(
+    first, second
+):
+    (rows_a, rate_a), (rows_b, rate_b) = first, second
+    rng = numpy.random.default_rng(14)
+    hits_a = rng.binomial(rows_a, rate_a, SIMULATIONS)
+    hits_b = rng.binomial(rows_b, rate_b, SIMULATIONS)
+    covered = 0
+    for count_a, count_b in zip(hits_a.tolist(), hits_b.tolist(), strict=True):
+        low, high = constraints.newcombe(
+            count_a, rows_a, count_b, rows_b, LEVEL
+        )
+        covered += low <= rate_a - rate_b <= high
+    support_statistics.assert_rate_near(
+        covered / SIMULATIONS, LEVEL, SIMULATIONS, f"newcombe {first} {second}"
+    )
