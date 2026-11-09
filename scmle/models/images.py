@@ -185,7 +185,7 @@ class ImageDriftReport:
 
     @property
     def shifted(self) -> bool:
-        """Whether the pixel distance or duplicate rate exceeds the threshold."""
+        """Whether the pixel distance or duplicate rate is past the threshold."""
         return (
             self.mean_pixel_distance > self.threshold
             or self.duplicate_rate > self.threshold
