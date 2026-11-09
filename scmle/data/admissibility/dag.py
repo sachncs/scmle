@@ -350,7 +350,7 @@ class Dag:
         return separated(self.nodes, cut, [treatment], [outcome], chosen)
 
     def require_nodes(self, names: Iterable[str]) -> None:
-        """Check that every name is a node of the graph.
+        """Checks that every name is a node of the graph.
 
         Args:
             names: Names to check.
@@ -363,7 +363,7 @@ class Dag:
             raise ValueError(f"not nodes of the graph: {unknown}")
 
     def candidates(self, treatment: str, outcome: str) -> list[str]:
-        """List the observed nodes that may be adjusted for.
+        """Lists the observed nodes that may be adjusted for.
 
         Args:
             treatment: The treatment node.
@@ -445,7 +445,7 @@ class Dag:
 
     @classmethod
     def from_artifact(cls, document: Mapping[str, Any]) -> Self:
-        """Rebuild a graph and verify its stored hash and status.
+        """Rebuilds a graph and verifies its stored hash and status.
 
         Args:
             document: A mapping in the form `artifact` returns.

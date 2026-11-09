@@ -13,7 +13,7 @@ DEFAULT_REQUIRED_KINDS = [kind.value for kind in review.ReviewClaimKind]
 
 
 def parse_arguments(arguments: list[str] | None = None) -> argparse.Namespace:
-    """Parse the review verification command line.
+    """Parses the review verification command line.
 
     Args:
         arguments: Command-line arguments; `None` reads `sys.argv`.
@@ -43,7 +43,7 @@ def parse_arguments(arguments: list[str] | None = None) -> argparse.Namespace:
 
 
 def main(arguments: list[str] | None = None) -> int:
-    """Return zero only when the signed review satisfies every gate.
+    """Returns zero only when the signed review satisfies every gate.
 
     Args:
         arguments: Command-line arguments; `None` reads `sys.argv`.

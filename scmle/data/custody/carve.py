@@ -68,7 +68,7 @@ def derived_seed(charter_hash: str, data_hash: str, seed: int) -> int:
 def unit_labels(
     size: int, groups: np.ndarray | None, duplicates: np.ndarray | None
 ) -> np.ndarray:
-    """Label each row with its unit: the smallest row index in its unit.
+    """Labels each row with its unit: the smallest row index in its unit.
 
     Rows sharing a group value or a duplicate-group id are merged
     transitively, so a group that contains a copy of a record in another

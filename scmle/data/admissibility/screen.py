@@ -195,7 +195,7 @@ def basis(series: pd.Series, knots: int = KNOTS) -> np.ndarray:
 def strata_of(
     n: int, groups: np.ndarray | None, block_size: int | None
 ) -> np.ndarray:
-    """Assign each row its permutation stratum: group, time block, or one.
+    """Assigns each row its permutation stratum: group, time block, or one.
 
     Args:
         n: Number of rows.
@@ -1090,7 +1090,7 @@ def screen_table(
     store: certificates.CertificateStore | None = None,
     time_budget_seconds: float | None = None,
 ) -> ScreenReport:
-    """Screen training data with the certified settings.
+    """Screens training data with the certified settings.
 
     Groups keep entities whole. A time column orders the rows and defines
     `TIME_BLOCKS` consecutive blocks; groups win when both are given.
@@ -1150,7 +1150,7 @@ def code_digest() -> str:
 
 
 def ceilings_of(cfg: leakage.LeakageConfig) -> dict[str, float]:
-    """Look up the pre-registered ceiling of each mechanism's effect size.
+    """Looks up the pre-registered ceiling of each mechanism's effect size.
 
     Args:
         cfg: Settings holding the ceilings.
@@ -1428,7 +1428,7 @@ def screen(
     store: certificates.CertificateStore | None = None,
     time_budget_seconds: float | None = None,
 ) -> ScreenReport:
-    """Screen the candidate columns of training data for leakage suspicion.
+    """Screens the candidate columns of training data for leakage suspicion.
 
     Args:
         frame: Training (or exploration) rows including the target. For time

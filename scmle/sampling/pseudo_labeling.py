@@ -77,7 +77,7 @@ def augmented_fit(
     unlabeled: pd.DataFrame,
     confidence: float,
 ) -> tuple[Any, int]:
-    """Label confident rows with a fitted model, then refit on both.
+    """Labels confident rows with a fitted model, then refits on both.
 
     Args:
         plain: Classifier already fitted on `features` and `target`.

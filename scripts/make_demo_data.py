@@ -83,7 +83,7 @@ def render(frame: pd.DataFrame) -> str:
 
 
 def main(arguments: list[str] | None = None) -> int:
-    """Write the files, or with --check compare them.
+    """Writes the files, or with --check compare them.
 
     Args:
         arguments: Command-line arguments; `None` reads `sys.argv`.

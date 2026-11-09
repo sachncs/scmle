@@ -90,7 +90,7 @@ class LifecycleCancellation:
         self.signal = threading.Event()
 
     def cancel(self) -> None:
-        """Request cancellation at the next lifecycle stage boundary."""
+        """Requests cancellation at the next lifecycle stage boundary."""
         self.signal.set()
 
     def is_cancelled(self) -> bool:

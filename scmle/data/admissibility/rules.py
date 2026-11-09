@@ -87,7 +87,7 @@ class FieldDecision:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild a decision, rejecting unknown or missing fields.
+        """Rebuilds a decision, rejecting unknown or missing fields.
 
         Args:
             record: A mapping in the form `to_dict` returns.
@@ -359,7 +359,7 @@ class AdmissibilityTable:
             raise ValueError("field names must be unique")
 
     def names(self, admission: Admission) -> tuple[str, ...]:
-        """List the fields that received an admission.
+        """Lists the fields that received an admission.
 
         Args:
             admission: The admission to select.

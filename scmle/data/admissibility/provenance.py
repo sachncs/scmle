@@ -82,7 +82,7 @@ class Availability(enum.StrEnum):
 
 
 def number(value: Any, name: str) -> float:
-    """Check that a value is a finite number.
+    """Checks that a value is a finite number.
 
     Args:
         value: The value to check.
@@ -445,7 +445,7 @@ class FieldProvenance:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild a record, rejecting unknown or missing fields.
+        """Rebuilds a record, rejecting unknown or missing fields.
 
         Args:
             record: A mapping in the form `to_dict` returns.
@@ -591,7 +591,7 @@ class ProvenanceTable:
 
     @classmethod
     def from_dict(cls, document: Mapping[str, Any]) -> Self:
-        """Rebuild a table, rejecting unknown versions and fields.
+        """Rebuilds a table, rejecting unknown versions and fields.
 
         Args:
             document: A mapping in the form `to_dict` returns.

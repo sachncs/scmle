@@ -48,7 +48,7 @@ class IndexResampler(Resampler):
     def indices(
         self, target: pd.Series, rng: np.random.Generator
     ) -> np.ndarray:
-        """Choose row positions for a resampled training set.
+        """Chooses row positions for a resampled training set.
 
         Args:
             target: Training labels.
@@ -153,7 +153,7 @@ class JitterOverSampler(IndexResampler):
     name = "jitter_oversample"
 
     def __init__(self, scale: float = 0.05) -> None:
-        """Initialize the sampler.
+        """Initializes the sampler.
 
         Args:
             scale: Noise level relative to each numeric column's std.
@@ -163,7 +163,7 @@ class JitterOverSampler(IndexResampler):
     def indices(
         self, target: pd.Series, rng: np.random.Generator
     ) -> np.ndarray:
-        """Choose source rows exactly like plain oversampling.
+        """Chooses source rows exactly like plain oversampling.
 
         Args:
             target: Training labels.
@@ -235,7 +235,7 @@ class PreprocessedResamplingClassifier(
         sampler: Any,
         estimator: base.BaseEstimator,
     ) -> None:
-        """Initialize the wrapper.
+        """Initializes the wrapper.
 
         Args:
             preprocessor: Preprocessing transformer.
@@ -308,7 +308,7 @@ class ResamplingClassifier(base.ClassifierMixin, base.BaseEstimator):
         resampler: Resampler,
         random_state: int = 0,
     ) -> None:
-        """Initialize the wrapper.
+        """Initializes the wrapper.
 
         Args:
             estimator: Classifier to fit on resampled data.
@@ -320,7 +320,7 @@ class ResamplingClassifier(base.ClassifierMixin, base.BaseEstimator):
         self.random_state = random_state
 
     def fit(self, features: Any, target: Any) -> Self:
-        """Rebalance the training data and fit the wrapped classifier.
+        """Rebalances the training data and fits the wrapped classifier.
 
         Args:
             features: Training features.
@@ -341,7 +341,7 @@ class ResamplingClassifier(base.ClassifierMixin, base.BaseEstimator):
         return self
 
     def predict(self, features: Any) -> np.ndarray:
-        """Predict with the fitted classifier (no resampling).
+        """Predicts with the fitted classifier (no resampling).
 
         Args:
             features: Rows to predict.
@@ -387,7 +387,7 @@ class DensityWeightedRegressor(base.RegressorMixin, base.BaseEstimator):
         bins: int = 10,
         max_weight: float = 10.0,
     ) -> None:
-        """Initialize the wrapper.
+        """Initializes the wrapper.
 
         Args:
             estimator: Pipeline to fit with sample weights.
@@ -433,7 +433,7 @@ class DensityWeightedRegressor(base.RegressorMixin, base.BaseEstimator):
         return self
 
     def predict(self, features: Any) -> np.ndarray:
-        """Predict with the fitted pipeline.
+        """Predicts with the fitted pipeline.
 
         Args:
             features: Rows to predict.

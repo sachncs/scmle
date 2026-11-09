@@ -182,7 +182,7 @@ class DatasetSource:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild a source and verify its declared identity.
+        """Rebuilds a source and verifies its declared identity.
 
         Args:
             record: A mapping as produced by ``to_dict``.  ``uri`` is required;
@@ -242,7 +242,7 @@ class DatasetField:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild a schema field from JSON evidence.
+        """Rebuilds a schema field from JSON evidence.
 
         Args:
             record: A mapping with ``name`` and ``data_type`` entries.
@@ -329,7 +329,7 @@ class MissingnessSummary:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild missingness evidence and recompute its fraction.
+        """Rebuilds missingness evidence and recomputes its fraction.
 
         Args:
             record: A mapping as produced by ``to_dict``.  A recorded
@@ -409,7 +409,7 @@ class DuplicateSummary:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild duplicate evidence.
+        """Rebuilds duplicate evidence.
 
         Args:
             record: A mapping as produced by ``to_dict``.
@@ -495,7 +495,7 @@ class LabelSummary:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild label evidence.
+        """Rebuilds label evidence.
 
         Args:
             record: A mapping as produced by ``to_dict``.  ``distribution`` is
@@ -675,7 +675,7 @@ class DatasetCatalog:
         limitations: Sequence[str] = (),
         release_blockers: Sequence[str] = (),
     ) -> Self:
-        """Observe common Python dataset forms without fitting a model.
+        """Observes common Python dataset forms without fitting a model.
 
         Supported forms include pandas frames and series, NumPy arrays,
         mappings of columns, sequences of records or values, scalars, and
@@ -780,7 +780,7 @@ class DatasetCatalog:
         return canonical_json(self.content_dict())
 
     def write(self, path: str | pathlib.Path) -> None:
-        """Persist the catalog atomically as verified JSON evidence.
+        """Persists the catalog atomically as verified JSON evidence.
 
         Args:
             path: Destination file.  The indented JSON, including
@@ -1083,7 +1083,7 @@ def schema_for_frame(frame: pd.DataFrame) -> tuple[DatasetField, ...]:
 
 
 def missingness_for_frame(frame: pd.DataFrame) -> MissingnessSummary:
-    """Measure missingness over a frame without imputing or modifying it.
+    """Measures missingness over a frame without imputing or modifying it.
 
     Args:
         frame: The frame to inspect.
@@ -1112,7 +1112,7 @@ def missingness_for_frame(frame: pd.DataFrame) -> MissingnessSummary:
 
 
 def duplicates_for_frame(frame: pd.DataFrame) -> DuplicateSummary:
-    """Measure duplicate rows and preserve unsupported cases as evidence.
+    """Measures duplicate rows and preserves unsupported cases as evidence.
 
     Args:
         frame: The frame to inspect.
@@ -1247,7 +1247,7 @@ def observe_data(
     label_column: str | None,
     supplied_identity: str | None,
 ) -> DataObservation:
-    """Observe a supported object and produce structured quality evidence.
+    """Observes a supported object and produces structured quality evidence.
 
     Args:
         data: The object to observe.

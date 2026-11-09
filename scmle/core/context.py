@@ -493,7 +493,7 @@ class RunContext:
     started_at: float = dataclasses.field(default_factory=time.monotonic)
 
     def __post_init__(self) -> None:
-        """Bind the captured facts to the registry used by planning."""
+        """Binds the captured facts to the registry used by planning."""
         if self.capability_observation is not None:
             self.capability_registry.bind_runtime_environment(
                 self.capability_observation.environment
@@ -524,7 +524,7 @@ class RunContext:
         return str(self.store.directory) if self.store else ""
 
     def close(self) -> None:
-        """Release resources owned by a prepared or executing context.
+        """Releases resources owned by a prepared or executing context.
 
         A preview still creates a locked test-set boundary during profiling.
         The context owns that boundary until the caller has opened it or the
@@ -557,7 +557,7 @@ class RunContext:
             self.store.write_text(relative, text)
 
     def persist_capability_observation(self) -> None:
-        """Persist the runtime facts immediately before capability planning."""
+        """Persists the runtime facts immediately before capability planning."""
         observation = require(
             self.capability_observation, "capability_observation"
         )

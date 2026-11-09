@@ -1111,7 +1111,7 @@ class StreamingLedger:
         )
 
     def write_atomically(self, state: StreamState) -> None:
-        """Publish state with durable temporary-file replacement.
+        """Publishes state with durable temporary-file replacement.
 
         Args:
             state: The state to persist.
@@ -1145,7 +1145,7 @@ class StreamingLedger:
     def write_pending_acknowledgement(
         self, acknowledgement: StreamAcknowledgement
     ) -> None:
-        """Persist an acknowledgement while the ledger lock is held.
+        """Persists an acknowledgement while the ledger lock is held.
 
         Args:
             acknowledgement: The acknowledgement to stage for delivery.
@@ -1224,7 +1224,7 @@ class StreamingLedger:
         return acknowledgement
 
     def clear_pending_acknowledgement(self) -> None:
-        """Remove a delivered acknowledgement and flush the directory.
+        """Removes a delivered acknowledgement and flushes the directory.
 
         Nothing happens if no acknowledgement is staged.
         """
@@ -1602,7 +1602,7 @@ class StreamingConsumer:
         self.acknowledge = acknowledge
 
     def deliver_pending_acknowledgement(self) -> str | None:
-        """Deliver and clear one staged acknowledgement after restart.
+        """Delivers and clears one staged acknowledgement after restart.
 
         Returns:
             The batch identity of the acknowledgement delivered, or None if
@@ -1786,7 +1786,7 @@ def source_for(uri: str | pathlib.Path) -> ChunkSource:
 
 
 def side_of(positions: np.ndarray, fraction: float, seed: int) -> np.ndarray:
-    """Assign each row position to development (0) or locked (1).
+    """Assigns each row position to development (0) or locked (1).
 
     Args:
         positions: Integer row positions (zero-based).

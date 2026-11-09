@@ -811,7 +811,7 @@ class EventStreamSource(IncrementalEventSource):
     def poll_events(
         self, checkpoint: EventCheckpoint, limit: int
     ) -> tuple[IncrementalEvent, ...]:
-        """Poll a bounded transport batch with retry evidence.
+        """Polls a bounded transport batch with retry evidence.
 
         The reader is called under the retry budget; if every attempt fails
         the retry helper's exhaustion error propagates.
@@ -853,7 +853,7 @@ class EventStreamSource(IncrementalEventSource):
         seen_event_ids: Iterable[str] = (),
         limit: int = 1_000,
     ) -> EventBatch:
-        """Poll and select one bounded event batch without acknowledging it.
+        """Polls and selects one bounded event batch without acknowledging it.
 
         Args:
             checkpoint: Last committed sequence and watermark.
@@ -1035,7 +1035,7 @@ class IncrementalIngestionLedger:
         return source.read_events(state.checkpoint, state.seen_event_ids, limit)
 
     def write_atomically(self, state: CommittedIncrementalState) -> None:
-        """Publish state with a durable temporary-file replacement.
+        """Publishes state with a durable temporary-file replacement.
 
         Callers that combine a read and write must hold ``lock``. This method
         remains public so transports can persist a prepared state explicitly.
@@ -1152,7 +1152,7 @@ class IncrementalIngestionLedger:
         return acknowledgement
 
     def clear_pending_acknowledgement(self) -> None:
-        """Remove a delivered acknowledgement and flush the directory entry.
+        """Removes a delivered acknowledgement and flushes the directory entry.
 
         Nothing is removed if no acknowledgement is staged.
         """
@@ -1383,7 +1383,7 @@ class EventConsumer:
         self.acknowledge = acknowledge
 
     def deliver_pending_acknowledgement(self) -> tuple[str, ...]:
-        """Deliver and clear a previously staged acknowledgement.
+        """Delivers and clears a previously staged acknowledgement.
 
         Returns:
             The event identities acknowledged, or an empty tuple if none was

@@ -88,7 +88,7 @@ class FeatureOp(abc.ABC):
         return {**self.defaults, **node.params}
 
     def fit(self, inputs: Inputs, params: Params) -> Any:
-        """Learn state from training data; the default is stateless.
+        """Learns state from training data; the default is stateless.
 
         Args:
             inputs: The input columns of the training fold.
@@ -114,7 +114,7 @@ class FeatureOp(abc.ABC):
 
 
 def numeric(series: pd.Series) -> pd.Series:
-    """Coerce to float; unparseable and infinite values become NaN.
+    """Coerces to float; unparseable and infinite values become NaN.
 
     Args:
         series: The column to convert.
@@ -169,7 +169,7 @@ class Square(FeatureOp):
     name = "square"
 
     def apply(self, inputs: Inputs, params: Params, state: Any) -> pd.Series:
-        """Square the input.
+        """Squares the input.
 
         Args:
             inputs: One column.
@@ -249,7 +249,7 @@ class Difference(FeatureOp):
     max_inputs = 2
 
     def apply(self, inputs: Inputs, params: Params, state: Any) -> pd.Series:
-        """Subtract the second input from the first.
+        """Subtracts the second input from the first.
 
         Args:
             inputs: Two columns.
@@ -270,7 +270,7 @@ class Product(FeatureOp):
     max_inputs = MAX_ARITY
 
     def apply(self, inputs: Inputs, params: Params, state: Any) -> pd.Series:
-        """Multiply the inputs.
+        """Multiplys the inputs.
 
         Args:
             inputs: Two or more columns.
@@ -294,7 +294,7 @@ class Ratio(FeatureOp):
     max_inputs = 2
 
     def apply(self, inputs: Inputs, params: Params, state: Any) -> pd.Series:
-        """Divide the first input by the second.
+        """Divides the first input by the second.
 
         Args:
             inputs: Two columns.
@@ -315,7 +315,7 @@ class Clip(FeatureOp):
     defaults = {"lower": 0.01, "upper": 0.99}
 
     def fit(self, inputs: Inputs, params: Params) -> Any:
-        """Learn the clipping bounds from training data.
+        """Learns the clipping bounds from training data.
 
         Args:
             inputs: One column.
@@ -332,7 +332,7 @@ class Clip(FeatureOp):
         return float(low), float(high)
 
     def apply(self, inputs: Inputs, params: Params, state: Any) -> pd.Series:
-        """Clip to the learned bounds.
+        """Clips to the learned bounds.
 
         Args:
             inputs: One column.
@@ -351,7 +351,7 @@ class Standardize(FeatureOp):
     name = "standardize"
 
     def fit(self, inputs: Inputs, params: Params) -> Any:
-        """Learn the mean and standard deviation from training data.
+        """Learns the mean and standard deviation from training data.
 
         Args:
             inputs: One column.
@@ -366,7 +366,7 @@ class Standardize(FeatureOp):
         return (float(values.mean()) if len(values) else 0.0, spread or 1.0)
 
     def apply(self, inputs: Inputs, params: Params, state: Any) -> pd.Series:
-        """Standardize with the learned statistics.
+        """Standardizes with the learned statistics.
 
         Args:
             inputs: One column.
@@ -386,7 +386,7 @@ class Bin(FeatureOp):
     defaults = {"bins": 5}
 
     def fit(self, inputs: Inputs, params: Params) -> Any:
-        """Learn the interior quantile edges from training data.
+        """Learns the interior quantile edges from training data.
 
         Args:
             inputs: One column.
@@ -546,7 +546,7 @@ class Lag(OrderedOp):
             raise errors.ConfigError(f"node '{node.name}': lag k must be >= 1")
 
     def compute(self, grouped: Any, params: Params) -> pd.Series:
-        """Shift the values forward in time.
+        """Shifts the values forward in time.
 
         Args:
             grouped: The values, sorted by time and grouped by entity.
@@ -699,7 +699,7 @@ class ExpandingMean(OrderedOp):
         return grouped.transform(lambda s: s.expanding().mean())
 
     def lookback(self, params: Params) -> int | None:
-        """Report that every earlier row contributes.
+        """Reports that every earlier row contributes.
 
         Args:
             params: Unused.
@@ -736,7 +736,7 @@ OPS: dict[str, FeatureOp] = {
 
 
 def get_op(name: str) -> FeatureOp:
-    """Look up a registered operation.
+    """Looks up a registered operation.
 
     Args:
         name: The operation name, as used in `FeatureNode.op`.
@@ -757,7 +757,7 @@ def get_op(name: str) -> FeatureOp:
 def split_nodes(
     spec: tasks.FeatureGraphSpec,
 ) -> tuple[list[tasks.FeatureNode], list[tasks.FeatureNode]]:
-    """Separate ordered (series) nodes from row-wise nodes.
+    """Separates ordered (series) nodes from row-wise nodes.
 
     Args:
         spec: The graph.
@@ -826,7 +826,7 @@ def validate_graph(
 def required_raw_inputs(
     nodes: list[tasks.FeatureNode], derived: set[str]
 ) -> list[str]:
-    """List the raw columns that `nodes` read.
+    """Lists the raw columns that `nodes` read.
 
     Args:
         nodes: The nodes to inspect.
@@ -949,7 +949,7 @@ class SeriesFeatureBuilder:
         return ordered[(rank_from_end < rows).to_numpy()].reset_index(drop=True)
 
     def apply(self, frame: pd.DataFrame) -> pd.DataFrame:
-        """Append the ordered features to a frame.
+        """Appends the ordered features to a frame.
 
         Args:
             frame: The rows to extend.
@@ -968,7 +968,7 @@ class SeriesFeatureBuilder:
         return self.compute_with_history(frame)
 
     def compute_with_history(self, frame: pd.DataFrame) -> pd.DataFrame:
-        """Append the features, adding stored history before the batch.
+        """Appends the features, adding stored history before the batch.
 
         Only history strictly earlier than an entity's first row in `frame`
         is used, so the batch's own rows always win on overlap.
@@ -1012,7 +1012,7 @@ class SeriesFeatureBuilder:
         return result
 
     def compute(self, frame: pd.DataFrame) -> pd.DataFrame:
-        """Append the features using only the rows of `frame`.
+        """Appends the features using only the rows of `frame`.
 
         Args:
             frame: The rows to extend.
@@ -1079,7 +1079,7 @@ class FeatureGraphTransformer(base.TransformerMixin, base.BaseEstimator):
         self.nodes = nodes
 
     def fit(self, features: Any, target: Any = None) -> Self:
-        """Learn operation state by evaluating the graph on training data.
+        """Learns operation state by evaluating the graph on training data.
 
         Args:
             features: The training rows, convertible to a data frame.
@@ -1099,7 +1099,7 @@ class FeatureGraphTransformer(base.TransformerMixin, base.BaseEstimator):
         return self
 
     def transform(self, features: Any) -> pd.DataFrame:
-        """Append the derived columns using the learned state.
+        """Appends the derived columns using the learned state.
 
         Args:
             features: The rows, convertible to a data frame.

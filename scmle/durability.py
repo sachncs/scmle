@@ -55,7 +55,7 @@ def append_text(path: str | pathlib.Path, text: str) -> None:
 
 
 def sync_file(path: str | pathlib.Path) -> None:
-    """Flush an existing file's contents to stable storage.
+    """Flushes an existing file's contents to stable storage.
 
     The file is opened for update because Windows rejects ``fsync`` on a
     read-only descriptor (``EBADF``) while POSIX accepts it.

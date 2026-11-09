@@ -507,7 +507,7 @@ class LongitudinalEstimationResult:
     def from_dict(
         cls, record: Mapping[str, Any]
     ) -> "LongitudinalEstimationResult":
-        """Rebuild a result from its JSON-compatible representation.
+        """Rebuilds a result from its JSON-compatible representation.
 
         Args:
             record: Mapping in the form produced by `to_dict`.
@@ -830,7 +830,7 @@ def prepare_longitudinal_frame(
     estimand: LongitudinalEstimand,
     policy: LongitudinalEstimationPolicy,
 ) -> tuple[pd.DataFrame, int]:
-    """Validate and numerically prepare a long-format input frame.
+    """Validates and numerically prepare a long-format input frame.
 
     Args:
         frame: Long-format panel to check.

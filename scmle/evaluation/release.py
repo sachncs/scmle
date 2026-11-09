@@ -591,7 +591,7 @@ def explanation_quality_value(report: Any, field_name: str) -> float | None:
 def apply_reliability_gate(
     outcome: ReleaseEvaluation, reliability_plan: Any
 ) -> ReleaseEvaluation:
-    """Block release until the persisted fault plan has verified evidence.
+    """Blocks release until the persisted fault plan has verified evidence.
 
     A model may satisfy its statistical success criteria while still being
     unsafe to release. The fault-injection plan is therefore an independent
@@ -656,7 +656,7 @@ def apply_attestation_gate(
     attestation_record: Any,
     verified: bool | None = None,
 ) -> ReleaseEvaluation:
-    """Block release until packaged evidence has a valid signed attestation.
+    """Blocks release until packaged evidence has a valid signed attestation.
 
     Args:
         outcome: The evaluation to extend.
@@ -729,7 +729,7 @@ def apply_evidence_index_gate(
     index: evidence.EvidenceIndex | None,
     verified: bool,
 ) -> ReleaseEvaluation:
-    """Block release until the persisted evidence index is signed.
+    """Blocks release until the persisted evidence index is signed.
 
     Args:
         outcome: The evaluation to extend.

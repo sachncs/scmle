@@ -79,7 +79,7 @@ class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):
         target: Any = None,
         sample_weight: Any = None,
     ) -> "JepaEstimator":
-        """Learn a representation without using a target label.
+        """Learns a representation without using a target label.
 
         Pipeline.fit forwards the supervised target to every intermediate
         transformer. JEPA must not consume that target, so this method
@@ -133,7 +133,7 @@ class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):
         return explanation
 
     def explain(self, features: Any) -> contracts.FeatureExplanation:
-        """Explain local sensitivity of the learned embedding.
+        """Explains local sensitivity of the learned embedding.
 
         Args:
             features: Numeric matrix with the width seen at fit.

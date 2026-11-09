@@ -16,7 +16,7 @@ DEFAULT_DIRECTORY = Path("deploy/local/golden")
 
 
 def build(directory: Path) -> str:
-    """Return the expected-output document for the files in `directory`.
+    """Returns the expected-output document for the files in `directory`.
 
     Args:
         directory: Folder with the model spec and the records.
@@ -35,7 +35,7 @@ def build(directory: Path) -> str:
 
 
 def main(arguments: list[str] | None = None) -> int:
-    """Write the file, or with --check fail when it is stale.
+    """Writes the file, or with --check fail when it is stale.
 
     Args:
         arguments: Command-line arguments; `None` reads `sys.argv`.

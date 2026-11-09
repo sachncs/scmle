@@ -215,7 +215,7 @@ class Incident:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> "Incident":
-        """Rebuild an incident from a journal snapshot.
+        """Rebuilds an incident from a journal snapshot.
 
         Args:
             record: A dict produced by `to_dict`.
@@ -269,7 +269,7 @@ class IncidentWorkflow:
     """
 
     def __init__(self, path: str | pathlib.Path) -> None:
-        """Initialize a workflow backed by a JSONL event journal.
+        """Initializes a workflow backed by a JSONL event journal.
 
         Transitions are serialized per journal file within this process.
 
@@ -529,7 +529,7 @@ class IncidentWorkflow:
 
     @serialized
     def append_event(self, event_type: str, incident: Incident) -> None:
-        """Append one chained state snapshot durably.
+        """Appends one chained state snapshot durably.
 
         Args:
             event_type: `opened`, `acknowledged` or `resolved`.
@@ -555,7 +555,7 @@ class IncidentWorkflow:
 
 
 def os_fsync(handle: Any) -> None:
-    """Flush a journal file descriptor without exposing platform details.
+    """Flushes a journal file descriptor without exposing platform details.
 
     Args:
         handle: An open file object.

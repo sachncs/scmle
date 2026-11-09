@@ -29,7 +29,7 @@ NAN = float("nan")
 
 
 def is_missing(value: Any) -> bool:
-    """Return True for None or NaN cells.
+    """Returns True for None or NaN cells.
 
     Args:
         value: The cell value.
@@ -47,7 +47,7 @@ def is_missing(value: Any) -> bool:
 
 
 def records(frame: pd.DataFrame) -> list[Mapping[str, Any]]:
-    """Return the frame rows as dicts keyed by column name.
+    """Returns the frame rows as dicts keyed by column name.
 
     Args:
         frame: The table.
@@ -67,7 +67,7 @@ def known_time(
     known_col: str | None,
     delta_rec_days: float,
 ) -> float:
-    """Return when a row became known.
+    """Returns when a row became known.
 
     Args:
         row: The table row.
@@ -97,7 +97,7 @@ def scope_rows(
     cutoff: float,
     window_days: float | None,
 ) -> list[Mapping[str, Any]]:
-    """Return visible, in-window rows in original order.
+    """Returns visible, in-window rows in original order.
 
     Args:
         rows: Table rows.
@@ -136,7 +136,7 @@ def primitive(
     delta_rec_days: float,
     cutoff: float,
 ) -> float:
-    """Apply a primitive to rows already in scope.
+    """Applies a primitive to rows already in scope.
 
     Args:
         name: One of ``PRIMITIVES``.
@@ -257,7 +257,7 @@ def aggregate_feature(
     lag_days: float,
     delta_rec_days: float,
 ) -> list[float]:
-    """Compute one aggregate feature per target row, in order.
+    """Computes one aggregate feature per target row, in order.
 
     Args:
         targets: Target frame.

@@ -62,7 +62,7 @@ PAGES_ROUTES = (
 
 
 def read_text(path: Path) -> str:
-    """Read one UTF-8 control file with a useful error.
+    """Reads one UTF-8 control file with a useful error.
 
     Args:
         path: The file.
@@ -80,7 +80,7 @@ def read_text(path: Path) -> str:
 
 
 def action_references(content: str) -> list[dict[str, str]]:
-    """Return every GitHub Action reference in a workflow.
+    """Returns every GitHub Action reference in a workflow.
 
     Args:
         content: The workflow text.
@@ -117,7 +117,7 @@ def action_references(content: str) -> list[dict[str, str]]:
 
 
 def workflow_failures(root: Path) -> list[str]:
-    """Return static workflow-control failures for a repository root.
+    """Returns static workflow-control failures for a repository root.
 
     Checks that each expected workflow exists, every action is pinned to a
     40-character commit, `pull_request_target` and long-lived cloud
@@ -228,7 +228,7 @@ def workflow_failures(root: Path) -> list[str]:
 
 
 def workflow_evidence(root: Path) -> dict[str, Any]:
-    """Build deterministic evidence for the static hosted-control check.
+    """Builds deterministic evidence for the static hosted-control check.
 
     Args:
         root: The repository root.
@@ -317,7 +317,7 @@ def public_page_evidence(
 
 
 def parse_arguments(arguments: list[str] | None = None) -> argparse.Namespace:
-    """Parse the hosted-control verifier arguments.
+    """Parses the hosted-control verifier arguments.
 
     Args:
         arguments: Command-line arguments; `None` reads `sys.argv`.
@@ -337,7 +337,7 @@ def parse_arguments(arguments: list[str] | None = None) -> argparse.Namespace:
 
 
 def main(arguments: list[str] | None = None) -> int:
-    """Run static checks and, optionally, the unauthenticated Pages probe.
+    """Runs static checks and, optionally, the unauthenticated Pages probe.
 
     Prints the evidence and writes it to `--output` when given.
 

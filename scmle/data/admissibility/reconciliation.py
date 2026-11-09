@@ -95,7 +95,7 @@ class Explanation:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild the record, rejecting unknown or missing fields.
+        """Rebuilds the record, rejecting unknown or missing fields.
 
         Args:
             record: A mapping in the form `to_dict` returns.

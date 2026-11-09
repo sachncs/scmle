@@ -516,7 +516,7 @@ class SigningKeyRegistry:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuild and validate a registry from JSON-native metadata.
+        """Rebuilds and validates a registry from JSON-native metadata.
 
         Args:
             record: A mapping with `schema_version` 1 and a list of `keys`.

@@ -22,7 +22,7 @@ from urllib.request import urlopen
 
 
 def artifact_records(directory: Path) -> list[dict[str, Any]]:
-    """Return deterministic digests for the wheel and source archives.
+    """Returns deterministic digests for the wheel and source archives.
 
     Args:
         directory: Folder holding the built artifacts.
@@ -52,7 +52,7 @@ def artifact_records(directory: Path) -> list[dict[str, Any]]:
 
 
 def request_bytes(url: str, timeout: float = 30.0) -> bytes:
-    """Fetch a public release response without credentials.
+    """Fetches a public release response without credentials.
 
     Args:
         url: The URL to fetch.
@@ -73,7 +73,7 @@ def request_bytes(url: str, timeout: float = 30.0) -> bytes:
 
 
 def request_json(url: str, timeout: float = 30.0) -> dict[str, Any]:
-    """Fetch and decode one public JSON response.
+    """Fetches and decode one public JSON response.
 
     Args:
         url: The URL to fetch.
@@ -252,7 +252,7 @@ def verify_external_release(
 
 
 def parse_arguments(arguments: list[str] | None = None) -> argparse.Namespace:
-    """Parse public release verification arguments.
+    """Parses public release verification arguments.
 
     Args:
         arguments: Command-line arguments; `None` reads `sys.argv`.

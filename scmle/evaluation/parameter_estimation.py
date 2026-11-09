@@ -784,7 +784,7 @@ class EstimationResult:
 
     @classmethod
     def read(cls, path: str | Path) -> "EstimationResult":
-        """Reads a report and reject a modified or malformed envelope.
+        """Reads a report and rejects a modified or malformed envelope.
 
         Args:
             path: File written by `write`.
@@ -816,7 +816,7 @@ class EstimationResult:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> "EstimationResult":
-        """Rebuild a result from its JSON-compatible report.
+        """Rebuilds a result from its JSON-compatible report.
 
         Args:
             record: Dictionary in the form produced by `to_dict`.
@@ -1484,7 +1484,7 @@ def validate_clusters(
 def validate_covariance(
     covariance: np.ndarray, dimension: int
 ) -> dict[str, Any]:
-    """Validates covariance shape and report rank and numerical conditioning.
+    """Validates covariance shape and reports rank and numerical conditioning.
 
     Args:
         covariance: Coefficient covariance matrix.
@@ -1824,7 +1824,7 @@ def reference_continuous_ipw_effect(
     coefficients: np.ndarray,
     clusters: np.ndarray | None,
 ) -> dict[str, Any]:
-    """Recompute the GPS-weighted dose-response with dense linear algebra.
+    """Recomputes the GPS-weighted dose-response with dense linear algebra.
 
     This reference intentionally uses a separate least-squares and normal
     equation calculation from :func:`fit_continuous_ipw_effect`. It verifies
@@ -2343,7 +2343,7 @@ def fit_aipw_nuisance_models(
 
 
 def deterministic_fold_assignments(rows: int, fold_count: int) -> np.ndarray:
-    """Assign rows to balanced folds using a deterministic row-order rule.
+    """Assigns rows to balanced folds using a deterministic row-order rule.
 
     Args:
         rows: Number of rows.
@@ -3890,7 +3890,7 @@ def reference_ipw_ate(
     policy: EstimationPolicy,
     clusters: np.ndarray | None,
 ) -> dict[str, Any]:
-    """Recompute IPW propensities with an independent BFGS calculation.
+    """Recomputes IPW propensities with an independent BFGS calculation.
 
     Args:
         propensity_design: Design matrix of the propensity model.
@@ -3972,7 +3972,7 @@ def reference_aipw_ate(
     policy: EstimationPolicy,
     clusters: np.ndarray | None,
 ) -> dict[str, Any]:
-    """Recompute the augmented IPW score with an independent reference.
+    """Recomputes the augmented IPW score with an independent reference.
 
     Args:
         inputs: Arrays from the primary fit: the nuisance design, the

@@ -36,7 +36,7 @@ class SyntheticGenerator(abc.ABC):
 
     @abc.abstractmethod
     def fit(self, features: pd.DataFrame) -> Self:
-        """Learn the distribution from real rows (training data only).
+        """Learns the distribution from real rows (training data only).
 
         Args:
             features: The real rows.

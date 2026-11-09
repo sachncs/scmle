@@ -14,7 +14,7 @@ DEFAULT_MANIFEST = Path(__file__).with_name("pytest_skip_manifest.json")
 def load_skip_rules(
     path: Path = DEFAULT_MANIFEST,
 ) -> tuple[tuple[str, re.Pattern[str]], ...]:
-    """Load the approved skip taxonomy from the checked-in manifest.
+    """Loads the approved skip taxonomy from the checked-in manifest.
 
     Args:
         path: The manifest JSON file.
@@ -52,7 +52,7 @@ def load_skip_rules(
 def classify_reason(
     reason: str, rules: tuple[tuple[str, re.Pattern[str]], ...]
 ) -> str | None:
-    """Return the approved category for a reason, if one is registered.
+    """Returns the approved category for a reason, if one is registered.
 
     Args:
         reason: The skip reason text.
@@ -69,7 +69,7 @@ def classify_reason(
 
 
 def parse_skips(path: Path) -> tuple[tuple[str, str], ...]:
-    """Return stable test identifiers and reasons from a JUnit report.
+    """Returns stable test identifiers and reasons from a JUnit report.
 
     Args:
         path: The JUnit XML report.
@@ -94,7 +94,7 @@ def parse_skips(path: Path) -> tuple[tuple[str, str], ...]:
 
 
 def parse_xfails(path: Path) -> tuple[tuple[str, str], ...]:
-    """Return test identifiers and reasons for xfail or xpass outcomes.
+    """Returns test identifiers and reasons for xfail or xpass outcomes.
 
     Args:
         path: The JUnit XML report.
@@ -123,7 +123,7 @@ def parse_xfails(path: Path) -> tuple[tuple[str, str], ...]:
 
 
 def parse_arguments(arguments: list[str] | None = None) -> argparse.Namespace:
-    """Parse the JUnit report path.
+    """Parses the JUnit report path.
 
     Args:
         arguments: Command-line arguments; `None` reads `sys.argv`.
@@ -143,7 +143,7 @@ def parse_arguments(arguments: list[str] | None = None) -> argparse.Namespace:
 
 
 def main(arguments: list[str] | None = None) -> int:
-    """Return zero only when skips are approved and no xfail is collected.
+    """Returns zero only when skips are approved and no xfail is collected.
 
     Prints a JSON summary of the skips, categories and xfails.
 

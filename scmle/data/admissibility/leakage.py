@@ -354,7 +354,7 @@ def binary_auc(truth: np.ndarray, score: np.ndarray) -> float:
 
 
 def skill_of(pred: np.ndarray, y: np.ndarray, task: str) -> float:
-    """Measure the skill of out-of-fold predictions: AUC or R^2.
+    """Measures the skill of out-of-fold predictions: AUC or R^2.
 
     Args:
         pred: Output of `out_of_fold`.
@@ -554,7 +554,7 @@ class SkillTest:
 def decision_for(
     suspect: bool, low_power: bool, gate: certificates.GateStatus
 ) -> qualification.Decision:
-    """Choose the decision of a leakage test, demoted when not certified.
+    """Chooses the decision of a leakage test, demoted when not certified.
 
     Args:
         suspect: Whether the test called the feature a suspect.

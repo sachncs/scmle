@@ -204,7 +204,7 @@ def apply(
     scope: str,
     today: str,
 ) -> Applied:
-    """Separate the attestations that count from those that do not.
+    """Separates the attestations that count from those that do not.
 
     Args:
         attestations: Everything the run was given.

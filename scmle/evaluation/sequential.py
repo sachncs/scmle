@@ -625,7 +625,7 @@ class SequentialEstimationResult:
     def from_dict(
         cls, record: Mapping[str, Any]
     ) -> "SequentialEstimationResult":
-        """Rebuild a result from its JSON-compatible representation.
+        """Rebuilds a result from its JSON-compatible representation.
 
         Args:
             record: Mapping in the form produced by `to_dict`.

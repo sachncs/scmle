@@ -58,7 +58,7 @@ class DataStrategy(abc.ABC):
         task: tasks.TaskType,
         adapter: models.ModelAdapter,
     ) -> str | None:
-        """Explain why the strategy does not apply, if it does not.
+        """Explains why the strategy does not apply, if it does not.
 
         Args:
             profile: Dataset profile.
@@ -990,7 +990,7 @@ DEFAULT_NAMES = tuple(n for n in EXPERIMENTAL if n not in OPT_IN)
 
 
 def get_strategy(name: str) -> DataStrategy:
-    """Look up a registered data strategy.
+    """Looks up a registered data strategy.
 
     Args:
         name: The strategy name, as recorded on trials.

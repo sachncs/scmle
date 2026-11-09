@@ -18,7 +18,7 @@ DEFAULT_DIRECTORY = Path("deploy/local/golden")
 
 
 def run(url: str, directory: Path, level: str, timeout: float) -> dict:
-    """Return the parity report for the service at `url`.
+    """Returns the parity report for the service at `url`.
 
     Args:
         url: Base URL of the running service.
@@ -34,7 +34,7 @@ def run(url: str, directory: Path, level: str, timeout: float) -> dict:
 
 
 def main(arguments: list[str] | None = None) -> int:
-    """Run the check; print the report as JSON.
+    """Runs the check; print the report as JSON.
 
     Args:
         arguments: Command-line arguments; `None` reads `sys.argv`.

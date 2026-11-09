@@ -41,7 +41,7 @@ STRICT_PYTEST_ARGUMENTS = ("-W", "error::ResourceWarning")
 
 
 def parse_date(value: str) -> datetime.date:
-    """Parse an ISO-8601 quarantine expiry date.
+    """Parses an ISO-8601 quarantine expiry date.
 
     Args:
         value: The date text, such as `2026-12-31`.
@@ -144,7 +144,7 @@ class StabilityRun:
     tests: dict[str, TestStatus]
 
     def __post_init__(self) -> None:
-        """Validate attempt identity and normalize status values.
+        """Validates attempt identity and normalize status values.
 
         Raises:
             ValueError: If the attempt number is below 1 or there are no test
@@ -163,7 +163,7 @@ class StabilityRun:
         object.__setattr__(self, "tests", normalized)
 
     def to_dict(self) -> dict[str, Any]:
-        """Return JSON-native run evidence.
+        """Returns JSON-native run evidence.
 
         Returns:
             The attempt, the return code and the status of each test, sorted by
@@ -239,7 +239,7 @@ class StabilityPolicy:
     """
 
     def __init__(self, entries: Mapping[str, QuarantineEntry]) -> None:
-        """Create a policy from a normalized test-id mapping.
+        """Creates a policy from a normalized test-id mapping.
 
         Args:
             entries: Quarantine entries by test identifier.
@@ -247,7 +247,7 @@ class StabilityPolicy:
         self.entries = dict(entries)
 
     def evaluate(self, runs: Sequence[StabilityRun]) -> StabilityReport:
-        """Return a fail-closed decision for repeated test results.
+        """Returns a fail-closed decision for repeated test results.
 
         Args:
             runs: The attempts, at least two.
@@ -315,7 +315,7 @@ class StabilityPolicy:
 
 
 def load_policy(path: Path) -> StabilityPolicy:
-    """Load and validate a quarantine policy file.
+    """Loads and validates a quarantine policy file.
 
     Args:
         path: The policy JSON file.
@@ -341,7 +341,7 @@ def load_policy(path: Path) -> StabilityPolicy:
 
 
 def parse_junit(path: Path) -> dict[str, TestStatus]:
-    """Parse pytest JUnit XML into stable test identifiers and statuses.
+    """Parses pytest JUnit XML into stable test identifiers and statuses.
 
     Args:
         path: The JUnit XML report.
@@ -379,7 +379,7 @@ def parse_junit(path: Path) -> dict[str, TestStatus]:
 def run_pytest(
     arguments: Sequence[str], attempt: int, directory: Path
 ) -> StabilityRun:
-    """Run pytest once and parse its durable JUnit result.
+    """Runs pytest once and parses its durable JUnit result.
 
     Args:
         arguments: Pytest arguments (test paths and options).
@@ -421,7 +421,7 @@ def run_pytest(
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Run the stability policy command.
+    """Runs the stability policy command.
 
     Prints and writes the JSON report.
 

@@ -366,7 +366,7 @@ class JepaEngine:
         return state
 
     def __setstate__(self, state: dict[str, Any]) -> None:
-        """Rebuild the PyTorch network from serialized arrays.
+        """Rebuilds the PyTorch network from serialized arrays.
 
         Args:
             state: Mapping produced by `__getstate__`.

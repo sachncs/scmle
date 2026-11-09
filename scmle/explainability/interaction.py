@@ -99,7 +99,7 @@ class PairwiseInteraction(diagnostics.Diagnostic):
                 break
 
         def sort_key(item: dict[str, object]) -> tuple[float, tuple[str, ...]]:
-            """Order interaction terms by strength and feature names.
+            """Orders interaction terms by strength and feature names.
 
             Args:
                 item: One interaction term with its feature pair and mean

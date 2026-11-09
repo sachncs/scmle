@@ -241,7 +241,7 @@ def is_discrete(series: pd.Series) -> bool:
 def run_test(
     frame: pd.DataFrame, x: str, y: str, given: Sequence[str]
 ) -> CITest:
-    """Choose Fisher's z for numeric data and chi-square for categories.
+    """Chooses Fisher's z for numeric data and chi-square for categories.
 
     Args:
         frame: Data holding the named columns.
@@ -275,7 +275,7 @@ def run_test(
 def implied_statements(
     graph: dag_module.Dag,
 ) -> tuple[list[Statement], list[str]]:
-    """List the local Markov statements of the observed part of a graph.
+    """Lists the local Markov statements of the observed part of a graph.
 
     Args:
         graph: The DAG hypothesis.

@@ -188,7 +188,7 @@ class AlertSink(abc.ABC):
 
     @abc.abstractmethod
     def deliver(self, alert: Alert) -> AlertDelivery:
-        """Deliver an alert and return a bounded outcome.
+        """Delivers an alert and returns a bounded outcome.
 
         Args:
             alert: The alert.
@@ -206,7 +206,7 @@ class JsonlAlertSink(AlertSink):
     """
 
     def __init__(self, path: str | Path) -> None:
-        """Bind a local alert journal.
+        """Binds a local alert journal.
 
         Args:
             path: The journal file; its directory is created on delivery.
@@ -214,7 +214,7 @@ class JsonlAlertSink(AlertSink):
         self.path = Path(path)
 
     def deliver(self, alert: Alert) -> AlertDelivery:
-        """Append one alert record and flush it durably.
+        """Appends one alert record and flushes it durably.
 
         Args:
             alert: The alert.
