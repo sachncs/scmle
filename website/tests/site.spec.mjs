@@ -24,7 +24,6 @@ const routes = [
   "./docs/rehearsal/",
   "./docs/observability/",
   "./docs/trail/",
-  "./docs/open-items/",
   "./docs/leakage/",
   "./docs/breadth/",
   "./docs/start-here/",

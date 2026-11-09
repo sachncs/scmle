@@ -1,8 +1,7 @@
 """The tier of a causal claim as a pure function of its reports (F10).
 
 The three tiers keep the canon's meaning (P4) and read as follows for a
-causal claim (`plan/00-canon.md`, "Tier readings added for the new
-features"):
+causal claim:
 
 * `confirmed` needs all five conditions: (1) the estimate and interval were
   computed on `C`, opened once; (2) every design diagnostic of the strategy

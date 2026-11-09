@@ -91,6 +91,6 @@ Without an envelope the retrain hook trains nothing and escalates
   checked when it was written. A process with write access to the ledger file
   can still write rows; this is code around the entry points of the package,
   not a sandbox.
-* **Not built yet** (see `plan/2-autonomous-operation.md`): alarm-gated
+* **Not built yet:** alarm-gated
   retraining, shadow, canary and rollback as envelope actions, a per-day cap
   and a workflow-engine hook, and a run in staging.

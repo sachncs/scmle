@@ -187,8 +187,8 @@ def question_hash(question: Mapping[str, Any]) -> str:
 class Attestation:
     """A person's signed reply to one escalation.
 
-    The fields follow the domain-owner sign-off of
-    ``plan/validation-referents.md`` (section 5). The signature covers every
+    The fields are a domain owner's sign-off: who, in what role, on
+    what date, for what scope. The signature covers every
     other field, so a reply cannot be moved to another question, scope or
     date. HMAC is symmetric: whoever can verify can also sign, so the verifier
     must keep the key where the system cannot read it (canon P6); the ledger

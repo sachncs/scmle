@@ -20,8 +20,7 @@ SCMLE cannot know:
 The tool's job is to make your choices explicit and to stop you when the data
 disagrees with them. The choices are yours. See [Decisions](DECISIONS.md).
 
-[`product/README.md`](../product/README.md) says it directly: it is not a
-replacement for a data scientist today. Its measured evidence is its own
+It is not a replacement for a data scientist today. Its measured evidence is its own
 benchmarks, which are not a head-to-head with people.
 
 ## Statistics: what is guaranteed and what is not

@@ -11,9 +11,9 @@ known. The tier follows canon P4 and the F4 feature file:
   third party could check, and the attestation has not expired;
 * `unverified` otherwise, including every field whose as-of rule is unknown.
 
-An attestation here is a record with a name and checkable evidence (see
-`plan/validation-referents.md`, section 5). Its cryptographic signature is not
-verified by this module.
+An attestation here is a record with a name and checkable evidence (who
+attested, in what role, on what date and for what scope). Its cryptographic
+signature is not verified by this module.
 """
 
 from collections.abc import Mapping
