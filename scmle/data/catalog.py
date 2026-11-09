@@ -5,6 +5,7 @@ stops at data understanding: it does not infer a task, select a model, or
 claim that an arbitrary modality is supported for training.
 """
 
+from collections.abc import Iterable
 from collections.abc import Mapping
 from collections.abc import Sequence
 import dataclasses
@@ -226,9 +227,11 @@ class Field:
             ValueError: If ``name`` or ``data_type`` is not a string or is
                 empty after stripping whitespace.
         """
-        if not isinstance(self.name, str) or not self.name.strip():
+        name: object = self.name
+        data_type: object = self.data_type
+        if not isinstance(name, str) or not name.strip():
             raise ValueError("field name must not be empty")
-        if not isinstance(self.data_type, str) or not self.data_type.strip():
+        if not isinstance(data_type, str) or not data_type.strip():
             raise ValueError("field data_type must not be empty")
         object.__setattr__(self, "name", self.name.strip())
         object.__setattr__(self, "data_type", self.data_type.strip())
@@ -288,13 +291,14 @@ class MissingnessSummary:
                 raise ValueError(f"{field_name} must not be negative")
         if self.missing_values > self.total_values:
             raise ValueError("missing_values cannot exceed total_values")
+        by_field_items: Iterable[tuple[object, object]] = self.by_field.items()
         if any(
             not isinstance(name, str)
             or not name.strip()
             or isinstance(count, bool)
             or not isinstance(count, int)
             or count < 0
-            for name, count in self.by_field.items()
+            for name, count in by_field_items
         ):
             raise ValueError("by_field must contain non-negative named counts")
         object.__setattr__(
@@ -464,13 +468,16 @@ class LabelSummary:
                 raise ValueError(f"{field_name} must not be negative")
         if self.distinct_count > self.observed_count:
             raise ValueError("distinct_count cannot exceed observed_count")
+        distribution_items: Iterable[tuple[object, object]] = (
+            self.distribution.items()
+        )
         if any(
             not isinstance(key, str)
             or not key
             or isinstance(value, bool)
             or not isinstance(value, int)
             or value < 0
-            for key, value in self.distribution.items()
+            for key, value in distribution_items
         ):
             raise ValueError("distribution must contain non-negative counts")
         if sum(self.distribution.values()) != self.observed_count:
@@ -620,14 +627,16 @@ class Catalog:
         """
         if not isinstance(self.source, Source):
             raise TypeError("source must be Source")
-        if not isinstance(self.data_kind, str) or not self.data_kind.strip():
+        data_kind: object = self.data_kind
+        if not isinstance(data_kind, str) or not data_kind.strip():
             raise ValueError("data_kind must not be empty")
         check_counts(self.sample_count, self.schema_version)
+        dimensions: Iterable[object] = self.shape
         if any(
             isinstance(dimension, bool)
             or not isinstance(dimension, int)
             or dimension < 0
-            for dimension in self.shape
+            for dimension in dimensions
         ):
             raise ValueError("shape must contain non-negative integers")
         fields = tuple(self.schema)
@@ -1141,7 +1150,11 @@ def canonical_value(value: Any) -> Any:
 
 
 def canonical_collection(
-    value: Mapping[Any, Any] | list[Any] | tuple[Any, ...] | set[Any],
+    value: Mapping[Any, Any]
+    | list[Any]
+    | tuple[Any, ...]
+    | set[Any]
+    | frozenset[Any],
 ) -> Any:
     """Converts a mapping, sequence or set into JSON-native content.
 
