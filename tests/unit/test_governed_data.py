@@ -493,3 +493,12 @@ def test_the_frame_dtype_kinds_are_reader_independent():
         "c": "string",
         "d": "bool",
     }
+
+
+def test_a_connector_reader_reads_the_object_a_store_uri_names(store):
+    store.put("data/a.csv", b"x,y\n1,2\n")
+    read = snapshot.connector_reader(store)
+
+    assert read(store.uri("data/a.csv")) == b"x,y\n1,2\n"
+    with pytest.raises(objectstore.NotFoundError):
+        read(store.uri("data/missing.csv"))

@@ -41,15 +41,6 @@ def test_polars_frames_and_lazyframes_are_accepted(binary_frame, tmp_path):
     assert len(result.predict(features)) == len(binary_frame)
 
 
-def test_results_export_to_arrow(binary_frame, tmp_path):
-    result = run(binary_frame, tmp_path)
-    table = interchange.to_arrow(result.leaderboard())
-    assert isinstance(table, pyarrow.Table) and table.num_rows == len(
-        result.trials
-    )
-    assert "score_mean" in table.column_names
-
-
 def test_feather_files_are_read_and_scored(binary_frame, tmp_path):
     path = tmp_path / "d.feather"
     binary_frame.to_feather(path)

@@ -61,15 +61,3 @@ def to_pandas(data: Any) -> pandas.DataFrame:
     if isinstance(data, (str, pathlib.Path)):
         raise errors.DataError("paths are read with the dataset loader")
     raise errors.DataError(f"unsupported table type {type(data).__name__}")
-
-
-def to_arrow(frame: pandas.DataFrame) -> pyarrow.Table:
-    """Exports a frame as an Arrow table (zero-copy where possible).
-
-    Args:
-        frame: The pandas DataFrame to export.
-
-    Returns:
-        An Arrow table with the frame's columns; the index is not included.
-    """
-    return pyarrow.Table.from_pandas(frame, preserve_index=False)

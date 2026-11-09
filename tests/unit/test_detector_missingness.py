@@ -346,7 +346,7 @@ def test_fold_imputer_state_ignores_held_out_rows(strategy):
         )
 
 
-def test_imputation_errors_and_selection():
+def test_imputation_errors_are_measured_per_strategy():
     rng = numpy.random.default_rng(0)
     base = rng.normal(size=(200, 1))
     values = numpy.hstack(
