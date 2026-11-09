@@ -2,7 +2,7 @@
 
 A `ControlPlane` is the thin interface the registry's promotion, staged
 traffic allocation and rollback go through. An implementation knows one
-platform (ECS, Cloud Run, or a test double); it can read what runs
+platform (or is a test double); it can read what runs
 (`observe`), start a new revision of an image digest (`deploy`) and send
 traffic to revisions (`set_traffic`). It never decides anything and never
 touches the registry.
@@ -71,7 +71,7 @@ class ControlPlane(abc.ABC):
         """Starts a revision of the image and returns its identifier.
 
         A platform that can hold a revision without traffic does so; one that
-        cannot (ECS rolling updates) sends it all the traffic, which is why
+        cannot (a rolling update) sends it all the traffic, which is why
         the caller confirms and can restore the previous revision.
         """
 

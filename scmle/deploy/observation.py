@@ -1,6 +1,6 @@
 """What a platform says is running, in one shape for every provider.
 
-`Observation` is the answer an adapter (ECS, Cloud Run, or a test double)
+`Observation` is the answer an adapter (or a test double)
 gives to "what is serving traffic right now?": the revision, the image
 digest, whether it is ready and how traffic is split between revisions. The
 registry, the reconcile command and the promotion gate compare against this
@@ -37,7 +37,7 @@ class Observation:
     """The running state of one service.
 
     Attributes:
-        provider: ``aws`` or ``gcp``.
+        provider: The name of the platform the adapter reads.
         service: The service name or ARN.
         revision: The revision that holds most traffic (the primary).
         image_digest: Digest of the image the primary revision runs.
