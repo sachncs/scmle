@@ -22,6 +22,7 @@ from typing import Any
 from scipy import stats
 
 MIN_CONFIRMATION_ROWS = 30
+FISHER_Z_OFFSET = 3
 DEFAULT_CONFIDENCE = 0.95
 CONFIRMATORY = "confirmatory"
 UNCONFIRMED = "exploratory_unconfirmed"
@@ -230,9 +231,11 @@ def mde_correlation(n: int, *, alpha: float, k_max: int, power: float) -> float:
         The smallest correlation, in (0, 1), detectable at `n` rows; NaN
         when `n` is 3 or less.
     """
-    if n <= 3:
+    if n <= FISHER_Z_OFFSET:
         return math.nan
-    return math.tanh(z_sum(alpha, k_max, power) / math.sqrt(n - 3))
+    return math.tanh(
+        z_sum(alpha, k_max, power) / math.sqrt(n - FISHER_Z_OFFSET)
+    )
 
 
 def n_required_two_proportions(

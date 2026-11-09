@@ -26,6 +26,12 @@ INGEST_ENTITY_FORMAT = 8
 SUBGROUP_FORMAT = 9
 UNCERTAINTY_FORMAT = 10
 CONFIRMATION_COVERAGE_FORMAT = 11
+BLOCK_FORMATS = (
+    ("decision", "a 'decision' block", DECISION_FORMAT),
+    ("unit_of_prediction", "'unit_of_prediction'", UNIT_FORMAT),
+    ("ingest", "'ingest'", INGEST_FORMAT),
+    ("uncertainty", "'uncertainty'", UNCERTAINTY_FORMAT),
+)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -136,30 +142,12 @@ def check_format(path: str | Path, record: dict[str, Any]) -> None:
             f"charter {path} declares format {declared} but carries a "
             f"'causal' block, which needs format {CAUSAL_FORMAT}"
         )
-    if declared < DECISION_FORMAT and "decision" in record.get("charter", {}):
-        raise errors.ConfigError(
-            f"charter {path} declares format {declared} but carries a "
-            f"'decision' block, which needs format {DECISION_FORMAT}"
-        )
-    if declared < UNIT_FORMAT and "unit_of_prediction" in record.get(
-        "charter", {}
-    ):
-        raise errors.ConfigError(
-            f"charter {path} declares format {declared} but carries "
-            f"'unit_of_prediction', which needs format {UNIT_FORMAT}"
-        )
-    if declared < INGEST_FORMAT and "ingest" in record.get("charter", {}):
-        raise errors.ConfigError(
-            f"charter {path} declares format {declared} but carries "
-            f"'ingest', which needs format {INGEST_FORMAT}"
-        )
-    if declared < UNCERTAINTY_FORMAT and "uncertainty" in record.get(
-        "charter", {}
-    ):
-        raise errors.ConfigError(
-            f"charter {path} declares format {declared} but carries "
-            f"'uncertainty', which needs format {UNCERTAINTY_FORMAT}"
-        )
+    for name, described, introduced in BLOCK_FORMATS:
+        if declared < introduced and name in record.get("charter", {}):
+            raise errors.ConfigError(
+                f"charter {path} declares format {declared} but carries "
+                f"{described}, which needs format {introduced}"
+            )
     if declared < CONFIRMATION_COVERAGE_FORMAT and (
         record.get("charter", {}).get("uncertainty") or {}
     ).get("coverage_on_confirmation"):
@@ -224,7 +212,7 @@ def read_verified(
         charter = contracts.charter_from_record(record)
         if require_signature:
             raise errors.ArtifactError(f"charter {path} is unsigned")
-        return VerifiedCharter(charter, charter.charter_hash, False)
+        return VerifiedCharter(charter, charter.charter_hash, signed=False)
     if record.get("algorithm") != signing.SIGNATURE_ALGORITHM:
         raise errors.ArtifactError(f"charter {path}: unknown algorithm")
     check_format(path, record)
@@ -238,19 +226,19 @@ def read_verified(
     if signature is None:
         if require_signature:
             raise errors.ArtifactError(f"charter {path} is unsigned")
-        return VerifiedCharter(charter, charter.charter_hash, False)
+        return VerifiedCharter(charter, charter.charter_hash, signed=False)
     if key is None:
         if require_signature:
             raise errors.ArtifactError(
                 f"charter {path} is signed but no signing key is configured"
             )
-        return VerifiedCharter(charter, charter.charter_hash, False)
+        return VerifiedCharter(charter, charter.charter_hash, signed=False)
     expected = signing.sign_payload(charter.to_dict(), key)
     if not hmac.compare_digest(str(signature), expected):
         raise errors.ArtifactError(
             f"charter signature does not verify for {path}"
         )
-    return VerifiedCharter(charter, charter.charter_hash, True)
+    return VerifiedCharter(charter, charter.charter_hash, signed=True)
 
 
 def tighter(old: Any, new: Any) -> bool:
