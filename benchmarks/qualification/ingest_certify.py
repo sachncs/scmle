@@ -416,7 +416,7 @@ def unit_pair(seed: int) -> tuple[str, str, str, str]:
     """
     combos = [(u, s) for u in ingest_worlds.UNITS for s in ingest_worlds.SHAPES]
     unit, shape = combos[seed % len(combos)]
-    db, table = ingest_worlds.grain_world(seed, unit, shape)
+    db, table = ingest_worlds.grain_world(seed, shape)
     source = db.source()
     profiled = profile.profile_table(source, table)
     assert profiled is not None
@@ -862,9 +862,9 @@ def audit_labels(store: certificates.Store) -> dict[str, list[str]]:
             report = certificates.audit(
                 store, {detector: (digests[detector], defect)}
             )
-            for label in found:
+            for label, entries in found.items():
                 if getattr(report, label):
-                    found[label].append(f"{detector}/{defect}")
+                    entries.append(f"{detector}/{defect}")
     return found
 
 
@@ -914,8 +914,8 @@ def live_checks() -> dict[str, Any]:
     leaks = [ingest_checks.late_leaks(s) for s in range(20)]
     diff = [ingest_checks.differential_equal(s) for s in range(60)]
     meta = [ingest_checks.metamorphic_unchanged(s) for s in range(60)]
-    torn = [torn_detected(s, True) for s in range(8)]
-    quiet = [torn_detected(s, False) for s in range(8)]
+    torn = [torn_detected(s, noisy=True) for s in range(8)]
+    quiet = [torn_detected(s, noisy=False) for s in range(8)]
     ok = (
         all(item.view == 0 for item in leaks)
         and all(diff)

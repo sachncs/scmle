@@ -72,6 +72,8 @@ from scmle.data.identification import run
 STORE_PATH = Path(__file__).with_name("subgroup_certificates.json")
 DEV_SEED_BASE = 10_000
 LEVELS = 8
+# share of rows treated
+TREATED_SHARE = 0.5
 LEVEL = 0.95
 ALPHA = 1.0 - LEVEL
 NULL_REPLICATES = 2000
@@ -128,7 +130,7 @@ def world(
     """
     group = numpy.repeat(names(), rows_per_level)
     tau = numpy.array([effects.get(g, 0.0) for g in group])
-    t = (rng.uniform(size=len(group)) < 0.5).astype(float)
+    t = (rng.uniform(size=len(group)) < TREATED_SHARE).astype(float)
     y = tau * t + rng.standard_normal(len(group))
     return pandas.DataFrame({"g": group, "t": t, "y": y})
 

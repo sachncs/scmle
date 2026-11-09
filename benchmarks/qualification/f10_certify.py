@@ -89,6 +89,24 @@ DEV_SEED_BASE = 10_000
 ALPHA_FALSIFY = 0.01
 LEVEL = 0.95
 COVERAGE_FLOOR = 0.93
+# largest mean standardised error that still counts as centred
+MEAN_Z_TOLERANCE = 0.1
+# floor on the Wilson lower bound of the power at the smallest planted violation
+POWER_FLOOR = 0.8
+# floor on the Wilson lower bound of a flag recall
+RECALL_FLOOR = 0.8
+# floor on the Wilson lower bound of the strategy selection rates
+SELECTION_FLOOR = 0.98
+# largest false-alarm or false-confirmation rate allowed
+FALSE_ALARM_CEILING = 0.05
+# largest Wilson upper bound of the false-confirmation rate
+FALSE_CONFIRM_UPPER_CEILING = 0.08
+# level of the placebo-in-space test of the synthetic control
+SYNTH_LEVEL = 0.05
+# effect planted in the backdoor and randomized worlds
+AIPW_TRUE_EFFECT = 2.0
+# effect planted in the panel worlds
+DID_TRUE_EFFECT = 1.5
 GATES = (
     "selector",
     "coverage_aipw",
@@ -173,7 +191,7 @@ def coverage_row(
     if z is not None:
         arr = numpy.array([v for v in z if math.isfinite(v)])
         row["mean_z"] = float(arr.mean())
-        row["z_within_0.1"] = bool(abs(arr.mean()) <= 0.1)
+        row["z_within_0.1"] = bool(abs(arr.mean()) <= MEAN_Z_TOLERANCE)
     return row
 
 
@@ -223,7 +241,7 @@ def power_curve(
         h, n = hits[delta]
         row = rate(h, n)
         curve[str(delta)] = row
-        if delta > 0 and delta_min is None and row["wilson"][0] >= 0.8:
+        if delta > 0 and delta_min is None and row["wilson"][0] >= POWER_FLOOR:
             delta_min = delta
     return {"curve": curve, "delta_min": delta_min}
 
@@ -328,12 +346,12 @@ def gate_selector(replicates: int, base: int = 0) -> dict[str, Any]:
         )
 
     refused = sum(
-        select.select(build(stream(base, i), False)).status
+        select.select(build(stream(base, i), eligible=False)).status
         == select.NOT_IDENTIFIED
         for i in range(replicates)
     )
     kept_ok = sum(
-        select.select(build(stream(base, i, 1), True)).status
+        select.select(build(stream(base, i, 1), eligible=True)).status
         == select.IDENTIFIED
         for i in range(replicates)
     )
@@ -343,7 +361,8 @@ def gate_selector(replicates: int, base: int = 0) -> dict[str, Any]:
         "refuses_when_none_eligible": refusal,
         "accepts_when_eligible": acceptance,
         "passed": bool(
-            refusal["wilson"][0] >= 0.98 and acceptance["wilson"][0] >= 0.98
+            refusal["wilson"][0] >= SELECTION_FLOOR
+            and acceptance["wilson"][0] >= SELECTION_FLOOR
         ),
     }
 
@@ -382,8 +401,8 @@ def aipw_world(
         )
         nuisances = aipw.fit_nuisances(x, cols, "t", "y", i, learner)
         out = aipw.estimate(nuisances, c, "t", "y", estimand, LEVEL)
-        covered.append(out.low <= 2.0 <= out.high)
-        z.append((out.estimate - 2.0) / out.se)
+        covered.append(out.low <= AIPW_TRUE_EFFECT <= out.high)
+        z.append((out.estimate - AIPW_TRUE_EFFECT) / out.se)
     return name, coverage_row(covered, z)
 
 
@@ -401,9 +420,30 @@ def gate_coverage_aipw(replicates: int, base: int = 0) -> dict[str, Any]:
     boosted = max(replicates // 4, 50)
     rows = dict(
         [
-            aipw_world("linear_ate", "ATE", "linear", False, replicates, base),
-            aipw_world("linear_att", "ATT", "linear", False, replicates, base),
-            aipw_world("boosted_ate", "ATE", "boosted", True, boosted, base),
+            aipw_world(
+                "linear_ate",
+                "ATE",
+                "linear",
+                nonlinear=False,
+                runs=replicates,
+                base=base,
+            ),
+            aipw_world(
+                "linear_att",
+                "ATT",
+                "linear",
+                nonlinear=False,
+                runs=replicates,
+                base=base,
+            ),
+            aipw_world(
+                "boosted_ate",
+                "ATE",
+                "boosted",
+                nonlinear=True,
+                runs=boosted,
+                base=base,
+            ),
         ]
     )
     return {
@@ -426,7 +466,7 @@ def gate_coverage_randomized(replicates: int, base: int = 0) -> dict[str, Any]:
     for i in range(replicates):
         frame = f10_generators.randomized(stream(base, i), 800)
         out = aipw.difference_in_means(frame, "t", "y", LEVEL)
-        covered.append(out.low <= 2.0 <= out.high)
+        covered.append(out.low <= AIPW_TRUE_EFFECT <= out.high)
     row = coverage_row(covered)
     return {"coverage": row, "passed": passes(row)}
 
@@ -453,8 +493,8 @@ def gate_coverage_did(replicates: int, base: int = 0) -> dict[str, Any]:
                 stream(base, i), 100, 100, second_group=second
             )
             out = did.estimate(frame, "id", "t", "g", "y", LEVEL)
-            covered.append(out.low <= 1.5 <= out.high)
-            z.append((out.estimate - 1.5) / out.se)
+            covered.append(out.low <= DID_TRUE_EFFECT <= out.high)
+            z.append((out.estimate - DID_TRUE_EFFECT) / out.se)
         rows[name] = coverage_row(covered, z)
     return {
         "worlds": rows,
@@ -538,8 +578,8 @@ def gate_iv_strength(replicates: int, base: int = 0) -> dict[str, Any]:
         "strong_world_false_weak": false_weak,
         "passed": bool(
             cover["meets_floor"]
-            and recall["wilson"][0] >= 0.8
-            and false_weak["rate"] <= 0.05
+            and recall["wilson"][0] >= RECALL_FLOOR
+            and false_weak["rate"] <= FALSE_ALARM_CEILING
         ),
     }
 
@@ -561,7 +601,7 @@ def gate_size_synth(replicates: int, base: int = 0) -> dict[str, Any]:
     for i in range(runs):
         frame = f10_generators.synthetic(stream(base, i), tau=0.0)
         out = synth.estimate(frame, "u", "t", "y", 0, 12)
-        rejected += out.p_value <= 0.05
+        rejected += out.p_value <= SYNTH_LEVEL
     bound = 0.05 + 2 * math.sqrt(0.05 * 0.95 / runs)
     power_runs = 60
     detected = sum(
@@ -573,7 +613,7 @@ def gate_size_synth(replicates: int, base: int = 0) -> dict[str, Any]:
             0,
             12,
         ).p_value
-        <= 0.05
+        <= SYNTH_LEVEL
         for i in range(power_runs)
     )
     return {
@@ -613,7 +653,7 @@ def gate_overlap(replicates: int, base: int = 0) -> dict[str, Any]:
             flagged += not report["passed"]
             lowest.append(report["min_propensity"])
             out = aipw.estimate(nuisances, c, "t", "y", "ATE", LEVEL)
-            covered.append(out.low <= 2.0 <= out.high)
+            covered.append(out.low <= AIPW_TRUE_EFFECT <= out.high)
             ess.append(out.overlap["ess_treated"] / out.n)
         curves[str(p_min)] = {
             "gate_fires": rate(flagged, runs),
@@ -632,7 +672,8 @@ def gate_overlap(replicates: int, base: int = 0) -> dict[str, Any]:
         "false_refuse_worst": false_refuse,
         "recall_wilson_lower_worst": min(v["wilson"][0] for v in bad),
         "passed": bool(
-            false_refuse <= 0.05 and all(v["wilson"][0] >= 0.8 for v in bad)
+            false_refuse <= FALSE_ALARM_CEILING
+            and all(v["wilson"][0] >= RECALL_FLOOR for v in bad)
         ),
     }
 
@@ -689,7 +730,7 @@ def gate_battery_pretrend(replicates: int, base: int = 0) -> dict[str, Any]:
         The `alarm_gate` result over trends 0 to 0.3 per period.
     """
 
-    def detect(delta: float, rx: Any, rc: Any) -> bool:
+    def detect(delta: float, rx: Any, rc: Any) -> bool:  # noqa: ARG001 -- alarm_gate calls detect(delta, rng_x, rng_c)
         """Whether the pre-trend test flags a world.
 
         Args:
@@ -721,7 +762,7 @@ def gate_density_rd(replicates: int, base: int = 0) -> dict[str, Any]:
         The `alarm_gate` result over sorting shares 0 to 0.7.
     """
 
-    def detect(delta: float, rx: Any, rc: Any) -> bool:
+    def detect(delta: float, rx: Any, rc: Any) -> bool:  # noqa: ARG001 -- alarm_gate calls detect(delta, rng_x, rng_c)
         """Whether the density check flags a world.
 
         Args:
@@ -752,7 +793,7 @@ def gate_battery_rd(replicates: int, base: int = 0) -> dict[str, Any]:
         The `alarm_gate` result over covariate jumps 0 to 0.5.
     """
 
-    def detect(delta: float, rx: Any, rc: Any) -> bool:
+    def detect(delta: float, rx: Any, rc: Any) -> bool:  # noqa: ARG001 -- alarm_gate calls detect(delta, rng_x, rng_c)
         """Whether the placebo and balance tests flag a world.
 
         Args:
@@ -877,8 +918,8 @@ def gate_sensitivity_did(replicates: int, base: int = 0) -> dict[str, Any]:
         frame = f10_generators.panel(stream(base, i), 150, 150, drift=0.1)
         out = did.estimate(frame, "id", "t", "g", "y")
         low, high = out.sensitivity(1.0)
-        covered_m1.append(low <= 1.5 <= high)
-        covered_m0.append(out.low <= 1.5 <= out.high)
+        covered_m1.append(low <= DID_TRUE_EFFECT <= high)
+        covered_m0.append(out.low <= DID_TRUE_EFFECT <= out.high)
     m1 = coverage_row(covered_m1)
     return {
         "replicates": runs,
@@ -992,7 +1033,10 @@ def gate_false_confirm(replicates: int, base: int = 0) -> dict[str, Any]:
             "all other gates were marked certified for this run; the "
             "unshared-confounder row is the known blind spot"
         ),
-        "passed": bool(shared["rate"] <= 0.05 and shared["wilson"][1] <= 0.08),
+        "passed": bool(
+            shared["rate"] <= FALSE_ALARM_CEILING
+            and shared["wilson"][1] <= FALSE_CONFIRM_UPPER_CEILING
+        ),
     }
 
 

@@ -212,11 +212,11 @@ def test_idempotent_sink_commit_filters_duplicates_and_persists_receipt(
 
     first = ledger.commit_with_writer(
         (event("b", 2, 1), event("a", 1, 0)),
-        lambda values: written.extend(values),
+        written.extend,
     )
     second = ledger.commit_with_writer(
         (event("a", 1, 0), event("b", 2, 1)),
-        lambda values: written.extend(values),
+        written.extend,
     )
 
     assert first.accepted_event_ids == ("a", "b")
@@ -260,7 +260,7 @@ def test_event_consumer_commits_before_acknowledging(tmp_path):
         source,
         ledger,
         "orders-worker",
-        lambda values: written.extend(values),
+        written.extend,
         acknowledgements.append,
     )
 
@@ -295,7 +295,7 @@ def test_event_consumer_retries_ack_without_replaying_the_sink(tmp_path):
         source,
         ledger,
         "orders-worker",
-        lambda values: written.extend(values),
+        written.extend,
         first_ack_fails,
     )
 
@@ -315,9 +315,6 @@ def test_event_consumer_retries_ack_without_replaying_the_sink(tmp_path):
 
 def test_event_contract_rejects_naive_timestamps_and_invalid_sequences():
     with pytest.raises(ValueError, match="timezone"):
-        event_value = incremental.Event(
-            "a", 1, "2026-10-20T10:00:00", {"value": 1}
-        )
-        del event_value
+        incremental.Event("a", 1, "2026-10-20T10:00:00", {"value": 1})
     with pytest.raises(ValueError, match="positive"):
         incremental.Event("a", 0, "2026-10-20T10:00:00+00:00", {"value": 1})

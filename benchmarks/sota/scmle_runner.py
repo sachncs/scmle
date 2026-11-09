@@ -229,7 +229,7 @@ def run_frames(
         result = project.run()
         record.score = score(result, test, target, kind)
         record.status, record.error = "ok", ""
-    except Exception:  # Every task yields a record, even a crash.
+    except Exception:  # noqa: BLE001 -- every task yields a record, even a crash
         record.status = "failed"
         record.error = traceback.format_exc(limit=4)
     record.seconds = time.monotonic() - started
@@ -272,7 +272,7 @@ def main(argv: list[str] | None = None) -> int:
     for task_id in args.tasks:
         try:
             frames = load_task(task_id, args.fold, args.repeat)
-        except Exception:  # A task that cannot load is still recorded.
+        except Exception:  # noqa: BLE001 -- a task that cannot load is still recorded
             frames = None
             error = traceback.format_exc(limit=4)
         for budget in args.budgets:

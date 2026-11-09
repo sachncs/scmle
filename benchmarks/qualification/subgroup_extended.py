@@ -70,6 +70,8 @@ MEASUREMENTS_PATH = Path(__file__).with_name(
 )
 UNEQUAL_SIZES = (20, 30, 50, 80, 120, 200, 300, 500)
 POWER_SIZES = (50, 100, 200, 400)
+# share of rows treated
+TREATED_SHARE = 0.5
 OVERLAP_LEVELS = 4
 OVERLAP_ROWS = 800
 EFFECT = 0.5
@@ -102,7 +104,7 @@ def unequal_world(
         ]
     )
     tau = numpy.array([effects.get(g, 0.0) for g in group])
-    t = (rng.uniform(size=len(group)) < 0.5).astype(float)
+    t = (rng.uniform(size=len(group)) < TREATED_SHARE).astype(float)
     y = tau * t + rng.standard_normal(len(group))
     return pandas.DataFrame({"g": group, "t": t, "y": y})
 
@@ -135,7 +137,7 @@ def overlap_world(
     g = rng.integers(0, OVERLAP_LEVELS, OVERLAP_ROWS)
     h = rng.integers(0, OVERLAP_LEVELS, OVERLAP_ROWS)
     tau = numpy.where(g == 0, effect_g0, 0.0)
-    t = (rng.uniform(size=OVERLAP_ROWS) < 0.5).astype(float)
+    t = (rng.uniform(size=OVERLAP_ROWS) < TREATED_SHARE).astype(float)
     y = tau * t + rng.standard_normal(OVERLAP_ROWS)
     return pandas.DataFrame(
         {

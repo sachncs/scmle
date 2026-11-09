@@ -217,7 +217,7 @@ def run_temporal(frame, charter):
     task = tasks.Task.REGRESSION
     split = splitters.Splitter(spec, task).split(frame)
     vault = sealed.Vault(sealed.OpenLog(), process=False)
-    outcome = pipeline.apply_custody(
+    return pipeline.apply_custody(
         charter=charter,
         split=split,
         frame=frame,
@@ -226,7 +226,6 @@ def run_temporal(frame, charter):
         data_hash=DATA_HASH,
         vault=vault,
     )
-    return outcome
 
 
 def test_a_serially_dependent_target_raises_the_embargo_above_the_charter():

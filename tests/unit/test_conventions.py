@@ -101,21 +101,19 @@ def aliases(tree):
             node.annotation
         ):
             found.append((node.lineno, "TypeAlias annotation"))
-    for node in tree.body:
-        if (
-            isinstance(node, ast.Assign)
-            and len(node.targets) == 1
-            and isinstance(node.targets[0], ast.Name)
-            and isinstance(node.value, ast.Name | ast.Attribute)
-            and chain(node.value)
-            and ast.unparse(node.value) not in ("True", "False", "None")
-        ):
-            found.append(
-                (
-                    node.lineno,
-                    f"{node.targets[0].id} = {ast.unparse(node.value)}",
-                )
-            )
+    found.extend(
+        (
+            node.lineno,
+            f"{node.targets[0].id} = {ast.unparse(node.value)}",
+        )
+        for node in tree.body
+        if isinstance(node, ast.Assign)
+        and len(node.targets) == 1
+        and isinstance(node.targets[0], ast.Name)
+        and isinstance(node.value, ast.Name | ast.Attribute)
+        and chain(node.value)
+        and ast.unparse(node.value) not in ("True", "False", "None")
+    )
     return found
 
 

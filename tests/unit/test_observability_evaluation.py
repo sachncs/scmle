@@ -90,13 +90,8 @@ def test_prediction_log_enforces_sidecar_retention_atomically(tmp_path):
         tmp_path / "predictions.jsonl", observability_policy=policy
     )
     log.observability_path.write_text(
-        "\n".join(
-            (
-                '{"type":"inference","timestamp":"2026-10-18T10:00:00+00:00"}',
-                '{"type":"inference","timestamp":"2026-10-20T10:00:00+00:00"}',
-            )
-        )
-        + "\n",
+        '{"type":"inference","timestamp":"2026-10-18T10:00:00+00:00"}\n'
+        '{"type":"inference","timestamp":"2026-10-20T10:00:00+00:00"}\n',
         encoding="utf-8",
     )
 

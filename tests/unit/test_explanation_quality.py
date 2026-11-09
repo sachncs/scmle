@@ -45,7 +45,7 @@ def test_linear_contribution_report_is_ranked_and_json_native():
 
 @pytest.mark.parametrize(
     "factory",
-    (
+    [
         lambda: quality.linear_contribution_report(
             "", ("signal",), (1.0,), (1.0,)
         ),
@@ -55,7 +55,7 @@ def test_linear_contribution_report_is_ranked_and_json_native():
         lambda: quality.linear_contribution_report(
             "sample", ("signal",), (1.0,), (1.0, 2.0)
         ),
-    ),
+    ],
 )
 def test_linear_contribution_report_rejects_incomplete_contract(factory):
     with pytest.raises(ValueError):
@@ -161,11 +161,11 @@ def test_independent_ground_truth_suite_fails_closed_for_partial_references():
 
 @pytest.mark.parametrize(
     "factory",
-    (
-        lambda: quality.QualityThresholds(),
+    [
+        quality.QualityThresholds,
         lambda: quality.fidelity_score((1.0,), (1.0, 2.0)),
         lambda: quality.ranking_stability((report("signal"),)),
-    ),
+    ],
 )
 def test_quality_contract_rejects_incomplete_evidence(factory):
     with pytest.raises(ValueError):

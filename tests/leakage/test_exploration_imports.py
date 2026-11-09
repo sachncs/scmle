@@ -69,13 +69,13 @@ def closure(start):
         path = source_of(module)
         if path is None:
             continue
-        for name in imported_modules(path):
-            if (
-                name.startswith("scmle.")
-                and name not in reached
-                and (source_of(name) is not None or forbidden(name))
-            ):
-                stack.append((name, (*trail, name)))
+        stack.extend(
+            (name, (*trail, name))
+            for name in imported_modules(path)
+            if name.startswith("scmle.")
+            and name not in reached
+            and (source_of(name) is not None or forbidden(name))
+        )
     return reached
 
 

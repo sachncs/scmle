@@ -112,6 +112,14 @@ REPLICATES = 2000
 CQR_REPLICATES = 150
 ESTIMATED_RATIO_REPLICATES = 200
 SURVIVAL_REPLICATES = 100
+# smallest Kolmogorov-Smirnov p-value of the coverage law that passes
+KS_P_FLOOR = 0.001
+# floor on the highest-noise-decile coverage of the quantile conformal rule
+TOP_DECILE_FLOOR = 0.87
+# floor on the Wilson lower bound of a slice flag recall
+SLICE_RECALL_FLOOR = 0.80
+# largest coherence residual that passes
+COHERENCE_TOLERANCE = 1e-8
 GATES = (
     "G1",
     "G2",
@@ -199,7 +207,7 @@ def gate_g1(replicates: int, base: int = 0) -> dict[str, Any]:
         "mean": mean,
         "band": [low, high],
         "ks_p": float(ks.pvalue),
-        "passed": bool(low <= mean <= high and ks.pvalue > 0.001),
+        "passed": bool(low <= mean <= high and ks.pvalue > KS_P_FLOOR),
     }
 
 
@@ -361,7 +369,9 @@ def gate_g3(replicates: int, base: int = 0) -> dict[str, Any]:
         "cqr_top_decile": top_cqr,
         "constant_width_top_decile": top_const,
         "constant_width_marginal": float(data[:, 2].mean()),
-        "passed": bool(marginal["meets_floor"] and top_cqr >= 0.87 > top_const),
+        "passed": bool(
+            marginal["meets_floor"] and top_cqr >= TOP_DECILE_FLOOR > top_const
+        ),
     }
 
 
@@ -475,7 +485,11 @@ def gate_g5(replicates: int, base: int = 0) -> dict[str, Any]:
             "recall": hits / replicates,
             "wilson_lower": wilson_lower(hits, replicates),
         }
-    certified = [int(k) for k, v in recall.items() if v["wilson_lower"] >= 0.80]
+    certified = [
+        int(k)
+        for k, v in recall.items()
+        if v["wilson_lower"] >= SLICE_RECALL_FLOOR
+    ]
     return {
         "replicates": replicates,
         "familywise_false_flag": flagged / replicates,
@@ -543,7 +557,7 @@ def gate_g5b(replicates: int, base: int = 0) -> dict[str, Any]:
     certified = [
         int(k)
         for k, v in detection["noise_3x"].items()
-        if v["wilson_lower"] >= 0.80
+        if v["wilson_lower"] >= SLICE_RECALL_FLOOR
     ]
     return {
         "replicates": replicates,
@@ -603,11 +617,11 @@ def gate_g6(replicates: int, base: int = 0) -> dict[str, Any]:
         weighted, plain, sizes = [], [], []
         for index in range(runs):
             rng = numpy.random.default_rng(base + index)
-            xc, ec = world(rng, 1000, False)
-            xt, et = world(rng, 3000, True)
+            xc, ec = world(rng, 1000, shift=False)
+            xt, et = world(rng, 3000, shift=True)
             score = numpy.abs(ec)
             if estimated:
-                unlabeled, _ = world(rng, 1000, True)
+                unlabeled, _ = world(rng, 1000, shift=True)
                 est = shift_weights.estimate_weights(xc, unlabeled)
                 wc = est.calibration
                 wt = est.ratio(xt)
@@ -632,8 +646,8 @@ def gate_g6(replicates: int, base: int = 0) -> dict[str, Any]:
             out["effective_size_mean"] = float(numpy.mean(sizes))
         return out
 
-    known = run(False, replicates)
-    estimated = run(True, ESTIMATED_RATIO_REPLICATES)
+    known = run(estimated=False, runs=replicates)
+    estimated = run(estimated=True, runs=ESTIMATED_RATIO_REPLICATES)
     return {
         "known_ratio": known,
         "estimated_ratio": estimated,
@@ -693,7 +707,7 @@ def gate_g9(replicates: int, base: int = 0) -> dict[str, Any]:
         "mean_difference": float(diffs.mean()),
         "upper_95": upper,
         "coherence_residual": worst,
-        "passed": bool(upper < 0 and worst < 1e-8),
+        "passed": bool(upper < 0 and worst < COHERENCE_TOLERANCE),
     }
 
 
@@ -740,16 +754,18 @@ def gate_g11i(replicates: int, base: int = 0) -> dict[str, Any]:
         errors, the mean floored share and `passed`.
     """
     rng = numpy.random.default_rng(999_999)
-    _, risk, full, _, _ = survival_world(rng, 6000, False)
+    _, risk, full, _, _ = survival_world(rng, 6000, censor=False)
     tau = float(numpy.quantile(full, 0.7))
-    flat = ipcw.CensoringWeights(numpy.ones(len(full)), 0.05, 0, False)
+    flat = ipcw.CensoringWeights(
+        numpy.ones(len(full)), 0.05, 0, covariate_dependent=False
+    )
     truth = ipcw.truncated_concordance(
         full, numpy.ones(len(full)), risk, tau, flat
     )
     cox, marginal, share = [], [], []
     for index in range(replicates):
         rng = numpy.random.default_rng(base + index)
-        x, risk, _, time, event = survival_world(rng, 1500, True)
+        x, risk, _, time, event = survival_world(rng, 1500, censor=True)
         wc = ipcw.censoring_weights(time, event, x)
         wm = ipcw.censoring_weights(time, event, None)
         cox.append(ipcw.truncated_concordance(time, event, risk, tau, wc))

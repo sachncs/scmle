@@ -131,8 +131,10 @@ def spawn_memory_hungry_subprocess(marker):
         [
             sys.executable,
             "-c",
-            "import time; data = bytearray(700 * 1024**2); "
-            "data[::4096] = b'x' * len(data[::4096]); time.sleep(120)",
+            (
+                "import time; data = bytearray(700 * 1024**2); "
+                "data[::4096] = b'x' * len(data[::4096]); time.sleep(120)"
+            ),
         ]
     )
     marker.write_text(str(child.pid))

@@ -514,9 +514,9 @@ def audit_labels(store: certificates.Store) -> dict[str, list[str]]:
             report = certificates.audit(
                 store, {detector: (digests[detector], defect)}
             )
-            for label in found:
+            for label, entries in found.items():
                 if getattr(report, label):
-                    found[label].append(f"{detector}/{defect}")
+                    entries.append(f"{detector}/{defect}")
     return found
 
 

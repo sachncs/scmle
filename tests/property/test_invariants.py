@@ -99,10 +99,13 @@ def test_attestation_parser_fails_closed_on_arbitrary_json(payload):
 def test_document_reader_fails_closed_on_arbitrary_bytes(payload):
     """Arbitrary document bytes become structured outcomes or valid samples."""
     reader = document.Reader(max_bytes=1024)
+    rejection = None
     try:
         sample = reader.load(payload, document_id="fuzzed")
     except document.DocumentValidationError as error:
-        assert error.category == "document_validation"
+        rejection = error
+    if rejection is not None:
+        assert rejection.category == "document_validation"
         return
     assert sample.document_id == "fuzzed"
     assert sample.content

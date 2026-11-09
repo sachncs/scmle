@@ -39,7 +39,7 @@ def serve(documents):
             self.end_headers()
             self.wfile.write(data)
 
-        def log_message(self, format, *args):
+        def log_message(self, message_format, *args):
             return
 
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)

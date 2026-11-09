@@ -113,6 +113,7 @@ def test_a_file_far_larger_than_the_budget_is_read_in_bounded_memory(tmp_path):
         [sys.executable, "-c", script],
         capture_output=True,
         text=True,
+        check=False,
         cwd=pathlib.Path(__file__).resolve().parents[2],
     )
 

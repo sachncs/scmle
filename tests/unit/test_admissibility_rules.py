@@ -229,8 +229,8 @@ def test_arguments_of_the_table_are_validated():
         rules.build_table(table, "descriptive")
     with pytest.raises(ValueError, match="graph, treatment, outcome"):
         rules.build_table(table, "causal")
+    d = rules.decide_predictive(make_field("a"))
     with pytest.raises(ValueError, match="unique"):
-        d = rules.decide_predictive(make_field("a"))
         rules.Admissibility("predictive", rules.Mode.STRICT, (d, d), None, None)
     with pytest.raises(ValueError, match="kind"):
         rules.Admissibility("x", rules.Mode.STRICT, (), None, None)

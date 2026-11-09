@@ -100,6 +100,12 @@ DELTA_CONF = 0.1
 BATCH = 50
 REPLICATES = 2000
 T_FALSE_ALARM = 5000
+# floor on the Wilson lower bound of the share of detections within D_MAX
+WITHIN_D_MAX_FLOOR = 0.90
+# share of cases on which a challenger sees the champion's latent
+SHARED_LATENT_SHARE = 0.7
+# share of challengers with a true advantage
+ADVANTAGE_SHARE = 0.2
 GATES = ("H1", "H2", "H3", "H4", "H5", "H6", "H7", "H8", "H9", "H10")
 NOT_MEASURED = (
     "H11 agreement with a domain owner's signed escalation audit",
@@ -278,7 +284,7 @@ def gate_h2(replicates: int, base: int = 0) -> dict[str, Any]:
         "replicates": replicates,
         "d_max": D_MAX,
         "by_rise": rows,
-        "passed": bool(rows["2.0"]["within_d_max_lower"] >= 0.90),
+        "passed": bool(rows["2.0"]["within_d_max_lower"] >= WITHIN_D_MAX_FLOOR),
     }
 
 
@@ -358,7 +364,7 @@ def sequence_gaps(
     latent = rng.random((batches, BATCH))
     count = len(advantages)
     own = rng.random((count, batches, BATCH))
-    shared = rng.random((count, batches, BATCH)) < 0.7
+    shared = rng.random((count, batches, BATCH)) < SHARED_LATENT_SHARE
     seen = numpy.where(shared, latent[None], own)
     low = numpy.clip(base - advantages, 0.0, 1.0)[:, None, None]
     champion = (latent < base).astype(float)[None]
@@ -475,7 +481,7 @@ def gate_h4(replicates: int, base: int = 0) -> dict[str, Any]:
     power_boot: list[float] = []
     for index in range(replicates):
         rng = numpy.random.default_rng(base + index)
-        truth = rng.random(count) < 0.2
+        truth = rng.random(count) < ADVANTAGE_SHARE
         advantages = numpy.where(truth, better, 0.0)
         gaps = sequence_gaps(rng, advantages, batches, base_risk)
         decided = elond_decisions(eprocess_paths(gaps), batches)
@@ -901,7 +907,7 @@ def gate_h10(replicates: int, base: int = 0) -> dict[str, Any]:
         "by_rise": rows,
         "coverage_after_halt": escalate.coverage,
         "passed": bool(
-            rows["r_star_x_2"]["within_d_max_lower"] >= 0.90
+            rows["r_star_x_2"]["within_d_max_lower"] >= WITHIN_D_MAX_FLOOR
             and escalate.coverage == 0.0
         ),
     }

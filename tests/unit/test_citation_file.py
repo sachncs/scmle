@@ -32,5 +32,5 @@ def test_citation_file_has_the_required_keys_and_the_package_version():
     assert keys["version"] == scmle.__version__
     assert keys["license"] == "Apache-2.0"
     assert keys["repository-code"] == "https://github.com/sachncs/scmle"
-    assert re.search(r"^  - family-names: ", text, flags=re.M)
+    assert re.search(r"^  - family-names: ", text, flags=re.MULTILINE)
     assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", keys["date-released"])

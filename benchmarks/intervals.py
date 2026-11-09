@@ -7,6 +7,8 @@ from scipy import stats
 
 LOWER_IS_BETTER = frozenset({"log_loss", "rmse", "mae"})
 CONFIDENCE = 0.95
+# fewest seeds for which an interval carries information
+MINIMUM_SEEDS = 2
 
 
 def mean_interval(
@@ -24,7 +26,7 @@ def mean_interval(
     """
     count = len(values)
     mean = sum(values) / count
-    if count < 2:
+    if count < MINIMUM_SEEDS:
         return mean, mean, mean
     spread = math.sqrt(sum((v - mean) ** 2 for v in values) / (count - 1))
     margin = (
@@ -65,7 +67,7 @@ def verdict(low: float, high: float, seeds: int) -> str:
         negative, otherwise `tie`. With fewer than two seeds the label is
         chosen by the sign of the midpoint and suffixed ` (1 seed)`.
     """
-    if seeds < 2:
+    if seeds < MINIMUM_SEEDS:
         mean = (low + high) / 2
         label = "ahead" if mean > 0 else "behind" if mean < 0 else "tie"
         return f"{label} (1 seed)"

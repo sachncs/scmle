@@ -119,7 +119,7 @@ def test_unusable_panels_are_refused():
         did.estimate(frame[frame["t"] < 2], "id", "t", "g", "y")
     with pytest.raises(ValueError, match="never-treated"):
         did.estimate(frame.dropna(subset=["g"]), "id", "t", "g", "y")
+    bad = frame.copy()
+    bad.loc[bad.index[0], "g"] = 5.0
     with pytest.raises(ValueError, match="constant"):
-        bad = frame.copy()
-        bad.loc[bad.index[0], "g"] = 5.0
         did.estimate(bad, "id", "t", "g", "y")

@@ -35,6 +35,8 @@ TASKS = ("regression", "binary")
 # deviation (regression) or log-odds per standard deviation (binary).
 EFFECT_GRID = (0.1, 0.2, 0.3, 0.5, 0.8)
 SIZE_BAND_SIGMAS = 2.0
+# fewest proportions that give a spread
+MINIMUM_PROPORTIONS = 2
 DEFAULT_SLACK = 0.01
 
 
@@ -604,7 +606,7 @@ def summarize_false_discoveries(
     )
     mean = float(values.mean())
     runs = len(values)
-    if runs < 2:
+    if runs < MINIMUM_PROPORTIONS:
         upper = 1.0
     else:
         z = float(stats.norm.ppf(confidence))

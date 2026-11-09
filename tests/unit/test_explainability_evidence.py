@@ -94,7 +94,7 @@ def build_evidence(
     **overrides: Any,
 ) -> explanations.Evidence:
     """Builds evidence using the test diagnostic and explicit identities."""
-    values = cast(EvidenceInputs, {**build_inputs(), **overrides})
+    values = cast("EvidenceInputs", {**build_inputs(), **overrides})
     return suite.build_evidence(
         CustomExplanation(),
         result

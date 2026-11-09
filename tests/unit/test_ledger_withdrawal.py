@@ -195,7 +195,7 @@ def test_the_false_claim_rate_stays_below_alpha_with_an_x_only_withdrawal():
     withdrawn = 0
     for seed in range(reps):
         (features, target), (cfeatures, ctarget) = weak_world(seed)
-        for name in proportions:
+        for name, values in proportions.items():
             result = governed.run_governed(
                 charter=make_charter(),
                 features=features,
@@ -214,7 +214,7 @@ def test_the_false_claim_rate_stays_below_alpha_with_an_x_only_withdrawal():
                 columns_of(result, [c]).pop() not in {"f0", "f1", "f2"}
                 for c in claims
             )
-            proportions[name].append(false / max(len(claims), 1))
+            values.append(false / max(len(claims), 1))
             if name == "with" and result.confirmation.stage_two:
                 withdrawn += len(result.confirmation.stage_two["withdrawn"])
     assert withdrawn > 0

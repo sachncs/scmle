@@ -205,7 +205,7 @@ def scenario_replies(tmp_path):
     for version in (3, 4):
         try:
             loop.move_champion(registry, "m", version, None)
-        except Exception as error:
+        except Exception as error:  # noqa: BLE001 -- the golden record keeps the type name of whatever error is raised
             outcomes.append(type(error).__name__)
     first, second = loop.pending_escalations()
     outcomes.append(loop.reply(first.id, test_loop.reply_to(first)))
@@ -217,12 +217,12 @@ def scenario_replies(tmp_path):
         loop.move_champion(registry, "m", 4, None)
     try:
         loop.amend_policy(r_star=0.9)
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001 -- the golden record keeps the type name of whatever error is raised
         outcomes.append(type(error).__name__)
     outcomes.append(loop.amend_policy(r_star=0.04))
     try:
         loop.rewrite_ledger(lambda: None, {"op": "truncate"})
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001 -- the golden record keeps the type name of whatever error is raised
         outcomes.append(type(error).__name__)
     test_loop.feed(
         loop, streams.simulate(test_loop.spec(batches=6, seed=1)), 0, 6

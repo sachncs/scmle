@@ -295,7 +295,7 @@ def test_contract_dataclasses_reject_invalid_evidence() -> None:
 
 
 @pytest.mark.parametrize(
-    "field, value",
+    ("field", "value"),
     [
         ("confidence_level", 1.0),
         ("propensity_clip", 0.0),

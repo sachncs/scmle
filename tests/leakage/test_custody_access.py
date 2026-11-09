@@ -78,9 +78,11 @@ def reachable(root, limit=200_000):
         else:
             stack.extend(getattr(item, "__dict__", {}).values())
             for cls in type(item).__mro__:
-                for name in getattr(cls, "__slots__", ()):
-                    if hasattr(item, name):
-                        stack.append(getattr(item, name))
+                stack.extend(
+                    getattr(item, name)
+                    for name in getattr(cls, "__slots__", ())
+                    if hasattr(item, name)
+                )
     return list(seen.values())
 
 

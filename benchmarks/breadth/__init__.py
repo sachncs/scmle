@@ -128,6 +128,33 @@ def section_problems(name: str, kind: str, section: Any) -> list[str]:
     return found
 
 
+def identity_problems(name: str, definition: dict[str, Any]) -> list[str]:
+    """What is wrong with the identity fields of one slice definition.
+
+    Args:
+        name: Slice name the definition is expected to carry.
+        definition: The parsed slice definition with all top-level fields.
+
+    Returns:
+        Problem descriptions of the slice name, status, built value,
+        lifecycle, deployment requirement and benchmark sections.
+    """
+    found: list[str] = []
+    if definition["slice"] != name:
+        found.append(f"{name} names slice {definition['slice']}")
+    if definition["status"] != "definition_only":
+        found.append(f"{name} has status {definition['status']}")
+    if definition["built"] not in BUILT:
+        found.append(f"{name} has unknown built value")
+    if tuple(definition["lifecycle_required"]) != LIFECYCLE:
+        found.append(f"{name} drops a lifecycle stage")
+    if definition["deployment_requirement"].get("declared") is not False:
+        found.append(f"{name} claims a declared deployment requirement")
+    if tuple(definition["benchmarks"]) != SECTIONS:
+        found.append(f"{name} must define exactly {', '.join(SECTIONS)}")
+    return found
+
+
 def problems(name: str, definition: dict[str, Any]) -> list[str]:
     """What is wrong with one slice definition (empty when well formed).
 
@@ -146,18 +173,7 @@ def problems(name: str, definition: dict[str, Any]) -> list[str]:
     ]
     if found:
         return found
-    if definition["slice"] != name:
-        found.append(f"{name} names slice {definition['slice']}")
-    if definition["status"] != "definition_only":
-        found.append(f"{name} has status {definition['status']}")
-    if definition["built"] not in BUILT:
-        found.append(f"{name} has unknown built value")
-    if tuple(definition["lifecycle_required"]) != LIFECYCLE:
-        found.append(f"{name} drops a lifecycle stage")
-    if definition["deployment_requirement"].get("declared") is not False:
-        found.append(f"{name} claims a declared deployment requirement")
-    if tuple(definition["benchmarks"]) != SECTIONS:
-        found.append(f"{name} must define exactly {', '.join(SECTIONS)}")
+    found.extend(identity_problems(name, definition))
     for kind in SECTIONS:
         found += section_problems(
             name, kind, definition["benchmarks"].get(kind)

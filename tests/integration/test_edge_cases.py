@@ -138,10 +138,14 @@ def test_rare_class_is_blocked_or_reduced_clearly(tmp_path):
     frame["y"] = numpy.where(
         numpy.arange(300) < 2, "rare", numpy.where(frame.a > 0, "x", "z")
     )
+    blocked = None
+    result = None
     try:
         result = run(frame, tmp_path, task="classification")
     except errors.BlockedError as error:
-        assert "class" in str(error)
+        blocked = error
+    if blocked is not None:
+        assert "class" in str(blocked)
     else:
         check_inference(result, frame)
 

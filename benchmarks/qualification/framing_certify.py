@@ -94,6 +94,12 @@ POWER_CLUSTERS = 100
 POWER_ATTAINABLE = 0.90
 POWER_FLOOR = 0.80
 Z_95 = 1.6448536269514722
+# share of rows with b = 1 in the selective-label worlds
+B_SHARE = 0.3
+# share of clean label worlds with no selective observation
+UNSELECTED_SHARE = 0.5
+# outcome prevalence of the omission worlds
+FLIP_PREVALENCE = 0.3
 
 
 def size_bound(runs: int = RUNS) -> float:
@@ -322,12 +328,14 @@ def label_world(
         A boolean array of observed outcomes and the 0/1 array `b`.
     """
     rng = randomness.component_rng(seed, "framing.labels", int(planted))
-    b = (rng.random(LABEL_ROWS) < 0.3).astype(float)
+    b = (rng.random(LABEL_ROWS) < B_SHARE).astype(float)
     if planted:
         keep = rng.uniform(0.0, 0.3)
         observed = (b == 1) | (rng.random(LABEL_ROWS) < keep)
     else:
-        rate = 0.0 if rng.random() < 0.5 else rng.uniform(0.0, 0.15)
+        rate = (
+            0.0 if rng.random() < UNSELECTED_SHARE else rng.uniform(0.0, 0.15)
+        )
         observed = rng.random(LABEL_ROWS) >= rate
     return observed, b
 
@@ -344,11 +352,15 @@ def label_certificate(
         The certificate and the measurements.
     """
     detected = sum(
-        baseline.selective_labels(*label_world(True, offset + s)).flagged
+        baseline.selective_labels(
+            *label_world(planted=True, seed=offset + s)
+        ).flagged
         for s in range(LABEL_RUNS)
     )
     alarms = sum(
-        baseline.selective_labels(*label_world(False, offset + s)).flagged
+        baseline.selective_labels(
+            *label_world(planted=False, seed=offset + s)
+        ).flagged
         for s in range(LABEL_RUNS)
     )
     result = qualification.Certificate(
@@ -458,8 +470,10 @@ def feasibility_rows(offset: int, runs: int) -> dict[str, Any]:
     agree = total = 0
     for ratio in FEASIBILITY_RATIOS:
         hits = sum(
-            (lambda r: r[0] == r[1])(feasibility_run(offset + s, ratio))
-            for s in range(runs)
+            result[0] == result[1]
+            for result in (
+                feasibility_run(offset + s, ratio) for s in range(runs)
+            )
         )
         out[f"ratio_{ratio}"] = {"agree": hits, "runs": runs}
         agree += hits
@@ -488,7 +502,7 @@ def omission_frame(
     """
     rng = randomness.component_rng(seed, "framing.omission", int(flips))
     n = 600
-    y = (rng.random(n) < 0.3).astype(int)
+    y = (rng.random(n) < FLIP_PREVALENCE).astype(int)
     if flips:
         pilot_rate = numpy.where(y == 1, 0.8, 0.45)
         base_rate = numpy.where(y == 1, 0.55, 0.15)
@@ -562,9 +576,15 @@ def omission_rows(offset: int, runs: int) -> dict[str, Any]:
         recall, the Wilson upper bound of false questions and whether both
         floors are met.
     """
-    asked = sum(omission_asks(offset + s, True, False) for s in range(runs))
-    robust = sum(omission_asks(offset + s, False, False) for s in range(runs))
-    given = sum(omission_asks(offset + s, True, True) for s in range(runs))
+    asked = sum(
+        omission_asks(offset + s, flips=True, given=False) for s in range(runs)
+    )
+    robust = sum(
+        omission_asks(offset + s, flips=False, given=False) for s in range(runs)
+    )
+    given = sum(
+        omission_asks(offset + s, flips=True, given=True) for s in range(runs)
+    )
     low = certificates.wilson_interval(asked, runs)[0]
     high = certificates.wilson_interval(robust + given, 2 * runs)[1]
     return {
@@ -605,18 +625,19 @@ def fuzz_rows(count: int = 1000) -> dict[str, Any]:
         record = json.loads(json.dumps(base))
         record["seed"] = number
         kind = rng.integers(0, 6)
-        if kind == 0:
-            del record[str(rng.choice(sorted(record)))]
-        elif kind == 1:
-            record[f"extra{rng.integers(1000)}"] = 1
-        elif kind == 2:
-            record[str(rng.choice(["question", "unit"]))] = ""
-        elif kind == 3:
-            record["power"] = float(rng.choice([0.0, 1.0, -1.0, 2.0]))
-        elif kind == 4:
-            record["estimand"]["kind"] = "other"
-        else:
-            record["k_max"] = float(rng.choice([0, -3]))
+        match kind:
+            case 0:
+                del record[str(rng.choice(sorted(record)))]
+            case 1:
+                record[f"extra{rng.integers(1000)}"] = 1
+            case 2:
+                record[str(rng.choice(["question", "unit"]))] = ""
+            case 3:
+                record["power"] = float(rng.choice([0.0, 1.0, -1.0, 2.0]))
+            case 4:
+                record["estimand"]["kind"] = "other"
+            case _:
+                record["k_max"] = float(rng.choice([0, -3]))
         try:
             contracts.AnalysisCharter.from_dict(record)
             accepted += 1

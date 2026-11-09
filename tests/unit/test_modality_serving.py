@@ -159,11 +159,13 @@ def test_modality_http_serving_verifies_health_schema_and_predictions(
         }
         status, body = post(f"{serving.address}/predict", payload)
         assert status == 200
-        assert re.fullmatch(r"srv-[0-9a-f]{32}", cast(str, body["request_id"]))
+        assert re.fullmatch(
+            r"srv-[0-9a-f]{32}", cast("str", body["request_id"])
+        )
         assert body["package_verified"] is True
         assert body["sample_count"] == 2
-        assert len(cast(list[object], body["predictions"])) == 2
-        assert len(cast(list[object], body["probabilities"])) == 2
+        assert len(cast("list[object]", body["predictions"])) == 2
+        assert len(cast("list[object]", body["probabilities"])) == 2
 
         status, body = post(f"{serving.address}/predict", {"samples": []})
         assert status == 422
@@ -185,14 +187,18 @@ def test_modality_http_serving_verifies_health_schema_and_predictions(
         )
         assert status == 415
         assert body["category"] == "request"
-        assert re.fullmatch(r"srv-[0-9a-f]{32}", cast(str, body["request_id"]))
+        assert re.fullmatch(
+            r"srv-[0-9a-f]{32}", cast("str", body["request_id"])
+        )
 
         status, body = request(
             f"{serving.address}/predict", b"not-json", "application/json"
         )
         assert status == 400
         assert body["category"] == "request"
-        assert re.fullmatch(r"srv-[0-9a-f]{32}", cast(str, body["request_id"]))
+        assert re.fullmatch(
+            r"srv-[0-9a-f]{32}", cast("str", body["request_id"])
+        )
     finally:
         serving.stop()
 
@@ -276,7 +282,7 @@ def test_modality_http_serving_rejects_invalid_request_bounds():
     """The reference server refuses unsafe zero-sized request limits."""
     with pytest.raises(ValueError, match="request bounds"):
         modality_serving.ModalityHttpServing(
-            predictor=cast(modality_lifecycle.Predictor, None),
+            predictor=cast("modality_lifecycle.Predictor", None),
             decoder=DocumentDecoder(),
             max_request_bytes=0,
         )
@@ -308,7 +314,9 @@ def test_modality_http_serving_classifies_unexpected_decoder_errors(tmp_path):
         assert status == 500
         assert body["error"] == "internal modality serving failure"
         assert body["category"] == "internal"
-        assert re.fullmatch(r"srv-[0-9a-f]{32}", cast(str, body["request_id"]))
+        assert re.fullmatch(
+            r"srv-[0-9a-f]{32}", cast("str", body["request_id"])
+        )
     finally:
         serving.stop()
 
@@ -370,7 +378,9 @@ def test_modality_http_serving_rejects_unsafe_request_identity(
         assert "request_id" in body
         if request_id:
             assert request_id not in json.dumps(body)
-        assert re.fullmatch(r"srv-[0-9a-f]{32}", cast(str, body["request_id"]))
+        assert re.fullmatch(
+            r"srv-[0-9a-f]{32}", cast("str", body["request_id"])
+        )
     finally:
         serving.stop()
 

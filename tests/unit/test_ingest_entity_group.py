@@ -48,7 +48,7 @@ def test_duplicates_under_different_keys_share_a_group():
 def test_distinct_people_are_not_merged():
     frame = duplicated_table()
     groups, ignored = ingest_stage.resolve_entities(frame, spec())
-    assert groups.nunique() > 1
+    assert not groups.eq(groups.iloc[0]).all()
 
 
 def test_a_missing_entity_field_is_a_config_error():

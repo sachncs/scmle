@@ -116,6 +116,46 @@ def text_or_none(record: Mapping[str, Any], key: str) -> str | None:
     return value
 
 
+def validated_digest(record: Mapping[str, Any]) -> str | None:
+    """Checks the `sha256` field of a manifest entry.
+
+    Args:
+        record: The entry as parsed from JSON.
+
+    Returns:
+        The digest, or None when the entry has none.
+
+    Raises:
+        CorpusError: If the digest is not 64 lowercase hex characters.
+    """
+    digest = record["sha256"]
+    if digest is not None and not (
+        isinstance(digest, str) and SHA256_HEX.fullmatch(digest)
+    ):
+        raise CorpusError("sha256 must be 64 lowercase hex characters")
+    return digest
+
+
+def validated_size(record: Mapping[str, Any]) -> int | None:
+    """Checks the `size_bytes` field of a manifest entry.
+
+    Args:
+        record: The entry as parsed from JSON.
+
+    Returns:
+        The size, or None when the entry has none.
+
+    Raises:
+        CorpusError: If the size is not a positive integer.
+    """
+    size = record["size_bytes"]
+    if size is not None and (
+        isinstance(size, bool) or not isinstance(size, int) or size < 1
+    ):
+        raise CorpusError("size_bytes must be a positive integer or null")
+    return size
+
+
 def parse_entry(record: Mapping[str, Any]) -> Corpus:
     """Validates one manifest entry.
 
@@ -145,16 +185,8 @@ def parse_entry(record: Mapping[str, Any]) -> Corpus:
     url = text_or_none(record, "source_url")
     if url is not None and urllib.parse.urlparse(url).scheme not in SCHEMES:
         raise CorpusError(f"source_url must use one of {SCHEMES}")
-    digest = record["sha256"]
-    if digest is not None and not (
-        isinstance(digest, str) and SHA256_HEX.fullmatch(digest)
-    ):
-        raise CorpusError("sha256 must be 64 lowercase hex characters")
-    size = record["size_bytes"]
-    if size is not None and (
-        isinstance(size, bool) or not isinstance(size, int) or size < 1
-    ):
-        raise CorpusError("size_bytes must be a positive integer or null")
+    digest = validated_digest(record)
+    size = validated_size(record)
     if record["intended_use"] not in USES:
         raise CorpusError(f"intended_use must be one of {USES}")
     if record["status"] not in STATUSES:

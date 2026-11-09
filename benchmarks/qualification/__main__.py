@@ -59,6 +59,7 @@ fail the check, and the loop then does not let an alarm retrain by itself.
 import argparse
 import json
 from pathlib import Path
+from typing import Any
 
 from benchmarks.qualification import f5
 from benchmarks.qualification import f5_corpora
@@ -195,14 +196,22 @@ def check_all() -> int:
     return 0 if ok else 1
 
 
-def main(arguments: list[str] | None = None) -> int:
-    """Runs the requested action and returns a process exit code.
+CHECK_MODULES = {
+    "f11": f11_certify,
+    "loop": loop_certify,
+    "framing": framing_certify,
+    "ingest": ingest_certify,
+}
+
+
+def parse_options(arguments: list[str] | None) -> argparse.Namespace:
+    """Parses the command line.
 
     Args:
         arguments: Command-line arguments; `None` reads `sys.argv`.
 
     Returns:
-        0 when the requested check or write succeeded, otherwise 1.
+        The namespace with the requested action and its settings.
     """
     parser = argparse.ArgumentParser(description=__doc__)
     action = parser.add_mutually_exclusive_group(required=True)
@@ -228,47 +237,68 @@ def main(arguments: list[str] | None = None) -> int:
     parser.add_argument("--runs", type=int, default=2000)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--repeats", type=int, default=400)
-    options = parser.parse_args(arguments)
-    if options.smoke:
-        report = smoke.run_smoke(options.runs, options.seed, options.full)
-        print(json.dumps(report.to_dict(), indent=2))
-        return 0 if report.ok else 1
+    return parser.parse_args(arguments)
+
+
+def print_verdict(found: dict[str, Any]) -> int:
+    """Prints a check's findings and returns its exit code.
+
+    Args:
+        found: The findings, with an `ok` entry.
+
+    Returns:
+        0 when `ok` is true, otherwise 1.
+    """
+    print(json.dumps(found, indent=2))
+    return 0 if found["ok"] else 1
+
+
+def run_check(options: argparse.Namespace) -> int:
+    """Runs the check named by `--check`.
+
+    Args:
+        options: The parsed command line with `check` set.
+
+    Returns:
+        0 when the check held, otherwise 1.
+    """
     if options.check == "all":
         return check_all()
     if options.check == "fdr":
         findings = ledger_checks.run_all(
             options.runs, options.seed, options.repeats
         )
-        summary = ledger_checks.report(findings)
-        print(json.dumps(summary, indent=2))
-        return 0 if summary["ok"] else 1
+        return print_verdict(ledger_checks.report(findings))
     if options.check == "f10":
         issues = f10_certify.problems()
-        f10_report = {
-            "ok": not issues,
-            "problems": issues,
-            "descriptive_only": f10_certify.descriptive_only(),
-        }
-        print(json.dumps(f10_report, indent=2))
-        return 0 if f10_report["ok"] else 1
-    if options.check == "f11":
-        decided = f11_certify.check()
-        print(json.dumps(decided, indent=2))
-        return 0 if decided["ok"] else 1
-    if options.check == "loop":
-        looped = loop_certify.check()
-        print(json.dumps(looped, indent=2))
-        return 0 if looped["ok"] else 1
-    if options.check == "framing":
-        found = framing_certify.check()
-        print(json.dumps(found, indent=2))
-        return 0 if found["ok"] else 1
-    if options.check == "ingest":
-        ingested = ingest_certify.check()
-        print(json.dumps(ingested, indent=2))
-        return 0 if ingested["ok"] else 1
+        return print_verdict(
+            {
+                "ok": not issues,
+                "problems": issues,
+                "descriptive_only": f10_certify.descriptive_only(),
+            }
+        )
+    if options.check in CHECK_MODULES:
+        return print_verdict(CHECK_MODULES[options.check].check())
+    return check_certificates()
+
+
+def main(arguments: list[str] | None = None) -> int:
+    """Runs the requested action and returns a process exit code.
+
+    Args:
+        arguments: Command-line arguments; `None` reads `sys.argv`.
+
+    Returns:
+        0 when the requested check or write succeeded, otherwise 1.
+    """
+    options = parse_options(arguments)
+    if options.smoke:
+        report = smoke.run_smoke(options.runs, options.seed, options.full)
+        print(json.dumps(report.to_dict(), indent=2))
+        return 0 if report.ok else 1
     if options.check:
-        return check_certificates()
+        return run_check(options)
     if options.write_f5:
         store = f5.certify_all()
         store.save(options.write_f5)

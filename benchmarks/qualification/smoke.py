@@ -337,6 +337,18 @@ def check_shift(seed: int) -> list[SmokeCheck]:
     ]
 
 
+def require_current_generators() -> None:
+    """Checks that every oracle file was written by the current generator.
+
+    Raises:
+        OracleError: If an oracle's generator hash is stale.
+    """
+    for name in oracles.NAMES:
+        document = oracles.load_oracle(name)
+        if document.generator_sha256 != oracles.generator_sha256():
+            raise oracles.OracleError(f"{name}: generator hash is stale")
+
+
 def check_oracles() -> SmokeCheck:
     """Oracle integrity and agreement of our statistics with scipy.
 
@@ -351,10 +363,7 @@ def check_oracles() -> SmokeCheck:
     """
     compared = 0
     try:
-        for name in oracles.NAMES:
-            document = oracles.load_oracle(name)
-            if document.generator_sha256 != oracles.generator_sha256():
-                raise oracles.OracleError(f"{name}: generator hash is stale")
+        require_current_generators()
         for case in oracles.load_oracle("wilson_interval").cases:
             given = case["inputs"]
             low, high = certificates.wilson_interval(
@@ -377,12 +386,15 @@ def check_oracles() -> SmokeCheck:
             )
             compared += 1
     except (oracles.OracleError, AssertionError) as error:
-        return SmokeCheck("oracles load and agree", False, str(error))
+        return SmokeCheck("oracles load and agree", ok=False, detail=str(error))
     return SmokeCheck(
         "oracles load and agree",
-        True,
-        f"{len(oracles.NAMES)} files verified, {compared} cases agree with "
-        "scipy; R oracles pending: " + ", ".join(sorted(oracles.PENDING_R)),
+        ok=True,
+        detail=(
+            f"{len(oracles.NAMES)} files verified, {compared} cases agree "
+            "with scipy; R oracles pending: "
+            + ", ".join(sorted(oracles.PENDING_R))
+        ),
     )
 
 
@@ -396,12 +408,14 @@ def check_corpora() -> SmokeCheck:
     try:
         manifest = corpora.load_manifest()
     except corpora.CorpusError as error:
-        return SmokeCheck("corpus manifest is valid", False, str(error))
+        return SmokeCheck(
+            "corpus manifest is valid", ok=False, detail=str(error)
+        )
     verified = sum(c.status == "verified" for c in manifest)
     return SmokeCheck(
         "corpus manifest is valid",
-        True,
-        f"{len(manifest)} corpora, {verified} verified, "
+        ok=True,
+        detail=f"{len(manifest)} corpora, {verified} verified, "
         f"{len(manifest) - verified} candidate",
     )
 

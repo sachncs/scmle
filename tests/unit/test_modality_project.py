@@ -61,7 +61,7 @@ def test_modality_project_rejects_invalid_configuration(tmp_path):
     """Configuration errors are explicit before a lifecycle can start."""
     with pytest.raises(TypeError, match="Preparer"):
         scmle.api.project.ModalityProject(
-            cast(modality_lifecycle.Preparer, object()),
+            cast("modality_lifecycle.Preparer", object()),
             "key",
             output_dir=tmp_path,
         )

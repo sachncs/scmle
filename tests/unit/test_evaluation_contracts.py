@@ -124,7 +124,7 @@ def test_explanation_quality_thresholds_are_explicit_and_serialized():
 
 @pytest.mark.parametrize(
     "field",
-    ("stability_threshold", "fidelity_threshold"),
+    ["stability_threshold", "fidelity_threshold"],
 )
 def test_required_explanation_quality_needs_a_threshold(field):
     values = {

@@ -32,7 +32,7 @@ BEGINNER = (
     "WHAT_SCMLE_CANNOT_DO.md",
     "LEAKAGE.md",
 )
-FENCE = re.compile(r"```(\w+)([^\n]*)\n(.*?)```", re.S)
+FENCE = re.compile(r"```(\w+)([^\n]*)\n(.*?)```", re.DOTALL)
 REQUIRED_TERMS = (
     "target",
     "feature",
@@ -244,10 +244,10 @@ def test_scripts_that_train_keep_the_main_guard(name, index, body):
 def glossary_terms():
     text = (DOCS / "GLOSSARY.md").read_text(encoding="utf-8")
     terms = []
-    for heading in re.findall(r"^### (.+)$", text, re.M):
+    for heading in re.findall(r"^### (.+)$", text, re.MULTILINE):
         plain = re.sub(r"\([^)]*\)", "", heading)
-        for part in plain.split(","):
-            part = part.strip()
+        for raw_part in plain.split(","):
+            part = raw_part.strip()
             if len(part) >= 3:
                 terms.append(part)
     return terms
@@ -255,7 +255,7 @@ def glossary_terms():
 
 def test_the_glossary_has_every_required_term():
     text = (DOCS / "GLOSSARY.md").read_text(encoding="utf-8").lower()
-    headings = " ".join(re.findall(r"^### (.+)$", text, re.M))
+    headings = " ".join(re.findall(r"^### (.+)$", text, re.MULTILINE))
     missing = [t for t in REQUIRED_TERMS if t not in headings and t not in text]
     assert not missing, missing
     for term in ("custody", "tier", "rto", "rpo", "canary", "e-value"):
@@ -264,7 +264,7 @@ def test_the_glossary_has_every_required_term():
 
 def test_every_glossary_entry_has_meaning_example_and_reason():
     text = (DOCS / "GLOSSARY.md").read_text(encoding="utf-8")
-    sections = re.split(r"^### ", text, flags=re.M)[1:]
+    sections = re.split(r"^### ", text, flags=re.MULTILINE)[1:]
     for section in sections:
         title = section.splitlines()[0]
         for label in ("**Meaning.**", "**Example.**", "**Why it matters.**"):

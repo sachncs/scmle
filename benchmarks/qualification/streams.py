@@ -47,6 +47,8 @@ import numpy
 
 KINDS = ("none", "abrupt", "gradual", "covariate", "concept")
 LABELS = ("full", "mar", "mnar")
+# probability of approving a skipped case
+FAIR_COIN = 0.5
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -165,7 +167,7 @@ def risk_path(spec: StreamSpec) -> numpy.ndarray:
     index = numpy.arange(spec.batches)
     path = numpy.full(spec.batches, spec.base, dtype=float)
     after = index >= spec.change
-    if spec.kind == "abrupt" or spec.kind == "concept":
+    if spec.kind in {"abrupt", "concept"}:
         path[after] = spec.base + spec.delta
     elif spec.kind == "gradual":
         part = numpy.clip(
@@ -318,7 +320,7 @@ def feedback_stream(
     shape = (batches, size)
     skipped = rng.random(shape) < bypass
     z = rng.standard_normal(shape)
-    coin = rng.random(shape) < 0.5
+    coin = rng.random(shape) < FAIR_COIN
     approved = numpy.where(skipped, coin, z > 0)
     next_z = z + gamma * approved + 0.5 * rng.standard_normal(shape)
     return FeedbackStream(z, next_z, skipped, approved, gamma)

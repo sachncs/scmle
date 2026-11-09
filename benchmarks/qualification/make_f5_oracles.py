@@ -20,6 +20,8 @@ import sys
 import numpy
 
 CASES = ((0, 300, 3), (1, 500, 2), (2, 400, 4))
+# share of labels flipped at random
+FLIP_SHARE = 0.1
 
 
 def build() -> dict[str, object]:
@@ -40,7 +42,7 @@ def build() -> dict[str, object]:
             rng.normal(size=(rows, classes)) + 2.5 * numpy.eye(classes)[truth]
         )
         probs = numpy.exp(logits) / numpy.exp(logits).sum(axis=1, keepdims=True)
-        flip = rng.random(rows) < 0.1
+        flip = rng.random(rows) < FLIP_SHARE
         given = numpy.where(flip, (truth + 1) % classes, truth)
         issues = find_label_issues(given, probs, filter_by="confident_learning")
         cases.append(

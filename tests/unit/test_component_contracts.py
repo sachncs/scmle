@@ -34,15 +34,15 @@ from scmle.sampling import synthesis
 def concrete_subclasses(base, *modules):
     found = []
     for module in modules:
-        for member in dict(
-            inspect.getmembers(module, inspect.isclass)
-        ).values():
-            if (
-                issubclass(member, base)
-                and member is not base
-                and member.__module__ == module.__name__
-            ):
-                found.append(member)
+        found.extend(
+            member
+            for member in dict(
+                inspect.getmembers(module, inspect.isclass)
+            ).values()
+            if issubclass(member, base)
+            and member is not base
+            and member.__module__ == module.__name__
+        )
     return found
 
 

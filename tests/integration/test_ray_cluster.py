@@ -3,6 +3,7 @@
 import dataclasses
 import importlib.util
 import os
+import pathlib
 import signal
 import sys
 
@@ -41,7 +42,7 @@ def cluster():
 
     if ray.is_initialized():
         ray.shutdown()
-    tests_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    tests_dir = str(pathlib.Path(__file__).resolve().parent.parent)
     os.environ["PYTHONPATH"] = os.pathsep.join(
         [tests_dir, os.environ.get("PYTHONPATH", "")]
     )

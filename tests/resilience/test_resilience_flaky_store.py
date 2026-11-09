@@ -305,11 +305,15 @@ def test_an_unusable_input_stops_at_it_and_leaves_the_checkpoint_alone(
     store, reference, after_two, torn
 ):
     store.put("input/o2-bad.csv", torn)
+    failure = None
+    result = None
     try:
         result = failpoints.processor(store, policy=POLICY).run()
-    except Exception as error:
-        assert not isinstance(error, processing.CheckpointCorruptError)
-        stopped_by = type(error).__name__
+    except Exception as error:  # noqa: BLE001 -- any stop is acceptable; the test checks which one and that the checkpoint survives
+        failure = error
+    if failure is not None:
+        assert not isinstance(failure, processing.CheckpointCorruptError)
+        stopped_by = type(failure).__name__
     else:
         assert result.failed == "input/o2-bad.csv"
         stopped_by = result.error

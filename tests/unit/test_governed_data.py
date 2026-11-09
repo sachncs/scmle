@@ -322,7 +322,7 @@ def test_a_crash_between_output_and_checkpoint_recovers_without_duplicates(
 
     def crash_on_b(key):
         if key == "input/b.csv":
-            raise Crash()
+            raise Crash
 
     crashing = processor(store, before_commit=crash_on_b)
     with pytest.raises(Crash):

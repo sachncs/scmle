@@ -20,12 +20,13 @@ def test_verdict_away_from_boundary_matches_the_oracle():
     runs = 60
     for ratio in framing_certify.FEASIBILITY_RATIOS:
         agree = sum(
-            (lambda r: r[0] == r[1])(
+            result[0] == result[1]
+            for result in (
                 framing_certify.feasibility_run(
                     framing_certify.DEV_SEED_BASE + s, ratio
                 )
+                for s in range(runs)
             )
-            for s in range(runs)
         )
         assert agree / runs >= 0.9
 
