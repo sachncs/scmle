@@ -1,8 +1,8 @@
-"""Contracts of the analysis charter (feature F1).
+"""Contracts of the analysis charter.
 
 The charter fixes, before any data is profiled, what is being asked, how a
 claim will be judged and what error the run may spend. Its estimand follows
-the attributes of ICH E9(R1): population, target variable, intercurrent
+the attributes of the ICH E9 addendum: population, target variable, intercurrent
 events and their handling strategy, and a summary measure; a prediction task
 adds the prediction moment. The class is named `AnalysisEstimand` because
 `EstimandSpec` already exists for parameter estimation.
@@ -57,7 +57,17 @@ class DecisionAction(enum.StrEnum):
 
 
 def texts(values: Iterable[Any], name: str) -> tuple[str, ...]:
-    """Returns a tuple of non-empty strings."""
+    """Converts values to text and requires each to be non-blank.
+
+    A blank value raises `ValueError` (from `evidence.require_text`).
+
+    Args:
+        values: The items; each is converted with `str`.
+        name: Field name used in the error message.
+
+    Returns:
+        The stripped strings, in the order of `values`.
+    """
     return tuple(evidence.require_text(str(v), name) for v in values)
 
 
@@ -74,27 +84,45 @@ class IntercurrentEvent:
     strategy: str
 
     def __post_init__(self) -> None:
-        """Validates the record."""
+        """Validates the record.
+
+        A blank `event` or `strategy` raises `ValueError` (from
+        `evidence.require_text`).
+        """
         evidence.require_text(self.event, "event")
         evidence.require_text(self.strategy, "strategy")
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Serializes the record.
+
+        Returns:
+            A JSON-ready dict of the record's fields.
+        """
         return dataclasses.asdict(self)
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds the event, rejecting unknown or missing fields."""
+        """Rebuilds the event from a dict.
+
+        Keys other than the fields, and missing fields, are rejected with
+        the `ValueError` of `qualification.require_fields`.
+
+        Args:
+            record: Field names to values, as produced by `to_dict`.
+
+        Returns:
+            The rebuilt event.
+        """
         qualification.require_fields(cls, record)
         return cls(**record)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class AnalysisEstimand:
-    """What the analysis estimates, in ICH E9(R1) terms.
+    """What the analysis estimates, in terms of the ICH E9 addendum.
 
     Attributes:
-        kind: `predictive` or `causal`; selects the admissibility rule (F4).
+        kind: `predictive` or `causal`; selects the admissibility rule.
         population: Who or what the claim is about.
         target: The variable, with its measurement window.
         prediction_moment: When a prediction is issued (the as-of rule).
@@ -115,7 +143,14 @@ class AnalysisEstimand:
     causal: causal_module.CausalSpec | None = None
 
     def __post_init__(self) -> None:
-        """Validates the estimand."""
+        """Validates the estimand.
+
+        Raises:
+            ValueError: If `kind` is not in `ESTIMAND_KINDS`, `population`,
+                `target`, `prediction_moment` or `summary_measure` is
+                blank, `intercurrent_events` is not a tuple or is empty, or
+                a causal block is given and `kind` is not `causal`.
+        """
         if self.kind not in ESTIMAND_KINDS:
             raise ValueError(f"kind must be one of {ESTIMAND_KINDS}")
         evidence.require_text(self.population, "population")
@@ -134,7 +169,12 @@ class AnalysisEstimand:
             raise ValueError("a causal block needs kind='causal'")
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Serializes the estimand.
+
+        Returns:
+            A JSON-ready dict of the fields, with `intercurrent_events` as a
+            list of dicts. `causal` is included, as a dict, only when set.
+        """
         record: dict[str, Any] = {
             "kind": self.kind,
             "population": self.population,
@@ -151,7 +191,18 @@ class AnalysisEstimand:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds the estimand, rejecting unknown or missing fields."""
+        """Rebuilds the estimand from a dict.
+
+        `causal` may be absent and then defaults to None. Other missing
+        fields, and keys that are not fields, are rejected with the
+        `ValueError` of `qualification.require_fields`.
+
+        Args:
+            record: Field names to values, as produced by `to_dict`.
+
+        Returns:
+            The rebuilt estimand.
+        """
         record = {"causal": None, **record}
         qualification.require_fields(cls, record)
         block = record["causal"]
@@ -191,14 +242,24 @@ class DecisionRow:
     certificate_id: str = ""
 
     def __post_init__(self) -> None:
-        """Validates the row."""
+        """Validates the row.
+
+        Raises:
+            ValueError: If `check_id` or `trigger` is blank, or `action` is
+                not a `DecisionAction`.
+        """
         evidence.require_text(self.check_id, "check_id")
         evidence.require_text(self.trigger, "trigger")
         if not isinstance(self.action, DecisionAction):
             raise ValueError("action must be a DecisionAction")
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Serializes the row.
+
+        Returns:
+            A JSON-ready dict of the fields, with `action` as its string
+            value.
+        """
         return {
             "check_id": self.check_id,
             "trigger": self.trigger,
@@ -208,7 +269,18 @@ class DecisionRow:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds the row, rejecting unknown or missing fields."""
+        """Rebuilds the row from a dict.
+
+        Keys other than the fields, and missing fields, are rejected with
+        the `ValueError` of `qualification.require_fields`; an `action`
+        that is not a `DecisionAction` value also raises `ValueError`.
+
+        Args:
+            record: Field names to values, as produced by `to_dict`.
+
+        Returns:
+            The rebuilt row.
+        """
         qualification.require_fields(cls, record)
         return cls(
             check_id=record["check_id"],
@@ -220,7 +292,7 @@ class DecisionRow:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class SetSizes:
-    """How the development rows are divided (F2).
+    """How the development rows are divided.
 
     Attributes:
         confirmation_fraction: Share of development rows carved out as the
@@ -233,7 +305,13 @@ class SetSizes:
     embargo_rows: int = 0
 
     def __post_init__(self) -> None:
-        """Validates the sizes."""
+        """Validates the sizes.
+
+        Raises:
+            ValueError: If `confirmation_fraction` is not finite or is
+                outside (0, `MAX_CONFIRMATION_FRACTION`], or `embargo_rows`
+                is not a non-negative integer.
+        """
         fraction = qualification.finite(
             self.confirmation_fraction, "confirmation_fraction"
         )
@@ -245,19 +323,33 @@ class SetSizes:
         qualification.count(self.embargo_rows, "embargo_rows")
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Serializes the record.
+
+        Returns:
+            A JSON-ready dict of the record's fields.
+        """
         return dataclasses.asdict(self)
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds the sizes, rejecting unknown or missing fields."""
+        """Rebuilds the sizes from a dict.
+
+        Keys other than the fields, and missing fields, are rejected with
+        the `ValueError` of `qualification.require_fields`.
+
+        Args:
+            record: Field names to values, as produced by `to_dict`.
+
+        Returns:
+            The rebuilt sizes.
+        """
         qualification.require_fields(cls, record)
         return cls(**record)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Choice:
-    """A defensible analysis choice declared before exploration (F6).
+    """A defensible analysis choice declared before exploration.
 
     Attributes:
         name: The choice (for example "imputation").
@@ -270,7 +362,13 @@ class Choice:
     default: str
 
     def __post_init__(self) -> None:
-        """Validates the choice."""
+        """Validates the choice.
+
+        Raises:
+            ValueError: If `name` is blank, `options` is not a tuple, is
+                empty or has a repeat, or `default` is not one of the
+                options.
+        """
         evidence.require_text(self.name, "name")
         qualification.require_tuple(self.options, "options")
         if not self.options or len(set(self.options)) != len(self.options):
@@ -279,7 +377,11 @@ class Choice:
             raise ValueError("default must be one of the options")
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Serializes the choice.
+
+        Returns:
+            A JSON-ready dict of the fields, with `options` as a list.
+        """
         return {
             "name": self.name,
             "options": list(self.options),
@@ -288,7 +390,17 @@ class Choice:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds the choice, rejecting unknown or missing fields."""
+        """Rebuilds the choice from a dict.
+
+        Keys other than the fields, and missing fields, are rejected with
+        the `ValueError` of `qualification.require_fields`.
+
+        Args:
+            record: Field names to values, as produced by `to_dict`.
+
+        Returns:
+            The rebuilt choice.
+        """
         qualification.require_fields(cls, record)
         return cls(
             name=record["name"],
@@ -298,7 +410,19 @@ class Choice:
 
 
 def positive(value: Any, name: str) -> float:
-    """A finite number strictly greater than zero."""
+    """Checks that a number is finite and strictly greater than zero.
+
+    Args:
+        value: The candidate number.
+        name: Name used in the error message.
+
+    Returns:
+        `value` as a float.
+
+    Raises:
+        ValueError: If `value` is not a finite int or float (a bool is
+            rejected) or is not greater than 0.
+    """
     number = qualification.finite(value, name)
     if number <= 0:
         raise ValueError(f"{name} must be greater than 0")
@@ -307,7 +431,7 @@ def positive(value: Any, name: str) -> float:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class AnalysisCharter:
-    """The signed plan of an analysis, fixed before any exploration.
+    """The signed specification of an analysis, fixed before any exploration.
 
     Attributes:
         question: The question being answered.
@@ -324,7 +448,7 @@ class AnalysisCharter:
         error_budget: Alpha, exploration wealth, permutations, tolerances.
         multiverse: Defensible choices declared in advance.
         seed: Seed of every random draw the charter governs.
-        cost_model: Costs of acting and not acting (F8), fixed before `C`
+        cost_model: Costs of acting and not acting, fixed before `C`
             is opened; None for a charter that does not claim a decision
             benefit. Format 1 charters have none and load unchanged.
         rules: Pre-registered ledger rule, confirmation rule, failure
@@ -344,8 +468,8 @@ class AnalysisCharter:
             windows, lag, reconciliation delay and key tolerances; None for
             a charter that reads a file, which serialises, hashes and loads
             as a format 1-6 charter did.
-        uncertainty: The uncertainty block (format 10, 11 with the claim on the
-            confirmation rows): the cap on the fold
+        uncertainty: The uncertainty block (format 10, or 11 with the
+            coverage claim on the confirmation rows): the cap on the fold
             models a bundle keeps for CV+; None for a charter that does not
             fix it, which serialises, hashes and loads as a format 1-9
             charter did.
@@ -372,7 +496,19 @@ class AnalysisCharter:
     uncertainty: uncertainty_module.UncertaintySpec | None = None
 
     def __post_init__(self) -> None:
-        """Validates the charter, including the decision-map lint."""
+        """Validates the charter, including the decision-map lint.
+
+        Raises:
+            ValueError: If `question`, `unit` or `deployment_population` is
+                blank; `gating_checks`, `decision_map` or `multiverse` is
+                not a tuple; `min_effect` is not finite and positive;
+                `k_max` is not an integer of at least 1; `power` is not
+                strictly in (0, 1); `seed` is not a non-negative integer; a
+                multiverse name repeats; the decision map fails
+                `check_decision_map`; a decision layer is given without a
+                `cost_model`; or `unit_of_prediction` is set and not in
+                `UNITS_OF_PREDICTION`.
+        """
         evidence.require_text(self.question, "question")
         evidence.require_text(self.unit, "unit")
         evidence.require_text(
@@ -401,7 +537,12 @@ class AnalysisCharter:
             )
 
     def check_decision_map(self) -> None:
-        """Every gating check has exactly one row and a certificate id."""
+        """Checks that every gating check has one row and a certificate id.
+
+        Raises:
+            ValueError: If two rows name the same check, a gating check has
+                no row, or its row has a blank `certificate_id`.
+        """
         rows: dict[str, DecisionRow] = {}
         for row in self.decision_map:
             if row.check_id in rows:
@@ -423,7 +564,8 @@ class AnalysisCharter:
             known_checks: Identifiers of the registered checks.
 
         Raises:
-            ValueError: If any row or gating check is unknown.
+            ValueError: If a decision row or a gating check names an
+                identifier that is not in `known_checks`.
         """
         known = set(known_checks)
         for check_id in (
@@ -441,7 +583,17 @@ class AnalysisCharter:
         ).hexdigest()
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record; fractions are written as ``"p/q"`` strings."""
+        """Serializes the charter.
+
+        The optional blocks (`cost_model`, `rules`, `decision`,
+        `unit_of_prediction`, `ingest`, `uncertainty`) are included only
+        when set, so a charter without them serializes, and hashes, as it
+        did before they existed.
+
+        Returns:
+            A JSON-ready dict of the charter; fractions in the error budget
+            are written as ``"p/q"`` strings.
+        """
         record = {
             "question": self.question,
             "estimand": self.estimand.to_dict(),
@@ -473,13 +625,15 @@ class AnalysisCharter:
 
     @property
     def format_version(self) -> int:
-        """Oldest format that carries this charter.
+        """The oldest charter format that can carry this charter.
 
-        2; 3 with rules; 4 with a causal block; 5 with a decision layer; 6
-        with a unit of prediction; 7 with an ingest block; 8 when the ingest
-        block carries an entity or reconcile sub-block; 9 when the causal
-        block carries subgroups or attestors; 10 with an uncertainty block; 11
-        when that block asks for the coverage claim on the confirmation rows.
+        It is 2 for a charter without optional blocks; 3 with rules; 4 with
+        a causal block; 5 with a decision layer; 6 with a unit of
+        prediction; 7 with an ingest block; 8 when the ingest block carries
+        an entity or reconcile sub-block; 9 when the causal block carries
+        subgroups, attestors or an attestations file; 10 with an
+        uncertainty block; 11 when that block asks for the coverage claim on
+        the confirmation rows. The largest applicable value is used.
         """
         found = 2 if self.rules is None else 3
         causal_block = self.estimand.causal
@@ -505,7 +659,20 @@ class AnalysisCharter:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds the charter, rejecting unknown or missing fields."""
+        """Rebuilds the charter from a dict.
+
+        The optional fields `cost_model`, `rules`, `decision`,
+        `unit_of_prediction`, `ingest` and `uncertainty` may be absent and
+        then default to None. Other missing fields, and keys that are not
+        fields, are rejected with the `ValueError` of
+        `qualification.require_fields`.
+
+        Args:
+            record: Field names to values, as produced by `to_dict`.
+
+        Returns:
+            The rebuilt charter.
+        """
         record = {
             "cost_model": None,
             "rules": None,
@@ -569,9 +736,16 @@ class AnalysisCharter:
 
 
 def template() -> dict[str, Any]:
-    """A skeleton charter whose required text fields are blank.
+    """Builds a skeleton charter record for the analyst to fill in.
 
-    It deliberately fails validation until the analyst fills it in.
+    The required text fields are blank and the lists are empty, so the
+    record fails validation until they are filled in. The numeric fields
+    carry starting values: a confirmation fraction of 0.25, no embargo, a
+    minimum effect of 0.2, `k_max` 10, power 0.8, an error budget created
+    with levels 0.05 and 0.1, and seed 0.
+
+    Returns:
+        A dict in the shape of `AnalysisCharter.to_dict`.
     """
     return {
         "question": "",
@@ -598,7 +772,18 @@ def template() -> dict[str, Any]:
 
 
 def charter_from_record(record: Mapping[str, Any]) -> AnalysisCharter:
-    """Builds a charter, reporting problems as a `ConfigError`."""
+    """Builds a charter from a record, reporting problems as `ConfigError`.
+
+    Args:
+        record: A charter record as written by `AnalysisCharter.to_dict`.
+
+    Returns:
+        The validated charter.
+
+    Raises:
+        ConfigError: If `AnalysisCharter.from_dict` raises `ValueError`,
+            `KeyError` or `TypeError` for the record.
+    """
     try:
         return AnalysisCharter.from_dict(record)
     except (ValueError, KeyError, TypeError) as error:
@@ -608,7 +793,18 @@ def charter_from_record(record: Mapping[str, Any]) -> AnalysisCharter:
 
 
 def load_json(path: str | Path) -> dict[str, Any]:
-    """Reads a JSON object, reporting problems as a `ConfigError`."""
+    """Reads a JSON object from a file.
+
+    Args:
+        path: The file to read, as UTF-8 text.
+
+    Returns:
+        The decoded top-level object.
+
+    Raises:
+        ConfigError: If the file cannot be read or decoded as JSON, or its
+            top-level value is not an object.
+    """
     try:
         record = json.loads(Path(path).read_text(encoding="utf-8"))
     except (OSError, ValueError) as error:
@@ -621,7 +817,18 @@ def load_json(path: str | Path) -> dict[str, Any]:
 
 
 def read_charter(path: str | Path) -> AnalysisCharter:
-    """Reads a charter file, bare or in its signed wrapper (unverified)."""
+    """Reads a charter file without verifying its hash or signature.
+
+    A file with a `charter` key is read as the signed wrapper and that
+    entry is used; any other object is read as a bare charter. Problems
+    raise `ConfigError` (from `load_json` and `charter_from_record`).
+
+    Args:
+        path: The charter file.
+
+    Returns:
+        The validated charter.
+    """
     record = load_json(path)
     inner = record.get("charter", record)
     return charter_from_record(inner)

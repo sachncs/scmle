@@ -4,8 +4,8 @@ A `kind="causal"` estimand may carry a `CausalSpec`: the treatment, the
 outcome, the estimand, the design columns, the assumptions the analyst
 attests, the priority order of strategies, the pre-registered negative
 controls and the sensitivity benchmark. The identification step reads this
-block and nothing else to choose a strategy (F10), so the choice is a function
-of the charter and never of the outcome values.
+block and nothing else to choose a strategy, so the choice is a function of
+the charter and never of the outcome values.
 
 Versioning. An estimand without the block serialises exactly as before (the
 key is omitted), so every charter signed under format 1 to 3 keeps its hash
@@ -45,10 +45,19 @@ BENCHMARKS = ("strongest_observed", "fixed")
 
 
 def covariates_of(assumptions: Iterable[str]) -> tuple[str, ...] | None:
-    """The covariates named by `unconfoundedness_given:...`, if declared.
+    """Extracts the covariates named by `unconfoundedness_given:...`.
+
+    Only the first item that starts with the `unconfoundedness_given:`
+    prefix is read; the text after it is split on commas, stripped, and
+    blank names are dropped.
+
+    Args:
+        assumptions: Assumption words of a causal block.
 
     Returns:
-        The names in declared order, or None when the assumption is absent.
+        The covariate names in declared order; an empty tuple when the only
+        name is `none` (no adjustment needed); None when no item carries
+        the prefix.
     """
     for item in assumptions:
         if item.startswith(UNCONFOUNDEDNESS_PREFIX):
@@ -59,7 +68,17 @@ def covariates_of(assumptions: Iterable[str]) -> tuple[str, ...] | None:
 
 
 def check_assumption(item: str) -> None:
-    """Raises `ValueError` for a word outside the closed vocabulary."""
+    """Checks an assumption word against the closed vocabulary.
+
+    Args:
+        item: One assumption: a member of `FIXED_ASSUMPTIONS`, or
+            `unconfoundedness_given:` followed by covariate names.
+
+    Raises:
+        ValueError: If `item` starts with `unconfoundedness_given:` but
+            nothing (or only whitespace) follows it, or if it is neither a
+            fixed assumption nor of that form.
+    """
     if item in FIXED_ASSUMPTIONS:
         return
     if item.startswith(UNCONFOUNDEDNESS_PREFIX):
@@ -92,18 +111,37 @@ class NegativeControl:
     variable: str
 
     def __post_init__(self) -> None:
-        """Validates the record."""
+        """Validates the record.
+
+        Raises:
+            ValueError: If `kind` is not in `NEGATIVE_CONTROL_KINDS` or
+                `variable` is blank.
+        """
         if self.kind not in NEGATIVE_CONTROL_KINDS:
             raise ValueError(f"kind must be one of {NEGATIVE_CONTROL_KINDS}")
         evidence.require_text(self.variable, "variable")
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Serializes the record.
+
+        Returns:
+            A JSON-ready dict of the record's fields.
+        """
         return dataclasses.asdict(self)
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds the control, rejecting unknown or missing fields."""
+        """Rebuilds the control from a dict.
+
+        Keys other than the fields, and missing fields, are rejected with
+        the `ValueError` of `qualification.require_fields`.
+
+        Args:
+            record: Field names to values, as produced by `to_dict`.
+
+        Returns:
+            The rebuilt control.
+        """
         qualification.require_fields(cls, record)
         return cls(**record)
 
@@ -125,7 +163,12 @@ class Subgroup:
     values: tuple[str, ...]
 
     def __post_init__(self) -> None:
-        """Validates the record."""
+        """Validates the record.
+
+        Raises:
+            ValueError: If `column` or any value is blank, `values` is not
+                a tuple, is empty, or contains a duplicate.
+        """
         evidence.require_text(self.column, "column")
         qualification.require_tuple(self.values, "values")
         if not self.values:
@@ -136,12 +179,26 @@ class Subgroup:
             raise ValueError("duplicate subgroup value")
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Serializes the record.
+
+        Returns:
+            A JSON-ready dict with `column` and `values` (as a list).
+        """
         return {"column": self.column, "values": list(self.values)}
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds the record, rejecting unknown or missing fields."""
+        """Rebuilds the subgroup from a dict.
+
+        Keys other than the fields, and missing fields, are rejected with
+        the `ValueError` of `qualification.require_fields`.
+
+        Args:
+            record: Field names to values, as produced by `to_dict`.
+
+        Returns:
+            The rebuilt subgroup.
+        """
         qualification.require_fields(cls, record)
         return cls(record["column"], tuple(record["values"]))
 
@@ -161,7 +218,13 @@ class Attestor:
     assumptions: tuple[str, ...]
 
     def __post_init__(self) -> None:
-        """Validates the record."""
+        """Validates the record.
+
+        Raises:
+            ValueError: If `name` or `role` is blank, `assumptions` is not
+                a tuple, is empty, holds a word `check_assumption` rejects,
+                or contains a duplicate.
+        """
         evidence.require_text(self.name, "name")
         evidence.require_text(self.role, "role")
         qualification.require_tuple(self.assumptions, "assumptions")
@@ -173,7 +236,12 @@ class Attestor:
             raise ValueError("duplicate assumption for an attestor")
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Serializes the record.
+
+        Returns:
+            A JSON-ready dict of the record's fields, with `assumptions` as
+            a list.
+        """
         return {
             "name": self.name,
             "role": self.role,
@@ -182,7 +250,17 @@ class Attestor:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds the record, rejecting unknown or missing fields."""
+        """Rebuilds the attestor from a dict.
+
+        Keys other than the fields, and missing fields, are rejected with
+        the `ValueError` of `qualification.require_fields`.
+
+        Args:
+            record: Field names to values, as produced by `to_dict`.
+
+        Returns:
+            The rebuilt attestor.
+        """
         qualification.require_fields(cls, record)
         return cls(record["name"], record["role"], tuple(record["assumptions"]))
 
@@ -206,7 +284,13 @@ class SensitivitySpec:
     m_max: float = 1.0
 
     def __post_init__(self) -> None:
-        """Validates the record."""
+        """Validates the record.
+
+        Raises:
+            ValueError: If `benchmark` is not in `BENCHMARKS`, `strength` is
+                not a finite positive number (or is at least 1 for the
+                `fixed` benchmark), or `m_max` is not finite or is negative.
+        """
         if self.benchmark not in BENCHMARKS:
             raise ValueError(f"benchmark must be one of {BENCHMARKS}")
         value = qualification.finite(self.strength, "strength")
@@ -218,12 +302,26 @@ class SensitivitySpec:
             raise ValueError("m_max must not be negative")
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Serializes the record.
+
+        Returns:
+            A JSON-ready dict of the record's fields.
+        """
         return dataclasses.asdict(self)
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds the record, rejecting unknown or missing fields."""
+        """Rebuilds the record from a dict.
+
+        Keys other than the fields, and missing fields, are rejected with
+        the `ValueError` of `qualification.require_fields`.
+
+        Args:
+            record: Field names to values, as produced by `to_dict`.
+
+        Returns:
+            The rebuilt record.
+        """
         qualification.require_fields(cls, record)
         return cls(**record)
 
@@ -288,7 +386,18 @@ class CausalSpec:
     attestations: str | None = None
 
     def __post_init__(self) -> None:
-        """Validates the block."""
+        """Validates the block.
+
+        Raises:
+            ValueError: If `treatment` or `outcome` is blank; `estimand` is
+                not in `CAUSAL_ESTIMANDS`; a tuple-valued field is not a
+                tuple; an assumption is outside the vocabulary or repeated;
+                a strategy is repeated; the attestors are inconsistent (see
+                `check_attestors`); two subgroups share a column or a
+                subgroup column is the treatment or the outcome; `cutoff`
+                is not finite; `trim` is not finite or outside [0, 0.5);
+                or `min_share` is not finite or outside (0, 1].
+        """
         evidence.require_text(self.treatment, "treatment")
         evidence.require_text(self.outcome, "outcome")
         if self.estimand not in CAUSAL_ESTIMANDS:
@@ -324,7 +433,14 @@ class CausalSpec:
             raise ValueError("min_share must be within (0, 1]")
 
     def check_attestors(self) -> None:
-        """Attestors are unique, name declared assumptions, and have a file."""
+        """Checks the attestors against the rest of the block.
+
+        Raises:
+            ValueError: If two attestors share a name, attestors are given
+                without an `attestations` file, an `attestations` file is
+                given without attestors or is blank, or an attestor names an
+                assumption that the block does not declare.
+        """
         names = [a.name for a in self.attestors]
         if len(set(names)) != len(names):
             raise ValueError("duplicate attestor")
@@ -343,7 +459,15 @@ class CausalSpec:
                 )
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Serializes the block.
+
+        Tuples become lists and nested records become dicts. `subgroups`,
+        `attestors` and `attestations` are omitted when empty or None, so a
+        block without them serializes as it did before they existed.
+
+        Returns:
+            A JSON-ready dict of the block.
+        """
         record = dataclasses.asdict(self)
         record["negative_controls"] = [
             c.to_dict() for c in self.negative_controls
@@ -364,7 +488,18 @@ class CausalSpec:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds the block, rejecting unknown or missing fields."""
+        """Rebuilds the block from a dict.
+
+        Fields that have a default may be absent from `record` and then take
+        that default. Other missing fields, and keys that are not fields,
+        are rejected with the `ValueError` of `qualification.require_fields`.
+
+        Args:
+            record: Field names to values, as produced by `to_dict`.
+
+        Returns:
+            The rebuilt block.
+        """
         defaults = {
             f.name: f.default
             for f in dataclasses.fields(cls)

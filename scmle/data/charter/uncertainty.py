@@ -1,4 +1,4 @@
-"""The charter's uncertainty block (feature F12, format 10).
+"""The charter's uncertainty block (format 10).
 
 Everything here is optional: a charter without an `UncertaintySpec`
 serialises, hashes and loads exactly as a format 1 to 9 charter did. The
@@ -42,7 +42,14 @@ class UncertaintySpec:
     coverage_on_confirmation: bool = False
 
     def __post_init__(self) -> None:
-        """Validates the block."""
+        """Validates the block.
+
+        Raises:
+            ValueError: If `coverage_on_confirmation` is not a bool,
+                `slice_columns` is not a tuple, holds a duplicate or a
+                non-string or blank name, or `cv_plus_max_bytes` is set but
+                is not an integer of at least 1.
+        """
         if not isinstance(self.coverage_on_confirmation, bool):
             raise ValueError("coverage_on_confirmation must be a bool")
         qualification.require_tuple(self.slice_columns, "slice_columns")
@@ -56,7 +63,14 @@ class UncertaintySpec:
             )
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record; unset fields are omitted."""
+        """Serializes the block.
+
+        Returns:
+            A JSON-ready dict holding only the fields that are set:
+            `cv_plus_max_bytes` when not None, `slice_columns` (as a list)
+            when non-empty, and `coverage_on_confirmation` (as True) when
+            true. A block with defaults gives an empty dict.
+        """
         record: dict[str, Any] = {}
         if self.cv_plus_max_bytes is not None:
             record["cv_plus_max_bytes"] = self.cv_plus_max_bytes
@@ -68,7 +82,20 @@ class UncertaintySpec:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds the block, rejecting unknown fields."""
+        """Rebuilds the block from a dict.
+
+        Every field is optional and takes its default when absent.
+
+        Args:
+            record: Field names to values, as produced by `to_dict`.
+
+        Returns:
+            The rebuilt block.
+
+        Raises:
+            ValueError: If `record` has a key that is not a field, or a
+                value fails the validation of the constructor.
+        """
         unknown = set(record) - {
             "cv_plus_max_bytes",
             "slice_columns",

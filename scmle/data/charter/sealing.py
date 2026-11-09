@@ -1,4 +1,4 @@
-"""Storing, signing and verifying a charter (feature F1).
+"""Storing, signing and verifying a charter.
 
 A charter file wraps the charter with its SHA-256 hash and, when a key is
 available, an HMAC-SHA256 signature over the canonical payload. The signature
@@ -46,7 +46,18 @@ class VerifiedCharter:
 def envelope(
     charter: contracts.AnalysisCharter, signing_key: str | bytes | None
 ) -> dict[str, Any]:
-    """The JSON wrapper stored on disk."""
+    """Builds the JSON wrapper that is stored on disk.
+
+    Args:
+        charter: The validated charter.
+        signing_key: Key to sign with; when None the key is taken from the
+            environment. An empty or missing key gives an unsigned wrapper.
+
+    Returns:
+        A dict with the charter format, the charter record, its hash, the
+        signature algorithm and the signature (None when no key is
+        available).
+    """
     key = signing.resolve_key(signing_key)
     return {
         "format": charter.format_version,
@@ -74,7 +85,8 @@ def write_charter(
         signing_key: Key to sign with; defaults to `SCMLE_SIGNING_KEY`.
 
     Returns:
-        The path written.
+        The path written, as a `Path`. Missing parent directories are
+        created and the file is written as UTF-8 JSON with sorted keys.
     """
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -92,15 +104,20 @@ def check_format(path: str | Path, record: dict[str, Any]) -> None:
 
     A wrapper without a `format` is read as format 1. Format 3 added `rules`,
     format 4 the causal block, format 5 the decision layer, format 6 the unit
-    of prediction, format 7 the ingest block and format 8 its entity
-    sub-block, format 9 causal subgroups and attestors, format 10 the
-    uncertainty block and format 11 its coverage claim on the confirmation
-    rows; an older wrapper that
-    carries one of them was edited or mislabelled.
+    of prediction, format 7 the ingest block and format 8 its entity and
+    reconcile sub-blocks, format 9 causal subgroups and attestors, format 10
+    the uncertainty block and format 11 its coverage claim on the
+    confirmation rows; an older wrapper that carries one of them was edited
+    or mislabelled.
+
+    Args:
+        path: Charter file, used in the error messages.
+        record: The decoded wrapper.
 
     Raises:
-        ConfigError: If the format is newer than this code reads, or an
-            older format carries a field it cannot have.
+        ConfigError: If the declared format is not an integer or is newer
+            than `contracts.FORMAT_VERSION`, or an older format carries a
+            field that a later format introduced.
     """
     declared = record.get("format", contracts.OLDEST_READABLE_FORMAT)
     if not isinstance(declared, int) or declared > contracts.FORMAT_VERSION:
@@ -184,12 +201,23 @@ def read_verified(
         signing_key: Key to verify with; defaults to `SCMLE_SIGNING_KEY`.
         require_signature: Fail unless a verified signature is present.
 
+    A file that cannot be read, is not a JSON object, is not a valid
+    charter, or fails `check_format` raises `ConfigError` (from
+    `contracts.load_json`, `contracts.charter_from_record` and
+    `check_format`). A bare charter has no wrapper and so no hash or
+    signature to check.
+
     Returns:
-        The charter, its hash and whether it was signed and verified.
+        The charter, its recomputed hash, and whether a signature was
+        present, a key was available and the signature verified. A signed
+        file read without a key is returned with `signed` false unless
+        `require_signature` is set.
 
     Raises:
-        ConfigError: If the file is not a valid charter.
-        ArtifactError: If the hash or signature does not verify.
+        ArtifactError: If the algorithm is unknown, the stored hash differs
+            from the recomputed one, the signature does not verify, or
+            `require_signature` is set and the charter is bare, unsigned, or
+            signed with no key available.
     """
     record = contracts.load_json(path)
     if "charter" not in record:
@@ -226,7 +254,15 @@ def read_verified(
 
 
 def tighter(old: Any, new: Any) -> bool:
-    """Whether `new` is no looser than `old`."""
+    """Compares two limits where a smaller value is tighter.
+
+    Args:
+        old: The current limit.
+        new: The proposed limit.
+
+    Returns:
+        True when `new <= old`.
+    """
     return bool(new <= old)
 
 
@@ -235,11 +271,16 @@ def check_amendment(
 ) -> None:
     """Allows an amendment only if it tightens the budget.
 
-    Only a smaller `alpha_confirm`, `K_max` or initial exploration wealth may
-    change; every other field must be identical.
+    Only a smaller or equal `alpha_confirm`, `k_max` or initial exploration
+    wealth may change; every other field must be identical.
+
+    Args:
+        old: The charter as signed.
+        new: The amended charter.
 
     Raises:
-        ConfigError: If anything else differs or the budget loosens.
+        ConfigError: If any of those three values is larger in `new`, or any
+            other field differs.
     """
     before, after = old.to_dict(), new.to_dict()
     budget_old, budget_new = old.error_budget, new.error_budget

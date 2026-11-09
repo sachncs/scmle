@@ -1,14 +1,14 @@
-"""The ingest block of the charter (feature F9, formats 7 and 8).
+"""The ingest block of the charter (formats 7 and 8).
 
 Everything here is optional: a charter without an `IngestSpec` serialises,
 hashes and loads exactly as a format 1 to 6 charter did, and an `IngestSpec`
-without the format 8 sub-blocks (`entity`) serialises exactly as under
-format 7. The block fixes, before
-any data is read, how much the source may be asked (queries, rows scanned,
-seconds), how many features the grammar may propose (`B_feat`), the windows
-and the lag of the as-of cutoff, the largest recording delay the reconciliation
-accepts, and the tolerances of key and foreign-key inference. The tables and
-columns are not here; they are in the plan file the data spec names.
+without the format 8 sub-blocks (`entity` and `reconcile`) serialises
+exactly as under format 7. The block fixes, before any data is read, how
+much the source may be asked (queries, rows scanned, seconds), how many
+features the grammar may propose (`B_feat`), the windows and the lag of the
+as-of cutoff, the largest recording delay the reconciliation accepts, and
+the tolerances of key and foreign-key inference. The tables and columns are
+not here; they are in the ingest-plan file that the data spec names.
 """
 
 from collections.abc import Mapping
@@ -27,7 +27,19 @@ DEFAULT_FEATURE_BUDGET = 200
 
 
 def non_negative(value: Any, name: str) -> float:
-    """A finite number that is not negative."""
+    """Checks that a number is finite and not negative.
+
+    Args:
+        value: The candidate number.
+        name: Name used in the error message.
+
+    Returns:
+        `value` as a float.
+
+    Raises:
+        ValueError: If `value` is not a finite int or float (a bool is
+            rejected) or is negative.
+    """
     number = qualification.finite(value, name)
     if number < 0:
         raise ValueError(f"{name} must not be negative")
@@ -47,16 +59,33 @@ class EntityField:
     fuzzy: bool = True
 
     def __post_init__(self) -> None:
-        """Validates the record."""
+        """Validates the record.
+
+        A blank `name` raises `ValueError` (from `evidence.require_text`).
+        """
         evidence.require_text(self.name, "name")
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Serializes the record.
+
+        Returns:
+            A JSON-ready dict of the record's fields.
+        """
         return dataclasses.asdict(self)
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds the record, rejecting unknown or missing fields."""
+        """Rebuilds the record from a dict.
+
+        Keys other than the fields, and missing fields, are rejected with
+        the `ValueError` of `qualification.require_fields`.
+
+        Args:
+            record: Field names to values, as produced by `to_dict`.
+
+        Returns:
+            The rebuilt record.
+        """
         qualification.require_fields(cls, record)
         return cls(**record)
 
@@ -76,19 +105,38 @@ class EntityPass:
     size: int = 3
 
     def __post_init__(self) -> None:
-        """Validates the record."""
+        """Validates the record.
+
+        Raises:
+            ValueError: If `field` is blank, `kind` is not in `PASS_KINDS`,
+                or `size` is not an integer of at least 1.
+        """
         evidence.require_text(self.field, "field")
         if self.kind not in PASS_KINDS:
             raise ValueError(f"kind must be one of {PASS_KINDS}")
         qualification.count(self.size, "size", minimum=1)
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Serializes the record.
+
+        Returns:
+            A JSON-ready dict of the record's fields.
+        """
         return dataclasses.asdict(self)
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds the record, rejecting unknown or missing fields."""
+        """Rebuilds the record from a dict.
+
+        Keys other than the fields, and missing fields, are rejected with
+        the `ValueError` of `qualification.require_fields`.
+
+        Args:
+            record: Field names to values, as produced by `to_dict`.
+
+        Returns:
+            The rebuilt record.
+        """
         qualification.require_fields(cls, record)
         return cls(**record)
 
@@ -110,7 +158,12 @@ class EntitySpec:
     column: str = "entity_group"
 
     def __post_init__(self) -> None:
-        """Validates the block."""
+        """Validates the block.
+
+        Raises:
+            ValueError: If `fields` or `passes` is not a tuple or is empty,
+                two fields share a name, or `column` is blank.
+        """
         qualification.require_tuple(self.fields, "fields")
         qualification.require_tuple(self.passes, "passes")
         if not self.fields or not self.passes:
@@ -121,7 +174,12 @@ class EntitySpec:
         evidence.require_text(self.column, "column")
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Serializes the block.
+
+        Returns:
+            A JSON-ready dict with `fields` and `passes` as lists of dicts
+            and `column`.
+        """
         return {
             "fields": [f.to_dict() for f in self.fields],
             "passes": [p.to_dict() for p in self.passes],
@@ -130,7 +188,17 @@ class EntitySpec:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds the block, rejecting unknown or missing fields."""
+        """Rebuilds the block from a dict.
+
+        Keys other than the fields, and missing fields, are rejected with
+        the `ValueError` of `qualification.require_fields`.
+
+        Args:
+            record: Field names to values, as produced by `to_dict`.
+
+        Returns:
+            The rebuilt block.
+        """
         qualification.require_fields(cls, record)
         return cls(
             tuple(EntityField.from_dict(f) for f in record["fields"]),
@@ -152,17 +220,35 @@ class ColumnTotal:
     total: float
 
     def __post_init__(self) -> None:
-        """Validates the record."""
+        """Validates the record.
+
+        A blank `column` or a `total` that is not finite raises `ValueError`
+        (from `evidence.require_text` and `qualification.finite`).
+        """
         evidence.require_text(self.column, "column")
         qualification.finite(self.total, "total")
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Serializes the record.
+
+        Returns:
+            A JSON-ready dict of the record's fields.
+        """
         return dataclasses.asdict(self)
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds the record, rejecting unknown or missing fields."""
+        """Rebuilds the record from a dict.
+
+        Keys other than the fields, and missing fields, are rejected with
+        the `ValueError` of `qualification.require_fields`.
+
+        Args:
+            record: Field names to values, as produced by `to_dict`.
+
+        Returns:
+            The rebuilt record.
+        """
         qualification.require_fields(cls, record)
         return cls(**record)
 
@@ -187,7 +273,15 @@ class TableTotals:
     checksum: str | None = None
 
     def __post_init__(self) -> None:
-        """Validates the record."""
+        """Validates the record.
+
+        Raises:
+            ValueError: If `view` is blank, `sums` is not a tuple, `rows` is
+                set but not a non-negative integer, only one of `checksum`
+                and `checksum_column` is set, `checksum` is not 64
+                lower-case hex digits, or none of `rows`, `sums` and
+                `checksum` is declared.
+        """
         evidence.require_text(self.view, "view")
         qualification.require_tuple(self.sums, "sums")
         if self.rows is not None:
@@ -200,7 +294,12 @@ class TableTotals:
             raise ValueError(f"nothing is declared for view {self.view!r}")
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Serializes the record.
+
+        Returns:
+            A JSON-ready dict with `view`, `rows`, `sums` (a list of dicts),
+            `checksum_column` and `checksum`.
+        """
         return {
             "view": self.view,
             "rows": self.rows,
@@ -211,7 +310,17 @@ class TableTotals:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds the record, rejecting unknown or missing fields."""
+        """Rebuilds the record from a dict.
+
+        Keys other than the fields, and missing fields, are rejected with
+        the `ValueError` of `qualification.require_fields`.
+
+        Args:
+            record: Field names to values, as produced by `to_dict`.
+
+        Returns:
+            The rebuilt record.
+        """
         qualification.require_fields(cls, record)
         return cls(
             record["view"],
@@ -234,7 +343,12 @@ class ReconcileSpec:
     tables: tuple[TableTotals, ...]
 
     def __post_init__(self) -> None:
-        """Validates the block."""
+        """Validates the block.
+
+        Raises:
+            ValueError: If `tables` is not a tuple or is empty, or two
+                records name the same view.
+        """
         qualification.require_tuple(self.tables, "tables")
         if not self.tables:
             raise ValueError("a reconcile block needs at least one table")
@@ -243,12 +357,26 @@ class ReconcileSpec:
             raise ValueError("duplicate view in the reconcile block")
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Serializes the block.
+
+        Returns:
+            A JSON-ready dict with `tables` as a list of dicts.
+        """
         return {"tables": [t.to_dict() for t in self.tables]}
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds the block, rejecting unknown or missing fields."""
+        """Rebuilds the block from a dict.
+
+        Keys other than the fields, and missing fields, are rejected with
+        the `ValueError` of `qualification.require_fields`.
+
+        Args:
+            record: Field names to values, as produced by `to_dict`.
+
+        Returns:
+            The rebuilt block.
+        """
         qualification.require_fields(cls, record)
         return cls(tuple(TableTotals.from_dict(t) for t in record["tables"]))
 
@@ -291,7 +419,17 @@ class IngestSpec:
     reconcile: ReconcileSpec | None = None
 
     def __post_init__(self) -> None:
-        """Validates the block."""
+        """Validates the block.
+
+        Raises:
+            ValueError: If `max_queries` or `max_rows_scanned` is set but is
+                not a non-negative integer, `max_seconds`, `lag`,
+                `delta_rec`, `eps_key`, `eps_null` or `eps_fk` is not a
+                finite non-negative number (`max_seconds` only when set),
+                `feature_budget` is not an integer of at least 1, or
+                `windows` is not a tuple, is empty, has a repeat, or holds a
+                value that is not finite and positive.
+        """
         for name in ("max_queries", "max_rows_scanned"):
             value = getattr(self, name)
             if value is not None:
@@ -309,7 +447,13 @@ class IngestSpec:
             non_negative(getattr(self, name), name)
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Serializes the block.
+
+        Returns:
+            A JSON-ready dict of the fields, with `windows` as a list.
+            `entity` and `reconcile` are included, as nested dicts, only
+            when set.
+        """
         record = dataclasses.asdict(self)
         record["windows"] = list(self.windows)
         del record["entity"], record["reconcile"]
@@ -321,7 +465,18 @@ class IngestSpec:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds the block, rejecting unknown or missing fields."""
+        """Rebuilds the block from a dict.
+
+        `entity` and `reconcile` may be absent and then default to None.
+        Other missing fields, and keys that are not fields, are rejected
+        with the `ValueError` of `qualification.require_fields`.
+
+        Args:
+            record: Field names to values, as produced by `to_dict`.
+
+        Returns:
+            The rebuilt block.
+        """
         values = {"entity": None, "reconcile": None, **record}
         qualification.require_fields(cls, values)
         values["windows"] = tuple(values["windows"])

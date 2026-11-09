@@ -1,11 +1,11 @@
-"""The decision block of the charter (feature F11).
+"""The decision block of the charter (format 5).
 
 Everything here is optional: a charter without a `DecisionLayer` runs as it
 always did and makes no decision claim. The costs of acting are not repeated
-here; they stay in the charter's `cost_model` (F8), which a decision layer
+here; they stay in the charter's `cost_model`, which a decision layer
 requires. What this block adds is how the cost model is used (baselines,
-calibration level, off-policy gates), which fairness constraints are declared,
-and the rollout plan with its error levels.
+calibration level, off-policy gates), which fairness constraints are
+declared, and the rollout design with its error levels.
 
 Costs, margins and propensities are inputs, never findings: the instrument
 tiers a decision claim `attested` at best when they come from a person.
@@ -35,7 +35,19 @@ DEFAULT_MIN_GROUP = 50
 
 
 def positive_number(value: Any, name: str) -> float:
-    """A finite number strictly greater than zero."""
+    """Checks that a number is finite and strictly greater than zero.
+
+    Args:
+        value: The candidate number.
+        name: Name used in the error message.
+
+    Returns:
+        `value` as a float.
+
+    Raises:
+        ValueError: If `value` is not a finite int or float (a bool is
+            rejected) or is not greater than 0.
+    """
     number = qualification.finite(value, name)
     if number <= 0:
         raise ValueError(f"{name} must be greater than 0")
@@ -43,7 +55,19 @@ def positive_number(value: Any, name: str) -> float:
 
 
 def open_unit(value: Any, name: str) -> float:
-    """A finite number strictly between 0 and 1."""
+    """Checks that a number is finite and strictly between 0 and 1.
+
+    Args:
+        value: The candidate number.
+        name: Name used in the error message.
+
+    Returns:
+        `value` as a float.
+
+    Raises:
+        ValueError: If `value` is not a finite int or float (a bool is
+            rejected) or is outside the open interval (0, 1).
+    """
     number = qualification.finite(value, name)
     if not 0 < number < 1:
         raise ValueError(f"{name} must be strictly between 0 and 1")
@@ -69,7 +93,13 @@ class OffPolicyRules:
     penalty: float = 0.0
 
     def __post_init__(self) -> None:
-        """Validates the rules."""
+        """Validates the rules.
+
+        Raises:
+            ValueError: If `clip` is set and is not a finite number of at
+                least 1, `min_propensity` or `ess_floor` is not strictly in
+                (0, 1), or `penalty` is not finite or is negative.
+        """
         if self.clip is not None and positive_number(self.clip, "clip") < 1:
             raise ValueError("clip must be at least 1")
         open_unit(self.min_propensity, "min_propensity")
@@ -78,12 +108,26 @@ class OffPolicyRules:
             raise ValueError("penalty must be non-negative")
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Serializes the record.
+
+        Returns:
+            A JSON-ready dict of the record's fields.
+        """
         return dataclasses.asdict(self)
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds the rules, rejecting unknown or missing fields."""
+        """Rebuilds the rules from a dict.
+
+        Keys other than the fields, and missing fields, are rejected with
+        the `ValueError` of `qualification.require_fields`.
+
+        Args:
+            record: Field names to values, as produced by `to_dict`.
+
+        Returns:
+            The rebuilt rules.
+        """
         qualification.require_fields(cls, record)
         return cls(**record)
 
@@ -110,7 +154,14 @@ class DecisionModel:
     )
 
     def __post_init__(self) -> None:
-        """Validates the model."""
+        """Validates the model.
+
+        Raises:
+            ValueError: If `unit` is blank, `baselines` is not a tuple, is
+                empty, has a repeat or names a rule outside `BASELINES`,
+                `treatment_cost` is set but not finite, or
+                `calibration_level` is not strictly in (0, 1).
+        """
         evidence.require_text(self.unit, "unit")
         qualification.require_tuple(self.baselines, "baselines")
         if not self.baselines or len(set(self.baselines)) != len(
@@ -125,7 +176,12 @@ class DecisionModel:
         open_unit(self.calibration_level, "calibration_level")
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Serializes the model.
+
+        Returns:
+            A JSON-ready dict of the fields, with `baselines` as a list and
+            `off_policy` as a nested dict.
+        """
         return {
             "unit": self.unit,
             "baselines": list(self.baselines),
@@ -136,7 +192,17 @@ class DecisionModel:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds the model, rejecting unknown or missing fields."""
+        """Rebuilds the model from a dict.
+
+        Keys other than the fields, and missing fields, are rejected with
+        the `ValueError` of `qualification.require_fields`.
+
+        Args:
+            record: Field names to values, as produced by `to_dict`.
+
+        Returns:
+            The rebuilt model.
+        """
         qualification.require_fields(cls, record)
         return cls(
             unit=record["unit"],
@@ -170,7 +236,15 @@ class FairnessConstraint:
     min_group: int = DEFAULT_MIN_GROUP
 
     def __post_init__(self) -> None:
-        """Validates the constraint."""
+        """Validates the constraint.
+
+        Raises:
+            ValueError: If `attribute` is blank, `criterion` is not in
+                `CRITERIA`, `max_gap` is not strictly in (0, 1), `mechanism`
+                is not in `MECHANISMS`, `group_thresholds` is chosen without
+                a non-blank `attestation`, or `min_group` is not an integer
+                of at least 2.
+        """
         evidence.require_text(self.attribute, "attribute")
         if self.criterion not in CRITERIA:
             raise ValueError(f"unknown criterion {self.criterion!r}")
@@ -186,12 +260,26 @@ class FairnessConstraint:
         qualification.count(self.min_group, "min_group", minimum=2)
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Serializes the record.
+
+        Returns:
+            A JSON-ready dict of the record's fields.
+        """
         return dataclasses.asdict(self)
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds the constraint, rejecting unknown or missing fields."""
+        """Rebuilds the constraint from a dict.
+
+        Keys other than the fields, and missing fields, are rejected with
+        the `ValueError` of `qualification.require_fields`.
+
+        Args:
+            record: Field names to values, as produced by `to_dict`.
+
+        Returns:
+            The rebuilt constraint.
+        """
         qualification.require_fields(cls, record)
         return cls(**record)
 
@@ -217,7 +305,12 @@ class Guardrail:
     higher_is_worse: bool = True
 
     def __post_init__(self) -> None:
-        """Validates the guardrail."""
+        """Validates the guardrail.
+
+        Raises:
+            ValueError: If `name` is blank, `margin` is not finite and
+                positive, or `low` is not finite and below a finite `high`.
+        """
         evidence.require_text(self.name, "name")
         positive_number(self.margin, "margin")
         if not qualification.finite(self.low, "low") < qualification.finite(
@@ -226,19 +319,33 @@ class Guardrail:
             raise ValueError("low must be below high")
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Serializes the record.
+
+        Returns:
+            A JSON-ready dict of the record's fields.
+        """
         return dataclasses.asdict(self)
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds the guardrail, rejecting unknown or missing fields."""
+        """Rebuilds the guardrail from a dict.
+
+        Keys other than the fields, and missing fields, are rejected with
+        the `ValueError` of `qualification.require_fields`.
+
+        Args:
+            record: Field names to values, as produced by `to_dict`.
+
+        Returns:
+            The rebuilt guardrail.
+        """
         qualification.require_fields(cls, record)
         return cls(**record)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class RolloutPlan:
-    """The pre-registered plan of an A/B test and its decisions.
+    """The pre-registered design of an A/B test and its decisions.
 
     Attributes:
         unit: Randomisation unit.
@@ -254,8 +361,9 @@ class RolloutPlan:
         guardrails: Metrics that must not get worse.
         salt: Salt of the hashed assignment.
         srm_level: Level of the sample-ratio check.
-        horizon: Planned number of experiments for the level discount, or
-            None for the open-ended sequence.
+        horizon: Number of experiments over which the false-promotion level
+            is divided equally, or None for the open-ended sequence of
+            decreasing shares.
     """
 
     unit: str
@@ -274,7 +382,18 @@ class RolloutPlan:
     horizon: int | None = None
 
     def __post_init__(self) -> None:
-        """Validates the plan."""
+        """Validates the rollout.
+
+        Raises:
+            ValueError: If `unit`, `primary` or `salt` is blank;
+                `assignment_prob` or `srm_level` is not strictly in (0, 1);
+                `delta_min` or `tolerance` is not finite and positive;
+                `n_max` is not an integer of at least 2; `alpha_promote` or
+                `alpha_rollback` is not strictly between 0 and 1; `low` is
+                not finite and below a finite `high`; `delta_min` is not
+                smaller than `high - low`; `guardrails` is not a tuple; or
+                guardrail names repeat or include `primary`.
+        """
         evidence.require_text(self.unit, "unit")
         evidence.require_text(self.primary, "primary")
         evidence.require_text(self.salt, "salt")
@@ -298,7 +417,12 @@ class RolloutPlan:
             raise ValueError("guardrail names must be distinct from each other")
 
     def budget(self) -> budget_module.DecisionBudget:
-        """A fresh decision budget with the plan's levels."""
+        """Builds a decision budget from the rollout's levels.
+
+        Returns:
+            A new `DecisionBudget` with this rollout's `alpha_promote`,
+            `alpha_rollback` and `horizon`.
+        """
         return budget_module.DecisionBudget(
             alpha_promote=self.alpha_promote,
             alpha_rollback=self.alpha_rollback,
@@ -306,7 +430,13 @@ class RolloutPlan:
         )
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record; fractions are written as ``"p/q"`` strings."""
+        """Serializes the rollout.
+
+        Returns:
+            A JSON-ready dict of the fields. The two alpha levels are
+            written as ``"p/q"`` strings and `guardrails` as a list of
+            dicts.
+        """
         return {
             "unit": self.unit,
             "primary": self.primary,
@@ -326,7 +456,19 @@ class RolloutPlan:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds the plan, rejecting unknown or missing fields."""
+        """Rebuilds the rollout from a dict.
+
+        Keys other than the fields, and missing fields, are rejected with
+        the `ValueError` of `qualification.require_fields`; an alpha level
+        that is not a valid fraction string raises `ValueError` from
+        `budget.parse_fraction`.
+
+        Args:
+            record: Field names to values, as produced by `to_dict`.
+
+        Returns:
+            The rebuilt rollout.
+        """
         qualification.require_fields(cls, record)
         return cls(
             unit=record["unit"],
@@ -359,7 +501,7 @@ class DecisionLayer:
     Attributes:
         model: How the chartered costs are used.
         fairness: Declared fairness constraints (possibly none).
-        rollout: The rollout plan, or None when only offline evidence is
+        rollout: The rollout design, or None when only offline evidence is
             wanted.
     """
 
@@ -368,11 +510,20 @@ class DecisionLayer:
     rollout: RolloutPlan | None = None
 
     def __post_init__(self) -> None:
-        """Validates the block."""
+        """Validates the block.
+
+        A `fairness` that is not a tuple raises `ValueError` (from
+        `qualification.require_tuple`).
+        """
         qualification.require_tuple(self.fairness, "fairness")
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record; absent parts are omitted."""
+        """Serializes the block.
+
+        Returns:
+            A JSON-ready dict with `model` and `fairness` (a list of
+            dicts), plus `rollout` only when it is set.
+        """
         record: dict[str, Any] = {
             "model": self.model.to_dict(),
             "fairness": [f.to_dict() for f in self.fairness],
@@ -383,7 +534,18 @@ class DecisionLayer:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds the block, rejecting unknown or missing fields."""
+        """Rebuilds the block from a dict.
+
+        `rollout` may be absent and then defaults to None. Other missing
+        fields, and keys that are not fields, are rejected with the
+        `ValueError` of `qualification.require_fields`.
+
+        Args:
+            record: Field names to values, as produced by `to_dict`.
+
+        Returns:
+            The rebuilt block.
+        """
         record = {"rollout": None, **record}
         qualification.require_fields(cls, record)
         plan = record["rollout"]

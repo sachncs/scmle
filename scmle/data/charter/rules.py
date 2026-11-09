@@ -1,10 +1,8 @@
 """The pre-registered rules of a charter run (charter format 3).
 
-Before this module the ledger rule, the confirmation rule, the failure policy
-and the stability thresholds were options of the run specification, outside
-the charter hash and the signature, so they could change after signing. A
-charter may now carry them as `RunRules`; the hash covers them, and altering
-any one of them changes `charter_hash`.
+A charter may carry the ledger rule, the confirmation rule, the failure
+policy and the stability thresholds as `RunRules`. The charter hash and the
+signature cover them, so altering any one of them changes `charter_hash`.
 
 Versioning. A charter without rules serialises exactly as before (the field is
 omitted), so every charter signed under format 1 or 2 keeps its hash, its
@@ -57,7 +55,16 @@ class RunRules:
     q_min: float = DEFAULT_Q_MIN
 
     def __post_init__(self) -> None:
-        """Validates every field."""
+        """Validates every field.
+
+        Raises:
+            ValueError: If `ledger_rule` is not in `online_fdr.RULE_NAMES`,
+                `confirmation_rule` is not a `MultiplicityRule` value,
+                `failure_policy` is not `confirm.UNCONFIRMED`,
+                `stability_filter` is not a bool, `s_min` or `q_min` is not
+                finite or outside (0, 1], or `band` is not finite or not
+                positive.
+        """
         if self.ledger_rule not in online_fdr.RULE_NAMES:
             raise ValueError(
                 f"ledger_rule must be one of {online_fdr.RULE_NAMES}"
@@ -80,11 +87,25 @@ class RunRules:
             raise ValueError("band must be positive")
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record."""
+        """Serializes the record.
+
+        Returns:
+            A JSON-ready dict of the record's fields.
+        """
         return dataclasses.asdict(self)
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds the rules, rejecting unknown or missing fields."""
+        """Rebuilds the rules from a dict.
+
+        Keys other than the fields, and missing fields, are rejected with
+        the `ValueError` of `qualification.require_fields`.
+
+        Args:
+            record: Field names to values, as produced by `to_dict`.
+
+        Returns:
+            The rebuilt rules.
+        """
         qualification.require_fields(cls, record)
         return cls(**record)

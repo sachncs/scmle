@@ -1,4 +1,4 @@
-"""Closed-form power and feasibility of the confirmation set (feature F1).
+"""Closed-form power and feasibility of the confirmation set.
 
 With `K` the most claims carried into confirmation, each claim is tested at
 the Bonferroni level `alpha / K`. That level is conservative for BH, so a
@@ -36,7 +36,20 @@ class Verdict(enum.StrEnum):
 
 
 def open_unit(value: float, name: str, low: float = 0.0) -> float:
-    """Requires a finite number strictly inside `(low, 1)`."""
+    """Checks that a number lies strictly inside `(low, 1)`.
+
+    Args:
+        value: The candidate; a bool or a non-number is rejected.
+        name: Name used in the error message.
+        low: Exclusive lower bound.
+
+    Returns:
+        `value` as a float.
+
+    Raises:
+        ValueError: If `value` is a bool, not an int or float, not finite,
+            or not strictly between `low` and 1.
+    """
     if (
         isinstance(value, bool)
         or not isinstance(value, int | float)
@@ -48,7 +61,19 @@ def open_unit(value: float, name: str, low: float = 0.0) -> float:
 
 
 def positive_delta(value: float, name: str) -> float:
-    """Requires a finite number strictly greater than zero."""
+    """Checks that a number is finite and strictly greater than zero.
+
+    Args:
+        value: The candidate; a bool or a non-number is rejected.
+        name: Name used in the error message.
+
+    Returns:
+        `value` as a float.
+
+    Raises:
+        ValueError: If `value` is a bool, not an int or float, not finite,
+            or not greater than 0.
+    """
     if (
         isinstance(value, bool)
         or not isinstance(value, int | float)
@@ -60,14 +85,37 @@ def positive_delta(value: float, name: str) -> float:
 
 
 def check_k(k_max: int) -> int:
-    """Requires a positive integer claim count."""
+    """Checks that the claim count is an integer of at least 1.
+
+    Args:
+        k_max: The candidate count; a bool is rejected.
+
+    Returns:
+        `k_max` unchanged.
+
+    Raises:
+        ValueError: If `k_max` is not an int or is below 1.
+    """
     if isinstance(k_max, bool) or not isinstance(k_max, int) or k_max < 1:
         raise ValueError("k_max must be an integer of at least 1")
     return k_max
 
 
 def z_sum(alpha: float, k_max: int, power: float) -> float:
-    """`z_{1-alpha/(2K)} + z_{power}`, the quantity both formulas share."""
+    """Computes `z_{1-alpha/(2K)} + z_{power}`, shared by both formulas.
+
+    Both quantiles are standard normal. `alpha` and `power` must lie
+    strictly in (0, 1) and `k_max` must be an integer of at least 1;
+    otherwise the checks in `open_unit` and `check_k` raise `ValueError`.
+
+    Args:
+        alpha: Family-wise level of the final claims.
+        k_max: Most claims carried into confirmation.
+        power: Target power.
+
+    Returns:
+        The sum of the two standard normal quantiles.
+    """
     open_unit(alpha, "alpha")
     open_unit(power, "power")
     check_k(k_max)
@@ -79,20 +127,63 @@ def z_sum(alpha: float, k_max: int, power: float) -> float:
 def n_required_mean(
     delta: float, *, alpha: float, k_max: int, power: float
 ) -> int:
-    """Smallest `n` that detects a standardised mean effect `delta`."""
+    """Computes the rows needed to detect a standardised mean effect.
+
+    The result is `ceil((z_sum / delta) ** 2)` (see `z_sum`). `delta` must
+    be finite and positive and the other inputs valid for `z_sum`;
+    otherwise `ValueError` is raised by those checks.
+
+    Args:
+        delta: Standardised mean effect to detect.
+        alpha: Family-wise level of the final claims.
+        k_max: Most claims carried into confirmation.
+        power: Target power.
+
+    Returns:
+        The smallest number of rows `n`.
+    """
     positive_delta(delta, "delta")
     return math.ceil((z_sum(alpha, k_max, power) / delta) ** 2)
 
 
 def mde_mean(n: int, *, alpha: float, k_max: int, power: float) -> float:
-    """Minimum detectable standardised mean effect at `n` rows."""
+    """Computes the minimum detectable standardised mean effect.
+
+    The result is `z_sum / sqrt(n)` (see `z_sum`, whose checks raise
+    `ValueError` for invalid `alpha`, `k_max` or `power` when `n >= 1`).
+
+    Args:
+        n: Rows available.
+        alpha: Family-wise level of the final claims.
+        k_max: Most claims carried into confirmation.
+        power: Target power.
+
+    Returns:
+        The smallest standardised effect detectable at `n` rows; NaN when
+        `n` is below 1.
+    """
     if n < 1:
         return math.nan
     return z_sum(alpha, k_max, power) / math.sqrt(n)
 
 
 def power_mean(delta: float, n: int, *, alpha: float, k_max: int) -> float:
-    """Power to detect `delta` with `n` rows at the Bonferroni level."""
+    """Computes the power to detect an effect at the Bonferroni level.
+
+    The result is `Phi(delta * sqrt(max(n, 0)) - z_{1-alpha/(2K)})`. `delta`
+    must be finite and positive, `alpha` strictly in (0, 1) and `k_max` an
+    integer of at least 1; otherwise `ValueError` is raised by those checks.
+
+    Args:
+        delta: Standardised mean effect.
+        n: Rows available; values below 0 count as 0.
+        alpha: Family-wise level of the final claims.
+        k_max: Most claims carried into confirmation.
+
+    Returns:
+        The probability, in [0, 1], of rejecting at level `alpha / K` when
+        the true effect is `delta`.
+    """
     positive_delta(delta, "delta")
     open_unit(alpha, "alpha")
     check_k(k_max)
@@ -103,13 +194,42 @@ def power_mean(delta: float, n: int, *, alpha: float, k_max: int) -> float:
 def n_required_correlation(
     r: float, *, alpha: float, k_max: int, power: float
 ) -> int:
-    """Smallest `n` that detects a correlation `r` (Fisher z)."""
+    """Computes the rows needed to detect a correlation (Fisher z).
+
+    The result is `ceil((z_sum / atanh(|r|)) ** 2 + 3)` (see `z_sum`).
+    `|r|` must lie strictly in (0, 1); otherwise `ValueError` is raised by
+    `open_unit`, as it is for invalid `alpha`, `k_max` or `power`.
+
+    Args:
+        r: Correlation to detect; only its absolute value matters.
+        alpha: Family-wise level of the final claims.
+        k_max: Most claims carried into confirmation.
+        power: Target power.
+
+    Returns:
+        The smallest number of rows `n`.
+    """
     open_unit(abs(r), "r")
     return math.ceil((z_sum(alpha, k_max, power) / math.atanh(abs(r))) ** 2 + 3)
 
 
 def mde_correlation(n: int, *, alpha: float, k_max: int, power: float) -> float:
-    """Minimum detectable correlation at `n` rows (needs `n > 3`)."""
+    """Computes the minimum detectable correlation.
+
+    The result is `tanh(z_sum / sqrt(n - 3))` (see `z_sum`, whose checks
+    raise `ValueError` for invalid `alpha`, `k_max` or `power` when
+    `n > 3`).
+
+    Args:
+        n: Rows available.
+        alpha: Family-wise level of the final claims.
+        k_max: Most claims carried into confirmation.
+        power: Target power.
+
+    Returns:
+        The smallest correlation, in (0, 1), detectable at `n` rows; NaN
+        when `n` is 3 or less.
+    """
     if n <= 3:
         return math.nan
     return math.tanh(z_sum(alpha, k_max, power) / math.sqrt(n - 3))
@@ -118,7 +238,24 @@ def mde_correlation(n: int, *, alpha: float, k_max: int, power: float) -> float:
 def n_required_two_proportions(
     p1: float, p2: float, *, alpha: float, k_max: int, power: float
 ) -> int:
-    """Rows per group to tell two proportions apart (pooled-variance test)."""
+    """Computes the rows per group to tell two proportions apart.
+
+    Uses the pooled-variance test at the Bonferroni level `alpha / K`.
+
+    Args:
+        p1: Proportion in the first group, strictly in (0, 1).
+        p2: Proportion in the second group, strictly in (0, 1).
+        alpha: Family-wise level of the final claims.
+        k_max: Most claims carried into confirmation.
+        power: Target power.
+
+    Returns:
+        The smallest number of rows in each of the two groups.
+
+    Raises:
+        ValueError: If `p1` or `p2` is not strictly in (0, 1), if they are
+            equal, or if `alpha`, `power` or `k_max` is invalid.
+    """
     open_unit(p1, "p1")
     open_unit(p2, "p2")
     if p1 == p2:
@@ -136,7 +273,17 @@ def n_required_two_proportions(
 def wilson_half_width(
     p: float, n: int, confidence: float = DEFAULT_CONFIDENCE
 ) -> float:
-    """Half-width of the Wilson interval for a proportion `p` at `n` rows."""
+    """Computes the half-width of the Wilson interval for a proportion.
+
+    Args:
+        p: Observed proportion, in [0, 1].
+        n: Rows the proportion is based on.
+        confidence: Two-sided confidence level of the interval.
+
+    Returns:
+        Half of the width of the Wilson interval; infinity when `n` is
+        below 1.
+    """
     if n < 1:
         return math.inf
     z = float(stats.norm.ppf(0.5 + confidence / 2))
@@ -167,7 +314,12 @@ class Feasibility:
     reason: str
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready record (non-finite numbers become null)."""
+        """Serializes the report.
+
+        Returns:
+            A JSON-ready dict of the fields, with `verdict` as its string
+            value and every non-finite float written as None.
+        """
         record = dataclasses.asdict(self)
         record["verdict"] = self.verdict.value
         for key, value in record.items():
@@ -177,7 +329,15 @@ class Feasibility:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> "Feasibility":
-        """Rebuilds a report written by `to_dict`."""
+        """Rebuilds a report written by `to_dict`.
+
+        Args:
+            record: Field names to values, as produced by `to_dict`.
+
+        Returns:
+            The report, with a None `mde` or `power_at_min_effect` read back
+            as NaN.
+        """
         values = dict(record)
         values["verdict"] = Verdict(values["verdict"])
         for key in ("mde", "power_at_min_effect"):
@@ -198,6 +358,14 @@ def assess(
 ) -> Feasibility:
     """Decides whether the confirmation set supports the promised power.
 
+    The verdict is `INFEASIBLE` below `MIN_CONFIRMATION_ROWS` rows,
+    otherwise `DOWNGRADE` when the rows are fewer than the mean-effect
+    requirement for `min_effect` or when the worst-case (p = 0.5) Wilson
+    half-width at `n_minority` exceeds `max_half_width`, otherwise
+    `FEASIBLE`. The scope is `CONFIRMATORY` only for `FEASIBLE`. Invalid
+    `min_effect`, `alpha`, `power` or `k_max` raise `ValueError` from the
+    checks of `n_required_mean`.
+
     Args:
         n_confirmation: Rows in the confirmation set.
         min_effect: Smallest standardised effect worth acting on.
@@ -209,7 +377,8 @@ def assess(
             `n_minority` (worst case p = 0.5).
 
     Returns:
-        The verdict with the achieved minimum detectable effect.
+        The verdict, its scope and reason, the rows required, the minimum
+        detectable effect at `n_confirmation` and the power at `min_effect`.
     """
     required = n_required_mean(
         min_effect, alpha=alpha, k_max=k_max, power=power
