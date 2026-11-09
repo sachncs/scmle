@@ -236,3 +236,19 @@ def test_short_and_constant_series_measure_zero():
 def test_a_trend_never_falls_inside_the_band_and_is_capped():
     assert carve.acf_embargo(np.arange(400.0)) == 100
     assert carve.acf_embargo(np.arange(400.0), max_lag=10) == 10
+
+
+def test_an_embargo_longer_than_half_the_series_still_masks_by_position():
+    in_c = np.zeros(10, dtype=bool)
+    in_c[0] = True
+
+    mask = carve.embargo_mask(in_c, np.arange(10), 7)
+
+    assert mask.tolist() == [False] + [True] * 7 + [False] * 2
+
+
+def test_an_explicit_zero_max_lag_gives_a_zero_embargo():
+    values = np.cumsum(np.random.default_rng(0).normal(size=400))
+
+    assert carve.acf_embargo(values) > 0
+    assert carve.acf_embargo(values, max_lag=0) == 0

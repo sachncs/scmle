@@ -227,7 +227,8 @@ def embargo_mask(in_c: np.ndarray, order: np.ndarray, rows: int) -> np.ndarray:
     if rows == 0 or not in_c.any():
         return np.zeros(len(in_c), dtype=bool)
     flags = in_c[order].astype(int)
-    near = np.convolve(flags, np.ones(2 * rows + 1, dtype=int), "same") > 0
+    spread = np.convolve(flags, np.ones(2 * rows + 1, dtype=int), "full")
+    near = spread[rows : rows + len(flags)] > 0
     mask = np.zeros(len(in_c), dtype=bool)
     mask[order] = near & ~in_c[order]
     return mask
@@ -281,7 +282,7 @@ def acf_embargo(values: np.ndarray, max_lag: int | None = None) -> int:
     size = len(values)
     if size < 8:
         return 0
-    limit = min(max_lag or size // 4, size // 2, 1000)
+    limit = min(size // 4 if max_lag is None else max_lag, size // 2, 1000)
     band = 1.96 / math.sqrt(size)
     inside = np.abs(autocorrelation(values, limit)) <= band
     return int(np.argmax(inside)) if inside.any() else limit
