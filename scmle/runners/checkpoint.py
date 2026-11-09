@@ -136,11 +136,6 @@ class CheckpointStore:
         Returns:
             The checkpoint, or None if it is absent or damaged (unreadable, not
             JSON, a different step, or a digest that does not match).
-
-        Raises:
-            ValueError: Raised on a digest mismatch, but caught inside the
-                method and turned into the None result; it never reaches the
-                caller.
         """
         try:
             data, ignored = self.store.get(self.key(step))
@@ -148,7 +143,7 @@ class CheckpointStore:
             if document["step"] != step or document["sha256"] != content_digest(
                 step, document["state"]
             ):
-                raise ValueError("digest mismatch")
+                return None
             return Checkpoint(step, document["state"], document["sha256"])
         except (objectstore.StoreError, ValueError, KeyError, TypeError):
             return None

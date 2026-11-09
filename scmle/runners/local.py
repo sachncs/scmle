@@ -46,7 +46,7 @@ class JobContext:
     attempt: int
     spec: base.Job
     checkpoints: checkpoint.CheckpointStore
-    hook: Callable[[int], None] = lambda step: None
+    hook: Callable[[int], None] = lambda step: None  # noqa: ARG005 -- hook signature
 
     def resume(self) -> checkpoint.Checkpoint | None:
         """Finds where to resume.
@@ -159,9 +159,9 @@ class Runner(base.Runner):
                     this attempt and step.
             """
             if self.watcher() is not None:
-                raise JobStoppedError()
+                raise JobStoppedError
             if self.interruptions and self.interruptions(attempt, step):
-                raise JobInterruptedError()
+                raise JobInterruptedError
 
         context = JobContext(
             roles.RoleStore(self.store, roles.TRAINING_ROLE),
@@ -182,7 +182,7 @@ class Runner(base.Runner):
             status = base.JobStatus(
                 base.JobState.FAILED, f"transient: {error}", retryable=True
             )
-        except Exception as error:
+        except Exception as error:  # noqa: BLE001 -- job boundary
             reason = f"{type(error).__name__}: {error}"[:300]
             status = base.JobStatus(base.JobState.FAILED, reason)
         self.jobs[handle.job_id] = Outcome(status)
