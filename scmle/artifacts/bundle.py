@@ -124,7 +124,7 @@ def installed_versions() -> dict[str, str]:
 def brier(
     probabilities: np.ndarray, labels: np.ndarray, classes: tuple[Any, ...]
 ) -> float:
-    """Computes the mean squared error between probabilities and one-hot labels.
+    """Computes the multiclass Brier score of predicted probabilities.
 
     Args:
         probabilities: Predicted class probabilities, one row per sample.
@@ -132,8 +132,8 @@ def brier(
         classes: Class labels in probability-column order.
 
     Returns:
-        The multiclass Brier score: the mean over samples of the summed squared
-        differences (0 is perfect).
+        The mean over samples of the squared differences to the one-hot truth,
+        summed over classes (0 is perfect).
     """
     truth = (labels[:, None] == np.asarray(classes)[None, :]).astype(float)
     return float(np.mean(np.sum((probabilities - truth) ** 2, axis=1)))
@@ -175,7 +175,10 @@ def resolve_key(signing_key: str | bytes | None) -> bytes | None:
         signing_key: The key, or None to read `$SCMLE_SIGNING_KEY`.
 
     Returns:
-        The key as bytes, or None if none is available or it is empty.
+        The key as bytes, or None if neither the argument nor the
+        environment variable gives one or the key is an empty string. An
+        empty `bytes` key is returned unchanged. A key passed explicitly,
+        even an empty string, never falls back to the environment.
     """
     key = (
         signing_key
@@ -206,6 +209,9 @@ def verify_signature(
     root: pathlib.Path, signing_key: str | bytes | None
 ) -> bool:
     """Checks the manifest signature.
+
+    A missing manifest surfaces as the `OSError` of reading it, not as an
+    `ArtifactError`.
 
     Args:
         root: Bundle directory.
@@ -266,12 +272,13 @@ class BundleInfo:
         model_params: Hyperparameter overrides of the selected model.
         strategy: Data strategy of the selected candidate.
         decision_threshold: Optimized binary decision threshold, if any.
-        libraries: Versions of the other libraries the pipeline depends on
-            (numpy, scipy, joblib and any installed model library).
+        libraries: Versions of the installed libraries in `TRACKED_LIBRARIES`
+            (numpy, scipy, joblib, lightgbm, xgboost, catboost, imblearn).
         calibration: Description of the probability calibration applied at
             inference, empty if none.
-        environment: Every distribution installed when the bundle was built,
-            by name, so the environment can be rebuilt.
+        environment: Every distribution installed when the bundle was built
+            (filled by `ModelBundle.create`, empty otherwise), by name, so the
+            environment can be rebuilt.
         platform: Operating system and architecture that built it.
     """
 
@@ -325,7 +332,8 @@ class BundleInfo:
 
         Returns:
             One message per difference in the minor version of scikit-learn,
-            Python, pandas or a tracked library; empty if all agree.
+            Python, pandas or a library in `libraries` that is installed now;
+            empty if all agree.
         """
         problems = []
         if minor_version(self.sklearn) != minor_version(sklearn.__version__):
@@ -458,8 +466,9 @@ class ModelBundle:
             graph_fingerprint: Hash of the feature graph, if one was used.
             group_column: Entity column for series features.
             time_column: Ordering column for series features.
-            history_source: All rows known at training time; the recent ones
-                per entity are stored as the model's series history.
+            history_source: All rows known at training time; when the schema has
+                series features, the recent ones per entity are stored as the
+                model's series history.
             class_labels: Labels of the classes in probability-column order
                 when the pipeline works on codes (ordinal tasks).
 
@@ -540,15 +549,18 @@ class ModelBundle:
         Args:
             directory: Where the bundle was saved.
             sample: Raw rows to score with both copies.
-            tolerance: Largest allowed absolute probability difference;
-                labels and regression values must match to the same
-                tolerance.
+            tolerance: Largest allowed absolute difference of probabilities
+                and of numeric predictions. Non-numeric labels are compared
+                by the count of differing rows, so any difference fails
+                unless the tolerance is at least 1.
 
         Returns:
-            The verification record (rows, tolerance, largest difference).
+            A dict with `rows`, `tolerance` and `largest_difference`.
 
         Raises:
-            ArtifactError: If the reloaded bundle disagrees with this one.
+            ArtifactError: If the reloaded bundle disagrees with this one. The
+                reload uses `trusted=True`, so it is refused when
+                `$SCMLE_ENV` is `production`.
         """
         reloaded = ModelBundle.load(directory, trusted=True)
         before = np.asarray(self.predict(sample))
@@ -595,9 +607,10 @@ class ModelBundle:
             mapping: Explicit column-name policy; exact names if omitted.
 
         Returns:
-            Predictions, class probabilities for classifiers, the model version,
-            whether the input satisfied the schema, and diagnostics (ignored
-            columns, missing-value counts, unseen categories).
+            A dict with `predictions`, `model_version`, `schema_valid` and
+            `diagnostics` (ignored columns, missing-value counts, unseen
+            categories). Classifiers also get `classes` and `probabilities`,
+            and a bundle with a novelty detector gets `out_of_distribution`.
         """
         frame = self.read_frame(data)
         if mapping is not None:
@@ -635,7 +648,8 @@ class ModelBundle:
             mapping: Explicit column-name policy; exact names if omitted.
 
         Returns:
-            `novelty_score` and `out_of_distribution` per row.
+            A frame with `novelty_score`, `out_of_range_features` and
+            `out_of_distribution` per row.
 
         Raises:
             ArtifactError: If the bundle has no novelty detector.
@@ -653,10 +667,10 @@ class ModelBundle:
     ) -> dict[str, float]:
         """Fits an optional probability calibrator on labeled rows.
 
-        The trained pipeline is frozen; only a monotone mapping from its
-        probabilities to calibrated ones is learned. Use rows the model was
-        not trained on. `predict_proba` then returns calibrated
-        probabilities; `predict` is unchanged.
+        The trained pipeline is frozen; only a mapping from its probabilities
+        to calibrated ones is learned. Use rows the model was not trained on.
+        `predict_proba` then returns calibrated probabilities; `predict` is
+        unchanged.
 
         Args:
             data: Labeled rows.
@@ -665,13 +679,15 @@ class ModelBundle:
                 map over all class probabilities; multiclass only).
 
         Returns:
-            Brier score and top-label expected calibration error before and
-            after, on the calibration rows (a diagnostic; the calibrator is
-            fitted on the same rows).
+            A dict with `brier_before`, `brier_after`, `ece_before` and
+            `ece_after` (top-label expected calibration error), computed on
+            the calibration rows (a diagnostic; the calibrator is fitted on
+            the same rows).
 
         Raises:
-            ArtifactError: For regression models.
-            ConfigError: For an unknown method.
+            ArtifactError: For regression and ordinal models.
+            ConfigError: For an unknown method, or `dirichlet` with fewer than
+                three classes.
         """
         if (
             self.schema.classes is None
@@ -767,6 +783,7 @@ class ModelBundle:
             directory: Destination directory (created if needed).
             signing_key: HMAC key; defaults to `$SCMLE_SIGNING_KEY`. An
                 unsigned bundle can only be loaded with `trusted=True`.
+                Without a key, an existing `signature.json` is deleted.
 
         Returns:
             The directory path.
@@ -864,7 +881,7 @@ class ModelBundle:
         current_key: str | bytes,
         new_key: str | bytes,
     ) -> pathlib.Path:
-        """Re-sign an existing bundle without reserializing its model.
+        """Re-signs an existing bundle without reserializing its model.
 
         The current signature must verify before the new signature is written.
         Rotation changes only ``signature.json`` and uses an atomic replace, so
@@ -949,7 +966,8 @@ class ModelBundle:
         Args:
             directory: Bundle directory.
             trusted: Load an unsigned bundle you vouch for.
-            signing_key: HMAC key used to verify the signature.
+            signing_key: HMAC key used to verify the signature; defaults to
+                `$SCMLE_SIGNING_KEY`.
             allow_version_mismatch: Load despite differing dependency
                 versions.
             allow_legacy_format: Load a trusted format 1 bundle so it can be
@@ -1172,13 +1190,14 @@ class ModelBundle:
     def read_frame(
         self, data: str | pathlib.Path | pd.DataFrame
     ) -> pd.DataFrame:
-        """Loads inference input from a path or copies a DataFrame.
+        """Loads inference input from a path or converts an in-memory table.
 
         Args:
-            data: A supported tabular path, or an in-memory table.
+            data: A supported tabular path, or an in-memory table (a pandas,
+                Polars or Arrow table).
 
         Returns:
-            The data as a pandas frame.
+            The data as a pandas frame (a copy for pandas input).
         """
         if isinstance(data, (str, pathlib.Path)):
             return tabular.read_table(data)
@@ -1196,7 +1215,8 @@ class ModelBundle:
             mapping: Explicit column-name policy; exact names if omitted.
 
         Returns:
-            Missing/extra columns, missing-value counts and unseen categories.
+            A report of missing and extra columns, missing-value counts and
+            unseen categories; problems are reported, not raised.
         """
         frame = self.read_frame(data)
         if mapping is not None:
@@ -1218,8 +1238,8 @@ class ModelBundle:
             mapping: Explicit column-name policy; exact names if omitted.
 
         Returns:
-            The pipeline's input columns (with series features computed and any
-            optional inputs that are present), in schema order.
+            The pipeline's input columns in schema order (with series features
+            computed), followed by any optional inputs that are present.
         """
         frame = self.read_frame(data)
         if mapping is not None:
@@ -1333,11 +1353,16 @@ class ModelBundle:
                 class when omitted for binary models.
 
         Returns:
-            A `prediction` column (probability of the class, or the
-            regression value) and one contribution column per feature.
+            A frame indexed like the prepared rows, with a `prediction`
+            column (probability of the class, or the regression value) and
+            one occlusion contribution column per feature: the prediction
+            minus its mean after replacing that feature with background
+            values (at most the first rows of `background` are used).
 
         Raises:
-            ArtifactError: For a multiclass model without `class_label`.
+            ArtifactError: For a model without exactly two classes when
+                `class_label` is omitted. A `class_label` that is not a class
+                raises `ValueError` from the lookup.
         """
         rows = self.prepare_frame(data, mapping)
         reference = self.prepare_frame(background, mapping)
@@ -1378,7 +1403,7 @@ class ModelBundle:
         method: str = "residual",
         shift: bool = False,
     ) -> pd.DataFrame:
-        """Prediction intervals with a stated coverage (regression).
+        """Returns prediction intervals with a stated coverage (regression).
 
         Args:
             data: DataFrame or path to a supported tabular dataset.
@@ -1388,12 +1413,15 @@ class ModelBundle:
                 `quantile` for conformalized quantile regression, whose
                 width follows how noisy each row's neighbourhood is, or
                 `cv_plus` for the CV+ interval from the stored fold models
-                (present when the run had fewer than 1000 calibration rows
-                held out once each).
+                (kept only when the run had fewer than 1000 calibration rows,
+                each held out in exactly one fold, and the models are small
+                enough). `quantile` bounds are widened to include the point
+                prediction.
             shift: Use the weighted conformal interval for covariate shift
                 with the weights attached by `attach_shift_weights`
                 (`residual` method only). The ratio is estimated, so the
-                coverage is approximate and is reported that way.
+                coverage is approximate; a limit is infinite where the
+                calibration weight cannot reach `coverage`.
 
         Returns:
             Columns `prediction`, `lower` and `upper`.
@@ -1459,8 +1487,9 @@ class ModelBundle:
         """Estimates and stores likelihood ratios for weighted conformal.
 
         A discriminator is fitted between the calibration rows and the target
-        rows; an effective sample size that is too small refuses the weights
-        (`WeightRefusedError`) and none are stored.
+        rows. An effective sample size that is too small refuses the weights
+        with `WeightRefusedError` (a `ValueError`, not an `ArtifactError`)
+        and none are stored.
 
         Args:
             calibration_rows: The rows the stored conformal scores came from, in
@@ -1557,10 +1586,13 @@ class ModelBundle:
         background: str | pathlib.Path | pd.DataFrame,
         max_changes: int = 3,
     ) -> counterfactual_module.Counterfactual:
-        """The smallest change to `row` that gives the wanted prediction.
+        """Searches greedily for a small change to `row` giving the wanted outcome.
 
-        Only the columns in `actionable` are ever changed, and only to values
-        seen in `background`.
+        Only the columns in `actionable` are ever changed, and only to
+        candidate values drawn from `background` (quantiles of numeric
+        columns, the most frequent categories). Unnecessary changes are
+        dropped afterwards, but the change is not guaranteed to be the
+        smallest possible.
 
         Args:
             row: One row (a dict or a one-row frame).
@@ -1574,9 +1606,10 @@ class ModelBundle:
             The search result; `found` says whether the outcome was reached.
 
         Raises:
-            ArtifactError: For unknown or non-feature actionable columns, an
-                outcome this model cannot produce, or a model without
-                probabilities when classifying.
+            ArtifactError: For unknown or non-feature actionable columns, a
+                `row` that is not exactly one row, or a `desired` class this
+                model does not have. A model without probabilities raises it
+                from `predict_proba` when classifying.
         """
         features = [*self.schema.numeric, *self.schema.categorical]
         unknown = [c for c in actionable if c not in features]
@@ -1659,14 +1692,15 @@ class ModelBundle:
         return search.search(fixed)
 
     def environment_lock(self, path: str | pathlib.Path | None = None) -> str:
-        """The environment this model was built in, as pinned requirements.
+        """Returns the build environment as pinned requirements.
 
         Args:
             path: Where to write it; omit to only return the text.
 
         Returns:
-            Python version, platform and every installed distribution with
-            its exact version, ready for `pip install -r`.
+            Comment lines with the Python version, platform and framework
+            version, then every distribution installed when the model was
+            built as `name==version`, ready for `pip install -r`.
         """
         text = self.info.environment_lock()
         if path is not None:
@@ -1681,8 +1715,10 @@ class ModelBundle:
         """Writes a deployable service folder (works for every model).
 
         The folder holds this bundle, the locked runtime requirements, the
-        full build environment, a server script, a hardened Dockerfile, an
-        SBOM and a signed provenance statement.
+        full build environment, a server script, a Dockerfile and build
+        script, a vulnerability policy, an SBOM, a provenance statement and a
+        README. It refuses (`ArtifactError`) if `destination` already holds a
+        service.
 
         Args:
             destination: Folder to create.
@@ -1703,8 +1739,10 @@ class ModelBundle:
     ) -> pathlib.Path:
         """Writes the pipeline as an ONNX graph (`onnx` extra).
 
-        Models that cannot be exported faithfully, a probability calibrator that
-        is attached, or a failed check raise `ArtifactError`.
+        Models that cannot be exported faithfully (only binary or multiclass
+        classification and regression are supported), an attached probability
+        calibrator, a missing `onnx` extra, or a failed check raise
+        `ArtifactError`.
 
         Args:
             path: Destination file.
@@ -1726,7 +1764,7 @@ class ModelBundle:
         times: Any,
         mapping: mapping_module.ColumnMapping | None = None,
     ) -> np.ndarray:
-        """Probability of no event yet at each time (survival tasks).
+        """Returns the probability of no event yet at each time (survival).
 
         Args:
             data: DataFrame or path to a supported tabular dataset.
@@ -1734,7 +1772,7 @@ class ModelBundle:
             mapping: Explicit column-name policy; exact names if omitted.
 
         Returns:
-            Array of shape `(rows, len(times))`; each row never increases.
+            Survival probabilities as an array of shape `(rows, len(times))`.
 
         Raises:
             ArtifactError: For models that are not survival models.
@@ -1758,21 +1796,25 @@ class ModelBundle:
 
         The history supplies each series' recent values (the lag and rolling
         features are computed from it), so the series need not have been
-        seen in training.
+        seen in training. Each series is forecast from its latest row. The
+        forecast time is that row's time plus the step count times the
+        median gap between distinct times in `history` (the latest time
+        itself when there is only one distinct time).
 
         Args:
             history: Past rows with the value, time and (if used) entity
                 columns.
-            steps: How many steps ahead, at most the trained horizon.
+            steps: How many steps ahead, from 1 to the trained horizon; all
+                of the trained horizon if omitted.
             mapping: Explicit column-name policy; exact names if omitted.
 
         Returns:
             One row per series and step: the entity column (if any), `step`,
-            the forecast time and `forecast`.
+            the forecast time (named like the time column) and `forecast`.
 
         Raises:
-            ArtifactError: For models that are not forecasters or a request
-                beyond the trained horizon.
+            ArtifactError: For models that are not forecasters or a `steps`
+                outside 1 to the trained horizon.
         """
         if self.schema.task != tasks.TaskType.FORECAST.value:
             raise errors.ArtifactError("this bundle is not a forecaster")
@@ -1843,7 +1885,8 @@ class ModelBundle:
 
         Returns:
             The input rows with `score` and `rank` (1 = best within its
-            query), sorted by query, then rank.
+            query, ties broken by row order), sorted by query, then rank, with
+            a fresh index.
 
         Raises:
             ArtifactError: For models that are not ranking models, or when
@@ -1875,8 +1918,9 @@ class ModelBundle:
         """Picks the unlabeled rows a person should label next.
 
         Classification ranks by the smallest gap between the two most likely
-        classes (the model cannot tell them apart). Regression ranks by the
-        width of the quantile band (the model is least sure there).
+        classes (the model cannot tell them apart), using the pipeline's
+        uncalibrated probabilities. Regression ranks by the width of the
+        uncalibrated quantile band (the model is least sure there).
 
         Args:
             data: Unlabeled rows (DataFrame or supported tabular path).
@@ -1884,9 +1928,9 @@ class ModelBundle:
             mapping: Explicit column-name policy; exact names if omitted.
 
         Returns:
-            The `count` most informative rows: `position` in `data` and an
-            `uncertainty` score in [0, 1] for classification (a width in
-            target units for regression), most uncertain first.
+            Up to `count` of the most informative rows: `position` in `data`
+            and an `uncertainty` score in [0, 1] for classification (a width
+            in target units for regression), most uncertain first.
 
         Raises:
             ArtifactError: For a regression bundle without quantile models.
@@ -1918,10 +1962,11 @@ class ModelBundle:
         mapping: mapping_module.ColumnMapping | None = None,
         conditional: str | None = None,
     ) -> list[list[Any]]:
-        """Prediction sets with a stated coverage (classification).
+        """Returns prediction sets with a stated coverage (classification).
 
         Regression models, or bundles saved without conformal scores, raise
-        `ArtifactError`.
+        `ArtifactError`. An unknown `conditional` mode or a coverage outside
+        (0, 1) raises `ValueError` from the calibrator.
 
         Args:
             data: DataFrame or path to a supported tabular dataset.

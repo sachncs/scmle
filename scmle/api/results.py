@@ -62,8 +62,10 @@ class RunResult:
         """Returns permutation importance, most important feature first.
 
         Returns:
-            One row per feature from the permutation-importance diagnostic; an
-            empty frame if that diagnostic was not produced.
+            One row per measured feature, ranked by mean metric drop, with the
+            columns `feature`, `importance` and `std`. The diagnostic may cover
+            only a random subset of the features when its time allowance ran
+            out. The frame is empty if the diagnostic was not produced.
         """
         report = self.diagnostics.get("permutation_importance", {})
         return pd.DataFrame(report.get("features", []))
@@ -89,9 +91,11 @@ class RunResult:
         """Returns trials ranked best-first, failed/skipped trials last.
 
         Returns:
-            One row per trial with its fit-health verdict and whether it was
-            selected; detail columns are left out and the parameters are JSON
-            text.
+            One row per trial: the trial's fields plus its fit-health verdict
+            and whether it was selected. The columns in `LEADERBOARD_DETAILS`
+            are left out and the parameters are JSON text. Successful trials
+            come first, ordered by mean score; the others follow in execution
+            order.
         """
         board = pd.DataFrame([t.to_dict() for t in self.trials])
         board["fit_health"] = [
@@ -177,8 +181,8 @@ class RunResult:
         Args:
             data: DataFrame or path to the rows to explain.
             background: DataFrame or path to the reference rows.
-            class_label: Class to explain for a classifier; the bundle's default
-                if None.
+            class_label: Class to explain for a classifier; if None, the
+                positive class of a binary model (a multiclass model needs it).
 
         Returns:
             The explanation as a frame.
@@ -191,11 +195,11 @@ class RunResult:
         return all(c["met"] for c in self.evaluation["success_criteria"])
 
     def unattested_suspects(self) -> list[str]:
-        """Flagged columns that are in the model and that no person attested.
+        """Lists flagged columns that are neither quarantined nor attested.
 
-        A column the leakage screen flagged stays a suspicion until a person
-        settles it. Columns left out of the features (quarantined, excluded
-        or declared unavailable) are not counted, nor are attested ones.
+        A column the leakage screen flagged stays a suspicion until the run's
+        `admissibility_table.json` records it as quarantined or attested.
+        Without that file, every flagged column is listed.
 
         Returns:
             Sorted column names; empty when nothing is outstanding.
@@ -213,10 +217,11 @@ class RunResult:
         return sorted(suspects)
 
     def claim_tiers(self) -> dict[str, int]:
-        """Counts the claims of a charter run by evidence tier.
+        """Counts the claims in `confirmed_claims.json` by evidence tier.
 
         Returns:
-            Tier name to count; empty without a charter run.
+            Tier name to count (a claim without a tier counts as
+            `unverified`); empty if the run wrote no `confirmed_claims.json`.
         """
         path = pathlib.Path(self.run_dir) / "confirmed_claims.json"
         if not path.exists():

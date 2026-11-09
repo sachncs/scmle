@@ -50,7 +50,7 @@ LeakagePolicy = Literal["warn", "block"]
 
 
 def publish_curation_artifact(path: pathlib.Path, content: bytes) -> None:
-    """Publish curation bytes atomically without replacing an artifact.
+    """Publishes curation bytes atomically without replacing an artifact.
 
     A hard link from a fully flushed sibling file gives the destination a
     no-clobber, atomic first publication.  ``FileExistsError`` is deliberately
@@ -282,7 +282,7 @@ def bind_parameter_estimation_evidence(
     artifact: pathlib.Path,
     estimation: parameter_estimation.EstimationResult,
 ) -> None:
-    """Bind a verified parameter report into the run evidence graph.
+    """Binds a verified parameter report into the run evidence graph.
 
     The graph is rebuilt from its validated content so the evaluation node's
     digest reflects the evaluation file after it gains the parameter-report
@@ -297,7 +297,7 @@ def bind_parameter_estimation_evidence(
 
     Raises:
         ArtifactError: If the evidence graph lacks the evaluation or snapshot
-            node.
+            node. A missing or corrupt graph file raises from the loader.
     """
     graph_path = run_directory / "evidence_graph.json"
     graph = inference_evidence.InferenceEvidenceLinker.load(graph_path)
@@ -424,11 +424,13 @@ def estimate_parameters_for_project(
     """Estimates the declared parameters against an orchestrator dataset.
 
     Args:
-        orchestrator: The orchestrator holding the project's data and spec.
+        orchestrator: The orchestrator holding the project's spec and either
+            its in-memory frame or the table at the spec's data URI.
         estimand: The declared population quantity.
         policy: The declared estimation policy.
         artifact_directory: If given, the report is written there as
-            ``parameter_estimation.json`` and read back verified.
+            ``parameter_estimation.json`` and the returned result is the one
+            read back through the digest-checking reader.
 
     Returns:
         The estimation result, with diagnostics naming the columns used, the
@@ -439,6 +441,8 @@ def estimate_parameters_for_project(
             estimator lacks a consistent `treatment_column`.
         DataError: If a declared column is absent, or has missing values under
             the `reject` policy.
+
+    Invalid estimator inputs raise `ValueError` from `estimate_parameters`.
     """
     if orchestrator.spec.data.modality != "tabular":
         raise errors.ConfigError(
@@ -635,8 +639,11 @@ class MLProject:
                 protocol.
             target: Name of the target column, or for `multilabel` and
                 `multioutput` tasks the list of all target columns.
-            task: `auto`, `classification`, `regression`, or an explicit
-                binary/multiclass task.
+            task: `auto`, `classification` (resolved from the target),
+                `regression`, an explicit `binary_classification` or
+                `multiclass_classification`, or one of `survival`, `ordinal`,
+                `ranking`, `multilabel`, `multioutput`, `forecast` and
+                `uplift`.
             metric: Primary metric; defaults per task.
             time_budget: Wall-clock budget in seconds.
             modality: Dataset family declaration. The supported beta path is
@@ -893,7 +900,7 @@ class MLProject:
         """Executes the workflow.
 
         If an estimand and policy were declared, the parameter estimation runs
-        first and its evidence is bound to the result.
+        before the workflow and its evidence is bound to the result after it.
 
         Args:
             plan: An approved or modified plan restricting candidates.
@@ -933,8 +940,10 @@ class MLProject:
             The declared parameter estimates and uncertainty evidence.
 
         Raises:
-            ConfigError: If the estimand, policy, or modality is undeclared or
-                incompatible with this tabular estimator.
+            ConfigError: If the estimand or policy is undeclared. A modality or
+                treatment-column mismatch raises it from
+                `estimate_parameters_for_project`, and missing columns or
+                values raise `DataError` from there.
         """
         if self.estimand is None or self.estimation_policy is None:
             raise errors.ConfigError(
@@ -956,7 +965,10 @@ class MLProject:
     ) -> results.RunResult:
         """Continues an interrupted run from its saved configuration.
 
-        Completed trials are reused; the rest are computed.
+        Completed trials are reused; the rest are computed. The saved
+        configuration and parameter-estimation declaration must be intact and
+        match (`ArtifactError` or `ConfigError` otherwise), and a run that
+        already completed cannot be resumed.
 
         Args:
             run_directory: Directory of a cancelled, failed or crashed run.
@@ -996,11 +1008,11 @@ class MLProject:
         Args:
             run_directory: A completed run directory.
             data: The original in-memory data, if the run used a DataFrame.
-            output_dir: Where to write the rerun (default: next to the
-                original).
+            output_dir: Parent directory for the rerun's new run directory
+                (default: the original run's parent directory).
 
         Returns:
-            Whether the rerun is `exact`, `comparable` or `different`.
+            A verdict whose level is `exact`, `comparable` or `different`.
         """
         original = pathlib.Path(run_directory)
         orchestrator = orchestrator_module.Orchestrator.for_run_directory(
@@ -1081,7 +1093,9 @@ class ModalityProject:
         Args:
             adapter: Typed adapter that owns modality validation and features.
             signing_key: Non-empty key used to authenticate the package.
-            output_dir: New directory for the package and lifecycle report.
+            output_dir: Directory for the package (in its `model` subdirectory,
+                which must not already exist) and the lifecycle report
+                (`modality_lifecycle.json`).
             seed: Deterministic split and model seed.
             observed_adapter: Optional shifted dataset for monitoring.
             performance_budget: Optional declared performance budget.
@@ -1091,9 +1105,9 @@ class ModalityProject:
                 explanation reference suite before packaging.
             cancellation: Optional thread-safe signal for cooperative
                 cancellation at lifecycle checkpoints.
-            checkpoint_path: Optional signed, atomic checkpoint path for durable
-                modality recovery. Supplying this requires the lifecycle report
-                path managed by this project.
+            checkpoint_path: Optional signed checkpoint file for durable
+                modality recovery. It must differ from the report path the
+                project uses (`modality_lifecycle.json` in `output_dir`).
             resume: Resume from ``checkpoint_path`` after verifying its
                 signature, identity, and deterministic replay of the completed
                 work.
@@ -1144,7 +1158,10 @@ class ModalityProject:
         self.report: modality_lifecycle.LifecycleReport | None = None
 
     def run(self) -> modality_lifecycle.LifecycleReport:
-        """Runs the full lifecycle and persist its evidence atomically.
+        """Runs the full lifecycle and writes its package and signed report.
+
+        A cancelled run raises `LifecycleCancelledError`; other lifecycle
+        failures propagate unchanged.
 
         Returns:
             The lifecycle report, also kept as `report`.
@@ -1173,7 +1190,7 @@ class ModalityProject:
         return self.report
 
     def cancel(self) -> None:
-        """Request cooperative cancellation of the active lifecycle run."""
+        """Requests cooperative cancellation of the active lifecycle run."""
         self.cancellation.cancel()
 
     def declaration(self) -> modalities.ModalityDeclaration:
@@ -1191,7 +1208,7 @@ class ModalityProject:
 
 
 class ModalityCurationProject:
-    """Curate and document a modality without forcing a model fit.
+    """Curates and documents a modality without forcing a model fit.
 
     This is the data-understanding entry point for unlabeled, unsupervised, or
     domain-specific datasets. It persists signed curation and dataset-card
@@ -1238,10 +1255,11 @@ class ModalityCurationProject:
         self.manifest = manifest
 
     def run(self) -> modality_lifecycle.ModalityCurationResult:
-        """Persist signed curation evidence without entering modelling.
+        """Persists signed curation evidence without entering modelling.
 
         If an artifact already exists it is verified and reused when it matches
-        the current adapter, instead of being replaced.
+        the current adapter, instead of being replaced. An existing artifact
+        whose signature does not verify raises from `read_verified`.
 
         Returns:
             The signed curation result, either newly written or the matching

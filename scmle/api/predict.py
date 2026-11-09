@@ -18,15 +18,18 @@ def load_model(
     """Loads a saved model bundle.
 
     Bundles are pickle-based, so loading is refused unless the signature
-    verifies or the caller vouches for the source.
+    verifies or the caller vouches for the source. An unauthenticated,
+    tampered or incompatible bundle raises `ArtifactError`, and so does
+    `trusted=True` when `$SCMLE_ENV` is `production`.
 
     Args:
         directory: Directory written by `RunResult.save`.
         trusted: Load an unsigned bundle you vouch for.
-        signing_key: HMAC key verifying the bundle signature.
+        signing_key: HMAC key verifying the bundle signature; defaults to
+            `$SCMLE_SIGNING_KEY`.
 
     Returns:
-        The verified bundle.
+        The bundle, after its checksums and signature checks.
     """
     return bundle_module.ModelBundle.load(
         directory, trusted=trusted, signing_key=signing_key
@@ -50,7 +53,8 @@ def predict(
         mapping: Explicit column-name policy; exact names if omitted.
 
     Returns:
-        Predictions, one per row.
+        Predictions, one per row (one column per target for multi-target
+        models).
     """
     model = load_model(directory, trusted, signing_key)
     return model.predict(data, mapping)
@@ -73,8 +77,9 @@ def score(
         mapping: Explicit column-name policy; exact names if omitted.
 
     Returns:
-        Predictions, probabilities for classifiers, model version and
-        whether the input satisfied the schema.
+        A dict with `predictions`, `model_version`, `schema_valid` and
+        `diagnostics`; classifiers also get `classes` and `probabilities`,
+        and a bundle with a novelty detector gets `out_of_distribution`.
     """
     model = load_model(directory, trusted, signing_key)
     return model.score(data, mapping)

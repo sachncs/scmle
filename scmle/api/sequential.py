@@ -24,7 +24,8 @@ def resolve_tabular_input(data: TabularInput) -> pd.DataFrame:
         A caller-independent DataFrame ready for sequential validation.
 
     Raises:
-        TypeError: If ``data`` is not a supported tabular input.
+        TypeError: If ``data`` is not a DataFrame, string or path. An
+            unsupported file suffix raises from the loader.
     """
     if isinstance(data, pd.DataFrame):
         return data.copy(deep=True)
@@ -90,6 +91,8 @@ class SequentialEstimationProject:
     def run(self) -> sequential.SequentialEstimationResult:
         """Estimates, atomically persists, and reads back the verified result.
 
+        The report is written to `artifact_path`, replacing any earlier one.
+
         Returns:
             The result as read back from the persisted report.
 
@@ -113,6 +116,9 @@ class SequentialEstimationProject:
     def load_result(self) -> sequential.SequentialEstimationResult:
         """Loads and verifies the durable report associated with this project.
 
+        A missing report, or one whose envelope or digest fails verification,
+        raises from the reader.
+
         Returns:
             The persisted result, which is also kept as `result`.
         """
@@ -124,7 +130,9 @@ class SequentialEstimationProject:
     def verify_replay(
         self, data: TabularInput | None = None
     ) -> reproducibility.ReplayVerdict:
-        """Replay the project and verify input, policy, and result identity.
+        """Replays the project and verifies input, policy, and result identity.
+
+        The persisted report must exist (it is loaded first).
 
         Args:
             data: Optional replacement input used for the replay.  When it is

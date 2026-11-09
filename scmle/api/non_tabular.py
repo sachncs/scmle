@@ -186,12 +186,13 @@ def capability_for_adapter(
         adapter: The adapter to describe.
 
     Returns:
-        The capability of the adapter's exact type, including whether a video
-        frame decoder or raster decoder makes the representation pixel- or
-        frame-based or metadata-only.
+        The capability of the adapter's exact type. For video and raster
+        adapters the representation and decoder policy depend on whether a
+        frame decoder or raster decoder is set (decoded statistics) or not
+        (container or raster metadata only).
 
     Raises:
-        TypeError: If ``adapter`` is not a modelling adapter.
+        TypeError: If ``adapter`` is not a ``ModalityAdapter``.
         UnsupportedNonTabularModelError: If its exact type is not allowlisted.
     """
     if not isinstance(adapter, modality_lifecycle.ModalityAdapter):
@@ -315,7 +316,7 @@ def capability_for_adapter(
 
 
 class NonTabularModelProject:
-    """Run a bounded, explicitly experimental non-tabular model lifecycle.
+    """Runs a bounded, explicitly experimental non-tabular model lifecycle.
 
     This project is production-oriented in its artifact and failure boundary,
     not production-supported in its model claims. It requires an explicit
@@ -366,10 +367,12 @@ class NonTabularModelProject:
             signing_key: Non-empty HMAC key that signs the package and report.
             experimental_opt_in: Must be True to acknowledge the experimental
                 status.
-            output_dir: Directory for the report and the package.
+            output_dir: Directory for the report and the package; its `model`
+                subdirectory must not already exist when the lifecycle runs.
             seed: Random seed (an integer, not a bool).
             observed_adapter: Adapter of later observed samples; it must have
-                the same capability and share the decoder object of `adapter`.
+                the same capability and, for video and raster adapters, share
+                the decoder object of `adapter`.
             performance_budget: Performance limits to enforce.
             performance_baseline: Performance baseline to compare with.
             manifest: The modality manifest.
@@ -383,8 +386,8 @@ class NonTabularModelProject:
             UnsupportedNonTabularModelError: If opt-in is absent, the adapter is
                 outside the exact built-in boundary, or the observed adapter
                 differs in capability or decoder.
-            TypeError: If a flag, the seed or the cancellation has the wrong
-                type.
+            TypeError: If an adapter is not a `ModalityAdapter`, or a flag, the
+                seed or the cancellation has the wrong type.
             ValueError: If the signing key is empty.
         """
         self.capability = capability_for_adapter(adapter)
@@ -473,14 +476,19 @@ class NonTabularModelProject:
         return self.output_dir / NON_TABULAR_MODEL_DIRECTORY
 
     def run(self) -> NonTabularModelResult:
-        """Run, verify, and return the complete bounded lifecycle.
+        """Runs, verifies, and returns the complete bounded lifecycle.
+
+        The lifecycle writes the signed report and package under `output_dir`.
+        Its failures, including cancellation, propagate unchanged.
 
         Returns:
             The verified result, loaded back from the written report and
             package.
 
         Raises:
-            ValueError: If `output_dir` exists and is not a directory.
+            ValueError: If `output_dir` exists and is not a directory. Loading
+                the result back raises it too when the report does not match
+                the project.
         """
         if self.output_dir.exists() and not self.output_dir.is_dir():
             raise ValueError("output_dir must be a directory")
@@ -535,7 +543,7 @@ class NonTabularModelProject:
         return self.result
 
     def cancel(self) -> None:
-        """Request cancellation at the next lifecycle check."""
+        """Requests cancellation at the next lifecycle check."""
         self.cancellation.cancel()
 
     @classmethod
