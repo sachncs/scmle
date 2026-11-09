@@ -168,10 +168,11 @@ class Orchestrator:
 
         Replaces `self.spec` with a copy whose validation strategy, time
         budget and metric are those of `approved`, validated with the rest
-        of the specification. A plan that contradicts the specification, for example
-        group validation without a group column, fails that validation with
-        a `ValidationError`. The plan's candidate models and task are not
-        applied here; the stages read them from the context's approved plan.
+        of the specification. A plan that contradicts the specification,
+        for example group validation without a group column, fails that
+        validation with a `ValidationError`. The candidate models and task of
+        the plan are not applied here; the stages read them from the
+        context's approved plan.
 
         Args:
             approved: The plan, or None to keep the specification as is.
