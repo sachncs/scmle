@@ -351,3 +351,28 @@ def test_an_unregistered_absent_file_that_appears_fails(tmp_path):
 def test_no_decision_files_adds_no_step(tmp_path):
     make_run(tmp_path)
     assert DECISION not in statuses(claims_audit.verify(tmp_path, KEY))
+
+
+def test_a_malformed_claims_document_fails_the_replay_instead_of_raising():
+    document = {
+        "outcome": confirm.CONFIRMED,
+        "rule": "holm",
+        "alpha_confirm": "1/20",
+        "claims": [{"claim_id": "h1"}],
+        "checks": [{"check_id": "h1:C", "p_value": 0.001}],
+    }
+    assert claims_audit.check_replay(document).status == "fail"
+    del document["checks"]
+    assert claims_audit.check_replay(document).status == "fail"
+
+
+def test_showing_a_claim_the_ledger_does_not_know_is_an_artifact_error(
+    tmp_path,
+):
+    make_run(tmp_path)
+    edit_claims(
+        tmp_path,
+        lambda d: d["claims"].append(dict(d["claims"][0], claim_id="h424242")),
+    )
+    with pytest.raises(errors.ArtifactError, match="h424242"):
+        claims_audit.show_claim(tmp_path, "h424242")

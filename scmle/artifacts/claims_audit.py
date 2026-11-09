@@ -295,7 +295,7 @@ def show_claim(run_dir: str | Path, claim_id: str) -> dict[str, Any]:
         outcome.
 
     Raises:
-        ArtifactError: If the claim is unknown.
+        ArtifactError: If the claim is unknown or is not in the ledger.
     """
     document = read_claims(run_dir)
     ledger = read_ledger(run_dir)
@@ -312,6 +312,10 @@ def show_claim(run_dir: str | Path, claim_id: str) -> dict[str, Any]:
         known = ", ".join(c["claim_id"] for c in document["claims"])
         raise errors.ArtifactError(
             f"no claim {claim_id!r}; the run has: {known or 'none'}"
+        )
+    if claim_id not in ledger.hypotheses or claim_id not in ledger.results:
+        raise errors.ArtifactError(
+            f"claim {claim_id!r} is not in the sealed ledger"
         )
     hypothesis = ledger.hypotheses[claim_id]
     result = ledger.results[claim_id]
@@ -498,25 +502,34 @@ def check_replay(document: dict[str, Any]) -> Finding:
     name = "confirmation replays from the p-values on C"
     if document.get("outcome") != confirm.CONFIRMED:
         return step(name, SKIPPED, f"outcome is {document.get('outcome')!r}")
-    by_check = {c["check_id"]: c for c in document["checks"]}
-    tested = [c for c in document["claims"] if f"{c['claim_id']}:C" in by_check]
     try:
+        by_check = {c["check_id"]: c for c in document["checks"]}
+        tested = [
+            c for c in document["claims"] if f"{c['claim_id']}:C" in by_check
+        ]
         values = [by_check[f"{c['claim_id']}:C"]["p_value"] for c in tested]
         adjustment = multiplicity.adjust(
             values,
             budget_module.MultiplicityRule(document["rule"]),
             Fraction(document["alpha_confirm"]),
         )
-    except (ValueError, KeyError) as error:
-        return step(name, FAIL, f"cannot replay: {error}")
-    for index, claim in enumerate(tested):
-        recorded = claim["adjusted_p_value"]
-        if recorded is None or not math.isclose(
-            recorded, adjustment.adjusted[index], abs_tol=TOLERANCE
-        ):
-            return step(name, FAIL, f"{claim['claim_id']}: adjusted p differs")
-        if is_confirmed(claim) != adjustment.rejected[index]:
-            return step(name, FAIL, f"{claim['claim_id']}: tier differs")
+        for index, claim in enumerate(tested):
+            recorded = claim["adjusted_p_value"]
+            if recorded is None or not math.isclose(
+                recorded, adjustment.adjusted[index], abs_tol=TOLERANCE
+            ):
+                return step(
+                    name, FAIL, f"{claim['claim_id']}: adjusted p differs"
+                )
+            if is_confirmed(claim) != adjustment.rejected[index]:
+                return step(name, FAIL, f"{claim['claim_id']}: tier differs")
+    except (
+        ValueError,
+        KeyError,
+        TypeError,
+        ZeroDivisionError,
+    ) as error:
+        return step(name, FAIL, f"cannot replay: {error!r}")
     return step(
         name, PASS, f"{len(tested)} hypotheses, rule {document['rule']}"
     )
