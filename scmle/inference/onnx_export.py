@@ -324,9 +324,10 @@ def decode(bundle: Any, session: Any, labels: numpy.ndarray) -> numpy.ndarray:
     """
     meta = session.get_modelmeta().custom_metadata_map
     if meta.get(CODES_KEY) == "1":
-        return numpy.asarray(bundle.classes, dtype=object)[
+        decoded: numpy.ndarray = numpy.asarray(bundle.classes, dtype=object)[
             numpy.asarray(labels).astype(int)
         ]
+        return decoded
     return numpy.asarray(labels)
 
 
