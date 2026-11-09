@@ -3,7 +3,7 @@
   "gates": {
     "subgroup_holm": {
       "alpha": 0.050000000000000044,
-      "code_hash": "dd6c625e621d318136cd5b280a62489f9e216119662c5bc0229da896ce02044f",
+      "code_hash": "5247c96846d62de21c7365ef8dc68dea55c9db2de78f645820059244b8479311",
       "familywise_bound": 0.059746794344809014,
       "familywise_error_null": {
         "hits": 111,
@@ -23,7 +23,7 @@
           0.05826609175151162
         ]
       },
-      "method_hash": "9b58b151a432973acc151c9bac33a091bb9a8d8b11dd043efa5fe47f0b4a0774",
+      "method_hash": "8a250fdb5fb8348fd0d647e507f8f703ccfa7f312ab4c2fb7abc1df141987b20",
       "min_certified_rows": 400,
       "passed": true,
       "power_at_effect_half_sd": {
@@ -117,7 +117,7 @@
       },
       "power_replicates": 500,
       "replicates": 2000,
-      "seconds": 22.1,
+      "seconds": 20.8,
       "seeds": [
         0,
         2000

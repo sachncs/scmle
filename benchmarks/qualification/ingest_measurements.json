@@ -11,11 +11,11 @@
     "within_budget": 100
   },
   "code_hashes": {
-    "budget": "29150a0ba10f145bd45c3840984fb6eb2cf3dcc6ff863bb1095fd01f38ed3068",
+    "budget": "a5503a64c1b5e316edc8138a3041fdf1de88123733be2918209ab7fbbeaf0ce1",
     "entities": "21c1c381ef596ddec9d95bd74b45118b460655bb9fadacf1fc54b876780e0092",
     "grain": "96a67e86e170fec0a20b02f509a12c6c0e6107c5fb0b6d737ebce5afd95ed3fc",
     "joins": "2694c6787db1f27fe57b4622a899669ee837a4ced9d27e162d8bbc3006096420",
-    "point_in_time": "dc21e30c08ac673f7685a7fc3f5df44ab3a9cfdf2ce8c787322753012be8e12c",
+    "point_in_time": "cc03160629a757bcc7bab88b1b1cf287ff8e7082b1f1a9015fc761940e7db739",
     "reconcile": "7b65d92c613a564235f9187335b734a45a49df8c10dbfb0686ff8c87970d80f2",
     "torn_read": "8e1fbde77a90fa58b463a75369fb1925490218c439453c097179dc1cf2772ce3"
   },
@@ -105,7 +105,7 @@
     "seed_offset": 0,
     "tolerance": 0.0
   },
-  "seconds": 82.9,
+  "seconds": 77.9,
   "torn_read": {
     "batch_rows": 5,
     "detected": 500,
