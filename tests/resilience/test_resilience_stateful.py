@@ -221,7 +221,7 @@ def test_the_processor_follows_the_reference_under_crashes_and_corruption():
         ProcessorMachine,
         settings=settings(
             max_examples=50,
-            stateful_step_count=14,
+            stateful_step_count=25,
             deadline=None,
             database=None,
             suppress_health_check=list(HealthCheck),
