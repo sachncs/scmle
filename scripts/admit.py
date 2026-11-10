@@ -67,8 +67,9 @@ def measure() -> float:
     """Measures memory available to new work.
 
     Returns:
-        Free plus reclaimable memory in gigabytes, or infinity when the
-        platform offers no cheap way to read it.
+        Free plus reclaimable memory in gigabytes (available memory on
+        Windows and Linux), or infinity when the platform offers no cheap way
+        to read it.
     """
     if sys.platform == "darwin":
         report = subprocess.run(  # nosec B603 B607
@@ -82,6 +83,10 @@ def measure() -> float:
             if name in ("Pages free", "Pages inactive", "Pages speculative"):
                 pages += int(count.strip().rstrip("."))
         return pages * size / BYTES_PER_GIGABYTE
+    if sys.platform == "win32":
+        import psutil  # Windows-only dependency
+
+        return float(psutil.virtual_memory().available) / BYTES_PER_GIGABYTE
     meminfo = pathlib.Path("/proc/meminfo")
     if meminfo.exists():
         for line in meminfo.read_text(encoding="utf-8").splitlines():

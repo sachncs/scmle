@@ -780,10 +780,20 @@ def process_memory_mb(process: subprocess.Popen[bytes] | None) -> float | None:
 
     Returns:
         The resident set size in MiB rounded to one decimal, or None if no
-        process was given or `ps` did not report a number.
+        process was given or the platform did not report a number (read with
+        `ps` on POSIX and `psutil` on Windows).
     """
     if process is None:
         return None
+    if sys.platform == "win32":
+        import psutil  # noqa: PLC0415 -- Windows-only dependency
+
+        try:
+            return round(
+                psutil.Process(process.pid).memory_info().rss / 1048576, 1
+            )
+        except psutil.Error:
+            return None
     result = subprocess.run(  # noqa: S603 -- fixed arguments  # nosec B603 B607
         ["ps", "-o", "rss=", "-p", str(process.pid)],  # noqa: S607 -- ps is looked up on PATH, as on every POSIX host
         capture_output=True,

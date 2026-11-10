@@ -991,6 +991,10 @@ marked `Breaking:` and listed first in their group.
   could fail or read differently there. Not run on Windows; the README now says
   which Windows scenarios CI covers and that the rest has only run on Linux
   and macOS.
+- On Windows, `scripts/admit.py` now reads available memory with `psutil` (it
+  treated memory as unlimited, so the gate never held work back) and the
+  deployment demo reads a child's memory with `psutil` instead of `ps`, which
+  does not exist there. Not run on Windows.
 
 - Windows: text artifacts were written with CRLF, so the framing draft's files
   differed in bytes while its charter hash did not
