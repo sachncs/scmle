@@ -86,7 +86,7 @@ def probe(rows):
 
 
 def test_peak_memory_grows_by_a_bounded_amount_per_row():
-    small_peak, _ = probe(SMALL_ROWS)
+    small_peak = probe(SMALL_ROWS)[0]
     large_peak, large_table = probe(LARGE_ROWS)
     growth_per_row = (large_peak - small_peak) / (LARGE_ROWS - SMALL_ROWS)
     table_per_row = large_table / LARGE_ROWS
