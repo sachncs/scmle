@@ -985,6 +985,13 @@ marked `Breaking:` and listed first in their group.
 
 ### Fixed
 
+- Every text file the package and its tests open now names its encoding
+  (`utf-8`), and ruff enforces it (`PLW1514`). Windows defaults to a legacy
+  code page, so reading a key, policy or attestation file with non-ASCII text
+  could fail or read differently there. Not run on Windows; the README now says
+  which Windows scenarios CI covers and that the rest has only run on Linux
+  and macOS.
+
 - Windows: text artifacts were written with CRLF, so the framing draft's files
   differed in bytes while its charter hash did not
   (`tests/unit/test_replay_identity.py` failed on Windows 3.11 and 3.14); the

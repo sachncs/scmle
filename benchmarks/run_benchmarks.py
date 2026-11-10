@@ -336,7 +336,9 @@ def main(argv: list[str] | None = None) -> int:
     payload: dict[str, Any] = {
         "results": [dataclasses.asdict(r) for r in records]
     }
-    pathlib.Path(args.output).write_text(json.dumps(payload, indent=2))
+    pathlib.Path(args.output).write_text(
+        json.dumps(payload, indent=2), encoding="utf-8"
+    )
     for record in records:
         if record.status != "ok":
             LOGGER.error("%s failed:\n%s", record.name, record.error)

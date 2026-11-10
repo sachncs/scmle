@@ -834,7 +834,9 @@ class IngestCommand(Command):
         declared: tuple[joins.DeclaredKey, ...] = ()
         if args.foreign_keys:
             declared = scmle.data.ingest.plan.declared_from_json(
-                json.loads(pathlib.Path(args.foreign_keys).read_text())
+                json.loads(
+                    pathlib.Path(args.foreign_keys).read_text(encoding="utf-8")
+                )
             )
         settings = scmle.data.ingest.plan.Config(
             tables=tuple(t for t in args.tables.split(",") if t),
@@ -925,6 +927,7 @@ class CharterCommand(Command):
             raise errors.ConfigError(f"{path} exists; pass --force")
         path.write_text(
             json.dumps(contracts.template(), indent=2) + "\n",
+            encoding="utf-8",
             newline="\n",
         )
         LOGGER.info("wrote template charter %s", path)
@@ -975,7 +978,7 @@ class CharterCommand(Command):
                 the environment.
         """
         key = (
-            pathlib.Path(args.key_file).read_text().strip()
+            pathlib.Path(args.key_file).read_text(encoding="utf-8").strip()
             if args.key_file
             else None
         )
@@ -1062,7 +1065,7 @@ class LoopCommand(Command):
             The exit status, EXIT_OK (0).
         """
         policy = scmle.governance.loop.Preregistration.from_dict(
-            json.loads(pathlib.Path(args.policy).read_text())
+            json.loads(pathlib.Path(args.policy).read_text(encoding="utf-8"))
         )
         charter = types.SimpleNamespace(charter_hash=args.charter_hash)
         scmle.governance.loop.Loop.open(args.deploy_dir, charter, policy)
@@ -1179,9 +1182,11 @@ class LoopCommand(Command):
         """
         loop = scmle.governance.loop.Loop.resume(args.deploy_dir)
         reply = deployment_ledger.Attestation.from_dict(
-            json.loads(pathlib.Path(args.attestation).read_text())
+            json.loads(
+                pathlib.Path(args.attestation).read_text(encoding="utf-8")
+            )
         )
-        key = pathlib.Path(args.key_file).read_text().strip()
+        key = pathlib.Path(args.key_file).read_text(encoding="utf-8").strip()
         try:
             outcome = loop.reply(args.escalation_id, reply, key)
         except scmle.governance.loop.ReplyRefused as error:
@@ -1324,7 +1329,7 @@ class OperateCommand(Command):
             The exit status, EXIT_OK (0).
         """
         keys = (
-            json.loads(pathlib.Path(args.keys_file).read_text())
+            json.loads(pathlib.Path(args.keys_file).read_text(encoding="utf-8"))
             if args.keys_file
             else None
         )
@@ -1360,9 +1365,9 @@ class OperateCommand(Command):
         Raises:
             ConfigError: If the envelope is refused.
         """
-        key = pathlib.Path(args.key_file).read_text().strip()
+        key = pathlib.Path(args.key_file).read_text(encoding="utf-8").strip()
         envelope = deployment_ledger.Envelope.from_dict(
-            json.loads(pathlib.Path(args.envelope).read_text())
+            json.loads(pathlib.Path(args.envelope).read_text(encoding="utf-8"))
         )
         controller = cls.open(
             args.deploy_dir, {deployment_ledger.key_fingerprint(key): key}
@@ -1765,7 +1770,7 @@ class ClaimsCommand(Command):
             ArtifactError: If any verification step failed.
         """
         key = (
-            pathlib.Path(args.key_file).read_text().strip()
+            pathlib.Path(args.key_file).read_text(encoding="utf-8").strip()
             if args.key_file
             else None
         )

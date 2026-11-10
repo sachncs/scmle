@@ -909,7 +909,10 @@ def main(argv: list[str] | None = None) -> int:
             LOGGER.info("%s", format_table([row]).splitlines()[-1])
     LOGGER.info("\n%s", format_table(rows))
     pathlib.Path(args.output).write_text(
-        json.dumps({"results": [dataclasses.asdict(r) for r in rows]}, indent=2)
+        json.dumps(
+            {"results": [dataclasses.asdict(r) for r in rows]}, indent=2
+        ),
+        encoding="utf-8",
     )
     return 0 if all(not r.error for r in rows) else 1
 

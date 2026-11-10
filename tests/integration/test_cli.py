@@ -175,7 +175,11 @@ def test_catalog_command_reads_raw_bytes_from_standard_input(
 ):
     """The '-' input gives a pipe-friendly raw-byte catalog path."""
     payload = b"streamed bytes"
-    monkeypatch.setattr(cli.sys, "stdin", io.TextIOWrapper(io.BytesIO(payload)))
+    monkeypatch.setattr(
+        cli.sys,
+        "stdin",
+        io.TextIOWrapper(io.BytesIO(payload), encoding="utf-8"),
+    )
 
     assert cli.main(["catalog", "-"]) == cli.EXIT_OK
 

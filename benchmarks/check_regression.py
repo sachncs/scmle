@@ -122,8 +122,12 @@ def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(
         level=logging.INFO, format="%(message)s", stream=sys.stdout
     )
-    results = json.loads(pathlib.Path(args.results).read_text())["results"]
-    baseline = json.loads(pathlib.Path(args.baseline).read_text())
+    results = json.loads(
+        pathlib.Path(args.results).read_text(encoding="utf-8")
+    )["results"]
+    baseline = json.loads(
+        pathlib.Path(args.baseline).read_text(encoding="utf-8")
+    )
     problems = violations(results, baseline)
     for problem in problems:
         LOGGER.error("REGRESSION %s", problem)

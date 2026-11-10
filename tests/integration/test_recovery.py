@@ -32,7 +32,9 @@ class ExplodingAdapter(models.Model):
 
 
 def read_events(run_dir):
-    with pathlib.Path(f"{run_dir}/events.jsonl").open() as handle:
+    with pathlib.Path(f"{run_dir}/events.jsonl").open(
+        encoding="utf-8"
+    ) as handle:
         return [json.loads(line) for line in handle]
 
 
