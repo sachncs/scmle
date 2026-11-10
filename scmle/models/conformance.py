@@ -199,7 +199,7 @@ def check_search_space(
     space = adapter.search_space
     if space is None:
         return
-    sampled = space.sample(random.Random(0))  # noqa: S311 -- seeded, not security
+    sampled = space.sample(random.Random(0))  # noqa: S311 -- seeded, not security  # nosec B311
     tuned = adapter.build(task, 0, sampled)
     applied = tuned.get_params(deep=True)
     for key, value in sampled.items():

@@ -320,7 +320,7 @@ class Classifier:
             max_features=self.config.max_features,
             ngram_range=self.config.ngram_range,
             min_df=self.config.min_df,
-            token_pattern=r"(?u)\b\w\w+\b",  # noqa: S106 -- regex, not a secret
+            token_pattern=r"(?u)\b\w\w+\b",  # noqa: S106 -- regex, not a secret  # nosec B106
         )
         matrix = vectorizer.fit_transform([sample.content for sample in values])
         if matrix.shape[1] == 0:

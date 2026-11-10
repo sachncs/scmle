@@ -411,7 +411,7 @@ def check_remote(
         {"Content-Type": "application/json"},
     )
     try:
-        with urllib.request.urlopen(  # noqa: S310 -- scheme checked above
+        with urllib.request.urlopen(  # noqa: S310 -- scheme checked above  # nosec B310
             request, timeout=timeout
         ) as reply:
             body = json.loads(reply.read())

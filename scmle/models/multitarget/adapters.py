@@ -86,7 +86,7 @@ class Multitarget(models.Model):
         """
         classify = task is tasks.Task.MULTILABEL
         kind = self.classifier if classify else self.regressor
-        assert kind is not None  # noqa: S101 -- capability guard, unreachable
+        assert kind is not None  # noqa: S101 -- capability guard, unreachable  # nosec B101
         settings = dict(params or {})
         try:
             inner = kind(random_state=seed, **settings)

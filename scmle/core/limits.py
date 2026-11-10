@@ -56,6 +56,9 @@ class TrialLimitError(errors.ScmleError):
     """Raised when a supervised trial was stopped or lost."""
 
 
+# A plain constant, so type checkers on Linux do not treat the macOS branch
+# below as unreachable.
+ON_MACOS = sys.platform == "darwin"
 ENVIRONMENT_LOCK = threading.Lock()
 ENVIRONMENT_USERS = [0]
 """How many threads are inside `forkserver_environment` (one-item list)."""
@@ -77,7 +80,7 @@ def forkserver_environment() -> Iterator[None]:
     share one change: the first in saves the original value and the last
     out restores it, so overlapping uses cannot leave the "1" behind.
     """
-    if sys.platform != "darwin":
+    if not ON_MACOS:
         yield
         return
     with ENVIRONMENT_LOCK:
