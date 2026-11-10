@@ -109,10 +109,11 @@ src = ["."]
 extend-exclude = ["mutants", "website"]
 
 [tool.ruff.lint]
-# Every rule, plus the preview rule DOC (documented arguments, returns and
-# raises). `preview = true` with `explicit-preview-rules = true` switches on only
+# Every rule, plus the preview rules DOC (documented arguments, returns and
+# raises) and PLW1514 (text files name their encoding; Windows defaults to a
+# legacy code page). `preview = true` with `explicit-preview-rules = true` switches on only
 # the preview rules named here, not all preview behaviour.
-select = ["ALL", "DOC"]
+select = ["ALL", "DOC", "PLW1514"]
 ignore = [
     # The formatter and the Google docstring convention settle these.
     "COM812",

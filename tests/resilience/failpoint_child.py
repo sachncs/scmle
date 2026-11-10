@@ -32,7 +32,7 @@ def hold_run(root, marker, release):
     store = objectstore.LocalObjectStore(root)
 
     def waiting(frame):
-        pathlib.Path(marker).write_text("held")
+        pathlib.Path(marker).write_text("held", encoding="utf-8")
         deadline = time.monotonic() + HOLD_SECONDS
         while not pathlib.Path(release).exists():
             if time.monotonic() > deadline:

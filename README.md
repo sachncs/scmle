@@ -13,7 +13,11 @@ discipline with production engineering: typed contracts, leakage-safe
 evaluation, signed artifacts, operational checkpoints, and monitoring.
 
 Runs on Linux, macOS and Windows with Python 3.11 or newer (tested on 3.11 to
-3.14, including the free-threaded 3.14 build). New to machine learning? Start with
+3.14, including the free-threaded 3.14 build). On Windows, CI is set up to run the
+unit, property and leakage tests and the end-to-end test (their results on
+Windows have not been checked here); serving, fault-injection
+and deployment scenarios have only been run on Linux and macOS. New to
+machine learning? Start with
 [Start here](docs/START_HERE.md). Otherwise start with the
 [quickstart](docs/TUTORIAL.md), then use the [architecture guide](docs/ARCHITECTURE.md)
 to understand how the system is composed.
