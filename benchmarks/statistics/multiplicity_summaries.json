@@ -1,0 +1,2205 @@
+{
+  "after_correction": {
+    "null_3": {
+      "configuration": {
+        "configs_per_model": 0,
+        "folds": 5,
+        "models": [
+          "decision_tree",
+          "knn",
+          "logistic_regression"
+        ],
+        "nominal_level_of_the_intervals": 0.95,
+        "rows": 1000,
+        "runs": 200,
+        "seed": 0,
+        "signal": 0.0,
+        "true_roc_auc_of_every_candidate": 0.5
+      },
+      "summary": {
+        "claims": {
+          "cv_interval_excludes_baseline": {
+            "clopper_pearson_95": [
+              0.02423416547210855,
+              0.09002753770135138
+            ],
+            "count": 10,
+            "rate": 0.05,
+            "runs": 200,
+            "wilson_95": [
+              0.02738264560076392,
+              0.08957814813877599
+            ]
+          },
+          "fit_health_healthy": {
+            "clopper_pearson_95": [
+              0.0012133490137360308,
+              0.03565466839723978
+            ],
+            "count": 2,
+            "rate": 0.01,
+            "runs": 200,
+            "wilson_95": [
+              0.002746658133544435,
+              0.0357217617161768
+            ]
+          },
+          "lead_exceeds_spread": {
+            "clopper_pearson_95": [
+              0.06618122702871175,
+              0.15601870554750283
+            ],
+            "count": 21,
+            "rate": 0.105,
+            "runs": 200,
+            "wilson_95": [
+              0.06970748792681018,
+              0.15518031991123044
+            ]
+          },
+          "leakage_suspect": {
+            "clopper_pearson_95": [
+              0.0,
+              0.01827534035513624
+            ],
+            "count": 0,
+            "rate": 0.0,
+            "runs": 200,
+            "wilson_95": [
+              0.0,
+              0.018845326377266575
+            ]
+          },
+          "test_interval_excludes_baseline": {
+            "clopper_pearson_95": [
+              0.00012658102786701839,
+              0.02754189845720563
+            ],
+            "count": 1,
+            "rate": 0.005,
+            "runs": 200,
+            "wilson_95": [
+              0.0008831687156009762,
+              0.02777370439789293
+            ]
+          }
+        },
+        "coverage_of_true_skill": {
+          "cv_interval_covers_truth": {
+            "clopper_pearson_95": [
+              0.8975381686916755,
+              0.9686160461065165
+            ],
+            "count": 188,
+            "rate": 0.94,
+            "runs": 200,
+            "wilson_95": [
+              0.8980683070423372,
+              0.9653478057456681
+            ]
+          },
+          "test_interval_covers_truth": {
+            "clopper_pearson_95": [
+              0.9292190016490227,
+              0.9858144741015806
+            ],
+            "count": 193,
+            "rate": 0.965,
+            "runs": 200,
+            "wilson_95": [
+              0.9295293884777092,
+              0.9829444579914328
+            ]
+          }
+        },
+        "mean_candidates": 3.0,
+        "mean_cv_score_minus_test_auc": 0.021661484298700472,
+        "mean_seconds_per_run": 3.180923339129513,
+        "mean_test_auc": 0.49691467685871543,
+        "mean_true_test_auc": 0.5,
+        "test_interval_misses": {
+          "test_interval_above_truth": {
+            "clopper_pearson_95": [
+              0.00012658102786701839,
+              0.02754189845720563
+            ],
+            "count": 1,
+            "rate": 0.005,
+            "runs": 200,
+            "wilson_95": [
+              0.0008831687156009762,
+              0.02777370439789293
+            ]
+          },
+          "test_interval_below_truth": {
+            "clopper_pearson_95": [
+              0.011087455672254777,
+              0.06415062670502701
+            ],
+            "count": 6,
+            "rate": 0.03,
+            "runs": 200,
+            "wilson_95": [
+              0.013820314340111339,
+              0.06389429245451923
+            ]
+          }
+        },
+        "winners": {
+          "decision_tree": 65,
+          "knn": 71,
+          "logistic_regression": 64
+        }
+      }
+    },
+    "null_30": {
+      "configuration": {
+        "configs_per_model": 9,
+        "folds": 5,
+        "models": [
+          "decision_tree",
+          "knn",
+          "logistic_regression"
+        ],
+        "nominal_level_of_the_intervals": 0.95,
+        "rows": 1000,
+        "runs": 200,
+        "seed": 0,
+        "signal": 0.0,
+        "true_roc_auc_of_every_candidate": 0.5
+      },
+      "summary": {
+        "claims": {
+          "cv_interval_excludes_baseline": {
+            "clopper_pearson_95": [
+              0.02423416547210855,
+              0.09002753770135138
+            ],
+            "count": 10,
+            "rate": 0.05,
+            "runs": 200,
+            "wilson_95": [
+              0.02738264560076392,
+              0.08957814813877599
+            ]
+          },
+          "fit_health_healthy": {
+            "clopper_pearson_95": [
+              0.0012133490137360308,
+              0.03565466839723978
+            ],
+            "count": 2,
+            "rate": 0.01,
+            "runs": 200,
+            "wilson_95": [
+              0.002746658133544435,
+              0.0357217617161768
+            ]
+          },
+          "lead_exceeds_spread": {
+            "clopper_pearson_95": [
+              0.0012133490137360308,
+              0.03565466839723978
+            ],
+            "count": 2,
+            "rate": 0.01,
+            "runs": 200,
+            "wilson_95": [
+              0.002746658133544435,
+              0.0357217617161768
+            ]
+          },
+          "leakage_suspect": {
+            "clopper_pearson_95": [
+              0.0,
+              0.01827534035513624
+            ],
+            "count": 0,
+            "rate": 0.0,
+            "runs": 200,
+            "wilson_95": [
+              0.0,
+              0.018845326377266575
+            ]
+          },
+          "test_interval_excludes_baseline": {
+            "clopper_pearson_95": [
+              0.00012658102786701839,
+              0.02754189845720563
+            ],
+            "count": 1,
+            "rate": 0.005,
+            "runs": 200,
+            "wilson_95": [
+              0.0008831687156009762,
+              0.02777370439789293
+            ]
+          }
+        },
+        "coverage_of_true_skill": {
+          "cv_interval_covers_truth": {
+            "clopper_pearson_95": [
+              0.9099724622986486,
+              0.9757658345278915
+            ],
+            "count": 190,
+            "rate": 0.95,
+            "runs": 200,
+            "wilson_95": [
+              0.910421851861224,
+              0.9726173543992361
+            ]
+          },
+          "test_interval_covers_truth": {
+            "clopper_pearson_95": [
+              0.9292190016490227,
+              0.9858144741015806
+            ],
+            "count": 193,
+            "rate": 0.965,
+            "runs": 200,
+            "wilson_95": [
+              0.9295293884777092,
+              0.9829444579914328
+            ]
+          }
+        },
+        "mean_candidates": 30.0,
+        "mean_cv_score_minus_test_auc": 0.03314875061527702,
+        "mean_seconds_per_run": 5.125393893928703,
+        "mean_test_auc": 0.49906573467491155,
+        "mean_true_test_auc": 0.5,
+        "test_interval_misses": {
+          "test_interval_above_truth": {
+            "clopper_pearson_95": [
+              0.00012658102786701839,
+              0.02754189845720563
+            ],
+            "count": 1,
+            "rate": 0.005,
+            "runs": 200,
+            "wilson_95": [
+              0.0008831687156009762,
+              0.02777370439789293
+            ]
+          },
+          "test_interval_below_truth": {
+            "clopper_pearson_95": [
+              0.011087455672254777,
+              0.06415062670502701
+            ],
+            "count": 6,
+            "rate": 0.03,
+            "runs": 200,
+            "wilson_95": [
+              0.013820314340111339,
+              0.06389429245451923
+            ]
+          }
+        },
+        "winners": {
+          "decision_tree": 96,
+          "knn": 69,
+          "logistic_regression": 35
+        }
+      }
+    },
+    "signal15_30": {
+      "configuration": {
+        "configs_per_model": 9,
+        "folds": 5,
+        "models": [
+          "decision_tree",
+          "knn",
+          "logistic_regression"
+        ],
+        "nominal_level_of_the_intervals": 0.95,
+        "rows": 1000,
+        "runs": 200,
+        "seed": 0,
+        "signal": 0.15,
+        "true_roc_auc_of_every_candidate": null
+      },
+      "summary": {
+        "claims": {
+          "cv_interval_excludes_baseline": {
+            "clopper_pearson_95": [
+              0.13810312537283964,
+              0.2513315186237442
+            ],
+            "count": 38,
+            "rate": 0.19,
+            "runs": 200,
+            "wilson_95": [
+              0.14167171527790673,
+              0.25001238707599854
+            ]
+          },
+          "fit_health_healthy": {
+            "clopper_pearson_95": [
+              0.046417608399822556,
+              0.1266648560220817
+            ],
+            "count": 16,
+            "rate": 0.08,
+            "runs": 200,
+            "wilson_95": [
+              0.049840585889759974,
+              0.12598948826714396
+            ]
+          },
+          "lead_exceeds_spread": {
+            "clopper_pearson_95": [
+              0.00012658102786701839,
+              0.02754189845720563
+            ],
+            "count": 1,
+            "rate": 0.005,
+            "runs": 200,
+            "wilson_95": [
+              0.0008831687156009762,
+              0.02777370439789293
+            ]
+          },
+          "leakage_suspect": {
+            "clopper_pearson_95": [
+              0.0,
+              0.01827534035513624
+            ],
+            "count": 0,
+            "rate": 0.0,
+            "runs": 200,
+            "wilson_95": [
+              0.0,
+              0.018845326377266575
+            ]
+          },
+          "test_interval_excludes_baseline": {
+            "clopper_pearson_95": [
+              0.09088710175489775,
+              0.19030917268339836
+            ],
+            "count": 27,
+            "rate": 0.135,
+            "runs": 200,
+            "wilson_95": [
+              0.09446570454787909,
+              0.18929138370752555
+            ]
+          }
+        },
+        "coverage_of_true_skill": {
+          "test_interval_covers_truth": {
+            "clopper_pearson_95": [
+              0.9037223555660872,
+              0.9722277454479934
+            ],
+            "count": 189,
+            "rate": 0.945,
+            "runs": 200,
+            "wilson_95": [
+              0.9042130012276915,
+              0.9690146582965412
+            ]
+          }
+        },
+        "mean_candidates": 30.0,
+        "mean_cv_score_minus_test_auc": 0.025006916664813358,
+        "mean_seconds_per_run": 5.516473308744025,
+        "mean_test_auc": 0.527733788047444,
+        "mean_true_test_auc": 0.5305369558497501,
+        "test_interval_misses": {
+          "test_interval_above_truth": {
+            "clopper_pearson_95": [
+              0.0012133490137360308,
+              0.03565466839723978
+            ],
+            "count": 2,
+            "rate": 0.01,
+            "runs": 200,
+            "wilson_95": [
+              0.002746658133544435,
+              0.0357217617161768
+            ]
+          },
+          "test_interval_below_truth": {
+            "clopper_pearson_95": [
+              0.02078042222700435,
+              0.08370268807585397
+            ],
+            "count": 9,
+            "rate": 0.045,
+            "runs": 200,
+            "wilson_95": [
+              0.023852543001492987,
+              0.08329670400181959
+            ]
+          }
+        },
+        "winners": {
+          "decision_tree": 38,
+          "knn": 52,
+          "logistic_regression": 110
+        }
+      }
+    },
+    "signal50_30": {
+      "configuration": {
+        "configs_per_model": 9,
+        "folds": 5,
+        "models": [
+          "decision_tree",
+          "knn",
+          "logistic_regression"
+        ],
+        "nominal_level_of_the_intervals": 0.95,
+        "rows": 1000,
+        "runs": 200,
+        "seed": 0,
+        "signal": 0.5,
+        "true_roc_auc_of_every_candidate": null
+      },
+      "summary": {
+        "claims": {
+          "cv_interval_excludes_baseline": {
+            "clopper_pearson_95": [
+              0.9643453316027603,
+              0.998786650986264
+            ],
+            "count": 198,
+            "rate": 0.99,
+            "runs": 200,
+            "wilson_95": [
+              0.9642782382838232,
+              0.9972533418664556
+            ]
+          },
+          "fit_health_healthy": {
+            "clopper_pearson_95": [
+              0.9567917180822874,
+              0.9968958923784464
+            ],
+            "count": 197,
+            "rate": 0.985,
+            "runs": 200,
+            "wilson_95": [
+              0.9568342712073097,
+              0.9948857622067417
+            ]
+          },
+          "lead_exceeds_spread": {
+            "clopper_pearson_95": [
+              0.0,
+              0.01827534035513624
+            ],
+            "count": 0,
+            "rate": 0.0,
+            "runs": 200,
+            "wilson_95": [
+              0.0,
+              0.018845326377266575
+            ]
+          },
+          "leakage_suspect": {
+            "clopper_pearson_95": [
+              0.0,
+              0.01827534035513624
+            ],
+            "count": 0,
+            "rate": 0.0,
+            "runs": 200,
+            "wilson_95": [
+              0.0,
+              0.018845326377266575
+            ]
+          },
+          "test_interval_excludes_baseline": {
+            "clopper_pearson_95": [
+              0.9643453316027603,
+              0.998786650986264
+            ],
+            "count": 198,
+            "rate": 0.99,
+            "runs": 200,
+            "wilson_95": [
+              0.9642782382838232,
+              0.9972533418664556
+            ]
+          }
+        },
+        "coverage_of_true_skill": {
+          "test_interval_covers_truth": {
+            "clopper_pearson_95": [
+              0.8793157746003387,
+              0.9574171962629073
+            ],
+            "count": 185,
+            "rate": 0.925,
+            "runs": 200,
+            "wilson_95": [
+              0.8799563897637054,
+              0.9540250828156179
+            ]
+          }
+        },
+        "mean_candidates": 30.0,
+        "mean_cv_score_minus_test_auc": 0.0025657136207135347,
+        "mean_seconds_per_run": 5.2846879233265645,
+        "mean_test_auc": 0.6726863596974171,
+        "mean_true_test_auc": 0.6755319877374335,
+        "test_interval_misses": {
+          "test_interval_above_truth": {
+            "clopper_pearson_95": [
+              0.0174248089944806,
+              0.07729196822601611
+            ],
+            "count": 8,
+            "rate": 0.04,
+            "runs": 200,
+            "wilson_95": [
+              0.020405632066152302,
+              0.07693206820093294
+            ]
+          },
+          "test_interval_below_truth": {
+            "clopper_pearson_95": [
+              0.014185525898419243,
+              0.07078099835097719
+            ],
+            "count": 7,
+            "rate": 0.035,
+            "runs": 200,
+            "wilson_95": [
+              0.0170555420085672,
+              0.07047061152229074
+            ]
+          }
+        },
+        "winners": {
+          "knn": 3,
+          "logistic_regression": 197
+        }
+      }
+    }
+  },
+  "before_correction": {
+    "null_3": {
+      "configuration": {
+        "configs_per_model": 0,
+        "folds": 5,
+        "models": [
+          "decision_tree",
+          "knn",
+          "logistic_regression"
+        ],
+        "nominal_level_of_the_intervals": 0.95,
+        "rows": 1000,
+        "runs": 200,
+        "seed": 0,
+        "signal": 0.0,
+        "true_roc_auc_of_every_candidate": 0.5
+      },
+      "summary": {
+        "claims": {
+          "cv_interval_excludes_baseline": {
+            "clopper_pearson_95": [
+              0.02423416547210855,
+              0.09002753770135138
+            ],
+            "count": 10,
+            "rate": 0.05,
+            "runs": 200,
+            "wilson_95": [
+              0.02738264560076392,
+              0.08957814813877599
+            ]
+          },
+          "fit_health_healthy": {
+            "clopper_pearson_95": [
+              0.0012133490137360308,
+              0.03565466839723978
+            ],
+            "count": 2,
+            "rate": 0.01,
+            "runs": 200,
+            "wilson_95": [
+              0.002746658133544435,
+              0.0357217617161768
+            ]
+          },
+          "lead_exceeds_spread": {
+            "clopper_pearson_95": [
+              0.06618122702871175,
+              0.15601870554750283
+            ],
+            "count": 21,
+            "rate": 0.105,
+            "runs": 200,
+            "wilson_95": [
+              0.06970748792681018,
+              0.15518031991123044
+            ]
+          },
+          "leakage_suspect": {
+            "clopper_pearson_95": [
+              0.0,
+              0.01827534035513624
+            ],
+            "count": 0,
+            "rate": 0.0,
+            "runs": 200,
+            "wilson_95": [
+              0.0,
+              0.018845326377266575
+            ]
+          },
+          "test_interval_excludes_baseline": {
+            "clopper_pearson_95": [
+              0.00012658102786701839,
+              0.02754189845720563
+            ],
+            "count": 1,
+            "rate": 0.005,
+            "runs": 200,
+            "wilson_95": [
+              0.0008831687156009762,
+              0.02777370439789293
+            ]
+          }
+        },
+        "coverage_of_true_skill": {
+          "cv_interval_covers_truth": {
+            "clopper_pearson_95": [
+              0.8975381686916755,
+              0.9686160461065165
+            ],
+            "count": 188,
+            "rate": 0.94,
+            "runs": 200,
+            "wilson_95": [
+              0.8980683070423372,
+              0.9653478057456681
+            ]
+          },
+          "test_interval_covers_truth": {
+            "clopper_pearson_95": [
+              0.9292190016490227,
+              0.9858144741015806
+            ],
+            "count": 193,
+            "rate": 0.965,
+            "runs": 200,
+            "wilson_95": [
+              0.9295293884777092,
+              0.9829444579914328
+            ]
+          }
+        },
+        "mean_candidates": 3.0,
+        "mean_cv_score_minus_test_auc": 0.021661484298700472,
+        "mean_seconds_per_run": 3.196655577714264,
+        "mean_test_auc": 0.49691467685871543,
+        "mean_true_test_auc": 0.5,
+        "test_interval_misses": {
+          "test_interval_above_truth": {
+            "clopper_pearson_95": [
+              0.00012658102786701839,
+              0.02754189845720563
+            ],
+            "count": 1,
+            "rate": 0.005,
+            "runs": 200,
+            "wilson_95": [
+              0.0008831687156009762,
+              0.02777370439789293
+            ]
+          },
+          "test_interval_below_truth": {
+            "clopper_pearson_95": [
+              0.011087455672254777,
+              0.06415062670502701
+            ],
+            "count": 6,
+            "rate": 0.03,
+            "runs": 200,
+            "wilson_95": [
+              0.013820314340111339,
+              0.06389429245451923
+            ]
+          }
+        },
+        "winners": {
+          "decision_tree": 65,
+          "knn": 71,
+          "logistic_regression": 64
+        }
+      }
+    },
+    "null_30": {
+      "configuration": {
+        "configs_per_model": 9,
+        "folds": 5,
+        "models": [
+          "decision_tree",
+          "knn",
+          "logistic_regression"
+        ],
+        "nominal_level_of_the_intervals": 0.95,
+        "rows": 1000,
+        "runs": 200,
+        "seed": 0,
+        "signal": 0.0,
+        "true_roc_auc_of_every_candidate": 0.5
+      },
+      "summary": {
+        "claims": {
+          "cv_interval_excludes_baseline": {
+            "clopper_pearson_95": [
+              0.06618122702871175,
+              0.15601870554750283
+            ],
+            "count": 21,
+            "rate": 0.105,
+            "runs": 200,
+            "wilson_95": [
+              0.06970748792681018,
+              0.15518031991123044
+            ]
+          },
+          "fit_health_healthy": {
+            "clopper_pearson_95": [
+              0.0012133490137360308,
+              0.03565466839723978
+            ],
+            "count": 2,
+            "rate": 0.01,
+            "runs": 200,
+            "wilson_95": [
+              0.002746658133544435,
+              0.0357217617161768
+            ]
+          },
+          "lead_exceeds_spread": {
+            "clopper_pearson_95": [
+              0.0012133490137360308,
+              0.03565466839723978
+            ],
+            "count": 2,
+            "rate": 0.01,
+            "runs": 200,
+            "wilson_95": [
+              0.002746658133544435,
+              0.0357217617161768
+            ]
+          },
+          "leakage_suspect": {
+            "clopper_pearson_95": [
+              0.0,
+              0.01827534035513624
+            ],
+            "count": 0,
+            "rate": 0.0,
+            "runs": 200,
+            "wilson_95": [
+              0.0,
+              0.018845326377266575
+            ]
+          },
+          "test_interval_excludes_baseline": {
+            "clopper_pearson_95": [
+              0.00012658102786701839,
+              0.02754189845720563
+            ],
+            "count": 1,
+            "rate": 0.005,
+            "runs": 200,
+            "wilson_95": [
+              0.0008831687156009762,
+              0.02777370439789293
+            ]
+          }
+        },
+        "coverage_of_true_skill": {
+          "cv_interval_covers_truth": {
+            "clopper_pearson_95": [
+              0.8439812944524973,
+              0.9338187729712882
+            ],
+            "count": 179,
+            "rate": 0.895,
+            "runs": 200,
+            "wilson_95": [
+              0.8448196800887696,
+              0.9302925120731899
+            ]
+          },
+          "test_interval_covers_truth": {
+            "clopper_pearson_95": [
+              0.9292190016490227,
+              0.9858144741015806
+            ],
+            "count": 193,
+            "rate": 0.965,
+            "runs": 200,
+            "wilson_95": [
+              0.9295293884777092,
+              0.9829444579914328
+            ]
+          }
+        },
+        "mean_candidates": 30.0,
+        "mean_cv_score_minus_test_auc": 0.03314875061527702,
+        "mean_seconds_per_run": 5.111660037929978,
+        "mean_test_auc": 0.49906573467491155,
+        "mean_true_test_auc": 0.5,
+        "test_interval_misses": {
+          "test_interval_above_truth": {
+            "clopper_pearson_95": [
+              0.00012658102786701839,
+              0.02754189845720563
+            ],
+            "count": 1,
+            "rate": 0.005,
+            "runs": 200,
+            "wilson_95": [
+              0.0008831687156009762,
+              0.02777370439789293
+            ]
+          },
+          "test_interval_below_truth": {
+            "clopper_pearson_95": [
+              0.011087455672254777,
+              0.06415062670502701
+            ],
+            "count": 6,
+            "rate": 0.03,
+            "runs": 200,
+            "wilson_95": [
+              0.013820314340111339,
+              0.06389429245451923
+            ]
+          }
+        },
+        "winners": {
+          "decision_tree": 96,
+          "knn": 69,
+          "logistic_regression": 35
+        }
+      }
+    },
+    "null_30_s1000": {
+      "configuration": {
+        "configs_per_model": 9,
+        "folds": 5,
+        "models": [
+          "decision_tree",
+          "knn",
+          "logistic_regression"
+        ],
+        "nominal_level_of_the_intervals": 0.95,
+        "rows": 1000,
+        "runs": 200,
+        "seed": 1000,
+        "signal": 0.0,
+        "true_roc_auc_of_every_candidate": 0.5
+      },
+      "summary": {
+        "claims": {
+          "cv_interval_excludes_baseline": {
+            "clopper_pearson_95": [
+              0.06215936625406605,
+              0.15021278786775571
+            ],
+            "count": 20,
+            "rate": 0.1,
+            "runs": 200,
+            "wilson_95": [
+              0.06567044866909588,
+              0.1494058124327174
+            ]
+          },
+          "fit_health_healthy": {
+            "clopper_pearson_95": [
+              0.0,
+              0.01827534035513624
+            ],
+            "count": 0,
+            "rate": 0.0,
+            "runs": 200,
+            "wilson_95": [
+              0.0,
+              0.018845326377266575
+            ]
+          },
+          "lead_exceeds_spread": {
+            "clopper_pearson_95": [
+              0.0,
+              0.01827534035513624
+            ],
+            "count": 0,
+            "rate": 0.0,
+            "runs": 200,
+            "wilson_95": [
+              0.0,
+              0.018845326377266575
+            ]
+          },
+          "leakage_suspect": {
+            "clopper_pearson_95": [
+              0.0,
+              0.01827534035513624
+            ],
+            "count": 0,
+            "rate": 0.0,
+            "runs": 200,
+            "wilson_95": [
+              0.0,
+              0.018845326377266575
+            ]
+          },
+          "test_interval_excludes_baseline": {
+            "clopper_pearson_95": [
+              0.0,
+              0.01827534035513624
+            ],
+            "count": 0,
+            "rate": 0.0,
+            "runs": 200,
+            "wilson_95": [
+              0.0,
+              0.018845326377266575
+            ]
+          }
+        },
+        "coverage_of_true_skill": {
+          "cv_interval_covers_truth": {
+            "clopper_pearson_95": [
+              0.8497872121322442,
+              0.9378406337459337
+            ],
+            "count": 180,
+            "rate": 0.9,
+            "runs": 200,
+            "wilson_95": [
+              0.8505941875672826,
+              0.9343295513309041
+            ]
+          },
+          "test_interval_covers_truth": {
+            "clopper_pearson_95": [
+              0.9292190016490227,
+              0.9858144741015806
+            ],
+            "count": 193,
+            "rate": 0.965,
+            "runs": 200,
+            "wilson_95": [
+              0.9295293884777092,
+              0.9829444579914328
+            ]
+          }
+        },
+        "mean_candidates": 30.0,
+        "mean_cv_score_minus_test_auc": 0.034782746843317024,
+        "mean_seconds_per_run": 5.09763119328316,
+        "mean_test_auc": 0.4974275216316502,
+        "mean_true_test_auc": 0.5,
+        "test_interval_misses": {
+          "test_interval_above_truth": {
+            "clopper_pearson_95": [
+              0.0,
+              0.01827534035513624
+            ],
+            "count": 0,
+            "rate": 0.0,
+            "runs": 200,
+            "wilson_95": [
+              0.0,
+              0.018845326377266575
+            ]
+          },
+          "test_interval_below_truth": {
+            "clopper_pearson_95": [
+              0.014185525898419243,
+              0.07078099835097719
+            ],
+            "count": 7,
+            "rate": 0.035,
+            "runs": 200,
+            "wilson_95": [
+              0.0170555420085672,
+              0.07047061152229074
+            ]
+          }
+        },
+        "winners": {
+          "decision_tree": 94,
+          "knn": 78,
+          "logistic_regression": 28
+        }
+      }
+    },
+    "null_30_s2000": {
+      "configuration": {
+        "configs_per_model": 9,
+        "folds": 5,
+        "models": [
+          "decision_tree",
+          "knn",
+          "logistic_regression"
+        ],
+        "nominal_level_of_the_intervals": 0.95,
+        "rows": 1000,
+        "runs": 200,
+        "seed": 2000,
+        "signal": 0.0,
+        "true_roc_auc_of_every_candidate": 0.5
+      },
+      "summary": {
+        "claims": {
+          "cv_interval_excludes_baseline": {
+            "clopper_pearson_95": [
+              0.05029591863025727,
+              0.13260516582955234
+            ],
+            "count": 17,
+            "rate": 0.085,
+            "runs": 200,
+            "wilson_95": [
+              0.053745750177475606,
+              0.13189587071565567
+            ]
+          },
+          "fit_health_healthy": {
+            "clopper_pearson_95": [
+              0.0,
+              0.01827534035513624
+            ],
+            "count": 0,
+            "rate": 0.0,
+            "runs": 200,
+            "wilson_95": [
+              0.0,
+              0.018845326377266575
+            ]
+          },
+          "lead_exceeds_spread": {
+            "clopper_pearson_95": [
+              0.0,
+              0.01827534035513624
+            ],
+            "count": 0,
+            "rate": 0.0,
+            "runs": 200,
+            "wilson_95": [
+              0.0,
+              0.018845326377266575
+            ]
+          },
+          "leakage_suspect": {
+            "clopper_pearson_95": [
+              0.0,
+              0.01827534035513624
+            ],
+            "count": 0,
+            "rate": 0.0,
+            "runs": 200,
+            "wilson_95": [
+              0.0,
+              0.018845326377266575
+            ]
+          },
+          "test_interval_excludes_baseline": {
+            "clopper_pearson_95": [
+              0.005475565879556451,
+              0.05041360908989628
+            ],
+            "count": 4,
+            "rate": 0.02,
+            "runs": 200,
+            "wilson_95": [
+              0.007804426416349465,
+              0.05028708690582644
+            ]
+          }
+        },
+        "coverage_of_true_skill": {
+          "cv_interval_covers_truth": {
+            "clopper_pearson_95": [
+              0.8673948341704476,
+              0.9497040813697427
+            ],
+            "count": 183,
+            "rate": 0.915,
+            "runs": 200,
+            "wilson_95": [
+              0.8681041292843443,
+              0.9462542498225244
+            ]
+          },
+          "test_interval_covers_truth": {
+            "clopper_pearson_95": [
+              0.8975381686916755,
+              0.9686160461065165
+            ],
+            "count": 188,
+            "rate": 0.94,
+            "runs": 200,
+            "wilson_95": [
+              0.8980683070423372,
+              0.9653478057456681
+            ]
+          }
+        },
+        "mean_candidates": 30.0,
+        "mean_cv_score_minus_test_auc": 0.03443484151432487,
+        "mean_seconds_per_run": 5.088094698323694,
+        "mean_test_auc": 0.49498117390942475,
+        "mean_true_test_auc": 0.5,
+        "test_interval_misses": {
+          "test_interval_above_truth": {
+            "clopper_pearson_95": [
+              0.005475565879556451,
+              0.05041360908989628
+            ],
+            "count": 4,
+            "rate": 0.02,
+            "runs": 200,
+            "wilson_95": [
+              0.007804426416349465,
+              0.05028708690582644
+            ]
+          },
+          "test_interval_below_truth": {
+            "clopper_pearson_95": [
+              0.0174248089944806,
+              0.07729196822601611
+            ],
+            "count": 8,
+            "rate": 0.04,
+            "runs": 200,
+            "wilson_95": [
+              0.020405632066152302,
+              0.07693206820093294
+            ]
+          }
+        },
+        "winners": {
+          "decision_tree": 93,
+          "knn": 73,
+          "logistic_regression": 34
+        }
+      }
+    },
+    "null_3_s1000": {
+      "configuration": {
+        "configs_per_model": 0,
+        "folds": 5,
+        "models": [
+          "decision_tree",
+          "knn",
+          "logistic_regression"
+        ],
+        "nominal_level_of_the_intervals": 0.95,
+        "rows": 1000,
+        "runs": 200,
+        "seed": 1000,
+        "signal": 0.0,
+        "true_roc_auc_of_every_candidate": 0.5
+      },
+      "summary": {
+        "claims": {
+          "cv_interval_excludes_baseline": {
+            "clopper_pearson_95": [
+              0.02078042222700435,
+              0.08370268807585397
+            ],
+            "count": 9,
+            "rate": 0.045,
+            "runs": 200,
+            "wilson_95": [
+              0.023852543001492987,
+              0.08329670400181959
+            ]
+          },
+          "fit_health_healthy": {
+            "clopper_pearson_95": [
+              0.0,
+              0.01827534035513624
+            ],
+            "count": 0,
+            "rate": 0.0,
+            "runs": 200,
+            "wilson_95": [
+              0.0,
+              0.018845326377266575
+            ]
+          },
+          "lead_exceeds_spread": {
+            "clopper_pearson_95": [
+              0.02423416547210855,
+              0.09002753770135138
+            ],
+            "count": 10,
+            "rate": 0.05,
+            "runs": 200,
+            "wilson_95": [
+              0.02738264560076392,
+              0.08957814813877599
+            ]
+          },
+          "leakage_suspect": {
+            "clopper_pearson_95": [
+              0.0,
+              0.01827534035513624
+            ],
+            "count": 0,
+            "rate": 0.0,
+            "runs": 200,
+            "wilson_95": [
+              0.0,
+              0.018845326377266575
+            ]
+          },
+          "test_interval_excludes_baseline": {
+            "clopper_pearson_95": [
+              0.0012133490137360308,
+              0.03565466839723978
+            ],
+            "count": 2,
+            "rate": 0.01,
+            "runs": 200,
+            "wilson_95": [
+              0.002746658133544435,
+              0.0357217617161768
+            ]
+          }
+        },
+        "coverage_of_true_skill": {
+          "cv_interval_covers_truth": {
+            "clopper_pearson_95": [
+              0.916297311924146,
+              0.9792195777729956
+            ],
+            "count": 191,
+            "rate": 0.955,
+            "runs": 200,
+            "wilson_95": [
+              0.9167032959981803,
+              0.976147456998507
+            ]
+          },
+          "test_interval_covers_truth": {
+            "clopper_pearson_95": [
+              0.935849373294973,
+              0.9889125443277452
+            ],
+            "count": 194,
+            "rate": 0.97,
+            "runs": 200,
+            "wilson_95": [
+              0.9361057075454807,
+              0.9861796856598887
+            ]
+          }
+        },
+        "mean_candidates": 3.0,
+        "mean_cv_score_minus_test_auc": 0.021001509637330846,
+        "mean_seconds_per_run": 3.1712777081446255,
+        "mean_test_auc": 0.49872955437612526,
+        "mean_true_test_auc": 0.5,
+        "test_interval_misses": {
+          "test_interval_above_truth": {
+            "clopper_pearson_95": [
+              0.0012133490137360308,
+              0.03565466839723978
+            ],
+            "count": 2,
+            "rate": 0.01,
+            "runs": 200,
+            "wilson_95": [
+              0.002746658133544435,
+              0.0357217617161768
+            ]
+          },
+          "test_interval_below_truth": {
+            "clopper_pearson_95": [
+              0.005475565879556451,
+              0.05041360908989628
+            ],
+            "count": 4,
+            "rate": 0.02,
+            "runs": 200,
+            "wilson_95": [
+              0.007804426416349465,
+              0.05028708690582644
+            ]
+          }
+        },
+        "winners": {
+          "decision_tree": 71,
+          "knn": 66,
+          "logistic_regression": 63
+        }
+      }
+    },
+    "null_3_s2000": {
+      "configuration": {
+        "configs_per_model": 0,
+        "folds": 5,
+        "models": [
+          "decision_tree",
+          "knn",
+          "logistic_regression"
+        ],
+        "nominal_level_of_the_intervals": 0.95,
+        "rows": 1000,
+        "runs": 200,
+        "seed": 2000,
+        "signal": 0.0,
+        "true_roc_auc_of_every_candidate": 0.5
+      },
+      "summary": {
+        "claims": {
+          "cv_interval_excludes_baseline": {
+            "clopper_pearson_95": [
+              0.0174248089944806,
+              0.07729196822601611
+            ],
+            "count": 8,
+            "rate": 0.04,
+            "runs": 200,
+            "wilson_95": [
+              0.020405632066152302,
+              0.07693206820093294
+            ]
+          },
+          "fit_health_healthy": {
+            "clopper_pearson_95": [
+              0.0,
+              0.01827534035513624
+            ],
+            "count": 0,
+            "rate": 0.0,
+            "runs": 200,
+            "wilson_95": [
+              0.0,
+              0.018845326377266575
+            ]
+          },
+          "lead_exceeds_spread": {
+            "clopper_pearson_95": [
+              0.02423416547210855,
+              0.09002753770135138
+            ],
+            "count": 10,
+            "rate": 0.05,
+            "runs": 200,
+            "wilson_95": [
+              0.02738264560076392,
+              0.08957814813877599
+            ]
+          },
+          "leakage_suspect": {
+            "clopper_pearson_95": [
+              0.0,
+              0.01827534035513624
+            ],
+            "count": 0,
+            "rate": 0.0,
+            "runs": 200,
+            "wilson_95": [
+              0.0,
+              0.018845326377266575
+            ]
+          },
+          "test_interval_excludes_baseline": {
+            "clopper_pearson_95": [
+              0.0012133490137360308,
+              0.03565466839723978
+            ],
+            "count": 2,
+            "rate": 0.01,
+            "runs": 200,
+            "wilson_95": [
+              0.002746658133544435,
+              0.0357217617161768
+            ]
+          }
+        },
+        "coverage_of_true_skill": {
+          "cv_interval_covers_truth": {
+            "clopper_pearson_95": [
+              0.916297311924146,
+              0.9792195777729956
+            ],
+            "count": 191,
+            "rate": 0.955,
+            "runs": 200,
+            "wilson_95": [
+              0.9167032959981803,
+              0.976147456998507
+            ]
+          },
+          "test_interval_covers_truth": {
+            "clopper_pearson_95": [
+              0.9292190016490227,
+              0.9858144741015806
+            ],
+            "count": 193,
+            "rate": 0.965,
+            "runs": 200,
+            "wilson_95": [
+              0.9295293884777092,
+              0.9829444579914328
+            ]
+          }
+        },
+        "mean_candidates": 3.0,
+        "mean_cv_score_minus_test_auc": 0.018707486458180177,
+        "mean_seconds_per_run": 3.1582312356296462,
+        "mean_test_auc": 0.4993517093525633,
+        "mean_true_test_auc": 0.5,
+        "test_interval_misses": {
+          "test_interval_above_truth": {
+            "clopper_pearson_95": [
+              0.0012133490137360308,
+              0.03565466839723978
+            ],
+            "count": 2,
+            "rate": 0.01,
+            "runs": 200,
+            "wilson_95": [
+              0.002746658133544435,
+              0.0357217617161768
+            ]
+          },
+          "test_interval_below_truth": {
+            "clopper_pearson_95": [
+              0.008166166190842513,
+              0.057374351126845816
+            ],
+            "count": 5,
+            "rate": 0.025,
+            "runs": 200,
+            "wilson_95": [
+              0.010724719651761264,
+              0.05717834040664198
+            ]
+          }
+        },
+        "winners": {
+          "decision_tree": 66,
+          "knn": 64,
+          "logistic_regression": 70
+        }
+      }
+    },
+    "null_9": {
+      "configuration": {
+        "configs_per_model": 2,
+        "folds": 5,
+        "models": [
+          "decision_tree",
+          "knn",
+          "logistic_regression"
+        ],
+        "nominal_level_of_the_intervals": 0.95,
+        "rows": 1000,
+        "runs": 200,
+        "seed": 0,
+        "signal": 0.0,
+        "true_roc_auc_of_every_candidate": 0.5
+      },
+      "summary": {
+        "claims": {
+          "cv_interval_excludes_baseline": {
+            "clopper_pearson_95": [
+              0.031383953893483446,
+              0.10246183130832441
+            ],
+            "count": 12,
+            "rate": 0.06,
+            "runs": 200,
+            "wilson_95": [
+              0.034652194254331865,
+              0.10193169295766272
+            ]
+          },
+          "fit_health_healthy": {
+            "clopper_pearson_95": [
+              0.0012133490137360308,
+              0.03565466839723978
+            ],
+            "count": 2,
+            "rate": 0.01,
+            "runs": 200,
+            "wilson_95": [
+              0.002746658133544435,
+              0.0357217617161768
+            ]
+          },
+          "lead_exceeds_spread": {
+            "clopper_pearson_95": [
+              0.00012658102786701839,
+              0.02754189845720563
+            ],
+            "count": 1,
+            "rate": 0.005,
+            "runs": 200,
+            "wilson_95": [
+              0.0008831687156009762,
+              0.02777370439789293
+            ]
+          },
+          "leakage_suspect": {
+            "clopper_pearson_95": [
+              0.0,
+              0.01827534035513624
+            ],
+            "count": 0,
+            "rate": 0.0,
+            "runs": 200,
+            "wilson_95": [
+              0.0,
+              0.018845326377266575
+            ]
+          },
+          "test_interval_excludes_baseline": {
+            "clopper_pearson_95": [
+              0.0012133490137360308,
+              0.03565466839723978
+            ],
+            "count": 2,
+            "rate": 0.01,
+            "runs": 200,
+            "wilson_95": [
+              0.002746658133544435,
+              0.0357217617161768
+            ]
+          }
+        },
+        "coverage_of_true_skill": {
+          "cv_interval_covers_truth": {
+            "clopper_pearson_95": [
+              0.8975381686916755,
+              0.9686160461065165
+            ],
+            "count": 188,
+            "rate": 0.94,
+            "runs": 200,
+            "wilson_95": [
+              0.8980683070423372,
+              0.9653478057456681
+            ]
+          },
+          "test_interval_covers_truth": {
+            "clopper_pearson_95": [
+              0.9292190016490227,
+              0.9858144741015806
+            ],
+            "count": 193,
+            "rate": 0.965,
+            "runs": 200,
+            "wilson_95": [
+              0.9295293884777092,
+              0.9829444579914328
+            ]
+          }
+        },
+        "mean_candidates": 9.0,
+        "mean_cv_score_minus_test_auc": 0.02899246042151379,
+        "mean_seconds_per_run": 3.6415348500036635,
+        "mean_test_auc": 0.4972700822133666,
+        "mean_true_test_auc": 0.5,
+        "test_interval_misses": {
+          "test_interval_above_truth": {
+            "clopper_pearson_95": [
+              0.0012133490137360308,
+              0.03565466839723978
+            ],
+            "count": 2,
+            "rate": 0.01,
+            "runs": 200,
+            "wilson_95": [
+              0.002746658133544435,
+              0.0357217617161768
+            ]
+          },
+          "test_interval_below_truth": {
+            "clopper_pearson_95": [
+              0.008166166190842513,
+              0.057374351126845816
+            ],
+            "count": 5,
+            "rate": 0.025,
+            "runs": 200,
+            "wilson_95": [
+              0.010724719651761264,
+              0.05717834040664198
+            ]
+          }
+        },
+        "winners": {
+          "decision_tree": 81,
+          "knn": 71,
+          "logistic_regression": 48
+        }
+      }
+    },
+    "signal15_3": {
+      "configuration": {
+        "configs_per_model": 0,
+        "folds": 5,
+        "models": [
+          "decision_tree",
+          "knn",
+          "logistic_regression"
+        ],
+        "nominal_level_of_the_intervals": 0.95,
+        "rows": 1000,
+        "runs": 200,
+        "seed": 0,
+        "signal": 0.15,
+        "true_roc_auc_of_every_candidate": null
+      },
+      "summary": {
+        "claims": {
+          "cv_interval_excludes_baseline": {
+            "clopper_pearson_95": [
+              0.15131057199551945,
+              0.26765392078528516
+            ],
+            "count": 41,
+            "rate": 0.205,
+            "runs": 200,
+            "wilson_95": [
+              0.1548617620383621,
+              0.2662569805242252
+            ]
+          },
+          "fit_health_healthy": {
+            "clopper_pearson_95": [
+              0.031383953893483446,
+              0.10246183130832441
+            ],
+            "count": 12,
+            "rate": 0.06,
+            "runs": 200,
+            "wilson_95": [
+              0.034652194254331865,
+              0.10193169295766272
+            ]
+          },
+          "lead_exceeds_spread": {
+            "clopper_pearson_95": [
+              0.23276878422312422,
+              0.3634231333179104
+            ],
+            "count": 59,
+            "rate": 0.295,
+            "runs": 200,
+            "wilson_95": [
+              0.2361394385684915,
+              0.36158714524618785
+            ]
+          },
+          "leakage_suspect": {
+            "clopper_pearson_95": [
+              0.0,
+              0.01827534035513624
+            ],
+            "count": 0,
+            "rate": 0.0,
+            "runs": 200,
+            "wilson_95": [
+              0.0,
+              0.018845326377266575
+            ]
+          },
+          "test_interval_excludes_baseline": {
+            "clopper_pearson_95": [
+              0.10780940010409651,
+              0.21273764321570585
+            ],
+            "count": 31,
+            "rate": 0.155,
+            "runs": 200,
+            "wilson_95": [
+              0.11139636927689317,
+              0.2116069059234208
+            ]
+          }
+        },
+        "coverage_of_true_skill": {
+          "test_interval_covers_truth": {
+            "clopper_pearson_95": [
+              0.9227080317739839,
+              0.9825751910055194
+            ],
+            "count": 192,
+            "rate": 0.96,
+            "runs": 200,
+            "wilson_95": [
+              0.9230679317990671,
+              0.9795943679338477
+            ]
+          }
+        },
+        "mean_candidates": 3.0,
+        "mean_cv_score_minus_test_auc": 0.012107631424895786,
+        "mean_seconds_per_run": 3.391202446655516,
+        "mean_test_auc": 0.5323734345811885,
+        "mean_true_test_auc": 0.5336786160139417,
+        "test_interval_misses": {
+          "test_interval_above_truth": {
+            "clopper_pearson_95": [
+              0.0012133490137360308,
+              0.03565466839723978
+            ],
+            "count": 2,
+            "rate": 0.01,
+            "runs": 200,
+            "wilson_95": [
+              0.002746658133544435,
+              0.0357217617161768
+            ]
+          },
+          "test_interval_below_truth": {
+            "clopper_pearson_95": [
+              0.011087455672254777,
+              0.06415062670502701
+            ],
+            "count": 6,
+            "rate": 0.03,
+            "runs": 200,
+            "wilson_95": [
+              0.013820314340111339,
+              0.06389429245451923
+            ]
+          }
+        },
+        "winners": {
+          "decision_tree": 17,
+          "knn": 36,
+          "logistic_regression": 147
+        }
+      }
+    },
+    "signal15_30": {
+      "configuration": {
+        "configs_per_model": 9,
+        "folds": 5,
+        "models": [
+          "decision_tree",
+          "knn",
+          "logistic_regression"
+        ],
+        "nominal_level_of_the_intervals": 0.95,
+        "rows": 1000,
+        "runs": 200,
+        "seed": 0,
+        "signal": 0.15,
+        "true_roc_auc_of_every_candidate": null
+      },
+      "summary": {
+        "claims": {
+          "cv_interval_excludes_baseline": {
+            "clopper_pearson_95": [
+              0.20980333746614468,
+              0.3371525906873306
+            ],
+            "count": 54,
+            "rate": 0.27,
+            "runs": 200,
+            "wilson_95": [
+              0.2132344981468584,
+              0.3354343519866842
+            ]
+          },
+          "fit_health_healthy": {
+            "clopper_pearson_95": [
+              0.046417608399822556,
+              0.1266648560220817
+            ],
+            "count": 16,
+            "rate": 0.08,
+            "runs": 200,
+            "wilson_95": [
+              0.049840585889759974,
+              0.12598948826714396
+            ]
+          },
+          "lead_exceeds_spread": {
+            "clopper_pearson_95": [
+              0.00012658102786701839,
+              0.02754189845720563
+            ],
+            "count": 1,
+            "rate": 0.005,
+            "runs": 200,
+            "wilson_95": [
+              0.0008831687156009762,
+              0.02777370439789293
+            ]
+          },
+          "leakage_suspect": {
+            "clopper_pearson_95": [
+              0.0,
+              0.01827534035513624
+            ],
+            "count": 0,
+            "rate": 0.0,
+            "runs": 200,
+            "wilson_95": [
+              0.0,
+              0.018845326377266575
+            ]
+          },
+          "test_interval_excludes_baseline": {
+            "clopper_pearson_95": [
+              0.09088710175489775,
+              0.19030917268339836
+            ],
+            "count": 27,
+            "rate": 0.135,
+            "runs": 200,
+            "wilson_95": [
+              0.09446570454787909,
+              0.18929138370752555
+            ]
+          }
+        },
+        "coverage_of_true_skill": {
+          "test_interval_covers_truth": {
+            "clopper_pearson_95": [
+              0.9037223555660872,
+              0.9722277454479934
+            ],
+            "count": 189,
+            "rate": 0.945,
+            "runs": 200,
+            "wilson_95": [
+              0.9042130012276915,
+              0.9690146582965412
+            ]
+          }
+        },
+        "mean_candidates": 30.0,
+        "mean_cv_score_minus_test_auc": 0.025006916664813358,
+        "mean_seconds_per_run": 5.5352937218656,
+        "mean_test_auc": 0.527733788047444,
+        "mean_true_test_auc": 0.5305369558497501,
+        "test_interval_misses": {
+          "test_interval_above_truth": {
+            "clopper_pearson_95": [
+              0.0012133490137360308,
+              0.03565466839723978
+            ],
+            "count": 2,
+            "rate": 0.01,
+            "runs": 200,
+            "wilson_95": [
+              0.002746658133544435,
+              0.0357217617161768
+            ]
+          },
+          "test_interval_below_truth": {
+            "clopper_pearson_95": [
+              0.02078042222700435,
+              0.08370268807585397
+            ],
+            "count": 9,
+            "rate": 0.045,
+            "runs": 200,
+            "wilson_95": [
+              0.023852543001492987,
+              0.08329670400181959
+            ]
+          }
+        },
+        "winners": {
+          "decision_tree": 38,
+          "knn": 52,
+          "logistic_regression": 110
+        }
+      }
+    },
+    "signal50_3": {
+      "configuration": {
+        "configs_per_model": 0,
+        "folds": 5,
+        "models": [
+          "decision_tree",
+          "knn",
+          "logistic_regression"
+        ],
+        "nominal_level_of_the_intervals": 0.95,
+        "rows": 1000,
+        "runs": 200,
+        "seed": 0,
+        "signal": 0.5,
+        "true_roc_auc_of_every_candidate": null
+      },
+      "summary": {
+        "claims": {
+          "cv_interval_excludes_baseline": {
+            "clopper_pearson_95": [
+              0.9724581015427943,
+              0.999873418972133
+            ],
+            "count": 199,
+            "rate": 0.995,
+            "runs": 200,
+            "wilson_95": [
+              0.972226295602107,
+              0.999116831284399
+            ]
+          },
+          "fit_health_healthy": {
+            "clopper_pearson_95": [
+              0.9567917180822874,
+              0.9968958923784464
+            ],
+            "count": 197,
+            "rate": 0.985,
+            "runs": 200,
+            "wilson_95": [
+              0.9568342712073097,
+              0.9948857622067417
+            ]
+          },
+          "lead_exceeds_spread": {
+            "clopper_pearson_95": [
+              0.9426256488731541,
+              0.9918338338091575
+            ],
+            "count": 195,
+            "rate": 0.975,
+            "runs": 200,
+            "wilson_95": [
+              0.9428216595933581,
+              0.9892752803482388
+            ]
+          },
+          "leakage_suspect": {
+            "clopper_pearson_95": [
+              0.0,
+              0.01827534035513624
+            ],
+            "count": 0,
+            "rate": 0.0,
+            "runs": 200,
+            "wilson_95": [
+              0.0,
+              0.018845326377266575
+            ]
+          },
+          "test_interval_excludes_baseline": {
+            "clopper_pearson_95": [
+              0.9643453316027603,
+              0.998786650986264
+            ],
+            "count": 198,
+            "rate": 0.99,
+            "runs": 200,
+            "wilson_95": [
+              0.9642782382838232,
+              0.9972533418664556
+            ]
+          }
+        },
+        "coverage_of_true_skill": {
+          "test_interval_covers_truth": {
+            "clopper_pearson_95": [
+              0.8914127634961848,
+              0.9649392913430209
+            ],
+            "count": 187,
+            "rate": 0.935,
+            "runs": 200,
+            "wilson_95": [
+              0.891980920700931,
+              0.9616236453508471
+            ]
+          }
+        },
+        "mean_candidates": 3.0,
+        "mean_cv_score_minus_test_auc": 0.0005186190322140865,
+        "mean_seconds_per_run": 3.3458013589591427,
+        "mean_test_auc": 0.6725191307406803,
+        "mean_true_test_auc": 0.6752499635123508,
+        "test_interval_misses": {
+          "test_interval_above_truth": {
+            "clopper_pearson_95": [
+              0.014185525898419243,
+              0.07078099835097719
+            ],
+            "count": 7,
+            "rate": 0.035,
+            "runs": 200,
+            "wilson_95": [
+              0.0170555420085672,
+              0.07047061152229074
+            ]
+          },
+          "test_interval_below_truth": {
+            "clopper_pearson_95": [
+              0.011087455672254777,
+              0.06415062670502701
+            ],
+            "count": 6,
+            "rate": 0.03,
+            "runs": 200,
+            "wilson_95": [
+              0.013820314340111339,
+              0.06389429245451923
+            ]
+          }
+        },
+        "winners": {
+          "logistic_regression": 200
+        }
+      }
+    },
+    "signal50_30": {
+      "configuration": {
+        "configs_per_model": 9,
+        "folds": 5,
+        "models": [
+          "decision_tree",
+          "knn",
+          "logistic_regression"
+        ],
+        "nominal_level_of_the_intervals": 0.95,
+        "rows": 1000,
+        "runs": 200,
+        "seed": 0,
+        "signal": 0.5,
+        "true_roc_auc_of_every_candidate": null
+      },
+      "summary": {
+        "claims": {
+          "cv_interval_excludes_baseline": {
+            "clopper_pearson_95": [
+              0.9817246596448638,
+              1.0
+            ],
+            "count": 200,
+            "rate": 1.0,
+            "runs": 200,
+            "wilson_95": [
+              0.9811546736227335,
+              1.0
+            ]
+          },
+          "fit_health_healthy": {
+            "clopper_pearson_95": [
+              0.9567917180822874,
+              0.9968958923784464
+            ],
+            "count": 197,
+            "rate": 0.985,
+            "runs": 200,
+            "wilson_95": [
+              0.9568342712073097,
+              0.9948857622067417
+            ]
+          },
+          "lead_exceeds_spread": {
+            "clopper_pearson_95": [
+              0.0,
+              0.01827534035513624
+            ],
+            "count": 0,
+            "rate": 0.0,
+            "runs": 200,
+            "wilson_95": [
+              0.0,
+              0.018845326377266575
+            ]
+          },
+          "leakage_suspect": {
+            "clopper_pearson_95": [
+              0.0,
+              0.01827534035513624
+            ],
+            "count": 0,
+            "rate": 0.0,
+            "runs": 200,
+            "wilson_95": [
+              0.0,
+              0.018845326377266575
+            ]
+          },
+          "test_interval_excludes_baseline": {
+            "clopper_pearson_95": [
+              0.9643453316027603,
+              0.998786650986264
+            ],
+            "count": 198,
+            "rate": 0.99,
+            "runs": 200,
+            "wilson_95": [
+              0.9642782382838232,
+              0.9972533418664556
+            ]
+          }
+        },
+        "coverage_of_true_skill": {
+          "test_interval_covers_truth": {
+            "clopper_pearson_95": [
+              0.8793157746003387,
+              0.9574171962629073
+            ],
+            "count": 185,
+            "rate": 0.925,
+            "runs": 200,
+            "wilson_95": [
+              0.8799563897637054,
+              0.9540250828156179
+            ]
+          }
+        },
+        "mean_candidates": 30.0,
+        "mean_cv_score_minus_test_auc": 0.0025657136207135347,
+        "mean_seconds_per_run": 5.259319817694195,
+        "mean_test_auc": 0.6726863596974171,
+        "mean_true_test_auc": 0.6755319877374335,
+        "test_interval_misses": {
+          "test_interval_above_truth": {
+            "clopper_pearson_95": [
+              0.0174248089944806,
+              0.07729196822601611
+            ],
+            "count": 8,
+            "rate": 0.04,
+            "runs": 200,
+            "wilson_95": [
+              0.020405632066152302,
+              0.07693206820093294
+            ]
+          },
+          "test_interval_below_truth": {
+            "clopper_pearson_95": [
+              0.014185525898419243,
+              0.07078099835097719
+            ],
+            "count": 7,
+            "rate": 0.035,
+            "runs": 200,
+            "wilson_95": [
+              0.0170555420085672,
+              0.07047061152229074
+            ]
+          }
+        },
+        "winners": {
+          "knn": 3,
+          "logistic_regression": 197
+        }
+      }
+    }
+  },
+  "note": "Summaries of benchmarks/statistics/null_selection.py runs, 200 runs per file. `before_correction` ran with the cross-validation band centred on the winner's mean; `after_correction` ran with the band moved by the selection optimism (scmle.evaluation.confidence). The exam-score band is the same in both. Per-run records are not kept."
+}

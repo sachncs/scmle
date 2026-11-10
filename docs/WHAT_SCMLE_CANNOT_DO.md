@@ -31,22 +31,57 @@ benchmarks, which are not a head-to-head with people.
 * **Choosing the best of many models is slightly optimistic.** The more models
   tried, the more the winner's practice score flatters it. The exam score is
   the one to trust ([`README.md`](../README.md) says the same).
-* **When no model has any skill, the winner's band can still sit above
-  chance too often.** In 200 simulated runs (1,000 rows, a target drawn
-  independently of every column, three candidate models, true ROC AUC 0.5,
-  one process on one machine, `benchmarks/statistics/null_selection.py`):
-  the run's 95 percent band on the winner's exam score lay wholly above 0.5 in
-  10 runs (5.0 percent; exact 95 percent interval 2.4 to 9.0) and contained
-  the true value 0.5 in 184 (92 percent; 87.3 to 95.4), where 95 percent is
-  the promise. An earlier build, which drew 200 bootstrap resamples instead of
-  up to 2,000, covered 88 percent (82.7 to 92.2) and lay above 0.5 in 6.5
-  percent of the same runs. The cross-validation band covered 94 percent (89.8
-  to 96.9) and lay wholly above the baseline in 6.0 percent (3.1 to 10.2). No
-  run labelled its winner `healthy`, and the leakage screen flagged no honest
-  column. Selection among candidates is not corrected for multiplicity and
-  nested validation is off by default, so read a small lead over the baseline,
-  or a band whose lower end is just above it, as weak evidence. Only these
-  settings were measured.
+* **When no model has any skill, a band can still sit above chance too
+  often, and the cross-validation band did until it was corrected for the
+  choice.** All numbers come from `benchmarks/statistics/null_selection.py`
+  (1,000 rows, a target drawn independently of every column, so every
+  candidate has a true ROC AUC of 0.5, one process on one machine, 200 runs
+  per setting unless a count says otherwise; intervals are Wilson 95 percent).
+  *Exam band.* Candidates were added by searching hyperparameters of the same
+  three models (3, 9 and 30 finished candidates). The 95 percent band on the
+  winner's exam score contained 0.5 in 193 of 200 runs at each of the three
+  (96.5 percent; 93.0 to 98.3) and lay wholly above 0.5 in 1, 2 and 1 runs.
+  Over 600 runs (three data seeds) it contained 0.5 in 96.7 percent (94.9 to
+  97.8) at 3 candidates and 95.7 percent (93.7 to 97.0) at 30, and lay above
+  0.5 in 0.8 percent (0.4 to 1.9) at both. So the number of candidates did not
+  make this band worse in these runs, which is what one expects: the exam rows
+  are opened once, after the winner is frozen, so the choice cannot flatter
+  them. It is not widened for the number of candidates. An earlier
+  measurement of the 3-candidate case on one other 200-run draw found 92
+  percent (87.3 to 95.4) and 5.0 percent above 0.5; the three draws above did
+  not reproduce it and I do not know why they differ. When the target does
+  depend on two features, the band contained the winner's own ROC AUC (measured
+  on 200,000 fresh rows) in 93.5 percent (89.2 to 96.2) of runs with 3
+  candidates and 92.5 percent (88.0 to 95.4) with 30 when the true AUC was
+  0.67, and in 96.0 and 94.5 percent when it was 0.53; the point estimates sit
+  a little under 95 in the strong-signal case, with 95 inside the intervals.
+  *Cross-validation band.* This one is affected. The winner's mean
+  cross-validation score was above its exam score by 0.021 on average at 3
+  candidates and 0.034 at 30. Its 95 percent band contained 0.5 in 95.0
+  percent (93.0 to 96.5; 600 runs) of runs at 3 candidates and 90.3 percent
+  (87.7 to 92.4) at 30, and lay wholly above the baseline's cross-validation
+  score in 4.5 percent (3.1 to 6.5) and 9.7 percent (7.6 to 12.3). The band is
+  now moved down by an estimate of that flattery (`selection_optimism` in the
+  `cv_confidence` record): for each fold, pick the candidate with the best mean
+  on the other folds, score it on the held fold, and take the gap to the
+  winner's own mean. With the move, the band contained 0.5 in 95.0 percent
+  (91.0 to 97.3) of 200 runs at 30 candidates (was 89.5 percent on the same
+  runs) and lay above the baseline in 5.0 percent (was 10.5 percent); on the
+  recorded fold scores of 600 runs it was 94.8 percent (92.8 to 96.3) and 4.8
+  percent. At 3 candidates it is unchanged in the same 200 runs (94.0 percent,
+  5.0 percent above the baseline), and the width does not change. A
+  Bonferroni widening and a max-over-candidates critical value were tried on
+  the same fold scores and covered 99.8 and 97.8 percent at 30 candidates with
+  bands 2.7 and 1.6 times as wide, so they were not used. What is still not
+  corrected: the estimate assumes the winner is the best mean and ignores
+  tie-breaking and serving limits; it was checked only on these synthetic
+  settings (three model families, ROC AUC, 1,000 rows, stratified folds, null
+  and two signal strengths) and on a least-squares simulation, not on other
+  metrics, tasks, sizes, group or temporal splits; at 3 candidates the
+  cross-validation band still lies above the baseline in about 5 percent of
+  null runs, twice the 2.5 percent a one-sided 95 percent claim would allow;
+  and nested validation is off by default. Read a small lead over the
+  baseline, or a band whose lower end is just above it, as weak evidence.
 * **Duplicates can inflate scores.** SCMLE warns and keeps copies together in a
   charter run, but it does not remove them for you.
 * **A leakage flag is a suspicion.** By default it does not stop the run: it labels the score provisional (`block` stops). A real strong predictor looks the same to
