@@ -815,6 +815,12 @@ marked `Breaking:` and listed first in their group.
 
 ### Changed
 
+- A run holds the table once less. The ingest stage shares the project's frame
+  instead of deep-copying it (pandas 3 is copy-on-write, so a write to either
+  side still copies first); outputs are identical. On a 30-column table the
+  peak memory slope fell from 4.0 to 3.7 KB per row (cache-free allocator: 2.2
+  to 1.9). The measured memory per row, where it goes, and a test that bounds
+  it are in [`docs/WHAT_SCMLE_CANNOT_DO.md`](docs/WHAT_SCMLE_CANNOT_DO.md).
 - Lint and types are strict. `ruff` selects every rule (16 ignores, each with a
   reason in `pyproject.toml`) and `mypy` runs in strict mode with
   `warn_unreachable` and the extra error codes. `scmle` and `benchmarks` pass
