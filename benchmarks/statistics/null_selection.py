@@ -2,7 +2,10 @@
 
 The data have a binary target drawn independently of every feature, so each
 candidate has a true ROC AUC of exactly 0.5 and the constant (`dummy`)
-baseline has 0.5 as well. Every run goes through the public `Project.run`
+baseline has 0.5 as well. `--configs-per-model` adds hyperparameter trials to
+each of the three models, so a run chooses among 3, 9, 30 or more candidates,
+and `--signal` gives the target a real dependence on two features so that the
+candidates differ in skill. Every run goes through the public `Project.run`
 (in process, cooperative enforcement, so no subprocess per trial), and the
 script counts how often the run's own outputs say the winner is better than
 the baseline. A run has no single "the winner beats the baseline" statement,
@@ -21,10 +24,15 @@ so four operational readings are counted, each as the run would present it:
   gain over the baseline carries over to validation).
 
 It also records how often the two intervals contain the true value 0.5 and
-how often the leakage screen names a suspect among the honest columns. Each
-rate comes with exact Clopper-Pearson and Wilson 95 percent intervals.
+how often the leakage screen names a suspect among the honest columns. With a
+signal the true value of the test interval is the winner's own ROC AUC on
+200,000 fresh rows from the same process, and the cross-validation interval is
+not scored (its target depends on the training size). Each rate comes with
+exact Clopper-Pearson and Wilson 95 percent intervals.
 
     python -m benchmarks.statistics.null_selection --runs 200 --output out.json
+    python -m benchmarks.statistics.null_selection --configs-per-model 9 \
+        --output out30.json
 """
 
 import argparse
@@ -39,6 +47,7 @@ from typing import Any
 import numpy
 import pandas
 from scipy import stats
+from sklearn import metrics
 
 import scmle.api.project
 from scmle.contracts import experiments
@@ -55,24 +64,29 @@ CLAIMS = (
     "leakage_suspect",
 )
 COVERAGES = ("test_interval_covers_truth", "cv_interval_covers_truth")
+FRESH_ROWS = 200_000
+FRESH_SEED = 10**6
 DEFAULT_OUTPUT = pathlib.Path(__file__).with_name("null_selection_result.json")
 
 
-def null_frame(rows: int, seed: int) -> pandas.DataFrame:
-    """Draws a table whose target is independent of every feature.
+def draw_frame(rows: int, seed: int, signal: float) -> pandas.DataFrame:
+    """Draws a table whose target depends on two features, or on none.
 
     Args:
         rows: Number of rows.
         seed: Seed of the draw.
+        signal: Coefficient of `f0 + f1` in the log-odds of the target; 0
+            makes the target a fair coin independent of every feature.
 
     Returns:
-        Six standard normal columns, one categorical column and a fair coin
+        Six standard normal columns, one categorical column and a binary
         target `y`.
     """
     rng = numpy.random.default_rng(seed)
     frame = pandas.DataFrame({f"f{i}": rng.normal(size=rows) for i in range(6)})
     frame["cat"] = rng.choice(list("abc"), rows)
-    frame["y"] = rng.integers(0, 2, rows)
+    odds = signal * (frame["f0"] + frame["f1"])
+    frame["y"] = (rng.random(rows) < 1 / (1 + numpy.exp(-odds))).astype(int)
     return frame
 
 
@@ -85,6 +99,22 @@ def excluded_models() -> list[str]:
     """
     names = scmle.models.registry.Catalog.with_builtins().adapters
     return sorted(set(names) - set(CANDIDATES) - {"dummy"})
+
+
+def candidate_count(run: Any) -> int:
+    """Counts the candidates the winner was chosen among.
+
+    Args:
+        run: A completed `Run`.
+
+    Returns:
+        The number of trials that finished, not counting the constant
+        baseline.
+    """
+    return sum(
+        t.status is experiments.TrialStatus.OK and t.model_name != "dummy"
+        for t in run.trials
+    )
 
 
 def lead_exceeds_spread(run: Any) -> bool:
@@ -111,7 +141,13 @@ def lead_exceeds_spread(run: Any) -> bool:
 
 
 def one_run(
-    index: int, rows: int, folds: int, seed: int, directory: pathlib.Path
+    index: int,
+    rows: int,
+    folds: int,
+    seed: int,
+    directory: pathlib.Path,
+    configs_per_model: int,
+    signal: float,
 ) -> dict[str, Any]:
     """Runs the full loop once on null data and reads the claims.
 
@@ -121,11 +157,14 @@ def one_run(
         folds: Cross-validation folds.
         seed: Base seed.
         directory: Folder for the run's artifacts.
+        configs_per_model: Hyperparameter trials added to each model (0
+            searches nothing).
+        signal: Dependence of the target on the features, see `draw_frame`.
 
     Returns:
         One record: the claims as booleans plus the numbers behind them.
     """
-    frame = null_frame(rows, seed + index)
+    frame = draw_frame(rows, seed + index, signal)
     started = time.monotonic()
     run = scmle.api.project.Project(
         frame,
@@ -135,7 +174,11 @@ def one_run(
         seed=seed + index,
         time_budget=300,
         enforcement="cooperative",
-        search=tasks.Search(top_models=0),
+        search=tasks.Search(
+            top_models=len(CANDIDATES) if configs_per_model else 0,
+            configs_per_model=max(configs_per_model, 1),
+            prune_fraction=0.0,
+        ),
         strategies=tasks.Strategies(top_models=0),
         ensemble=tasks.Stacking(size=0),
         models=tasks.Candidates(exclude_models=excluded_models()),
@@ -146,8 +189,17 @@ def one_run(
     chosen = next(
         t for t in run.trials if t.trial_id == evaluation["selected_trial_id"]
     )
-    return {
+    truth = TRUE_SKILL
+    if signal:
+        fresh = draw_frame(FRESH_ROWS, FRESH_SEED + seed + index, signal)
+        truth = float(
+            metrics.roc_auc_score(
+                fresh["y"], run.predict_proba(fresh.drop(columns="y"))[:, 1]
+            )
+        )
+    record = {
         "run": index,
+        "candidates": candidate_count(run),
         "selected_model": evaluation["selected_model"],
         "test_auc": evaluation["test_metrics"]["roc_auc"],
         "cv_score": evaluation["selected_cv_score"],
@@ -162,10 +214,23 @@ def one_run(
         "lead_exceeds_spread": lead_exceeds_spread(run),
         "fit_health_healthy": run.health_label(chosen) == "healthy",
         "leakage_suspect": bool(run.profile.leakage.get("suspects")),
-        "test_interval_covers_truth": bool(test_low <= TRUE_SKILL <= test_high),
-        "cv_interval_covers_truth": bool(cv_low <= TRUE_SKILL <= cv_high),
+        "true_test_auc": truth,
+        "test_interval_covers_truth": bool(test_low <= truth <= test_high),
+        "test_interval_above_truth": bool(test_low > truth),
+        "test_interval_below_truth": bool(test_high < truth),
+        "selected_trial_id": evaluation["selected_trial_id"],
+        "trial_fold_scores": {
+            t.trial_id: t.fold_scores
+            for t in run.trials
+            if t.status is experiments.TrialStatus.OK
+        },
         "seconds": time.monotonic() - started,
     }
+    if not signal:
+        record["cv_interval_covers_truth"] = bool(
+            cv_low <= TRUE_SKILL <= cv_high
+        )
+    return record
 
 
 def rate_summary(count: int, runs: int) -> dict[str, Any]:
@@ -209,7 +274,24 @@ def summarize(records: list[dict[str, Any]]) -> dict[str, Any]:
         "coverage_of_true_skill": {
             name: rate_summary(sum(r[name] for r in records), runs)
             for name in COVERAGES
+            if name in records[0]
         },
+        "test_interval_misses": {
+            name: rate_summary(sum(r[name] for r in records), runs)
+            for name in (
+                "test_interval_above_truth",
+                "test_interval_below_truth",
+            )
+        },
+        "mean_candidates": float(
+            numpy.mean([r["candidates"] for r in records])
+        ),
+        "mean_true_test_auc": float(
+            numpy.mean([r["true_test_auc"] for r in records])
+        ),
+        "mean_cv_score_minus_test_auc": float(
+            numpy.mean([r["cv_score"] - r["test_auc"] for r in records])
+        ),
         "mean_test_auc": float(numpy.mean([r["test_auc"] for r in records])),
         "mean_seconds_per_run": float(
             numpy.mean([r["seconds"] for r in records])
@@ -235,6 +317,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--rows", type=int, default=1000)
     parser.add_argument("--folds", type=int, default=5)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--configs-per-model", type=int, default=0)
+    parser.add_argument("--signal", type=float, default=0.0)
     parser.add_argument("--output", type=pathlib.Path, default=DEFAULT_OUTPUT)
     args = parser.parse_args(argv)
     with tempfile.TemporaryDirectory() as scratch:
@@ -245,6 +329,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 args.folds,
                 args.seed,
                 pathlib.Path(scratch) / f"run_{index}",
+                args.configs_per_model,
+                args.signal,
             )
             for index in range(args.runs)
         ]
@@ -254,8 +340,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             "rows": args.rows,
             "folds": args.folds,
             "seed": args.seed,
-            "candidates": list(CANDIDATES),
-            "true_roc_auc_of_every_candidate": TRUE_SKILL,
+            "models": list(CANDIDATES),
+            "configs_per_model": args.configs_per_model,
+            "signal": args.signal,
+            "true_roc_auc_of_every_candidate": None
+            if args.signal
+            else TRUE_SKILL,
             "nominal_level_of_the_intervals": 0.95,
         },
         "summary": summarize(records),

@@ -851,6 +851,29 @@ marked `Breaking:` and listed first in their group.
   null runs its coverage of the true value rose from 88 to 92 percent
   (`benchmarks/statistics/null_selection.py`); it is still below the 95
   percent promise in the point estimate, and the run takes about twice as long.
+- The cross-validation band of the winner (`cv_confidence.interval`) is moved
+  down by the estimated flattery of choosing the best of several candidates
+  (`selection_optimism`, new, with `candidates`; `confidence.cv_interval` takes
+  the fold scores of every finished candidate and `greater_is_better`). Measured
+  on pure-noise labels (1,000 rows, 600 runs per setting, three model families
+  with hyperparameter trials added): the band contained the true value in 95.0
+  percent of runs at 3 candidates and 90.3 percent at 30 (87.7 to 92.4), and
+  lay wholly above the baseline in 4.5 and 9.7 percent. With the move, 30
+  candidates gave 95.0 percent (91.0 to 97.3, 200 runs; 89.5 before on the same
+  runs) and 5.0 percent above the baseline (10.5 before), 3 candidates were
+  unchanged, and the width is the same. A Bonferroni widening covered 99.8
+  percent at 30 candidates with bands 2.7 times as wide and a max-over-
+  candidates critical value 97.8 percent at 1.6 times, so neither was used.
+  The exam-score band (`metric_uncertainty`) is not changed: in the same runs
+  it contained the true value in 96.7 percent at 3 candidates and 95.7 percent
+  at 30 and was above chance in 0.8 percent at both, because the exam rows are
+  opened after the choice. Still uncorrected: the estimate treats the winner as
+  the best mean (ignoring tie-breaking and serving limits), and it was checked
+  only on these synthetic settings. `run.evaluation` and the trail/model-card
+  copies of `cv_confidence` change, so stored certificates and fixtures that
+  embed it must be regenerated. `benchmarks/statistics/null_selection.py`
+  takes `--configs-per-model` and `--signal`; the cell summaries are in
+  `benchmarks/statistics/multiplicity_summaries.json`.
 - The coverage ledger reports the exact `interval_coverage` and
   `p95_interval_achieved_confidence` in place of `percentile_interval`, which
   covered only 0.626 at 20 reruns.
