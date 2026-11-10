@@ -11,7 +11,7 @@
 <p><strong>The question.</strong> Which number tells me the model is good enough for my use?</p>
 <p><strong>How to choose.</strong></p>
 <div class="model-table" role="region" aria-label="2. How will I judge a prediction? (the metric) (table)" tabindex="0"><table style="min-width:560px"><thead><tr><th scope="col">Your situation</th><th scope="col">A good first metric</th><th scope="col">Why</th></tr></thead><tbody><tr><th scope="row">Two answers, balanced, you rank cases</th><td><code>roc_auc</code></td><td>Ignores the cut-off; good for ranking</td></tr><tr><th scope="row">Two answers, the "yes" is rare (under about 10 percent)</th><td><code>pr_auc</code> (PR AUC)</td><td>ROC AUC looks fine even when you miss most rare cases</td></tr><tr><th scope="row">You act on the probability itself</th><td><code>log_loss</code></td><td>Punishes confident mistakes and bad probabilities</td></tr><tr><th scope="row">A number, big mistakes hurt more</th><td><code>rmse</code></td><td>Squares the errors</td></tr><tr><th scope="row">A number, all mistakes count the same</th><td><code>mae</code></td><td>The typical miss</td></tr><tr><th scope="row">Many categories</th><td><code>f1_macro</code> or <code>log_loss</code></td><td>Counts every category equally</td></tr></tbody></table></div>
-<p>SCMLE lists the others it knows in <code>scmle.evaluation.metrics.CATALOG</code>. You can also add your own with <code>scmle.register_metric</code>, for example the money lost.</p>
+<p>SCMLE lists the others it knows in <code>scmle.evaluation.metrics.CATALOG</code>. You can also add your own with <code>scmle.evaluation.metrics.register_metric</code>, for example the money lost.</p>
 <p><strong>If you choose wrong.</strong> The search picks the model that is best at the wrong thing. Accuracy on a rare event picks a model that always says "no". The tool's pick is <code>roc_auc</code> for two answers by default; that is only a default.</p>
 <p><strong>Command.</strong> <code>--metric pr_auc</code>.</p>
 <h2 id="3-which-columns-may-the-model-use-what-you-may-not-use">3. Which columns may the model use? (what you may not use)</h2>
@@ -55,7 +55,7 @@
 <h2 id="10-what-will-make-me-stop">10. What will make me stop?</h2>
 <p>Write this before you see results, so that you cannot talk yourself out of it later.</p>
 <ul><li>The lowest exam score I would accept (a number, not "good").</li><li>The largest gap between practice and exam score I would accept.</li><li>The drift or performance drop at which I roll back.</li><li>The names of the people to call.</li></ul>
-<p>SCMLE can hold your thresholds as success criteria (<code>ProblemSpec.success_criteria</code>). If you declare none, the release evaluation says <code>policy_not_declared</code> and blocks: the tool will not invent thresholds from the metrics it just saw.</p>
+<p>SCMLE can hold your thresholds as success criteria (<code>Problem.success_criteria</code>). If you declare none, the release evaluation says <code>policy_not_declared</code> and blocks: the tool will not invent thresholds from the metrics it just saw.</p>
 <h2 id="the-decision-sheet">The decision sheet</h2>
 <p>Copy this, fill it in, keep it next to the run.</p>
 <pre><code class="language-text">Question in one sentence:

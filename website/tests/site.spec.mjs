@@ -123,7 +123,7 @@ test("modeling page exposes the estimation contract and honest boundaries", asyn
   await expect(page.getByText("Identifiability", { exact: true })).toBeVisible();
   await expect(page.getByText("reference calculation", { exact: false }).first()).toBeVisible();
   await expect(page.getByText("There is no image, document, audio, video, graph, or geospatial JEPA", { exact: false })).toBeVisible();
-  await expect(page.getByText("MLProject is not a production non-tabular modelling path", { exact: false })).toBeVisible();
+  await expect(page.getByText("Project is not a production non-tabular modelling path", { exact: false })).toBeVisible();
   await expect(page.getByRole("link", { name: "Use the public API" })).toHaveAttribute(
     "href",
     "/scmle/docs/api/",
