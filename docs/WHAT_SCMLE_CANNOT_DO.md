@@ -139,6 +139,41 @@ against planted problems and is on file as a certificate. Everything else is
 * Latency and availability objectives are **targets measured on a developer
   machine**, not promises under load ([`SERVICE_SLO.md`](SERVICE_SLO.md)).
 
+## Memory
+
+A run needs several times the table's size in memory, and the multiple grows
+with the number of numeric columns. These are the only measurements.
+
+* **Setup.** An Apple-silicon laptop (12 cores, 19 GB, macOS), Python 3.14.7
+  free-threaded, pandas 3.0.6, scikit-learn 1.9.1. `Project(...).run()` with
+  three candidates (`dummy`, `logistic_regression`, `decision_tree`), 3 folds
+  and a seed, on a synthetic table of 30 columns (26 float64, one int64, two
+  text, an int target; 242 bytes per row in memory), at 20,000, 50,000 and
+  100,000 rows. The figure is the peak physical footprint of the process.
+* **Result.** With the default `cooperative` enforcement the peak grew by
+  3.7 KB per added row, which is 15 times the table, or about 3.7 GB per
+  million rows of this shape. About half of that is the operating system's
+  allocator keeping freed large blocks. With that cache off
+  (`MallocLargeCache=0`) the slope was 1.9 KB per row (8 times). The
+  allocator-free figure is the one to plan with on systems that return memory
+  at once; it is not known what Linux does.
+* **`hard` enforcement.** The main process grew by the same amount (3.8 KB per
+  row, 2.3 with the cache off). Every process it starts imports the libraries
+  again, so the whole tree needed about 0.5 GB more at any size, and grew by
+  2.7 KB per row (cache off) because a trial process holds the development
+  rows and its own working copies. With several workers each one costs that.
+* **Where it goes** (cache off, per added row): the caller's table and the
+  project's copy 0.43 KB, the split and the profile 0.75 KB that stays for the
+  whole run, and 0.7 KB of working memory in the step that peaks, a refit,
+  of which 0.6 KB is scikit-learn's median imputer building masked copies of the
+  numeric block.
+* **Not measured.** Linux, more than 100,000 rows, other model families,
+  hyperparameter search, strategies and ensembles, wide text columns. Tables
+  with fewer or narrower columns have a larger multiple of their own size,
+  because the numeric block is rebuilt as float64.
+  `tests/unit/test_memory_growth.py` fails if the slope rises above 22 times
+  the table.
+
 ## Deployment has not been proven end to end
 
 * The package has **never been run against a hosted platform**. The release
