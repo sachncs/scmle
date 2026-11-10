@@ -5,7 +5,7 @@
       "code_hash": "6d7f8ac4f2e70feaaabda93584a577dc1a45d4d1e62efbf0bc4a747902007a76",
       "passed": true,
       "replicates": 200,
-      "seconds": 7.5,
+      "seconds": 7.3,
       "seeds": [
         0,
         200
@@ -74,7 +74,7 @@
         "1.6": 1.0
       },
       "replicates": 2000,
-      "seconds": 2.8,
+      "seconds": 2.9,
       "seeds": [
         0,
         2000
@@ -100,7 +100,7 @@
       "code_hash": "bbc1f705e0527b005d84d387c2026c3913619f233cbd01cc408c99f7b28deafe",
       "passed": false,
       "replicates": 2000,
-      "seconds": 109.9,
+      "seconds": 110.8,
       "seeds": [
         0,
         2000
@@ -185,7 +185,7 @@
         "1.5": 0.9133333333333333
       },
       "replicates": 2000,
-      "seconds": 38.5,
+      "seconds": 40.1,
       "seeds": [
         0,
         2000
@@ -371,7 +371,7 @@
       },
       "passed": true,
       "replicates": 2000,
-      "seconds": 12.5,
+      "seconds": 12.6,
       "seeds": [
         0,
         2000
@@ -390,7 +390,7 @@
         "q95": 0.004483527626684906
       },
       "replicates": 20,
-      "seconds": 58.7,
+      "seconds": 59.1,
       "seeds": [
         0,
         20
@@ -440,7 +440,7 @@
       "passed": true,
       "rate": 0.0037,
       "replicates": 10000,
-      "seconds": 174.5,
+      "seconds": 172.6,
       "seeds": [
         0,
         10000
@@ -473,7 +473,7 @@
       "promotions": 6,
       "rate": 0.0012,
       "replicates": 5000,
-      "seconds": 12.0,
+      "seconds": 12.3,
       "seeds": [
         0,
         5000
@@ -502,7 +502,7 @@
       "floor": "none: reported",
       "passed": true,
       "replicates": 500,
-      "seconds": 4.3,
+      "seconds": 4.2,
       "seeds": [
         0,
         500
@@ -531,7 +531,7 @@
       "passed": true,
       "rate": 0.0019,
       "replicates": 10000,
-      "seconds": 15.4,
+      "seconds": 15.9,
       "seeds": [
         0,
         10000
@@ -638,7 +638,7 @@
       "promote_bound": 0.026260990336999412,
       "replicates": 2000,
       "rollback_bound": 0.014449719092257398,
-      "seconds": 75.1,
+      "seconds": 71.3,
       "seeds": [
         0,
         2000
