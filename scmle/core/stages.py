@@ -3791,6 +3791,12 @@ class FinalEvaluationStage(Stage):
                     numpy.mean([len(fold[1]) for fold in split.manifest.folds])
                 ),
                 split.manifest.strategy,
+                [
+                    trial.fold_scores
+                    for trial in context.trials
+                    if trial.status is experiments.TrialStatus.OK
+                ],
+                metric.greater_is_better,
             ),
             "baseline_cv_score": baseline.score_mean if baseline else None,
             "test_metrics": test_metrics,
