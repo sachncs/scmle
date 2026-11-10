@@ -25,7 +25,7 @@
         "fixed_rule_rate": 1.0,
         "true_risk": 0.15000000000000002
       },
-      "code_hash": "73a41428345bba4ae63df924a5e3e6f20b9d8ea1fc9b70800e0531f6c37ed459",
+      "code_hash": "c6b57bd010805867c20e3cf61f2ed67064b3bf9503ca09240300ac1abec8457d",
       "passed": true,
       "replicates": 2000,
       "seeds": [
@@ -59,7 +59,7 @@
           "within_d_max_lower": 0.9985032551048117
         }
       },
-      "code_hash": "ef916234128e25c50b57771bd60d2c0c54ba7b2ed315cc43b633b3496d68ce56",
+      "code_hash": "22326649a37988046e0a5b1ac0ed86cdb223aa0dd32899b567e4024beaf33d04",
       "coverage_after_halt": 0.0,
       "passed": false,
       "replicates": 2000,
@@ -95,7 +95,7 @@
           "within_d_max_lower": 0.9985032551048117
         }
       },
-      "code_hash": "1719e6e38f4ff97b5a89a93290837e07050d929bd61f92dd3ef14a8868598cf5",
+      "code_hash": "2a30ef8f27903f4ebc982907de03e692c1c3e5b6e4f3f4ec703fdffbb0f4bcba",
       "d_max": 50,
       "passed": false,
       "replicates": 2000,
@@ -105,7 +105,7 @@
       ]
     },
     "H3": {
-      "code_hash": "485ac1d218863bc6224923ec2cf34adf071199a45572b7efa7a45c16c2e51962",
+      "code_hash": "7852173745d3e86ea038af78bb1b7c8dc84f6c4c7fc5e6dc21d354e1bb192b3a",
       "passed": true,
       "psi_rule_flag_rate": 1.0,
       "replicates": 300,
@@ -124,7 +124,7 @@
       "bootstrap_fdr": 0.6136285926448561,
       "bootstrap_power": 1.0,
       "challengers": 200,
-      "code_hash": "184d35c9d9d20392f13ad3c3a410946a0c1db1a68d6e905d897bd14200c581fd",
+      "code_hash": "7e59aeac860ff0d781683fae19dd661aa5432ee5477f0251f647e107692598a9",
       "elond_fdr": 0.0,
       "elond_power": 1.0,
       "elond_se": 0.0,
@@ -156,7 +156,7 @@
           "worse_by": 0.1
         }
       },
-      "code_hash": "b707336b7572c4a7673a008f04f2d64fdc4fa1f0b88b70d6df249b637419cce3",
+      "code_hash": "9196b9a916fad5d2df8e368bcba7e21e2f9c11f97e7a27e528bd123741a7d898",
       "passed": true,
       "replicates": 2000,
       "seeds": [
@@ -165,7 +165,7 @@
       ]
     },
     "H6": {
-      "code_hash": "37d763f4c9c00ebcf1dd352c15597865703f6e2dc70d4fcb5b62d2b7acf07e0f",
+      "code_hash": "82dde8cd36af3095c015a3d2487e4bc3c134cd3d337b47c9048b95efe8805ac8",
       "cs_coverage_floor": 0.9122508278236462,
       "cs_time_uniform_coverage": 1.0,
       "mnar_without_audit_slice": {
@@ -186,7 +186,7 @@
     "H7": {
       "arrival_bias": -0.07573849154210222,
       "arrival_se": 0.0005145558523951006,
-      "code_hash": "81189b75780d1727c1d5f6d5f965820ef5ec282de15314799c616dbfe0c31e2d",
+      "code_hash": "790d905f853e452ea072f15a6ddd421c0f3a0593ee6c2d8f1819d567cb3ae399",
       "maturity_bias": -8.098765432099855e-05,
       "maturity_se": 0.0001913306067687159,
       "passed": true,
@@ -197,7 +197,7 @@
       ]
     },
     "H8": {
-      "code_hash": "4bb719b5688e2facbf00340c7659316e8a29acdc38019874290c365a46874086",
+      "code_hash": "3cf67b42ffd4a63ac16216dc88b7636119e06566bfbb2020a8895204881725a8",
       "detection_rate": {
         "loop_bypass_0.05": 0.9,
         "loop_bypass_0.10": 0.98,
@@ -214,7 +214,7 @@
       "without_bypass_slice": "unverified"
     },
     "H9": {
-      "code_hash": "1e8318bb144b4392f9f7c77139f02dcbdff0806a9c6128bfdb7e32861b6a9ea0",
+      "code_hash": "0c9dafdc76721d1a7795a03a8ddb2bd3e5f1efc0b322b2d82504765c1bed691e",
       "everything_escalates_rate": 0.008,
       "mean_coverage_at_tau": 0.6387600806451614,
       "naive_best_cut_violation_rate": 0.464,
@@ -236,6 +236,6 @@
     "ledger replay on Python 3.11 (only the environment's interpreter ran)",
     "independent confidence-sequence implementation (none pinned)"
   ],
-  "simulator_hash": "f909387f761776286662131e3f4136101ebf9a237a6e4f407d251c1fb4535ae3",
+  "simulator_hash": "2305eaca042caa9e11b0d8d0ef97fff33a6ebb755ab2f3a7750dece158c5acb9",
   "version": 1
 }
