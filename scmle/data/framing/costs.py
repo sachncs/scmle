@@ -23,7 +23,6 @@ implementation of the same definition.
 """
 
 from collections.abc import Mapping
-from collections.abc import Sequence
 import dataclasses
 import enum
 import hashlib
@@ -50,26 +49,6 @@ class CostSource(enum.StrEnum):
 
 class DominatedActionError(ValueError):
     """One action dominates, so there is no decision to make."""
-
-
-def sources_from(values: Sequence[Any]) -> tuple[CostSource, ...]:
-    """Coerces four source labels to `CostSource` values.
-
-    Args:
-        values: One source label per cost, in the order of `ENTRY_NAMES`.
-            Each is a `CostSource` or one of its string values.
-
-    Returns:
-        The labels as `CostSource` members, in the same order.
-
-    Raises:
-        ValueError: If a label is not a `CostSource` value, or the number of
-            labels differs from the number of costs.
-    """
-    sources = tuple(CostSource(v) for v in values)
-    if len(sources) != len(ENTRY_NAMES):
-        raise ValueError("sources must hold one entry per cost")
-    return sources
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -196,6 +175,9 @@ class DecisionCostModel:
             The model.
         """
         qualification.require_fields(cls, record)
+        sources = tuple(CostSource(v) for v in record["sources"])
+        if len(sources) != len(ENTRY_NAMES):
+            raise ValueError("sources must hold one entry per cost")
         return cls(
             c_00=record["c_00"],
             c_01=record["c_01"],
@@ -203,7 +185,7 @@ class DecisionCostModel:
             c_11=record["c_11"],
             t_lo=record["t_lo"],
             t_hi=record["t_hi"],
-            sources=sources_from(record["sources"]),
+            sources=sources,
             range_source=CostSource(record["range_source"]),
         )
 

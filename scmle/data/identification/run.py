@@ -148,26 +148,6 @@ def digest(document: Mapping[str, Any]) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def stratum_frames(
-    frame: pandas.DataFrame, column: str
-) -> dict[str, pandas.DataFrame]:
-    """Splits rows into the strata large enough to estimate in.
-
-    Args:
-        frame: The rows to split.
-        column: The stratifying column.
-
-    Returns:
-        Stratum label (as text) to its rows, for each stratum with at least
-        `MIN_STRATUM_ROWS` rows.
-    """
-    out = {}
-    for level, part in frame.groupby(column):
-        if len(part) >= MIN_STRATUM_ROWS:
-            out[str(level)] = part
-    return out
-
-
 def wald_from(est: Est, name: str, kind: str) -> battery.Test | None:
     """Builds a Wald test of a placebo estimate.
 
@@ -1359,13 +1339,15 @@ def replication(
             results[column] = {"skipped": "column not in C"}
             continue
         values: dict[str, tuple[float, float]] = {}
-        for label, part in stratum_frames(c, column).items():
+        for stratum, part in c.groupby(column):
+            if len(part) < MIN_STRATUM_ROWS:
+                continue
             try:
                 est = adapter.estimate(part, level)
             except ValueError:
                 continue
             if numpy.isfinite(est.se) and est.se > 0:
-                values[f"{column}={label}"] = (est.estimate, est.se)
+                values[f"{column}={stratum}"] = (est.estimate, est.se)
         if len(values) < battery.MIN_STRATA:
             results[column] = {"skipped": "fewer than two usable strata"}
             continue
@@ -1531,34 +1513,6 @@ def label_subgroups(
     )
 
 
-def strata_replication(
-    adapter: Estimator,
-    spec: causal.Question,
-    c: pandas.DataFrame,
-    level: float,
-    pooled: float,
-    alpha: float,
-) -> dict[str, Any]:
-    """Runs the replication test when the charter declares strata.
-
-    Args:
-        adapter: The strategy's estimator.
-        spec: The charter's causal block.
-        c: The confirmation rows.
-        level: Confidence level.
-        pooled: The pooled estimate on `C`.
-        alpha: Level of the agreement and heterogeneity tests.
-
-    Returns:
-        The `replication` result, or an empty one that has not passed or
-        failed (`passed` None) when there are no strata or a single treated
-        unit.
-    """
-    if spec.strata and not adapter.single_unit:
-        return replication(adapter, c, level, pooled, alpha)
-    return {"by_column": {}, "passed": None}
-
-
 def sensitivity_of(
     adapter: Estimator, c: pandas.DataFrame, level: float
 ) -> dict[str, Any]:
@@ -1614,24 +1568,6 @@ def subgroup_results(
     if found is not None:
         label_subgroups(found, named)
     return found
-
-
-def primary_verdict(spec: causal.Question, primary: Est) -> dict[str, Any]:
-    """States the primary hypothesis and whether its interval excludes zero.
-
-    Args:
-        spec: The charter's causal block.
-        primary: The primary estimate.
-
-    Returns:
-        The `verdict_of` sentence with `interval_excludes_zero`, None when
-        the interval is not finite.
-    """
-    verdict = verdict_of(spec)
-    verdict["interval_excludes_zero"] = (
-        primary.excludes_zero() if numpy.isfinite(primary.low) else None
-    )
-    return verdict
 
 
 def closing_notes(
@@ -1735,9 +1671,11 @@ def identify(
     except ValueError as error:
         notes.append(f"controls could not run: {error}")
     report_battery = battery.run_battery(tests, alpha_falsify)
-    rep = strata_replication(
-        adapter, spec, c, level, primary.estimate, alpha_falsify
-    )
+    rep: dict[str, Any]
+    if spec.strata and not adapter.single_unit:
+        rep = replication(adapter, c, level, primary.estimate, alpha_falsify)
+    else:
+        rep = {"by_column": {}, "passed": None}
     sens = sensitivity_of(adapter, c, level)
     subgroup_found = subgroup_results(adapter, spec, c, level, named)
     needed = needed_assumptions(strategy, spec)
@@ -1764,6 +1702,10 @@ def identify(
     )
     decision = tier.decide(facts)
     notes.extend(closing_notes(spec, strategy, checked=checked))
+    verdict = verdict_of(spec)
+    verdict["interval_excludes_zero"] = (
+        primary.excludes_zero() if numpy.isfinite(primary.low) else None
+    )
     report = {
         "status": select.IDENTIFIED,
         "strategy": strategy,
@@ -1782,7 +1724,7 @@ def identify(
         "design": adapter.design,
         "multiverse_not_run": list(plan.multiverse),
         "notes": notes,
-        "verdict": primary_verdict(spec, primary),
+        "verdict": verdict,
     }
     if dag_checks is not None:
         report["dag"] = dict(dag_checks)

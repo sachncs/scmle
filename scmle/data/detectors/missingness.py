@@ -646,26 +646,6 @@ def tipping_point(
     return TippingPoint(low, high, flip, flip is not None, baseline, steps)
 
 
-def draw_holdout(
-    train: numpy.ndarray, seed: int, fold: int, share: float
-) -> tuple[numpy.ndarray, numpy.ndarray]:
-    """Picks observed cells of `train` to hide for scoring.
-
-    Args:
-        train: Array (n, p) with NaN for gaps.
-        seed: Run seed.
-        fold: Fold number, which varies the draw.
-        share: Probability that each observed cell is chosen.
-
-    Returns:
-        The row positions and the column positions of the chosen cells.
-    """
-    rng = randomness.component_rng(seed, "detectors.imputation.holdout", fold)
-    rows, cols = numpy.nonzero(~numpy.isnan(train))
-    chosen = rng.random(len(rows)) < share
-    return rows[chosen], cols[chosen]
-
-
 def make_imputer(strategy: str) -> Any:
     """Builds an unfitted imputer for a strategy name.
 
@@ -764,7 +744,14 @@ def imputation_errors(
         ):
             held, imputer = fold[1], fold[2]
             block = values[held].copy()
-            rows, cols = draw_holdout(block, seed, index, share)
+            # Hide each observed cell with probability `share`; the fold
+            # index varies the draw.
+            rng = randomness.component_rng(
+                seed, "detectors.imputation.holdout", index
+            )
+            rows, cols = numpy.nonzero(~numpy.isnan(block))
+            chosen = rng.random(len(rows)) < share
+            rows, cols = rows[chosen], cols[chosen]
             if len(rows) == 0:
                 continue
             truth = block[rows, cols].copy()

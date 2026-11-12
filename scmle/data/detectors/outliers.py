@@ -98,22 +98,6 @@ def robust_z(series: pandas.Series) -> pandas.Series:
     return ((values - centre).abs() / mad).fillna(0.0)
 
 
-def row_scores(frame: pandas.DataFrame, columns: list[str]) -> pandas.Series:
-    """Computes the maximum robust z-score per row over `columns`.
-
-    Args:
-        frame: Table.
-        columns: Numeric columns to score.
-
-    Returns:
-        The largest score of each row, or zeros when `columns` is empty.
-    """
-    if not columns:
-        return pandas.Series(0.0, index=frame.index)
-    table = pandas.concat([robust_z(frame[c]) for c in columns], axis=1)
-    return table.max(axis=1)
-
-
 def outside(
     series: pandas.Series, bounds: tuple[float, float]
 ) -> pandas.Series:
@@ -163,7 +147,13 @@ def triage(
         if pandas.api.types.is_numeric_dtype(frame[c])
         and not pandas.api.types.is_bool_dtype(frame[c])
     ]
-    scores = row_scores(frame, numeric)
+    # The largest robust z-score of each row; zeros without numeric columns.
+    if numeric:
+        scores = pandas.concat(
+            [robust_z(frame[c]) for c in numeric], axis=1
+        ).max(axis=1)
+    else:
+        scores = pandas.Series(0.0, index=frame.index)
     candidate = scores >= cutoff
     error = pandas.Series(data=False, index=frame.index)
     population = pandas.Series(data=False, index=frame.index)

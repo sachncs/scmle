@@ -276,28 +276,6 @@ class Standard:
         return cls(**record)
 
 
-def interval_pair(value: Any, name: str) -> tuple[float, float]:
-    """Parses a stored (low, high) interval.
-
-    Args:
-        value: A list or tuple of two numbers.
-        name: Name of the field, used in the error message.
-
-    Returns:
-        The low and high limits as floats.
-
-    Raises:
-        ValueError: If `value` is not a pair, or a limit is not a finite
-            number.
-    """
-    if not isinstance(value, list | tuple) or len(value) != PAIR_LENGTH:
-        raise ValueError(f"{name} must hold (low, high)")
-    return (
-        qualification.finite(value[0], name),
-        qualification.finite(value[1], name),
-    )
-
-
 @dataclasses.dataclass(frozen=True, slots=True)
 class DefectOutcome:
     """Measured result for one defect type, with its verdict.
@@ -377,7 +355,16 @@ class DefectOutcome:
         certificate = qualification.Certificate.from_dict(record["certificate"])
         expected = cls.measure(certificate, policy)
         for name in ("recall_interval", "false_alarm_interval"):
-            stored = interval_pair(record[name], name)
+            limits = record[name]
+            if (
+                not isinstance(limits, list | tuple)
+                or len(limits) != PAIR_LENGTH
+            ):
+                raise ValueError(f"{name} must hold (low, high)")
+            stored = (
+                qualification.finite(limits[0], name),
+                qualification.finite(limits[1], name),
+            )
             recomputed = getattr(expected, name)
             if any(
                 abs(a - b) > INTERVAL_TOLERANCE

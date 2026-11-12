@@ -547,25 +547,6 @@ def check_counts(sample_count: Any, schema_version: Any) -> None:
         raise ValueError("unsupported catalog schema version")
 
 
-def check_summaries(missingness: Any, duplicates: Any, label: Any) -> None:
-    """Checks the classes of the three summaries of a catalog.
-
-    Args:
-        missingness: The missingness summary to check.
-        duplicates: The duplicate summary to check.
-        label: The label summary to check.
-
-    Raises:
-        TypeError: If a summary has the wrong class.
-    """
-    if not isinstance(missingness, MissingnessSummary):
-        raise TypeError("missingness must be MissingnessSummary")
-    if not isinstance(duplicates, DuplicateSummary):
-        raise TypeError("duplicates must be DuplicateSummary")
-    if not isinstance(label, LabelSummary):
-        raise TypeError("label must be LabelSummary")
-
-
 def check_notes(limitations: Any, release_blockers: Any) -> None:
     """Checks the two lists of notes of a catalog.
 
@@ -642,7 +623,12 @@ class Catalog:
         fields = tuple(self.schema)
         if any(not isinstance(field, Field) for field in fields):
             raise TypeError("schema must contain Field records")
-        check_summaries(self.missingness, self.duplicates, self.label)
+        if not isinstance(self.missingness, MissingnessSummary):
+            raise TypeError("missingness must be MissingnessSummary")
+        if not isinstance(self.duplicates, DuplicateSummary):
+            raise TypeError("duplicates must be DuplicateSummary")
+        if not isinstance(self.label, LabelSummary):
+            raise TypeError("label must be LabelSummary")
         check_notes(self.limitations, self.release_blockers)
         object.__setattr__(self, "schema", fields)
         object.__setattr__(
@@ -752,11 +738,15 @@ class Catalog:
             *observation.limitations,
             *limitations,
         ]
-        blocker_values = [
-            *source_blockers(source_value),
-            *observation.release_blockers,
-            *release_blockers,
-        ]
+        blocker_values: list[str] = []
+        if not source_value.owner:
+            blocker_values.append("source_owner_not_declared")
+        if not source_value.acquisition_method:
+            blocker_values.append("source_acquisition_method_not_declared")
+        if not source_value.privacy_classification:
+            blocker_values.append("privacy_and_retention_not_assessed")
+        blocker_values.extend(observation.release_blockers)
+        blocker_values.extend(release_blockers)
         return cls.from_observation(
             source=source_value,
             data_kind=observation.data_kind,
@@ -927,26 +917,6 @@ class Observation:
     release_blockers: tuple[str, ...]
 
 
-def source_blockers(source: Source) -> tuple[str, ...]:
-    """Returns governance blockers that can be proven from source metadata.
-
-    Args:
-        source: The data source whose governance fields are checked.
-
-    Returns:
-        Blocker names, one for each of owner, acquisition method, and
-        privacy classification that is empty.
-    """
-    blockers: list[str] = []
-    if not source.owner:
-        blockers.append("source_owner_not_declared")
-    if not source.acquisition_method:
-        blockers.append("source_acquisition_method_not_declared")
-    if not source.privacy_classification:
-        blockers.append("privacy_and_retention_not_assessed")
-    return tuple(blockers)
-
-
 def is_sequence_value(value: Any) -> bool:
     """Returns whether a value can represent an ordered column.
 
@@ -1046,45 +1016,6 @@ def frame_for_mapping(
     return frame, "record_mapping", frame_shape(frame)
 
 
-def frame_for_sequence(
-    data: list[Any] | tuple[Any, ...],
-) -> tuple[pandas.DataFrame | None, str, tuple[int, ...]]:
-    """Converts a list or tuple to an observation frame.
-
-    Args:
-        data: A sequence of records or of values.
-
-    Returns:
-        A tuple ``(frame, data_kind, shape)``; a non-empty sequence of
-        mappings is a set of records, any other sequence is one column.
-    """
-    if data and all(isinstance(value, Mapping) for value in data):
-        frame = pandas.DataFrame.from_records(data)
-        return frame, "record_sequence", frame_shape(frame)
-    frame = pandas.DataFrame({"value": list(data)})
-    return frame, "sequence", frame_shape(frame)
-
-
-def frame_for_other(
-    data: Any,
-) -> tuple[pandas.DataFrame | None, str, tuple[int, ...]]:
-    """Describes bytes, scalars and opaque objects.
-
-    Args:
-        data: The object.
-
-    Returns:
-        A tuple ``(frame, data_kind, shape)``; the frame is None for bytes
-        and opaque objects, whose kind is the type name.
-    """
-    if isinstance(data, (bytes, bytearray, memoryview)):
-        return None, "bytes", (len(data),)
-    if isinstance(data, (str, int, float, bool, datetime.date)) or data is None:
-        frame = pandas.DataFrame({"value": [data]})
-        return frame, "scalar", ()
-    return None, type(data).__name__, ()
-
-
 def frame_for_data(
     data: Any,
 ) -> tuple[pandas.DataFrame | None, str, tuple[int, ...]]:
@@ -1110,8 +1041,32 @@ def frame_for_data(
     if isinstance(data, Mapping):
         return frame_for_mapping(data)
     if isinstance(data, (list, tuple)):
-        return frame_for_sequence(data)
+        if data and all(isinstance(value, Mapping) for value in data):
+            frame = pandas.DataFrame.from_records(data)
+            return frame, "record_sequence", frame_shape(frame)
+        frame = pandas.DataFrame({"value": list(data)})
+        return frame, "sequence", frame_shape(frame)
     return frame_for_other(data)
+
+
+def frame_for_other(
+    data: Any,
+) -> tuple[pandas.DataFrame | None, str, tuple[int, ...]]:
+    """Describes bytes, scalars and opaque objects.
+
+    Args:
+        data: The object.
+
+    Returns:
+        A tuple ``(frame, data_kind, shape)``; the frame is None for bytes
+        and opaque objects, whose kind is the type name.
+    """
+    if isinstance(data, (bytes, bytearray, memoryview)):
+        return None, "bytes", (len(data),)
+    if isinstance(data, (str, int, float, bool, datetime.date)) or data is None:
+        frame = pandas.DataFrame({"value": [data]})
+        return frame, "scalar", ()
+    return None, type(data).__name__, ()
 
 
 def canonical_value(value: Any) -> Any:
@@ -1376,18 +1331,6 @@ def frame_content(
     }
 
 
-def bytes_content(data: bytes | bytearray | memoryview) -> str:
-    """Returns direct content identity for raw byte observations.
-
-    Args:
-        data: The raw bytes.
-
-    Returns:
-        The ``sha256:``-prefixed digest of the bytes.
-    """
-    return f"sha256:{hashlib.sha256(bytes(data)).hexdigest()}"
-
-
 def observe_data(
     data: Any,
     label_column: str | None,
@@ -1454,7 +1397,7 @@ def observe_data(
     if isinstance(data, (bytes, bytearray, memoryview)):
         schema = (Field("payload", "bytes"),)
         content_identity = (
-            bytes_content(data)
+            f"sha256:{hashlib.sha256(bytes(data)).hexdigest()}"
             if supplied_identity is None
             else validate_digest(supplied_identity, "content_identity")
         )

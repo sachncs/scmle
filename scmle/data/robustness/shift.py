@@ -154,23 +154,6 @@ def pooled_codes(
     return both.astype(float)
 
 
-def side_labels(sample_rows: int, reference_rows: int) -> numpy.ndarray:
-    """Labels the pooled rows by side.
-
-    Args:
-        sample_rows: Number of sample rows.
-        reference_rows: Number of reference rows.
-
-    Returns:
-        A float array of length ``sample_rows + reference_rows``: 0 for each
-        sample row, then 1 for each reference row.
-    """
-    labels: numpy.ndarray = numpy.r_[
-        numpy.zeros(sample_rows), numpy.ones(reference_rows)
-    ]
-    return labels
-
-
 def holdout_split(
     side: numpy.ndarray, rng: numpy.random.Generator
 ) -> tuple[numpy.ndarray, numpy.ndarray]:
@@ -254,7 +237,11 @@ def c2st(
     """
     check_pair(sample, reference)
     both = pooled_codes(sample, reference)
-    side = side_labels(len(sample), len(reference))
+    # The side of each pooled row: 0 for each sample row, then 1 for each
+    # reference row, in the row order of `pooled_codes`.
+    side: numpy.ndarray = numpy.r_[
+        numpy.zeros(len(sample)), numpy.ones(len(reference))
+    ]
     rng = randomness.component_rng(seed, C2ST_ID, 0)
     train, test = holdout_split(side, rng)
     model = ensemble.HistGradientBoostingClassifier(

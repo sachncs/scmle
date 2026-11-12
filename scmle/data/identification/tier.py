@@ -155,27 +155,6 @@ def tier_conditions(
     }
 
 
-def failure_reasons(facts: Inputs, unnamed: Collection[str]) -> list[str]:
-    """Lists the failures that make a claim `unverified`.
-
-    Args:
-        facts: The facts about the run.
-        unnamed: The needed assumptions that have no named attestor.
-
-    Returns:
-        The reasons, for an assumption without an attestor, a failed design
-        diagnostic and a rejecting falsification test, in that order.
-    """
-    reasons: list[str] = []
-    if unnamed:
-        reasons.append("no named attestor for: " + ", ".join(unnamed))
-    if not facts.design_passed:
-        reasons.append("a design diagnostic failed")
-    if facts.battery_ran and not facts.battery_passed:
-        reasons.append("a falsification test rejected")
-    return reasons
-
-
 def design_shortfalls(
     facts: Inputs, conditions: Mapping[str, bool], certified: Collection[str]
 ) -> list[str]:
@@ -271,12 +250,14 @@ def decide(facts: Inputs) -> Assignment:
         a for a in facts.needed if not facts.attestors.get(a, "").strip()
     ]
     conditions = tier_conditions(facts, certified)
-    reasons = failure_reasons(facts, unnamed)
-    if (
-        unnamed
-        or not facts.design_passed
-        or (facts.battery_ran and not facts.battery_passed)
-    ):
+    reasons: list[str] = []
+    if unnamed:
+        reasons.append("no named attestor for: " + ", ".join(unnamed))
+    if not facts.design_passed:
+        reasons.append("a design diagnostic failed")
+    if facts.battery_ran and not facts.battery_passed:
+        reasons.append("a falsification test rejected")
+    if reasons:
         return Assignment(
             qualification.Tier.UNVERIFIED,
             "identified",

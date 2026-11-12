@@ -152,29 +152,6 @@ def wide_panel(
     return table.sort_index(axis=1)
 
 
-def adoption_of(
-    frame: pandas.DataFrame, unit: str, adoption: str
-) -> pandas.Series:
-    """Finds the first treated period of each unit.
-
-    Args:
-        frame: Long panel data.
-        unit: Unit column.
-        adoption: Column holding the unit's adoption period (constant within
-            a unit; missing for never-treated units).
-
-    Returns:
-        The adoption period per unit (NaN for never treated).
-
-    Raises:
-        ValueError: If the adoption value varies within a unit.
-    """
-    per_unit = frame.groupby(unit)[adoption]
-    if (per_unit.nunique(dropna=False) > 1).any():  # noqa: PD101 -- a per-unit count on a SeriesGroupBy, not a check that one Series is constant
-        raise ValueError("adoption must be constant within a unit")
-    return per_unit.first()
-
-
 def event_arms(
     y: numpy.ndarray,
     index: Mapping[Any, int],
@@ -218,29 +195,6 @@ def event_arms(
             control += weight * delta[never]
         control_vars[e] = control
     return treated_vars, control_vars
-
-
-def event_coefficients(
-    events: Sequence[int],
-    treated_vars: Mapping[int, Mapping[Any, numpy.ndarray]],
-    control_vars: Mapping[int, numpy.ndarray],
-) -> list[float]:
-    """Computes the event-study coefficients.
-
-    Args:
-        events: Event times.
-        treated_vars: Treated changes per event time and cohort.
-        control_vars: Never-treated changes per event time.
-
-    Returns:
-        For each event time, the mean treated change minus the mean
-        never-treated change.
-    """
-    coefficients = []
-    for e in events:
-        mean_treated = sum(v.mean() for v in treated_vars[e].values())
-        coefficients.append(float(mean_treated - control_vars[e].mean()))
-    return coefficients
 
 
 def event_covariance(
@@ -409,7 +363,10 @@ def estimate(
     periods = list(wide.columns)
     if len(periods) < MIN_PERIODS:
         raise ValueError(f"at least {MIN_PERIODS} periods are needed")
-    adopt = adoption_of(frame, unit, adoption).reindex(wide.index)
+    per_unit = frame.groupby(unit)[adoption]
+    if (per_unit.nunique(dropna=False) > 1).any():  # noqa: PD101 -- a per-unit count on a SeriesGroupBy, not a check that one Series is constant
+        raise ValueError("adoption must be constant within a unit")
+    adopt = per_unit.first().reindex(wide.index)
     never = adopt.isna().to_numpy()
     if never.sum() < MIN_NEVER_TREATED:
         raise ValueError("at least two never-treated units are needed")
@@ -432,7 +389,14 @@ def estimate(
     treated_vars, control_vars = event_arms(
         y, index, len(periods), groups, sizes, members, never, events
     )
-    coefficients = event_coefficients(events, treated_vars, control_vars)
+    # Mean treated change minus mean never-treated change at each event time.
+    coefficients = [
+        float(
+            sum(v.mean() for v in treated_vars[e].values())
+            - control_vars[e].mean()
+        )
+        for e in events
+    ]
     n_never = int(never.sum())
     covariance = event_covariance(
         events, groups, sizes, treated_vars, control_vars, n_never

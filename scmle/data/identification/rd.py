@@ -256,35 +256,6 @@ def chosen_bandwidth(
     return float(bandwidth)
 
 
-def placebo_fits(
-    x: numpy.ndarray,
-    y: numpy.ndarray,
-    left: numpy.ndarray,
-    h: float,
-    level: float,
-) -> dict[str, dict[str, float]]:
-    """Fits the discontinuity at the median of each side.
-
-    Args:
-        x: Running variable.
-        y: Outcomes, aligned with `x`.
-        left: Mask of the rows below the cutoff.
-        h: The bandwidth.
-        level: Confidence level.
-
-    Returns:
-        The placebo fits keyed `left_median` and `right_median`, each with
-        its `cutoff`; a side whose fit was degenerate is left out.
-    """
-    placebos = {}
-    for name, mask in (("left_median", left), ("right_median", ~left)):
-        point = float(numpy.median(x[mask]))
-        found = discontinuity(x[mask], y[mask], point, h, level)
-        if found is not None:
-            placebos[name] = {"cutoff": point, **found}
-    return placebos
-
-
 def estimate(
     frame: pandas.DataFrame,
     running: str,
@@ -330,7 +301,12 @@ def estimate(
     inside_right = int(((x >= cutoff) & (x < cutoff + h)).sum())
     total = inside_left + inside_right
     density_p = float(stats.binomtest(inside_right, total, 0.5).pvalue)
-    placebos = placebo_fits(x, y, left, h, level)
+    placebos = {}
+    for name, mask in (("left_median", left), ("right_median", ~left)):
+        point = float(numpy.median(x[mask]))
+        found = discontinuity(x[mask], y[mask], point, h, level)
+        if found is not None:
+            placebos[name] = {"cutoff": point, **found}
     balance = {}
     for name in covariates:
         found = discontinuity(

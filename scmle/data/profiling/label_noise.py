@@ -182,27 +182,6 @@ def find_label_noise(
     )
 
 
-def label_noise_note(report: LabelNoise, rows_checked: int) -> str | None:
-    """Writes the finding text for a label-noise report.
-
-    Args:
-        report: The label-noise report.
-        rows_checked: Rows the check used.
-
-    Returns:
-        A sentence naming the flagged share, or None when the rate is below
-        `NOTE_RATE`.
-    """
-    if report.rate < NOTE_RATE:
-        return None
-    return (
-        f"label noise: {report.rate:.0%} of {rows_checked} checked rows "
-        "have a label that a model trained without them contradicts "
-        "confidently; review "
-        "before trusting scores"
-    )
-
-
 def assess_label_noise(
     features: pandas.DataFrame, labels: pandas.Series, seed: int = 0
 ) -> data.QualityObservation:
@@ -252,8 +231,16 @@ def assess_label_noise(
                 ],
             },
         )
+    note = None
+    if report.rate >= NOTE_RATE:
+        note = (
+            f"label noise: {report.rate:.0%} of {rows_checked} checked rows "
+            "have a label that a model trained without them contradicts "
+            "confidently; review "
+            "before trusting scores"
+        )
     return data.QualityObservation(
-        note=label_noise_note(report, rows_checked),
+        note=note,
         evidence=report.quality_evidence(
             input_rows, rows_checked, seed, MAX_ROWS
         ),

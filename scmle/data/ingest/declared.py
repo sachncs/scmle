@@ -172,29 +172,6 @@ def reconcile(
     }
 
 
-def source_check(
-    name: str, extract: Any, source: Any, tolerance: float
-) -> dict[str, Any]:
-    """Compares one quantity with the source's own answer.
-
-    Counts and checksums are exact (`tolerance` 0); a source total of zero is
-    compared as an absolute gap.
-
-    Args:
-        name: Name of the quantity.
-        extract: Value found in the extract.
-        source: Value the source database gave.
-        tolerance: Largest relative gap that passes.
-
-    Returns:
-        The comparison record, as `check` forms it, with the gap relative to
-        the source value.
-    """
-    gap = abs(float(extract) - float(source))
-    denominator = abs(float(source)) or 1.0
-    return check(name, extract, source, gap / denominator, tolerance)
-
-
 def source_totals(
     view: str,
     frame: pandas.DataFrame,
@@ -254,7 +231,11 @@ def source_totals(
     for name, extract in own.items():
         theirs = found.get(name, (extract, 0.0))[1]
         limit = 0.0 if name == "row_count" else tolerance
-        checks.append(source_check(f"{view}.{name}", extract, theirs, limit))
+        gap = abs(float(extract) - float(theirs))
+        denominator = abs(float(theirs)) or 1.0
+        checks.append(
+            check(f"{view}.{name}", extract, theirs, gap / denominator, limit)
+        )
     if totals.checksum_column is not None:
         column = column_of(frame, view, totals.checksum_column)
         values = source.fetch(
