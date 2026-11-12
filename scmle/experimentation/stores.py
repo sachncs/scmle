@@ -7,7 +7,7 @@ example MLflow) implement the same interface.
 """
 
 import abc
-from collections.abc import Iterator
+from collections.abc import Generator
 import contextlib
 import json
 import pathlib
@@ -283,7 +283,7 @@ class SqliteExperimentStore(ExperimentStore):
                 raise
 
     @contextlib.contextmanager
-    def session(self) -> Iterator[sqlite3.Connection]:
+    def session(self) -> Generator[sqlite3.Connection, None, None]:
         """Opens a transaction and always closes the connection.
 
         `with sqlite3.connect(...)` only commits or rolls back; it never closes,

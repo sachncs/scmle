@@ -7,6 +7,7 @@ preprocessing therefore iterate over kinds instead of branching on dtype.
 """
 
 import abc
+import importlib
 from typing import Any
 from typing import ClassVar
 
@@ -113,7 +114,9 @@ def experimental_impute() -> Any:
         An unfitted `IterativeImputer` with five iterations, a fixed random
         state and empty features kept.
     """
-    from sklearn.experimental import enable_iterative_imputer  # noqa: F401, PLC0415 -- side-effect import that enables the experimental imputer; kept lazy so it runs only when the imputer is requested
+    # Imported for its side effect (it enables the experimental imputer) and
+    # kept lazy so it runs only when the imputer is requested.
+    importlib.import_module("sklearn.experimental.enable_iterative_imputer")
 
     return impute.IterativeImputer(
         max_iter=5,

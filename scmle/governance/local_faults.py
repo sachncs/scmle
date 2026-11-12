@@ -33,6 +33,10 @@ if TYPE_CHECKING:
 
 DISK_BUDGET_BYTES = 8  # the fixed budget a disk-full payload exceeds
 MEMORY_BUDGET_BYTES = 1024  # the fixed budget the memory fault exceeds
+REQUIRED_DEPENDENCY: str = "numpy==2.3.0"  # the identity the run requires
+OBSERVED_DEPENDENCY: str = (
+    "numpy==2.4.0"  # the identity the environment reports
+)
 
 
 def reject_over_budget(payload: bytes) -> None:
@@ -623,8 +627,8 @@ class LocalFaultExecutor:
             dependency rejection and run state.
         """
         scenario = reliability.FaultScenario.DEPENDENCY_MISMATCH
-        required = "numpy==2.3.0"
-        observed = "numpy==2.4.0"
+        required = REQUIRED_DEPENDENCY
+        observed = OBSERVED_DEPENDENCY
         rejected = required != observed
         return (
             self.artifact(

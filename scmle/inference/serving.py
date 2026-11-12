@@ -77,7 +77,7 @@ class Server(abc.ABC):
             raise errors.ConfigError(
                 f"on_unseen must be in {serving.UNSEEN_POLICIES}"
             )
-        self.loaded = bundle
+        self.loaded: scmle.artifacts.bundle.Bundle | None = bundle
         self.lock = threading.Lock()
         self.on_null = on_null
         self.on_unseen = on_unseen

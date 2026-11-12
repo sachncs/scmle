@@ -8,7 +8,7 @@ stuck model answers quickly instead of queueing without limit.
 """
 
 from collections.abc import Callable
-from collections.abc import Iterator
+from collections.abc import Generator
 import concurrent.futures
 import contextlib
 import enum
@@ -178,7 +178,7 @@ class AdmissionControl:
         )
 
     @contextlib.contextmanager
-    def admit(self) -> Iterator[None]:
+    def admit(self) -> Generator[None, None, None]:
         """Takes a slot without waiting, or raises `OverloadedError`.
 
         Yields:

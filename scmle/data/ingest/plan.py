@@ -18,7 +18,6 @@ import sqlite3
 from typing import Any
 
 from scmle import durability
-from scmle.contracts import errors
 from scmle.data.ingest import grain
 from scmle.data.ingest import joins
 from scmle.data.ingest import profile
@@ -168,8 +167,6 @@ class Plan:
         }
         target = self.settings.target_table
         if self.settings.unit is not None and target in self.scans:
-            if target is None:
-                raise errors.ScmleError("target table is not set")
             self.verdict = grain.unit_verdict(
                 self.source,
                 catalog.table(target),

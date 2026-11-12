@@ -169,10 +169,7 @@ DEFAULT_METRICS: Mapping[tasks.Task, str] = {
 
 
 SUPPORTED_UNCERTAINTY: Mapping[tasks.Task, frozenset[UncertaintyMethod]] = {
-    task: frozenset({UncertaintyMethod.NONE}) for task in tasks.Task
-}
-SUPPORTED_UNCERTAINTY = {
-    **SUPPORTED_UNCERTAINTY,
+    **{task: frozenset({UncertaintyMethod.NONE}) for task in tasks.Task},
     tasks.Task.BINARY: frozenset(
         {
             UncertaintyMethod.NONE,
@@ -204,10 +201,7 @@ SUPPORTED_UNCERTAINTY = {
 
 
 SUPPORTED_CALIBRATION: Mapping[tasks.Task, frozenset[CalibrationMethod]] = {
-    task: frozenset({CalibrationMethod.NONE}) for task in tasks.Task
-}
-SUPPORTED_CALIBRATION = {
-    **SUPPORTED_CALIBRATION,
+    **{task: frozenset({CalibrationMethod.NONE}) for task in tasks.Task},
     tasks.Task.BINARY: frozenset(
         {
             CalibrationMethod.NONE,
@@ -227,10 +221,7 @@ SUPPORTED_CALIBRATION = {
 
 
 SUPPORTED_FAIRNESS: Mapping[tasks.Task, frozenset[FairnessMethod]] = {
-    task: frozenset({FairnessMethod.NONE}) for task in tasks.Task
-}
-SUPPORTED_FAIRNESS = {
-    **SUPPORTED_FAIRNESS,
+    **{task: frozenset({FairnessMethod.NONE}) for task in tasks.Task},
     tasks.Task.BINARY: frozenset(
         {
             FairnessMethod.NONE,
@@ -251,13 +242,12 @@ SUPPORTED_FAIRNESS = {
 SUPPORTED_EXPLANATIONS: Mapping[
     tasks.Task, frozenset[ExplanationAvailability]
 ] = {
-    task: frozenset(
-        {ExplanationAvailability.NONE, ExplanationAvailability.GLOBAL}
-    )
-    for task in tasks.Task
-}
-SUPPORTED_EXPLANATIONS = {
-    **SUPPORTED_EXPLANATIONS,
+    **{
+        task: frozenset(
+            {ExplanationAvailability.NONE, ExplanationAvailability.GLOBAL}
+        )
+        for task in tasks.Task
+    },
     tasks.Task.BINARY: frozenset(
         {
             ExplanationAvailability.NONE,
@@ -287,11 +277,8 @@ COMMON_DIAGNOSTICS = frozenset(
         "adversarial_validation",
     }
 )
-SUPPORTED_DIAGNOSTICS: Mapping[tasks.Task, frozenset[str]] = dict.fromkeys(
-    tasks.Task, COMMON_DIAGNOSTICS
-)
-SUPPORTED_DIAGNOSTICS = {
-    **SUPPORTED_DIAGNOSTICS,
+SUPPORTED_DIAGNOSTICS: Mapping[tasks.Task, frozenset[str]] = {
+    **dict.fromkeys(tasks.Task, COMMON_DIAGNOSTICS),
     tasks.Task.BINARY: COMMON_DIAGNOSTICS
     | frozenset(
         {
