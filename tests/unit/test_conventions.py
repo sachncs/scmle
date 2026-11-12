@@ -134,23 +134,25 @@ def test_alias_checker_detects_violations():
         "from os import path as p\n"
         "X = np.pi\n"
         "Y: TypeAlias = int | str\n"
-        "type Z = list[int]\n"
         "class K:\n"
         "    kind = X\n"
         "ok = None\n"
         "def f():\n"
         "    inner = X\n"
     )
-
-    found = [item[1] for item in aliases(ast.parse(source))]
-
-    assert sorted(found) == [
+    expected = [
         "TypeAlias annotation",
         "X = np.pi",
         "import numpy as np",
         "import path as p",
-        "type alias Z",
     ]
+    if TYPE_ALIAS_NODES:
+        source += "type Z = list[int]\n"
+        expected.append("type alias Z")
+
+    found = [item[1] for item in aliases(ast.parse(source))]
+
+    assert sorted(found) == sorted(expected)
 
 
 def test_checker_detects_violations():
