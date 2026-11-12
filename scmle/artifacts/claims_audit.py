@@ -854,7 +854,7 @@ def check_coverage_claim(
     problems = []
     try:
         claim = json.loads(claim_path.read_text(encoding="utf-8"))
-        found = coverage_run.claim_hash(claim)
+        found = scmle.data.ledger.ledger.digest(claim)
     except (OSError, ValueError, TypeError):
         claim, found = None, None
         problems.append(f"{coverage_run.CLAIM_FILE}: missing or unreadable")
@@ -970,7 +970,7 @@ def check_coverage_confirmation(
     problems = []
     claim = read_optional(run_dir / coverage_run.CLAIM_FILE)
     try:
-        claim_hash = coverage_run.claim_hash(claim or {})
+        claim_hash = scmle.data.ledger.ledger.digest(claim or {})
         choice = document["primary"]
         body = coverage_confirm.registration_body(claim_hash, choice)
         if document.get("coverage_claim_sha256") != claim_hash:

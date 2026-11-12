@@ -62,6 +62,7 @@ from scmle.data.ledger import confirm
 from scmle.data.ledger import explore
 from scmle.data.ledger import governed
 import scmle.data.ledger.budget
+import scmle.data.ledger.ledger
 from scmle.data.profiling import label_noise
 from scmle.data.profiling import profiler
 from scmle.data.profiling import representativeness
@@ -2218,7 +2219,7 @@ def build_plan(
         except capabilities.UnsupportedCapabilityError:
             if model_family not in {"custom", "test"}:
                 raise
-            if context.capability_registry.find(key) is None:
+            if context.capability_registry.records.get(key) is None:
                 context.capability_registry.register(
                     scmle.core.context.extension_capability(key)
                 )
@@ -3520,7 +3521,7 @@ class FinalEvaluationStage(Stage):
         )
         if claim is None:
             return
-        sha = coverage_run.claim_hash(claim)
+        sha = scmle.data.ledger.ledger.digest(claim)
         context.write_json(coverage_run.CLAIM_FILE, claim)
         context.coverage_claim_sha256 = sha
         vault = context.custody_vault
