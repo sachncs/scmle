@@ -997,29 +997,6 @@ def check_coverage_confirmation(
     )
 
 
-def attachment_problems(
-    run_dir: Path, attachments: dict[str, str]
-) -> list[str]:
-    """Checks that each attachment file hashes to its sealed digest.
-
-    Args:
-        run_dir: The run directory.
-        attachments: The sealed digests by file name.
-
-    Returns:
-        A message for each attachment that is missing or differs; empty if
-        all match.
-    """
-    problems = []
-    for file_name, expected in sorted(attachments.items()):
-        found = read_optional(run_dir / file_name)
-        if found is None:
-            problems.append(f"{file_name}: missing")
-        elif scmle.data.ledger.ledger.digest(found) != expected:
-            problems.append(f"{file_name}: differs from the sealed hash")
-    return problems
-
-
 def baseline_report_problems(
     run_dir: Path, ledger: scmle.data.ledger.ledger.Ledger
 ) -> list[str]:
@@ -1070,7 +1047,12 @@ def check_registered(
         stated = (sealed_row.get("claims") or {}).get(claim_id)
         if stated is None or stated.get("sha256") != item["sha256"]:
             problems.append(f"{claim_id}: registration hash differs")
-    problems.extend(attachment_problems(run_dir, attachments))
+    for file_name, expected in sorted(attachments.items()):
+        found = read_optional(run_dir / file_name)
+        if found is None:
+            problems.append(f"{file_name}: missing")
+        elif scmle.data.ledger.ledger.digest(found) != expected:
+            problems.append(f"{file_name}: differs from the sealed hash")
     if document.get("attachments") != attachments:
         problems.append("attachment hashes differ from the claims file")
     problems.extend(baseline_report_problems(run_dir, ledger))
