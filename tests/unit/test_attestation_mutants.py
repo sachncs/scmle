@@ -29,7 +29,7 @@ def test_required_text_rejects_a_blank_value_and_a_non_mapping_step():
     assert attestation.required_text({"a": {"b": "ok"}}, "a.b") == "ok"
 
 
-def _build(**changes):
+def build_record(**changes):
     fields = {
         "run_id": "r",
         "model_manifest_sha256": "m",
@@ -49,23 +49,25 @@ def test_identity_fields_must_be_non_blank_text():
         "sbom_sha256",
     ):
         with pytest.raises(ValueError, match=f"{name} must not be empty"):
-            _build(**{name: "   "})
+            build_record(**{name: "   "})
         with pytest.raises(ValueError, match=f"{name} must not be empty"):
-            _build(**{name: 7})
+            build_record(**{name: 7})
 
 
 def test_the_signature_must_be_non_blank_text_when_given():
     with pytest.raises(ValueError, match="attestation_signature"):
-        _build(attestation_signature="  ")
+        build_record(attestation_signature="  ")
     with pytest.raises(ValueError, match="attestation_signature"):
-        _build(attestation_signature=5)
-    assert _build(attestation_signature="sig").attestation_signature == "sig"
-    assert _build().attestation_signature is None
+        build_record(attestation_signature=5)
+    assert (
+        build_record(attestation_signature="sig").attestation_signature == "sig"
+    )
+    assert build_record().attestation_signature is None
 
 
 def test_a_non_bool_signature_claim_is_a_type_error():
     with pytest.raises(TypeError, match="signature_present must be bool"):
-        _build(signature_present=1)
+        build_record(signature_present=1)
 
 
 def test_from_records_message_and_signature_cover_the_unsigned_record():
@@ -86,7 +88,7 @@ def test_from_records_message_and_signature_cover_the_unsigned_record():
 
 
 def test_a_missing_signature_present_reads_as_false_and_true_is_kept():
-    base = _build(signature_present=False).to_dict()
+    base = build_record(signature_present=False).to_dict()
     del base["signature_present"]
     loaded = attestation.ReleaseAttestation.from_dict(base)
     assert loaded.signature_present is False
@@ -120,7 +122,7 @@ def test_from_dict_rejects_blank_or_missing_signature_values():
 
 
 def test_unsigned_dict_is_exactly_the_schema_one_record():
-    assert _build().unsigned_dict() == {
+    assert build_record().unsigned_dict() == {
         "schema_version": 1,
         "run_id": "r",
         "subjects": {

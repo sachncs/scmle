@@ -10,7 +10,7 @@ from scmle.data.robustness import stability
 from tests.unit.test_robustness_prefilter import run
 
 
-def _row(column, rejected):
+def make_row(column, rejected):
     return types.SimpleNamespace(
         column=column,
         statistic=1.5,
@@ -22,7 +22,11 @@ def _row(column, rejected):
 
 def test_feature_checks_put_rejected_columns_first_and_keep_their_seed_index():
     shift_result = types.SimpleNamespace(
-        features=(_row("a", False), _row("b", True), _row("c", False))
+        features=(
+            make_row("a", False),
+            make_row("b", True),
+            make_row("c", False),
+        )
     )
 
     checks = prefilter.feature_checks(shift_result, rows=40, seed=7)
@@ -49,7 +53,7 @@ def test_feature_checks_put_rejected_columns_first_and_keep_their_seed_index():
 
 
 def test_feature_checks_are_capped():
-    rows = tuple(_row(f"c{i}", False) for i in range(300))
+    rows = tuple(make_row(f"c{i}", False) for i in range(300))
     checks = prefilter.feature_checks(
         types.SimpleNamespace(features=rows), rows=1, seed=0
     )
@@ -89,7 +93,7 @@ def test_the_applied_stage_records_every_field_and_the_fragile_reason():
 
 def test_a_not_applied_note_appends_the_rule_note_in_parentheses():
     loose = stability.Thresholds(s_min=0.5, band=0.9, q_min=0.5)
-    _, stage = run(True, rule=loose)
+    stage = run(True, rule=loose)[1]
 
     found = stage.found
     assert found.rule_note and not found.store_note
