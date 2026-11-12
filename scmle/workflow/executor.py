@@ -1109,7 +1109,10 @@ class Executor:
             str(decision["decision"]),
             float(decision["at"]),
         )
-        if key is None or not signing_matches(payload, key, decision):
+        if key is None or not hmac.compare_digest(
+            signing.sign_payload(payload, key),
+            str(decision.get("signature", "")),
+        ):
             raise ApprovalError("the approval signature does not verify")
         if decision["decision"] not in ("approve", "reject"):
             raise ApprovalError("decision must be approve or reject")
@@ -1158,20 +1161,3 @@ class Executor:
             return StepState.EXPIRED
         self.save_step(run_id, step, StepState.WAITING, waiting_since=since)
         return StepState.WAITING
-
-
-def signing_matches(
-    payload: Mapping[str, Any], key: str, decision: Mapping[str, Any]
-) -> bool:
-    """Checks that the decision's signature is the payload's signature.
-
-    Args:
-        payload: The content that was signed.
-        key: The approver's key.
-        decision: The submitted decision, with its `signature`.
-
-    Returns:
-        True if the signature equals the HMAC of the payload under the key.
-    """
-    expected = signing.sign_payload(payload, key)
-    return hmac.compare_digest(expected, str(decision.get("signature", "")))

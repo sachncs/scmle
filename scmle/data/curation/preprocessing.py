@@ -391,7 +391,12 @@ def build_pipeline(
             f"monotonic constraints cannot apply: {problem}"
         )
     if plan.monotonic:
-        estimator = wrappers.monotone(
+        kind = (
+            wrappers.MonotoneClassifier
+            if base.is_classifier(estimator)
+            else wrappers.MonotoneRegressor
+        )
+        estimator = kind(
             cast("base.BaseEstimator", estimator),
             adapter.monotonic_param or "",
             monotonic_signs(plan, len(special)),

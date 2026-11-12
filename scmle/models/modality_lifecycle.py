@@ -580,52 +580,6 @@ def require_string_list(value: object, message: str) -> list[str]:
     return value
 
 
-def parse_curation_signature(signature: object) -> str:
-    """Restores the signature value of a persisted curation result.
-
-    Args:
-        signature: The result's `signature` entry.
-
-    Returns:
-        The signature value.
-
-    Raises:
-        ValueError: If the entry is not a mapping with the supported
-            algorithm and a SHA-256 string value.
-    """
-    if not isinstance(signature, Mapping):
-        raise ValueError("modality curation signature is missing")
-    if signature.get("algorithm") != signing.SIGNATURE_ALGORITHM:
-        raise ValueError("unsupported modality curation signature")
-    signature_value = signature.get("value")
-    if not isinstance(signature_value, str) or not is_sha256(signature_value):
-        raise ValueError("modality curation signature is invalid")
-    return signature_value
-
-
-def parse_checkpoint_signature(signature: object) -> str:
-    """Restores the signature value of a persisted lifecycle checkpoint.
-
-    Args:
-        signature: The checkpoint's `signature` entry.
-
-    Returns:
-        The signature value.
-
-    Raises:
-        ValueError: If the entry is not a mapping with the supported
-            algorithm and a non-blank string value.
-    """
-    if not isinstance(signature, Mapping):
-        raise ValueError("checkpoint signature is missing")
-    if signature.get("algorithm") != signing.SIGNATURE_ALGORITHM:
-        raise ValueError("unsupported lifecycle checkpoint signature")
-    signature_value = signature.get("value")
-    if not isinstance(signature_value, str) or not signature_value.strip():
-        raise ValueError("lifecycle checkpoint signature is invalid")
-    return signature_value
-
-
 @dataclasses.dataclass(frozen=True, slots=True)
 class Record:
     """All evidence emitted by one completed modality lifecycle.
@@ -1060,7 +1014,14 @@ class Checkpoint:
         status = record.get("status")
         if status not in ("running", "completed"):
             raise ValueError("checkpoint status is invalid")
-        signature_value = parse_checkpoint_signature(record.get("signature"))
+        signature = record.get("signature")
+        if not isinstance(signature, Mapping):
+            raise ValueError("checkpoint signature is missing")
+        if signature.get("algorithm") != signing.SIGNATURE_ALGORITHM:
+            raise ValueError("unsupported lifecycle checkpoint signature")
+        signature_value = signature.get("value")
+        if not isinstance(signature_value, str) or not signature_value.strip():
+            raise ValueError("lifecycle checkpoint signature is invalid")
         manifest_digest = record.get("manifest_digest")
         if manifest_digest is not None and not isinstance(manifest_digest, str):
             raise ValueError("checkpoint manifest_digest is invalid")
@@ -1286,7 +1247,16 @@ class Curation:
             dataset_card, Mapping
         ):
             raise ValueError("modality curation evidence is invalid")
-        signature_value = parse_curation_signature(record.get("signature"))
+        signature = record.get("signature")
+        if not isinstance(signature, Mapping):
+            raise ValueError("modality curation signature is missing")
+        if signature.get("algorithm") != signing.SIGNATURE_ALGORITHM:
+            raise ValueError("unsupported modality curation signature")
+        signature_value = signature.get("value")
+        if not isinstance(signature_value, str) or not is_sha256(
+            signature_value
+        ):
+            raise ValueError("modality curation signature is invalid")
         result = cls(
             modality=cast("str", modality),
             dataset_hash=cast("str", dataset_hash),

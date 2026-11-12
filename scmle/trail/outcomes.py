@@ -43,33 +43,6 @@ def optimal_threshold(costs: Mapping[str, float]) -> float:
     return false_positive / (false_positive + false_negative)
 
 
-def case_costs(
-    costs: Mapping[str, float],
-    threshold: float,
-    probability: list[float],
-    label: list[int],
-) -> list[float]:
-    """Computes the cost of each case when the rule acts at the threshold.
-
-    A `probability` and `label` of different lengths raise `ValueError`.
-
-    Args:
-        costs: The cost model with ``c_00``, ``c_01``, ``c_10``, ``c_11``
-            (first index the action, second the outcome).
-        threshold: The rule acts when the probability is at least this.
-        probability: Predicted probability of each case.
-        label: Observed outcome (0 or 1) of each case.
-
-    Returns:
-        The cost of each case, in the order given.
-    """
-    found = []
-    for p_value, outcome in zip(probability, label, strict=True):
-        action = 1 if p_value >= threshold else 0
-        found.append(float(costs[f"c_{action}{int(outcome)}"]))
-    return found
-
-
 def interval(values: list[float]) -> tuple[float, float, float]:
     """Computes the mean and a normal-approximation 95% interval.
 
@@ -118,9 +91,12 @@ def track(
     per_batch = []
     every: list[float] = []
     for batch in feed["batches"]:
-        found = case_costs(
-            costs, threshold, batch["probability"], batch["label"]
-        )
+        found = []
+        for p_value, outcome in zip(
+            batch["probability"], batch["label"], strict=True
+        ):
+            action = 1 if p_value >= threshold else 0
+            found.append(float(costs[f"c_{action}{int(outcome)}"]))
         every.extend(found)
         per_batch.append(
             {

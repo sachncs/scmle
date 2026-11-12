@@ -224,36 +224,6 @@ class RateLimiter:
             del self.buckets[name]
 
 
-def bearer_token(header: str | None) -> str | None:
-    """Extracts the token of an ``Authorization: Bearer <token>`` header.
-
-    Args:
-        header: The header value, or None.
-
-    Returns:
-        The token, or None if the header is absent, is not a bearer credential,
-        or has an empty token.
-    """
-    if header is None:
-        return None
-    scheme, separator, value = header.partition(" ")
-    if scheme.lower() != "bearer" or not separator or not value.strip():
-        return None
-    return value.strip()
-
-
-def client_key(remote: str) -> str:
-    """Derives a fixed-size key for a remote address.
-
-    Args:
-        remote: The peer address.
-
-    Returns:
-        The first 16 hex characters of its SHA-256.
-    """
-    return hashlib.sha256(remote.encode()).hexdigest()[:16]
-
-
 class Gateway:
     """Authenticates, authorizes and rate-limits requests, and audits them.
 
@@ -375,7 +345,11 @@ class Gateway:
                 mismatch, and 429 when the caller is rate-limited or the
                 client has made too many failed attempts.
         """
-        token = bearer_token(authorization)
+        token = None
+        if authorization is not None:
+            scheme, separator, value = authorization.partition(" ")
+            if scheme.lower() == "bearer" and separator and value.strip():
+                token = value.strip()
         if token is None:
             self.refuse(401, "no_credentials", remote)
         try:
@@ -406,7 +380,9 @@ class Gateway:
             DeniedError: With the given status, or with 429 if the client has
                 made too many refused attempts.
         """
-        wait = self.failure_limiter.take(client_key(remote))
+        # A fixed-size key, so the limiter never stores the raw address.
+        client = hashlib.sha256(remote.encode()).hexdigest()[:16]
+        wait = self.failure_limiter.take(client)
         if wait is not None:
             raise DeniedError(429, "too_many_failures", wait)
         raise DeniedError(status, reason)

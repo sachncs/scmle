@@ -68,23 +68,6 @@ MODEL_WRAPPERS = (
 CODES_KEY = "label_codes"
 
 
-def inner_model(step: Any) -> tuple[Any, bool]:
-    """Finds the fitted model inside the framework's model wrappers.
-
-    Args:
-        step: A fitted estimator, possibly wrapped.
-
-    Returns:
-        The innermost estimator and whether it was trained on integer codes
-        for the class labels (so its outputs must be mapped back).
-    """
-    encoded = False
-    while isinstance(step, MODEL_WRAPPERS):
-        encoded = encoded or hasattr(step, "encoder_")
-        step = step.estimator_
-    return step, encoded
-
-
 def register_booster_converters() -> None:
     """Registers LightGBM and XGBoost converters when onnxmltools exists.
 
@@ -224,24 +207,6 @@ def without_casts(model: Any) -> Any:
     return clone
 
 
-def input_types(bundle: Any, types: Any) -> list[tuple[str, Any]]:
-    """Declares the ONNX inputs: floats for numeric, strings for categorical.
-
-    Args:
-        bundle: A bundle whose schema lists the numeric and categorical
-            columns.
-        types: The `skl2onnx.common.data_types` module.
-
-    Returns:
-        One (column name, tensor type) pair per input, numeric columns first.
-    """
-    schema = bundle.schema
-    return [
-        *((c, types.FloatTensorType([None, 1])) for c in schema.numeric),
-        *((c, types.StringTensorType([None, 1])) for c in schema.categorical),
-    ]
-
-
 def export(bundle: Any, path: str | pathlib.Path) -> pathlib.Path:
     """Writes the bundle's pipeline as an ONNX file.
 
@@ -281,7 +246,11 @@ def export(bundle: Any, path: str | pathlib.Path) -> pathlib.Path:
         )
     register_booster_converters()
     fitted = without_casts(unwrap(bundle.pipeline))
-    model_step, encoded = inner_model(fitted.steps[-1][1])
+    model_step = fitted.steps[-1][1]
+    encoded = False
+    while isinstance(model_step, MODEL_WRAPPERS):
+        encoded = encoded or hasattr(model_step, "encoder_")
+        model_step = model_step.estimator_
     fitted.steps[-1] = (fitted.steps[-1][0], model_step)
     options = (
         {id(fitted.steps[-1][1]): {"zipmap": False}}
@@ -291,7 +260,16 @@ def export(bundle: Any, path: str | pathlib.Path) -> pathlib.Path:
     try:
         model = converter.convert_sklearn(
             fitted,
-            initial_types=input_types(bundle, types),
+            initial_types=[
+                *(
+                    (c, types.FloatTensorType([None, 1]))
+                    for c in bundle.schema.numeric
+                ),
+                *(
+                    (c, types.StringTensorType([None, 1]))
+                    for c in bundle.schema.categorical
+                ),
+            ],
             options=options,
             target_opset={"": OPSET, "ai.onnx.ml": ML_OPSET},
         )
