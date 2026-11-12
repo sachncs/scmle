@@ -36,7 +36,7 @@ MATRIX_DIMENSIONS = 2
 
 PillowModule: Any = None
 try:
-    from PIL import Image
+    from PIL import Image  # pyright: ignore[reportMissingImports]  # optional extra, imported lazily and guarded; not installed in the type-check environment
 except ImportError:
     pass
 else:

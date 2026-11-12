@@ -303,7 +303,7 @@ class OptunaOptimizer(Optimizer):
             raise errors.ConfigError(
                 "optimizer 'optuna' needs the 'optimization' extra"
             )
-        import optuna  # noqa: PLC0415 -- optional dependency
+        import optuna  # noqa: PLC0415 -- optional dependency  # pyright: ignore[reportMissingImports]  # optional extra, imported lazily and guarded; not installed in the type-check environment
 
         optuna.logging.set_verbosity(optuna.logging.WARNING)
         self.study = optuna.create_study(

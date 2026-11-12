@@ -102,9 +102,7 @@ dev = [
 include = ["scmle"]
 pythonVersion = "3.11"
 typeCheckingMode = "standard"
-# Errors that existed when this check was added are recorded in
-# .basedpyright/baseline.json; the check fails only on new ones.
-baselineFile = ".basedpyright/baseline.json"
+# No baseline: every error fails the check.
 
 [tool.deptry]
 [tool.deptry.package_module_name_map]

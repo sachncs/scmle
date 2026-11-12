@@ -1493,7 +1493,7 @@ class ExtensionCurator(Curator):
 class Preparer(Curator):
     """Polymorphic boundary between a dataset family and the lifecycle."""
 
-    modality: ClassVar[modalities.ModalityIdentity]
+    modality: ClassVar[modalities.ModalityIdentity]  # pyright: ignore[reportIncompatibleMethodOverride]  # each adapter sets a class attribute, which satisfies the abstract Curator.modality property
 
     @abc.abstractmethod
     def split(self, seed: int) -> DatasetPartitions:

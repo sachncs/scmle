@@ -44,8 +44,8 @@ class MlflowExperimentStore(stores.ExperimentStore):
             ConfigError: If MLflow is not installed.
         """
         try:
-            import mlflow  # noqa: PLC0415 -- optional dependency
-            from mlflow import tracking  # noqa: PLC0415 -- optional dependency
+            import mlflow  # noqa: PLC0415 -- optional dependency  # pyright: ignore[reportMissingImports]  # optional extra, imported lazily and guarded; not installed in the type-check environment
+            from mlflow import tracking  # noqa: PLC0415 -- optional dependency  # pyright: ignore[reportMissingImports]  # optional extra, imported lazily and guarded; not installed in the type-check environment
         except ImportError as error:
             raise errors.ConfigError(
                 "MlflowExperimentStore needs the 'tracking' extra (mlflow)"

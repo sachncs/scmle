@@ -130,7 +130,7 @@ class LibraryRanker(base.RegressorMixin, base.BaseEstimator):  # type: ignore[mi
             ranker for any other `library` value.
         """
         if self.library == "lightgbm":
-            import lightgbm  # noqa: PLC0415 -- optional dependency
+            import lightgbm  # noqa: PLC0415 -- optional dependency  # pyright: ignore[reportMissingImports]  # optional extra, imported lazily and guarded; not installed in the type-check environment
 
             return lightgbm.LGBMRanker(
                 objective="lambdarank",
@@ -140,7 +140,7 @@ class LibraryRanker(base.RegressorMixin, base.BaseEstimator):  # type: ignore[mi
                 n_jobs=1,
                 verbose=-1,
             )
-        import xgboost  # noqa: PLC0415 -- optional dependency
+        import xgboost  # noqa: PLC0415 -- optional dependency  # pyright: ignore[reportMissingImports]  # optional extra, imported lazily and guarded; not installed in the type-check environment
 
         return xgboost.XGBRanker(
             objective="rank:ndcg",

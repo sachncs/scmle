@@ -149,7 +149,7 @@ class HoldoutEarlyStopping(base.BaseEstimator):  # type: ignore[misc]  # scikit-
             numpy.asarray(target)[held],
         )
         if self.library == "lightgbm":
-            import lightgbm  # noqa: PLC0415 -- optional dependency
+            import lightgbm  # noqa: PLC0415 -- optional dependency  # pyright: ignore[reportMissingImports]  # optional extra, imported lazily and guarded; not installed in the type-check environment
 
             stopper = [lightgbm.early_stopping(self.rounds, verbose=False)]
             if "eval_X" in inspect.signature(self.estimator_.fit).parameters:

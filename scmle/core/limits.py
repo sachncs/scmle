@@ -113,7 +113,7 @@ def peak_memory_gb() -> float:
         not counted).
     """
     if resource is None:
-        import psutil  # noqa: PLC0415 -- Windows-only dependency
+        import psutil  # noqa: PLC0415 -- Windows-only dependency  # pyright: ignore[reportMissingModuleSource]  # psutil is a Windows-only dependency and ships no stub source here
 
         peak_wset: float = psutil.Process().memory_info().peak_wset
         return peak_wset / BYTES_PER_GB
@@ -176,7 +176,7 @@ def psutil_table() -> dict[int, tuple[int, int]]:
         A mapping from pid to (parent pid, resident bytes). Processes whose
         memory information is unavailable are omitted.
     """
-    import psutil  # noqa: PLC0415 -- Windows-only dependency
+    import psutil  # noqa: PLC0415 -- Windows-only dependency  # pyright: ignore[reportMissingModuleSource]  # psutil is a Windows-only dependency and ships no stub source here
 
     table: dict[int, tuple[int, int]] = {}
     for process in psutil.process_iter(["pid", "ppid", "memory_info"]):

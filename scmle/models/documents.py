@@ -323,7 +323,9 @@ class Classifier:
             min_df=self.config.min_df,
             token_pattern=r"(?u)\b\w\w+\b",  # noqa: S106 -- regex, not a secret  # nosec B106
         )
-        matrix = vectorizer.fit_transform([sample.content for sample in values])
+        matrix: Any = vectorizer.fit_transform(
+            [sample.content for sample in values]
+        )
         if matrix.shape[1] == 0:
             raise ValueError("training documents contain no usable tokens")
         estimator = LogisticRegression(
