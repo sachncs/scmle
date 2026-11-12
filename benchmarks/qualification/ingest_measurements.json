@@ -17,7 +17,7 @@
     "joins": "0b3d88e74def3af8765062e52439968e0107fe5c6c8a9ff6164b823c8ef096b4",
     "point_in_time": "e965dc6d0fc5cbfe7a101573a29b5d990324683af00fdc071f26780c111eaa63",
     "reconcile": "7b65d92c613a564235f9187335b734a45a49df8c10dbfb0686ff8c87970d80f2",
-    "torn_read": "8e1fbde77a90fa58b463a75369fb1925490218c439453c097179dc1cf2772ce3"
+    "torn_read": "de3ff8ee4178d4121b3fbb3495ae632ecfc579d1337115515431b8a9fb76ebae"
   },
   "development_seed_base": 10000,
   "entities": {
@@ -105,7 +105,7 @@
     "seed_offset": 0,
     "tolerance": 0.0
   },
-  "seconds": 77.0,
+  "seconds": 31.8,
   "torn_read": {
     "batch_rows": 5,
     "detected": 500,
