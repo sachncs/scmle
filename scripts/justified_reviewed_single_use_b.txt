@@ -22,15 +22,3 @@ scmle/evaluation/sequential.py ordered_subjects single-use name states the inten
 scmle/evaluation/sequential.py require_distinct_neighbours single-use name states the intent of a short check; inlining would duplicate its docstring contract
 scmle/governance/lifecycle.py read_run_config single-use name states the intent of a short check; inlining would duplicate its docstring contract
 scmle/governance/release_state.py require_previous single-use name states the intent of a short check; inlining would duplicate its docstring contract
-scmle/governance/sbom.py component_ref single-use name states the intent of a short check; inlining would duplicate its docstring contract
-scmle/inference/onnx_export.py inner_model single-use name states the intent of a short check; inlining would duplicate its docstring contract
-scmle/inference/onnx_export.py input_types single-use name states the intent of a short check; inlining would duplicate its docstring contract
-scmle/models/conformance.py check_estimator_interface single-use name states the intent of a short check; inlining would duplicate its docstring contract
-scmle/models/modality_lifecycle.py check_run_option_types single-use name states the intent of a short check; inlining would duplicate its docstring contract
-scmle/operations/metrics.py cpu_seconds single-use name states the intent of a short check; inlining would duplicate its docstring contract
-scmle/runners/entrypoint.py require_started_spec single-use name states the intent of a short check; inlining would duplicate its docstring contract
-scmle/security/access.py bearer_token single-use name states the intent of a short check; inlining would duplicate its docstring contract
-scmle/security/access.py client_key single-use name states the intent of a short check; inlining would duplicate its docstring contract
-scmle/security/tokens.py require_number single-use name states the intent of a short check; inlining would duplicate its docstring contract
-scmle/trail/outcomes.py case_costs single-use name states the intent of a short check; inlining would duplicate its docstring contract
-scmle/workflow/executor.py signing_matches single-use name states the intent of a short check; inlining would duplicate its docstring contract
