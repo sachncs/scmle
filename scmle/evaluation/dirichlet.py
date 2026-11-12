@@ -48,7 +48,7 @@ class DirichletCalibrator(base.BaseEstimator, base.ClassifierMixin):  # type: ig
             clipped to `[FLOOR, 1]` first; shape `(rows, classes)`.
         """
         probabilities = numpy.asarray(self.estimator.predict_proba(features))
-        return numpy.log(numpy.clip(probabilities, FLOOR, 1.0))
+        return numpy.asarray(numpy.log(numpy.clip(probabilities, FLOOR, 1.0)))
 
     def fit(self, features: Any, labels: Any) -> Self:
         """Fits a multinomial logistic map on the wrapped log-probabilities.

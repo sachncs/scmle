@@ -204,4 +204,4 @@ class AsinhTarget(base.TransformerMixin, base.BaseEstimator):  # type: ignore[mi
         clipped = numpy.clip(
             numpy.asarray(target, dtype=float), -self.LIMIT, self.LIMIT
         )
-        return numpy.sinh(clipped) * self.scale_
+        return numpy.asarray(numpy.sinh(clipped) * self.scale_)

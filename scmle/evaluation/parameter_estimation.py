@@ -4429,7 +4429,7 @@ def covariance_matrix(
         adjusted = residuals / numpy.maximum(1.0 - leverage, 1e-12)
     if covariance == "hc3":
         scores = design * adjusted[:, None]
-        return bread @ (scores.T @ scores) @ bread
+        return numpy.asarray(bread @ (scores.T @ scores) @ bread)
     if clusters is None:
         raise ValueError("cluster labels are required")
     adjusted = residuals

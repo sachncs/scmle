@@ -154,4 +154,4 @@ class PairwiseInteraction(diagnostics.Diagnostic):
         probabilities = numpy.asarray(inputs.estimator.predict_proba(frame))
         if inputs.task in diagnostics.BINARY_ONLY:
             return probabilities[:, 1]
-        return probabilities.max(axis=1)
+        return numpy.asarray(probabilities.max(axis=1))
