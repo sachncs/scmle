@@ -16,7 +16,7 @@ Supervision applies when `Resources.enforcement` is `hard` (the default);
 """
 
 from collections.abc import Callable
-from collections.abc import Iterator
+from collections.abc import Generator
 import contextlib
 import dataclasses
 import importlib
@@ -68,7 +68,7 @@ ENVIRONMENT_SAVED: list[str | None] = [None]
 
 
 @contextlib.contextmanager
-def forkserver_environment() -> Iterator[None]:
+def forkserver_environment() -> Generator[None, None, None]:
     """Starts the forkserver with a fork-safe BLAS configuration.
 
     On macOS the Accelerate library parallelises large matrix products with

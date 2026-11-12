@@ -509,8 +509,7 @@ class SigningKeyRegistry:
         return {
             "schema_version": 1,
             "keys": [
-                record.to_dict()
-                for key, record in sorted(dict(self.records).items())
+                self.records[key].to_dict() for key in sorted(self.records)
             ],
         }
 

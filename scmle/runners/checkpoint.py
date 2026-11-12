@@ -138,7 +138,7 @@ class CheckpointStore:
             JSON, a different step, or a digest that does not match).
         """
         try:
-            data, ignored = self.store.get(self.key(step))
+            data = self.store.get(self.key(step))[0]
             document = json.loads(data)
             if document["step"] != step or document["sha256"] != content_digest(
                 step, document["state"]

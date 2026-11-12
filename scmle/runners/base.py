@@ -618,7 +618,7 @@ class Runner(abc.ABC):
             The stored manifest, or None if the run has none.
         """
         try:
-            data, ignored = self.store.get(self.manifest_key(run_id))
+            data = self.store.get(self.manifest_key(run_id))[0]
         except objectstore.NotFoundError:
             return None
         return RunManifest.from_dict(json.loads(data))
@@ -643,7 +643,7 @@ class Runner(abc.ABC):
         try:
             self.store.put(self.spec_key(spec.run_id), body, if_absent=True)
         except objectstore.AlreadyExistsError:
-            stored, ignored = self.store.get(self.spec_key(spec.run_id))
+            stored = self.store.get(self.spec_key(spec.run_id))[0]
             if stored != body:
                 raise RunConflictError(
                     f"run {spec.run_id} exists with a different spec"
@@ -779,7 +779,9 @@ class Runner(abc.ABC):
             a `CANCELLED` status with the reason `cancel requested`.
         """
         status = self.poll(handle)
-        for ignored in range(5):
+        remaining = 5
+        while remaining > 0:
+            remaining -= 1
             if status.state in TERMINAL:
                 return status
             self.clock.sleep(self.poll_seconds)
@@ -809,7 +811,7 @@ class Runner(abc.ABC):
         ]
         if state is RunState.SUCCEEDED:
             try:
-                ignored, meta = self.store.get(self.result_key(spec.run_id))
+                meta = self.store.get(self.result_key(spec.run_id))[1]
             except objectstore.NotFoundError:
                 state = RunState.FAILED
                 manifest.attempts[-1].reason = "job ended without a result"

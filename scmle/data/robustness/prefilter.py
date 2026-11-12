@@ -182,7 +182,7 @@ class StabilityStage:
             by_name = {f.name: f for f in found.findings}
             for hypothesis in survivors:
                 name = hypothesis.spec.column
-                if name in fragile and name is not None:
+                if name in fragile:
                     reasons[hypothesis.hypothesis_id] = (
                         f"fragile across the declared grid: "
                         f"{by_name[name].reason}"

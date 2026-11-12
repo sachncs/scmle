@@ -514,10 +514,10 @@ class DecisionBudget:
                 raise ValueError(f"{name} must be strictly between 0 and 1")
         if self.horizon is not None:
             qualification.count(self.horizon, "horizon", minimum=1)
-        ids = [name for name, ignored in self.assigned]
+        ids = [pair[0] for pair in self.assigned]
         if len(set(ids)) != len(ids):
             raise ValueError("duplicate experiment id in assigned")
-        if any(level <= 0 for ignored, level in self.assigned):
+        if any(pair[1] <= 0 for pair in self.assigned):
             raise ValueError("assigned levels must be positive")
         if self.spent > self.alpha_promote:
             raise ValueError("assigned levels exceed alpha_promote")
@@ -554,7 +554,7 @@ class DecisionBudget:
     @property
     def spent(self) -> Fraction:
         """The sum of the assigned promotion levels."""
-        return sum((level for ignored, level in self.assigned), Fraction(0))
+        return sum((pair[1] for pair in self.assigned), Fraction(0))
 
     @property
     def remaining(self) -> Fraction:
@@ -629,7 +629,7 @@ def assign_experiment(
             `alpha_promote`, or the horizon is used up.
     """
     evidence.require_text(experiment_id, "experiment_id")
-    if any(name == experiment_id for name, ignored in budget.assigned):
+    if any(pair[0] == experiment_id for pair in budget.assigned):
         raise ValueError(f"experiment {experiment_id} already has a level")
     if level is None:
         gamma = discount_weight(len(budget.assigned) + 1, budget.horizon)

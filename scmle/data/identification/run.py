@@ -1279,7 +1279,7 @@ def assemble(
         "sensitivity_report.json": sens,
     }
     hashes = {k: digest(v) for k, v in documents.items()}
-    claims = {
+    claims: dict[str, Any] = {
         "status": decision.status,
         "strategy": strategy or None,
         "estimand": spec.estimand,

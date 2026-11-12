@@ -6,7 +6,9 @@ first cross-validation fold). Only the best fraction advances to full
 cross-validation; the rest are recorded as pruned.
 """
 
+import itertools
 import math
+import operator
 
 from scmle.contracts import experiments
 import scmle.core.context
@@ -190,7 +192,9 @@ class Tuner:
             size: Number of configurations to propose.
             rungs: Fold counts of the rungs, ending in `None` for all folds.
         """
-        proposals = [optimizer.ask() for count in range(size)]
+        proposals = list(
+            map(operator.call, itertools.repeat(optimizer.ask, size))
+        )
         ids = self.context.allocate_trial_ids(len(proposals))
         current = self.runner.run_many(
             [
@@ -253,7 +257,9 @@ class Tuner:
         """
         multi_fold = len(self.runner.folds) > 1
         rung_folds = 1 if multi_fold else None
-        proposals = [optimizer.ask() for count in range(size)]
+        proposals = list(
+            map(operator.call, itertools.repeat(optimizer.ask, size))
+        )
         ids = self.context.allocate_trial_ids(len(proposals))
         first_rung = self.runner.run_many(
             [

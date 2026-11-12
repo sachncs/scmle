@@ -433,7 +433,7 @@ class Predictor:
             feature names and model digest, plus the lifecycle report digest and
             flag if a report was checked.
         """
-        health = {
+        health: dict[str, object] = {
             "package_verified": True,
             "modality": modalities.modality_value(self.adapter.modality),
             "training_dataset_hash": self.training_dataset_hash,

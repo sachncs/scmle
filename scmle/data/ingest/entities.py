@@ -339,8 +339,10 @@ def fit_em(
         for col in range(fields):
             seen = levels[:, col] != MISSING
             level = numpy.where(seen, levels[:, col], 0)
-            log_m += numpy.where(seen, numpy.log(m[col][level]), 0.0)
-            log_u += numpy.where(seen, numpy.log(u[col][level]), 0.0)
+            match_rates = m[col][level]
+            other_rates = u[col][level]
+            log_m += numpy.where(seen, numpy.log(match_rates), 0.0)
+            log_u += numpy.where(seen, numpy.log(other_rates), 0.0)
         top = numpy.maximum(log_m, log_u)
         gamma = numpy.exp(log_m - top) / (
             numpy.exp(log_m - top) + numpy.exp(log_u - top)

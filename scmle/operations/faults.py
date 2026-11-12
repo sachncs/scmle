@@ -496,7 +496,9 @@ def process_kill() -> recovery.Outcome:
         service = export_service(base / "service", golden_spec())
         times = []
         same = []
-        for ignored in range(3):
+        remaining = 3
+        while remaining > 0:
+            remaining -= 1
             first = fleet.start(service)
             if ready_after(first) is None:
                 raise errors.ScmleError("the service did not become ready")

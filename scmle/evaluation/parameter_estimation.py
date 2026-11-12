@@ -499,7 +499,7 @@ class Config:
             if (
                 len(self.causal_assumptions)
                 != len(set(self.causal_assumptions))
-                or set(self.causal_assumptions)
+                or frozenset(self.causal_assumptions)
                 != REQUIRED_BAYESIAN_ATE_ASSUMPTIONS
             ):
                 raise ValueError(
@@ -537,7 +537,7 @@ class Config:
             if (
                 len(self.continuous_treatment_assumptions)
                 != len(set(self.continuous_treatment_assumptions))
-                or set(self.continuous_treatment_assumptions)
+                or frozenset(self.continuous_treatment_assumptions)
                 != REQUIRED_CONTINUOUS_TREATMENT_ASSUMPTIONS
             ):
                 raise ValueError(
@@ -549,7 +549,7 @@ class Config:
                 )
         elif (
             len(self.causal_assumptions) != len(set(self.causal_assumptions))
-            or set(self.causal_assumptions) != REQUIRED_CAUSAL_ASSUMPTIONS
+            or frozenset(self.causal_assumptions) != REQUIRED_CAUSAL_ASSUMPTIONS
         ):
             raise ValueError(
                 f"{self.estimator} requires consistency, "
@@ -582,7 +582,7 @@ class Config:
         if (
             len(self.hierarchical_assumptions)
             != len(set(self.hierarchical_assumptions))
-            or set(self.hierarchical_assumptions)
+            or frozenset(self.hierarchical_assumptions)
             != required_hierarchical_assumptions
         ):
             raise ValueError(

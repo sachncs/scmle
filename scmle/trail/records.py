@@ -193,7 +193,8 @@ def resolve(directory: Path, spec: str, derived: Mapping[str, Any]) -> Any:
         the document raises `KeyError` (see `lookup` for the list-index
         errors) and a missing file raises `FileNotFoundError`.
     """
-    name, ignored, dotted = spec.partition("#")
+    parts = spec.partition("#")
+    name, dotted = parts[0], parts[2]
     if name in derived:
         document = derived[name]
     else:

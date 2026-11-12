@@ -117,7 +117,7 @@ class WorkdirSync:
             relative = meta.key.removeprefix(self.prefix)
             target = self.directory / relative
             target.parent.mkdir(parents=True, exist_ok=True)
-            data, ignored = self.store.get(meta.key)
+            data = self.store.get(meta.key)[0]
             target.write_bytes(data)
             self.uploaded[relative] = meta.sha256
             count += 1
@@ -219,7 +219,7 @@ def run_project(
     try:
         data_path = root / "data" / pathlib.Path(str(spec["data"])).name
         data_path.parent.mkdir(parents=True)
-        content, ignored = context.store.get(str(spec["data"]))
+        content = context.store.get(str(spec["data"]))[0]
         data_path.write_bytes(content)
         workdir = root / "runs"
         workdir.mkdir()

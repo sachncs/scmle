@@ -285,9 +285,7 @@ class IncrementalProcessor:
             The stored checkpoint, or an empty one if none exists yet.
         """
         try:
-            data, ignored = self.retrying(
-                lambda: self.store.get(self.state_key)
-            )
+            data = self.retrying(lambda: self.store.get(self.state_key))[0]
         except objectstore.NotFoundError:
             return Checkpoint()
         return Checkpoint.from_bytes(data)

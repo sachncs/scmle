@@ -9,8 +9,8 @@ events through ``EventSource``.
 
 import abc
 from collections.abc import Callable
+from collections.abc import Generator
 from collections.abc import Iterable
-from collections.abc import Iterator
 from collections.abc import Mapping
 import contextlib
 import dataclasses
@@ -945,7 +945,7 @@ class IngestionLedger:
         return self.path.with_name(f"{self.path.name}.ack")
 
     @contextlib.contextmanager
-    def lock(self) -> Iterator[None]:
+    def lock(self) -> Generator[None, None, None]:
         """Serializes ledger writers with the platform's advisory file lock.
 
         Yields:

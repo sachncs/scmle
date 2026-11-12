@@ -99,7 +99,7 @@ class Scheduler:
             The slot time in epoch seconds, or None if none has been dealt with.
         """
         try:
-            data, ignored = self.store.get(self.key)
+            data = self.store.get(self.key)[0]
         except objectstore.NotFoundError:
             return None
         value = json.loads(data)["last_slot"]
@@ -175,7 +175,7 @@ class Scheduler:
                 deferred.append(slot)
                 break
             ran.append((slot, record["state"]))
-        progressed = [s for s, ignored in ran]
+        progressed = [pair[0] for pair in ran]
         if slots and not deferred:
             self.save(slots[-1], {"ran": progressed, "missed": missed})
         elif progressed or missed:

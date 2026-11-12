@@ -42,7 +42,9 @@ certificate passes, a `fragile` verdict is a warning, not a quarantine.
 from collections.abc import Callable
 from collections.abc import Sequence
 import dataclasses
+import itertools
 import math
+import operator
 import sys
 from typing import Any
 
@@ -350,7 +352,12 @@ def estimate_spec(
     rng = randomness.component_rng(
         seed, f"f6.stability.{finding}.{spec.sha256}", 0
     )
-    picks = [resample(rows, strata, rng) for index in range(bootstrap)]
+    picks = list(
+        map(
+            operator.call,
+            itertools.repeat(lambda: resample(rows, strata, rng), bootstrap),
+        )
+    )
     values = [
         rank_effect(*prepare(x[pick], y[pick], pick, rows, spec))
         for pick in picks
@@ -577,12 +584,19 @@ def curve_test(
     qualification.count(permutations, "permutations", minimum=1)
     median, share = curve_statistics(x, y, grid)
     rng = randomness.component_rng(seed, f"f6.curve.{finding}", 0)
-    curves = [
-        curve_statistics(x, controls.permute_within(y, strata, rng), grid)
-        for index in range(permutations)
-    ]
-    medians = [m for m, share in curves]
-    shares = [share for m, share in curves]
+    curves = list(
+        map(
+            operator.call,
+            itertools.repeat(
+                lambda: curve_statistics(
+                    x, controls.permute_within(y, strata, rng), grid
+                ),
+                permutations,
+            ),
+        )
+    )
+    medians = [curve[0] for curve in curves]
+    shares = [curve[1] for curve in curves]
     return CurveTest(
         permutations,
         median,

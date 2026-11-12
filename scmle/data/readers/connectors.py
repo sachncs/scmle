@@ -10,7 +10,7 @@ cloud SDK import.
 import abc
 import base64
 from collections.abc import Callable
-from collections.abc import Iterator
+from collections.abc import Generator
 from collections.abc import Mapping
 from collections.abc import Sequence
 import contextlib
@@ -1093,7 +1093,7 @@ class DbApiConnector(SourceConnector):
         )
 
     @contextlib.contextmanager
-    def session(self, sql: str) -> Iterator[Any]:
+    def session(self, sql: str) -> Generator[Any, None, None]:
         """Opens a connection and executes ``sql`` on a cursor.
 
         The cursor and connection are closed on exit, ignoring errors from

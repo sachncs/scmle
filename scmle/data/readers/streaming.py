@@ -9,6 +9,7 @@ position, so the sample does not depend on the batch size.
 
 import abc
 from collections.abc import Callable
+from collections.abc import Generator
 from collections.abc import Iterator
 from collections.abc import Mapping
 import contextlib
@@ -1003,7 +1004,7 @@ class CommitLedger:
         return self.path.with_name(f"{self.path.name}.ack")
 
     @contextlib.contextmanager
-    def lock(self) -> Iterator[None]:
+    def lock(self) -> Generator[None, None, None]:
         """Serializes state transitions with an advisory file lock.
 
         Yields:

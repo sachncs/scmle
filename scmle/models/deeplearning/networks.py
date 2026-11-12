@@ -134,7 +134,7 @@ class Network(models.Model):
             raise errors.ConfigError(
                 f"{self.name}: install the 'deeplearning' extra (torch)"
             )
-        settings = {
+        settings: dict[str, Any] = {
             "architecture": self.architecture,
             "random_state": seed,
             **(params or {}),
@@ -427,7 +427,7 @@ class KerasMlp(Network):
             raise errors.ConfigError(
                 f"{self.name}: install the 'deeplearning' extra (torch, keras)"
             )
-        settings = {"random_state": seed, **(params or {})}
+        settings: dict[str, Any] = {"random_state": seed, **(params or {})}
         if task.is_classification:
             return estimators.KerasClassifier(**settings)
         return estimators.KerasRegressor(**settings)
@@ -514,7 +514,7 @@ class TabPfn(models.Model):
             raise errors.ConfigError(
                 f"{self.name}: install the 'tabpfn' extra (tabpfn)"
             )
-        settings = {"random_state": seed, **(params or {})}
+        settings: dict[str, Any] = {"random_state": seed, **(params or {})}
         if task.is_classification:
             return estimators.TabPfnClassifier(**settings)
         return estimators.TabPfnRegressor(**settings)

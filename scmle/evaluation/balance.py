@@ -18,6 +18,8 @@ assignment was randomized. Balance on observed covariates says nothing about
 unobserved ones.
 """
 
+import itertools
+import operator
 from typing import Any
 
 import numpy
@@ -107,7 +109,12 @@ def balance_test(
 
     observed = float(statistic(arm.astype(float)[None, :])[0])
     draws = numpy.stack(
-        [rng.permutation(arm) for ignored in range(permutations)]
+        list(
+            map(
+                operator.call,
+                itertools.repeat(lambda: rng.permutation(arm), permutations),
+            )
+        )
     )
     null = statistic(draws.astype(float))
     p_value = float((1 + numpy.sum(null >= observed)) / (permutations + 1))

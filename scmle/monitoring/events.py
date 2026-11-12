@@ -8,7 +8,9 @@ rather than silently dropped, so performance estimates know their coverage.
 import dataclasses
 import datetime
 import hashlib
+import itertools
 import json
+import operator
 import os
 import pathlib
 import tempfile
@@ -154,7 +156,12 @@ class PredictionLog:
         started = time.perf_counter()
         if event_ids is not None and len(event_ids) != len(data):
             raise ValueError("event_ids must have one id per input row")
-        ids = event_ids or [uuid.uuid4().hex for row in range(len(data))]
+        ids = event_ids or list(
+            map(
+                operator.call,
+                itertools.repeat(lambda: uuid.uuid4().hex, len(data)),
+            )
+        )
         try:
             frame = bundle.prepare_frame(data)
             predictions = bundle.predict(data)

@@ -8,6 +8,8 @@ build on the same base class in `scmle.explainability`.
 
 import abc
 import dataclasses
+import itertools
+import operator
 import time
 from typing import Any
 from typing import cast
@@ -632,10 +634,17 @@ class MetricUncertainty(Diagnostic):
             if inputs.temporal
             else "rows"
         )
-        draws = [
-            resample_rows(len(target), groups, inputs.temporal, rng)
-            for count in range(self.resample_count(len(target)))
-        ]
+        draws = list(
+            map(
+                operator.call,
+                itertools.repeat(
+                    lambda: resample_rows(
+                        len(target), groups, inputs.temporal, rng
+                    ),
+                    self.resample_count(len(target)),
+                ),
+            )
+        )
         for rows in draws:
             try:
                 scores.append(

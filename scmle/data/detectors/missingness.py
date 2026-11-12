@@ -29,6 +29,8 @@ sampled and the sampling cap is recorded.
 from collections.abc import Callable
 from collections.abc import Sequence
 import dataclasses
+import itertools
+import operator
 from typing import Any
 
 import numpy
@@ -487,7 +489,12 @@ def indicator_model_test(
     target = flag.astype(float)
     observed = auc_from_ranks(oof_linear_scores(design, target, parts), flag)
     beaten = 0
-    shuffles = [rng.permutation(flag) for count in range(permutations)]
+    shuffles = list(
+        map(
+            operator.call,
+            itertools.repeat(lambda: rng.permutation(flag), permutations),
+        )
+    )
     for shuffled in shuffles:
         null = auc_from_ranks(
             oof_linear_scores(design, shuffled.astype(float), parts), shuffled

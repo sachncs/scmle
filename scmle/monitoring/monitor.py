@@ -364,8 +364,8 @@ def advise(
     ]
     if not fired:
         return Recommendation("none", [])
-    action = max((a for a, r in fired), key=order.__getitem__)
-    return Recommendation(action, [reason for a, reason in fired])
+    action = max((pair[0] for pair in fired), key=order.__getitem__)
+    return Recommendation(action, [pair[1] for pair in fired])
 
 
 class ModelMonitor:

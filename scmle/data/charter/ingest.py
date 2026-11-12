@@ -479,7 +479,7 @@ class Ingestion:
         Returns:
             The rebuilt block.
         """
-        values = {"entity": None, "reconcile": None, **record}
+        values: dict[str, Any] = {"entity": None, "reconcile": None, **record}
         qualification.require_fields(cls, values)
         values["windows"] = tuple(values["windows"])
         block = values["entity"]

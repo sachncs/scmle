@@ -32,7 +32,9 @@ passes, decisions are demoted to warnings.
 
 import dataclasses
 import enum
+import itertools
 import math
+import operator
 import sys
 from typing import Any
 
@@ -264,12 +266,17 @@ def c2st(
     observed = float(metrics.roc_auc_score(held, scores))
     labels = None if strata is None else numpy.asarray(strata)[test]
     null = numpy.array(
-        [
-            metrics.roc_auc_score(
-                controls.permute_within(held, labels, rng), scores
+        list(
+            map(
+                operator.call,
+                itertools.repeat(
+                    lambda: metrics.roc_auc_score(
+                        controls.permute_within(held, labels, rng), scores
+                    ),
+                    permutations,
+                ),
             )
-            for draw in range(permutations)
-        ]
+        )
     )
     p_value = permutation_p_value(observed, null)
     auc, interval = auc_delong(scores, held)
@@ -465,10 +472,15 @@ def mmd_test(
     for start in range(0, permutations, CHUNK):
         stop = min(start + CHUNK, permutations)
         block = numpy.column_stack(
-            [
-                controls.permute_within(indicator, labels, rng)
-                for draw in range(start, stop)
-            ]
+            list(
+                map(
+                    operator.call,
+                    itertools.repeat(
+                        lambda: controls.permute_within(indicator, labels, rng),
+                        stop - start,
+                    ),
+                )
+            )
         )
         null[start:stop] = mmd_statistics(kernel, block)
     p_value = permutation_p_value(observed, null)
